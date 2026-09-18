@@ -15,6 +15,7 @@
 // normalizeCostSummaryToCurrency was not moved and stays on BOMItemsService.
 import { BOMItemsService } from '../../../modules/bom-items/bom-items.service';
 import { RateResolutionService } from '../../../modules/bom-items/services/rate-resolution.service';
+import { type MaterialResolutionService } from '../../../modules/bom-items/services/material-resolution.service';
 import { type CalculatorCatalogService } from '../../../modules/bom-items/services/calculator-catalog.service';
 import { type BlankOptimizerService } from '../../../modules/bom-items/costing/sheet-metal/machine/blank-optimizer.service';
 import { type SheetMetalLookupService } from '../../../modules/bom-items/costing/sheet-metal/lookup/sheet-metal-lookup.service';
@@ -82,6 +83,7 @@ function buildService(supabaseService: SupabaseService, identities: Record<strin
     {} as unknown as CADAnalysisService,
     {} as unknown as RateResolutionService,
     {} as unknown as CalculatorCatalogService,
+    {} as unknown as MaterialResolutionService,
   );
 
   return { rateResolutionService, bomItemsService };

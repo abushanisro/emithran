@@ -6,7 +6,7 @@ import type { MHRRateInput, LhrRateSource } from '../costing/shared/core/cost-en
 import {
   MACHINE_REGISTRY, LOCATION_INFO,
   type RateWarnThresholds, DEFAULT_RATE_WARN_THRESHOLDS,
-  lhrRateWarning,
+  lhrRateWarning, classifyInspectionResource, DEFAULT_COSTING_LOCATION,
 } from '../costing/shared/core/default-rates.constants';
 import type { MachineClass } from '../costing/shared/core/default-rates.constants';
 import { decideBenchmarkOverride } from '../costing/shared/core/engine-kernel';
@@ -15,6 +15,7 @@ import { EMPTY_CAPABILITY, MACHINE_CLASS_DEFAULTS } from '../costing/shared/capa
 import type { MachineRequirement } from '../costing/shared/capability/machine-selection/physics';
 import type { MachineCandidate, MachineRecommendation, MachineSelectionResult } from '../dto/machine-selection.dto';
 import type { RateSnapshot } from '../../../common/exchange-rate/exchange-rate.service';
+import { cachedRead } from '../costing/shared/core/request-cache';
 
 /**
  * Every machine class an MHR (machine-hour rate) is resolved for, in one pass.
@@ -1085,6 +1086,297 @@ export class RateResolutionService {
     } catch (err: any) {
       this.logger.warn(`resolveProcessIdentities failed: ${err.message}`, 'BOMItemsService');
       return {};
+    }
+  }
+
+  // User overrides: processKey (machine class) → forced mhr_records.id.
+  // Scoped by Digital Factory location — an override recorded for India must
+  // never force its machine (or its ₹ rate) into a USA/China/Germany costing.
+  async fetchMachineOverrides(
+    bomItemId: string,
+    accessToken: string,
+    location: string,
+  ): Promise<Map<string, string>> {
+    const overrides = new Map<string, string>();
+    const client = this.supabaseService.getClient(accessToken);
+    try {
+      let { data, error } = await client
+        .from('bom_item_machine_overrides')
+        .select('process_key, mhr_record_id')
+        .eq('bom_item_id', bomItemId)
+        .eq('location', location);
+      if (error && /column|schema cache/i.test(error.message)) {
+        // Migration 329 pending — location column absent. Pre-329 overrides are
+        // unscoped; only honour them for the default location rather than let a
+        // stale pick leak into every country (the exact bug 329 fixes).
+        if (location !== DEFAULT_COSTING_LOCATION) return overrides;
+        ({ data, error } = await client
+          .from('bom_item_machine_overrides')
+          .select('process_key, mhr_record_id')
+          .eq('bom_item_id', bomItemId));
+      }
+      if (error) return overrides;
+      for (const row of data ?? []) {
+        if (row.process_key && row.mhr_record_id) overrides.set(row.process_key, row.mhr_record_id);
+      }
+    } catch {
+      // Table missing (migration 326 pending) — no overrides
+    }
+    return overrides;
+  }
+
+  // eMithran-style manual overrides: field_key = 'mat_rate' | '<process>::rate' |
+  // '<process>::cycleMin'. Scoped by location for the same reason as machine
+  // overrides — an India rate override must not silently apply after switching
+  // the Digital Factory to USA.
+  async fetchCostOverrides(
+    bomItemId: string,
+    accessToken: string,
+    location: string,
+  ): Promise<Map<string, number>> {
+    const overrides = new Map<string, number>();
+    try {
+      const { data, error } = await this.supabaseService
+        .getClient(accessToken)
+        .from('bom_item_cost_overrides')
+        .select('field_key, value')
+        .eq('bom_item_id', bomItemId)
+        .eq('location', location);
+      if (error) return overrides;
+      for (const row of data ?? []) {
+        const v = Number(row.value);
+        if (row.field_key && Number.isFinite(v)) overrides.set(row.field_key, v);
+      }
+    } catch {
+      // Table missing (migration 330 pending) — no overrides
+    }
+    return overrides;
+  }
+
+  /**
+   * Resolves a real, CMM-specific machine rate for inspection lines that
+   * escalate to the 'cmm' InspectionMethod — separate from resolveMHRRates'
+   * own `inspection` field (which resolves whatever single 'cmm'-class
+   * machine the tenant's pool scores best, e.g. a cheap manual inspection
+   * bench — correct for the visual/caliper/height_gauge tiers, but wrong for
+   * an actual CMM-tier check, which needs a dedicated, meaningfully more
+   * expensive CMM machine, not a bench charged at bench rates).
+   *
+   * Real → benchmark → generic-inspection-rate fallback, same 3-pass
+   * convention as resolveMHRRates' own get(), just filtered to machine names
+   * that actually indicate CMM equipment rather than every 'cmm'-class row
+   * (which in this schema also covers inspection benches/gauges — see
+   * default-rates.ts's cmm keyword registry).
+   */
+  async resolveCmmSpecificRate(
+    accessToken: string,
+    location: string,
+    rates: RateSnapshot,
+    warnings: string[],
+  ): Promise<MHRRateInput> {
+    const client = this.supabaseService.getClient(accessToken);
+
+    try {
+      // Shared with the sibling inspection-rate resolver, which reads the same
+      // cmm pool and differs only in its in-memory CMM/non-CMM filter.
+      const realRows = await cachedRead(`mhr:cmm:${location}`, async () => {
+        const { data } = await client
+          .from('mhr_records')
+          .select('id, machine_name, machine_class, total_machine_hour_rate, manual_mhr_value, is_manual_entry, commodity_code, setup_time_hr')
+          .eq('machine_class', 'cmm')
+          .eq('location', location);
+        return data;
+      });
+      const realCmm = (realRows ?? [])
+        .filter((r: any) => classifyInspectionResource(r.machine_class, r.machine_name) === 'CMM')
+        .map((r: any) => ({
+          id: r.id as string,
+          machineName: r.machine_name as string,
+          rate: Number(r.is_manual_entry ? r.manual_mhr_value : r.total_machine_hour_rate) || 0,
+          commodityCode: r.commodity_code ?? null,
+          // Real per-CMM program/fixture/datum-alignment setup time, when
+          // staged — was selected nowhere in this resolver before, so a real
+          // CMM's own setup_time_hr was unreachable even when present. See
+          // finalizeInspectionLine's CMM setup fix (inspection-engine.ts).
+          setupTimeHr: r.setup_time_hr != null ? Number(r.setup_time_hr) || null : null,
+        }))
+        .filter((r) => r.rate > 0)
+        .sort((a, b) => a.rate - b.rate)[0];
+      if (realCmm) {
+        return {
+          rate: realCmm.rate, source: 'mhr_database', machineClass: 'cmm',
+          machineName: realCmm.machineName, commodityCode: realCmm.commodityCode,
+          mhrRecordId: realCmm.id, setupTimeHr: realCmm.setupTimeHr,
+        };
+      }
+
+      const benchRows = await cachedRead(`mhr-benchmark:${location}`, async () => {
+        const { data } = await client
+          .from('mhr_benchmark_rates')
+          .select('id, machine_name, mhr_usd, process_group, machine_class')
+          .eq('location', location);
+        return data;
+      });
+      const localCurrencyCode = (LOCATION_INFO[location] ?? LOCATION_INFO['Other']).code;
+      const qualityPgKws = MACHINE_REGISTRY.cmm.processGroupKeywords;
+      const cmmBench = (benchRows ?? [])
+        .filter((r: any) =>
+          classifyInspectionResource(r.machine_class, r.machine_name) === 'CMM' && Number(r.mhr_usd ?? 0) > 0 &&
+          qualityPgKws.some((kw) => (r.process_group ?? '').toLowerCase().includes(kw.toLowerCase())))
+        .sort((a: any, b: any) => Number(a.mhr_usd) - Number(b.mhr_usd))[0];
+      if (cmmBench != null) {
+        return {
+          rate: Number(cmmBench.mhr_usd) * rates.convertStrict('USD', localCurrencyCode),
+          source: 'benchmark_override', machineClass: 'cmm',
+          machineName: 'CMM Machine (benchmark)', commodityCode: null,
+          benchmarkMhrId: `bm-mhr-${cmmBench.id}`,
+        };
+      }
+    } catch {
+      // Non-critical — falls through to the generic inspection rate below
+    }
+
+    // Unresolved, not substituted. This used to return the caller's generic
+    // inspection-bench rate, so a CMM-tier check acquired a machine cost from a
+    // different, cheaper resource — and said so in the same breath ("likely
+    // understates real CMM cost"), which means the number was known to be wrong
+    // at the moment it was produced. A missing CMM resource is a data gap; the
+    // engine already treats a rate-0 'no_db_rate' as exactly that and charges no
+    // machine cost for it (see planInspection's own rate selection).
+    //
+    // Deliberately NOT downgraded to visual inspection either: the method stays
+    // 'cmm' — the part still needs a CMM check — only its machine cost is
+    // unresolved. Real QA labour is a separately resolved, real rate and is
+    // unaffected.
+    warnings.push(
+      `No dedicated CMM machine on file for ${location} (real or benchmark) — the CMM-tier inspection ` +
+      `check is unresolved and carries no machine cost. Add a CMM to mhr_records, or a ${location} ` +
+      `CMM benchmark rate, to quote it.`,
+    );
+    return {
+      rate: 0, source: 'no_db_rate', machineClass: 'cmm',
+      machineName: null, commodityCode: null,
+    };
+  }
+
+  /**
+   * Resolves a real, non-CMM inspection-resource rate (manual bench/gauge
+   * equipment) for the visual/caliper/height_gauge InspectionMethod tiers —
+   * the mirror image of resolveCmmSpecificRate: same 'cmm'-class row pool
+   * (this schema has no separate machine_class for bench-type inspection
+   * equipment), same real → benchmark → gap fallback order, but EXCLUDING
+   * CMM_NAME_PATTERN matches instead of requiring them, so a visual/caliper/
+   * height_gauge line can never end up silently priced at real CMM
+   * equipment's rate just because resolveMHRRates' cost/utilization scoring
+   * happened to prefer it that request. Confirmed live (2026-08-09): every
+   * tested location has a real, distinct, cheaper "Manual Inspection Bench"
+   * row alongside its "CMM Machine" row (e.g. India: bench $5/hr vs CMM
+   * $8/hr) — this filter is what makes using it deterministic rather than
+   * an accident of scoring.
+   */
+  async resolveGenericInspectionRate(
+    accessToken: string,
+    location: string,
+    rates: RateSnapshot,
+    warnings: string[],
+  ): Promise<MHRRateInput> {
+    const client = this.supabaseService.getClient(accessToken);
+    const gap: MHRRateInput = { rate: 0, source: 'no_db_rate', machineClass: 'cmm', machineName: null, commodityCode: null };
+
+    try {
+      // Shared with the sibling inspection-rate resolver, which reads the same
+      // cmm pool and differs only in its in-memory CMM/non-CMM filter.
+      // Column list must match resolveCmmSpecificRate's exactly -- both share
+      // the `mhr:cmm:${location}` cache key/entry, so whichever of the two
+      // resolvers runs first determines what's cached for the other.
+      const realRows = await cachedRead(`mhr:cmm:${location}`, async () => {
+        const { data } = await client
+          .from('mhr_records')
+          .select('id, machine_name, machine_class, total_machine_hour_rate, manual_mhr_value, is_manual_entry, commodity_code, setup_time_hr')
+          .eq('machine_class', 'cmm')
+          .eq('location', location);
+        return data;
+      });
+      const realBench = (realRows ?? [])
+        .filter((r: any) => classifyInspectionResource(r.machine_class, r.machine_name) !== 'CMM')
+        .map((r: any) => ({
+          id: r.id as string,
+          machineName: r.machine_name as string,
+          rate: Number(r.is_manual_entry ? r.manual_mhr_value : r.total_machine_hour_rate) || 0,
+          commodityCode: r.commodity_code ?? null,
+        }))
+        .filter((r) => r.rate > 0)
+        .sort((a, b) => a.rate - b.rate)[0];
+      if (realBench) {
+        return {
+          rate: realBench.rate, source: 'mhr_database', machineClass: 'cmm',
+          machineName: realBench.machineName, commodityCode: realBench.commodityCode,
+          mhrRecordId: realBench.id,
+        };
+      }
+
+      const benchRows = await cachedRead(`mhr-benchmark:${location}`, async () => {
+        const { data } = await client
+          .from('mhr_benchmark_rates')
+          .select('id, machine_name, mhr_usd, process_group, machine_class')
+          .eq('location', location);
+        return data;
+      });
+      const localCurrencyCode = (LOCATION_INFO[location] ?? LOCATION_INFO['Other']).code;
+      const qualityPgKws = MACHINE_REGISTRY.cmm.processGroupKeywords;
+      const benchOnly = (benchRows ?? [])
+        .filter((r: any) =>
+          classifyInspectionResource(r.machine_class, r.machine_name) !== 'CMM' && Number(r.mhr_usd ?? 0) > 0 &&
+          qualityPgKws.some((kw) => (r.process_group ?? '').toLowerCase().includes(kw.toLowerCase())))
+        .sort((a: any, b: any) => Number(a.mhr_usd) - Number(b.mhr_usd))[0];
+      if (benchOnly) {
+        return {
+          rate: Number(benchOnly.mhr_usd) * rates.convertStrict('USD', localCurrencyCode),
+          source: 'benchmark_override', machineClass: 'cmm',
+          machineName: `${benchOnly.machine_name} (benchmark)`, commodityCode: null,
+          benchmarkMhrId: `bm-mhr-${benchOnly.id}`,
+        };
+      }
+    } catch {
+      // Non-critical — falls through to the genuine no_db_rate gap below
+    }
+
+    warnings.push(
+      `No dedicated inspection-bench resource on file for ${location} (real or benchmark) — visual/caliper/` +
+      `height_gauge inspection is costed at labor-only, machine cost is a genuine $0.`,
+    );
+    return gap;
+  }
+
+  // MHR/LHR plausibility-guard thresholds are business/costing POLICY, not an
+  // algorithmic constant — read once per request from `costing_settings`
+  // (migration 473), the SAME table/convention cost-aggregation.service.ts
+  // and location-comparison.service.ts already use for sga_pct/profit_pct.
+  // Falls back to DEFAULT_RATE_WARN_THRESHOLDS with a disclosed warning only
+  // if the table is empty — identical convention to SGA/profit's own fallback.
+  async loadRateWarnThresholds(accessToken: string, warnings: string[]): Promise<RateWarnThresholds> {
+    try {
+      const { data } = await this.supabaseService
+        .getClient(accessToken)
+        .from('costing_settings')
+        .select('key, value')
+        .in('key', ['rate_warn_low_fraction', 'rate_warn_high_fraction']);
+
+      const settingsMap = new Map<string, number>();
+      for (const row of data ?? []) settingsMap.set(row.key as string, Number(row.value));
+
+      const lowFraction = settingsMap.get('rate_warn_low_fraction');
+      const highFraction = settingsMap.get('rate_warn_high_fraction');
+      if (lowFraction == null || highFraction == null) {
+        warnings.push(
+          'rate_warn_low_fraction/rate_warn_high_fraction not found in costing_settings — using built-in defaults (50%/300%); deploy migration 473 to make these configurable.',
+        );
+        return DEFAULT_RATE_WARN_THRESHOLDS;
+      }
+      return { lowFraction, highFraction };
+    } catch {
+      warnings.push('costing_settings unavailable — MHR/LHR plausibility thresholds using built-in defaults (50%/300%).');
+      return DEFAULT_RATE_WARN_THRESHOLDS;
     }
   }
 }
