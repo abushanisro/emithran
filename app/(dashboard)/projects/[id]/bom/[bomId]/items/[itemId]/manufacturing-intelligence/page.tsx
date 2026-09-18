@@ -6441,8 +6441,8 @@ function CostGuidePanel({
   // No manual route staged this session — re-apply whatever route is
   // already persisted (so a material-grade-only change doesn't silently
   // revert an earlier explicit pick), else fall back to the engine's own
-  // default route. Shared by reapplyEffectiveRoute below and the bottom
-  // "Apply" button's own material-grade branch (which has already called
+  // default route. Called by the bottom "Apply" button's own material-grade
+  // branch (which has already called
   // applyScenario() itself when a route WAS staged, so it skips this).
   const reapplyExistingOrDefaultRoute = async (locationOverride?: string) => {
     // Guards the WHOLE deactivate-then-recreate sequence, not just the create
@@ -6559,13 +6559,6 @@ function CostGuidePanel({
     } finally {
       autoAddLock.current.delete('route');
     }
-  };
-  const reapplyEffectiveRoute = async () => {
-    if (processRouting === 'manual' && selectedManualRoute) {
-      await applyScenario();
-      return;
-    }
-    await reapplyExistingOrDefaultRoute();
   };
 
   // ── Currency & Ask Price — real FX architecture ────────────────────────────
@@ -6742,10 +6735,16 @@ function CostGuidePanel({
         }
         setApplyProgress({ step: 'Saving material grade…', pct: 40 });
 
+        // Single commit point for Material Grade — every picker interaction above
+        // (typing, dropdown pick, Browse dialog, drawing suggestion) only stages
+        // matInputValue; nothing writes materialGrade to the server until here.
+        // materialSource: 'manual' is real provenance (migration 081): it's what
+        // lets the backend's costing precedence (bom-items.service.ts) trust this
+        // explicit selection is exactly that — explicit, not a guess.
         const pendingGrade = matInputValue.trim();
         if (pendingGrade && pendingGrade !== item.materialGrade) {
           try {
-            await updateBOMItem.mutateAsync({ id: item.id, data: { materialGrade: pendingGrade } });
+            await updateBOMItem.mutateAsync({ id: item.id, data: { materialGrade: pendingGrade, materialSource: 'manual' } });
           } catch { /* non-fatal — proceed with whatever is on the server */ }
         }
 
@@ -7012,14 +7011,12 @@ function CostGuidePanel({
                   onFocus={() => setMatDropOpen(true)}
                   onBlur={() => setTimeout(() => setMatDropOpen(false), 160)}
                   onKeyDown={(e) => {
+                    // Enter only closes the dropdown — matInputValue is already staged
+                    // live via onChange above. The one and only place this gets
+                    // committed to the server is the main "Apply" scenario flow
+                    // (runApplyScenario), so a typed grade never silently prices the
+                    // part before the engineer has confirmed the whole scenario.
                     if (e.key === 'Enter' && matInputValue.trim()) {
-                      // materialSource: 'manual' — real provenance (migration 081), stamped
-                      // here so the backend's grade precedence (bom-items.service.ts) can
-                      // trust this explicit selection over the drawing title block instead
-                      // of silently deferring to a less-specific/generic drawing extraction.
-                      updateBOMItem.mutate({ id: item.id, data: { materialGrade: matInputValue.trim(), materialSource: 'manual' } });
-                      autoAddMaterialCost(matInputValue.trim());
-                      void reapplyEffectiveRoute();
                       setMatDropOpen(false);
                     }
                     if (e.key === 'Escape') setMatDropOpen(false);
@@ -7029,18 +7026,6 @@ function CostGuidePanel({
                   className="w-full text-xs border border-border rounded px-2.5 py-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500 pl-8 pr-24"
                 />
                 <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                  {matInputValue.trim() && matInputValue.trim() !== item.materialGrade && (
-                    <button
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        updateBOMItem.mutate({ id: item.id, data: { materialGrade: matInputValue.trim(), materialSource: 'manual' } });
-                        autoAddMaterialCost(matInputValue.trim());
-                        void reapplyEffectiveRoute();
-                        setMatDropOpen(false);
-                      }}
-                      className="text-[10px] font-semibold text-violet-500 border border-violet-500/40 rounded px-1.5 py-0.5 leading-none hover:bg-violet-500/10 transition-colors"
-                    >Apply</button>
-                  )}
                   <button
                     onMouseDown={(e) => { e.preventDefault(); setMatPickerOpen(true); setMatDropOpen(false); }}
                     className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground border border-border rounded px-1.5 py-0.5 leading-none transition-colors"
@@ -7066,10 +7051,8 @@ function CostGuidePanel({
                           key={m.id}
                           onMouseDown={(e) => {
                             e.preventDefault();
+                            // Stage only — committed by the main Apply flow, same as typing.
                             setMatInputValue(grade);
-                            updateBOMItem.mutate({ id: item.id, data: { materialGrade: grade, materialSource: 'manual' } });
-                            autoAddMaterialCost(grade);
-                            void reapplyEffectiveRoute();
                             setMatDropOpen(false);
                           }}
                           className={`w-full text-left px-2.5 py-1.5 hover:bg-muted/60 transition-colors border-b border-border/20 last:border-0 flex items-center justify-between gap-2 ${isCurrent ? 'bg-emerald-500/5' : ''}`}
@@ -7088,19 +7071,15 @@ function CostGuidePanel({
                 )}
               </div>
 
-              {/* Currently-costed confirmation — the grade the ENGINE resolved and
-                  priced with, echoed on the response, not this item's stored
-                  materialGrade column.
-
-                  Those are not the same value and reading the column was wrong.
-                  Costing resolves drawing material -> stored grade -> material
-                  (bom-items.service.ts), so a drawing title-block grade takes
-                  precedence. Confirmed live on a real part: the column held
-                  "Generic CuZn39Pb3" (a generic name the CAD import wrote), the
-                  drawing held SECC at 0.92 confidence, and the engine correctly
-                  costed SECC from the database at $1.175/kg — while this line
-                  told the user the part was "Currently costed as Generic
-                  CuZn39Pb3". The label contradicted the quote it sat on. */}
+              {/* Currently-costed confirmation — the grade the ENGINE actually
+                  resolved and priced with, echoed on the cost-summary response.
+                  Root cause fixed 2026-09-18/19: costing now ONLY ever prices
+                  against the engineer's own explicit Material Grade selection
+                  (item.materialGrade) — drawing/CAD-extracted text is never
+                  read into the costing precedence at all (bom-items.service.ts),
+                  so this value and the stored column can no longer diverge the
+                  way they used to (a CAD-import-written generic grade like
+                  "Generic CuZn39Pb3" silently beating a real drawing/selection). */}
               {cgpCostSummary?.materialGrade && (
                 <div className="flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 mb-1.5 px-0.5">
                   <span>✓</span>
@@ -7109,8 +7088,9 @@ function CostGuidePanel({
               )}
 
               {/* Drawing / CAD suggestion — shown only when it is NOT already the
-                  grade being costed. Comparing against the stored column offered
-                  "Apply" for a drawing material the engine was already using. */}
+                  grade being costed. Never applied immediately: this only stages
+                  matInputValue (same as typing/picking above) — the single commit
+                  point for Material Grade is the main "Apply" scenario flow. */}
               {hasDrawingMaterial && drawingMaterial !== (cgpCostSummary?.materialGrade ?? item.materialGrade) && (
                 <div className="flex items-center gap-1.5 mb-1.5 pb-1.5 border-b border-border/30">
                   <div className="flex-1 min-w-0">
@@ -7119,9 +7099,10 @@ function CostGuidePanel({
                   </div>
                   <span className="text-[9px] font-semibold text-blue-400 border border-blue-500/40 rounded px-1 py-px leading-none shrink-0">DRAWING</span>
                   <button
-                    onClick={() => { updateBOMItem.mutate({ id: item.id, data: { materialGrade: drawingMaterial!, materialSource: 'manual' } }); autoAddMaterialCost(drawingMaterial!); void reapplyEffectiveRoute(); }}
+                    onClick={() => setMatInputValue(drawingMaterial!)}
                     className="text-[9px] font-medium text-violet-400 hover:text-violet-300 shrink-0"
-                  >Apply</button>
+                    title="Stage this grade — commit it with the main Apply button below"
+                  >Use</button>
                 </div>
               )}
             </Section>
@@ -7395,7 +7376,8 @@ function CostGuidePanel({
         open={matPickerOpen}
         onClose={() => setMatPickerOpen(false)}
         onSelect={(grade) => {
-          updateBOMItem.mutate({ id: item.id, data: { materialGrade: grade } });
+          // Stage only — committed by the main Apply flow, same as typing/picking above.
+          setMatInputValue(grade);
           setMatPickerOpen(false);
         }}
       />
