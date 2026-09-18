@@ -1,18 +1,17 @@
-// Mocked unit tests of resolveWageGradeBucketRates (private method,
-// exercised via `as any`, hand-built Supabase stub — NOT end-to-end, NOT
-// live-data) — same style as bom-items.lhr-fx-provenance.spec.ts. The real
-// "127 real Injection Molding machines / 12 real Sheet Metal categories
-// actually carry these wage grades and rates live" claims are verified
-// separately against the real database (migrations 633/643/645), not here;
-// this proves the grouping/averaging arithmetic in isolation.
-import { BOMItemsService } from '../../../modules/bom-items/bom-items.service';
-import { type BlankOptimizerService } from '../../../modules/bom-items/costing/sheet-metal/machine/blank-optimizer.service';
-import { type SheetMetalLookupService } from '../../../modules/bom-items/costing/sheet-metal/lookup/sheet-metal-lookup.service';
-import { type MachiningLookupService } from '../../../modules/bom-items/costing/machining/lookup/machining-lookup.service';
-import { type CADAnalysisService } from '../../../modules/bom-items/services/cad-analysis.service';
-import { type ExchangeRateService } from '../../../common/exchange-rate/exchange-rate.service';
+// Mocked unit tests of RateResolutionService.resolveWageGradeBucketRates
+// (hand-built Supabase stub — NOT end-to-end, NOT live-data) — same style as
+// bom-items.lhr-fx-provenance.spec.ts. The real "127 real Injection Molding
+// machines / 12 real Sheet Metal categories actually carry these wage grades
+// and rates live" claims are verified separately against the real database
+// (migrations 633/643/645), not here; this proves the grouping/averaging
+// arithmetic in isolation.
+//
+// Moved from bom-items.service.ts (private method, exercised via `as any`)
+// to RateResolutionService (public method, no cast needed) as part of the
+// RateResolutionService extraction — same behavior, real class.
+import { RateResolutionService } from '../../../modules/bom-items/services/rate-resolution.service';
+import { type CalculatorCatalogService } from '../../../modules/bom-items/services/calculator-catalog.service';
 import { type SupabaseService } from '../../../common/supabase/supabase.service';
-import { type InspectionKnowledgeService } from '../../../modules/manufacturing-knowledge/services/inspection-knowledge.service';
 
 function makeSupabaseStub(mhrRecordsRows: any[]) {
   const node: any = {
@@ -25,14 +24,9 @@ function makeSupabaseStub(mhrRecordsRows: any[]) {
 }
 
 function buildService(supabaseService: SupabaseService) {
-  return new BOMItemsService(
+  return new RateResolutionService(
     supabaseService,
-    {} as unknown as InspectionKnowledgeService,
-    {} as unknown as BlankOptimizerService,
-    {} as unknown as SheetMetalLookupService,
-    {} as unknown as MachiningLookupService,
-    {} as unknown as ExchangeRateService,
-    {} as unknown as CADAnalysisService,
+    {} as unknown as CalculatorCatalogService,
   );
 }
 
@@ -46,7 +40,7 @@ describe('resolveWageGradeBucketRates (mocked unit tests)', () => {
       { machine_class: 'press_brake', wage_grade: '3 - Metal', usd_lhr_total: 22.01 },
     ]));
 
-    const result: Map<string, number> = await (service as any).resolveWageGradeBucketRates('token-1', 'USA');
+    const result: Map<string, number> = await service.resolveWageGradeBucketRates('token-1', 'USA');
 
     const expectedAvg = (19.83 + 29.07 + 22.01) / 3;
     expect(result.get('press_brake')).toBeCloseTo(expectedAvg, 5);
@@ -62,7 +56,7 @@ describe('resolveWageGradeBucketRates (mocked unit tests)', () => {
       { machine_class: 'waterjet',     wage_grade: '3 - Metal', usd_lhr_total: 30.0 },
     ]));
 
-    const result: Map<string, number> = await (service as any).resolveWageGradeBucketRates('token-1', 'USA');
+    const result: Map<string, number> = await service.resolveWageGradeBucketRates('token-1', 'USA');
 
     expect(result.get('press_brake')).toBeCloseTo(30.0, 5);
     expect(result.get('fiber_laser')).toBeCloseTo(30.0, 5);
@@ -75,7 +69,7 @@ describe('resolveWageGradeBucketRates (mocked unit tests)', () => {
     // appears in the result set.
     const service = buildService(makeSupabaseStub([]));
 
-    const result: Map<string, number> = await (service as any).resolveWageGradeBucketRates('token-1', 'USA');
+    const result: Map<string, number> = await service.resolveWageGradeBucketRates('token-1', 'USA');
 
     expect(result.size).toBe(0);
     expect(result.get('cnc_3ax_vmc')).toBeUndefined();
@@ -83,7 +77,7 @@ describe('resolveWageGradeBucketRates (mocked unit tests)', () => {
 
   it('F: no fabricated rate is ever introduced when the query returns nothing — empty map, not a default number', async () => {
     const service = buildService(makeSupabaseStub([]));
-    const result: Map<string, number> = await (service as any).resolveWageGradeBucketRates('token-1', 'USA');
+    const result: Map<string, number> = await service.resolveWageGradeBucketRates('token-1', 'USA');
     expect(result).toEqual(new Map());
   });
 
@@ -96,7 +90,7 @@ describe('resolveWageGradeBucketRates (mocked unit tests)', () => {
       { machine_class: 'injection_molding',  wage_grade: '3 - Plastic', usd_lhr_total: 34.48 },
     ]));
 
-    const result: Map<string, number> = await (service as any).resolveWageGradeBucketRates('token-1', 'USA');
+    const result: Map<string, number> = await service.resolveWageGradeBucketRates('token-1', 'USA');
 
     expect(result.get('press_brake')).toBeCloseTo(20.0, 5);
     expect(result.get('injection_molding')).toBeCloseTo(34.48, 5);
@@ -113,7 +107,7 @@ describe('resolveWageGradeBucketRates (mocked unit tests)', () => {
       { machine_class: 'press_brake', wage_grade: '3 - Metal', usd_lhr_total: 40.0 },
     ]));
 
-    const result: Map<string, number> = await (service as any).resolveWageGradeBucketRates('token-1', 'USA');
+    const result: Map<string, number> = await service.resolveWageGradeBucketRates('token-1', 'USA');
     expect(result.get('press_brake')).toBeCloseTo(30.0, 5);
   });
 });

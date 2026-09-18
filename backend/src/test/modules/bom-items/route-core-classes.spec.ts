@@ -6,7 +6,7 @@ import {
   getFormingProcessClasses,
   getEnginesForFamily,
 } from '../../../modules/bom-items/costing/shared/core/manufacturing-process-registry';
-import { MHR_RATE_MACHINE_CLASSES } from '../../../modules/bom-items/bom-items.service';
+import { MHR_RATE_MACHINE_CLASSES } from '../../../modules/bom-items/services/rate-resolution.service';
 
 // Two lists used to state, as string literals, something the engine registry
 // already knows. Both are now derived or locked, because both fail SILENTLY —

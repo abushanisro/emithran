@@ -1,5 +1,5 @@
-// Mocked unit tests (private method exercised via `as any`, hand-built Supabase
-// stub — NOT an end-to-end or live-data test) for resolveLHRRates' Pass 4
+// Mocked unit tests (hand-built Supabase stub — NOT an end-to-end or
+// live-data test) for RateResolutionService.resolveLHRRates' Pass 4
 // plausibility guard. The FX pivot value below is an arbitrary arithmetic
 // fixture used only to exercise the guard's comparison/threshold logic — it is
 // NOT a claim about any current or historical live FX rate. Separately, the
@@ -8,14 +8,14 @@
 // multiplying an already-local India rate by the FX pivot again) — isolated
 // under `historicalDoubleConversionLhr` and used only in tests explicitly about
 // not regressing that pattern.
-import { BOMItemsService } from '../../../modules/bom-items/bom-items.service';
-import { type BlankOptimizerService } from '../../../modules/bom-items/costing/sheet-metal/machine/blank-optimizer.service';
-import { type SheetMetalLookupService } from '../../../modules/bom-items/costing/sheet-metal/lookup/sheet-metal-lookup.service';
-import { type MachiningLookupService } from '../../../modules/bom-items/costing/machining/lookup/machining-lookup.service';
-import { type CADAnalysisService } from '../../../modules/bom-items/services/cad-analysis.service';
-import { type ExchangeRateService, type RateSnapshot } from '../../../common/exchange-rate/exchange-rate.service';
+//
+// resolveLHRRates moved from bom-items.service.ts (private, exercised via
+// `as any`) to RateResolutionService (public, no cast needed) as part of the
+// RateResolutionService extraction — same behavior, real class.
+import { RateResolutionService } from '../../../modules/bom-items/services/rate-resolution.service';
+import { type CalculatorCatalogService } from '../../../modules/bom-items/services/calculator-catalog.service';
 import { type SupabaseService } from '../../../common/supabase/supabase.service';
-import { type InspectionKnowledgeService } from '../../../modules/manufacturing-knowledge/services/inspection-knowledge.service';
+import { type RateSnapshot } from '../../../common/exchange-rate/exchange-rate.service';
 import { DEFAULT_RATE_WARN_THRESHOLDS } from '../../../modules/bom-items/costing/shared/core/default-rates.constants';
 
 // Arbitrary fixture for exercising ×-once arithmetic in a mocked unit test —
@@ -65,16 +65,11 @@ function makeSupabaseStub(script: Record<string, any[][]>) {
 }
 
 function buildService(supabaseService: SupabaseService) {
-  const service = new BOMItemsService(
+  const service = new RateResolutionService(
     supabaseService,
-    {} as unknown as InspectionKnowledgeService,
-    {} as unknown as BlankOptimizerService,
-    {} as unknown as SheetMetalLookupService,
-    {} as unknown as MachiningLookupService,
-    {} as unknown as ExchangeRateService,
-    {} as unknown as CADAnalysisService,
+    {} as unknown as CalculatorCatalogService,
   );
-  jest.spyOn(service as any, 'resolveProcessIdentities').mockResolvedValue({
+  jest.spyOn(service, 'resolveProcessIdentities').mockResolvedValue({
     fiber_laser: { processGroup: 'Sheet Metal', processRoute: 'Laser Cutting', operation: 'Laser Cut', lhrProcessGroup: 'Sheet Metal' },
   });
   return service;
@@ -96,7 +91,7 @@ describe('resolveLHRRates — Pass 4 plausibility guard (mocked unit tests, arbi
     const rates = makeRates(arithmeticFixtureUsdToInr);
     const warnings: string[] = [];
 
-    const result: Map<string, { rate: number; source: string }> = await (service as any).resolveLHRRates(
+    const result: Map<string, { rate: number; source: string }> = await service.resolveLHRRates(
       'token-1', 'India', 'sheet_metal', rates, warnings, DEFAULT_RATE_WARN_THRESHOLDS,
     );
 
@@ -117,7 +112,7 @@ describe('resolveLHRRates — Pass 4 plausibility guard (mocked unit tests, arbi
     const rates = makeRates(arithmeticFixtureUsdToInr);
     const warnings: string[] = [];
 
-    const result: Map<string, { rate: number; source: string }> = await (service as any).resolveLHRRates(
+    const result: Map<string, { rate: number; source: string }> = await service.resolveLHRRates(
       'token-1', 'India', 'sheet_metal', rates, warnings, DEFAULT_RATE_WARN_THRESHOLDS,
     );
 
@@ -136,7 +131,7 @@ describe('resolveLHRRates — Pass 4 plausibility guard (mocked unit tests, arbi
     const rates = makeRates(arithmeticFixtureUsdToInr);
     const warnings: string[] = [];
 
-    const result: Map<string, { rate: number; source: string }> = await (service as any).resolveLHRRates(
+    const result: Map<string, { rate: number; source: string }> = await service.resolveLHRRates(
       'token-1', 'India', 'sheet_metal', rates, warnings, DEFAULT_RATE_WARN_THRESHOLDS,
     );
 
