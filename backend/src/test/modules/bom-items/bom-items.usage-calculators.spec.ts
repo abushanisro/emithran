@@ -11,6 +11,8 @@ import { type SheetMetalLookupService } from '../../../modules/bom-items/costing
 import { type MachiningLookupService } from '../../../modules/bom-items/costing/machining/lookup/machining-lookup.service';
 import { STANDARD_SHEETS } from '../../../modules/bom-items/costing/sheet-metal/machine/sheet-metal-nesting.engine';
 import { type CADAnalysisService } from '../../../modules/bom-items/services/cad-analysis.service';
+import { type RateResolutionService } from '../../../modules/bom-items/services/rate-resolution.service';
+import { type CalculatorCatalogService } from '../../../modules/bom-items/services/calculator-catalog.service';
 import { type ExchangeRateService } from '../../../common/exchange-rate/exchange-rate.service';
 import { type SupabaseService } from '../../../common/supabase/supabase.service';
 import { type InspectionKnowledgeService } from '../../../modules/manufacturing-knowledge/services/inspection-knowledge.service';
@@ -34,6 +36,8 @@ function buildService(computeTrueNest: jest.Mock, summary: Record<string, unknow
     {} as unknown as MachiningLookupService,
     {} as unknown as ExchangeRateService,
     cadAnalysisService,
+    {} as unknown as RateResolutionService,
+    {} as unknown as CalculatorCatalogService,
   );
   const findOneSpy = jest.spyOn(service, 'findOne')
     .mockResolvedValue({ id: 'item-1', featureGraph: { summary } } as unknown as BOMItemResponseDto);

@@ -1,14 +1,21 @@
-// Mocked unit tests of resolveLHRRates + normalizeCostSummaryToCurrency's
-// arithmetic (private methods, exercised via `as any`, hand-built Supabase
-// stub — NOT end-to-end, NOT live-data). These prove the ×-once conversion
-// logic in isolation: an INR-native lhr_records row must pass through
-// unconverted, and a USD-denominated benchmark row must be converted exactly
-// once. The FX pivot value used below is an arbitrary fixture for exercising
-// that arithmetic — it is not asserted anywhere as a live or historical FX
-// truth. The real "editor rate == Cost Summary rate, same DB record" invariant
-// is proved separately, against real data and the real live FX rate, in
-// test/lhr-currency-provenance.e2e-spec.ts.
+// Mocked unit tests of RateResolutionService.resolveLHRRates +
+// BOMItemsService.normalizeCostSummaryToCurrency's arithmetic (hand-built
+// Supabase stub — NOT end-to-end, NOT live-data). These prove the ×-once
+// conversion logic in isolation: an INR-native lhr_records row must pass
+// through unconverted, and a USD-denominated benchmark row must be converted
+// exactly once. The FX pivot value used below is an arbitrary fixture for
+// exercising that arithmetic — it is not asserted anywhere as a live or
+// historical FX truth. The real "editor rate == Cost Summary rate, same DB
+// record" invariant is proved separately, against real data and the real
+// live FX rate, in test/lhr-currency-provenance.e2e-spec.ts.
+//
+// resolveLHRRates moved from bom-items.service.ts (private, exercised via
+// `as any`) to RateResolutionService (public, no cast needed) as part of the
+// RateResolutionService extraction — same behavior, real class.
+// normalizeCostSummaryToCurrency was not moved and stays on BOMItemsService.
 import { BOMItemsService } from '../../../modules/bom-items/bom-items.service';
+import { RateResolutionService } from '../../../modules/bom-items/services/rate-resolution.service';
+import { type CalculatorCatalogService } from '../../../modules/bom-items/services/calculator-catalog.service';
 import { type BlankOptimizerService } from '../../../modules/bom-items/costing/sheet-metal/machine/blank-optimizer.service';
 import { type SheetMetalLookupService } from '../../../modules/bom-items/costing/sheet-metal/lookup/sheet-metal-lookup.service';
 import { type MachiningLookupService } from '../../../modules/bom-items/costing/machining/lookup/machining-lookup.service';
@@ -55,7 +62,17 @@ function makeSupabaseStub(script: Record<string, any[][]>) {
 }
 
 function buildService(supabaseService: SupabaseService, identities: Record<string, any>) {
-  const service = new BOMItemsService(
+  const rateResolutionService = new RateResolutionService(
+    supabaseService,
+    {} as unknown as CalculatorCatalogService,
+  );
+  jest.spyOn(rateResolutionService, 'resolveProcessIdentities').mockResolvedValue(identities);
+
+  // normalizeCostSummaryToCurrency (unrelated to the extraction, still a
+  // private BOMItemsService method) is exercised on a separately-built
+  // instance — it never calls resolveLHRRates/resolveProcessIdentities
+  // itself, so its other dependencies stay unused stubs.
+  const bomItemsService = new BOMItemsService(
     supabaseService,
     {} as unknown as InspectionKnowledgeService,
     {} as unknown as BlankOptimizerService,
@@ -63,9 +80,11 @@ function buildService(supabaseService: SupabaseService, identities: Record<strin
     {} as unknown as MachiningLookupService,
     {} as unknown as ExchangeRateService,
     {} as unknown as CADAnalysisService,
+    {} as unknown as RateResolutionService,
+    {} as unknown as CalculatorCatalogService,
   );
-  jest.spyOn(service as any, 'resolveProcessIdentities').mockResolvedValue(identities);
-  return service;
+
+  return { rateResolutionService, bomItemsService };
 }
 
 function minimalCostSummary(labourRate: number): CostSummaryDto {
@@ -82,14 +101,14 @@ describe('resolveLHRRates + normalizeCostSummaryToCurrency arithmetic (mocked un
       lhr_records: [[{ process_group: 'Sheet Metal', lhr: 144.46 }]],
       lhr_benchmark_rates: [[{ process_group: 'Sheet Metal', lhr_usd_effective: 1.73 }]],
     });
-    const service = buildService(supabaseService, {
+    const { rateResolutionService, bomItemsService } = buildService(supabaseService, {
       fiber_laser: { processGroup: 'Sheet Metal', processRoute: 'Laser Cutting', operation: 'Laser Cut', lhrProcessGroup: 'Sheet Metal' },
     });
     const rates = makeRates(arithmeticFixtureUsdToInr);
     const warnings: string[] = [];
 
     // Step 1: resolveLHRRates resolves the local-currency row as-is (Pass 1: "no FX needed").
-    const lhrRates: Map<string, { rate: number; source: string }> = await (service as any).resolveLHRRates('token-1', 'India', 'sheet_metal', rates, warnings, undefined);
+    const lhrRates: Map<string, { rate: number; source: string }> = await rateResolutionService.resolveLHRRates('token-1', 'India', 'sheet_metal', rates, warnings, undefined);
     expect(lhrRates.get('fiber_laser')?.rate).toBe(144.46);
     // P0.6: Pass 1 (real, same-location lhr_records) must tag 'lhr_database' —
     // the provenance visibility the machine-rate side already had via
@@ -101,7 +120,7 @@ describe('resolveLHRRates + normalizeCostSummaryToCurrency arithmetic (mocked un
     const dto = minimalCostSummary(lhrRates.get('fiber_laser')!.rate);
 
     // Step 3: factory currency == scenario currency (identity) must leave labourRate untouched.
-    const result = (service as any).normalizeCostSummaryToCurrency(dto, rates, 'INR', {
+    const result = (bomItemsService as any).normalizeCostSummaryToCurrency(dto, rates, 'INR', {
       fxSnapshot: { factoryCurrency: 'INR', scenarioCurrency: 'INR', provider: null, source: 'identity', rate: 1, rateDate: '2026-08-17', rateType: 'reference', retrievedAt: '2026-08-17T00:00:00Z' },
     });
 
@@ -118,20 +137,20 @@ describe('resolveLHRRates + normalizeCostSummaryToCurrency arithmetic (mocked un
         [{ process_group: 'Quality', lhr_usd_effective: 1.65 }], // Pass 4: plausibility reference (re-queried)
       ],
     });
-    const service = buildService(supabaseService, {
+    const { rateResolutionService, bomItemsService } = buildService(supabaseService, {
       cmm: { processGroup: 'Quality', processRoute: 'Inspection', operation: 'Inspect', lhrProcessGroup: 'Quality' },
     });
     const rates = makeRates(arithmeticFixtureUsdToInr);
     const warnings: string[] = [];
 
-    const lhrRates: Map<string, { rate: number; source: string }> = await (service as any).resolveLHRRates('token-1', 'India', 'sheet_metal', rates, warnings, undefined);
+    const lhrRates: Map<string, { rate: number; source: string }> = await rateResolutionService.resolveLHRRates('token-1', 'India', 'sheet_metal', rates, warnings, undefined);
     expect(lhrRates.get('cmm')?.rate).toBeCloseTo(1.65 * arithmeticFixtureUsdToInr, 2);
     // P0.6: Pass 2 (lhr_benchmark_rates filling a missing group) must tag 'lhr_benchmark'.
     expect(lhrRates.get('cmm')?.source).toBe('lhr_benchmark');
     expect(warnings).toHaveLength(0); // matches its own benchmark exactly — no warning
 
     const dto = minimalCostSummary(lhrRates.get('cmm')!.rate);
-    const result = (service as any).normalizeCostSummaryToCurrency(dto, rates, 'INR', {
+    const result = (bomItemsService as any).normalizeCostSummaryToCurrency(dto, rates, 'INR', {
       fxSnapshot: { factoryCurrency: 'INR', scenarioCurrency: 'INR', provider: null, source: 'identity', rate: 1, rateDate: '2026-08-17', rateType: 'reference', retrievedAt: '2026-08-17T00:00:00Z' },
     });
     // Still exactly one conversion end-to-end — identity currency does not add a second one.
@@ -157,13 +176,13 @@ describe('resolveLHRRates + normalizeCostSummaryToCurrency arithmetic (mocked un
       ],
       lhr_benchmark_rates: [[], []], // Pass 2 (no benchmark) and Pass 4 (plausibility reference, also none)
     });
-    const service = buildService(supabaseService, {
+    const { rateResolutionService, bomItemsService } = buildService(supabaseService, {
       fiber_laser: { processGroup: 'Sheet Metal', processRoute: 'Laser Cutting', operation: 'Laser Cut', lhrProcessGroup: 'Sheet Metal' },
     });
     const rates = makeRates(arithmeticFixtureUsdToInr);
     const warnings: string[] = [];
 
-    const lhrRates: Map<string, { rate: number; source: string }> = await (service as any).resolveLHRRates('token-1', 'India', 'sheet_metal', rates, warnings, undefined);
+    const lhrRates: Map<string, { rate: number; source: string }> = await rateResolutionService.resolveLHRRates('token-1', 'India', 'sheet_metal', rates, warnings, undefined);
     expect(lhrRates.get('fiber_laser')?.source).toBe('lhr_cross_location');
     expect(lhrRates.get('fiber_laser')?.rate).toBe(2.1); // raw USD figure, undocumented pre-existing behavior — see note above
   });
