@@ -2,12 +2,13 @@ import {
   computeCNCTurnedCostSummary,
   checkCNCCapability,
   type CNCCostInput,
-  type CNCMachineClass,
+  type MachineClassId,
   type CNCCapabilityResult,
 } from './cost-cnc-engine';
 import type { CostSummaryDto } from '../../../dto/cost-breakdown.dto';
 import type { ManufacturingProcessEngine } from '../../shared/core/manufacturing-process.types';
 import type { CNCCapabilityGeometry } from './cnc-milling-registry-engine';
+import type { MachineClass } from '../../shared/core/default-rates.constants';
 
 // Thin conformance wrapper around the real, tested computeCNCTurnedCostSummary()
 // (Platform Architecture Remediation Phase 1 — "fix the pattern across all
@@ -19,18 +20,20 @@ export class CncTurningEngine implements ManufacturingProcessEngine<
   CNCCapabilityGeometry,
   CNCCapabilityResult
 > {
-  readonly machineClass: CNCMachineClass;
+  // See cnc-milling-registry-engine.ts's identical field for why this is
+  // MachineClass (the shared cross-domain union), not MachineClassId.
+  readonly machineClass: MachineClass;
   readonly processFamily = 'cnc_turning';
 
-  constructor(machineClass: 'cnc_lathe' | 'cnc_lathe_live' | 'cnc_mill_turn') {
-    this.machineClass = machineClass;
+  constructor(machineClass: string) {
+    this.machineClass = machineClass as MachineClass;
   }
 
   checkCapability(geometry: CNCCapabilityGeometry): CNCCapabilityResult {
-    return checkCNCCapability(this.machineClass, geometry.maxLength, geometry.maxWidth, geometry.maxHeight, geometry.weightKg);
+    return checkCNCCapability(this.machineClass as MachineClassId, geometry.maxLength, geometry.maxWidth, geometry.maxHeight, geometry.weightKg);
   }
 
   computeCost(context: CNCCostInput): CostSummaryDto {
-    return computeCNCTurnedCostSummary(context, this.machineClass as 'cnc_lathe' | 'cnc_lathe_live' | 'cnc_mill_turn');
+    return computeCNCTurnedCostSummary(context, this.machineClass as MachineClassId);
   }
 }

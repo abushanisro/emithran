@@ -1851,9 +1851,18 @@ export class MHRService {
   private static readonly MACHINE_CLASS_PROCESS_GROUP: Record<string, string> = {
     fiber_laser: 'Sheet Metal',
     press_brake: 'Sheet Metal',
-    cnc_lathe: 'Machining',
-    cnc_3ax_vmc: 'Machining',
-    cnc_5ax_mc: 'Machining',
+    // Real, granular primary CNC classes — replaces the deleted
+    // cnc_lathe/cnc_3ax_vmc/cnc_5ax_mc entries (Machining Engine
+    // Re-Architecture). Also closes a pre-existing gap: the old map never
+    // had entries for cnc_4ax_vmc/cnc_lathe_live/cnc_mill_turn either —
+    // every granular class this project promoted is covered here now.
+    '2_axis_lathe': 'Machining',
+    '3_axis_lathe': 'Machining',
+    '2_axis_bar_feed_lathe_with_sub_spindle': 'Machining',
+    '3_axis_bar_feed_lathe_with_sub_spindle': 'Machining',
+    '3_axis_mill': 'Machining',
+    '4_axis_mill': 'Machining',
+    '5_axis_mill': 'Machining',
     injection_molding: 'Plastic Molding',
     cmm: 'Post Processing',
     deburring: 'Post Processing',

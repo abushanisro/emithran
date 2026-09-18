@@ -176,50 +176,47 @@ describe('classifyMachineRecord', () => {
     expect(classifyMachineRecord(thermwood)).toBeNull();
   });
 
-  // Root-caused 2026-09-16: real Machining machine_class values (staged
-  // from memory/machining/machine/*.json, migrations 692/693/737/738) use
-  // Digital-Factory-sourced snake_case station names ('3_axis_mill',
-  // '2_axis_lathe', ...) instead of this registry's canonical cnc_*
-  // buckets. Before MACHINING_CATEGORY_ALIAS, ALL 314 real Machining
-  // machines (old and new) returned null here — invisible to live
-  // quoting despite rendering correctly on the HR Rates page (which
-  // reads mhr_records directly, bypassing this classifier entirely).
-  it('classifies the 7 real Machining categories with a 1:1 coarse-bucket match via the alias, and leaves the rest genuinely unclassified', () => {
+  // FIXED (Machining Engine Re-Architecture): the 7 real granular categories
+  // below are now real MachineClass members in their own right (see
+  // MACHINE_REGISTRY, default-rates.constants.ts) — Tier 0's exact-match
+  // path resolves each of them to ITSELF directly, no alias/coarsening
+  // needed. MACHINING_CATEGORY_ALIAS (which used to coarsen these into
+  // cnc_3ax_vmc/cnc_4ax_vmc/cnc_5ax_mc/cnc_lathe/cnc_lathe_live) has been
+  // removed entirely, not just made dead code, since keeping it would have
+  // silently thrown away the exact granularity this fix restores.
+  it('classifies the 7 real Machining categories to themselves via Tier 0, and leaves the rest genuinely unclassified', () => {
     const real = (id: string, machineClass: string, machineName: string) => ({
       id, machine_name: machineName, machine_class: machineClass,
       process_group: 'Machining', commodity_code: null,
       total_machine_hour_rate: 40, manual_mhr_value: 40, fully_burdened_local_per_hr: 40,
       capacity_utilization_rate: 85, operators: null, usd_lhr_total: null,
     });
-    expect(classifyMachineRecord(real('m1', '2_axis_lathe', 'Acra 2800 CET'))).toBe('cnc_lathe');
-    expect(classifyMachineRecord(real('m2', '3_axis_lathe', 'Boehringer VDF 400'))).toBe('cnc_lathe');
-    expect(classifyMachineRecord(real('m3', '2_axis_bar_feed_lathe_with_sub_spindle', 'Haas DS-30 with BAR3010SS Feeder'))).toBe('cnc_lathe_live');
-    expect(classifyMachineRecord(real('m4', '3_axis_bar_feed_lathe_with_sub_spindle', 'Haas DS-30SSY with BAR3010SS Feeder'))).toBe('cnc_lathe_live');
-    expect(classifyMachineRecord(real('m5', '3_axis_mill', 'Giddings & Lewis H60F'))).toBe('cnc_3ax_vmc');
-    expect(classifyMachineRecord(real('m6', '4_axis_mill', 'Giddings & Lewis H60F w Rotary Table'))).toBe('cnc_4ax_vmc');
-    expect(classifyMachineRecord(real('m7', '5_axis_mill', 'DMG MORI DMU 105 monoBLOCK'))).toBe('cnc_5ax_mc');
+    expect(classifyMachineRecord(real('m1', '2_axis_lathe', 'Acra 2800 CET'))).toBe('2_axis_lathe');
+    expect(classifyMachineRecord(real('m2', '3_axis_lathe', 'Boehringer VDF 400'))).toBe('3_axis_lathe');
+    expect(classifyMachineRecord(real('m3', '2_axis_bar_feed_lathe_with_sub_spindle', 'Haas DS-30 with BAR3010SS Feeder'))).toBe('2_axis_bar_feed_lathe_with_sub_spindle');
+    expect(classifyMachineRecord(real('m4', '3_axis_bar_feed_lathe_with_sub_spindle', 'Haas DS-30SSY with BAR3010SS Feeder'))).toBe('3_axis_bar_feed_lathe_with_sub_spindle');
+    expect(classifyMachineRecord(real('m5', '3_axis_mill', 'Giddings & Lewis H60F'))).toBe('3_axis_mill');
+    expect(classifyMachineRecord(real('m6', '4_axis_mill', 'Giddings & Lewis H60F w Rotary Table'))).toBe('4_axis_mill');
+    expect(classifyMachineRecord(real('m7', '5_axis_mill', 'DMG MORI DMU 105 monoBLOCK'))).toBe('5_axis_mill');
 
-    // Several more real Machining categories have since gained their own
-    // dedicated cost engine and MACHINE_REGISTRY entry (gun_drill,
-    // deep_bore_machine, manual_deburr, cylindrical_grinder, jig_bore,
-    // internal_grinder, broach — 2026-09-18/2026-09-17) — they now correctly
-    // resolve to THEMSELVES via Tier 0's exact-match path (a real class_key
-    // already equal to a real MachineClass, no keyword aliasing needed), not
-    // via MACHINING_CATEGORY_ALIAS.
+    // Several more real Machining categories have their own dedicated cost
+    // engine and MACHINE_REGISTRY entry (gun_drill, deep_bore_machine,
+    // manual_deburr, cylindrical_grinder, jig_bore, internal_grinder,
+    // broach) — they resolve to THEMSELVES via Tier 0's exact-match path too.
     expect(classifyMachineRecord(real('m9', 'cylindrical_grinder', 'Flex Grind Schaudt M'))).toBe('cylindrical_grinder');
     expect(classifyMachineRecord(real('m8', 'broach', 'Pioneer VT1040'))).toBe('broach');
 
-    // The remaining real Machining categories still have no dedicated cost
-    // engine to alias into yet — correctly stay unclassified (a disclosed
-    // gap, not force-fit into an unrelated bucket). Spot-check a
-    // representative few, including MillTurn (deliberately NOT aliased to
-    // cnc_mill_turn despite its keyword-collision-avoidance rename to
-    // 'machining_millturn' — see MACHINING_CATEGORY_ALIAS's own doc comment).
-    expect(classifyMachineRecord(real('m10', 'machining_millturn', 'GILDEMEISTER GMX 400 LINEAR'))).toBeNull();
+    // machining_millturn already has its own real MACHINE_REGISTRY entry and
+    // registered engine (a separate, distinct fleet from the deleted
+    // cnc_mill_turn bucket) — classifies to itself via Tier 0, same as the
+    // other real classes above.
+    expect(classifyMachineRecord(real('m10', 'machining_millturn', 'GILDEMEISTER GMX 400 LINEAR'))).toBe('machining_millturn');
+    // 3_axis_router has no dedicated cost engine yet — correctly stays
+    // unclassified (a disclosed gap, not force-fit into an unrelated bucket).
     expect(classifyMachineRecord(real('m11', '3_axis_router', 'Multicam 7000 Series CNC Router, Model 103'))).toBeNull();
   });
 
-  it('still classifies a real machining center correctly', () => {
+  it('still classifies a real machining center correctly from a generic axis-count name (Tier 2 keyword fallback)', () => {
     const makino = {
       id: '4', machine_name: 'Makino V56i', machine_class: 'Milling_Center 3axis',
       process_group: 'Machining', commodity_code: 'Machining',
@@ -236,8 +233,8 @@ describe('classifyMachineRecord', () => {
       operators: null,
       usd_lhr_total: null,
     };
-    expect(classifyMachineRecord(makino)).toBe('cnc_3ax_vmc');
-    expect(classifyMachineRecord(dmgMori5ax)).toBe('cnc_5ax_mc');
+    expect(classifyMachineRecord(makino)).toBe('3_axis_mill');
+    expect(classifyMachineRecord(dmgMori5ax)).toBe('5_axis_mill');
   });
 
   it('never classifies a Press/Forming-family machine into press_brake (root-caused 2026-08-30 live bug: Aida UMX-600, a Progressive Die Press machine, was wrongly resolved for a Bend Brake/Shearning quote line)', () => {
@@ -314,7 +311,7 @@ describe('isCapable', () => {
   });
 
   it('filters a sliding-head lathe for parts above its diameter', () => {
-    const bnc20 = candidate({ machineClass: 'cnc_lathe', hourlyRate: 300, capability: { maxDiameterMm: 20, maxLengthMm: 320 } });
+    const bnc20 = candidate({ machineClass: '2_axis_lathe', hourlyRate: 300, capability: { maxDiameterMm: 20, maxLengthMm: 320 } });
     expect(isCapable(bnc20, latheRequirement({ maxDiameterMm: 50, maxLengthMm: 200 }))).toBe(false);
     expect(isCapable(bnc20, latheRequirement({ maxDiameterMm: 15, maxLengthMm: 200 }))).toBe(true);
   });
@@ -362,11 +359,11 @@ describe('selectMachine', () => {
     // production, but if a caller ever constructs a router candidate directly this
     // locks in that isCapable/scoring alone would not save us — classification must).
     const router = candidate({
-      machineId: 'router', machineName: 'Virtual 5 Axis Router - Small', machineClass: 'cnc_5ax_mc',
+      machineId: 'router', machineName: 'Virtual 5 Axis Router - Small', machineClass: '5_axis_mill',
       hourlyRate: 11.18, capability: { maxXMm: 400, maxYMm: 400, maxZMm: 400, maxWorkpieceWeightKg: 300 },
     });
     const realMill = candidate({
-      machineId: 'dmg', machineName: 'DMG MORI DMU 105 monoBLOCK', machineClass: 'cnc_5ax_mc',
+      machineId: 'dmg', machineName: 'DMG MORI DMU 105 monoBLOCK', machineClass: '5_axis_mill',
       hourlyRate: 23.26, capability: { maxXMm: 1050, maxYMm: 1050, maxZMm: 1050, maxWorkpieceWeightKg: 1000 },
     });
     const req = vmcRequirement({ bboxXMm: 83, bboxYMm: 62.4, bboxZMm: 34.5, finishedWeightKg: 0.2, materialMrrCm3PerMin: 150 });
@@ -422,12 +419,12 @@ describe('selectMachine', () => {
   });
 
   it('honours a user override even outside the capability filter', () => {
-    const small = candidate({ machineId: 'small', machineClass: 'cnc_lathe', hourlyRate: 300, capability: { maxDiameterMm: 20, maxLengthMm: 320 } });
-    const big = candidate({ machineId: 'big', machineClass: 'cnc_lathe', hourlyRate: 700, capability: { maxDiameterMm: 356, maxLengthMm: 533 } });
+    const small = candidate({ machineId: 'small', machineClass: '2_axis_lathe', hourlyRate: 300, capability: { maxDiameterMm: 20, maxLengthMm: 320 } });
+    const big = candidate({ machineId: 'big', machineClass: '2_axis_lathe', hourlyRate: 700, capability: { maxDiameterMm: 356, maxLengthMm: 533 } });
     const result = selectMachine({
       pool: [small, big],
       location,
-      machineClass: 'cnc_lathe',
+      machineClass: '2_axis_lathe',
       requirement: latheRequirement({ maxDiameterMm: 50, maxLengthMm: 200 }),
       overrideMachineId: 'small',
     });
@@ -452,8 +449,8 @@ describe('selectMachine', () => {
 
   it('fitScore rewards tighter machines and floors at 0.3', () => {
     const req = vmcRequirement({ bboxXMm: 350, bboxYMm: 250, bboxZMm: 180, finishedWeightKg: 10, materialMrrCm3PerMin: 60 });
-    const snug = candidate({ machineClass: 'cnc_3ax_vmc', hourlyRate: 900, capability: { maxXMm: 500, maxYMm: 400, maxZMm: 300, maxWorkpieceWeightKg: 500 } });
-    const huge = candidate({ machineClass: 'cnc_3ax_vmc', hourlyRate: 2000, capability: { maxXMm: 4000, maxYMm: 3000, maxZMm: 2000, maxWorkpieceWeightKg: 9000 } });
+    const snug = candidate({ machineClass: '3_axis_mill', hourlyRate: 900, capability: { maxXMm: 500, maxYMm: 400, maxZMm: 300, maxWorkpieceWeightKg: 500 } });
+    const huge = candidate({ machineClass: '3_axis_mill', hourlyRate: 2000, capability: { maxXMm: 4000, maxYMm: 3000, maxZMm: 2000, maxWorkpieceWeightKg: 9000 } });
     expect(fitScore(snug, req)).toBeGreaterThan(fitScore(huge, req));
     expect(fitScore(huge, req)).toBeGreaterThanOrEqual(0.3);
   });
@@ -571,7 +568,7 @@ describe('P0.4 — integration: buildPartRequirements() feeds selectMachine() wi
   function callBuildPartRequirements(input: Record<string, unknown>) {
     const svc = Object.create(BOMItemsService.prototype) as BOMItemsService;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (svc as any).buildPartRequirements(input);
+    return (svc as any).buildPartRequirements({ location: 'India', accessToken: 'test-token', ...input });
   }
 
   const partGeometry = {
@@ -591,24 +588,24 @@ describe('P0.4 — integration: buildPartRequirements() feeds selectMachine() wi
     materialShearStrengthMpa: 300,
   };
 
-  it('produces a real PunchingRequirement (not a shared LaserRequirement) for turret_punch', () => {
-    const requirements = callBuildPartRequirements(partGeometry);
+  it('produces a real PunchingRequirement (not a shared LaserRequirement) for turret_punch', async () => {
+    const requirements = await callBuildPartRequirements(partGeometry);
     expect(requirements.turret_punch?.kind).toBe('turret_punch');
     expect(requirements.turret_punch?.tonnage).toBeCloseTo(11.47, 1);
     // fiber/CO2 laser must still get the laser requirement, unmodified
     expect(requirements.fiber_laser?.kind).toBe('laser');
   });
 
-  it('produces a real WaterjetRequirement (not a shared LaserRequirement) for waterjet', () => {
-    const requirements = callBuildPartRequirements(partGeometry);
+  it('produces a real WaterjetRequirement (not a shared LaserRequirement) for waterjet', async () => {
+    const requirements = await callBuildPartRequirements(partGeometry);
     expect(requirements.waterjet?.kind).toBe('waterjet');
     expect(requirements.waterjet?.thicknessMm).toBe(1.5);
     expect(requirements.waterjet?.bedLengthMm).toBe(300);
     expect(requirements.waterjet?.bedWidthMm).toBe(200);
   });
 
-  it('the PunchingRequirement produced by the real production method correctly drives selectMachine() to reject an incapable turret and pick the capable one', () => {
-    const requirements = callBuildPartRequirements(partGeometry);
+  it('the PunchingRequirement produced by the real production method correctly drives selectMachine() to reject an incapable turret and pick the capable one', async () => {
+    const requirements = await callBuildPartRequirements(partGeometry);
     const weakTurret = candidate({
       machineId: 'weak-turret', machineClass: 'turret_punch', hourlyRate: 40,
       capability: { maxTonnage: 5, maxThicknessMm: 3, maxXMm: 1250, maxYMm: 2500 },
@@ -628,9 +625,9 @@ describe('P0.4 — integration: buildPartRequirements() feeds selectMachine() wi
     expect(result.balanced.candidate.hourlyRate).toBe(45); // proves the RATE flows from the real selection, not a placeholder
   });
 
-  it('the WaterjetRequirement produced by the real production method correctly drives selectMachine() to reject a too-thin-capacity waterjet and pick the capable one', () => {
+  it('the WaterjetRequirement produced by the real production method correctly drives selectMachine() to reject a too-thin-capacity waterjet and pick the capable one', async () => {
     const thickJob = { ...partGeometry, sheetThicknessMm: 25, flatPatternAreaMm2: 1000 * 500, flatLenMm: 1000, flatWidMm: 500 };
-    const requirements = callBuildPartRequirements(thickJob);
+    const requirements = await callBuildPartRequirements(thickJob);
     const thin = candidate({ machineId: 'thin-wj', machineClass: 'waterjet', hourlyRate: 900, capability: { maxThicknessMm: 10, maxXMm: 3000, maxYMm: 1500 } });
     const thick = candidate({ machineId: 'thick-wj', machineClass: 'waterjet', hourlyRate: 1500, capability: { maxThicknessMm: 50, maxXMm: 3000, maxYMm: 1500 } });
     const result = selectMachine({
@@ -644,8 +641,8 @@ describe('P0.4 — integration: buildPartRequirements() feeds selectMachine() wi
     expect(result.balanced.candidate.hourlyRate).toBe(1500);
   });
 
-  it('a part with zero bends still only assigns press_brake when bendCount > 0 — turret/waterjet fix does not disturb unrelated requirement assignment', () => {
-    const requirements = callBuildPartRequirements(partGeometry); // bendCount: 0
+  it('a part with zero bends still only assigns press_brake when bendCount > 0 — turret/waterjet fix does not disturb unrelated requirement assignment', async () => {
+    const requirements = await callBuildPartRequirements(partGeometry); // bendCount: 0
     expect(requirements.press_brake).toBeUndefined();
     expect(requirements.turret_punch).toBeDefined();
     expect(requirements.waterjet).toBeDefined();
@@ -736,9 +733,9 @@ describe('Machine Economics — shear gets its own real ShearRequirement', () =>
     expect(result.balanced.candidate.machineId).toBe('no-data-shear'); // still a real selection, not a crash
   });
 
-  it('production wiring: buildPartRequirements() produces a real ShearRequirement for shear, not a shared LaserRequirement', () => {
+  it('production wiring: buildPartRequirements() produces a real ShearRequirement for shear, not a shared LaserRequirement', async () => {
     const svc = Object.create(BOMItemsService.prototype) as BOMItemsService;
-    const requirements = (svc as any).buildPartRequirements({
+    const requirements = await (svc as any).buildPartRequirements({
       family: 'sheet_metal',
       grade: 'CRCA',
       sheetThicknessMm: 3,
@@ -796,9 +793,9 @@ describe('Machine Economics — plasma_cut gets its own real PlasmaCutRequiremen
     expect(result.balanced.candidate.machineId).toBe('no-data-plasma');
   });
 
-  it('production wiring: buildPartRequirements() produces a real PlasmaCutRequirement for plasma_cut, not a shared LaserRequirement', () => {
+  it('production wiring: buildPartRequirements() produces a real PlasmaCutRequirement for plasma_cut, not a shared LaserRequirement', async () => {
     const svc = Object.create(BOMItemsService.prototype) as BOMItemsService;
-    const requirements = (svc as any).buildPartRequirements({
+    const requirements = await (svc as any).buildPartRequirements({
       family: 'sheet_metal',
       grade: 'CRCA',
       sheetThicknessMm: 3,
@@ -828,9 +825,9 @@ describe('Machine Economics — plasma_cut gets its own real PlasmaCutRequiremen
 // getting the laser-shaped `cutReq` instead (same false-rejection defect as
 // shear/plasma_cut before their fixes).
 describe('Machine Economics — plasma_punch correctly gets a generic requirement, not a shared LaserRequirement', () => {
-  it('production wiring: buildPartRequirements() assigns kind:generic for plasma_punch', () => {
+  it('production wiring: buildPartRequirements() assigns kind:generic for plasma_punch', async () => {
     const svc = Object.create(BOMItemsService.prototype) as BOMItemsService;
-    const requirements = (svc as any).buildPartRequirements({
+    const requirements = await (svc as any).buildPartRequirements({
       family: 'sheet_metal',
       grade: 'CRCA',
       sheetThicknessMm: 3,
@@ -920,9 +917,9 @@ describe('Machine Economics — laser_punch gets its own real LaserPunchRequirem
     expect(result.balanced.candidate.machineId).toBe('no-data-lp');
   });
 
-  it('production wiring: buildPartRequirements() produces a real LaserPunchRequirement for laser_punch, not a shared LaserRequirement', () => {
+  it('production wiring: buildPartRequirements() produces a real LaserPunchRequirement for laser_punch, not a shared LaserRequirement', async () => {
     const svc = Object.create(BOMItemsService.prototype) as BOMItemsService;
-    const requirements = (svc as any).buildPartRequirements({
+    const requirements = await (svc as any).buildPartRequirements({
       family: 'sheet_metal',
       grade: 'CRCA',
       sheetThicknessMm: 3,
@@ -1027,9 +1024,9 @@ describe('Machine Economics — standard_press/tandem_press get their own real P
     expect(result.balanced.candidate.machineId).toBe('no-data-sp');
   });
 
-  it('production wiring: buildPartRequirements() produces real PressRequirements for standard_press/tandem_press/progressive_die_press, not the generic fallback', () => {
+  it('production wiring: buildPartRequirements() produces real PressRequirements for standard_press/tandem_press/progressive_die_press, not the generic fallback', async () => {
     const svc = Object.create(BOMItemsService.prototype) as BOMItemsService;
-    const requirements = (svc as any).buildPartRequirements({
+    const requirements = await (svc as any).buildPartRequirements({
       family: 'sheet_metal',
       grade: 'CRCA',
       sheetThicknessMm: 3,
@@ -1089,9 +1086,9 @@ describe('Machine Economics — roll_bending_2/3/4 get their own real RollBendin
     expect(result.balanced.candidate.machineId).toBe('no-data-rb');
   });
 
-  it('production wiring: buildPartRequirements() produces real RollBendingRequirements for roll_bending_2/3/4, not the generic fallback', () => {
+  it('production wiring: buildPartRequirements() produces real RollBendingRequirements for roll_bending_2/3/4, not the generic fallback', async () => {
     const svc = Object.create(BOMItemsService.prototype) as BOMItemsService;
-    const requirements = (svc as any).buildPartRequirements({
+    const requirements = await (svc as any).buildPartRequirements({
       family: 'sheet_metal',
       grade: 'CRCA',
       sheetThicknessMm: 3,

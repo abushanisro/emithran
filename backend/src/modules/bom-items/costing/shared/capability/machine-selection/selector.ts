@@ -85,27 +85,12 @@ const ALL_CLASSES = Object.keys(MACHINE_REGISTRY) as MachineClass[];
 // returned null for every one of them, so cost-cnc-engine.ts always priced
 // off the class-default/benchmark rate instead of real machine data.
 //
-// Scoped to the 7 real categories that correspond 1:1 to an EXISTING
-// coarse cnc_* pricing bucket. The "...with Sub Spindle" pair maps to
-// cnc_lathe_live specifically because they name the real distinguishing
-// feature (live-tooling sub-spindle bar feed) — not because of the axis
-// count, which "2 Axis Lathe"/"3 Axis Lathe" also carry without implying
-// live tooling. The other 31 real Machining station categories (Broach,
-// grinders, MillTurn, routers, ...) have no dedicated cost engine to alias
-// into yet — deliberately left unclassified (returns null, same as
-// today) rather than force-fit into an unrelated bucket; wiring them is
-// its own future phase (new registered engines per category, mirroring
-// how Sheet Metal's secondary ops were each extracted into their own
-// engine — see this project's Phase 1 remediation).
-const MACHINING_CATEGORY_ALIAS: Readonly<Record<string, MachineClass>> = {
-  '2_axis_lathe': 'cnc_lathe',
-  '3_axis_lathe': 'cnc_lathe',
-  '2_axis_bar_feed_lathe_with_sub_spindle': 'cnc_lathe_live',
-  '3_axis_bar_feed_lathe_with_sub_spindle': 'cnc_lathe_live',
-  '3_axis_mill': 'cnc_3ax_vmc',
-  '4_axis_mill': 'cnc_4ax_vmc',
-  '5_axis_mill': 'cnc_5ax_mc',
-};
+// FIXED (Machining Engine Re-Architecture): these 7 real categories are now
+// real MachineClass members in their own right (MACHINE_REGISTRY,
+// default-rates.constants.ts), so Tier 0 below matches them directly —
+// the alias that used to coarsen them down into a cnc_* bucket has been
+// removed entirely, not just made dead code, since keeping it would have
+// silently thrown away the exact granularity this fix restores.
 
 const COMMODITY_TO_CLASS = new Map<string, MachineClass>();
 for (const cls of ALL_CLASSES) {
@@ -211,18 +196,24 @@ export function classifyMachineRecord(row: RawMachineRow): MachineClass | null {
   // NAME to also contain a keyword) — so every process line for that class
   // fell back to the generic class-default/benchmark rate instead of the
   // real machine actually on file.
+  //
+  // REVERTED (Machining Engine Re-Architecture audit): a same-day attempt to
+  // trust ANY non-empty machine_class directly here (removing the
+  // ALL_CLASSES_SET.has(rawClass) gate, reasoning it only served as a
+  // pool-inclusion gate) was wrong and reverted — real mhr_records rows
+  // legitimately carry MESSY, non-canonical text directly in machine_class
+  // (e.g. "Milling_Center 3axis", "Bend Press Brake"), and this gate is
+  // what tells Tier 0 "this value is already a clean, canonical slug, trust
+  // it" apart from "this value needs Tier 2/3 keyword classification like
+  // any messy machine_name would" — caught by machine-selection.spec.ts's
+  // own real-messy-machine_class regression tests before this shipped.
+  // MACHINE_REGISTRY's Tier-0 gate closing off an unregistered-but-clean
+  // real class remains a known, narrower gap than originally scoped — not
+  // fixed here; needs a real signal to distinguish "clean slug" from "messy
+  // free text" that this column alone doesn't reliably provide.
   const rawClass = (row.machine_class ?? '').trim().toLowerCase();
   if (rawClass && ALL_CLASSES_SET.has(rawClass)) {
     return rawClass as MachineClass;
-  }
-
-  // Tier 0b — real Machining category alias (see MACHINING_CATEGORY_ALIAS's
-  // own doc comment). Checked immediately after Tier 0 proper, with the
-  // same "trust it directly" confidence — these are known, reviewed 1:1
-  // synonyms for a real vocabulary this registry never spoke, not a fuzzy
-  // guess.
-  if (rawClass && rawClass in MACHINING_CATEGORY_ALIAS) {
-    return MACHINING_CATEGORY_ALIAS[rawClass];
   }
 
   // Tier 1 — exact commodity code
@@ -243,10 +234,18 @@ export function classifyMachineRecord(row: RawMachineRow): MachineClass | null {
   // cnc_* class regardless of axis-count text matching.
   const isRouterRecord = /\brouter\b/i.test(allText);
 
+  // Real granular primary Machining classes (Machining Engine Re-Architecture)
+  // — replaces the old cls.startsWith('cnc_')/cnc_3ax_vmc-etc. checks below,
+  // which named the 6 now-deleted coarse buckets directly.
+  const isMillingClass = (cls: string) => cls === '3_axis_mill' || cls === '4_axis_mill' || cls === '5_axis_mill';
+  const isTurningClass = (cls: string) =>
+    cls === '2_axis_lathe' || cls === '3_axis_lathe' ||
+    cls === '2_axis_bar_feed_lathe_with_sub_spindle' || cls === '3_axis_bar_feed_lathe_with_sub_spindle';
+
   // Tier 2 — machine_class keyword (most specific text field)
   for (const cls of ALL_CLASSES) {
-    const isMachiningClass = cls.startsWith('cnc_');
-    const isVMCClass = cls === 'cnc_3ax_vmc' || cls === 'cnc_4ax_vmc' || cls === 'cnc_5ax_mc';
+    const isMachiningClass = isMillingClass(cls) || isTurningClass(cls);
+    const isVMCClass = isMillingClass(cls);
     if (isVMCClass && isLatheRecord) continue;
     if (isMachiningClass && isRouterRecord) continue;
     if (MACHINE_REGISTRY[cls].machineClassKeywords.some((kw) => hasKeyword(mcLower, kw))) {
@@ -257,8 +256,8 @@ export function classifyMachineRecord(row: RawMachineRow): MachineClass | null {
   // Tier 3 — process_group keyword, but only when the machine NAME also matches,
   // so "Default Deslag" (process_group=Laser) can't classify as a fiber laser.
   for (const cls of ALL_CLASSES) {
-    const isMachiningClass = cls.startsWith('cnc_');
-    const isVMCClass = cls === 'cnc_3ax_vmc' || cls === 'cnc_4ax_vmc' || cls === 'cnc_5ax_mc';
+    const isMachiningClass = isMillingClass(cls) || isTurningClass(cls);
+    const isVMCClass = isMillingClass(cls);
     if (isVMCClass && isLatheRecord) continue;
     if (isMachiningClass && isRouterRecord) continue;
     const entry = MACHINE_REGISTRY[cls];

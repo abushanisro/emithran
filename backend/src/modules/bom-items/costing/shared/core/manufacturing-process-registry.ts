@@ -89,12 +89,16 @@ export const MANUFACTURING_PROCESS_REGISTRY: ManufacturingProcessEngine<any, any
   new CountersinkingEngine(),
   new ReamingEngine(),
   new PemInsertionEngine(),
-  new CncMillingEngine('cnc_3ax_vmc'),
-  new CncMillingEngine('cnc_4ax_vmc'),
-  new CncMillingEngine('cnc_5ax_mc'),
-  new CncTurningEngine('cnc_lathe'),
-  new CncTurningEngine('cnc_lathe_live'),
-  new CncTurningEngine('cnc_mill_turn'),
+  // Real, granular primary CNC classes — replaces the deleted 6-member
+  // cnc_3ax_vmc/cnc_4ax_vmc/cnc_5ax_mc/cnc_lathe/cnc_lathe_live/cnc_mill_turn
+  // registrations (Machining Engine Re-Architecture).
+  new CncMillingEngine('3_axis_mill'),
+  new CncMillingEngine('4_axis_mill'),
+  new CncMillingEngine('5_axis_mill'),
+  new CncTurningEngine('2_axis_lathe'),
+  new CncTurningEngine('3_axis_lathe'),
+  new CncTurningEngine('2_axis_bar_feed_lathe_with_sub_spindle'),
+  new CncTurningEngine('3_axis_bar_feed_lathe_with_sub_spindle'),
   new InjectionMoldingEngine(),
   new InspectionRegistryEngine(),
   new SurfaceTreatmentEngine(),

@@ -24,7 +24,7 @@ import {
   requiredMilledMachineClass, meetsRequiredMilledClass, pickRecommendedRoute,
   detectMaterialClass,
 } from './costing/machining/process/cost-cnc-engine';
-import type { CNCCostInput, CNCMachineClass } from './costing/machining/process/cost-cnc-engine';
+import type { CNCCostInput, MachineClassId } from './costing/machining/process/cost-cnc-engine';
 import { BlankOptimizerService } from './costing/sheet-metal/machine/blank-optimizer.service';
 import { buildOperationSequence, injectDrawingIntelligence } from './costing/machining/operation/operation-sequencer';
 import type { OperationLine } from './costing/machining/operation/operation-sequencer';
@@ -108,6 +108,7 @@ import { CADAnalysisService } from './services/cad-analysis.service';
 import { RateResolutionService } from './services/rate-resolution.service';
 import { CalculatorCatalogService } from './services/calculator-catalog.service';
 import { MaterialResolutionService } from './services/material-resolution.service';
+import { MachineDiscoveryService } from './services/machine-discovery.service';
 
 @Injectable()
 export class BOMItemsService {
@@ -170,6 +171,7 @@ export class BOMItemsService {
     private readonly rateResolutionService: RateResolutionService,
     private readonly calculatorCatalogService: CalculatorCatalogService,
     private readonly materialResolutionService: MaterialResolutionService,
+    private readonly machineDiscoveryService: MachineDiscoveryService,
   ) { }
 
   /**
@@ -1165,7 +1167,7 @@ export class BOMItemsService {
 
   // Compute the physical requirement each machine class must meet for this part.
   // Classes absent from the map are gated as 'generic' (no dimensional constraint).
-  private buildPartRequirements(input: {
+  private async buildPartRequirements(input: {
     family: string;
     grade: string | null;
     sheetThicknessMm: number;
@@ -1202,8 +1204,13 @@ export class BOMItemsService {
     // post-selection TONNAGE_EXCEEDED capability check can never disagree.
     cutLengthMm?: number;
     materialShearStrengthMpa?: number | null;
-  }): Partial<Record<MachineClass, MachineRequirement>> {
-    const requirements: Partial<Record<MachineClass, MachineRequirement>> = {};
+    // Needed only for the Machining branches below, which discover their
+    // eligible primary machine classes from the database (MachineDiscoveryService)
+    // instead of a hardcoded list — see machine-discovery.service.ts.
+    location: string;
+    accessToken: string;
+  }): Promise<Partial<Record<string, MachineRequirement>>> {
+    const requirements: Partial<Record<string, MachineRequirement>> = {};
     const matFamily = classifyLaserMaterial(input.grade);
 
     if (input.family === 'sheet_metal' || input.sheetThicknessMm > 0) {
@@ -1358,9 +1365,17 @@ export class BOMItemsService {
         finishedWeightKg: input.weightKg,
         materialMrrCm3PerMin: MATERIAL_MRR_CM3_MIN[matFamily] ?? MATERIAL_MRR_CM3_MIN.OTHER,
       });
-      requirements.cnc_3ax_vmc = vmcReq;
-      requirements.cnc_4ax_vmc = vmcReq;
-      requirements.cnc_5ax_mc = vmcReq;
+      // Discovered from the database (real mhr_records rows joined through
+      // process_taxonomy.machining_route_role='primary_milling'), not a
+      // fixed 3-member list — see machine-discovery.service.ts. Every
+      // milling machine class gets the SAME physics requirement object
+      // (only the downstream capability envelope check differs per class),
+      // matching this function's own pre-existing behavior for the 6
+      // literal classes it used to assign identically.
+      const millingClasses = await this.machineDiscoveryService.getEligibleClasses(
+        'primary_milling', input.location, input.accessToken,
+      );
+      for (const cls of millingClasses) requirements[cls] = vmcReq;
     }
 
     if (input.family === 'cnc_turned' || input.family === 'mill_turn') {
@@ -1368,9 +1383,10 @@ export class BOMItemsService {
       // is the turned diameter
       const dims = [input.bboxXMm, input.bboxYMm, input.bboxZMm].sort((a, b) => b - a);
       const latheReq = latheRequirement({ maxDiameterMm: dims[1], maxLengthMm: dims[0] });
-      requirements.cnc_lathe = latheReq;
-      requirements.cnc_lathe_live = latheReq;
-      requirements.cnc_mill_turn = latheReq;
+      const turningClasses = await this.machineDiscoveryService.getEligibleClasses(
+        'primary_turning', input.location, input.accessToken,
+      );
+      for (const cls of turningClasses) requirements[cls] = latheReq;
     }
 
     if (input.family === 'plastic_molded') {
@@ -2846,7 +2862,7 @@ export class BOMItemsService {
 
     const physics = this.physicsSelectionEnabled()
       ? {
-          requirements: this.buildPartRequirements({
+          requirements: await this.buildPartRequirements({
             family,
             grade,
             sheetThicknessMm,
@@ -2864,6 +2880,8 @@ export class BOMItemsService {
             burlDiameterMm: estimateBurlDiameterMm(threads, (fg?.summary?.holeDiameters ?? []) as number[]),
             cutLengthMm,
             materialShearStrengthMpa: shearStrengthMpa,
+            location,
+            accessToken,
           }),
           overrides: await this.fetchMachineOverrides(id, accessToken, location),
         }
@@ -2989,12 +3007,13 @@ export class BOMItemsService {
       );
 
       const cncProcessIdentities = await this.resolveProcessIdentities(accessToken, [
-        mhrRates.cnc3ax.machineClass,
-        mhrRates.cnc4ax.machineClass,
-        mhrRates.cnc5ax.machineClass,
-        mhrRates.cncLathe.machineClass,
-        mhrRates.cncLatheLive.machineClass,
-        mhrRates.cncMillTurn.machineClass,
+        mhrRates.mill3ax.machineClass,
+        mhrRates.mill4ax.machineClass,
+        mhrRates.mill5ax.machineClass,
+        mhrRates.lathe2ax.machineClass,
+        mhrRates.lathe3ax.machineClass,
+        mhrRates.latheBarFeed2ax.machineClass,
+        mhrRates.latheBarFeed3ax.machineClass,
         mhrRates.deburring.machineClass,
         mhrRates.inspection.machineClass,
         mhrRates.tapping.machineClass,
@@ -3023,7 +3042,7 @@ export class BOMItemsService {
         // generic (Sheet-Metal-sourced) deburring class when it's actually
         // on file for this location — see preferRealRate()'s own doc comment.
         deburrRate: preferRealRate(mhrRates.manualDeburr, mhrRates.deburring),
-        inspectionRate: mhrRates.inspection,
+        inspectionRate: preferRealRate(mhrRates.machiningInspection, mhrRates.inspection),
         surfaceTreatment: this.resolveSurfaceTreatment(item),
         surfaceTreatmentDbRate,
         samplingPerN: this.resolveSamplingPerN(item),
@@ -3063,18 +3082,34 @@ export class BOMItemsService {
       const pockets = (fg?.cnc_features?.feature_summary?.pockets ?? 0) as number;
       const requiredClass = requiredMilledMachineClass(fg?.difficultyLevel as string | null, pockets);
 
-      const candidateClasses: Array<{ cls: CNCMachineClass; rate: MHRRateInput }> =
-        family === 'cnc_milled'
-          ? [
-              { cls: 'cnc_3ax_vmc', rate: mhrRates.cnc3ax },
-              { cls: 'cnc_4ax_vmc', rate: mhrRates.cnc4ax },
-              { cls: 'cnc_5ax_mc', rate: mhrRates.cnc5ax },
-            ]
-          : [
-              { cls: 'cnc_lathe', rate: mhrRates.cncLathe },
-              { cls: 'cnc_lathe_live', rate: mhrRates.cncLatheLive },
-              { cls: 'cnc_mill_turn', rate: mhrRates.cncMillTurn },
-            ];
+      // Discovered from the database (real mhr_records rows joined through
+      // process_taxonomy.machining_route_role), not a fixed 3-member array —
+      // see machine-discovery.service.ts. primaryRateByClass is not a second
+      // hardcoded class list — it is just the lookup from a discovered class
+      // string to the rate resolveMHRRates already resolved for it.
+      const primaryRateByClass = new Map<string, MHRRateInput>([
+        ['3_axis_mill', mhrRates.mill3ax],
+        ['4_axis_mill', mhrRates.mill4ax],
+        ['5_axis_mill', mhrRates.mill5ax],
+        ['2_axis_lathe', mhrRates.lathe2ax],
+        ['3_axis_lathe', mhrRates.lathe3ax],
+        ['2_axis_bar_feed_lathe_with_sub_spindle', mhrRates.latheBarFeed2ax],
+        ['3_axis_bar_feed_lathe_with_sub_spindle', mhrRates.latheBarFeed3ax],
+      ]);
+      const discoveredPrimaryClasses = await this.machineDiscoveryService.getEligibleClasses(
+        family === 'cnc_milled' ? 'primary_milling' : 'primary_turning', location, accessToken,
+      );
+      if (discoveredPrimaryClasses.length === 0) {
+        throw new Error(
+          `No primary ${family === 'cnc_milled' ? 'milling' : 'turning'} machine classes discovered for ` +
+          `location "${location}" — process_taxonomy.machining_route_role (migration 780) and ` +
+          'mhr_records.canonical_process_id (migration 781) must be run against the live database ' +
+          'before Machining parts can be costed.',
+        );
+      }
+      const candidateClasses: Array<{ cls: MachineClassId; rate: MHRRateInput }> = discoveredPrimaryClasses
+        .filter((cls) => primaryRateByClass.has(cls))
+        .map((cls) => ({ cls: cls as MachineClassId, rate: primaryRateByClass.get(cls)! }));
 
       const costedRoutes = candidateClasses.map(({ cls, rate }) => {
         const tappingRate = this.inheritCncTappingRate(mhrRates.tapping, rate);
@@ -4679,7 +4714,7 @@ export class BOMItemsService {
     // ── MHR rates ──────────────────────────────────────────────────────────────
     const physics = this.physicsSelectionEnabled()
       ? {
-          requirements: this.buildPartRequirements({
+          requirements: await this.buildPartRequirements({
             family,
             grade,
             sheetThicknessMm,
@@ -4697,6 +4732,8 @@ export class BOMItemsService {
             burlDiameterMm: estimateBurlDiameterMm(threads, (fg?.summary?.holeDiameters ?? []) as number[]),
             cutLengthMm,
             materialShearStrengthMpa: rcShearStrengthMpa,
+            location,
+            accessToken,
           }),
           overrides: await this.fetchMachineOverrides(id, accessToken, location),
         }
@@ -5089,18 +5126,20 @@ export class BOMItemsService {
       ]);
       const routeDeburrLinearSpeed = routeDeburrParams.dataFound ? routeDeburrParams.linearSpeedMmPerSec : null;
       if (family === 'cnc_milled') {
-        return attachToRoutes(this.buildCNCMilledRoutes(
+        return attachToRoutes(await this.buildCNCMilledRoutes(
           id, item, fg, summary, grade, materialCostPerKg, materialDensityKgM3,
           materialSource, mhrRates, batchSize, comparisonWarnings, locInfo, location,
           inspection, cncSurfaceTreatmentDbRate, routeDeburrLinearSpeed, routeReamTable,
           routeJigBoreTable, routeCylindricalGrindingParams, routeBroachingParams,
+          accessToken,
         ));
       }
-      return attachToRoutes(this.buildCNCTurnedRoutes(
+      return attachToRoutes(await this.buildCNCTurnedRoutes(
         id, item, fg, summary, grade, materialCostPerKg, materialDensityKgM3,
         materialSource, mhrRates, batchSize, comparisonWarnings, locInfo, location,
         inspection, cncSurfaceTreatmentDbRate, routeDeburrLinearSpeed, routeReamTable,
         routeCylindricalGrindingParams, routeJigBoreTable, routeBroachingParams,
+        accessToken,
       ));
     }
     if (family === 'unknown') {
@@ -6633,7 +6672,7 @@ export class BOMItemsService {
       materialGrade: null, materialCostPerKg, materialDensityKgM3, materialSource,
       threads: [], tightestToleranceMm: null, gdtFeatureCount: 0,
       batchSize, family: 'cnc_milled', finishedWeightKg,
-      deburrRate: preferRealRate(mhrRates.manualDeburr, mhrRates.deburring), inspectionRate: mhrRates.inspection,
+      deburrRate: preferRealRate(mhrRates.manualDeburr, mhrRates.deburring), inspectionRate: preferRealRate(mhrRates.machiningInspection, mhrRates.inspection),
       surfaceTreatment: null, surfaceTreatmentDbRate: null,
       samplingPerN: undefined, samplingPolicy: undefined,
       gdtFeatures: [], location, blankResult,
@@ -6641,7 +6680,7 @@ export class BOMItemsService {
       mhrRate: mhrRates.cnc3ax, tappingRate: mhrRates.tapping,
     };
 
-    const cost = computeCNCMilledCostSummary(cncInput, 'cnc_3ax_vmc');
+    const cost = computeCNCMilledCostSummary(cncInput, '3_axis_mill' as MachineClassId);
     const blankSpec: BlankSpecDto = {
       form:           'billet',
       sizeLabel:      blankResult.sizeLabel,
@@ -6932,7 +6971,18 @@ export class BOMItemsService {
     return Number.isFinite(raMicron) && raMicron > 0 ? raMicron : null;
   }
 
-  private buildCNCMilledRoutes(
+  // Same convention as MHRService's private humanizeMachineClass — turns a
+  // real, DB-discovered snake_case class ('3_axis_mill') into a display
+  // label ('3 Axis Mill') without a per-class cosmetic lookup table.
+  private humanizeMachineClass(machineClass: string): string {
+    return machineClass
+      .split('_')
+      .filter(Boolean)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+  }
+
+  private async buildCNCMilledRoutes(
     id: string,
     item: any,
     fg: any,
@@ -6956,7 +7006,8 @@ export class BOMItemsService {
       roughAxialFeedRevMm: number; finishAxialFeedRevMm: number; dataFound: boolean;
     } | null,
     broachingParams?: { roughCuttingSpeedMPerMin: number; finishCuttingSpeedMPerMin: number; dataFound: boolean } | null,
-  ): Omit<RouteComparisonDto, 'recommendedRouteId'> {
+    accessToken: string = '',
+  ): Promise<Omit<RouteComparisonDto, 'recommendedRouteId'>> {
     // Fix 1: milled parts always use feature recognizer hole count (not raw cylinder count)
     const milledCncSummary = fg?.cnc_features?.feature_summary ?? null;
     const holeCount = milledCncSummary !== null
@@ -6993,7 +7044,7 @@ export class BOMItemsService {
       finishedWeightKg,
       // Same preference as getCostSummary — must match line for line.
       deburrRate:           preferRealRate(mhrRates.manualDeburr, mhrRates.deburring),
-      inspectionRate:       mhrRates.inspection,
+      inspectionRate:       preferRealRate(mhrRates.machiningInspection, mhrRates.inspection),
       surfaceTreatment:     this.resolveSurfaceTreatment(item),
       surfaceTreatmentDbRate: surfaceTreatmentDbRate ?? null,
       samplingPerN:         this.resolveSamplingPerN(item),
@@ -7015,10 +7066,28 @@ export class BOMItemsService {
       broachRate: mhrRates.broach,
     };
 
-    const milledMachineClasses: CNCMachineClass[] = ['cnc_3ax_vmc', 'cnc_4ax_vmc', 'cnc_5ax_mc'];
-    const milledRouteIds: RouteId[] = ['cnc-3ax', 'cnc-4ax', 'cnc-5ax'];
-    const milledRouteLabels = ['3-Axis VMC', '4-Axis VMC', '5-Axis MC'];
-    const milledMhrKeys = ['cnc3ax', 'cnc4ax', 'cnc5ax'] as const;
+    // Discovered from the database, not a fixed 3-member array — see
+    // machine-discovery.service.ts. primaryRateByClass is the same lookup
+    // (discovered class string -> already-resolved rate), not a second
+    // hardcoded class list.
+    const primaryRateByClass = new Map<string, MHRRateInput>([
+      ['3_axis_mill', mhrRates.mill3ax],
+      ['4_axis_mill', mhrRates.mill4ax],
+      ['5_axis_mill', mhrRates.mill5ax],
+    ]);
+    const discoveredMilledClasses = await this.machineDiscoveryService.getEligibleClasses(
+      'primary_milling', location, accessToken,
+    );
+    if (discoveredMilledClasses.length === 0) {
+      throw new Error(
+        `No primary milling machine classes discovered for location "${location}" — ` +
+        'process_taxonomy.machining_route_role (migration 780) and mhr_records.canonical_process_id ' +
+        '(migration 781) must be run against the live database before Route Comparison can offer milling routes.',
+      );
+    }
+    const milledMachineClasses: MachineClassId[] = discoveredMilledClasses
+      .filter((cls) => primaryRateByClass.has(cls))
+      .map((cls) => cls as MachineClassId);
 
     const pocketCount = (fg?.cnc_features?.feature_summary?.pockets ?? 0) as number;
     // Same feature gate the cost summary uses — a route below the class the
@@ -7027,8 +7096,8 @@ export class BOMItemsService {
 
     const threadCount = baseInput.threads.reduce((s, t) => s + t.count, 0);
 
-    const routes: RouteResultDto[] = milledMachineClasses.map((mc, i) => {
-      const routeRate = mhrRates[milledMhrKeys[i]];
+    const routes: RouteResultDto[] = milledMachineClasses.map((mc) => {
+      const routeRate = primaryRateByClass.get(mc)!;
       const cost = computeCNCMilledCostSummary(
         { ...baseInput, mhrRate: routeRate, tappingRate: this.inheritCncTappingRate(mhrRates.tapping, routeRate) },
         mc,
@@ -7048,8 +7117,8 @@ export class BOMItemsService {
       const overallCapable = envelope.overallCapable && meetsClass;
       const routeSetups = cost.setupCount ?? 1;
       return {
-        routeId: milledRouteIds[i],
-        routeLabel: milledRouteLabels[i],
+        routeId: mc as unknown as RouteId,
+        routeLabel: this.humanizeMachineClass(mc),
         processFamily: 'cutting',
         toolingVolumeNote: null,
         processLines: cost.processLines,
@@ -7104,9 +7173,15 @@ export class BOMItemsService {
       ).route;
       routes.forEach((r) => { r.badges.lowestCost = r.routeId === recommended.routeId; });
 
-      // Fastest: many pockets → 5-axis (no repositioning); otherwise 3-axis
-      const fastestId: RouteId = pocketCount > 5 ? 'cnc-5ax' : 'cnc-3ax';
-      routes.forEach((r) => { r.badges.fastest = r.routeId === fastestId && r.capability.overallCapable; });
+      // Fastest: minimum realized cycle time among capable routes — the
+      // axis-count proxy this used to be (many pockets -> 5-axis, otherwise
+      // 3-axis) was always a stand-in for cycle time, which is already
+      // computed per route; ranking on it directly works for any number of
+      // discovered candidates, not just a fixed 3-way choice.
+      const fastestCycleMin = Math.min(...capable.map((r) => r.cycleTimes.totalMin ?? Infinity));
+      routes.forEach((r) => {
+        r.badges.fastest = r.capability.overallCapable && (r.cycleTimes.totalMin ?? Infinity) === fastestCycleMin;
+      });
 
       // Best quality: fewest setups among capable routes (minimum repositioning error)
       const minSetups = Math.min(...capable.map((r) => r.setupCount ?? 99));
@@ -7126,7 +7201,7 @@ export class BOMItemsService {
     };
   }
 
-  private buildCNCTurnedRoutes(
+  private async buildCNCTurnedRoutes(
     id: string,
     item: any,
     fg: any,
@@ -7150,7 +7225,8 @@ export class BOMItemsService {
     } | null,
     jigBoreTable?: any[] | null,
     broachingParams?: { roughCuttingSpeedMPerMin: number; finishCuttingSpeedMPerMin: number; dataFound: boolean } | null,
-  ): Omit<RouteComparisonDto, 'recommendedRouteId'> {
+    accessToken: string = '',
+  ): Promise<Omit<RouteComparisonDto, 'recommendedRouteId'>> {
     // Fix 1: turned parts also use feature recognizer hole count
     const turnedCncSummary = fg?.cnc_features?.feature_summary ?? null;
     const holeCount = turnedCncSummary !== null
@@ -7185,7 +7261,7 @@ export class BOMItemsService {
       finishedWeightKg,
       // Same preference as getCostSummary — must match line for line.
       deburrRate:           preferRealRate(mhrRates.manualDeburr, mhrRates.deburring),
-      inspectionRate:       mhrRates.inspection,
+      inspectionRate:       preferRealRate(mhrRates.machiningInspection, mhrRates.inspection),
       surfaceTreatment:     this.resolveSurfaceTreatment(item),
       surfaceTreatmentDbRate: surfaceTreatmentDbRate ?? null,
       samplingPerN:         this.resolveSamplingPerN(item),
@@ -7208,15 +7284,34 @@ export class BOMItemsService {
       broachRate: mhrRates.broach,
     };
 
-    const machineClasses: CNCMachineClass[] = ['cnc_lathe', 'cnc_lathe_live', 'cnc_mill_turn'];
-    const routeIds: RouteId[] = ['cnc-lathe', 'cnc-lathe-lt', 'cnc-mill-turn'];
-    const routeLabels = ['CNC Lathe (2-Axis)', 'Lathe + Live Tooling', 'Mill-Turn'];
-    const mhrKeys = ['cncLathe', 'cncLatheLive', 'cncMillTurn'] as const;
+    // Discovered from the database, not a fixed 3-member array — see
+    // machine-discovery.service.ts. primaryRateByClass is the same lookup
+    // (discovered class string -> already-resolved rate), not a second
+    // hardcoded class list.
+    const primaryRateByClass = new Map<string, MHRRateInput>([
+      ['2_axis_lathe', mhrRates.lathe2ax],
+      ['3_axis_lathe', mhrRates.lathe3ax],
+      ['2_axis_bar_feed_lathe_with_sub_spindle', mhrRates.latheBarFeed2ax],
+      ['3_axis_bar_feed_lathe_with_sub_spindle', mhrRates.latheBarFeed3ax],
+    ]);
+    const discoveredTurnedClasses = await this.machineDiscoveryService.getEligibleClasses(
+      'primary_turning', location, accessToken,
+    );
+    if (discoveredTurnedClasses.length === 0) {
+      throw new Error(
+        `No primary turning machine classes discovered for location "${location}" — ` +
+        'process_taxonomy.machining_route_role (migration 780) and mhr_records.canonical_process_id ' +
+        '(migration 781) must be run against the live database before Route Comparison can offer turning routes.',
+      );
+    }
+    const machineClasses: MachineClassId[] = discoveredTurnedClasses
+      .filter((cls) => primaryRateByClass.has(cls))
+      .map((cls) => cls as MachineClassId);
 
     const threadCount = baseInput.threads.reduce((s, t) => s + t.count, 0);
 
-    const routes: RouteResultDto[] = machineClasses.map((mc, i) => {
-      const routeRate = mhrRates[mhrKeys[i]];
+    const routes: RouteResultDto[] = machineClasses.map((mc) => {
+      const routeRate = primaryRateByClass.get(mc)!;
       const cost = computeCNCTurnedCostSummary(
         { ...baseInput, mhrRate: routeRate, tappingRate: this.inheritCncTappingRate(mhrRates.tapping, routeRate) },
         mc,
@@ -7228,8 +7323,8 @@ export class BOMItemsService {
       );
       const routeSetups = cost.setupCount ?? 1;
       return {
-        routeId: routeIds[i],
-        routeLabel: routeLabels[i],
+        routeId: mc as unknown as RouteId,
+        routeLabel: this.humanizeMachineClass(mc),
         processFamily: 'cutting',
         toolingVolumeNote: null,
         processLines: cost.processLines,
@@ -7285,7 +7380,13 @@ export class BOMItemsService {
         routes.map((r) => ({ route: r, totalCost: r.totalCost ?? Infinity, capable: r.capability.overallCapable, setupCount: r.setupCount ?? 99 })),
       ).route;
       routes.forEach((r) => { r.badges.lowestCost = r.routeId === recommended.routeId; });
-      routes.forEach((r) => { r.badges.fastest    = r.routeId === 'cnc-mill-turn' && r.capability.overallCapable; });
+      // Fastest: minimum realized cycle time among capable routes — replaces
+      // the old unconditional "mill-turn is always fastest" badge, which had
+      // no physical justification beyond being the last of 3 fixed literals.
+      const fastestCycleMin = Math.min(...capable.map((r) => r.cycleTimes.totalMin ?? Infinity));
+      routes.forEach((r) => {
+        r.badges.fastest = r.capability.overallCapable && (r.cycleTimes.totalMin ?? Infinity) === fastestCycleMin;
+      });
       // Best quality: fewest setups among capable routes
       const minSetups = Math.min(...capable.map((r) => r.setupCount ?? 99));
       routes.forEach((r) => { r.badges.bestQuality = r.capability.overallCapable && (r.setupCount ?? 99) === minSetups; });

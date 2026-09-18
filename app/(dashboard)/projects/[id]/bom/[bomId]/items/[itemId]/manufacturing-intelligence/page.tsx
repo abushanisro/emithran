@@ -618,7 +618,13 @@ function machineDisplayLabel(proc: { machineName?: string | null; mhrId?: string
 function deriveProcessGroupFromMachineClass(machineClass: string | null | undefined): string {
   if (!machineClass) return '';
   const sheetMetal = ['fiber_laser', 'co2_laser', 'plasma', 'waterjet', 'press_brake', 'turret_punch', 'roll_forming', 'deep_draw', 'band_saw'];
-  const machining = ['cnc_lathe', 'cnc_lathe_live', 'cnc_mill_turn', 'cnc_3ax_vmc', 'cnc_4ax_vmc', 'cnc_5ax_mc', 'grinding', 'drill_press', 'tapping', 'edm'];
+  // Real, granular primary CNC classes — replaces the deleted 6-member
+  // cnc_lathe/cnc_lathe_live/cnc_mill_turn/cnc_3ax_vmc/cnc_4ax_vmc/cnc_5ax_mc
+  // set (Machining Engine Re-Architecture).
+  const machining = [
+    '2_axis_lathe', '3_axis_lathe', '2_axis_bar_feed_lathe_with_sub_spindle', '3_axis_bar_feed_lathe_with_sub_spindle',
+    '3_axis_mill', '4_axis_mill', '5_axis_mill', 'grinding', 'drill_press', 'tapping', 'edm',
+  ];
   const assembly = ['welding', 'manual_assembly', 'adhesive_bonding', 'electrical_assembly'];
   const postProcessing = ['cmm', 'ndt_test', 'heat_treat_furnace', 'anodize', 'powder_coat', 'plating', 'chem_treatment', 'laser_marking', 'deburring'];
   const plastics = ['injection_molding', 'thermoforming', 'blow_molding', 'extrusion', 'rotational_molding', 'rubber_molding', 'compression_molding'];
@@ -1645,18 +1651,34 @@ function buildProcessTree(
     return { id: `op_${opIdx}`, kind: 'operation', label: rec.process, factory, machine, children: [subOp] };
   });
 
-  // Inject Threaded Features from drawing intelligence for CNC families
+  // Inject Threaded Features from drawing intelligence for CNC families.
+  //
+  // FIXED: this used to always create a brand-new top-level "Threaded
+  // Features" operation node with a hardcoded `machine: 'Tapping Machine'` —
+  // a fabricated label, never the real resolved machine every other node in
+  // this tree uses (realMachineName, off cost.processLines). Whenever a real
+  // "Tapping" operation already exists (the normal case — Tapping is
+  // costed/applied like any other step), that operation's own row already
+  // shows the correct real machine (e.g. "Haas DS-30 with BAR3010SS
+  // Feeder"); injecting a sibling with a different, fake machine name for
+  // the same physical operation broke the Process → Machine → Operation
+  // hierarchy the rest of the tree follows. Thread Features now nests
+  // UNDER the real Tapping operation and inherits its real machine.
   const isCNCFamily = family !== 'sheet_metal' && family !== 'plastic_molded';
   const diThreadSpecs = isCNCFamily
     ? ((item.drawingIntelligence as any)?.threads as Array<{ size: string; pitch: number; count: number }> | undefined)
     : undefined;
   if (diThreadSpecs && diThreadSpecs.length > 0) {
+    const tappingOp = operations.find((op) => op.label === 'Tapping');
+    // '—' matches this tree's own convention elsewhere for "no machine
+    // resolved yet" (see `machine` above) — never a fabricated name.
+    const tappingMachine: string = tappingOp?.machine ?? '—';
     const threadChildren: ProcessTreeNode[] = diThreadSpecs.map((t, i) => ({
       id: `thread_di_${i}`,
       kind: 'feature' as const,
       label: `${t.size} ×${t.count}`,
       factory,
-      machine: 'Tapping Machine',
+      machine: tappingMachine,
       source: 'drawing_intelligence',
       attrs: [
         { name: 'Specification', value: `${t.size} × ${t.pitch}` },
@@ -1671,15 +1693,23 @@ function buildProcessTree(
       label: 'Thread Features',
       children: threadChildren,
     };
-    const deburrIdx = operations.findIndex((op) => op.label === 'Deburring');
-    operations.splice(deburrIdx >= 0 ? deburrIdx : operations.length, 0, {
-      id: 'op_threads',
-      kind: 'operation',
-      label: 'Threaded Features',
-      factory,
-      machine: 'Tapping Machine',
-      children: [threadSubOp],
-    });
+    if (tappingOp) {
+      tappingOp.children = [...(tappingOp.children ?? []), threadSubOp];
+    } else {
+      // No real Tapping process step exists on this part yet (e.g. not
+      // costed/applied) — keep the finding visible as its own disclosed
+      // top-level node rather than silently dropping it, but with an
+      // honest '—' machine instead of a fabricated one.
+      const deburrIdx = operations.findIndex((op) => op.label === 'Deburring');
+      operations.splice(deburrIdx >= 0 ? deburrIdx : operations.length, 0, {
+        id: 'op_threads',
+        kind: 'operation',
+        label: 'Threaded Features',
+        factory,
+        machine: '—',
+        children: [threadSubOp],
+      });
+    }
   }
 
   // Processes the live engine computed for THIS route but that could never be
@@ -8803,13 +8833,20 @@ function DrawingIntelligenceTab({ item }: { item: BOMItem }) {
 // chosen currency and the real exchange_rates-backed conversion are the only
 // source, exactly like every other cost figure in this page.) ─────────────
 
+// Real, granular primary CNC classes — replaces the deleted 6-member
+// cnc_3ax_vmc/cnc_4ax_vmc/cnc_5ax_mc/cnc_lathe/cnc_lathe_live/cnc_mill_turn
+// set (Machining Engine Re-Architecture). Each granular class inherits its
+// coarse predecessor's figure verbatim as an explicit placeholder, same
+// convention as the backend's SETUP_COUNT/MACHINE_ENVELOPE tables.
 const INV_FIXTURE_NRE: Record<string, number> = {
-  cnc_3ax_vmc: 25_000, cnc_4ax_vmc: 45_000, cnc_5ax_mc: 85_000,
-  cnc_lathe: 12_000, cnc_lathe_live: 22_000, cnc_mill_turn: 35_000,
+  '3_axis_mill': 25_000, '4_axis_mill': 45_000, '5_axis_mill': 85_000,
+  '2_axis_lathe': 12_000, '3_axis_lathe': 12_000,
+  '2_axis_bar_feed_lathe_with_sub_spindle': 22_000, '3_axis_bar_feed_lathe_with_sub_spindle': 22_000,
 };
 const INV_SETUP_COUNT: Record<string, number> = {
-  cnc_3ax_vmc: 3, cnc_4ax_vmc: 2, cnc_5ax_mc: 1,
-  cnc_lathe: 2, cnc_lathe_live: 1, cnc_mill_turn: 1,
+  '3_axis_mill': 3, '4_axis_mill': 2, '5_axis_mill': 1,
+  '2_axis_lathe': 2, '3_axis_lathe': 2,
+  '2_axis_bar_feed_lathe_with_sub_spindle': 1, '3_axis_bar_feed_lathe_with_sub_spindle': 1,
 };
 const INV_TIGHT_TOL_PREMIUM   = 1.5;
 const INV_PROG_BASE: Record<string, number> = {
@@ -8862,8 +8899,16 @@ function InvestmentTab({
   // amortised per unit. None of it came from this part.
   //
   // Now: no CNC line, no CNC investment model. The tab says so instead.
+  //
+  // FIXED (Machining Engine Re-Architecture): real granular primary classes
+  // (3_axis_mill, 2_axis_lathe, ...) don't start with 'cnc_' — that check
+  // silently matched nothing after the 6 coarse buckets were deleted, so
+  // this tab showed "no CNC operation" for every genuine CNC part. Checking
+  // membership in INV_FIXTURE_NRE (the real primary classes this NRE model
+  // actually covers) is both the fix and self-consistent — no separate
+  // hardcoded class list needed beyond the one already declared above.
   const machineClass =
-    cost?.processLines?.find((l) => l.machineClass?.startsWith('cnc_'))?.machineClass ?? null;
+    cost?.processLines?.find((l) => l.machineClass && l.machineClass in INV_FIXTURE_NRE)?.machineClass ?? null;
   if (machineClass === null) {
     return (
       <div className="flex flex-col items-center justify-center h-40 gap-2 text-muted-foreground p-6">
@@ -8922,7 +8967,7 @@ function InvestmentTab({
   // ── Programming ──
   const progBase = (INV_PROG_BASE[difficulty] ?? INV_PROG_BASE['medium'])!;
   const progPockets = pocketCount * INV_PROG_PER_POCKET;
-  const prog5ax = machineClass === 'cnc_5ax_mc' ? INV_PROG_5AX_ADDER : 0;
+  const prog5ax = machineClass === '5_axis_mill' ? INV_PROG_5AX_ADDER : 0;
   const progTotal = progBase + progPockets + prog5ax;
   const progHours   = Math.round(progTotal / INV_PROG_HOURLY_RATE);
 

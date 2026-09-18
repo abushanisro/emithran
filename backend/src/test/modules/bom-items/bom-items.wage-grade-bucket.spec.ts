@@ -72,7 +72,7 @@ describe('resolveWageGradeBucketRates (mocked unit tests)', () => {
     const result: Map<string, number> = await service.resolveWageGradeBucketRates('token-1', 'USA');
 
     expect(result.size).toBe(0);
-    expect(result.get('cnc_3ax_vmc')).toBeUndefined();
+    expect(result.get('3_axis_mill')).toBeUndefined();
   });
 
   it('F: no fabricated rate is ever introduced when the query returns nothing — empty map, not a default number', async () => {

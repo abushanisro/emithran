@@ -1272,13 +1272,55 @@ export const MACHINE_REGISTRY = {
   // 3-50mm; deep_bore_machine_usa.json: 50-600mm) — see deep-hole-routing.ts.
   gun_drill:        { commodityCodes: [],                                                                                            processGroupKeywords: ['Drilling', 'Machining'],                                                                                            machineClassKeywords: ['Gun Drill', 'Gun Drilling'] },
   deep_bore_machine: { commodityCodes: [],                                                                                           processGroupKeywords: ['Drilling', 'Machining'],                                                                                            machineClassKeywords: ['Deep Bore', 'Deep Bore Machine', 'Trepan'] },
-  // 'Machining' is the exact process_group in process_calculator_mappings for all CNC ops.
-  cnc_3ax_vmc:    { commodityCodes: ['CNC-VMC-3AX', 'SM-VMC-3AX'],                                                                   processGroupKeywords: ['CNC Machining', 'Milling', 'Machining'],                                                                            machineClassKeywords: ['3-Axis', '3 Axis', '3AX', 'VMC 3', '3-axis'] },
-  cnc_4ax_vmc:    { commodityCodes: ['CNC-VMC-4AX'],                                                                                  processGroupKeywords: ['CNC Machining', 'Milling', 'Machining'],                                                                            machineClassKeywords: ['4-Axis', '4 Axis', '4AX', 'VMC 4', '4-axis'] },
-  cnc_5ax_mc:     { commodityCodes: ['CNC-MC-5AX', 'SM-VMC-5AX'],                                                                    processGroupKeywords: ['CNC Machining', 'Milling', 'Machining'],                                                                            machineClassKeywords: ['5-Axis', '5 Axis', '5AX', '5-axis'] },
-  cnc_lathe:      { commodityCodes: ['CNC-LATHE-2AX', 'SM-LATHE-2AX'],                                                               processGroupKeywords: ['Turning', 'Lathe', 'Machining'],                                                                                    machineClassKeywords: ['2-Axis Lathe', 'CNC Lathe', '2-Axis', 'Lathe'] },
-  cnc_lathe_live: { commodityCodes: ['CNC-LATHE-LT'],                                                                                processGroupKeywords: ['Turning', 'Lathe', 'Machining'],                                                                                    machineClassKeywords: ['Live Tool', 'Sub-Spindle', 'Live Tooling'] },
-  cnc_mill_turn:  { commodityCodes: ['CNC-MILLTURN'],                                                                                processGroupKeywords: ['Mill-Turn', 'Turn-Mill', 'Machining'],                                                                               machineClassKeywords: ['Mill-Turn', 'MillTurn', 'Turn Mill', 'Mill Turn'] },
+  // Real, staged Machining-domain inspection classes (memory/machining/machine/
+  // inspection_usa.json, special_inspection_usa.json — real labor/overhead
+  // rates, machine_price_usd, confirmed live 2026-09-18 against a real
+  // mhr_records row: process_group 'Machining', machine_class
+  // 'machining_inspection', direct OH $0.30/hr, indirect OH $13.90/hr,
+  // labor $43.21/hr, machine price $5,000 — matches inspection_usa.json's
+  // "Default" station exactly). Deliberately distinct from the shared 'cmm'
+  // class: Machining's inspection equipment is its own real fleet, not the
+  // same CMM/bench pool Sheet Metal's classifyInspectionResource splits.
+  // Genuinely narrow, exact keyword (the real snake_case class value itself,
+  // not a generic "Inspection" substring — cmm's own registry entry above
+  // already carries that word, so reusing it here would let a single row
+  // satisfy both classes' keyword match) so 'machining_inspection' and
+  // 'special_inspection' rows can never cross-match each other or the
+  // shared 'cmm' class's own real rows.
+  machining_inspection: { commodityCodes: [],                                                                                        processGroupKeywords: ['Machining'],                                                                                                        machineClassKeywords: ['machining_inspection'] },
+  // Real per-feature cycle-time signal for this tier not yet confirmed real
+  // (disclosed gap, not fabricated) — rate is resolvable/queryable now;
+  // wiring it into an actual CNC cost line is deferred until a real
+  // time-per-feature source is found, same discipline as every other
+  // documented "resolvable but not yet costed" gap in this file.
+  special_inspection: { commodityCodes: [],                                                                                          processGroupKeywords: ['Machining'],                                                                                                        machineClassKeywords: ['special_inspection', 'Special Inspection'] },
+  // Real, granular primary CNC milling/turning classes — replaces the 6
+  // generic cnc_3ax_vmc/cnc_4ax_vmc/cnc_5ax_mc/cnc_lathe/cnc_lathe_live/
+  // cnc_mill_turn buckets that used to sit here (Machining Engine
+  // Re-Architecture, see the plan at C:\Users\singi\.claude\plans\
+  // logical-noodling-lampson.md). Each is a real, distinct station category
+  // seeded into mhr_records by migration 693 (source: memory/machining/
+  // machine/machiningusa.json), no longer coarsened by selector.ts's
+  // MACHINING_CATEGORY_ALIAS (removed). 'Machining' is the exact
+  // process_group in process_calculator_mappings for all CNC ops.
+  // Machine-class keywords are the exact real category names — Tier 0
+  // (exact machine_class match) is the primary resolution path for these
+  // clean, freshly-seeded snake_case values; these keyword entries are only
+  // the Tier 1+ fallback for messy/legacy free-text data, same role as
+  // every other entry in this registry.
+  // Generic axis-count keywords (e.g. '3AX', 'VMC 3') are carried forward
+  // from the deleted cnc_3ax_vmc/cnc_4ax_vmc/cnc_5ax_mc entries — real,
+  // legacy free-text machine names like "Milling_Center 3axis" never say
+  // "3 Axis Mill" verbatim, so dropping these would silently stop
+  // classifying them (Tier 2/3 fallback, only consulted when Tier 0's
+  // exact machine_class match already failed).
+  '3_axis_mill':    { commodityCodes: [], processGroupKeywords: ['Machining'], machineClassKeywords: ['3 Axis Mill', '3-Axis Mill', '3-Axis', '3 Axis', '3AX', 'VMC 3', '3-axis'] },
+  '4_axis_mill':    { commodityCodes: [], processGroupKeywords: ['Machining'], machineClassKeywords: ['4 Axis Mill', '4-Axis Mill', '4-Axis', '4 Axis', '4AX', 'VMC 4', '4-axis'] },
+  '5_axis_mill':    { commodityCodes: [], processGroupKeywords: ['Machining'], machineClassKeywords: ['5 Axis Mill', '5-Axis Mill', '5-Axis', '5 Axis', '5AX', '5-axis'] },
+  '2_axis_lathe':   { commodityCodes: [], processGroupKeywords: ['Machining'], machineClassKeywords: ['2 Axis Lathe', '2-Axis Lathe'] },
+  '3_axis_lathe':   { commodityCodes: [], processGroupKeywords: ['Machining'], machineClassKeywords: ['3 Axis Lathe', '3-Axis Lathe'] },
+  '2_axis_bar_feed_lathe_with_sub_spindle': { commodityCodes: [], processGroupKeywords: ['Machining'], machineClassKeywords: ['2 Axis Bar Feed Lathe with Sub Spindle'] },
+  '3_axis_bar_feed_lathe_with_sub_spindle': { commodityCodes: [], processGroupKeywords: ['Machining'], machineClassKeywords: ['3 Axis Bar Feed Lathe with Sub Spindle'] },
   // Real, DISTINCT "MillTurn" Machining-domain fleet (migrations 737/738/
   // 753, machine_class literal 'machining_millturn' — deliberately renamed
   // to avoid colliding with the pre-existing 'cnc_mill_turn' bucket above,

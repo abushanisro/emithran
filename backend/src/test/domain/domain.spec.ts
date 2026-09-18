@@ -34,7 +34,7 @@ describe('canonical cost-result domain contract', () => {
     cycleTimeMin: 6.1,
     hourlyRate: 45,
     rateSource: 'default_rate',
-    machineClass: 'cnc_3ax_vmc',
+    machineClass: '3_axis_mill',
     machineName: null,
     commodityCode: null,
   };

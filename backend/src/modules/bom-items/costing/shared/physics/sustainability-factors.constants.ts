@@ -6,13 +6,17 @@ export const ENERGY_KWH_PER_HR: Record<string, number> = {
   press_brake:   4.5,   // hydraulic servo press brake
   tapping:       1.5,   // CNC tapping centre
   deburring:     0.75,  // rotary brush / bench grinder
-  // CNC machining
-  cnc_3ax_vmc:   7.5,   // 3-axis VMC: spindle + coolant + control
-  cnc_4ax_vmc:   9.0,   // 4-axis: higher torque for rotary axis
-  cnc_5ax_mc:   12.0,   // 5-axis: multiple servo axes + coolant
-  cnc_lathe:     5.5,   // CNC lathe: spindle + coolant
-  cnc_lathe_live: 7.0,  // live tooling: additional spindle power
-  cnc_mill_turn: 10.0,  // full mill-turn: two spindles
+  // CNC machining — real granular classes, replacing the deleted
+  // cnc_3ax_vmc/cnc_4ax_vmc/cnc_5ax_mc/cnc_lathe/cnc_lathe_live/cnc_mill_turn
+  // keys (Machining Engine Re-Architecture); each granular class inherits
+  // its coarse predecessor's figure verbatim.
+  '3_axis_mill':   7.5,   // 3-axis VMC: spindle + coolant + control
+  '4_axis_mill':   9.0,   // 4-axis: higher torque for rotary axis
+  '5_axis_mill':  12.0,   // 5-axis: multiple servo axes + coolant
+  '2_axis_lathe':  5.5,   // CNC lathe: spindle + coolant
+  '3_axis_lathe':  5.5,   // CNC lathe: spindle + coolant
+  '2_axis_bar_feed_lathe_with_sub_spindle': 7.0, // live tooling: additional spindle power
+  '3_axis_bar_feed_lathe_with_sub_spindle': 7.0, // live tooling: additional spindle power
   inspection:    0.5,   // CMM / bench gauge: minimal draw
   cmm:           0.5,   // coordinate measuring machine: probe + controller
   surface_treatment: 2.5, // anodize/plating line share: rectifier + tanks + rinse

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -31,6 +31,7 @@ import {
   useCalculator,
   useExecuteCalculator,
 } from '@/lib/api/hooks/useCalculators';
+import { useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculatorMappings';
 
 interface ToolingCostDialogProps {
   open: boolean;
@@ -53,17 +54,16 @@ interface ProcessDefinition {
   subProcesses: Record<string, SubProcessDefinition>;
 }
 
+// Machining's sub-process list is fetched dynamically below (real
+// process_calculator_mappings rows, processGroup='Machining') — never a
+// hardcoded sub-process list. The other domains here have no equivalent
+// real per-operation catalog to fetch from and are out of scope for this
+// fix; 'machining' is intentionally left without a static subProcesses
+// entry so a bug can't silently fall back to a stale hardcoded list.
 const MANUFACTURING_PROCESSES: Record<string, ProcessDefinition> = {
   machining: {
     label: 'Machining',
-    subProcesses: {
-      turning: { label: 'Turning', toolTypes: ['cutting_tool', 'fixture', 'measuring_tool'] },
-      milling: { label: 'Milling', toolTypes: ['cutting_tool', 'fixture', 'measuring_tool'] },
-      drilling: { label: 'Drilling', toolTypes: ['cutting_tool', 'fixture', 'jig'] },
-      grinding: { label: 'Grinding', toolTypes: ['cutting_tool', 'fixture', 'measuring_tool'] },
-      boring: { label: 'Boring', toolTypes: ['cutting_tool', 'fixture', 'measuring_tool'] },
-      threading: { label: 'Threading', toolTypes: ['cutting_tool', 'fixture', 'gauge'] }
-    }
+    subProcesses: {},
   },
   injection_molding: {
     label: 'Plastic Molding',
@@ -240,6 +240,32 @@ export function ToolingCostDialog({
   const { data: calculatorsData } = useCalculators();
   const { data: selectedCalculator } = useCalculator(selectedCalculatorId);
   const executeCalculator = useExecuteCalculator();
+
+  // Real Machining operations (process_calculator_mappings, processGroup=
+  // 'Machining') — replaces the hardcoded turning/milling/drilling/grinding/
+  // boring/threading sub-process list. Fetched with both active and
+  // inactive rows (same convention as the Process Catalog page): every one
+  // of Machining's 43 real categories has no calculator wired yet
+  // (is_active=false), so filtering to active-only would show nothing.
+  // Only fetched while this dialog is open.
+  const { data: machiningMappingsData } = useProcessCalculatorMappings(
+    { processGroup: 'Machining', limit: 1000 },
+    { enabled: open },
+  );
+  const machiningOperations = useMemo<Array<[string, SubProcessDefinition]>>(() => {
+    const rows = machiningMappingsData?.mappings ?? [];
+    const seen = new Set<string>();
+    const ops: Array<[string, SubProcessDefinition]> = [];
+    for (const m of rows) {
+      if (!m.operation || seen.has(m.operation)) continue;
+      seen.add(m.operation);
+      // No real per-operation tool-type recommendation data exists for
+      // Machining anywhere — an empty list here (not a fabricated guess)
+      // correctly falls through to "no recommendation, show all tool types".
+      ops.push([m.operation, { label: m.operation, toolTypes: [] }]);
+    }
+    return ops.sort((a, b) => a[0].localeCompare(b[0]));
+  }, [machiningMappingsData]);
 
   // Lookup table state (matching raw material pattern)
   const [lookupTableData, setLookupTableData] = useState<any>(null);
@@ -428,8 +454,13 @@ export function ToolingCostDialog({
 
   const selectedTooling = TOOLING_TYPES.find(t => t.value === formData.toolingType);
   const selectedProcessData = MANUFACTURING_PROCESSES[formData.manufacturingProcess];
-  const availableSubProcesses = selectedProcessData ? Object.entries(selectedProcessData.subProcesses) : [];
-  const selectedSubProcessData: SubProcessDefinition | undefined = selectedProcessData?.subProcesses[formData.subProcess];
+  const isMachiningSelected = formData.manufacturingProcess === 'machining';
+  const availableSubProcesses = isMachiningSelected
+    ? machiningOperations
+    : (selectedProcessData ? Object.entries(selectedProcessData.subProcesses) : []);
+  const selectedSubProcessData: SubProcessDefinition | undefined = isMachiningSelected
+    ? machiningOperations.find(([key]) => key === formData.subProcess)?.[1]
+    : selectedProcessData?.subProcesses[formData.subProcess];
 
   // Filter tooling types based on selected sub-process
   const getRecommendedTools = () => {
@@ -459,7 +490,9 @@ export function ToolingCostDialog({
                 </Badge>
                 <span className="text-xs text-muted-foreground">→</span>
                 <Badge variant="outline" className="text-xs">
-                  {MANUFACTURING_PROCESSES[selectedProcess]?.subProcesses[selectedSubProcess]?.label}
+                  {selectedProcess === 'machining'
+                    ? (machiningOperations.find(([key]) => key === selectedSubProcess)?.[1]?.label ?? selectedSubProcess)
+                    : MANUFACTURING_PROCESSES[selectedProcess]?.subProcesses[selectedSubProcess]?.label}
                 </Badge>
               </div>
             )}
@@ -517,8 +550,10 @@ export function ToolingCostDialog({
             </div>
           </div>
 
-          {/* Recommended Tool Types */}
-          {selectedSubProcessData && (
+          {/* Recommended Tool Types — no real recommendation data exists for
+              Machining's operations, so this stays hidden for them rather
+              than showing an empty box. */}
+          {selectedSubProcessData && selectedSubProcessData.toolTypes.length > 0 && (
             <div className="p-4 bg-primary/5 rounded-lg">
               <Label className="text-sm font-medium">Recommended Tool Types for {selectedSubProcessData.label}:</Label>
               <div className="flex flex-wrap gap-2 mt-2">

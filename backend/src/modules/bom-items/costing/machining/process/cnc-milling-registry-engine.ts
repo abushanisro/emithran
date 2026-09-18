@@ -2,11 +2,12 @@ import {
   computeCNCMilledCostSummary,
   checkCNCCapability,
   type CNCCostInput,
-  type CNCMachineClass,
+  type MachineClassId,
   type CNCCapabilityResult,
 } from './cost-cnc-engine';
 import type { CostSummaryDto } from '../../../dto/cost-breakdown.dto';
 import type { ManufacturingProcessEngine } from '../../shared/core/manufacturing-process.types';
+import type { MachineClass } from '../../shared/core/default-rates.constants';
 
 // Thin conformance wrapper around the real, tested computeCNCMilledCostSummary()
 // (Platform Architecture Remediation Phase 1 — "fix the pattern across all
@@ -28,11 +29,15 @@ export class CncMillingEngine implements ManufacturingProcessEngine<
   CNCCapabilityGeometry,
   CNCCapabilityResult
 > {
-  readonly machineClass: CNCMachineClass;
+  // Typed against the shared, cross-domain MachineClass union (required by
+  // ManufacturingProcessEngine, which every domain's engines implement) —
+  // NOT MachineClassId. Casting to MachineClassId happens only at the two
+  // call sites below, into cost-cnc-engine.ts's own functions.
+  readonly machineClass: MachineClass;
   readonly processFamily = 'cnc_milling';
 
-  constructor(machineClass: 'cnc_3ax_vmc' | 'cnc_4ax_vmc' | 'cnc_5ax_mc') {
-    this.machineClass = machineClass;
+  constructor(machineClass: string) {
+    this.machineClass = machineClass as MachineClass;
   }
 
   checkCapability(geometry: CNCCapabilityGeometry): CNCCapabilityResult {
@@ -40,10 +45,10 @@ export class CncMillingEngine implements ManufacturingProcessEngine<
     // realCapability/capabilitySource — CNC capability today is a bounding-
     // box + weight envelope check per class, not a per-machine capability
     // hydration (unlike the sheet-metal engines' checkMachineCapability).
-    return checkCNCCapability(this.machineClass, geometry.maxLength, geometry.maxWidth, geometry.maxHeight, geometry.weightKg);
+    return checkCNCCapability(this.machineClass as MachineClassId, geometry.maxLength, geometry.maxWidth, geometry.maxHeight, geometry.weightKg);
   }
 
   computeCost(context: CNCCostInput): CostSummaryDto {
-    return computeCNCMilledCostSummary(context, this.machineClass as 'cnc_3ax_vmc' | 'cnc_4ax_vmc' | 'cnc_5ax_mc');
+    return computeCNCMilledCostSummary(context, this.machineClass as MachineClassId);
   }
 }

@@ -80,7 +80,11 @@ const MACHINE_CLASS_TO_PROCESS_GROUP: ReadonlyMap<string, string> = new Map([
   ...['cmm', 'inspection'].map((c) => [c, 'Quality'] as const),
   ...['fiber_laser', 'co2_laser', 'plasma', 'waterjet', 'press_brake', 'turret_punch', 'roll_forming', 'deep_draw', 'band_saw']
     .map((c) => [c, 'Sheet Metal'] as const),
-  ...['cnc_lathe', 'cnc_lathe_live', 'cnc_mill_turn', 'cnc_3ax_vmc', 'cnc_4ax_vmc', 'cnc_5ax_mc', 'grinding', 'drill_press', 'tapping', 'edm']
+  // Real, granular primary CNC classes — replaces the deleted 6-member
+  // cnc_lathe/cnc_lathe_live/cnc_mill_turn/cnc_3ax_vmc/cnc_4ax_vmc/cnc_5ax_mc
+  // set (Machining Engine Re-Architecture).
+  ...['2_axis_lathe', '3_axis_lathe', '2_axis_bar_feed_lathe_with_sub_spindle', '3_axis_bar_feed_lathe_with_sub_spindle',
+      '3_axis_mill', '4_axis_mill', '5_axis_mill', 'grinding', 'drill_press', 'tapping', 'edm']
     .map((c) => [c, 'Machining'] as const),
   ...['welding', 'manual_assembly', 'adhesive_bonding', 'electrical_assembly'].map((c) => [c, 'Assembly'] as const),
   ...['ndt_test', 'heat_treat_furnace', 'anodize', 'powder_coat', 'plating', 'chem_treatment', 'laser_marking', 'deburring', 'cleaning']
@@ -2255,19 +2259,6 @@ export class BOMItemsController {
     }
 
     return insertedOps;
-  }
-
-  private getMhrSearchTerm(machineCategoryHint: string): string {
-    const map: Record<string, string> = {
-      laser_6kw: 'laser',
-      press_brake: 'press',
-      vmc_3ax: 'mill',
-      cnc_lathe: 'lathe',
-      im_100t: 'injection',
-      drill_press: 'drill',
-      radial_drill: 'drill',
-    };
-    return map[machineCategoryHint] ?? machineCategoryHint.split('_')[0];
   }
 
   // The old version only recognised 4 machine classes and silently

@@ -20,11 +20,16 @@ interface ToolingSectionProps {
   conversionRate?: number; // multiply stored USD values by this to get factory currency — default 1
 }
 
-// Manufacturing Process Hierarchy (simplified version)
+// Manufacturing Process Hierarchy (simplified version). 'machining' has no
+// static subProcesses list — ToolingCostDialog now saves a real
+// process_calculator_mappings operation name (e.g. "Gun Drilling") as
+// item.subProcess for Machining tooling, already human-readable, so display
+// below skips the snake_case->Title Case transform for it rather than
+// hardcoding a duplicate sub-process list here just to label it.
 const MANUFACTURING_PROCESSES = {
   machining: {
     label: 'Machining',
-    subProcesses: ['turning', 'milling', 'drilling', 'grinding', 'boring', 'threading']
+    subProcesses: [] as string[],
   },
   injection_molding: {
     label: 'Plastic Molding',
