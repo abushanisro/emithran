@@ -46,7 +46,7 @@ export const MHR_RATE_MACHINE_CLASSES: readonly MachineClass[] = [
   '3_axis_mill', '4_axis_mill', '5_axis_mill',
   '2_axis_lathe', '3_axis_lathe', '2_axis_bar_feed_lathe_with_sub_spindle', '3_axis_bar_feed_lathe_with_sub_spindle',
   'injection_molding', 'compression_molding', 'structural_foam_molding', 'reaction_injection_molding', 'drill_press', 'pem_press', 'hole_forming',
-  'gun_drill', 'deep_bore_machine', 'manual_deburr', 'cylindrical_grinder', 'jig_bore', 'jig_grind', 'internal_grinder', 'broach', 'machining_millturn',
+  'gun_drill', 'deep_bore_machine', 'manual_deburr', 'cylindrical_grinder', 'jig_bore', 'jig_grind', 'internal_grinder', 'broach', 'machining_millturn', 'wire_edm',
   'machining_inspection', 'special_inspection',
 ];
 
@@ -130,6 +130,9 @@ export class RateResolutionService {
     jigGrind: MHRRateInput;
     internalGrinder: MHRRateInput;
     broach: MHRRateInput;
+    // Wire EDM (memory/machining/machine/wire_edm_work_center_data.json) — same real,
+    // registered-engine-and-MACHINE_REGISTRY-entry pattern as broach/gun_drill above.
+    wireEdm: MHRRateInput;
     // Real, distinct Machining-domain inspection classes (memory/machining/
     // machine/inspection_usa.json, special_inspection_usa.json) — separate
     // from the shared 'cmm' class Sheet Metal/generic inspection resolves
@@ -431,6 +434,7 @@ export class RateResolutionService {
         jigGrind:         get('jig_grind'),
         internalGrinder:  get('internal_grinder'),
         broach:           get('broach'),
+        wireEdm:          get('wire_edm'),
         machiningInspection: get('machining_inspection'),
         specialInspection:   get('special_inspection'),
         turret:           get('turret_punch'),

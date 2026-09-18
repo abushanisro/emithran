@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { HttpModule } from '@nestjs/axios';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 
@@ -119,6 +119,14 @@ import { AppController } from './app.controller';
     {
       provide: APP_GUARD,
       useClass: SupabaseAuthGuard,
+    },
+    // Global so rate limiting can never be missed by a controller that forgot to opt in.
+    // The one controller that previously applied @UseGuards(ThrottlerGuard) locally
+    // (CalculatorsController) had that removed in the same change — running the same
+    // ThrottlerGuard singleton twice per request would double-count against its limit.
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
     },
     {
       provide: APP_INTERCEPTOR,

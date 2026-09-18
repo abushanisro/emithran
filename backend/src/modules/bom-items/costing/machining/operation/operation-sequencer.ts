@@ -158,6 +158,16 @@ export interface OperationLine {
   name: string;
   timeSec: number;
   source: "feature" | "fixed";
+  // Real CAD feature_type ('through_hole'/'blind_hole'/'tapped_hole'/
+  // 'counterbore'/'countersink'/'pocket'/'slot') and diameter this specific
+  // op line was generated from, when it came from one feature_graph_v2
+  // occurrence group. Carried through so the frontend can trace an operation
+  // back to the exact CAD feature for 3D-viewer highlighting (same purpose
+  // Sheet Metal's FeatureBreakdown already serves for bends/holes) — a
+  // "fixed" op (Face Mill, Deburr) has neither, since it isn't tied to one
+  // detected feature.
+  cadFeatureType?: string;
+  diameterMm?: number;
 }
 
 // Feature types that are hole-like (need drilling before tapping/counterboring)
@@ -250,51 +260,51 @@ export function buildOperationSequence(
 
     switch (ft) {
       case "pocket":
-        ops.push({ name: "Pocket Rough", timeSec: pocketRoughSec(totalRemovedMm3, mrr), source: "feature" });
-        ops.push({ name: "Pocket Finish Floor", timeSec: count * 30, source: "feature" });
-        ops.push({ name: "Pocket Finish Wall", timeSec: count * 25, source: "feature" });
+        ops.push({ name: "Pocket Rough", timeSec: pocketRoughSec(totalRemovedMm3, mrr), source: "feature", cadFeatureType: ft });
+        ops.push({ name: "Pocket Finish Floor", timeSec: count * 30, source: "feature", cadFeatureType: ft });
+        ops.push({ name: "Pocket Finish Wall", timeSec: count * 25, source: "feature", cadFeatureType: ft });
         break;
 
       case "slot":
-        ops.push({ name: "Slot Rough", timeSec: pocketRoughSec(totalRemovedMm3, mrr), source: "feature" });
-        ops.push({ name: "Slot Finish", timeSec: count * 20, source: "feature" });
+        ops.push({ name: "Slot Rough", timeSec: pocketRoughSec(totalRemovedMm3, mrr), source: "feature", cadFeatureType: ft });
+        ops.push({ name: "Slot Finish", timeSec: count * 20, source: "feature", cadFeatureType: ft });
         break;
 
       case "through_hole":
       case "blind_hole":
         if (diamMm > 0) {
-          ops.push({ name: "Spot Drill", timeSec: count * 5, source: "feature" });
-          ops.push({ name: "Drill", timeSec: drillTimeSec(diamMm, depthMm, count, materialGrade), source: "feature" });
+          ops.push({ name: "Spot Drill", timeSec: count * 5, source: "feature", cadFeatureType: ft, diameterMm: diamMm });
+          ops.push({ name: "Drill", timeSec: drillTimeSec(diamMm, depthMm, count, materialGrade), source: "feature", cadFeatureType: ft, diameterMm: diamMm });
         }
         break;
 
       case "tapped_hole":
         if (diamMm > 0) {
-          ops.push({ name: "Spot Drill", timeSec: count * 5, source: "feature" });
-          ops.push({ name: "Drill", timeSec: drillTimeSec(diamMm * 0.8, depthMm, count, materialGrade), source: "feature" }); // minor diameter
-          ops.push({ name: "Chamfer", timeSec: chamferTimeSec(diamMm, count, chamferLinearSpeedMmPerSec), source: "feature" });
-          ops.push({ name: "Rigid Tap", timeSec: tapTimeSec(threadSpec, count, materialGrade, threadPitchMm, depthMm), source: "feature" });
+          ops.push({ name: "Spot Drill", timeSec: count * 5, source: "feature", cadFeatureType: ft, diameterMm: diamMm });
+          ops.push({ name: "Drill", timeSec: drillTimeSec(diamMm * 0.8, depthMm, count, materialGrade), source: "feature", cadFeatureType: ft, diameterMm: diamMm }); // minor diameter
+          ops.push({ name: "Chamfer", timeSec: chamferTimeSec(diamMm, count, chamferLinearSpeedMmPerSec), source: "feature", cadFeatureType: ft, diameterMm: diamMm });
+          ops.push({ name: "Rigid Tap", timeSec: tapTimeSec(threadSpec, count, materialGrade, threadPitchMm, depthMm), source: "feature", cadFeatureType: ft, diameterMm: diamMm });
         }
         break;
 
       case "counterbore":
         if (diamMm > 0) {
-          ops.push({ name: "Spot Drill", timeSec: count * 5, source: "feature" });
-          ops.push({ name: "Drill", timeSec: drillTimeSec(diamMm * 0.6, depthMm, count, materialGrade), source: "feature" }); // through bore
-          ops.push({ name: "Counterbore", timeSec: counterboreTimeSec(diamMm, depthMm, count, matClass, counterboreTable), source: "feature" });
+          ops.push({ name: "Spot Drill", timeSec: count * 5, source: "feature", cadFeatureType: ft, diameterMm: diamMm });
+          ops.push({ name: "Drill", timeSec: drillTimeSec(diamMm * 0.6, depthMm, count, materialGrade), source: "feature", cadFeatureType: ft, diameterMm: diamMm }); // through bore
+          ops.push({ name: "Counterbore", timeSec: counterboreTimeSec(diamMm, depthMm, count, matClass, counterboreTable), source: "feature", cadFeatureType: ft, diameterMm: diamMm });
         }
         break;
 
       case "countersink":
         if (diamMm > 0) {
-          ops.push({ name: "Spot Drill", timeSec: count * 4, source: "feature" });
-          ops.push({ name: "Drill", timeSec: drillTimeSec(diamMm * 0.6, depthMm, count, materialGrade), source: "feature" });
-          ops.push({ name: "Countersink", timeSec: count * 6, source: "feature" });
+          ops.push({ name: "Spot Drill", timeSec: count * 4, source: "feature", cadFeatureType: ft, diameterMm: diamMm });
+          ops.push({ name: "Drill", timeSec: drillTimeSec(diamMm * 0.6, depthMm, count, materialGrade), source: "feature", cadFeatureType: ft, diameterMm: diamMm });
+          ops.push({ name: "Countersink", timeSec: count * 6, source: "feature", cadFeatureType: ft, diameterMm: diamMm });
         }
         break;
 
       case "chamfer":
-        ops.push({ name: "Chamfer", timeSec: chamferTimeSec(diamMm, count, chamferLinearSpeedMmPerSec), source: "feature" });
+        ops.push({ name: "Chamfer", timeSec: chamferTimeSec(diamMm, count, chamferLinearSpeedMmPerSec), source: "feature", cadFeatureType: ft, diameterMm: diamMm > 0 ? diamMm : undefined });
         break;
 
       default:

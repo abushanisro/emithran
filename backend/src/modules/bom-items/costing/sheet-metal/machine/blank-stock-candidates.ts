@@ -4,6 +4,8 @@
 // BlankOptimizerService (blank-optimizer.service.ts) is the thin DB-fetching
 // wrapper around these functions; it owns no geometry of its own.
 
+import { CNC_STOCK_ALLOWANCE_PER_SIDE_MM } from '../../shared/core/default-rates.constants';
+
 export interface BoundingBox {
   length: number; // mm — longest dimension (feed direction)
   width: number; // mm
@@ -122,8 +124,15 @@ export function rectangularBarCandidates(
 }
 
 export function billetFallback(bbox: BoundingBox, partVolMm3: number): BlankResult {
-  // 3mm per side (not 6mm) — halved stock allowance is still an improvement
-  const allow = 6; // 3mm per side × 2 axes
+  // Real per-side machining stock allowance (CNC_STOCK_ALLOWANCE_PER_SIDE_MM,
+  // default-rates.constants.ts) applied on both sides of each dimension —
+  // was a separately-hardcoded literal `6` here, duplicating the same
+  // constant used elsewhere in this module (selectBestAutoCandidate below)
+  // and in cost-cnc-engine.ts, all meant to be the same real number. No real
+  // stock-allowance-by-material/machine/process table exists in the
+  // reference corpus (checked directly) -- this stays a single, disclosed,
+  // class-level constant until one is sourced, not a fabricated table.
+  const allow = CNC_STOCK_ALLOWANCE_PER_SIDE_MM * 2;
   const vol = (bbox.length + allow) * (bbox.width + allow) * (bbox.height + allow);
   const util = vol > 0 && partVolMm3 > 0 ? (partVolMm3 / vol) * 100 : null;
   return {
@@ -144,7 +153,8 @@ export function selectBestAutoCandidate(
 ): ScoredCandidate | null {
   if (candidates.length === 0) return null;
   const sorted = [...candidates].sort((a, b) => b.score - a.score);
-  const bboxFallbackVol = (bbox.length + 6) * (bbox.width + 6) * (bbox.height + 6);
+  const bboxAllow = CNC_STOCK_ALLOWANCE_PER_SIDE_MM * 2;
+  const bboxFallbackVol = (bbox.length + bboxAllow) * (bbox.width + bboxAllow) * (bbox.height + bboxAllow);
   return sorted.find((c) => c.billetVolMm3 < bboxFallbackVol) ?? null;
 }
 
