@@ -47,7 +47,17 @@ export type FeatureCategory =
   | 'extruded_flange' // burled/extruded hole collar (coaxial stepped-hole cluster, >=3 members) — detected, geo_v40+
   | 'thin_web'    // pair of holes with true edge-to-edge gap < 1.5x sheet thickness — detected, geo_v40+
   | 'im_undercut'   // injection molding undercut face (DFM)
-  | 'im_undrafted'; // injection molding undrafted face (DFM)
+  | 'im_undrafted'  // injection molding undrafted face (DFM)
+  // CNC-bucketed types — from cad-engine/machining/cnc_feature_recognizer.py's
+  // build_feature_graph_v2_from_cnc (the only producer of these on feature_graph_v2).
+  // 'pocket'/'slot' above already cover the CNC pocket/slot/keyway/radial_slot bucket.
+  | 'through_hole'
+  | 'blind_hole'
+  | 'tapped_hole'
+  | 'cross_hole'
+  | 'counterbore'
+  | 'countersink'
+  | 'chamfer';
 
 export type ExtractionMethod =
   | 'occ_cylindrical_face'    // OCC topology — STEP, trusted
@@ -332,6 +342,14 @@ export interface FeatureNodeV2 {
   width_mm?: number;     // slot, louver, emboss
   depth_mm?: number;     // pocket, emboss, bead
   angle_deg?: number;    // bend, flange, hem
+  /**
+   * Real "Operation // FeatureType" string from the canonical Machining
+   * operations catalog (memory/machining/operations_full.json /
+   * process_taxonomy_operations) — attached backend-side by
+   * auto-fill.service.ts's attachCanonicalOperations for CNC feature types
+   * only. Absent for Sheet Metal / Plastic Molding features.
+   */
+  canonical_operation?: string;
 }
 
 export interface FeatureGraphV2 {

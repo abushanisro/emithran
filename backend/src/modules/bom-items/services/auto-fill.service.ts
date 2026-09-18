@@ -27,6 +27,7 @@ import {
   laserSpeedFactor,
 } from '../costing/shared/core/default-rates.constants';
 import { computeCycleTime } from '../costing/plastic-molding/process/cycle-time';
+import { machiningRouteFamilyOf, resolveCanonicalOperation } from '../costing/machining/process/canonical-operation';
 
 export interface RawGeometry {
   volume: number;
@@ -723,7 +724,7 @@ export class AutoFillService {
       feature_graph_version:  parseInt(process.env.FEATURE_GRAPH_VERSION ?? '4', 10),
       cad_engine_version:     process.env.CAD_ENGINE_VERSION ?? 'geo_v5',
       analyzed_at:            new Date().toISOString(),
-      ...(cadV2 ? { feature_graph_v2: cadV2 } : {}),
+      ...(cadV2 ? { feature_graph_v2: this.attachCanonicalOperations(cadV2, family.family) } : {}),
       ...(cncFeatures ? { cnc_features: cncFeatures } : {}),
       ...(imHeatmapFeatures ? { imHeatmapFeatures } : {}),
       ...(cadResult?.geometry_features?.manufacturing_features?.component_features
@@ -735,6 +736,25 @@ export class AutoFillService {
       `[component_features] ${_cf ? `stored in featureGraph (axes=${_cf.setup_axes_candidates?.length ?? 0})` : 'NOT stored — cadResult path returned nothing'}`,
     );
     return featureGraph;
+  }
+
+  /**
+   * Attaches a real `canonical_operation` string (e.g. "Drilling // SimpleHole")
+   * to each CNC feature_graph_v2 entry whose feature_type resolves via
+   * canonical-operation.ts. Non-CNC families (sheet_metal, plastic_molded, ...)
+   * and any feature_type not in that table are passed through unchanged — no
+   * fabricated label is ever attached.
+   */
+  private attachCanonicalOperations(cadV2: any, cadFamily: string | null | undefined): any {
+    if (!cadV2?.features?.length) return cadV2;
+    const family = machiningRouteFamilyOf(cadFamily);
+    return {
+      ...cadV2,
+      features: cadV2.features.map((f: any) => {
+        const canonicalOperation = resolveCanonicalOperation(f.feature_type, family);
+        return canonicalOperation ? { ...f, canonical_operation: canonicalOperation } : f;
+      }),
+    };
   }
 
   private extractManufacturabilityScore(cadResult?: any): number | undefined {
