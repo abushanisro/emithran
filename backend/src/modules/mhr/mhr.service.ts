@@ -1893,6 +1893,35 @@ export class MHRService {
    * "Machining" was the selected Process).
    */
   async getDistinctCategories(accessToken: string, processGroup?: string): Promise<string[]> {
+    const withClass = await this.getDistinctCategoriesWithClass(accessToken, processGroup);
+    return withClass.map((c) => c.category);
+  }
+
+  /**
+   * Same real category derivation as getDistinctCategories, but also carries
+   * each category's real underlying machine_class — the value the cost
+   * engine's rate resolvers actually filter on (e.g. resolveCmmSpecificRate's
+   * `.eq('machine_class', 'cmm')`), which the display-only category string
+   * alone cannot reconstruct.
+   *
+   * Root cause this closes: the HR Rates form's Category field is a free-text
+   * combobox whose presets are these display categories (mhrApi.getCategories
+   * -> string[]). Selecting an EXISTING category like "Inspection" (derived
+   * here from a real cmm-classed row's benchmark_source_key) and saving a
+   * BRAND NEW record wrote the literal display string "Inspection" as that
+   * new row's machine_class — a value the resolvers' exact `.eq('machine_class',
+   * 'cmm')` filter can never match, silently orphaning the new machine's real
+   * rate from ever being found by inspection costing (confirmed live,
+   * 2026-09-18: a real "Inspection" row with real MHR $14.20/hr and LHR
+   * $43.21/hr on file, unresolvable, logging "No MHR machine or benchmark
+   * rate on file in USA for: cmm"). The form now resolves a chosen KNOWN
+   * category back to this real machine_class before saving a new record,
+   * instead of persisting the human label as if it were the class itself.
+   */
+  async getDistinctCategoriesWithClass(
+    accessToken: string,
+    processGroup?: string,
+  ): Promise<Array<{ category: string; machineClass: string | null }>> {
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
       .from('mhr_records')
@@ -1904,17 +1933,27 @@ export class MHRService {
       return [];
     }
 
-    const categories = (data ?? []).map((r: any) => {
+    const machineClassByCategory = new Map<string, string | null>();
+    for (const r of (data ?? []) as any[]) {
       const fromKey = r.benchmark_source_key?.split(':')[0]?.trim();
       const rowGroup = r.process_group
         || (fromKey ? 'Sheet Metal' : (r.machine_class ? MHRService.MACHINE_CLASS_PROCESS_GROUP[r.machine_class] : undefined));
-      if (processGroup && rowGroup !== processGroup) return null;
-      if (fromKey) return fromKey;
-      if (!r.machine_class) return null;
-      return MHRService.VERIFIED_CLASS_CATEGORY[r.machine_class] ?? MHRService.humanizeMachineClass(r.machine_class);
-    }).filter(Boolean) as string[];
+      if (processGroup && rowGroup !== processGroup) continue;
+      const category = fromKey
+        || (r.machine_class ? (MHRService.VERIFIED_CLASS_CATEGORY[r.machine_class] ?? MHRService.humanizeMachineClass(r.machine_class)) : null);
+      if (!category) continue;
+      // First real machine_class seen for this category wins — in practice
+      // one display category maps to exactly one real machine_class (see
+      // this method's own doc comment); an existing null placeholder is
+      // upgraded if a later row for the same category does carry one.
+      if (!machineClassByCategory.has(category) || (!machineClassByCategory.get(category) && r.machine_class)) {
+        machineClassByCategory.set(category, r.machine_class ?? null);
+      }
+    }
 
-    return [...new Set(categories)].sort();
+    return [...machineClassByCategory.entries()]
+      .map(([category, machineClass]) => ({ category, machineClass }))
+      .sort((a, b) => a.category.localeCompare(b.category));
   }
 
   /**

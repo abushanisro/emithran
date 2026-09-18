@@ -325,6 +325,20 @@ export const mhrApi = {
   },
 
   /**
+   * Same real categories as getCategories, paired with each one's real
+   * underlying machine_class — the value the cost engine's rate resolvers
+   * actually filter on. Used by MHRFormDialog to resolve a chosen EXISTING
+   * category back to its real class when saving a new record, instead of
+   * persisting the display label itself as a brand-new, unmatchable class.
+   */
+  getCategoriesWithClass: async (processGroup?: string): Promise<Array<{ category: string; machineClass: string | null }>> => {
+    return (await apiClient.get<Array<{ category: string; machineClass: string | null }>>('/mhr/categories-with-class', {
+      silent: true, retry: false,
+      ...(processGroup ? { params: { processGroup } } : {}),
+    })) ?? [];
+  },
+
+  /**
    * Get distinct real process_group values on file in MHR records — the
    * direct column, not process_calculator_mappings' is_active-gated list
    * (those are different concepts: whether a calculator is wired vs.
