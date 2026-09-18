@@ -1,0 +1,1113 @@
+{
+  "tool_type": "Dovetail Mill",
+  "tool_series": "Virtual Dovetail Mill, Uncoated",
+  "cut_type": "Finish Dovetail Milling",
+  "units": {
+    "neck_diameter": "mm",
+    "max_cutting_depth": "mm",
+    "depth_max": "mm",
+    "cutting_speed": "m/min",
+    "feed_per_tooth": "mm"
+  },
+  "neck_diameters_mm": [
+    0.381,
+    19.05
+  ],
+  "max_cutting_depth_mm": 0.0,
+  "depth_max_mm": 0.0,
+  "materials": [
+    {
+      "material_cut_code": "30.3",
+      "material": "Aluminum Alloys: Al > 99%",
+      "hardness": 30,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 228.6,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00432,
+        "19.05": 0.20955
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "30.22",
+      "material": "Aluminum Alloys: Cast or cast and aged",
+      "hardness": 90,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 198.1,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00381,
+        "19.05": 0.18872
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "30.41",
+      "material": "Aluminum Alloys: Cast, 13 - 15% Si",
+      "hardness": 130,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 228.6,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00432,
+        "19.05": 0.20955
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "30.42",
+      "material": "Aluminum Alloys: Cast, 16 - 22% Si",
+      "hardness": 130,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 228.6,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00432,
+        "19.05": 0.20955
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "30.21",
+      "material": "Aluminum Alloys: Cast, non-aging",
+      "hardness": 75,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 228.6,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00381,
+        "19.05": 0.18872
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "30.12",
+      "material": "Aluminum Alloys: Wrought or wrought and aged",
+      "hardness": 100,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 304.8,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00432,
+        "19.05": 0.20955
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "30.11",
+      "material": "Aluminum Alloys: Wrought or wrought and coldworked, non-aging",
+      "hardness": 60,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 304.8,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00432,
+        "19.05": 0.20955
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "6.33",
+      "material": "Castings: Manganese steel, 12-14%",
+      "hardness": 250,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 61.0,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00127,
+        "19.05": 0.06579
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "6.32",
+      "material": "Castings: Stainless austenitic",
+      "hardness": 200,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 61.0,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00127,
+        "19.05": 0.06579
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "10.0",
+      "material": "Chilled Cast Iron",
+      "hardness": 400,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 61.0,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00127,
+        "19.05": 0.06579
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "10.1",
+      "material": "Chilled Cast Iron: Cast or cast and aged",
+      "hardness": 400,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 61.0,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00127,
+        "19.05": 0.06579
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "33.2",
+      "material": "Copper and Copper Alloys: Brass, leaded bronzes, < 1% Pb",
+      "hardness": 90,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 152.4,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.0033,
+        "19.05": 0.16764
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "33.3",
+      "material": "Copper and Copper Alloys: Bronze and non-leaded copper including electrolytic copper",
+      "hardness": 100,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 68.6,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.0033,
+        "19.05": 0.16764
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "33.1",
+      "material": "Copper and Copper Alloys: Free cutting alloys, > 1% Pb",
+      "hardness": 110,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 68.6,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.0033,
+        "19.05": 0.16764
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "4.1",
+      "material": "Extra Hard Steel, hardened and tempered",
+      "hardness": 59,
+      "hardness_system": "Rockwell C",
+      "cutting_speed_m_min": 45.7,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00076,
+        "19.05": 0.04115
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "41.11",
+      "material": "Glass Filled Thermoplastic, Low Speed",
+      "hardness": 30,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 304.8,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00345,
+        "19.05": 0.16764
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "41.21",
+      "material": "Glass Filled Thermoplastic, Medium Speed",
+      "hardness": 30,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 304.8,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00345,
+        "19.05": 0.16764
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "42.11",
+      "material": "Glass Filled Thermoset, Low Speed",
+      "hardness": 30,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 249.9,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00497,
+        "19.05": 0.24098
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "42.12",
+      "material": "Glass Filled Thermoset, Low Speed",
+      "hardness": 30,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 304.8,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00345,
+        "19.05": 0.16764
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "42.13",
+      "material": "Glass Filled Thermoset, Low Speed",
+      "hardness": 30,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 304.8,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00345,
+        "19.05": 0.16764
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "34.0",
+      "material": "Graphite: Mechanical Grade",
+      "hardness": 515,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 435.9,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00415,
+        "19.05": 0.20117
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "8.3",
+      "material": "Grey Cast Iron: Austenitic",
+      "hardness": 175,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 61.0,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00127,
+        "19.05": 0.06579
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "8.2",
+      "material": "Grey Cast Iron: High tensile strength",
+      "hardness": 220,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 61.0,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00127,
+        "19.05": 0.06579
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "8.1",
+      "material": "Grey Cast Iron: Low tensile strength",
+      "hardness": 180,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 61.0,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00127,
+        "19.05": 0.06579
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "4.0",
+      "material": "Hard Steel: Hardened steel",
+      "hardness": 55,
+      "hardness_system": "Rockwell C",
+      "cutting_speed_m_min": 45.7,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00076,
+        "19.05": 0.04115
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "20.32",
+      "material": "Heat Resistant Super Alloys: Cobalt base, aged or solution treated and aged",
+      "hardness": 300,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 21.3,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00076,
+        "19.05": 0.04115
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "20.31",
+      "material": "Heat Resistant Super Alloys: Cobalt base, annealed or solution treated",
+      "hardness": 200,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 21.3,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00076,
+        "19.05": 0.04115
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "20.33",
+      "material": "Heat Resistant Super Alloys: Cobalt base, cast or cast and aged",
+      "hardness": 320,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 21.3,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00076,
+        "19.05": 0.04115
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "20.12",
+      "material": "Heat Resistant Super Alloys: Iron base, aged or solution treated and aged",
+      "hardness": 280,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 21.3,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00076,
+        "19.05": 0.04115
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "20.11",
+      "material": "Heat Resistant Super Alloys: Iron base, annealed or solution treated",
+      "hardness": 200,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 21.3,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00076,
+        "19.05": 0.04115
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "20.22",
+      "material": "Heat Resistant Super Alloys: Nickel base, aged or solution treated and aged",
+      "hardness": 350,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 21.3,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00051,
+        "19.05": 0.02057
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "20.21",
+      "material": "Heat Resistant Super Alloys: Nickel base, annealed or solution treated",
+      "hardness": 250,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 21.3,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00076,
+        "19.05": 0.04115
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "20.24",
+      "material": "Heat Resistant Super Alloys: Nickel base, cast or cast and aged",
+      "hardness": 320,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 21.3,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00076,
+        "19.05": 0.04115
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "20.23",
+      "material": "Heat Resistant Super Alloys: Nickel base, cold drawn",
+      "hardness": 275,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 21.3,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00076,
+        "19.05": 0.04115
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "23.22",
+      "material": "Heat Resistant Super Alloys: Titanium alloys, a + b alloys in aged condition, b alloys, annealed",
+      "hardness": 1050,
+      "hardness_system": "Tensile Strength",
+      "cutting_speed_m_min": 45.7,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00051,
+        "19.05": 0.02057
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "23.21",
+      "material": "Heat Resistant Super Alloys: Titanium alloys, a, near a and a + b alloys, annealed",
+      "hardness": 950,
+      "hardness_system": "Tensile Strength",
+      "cutting_speed_m_min": 45.7,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00076,
+        "19.05": 0.04115
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "23.1",
+      "material": "Heat Resistant Super Alloys: Titanium alloys, commercial pure (99.5% Ti)",
+      "hardness": 400,
+      "hardness_system": "Tensile Strength",
+      "cutting_speed_m_min": 45.7,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00051,
+        "19.05": 0.02057
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "7.1",
+      "material": "Malleable Cast Iron: Ferritic (short chipping)",
+      "hardness": 130,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 61.0,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00127,
+        "19.05": 0.06579
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "7.3",
+      "material": "Malleable Cast Iron: Martensitic",
+      "hardness": 250,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 61.0,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00127,
+        "19.05": 0.06579
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "7.2",
+      "material": "Malleable Cast Iron: Pearlitic (long chipping)",
+      "hardness": 230,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 61.0,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00127,
+        "19.05": 0.06579
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "9.1",
+      "material": "Nodular SG Iron: Ferritic",
+      "hardness": 160,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 61.0,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00127,
+        "19.05": 0.06579
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "9.3",
+      "material": "Nodular SG Iron: Martensitic",
+      "hardness": 330,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 61.0,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00127,
+        "19.05": 0.06579
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "9.2",
+      "material": "Nodular SG Iron: Pearlitic",
+      "hardness": 250,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 61.0,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00127,
+        "19.05": 0.06579
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "5.2",
+      "material": "Stainless Steel - bars/forged: Austenitic",
+      "hardness": 175,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 61.0,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00127,
+        "19.05": 0.06579
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "5.21",
+      "material": "Stainless Steel - bars/forged: Austenitic, non-hardened",
+      "hardness": 200,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 61.0,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00127,
+        "19.05": 0.06579
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "5.22",
+      "material": "Stainless Steel - bars/forged: Austenitic, PH-hardened",
+      "hardness": 330,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 45.7,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00076,
+        "19.05": 0.04115
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "5.23",
+      "material": "Stainless Steel - bars/forged: Austenitic, super austenitic",
+      "hardness": 200,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 45.7,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00076,
+        "19.05": 0.04115
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "5.51",
+      "material": "Stainless Steel - bars/forged: Austenitic-ferritic (Duplex), non-weldable > 0.05%C",
+      "hardness": 230,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 61.0,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00127,
+        "19.05": 0.06579
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "5.52",
+      "material": "Stainless Steel - bars/forged: Austenitic-ferritic (Duplex), weldable < 0.05%C",
+      "hardness": 260,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 61.0,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00127,
+        "19.05": 0.06579
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "5.1",
+      "material": "Stainless Steel - bars/forged: Ferritic/martensitic",
+      "hardness": 200,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 61.0,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00127,
+        "19.05": 0.06579
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "5.13",
+      "material": "Stainless Steel - bars/forged: Ferritic/martensitic, hardened",
+      "hardness": 330,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 61.0,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00127,
+        "19.05": 0.06579
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "5.11",
+      "material": "Stainless Steel - bars/forged: Ferritic/martensitic, non-hardened",
+      "hardness": 200,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 61.0,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00127,
+        "19.05": 0.06579
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "5.12",
+      "material": "Stainless Steel - bars/forged: Ferritic/martensitic, PH-hardened",
+      "hardness": 330,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 45.7,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00076,
+        "19.05": 0.04115
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "15.21",
+      "material": "Stainless Steel - cast: Austenitic",
+      "hardness": 200,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 213.4,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00381,
+        "19.05": 0.18872
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "15.22",
+      "material": "Stainless Steel - cast: Austenitic, PH-hardened",
+      "hardness": 330,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 198.1,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00381,
+        "19.05": 0.18872
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "15.23",
+      "material": "Stainless Steel - cast: Austenitic, super austenitic",
+      "hardness": 330,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 144.8,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00381,
+        "19.05": 0.18872
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "15.51",
+      "material": "Stainless Steel - cast: Austenitic-ferritic (Duplex), non-weldable > 0.05%C",
+      "hardness": 230,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 144.8,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00381,
+        "19.05": 0.18872
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "15.52",
+      "material": "Stainless Steel - cast: Austenitic-ferritic (Duplex), weldable < 0.05%C",
+      "hardness": 260,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 144.8,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00381,
+        "19.05": 0.18872
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "15.13",
+      "material": "Stainless Steel - cast: Ferritic/martensitic, hardened",
+      "hardness": 330,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 144.8,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00381,
+        "19.05": 0.18872
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "15.11",
+      "material": "Stainless Steel - cast: Ferritic/martensitic, non-hardened",
+      "hardness": 200,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 213.4,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00381,
+        "19.05": 0.18872
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "15.12",
+      "material": "Stainless Steel - cast: Ferritic/martensitic, PH-hardened",
+      "hardness": 330,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 198.1,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00381,
+        "19.05": 0.18872
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "6.3",
+      "material": "Steel Castings: High-alloy (alloying elements > 5%)",
+      "hardness": 200,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 45.7,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00076,
+        "19.05": 0.04115
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "6.2",
+      "material": "Steel Castings: Low-alloy (alloying elements < 5%)",
+      "hardness": 200,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 61.0,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00127,
+        "19.05": 0.06579
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "6.1",
+      "material": "Steel Castings: Unalloyed",
+      "hardness": 150,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 182.9,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00152,
+        "19.05": 0.07214
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "3.22",
+      "material": "Steel: High alloyed, hardened steel; others",
+      "hardness": 380,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 45.7,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00051,
+        "19.05": 0.02057
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "3.1",
+      "material": "Steel: High-alloyed, annealed",
+      "hardness": 200,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 45.7,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00076,
+        "19.05": 0.04115
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "3.11",
+      "material": "Steel: High-alloyed, annealed",
+      "hardness": 200,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 45.7,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00076,
+        "19.05": 0.04115
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "3.2",
+      "material": "Steel: High-alloyed, hardened",
+      "hardness": 225,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 45.7,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00076,
+        "19.05": 0.04115
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "3.13",
+      "material": "Steel: High-alloyed, hardened tool steel",
+      "hardness": 200,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 45.7,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00076,
+        "19.05": 0.04115
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "3.21",
+      "material": "Steel: High-alloyed, hardened tool steel",
+      "hardness": 300,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 45.7,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00076,
+        "19.05": 0.04115
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "2.12",
+      "material": "Steel: Low-alloyed, ball bearing steel",
+      "hardness": 210,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 61.0,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00127,
+        "19.05": 0.06579
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "2.2",
+      "material": "Steel: Low-alloyed, hardened and tempered",
+      "hardness": 330,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 61.0,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00127,
+        "19.05": 0.06579
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "2.1",
+      "material": "Steel: Low-alloyed, non-hardened",
+      "hardness": 180,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 61.0,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00127,
+        "19.05": 0.06579
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "1.0",
+      "material": "Steel: Unalloyed, C = 0.05 - 0.10%",
+      "hardness": 125,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 182.9,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00152,
+        "19.05": 0.07214
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "1.1",
+      "material": "Steel: Unalloyed, C = 0.10 - 0.25%",
+      "hardness": 125,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 182.9,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00152,
+        "19.05": 0.07214
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "1.2",
+      "material": "Steel: Unalloyed, C = 0.25 - 0.55%",
+      "hardness": 150,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 61.0,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00127,
+        "19.05": 0.06579
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "1.3",
+      "material": "Steel: Unalloyed, C = 0.55 - 0.80%",
+      "hardness": 170,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 61.0,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00127,
+        "19.05": 0.06579
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "1.5",
+      "material": "Steel: Unalloyed, hardened and tempered",
+      "hardness": 300,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 61.0,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00127,
+        "19.05": 0.06579
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "1.4",
+      "material": "Steel: Unalloyed, high carbon & carbon tool steel",
+      "hardness": 210,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 61.0,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00127,
+        "19.05": 0.06579
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "51.31",
+      "material": "Unfilled Thermoplastic, High Speed",
+      "hardness": 30,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 716.3,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00497,
+        "19.05": 0.24098
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "51.32",
+      "material": "Unfilled Thermoplastic, High Speed",
+      "hardness": 30,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 716.3,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00497,
+        "19.05": 0.24098
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "51.21",
+      "material": "Unfilled Thermoplastic, Medium Speed",
+      "hardness": 30,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 579.1,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00497,
+        "19.05": 0.24098
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "51.22",
+      "material": "Unfilled Thermoplastic, Medium Speed",
+      "hardness": 30,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 579.1,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00497,
+        "19.05": 0.24098
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "52.31",
+      "material": "Unfilled Thermoset, High Speed",
+      "hardness": 30,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 716.3,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00497,
+        "19.05": 0.24098
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "52.32",
+      "material": "Unfilled Thermoset, High Speed",
+      "hardness": 30,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 716.3,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00497,
+        "19.05": 0.24098
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "52.11",
+      "material": "Unfilled Thermoset, Low Speed",
+      "hardness": 30,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 317.0,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00497,
+        "19.05": 0.24098
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "52.12",
+      "material": "Unfilled Thermoset, Low Speed",
+      "hardness": 30,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 457.2,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00497,
+        "19.05": 0.24098
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "52.13",
+      "material": "Unfilled Thermoset, Low Speed",
+      "hardness": 30,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 457.2,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00497,
+        "19.05": 0.24098
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "52.14",
+      "material": "Unfilled Thermoset, Low Speed",
+      "hardness": 30,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 399.3,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00332,
+        "19.05": 0.16135
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "52.15",
+      "material": "Unfilled Thermoset, Low Speed",
+      "hardness": 30,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 579.1,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00497,
+        "19.05": 0.24098
+      },
+      "data_complete": true
+    },
+    {
+      "material_cut_code": "52.21",
+      "material": "Unfilled Thermoset, Medium Speed",
+      "hardness": 30,
+      "hardness_system": "Brinell",
+      "cutting_speed_m_min": 579.1,
+      "feed_per_tooth_mm_by_neck_diameter": {
+        "0.381": 0.00497,
+        "19.05": 0.24098
+      },
+      "data_complete": true
+    }
+  ],
+  "data_gaps": []
+}

@@ -1,0 +1,207 @@
+{
+  "process_name": "Etch Cell",
+  "digital_factory": "USA reference export",
+  "sector": "World Average",
+  "machines": [
+    {
+      "name": "Etch Cell - 1.8m x 1.0m x 1.2m Tank Size",
+      "description": "1.8m x 1.0m x 1.2m etch cell -etch, rinse, rinse, dry, desmut and desmut rinse tanks",
+      "workcenter": "Default",
+      "accounting": {
+        "labor_rate_usd_per_hr": 47.36,
+        "overhead_multiplier": 0.00,
+        "direct_overhead_rate_usd_per_hr": 17.73,
+        "indirect_overhead_rate_usd_per_hr": 14.80,
+        "total_overhead_rate_usd_per_hr": 32.53,
+        "labor_time_standard": 1.00,
+        "number_of_operators": 1.00,
+        "period_overhead_coefficient": 0.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 0.50
+      },
+      "limits": {
+        "tank_depth_mm": 1200.00,
+        "tank_length_mm": 1800.00,
+        "tank_width_mm": 1050.00
+      },
+      "other": {
+        "is_preferred": true
+      },
+      "yields": {
+        "avg_utilization": 0.00,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "annual_maintenance_factor_percent": 5.00,
+        "footprint_allowance_factor": 1.00,
+        "installation_factor_percent": 20.00,
+        "machine_length_mm": 10800.00,
+        "machine_life_yr": 10,
+        "machine_power_kW": 95.00,
+        "machine_price_usd": 55680.00,
+        "machine_uptime_percent": 80.00,
+        "machine_width_mm": 1050.00,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Virtual"
+      },
+      "unlabeled_column_value": 4.80,
+      "unlabeled_column_note": "Column header was truncated to 'hr)' in the source screenshot, positioned immediately before Total Overhead Rate. Could not be matched to any other visible field (not Direct/Indirect Overhead Rate, not Setup Time). Reported as-is, meaning not confirmed."
+    },
+    {
+      "name": "Etch Cell - 12.2m x 2.1m x 3.0m Tank Size",
+      "description": "12.2m x 2.1m x 3.0m etch cell -etch, rinse, rinse, dry, desmut and desmut rinse tanks",
+      "workcenter": "Default",
+      "accounting": {
+        "labor_rate_usd_per_hr": 47.36,
+        "overhead_multiplier": 0.00,
+        "direct_overhead_rate_usd_per_hr": 213.49,
+        "indirect_overhead_rate_usd_per_hr": 27.18,
+        "total_overhead_rate_usd_per_hr": 240.67,
+        "labor_time_standard": 1.00,
+        "number_of_operators": 1.00,
+        "period_overhead_coefficient": 0.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 1.50
+      },
+      "limits": {
+        "tank_depth_mm": 3048.00,
+        "tank_length_mm": 12192.00,
+        "tank_width_mm": 2133.00
+      },
+      "other": {
+        "is_preferred": true
+      },
+      "yields": {
+        "avg_utilization": 0.00,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "annual_maintenance_factor_percent": 5.00,
+        "footprint_allowance_factor": 1.00,
+        "installation_factor_percent": 20.00,
+        "machine_length_mm": 73152.00,
+        "machine_life_yr": 10,
+        "machine_power_kW": 1300.00,
+        "machine_price_usd": 281587.00,
+        "machine_uptime_percent": 80.00,
+        "machine_width_mm": 2133.60,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Virtual"
+      },
+      "unlabeled_column_value": 7.18,
+      "unlabeled_column_note": "Column header was truncated to 'hr)' in the source screenshot, positioned immediately before Total Overhead Rate. Could not be matched to any other visible field (not Direct/Indirect Overhead Rate, not Setup Time). Reported as-is, meaning not confirmed."
+    },
+    {
+      "name": "Etch Cell - 3.6m x 2.1m x 2.4m Tank Size",
+      "description": "3.6m x 2.1m x 2.4m etch cell -etch, rinse, rinse, dry, desmut and desmut rinse tanks",
+      "workcenter": "Default",
+      "accounting": {
+        "labor_rate_usd_per_hr": 47.36,
+        "overhead_multiplier": 0.00,
+        "direct_overhead_rate_usd_per_hr": 63.25,
+        "indirect_overhead_rate_usd_per_hr": 17.71,
+        "total_overhead_rate_usd_per_hr": 80.96,
+        "labor_time_standard": 1.00,
+        "number_of_operators": 1.00,
+        "period_overhead_coefficient": 0.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 1.00
+      },
+      "limits": {
+        "tank_depth_mm": 2400.00,
+        "tank_length_mm": 3600.00,
+        "tank_width_mm": 2100.00
+      },
+      "other": {
+        "is_preferred": true
+      },
+      "yields": {
+        "avg_utilization": 0.00,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "annual_maintenance_factor_percent": 5.00,
+        "footprint_allowance_factor": 1.00,
+        "installation_factor_percent": 20.00,
+        "machine_length_mm": 21600.00,
+        "machine_life_yr": 10,
+        "machine_power_kW": 378.00,
+        "machine_price_usd": 101200.00,
+        "machine_uptime_percent": 80.00,
+        "machine_width_mm": 2100.00,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Virtual"
+      },
+      "unlabeled_column_value": 7.71,
+      "unlabeled_column_note": "Column header was truncated to 'hr)' in the source screenshot, positioned immediately before Total Overhead Rate. Could not be matched to any other visible field (not Direct/Indirect Overhead Rate, not Setup Time). Reported as-is, meaning not confirmed."
+    },
+    {
+      "name": "Etch Cell - 7.2m x 4.2m x 4.8m Tank Size",
+      "description": "7.2m x 4.2m x 4.8m etch cell -etch, rinse, rinse, dry, desmut and desmut rinse tanks",
+      "workcenter": "Default",
+      "accounting": {
+        "labor_rate_usd_per_hr": 47.36,
+        "overhead_multiplier": 0.00,
+        "direct_overhead_rate_usd_per_hr": 240.10,
+        "indirect_overhead_rate_usd_per_hr": 29.35,
+        "total_overhead_rate_usd_per_hr": 269.46,
+        "labor_time_standard": 1.00,
+        "number_of_operators": 1.00,
+        "period_overhead_coefficient": 0.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 1.50
+      },
+      "limits": {
+        "tank_depth_mm": 4800.00,
+        "tank_length_mm": 7200.00,
+        "tank_width_mm": 4200.00
+      },
+      "other": {
+        "is_preferred": true
+      },
+      "yields": {
+        "avg_utilization": 0.00,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "annual_maintenance_factor_percent": 5.00,
+        "footprint_allowance_factor": 1.00,
+        "installation_factor_percent": 20.00,
+        "machine_length_mm": 43200.00,
+        "machine_life_yr": 10,
+        "machine_power_kW": 1512.00,
+        "machine_price_usd": 192000.00,
+        "machine_uptime_percent": 80.00,
+        "machine_width_mm": 4200.00,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Virtual"
+      },
+      "unlabeled_column_value": 9.35,
+      "unlabeled_column_note": "Column header was truncated to 'hr)' in the source screenshot, positioned immediately before Total Overhead Rate. Could not be matched to any other visible field (not Direct/Indirect Overhead Rate, not Setup Time). Reported as-is, meaning not confirmed."
+    }
+  ]
+}

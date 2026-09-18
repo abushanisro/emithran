@@ -1,0 +1,382 @@
+[
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "Metric 60 deg",
+    "MmPerThreadMm": 0.5,
+    "Passes": 4,
+    "Pitch": 0.5,
+    "PitchUnits": "mm",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "Metric 60 deg",
+    "MmPerThreadMm": 0.75,
+    "Passes": 4,
+    "Pitch": 0.75,
+    "PitchUnits": "mm",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "Metric 60 deg",
+    "MmPerThreadMm": 1.0,
+    "Passes": 5,
+    "Pitch": 1.0,
+    "PitchUnits": "mm",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "Metric 60 deg",
+    "MmPerThreadMm": 1.25,
+    "Passes": 6,
+    "Pitch": 1.25,
+    "PitchUnits": "mm",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "Metric 60 deg",
+    "MmPerThreadMm": 1.5,
+    "Passes": 6,
+    "Pitch": 1.5,
+    "PitchUnits": "mm",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "Metric 60 deg",
+    "MmPerThreadMm": 1.75,
+    "Passes": 8,
+    "Pitch": 1.75,
+    "PitchUnits": "mm",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "Metric 60 deg",
+    "MmPerThreadMm": 2.0,
+    "Passes": 8,
+    "Pitch": 2.0,
+    "PitchUnits": "mm",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "Metric 60 deg",
+    "MmPerThreadMm": 2.5,
+    "Passes": 10,
+    "Pitch": 2.5,
+    "PitchUnits": "mm",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "Metric 60 deg",
+    "MmPerThreadMm": 3.0,
+    "Passes": 12,
+    "Pitch": 3.0,
+    "PitchUnits": "mm",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "Metric 60 deg",
+    "MmPerThreadMm": 3.5,
+    "Passes": 12,
+    "Pitch": 3.5,
+    "PitchUnits": "mm",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "Metric 60 deg",
+    "MmPerThreadMm": 4.0,
+    "Passes": 14,
+    "Pitch": 4.0,
+    "PitchUnits": "mm",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "Metric 60 deg",
+    "MmPerThreadMm": 4.5,
+    "Passes": 14,
+    "Pitch": 4.5,
+    "PitchUnits": "mm",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "Metric 60 deg",
+    "MmPerThreadMm": 5.0,
+    "Passes": 14,
+    "Pitch": 5.0,
+    "PitchUnits": "mm",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "Metric 60 deg",
+    "MmPerThreadMm": 5.5,
+    "Passes": 16,
+    "Pitch": 5.5,
+    "PitchUnits": "mm",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "Metric 60 deg",
+    "MmPerThreadMm": 6.0,
+    "Passes": 16,
+    "Pitch": 6.0,
+    "PitchUnits": "mm",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "NPT (INT)",
+    "MmPerThreadMm": 0.94,
+    "Passes": 6,
+    "Pitch": 27.0,
+    "PitchUnits": "TPI",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "NPT (INT)",
+    "MmPerThreadMm": 1.41,
+    "Passes": 8,
+    "Pitch": 18.0,
+    "PitchUnits": "TPI",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "NPT (INT)",
+    "MmPerThreadMm": 1.81,
+    "Passes": 10,
+    "Pitch": 14.0,
+    "PitchUnits": "TPI",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "NPT (INT)",
+    "MmPerThreadMm": 2.21,
+    "Passes": 12,
+    "Pitch": 11.5,
+    "PitchUnits": "TPI",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "NPT (INT)",
+    "MmPerThreadMm": 3.18,
+    "Passes": 15,
+    "Pitch": 8.0,
+    "PitchUnits": "TPI",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "UN 60 deg",
+    "MmPerThreadMm": 0.79,
+    "Passes": 4,
+    "Pitch": 32.0,
+    "PitchUnits": "TPI",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "UN 60 deg",
+    "MmPerThreadMm": 0.91,
+    "Passes": 5,
+    "Pitch": 28.0,
+    "PitchUnits": "TPI",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "UN 60 deg",
+    "MmPerThreadMm": 1.0,
+    "Passes": 5,
+    "Pitch": 24.0,
+    "PitchUnits": "TPI",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "UN 60 deg",
+    "MmPerThreadMm": 1.27,
+    "Passes": 6,
+    "Pitch": 20.0,
+    "PitchUnits": "TPI",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "UN 60 deg",
+    "MmPerThreadMm": 1.41,
+    "Passes": 6,
+    "Pitch": 18.0,
+    "PitchUnits": "TPI",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "UN 60 deg",
+    "MmPerThreadMm": 1.59,
+    "Passes": 7,
+    "Pitch": 16.0,
+    "PitchUnits": "TPI",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "UN 60 deg",
+    "MmPerThreadMm": 1.81,
+    "Passes": 8,
+    "Pitch": 14.0,
+    "PitchUnits": "TPI",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "UN 60 deg",
+    "MmPerThreadMm": 1.95,
+    "Passes": 8,
+    "Pitch": 13.0,
+    "PitchUnits": "TPI",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "UN 60 deg",
+    "MmPerThreadMm": 2.12,
+    "Passes": 8,
+    "Pitch": 12.0,
+    "PitchUnits": "TPI",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "UN 60 deg",
+    "MmPerThreadMm": 2.31,
+    "Passes": 9,
+    "Pitch": 11.0,
+    "PitchUnits": "TPI",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "UN 60 deg",
+    "MmPerThreadMm": 2.54,
+    "Passes": 10,
+    "Pitch": 10.0,
+    "PitchUnits": "TPI",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "UN 60 deg",
+    "MmPerThreadMm": 2.82,
+    "Passes": 11,
+    "Pitch": 9.0,
+    "PitchUnits": "TPI",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "UN 60 deg",
+    "MmPerThreadMm": 3.18,
+    "Passes": 12,
+    "Pitch": 8.0,
+    "PitchUnits": "TPI",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "UN 60 deg",
+    "MmPerThreadMm": 3.63,
+    "Passes": 12,
+    "Pitch": 7.0,
+    "PitchUnits": "TPI",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "UN 60 deg",
+    "MmPerThreadMm": 4.23,
+    "Passes": 14,
+    "Pitch": 6.0,
+    "PitchUnits": "TPI",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "UN 60 deg",
+    "MmPerThreadMm": 5.08,
+    "Passes": 14,
+    "Pitch": 5.0,
+    "PitchUnits": "TPI",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "UN 60 deg",
+    "MmPerThreadMm": 5.64,
+    "Passes": 16,
+    "Pitch": 4.5,
+    "PitchUnits": "TPI",
+    "ToolLifeCostUSD": 6.0
+  },
+  {
+    "ToolType": "Thread Chaser Insert",
+    "ToolSeries": "Virtual Thread Chaser Insert",
+    "ThreadForm": "UN 60 deg",
+    "MmPerThreadMm": 6.35,
+    "Passes": 16,
+    "Pitch": 4.0,
+    "PitchUnits": "TPI",
+    "ToolLifeCostUSD": 6.0
+  }
+]

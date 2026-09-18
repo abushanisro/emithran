@@ -1,0 +1,556 @@
+{
+  "process_name": "drill press",
+  "digital_factory": "USA reference export",
+  "sector": "World Average",
+  "machines": [
+    {
+      "name": "Carlton 5 ft X 13 in",
+      "description": "10 hp, 1200 rpm, 60 in. Spindle to Col Surf",
+      "drill_press_type": "Radial",
+      "accounting": {
+        "labor_rate_usd_per_hr": 29.95,
+        "total_overhead_rate_usd_per_hr": 17.28,
+        "direct_overhead_rate_usd_per_hr": 2.25,
+        "indirect_overhead_rate_usd_per_hr": 15.02,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 0.25,
+        "index_time_s": 3.60,
+        "spotting_time_s": 1.00,
+        "time_to_replace_dull_tool_s": 60.00,
+        "countersinking_time_s": 1.00,
+        "base_part_setup_time_hr": 0.05
+      },
+      "rates": {
+        "rapid_traverse_rate_mm_per_min": 3000.00
+      },
+      "limits": {
+        "spindle_speed_rpm": 1200.00,
+        "table_length_mm": 0.00,
+        "table_width_mm": 0.00,
+        "spindle_to_column_surface_mm": 1524.00
+      },
+      "powers": {
+        "spindle_power_kW": 7.46,
+        "auxiliary_power_kW": 3.45
+      },
+      "other": {
+        "approach_depart_distance_mm": 2.54,
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 10000.00,
+        "machine_length_mm": 3050.00,
+        "machine_width_mm": 1520.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 10.91,
+        "installation_factor_percent": 20.00,
+        "machine_uptime_percent": 80.00,
+        "annual_maintenance_factor_percent": 5.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "USA"
+      }
+    },
+    {
+      "name": "Cincinnati HD 8 X 20",
+      "description": "15 hp, 2180 rpm, 74 in. Spindle to Col Surf",
+      "drill_press_type": "Radial",
+      "accounting": {
+        "labor_rate_usd_per_hr": 29.95,
+        "total_overhead_rate_usd_per_hr": 18.05,
+        "direct_overhead_rate_usd_per_hr": 3.08,
+        "indirect_overhead_rate_usd_per_hr": 14.97,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 0.25,
+        "index_time_s": 3.60,
+        "spotting_time_s": 1.00,
+        "time_to_replace_dull_tool_s": 60.00,
+        "countersinking_time_s": 1.00,
+        "base_part_setup_time_hr": 0.05
+      },
+      "rates": {
+        "rapid_traverse_rate_mm_per_min": 3000.00
+      },
+      "limits": {
+        "spindle_speed_rpm": 2180.00,
+        "table_length_mm": 0.00,
+        "table_width_mm": 0.00,
+        "spindle_to_column_surface_mm": 1880.00
+      },
+      "powers": {
+        "spindle_power_kW": 11.19,
+        "auxiliary_power_kW": 5.18
+      },
+      "other": {
+        "approach_depart_distance_mm": 2.54,
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 10000.00,
+        "machine_length_mm": 3580.00,
+        "machine_width_mm": 1240.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 16.36,
+        "installation_factor_percent": 20.00,
+        "machine_uptime_percent": 80.00,
+        "annual_maintenance_factor_percent": 5.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "USA"
+      }
+    },
+    {
+      "name": "Delta 15-331",
+      "description": "3 hp, 4700 rpm, 15 in. Spindle to Col Surf",
+      "drill_press_type": "Upright",
+      "accounting": {
+        "labor_rate_usd_per_hr": 29.95,
+        "total_overhead_rate_usd_per_hr": 14.91,
+        "direct_overhead_rate_usd_per_hr": 0.71,
+        "indirect_overhead_rate_usd_per_hr": 14.20,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 0.25,
+        "index_time_s": 3.60,
+        "spotting_time_s": 1.00,
+        "time_to_replace_dull_tool_s": 60.00,
+        "countersinking_time_s": 1.00,
+        "base_part_setup_time_hr": 0.05
+      },
+      "rates": {
+        "rapid_traverse_rate_mm_per_min": 3000.00
+      },
+      "limits": {
+        "spindle_speed_rpm": 4700.00,
+        "table_length_mm": 0.00,
+        "table_width_mm": 0.00,
+        "spindle_to_column_surface_mm": 381.00
+      },
+      "powers": {
+        "spindle_power_kW": 2.24,
+        "auxiliary_power_kW": 1.04
+      },
+      "other": {
+        "approach_depart_distance_mm": 2.54,
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 3500.00,
+        "machine_length_mm": 610.00,
+        "machine_width_mm": 710.00,
+        "footprint_allowance_factor": 10.00,
+        "machine_power_kW": 3.27,
+        "installation_factor_percent": 20.00,
+        "machine_uptime_percent": 80.00,
+        "annual_maintenance_factor_percent": 5.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "USA"
+      }
+    },
+    {
+      "name": "Delta 15-344",
+      "description": "3 hp, 4700 rpm, 21 in. Spindle to Col Surf",
+      "drill_press_type": "Upright",
+      "accounting": {
+        "labor_rate_usd_per_hr": 29.95,
+        "total_overhead_rate_usd_per_hr": 15.03,
+        "direct_overhead_rate_usd_per_hr": 0.80,
+        "indirect_overhead_rate_usd_per_hr": 14.23,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 0.25,
+        "index_time_s": 3.60,
+        "spotting_time_s": 1.00,
+        "time_to_replace_dull_tool_s": 60.00,
+        "countersinking_time_s": 1.00,
+        "base_part_setup_time_hr": 0.05
+      },
+      "rates": {
+        "rapid_traverse_rate_mm_per_min": 3000.00
+      },
+      "limits": {
+        "spindle_speed_rpm": 4700.00,
+        "table_length_mm": 0.00,
+        "table_width_mm": 0.00,
+        "spindle_to_column_surface_mm": 546.00
+      },
+      "powers": {
+        "spindle_power_kW": 2.24,
+        "auxiliary_power_kW": 1.04
+      },
+      "other": {
+        "approach_depart_distance_mm": 2.54,
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 5000.00,
+        "machine_length_mm": 760.00,
+        "machine_width_mm": 610.00,
+        "footprint_allowance_factor": 10.00,
+        "machine_power_kW": 3.27,
+        "installation_factor_percent": 20.00,
+        "machine_uptime_percent": 80.00,
+        "annual_maintenance_factor_percent": 5.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "USA"
+      }
+    },
+    {
+      "name": "Jet JDP- 20Vs",
+      "description": "2 hp, 3630 rpm, 29 in. Spindle to Col Surf",
+      "drill_press_type": "Upright",
+      "accounting": {
+        "labor_rate_usd_per_hr": 29.95,
+        "total_overhead_rate_usd_per_hr": 14.70,
+        "direct_overhead_rate_usd_per_hr": 0.60,
+        "indirect_overhead_rate_usd_per_hr": 14.10,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 0.25,
+        "index_time_s": 3.60,
+        "spotting_time_s": 1.00,
+        "time_to_replace_dull_tool_s": 60.00,
+        "countersinking_time_s": 1.00,
+        "base_part_setup_time_hr": 0.05
+      },
+      "rates": {
+        "rapid_traverse_rate_mm_per_min": 3000.00
+      },
+      "limits": {
+        "spindle_speed_rpm": 3630.00,
+        "table_length_mm": 0.00,
+        "table_width_mm": 0.00,
+        "spindle_to_column_surface_mm": 737.00
+      },
+      "powers": {
+        "spindle_power_kW": 1.49,
+        "auxiliary_power_kW": 1.30
+      },
+      "other": {
+        "approach_depart_distance_mm": 2.54,
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 2899.00,
+        "machine_length_mm": 660.00,
+        "machine_width_mm": 480.00,
+        "footprint_allowance_factor": 10.00,
+        "machine_power_kW": 2.79,
+        "installation_factor_percent": 20.00,
+        "machine_uptime_percent": 80.00,
+        "annual_maintenance_factor_percent": 5.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "USA"
+      }
+    },
+    {
+      "name": "Knuth R100",
+      "description": "20.1 hp, 1000 rpm, 98 in. Spindle to Col Surf",
+      "drill_press_type": "Radial",
+      "accounting": {
+        "labor_rate_usd_per_hr": 29.95,
+        "total_overhead_rate_usd_per_hr": 19.75,
+        "direct_overhead_rate_usd_per_hr": 3.92,
+        "indirect_overhead_rate_usd_per_hr": 15.83,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 0.25,
+        "index_time_s": 3.60,
+        "spotting_time_s": 1.00,
+        "time_to_replace_dull_tool_s": 60.00,
+        "countersinking_time_s": 1.00,
+        "base_part_setup_time_hr": 0.05
+      },
+      "rates": {
+        "rapid_traverse_rate_mm_per_min": 3000.00
+      },
+      "limits": {
+        "spindle_speed_rpm": 1000.00,
+        "table_length_mm": 0.00,
+        "table_width_mm": 0.00,
+        "spindle_to_column_surface_mm": 2500.00
+      },
+      "powers": {
+        "spindle_power_kW": 15.00,
+        "auxiliary_power_kW": 6.94
+      },
+      "other": {
+        "approach_depart_distance_mm": 2.54,
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 10000.00,
+        "machine_length_mm": 4780.00,
+        "machine_width_mm": 1630.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 21.94,
+        "installation_factor_percent": 20.00,
+        "machine_uptime_percent": 80.00,
+        "annual_maintenance_factor_percent": 5.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Germany"
+      }
+    },
+    {
+      "name": "Rigid",
+      "description": "1 hp, 3100 rpm, 10 in. Spindle to Col Surf",
+      "drill_press_type": "Upright",
+      "accounting": {
+        "labor_rate_usd_per_hr": 29.95,
+        "total_overhead_rate_usd_per_hr": 15.79,
+        "direct_overhead_rate_usd_per_hr": 0.77,
+        "indirect_overhead_rate_usd_per_hr": 15.02,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 0.25,
+        "index_time_s": 3.60,
+        "spotting_time_s": 1.00,
+        "time_to_replace_dull_tool_s": 60.00,
+        "countersinking_time_s": 1.00,
+        "base_part_setup_time_hr": 0.05
+      },
+      "rates": {
+        "rapid_traverse_rate_mm_per_min": 3000.00
+      },
+      "limits": {
+        "spindle_speed_rpm": 3100.00,
+        "table_length_mm": 0.00,
+        "table_width_mm": 0.00,
+        "spindle_to_column_surface_mm": 254.00
+      },
+      "powers": {
+        "spindle_power_kW": 0.75,
+        "auxiliary_power_kW": 0.35
+      },
+      "other": {
+        "approach_depart_distance_mm": 2.54,
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 10000.00,
+        "machine_length_mm": 3050.00,
+        "machine_width_mm": 1520.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 1.09,
+        "installation_factor_percent": 20.00,
+        "machine_uptime_percent": 80.00,
+        "annual_maintenance_factor_percent": 5.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "USA"
+      }
+    },
+    {
+      "name": "Syderic SRD 350",
+      "description": "1.1 hp, 1500 rpm, 2 in. Spindle to Col Surf",
+      "drill_press_type": "Upright",
+      "accounting": {
+        "labor_rate_usd_per_hr": 29.95,
+        "total_overhead_rate_usd_per_hr": 15.56,
+        "direct_overhead_rate_usd_per_hr": 0.54,
+        "indirect_overhead_rate_usd_per_hr": 15.02,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 0.25,
+        "index_time_s": 3.60,
+        "spotting_time_s": 1.00,
+        "time_to_replace_dull_tool_s": 60.00,
+        "countersinking_time_s": 1.00,
+        "base_part_setup_time_hr": 0.05
+      },
+      "rates": {
+        "rapid_traverse_rate_mm_per_min": 3000.00
+      },
+      "limits": {
+        "spindle_speed_rpm": 1500.00,
+        "table_length_mm": 0.00,
+        "table_width_mm": 0.00,
+        "spindle_to_column_surface_mm": 60.00
+      },
+      "powers": {
+        "spindle_power_kW": 0.82,
+        "auxiliary_power_kW": 0.38
+      },
+      "other": {
+        "approach_depart_distance_mm": 2.54,
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 5932.00,
+        "machine_length_mm": 3050.00,
+        "machine_width_mm": 1520.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 1.20,
+        "installation_factor_percent": 20.00,
+        "machine_uptime_percent": 80.00,
+        "annual_maintenance_factor_percent": 5.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "France"
+      }
+    },
+    {
+      "name": "Weiler Vo75",
+      "description": "10.1 hp, 2000 rpm, 15 in. Spindle to Col Surf",
+      "drill_press_type": "Radial",
+      "accounting": {
+        "labor_rate_usd_per_hr": 29.95,
+        "total_overhead_rate_usd_per_hr": 16.94,
+        "direct_overhead_rate_usd_per_hr": 1.80,
+        "indirect_overhead_rate_usd_per_hr": 15.14,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 0.25,
+        "index_time_s": 3.60,
+        "spotting_time_s": 1.00,
+        "time_to_replace_dull_tool_s": 60.00,
+        "countersinking_time_s": 1.00,
+        "base_part_setup_time_hr": 0.05
+      },
+      "rates": {
+        "rapid_traverse_rate_mm_per_min": 3000.00
+      },
+      "limits": {
+        "spindle_speed_rpm": 2000.00,
+        "table_length_mm": 0.00,
+        "table_width_mm": 0.00,
+        "spindle_to_column_surface_mm": 386.00
+      },
+      "powers": {
+        "spindle_power_kW": 7.50,
+        "auxiliary_power_kW": 0.41
+      },
+      "other": {
+        "approach_depart_distance_mm": 2.54,
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 10000.00,
+        "machine_length_mm": 3700.00,
+        "machine_width_mm": 1380.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 7.91,
+        "installation_factor_percent": 20.00,
+        "machine_uptime_percent": 80.00,
+        "annual_maintenance_factor_percent": 5.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Germany"
+      }
+    }
+  ]
+}

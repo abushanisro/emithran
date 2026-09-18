@@ -1,0 +1,14 @@
+{
+  "digital_factory": "USA reference export",
+  "object_type": "Lookup Table",
+  "category_path": "Machining > Lookup Tables",
+  "table_name": "tblChemicalMilling",
+  "file_path": "lookupTables/Component/tblChemicalMilling.csv",
+  "column_names": ["Component Area (mm^2)", "Manual Clean Rate (mm^2/s)", "Peel Rate (mm^2/s)"],
+  "rows": [
+    { "component_area_mm2": 1000000.00, "manual_clean_rate_mm2_s": 50000.00, "peel_rate_mm2_s": 4166.00 },
+    { "component_area_mm2": 5000000.00, "manual_clean_rate_mm2_s": 35000.00, "peel_rate_mm2_s": 4166.00 },
+    { "component_area_mm2": 50000000.00, "manual_clean_rate_mm2_s": 20000.00, "peel_rate_mm2_s": 4166.00 }
+  ],
+  "total_row_count": 3
+}

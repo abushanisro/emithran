@@ -1,0 +1,242 @@
+{
+  "table_name": "tblFeatureToReviewPriority",
+  "description": "Priority weight per named validation/review rule, used to rank which feature-review failures surface first.",
+  "units": {
+    "priority": "unitless (higher = reviewed first)"
+  },
+  "row_count": 58,
+  "rules": [
+    {
+      "rule_name": "CanMachineGunDrill",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "CheckForBogusGCD",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "CheckForNumberOfUniqueDiameters",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "CheckForWallCornerDiameter",
+      "priority": 2.0
+    },
+    {
+      "rule_name": "CheckMinFloorRadius",
+      "priority": 0.2
+    },
+    {
+      "rule_name": "CompatibleMaterial",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "CornerPickingPriority",
+      "priority": 8.0
+    },
+    {
+      "rule_name": "DepthOk",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "DiameterOk",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "DirectionTypeOK",
+      "priority": 0.4
+    },
+    {
+      "rule_name": "DirectionTypeOk",
+      "priority": 5.0
+    },
+    {
+      "rule_name": "DovetailNoDropHoleHighCycleTimeReviewPriority",
+      "priority": 0.7
+    },
+    {
+      "rule_name": "DovetailWithDropHoleHighCycleTimeReviewPriority",
+      "priority": 0.8
+    },
+    {
+      "rule_name": "FaceAorBAccess",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "hasChamferEdge",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "HasFeasibleFilletSetup",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "HasNoSharpCorners",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "HasPositiveArea",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "HasPositiveMecDiameter",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "HasPositiveOpLength",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "HasPositivePerimeter",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "hasRoundEdge",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "HasSetupAxis",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "HaveNoFilletsAndPitch",
+      "priority": 0.3
+    },
+    {
+      "rule_name": "HighCycleTimeFailurePriority",
+      "priority": 6.0
+    },
+    {
+      "rule_name": "HoleIsNotUndercut",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "HoleIsUndercut",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "HoleShorterThanNineInches",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "IsARightCircularCylinder",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "IsBathtubSlot",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "isChamferEdge",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "IsChildOfRing",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "isDirectionOk",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "isFeasibleTool",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "isHoleEdgeRound",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "IsObroundSlot",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "IsPlanar",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "isRadiusReachingLimit",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "isRoundLengthNotZero",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "isRoundRadiusWithinToolRange",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "IsWoodruffSlot",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "LowSurfaceFinishFailurePriority",
+      "priority": 7.0
+    },
+    {
+      "rule_name": "MaxDovetailAngleCheck",
+      "priority": 0.6
+    },
+    {
+      "rule_name": "MinFloorVsToolDiameterCheck",
+      "priority": 0.31
+    },
+    {
+      "rule_name": "MultistepHole",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "needActiveSetup",
+      "priority": 4.0
+    },
+    {
+      "rule_name": "NonZeroToolDia",
+      "priority": 3.0
+    },
+    {
+      "rule_name": "notARoundPart",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "NotSmallestHole",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "PartialCastingContour",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "PartialCastingGMF",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "PositiveFilletRadius",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "RoundingPrefered",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "SideMillLDRatio",
+      "priority": 1.0
+    },
+    {
+      "rule_name": "SmallFilletRadius",
+      "priority": 9.0
+    },
+    {
+      "rule_name": "ToolAccessible",
+      "priority": 0.1
+    },
+    {
+      "rule_name": "ToolNeckDiameterCheck",
+      "priority": 0.5
+    },
+    {
+      "rule_name": "ToolReachOk",
+      "priority": 9.0
+    }
+  ]
+}

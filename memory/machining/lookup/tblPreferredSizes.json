@@ -1,0 +1,1372 @@
+[
+  {
+    "UnitSystem": "both",
+    "SizeMm": 0.2,
+    "Comment": "0.2 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 0.254,
+    "Comment": "10 thousandths"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 0.3,
+    "Comment": "0.3 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 0.39688,
+    "Comment": "1/64\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 0.4,
+    "Comment": "0.4 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 0.5,
+    "Comment": "0.5 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 0.508,
+    "Comment": "20 thousandths"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 0.6,
+    "Comment": "0.6 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 0.7,
+    "Comment": "0.7 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 0.762,
+    "Comment": "30 thousandths"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 0.79375,
+    "Comment": "1/32\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 0.8,
+    "Comment": "0.8 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 0.9,
+    "Comment": "0.9 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 1.0,
+    "Comment": "1 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 1.016,
+    "Comment": "40 thousandths"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 1.19063,
+    "Comment": "3/64\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 1.2,
+    "Comment": "1.2mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 1.27,
+    "Comment": "50 thousandths"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 1.5,
+    "Comment": "1.5 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 1.5875,
+    "Comment": "1/16\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 1.98438,
+    "Comment": "5/64\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 2.0,
+    "Comment": "2 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 2.38125,
+    "Comment": "3/32\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 2.5,
+    "Comment": "2.5 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 2.54,
+    "Comment": "1/10\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 3.0,
+    "Comment": "3 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 3.175,
+    "Comment": "1/8\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 3.5,
+    "Comment": "3.5 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 3.96875,
+    "Comment": "5/32\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 4.0,
+    "Comment": "4 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 4.5,
+    "Comment": "4.5 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 4.7625,
+    "Comment": "3/16\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 5.0,
+    "Comment": "5 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 5.55625,
+    "Comment": "7/32\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 6.0,
+    "Comment": "6 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 6.35,
+    "Comment": "1/4\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 7.0,
+    "Comment": "7 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 7.9375,
+    "Comment": "5/16\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 8.0,
+    "Comment": "8 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 9.0,
+    "Comment": "9 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 9.525,
+    "Comment": "3/8\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 10.0,
+    "Comment": "10 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 11.1125,
+    "Comment": "7/16\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 12.0,
+    "Comment": "12 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 12.7,
+    "Comment": "1/2\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 14.0,
+    "Comment": "14 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 14.2875,
+    "Comment": "9/16\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 15.0,
+    "Comment": "15 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 15.875,
+    "Comment": "5/8\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 16.0,
+    "Comment": "16 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 17.4625,
+    "Comment": "11/16\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 18.0,
+    "Comment": "18 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 19.05,
+    "Comment": "3/4\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 20.0,
+    "Comment": "20 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 22.0,
+    "Comment": "22 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 22.225,
+    "Comment": "7/8\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 25.0,
+    "Comment": "25 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 25.4,
+    "Comment": "1\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 30.0,
+    "Comment": "30 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 31.75,
+    "Comment": "1.25\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 35.0,
+    "Comment": "35 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 38.1,
+    "Comment": "1.5\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 40.0,
+    "Comment": "40 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 44.45,
+    "Comment": "1.75\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 45.0,
+    "Comment": "45 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 50.0,
+    "Comment": "50 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 50.8,
+    "Comment": "2\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 55.0,
+    "Comment": "55 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 57.15,
+    "Comment": "2.25\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 60.0,
+    "Comment": "60 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 63.5,
+    "Comment": "2.5\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 65.0,
+    "Comment": "65 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 69.85,
+    "Comment": "2.75\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 70.0,
+    "Comment": "70 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 75.0,
+    "Comment": "75 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 76.2,
+    "Comment": "3\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 80.0,
+    "Comment": "80 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 82.55,
+    "Comment": "3.25\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 88.9,
+    "Comment": "3.5\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 90.0,
+    "Comment": "90 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 95.0,
+    "Comment": "95 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 95.25,
+    "Comment": "3.75\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 100.0,
+    "Comment": "100 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 101.6,
+    "Comment": "4\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 105.0,
+    "Comment": "105 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 107.95,
+    "Comment": "4.25\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 110.0,
+    "Comment": "110 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 114.3,
+    "Comment": "4.5\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 115.0,
+    "Comment": "115 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 120.0,
+    "Comment": "120 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 120.65,
+    "Comment": "4.75\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 125.0,
+    "Comment": "125 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 127.0,
+    "Comment": "5\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 130.0,
+    "Comment": "130 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 139.7,
+    "Comment": "5.5\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 140.0,
+    "Comment": "140 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 150.0,
+    "Comment": "150 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 152.4,
+    "Comment": "6\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 160.0,
+    "Comment": "160 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 165.1,
+    "Comment": "6.5\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 170.0,
+    "Comment": "170 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 177.8,
+    "Comment": "7\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 180.0,
+    "Comment": "180 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 190.0,
+    "Comment": "190 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 190.5,
+    "Comment": "7.5\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 200.0,
+    "Comment": "200 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 203.2,
+    "Comment": "8\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 215.9,
+    "Comment": "8.5\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 220.0,
+    "Comment": "220 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 228.6,
+    "Comment": "9\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 240.0,
+    "Comment": "240 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 241.3,
+    "Comment": "9.5\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 250.0,
+    "Comment": "250 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 254.0,
+    "Comment": "10\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 260.0,
+    "Comment": "260 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 279.4,
+    "Comment": "11\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 280.0,
+    "Comment": "280 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 300.0,
+    "Comment": "300 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 304.8,
+    "Comment": "12\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 320.0,
+    "Comment": "320 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 330.2,
+    "Comment": "13\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 340.0,
+    "Comment": "340 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 355.6,
+    "Comment": "14\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 360.0,
+    "Comment": "360 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 380.0,
+    "Comment": "380 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 381.0,
+    "Comment": "15\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 400.0,
+    "Comment": "400 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 406.4,
+    "Comment": "16\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 420.0,
+    "Comment": "420 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 431.8,
+    "Comment": "17\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 440.0,
+    "Comment": "440 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 457.2,
+    "Comment": "18\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 460.0,
+    "Comment": "460 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 480.0,
+    "Comment": "480 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 482.6,
+    "Comment": "19.0\""
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 500.0,
+    "Comment": "500 mm"
+  },
+  {
+    "UnitSystem": "both",
+    "SizeMm": 508.0,
+    "Comment": "20.0\""
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 0.2,
+    "Comment": "0.2 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 0.3,
+    "Comment": "0.3 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 0.4,
+    "Comment": "0.4 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 0.5,
+    "Comment": "0.5 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 0.6,
+    "Comment": "0.6 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 0.7,
+    "Comment": "0.7 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 0.8,
+    "Comment": "0.8 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 0.9,
+    "Comment": "0.9 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 1.0,
+    "Comment": "1 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 1.2,
+    "Comment": "1.2mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 1.5,
+    "Comment": "1.5 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 2.0,
+    "Comment": "2 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 2.5,
+    "Comment": "2.5 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 3.0,
+    "Comment": "3 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 3.5,
+    "Comment": "3.5 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 4.0,
+    "Comment": "4 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 4.5,
+    "Comment": "4.5 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 5.0,
+    "Comment": "5 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 6.0,
+    "Comment": "6 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 7.0,
+    "Comment": "7 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 8.0,
+    "Comment": "8 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 9.0,
+    "Comment": "9 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 10.0,
+    "Comment": "10 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 12.0,
+    "Comment": "12 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 14.0,
+    "Comment": "14 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 15.0,
+    "Comment": "15 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 16.0,
+    "Comment": "16 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 18.0,
+    "Comment": "18 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 20.0,
+    "Comment": "20 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 22.0,
+    "Comment": "22 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 25.0,
+    "Comment": "25 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 30.0,
+    "Comment": "30 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 35.0,
+    "Comment": "35 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 40.0,
+    "Comment": "40 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 45.0,
+    "Comment": "45 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 50.0,
+    "Comment": "50 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 55.0,
+    "Comment": "55 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 60.0,
+    "Comment": "60 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 65.0,
+    "Comment": "65 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 70.0,
+    "Comment": "70 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 75.0,
+    "Comment": "75 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 80.0,
+    "Comment": "80 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 90.0,
+    "Comment": "90 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 95.0,
+    "Comment": "95 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 100.0,
+    "Comment": "100 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 105.0,
+    "Comment": "105 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 110.0,
+    "Comment": "110 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 115.0,
+    "Comment": "115 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 120.0,
+    "Comment": "120 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 125.0,
+    "Comment": "125 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 130.0,
+    "Comment": "130 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 140.0,
+    "Comment": "140 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 150.0,
+    "Comment": "150 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 160.0,
+    "Comment": "160 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 170.0,
+    "Comment": "170 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 180.0,
+    "Comment": "180 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 190.0,
+    "Comment": "190 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 200.0,
+    "Comment": "200 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 220.0,
+    "Comment": "220 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 240.0,
+    "Comment": "240 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 250.0,
+    "Comment": "250 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 260.0,
+    "Comment": "260 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 280.0,
+    "Comment": "280 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 300.0,
+    "Comment": "300 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 320.0,
+    "Comment": "320 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 340.0,
+    "Comment": "340 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 360.0,
+    "Comment": "360 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 380.0,
+    "Comment": "380 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 400.0,
+    "Comment": "400 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 420.0,
+    "Comment": "420 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 440.0,
+    "Comment": "440 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 460.0,
+    "Comment": "460 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 480.0,
+    "Comment": "480 mm"
+  },
+  {
+    "UnitSystem": "metric",
+    "SizeMm": 500.0,
+    "Comment": "500 mm"
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 0.254,
+    "Comment": "10 thousandths"
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 0.39688,
+    "Comment": "1/64\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 0.508,
+    "Comment": "20 thousandths"
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 0.762,
+    "Comment": "30 thousandths"
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 0.79375,
+    "Comment": "1/32\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 1.016,
+    "Comment": "40 thousandths"
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 1.19063,
+    "Comment": "3/64\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 1.27,
+    "Comment": "50 thousandths"
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 1.5875,
+    "Comment": "1/16\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 1.98438,
+    "Comment": "5/64\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 2.38125,
+    "Comment": "3/32\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 2.54,
+    "Comment": "1/10\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 3.175,
+    "Comment": "1/8\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 3.96875,
+    "Comment": "5/32\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 4.7625,
+    "Comment": "3/16\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 5.55625,
+    "Comment": "7/32\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 6.35,
+    "Comment": "1/4\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 7.9375,
+    "Comment": "5/16\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 9.525,
+    "Comment": "3/8\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 11.1125,
+    "Comment": "7/16\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 12.7,
+    "Comment": "1/2\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 14.2875,
+    "Comment": "9/16\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 15.875,
+    "Comment": "5/8\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 17.4625,
+    "Comment": "11/16\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 19.05,
+    "Comment": "3/4\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 22.225,
+    "Comment": "7/8\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 25.4,
+    "Comment": "1\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 31.75,
+    "Comment": "1.25\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 38.1,
+    "Comment": "1.5\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 44.45,
+    "Comment": "1.75\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 50.8,
+    "Comment": "2\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 57.15,
+    "Comment": "2.25\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 63.5,
+    "Comment": "2.5\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 69.85,
+    "Comment": "2.75\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 76.2,
+    "Comment": "3\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 82.55,
+    "Comment": "3.25\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 88.9,
+    "Comment": "3.5\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 95.25,
+    "Comment": "3.75\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 101.6,
+    "Comment": "4\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 107.95,
+    "Comment": "4.25\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 114.3,
+    "Comment": "4.5\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 120.65,
+    "Comment": "4.75\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 127.0,
+    "Comment": "5\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 139.7,
+    "Comment": "5.5\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 152.4,
+    "Comment": "6\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 165.1,
+    "Comment": "6.5\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 177.8,
+    "Comment": "7\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 190.5,
+    "Comment": "7.5\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 203.2,
+    "Comment": "8\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 215.9,
+    "Comment": "8.5\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 228.6,
+    "Comment": "9\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 241.3,
+    "Comment": "9.5\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 254.0,
+    "Comment": "10\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 279.4,
+    "Comment": "11\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 304.8,
+    "Comment": "12\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 330.2,
+    "Comment": "13\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 355.6,
+    "Comment": "14\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 381.0,
+    "Comment": "15\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 406.4,
+    "Comment": "16\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 431.8,
+    "Comment": "17\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 457.2,
+    "Comment": "18\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 482.6,
+    "Comment": "19.0\""
+  },
+  {
+    "UnitSystem": "US",
+    "SizeMm": 508.0,
+    "Comment": "20.0\""
+  }
+]

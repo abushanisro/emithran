@@ -1,0 +1,11 @@
+[
+  { "Feature": "Ring", "Operation": "Rough Turning", "MachineSpindles": 2.00, "NumberOfOperations": 1.00 },
+  { "Feature": "Ring", "Operation": "Rough Turning", "MachineSpindles": 6.00, "NumberOfOperations": 2.00 },
+  { "Feature": "Ring", "Operation": "Rough Turning", "MachineSpindles": 8.00, "NumberOfOperations": 3.00 },
+  { "Feature": "SimpleHole", "Operation": "Drilling", "MachineSpindles": 2.00, "NumberOfOperations": 1.00 },
+  { "Feature": "SimpleHole", "Operation": "Drilling", "MachineSpindles": 6.00, "NumberOfOperations": 3.00 },
+  { "Feature": "SimpleHole", "Operation": "Drilling", "MachineSpindles": 8.00, "NumberOfOperations": 3.00 },
+  { "Feature": "SimpleHole", "Operation": "Pecking", "MachineSpindles": 2.00, "NumberOfOperations": 1.00 },
+  { "Feature": "SimpleHole", "Operation": "Pecking", "MachineSpindles": 6.00, "NumberOfOperations": 3.00 },
+  { "Feature": "SimpleHole", "Operation": "Pecking", "MachineSpindles": 8.00, "NumberOfOperations": 3.00 }
+]

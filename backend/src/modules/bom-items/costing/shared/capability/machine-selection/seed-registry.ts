@@ -318,6 +318,7 @@ export const MACHINE_CLASS_DEFAULTS: Record<MachineClass, Partial<MachineCapabil
   jig_bore:       {},
   jig_grind:      {},
   machining_millturn: {},
+  wire_edm:       {},
   internal_grinder: {},
   broach:         {},
   // No real per-machine or class-level envelope data on file for either

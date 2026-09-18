@@ -1,0 +1,493 @@
+{
+  "process_name": "Scribe",
+  "digital_factory": "USA reference export",
+  "sector": "World Average",
+  "machines": [
+    {
+      "name": "Laser Scribe - 0.35m x 0.35m x 0.35m Bed Size",
+      "description": "0.35m x 0.35m x 0.35m Bed Size Multi Axis Laser Processing System",
+      "workcenter": "Default",
+      "accounting": {
+        "labor_rate_usd_per_hr": 47.36,
+        "overhead_multiplier": 0.00,
+        "direct_overhead_rate_usd_per_hr": 13.05,
+        "indirect_overhead_rate_usd_per_hr": 14.47,
+        "total_overhead_rate_usd_per_hr": 27.52,
+        "labor_time_standard": 1.00,
+        "number_of_operators": 1.00,
+        "period_overhead_coefficient": 0.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 0.25,
+        "programming_time_hr": 1.00
+      },
+      "rates": {
+        "feed_rate_mm_per_min": 7000.00,
+        "programming_rate_usd_per_hr": 31.67,
+        "rapid_traverse_rate_mm_per_min": 15200.00
+      },
+      "limits": {
+        "bed_height_mm": 355.00,
+        "bed_length_mm": 355.00,
+        "bed_width_mm": 355.00
+      },
+      "other": {
+        "is_preferred": true
+      },
+      "yields": {
+        "avg_utilization": 0.00,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "annual_maintenance_factor_percent": 5.00,
+        "footprint_allowance_factor": 1.00,
+        "installation_factor_percent": 20.00,
+        "machine_length_mm": 3000.00,
+        "machine_life_yr": 10,
+        "machine_power_kW": 6.23,
+        "machine_price_usd": 200000.00,
+        "machine_uptime_percent": 80.00,
+        "machine_width_mm": 2500.00,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Virtual"
+      }
+    },
+    {
+      "name": "Laserdyne Systems 450",
+      "description": "0.35m x 0.35m x 0.35m Bed Size Multi Axis Laser Processing System",
+      "workcenter": "Default",
+      "accounting": {
+        "labor_rate_usd_per_hr": 47.36,
+        "overhead_multiplier": 0.00,
+        "direct_overhead_rate_usd_per_hr": 13.05,
+        "indirect_overhead_rate_usd_per_hr": 14.47,
+        "total_overhead_rate_usd_per_hr": 27.52,
+        "labor_time_standard": 1.00,
+        "number_of_operators": 1.00,
+        "period_overhead_coefficient": 0.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 0.25,
+        "programming_time_hr": 1.00
+      },
+      "rates": {
+        "feed_rate_mm_per_min": 7000.00,
+        "programming_rate_usd_per_hr": 60.01,
+        "rapid_traverse_rate_mm_per_min": 15200.00
+      },
+      "limits": {
+        "bed_height_mm": 355.00,
+        "bed_length_mm": 355.00,
+        "bed_width_mm": 355.00
+      },
+      "other": {
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.00,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "annual_maintenance_factor_percent": 5.00,
+        "footprint_allowance_factor": 1.00,
+        "installation_factor_percent": 20.00,
+        "machine_length_mm": 3000.00,
+        "machine_life_yr": 10,
+        "machine_power_kW": 6.23,
+        "machine_price_usd": 200000.00,
+        "machine_uptime_percent": 80.00,
+        "machine_width_mm": 2500.00,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "USA"
+      }
+    },
+    {
+      "name": "Laser Scribe - 1.5m x 1m x 1m Bed Size",
+      "description": "1.5m x 1m x 1m Bed Size Multi Axis Laser Processing System",
+      "workcenter": "Default",
+      "accounting": {
+        "labor_rate_usd_per_hr": 47.36,
+        "overhead_multiplier": 0.00,
+        "direct_overhead_rate_usd_per_hr": 26.75,
+        "indirect_overhead_rate_usd_per_hr": 15.24,
+        "total_overhead_rate_usd_per_hr": 41.99,
+        "labor_time_standard": 1.00,
+        "number_of_operators": 1.00,
+        "period_overhead_coefficient": 0.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 0.63,
+        "programming_time_hr": 1.00
+      },
+      "rates": {
+        "feed_rate_mm_per_min": 10000.00,
+        "programming_rate_usd_per_hr": 31.67,
+        "rapid_traverse_rate_mm_per_min": 20000.00
+      },
+      "limits": {
+        "bed_height_mm": 1000.00,
+        "bed_length_mm": 1500.00,
+        "bed_width_mm": 1000.00
+      },
+      "other": {
+        "is_preferred": true
+      },
+      "yields": {
+        "avg_utilization": 0.00,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "annual_maintenance_factor_percent": 5.00,
+        "footprint_allowance_factor": 1.00,
+        "installation_factor_percent": 20.00,
+        "machine_length_mm": 5500.00,
+        "machine_life_yr": 10,
+        "machine_power_kW": 6.75,
+        "machine_price_usd": 425000.00,
+        "machine_uptime_percent": 80.00,
+        "machine_width_mm": 3000.00,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Virtual"
+      }
+    },
+    {
+      "name": "Gantry Laser Scribe - 15m x 4m x 1.5m Bed Size",
+      "description": "15m x 4m x 1.5m Bed Size Multi Axis Overhead Gantry Laser",
+      "workcenter": "Default",
+      "accounting": {
+        "labor_rate_usd_per_hr": 47.36,
+        "overhead_multiplier": 0.00,
+        "direct_overhead_rate_usd_per_hr": 114.98,
+        "indirect_overhead_rate_usd_per_hr": 35.22,
+        "total_overhead_rate_usd_per_hr": 150.20,
+        "labor_time_standard": 1.00,
+        "number_of_operators": 1.00,
+        "period_overhead_coefficient": 0.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 1.00,
+        "programming_time_hr": 1.00
+      },
+      "rates": {
+        "feed_rate_mm_per_min": 10000.00,
+        "programming_rate_usd_per_hr": 31.67,
+        "rapid_traverse_rate_mm_per_min": 20000.00
+      },
+      "limits": {
+        "bed_height_mm": 1500.00,
+        "bed_length_mm": 15000.00,
+        "bed_width_mm": 4000.00
+      },
+      "other": {
+        "is_preferred": true
+      },
+      "yields": {
+        "avg_utilization": 0.00,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "annual_maintenance_factor_percent": 5.00,
+        "footprint_allowance_factor": 1.00,
+        "installation_factor_percent": 20.00,
+        "machine_length_mm": 25000.00,
+        "machine_life_yr": 10,
+        "machine_power_kW": 160.00,
+        "machine_price_usd": 1500000.00,
+        "machine_uptime_percent": 80.00,
+        "machine_width_mm": 10000.00,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Virtual"
+      }
+    },
+    {
+      "name": "mTorres TorresLaser",
+      "description": "15m x 4m x 1.5m Bed Size Multi Axis Overhead Gantry Laser",
+      "workcenter": "Default",
+      "accounting": {
+        "labor_rate_usd_per_hr": 47.36,
+        "overhead_multiplier": 0.00,
+        "direct_overhead_rate_usd_per_hr": 114.98,
+        "indirect_overhead_rate_usd_per_hr": 35.22,
+        "total_overhead_rate_usd_per_hr": 150.20,
+        "labor_time_standard": 1.00,
+        "number_of_operators": 1.00,
+        "period_overhead_coefficient": 0.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 1.00,
+        "programming_time_hr": 1.00
+      },
+      "rates": {
+        "feed_rate_mm_per_min": 10000.00,
+        "programming_rate_usd_per_hr": 60.01,
+        "rapid_traverse_rate_mm_per_min": 20000.00
+      },
+      "limits": {
+        "bed_height_mm": 1500.00,
+        "bed_length_mm": 15000.00,
+        "bed_width_mm": 4000.00
+      },
+      "other": {
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.00,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "annual_maintenance_factor_percent": 5.00,
+        "footprint_allowance_factor": 1.00,
+        "installation_factor_percent": 20.00,
+        "machine_length_mm": 25000.00,
+        "machine_life_yr": 10,
+        "machine_power_kW": 160.00,
+        "machine_price_usd": 1500000.00,
+        "machine_uptime_percent": 80.00,
+        "machine_width_mm": 10000.00,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Spain"
+      }
+    },
+    {
+      "name": "Laserdyne Systems 795XS",
+      "description": "1m x 1m x 1m Bed Size Multi Axis Laser Processing System",
+      "workcenter": "Default",
+      "accounting": {
+        "labor_rate_usd_per_hr": 47.36,
+        "overhead_multiplier": 0.00,
+        "direct_overhead_rate_usd_per_hr": 25.23,
+        "indirect_overhead_rate_usd_per_hr": 15.12,
+        "total_overhead_rate_usd_per_hr": 40.35,
+        "labor_time_standard": 1.00,
+        "number_of_operators": 1.00,
+        "period_overhead_coefficient": 0.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 0.75,
+        "programming_time_hr": 1.00
+      },
+      "rates": {
+        "feed_rate_mm_per_min": 10000.00,
+        "programming_rate_usd_per_hr": 60.01,
+        "rapid_traverse_rate_mm_per_min": 20000.00
+      },
+      "limits": {
+        "bed_height_mm": 1000.00,
+        "bed_length_mm": 1000.00,
+        "bed_width_mm": 1000.00
+      },
+      "other": {
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.00,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "annual_maintenance_factor_percent": 5.00,
+        "footprint_allowance_factor": 1.00,
+        "installation_factor_percent": 20.00,
+        "machine_length_mm": 5000.00,
+        "machine_life_yr": 10,
+        "machine_power_kW": 6.75,
+        "machine_price_usd": 400000.00,
+        "machine_uptime_percent": 80.00,
+        "machine_width_mm": 3000.00,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "USA"
+      }
+    },
+    {
+      "name": "Gantry Laser Scribe - 2.4m x 1.8m x 0.9m Bed Size",
+      "description": "2.4m x 1.8m x 0.9m Bed Size Multi Axis Overhead Gantry Laser",
+      "workcenter": "Default",
+      "accounting": {
+        "labor_rate_usd_per_hr": 47.36,
+        "overhead_multiplier": 0.00,
+        "direct_overhead_rate_usd_per_hr": 48.64,
+        "indirect_overhead_rate_usd_per_hr": 16.83,
+        "total_overhead_rate_usd_per_hr": 65.47,
+        "labor_time_standard": 1.00,
+        "number_of_operators": 1.00,
+        "period_overhead_coefficient": 0.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 1.00,
+        "programming_time_hr": 1.00
+      },
+      "rates": {
+        "feed_rate_mm_per_min": 10000.00,
+        "programming_rate_usd_per_hr": 31.67,
+        "rapid_traverse_rate_mm_per_min": 20000.00
+      },
+      "limits": {
+        "bed_height_mm": 900.00,
+        "bed_length_mm": 2400.00,
+        "bed_width_mm": 1800.00
+      },
+      "other": {
+        "is_preferred": true
+      },
+      "yields": {
+        "avg_utilization": 0.00,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "annual_maintenance_factor_percent": 5.00,
+        "footprint_allowance_factor": 1.00,
+        "installation_factor_percent": 20.00,
+        "machine_length_mm": 7056.00,
+        "machine_life_yr": 10,
+        "machine_power_kW": 41.50,
+        "machine_price_usd": 700000.00,
+        "machine_uptime_percent": 80.00,
+        "machine_width_mm": 4958.08,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Virtual"
+      }
+    },
+    {
+      "name": "Laserdyne Systems 890",
+      "description": "2.4m x 1.8m x 0.9m Bed Size Multi Axis Overhead Gantry Laser",
+      "workcenter": "Default",
+      "accounting": {
+        "labor_rate_usd_per_hr": 47.36,
+        "overhead_multiplier": 0.00,
+        "direct_overhead_rate_usd_per_hr": 48.64,
+        "indirect_overhead_rate_usd_per_hr": 16.83,
+        "total_overhead_rate_usd_per_hr": 65.47,
+        "labor_time_standard": 1.00,
+        "number_of_operators": 1.00,
+        "period_overhead_coefficient": 0.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 1.00,
+        "programming_time_hr": 1.00
+      },
+      "rates": {
+        "feed_rate_mm_per_min": 10000.00,
+        "programming_rate_usd_per_hr": 60.01,
+        "rapid_traverse_rate_mm_per_min": 20000.00
+      },
+      "limits": {
+        "bed_height_mm": 900.00,
+        "bed_length_mm": 2400.00,
+        "bed_width_mm": 1800.00
+      },
+      "other": {
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.00,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "annual_maintenance_factor_percent": 5.00,
+        "footprint_allowance_factor": 1.00,
+        "installation_factor_percent": 20.00,
+        "machine_length_mm": 7056.00,
+        "machine_life_yr": 10,
+        "machine_power_kW": 41.50,
+        "machine_price_usd": 700000.00,
+        "machine_uptime_percent": 80.00,
+        "machine_width_mm": 4958.08,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "USA"
+      }
+    },
+    {
+      "name": "Laserdyne Systems 795XL",
+      "description": "2m x 1m x 1m Bed Size Multi Axis Laser Processing System",
+      "workcenter": "Default",
+      "accounting": {
+        "labor_rate_usd_per_hr": 47.36,
+        "overhead_multiplier": 0.00,
+        "direct_overhead_rate_usd_per_hr": 28.26,
+        "indirect_overhead_rate_usd_per_hr": 15.37,
+        "total_overhead_rate_usd_per_hr": 43.63,
+        "labor_time_standard": 1.00,
+        "number_of_operators": 1.00,
+        "period_overhead_coefficient": 0.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 0.50,
+        "programming_time_hr": 1.00
+      },
+      "rates": {
+        "feed_rate_mm_per_min": 10000.00,
+        "programming_rate_usd_per_hr": 60.01,
+        "rapid_traverse_rate_mm_per_min": 20000.00
+      },
+      "limits": {
+        "bed_height_mm": 1000.00,
+        "bed_length_mm": 2000.00,
+        "bed_width_mm": 1000.00
+      },
+      "other": {
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.00,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "annual_maintenance_factor_percent": 5.00,
+        "footprint_allowance_factor": 1.00,
+        "installation_factor_percent": 20.00,
+        "machine_length_mm": 6000.00,
+        "machine_life_yr": 10,
+        "machine_power_kW": 6.75,
+        "machine_price_usd": 450000.00,
+        "machine_uptime_percent": 80.00,
+        "machine_width_mm": 3000.00,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "USA"
+      }
+    }
+  ]
+}

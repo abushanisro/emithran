@@ -1,5 +1,5 @@
 {
-  "digitalFactory": "aPriori USA",
+  "digitalFactory": "USA reference export",
   "sector": "World Average",
   "machineCategories": [
     {
@@ -68,7 +68,7 @@
           },
           "manufacturerInformation": {
             "machineManufacturerLocation": "USA",
-            "dataSource": "aPriori Baseline"
+            "dataSource": "the system Baseline"
           }
         },
         {
@@ -134,7 +134,7 @@
           },
           "manufacturerInformation": {
             "machineManufacturerLocation": "USA",
-            "dataSource": "aPriori Baseline"
+            "dataSource": "the system Baseline"
           }
         }
       ]
@@ -9216,7 +9216,7 @@
           },
           "manufacturerInformation": {
             "machineManufacturerLocation": "Virtual",
-            "dataSource": "aPriori Baseline"
+            "dataSource": "the system Baseline"
           }
         },
         {
@@ -9261,7 +9261,7 @@
           },
           "manufacturerInformation": {
             "machineManufacturerLocation": "Virtual",
-            "dataSource": "aPriori Baseline"
+            "dataSource": "the system Baseline"
           }
         },
         {
@@ -9306,7 +9306,7 @@
           },
           "manufacturerInformation": {
             "machineManufacturerLocation": "Virtual",
-            "dataSource": "aPriori Baseline"
+            "dataSource": "the system Baseline"
           }
         },
         {
@@ -9351,7 +9351,7 @@
           },
           "manufacturerInformation": {
             "machineManufacturerLocation": "Virtual",
-            "dataSource": "aPriori Baseline"
+            "dataSource": "the system Baseline"
           }
         }
       ]

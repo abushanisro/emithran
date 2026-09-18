@@ -74,7 +74,9 @@ async function bootstrap() {
       ].filter(Boolean);
       const isVercelApp = requestOrigin?.match(/^https:\/\/mithran(-[a-z0-9]+)?\.vercel\.app$/);
       const isEmithranApp = requestOrigin?.match(/^https:\/\/([a-z0-9-]+\.)?emithran\.com$/);
-      if (!requestOrigin || isVercelApp || isEmithranApp || allowedOrigins.includes(requestOrigin) || allowedOrigins.some(o => requestOrigin.startsWith(o))) {
+      // Exact match only — a prefix match (e.g. via startsWith) would also let through
+      // an origin like "http://localhost:3000.attacker.example".
+      if (!requestOrigin || isVercelApp || isEmithranApp || allowedOrigins.includes(requestOrigin)) {
         callback(null, true);
       } else {
         callback(null, false);
@@ -101,12 +103,11 @@ async function bootstrap() {
       // Idempotency headers
       'Idempotency-Key',
       'idempotency-key',
-      // Development auth bypass headers
-      'x-auth-bypass',
-      'x-mock-user',
-      'x-dev-mode',
-      'x-mock-user-id',
-      'x-mock-user-email',
+      // Development auth bypass headers — never advertised as an accepted transport-layer
+      // header outside development, so a production deployment never even offers this surface.
+      ...(process.env.NODE_ENV !== 'production'
+        ? ['x-auth-bypass', 'x-mock-user', 'x-dev-mode', 'x-mock-user-id', 'x-mock-user-email']
+        : []),
     ],
     exposedHeaders: ['X-Request-ID', 'X-Correlation-ID'],
     maxAge: 3600, // Cache preflight for 1 hour

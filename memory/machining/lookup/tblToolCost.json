@@ -1,0 +1,37 @@
+[
+  {
+    "ToolType": "Straight Drill",
+    "ToolSeries": "Virtual Drill, Carbide",
+    "Construction": "Insert-Based",
+    "DiameterMm": 20.0,
+    "ToolCostUSD": 7.28
+  },
+  {
+    "ToolType": "Straight Drill",
+    "ToolSeries": "Virtual Drill, Carbide",
+    "Construction": "Insert-Based",
+    "DiameterMm": 60.0,
+    "ToolCostUSD": 10.52
+  },
+  {
+    "ToolType": "Straight Drill",
+    "ToolSeries": "Virtual Drill, Carbide",
+    "Construction": "Solid",
+    "DiameterMm": 0.1,
+    "ToolCostUSD": 38.5
+  },
+  {
+    "ToolType": "Straight Drill",
+    "ToolSeries": "Virtual Drill, Carbide",
+    "Construction": "Solid",
+    "DiameterMm": 5.0,
+    "ToolCostUSD": 38.5
+  },
+  {
+    "ToolType": "Straight Drill",
+    "ToolSeries": "Virtual Drill, Carbide",
+    "Construction": "Solid",
+    "DiameterMm": 19.9,
+    "ToolCostUSD": 240.0
+  }
+]

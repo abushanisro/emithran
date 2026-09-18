@@ -3,8 +3,9 @@ import { z } from 'zod';
 import type { RouteResultDto, ProcessLineCost } from '@/lib/api/hooks/useBOMItems';
 
 // Recursive route-tree model for the Workflow Builder's multi-route picker
-// (aPriori-style: many parallel route rows, each expandable to reveal its own
-// real step chain — matches memory/sheetmetal/route1-5.png/sheetmetalroute.png,
+// (reference USA Digital Factory style: many parallel route rows, each
+// expandable to reveal its own real step chain — matches
+// memory/sheetmetal/route1-5.png/sheetmetalroute.png,
 // which show cutting AND forming (Prog Die/Tandem Die) routes as parallel
 // top-level rows in the SAME grid). Deliberately forward-compatible: 'kind'
 // already distinguishes required/optional/repeated nodes even though every

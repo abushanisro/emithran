@@ -4,15 +4,23 @@ CNC Feature Recognizer — Phase 1 architecture.
 Converts raw OCC topology into a structured manufacturing feature tree that
 resembles eMithran's feature representation rather than a flat face inventory.
 
-Phase 1 covers cnc_turned and mill_turn parts:
+Covers cnc_turned and mill_turn parts (_recognize_turned):
   external_diameter, through_hole, blind_hole, cross_hole, pcd_hole_pattern,
   chamfer, groove, fillet, slot, radial_slot, pocket, counterbore,
   countersink, keyway
 
-cnc_milled: stub — returns empty list + warning (Phase 2).
+cnc_milled (_recognize_milled) is a real, live implementation, not a stub —
+this docstring previously claimed otherwise; verified false 2026-09-16 while
+fixing build_feature_graph_v2_from_cnc's type/centroid bugs below (see that
+function's own doc comment). Covers the same feature set as the turned path
+minus the turning-specific ones (external_diameter, pcd_hole_pattern,
+radial_slot), using generic "pocket" instead of the turned-only keyway/
+radial_slot split.
 
-Thread detection is NOT performed here. Threads are sourced from PMI/drawing
-data only and merged by the backend process planner.
+Thread detection here is geometry-heuristic only (tap-drill-diameter table),
+confidence-capped accordingly -- not sourced from PMI/drawing data. Threads
+sourced from PMI/drawing data are merged separately by the backend process
+planner.
 """
 from __future__ import annotations
 
@@ -986,11 +994,17 @@ def _classify_cone(
                     "entry_diameter_mm": round(ref_r * 2.0, 3),
                     "bore_diameter_mm": round(cyl["radius"] * 2.0, 3),
                     "half_angle_deg": round(half_angle, 1),
+                    # centroid required by build_feature_graph_v2_from_cnc to
+                    # place this feature -- the cone's own centroid, already
+                    # computed above, was never actually propagated into the
+                    # returned params before this fix.
+                    "centroid": (round(cx, 3), round(cy, 3), round(cz, 3)),
                 }, 0.78
 
     return "chamfer", {
         "half_angle_deg": round(half_angle, 1),
         "diameter_mm": round(ref_r * 2.0, 3),
+        "centroid": (round(cx, 3), round(cy, 3), round(cz, 3)),
     }, 0.85
 
 
@@ -1010,6 +1024,12 @@ def _classify_prismatic(pocket: Dict, main_axis: Tuple[float, float, float]) -> 
     nx, ny, nz = pocket["normal"]
     ax, ay, az = main_axis
 
+    # centroid is real, already computed by _collect_prismatic_pockets (the
+    # pocket dict's own "centroid" key) -- previously never propagated into
+    # the returned params, so build_feature_graph_v2_from_cnc's required
+    # centroid check silently dropped every pocket/slot/keyway feature.
+    centroid = pocket.get("centroid")
+
     # Slot: elongated + floor normal parallel to main axis (floor faces axially downward)
     dot = abs(nx * ax + ny * ay + nz * az)
     if aspect > 2.5 and dot > 0.85:
@@ -1017,8 +1037,10 @@ def _classify_prismatic(pocket: Dict, main_axis: Tuple[float, float, float]) -> 
         # Keyway: long axis parallel to main rotation axis
         # Slot / radial_slot: long axis perpendicular
         return "keyway", {
+            "length_mm": round(long, 3),
             "width_mm": round(mid, 3),
             "depth_mm": round(short, 3),
+            "centroid": centroid,
         }
 
     if aspect > 2.5:
@@ -1026,12 +1048,14 @@ def _classify_prismatic(pocket: Dict, main_axis: Tuple[float, float, float]) -> 
             "length_mm": round(long, 3),
             "width_mm": round(mid, 3),
             "depth_mm": round(short, 3),
+            "centroid": centroid,
         }
 
     return "pocket", {
         "length_mm": round(long, 3),
         "width_mm": round(mid, 3),
         "depth_mm": round(short, 3),
+        "centroid": centroid,
     }
 
 
@@ -1059,11 +1083,16 @@ def _classify_prismatic_turned(
     ax, ay, az = main_axis
     dot_with_axis = abs(nx * ax + ny * ay + nz * az)
 
+    # centroid: see _classify_prismatic's identical fix above.
+    centroid = pocket.get("centroid")
+
     if dot_with_axis > 0.85:
         # Floor normal is parallel to axis → keyway running along the shaft
         return "keyway", {
+            "length_mm": round(long, 3),
             "width_mm": round(mid, 3),
             "depth_mm": round(short, 3),
+            "centroid": centroid,
         }
 
     # Elongated face with normal perpendicular to axis → radial slot on OD
@@ -1071,6 +1100,7 @@ def _classify_prismatic_turned(
         "length_mm": round(long, 3),
         "width_mm": round(mid, 3),
         "depth_mm": round(short, 3),
+        "centroid": centroid,
     }
 
 
@@ -1216,6 +1246,7 @@ def _detect_counterbores(
             id_ = inner.params["diameter_mm"]
             if od <= id_:
                 continue
+            oc = None
             if bore_id_to_cyl:
                 oc = bore_id_to_cyl.get(outer.id, {}).get("centroid")
                 ic = bore_id_to_cyl.get(inner.id, {}).get("centroid")
@@ -1227,12 +1258,20 @@ def _detect_counterbores(
             inner_depth = inner.params["depth_mm"]
             if outer_depth >= inner_depth:
                 continue
-            results.append((outer.id, inner.id, {
+            params = {
                 "counterbore_diameter_mm": od,
                 "counterbore_depth_mm": round(outer_depth, 3),
                 "bore_diameter_mm": id_,
                 "bore_depth_mm": round(inner_depth, 3),
-            }))
+            }
+            # centroid (the outer/visible bore's position -- where a tool
+            # approaches from) is required by build_feature_graph_v2_from_cnc
+            # to place this feature; without bore_id_to_cyl there is no real
+            # position data to report, so the feature is correctly omitted
+            # downstream rather than placed at a fabricated location.
+            if oc:
+                params["centroid"] = oc
+            results.append((outer.id, inner.id, params))
     return results
 
 
@@ -1332,8 +1371,70 @@ def _part_bounding_box(shape) -> Dict:
     }
 
 
-_HOLE_TYPES = {"through_hole", "blind_hole", "tapped_hole", "cross_hole", "counterbore"}
+# Feature types that carry a diameter and are grouped/labelled by diameter
+# bucket. Each maps to its own real feature_type string in the output --
+# previously ALL of these (plus counterbore/countersink, which were missing
+# entirely -- see _extract_diam_depth's own doc comment) collapsed into one
+# generic "hole" string that operation-sequencer.ts's switch (which matches
+# on the exact strings "through_hole"/"blind_hole"/"tapped_hole"/
+# "counterbore"/"countersink"/"chamfer") never matched, silently routing
+# every real hole/counterbore/chamfer/countersink into its volume-only
+# default-case costing instead of real per-feature Drill/Tap/Counterbore/
+# Chamfer/Countersink cycle times.
+_DIAMETER_TYPES = {
+    "through_hole", "blind_hole", "tapped_hole", "cross_hole",
+    "counterbore", "countersink", "chamfer",
+}
+# Feature types classified by volumetric dims rather than a diameter.
+# "pocket" stays "pocket"; "keyway" stays "keyway" (real, distinct data --
+# a dedicated Keyway Broaching engine now consumes it, pre-filtered out of
+# what reaches build_operation_sequence the same way through_hole/blind_hole
+# occurrences are split off for Gun Drilling/Deep Bore -- see
+# deep-hole-routing.ts's splitDeepHoleOccurrences and its keyway analogue).
+# radial_slot still folds into "slot": operation-sequencer.ts has no
+# dedicated case for it yet (only "pocket"/"slot"/now "keyway"), so it is
+# still a 1:1 passthrough compromise, not a fabricated mapping.
 _POCKET_TYPES = {"pocket", "slot", "radial_slot", "keyway"}
+_KEYWAY_DIM_FIELDS = ("length_mm", "width_mm", "depth_mm")
+
+
+def _extract_diam_depth(ftype: str, p: dict):
+    """Real (diameter_mm, depth_mm) for one _DIAMETER_TYPES feature, or
+    (None, None) when the source data genuinely doesn't have it -- never a
+    guessed value.
+
+    Each type's real params use a different field name for the same real
+    quantity (through_hole/blind_hole/tapped_hole/cross_hole:
+    "diameter_mm"/"depth_mm"; counterbore: "counterbore_diameter_mm"/
+    "counterbore_depth_mm" from _detect_counterbores, kept distinct from its
+    own "bore_diameter_mm" rather than conflated; countersink: only
+    "entry_diameter_mm"/"bore_diameter_mm"/"half_angle_deg" from
+    _classify_cone -- no direct depth signal from cone geometry alone, so
+    depth is derived from the real entry/bore diameter step and half-angle
+    (right-triangle: depth = radial_step / tan(half_angle)) when both are
+    present, else 0.0 so the TS-side fallback (diamMm * 2.5) applies rather
+    than fabricating a number here; chamfer: only "diameter_mm", no depth
+    concept at all -- operation-sequencer.ts's chamfer case is a fixed
+    per-count time, not diameter/depth-driven).
+    """
+    if ftype in ("through_hole", "blind_hole", "tapped_hole", "cross_hole"):
+        return p.get("diameter_mm"), (p.get("depth_mm", 0.0) or 0.0)
+    if ftype == "counterbore":
+        return p.get("counterbore_diameter_mm"), (p.get("counterbore_depth_mm", 0.0) or 0.0)
+    if ftype == "countersink":
+        diam = p.get("entry_diameter_mm")
+        bore_d = p.get("bore_diameter_mm")
+        half_angle = p.get("half_angle_deg")
+        depth = 0.0
+        if diam is not None and bore_d is not None and half_angle:
+            step_r = (diam - bore_d) / 2.0
+            tan_a = math.tan(math.radians(half_angle))
+            if tan_a > 1e-6:
+                depth = round(step_r / tan_a, 3)
+        return diam, depth
+    if ftype == "chamfer":
+        return p.get("diameter_mm"), 0.0
+    return None, None
 
 
 def build_feature_graph_v2_from_cnc(
@@ -1344,8 +1445,11 @@ def build_feature_graph_v2_from_cnc(
 ) -> dict:
     """Synthesise a feature_graph_v2 payload from CNC feature data.
 
-    Groups holes by diameter bucket and pockets/slots by type so the heatmap
-    builders (sources.ts) can consume CNC parts the same way as sheet metal.
+    Groups diameter-bearing features (holes, counterbore, countersink,
+    chamfer) by real type + diameter bucket, and volumetric features
+    (pocket/slot) by real type, so operation-sequencer.ts's per-feature-type
+    switch actually receives the type it switches on -- see _DIAMETER_TYPES'
+    own doc comment for what this replaces.
     """
     from collections import defaultdict
 
@@ -1359,41 +1463,50 @@ def build_feature_graph_v2_from_cnc(
         if centroid_abs is None:
             continue
 
-        if ftype in _HOLE_TYPES:
-            diam = p.get("diameter_mm")
+        if ftype in _DIAMETER_TYPES:
+            diam, depth = _extract_diam_depth(ftype, p)
             if diam is None:
                 continue
             d_bucket = round(diam / 0.1) * 0.1
-            depth = p.get("depth_mm", 0.0) or 0.0
-            buckets[("hole", d_bucket)].append({
+            buckets[(ftype, d_bucket)].append({
                 "centroid_abs": centroid_abs,
                 "depth_mm": depth,
                 "face_ids": feat.get("face_ids", []),
                 "tapped": ftype == "tapped_hole",
                 "spec": p.get("spec"),
-                "material_removed_mm3": round(math.pi * (diam / 2) ** 2 * depth, 2),
+                "material_removed_mm3": round(math.pi * (diam / 2) ** 2 * depth, 2) if depth else 0.0,
             })
 
         elif ftype in _POCKET_TYPES:
-            feat_type_out = "slot" if ftype == "keyway" else "pocket"
+            if ftype == "pocket":
+                feat_type_out = "pocket"
+            elif ftype == "keyway":
+                feat_type_out = "keyway"
+            else:
+                feat_type_out = "slot"
             dims = p.get("dims") or [
                 p.get("depth_mm", 0) or 0,
                 p.get("width_mm", 0) or 0,
                 p.get("length_mm", 0) or 0,
             ]
             vol = round(dims[-1] * dims[-2] * dims[0], 2) if len(dims) >= 3 else 0.0
-            buckets[(feat_type_out, "pocket")].append({
+            bucket_entry = {
                 "centroid_abs": centroid_abs,
                 "face_ids": feat.get("face_ids", []),
                 "material_removed_mm3": vol,
-            })
+            }
+            if feat_type_out == "keyway":
+                for field in _KEYWAY_DIM_FIELDS:
+                    bucket_entry[field] = p.get(field)
+            buckets[(feat_type_out, "pocket")].append(bucket_entry)
 
     features_out = []
     for (feat_type_out, diam_or_tag), occurrences in buckets.items():
-        diam = diam_or_tag if feat_type_out == "hole" else None
+        is_diam_type = feat_type_out in _DIAMETER_TYPES
+        diam = diam_or_tag if is_diam_type else None
         count = len(occurrences)
         feat_id = (
-            f"hole_d{diam}_c{count}_cnc" if feat_type_out == "hole"
+            f"{feat_type_out}_d{diam}_c{count}_cnc" if is_diam_type
             else f"{feat_type_out}_c{count}_cnc"
         )
         occ_list = []
@@ -1401,18 +1514,22 @@ def build_feature_graph_v2_from_cnc(
             ax, ay, az = occ["centroid_abs"]
             centered = [round(ax - cx, 3), round(ay - cy, 3), round(az - cz, 3)]
             depth = occ.get("depth_mm", 0.0) or 0.0
-            ld_ratio = round(depth / max(diam, 0.1), 3) if diam else None
+            ld_ratio = round(depth / max(diam, 0.1), 3) if (diam and depth) else None
             occ_entry: dict = {
                 "centroid": centered,
                 "face_ids": occ["face_ids"],
                 "local_feature_density": count,
                 "material_removed_mm3": occ.get("material_removed_mm3", 0.0),
             }
-            if feat_type_out == "hole":
+            if is_diam_type:
                 occ_entry["depth_mm"] = round(depth, 3)
                 occ_entry["ld_ratio"] = ld_ratio
                 occ_entry["tapped"] = occ.get("tapped", False)
                 occ_entry["spec"] = occ.get("spec")
+            if feat_type_out == "keyway":
+                for field in _KEYWAY_DIM_FIELDS:
+                    val = occ.get(field)
+                    occ_entry[field] = round(val, 3) if val is not None else None
             occ_list.append(occ_entry)
         entry: dict = {"id": feat_id, "feature_type": feat_type_out, "occurrences": occ_list}
         if diam is not None:
@@ -1427,3 +1544,4 @@ def build_feature_graph_v2_from_cnc(
         },
         "features": features_out,
     }
+

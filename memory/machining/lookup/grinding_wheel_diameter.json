@@ -1,0 +1,51 @@
+{
+  "table_name": "tblGrindingWheelDiameter",
+  "description": "Grinding wheel diameter selection by gear diametral pitch range.",
+  "units": {
+    "diametral_pitch": "in^-1",
+    "grinding_wheel_diameter": "mm"
+  },
+  "row_count": 8,
+  "ranges": [
+    {
+      "max_diametral_pitch_in_inv": 2.5,
+      "min_diametral_pitch_in_inv": 2.0,
+      "grinding_wheel_diameter_mm": 139.7
+    },
+    {
+      "max_diametral_pitch_in_inv": 3.0,
+      "min_diametral_pitch_in_inv": 2.5,
+      "grinding_wheel_diameter_mm": 127.0
+    },
+    {
+      "max_diametral_pitch_in_inv": 4.0,
+      "min_diametral_pitch_in_inv": 3.0,
+      "grinding_wheel_diameter_mm": 114.3
+    },
+    {
+      "max_diametral_pitch_in_inv": 5.0,
+      "min_diametral_pitch_in_inv": 4.0,
+      "grinding_wheel_diameter_mm": 101.6
+    },
+    {
+      "max_diametral_pitch_in_inv": 7.0,
+      "min_diametral_pitch_in_inv": 5.0,
+      "grinding_wheel_diameter_mm": 88.9
+    },
+    {
+      "max_diametral_pitch_in_inv": 8.0,
+      "min_diametral_pitch_in_inv": 7.0,
+      "grinding_wheel_diameter_mm": 82.55
+    },
+    {
+      "max_diametral_pitch_in_inv": 12.7,
+      "min_diametral_pitch_in_inv": 8.0,
+      "grinding_wheel_diameter_mm": 76.2
+    },
+    {
+      "max_diametral_pitch_in_inv": 999.0,
+      "min_diametral_pitch_in_inv": 12.7,
+      "grinding_wheel_diameter_mm": 63.5
+    }
+  ]
+}

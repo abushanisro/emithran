@@ -1,0 +1,247 @@
+{
+  "process_name": "Jig Grind",
+  "digital_factory": "USA reference export",
+  "sector": "World Average",
+  "machines": [
+    {
+      "name": "Hauser S3-DR",
+      "description": null,
+      "accounting": {
+        "labor_rate_usd_per_hr": 29.95,
+        "direct_overhead_rate_usd_per_hr": 9.64,
+        "indirect_overhead_rate_usd_per_hr": 14.49,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 1.00,
+        "base_part_setup_time_hr": 0.05,
+        "index_time_s": 240.00,
+        "alignment_time_s": 10.00
+      },
+      "rates": {
+        "rapid_traverse_rate_mm_per_min": 7500.00
+      },
+      "limits": {
+        "spindle_speed_rpm": 160000.00,
+        "max_diameter_mm": 600.00,
+        "max_length_mm": 350.00,
+        "table_length_mm": 600.00,
+        "table_width_mm": 380.00,
+        "spindle_to_column_surface_mm": 1000.00
+      },
+      "powers": {
+        "spindle_power_kW": 5.59,
+        "auxiliary_power_kW": 2.91
+      },
+      "other": {
+        "machine_style": "Manual",
+        "is_preferred": false,
+        "approach_depart_distance_mm": 2.54
+      },
+      "yields": {
+        "avg_utilization": 1.00,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 138000.00,
+        "machine_length_mm": 3280.00,
+        "machine_width_mm": 2335.00,
+        "footprint_allowance_factor": 1.00,
+        "machine_power_kW": 8.50,
+        "installation_factor_percent": 20.00,
+        "machine_uptime_percent": 80.00,
+        "annual_maintenance_factor_percent": 5.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Germany"
+      }
+    },
+    {
+      "name": "Mitsui Seiki J4GDN CNC Jig Grinder",
+      "description": null,
+      "accounting": {
+        "labor_rate_usd_per_hr": 29.95,
+        "direct_overhead_rate_usd_per_hr": 17.70,
+        "indirect_overhead_rate_usd_per_hr": 14.49,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 1.00,
+        "base_part_setup_time_hr": 0.05,
+        "index_time_s": 1.50,
+        "alignment_time_s": 2.00
+      },
+      "rates": {
+        "rapid_traverse_rate_mm_per_min": 5080.00
+      },
+      "limits": {
+        "spindle_speed_rpm": 90000.00,
+        "max_diameter_mm": 790.00,
+        "max_length_mm": 790.00,
+        "table_length_mm": 610.00,
+        "table_width_mm": 410.00,
+        "spindle_to_column_surface_mm": 1000.00
+      },
+      "powers": {
+        "spindle_power_kW": 0.75,
+        "auxiliary_power_kW": 16.25
+      },
+      "other": {
+        "machine_style": "CNC",
+        "is_preferred": false,
+        "approach_depart_distance_mm": 2.54
+      },
+      "yields": {
+        "avg_utilization": 1.00,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 250000.00,
+        "machine_length_mm": 3280.00,
+        "machine_width_mm": 2335.00,
+        "footprint_allowance_factor": 1.00,
+        "machine_power_kW": 17.00,
+        "installation_factor_percent": 20.00,
+        "machine_uptime_percent": 80.00,
+        "annual_maintenance_factor_percent": 5.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Japan"
+      }
+    },
+    {
+      "name": "Virtual CNC Jig Grinder",
+      "description": null,
+      "accounting": {
+        "labor_rate_usd_per_hr": 29.95,
+        "direct_overhead_rate_usd_per_hr": 17.70,
+        "indirect_overhead_rate_usd_per_hr": 14.49,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 1.00,
+        "base_part_setup_time_hr": 0.05,
+        "index_time_s": 1.50,
+        "alignment_time_s": 2.00
+      },
+      "rates": {
+        "rapid_traverse_rate_mm_per_min": 5080.00
+      },
+      "limits": {
+        "spindle_speed_rpm": 90000.00,
+        "max_diameter_mm": 790.00,
+        "max_length_mm": 790.00,
+        "table_length_mm": 610.00,
+        "table_width_mm": 410.00,
+        "spindle_to_column_surface_mm": 1000.00
+      },
+      "powers": {
+        "spindle_power_kW": 0.75,
+        "auxiliary_power_kW": 16.25
+      },
+      "other": {
+        "machine_style": "CNC",
+        "is_preferred": true,
+        "approach_depart_distance_mm": 2.54
+      },
+      "yields": {
+        "avg_utilization": 1.00,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 250000.00,
+        "machine_length_mm": 3280.00,
+        "machine_width_mm": 2335.00,
+        "footprint_allowance_factor": 1.00,
+        "machine_power_kW": 17.00,
+        "installation_factor_percent": 20.00,
+        "machine_uptime_percent": 80.00,
+        "annual_maintenance_factor_percent": 5.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Virtual"
+      }
+    },
+    {
+      "name": "Virtual Manual Jig Grinder",
+      "description": null,
+      "accounting": {
+        "labor_rate_usd_per_hr": 29.95,
+        "direct_overhead_rate_usd_per_hr": 9.64,
+        "indirect_overhead_rate_usd_per_hr": 14.49,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 1.00,
+        "base_part_setup_time_hr": 0.05,
+        "index_time_s": 240.00,
+        "alignment_time_s": 10.00
+      },
+      "rates": {
+        "rapid_traverse_rate_mm_per_min": 7500.00
+      },
+      "limits": {
+        "spindle_speed_rpm": 160000.00,
+        "max_diameter_mm": 600.00,
+        "max_length_mm": 350.00,
+        "table_length_mm": 600.00,
+        "table_width_mm": 380.00,
+        "spindle_to_column_surface_mm": 1000.00
+      },
+      "powers": {
+        "spindle_power_kW": 5.59,
+        "auxiliary_power_kW": 2.91
+      },
+      "other": {
+        "machine_style": "Manual",
+        "is_preferred": true,
+        "approach_depart_distance_mm": 2.54
+      },
+      "yields": {
+        "avg_utilization": 1.00,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 138000.00,
+        "machine_length_mm": 3280.00,
+        "machine_width_mm": 2335.00,
+        "footprint_allowance_factor": 1.00,
+        "machine_power_kW": 8.50,
+        "installation_factor_percent": 20.00,
+        "machine_uptime_percent": 80.00,
+        "annual_maintenance_factor_percent": 5.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Virtual"
+      }
+    }
+  ]
+}

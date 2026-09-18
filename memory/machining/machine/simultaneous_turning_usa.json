@@ -1,0 +1,1118 @@
+{
+  "process_name": "Simultaneous Turning",
+  "digital_factory": "USA reference export",
+  "sector": "World Average",
+  "data_note": "Bottom Up Overhead Rate Inputs percentages (Installation Factor, Machine Uptime, Annual Maintenance Factor) are shown in this source table as raw decimal fractions (e.g. 0.20, 0.80, 0.05) rather than the 'value-before-percent' convention (e.g. 20.00, 80.00, 5.00) used in every other process table extracted so far. Transcribed exactly as shown per machine below; do not multiply by 100 again, and do not assume these numbers mean the same magnitude as the equivalent fields in other process JSON files without checking which convention the source table intends.",
+  "machines": [
+    {
+      "name": "DMG Mori GMC25ISM-6",
+      "description": "54hp, 6000 rpm, 1 in. max workpiece",
+      "process_type": "CNC Multi-Spindle",
+      "slide_configuration": {
+        "number_spindles": 6,
+        "spindles_with_od_slide": "1, 2, 3, 4, 5, 6",
+        "spindles_with_end_slide": "1, 2, 3, 4, 5, 6",
+        "spindles_with_live_tooling": "1, 2, 3, 4, 5, 6",
+        "back_work_spindles": "6"
+      },
+      "accounting": {
+        "labor_rate_usd_per_hr": 47.36,
+        "direct_overhead_rate_usd_per_hr": 52.05,
+        "indirect_overhead_rate_usd_per_hr": 15.84,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 0.25,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 2.00,
+        "base_part_setup_time_hr": 0.07,
+        "speed_synchronization_time_s": 1.50,
+        "stock_feed_time_s": 2.50,
+        "drum_index_time_s": 0.70,
+        "transfer_time_s": 1.00,
+        "part_eject_time_s": 1.00,
+        "tool_positioning_time_s": 0.90,
+        "time_to_replace_dull_tool_s": 60.00,
+        "spotting_time_s": 1.00,
+        "countersinking_time_s": 1.00
+      },
+      "limits": {
+        "spindle_power_kW": 17.20,
+        "spindle_speed_rpm": 6000.00,
+        "travel_z_axis_mm": 70.00,
+        "max_mill_tool_diameter_mm": 50.80,
+        "max_diameter_mm": 25.00,
+        "max_length_mm": 120.00
+      },
+      "rates": {
+        "live_tooling_spindle_power_kW": 15.00,
+        "live_tooling_spindle_speed_rpm": 6000.00,
+        "rapid_traverse_rate_mm_per_min": 30000.00
+      },
+      "other": {
+        "is_virtual_machine": false,
+        "approach_depart_distance_mm": 2.54,
+        "can_gun_drill": true,
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 760000.00,
+        "machine_length_mm": 4470.00,
+        "machine_width_mm": 1750.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 40.00,
+        "installation_factor": 0.20,
+        "machine_uptime": 0.80,
+        "annual_maintenance_factor": 0.05,
+        "machine_life_yr": 10,
+        "salvage_value_factor": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Japan"
+      }
+    },
+    {
+      "name": "Dooson Puma TT2500SY",
+      "description": "80 hp, 7000 rpm, 1.7 in. max workpiece",
+      "process_type": "CNC Turning Center with Sub Spindle",
+      "slide_configuration": {
+        "number_spindles": 2,
+        "spindles_with_od_slide": "1, 1, 2, 2",
+        "spindles_with_end_slide": "1, 2",
+        "spindles_with_live_tooling": "1, 2",
+        "back_work_spindles": "2"
+      },
+      "accounting": {
+        "labor_rate_usd_per_hr": 47.36,
+        "direct_overhead_rate_usd_per_hr": 28.44,
+        "indirect_overhead_rate_usd_per_hr": 16.18,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 0.50,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 2.00,
+        "base_part_setup_time_hr": 0.07,
+        "speed_synchronization_time_s": 1.50,
+        "stock_feed_time_s": 2.50,
+        "drum_index_time_s": 0.00,
+        "transfer_time_s": 1.00,
+        "part_eject_time_s": 1.00,
+        "tool_positioning_time_s": 0.90,
+        "time_to_replace_dull_tool_s": 60.00,
+        "spotting_time_s": 1.00,
+        "countersinking_time_s": 1.00
+      },
+      "limits": {
+        "spindle_power_kW": 20.13,
+        "spindle_speed_rpm": 7000.00,
+        "travel_z_axis_mm": 80.00,
+        "max_mill_tool_diameter_mm": 50.80,
+        "max_diameter_mm": 42.00,
+        "max_length_mm": 80.00
+      },
+      "rates": {
+        "live_tooling_spindle_power_kW": 26.00,
+        "live_tooling_spindle_speed_rpm": 5000.00,
+        "rapid_traverse_rate_mm_per_min": 24000.00
+      },
+      "other": {
+        "is_virtual_machine": false,
+        "approach_depart_distance_mm": 2.54,
+        "can_gun_drill": true,
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 320000.00,
+        "machine_length_mm": 4140.00,
+        "machine_width_mm": 2210.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 60.00,
+        "installation_factor": 0.20,
+        "machine_uptime": 0.80,
+        "annual_maintenance_factor": 0.05,
+        "machine_life_yr": 10,
+        "salvage_value_factor": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "South Korea"
+      }
+    },
+    {
+      "name": "HAAS DS-30Y",
+      "description": "54 hp, 4500 rpm, 3 in. max workpiece",
+      "process_type": "CNC Turning Center with Sub Spindle",
+      "slide_configuration": {
+        "number_spindles": 2,
+        "spindles_with_od_slide": "1, 1, 2, 2",
+        "spindles_with_end_slide": "1, 2",
+        "spindles_with_live_tooling": "1, 2",
+        "back_work_spindles": "2"
+      },
+      "accounting": {
+        "labor_rate_usd_per_hr": 47.36,
+        "direct_overhead_rate_usd_per_hr": 14.82,
+        "indirect_overhead_rate_usd_per_hr": 17.37,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 0.50,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 2.00,
+        "base_part_setup_time_hr": 0.07,
+        "speed_synchronization_time_s": 1.50,
+        "stock_feed_time_s": 2.50,
+        "drum_index_time_s": 0.00,
+        "transfer_time_s": 1.00,
+        "part_eject_time_s": 1.00,
+        "tool_positioning_time_s": 0.90,
+        "time_to_replace_dull_tool_s": 60.00,
+        "spotting_time_s": 1.00,
+        "countersinking_time_s": 1.00
+      },
+      "limits": {
+        "spindle_power_kW": 22.37,
+        "spindle_speed_rpm": 4500.00,
+        "travel_z_axis_mm": 584.00,
+        "max_mill_tool_diameter_mm": 50.80,
+        "max_diameter_mm": 76.00,
+        "max_length_mm": 584.00
+      },
+      "rates": {
+        "live_tooling_spindle_power_kW": 15.00,
+        "live_tooling_spindle_speed_rpm": 6000.00,
+        "rapid_traverse_rate_mm_per_min": 24000.00
+      },
+      "other": {
+        "is_virtual_machine": false,
+        "approach_depart_distance_mm": 2.54,
+        "can_gun_drill": true,
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 145000.00,
+        "machine_length_mm": 4521.00,
+        "machine_width_mm": 3048.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 40.00,
+        "installation_factor": 0.20,
+        "machine_uptime": 0.80,
+        "annual_maintenance_factor": 0.05,
+        "machine_life_yr": 10,
+        "salvage_value_factor": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "USA"
+      }
+    },
+    {
+      "name": "Index MS16C-6",
+      "description": "60 hp, 10000 rpm, 0.9 in. max workpiece",
+      "process_type": "CNC Multi-Spindle",
+      "slide_configuration": {
+        "number_spindles": 6,
+        "spindles_with_od_slide": "1, 2, 3, 4, 5, 6",
+        "spindles_with_end_slide": "1, 2, 3, 4, 5, 6",
+        "spindles_with_live_tooling": "1, 2, 3, 4, 5, 6",
+        "back_work_spindles": "6"
+      },
+      "accounting": {
+        "labor_rate_usd_per_hr": 47.36,
+        "direct_overhead_rate_usd_per_hr": 67.94,
+        "indirect_overhead_rate_usd_per_hr": 14.70,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 0.25,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 2.00,
+        "base_part_setup_time_hr": 0.07,
+        "speed_synchronization_time_s": 1.50,
+        "stock_feed_time_s": 2.50,
+        "drum_index_time_s": 0.70,
+        "transfer_time_s": 1.00,
+        "part_eject_time_s": 1.00,
+        "tool_positioning_time_s": 0.90,
+        "time_to_replace_dull_tool_s": 60.00,
+        "spotting_time_s": 1.00,
+        "countersinking_time_s": 1.00
+      },
+      "limits": {
+        "spindle_power_kW": 15.00,
+        "spindle_speed_rpm": 10000.00,
+        "travel_z_axis_mm": 70.00,
+        "max_mill_tool_diameter_mm": 50.80,
+        "max_diameter_mm": 22.00,
+        "max_length_mm": 70.00
+      },
+      "rates": {
+        "live_tooling_spindle_power_kW": 12.00,
+        "live_tooling_spindle_speed_rpm": 10000.00,
+        "rapid_traverse_rate_mm_per_min": 24000.00
+      },
+      "other": {
+        "is_virtual_machine": false,
+        "approach_depart_distance_mm": 2.54,
+        "can_gun_drill": true,
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 1000000.00,
+        "machine_length_mm": 2599.00,
+        "machine_width_mm": 1300.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 49.00,
+        "installation_factor": 0.20,
+        "machine_uptime": 0.80,
+        "annual_maintenance_factor": 0.05,
+        "machine_life_yr": 10,
+        "salvage_value_factor": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Germany"
+      }
+    },
+    {
+      "name": "Index MS22-8",
+      "description": "74 hp, 10000 rpm, 0.9 in. max workpiece",
+      "process_type": "CNC Multi-Spindle",
+      "slide_configuration": {
+        "number_spindles": 8,
+        "spindles_with_od_slide": "1, 2, 3, 4, 5, 6, 7, 8",
+        "spindles_with_end_slide": "1, 2, 3, 4, 5, 6, 7, 8",
+        "spindles_with_live_tooling": "1, 2, 3, 4, 5, 6, 7, 8",
+        "back_work_spindles": "7, 8"
+      },
+      "accounting": {
+        "labor_rate_usd_per_hr": 47.36,
+        "direct_overhead_rate_usd_per_hr": 114.54,
+        "indirect_overhead_rate_usd_per_hr": 15.58,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 0.25,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 2.00,
+        "base_part_setup_time_hr": 0.07,
+        "speed_synchronization_time_s": 1.50,
+        "stock_feed_time_s": 2.50,
+        "drum_index_time_s": 1.20,
+        "transfer_time_s": 1.00,
+        "part_eject_time_s": 1.00,
+        "tool_positioning_time_s": 0.90,
+        "time_to_replace_dull_tool_s": 60.00,
+        "spotting_time_s": 1.00,
+        "countersinking_time_s": 1.00
+      },
+      "limits": {
+        "spindle_power_kW": 15.00,
+        "spindle_speed_rpm": 10000.00,
+        "travel_z_axis_mm": 85.00,
+        "max_mill_tool_diameter_mm": 50.80,
+        "max_diameter_mm": 24.00,
+        "max_length_mm": 85.00
+      },
+      "rates": {
+        "live_tooling_spindle_power_kW": 12.00,
+        "live_tooling_spindle_speed_rpm": 10000.00,
+        "rapid_traverse_rate_mm_per_min": 24000.00
+      },
+      "other": {
+        "is_virtual_machine": false,
+        "approach_depart_distance_mm": 2.54,
+        "can_gun_drill": true,
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 1700000.00,
+        "machine_length_mm": 3349.00,
+        "machine_width_mm": 2032.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 77.00,
+        "installation_factor": 0.20,
+        "machine_uptime": 0.80,
+        "annual_maintenance_factor": 0.05,
+        "machine_life_yr": 10,
+        "salvage_value_factor": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Germany"
+      }
+    },
+    {
+      "name": "Index MS32-6",
+      "description": "74 hp, 10000 rpm, 1.3 in. max workpiece",
+      "process_type": "CNC Multi-Spindle",
+      "slide_configuration": {
+        "number_spindles": 6,
+        "spindles_with_od_slide": "1, 2, 3, 4, 5, 6",
+        "spindles_with_end_slide": "1, 2, 3, 4, 5, 6",
+        "spindles_with_live_tooling": "1, 2, 3, 4, 5, 6",
+        "back_work_spindles": "6"
+      },
+      "accounting": {
+        "labor_rate_usd_per_hr": 47.36,
+        "direct_overhead_rate_usd_per_hr": 89.88,
+        "indirect_overhead_rate_usd_per_hr": 15.53,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 0.25,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 2.00,
+        "base_part_setup_time_hr": 0.07,
+        "speed_synchronization_time_s": 1.50,
+        "stock_feed_time_s": 2.50,
+        "drum_index_time_s": 0.70,
+        "transfer_time_s": 1.00,
+        "part_eject_time_s": 1.00,
+        "tool_positioning_time_s": 0.90,
+        "time_to_replace_dull_tool_s": 60.00,
+        "spotting_time_s": 1.00,
+        "countersinking_time_s": 1.00
+      },
+      "limits": {
+        "spindle_power_kW": 19.00,
+        "spindle_speed_rpm": 8000.00,
+        "travel_z_axis_mm": 100.00,
+        "max_mill_tool_diameter_mm": 50.80,
+        "max_diameter_mm": 32.00,
+        "max_length_mm": 100.00
+      },
+      "rates": {
+        "live_tooling_spindle_power_kW": 14.00,
+        "live_tooling_spindle_speed_rpm": 8000.00,
+        "rapid_traverse_rate_mm_per_min": 24000.00
+      },
+      "other": {
+        "is_virtual_machine": false,
+        "approach_depart_distance_mm": 2.54,
+        "can_gun_drill": true,
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 1300000.00,
+        "machine_length_mm": 3365.00,
+        "machine_width_mm": 1966.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 74.00,
+        "installation_factor": 0.20,
+        "machine_uptime": 0.80,
+        "annual_maintenance_factor": 0.05,
+        "machine_life_yr": 10,
+        "salvage_value_factor": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Germany"
+      }
+    },
+    {
+      "name": "Index MS40-8",
+      "description": "66 hp, 7000 rpm, 1.6 in. max workpiece",
+      "process_type": "CNC Multi-Spindle",
+      "slide_configuration": {
+        "number_spindles": 8,
+        "spindles_with_od_slide": "1, 2, 3, 4, 5, 6, 7, 8",
+        "spindles_with_end_slide": "1, 2, 3, 4, 5, 6, 7, 8",
+        "spindles_with_live_tooling": "1, 2, 3, 4, 5, 6, 7, 8",
+        "back_work_spindles": "7, 8"
+      },
+      "accounting": {
+        "labor_rate_usd_per_hr": 47.36,
+        "direct_overhead_rate_usd_per_hr": 124.68,
+        "indirect_overhead_rate_usd_per_hr": 16.04,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 0.25,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 2.00,
+        "base_part_setup_time_hr": 0.07,
+        "speed_synchronization_time_s": 1.50,
+        "stock_feed_time_s": 2.50,
+        "drum_index_time_s": 1.20,
+        "transfer_time_s": 1.00,
+        "part_eject_time_s": 1.00,
+        "tool_positioning_time_s": 0.90,
+        "time_to_replace_dull_tool_s": 60.00,
+        "spotting_time_s": 1.00,
+        "countersinking_time_s": 1.00
+      },
+      "limits": {
+        "spindle_power_kW": 24.00,
+        "spindle_speed_rpm": 7000.00,
+        "travel_z_axis_mm": 120.00,
+        "max_mill_tool_diameter_mm": 50.80,
+        "max_diameter_mm": 40.00,
+        "max_length_mm": 120.00
+      },
+      "rates": {
+        "live_tooling_spindle_power_kW": 14.00,
+        "live_tooling_spindle_speed_rpm": 8000.00,
+        "rapid_traverse_rate_mm_per_min": 24000.00
+      },
+      "other": {
+        "is_virtual_machine": false,
+        "approach_depart_distance_mm": 2.54,
+        "can_gun_drill": true,
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 1800000.00,
+        "machine_length_mm": 4010.00,
+        "machine_width_mm": 2142.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 104.00,
+        "installation_factor": 0.20,
+        "machine_uptime": 0.80,
+        "annual_maintenance_factor": 0.05,
+        "machine_life_yr": 10,
+        "salvage_value_factor": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Germany"
+      }
+    },
+    {
+      "name": "Tsugami M08SY",
+      "description": "103 hp, 2.6 in. max workpiece",
+      "process_type": "CNC Turning Center with Sub Spindle",
+      "slide_configuration": {
+        "number_spindles": 2,
+        "spindles_with_od_slide": "1, 1, 2, 2",
+        "spindles_with_end_slide": "1, 2",
+        "spindles_with_live_tooling": "1, 2",
+        "back_work_spindles": "2"
+      },
+      "accounting": {
+        "labor_rate_usd_per_hr": 47.36,
+        "direct_overhead_rate_usd_per_hr": 12.55,
+        "indirect_overhead_rate_usd_per_hr": 15.01,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 0.50,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 2.00,
+        "base_part_setup_time_hr": 0.07,
+        "speed_synchronization_time_s": 1.50,
+        "stock_feed_time_s": 2.50,
+        "drum_index_time_s": 0.00,
+        "transfer_time_s": 1.00,
+        "part_eject_time_s": 1.00,
+        "tool_positioning_time_s": 0.90,
+        "time_to_replace_dull_tool_s": 60.00,
+        "spotting_time_s": 1.00,
+        "countersinking_time_s": 1.00
+      },
+      "limits": {
+        "spindle_power_kW": 11.00,
+        "spindle_speed_rpm": 4500.00,
+        "travel_z_axis_mm": 100.00,
+        "max_mill_tool_diameter_mm": 50.80,
+        "max_diameter_mm": 65.00,
+        "max_length_mm": 380.00
+      },
+      "rates": {
+        "live_tooling_spindle_power_kW": 8.00,
+        "live_tooling_spindle_speed_rpm": 5000.00,
+        "rapid_traverse_rate_mm_per_min": 27000.00
+      },
+      "other": {
+        "is_virtual_machine": false,
+        "approach_depart_distance_mm": 2.54,
+        "can_gun_drill": true,
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 137500.00,
+        "machine_length_mm": 2470.00,
+        "machine_width_mm": 1850.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 28.00,
+        "installation_factor": 0.20,
+        "machine_uptime": 0.80,
+        "annual_maintenance_factor": 0.05,
+        "machine_life_yr": 10,
+        "salvage_value_factor": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Japan"
+      }
+    },
+    {
+      "name": "Virtual CNC Multi-Spindle, 6 Spindles, Large",
+      "description": "140 hp, 10000 rpm, 2 in. max workpiece",
+      "process_type": "CNC Multi-Spindle",
+      "slide_configuration": {
+        "number_spindles": 6,
+        "spindles_with_od_slide": "1, 2, 3, 4, 5, 6",
+        "spindles_with_end_slide": "1, 2, 3, 4, 5, 6",
+        "spindles_with_live_tooling": "1, 2, 3, 4, 5, 6",
+        "back_work_spindles": "6"
+      },
+      "accounting": {
+        "labor_rate_usd_per_hr": 47.36,
+        "direct_overhead_rate_usd_per_hr": 92.90,
+        "indirect_overhead_rate_usd_per_hr": 16.37,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 0.25,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 2.00,
+        "base_part_setup_time_hr": 0.07,
+        "speed_synchronization_time_s": 1.50,
+        "stock_feed_time_s": 2.50,
+        "drum_index_time_s": 0.70,
+        "transfer_time_s": 1.00,
+        "part_eject_time_s": 1.00,
+        "tool_positioning_time_s": 0.90,
+        "time_to_replace_dull_tool_s": 60.00,
+        "spotting_time_s": 1.00,
+        "countersinking_time_s": 1.00
+      },
+      "limits": {
+        "spindle_power_kW": 24.00,
+        "spindle_speed_rpm": 10000.00,
+        "travel_z_axis_mm": 120.00,
+        "max_mill_tool_diameter_mm": 50.80,
+        "max_diameter_mm": 90.00,
+        "max_length_mm": 205.00
+      },
+      "rates": {
+        "live_tooling_spindle_power_kW": 14.00,
+        "live_tooling_spindle_speed_rpm": 10000.00,
+        "rapid_traverse_rate_mm_per_min": 24000.00
+      },
+      "other": {
+        "is_virtual_machine": true,
+        "approach_depart_distance_mm": 2.54,
+        "can_gun_drill": true,
+        "is_preferred": true
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 1300000.00,
+        "machine_length_mm": 4500.00,
+        "machine_width_mm": 2200.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 94.00,
+        "installation_factor": 0.20,
+        "machine_uptime": 0.80,
+        "annual_maintenance_factor": 0.05,
+        "machine_life_yr": 10,
+        "salvage_value_factor": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "USA"
+      }
+    },
+    {
+      "name": "Virtual CNC Multi-Spindle, 6 Spindles, Small",
+      "description": "38 hp, 6000 rpm, 0.6 in. max workpiece",
+      "process_type": "CNC Multi-Spindle",
+      "slide_configuration": {
+        "number_spindles": 6,
+        "spindles_with_od_slide": "1, 2, 3, 4, 5, 6",
+        "spindles_with_end_slide": "1, 2, 3, 4, 5, 6",
+        "spindles_with_live_tooling": "1, 2, 3, 4, 5, 6",
+        "back_work_spindles": "6"
+      },
+      "accounting": {
+        "labor_rate_usd_per_hr": 47.36,
+        "direct_overhead_rate_usd_per_hr": 54.47,
+        "indirect_overhead_rate_usd_per_hr": 14.70,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 0.25,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 2.00,
+        "base_part_setup_time_hr": 0.07,
+        "speed_synchronization_time_s": 1.50,
+        "stock_feed_time_s": 2.50,
+        "drum_index_time_s": 0.70,
+        "transfer_time_s": 1.00,
+        "part_eject_time_s": 1.00,
+        "tool_positioning_time_s": 0.90,
+        "time_to_replace_dull_tool_s": 60.00,
+        "spotting_time_s": 1.00,
+        "countersinking_time_s": 1.00
+      },
+      "limits": {
+        "spindle_power_kW": 15.00,
+        "spindle_speed_rpm": 6000.00,
+        "travel_z_axis_mm": 80.00,
+        "max_mill_tool_diameter_mm": 50.80,
+        "max_diameter_mm": 25.40,
+        "max_length_mm": 80.00
+      },
+      "rates": {
+        "live_tooling_spindle_power_kW": 12.00,
+        "live_tooling_spindle_speed_rpm": 6000.00,
+        "rapid_traverse_rate_mm_per_min": 12000.00
+      },
+      "other": {
+        "is_virtual_machine": true,
+        "approach_depart_distance_mm": 2.54,
+        "can_gun_drill": true,
+        "is_preferred": true
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 800000.00,
+        "machine_length_mm": 2600.00,
+        "machine_width_mm": 1300.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 40.00,
+        "installation_factor": 0.20,
+        "machine_uptime": 0.80,
+        "annual_maintenance_factor": 0.05,
+        "machine_life_yr": 10,
+        "salvage_value_factor": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "USA"
+      }
+    },
+    {
+      "name": "Virtual CNC Multi-Spindle, 8 Spindles, Large",
+      "description": "40 hp, 8000 rpm, 2 in. max workpiece",
+      "process_type": "CNC Multi-Spindle",
+      "slide_configuration": {
+        "number_spindles": 8,
+        "spindles_with_od_slide": "1, 2, 3, 4, 5, 6, 7, 8",
+        "spindles_with_end_slide": "1, 2, 3, 4, 5, 6, 7, 8",
+        "spindles_with_live_tooling": "1, 2, 3, 4, 5, 6, 7, 8",
+        "back_work_spindles": "7, 8"
+      },
+      "accounting": {
+        "labor_rate_usd_per_hr": 47.36,
+        "direct_overhead_rate_usd_per_hr": 124.68,
+        "indirect_overhead_rate_usd_per_hr": 19.93,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 0.25,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 2.00,
+        "base_part_setup_time_hr": 0.07,
+        "speed_synchronization_time_s": 1.50,
+        "stock_feed_time_s": 2.50,
+        "drum_index_time_s": 1.20,
+        "transfer_time_s": 1.00,
+        "part_eject_time_s": 1.00,
+        "tool_positioning_time_s": 0.90,
+        "time_to_replace_dull_tool_s": 60.00,
+        "spotting_time_s": 1.00,
+        "countersinking_time_s": 1.00
+      },
+      "limits": {
+        "spindle_power_kW": 30.00,
+        "spindle_speed_rpm": 10000.00,
+        "travel_z_axis_mm": 120.00,
+        "max_mill_tool_diameter_mm": 50.80,
+        "max_diameter_mm": 90.00,
+        "max_length_mm": 205.00
+      },
+      "rates": {
+        "live_tooling_spindle_power_kW": 14.00,
+        "live_tooling_spindle_speed_rpm": 10000.00,
+        "rapid_traverse_rate_mm_per_min": 24000.00
+      },
+      "other": {
+        "is_virtual_machine": true,
+        "approach_depart_distance_mm": 2.54,
+        "can_gun_drill": true,
+        "is_preferred": true
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 1800000.00,
+        "machine_length_mm": 9500.00,
+        "machine_width_mm": 2500.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 104.00,
+        "installation_factor": 0.20,
+        "machine_uptime": 0.80,
+        "annual_maintenance_factor": 0.05,
+        "machine_life_yr": 10,
+        "salvage_value_factor": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "USA"
+      }
+    },
+    {
+      "name": "Virtual CNC Multi-Spindle, 8 Spindles, Small",
+      "description": "126 hp, 8000 rpm, 0.9 in. max workpiece",
+      "process_type": "CNC Multi-Spindle",
+      "slide_configuration": {
+        "number_spindles": 8,
+        "spindles_with_od_slide": "1, 2, 3, 4, 5, 6, 7, 8",
+        "spindles_with_end_slide": "1, 2, 3, 4, 5, 6, 7, 8",
+        "spindles_with_live_tooling": "1, 2, 3, 4, 5, 6, 7, 8",
+        "back_work_spindles": "7, 8"
+      },
+      "accounting": {
+        "labor_rate_usd_per_hr": 47.36,
+        "direct_overhead_rate_usd_per_hr": 100.62,
+        "indirect_overhead_rate_usd_per_hr": 15.63,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 0.25,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 2.00,
+        "base_part_setup_time_hr": 0.07,
+        "speed_synchronization_time_s": 1.50,
+        "stock_feed_time_s": 2.50,
+        "drum_index_time_s": 1.20,
+        "transfer_time_s": 1.00,
+        "part_eject_time_s": 1.00,
+        "tool_positioning_time_s": 0.90,
+        "time_to_replace_dull_tool_s": 60.00,
+        "spotting_time_s": 1.00,
+        "countersinking_time_s": 1.00
+      },
+      "limits": {
+        "spindle_power_kW": 20.00,
+        "spindle_speed_rpm": 8000.00,
+        "travel_z_axis_mm": 80.00,
+        "max_mill_tool_diameter_mm": 50.80,
+        "max_diameter_mm": 25.40,
+        "max_length_mm": 80.00
+      },
+      "rates": {
+        "live_tooling_spindle_power_kW": 12.00,
+        "live_tooling_spindle_speed_rpm": 8000.00,
+        "rapid_traverse_rate_mm_per_min": 12000.00
+      },
+      "other": {
+        "is_virtual_machine": true,
+        "approach_depart_distance_mm": 2.54,
+        "can_gun_drill": true,
+        "is_preferred": true
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 1500000.00,
+        "machine_length_mm": 3500.00,
+        "machine_width_mm": 2000.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 65.00,
+        "installation_factor": 0.20,
+        "machine_uptime": 0.80,
+        "annual_maintenance_factor": 0.05,
+        "machine_life_yr": 10,
+        "salvage_value_factor": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "USA"
+      }
+    },
+    {
+      "name": "Virtual CNC Turning Center with Sub Spindle, Large",
+      "description": "54 hp, 4500 rpm, 3.2 in. max workpiece",
+      "process_type": "CNC Turning Center with Sub Spindle",
+      "slide_configuration": {
+        "number_spindles": 2,
+        "spindles_with_od_slide": "1, 1, 2, 2",
+        "spindles_with_end_slide": "1, 2",
+        "spindles_with_live_tooling": "1, 2",
+        "back_work_spindles": "2"
+      },
+      "accounting": {
+        "labor_rate_usd_per_hr": 47.36,
+        "direct_overhead_rate_usd_per_hr": 31.46,
+        "indirect_overhead_rate_usd_per_hr": 17.30,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 0.50,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 2.00,
+        "base_part_setup_time_hr": 0.07,
+        "speed_synchronization_time_s": 1.50,
+        "stock_feed_time_s": 2.50,
+        "drum_index_time_s": 0.00,
+        "transfer_time_s": 1.00,
+        "part_eject_time_s": 1.00,
+        "tool_positioning_time_s": 0.90,
+        "time_to_replace_dull_tool_s": 60.00,
+        "spotting_time_s": 1.00,
+        "countersinking_time_s": 1.00
+      },
+      "limits": {
+        "spindle_power_kW": 28.00,
+        "spindle_speed_rpm": 7000.00,
+        "travel_z_axis_mm": 600.00,
+        "max_mill_tool_diameter_mm": 50.80,
+        "max_diameter_mm": 82.00,
+        "max_length_mm": 1000.00
+      },
+      "rates": {
+        "live_tooling_spindle_power_kW": 28.00,
+        "live_tooling_spindle_speed_rpm": 10000.00,
+        "rapid_traverse_rate_mm_per_min": 30000.00
+      },
+      "other": {
+        "is_virtual_machine": true,
+        "approach_depart_distance_mm": 2.54,
+        "can_gun_drill": true,
+        "is_preferred": true
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 370000.00,
+        "machine_length_mm": 4500.00,
+        "machine_width_mm": 3000.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 60.00,
+        "installation_factor": 0.20,
+        "machine_uptime": 0.80,
+        "annual_maintenance_factor": 0.05,
+        "machine_life_yr": 10,
+        "salvage_value_factor": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "USA"
+      }
+    },
+    {
+      "name": "Virtual CNC Turning Center with Sub Spindle, Medium",
+      "description": "140 hp, 4500 rpm, 2.6 in. max workpiece",
+      "process_type": "CNC Turning Center with Sub Spindle",
+      "slide_configuration": {
+        "number_spindles": 2,
+        "spindles_with_od_slide": "1, 1, 2, 2",
+        "spindles_with_end_slide": "1, 2",
+        "spindles_with_live_tooling": "1, 2",
+        "back_work_spindles": "2"
+      },
+      "accounting": {
+        "labor_rate_usd_per_hr": 47.36,
+        "direct_overhead_rate_usd_per_hr": 18.91,
+        "indirect_overhead_rate_usd_per_hr": 15.63,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 0.50,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 2.00,
+        "base_part_setup_time_hr": 0.07,
+        "speed_synchronization_time_s": 1.50,
+        "stock_feed_time_s": 2.50,
+        "drum_index_time_s": 0.00,
+        "transfer_time_s": 1.00,
+        "part_eject_time_s": 1.00,
+        "tool_positioning_time_s": 0.90,
+        "time_to_replace_dull_tool_s": 60.00,
+        "spotting_time_s": 1.00,
+        "countersinking_time_s": 1.00
+      },
+      "limits": {
+        "spindle_power_kW": 15.00,
+        "spindle_speed_rpm": 4500.00,
+        "travel_z_axis_mm": 300.00,
+        "max_mill_tool_diameter_mm": 50.80,
+        "max_diameter_mm": 65.00,
+        "max_length_mm": 450.00
+      },
+      "rates": {
+        "live_tooling_spindle_power_kW": 11.00,
+        "live_tooling_spindle_speed_rpm": 6000.00,
+        "rapid_traverse_rate_mm_per_min": 27000.00
+      },
+      "other": {
+        "is_virtual_machine": true,
+        "approach_depart_distance_mm": 2.54,
+        "can_gun_drill": true,
+        "is_preferred": true
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 200000.00,
+        "machine_length_mm": 3500.00,
+        "machine_width_mm": 2000.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 45.00,
+        "installation_factor": 0.20,
+        "machine_uptime": 0.80,
+        "annual_maintenance_factor": 0.05,
+        "machine_life_yr": 10,
+        "salvage_value_factor": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "USA"
+      }
+    },
+    {
+      "name": "Virtual CNC Turning Center with Sub Spindle, Small",
+      "description": "87 hp, 3500 rpm, 1.7 in. max workpiece",
+      "process_type": "CNC Turning Center with Sub Spindle",
+      "slide_configuration": {
+        "number_spindles": 2,
+        "spindles_with_od_slide": "1, 1, 2, 2",
+        "spindles_with_end_slide": "1, 2",
+        "spindles_with_live_tooling": "1, 2",
+        "back_work_spindles": "2"
+      },
+      "accounting": {
+        "labor_rate_usd_per_hr": 47.36,
+        "direct_overhead_rate_usd_per_hr": 13.61,
+        "indirect_overhead_rate_usd_per_hr": 14.60,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 0.50,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 2.00,
+        "base_part_setup_time_hr": 0.07,
+        "speed_synchronization_time_s": 1.50,
+        "stock_feed_time_s": 2.50,
+        "drum_index_time_s": 0.00,
+        "transfer_time_s": 1.00,
+        "part_eject_time_s": 1.00,
+        "tool_positioning_time_s": 0.90,
+        "time_to_replace_dull_tool_s": 60.00,
+        "spotting_time_s": 1.00,
+        "countersinking_time_s": 1.00
+      },
+      "limits": {
+        "spindle_power_kW": 11.00,
+        "spindle_speed_rpm": 3500.00,
+        "travel_z_axis_mm": 100.00,
+        "max_mill_tool_diameter_mm": 50.80,
+        "max_diameter_mm": 25.40,
+        "max_length_mm": 150.00
+      },
+      "rates": {
+        "live_tooling_spindle_power_kW": 8.00,
+        "live_tooling_spindle_speed_rpm": 5000.00,
+        "rapid_traverse_rate_mm_per_min": 24000.00
+      },
+      "other": {
+        "is_virtual_machine": true,
+        "approach_depart_distance_mm": 2.54,
+        "can_gun_drill": true,
+        "is_preferred": true
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 150000.00,
+        "machine_length_mm": 2500.00,
+        "machine_width_mm": 1200.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 30.00,
+        "installation_factor": 0.20,
+        "machine_uptime": 0.80,
+        "annual_maintenance_factor": 0.05,
+        "machine_life_yr": 10,
+        "salvage_value_factor": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "USA"
+      }
+    }
+  ]
+}

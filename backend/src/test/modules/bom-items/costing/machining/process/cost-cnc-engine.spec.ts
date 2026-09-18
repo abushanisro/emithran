@@ -115,17 +115,21 @@ describe('computeCNCMilledCostSummary — billet and chip loss', () => {
     expect(result.warnings.some((w) => w.includes('Chip loss'))).toBe(true);
   });
 
-  it('folds fixture cost into Setup (no separate Fixture process line)', () => {
+  it('folds fixture cost into CNC Milling setupCost (no separate Setup or Fixture process line)', () => {
     const india = computeCNCMilledCostSummary(milledInput({ location: 'India' }), mc('3_axis_mill'));
     const usa = computeCNCMilledCostSummary(milledInput({ location: 'USA' }), mc('3_axis_mill'));
     // Fixture is no longer a standalone process line
     expect(india.processLines.find((l) => l.process === 'Fixture')).toBeUndefined();
     expect(usa.processLines.find((l) => l.process === 'Fixture')).toBeUndefined();
-    // Fixture cost is folded into Setup's setupCost (500 INR / batchSize=60 for India)
-    const indiaSetup = india.processLines.find((l) => l.process === 'Setup')!;
-    const usaSetup = usa.processLines.find((l) => l.process === 'Setup')!;
-    expect(indiaSetup.setupCost).toBeGreaterThan(500 / 60 - 0.1); // includes fixture amortization
-    expect(usaSetup.setupCost).toBeGreaterThan((500 * (85 / 900)) / 60 - 0.01);
+    // "Setup" is no longer a standalone process line either (2026-09-18) —
+    // it's folded into the first real line (CNC Milling) instead.
+    expect(india.processLines.find((l) => l.process === 'Setup')).toBeUndefined();
+    expect(usa.processLines.find((l) => l.process === 'Setup')).toBeUndefined();
+    // Fixture cost is folded into CNC Milling's setupCost (500 INR / batchSize=60 for India)
+    const indiaMilling = india.processLines.find((l) => l.process === 'CNC Milling')!;
+    const usaMilling = usa.processLines.find((l) => l.process === 'CNC Milling')!;
+    expect(indiaMilling.setupCost).toBeGreaterThan(500 / 60 - 0.1); // includes fixture amortization
+    expect(usaMilling.setupCost).toBeGreaterThan((500 * (85 / 900)) / 60 - 0.01);
   });
 
   it('prices the tapping line at the machine rate it was given (rigid tapping inheritance)', () => {
@@ -258,7 +262,7 @@ describe('inspection line — batch sampling + CMM amortized rate', () => {
   });
 });
 
-describe('Setup line — real per-machine mhr_records.setup_time_hr vs the disclosed class default', () => {
+describe('Setup — folded into the first real line (CNC Milling / OD Turning), real per-machine mhr_records.setup_time_hr vs the disclosed class default', () => {
   it('uses the real per-machine setup_time_hr when the selected machine has one, not the class default', () => {
     const result = computeCNCMilledCostSummary(
       milledInput({
@@ -267,9 +271,13 @@ describe('Setup line — real per-machine mhr_records.setup_time_hr vs the discl
       }),
       mc('3_axis_mill'),
     );
-    const setup = result.processLines.find((l) => l.process === 'Setup')!;
-    expect(setup.setupTimeMin).toBe(45);
-    expect(setup.setupTimeSource).toBe('machine');
+    // "Setup" is no longer its own process line (2026-09-18) — a machine's
+    // one-time workholding/fixturing overhead is folded into the first real
+    // operation line it produces instead of appearing as a peer operation.
+    expect(result.processLines.find((l) => l.process === 'Setup')).toBeUndefined();
+    const milling = result.processLines.find((l) => l.process === 'CNC Milling')!;
+    expect(milling.setupTimeMin).toBe(45);
+    expect(milling.setupTimeSource).toBe('machine');
     // "CNC Setup: ..." is resolveSetupMinutes' own process-labeled warning for
     // THIS line specifically -- the Inspection line's separate CMM_SETUP_MIN
     // fallback warning is expected to still fire in this fixture (its own
@@ -279,9 +287,9 @@ describe('Setup line — real per-machine mhr_records.setup_time_hr vs the discl
 
   it('falls back to the cited SETUP_COUNT×BASE_SETUP_MIN class default with a disclosed warning when absent', () => {
     const result = computeCNCMilledCostSummary(milledInput({ batchSize: 10 }), mc('3_axis_mill'));
-    const setup = result.processLines.find((l) => l.process === 'Setup')!;
-    expect(setup.setupTimeMin).toBe(3 * 20); // 3_axis_mill: SETUP_COUNT=3 * BASE_SETUP_MIN=20
-    expect(setup.setupTimeSource).toBe('class_default');
+    const milling = result.processLines.find((l) => l.process === 'CNC Milling')!;
+    expect(milling.setupTimeMin).toBe(3 * 20); // 3_axis_mill: SETUP_COUNT=3 * BASE_SETUP_MIN=20
+    expect(milling.setupTimeSource).toBe('class_default');
     expect(result.warnings.some((w) => w.startsWith('CNC Setup:'))).toBe(true);
   });
 
@@ -290,9 +298,10 @@ describe('Setup line — real per-machine mhr_records.setup_time_hr vs the discl
       milledInput({ family: 'cnc_turned', batchSize: 10, mhrRate: rate(900, { machineClass: '2_axis_lathe', setupTimeHr: 0.1 }) }), // 6 min
       mc('2_axis_lathe'),
     );
-    const setup = result.processLines.find((l) => l.process === 'Setup')!;
-    expect(setup.setupTimeMin).toBe(6);
-    expect(setup.setupTimeSource).toBe('machine');
+    expect(result.processLines.find((l) => l.process === 'Setup')).toBeUndefined();
+    const odTurning = result.processLines.find((l) => l.process === 'OD Turning')!;
+    expect(odTurning.setupTimeMin).toBe(6);
+    expect(odTurning.setupTimeSource).toBe('machine');
   });
 });
 
@@ -390,6 +399,223 @@ describe('computeCNCTurnedCostSummary — data sanity', () => {
       mc('2_axis_lathe'),
     );
     expect(result.warnings.some((w) => w.includes('sheet/plate'))).toBe(true);
+  });
+});
+
+// Real tblGeneralTurning material_cut_code_name '1.0' row (hardness 125):
+// medium_rough_turning cut_depth_mm=1.3/cutting_speed_m_min=250.4/
+// feed_rate_mm_rev=0.3625; finish_turning cut_depth_mm=0.8/
+// cutting_speed_m_min=333.1/feed_rate_mm_rev=0.29 (verified directly against
+// the source data 2026-09-18). Root-caused: OD Turning previously used a
+// flat, uncited TURNING_MRR table (mm3/min) + a fixed x1.2 fudge factor with
+// no real pass-count model at all — replaced with real per-pass depth-of-cut
+// physics (computeTurningCycleSec), same "L/F x N" shape the reference
+// methodology for this domain describes.
+const REAL_TURNING_PARAMS = {
+  roughCutDepthMm: 1.3, roughCuttingSpeedMPerMin: 250.4, roughFeedMmPerRev: 0.3625,
+  finishCutDepthMm: 0.8, finishCuttingSpeedMPerMin: 333.1, finishFeedMmPerRev: 0.29,
+  dataFound: true,
+};
+
+describe('OD Turning — real per-pass depth-of-cut physics (tblGeneralTurning)', () => {
+  it('computes exact real rough-pass-count + finish-pass cycle time, split into the real distinct Rough Turning / Finish Turning operations', () => {
+    const result = computeCNCTurnedCostSummary(
+      turnedInput({
+        maxLength: 100, maxWidth: 20, maxHeight: 20,
+        blankResult: {
+          form: 'round_bar', sizeLabel: 'Ø30 round bar',
+          billetVolMm3: Math.PI * 15 ** 2 * 100, // real equivalent 30mm-diameter round bar, 100mm long
+          utilizationPct: 50,
+        },
+        turningParams: REAL_TURNING_PARAMS,
+      } as any),
+      mc('2_axis_lathe'),
+    );
+    // "OD Turning" is no longer emitted when real per-pass data resolves —
+    // replaced by the real distinct catalog operations.
+    expect(result.processLines.some((l) => l.process === 'OD Turning')).toBe(false);
+    const roughLine = result.processLines.find((l) => l.process === 'Rough Turning')!;
+    const finishLine = result.processLines.find((l) => l.process === 'Finish Turning')!;
+    expect(roughLine).toBeDefined();
+    expect(finishLine).toBeDefined();
+    // partDiameterMm = max(20,20) = 20; barDiameterMm = 30 (by construction);
+    // radialStockMm = (30-20)/2 = 5mm. finishStockMm = min(0.8,5) = 0.8;
+    // roughStockMm = 5-0.8 = 4.2; numRoughPasses = round(4.2/1.3) = 3.
+    const diameterMm = 20;
+    const passTimeSec = (speedMPerMin: number, feedMmPerRev: number) => {
+      const rpm = (speedMPerMin * 1000) / (Math.PI * diameterMm);
+      const feedMmPerMin = rpm * feedMmPerRev;
+      return (100 / feedMmPerMin) * 60;
+    };
+    const expectedRoughSec = 3 * passTimeSec(250.4, 0.3625);
+    const expectedFinishSec = passTimeSec(333.1, 0.29);
+    expect(roughLine.cycleTimeMin).toBeCloseTo(expectedRoughSec / 60, 2);
+    expect(finishLine.cycleTimeMin).toBeCloseTo(expectedFinishSec / 60, 2);
+    // Setup folds into Rough Turning only, not Finish Turning.
+    expect(roughLine.setupTimeMin).toBeGreaterThan(0);
+    expect(finishLine.setupTimeMin).toBeUndefined();
+  });
+
+  it('discloses and falls back to the MRR-based estimate when real tblGeneralTurning data is not resolved (never a $0 turning line)', () => {
+    const result = computeCNCTurnedCostSummary(
+      turnedInput({
+        maxLength: 100, maxWidth: 20, maxHeight: 20, volume: 5000,
+        blankResult: {
+          form: 'round_bar', sizeLabel: 'Ø30 round bar',
+          billetVolMm3: Math.PI * 15 ** 2 * 100,
+          utilizationPct: 50,
+        },
+        turningParams: { roughCutDepthMm: 0, roughCuttingSpeedMPerMin: 0, roughFeedMmPerRev: 0, finishCutDepthMm: 0, finishCuttingSpeedMPerMin: 0, finishFeedMmPerRev: 0, dataFound: false },
+      } as any),
+      mc('2_axis_lathe'),
+    );
+    const line = result.processLines.find((l) => l.process === 'OD Turning')!;
+    expect(line.cycleTimeMin).toBeGreaterThan(0);
+    expect(result.warnings.some((w) => w.includes('OD Turning') && w.includes('falling back'))).toBe(true);
+  });
+
+  it('does not fall back with a warning when there is genuinely no material to remove (radial stock is zero)', () => {
+    const result = computeCNCTurnedCostSummary(
+      turnedInput({
+        maxLength: 100, maxWidth: 20, maxHeight: 20, volume: 5000,
+        blankResult: {
+          form: 'round_bar', sizeLabel: 'Ø20 round bar',
+          billetVolMm3: Math.PI * 10 ** 2 * 100, // same diameter as the part -- no stock to remove
+          utilizationPct: 100,
+        },
+        turningParams: { roughCutDepthMm: 0, roughCuttingSpeedMPerMin: 0, roughFeedMmPerRev: 0, finishCutDepthMm: 0, finishCuttingSpeedMPerMin: 0, finishFeedMmPerRev: 0, dataFound: false },
+      } as any),
+      mc('2_axis_lathe'),
+    );
+    expect(result.warnings.some((w) => w.includes('OD Turning') && w.includes('falling back'))).toBe(false);
+  });
+});
+
+// Root-caused live 2026-09-18: every per-line operation NAME (Rough
+// Turning, Finish Turning, Drilling, Parting, Tapping) was a string
+// literal written directly in this file — even though each one was
+// independently verified against the real operations_full.json catalog,
+// the user's own explicit requirement is that these must be resolved
+// against the LIVE process_taxonomy_operations catalog at runtime, not
+// merely happen to match it. resolveOperationName() (internal, tested
+// through the exported cost summary functions, matching this file's own
+// established convention for every other internal helper) does exactly
+// that: returns the live catalog's own string when a real
+// (machineClass, operation_category) row exists, discloses a warning and
+// keeps this engine's own verified name when it doesn't, and never
+// invents a different name.
+describe('resolveOperationName — every operation name confirmed against the live process_taxonomy_operations catalog', () => {
+  it('uses the live catalog value (not silently trusting the hardcoded literal) when a real row exists for this machine class', () => {
+    const result = computeCNCTurnedCostSummary(
+      turnedInput({
+        maxLength: 100, maxWidth: 20, maxHeight: 20, volume: 5000,
+        blankResult: {
+          form: 'round_bar', sizeLabel: 'Ø30 round bar',
+          billetVolMm3: Math.PI * 15 ** 2 * 100,
+          utilizationPct: 50,
+        },
+        turningParams: REAL_TURNING_PARAMS,
+        // Includes every real operation this default fixture's holes/
+        // threads also trigger (Drilling, Tapping) so the "no warning"
+        // assertion below is genuinely testing a full real match, not
+        // accidentally passing because an unrelated line's name was never
+        // checked against an incomplete list.
+        realOperationCategories: { cnc_lathe: ['Rough Turning', 'Finish Turning', 'Parting', 'Drilling'], tapping: ['Tapping'] },
+      } as any),
+      mc('2_axis_lathe'),
+    );
+    expect(result.processLines.some((l) => l.process === 'Rough Turning')).toBe(true);
+    expect(result.processLines.some((l) => l.process === 'Finish Turning')).toBe(true);
+    expect(result.processLines.some((l) => l.process === 'Parting')).toBe(true);
+    expect(result.warnings.some((w) => w.includes('no matching real operation_category'))).toBe(false);
+  });
+
+  it('discloses a warning (never blocking, never inventing a different name) when this machine class has no real matching row', () => {
+    const result = computeCNCTurnedCostSummary(
+      turnedInput({
+        maxLength: 100, maxWidth: 20, maxHeight: 20, volume: 5000,
+        blankResult: {
+          form: 'round_bar', sizeLabel: 'Ø30 round bar',
+          billetVolMm3: Math.PI * 15 ** 2 * 100,
+          utilizationPct: 50,
+        },
+        turningParams: REAL_TURNING_PARAMS,
+        // Real data exists for this class, but "Rough Turning" isn't in it
+        // -- e.g. migration 754 partially applied, or a genuinely
+        // uncatalogued operation for this specific class.
+        realOperationCategories: { '2_axis_lathe': ['Some Other Real Operation'] },
+      } as any),
+      mc('2_axis_lathe'),
+    );
+    const roughLine = result.processLines.find((l) => l.process === 'Rough Turning');
+    expect(roughLine).toBeDefined(); // never dropped/blocked
+    expect(result.warnings.some((w) =>
+      w.includes('"Rough Turning"') && w.includes('no matching real operation_category') && w.includes('2_axis_lathe'),
+    )).toBe(true);
+  });
+
+  it('does not warn when no real operation-category data is on file at all for any class (genuinely absent, not a mismatch)', () => {
+    const result = computeCNCTurnedCostSummary(
+      turnedInput({
+        maxLength: 100, maxWidth: 20, maxHeight: 20, volume: 5000,
+        blankResult: {
+          form: 'round_bar', sizeLabel: 'Ø30 round bar',
+          billetVolMm3: Math.PI * 15 ** 2 * 100,
+          utilizationPct: 50,
+        },
+        turningParams: REAL_TURNING_PARAMS,
+        realOperationCategories: null,
+      } as any),
+      mc('2_axis_lathe'),
+    );
+    expect(result.processLines.some((l) => l.process === 'Rough Turning')).toBe(true);
+    expect(result.warnings.some((w) => w.includes('no matching real operation_category'))).toBe(false);
+  });
+
+  it('resolves Tapping against the tapping-specific machine class (tappingRate), not the main turning machine class', () => {
+    const result = computeCNCTurnedCostSummary(
+      turnedInput({
+        threads: [{ size: 'M4', count: 2 }],
+        tappingRate: rate(900, { machineClass: 'tapping' }),
+        realOperationCategories: { tapping: ['Tapping'], cnc_lathe: [] },
+      } as any),
+      mc('2_axis_lathe'),
+    );
+    expect(result.processLines.some((l) => l.process === 'Tapping')).toBe(true);
+    expect(result.warnings.some((w) => w.includes('no matching real operation_category'))).toBe(false);
+  });
+});
+
+// Root-caused 2026-09-18: "MillTurn" is a real, staged Machining Process-page
+// category (migrations 737/738/753, 7 real 5-axis mill-turn centers, e.g.
+// GILDEMEISTER GMX 400 LINEAR) whose real machine_class ('machining_millturn')
+// was deliberately kept separate from the pre-existing 'cnc_mill_turn' bucket
+// (a different real machine population — see migration 738's own comment),
+// but had no cost engine of its own. Its real ops (Back Finish Turning,
+// Dovetail Milled, Polygon Turned, Rotary Broached, ...) are the same real
+// turning taxonomy computeCNCTurnedCostSummary already prices — this is a
+// pure machine-class wiring fix (MACHINE_ENVELOPE/MACHINE_REGISTRY/
+// SETUP_COUNT/BASE_SETUP_MIN entries + a 4th route candidate), zero new
+// physics.
+describe('machining_millturn — real, distinct MillTurn machine class', () => {
+  it('prices a turned part via computeCNCTurnedCostSummary using the machining_millturn machine class', () => {
+    const result = computeCNCTurnedCostSummary(
+      turnedInput({ mhrRate: rate(1200, { machineClass: 'machining_millturn', machineName: 'GILDEMEISTER GMX 400 LINEAR' }) } as any),
+      mc('machining_millturn'),
+    );
+    expect(result.totalCost).toBeGreaterThan(0);
+    expect(result.processLines.some((l) => l.machineClass === 'machining_millturn')).toBe(true);
+  });
+
+  it('uses the real disclosed 45min class-default setup when no per-machine setup_time_hr is on the rate', () => {
+    const result = computeCNCTurnedCostSummary(
+      turnedInput({ mhrRate: rate(1200, { machineClass: 'machining_millturn' }) } as any),
+      mc('machining_millturn'),
+    );
+    // "Setup" is no longer its own process line -- folded into OD Turning.
+    const odTurning = result.processLines.find((l) => l.process === 'OD Turning');
+    expect(odTurning).toBeDefined();
+    expect(odTurning!.setupTimeMin).toBeGreaterThan(0);
   });
 });
 
@@ -697,8 +923,8 @@ describe('Fix — drilling/tapping now use real material-aware physics (no more 
     });
     const alu = computeCNCTurnedCostSummary(turnedInput({ materialGrade: 'AL6061-T6' }), mc('2_axis_lathe'));
     const stainless = computeCNCTurnedCostSummary(turnedInput({ materialGrade: 'SS304' }), mc('2_axis_lathe'));
-    const aluBoring = alu.processLines.find((l) => l.process === 'Boring/Drilling')!.cycleTimeMin;
-    const ssBoring = stainless.processLines.find((l) => l.process === 'Boring/Drilling')!.cycleTimeMin;
+    const aluBoring = alu.processLines.find((l) => l.process === 'Drilling')!.cycleTimeMin;
+    const ssBoring = stainless.processLines.find((l) => l.process === 'Drilling')!.cycleTimeMin;
     expect(ssBoring).toBeGreaterThan(aluBoring);
   });
 });
@@ -958,7 +1184,7 @@ describe('Deburring — real hardness-matched tblDeburring speed, fixed a pre-ex
       ...overrides,
     });
     const result = computeCNCTurnedCostSummary(turnedInput(), mc('2_axis_lathe'));
-    const boringLine = result.processLines.find((l) => l.process === 'Boring/Drilling')!;
+    const boringLine = result.processLines.find((l) => l.process === 'Drilling')!;
     const deburrLine = result.processLines.find((l) => l.process === 'Deburring')!;
     expect(result.cycleTimes.deburrMin).toBeCloseTo(deburrLine.cycleTimeMin, 2);
     expect(result.cycleTimes.deburrMin).not.toBeCloseTo(boringLine.cycleTimeMin, 2);
@@ -1742,5 +1968,132 @@ describe('Keyway Broaching — new operation, genuinely linear stroke physics', 
       mc('2_axis_lathe'),
     );
     expect(result.processLines.some((l) => l.process === 'Keyway Broaching')).toBe(true);
+  });
+});
+
+// Real tblWireEDMing.json row shape (material_cut_code_name '1.0', real
+// Roughing/Finishing FeedRateMmPerMin). Root-caused 2026-09-18: "Wire EDM"
+// is a real, staged machine category (migrations 737/738/753, 6 real
+// machines) with real material cutting physics but had ZERO cost engine.
+// Real, disclosed trigger: same heat-treat-callout signal Jig Grind
+// already uses, applied to a real "slot" feature instead of a round bore
+// (a hardened slot cannot be conventionally milled any more than a
+// hardened bore can be conventionally bored). wireEdmCandidates are
+// pre-filtered out of fgv2Features by splitWireEdmOccurrences
+// (wire-edm-routing.ts) — these tests exercise
+// computeCNCMilledCostSummary/computeCNCTurnedCostSummary directly with
+// pre-resolved candidates, the same convention every other new-engine
+// describe block above uses.
+const WIRE_EDM_PARAMS = { roughFeedRateMmPerMin: 5.8, finishFeedRateMmPerMin: 4.8, dataFound: true };
+
+describe('Wire EDM — new operation, real hardened-slot trigger', () => {
+  it('adds no line when there are no real Wire EDM candidates', () => {
+    const result = computeCNCMilledCostSummary(
+      milledInput({
+        wireEdmCandidates: [], wireEdmParams: WIRE_EDM_PARAMS,
+        wireEdmRate: rate(1400, { machineClass: 'wire_edm' }),
+      } as any),
+      mc('3_axis_mill'),
+    );
+    expect(result.processLines.some((l) => l.process === 'Wire EDM')).toBe(false);
+  });
+
+  it('adds a real Wire EDM line, billed at its own dedicated rate, for a real hardened slot on a MILLED part', () => {
+    const result = computeCNCMilledCostSummary(
+      milledInput({
+        wireEdmCandidates: [{ lengthMm: 100, count: 2 }],
+        wireEdmParams: WIRE_EDM_PARAMS,
+        wireEdmRate: rate(1400, { machineClass: 'wire_edm', machineName: 'Fanuc 0id' }),
+      } as any),
+      mc('3_axis_mill'),
+    );
+    const line = result.processLines.find((l) => l.process === 'Wire EDM');
+    expect(line).toBeDefined();
+    expect(line!.cycleTimeMin).toBeGreaterThan(0);
+    expect(line!.machineClass).toBe('wire_edm');
+    expect(line!.machineName).toBe('Fanuc 0id');
+  });
+
+  it('computes exact real 2-pass linear-cut physics: one rough pass + one finish pass, each the full cut-path length', () => {
+    const result = computeCNCMilledCostSummary(
+      milledInput({
+        wireEdmCandidates: [{ lengthMm: 100, count: 3 }],
+        wireEdmParams: WIRE_EDM_PARAMS,
+        wireEdmRate: rate(1400, { machineClass: 'wire_edm' }),
+      } as any),
+      mc('3_axis_mill'),
+    );
+    const line = result.processLines.find((l) => l.process === 'Wire EDM')!;
+    // roughTimeSec = (100mm / 5.8 mm/min) * 60 = 1034.48s
+    // finishTimeSec = (100mm / 4.8 mm/min) * 60 = 1250.0s
+    // per-occurrence = 2284.48s; x3 occurrences = 6853.45s total
+    const roughSec = (100 / 5.8) * 60;
+    const finishSec = (100 / 4.8) * 60;
+    const expectedRunMin = ((roughSec + finishSec) * 3) / 60;
+    expect(line.cycleTimeMin).toBeCloseTo(expectedRunMin, 1);
+  });
+
+  it('discloses, rather than fabricates, when a real hardened slot exists but no real Wire EDM cutting-speed data was resolved', () => {
+    const result = computeCNCMilledCostSummary(
+      milledInput({
+        wireEdmCandidates: [{ lengthMm: 100, count: 1 }],
+        wireEdmParams: { roughFeedRateMmPerMin: 0, finishFeedRateMmPerMin: 0, dataFound: false },
+        wireEdmRate: rate(1400, { machineClass: 'wire_edm' }),
+      } as any),
+      mc('3_axis_mill'),
+    );
+    expect(result.processLines.some((l) => l.process === 'Wire EDM')).toBe(false);
+    expect(result.warnings.some((w) => w.includes('Wire EDM') && w.includes('not available'))).toBe(true);
+  });
+
+  it('adds no line when a real hardened slot exists but no dedicated Wire EDM rate is on file (genuine gap, no fallback machine)', () => {
+    const result = computeCNCMilledCostSummary(
+      milledInput({
+        wireEdmCandidates: [{ lengthMm: 100, count: 1 }],
+        wireEdmParams: WIRE_EDM_PARAMS, wireEdmRate: undefined,
+      } as any),
+      mc('3_axis_mill'),
+    );
+    expect(result.processLines.some((l) => l.process === 'Wire EDM')).toBe(false);
+  });
+
+  it("prefers the real machine's own setup_time_hr over the disclosed class default", () => {
+    const result = computeCNCMilledCostSummary(
+      milledInput({
+        wireEdmCandidates: [{ lengthMm: 100, count: 1 }],
+        wireEdmParams: WIRE_EDM_PARAMS,
+        wireEdmRate: rate(1400, { machineClass: 'wire_edm', setupTimeHr: 0.5 }), // real 30min, every real Wire EDM machine on file
+      } as any),
+      mc('3_axis_mill'),
+    );
+    const line = result.processLines.find((l) => l.process === 'Wire EDM')!;
+    expect(line.setupTimeMin).toBe(30);
+    expect(line.setupTimeSource).toBe('machine');
+  });
+
+  it(`falls back to the disclosed ${30}min class default when setup_time_hr is absent`, () => {
+    const result = computeCNCMilledCostSummary(
+      milledInput({
+        wireEdmCandidates: [{ lengthMm: 100, count: 1 }],
+        wireEdmParams: WIRE_EDM_PARAMS,
+        wireEdmRate: rate(1400, { machineClass: 'wire_edm' }),
+      } as any),
+      mc('3_axis_mill'),
+    );
+    const line = result.processLines.find((l) => l.process === 'Wire EDM')!;
+    expect(line.setupTimeMin).toBe(30);
+    expect(line.setupTimeSource).toBe('class_default');
+  });
+
+  it('applies to a real hardened slot on a TURNED part too', () => {
+    const result = computeCNCTurnedCostSummary(
+      turnedInput({
+        wireEdmCandidates: [{ lengthMm: 100, count: 1 }],
+        wireEdmParams: WIRE_EDM_PARAMS,
+        wireEdmRate: rate(1400, { machineClass: 'wire_edm' }),
+      } as any),
+      mc('2_axis_lathe'),
+    );
+    expect(result.processLines.some((l) => l.process === 'Wire EDM')).toBe(true);
   });
 });

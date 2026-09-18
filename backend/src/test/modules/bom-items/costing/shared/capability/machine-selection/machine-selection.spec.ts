@@ -199,20 +199,26 @@ describe('classifyMachineRecord', () => {
     expect(classifyMachineRecord(real('m6', '4_axis_mill', 'Giddings & Lewis H60F w Rotary Table'))).toBe('4_axis_mill');
     expect(classifyMachineRecord(real('m7', '5_axis_mill', 'DMG MORI DMU 105 monoBLOCK'))).toBe('5_axis_mill');
 
-    // Several more real Machining categories have their own dedicated cost
-    // engine and MACHINE_REGISTRY entry (gun_drill, deep_bore_machine,
-    // manual_deburr, cylindrical_grinder, jig_bore, internal_grinder,
-    // broach) — they resolve to THEMSELVES via Tier 0's exact-match path too.
+    // Several more real Machining categories have since gained their own
+    // dedicated cost engine and MACHINE_REGISTRY entry (gun_drill,
+    // deep_bore_machine, manual_deburr, cylindrical_grinder, jig_bore,
+    // jig_grind, internal_grinder, broach, machining_millturn —
+    // 2026-09-17/2026-09-18) — they now correctly resolve to THEMSELVES via
+    // Tier 0's exact-match path (a real class_key already equal to a real
+    // MachineClass, no keyword aliasing needed), not via
+    // MACHINING_CATEGORY_ALIAS. machining_millturn keeps its own real,
+    // deliberately-renamed identity distinct from the pre-existing
+    // cnc_mill_turn bucket (a different real machine population, see
+    // migration 738's own comment) — Tier 0 exact match means the two
+    // classes' shared 'MillTurn' keyword never actually needs to
+    // disambiguate them.
     expect(classifyMachineRecord(real('m9', 'cylindrical_grinder', 'Flex Grind Schaudt M'))).toBe('cylindrical_grinder');
     expect(classifyMachineRecord(real('m8', 'broach', 'Pioneer VT1040'))).toBe('broach');
-
-    // machining_millturn already has its own real MACHINE_REGISTRY entry and
-    // registered engine (a separate, distinct fleet from the deleted
-    // cnc_mill_turn bucket) — classifies to itself via Tier 0, same as the
-    // other real classes above.
     expect(classifyMachineRecord(real('m10', 'machining_millturn', 'GILDEMEISTER GMX 400 LINEAR'))).toBe('machining_millturn');
-    // 3_axis_router has no dedicated cost engine yet — correctly stays
-    // unclassified (a disclosed gap, not force-fit into an unrelated bucket).
+
+    // The remaining real Machining categories still have no dedicated cost
+    // engine to alias into yet — correctly stay unclassified (a disclosed
+    // gap, not force-fit into an unrelated bucket).
     expect(classifyMachineRecord(real('m11', '3_axis_router', 'Multicam 7000 Series CNC Router, Model 103'))).toBeNull();
   });
 

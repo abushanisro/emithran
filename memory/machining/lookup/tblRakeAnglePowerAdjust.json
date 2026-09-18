@@ -1,0 +1,154 @@
+[
+  {
+    "RakeAngleDeg": -7.0,
+    "PowerFactor": 1.07
+  },
+  {
+    "RakeAngleDeg": -6.0,
+    "PowerFactor": 1.06
+  },
+  {
+    "RakeAngleDeg": -5.0,
+    "PowerFactor": 1.05
+  },
+  {
+    "RakeAngleDeg": -4.0,
+    "PowerFactor": 1.04
+  },
+  {
+    "RakeAngleDeg": -3.0,
+    "PowerFactor": 1.03
+  },
+  {
+    "RakeAngleDeg": -2.0,
+    "PowerFactor": 1.02
+  },
+  {
+    "RakeAngleDeg": -1.0,
+    "PowerFactor": 1.01
+  },
+  {
+    "RakeAngleDeg": 0.0,
+    "PowerFactor": 1.0
+  },
+  {
+    "RakeAngleDeg": 1.0,
+    "PowerFactor": 0.99
+  },
+  {
+    "RakeAngleDeg": 2.0,
+    "PowerFactor": 0.98
+  },
+  {
+    "RakeAngleDeg": 3.0,
+    "PowerFactor": 0.97
+  },
+  {
+    "RakeAngleDeg": 4.0,
+    "PowerFactor": 0.96
+  },
+  {
+    "RakeAngleDeg": 5.0,
+    "PowerFactor": 0.95
+  },
+  {
+    "RakeAngleDeg": 6.0,
+    "PowerFactor": 0.94
+  },
+  {
+    "RakeAngleDeg": 7.0,
+    "PowerFactor": 0.93
+  },
+  {
+    "RakeAngleDeg": 8.0,
+    "PowerFactor": 0.92
+  },
+  {
+    "RakeAngleDeg": 9.0,
+    "PowerFactor": 0.91
+  },
+  {
+    "RakeAngleDeg": 10.0,
+    "PowerFactor": 0.9
+  },
+  {
+    "RakeAngleDeg": 11.0,
+    "PowerFactor": 0.89
+  },
+  {
+    "RakeAngleDeg": 12.0,
+    "PowerFactor": 0.88
+  },
+  {
+    "RakeAngleDeg": 13.0,
+    "PowerFactor": 0.87
+  },
+  {
+    "RakeAngleDeg": 14.0,
+    "PowerFactor": 0.86
+  },
+  {
+    "RakeAngleDeg": 15.0,
+    "PowerFactor": 0.85
+  },
+  {
+    "RakeAngleDeg": 16.0,
+    "PowerFactor": 0.84
+  },
+  {
+    "RakeAngleDeg": 17.0,
+    "PowerFactor": 0.83
+  },
+  {
+    "RakeAngleDeg": 18.0,
+    "PowerFactor": 0.82
+  },
+  {
+    "RakeAngleDeg": 19.0,
+    "PowerFactor": 0.81
+  },
+  {
+    "RakeAngleDeg": 20.0,
+    "PowerFactor": 0.8
+  },
+  {
+    "RakeAngleDeg": 21.0,
+    "PowerFactor": 0.79
+  },
+  {
+    "RakeAngleDeg": 22.0,
+    "PowerFactor": 0.78
+  },
+  {
+    "RakeAngleDeg": 23.0,
+    "PowerFactor": 0.77
+  },
+  {
+    "RakeAngleDeg": 24.0,
+    "PowerFactor": 0.76
+  },
+  {
+    "RakeAngleDeg": 25.0,
+    "PowerFactor": 0.75
+  },
+  {
+    "RakeAngleDeg": 26.0,
+    "PowerFactor": 0.74
+  },
+  {
+    "RakeAngleDeg": 27.0,
+    "PowerFactor": 0.73
+  },
+  {
+    "RakeAngleDeg": 28.0,
+    "PowerFactor": 0.72
+  },
+  {
+    "RakeAngleDeg": 29.0,
+    "PowerFactor": 0.71
+  },
+  {
+    "RakeAngleDeg": 30.0,
+    "PowerFactor": 0.7
+  }
+]

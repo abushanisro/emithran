@@ -1,0 +1,56 @@
+[
+  {
+    "Equipment": "crane",
+    "Handling Time (s)": 1800.0,
+    "Max Weight (kg)": 2000.0,
+    "Num Operators": 2.0
+  },
+  {
+    "Equipment": "crane",
+    "Handling Time (s)": 2700.0,
+    "Max Weight (kg)": 9999999.0,
+    "Num Operators": 2.0
+  },
+  {
+    "Equipment": "forklift",
+    "Handling Time (s)": 540.0,
+    "Max Weight (kg)": 300.0,
+    "Num Operators": 1.0
+  },
+  {
+    "Equipment": "forklift",
+    "Handling Time (s)": 900.0,
+    "Max Weight (kg)": 500.0,
+    "Num Operators": 1.0
+  },
+  {
+    "Equipment": "none",
+    "Handling Time (s)": 1.0,
+    "Max Weight (kg)": 0.0,
+    "Num Operators": 1.0
+  },
+  {
+    "Equipment": "none",
+    "Handling Time (s)": 2.0,
+    "Max Weight (kg)": 1.0,
+    "Num Operators": 1.0
+  },
+  {
+    "Equipment": "none",
+    "Handling Time (s)": 10.0,
+    "Max Weight (kg)": 5.0,
+    "Num Operators": 1.0
+  },
+  {
+    "Equipment": "none",
+    "Handling Time (s)": 30.0,
+    "Max Weight (kg)": 15.0,
+    "Num Operators": 1.0
+  },
+  {
+    "Equipment": "none",
+    "Handling Time (s)": 45.0,
+    "Max Weight (kg)": 20.0,
+    "Num Operators": 1.0
+  }
+]
