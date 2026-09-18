@@ -7013,7 +7013,11 @@ function CostGuidePanel({
                   onBlur={() => setTimeout(() => setMatDropOpen(false), 160)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && matInputValue.trim()) {
-                      updateBOMItem.mutate({ id: item.id, data: { materialGrade: matInputValue.trim() } });
+                      // materialSource: 'manual' — real provenance (migration 081), stamped
+                      // here so the backend's grade precedence (bom-items.service.ts) can
+                      // trust this explicit selection over the drawing title block instead
+                      // of silently deferring to a less-specific/generic drawing extraction.
+                      updateBOMItem.mutate({ id: item.id, data: { materialGrade: matInputValue.trim(), materialSource: 'manual' } });
                       autoAddMaterialCost(matInputValue.trim());
                       void reapplyEffectiveRoute();
                       setMatDropOpen(false);
@@ -7029,7 +7033,7 @@ function CostGuidePanel({
                     <button
                       onMouseDown={(e) => {
                         e.preventDefault();
-                        updateBOMItem.mutate({ id: item.id, data: { materialGrade: matInputValue.trim() } });
+                        updateBOMItem.mutate({ id: item.id, data: { materialGrade: matInputValue.trim(), materialSource: 'manual' } });
                         autoAddMaterialCost(matInputValue.trim());
                         void reapplyEffectiveRoute();
                         setMatDropOpen(false);
@@ -7063,7 +7067,7 @@ function CostGuidePanel({
                           onMouseDown={(e) => {
                             e.preventDefault();
                             setMatInputValue(grade);
-                            updateBOMItem.mutate({ id: item.id, data: { materialGrade: grade } });
+                            updateBOMItem.mutate({ id: item.id, data: { materialGrade: grade, materialSource: 'manual' } });
                             autoAddMaterialCost(grade);
                             void reapplyEffectiveRoute();
                             setMatDropOpen(false);
@@ -7115,7 +7119,7 @@ function CostGuidePanel({
                   </div>
                   <span className="text-[9px] font-semibold text-blue-400 border border-blue-500/40 rounded px-1 py-px leading-none shrink-0">DRAWING</span>
                   <button
-                    onClick={() => { updateBOMItem.mutate({ id: item.id, data: { materialGrade: drawingMaterial! } }); autoAddMaterialCost(drawingMaterial!); void reapplyEffectiveRoute(); }}
+                    onClick={() => { updateBOMItem.mutate({ id: item.id, data: { materialGrade: drawingMaterial!, materialSource: 'manual' } }); autoAddMaterialCost(drawingMaterial!); void reapplyEffectiveRoute(); }}
                     className="text-[9px] font-medium text-violet-400 hover:text-violet-300 shrink-0"
                   >Apply</button>
                 </div>

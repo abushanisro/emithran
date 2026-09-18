@@ -171,6 +171,14 @@ export interface UpdateBOMItemDto {
   material?: string | undefined;
   materialCategory?: string | undefined;
   materialGrade?: string | undefined;
+  // Provenance of materialGrade — 'manual' means the engineer explicitly
+  // confirmed it via the Material Grade picker (see bom-items.service.ts's
+  // grade-precedence comment for why this matters: it's what lets a
+  // deliberate selection outrank a generic/unconfirmed drawing extraction).
+  // Loosely typed as string (matching the backend DTO, bom-items.dto.ts) —
+  // not narrowed to the literal union, since an existing caller
+  // (BOMItemDialog.tsx) already forwards a generic string here.
+  materialSource?: string | undefined;
   bomLevel?: string | undefined;
   makeBuy?: 'make' | 'buy' | undefined;
   unitCost?: number | undefined;

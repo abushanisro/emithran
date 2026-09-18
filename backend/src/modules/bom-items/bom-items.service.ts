@@ -2705,16 +2705,41 @@ export class BOMItemsService {
 
     const sheetThicknessMm = resolveEffectiveSheetThicknessMm(item.scenarioOverrides, summary.sheetThicknessMm, item.sheetThicknessMm ?? 0);
 
-    // Drawing analysis material always wins — it reads the title block directly.
-    // Auto-fill material (from geometry heuristics) is a fallback only.
-    // Drawing intelligence returns structured fields: { value, confidence } or plain string.
+    // Drawing analysis material wins UNLESS the engineer has explicitly
+    // confirmed a Material Grade via the Browse/combobox picker
+    // (manufacturing-intelligence/page.tsx's "Material Grade" section stamps
+    // materialSource: 'manual' on every explicit pick/type/Apply there).
+    //
+    // Root cause fixed 2026-09-18: this used to read "Drawing analysis
+    // material always wins — auto-fill material (from geometry heuristics)
+    // is a fallback only," on the premise that item.materialGrade could only
+    // ever be a low-confidence geometry guess. That premise is false today —
+    // auto-fill.service.ts deliberately writes an EMPTY materialGrade
+    // suggestion (a prior fix for exactly that guessing problem; see its own
+    // "Empty on purpose — the engineer picks the material" comment) and the
+    // ONLY thing that writes a non-empty materialGrade is the engineer's own
+    // explicit selection. Unconditionally letting the drawing's raw title-
+    // block text (often generic, e.g. "ALUMINIUM" with no alloy number) beat
+    // a deliberate, specific selection (e.g. "Aluminum, ANSI 6061", a real
+    // exact raw_materials row) silently zeroed cost/weight/UTS for a material
+    // that DOES exist.
+    //
+    // materialSource === 'manual' is the real, existing-but-previously-unread
+    // provenance column (migration 081) — not a new flag. Older rows whose
+    // materialGrade was never re-confirmed through the picker (materialSource
+    // unset) correctly keep drawing-wins semantics, which is deliberately
+    // preserved: a stale/generic stored grade from before this column was
+    // wired (see the "Generic CuZn39Pb3 vs SECC" case documented on the
+    // Material Grade section itself) must not silently start outranking a
+    // real drawing extraction just because this precedence changed.
     const rawDiMaterial = (item.drawingIntelligence as any)?.material;
     const drawingGrade = this.sanitizeDrawingGrade((
       typeof rawDiMaterial === 'string' ? rawDiMaterial :
       rawDiMaterial != null && typeof rawDiMaterial === 'object' ? (rawDiMaterial.value ?? null) :
       null
     ) as string | null);
-    const grade = drawingGrade ?? item.materialGrade ?? (item as any).material ?? null;
+    const confirmedGrade = item.materialSource === 'manual' ? (item.materialGrade ?? null) : null;
+    const grade = confirmedGrade ?? drawingGrade ?? item.materialGrade ?? (item as any).material ?? null;
 
     // Scenario gate: refuse to cost without a material grade. Silently defaulting to
     // mild steel produces numbers the engineer might quote; a blocked state forces the
@@ -4561,13 +4586,18 @@ export class BOMItemsService {
     const summary = fg?.summary ?? {};
 
     const sheetThicknessMm = resolveEffectiveSheetThicknessMm(item.scenarioOverrides, summary.sheetThicknessMm, item.sheetThicknessMm ?? 0);
+    // Grade precedence: same rule as getCostSummary, by construction — a
+    // manually-confirmed Material Grade (materialSource === 'manual') beats
+    // the drawing title block; an unconfirmed/legacy stored grade does not.
+    // See getCostSummary's full comment for the root cause this fixes.
     const rawDiMaterialRC = (item.drawingIntelligence as any)?.material;
     const drawingGradeRC = this.sanitizeDrawingGrade((
       typeof rawDiMaterialRC === 'string' ? rawDiMaterialRC :
       rawDiMaterialRC != null && typeof rawDiMaterialRC === 'object' ? (rawDiMaterialRC.value ?? null) :
       null
     ) as string | null);
-    const grade = drawingGradeRC ?? item.materialGrade ?? (item as any).material ?? null;
+    const confirmedGradeRC = item.materialSource === 'manual' ? (item.materialGrade ?? null) : null;
+    const grade = confirmedGradeRC ?? drawingGradeRC ?? item.materialGrade ?? (item as any).material ?? null;
 
     // Override > material > geometry — same resolver as getCostSummary, by
     // construction (summary ≡ route invariant).
@@ -6478,12 +6508,14 @@ export class BOMItemsService {
     const finishedWeightKg   = ((item as any).weight ?? 0) as number;
     const surfaceArea        = (item.surfaceArea ?? 0) as number;
 
+    // Grade precedence: same rule as getCostSummary, by construction.
     const rawDiMaterial = (item.drawingIntelligence as any)?.material;
     const drawingGrade = this.sanitizeDrawingGrade((
       typeof rawDiMaterial === 'string' ? rawDiMaterial :
       rawDiMaterial != null && typeof rawDiMaterial === 'object' ? (rawDiMaterial.value ?? null) : null
     ) as string | null);
-    const grade = drawingGrade ?? item.materialGrade ?? (item as any).material ?? null;
+    const confirmedGradeCR = item.materialSource === 'manual' ? (item.materialGrade ?? null) : null;
+    const grade = confirmedGradeCR ?? drawingGrade ?? item.materialGrade ?? (item as any).material ?? null;
     const { family } = this.resolveEffectiveFamily({ item, fg, grade, sheetThicknessMm });
 
     const isCNC = family === 'cnc_milled' || family === 'cnc_turned' || family === 'mill_turn';
