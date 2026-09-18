@@ -213,53 +213,6 @@ export interface ProcessPlanningState {
   error?: string;
 }
 
-// Category Configuration
-export interface CategoryConfig {
-  id: ProcessCategory;
-  label: string;
-  description: string;
-  processes: string[];
-}
-
-export const PROCESS_CATEGORIES: CategoryConfig[] = [
-  {
-    id: 'machining',
-    label: 'Machining',
-    description: 'CNC, Turning, Milling, Drilling',
-    processes: ['CNC Milling', 'CNC Turning', 'Drilling', 'Grinding', 'EDM'],
-  },
-  {
-    id: 'sheet_metal',
-    label: 'Sheet Metal',
-    description: 'Cutting, Bending, Welding',
-    processes: ['Laser Cutting', 'Bending', 'Welding', 'Punching', 'Rolling'],
-  },
-  {
-    id: 'assembly',
-    label: 'Assembly',
-    description: 'Manual, Automated',
-    processes: ['Manual Assembly', 'Automated Assembly', 'Testing', 'Quality Control'],
-  },
-  {
-    id: 'plastic_rubber',
-    label: 'Plastic Molding',
-    description: 'Injection Molding, Compression Molding, Reaction Injection Molding, Structural Foam Molding',
-    processes: ['Injection Molding', 'Compression Molding', 'Reaction Injection Molding', 'Structural Foam Molding'],
-  },
-  {
-    id: 'post_processing',
-    label: 'Post Processing',
-    description: 'Heat Treatment, Surface Finishing, Coating',
-    processes: ['Heat Treatment', 'Surface Finishing', 'Coating', 'Painting', 'Plating'],
-  },
-  {
-    id: 'packing_delivery',
-    label: 'Packing & Delivery',
-    description: 'Packaging, Labeling, Shipping',
-    processes: ['Packaging', 'Labeling', 'Shipping', 'Quality Inspection'],
-  },
-];
-
 // Workflow State Configuration
 export interface WorkflowStateConfig {
   id: WorkflowState;
@@ -306,6 +259,3 @@ export function getWorkflowStateConfig(state: WorkflowState): WorkflowStateConfi
   return WORKFLOW_STATES.find((s) => s.id === state) ?? WORKFLOW_STATES[0]!;
 }
 
-export function getCategoryConfig(category: ProcessCategory): CategoryConfig {
-  return PROCESS_CATEGORIES.find((c) => c.id === category) ?? PROCESS_CATEGORIES[0]!;
-}

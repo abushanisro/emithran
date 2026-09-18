@@ -320,6 +320,12 @@ export const MACHINE_CLASS_DEFAULTS: Record<MachineClass, Partial<MachineCapabil
   machining_millturn: {},
   internal_grinder: {},
   broach:         {},
+  // No real per-machine or class-level envelope data on file for either
+  // (rate-only classes — see MACHINE_REGISTRY's doc comments in
+  // default-rates.constants.ts) — same disclosed-gap convention as every
+  // other Machining secondary-op class above.
+  machining_inspection: {},
+  special_inspection: {},
   pem_press:      {},
   // Conservative floor for an unknown hole_forming machine with no capability
   // on file — real researched units (Whitney Jensen/FTC105-10T/Fresan FP10P,
@@ -328,12 +334,23 @@ export const MACHINE_CLASS_DEFAULTS: Record<MachineClass, Partial<MachineCapabil
   // as the real ones (same "conservative floor, not the real number" pattern
   // as press_brake/turret_punch above).
   hole_forming:   { maxTonnage: 5 },
-  cnc_3ax_vmc:    { maxXMm: 600, maxYMm: 400, maxZMm: 400, maxWorkpieceWeightKg: 500 },
-  cnc_4ax_vmc:    { maxXMm: 500, maxYMm: 400, maxZMm: 400, maxWorkpieceWeightKg: 400 },
-  cnc_5ax_mc:     { maxXMm: 400, maxYMm: 400, maxZMm: 400, maxWorkpieceWeightKg: 300 },
-  cnc_lathe:      { maxDiameterMm: 250, maxLengthMm: 500 },
-  cnc_lathe_live: { maxDiameterMm: 200, maxLengthMm: 400 },
-  cnc_mill_turn:  { maxDiameterMm: 300, maxLengthMm: 600 },
+  // Real, granular primary CNC classes — replaces the 6 generic cnc_*
+  // buckets these numbers used to be keyed under (Machining Engine
+  // Re-Architecture). Each granular class inherits its coarse
+  // predecessor's envelope verbatim as an explicit Phase-1 placeholder
+  // (disclosed, not re-derived) until real per-class envelope data is
+  // sourced: 3_axis_mill<-cnc_3ax_vmc, 4_axis_mill<-cnc_4ax_vmc,
+  // 5_axis_mill<-cnc_5ax_mc, 2_axis_lathe/3_axis_lathe<-cnc_lathe,
+  // both bar-feed-with-sub-spindle classes<-cnc_lathe_live (both are a
+  // live-tooling/sub-spindle lathe archetype, same as the coarse bucket
+  // they replace).
+  '3_axis_mill':    { maxXMm: 600, maxYMm: 400, maxZMm: 400, maxWorkpieceWeightKg: 500 },
+  '4_axis_mill':    { maxXMm: 500, maxYMm: 400, maxZMm: 400, maxWorkpieceWeightKg: 400 },
+  '5_axis_mill':    { maxXMm: 400, maxYMm: 400, maxZMm: 400, maxWorkpieceWeightKg: 300 },
+  '2_axis_lathe':   { maxDiameterMm: 250, maxLengthMm: 500 },
+  '3_axis_lathe':   { maxDiameterMm: 250, maxLengthMm: 500 },
+  '2_axis_bar_feed_lathe_with_sub_spindle': { maxDiameterMm: 200, maxLengthMm: 400 },
+  '3_axis_bar_feed_lathe_with_sub_spindle': { maxDiameterMm: 200, maxLengthMm: 400 },
   // Small/entry-tier clamp tonnage (see backend/data/MHR_LHR_India_2026.json's
   // 30-80T Arburg Allrounder class) — an unknown injection molding machine
   // should only win small parts, not silently claim a 500T part.

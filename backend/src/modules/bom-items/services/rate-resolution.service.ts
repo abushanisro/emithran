@@ -40,9 +40,14 @@ import { cachedRead } from '../costing/shared/core/request-cache';
 export const MHR_RATE_MACHINE_CLASSES: readonly MachineClass[] = [
   'fiber_laser', 'co2_laser', 'laser_3d', 'press_brake', 'deburring', 'tapping', 'cmm', 'turret_punch', 'waterjet', 'router_2axis', 'oxyfuel_cut', 'shear', 'cut_to_length', 'laser_punch', 'plasma_cut', 'plasma_punch',
   'standard_press', 'tandem_press', 'progressive_die_press', 'roll_bending_2', 'roll_bending_3', 'roll_bending_4',
-  'cnc_3ax_vmc', 'cnc_4ax_vmc', 'cnc_5ax_mc', 'cnc_lathe', 'cnc_lathe_live', 'cnc_mill_turn',
+  // Real, granular primary CNC milling/turning classes — replaces the 6
+  // deleted generic cnc_3ax_vmc/cnc_4ax_vmc/cnc_5ax_mc/cnc_lathe/
+  // cnc_lathe_live/cnc_mill_turn buckets (Machining Engine Re-Architecture).
+  '3_axis_mill', '4_axis_mill', '5_axis_mill',
+  '2_axis_lathe', '3_axis_lathe', '2_axis_bar_feed_lathe_with_sub_spindle', '3_axis_bar_feed_lathe_with_sub_spindle',
   'injection_molding', 'compression_molding', 'structural_foam_molding', 'reaction_injection_molding', 'drill_press', 'pem_press', 'hole_forming',
   'gun_drill', 'deep_bore_machine', 'manual_deburr', 'cylindrical_grinder', 'jig_bore', 'jig_grind', 'internal_grinder', 'broach', 'machining_millturn',
+  'machining_inspection', 'special_inspection',
 ];
 
 @Injectable()
@@ -125,6 +130,14 @@ export class RateResolutionService {
     jigGrind: MHRRateInput;
     internalGrinder: MHRRateInput;
     broach: MHRRateInput;
+    // Real, distinct Machining-domain inspection classes (memory/machining/
+    // machine/inspection_usa.json, special_inspection_usa.json) — separate
+    // from the shared 'cmm' class Sheet Metal/generic inspection resolves
+    // through. Published so CNC-family inspectionRate: call sites can prefer
+    // the real Machining-specific rate over the generic cmm fallback (same
+    // preferRealRate() pattern already used for manualDeburr vs. deburring).
+    machiningInspection: MHRRateInput;
+    specialInspection: MHRRateInput;
     turret: MHRRateInput;
     waterjet: MHRRateInput;
     router: MHRRateInput;
@@ -143,12 +156,19 @@ export class RateResolutionService {
     rollBending2: MHRRateInput;
     rollBending3: MHRRateInput;
     rollBending4: MHRRateInput;
-    cnc3ax: MHRRateInput;
-    cnc4ax: MHRRateInput;
-    cnc5ax: MHRRateInput;
-    cncLathe: MHRRateInput;
-    cncLatheLive: MHRRateInput;
-    cncMillTurn: MHRRateInput;
+    // Real, granular primary CNC milling/turning classes (Machining Engine
+    // Re-Architecture) — replaces the deleted 6-member cnc3ax/cnc4ax/cnc5ax/
+    // cncLathe/cncLatheLive/cncMillTurn field set. Each names one real
+    // station category (migration 693); which of these are actually
+    // eligible/offered for a given part is decided dynamically by
+    // MachineDiscoveryService, not by which fields exist here.
+    mill3ax: MHRRateInput;
+    mill4ax: MHRRateInput;
+    mill5ax: MHRRateInput;
+    lathe2ax: MHRRateInput;
+    lathe3ax: MHRRateInput;
+    latheBarFeed2ax: MHRRateInput;
+    latheBarFeed3ax: MHRRateInput;
     injectionMolding: MHRRateInput;
     compressionMolding: MHRRateInput;
     structuralFoamMolding: MHRRateInput;
@@ -411,6 +431,8 @@ export class RateResolutionService {
         jigGrind:         get('jig_grind'),
         internalGrinder:  get('internal_grinder'),
         broach:           get('broach'),
+        machiningInspection: get('machining_inspection'),
+        specialInspection:   get('special_inspection'),
         turret:           get('turret_punch'),
         waterjet:         get('waterjet'),
         router:           get('router_2axis'),
@@ -426,12 +448,13 @@ export class RateResolutionService {
         rollBending2:     get('roll_bending_2'),
         rollBending3:     get('roll_bending_3'),
         rollBending4:     get('roll_bending_4'),
-        cnc3ax:           get('cnc_3ax_vmc'),
-        cnc4ax:           get('cnc_4ax_vmc'),
-        cnc5ax:           get('cnc_5ax_mc'),
-        cncLathe:         get('cnc_lathe'),
-        cncLatheLive:     get('cnc_lathe_live'),
-        cncMillTurn:      get('cnc_mill_turn'),
+        mill3ax:          get('3_axis_mill'),
+        mill4ax:          get('4_axis_mill'),
+        mill5ax:          get('5_axis_mill'),
+        lathe2ax:         get('2_axis_lathe'),
+        lathe3ax:         get('3_axis_lathe'),
+        latheBarFeed2ax:  get('2_axis_bar_feed_lathe_with_sub_spindle'),
+        latheBarFeed3ax:  get('3_axis_bar_feed_lathe_with_sub_spindle'),
         injectionMolding: get('injection_molding'),
         compressionMolding: get('compression_molding'),
         structuralFoamMolding: get('structural_foam_molding'),
@@ -623,9 +646,11 @@ export class RateResolutionService {
 
               if (!mcMatch && !pgMatch) continue;
 
-              // Prevent cross-class contamination: lathes must not resolve VMC milling classes
+              // Prevent cross-class contamination: lathes must not resolve milling classes
+              // (real granular classes — 3_axis_mill/4_axis_mill/5_axis_mill — replacing
+              // the deleted cnc_3ax_vmc/cnc_4ax_vmc/cnc_5ax_mc buckets).
               const isLatheRecord = /lathe|turning|sliding.head|sub.?spindle/i.test(mcLower + ' ' + pgLower);
-              const isVMCClass = ['cnc_3ax_vmc', 'cnc_4ax_vmc', 'cnc_5ax_mc'].includes(cls as string);
+              const isVMCClass = ['3_axis_mill', '4_axis_mill', '5_axis_mill'].includes(cls as string);
               if (isVMCClass && isLatheRecord) continue;
 
               // When only process_group matched (less specific), also require the machine_name

@@ -17,6 +17,7 @@ import { BOMItemsService } from '../../../modules/bom-items/bom-items.service';
 import { RateResolutionService } from '../../../modules/bom-items/services/rate-resolution.service';
 import { type MaterialResolutionService } from '../../../modules/bom-items/services/material-resolution.service';
 import { type CalculatorCatalogService } from '../../../modules/bom-items/services/calculator-catalog.service';
+import { type MachineDiscoveryService } from '../../../modules/bom-items/services/machine-discovery.service';
 import { type BlankOptimizerService } from '../../../modules/bom-items/costing/sheet-metal/machine/blank-optimizer.service';
 import { type SheetMetalLookupService } from '../../../modules/bom-items/costing/sheet-metal/lookup/sheet-metal-lookup.service';
 import { type MachiningLookupService } from '../../../modules/bom-items/costing/machining/lookup/machining-lookup.service';
@@ -84,6 +85,7 @@ function buildService(supabaseService: SupabaseService, identities: Record<strin
     {} as unknown as RateResolutionService,
     {} as unknown as CalculatorCatalogService,
     {} as unknown as MaterialResolutionService,
+    {} as unknown as MachineDiscoveryService,
   );
 
   return { rateResolutionService, bomItemsService };

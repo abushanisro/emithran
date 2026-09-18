@@ -43,9 +43,44 @@ export type MaterialClass =
   | 'aluminum' | 'mild_steel' | 'stainless'
   | 'titanium' | 'copper_alloy' | 'tool_steel' | 'plastic';
 
-export type CNCMachineClass =
-  | 'cnc_3ax_vmc' | 'cnc_4ax_vmc' | 'cnc_5ax_mc'
-  | 'cnc_lathe' | 'cnc_lathe_live' | 'cnc_mill_turn' | 'machining_millturn';
+/**
+ * A machine class discovered from the database (MachineDiscoveryService),
+ * rather than one of a fixed set of TypeScript literals.
+ *
+ * Replaces the former CNCMachineClass literal union (Section G.2,
+ * C:\Users\singi\.claude\plans\logical-noodling-lampson.md) — every
+ * consumer that used to take a fixed 6-member union now takes this instead.
+ * The dynamic discovery/route-comparison/registry rewrite (route builders,
+ * requirement-builder, MHR_RATE_MACHINE_CLASSES, the MACHINING_CATEGORY_ALIAS
+ * removal) is still pending — see the plan's H.2 for the remaining steps.
+ *
+ * Branded so a raw string literal can't silently satisfy the type by
+ * accident — the only legal way to produce one is assertKnownMachineClass,
+ * which checks it against a real, request-scoped, DB-discovered set and
+ * throws instead of admitting an unrecognized value. This intentionally
+ * gives up compile-time exhaustiveness checking (TypeScript can no longer
+ * catch "a class is missing from an array" at build time, because the set
+ * of valid classes is no longer knowable at build time) in exchange for a
+ * loud runtime failure instead of a silent one — the same "explicit
+ * reason, never fabricate" discipline the rate-resolution chain already
+ * uses for a missing rate.
+ */
+export type MachineClassId = string & { readonly __machineClassIdBrand: 'MachineClassId' };
+
+export class UnknownMachineClassError extends Error {
+  constructor(value: string) {
+    super(`Unknown machine class "${value}" — not present in the current, DB-discovered set of valid machine classes.`);
+    this.name = 'UnknownMachineClassError';
+  }
+}
+
+/** The only legal way to construct a MachineClassId — see its doc comment. */
+export function assertKnownMachineClass(value: string, knownClasses: ReadonlySet<string>): MachineClassId {
+  if (!knownClasses.has(value)) {
+    throw new UnknownMachineClassError(value);
+  }
+  return value as MachineClassId;
+}
 
 export interface CNCCostInput {
   volume: number;          // mm³ (finish volume from CAD)
@@ -719,25 +754,41 @@ function computeKeywayBroachingLine(
 // convention Sheet Metal's *_SETUP_MIN constants already document; Machining
 // previously used these unconditionally, ignoring a real per-machine value
 // even when one existed.
-const SETUP_COUNT: Record<CNCMachineClass, number> = {
-  cnc_3ax_vmc: 3, cnc_4ax_vmc: 2, cnc_5ax_mc: 1,
-  cnc_lathe: 2, cnc_lathe_live: 1, cnc_mill_turn: 1,
+// Keyed by discovered machine-class string, not a compile-time union — see
+// MachineClassId's doc comment. Still a hand-maintained data table (Phase 1
+// interim tier, Section G.3 of the re-architecture plan); the target state
+// promotes real setup-count/setup-min data onto process_taxonomy itself.
+// Real, granular primary CNC classes — replaces the deleted 6-member
+// cnc_3ax_vmc/cnc_4ax_vmc/cnc_5ax_mc/cnc_lathe/cnc_lathe_live/cnc_mill_turn
+// keys (Machining Engine Re-Architecture). Each granular class inherits its
+// coarse predecessor's numbers verbatim as an explicit, disclosed Phase-1
+// placeholder (2_axis_lathe/3_axis_lathe <- cnc_lathe; both bar-feed-with-
+// sub-spindle classes <- cnc_lathe_live) until real per-class setup data is
+// sourced. cnc_mill_turn's numbers are not carried forward — 'MillTurn'
+// resolves through the separate, already-real machining_millturn class,
+// which has never had a SETUP_COUNT/BASE_SETUP_MIN entry of its own.
+const SETUP_COUNT: Record<string, number> = {
+  '3_axis_mill': 3, '4_axis_mill': 2, '5_axis_mill': 1,
+  '2_axis_lathe': 2, '3_axis_lathe': 2,
+  '2_axis_bar_feed_lathe_with_sub_spindle': 1, '3_axis_bar_feed_lathe_with_sub_spindle': 1,
 };
 
-const BASE_SETUP_MIN: Record<CNCMachineClass, number> = {
-  cnc_3ax_vmc:  20, cnc_4ax_vmc: 30, cnc_5ax_mc: 45,
-  cnc_lathe:    15, cnc_lathe_live: 20, cnc_mill_turn: 35,
+const BASE_SETUP_MIN: Record<string, number> = {
+  '3_axis_mill': 20, '4_axis_mill': 30, '5_axis_mill': 45,
+  '2_axis_lathe': 15, '3_axis_lathe': 15,
+  '2_axis_bar_feed_lathe_with_sub_spindle': 20, '3_axis_bar_feed_lathe_with_sub_spindle': 20,
 };
 
 // ── Machine capability envelopes ──────────────────────────────────────────────
 
-const MACHINE_ENVELOPE: Record<CNCMachineClass, { l: number; w: number; h: number; maxWeightKg: number }> = {
-  cnc_3ax_vmc:    { l: 600, w: 400, h: 400, maxWeightKg: 500 },
-  cnc_4ax_vmc:    { l: 500, w: 400, h: 400, maxWeightKg: 400 },
-  cnc_5ax_mc:     { l: 400, w: 400, h: 400, maxWeightKg: 300 },
-  cnc_lathe:      { l: 600, w: 300, h: 300, maxWeightKg: 200 },
-  cnc_lathe_live: { l: 500, w: 250, h: 250, maxWeightKg: 150 },
-  cnc_mill_turn:  { l: 600, w: 350, h: 350, maxWeightKg: 300 },
+const MACHINE_ENVELOPE: Record<string, { l: number; w: number; h: number; maxWeightKg: number }> = {
+  '3_axis_mill':    { l: 600, w: 400, h: 400, maxWeightKg: 500 },
+  '4_axis_mill':    { l: 500, w: 400, h: 400, maxWeightKg: 400 },
+  '5_axis_mill':    { l: 400, w: 400, h: 400, maxWeightKg: 300 },
+  '2_axis_lathe':   { l: 600, w: 300, h: 300, maxWeightKg: 200 },
+  '3_axis_lathe':   { l: 600, w: 300, h: 300, maxWeightKg: 200 },
+  '2_axis_bar_feed_lathe_with_sub_spindle': { l: 500, w: 250, h: 250, maxWeightKg: 150 },
+  '3_axis_bar_feed_lathe_with_sub_spindle': { l: 500, w: 250, h: 250, maxWeightKg: 150 },
   // Real, distinct 5-axis mill-turn fleet (migrations 737/738/753, 7
   // machines — GILDEMEISTER GMX 400 LINEAR, Mazak Integrex e-410/500/650H-S
   // II/e650, INDEX RatioLine G200 — deliberately kept a SEPARATE
@@ -953,7 +1004,7 @@ export function computeRouteComplexityScore(
 // class-level MACHINE_ENVELOPE default for every caller, a disclosed gap,
 // not fabricated per-machine data.
 export function checkCNCCapability(
-  machineClass: CNCMachineClass,
+  machineClass: MachineClassId,
   maxLength: number,
   maxWidth: number,
   maxHeight: number,
@@ -965,7 +1016,11 @@ export function checkCNCCapability(
   const warnings: string[] = [];
 
   if (realCapability) {
-    const isTurning = machineClass === 'cnc_lathe' || machineClass === 'cnc_lathe_live';
+    // Real granular turning classes — replaces the deleted cnc_lathe/
+    // cnc_lathe_live coarse buckets.
+    const isTurning =
+      machineClass === '2_axis_lathe' || machineClass === '3_axis_lathe' ||
+      machineClass === '2_axis_bar_feed_lathe_with_sub_spindle' || machineClass === '3_axis_bar_feed_lathe_with_sub_spindle';
     const geometry: PartGeometryForCapability = {
       sheetThicknessMm: 0,
       flatPatternLengthMm: null,
@@ -1014,7 +1069,7 @@ export function checkCNCCapability(
 
 export function computeCNCMilledCostSummary(
   input: CNCCostInput,
-  machineClass: CNCMachineClass,
+  machineClass: MachineClassId,
 ): CostSummaryDto {
   const {
     volume, surfaceArea, maxLength, maxWidth, maxHeight,
@@ -1302,7 +1357,7 @@ export function computeCNCMilledCostSummary(
 
 export function computeCNCTurnedCostSummary(
   input: CNCCostInput,
-  machineClass: CNCMachineClass,
+  machineClass: MachineClassId,
 ): CostSummaryDto {
   const {
     volume, maxLength, maxWidth, maxHeight, holeCount, holeGroups,
@@ -1576,19 +1631,21 @@ export function computeCNCTurnedCostSummary(
 export function requiredMilledMachineClass(
   difficultyLevel: string | null | undefined,
   pocketCount: number,
-): CNCMachineClass {
-  if (difficultyLevel === 'very_hard' || pocketCount > 25) return 'cnc_5ax_mc';
-  if (difficultyLevel === 'hard' || pocketCount > 12) return 'cnc_4ax_vmc';
-  return 'cnc_3ax_vmc';
+): MachineClassId {
+  // Real granular milling classes — replaces the deleted cnc_5ax_mc/
+  // cnc_4ax_vmc/cnc_3ax_vmc coarse buckets (Machining Engine Re-Architecture).
+  if (difficultyLevel === 'very_hard' || pocketCount > 25) return '5_axis_mill' as MachineClassId;
+  if (difficultyLevel === 'hard' || pocketCount > 12) return '4_axis_mill' as MachineClassId;
+  return '3_axis_mill' as MachineClassId;
 }
 
 const MILLED_CLASS_RANK: Record<string, number> = {
-  cnc_3ax_vmc: 0, cnc_4ax_vmc: 1, cnc_5ax_mc: 2,
+  '3_axis_mill': 0, '4_axis_mill': 1, '5_axis_mill': 2,
 };
 
 export function meetsRequiredMilledClass(
-  machineClass: CNCMachineClass,
-  required: CNCMachineClass,
+  machineClass: MachineClassId,
+  required: MachineClassId,
 ): boolean {
   const rank = MILLED_CLASS_RANK[machineClass];
   const requiredRank = MILLED_CLASS_RANK[required];

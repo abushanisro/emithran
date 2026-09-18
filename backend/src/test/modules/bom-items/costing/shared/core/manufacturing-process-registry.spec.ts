@@ -22,9 +22,15 @@ describe('MANUFACTURING_PROCESS_REGISTRY — registry completeness', () => {
     }
   });
 
-  it('registers exactly 3 engines for cnc_milling and cnc_turning each (one per real machine class)', () => {
+  // Machining Engine Re-Architecture: the 6 coarse cnc_3ax_vmc/cnc_4ax_vmc/
+  // cnc_5ax_mc/cnc_lathe/cnc_lathe_live/cnc_mill_turn buckets were replaced
+  // by 7 real granular classes (3 milling, 4 turning — 2_axis_lathe/
+  // 3_axis_lathe/2_axis_bar_feed_lathe_with_sub_spindle/
+  // 3_axis_bar_feed_lathe_with_sub_spindle, since the coarse cnc_lathe/
+  // cnc_lathe_live buckets each mapped to two real, distinct categories).
+  it('registers one engine per real granular machine class for cnc_milling (3) and cnc_turning (4)', () => {
     expect(getEnginesForFamily('cnc_milling')).toHaveLength(3);
-    expect(getEnginesForFamily('cnc_turning')).toHaveLength(3);
+    expect(getEnginesForFamily('cnc_turning')).toHaveLength(4);
   });
 
   it('every registered engine has a non-empty machineClass and processFamily', () => {

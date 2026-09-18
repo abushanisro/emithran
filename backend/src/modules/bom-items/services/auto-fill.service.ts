@@ -27,7 +27,6 @@ import {
   laserSpeedFactor,
 } from '../costing/shared/core/default-rates.constants';
 import { computeCycleTime } from '../costing/plastic-molding/process/cycle-time';
-import { getEnginesForFamily } from '../costing/shared/core/manufacturing-process-registry';
 
 export interface RawGeometry {
   volume: number;
@@ -1411,43 +1410,43 @@ export class AutoFillService {
   }
 
   // A CAD-detected family (detect_part_family()'s literal output) is not a
-  // process/route id anywhere else in this platform — it maps to the real,
-  // registered engine "processFamily" identifiers MANUFACTURING_PROCESS_
-  // REGISTRY already declares (CncMillingEngine='cnc_milling', CncTurningEngine
-  // ='cnc_turning' — cnc_mill_turn is registered as a CncTurningEngine
-  // instance, so mill_turn also resolves there — InjectionMoldingEngine=
-  // 'injection_molding'). This is a narrow vocabulary bridge between two
-  // code-level enums that already exist, not a fabricated business mapping.
-  private static readonly CAD_FAMILY_TO_REGISTRY_PROCESS_FAMILY: Record<string, string> = {
-    plastic_molded: 'injection_molding',
-    cnc_milled: 'cnc_milling',
-    cnc_turned: 'cnc_turning',
-    mill_turn: 'cnc_turning',
+  // process/route id anywhere else in this platform — it maps to the real
+  // process_taxonomy.process_group it belongs to. Previously this went
+  // through MANUFACTURING_PROCESS_REGISTRY's static engine-family machine-
+  // class list (a second, independent hardcoded enumeration of the granular
+  // CNC classes, redundant with MachineDiscoveryService's DB-driven
+  // discovery already used by the real costing path) — removed in favor of
+  // a direct real-process_group mapping, since that machine-class detour
+  // never changed the actual returned value (every CNC family's machine
+  // classes share the same real 'Machining' process_group; the query only
+  // ever needed to confirm SOME real production row exists for that group).
+  private static readonly CAD_FAMILY_TO_PROCESS_GROUP: Record<string, string> = {
+    plastic_molded: 'Plastic Molding',
+    cnc_milled: 'Machining',
+    cnc_turned: 'Machining',
+    mill_turn: 'Machining',
   };
 
   /**
    * Resolves a CAD-detected family to a real, live process_taxonomy label —
-   * never a hardcoded process-name string. Looks up the real registered
-   * machine class(es) for that family (from MANUFACTURING_PROCESS_REGISTRY),
-   * then queries process_taxonomy for a real, currently-'production' row on
-   * one of those classes and returns its real process_group. Returns null
-   * (a disclosed gap, not a guess) when no real registered/production row
-   * exists for the family — the caller must never fabricate a label itself.
+   * never a hardcoded process-name string. Confirms process_taxonomy has a
+   * real, currently-'production' row for that family's real process_group
+   * and returns it. Returns null (a disclosed gap, not a guess) when no
+   * real production row exists for the group — the caller must never
+   * fabricate a label itself.
    */
   private async resolveDbDrivenProcessLabel(
     cadFamily: string,
     accessToken: string,
   ): Promise<string | null> {
-    const registryFamily = AutoFillService.CAD_FAMILY_TO_REGISTRY_PROCESS_FAMILY[cadFamily];
-    if (!registryFamily) return null;
-    const machineClasses = getEnginesForFamily(registryFamily).map((e) => e.machineClass);
-    if (machineClasses.length === 0) return null;
+    const processGroup = AutoFillService.CAD_FAMILY_TO_PROCESS_GROUP[cadFamily];
+    if (!processGroup) return null;
 
     const client = this.supabaseService.getClient(accessToken);
     const { data, error } = await client
       .from('process_taxonomy')
       .select('process_group')
-      .in('machine_class', machineClasses)
+      .eq('process_group', processGroup)
       .eq('roadmap_status', 'production')
       .limit(1);
     if (error || !data || data.length === 0) return null;

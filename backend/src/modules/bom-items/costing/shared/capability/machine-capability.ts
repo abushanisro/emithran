@@ -112,6 +112,19 @@ const CLASS_CONSTRAINTS: Partial<
       : [],
 };
 
+// Real, granular primary CNC classes (Machining Engine Re-Architecture) —
+// the classes this function's turning/milling branches below handle with
+// CNC-style geometry (partDiameterMm/partLengthMm/partWidthMm/partHeightMm)
+// rather than sheet-metal-style flat-pattern geometry. Replaces a broken
+// machineClass.startsWith("cnc_") check: none of these granular class names
+// start with "cnc_", so that check silently stopped gating anything the
+// moment the coarse cnc_3ax_vmc/cnc_lathe/etc. buckets were deleted —
+// caught by machine-capability.spec.ts's real-per-machine-envelope tests.
+const CNC_PRIMARY_CLASSES = new Set([
+  '2_axis_lathe', '3_axis_lathe', '2_axis_bar_feed_lathe_with_sub_spindle', '3_axis_bar_feed_lathe_with_sub_spindle',
+  '3_axis_mill', '4_axis_mill', '5_axis_mill',
+]);
+
 export function checkMachineCapability(
   machineClass: string,
   commodityCode: string | null,
@@ -166,7 +179,7 @@ export function checkMachineCapability(
   // gate, EVERY CNC check short-circuited to "assumed capable" here before
   // ever reaching the CNC turning/milling branches below — caught by their
   // own test suite (machine-capability.spec.ts) immediately after adding it.
-  const isCncClass = machineClass.startsWith("cnc_");
+  const isCncClass = CNC_PRIMARY_CLASSES.has(machineClass);
   if (!isCncClass && (geometry.flatPatternLengthMm == null || geometry.flatPatternWidthMm == null)) {
     return {
       capable: true,
@@ -226,7 +239,10 @@ export function checkMachineCapability(
       if (realCapability.maxLengthMm != null && cutLen != null && cutLen * BED_MARGIN > realCapability.maxLengthMm) {
         failures.push({ code: "BED_LENGTH_EXCEEDED", message: `Cut length ${cutLen}mm exceeds machine shear bed (${realCapability.maxLengthMm}mm)` });
       }
-    } else if (machineClass === "cnc_lathe" || machineClass === "cnc_lathe_live") {
+    } else if (
+      machineClass === "2_axis_lathe" || machineClass === "3_axis_lathe" ||
+      machineClass === "2_axis_bar_feed_lathe_with_sub_spindle" || machineClass === "3_axis_bar_feed_lathe_with_sub_spindle"
+    ) {
       // Real turning capacity: chuck swing (part cross-section diameter) and
       // bar/part length — genuinely different physical quantities from the
       // XY bed-fit check below (a lathe doesn't have an X/Y bed; it has a
@@ -250,7 +266,7 @@ export function checkMachineCapability(
           message: `Part length ${geometry.partLengthMm}mm exceeds machine turning length (${realCapability.maxLengthMm}mm)`,
         });
       }
-    } else if (machineClass === "cnc_3ax_vmc" || machineClass === "cnc_4ax_vmc" || machineClass === "cnc_5ax_mc" || machineClass === "cnc_mill_turn") {
+    } else if (machineClass === "3_axis_mill" || machineClass === "4_axis_mill" || machineClass === "5_axis_mill") {
       // Real 3-axis work envelope (table travel), staged from the real
       // per-machine limits.travelXAxisMm/travelYAxisMm/travelZAxisMm
       // (migration 755) — the same real columns (max_x_mm/max_y_mm) Sheet
