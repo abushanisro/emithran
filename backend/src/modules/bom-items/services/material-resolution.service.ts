@@ -87,21 +87,6 @@ export class MaterialResolutionService {
     return { family: geoFamily, familySource: 'geometry', warning: null };
   }
 
-  // Drawing-intelligence extraction returns a sentinel string like "Not specified"
-  // when the title block has no material field, rather than null. Treated as a real
-  // grade, that sentinel passes the `!grade` scenario gate (it's a non-empty string),
-  // so costing proceeds to look up "Not specified" in raw_materials — which obviously
-  // fails, producing a $0 quote with a warning that misleadingly tells the user to add
-  // a material row named "Not specified". Filtering it here lets the grade resolver
-  // correctly fall through to item.materialGrade/item.material, and — when those are
-  // also empty — hit the real "specify a material" gate instead of a fake match attempt.
-  private static readonly UNSPECIFIED_DRAWING_MATERIAL = new Set(['Unknown', 'Not Specified', 'Not specified', 'None', '']);
-  sanitizeDrawingGrade(raw: string | null): string | null {
-    const trimmed = raw?.trim() || null;
-    if (!trimmed) return null;
-    return MaterialResolutionService.UNSPECIFIED_DRAWING_MATERIAL.has(trimmed) ? null : trimmed;
-  }
-
   async resolveMaterialForFamily(input: {
     accessToken: string;
     grade: string | null;
