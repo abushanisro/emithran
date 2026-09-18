@@ -107,6 +107,7 @@ import { ExchangeRateService, RateSnapshot } from '../../common/exchange-rate/ex
 import { CADAnalysisService } from './services/cad-analysis.service';
 import { RateResolutionService } from './services/rate-resolution.service';
 import { CalculatorCatalogService } from './services/calculator-catalog.service';
+import { MaterialResolutionService } from './services/material-resolution.service';
 
 @Injectable()
 export class BOMItemsService {
@@ -168,6 +169,7 @@ export class BOMItemsService {
     private readonly cadAnalysisService: CADAnalysisService,
     private readonly rateResolutionService: RateResolutionService,
     private readonly calculatorCatalogService: CalculatorCatalogService,
+    private readonly materialResolutionService: MaterialResolutionService,
   ) { }
 
   /**
@@ -1160,22 +1162,6 @@ export class BOMItemsService {
     return process.env.ENABLE_PHYSICS_MACHINE_SELECTION !== 'false';
   }
 
-  // Cached per-process, not per-request: migration 619 adds raw_materials.
-  // cure_time_min, but this code must keep working correctly (not crash,
-  // not silently misreport "material not found") against a database that
-  // hasn't had that migration applied yet. Probed once and cached, mirroring
-  // selector.ts's fetchMachinePool's own "retry without the new columns on
-  // a schema-cache error" resilience for the exact same reason (see that
-  // file's own comment). Real per-grade thermal columns (melting_temp_c
-  // etc.) are NOT probed here — they've been live in raw_materials since
-  // before this session, unlike cure_time_min.
-  private materialCureTimeColumnAvailable: boolean | null = null;
-  private async checkMaterialCureTimeColumnAvailable(client: ReturnType<SupabaseService['getClient']>): Promise<boolean> {
-    if (this.materialCureTimeColumnAvailable != null) return this.materialCureTimeColumnAvailable;
-    const { error } = await client.from('raw_materials').select('cure_time_min').limit(1);
-    this.materialCureTimeColumnAvailable = !(error && /column|schema cache/i.test(error.message));
-    return this.materialCureTimeColumnAvailable;
-  }
 
   // Compute the physical requirement each machine class must meet for this part.
   // Classes absent from the map are gated as 'generic' (no dimensional constraint).
@@ -1450,40 +1436,15 @@ export class BOMItemsService {
     return requirements;
   }
 
-  // User overrides: processKey (machine class) → forced mhr_records.id.
-  // Scoped by Digital Factory location — an override recorded for India must
-  // never force its machine (or its ₹ rate) into a USA/China/Germany costing.
+  // Delegates to RateResolutionService — see that class for the real
+  // implementation and doc comment. Kept as a same-named private wrapper so
+  // every existing call site in this file is unaffected by the extraction.
   private async fetchMachineOverrides(
     bomItemId: string,
     accessToken: string,
     location: string,
-  ): Promise<Map<string, string>> {
-    const overrides = new Map<string, string>();
-    const client = this.supabaseService.getClient(accessToken);
-    try {
-      let { data, error } = await client
-        .from('bom_item_machine_overrides')
-        .select('process_key, mhr_record_id')
-        .eq('bom_item_id', bomItemId)
-        .eq('location', location);
-      if (error && /column|schema cache/i.test(error.message)) {
-        // Migration 329 pending — location column absent. Pre-329 overrides are
-        // unscoped; only honour them for the default location rather than let a
-        // stale pick leak into every country (the exact bug 329 fixes).
-        if (location !== DEFAULT_COSTING_LOCATION) return overrides;
-        ({ data, error } = await client
-          .from('bom_item_machine_overrides')
-          .select('process_key, mhr_record_id')
-          .eq('bom_item_id', bomItemId));
-      }
-      if (error) return overrides;
-      for (const row of data ?? []) {
-        if (row.process_key && row.mhr_record_id) overrides.set(row.process_key, row.mhr_record_id);
-      }
-    } catch {
-      // Table missing (migration 326 pending) — no overrides
-    }
-    return overrides;
+  ) {
+    return this.rateResolutionService.fetchMachineOverrides(bomItemId, accessToken, location);
   }
 
   // Attach the full selection result onto each process line by machine class,
@@ -1731,32 +1692,15 @@ export class BOMItemsService {
     return { processKey, mhrRecordId, location };
   }
 
-  // eMithran-style manual overrides: field_key = 'mat_rate' | '<process>::rate' |
-  // '<process>::cycleMin'. Scoped by location for the same reason as machine
-  // overrides — an India rate override must not silently apply after switching
-  // the Digital Factory to USA.
+  // Delegates to RateResolutionService — see that class for the real
+  // implementation and doc comment. Kept as a same-named private wrapper so
+  // every existing call site in this file is unaffected by the extraction.
   private async fetchCostOverrides(
     bomItemId: string,
     accessToken: string,
     location: string,
-  ): Promise<Map<string, number>> {
-    const overrides = new Map<string, number>();
-    try {
-      const { data, error } = await this.supabaseService
-        .getClient(accessToken)
-        .from('bom_item_cost_overrides')
-        .select('field_key, value')
-        .eq('bom_item_id', bomItemId)
-        .eq('location', location);
-      if (error) return overrides;
-      for (const row of data ?? []) {
-        const v = Number(row.value);
-        if (row.field_key && Number.isFinite(v)) overrides.set(row.field_key, v);
-      }
-    } catch {
-      // Table missing (migration 330 pending) — no overrides
-    }
-    return overrides;
+  ) {
+    return this.rateResolutionService.fetchCostOverrides(bomItemId, accessToken, location);
   }
 
   // Applied after the family-specific engine + attachMachineSelections, so it
@@ -1933,199 +1877,28 @@ export class BOMItemsService {
     return this.rateResolutionService.resolveMHRRates(accessToken, location, physics, family, fxRates, warnings, thresholds);
   }
 
-  /**
-   * Resolves a real, CMM-specific machine rate for inspection lines that
-   * escalate to the 'cmm' InspectionMethod — separate from resolveMHRRates'
-   * own `inspection` field (which resolves whatever single 'cmm'-class
-   * machine the tenant's pool scores best, e.g. a cheap manual inspection
-   * bench — correct for the visual/caliper/height_gauge tiers, but wrong for
-   * an actual CMM-tier check, which needs a dedicated, meaningfully more
-   * expensive CMM machine, not a bench charged at bench rates).
-   *
-   * Real → benchmark → generic-inspection-rate fallback, same 3-pass
-   * convention as resolveMHRRates' own get(), just filtered to machine names
-   * that actually indicate CMM equipment rather than every 'cmm'-class row
-   * (which in this schema also covers inspection benches/gauges — see
-   * default-rates.ts's cmm keyword registry).
-   */
+  // Delegates to RateResolutionService — see that class for the real
+  // implementation and doc comment. Kept as a same-named private wrapper so
+  // every existing call site in this file is unaffected by the extraction.
   private async resolveCmmSpecificRate(
     accessToken: string,
     location: string,
     rates: RateSnapshot,
     warnings: string[],
-  ): Promise<MHRRateInput> {
-    const client = this.supabaseService.getClient(accessToken);
-
-    try {
-      // Shared with the sibling inspection-rate resolver, which reads the same
-      // cmm pool and differs only in its in-memory CMM/non-CMM filter.
-      const realRows = await cachedRead(`mhr:cmm:${location}`, async () => {
-        const { data } = await client
-          .from('mhr_records')
-          .select('id, machine_name, machine_class, total_machine_hour_rate, manual_mhr_value, is_manual_entry, commodity_code, setup_time_hr')
-          .eq('machine_class', 'cmm')
-          .eq('location', location);
-        return data;
-      });
-      const realCmm = (realRows ?? [])
-        .filter((r: any) => classifyInspectionResource(r.machine_class, r.machine_name) === 'CMM')
-        .map((r: any) => ({
-          id: r.id as string,
-          machineName: r.machine_name as string,
-          rate: Number(r.is_manual_entry ? r.manual_mhr_value : r.total_machine_hour_rate) || 0,
-          commodityCode: r.commodity_code ?? null,
-          // Real per-CMM program/fixture/datum-alignment setup time, when
-          // staged — was selected nowhere in this resolver before, so a real
-          // CMM's own setup_time_hr was unreachable even when present. See
-          // finalizeInspectionLine's CMM setup fix (inspection-engine.ts).
-          setupTimeHr: r.setup_time_hr != null ? Number(r.setup_time_hr) || null : null,
-        }))
-        .filter((r) => r.rate > 0)
-        .sort((a, b) => a.rate - b.rate)[0];
-      if (realCmm) {
-        return {
-          rate: realCmm.rate, source: 'mhr_database', machineClass: 'cmm',
-          machineName: realCmm.machineName, commodityCode: realCmm.commodityCode,
-          mhrRecordId: realCmm.id, setupTimeHr: realCmm.setupTimeHr,
-        };
-      }
-
-      const benchRows = await cachedRead(`mhr-benchmark:${location}`, async () => {
-        const { data } = await client
-          .from('mhr_benchmark_rates')
-          .select('id, machine_name, mhr_usd, process_group, machine_class')
-          .eq('location', location);
-        return data;
-      });
-      const localCurrencyCode = (LOCATION_INFO[location] ?? LOCATION_INFO['Other']).code;
-      const qualityPgKws = MACHINE_REGISTRY.cmm.processGroupKeywords;
-      const cmmBench = (benchRows ?? [])
-        .filter((r: any) =>
-          classifyInspectionResource(r.machine_class, r.machine_name) === 'CMM' && Number(r.mhr_usd ?? 0) > 0 &&
-          qualityPgKws.some((kw) => (r.process_group ?? '').toLowerCase().includes(kw.toLowerCase())))
-        .sort((a: any, b: any) => Number(a.mhr_usd) - Number(b.mhr_usd))[0];
-      if (cmmBench != null) {
-        return {
-          rate: Number(cmmBench.mhr_usd) * rates.convertStrict('USD', localCurrencyCode),
-          source: 'benchmark_override', machineClass: 'cmm',
-          machineName: 'CMM Machine (benchmark)', commodityCode: null,
-          benchmarkMhrId: `bm-mhr-${cmmBench.id}`,
-        };
-      }
-    } catch {
-      // Non-critical — falls through to the generic inspection rate below
-    }
-
-    // Unresolved, not substituted. This used to return the caller's generic
-    // inspection-bench rate, so a CMM-tier check acquired a machine cost from a
-    // different, cheaper resource — and said so in the same breath ("likely
-    // understates real CMM cost"), which means the number was known to be wrong
-    // at the moment it was produced. A missing CMM resource is a data gap; the
-    // engine already treats a rate-0 'no_db_rate' as exactly that and charges no
-    // machine cost for it (see planInspection's own rate selection).
-    //
-    // Deliberately NOT downgraded to visual inspection either: the method stays
-    // 'cmm' — the part still needs a CMM check — only its machine cost is
-    // unresolved. Real QA labour is a separately resolved, real rate and is
-    // unaffected.
-    warnings.push(
-      `No dedicated CMM machine on file for ${location} (real or benchmark) — the CMM-tier inspection ` +
-      `check is unresolved and carries no machine cost. Add a CMM to mhr_records, or a ${location} ` +
-      `CMM benchmark rate, to quote it.`,
-    );
-    return {
-      rate: 0, source: 'no_db_rate', machineClass: 'cmm',
-      machineName: null, commodityCode: null,
-    };
+  ) {
+    return this.rateResolutionService.resolveCmmSpecificRate(accessToken, location, rates, warnings);
   }
 
-  /**
-   * Resolves a real, non-CMM inspection-resource rate (manual bench/gauge
-   * equipment) for the visual/caliper/height_gauge InspectionMethod tiers —
-   * the mirror image of resolveCmmSpecificRate: same 'cmm'-class row pool
-   * (this schema has no separate machine_class for bench-type inspection
-   * equipment), same real → benchmark → gap fallback order, but EXCLUDING
-   * CMM_NAME_PATTERN matches instead of requiring them, so a visual/caliper/
-   * height_gauge line can never end up silently priced at real CMM
-   * equipment's rate just because resolveMHRRates' cost/utilization scoring
-   * happened to prefer it that request. Confirmed live (2026-08-09): every
-   * tested location has a real, distinct, cheaper "Manual Inspection Bench"
-   * row alongside its "CMM Machine" row (e.g. India: bench $5/hr vs CMM
-   * $8/hr) — this filter is what makes using it deterministic rather than
-   * an accident of scoring.
-   */
+  // Delegates to RateResolutionService — see that class for the real
+  // implementation and doc comment. Kept as a same-named private wrapper so
+  // every existing call site in this file is unaffected by the extraction.
   private async resolveGenericInspectionRate(
     accessToken: string,
     location: string,
     rates: RateSnapshot,
     warnings: string[],
-  ): Promise<MHRRateInput> {
-    const client = this.supabaseService.getClient(accessToken);
-    const gap: MHRRateInput = { rate: 0, source: 'no_db_rate', machineClass: 'cmm', machineName: null, commodityCode: null };
-
-    try {
-      // Shared with the sibling inspection-rate resolver, which reads the same
-      // cmm pool and differs only in its in-memory CMM/non-CMM filter.
-      // Column list must match resolveCmmSpecificRate's exactly -- both share
-      // the `mhr:cmm:${location}` cache key/entry, so whichever of the two
-      // resolvers runs first determines what's cached for the other.
-      const realRows = await cachedRead(`mhr:cmm:${location}`, async () => {
-        const { data } = await client
-          .from('mhr_records')
-          .select('id, machine_name, machine_class, total_machine_hour_rate, manual_mhr_value, is_manual_entry, commodity_code, setup_time_hr')
-          .eq('machine_class', 'cmm')
-          .eq('location', location);
-        return data;
-      });
-      const realBench = (realRows ?? [])
-        .filter((r: any) => classifyInspectionResource(r.machine_class, r.machine_name) !== 'CMM')
-        .map((r: any) => ({
-          id: r.id as string,
-          machineName: r.machine_name as string,
-          rate: Number(r.is_manual_entry ? r.manual_mhr_value : r.total_machine_hour_rate) || 0,
-          commodityCode: r.commodity_code ?? null,
-        }))
-        .filter((r) => r.rate > 0)
-        .sort((a, b) => a.rate - b.rate)[0];
-      if (realBench) {
-        return {
-          rate: realBench.rate, source: 'mhr_database', machineClass: 'cmm',
-          machineName: realBench.machineName, commodityCode: realBench.commodityCode,
-          mhrRecordId: realBench.id,
-        };
-      }
-
-      const benchRows = await cachedRead(`mhr-benchmark:${location}`, async () => {
-        const { data } = await client
-          .from('mhr_benchmark_rates')
-          .select('id, machine_name, mhr_usd, process_group, machine_class')
-          .eq('location', location);
-        return data;
-      });
-      const localCurrencyCode = (LOCATION_INFO[location] ?? LOCATION_INFO['Other']).code;
-      const qualityPgKws = MACHINE_REGISTRY.cmm.processGroupKeywords;
-      const benchOnly = (benchRows ?? [])
-        .filter((r: any) =>
-          classifyInspectionResource(r.machine_class, r.machine_name) !== 'CMM' && Number(r.mhr_usd ?? 0) > 0 &&
-          qualityPgKws.some((kw) => (r.process_group ?? '').toLowerCase().includes(kw.toLowerCase())))
-        .sort((a: any, b: any) => Number(a.mhr_usd) - Number(b.mhr_usd))[0];
-      if (benchOnly) {
-        return {
-          rate: Number(benchOnly.mhr_usd) * rates.convertStrict('USD', localCurrencyCode),
-          source: 'benchmark_override', machineClass: 'cmm',
-          machineName: `${benchOnly.machine_name} (benchmark)`, commodityCode: null,
-          benchmarkMhrId: `bm-mhr-${benchOnly.id}`,
-        };
-      }
-    } catch {
-      // Non-critical — falls through to the genuine no_db_rate gap below
-    }
-
-    warnings.push(
-      `No dedicated inspection-bench resource on file for ${location} (real or benchmark) — visual/caliper/` +
-      `height_gauge inspection is costed at labor-only, machine cost is a genuine $0.`,
-    );
-    return gap;
+  ) {
+    return this.rateResolutionService.resolveGenericInspectionRate(accessToken, location, rates, warnings);
   }
 
   // Delegates to CalculatorCatalogService — see that class for the real
@@ -2202,80 +1975,25 @@ export class BOMItemsService {
     return this.rateResolutionService.resolveProcessIdentities(accessToken, machineClasses, family);
   }
 
-  // Family-aware material resolution — shared by cost summary and route
-  // comparison so both price the SAME raw-material row. Candidate rows are
-  // ranked by product form for the part family (a machined billet part must
-  // never price on a "Sheet" row while a plate/bar row exists — that was the
-  // "T6 - Sheet on a machined boom clamp" defect). All INR fallbacks convert
-  // to the location currency; a raw INR number in a EUR/USD costing is a
-  // silent ~80-90× error.
-  // ── Family resolution ───────────────────────────────────────────────────────
-  // Single precedence chain used by BOTH costing endpoints (summary ≡ route
-  // invariant): user override > material physics > geometry classifier.
-  //
-  // Geometry alone cannot distinguish a machined plate from a molded cover of
-  // the identical shape — the material can. This is the eMithran routing model:
-  // geometry proposes, material routes, user override is final.
-  //   1. manufacturing_family_override — explicit user intent, always wins
-  //      (e.g. machined-PEEK prototype pinned to cnc_milled).
-  //   2. Thermoplastic grade → plastic_molded, whatever the shape classifier
-  //      guessed (a PA66 cover and an aluminium cover are the same geometry).
-  //   3. Non-sheet-formable alloy on a sheet-shaped part → cnc_milled (flat
-  //      bronze casting can never run a laser + press-brake route).
-  //   4. Geometry classifier result.
+  // Delegates to MaterialResolutionService — see that class for the real
+  // implementation and doc comment. Kept as a same-named private wrapper so
+  // every existing call site in this file is unaffected by the extraction.
   private resolveEffectiveFamily(input: {
     item: BOMItemResponseDto;
     fg: any;
     grade: string | null;
     sheetThicknessMm: number;
-  }): { family: string; familySource: 'override' | 'material' | 'geometry'; warning: string | null } {
-    const override = (input.item.manufacturingFamilyOverride ?? '').trim();
-    if (override) return { family: override, familySource: 'override', warning: null };
-
-    const geoFamily: string =
-      input.fg?.classification?.family ??
-      input.item.familyClassification ??
-      (input.sheetThicknessMm > 0 ? 'sheet_metal' : 'unknown');
-
-    if (isPlasticGrade(input.grade) && geoFamily !== 'plastic_molded') {
-      return {
-        family: 'plastic_molded',
-        familySource: 'material',
-        warning:
-          `Material "${input.grade}" is a thermoplastic — routed to injection molding ` +
-          `(geometry classifier suggested ${geoFamily.replace(/_/g, ' ')}). ` +
-          'Set a manufacturing-family override on the item to force a machining route instead.',
-      };
-    }
-
-    if (geoFamily === 'sheet_metal' && !isSheetFormableMaterial(input.grade)) {
-      return {
-        family: 'cnc_milled',
-        familySource: 'material',
-        warning:
-          `${input.grade} is not sheet-formable (cast alloy) — geometry looks like flat sheet ` +
-          'but the part is costed as a machined plate; verify the intended process',
-      };
-    }
-
-    return { family: geoFamily, familySource: 'geometry', warning: null };
+  }) {
+    return this.materialResolutionService.resolveEffectiveFamily(input);
   }
 
-  // Drawing-intelligence extraction returns a sentinel string like "Not specified"
-  // when the title block has no material field, rather than null. Treated as a real
-  // grade, that sentinel passes the `!grade` scenario gate (it's a non-empty string),
-  // so costing proceeds to look up "Not specified" in raw_materials — which obviously
-  // fails, producing a $0 quote with a warning that misleadingly tells the user to add
-  // a material row named "Not specified". Filtering it here lets the grade resolver
-  // correctly fall through to item.materialGrade/item.material, and — when those are
-  // also empty — hit the real "specify a material" gate instead of a fake match attempt.
-  private static readonly UNSPECIFIED_DRAWING_MATERIAL = new Set(['Unknown', 'Not Specified', 'Not specified', 'None', '']);
   private sanitizeDrawingGrade(raw: string | null): string | null {
-    const trimmed = raw?.trim() || null;
-    if (!trimmed) return null;
-    return BOMItemsService.UNSPECIFIED_DRAWING_MATERIAL.has(trimmed) ? null : trimmed;
+    return this.materialResolutionService.sanitizeDrawingGrade(raw);
   }
 
+  // Delegates to MaterialResolutionService — see that class for the real
+  // implementation and doc comment. Kept as a same-named private wrapper so
+  // every existing call site in this file is unaffected by the extraction.
   private async resolveMaterialForFamily(input: {
     accessToken: string;
     grade: string | null;
@@ -2284,249 +2002,8 @@ export class BOMItemsService {
     rates: RateSnapshot;
     locCurrencyCode: string;
     warnings: string[];
-  }): Promise<{
-    materialCostPerKg: number; materialDensityKgM3: number; materialSource: 'db' | 'default';
-    // UTS/shear strength — resolved from the SAME raw_materials row density/cost
-    // came from (same exact-then-tokenized match), so machine selection (press-
-    // brake tonnage) and $ costing can never diverge onto two different material
-    // rows or two different property sources. Three-tier hierarchy, no invented
-    // catch-all: verified per-part DB value ('db') -> approved material-family
-    // value from MATERIAL_UTS_MPA ('family_default') -> null ('unavailable') when
-    // the grade matches neither. Callers must treat null as "skip the UTS-
-    // dependent check" (never substitute a guessed number), and utsSource lets
-    // them warn appropriately.
-    utsMpa: number | null; shearStrengthMpa: number | null; utsSource: 'db' | 'family_default' | 'unavailable';
-    // Real per-grade Injection Molding thermal/process properties (Phase 1
-    // materials-data foundation, 2026-09-02) — resolved from the SAME
-    // raw_materials row every other field on this return came from (same
-    // exact-then-tokenized match), never a second, independently-resolved
-    // material. null (never a fabricated default) when this specific grade
-    // has no real value on file — see thermalSource/cureTimeSource for why.
-    meltingTempC: number | null; moldTempC: number | null; ejectionTempC: number | null;
-    specificHeatMeltJgC: number | null; thermalConductivityMeltWMK: number | null;
-    thermalSource: 'db' | 'unavailable';
-    cureTimeMinFromMaterial: number | null;
-    cureTimeSource: 'db' | 'unavailable' | 'column_not_migrated';
-  }> {
-    const { accessToken, grade, family, materialCol, rates, locCurrencyCode, warnings } = input;
-
-    if (grade) {
-      try {
-        const client = this.supabaseService.getClient(accessToken);
-        const cureTimeColumnAvailable = await this.checkMaterialCureTimeColumnAvailable(client);
-        const g = grade.trim();
-        // melting_temp_c/mold_temp_c/specific_heat_melt/thermal_conductivity_melt:
-        // real, per-grade Injection Molding thermal properties, already
-        // populated for 511/574 raw_materials rows (imported at some earlier
-        // point from the same licensed reference-data source as
-        // memory/Injection/materials_final.json). Selected unconditionally
-        // (not gated by family) since they're NULL-safe for every non-plastic
-        // material and this is the SAME single material-resolution call
-        // every family already shares — a second, family-gated query would
-        // be a second source of truth.
-        //
-        // cure_time_min: migration 619's new column (compression-molding-
-        // relevant thermoset grades only, see
-        // gen_619_seed_material_cure_time.js) — only requested when
-        // checkMaterialCureTimeColumnAvailable() has confirmed it exists, so
-        // this resolver keeps working correctly against a database that
-        // hasn't had migration 619 applied yet (never a crash, never a
-        // false "material not found").
-        const selectCols = `${materialCol}, cost_india, cost, density, density_kg_m3, shape, material_grade, shearing_strength, ultimate_tensile_strength, shear_strength_mpa, uts_mpa, melting_temp_c, mold_temp_c, specific_heat_melt, thermal_conductivity_melt, eject_deflection_temp_c` +
-          (cureTimeColumnAvailable ? `, cure_time_min` : '');
-
-        // Alias lookup first — e.g. "AL6101" has no substring in common with its
-        // real row ("Generic Aluminum, ANSI 6101"), so none of the ilike attempts
-        // below can ever match it. material_aliases (migration 382/383) exists
-        // exactly for this and is already used by raw-materials.service.ts's own
-        // search — this resolver just never queried it, so any alias-only grade
-        // silently fell through to the mild-steel default further down.
-        let data: unknown[] | null = null;
-        const aliasNormalized = g.toUpperCase().replace(/[\s-]/g, '');
-        if (aliasNormalized) {
-          const { data: aliasRow } = await client
-            .from('material_aliases')
-            .select('raw_material_id')
-            .eq('alias_normalized', aliasNormalized)
-            .maybeSingle();
-          if (aliasRow?.raw_material_id) {
-            ({ data } = await client
-              .from('raw_materials')
-              .select(selectCols)
-              .eq('id', aliasRow.raw_material_id)
-              .limit(1));
-          }
-        }
-
-        // Try an exact (case-insensitive) match on the full grade string first — e.g.
-        // "Generic Aluminum - Honeycomb (Expanded 1)" should hit that literal row, not
-        // whatever else happens to contain "Aluminum". Without this, the tokenized
-        // fuzzy fallback below could silently substitute a completely different
-        // material's density/cost (confirmed live against this DB: this exact grade has
-        // real density 50 kg/m³, but the fuzzy path was landing on unrelated
-        // ~450-2700 kg/m³ rows — an 8-50x error in computed part weight with no warning).
-        // Uses two separate .ilike() calls, not .or('material.ilike.X,...') — PostgREST's
-        // or() filter treats "," and "(" "/" ")" in the embedded value as its own
-        // grouping syntax, so a grade string containing them (confirmed: "(Expanded 1)")
-        // silently corrupts the filter and the query returns nothing.
-        if (!data?.length) {
-          ({ data } = await client
-            .from('raw_materials')
-            .select(selectCols)
-            .ilike('material', g)
-            .limit(5));
-        }
-        if (!data?.length) {
-          ({ data } = await client
-            .from('raw_materials')
-            .select(selectCols)
-            .ilike('material_grade', g)
-            .limit(5));
-        }
-
-        if (!data?.length) {
-          // Tokenize compound grade strings so partial-standard matches succeed.
-          // "IS2062 E250 CRCA" splits to ["IS2062","E250","CRCA"]; the DB stores
-          // "Mild Steel IS2062" and "CRCA Steel" as separate rows — neither matches
-          // the full compound string, but each token matches at least one row. Only
-          // reached when no exact match exists — this is a lower-confidence fallback,
-          // not an equal alternative to the exact match above. Strip PostgREST's
-          // or()-filter-special characters (same corruption risk as above — a token
-          // like "(Expanded" would otherwise break the whole clause) rather than
-          // silently dropping the token or the whole match attempt.
-          const tokens = g
-            .split(/[\s\-\/]+/)
-            .map((t) => t.replace(/[(),]/g, ''))
-            .filter((t) => t.length >= 3);
-          const orClause = (tokens.length > 1 ? tokens : [g.replace(/[(),]/g, '')])
-            .flatMap((t) => [`material_grade.ilike.%${t}%`, `material.ilike.%${t}%`])
-            .join(',');
-          ({ data } = await client
-            .from('raw_materials')
-            .select(selectCols)
-            .or(orClause)
-            .limit(12));
-        }
-
-        // Cast via unknown: the select() column list is dynamic (location column),
-        // which Supabase's literal-type parser cannot statically resolve.
-        const rows = ((data ?? []) as unknown as Array<Record<string, unknown>>).map((row) => {
-          const locCost = row[materialCol] as number | null;
-          const indiaCost = (row.cost_india ?? row.cost) as number | null;
-          const densityGCm3 = row.density as number | null;
-          const densityKgM3 =
-            (row.density_kg_m3 as number | null) ?? (densityGCm3 != null ? densityGCm3 * 1000 : null);
-          // Prefer the newer, calculator-facing columns (uts_mpa/shear_strength_mpa,
-          // migration 360) over their legacy source columns — migration 395's own
-          // comment already documents this as the intended single source of truth
-          // ("the calculator system reads uts_mpa specifically, not the legacy
-          // column"), but this resolver kept reading the legacy columns directly,
-          // so a row whose uts_mpa was deliberately set to a different, more
-          // current value than its legacy ultimate_tensile_strength (~25 rows
-          // predating migration 395's backfill) was silently ignored. Falling back
-          // to the legacy column keeps every already-synced row (511/511 after
-          // migration 395) numerically identical to today's behavior.
-          const shearStrengthMpa = (row.shear_strength_mpa as number | null) ?? (row.shearing_strength as number | null);
-          const utsMpa = (row.uts_mpa as number | null) ?? (row.ultimate_tensile_strength as number | null);
-          const meltingTempC = (row.melting_temp_c as number | null) ?? null;
-          const moldTempC = (row.mold_temp_c as number | null) ?? null;
-          const ejectDeflectionTempC = (row.eject_deflection_temp_c as number | null) ?? null;
-          const specificHeatMeltJgC = (row.specific_heat_melt as number | null) ?? null;
-          const thermalConductivityMeltWMK = (row.thermal_conductivity_melt as number | null) ?? null;
-          const cureTimeMinFromMaterial = (row.cure_time_min as number | null) ?? null;
-          return {
-            shape: (row.shape as string | null) ?? null, locCost, indiaCost, densityKgM3, shearStrengthMpa, utsMpa,
-            meltingTempC, moldTempC, ejectDeflectionTempC, specificHeatMeltJgC, thermalConductivityMeltWMK, cureTimeMinFromMaterial,
-          };
-        });
-
-        // Density and cost are independent facts about a material row — a
-        // PENDING_REVIEW row (real, verified density; cost intentionally left
-        // NULL because no verified quote exists) must still power weight/
-        // tonnage calculations from its real density. Requiring cost>0 here
-        // discarded the whole row, silently zeroing density too and reporting
-        // "material not found" for a material that DOES exist in the DB.
-        const withDensity = rows
-          .filter((r) => r.densityKgM3 != null && r.densityKgM3 > 0)
-          .sort((a, b) => shapeRankForFamily(a.shape, family) - shapeRankForFamily(b.shape, family));
-        const withCost = withDensity.filter(
-          (r) => (r.locCost != null && r.locCost > 0) || (r.indiaCost != null && r.indiaCost > 0),
-        );
-        const best = withCost[0] ?? withDensity[0];
-
-        if (best) {
-          if (isDiscouragedShapeForFamily(best.shape, family)) {
-            warnings.push(
-              `Material priced from "${best.shape}" stock — no ${family.replace(/_/g, ' ')}-appropriate product form found for "${grade}" in raw materials. Verify the cost/kg before quoting.`,
-            );
-          }
-          const hasCost = (best.locCost != null && best.locCost > 0) || (best.indiaCost != null && best.indiaCost > 0);
-          if (!hasCost) {
-            warnings.push(
-              `Material "${grade}" found in raw_materials with verified density, but no verified cost ` +
-              `(pending review) — weight/tonnage use its real density; material cost shows as $0 until a cost is added.`,
-            );
-          }
-          const hasUts = best.utsMpa != null && best.utsMpa > 0 && best.shearStrengthMpa != null && best.shearStrengthMpa > 0;
-          const familyUts = hasUts ? null : resolveUtsMpa(grade);
-          if (!hasUts) {
-            warnings.push(
-              familyUts != null
-                ? `Material "${grade}" found in raw_materials, but no verified UTS/shear strength — using the approved ${grade} family UTS (${familyUts} MPa) for press-brake tonnage. Shear strength has no approved-family table, so it is unavailable and turret-punch tonnage checks are skipped until verified values are added.`
-                : `Material "${grade}" found in raw_materials, but no verified UTS/shear strength, and the grade matches no approved material family either — press-brake tonnage, turret-punch tonnage, and UTS-dependent DFM checks are skipped until verified values are added.`,
-            );
-          }
-          const hasThermal = best.meltingTempC != null && best.moldTempC != null;
-          return {
-            materialCostPerKg: hasCost
-              ? (best.locCost != null && best.locCost > 0 ? best.locCost : (best.indiaCost as number) * rates.convertStrict('INR', locCurrencyCode))
-              : 0,
-            materialDensityKgM3: best.densityKgM3 as number,
-            materialSource: 'db',
-            utsMpa: hasUts ? (best.utsMpa as number) : familyUts,
-            shearStrengthMpa: hasUts ? (best.shearStrengthMpa as number) : null,
-            utsSource: hasUts ? 'db' : (familyUts != null ? 'family_default' : 'unavailable'),
-            meltingTempC: best.meltingTempC, moldTempC: best.moldTempC, ejectionTempC: best.ejectDeflectionTempC,
-            specificHeatMeltJgC: best.specificHeatMeltJgC, thermalConductivityMeltWMK: best.thermalConductivityMeltWMK,
-            thermalSource: hasThermal ? 'db' : 'unavailable',
-            cureTimeMinFromMaterial: best.cureTimeMinFromMaterial,
-            cureTimeSource: best.cureTimeMinFromMaterial != null
-              ? 'db'
-              : (cureTimeColumnAvailable ? 'unavailable' : 'column_not_migrated'),
-          };
-        }
-      } catch {
-        // fall through to named defaults below
-      }
-    }
-
-    // No DB match — warn and return zero for both cost and density. A "mild steel"
-    // density default here would silently fabricate a weight for a material that
-    // was never actually looked up (e.g. this exact bug: a honeycomb material with
-    // real density 50 kg/m³ falling through to a 7850 kg/m³ steel assumption — a
-    // ~150x error with no indication anything was wrong). materialDensityKgM3 = 0
-    // correctly gates hasValidDimensions downstream to false, so weight/nesting
-    // are skipped entirely rather than computed from an invented number.
-    const notFoundFamilyUts = resolveUtsMpa(grade);
-    warnings.push(
-      `Material "${grade ?? 'unknown'}" not found in raw_materials database — material cost and weight are $0/0kg. ` +
-      (notFoundFamilyUts != null
-        ? `Press-brake tonnage uses the approved ${grade} family UTS (${notFoundFamilyUts} MPa); shear strength has no approved-family table, so it is unavailable and turret-punch tonnage checks are skipped. `
-        : `The grade also matches no approved material family, so press-brake tonnage, turret-punch tonnage, and UTS-dependent DFM checks are all skipped. `) +
-      `Add the material to the raw materials table to quote accurately.`,
-    );
-    return {
-      materialCostPerKg: 0,
-      materialDensityKgM3: 0,
-      materialSource: 'default',
-      utsMpa: notFoundFamilyUts,
-      shearStrengthMpa: null,
-      utsSource: notFoundFamilyUts != null ? 'family_default' : 'unavailable',
-      meltingTempC: null, moldTempC: null, ejectionTempC: null, specificHeatMeltJgC: null, thermalConductivityMeltWMK: null,
-      thermalSource: 'unavailable',
-      cureTimeMinFromMaterial: null,
-      cureTimeSource: 'unavailable',
-    };
+  }) {
+    return this.materialResolutionService.resolveMaterialForFamily(input);
   }
 
   // Rigid tapping runs on the machining centre that milled/turned the part when
@@ -2543,36 +2020,11 @@ export class BOMItemsService {
     };
   }
 
-  // MHR/LHR plausibility-guard thresholds are business/costing POLICY, not an
-  // algorithmic constant — read once per request from `costing_settings`
-  // (migration 473), the SAME table/convention cost-aggregation.service.ts
-  // and location-comparison.service.ts already use for sga_pct/profit_pct.
-  // Falls back to DEFAULT_RATE_WARN_THRESHOLDS with a disclosed warning only
-  // if the table is empty — identical convention to SGA/profit's own fallback.
+  // Delegates to RateResolutionService — see that class for the real
+  // implementation and doc comment. Kept as a same-named private wrapper so
+  // every existing call site in this file is unaffected by the extraction.
   private async loadRateWarnThresholds(accessToken: string, warnings: string[]): Promise<RateWarnThresholds> {
-    try {
-      const { data } = await this.supabaseService
-        .getClient(accessToken)
-        .from('costing_settings')
-        .select('key, value')
-        .in('key', ['rate_warn_low_fraction', 'rate_warn_high_fraction']);
-
-      const settingsMap = new Map<string, number>();
-      for (const row of data ?? []) settingsMap.set(row.key as string, Number(row.value));
-
-      const lowFraction = settingsMap.get('rate_warn_low_fraction');
-      const highFraction = settingsMap.get('rate_warn_high_fraction');
-      if (lowFraction == null || highFraction == null) {
-        warnings.push(
-          'rate_warn_low_fraction/rate_warn_high_fraction not found in costing_settings — using built-in defaults (50%/300%); deploy migration 473 to make these configurable.',
-        );
-        return DEFAULT_RATE_WARN_THRESHOLDS;
-      }
-      return { lowFraction, highFraction };
-    } catch {
-      warnings.push('costing_settings unavailable — MHR/LHR plausibility thresholds using built-in defaults (50%/300%).');
-      return DEFAULT_RATE_WARN_THRESHOLDS;
-    }
+    return this.rateResolutionService.loadRateWarnThresholds(accessToken, warnings);
   }
 
   // Surface implausible DB rates (broken imports — the migration-327 bug class)
