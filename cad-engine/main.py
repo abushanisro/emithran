@@ -224,7 +224,13 @@ _api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 async def require_api_key(api_key: str = Security(_api_key_header)):
     if not _CAD_API_KEY:
-        return  # key not configured — open (dev mode)
+        if config.environment == "production":
+            # Fail closed: an unset key must never silently open every route in production.
+            raise HTTPException(
+                status_code=503,
+                detail="Service misconfigured: CAD_ENGINE_API_KEY is not set",
+            )
+        return  # key not configured — open only outside production (dev mode)
     if api_key != _CAD_API_KEY:
         raise HTTPException(status_code=403, detail="Invalid or missing API key")
 

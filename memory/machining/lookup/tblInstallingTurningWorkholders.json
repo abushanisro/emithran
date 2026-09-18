@@ -1,0 +1,34 @@
+[
+  {
+    "Name": "3 Jaw Chuck",
+    "Install And Remove Time (min)": 15.0
+  },
+  {
+    "Name": "3 Jaw Chuck with Soft Jaw",
+    "Install And Remove Time (min)": 25.0
+  },
+  {
+    "Name": "4 Jaw Chuck",
+    "Install And Remove Time (min)": 20.0
+  },
+  {
+    "Name": "4 Jaw Chuck with Soft Jaw",
+    "Install And Remove Time (min)": 30.0
+  },
+  {
+    "Name": "Collet Chuck",
+    "Install And Remove Time (min)": 10.0
+  },
+  {
+    "Name": "Collet Chuck with Soft Jaw",
+    "Install And Remove Time (min)": 20.0
+  },
+  {
+    "Name": "Face Driver",
+    "Install And Remove Time (min)": 12.0
+  },
+  {
+    "Name": "Mandrel",
+    "Install And Remove Time (min)": 12.0
+  }
+]

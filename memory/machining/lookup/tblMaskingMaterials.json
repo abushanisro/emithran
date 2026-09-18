@@ -1,0 +1,12 @@
+[
+  {
+    "Maskant": "AC850AeroDTan",
+    "Heated Cure": false,
+    "Cure Time (hr)": 8.0
+  },
+  {
+    "Maskant": "AC850AeroDTan",
+    "Heated Cure": true,
+    "Cure Time (hr)": 1.0
+  }
+]

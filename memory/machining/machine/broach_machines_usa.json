@@ -1,0 +1,239 @@
+{
+  "process_name": "broach",
+  "digital_factory": "USA reference export",
+  "sector": "World Average",
+  "machines": [
+    {
+      "name": "Pioneer VT1040",
+      "description": "Vertical Internal broaching machine",
+      "workcenter": "Default",
+      "accounting": {
+        "labor_rate_usd_per_hr": 36.30,
+        "direct_overhead_rate_usd_per_hr": 7.46,
+        "indirect_overhead_rate_usd_per_hr": 14.52,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "fixture_build_rate_usd_per_hr": 81.00,
+        "fixture_build_time_hr": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "limits": {
+        "max_cutting_speed_m_per_min": 7.62,
+        "max_return_speed_m_per_min": 15.24,
+        "max_stroke_length_mm": 1143.00,
+        "pulling_capacity_N": 98066.50,
+        "pull_end_length_mm": 280.00,
+        "face_plate_bore_mm": 127.00,
+        "max_work_diameter_mm": 10000.00
+      },
+      "powers": {
+        "power_kW": 14.91,
+        "auxiliary_power_kW": 6.39
+      },
+      "standards": {
+        "setup_time_hr": 0.01,
+        "base_part_setup_time_hr": 0.007
+      },
+      "other": {
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.00,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 70000.00,
+        "machine_length_mm": 2030.00,
+        "machine_width_mm": 1320.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 21.30,
+        "installation_factor_percent": 20.00,
+        "machine_uptime_percent": 80.00,
+        "annual_maintenance_factor_percent": 5.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "USA",
+        "data_source": "the system Bas... (truncated in source, not fully visible)"
+      }
+    },
+    {
+      "name": "Pioneer H1560",
+      "description": "Horizontal broaching machine",
+      "workcenter": "Default",
+      "accounting": {
+        "labor_rate_usd_per_hr": 36.30,
+        "direct_overhead_rate_usd_per_hr": 9.55,
+        "indirect_overhead_rate_usd_per_hr": 14.74,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "fixture_build_rate_usd_per_hr": 81.00,
+        "fixture_build_time_hr": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "limits": {
+        "max_cutting_speed_m_per_min": 7.62,
+        "max_return_speed_m_per_min": 15.24,
+        "max_stroke_length_mm": 1524.00,
+        "pulling_capacity_N": 147099.75,
+        "pull_end_length_mm": 280.00,
+        "face_plate_bore_mm": 254.00,
+        "max_work_diameter_mm": 1143.00
+      },
+      "powers": {
+        "power_kW": 22.37,
+        "auxiliary_power_kW": 9.59
+      },
+      "standards": {
+        "setup_time_hr": 0.01,
+        "base_part_setup_time_hr": 0.007
+      },
+      "other": {
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.00,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 78000.00,
+        "machine_length_mm": 4140.00,
+        "machine_width_mm": 850.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 31.96,
+        "installation_factor_percent": 20.00,
+        "machine_uptime_percent": 80.00,
+        "annual_maintenance_factor_percent": 5.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "USA",
+        "data_source": "the system Bas... (truncated in source, not fully visible)"
+      }
+    },
+    {
+      "name": "Nachi NUV-20-23",
+      "description": "Vertical internal broaching machines",
+      "workcenter": "Default",
+      "accounting": {
+        "labor_rate_usd_per_hr": 36.30,
+        "direct_overhead_rate_usd_per_hr": 15.86,
+        "indirect_overhead_rate_usd_per_hr": 15.37,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "fixture_build_rate_usd_per_hr": 81.00,
+        "fixture_build_time_hr": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "limits": {
+        "max_cutting_speed_m_per_min": 7.20,
+        "max_return_speed_m_per_min": 20.00,
+        "max_stroke_length_mm": 2300.00,
+        "pulling_capacity_N": 200000.00,
+        "pull_end_length_mm": 280.00,
+        "face_plate_bore_mm": 140.00,
+        "max_work_diameter_mm": 380.00
+      },
+      "powers": {
+        "power_kW": 30.00,
+        "auxiliary_power_kW": 12.86
+      },
+      "standards": {
+        "setup_time_hr": 0.01,
+        "base_part_setup_time_hr": 0.007
+      },
+      "other": {
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.00,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 155000.00,
+        "machine_length_mm": 3000.00,
+        "machine_width_mm": 2000.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 42.86,
+        "installation_factor_percent": 20.00,
+        "machine_uptime_percent": 80.00,
+        "annual_maintenance_factor_percent": 5.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Japan",
+        "data_source": "the system Bas... (truncated in source, not fully visible)"
+      }
+    },
+    {
+      "name": "Cell-Mate",
+      "description": "Vertical Pull-Type Broach",
+      "workcenter": "Default",
+      "accounting": {
+        "labor_rate_usd_per_hr": 36.30,
+        "direct_overhead_rate_usd_per_hr": 13.91,
+        "indirect_overhead_rate_usd_per_hr": 15.65,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "fixture_build_rate_usd_per_hr": 81.00,
+        "fixture_build_time_hr": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "limits": {
+        "max_cutting_speed_m_per_min": 9.10,
+        "max_return_speed_m_per_min": 18.30,
+        "max_stroke_length_mm": 1067.00,
+        "pulling_capacity_N": 88964.00,
+        "pull_end_length_mm": 280.00,
+        "face_plate_bore_mm": 304.80,
+        "max_work_diameter_mm": 304.80
+      },
+      "powers": {
+        "power_kW": 22.37,
+        "auxiliary_power_kW": 9.59
+      },
+      "standards": {
+        "setup_time_hr": 0.01,
+        "base_part_setup_time_hr": 0.007
+      },
+      "other": {
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 150000.00,
+        "machine_length_mm": 3660.00,
+        "machine_width_mm": 1930.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 31.96,
+        "installation_factor_percent": 20.00,
+        "machine_uptime_percent": 80.00,
+        "annual_maintenance_factor_percent": 5.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "USA",
+        "data_source": "the system Bas... (truncated in source, not fully visible)"
+      }
+    }
+  ]
+}

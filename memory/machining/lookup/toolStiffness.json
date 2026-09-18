@@ -1,0 +1,10 @@
+[
+  {
+    "ToolMaterial": "Carbide",
+    "YoungsModulusMPa": 800000.0
+  },
+  {
+    "ToolMaterial": "Steel",
+    "YoungsModulusMPa": 200000.0
+  }
+]

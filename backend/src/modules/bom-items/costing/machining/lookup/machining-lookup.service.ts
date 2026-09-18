@@ -57,6 +57,22 @@ export interface BroachingParams {
   dataFound: boolean;
 }
 
+export interface WireEdmParams {
+  roughFeedRateMmPerMin: number;
+  finishFeedRateMmPerMin: number;
+  dataFound: boolean;
+}
+
+export interface TurningParams {
+  roughCutDepthMm: number;
+  roughCuttingSpeedMPerMin: number;
+  roughFeedMmPerRev: number;
+  finishCutDepthMm: number;
+  finishCuttingSpeedMPerMin: number;
+  finishFeedMmPerRev: number;
+  dataFound: boolean;
+}
+
 @Injectable()
 export class MachiningLookupService {
   constructor(private readonly supabase: SupabaseService) {}
@@ -317,5 +333,86 @@ export class MachiningLookupService {
     const finishSpeed = finishRow?.cutting_speed_m_min;
     if (typeof roughSpeed !== 'number' || typeof finishSpeed !== 'number') return noData;
     return { roughCuttingSpeedMPerMin: roughSpeed, finishCuttingSpeedMPerMin: finishSpeed, dataFound: true };
+  }
+
+  // ── Wire EDM (tblWireEDMing.json, 73 real rows) — this table has NO
+  // hardness column of its own (confirmed directly), keyed only by the
+  // same real material_cut_code numbering tblGeneralTurning/tblDrilling
+  // use. Real 2-hop bridge, identical in structure to
+  // getCylindricalGrindingParams above: resolve the nearest real
+  // material_cut_code for this material class's hardness from
+  // tblGeneralTurning, then EXACT-match that code here (all 37 of this
+  // table's real codes are a genuine subset of tblGeneralTurning's 91,
+  // verified directly — every resolvable code has a real row here, not a
+  // guess). The table's own real `_status` field discloses it is a PARTIAL
+  // transcription — several real material codes carry a real
+  // FeedRateMmPerMin of exactly 0 (data not yet transcribed for that code,
+  // not a real zero cutting speed) — treated as "no data" (dataFound:
+  // false), never divided into a cycle time.
+  async getWireEdmParams(materialClass: MaterialClass): Promise<WireEdmParams> {
+    const noData: WireEdmParams = { roughFeedRateMmPerMin: 0, finishFeedRateMmPerMin: 0, dataFound: false };
+    const turningTable = await this.loadObjectTable('tblGeneralTurning');
+    const turningMaterials: any[] | undefined = turningTable?.materials;
+    if (!Array.isArray(turningMaterials) || turningMaterials.length === 0) return noData;
+    const targetHb = MACHINING_MATERIAL_HARDNESS_HB[materialClass];
+    const code = nearestByHardness(turningMaterials, targetHb)?.material_cut_code;
+    if (!code) return noData;
+
+    const edmRows = await this.loadTable('tblWireEDMing');
+    if (!edmRows?.length) return noData;
+    const codeRows = edmRows.filter((r: any) => r.MaterialCutCodeName === code);
+    const roughRow = codeRows.find((r: any) => r.CutType === 'Roughing');
+    const finishRow = codeRows.find((r: any) => r.CutType === 'Finishing');
+    const roughFeed = roughRow?.FeedRateMmPerMin;
+    const finishFeed = finishRow?.FeedRateMmPerMin;
+    if (typeof roughFeed !== 'number' || roughFeed <= 0 || typeof finishFeed !== 'number' || finishFeed <= 0) {
+      return noData;
+    }
+    return { roughFeedRateMmPerMin: roughFeed, finishFeedRateMmPerMin: finishFeed, dataFound: true };
+  }
+
+  // ── General Turning depth-of-cut (tblGeneralTurning / general_turning_
+  // lookup.json, 91 real materials) — this table carries its own real
+  // hardness column directly (unlike tblCylindricalGrinding), so a single
+  // nearestByHardness bridge resolves the row -- no 2-hop needed. Each real
+  // material row's own `operations.medium_rough_turning`/`finish_turning`
+  // sub-objects give real per-pass cut_depth_mm/cutting_speed_m_min/
+  // feed_rate_mm_rev -- replaces the previous flat, uncited TURNING_MRR
+  // table + fixed x1.2 fudge factor with a genuine rough/finish pass model
+  // (real max roughing depth -> real pass count, same "L/F x N" physics
+  // the reference methodology for this domain describes).
+  async getTurningParams(materialClass: MaterialClass): Promise<TurningParams> {
+    const noData: TurningParams = {
+      roughCutDepthMm: 0, roughCuttingSpeedMPerMin: 0, roughFeedMmPerRev: 0,
+      finishCutDepthMm: 0, finishCuttingSpeedMPerMin: 0, finishFeedMmPerRev: 0,
+      dataFound: false,
+    };
+    const turningTable = await this.loadObjectTable('tblGeneralTurning');
+    const turningMaterials: any[] | undefined = turningTable?.materials;
+    if (!Array.isArray(turningMaterials) || turningMaterials.length === 0) return noData;
+    const targetHb = MACHINING_MATERIAL_HARDNESS_HB[materialClass];
+    const row = nearestByHardness(turningMaterials, targetHb) as any;
+    const rough = row?.operations?.medium_rough_turning;
+    const finish = row?.operations?.finish_turning;
+    if (
+      !rough || !finish
+      || typeof rough.cut_depth_mm !== 'number' || rough.cut_depth_mm <= 0
+      || typeof rough.cutting_speed_m_min !== 'number' || rough.cutting_speed_m_min <= 0
+      || typeof rough.feed_rate_mm_rev !== 'number' || rough.feed_rate_mm_rev <= 0
+      || typeof finish.cut_depth_mm !== 'number' || finish.cut_depth_mm <= 0
+      || typeof finish.cutting_speed_m_min !== 'number' || finish.cutting_speed_m_min <= 0
+      || typeof finish.feed_rate_mm_rev !== 'number' || finish.feed_rate_mm_rev <= 0
+    ) {
+      return noData;
+    }
+    return {
+      roughCutDepthMm: rough.cut_depth_mm,
+      roughCuttingSpeedMPerMin: rough.cutting_speed_m_min,
+      roughFeedMmPerRev: rough.feed_rate_mm_rev,
+      finishCutDepthMm: finish.cut_depth_mm,
+      finishCuttingSpeedMPerMin: finish.cutting_speed_m_min,
+      finishFeedMmPerRev: finish.feed_rate_mm_rev,
+      dataFound: true,
+    };
   }
 }

@@ -1,0 +1,10 @@
+[
+  {
+    "Name": "diametrical",
+    "Time Per Analysis (s)": 400.0
+  },
+  {
+    "Name": "surface",
+    "Time Per Analysis (s)": 200.0
+  }
+]

@@ -1,0 +1,463 @@
+{
+  "process_name": "gun drill",
+  "digital_factory": "USA reference export",
+  "sector": "World Average",
+  "machines": [
+    {
+      "name": "Honge XE 1200-CNC",
+      "description": "5.4 hp, 6000 rpm, 47 in max hole depth",
+      "accounting": {
+        "labor_rate_usd_per_hr": 29.95,
+        "direct_overhead_rate_usd_per_hr": 7.43,
+        "indirect_overhead_rate_usd_per_hr": 21.53,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 0.50,
+        "index_time_s": 1.80,
+        "time_to_replace_dull_tool_s": 60.00,
+        "base_part_setup_time_hr": 0.05
+      },
+      "limits": {
+        "spindle_speed_rpm": 6000.00,
+        "min_diameter_mm": 3.00,
+        "max_diameter_mm": 25.00,
+        "max_drill_length_mm": 1200.00
+      },
+      "powers": {
+        "spindle_power_kW": 4.00,
+        "auxiliary_power_kW": 15.10
+      },
+      "rates": {
+        "rapid_traverse_rate_mm_per_min": 30000.00
+      },
+      "other": {
+        "approach_depart_distance_mm": 2.54,
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 75000.00,
+        "machine_length_mm": 5000.00,
+        "machine_width_mm": 6000.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 19.10,
+        "installation_factor_percent": 20.00,
+        "machine_uptime_percent": 80.00,
+        "annual_maintenance_factor_percent": 5.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Taiwan"
+      }
+    },
+    {
+      "name": "Honge XL 10000",
+      "description": "20.1 hp, 4000 rpm, 394 in max hole depth",
+      "accounting": {
+        "labor_rate_usd_per_hr": 29.95,
+        "direct_overhead_rate_usd_per_hr": 15.37,
+        "indirect_overhead_rate_usd_per_hr": 24.61,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 0.50,
+        "index_time_s": 1.80,
+        "time_to_replace_dull_tool_s": 60.00,
+        "base_part_setup_time_hr": 0.05
+      },
+      "limits": {
+        "spindle_speed_rpm": 4000.00,
+        "min_diameter_mm": 8.00,
+        "max_diameter_mm": 50.00,
+        "max_drill_length_mm": 10000.00
+      },
+      "powers": {
+        "spindle_power_kW": 15.00,
+        "auxiliary_power_kW": 56.64
+      },
+      "rates": {
+        "rapid_traverse_rate_mm_per_min": 30000.00
+      },
+      "other": {
+        "approach_depart_distance_mm": 2.54,
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 75000.00,
+        "machine_length_mm": 3000.00,
+        "machine_width_mm": 14000.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 71.64,
+        "installation_factor_percent": 20.00,
+        "machine_uptime_percent": 80.00,
+        "annual_maintenance_factor_percent": 5.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Taiwan"
+      }
+    },
+    {
+      "name": "Honge XL 9999",
+      "description": "9.9 hp, 4000 rpm, 236 in max hole depth",
+      "accounting": {
+        "labor_rate_usd_per_hr": 29.95,
+        "direct_overhead_rate_usd_per_hr": 9.88,
+        "indirect_overhead_rate_usd_per_hr": 18.61,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 0.50,
+        "index_time_s": 1.80,
+        "time_to_replace_dull_tool_s": 60.00,
+        "base_part_setup_time_hr": 0.05
+      },
+      "limits": {
+        "spindle_speed_rpm": 4000.00,
+        "min_diameter_mm": 8.00,
+        "max_diameter_mm": 50.00,
+        "max_drill_length_mm": 6000.00
+      },
+      "powers": {
+        "spindle_power_kW": 7.40,
+        "auxiliary_power_kW": 27.94
+      },
+      "rates": {
+        "rapid_traverse_rate_mm_per_min": 30000.00
+      },
+      "other": {
+        "approach_depart_distance_mm": 2.54,
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 75000.00,
+        "machine_length_mm": 6100.00,
+        "machine_width_mm": 3050.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 35.34,
+        "installation_factor_percent": 20.00,
+        "machine_uptime_percent": 80.00,
+        "annual_maintenance_factor_percent": 5.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Taiwan"
+      }
+    },
+    {
+      "name": "Honge Xt 2500-CNC",
+      "description": "8 hp, 6000 rpm, 98 in max hole depth",
+      "accounting": {
+        "labor_rate_usd_per_hr": 29.95,
+        "direct_overhead_rate_usd_per_hr": 8.87,
+        "indirect_overhead_rate_usd_per_hr": 23.95,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 0.50,
+        "index_time_s": 1.80,
+        "time_to_replace_dull_tool_s": 60.00,
+        "base_part_setup_time_hr": 0.05
+      },
+      "limits": {
+        "spindle_speed_rpm": 6000.00,
+        "min_diameter_mm": 3.00,
+        "max_diameter_mm": 30.00,
+        "max_drill_length_mm": 2500.00
+      },
+      "powers": {
+        "spindle_power_kW": 6.00,
+        "auxiliary_power_kW": 22.66
+      },
+      "rates": {
+        "rapid_traverse_rate_mm_per_min": 30000.00
+      },
+      "other": {
+        "approach_depart_distance_mm": 2.54,
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 75000.00,
+        "machine_length_mm": 5800.00,
+        "machine_width_mm": 6800.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 28.66,
+        "installation_factor_percent": 20.00,
+        "machine_uptime_percent": 80.00,
+        "annual_maintenance_factor_percent": 5.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Taiwan"
+      }
+    },
+    {
+      "name": "TechniDrill HS 375 CR",
+      "description": "20.1 hp, 21000 rpm, 20 in max hole depth",
+      "accounting": {
+        "labor_rate_usd_per_hr": 29.95,
+        "direct_overhead_rate_usd_per_hr": 23.84,
+        "indirect_overhead_rate_usd_per_hr": 18.61,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 0.50,
+        "index_time_s": 1.80,
+        "time_to_replace_dull_tool_s": 60.00,
+        "base_part_setup_time_hr": 0.05
+      },
+      "limits": {
+        "spindle_speed_rpm": 21000.00,
+        "min_diameter_mm": 0.79,
+        "max_diameter_mm": 50.80,
+        "max_drill_length_mm": 508.00
+      },
+      "powers": {
+        "spindle_power_kW": 15.00,
+        "auxiliary_power_kW": 56.64
+      },
+      "rates": {
+        "rapid_traverse_rate_mm_per_min": 30000.00
+      },
+      "other": {
+        "approach_depart_distance_mm": 2.54,
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 215000.00,
+        "machine_length_mm": 6100.00,
+        "machine_width_mm": 3050.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 71.64,
+        "installation_factor_percent": 20.00,
+        "machine_uptime_percent": 80.00,
+        "annual_maintenance_factor_percent": 5.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "USA"
+      }
+    },
+    {
+      "name": "TechniDrill TDS 100",
+      "description": "10 hp, 3000 rpm, 60 in max hole depth",
+      "accounting": {
+        "labor_rate_usd_per_hr": 29.95,
+        "direct_overhead_rate_usd_per_hr": 15.98,
+        "indirect_overhead_rate_usd_per_hr": 18.61,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 0.50,
+        "index_time_s": 1.80,
+        "time_to_replace_dull_tool_s": 60.00,
+        "base_part_setup_time_hr": 0.05
+      },
+      "limits": {
+        "spindle_speed_rpm": 3000.00,
+        "min_diameter_mm": 3.00,
+        "max_diameter_mm": 31.75,
+        "max_drill_length_mm": 1524.00
+      },
+      "powers": {
+        "spindle_power_kW": 7.46,
+        "auxiliary_power_kW": 28.17
+      },
+      "rates": {
+        "rapid_traverse_rate_mm_per_min": 30000.00
+      },
+      "other": {
+        "approach_depart_distance_mm": 2.54,
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 175000.00,
+        "machine_length_mm": 6100.00,
+        "machine_width_mm": 3050.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 35.63,
+        "installation_factor_percent": 20.00,
+        "machine_uptime_percent": 80.00,
+        "annual_maintenance_factor_percent": 5.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "USA"
+      }
+    },
+    {
+      "name": "TechniDrill TDS 200",
+      "description": "25 hp, 3000 rpm, 60 in max hole depth",
+      "accounting": {
+        "labor_rate_usd_per_hr": 29.95,
+        "direct_overhead_rate_usd_per_hr": 24.05,
+        "indirect_overhead_rate_usd_per_hr": 18.61,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 0.50,
+        "index_time_s": 1.80,
+        "time_to_replace_dull_tool_s": 60.00,
+        "base_part_setup_time_hr": 0.05
+      },
+      "limits": {
+        "spindle_speed_rpm": 3000.00,
+        "min_diameter_mm": 3.00,
+        "max_diameter_mm": 50.80,
+        "max_drill_length_mm": 1524.00
+      },
+      "powers": {
+        "spindle_power_kW": 18.64,
+        "auxiliary_power_kW": 70.38
+      },
+      "rates": {
+        "rapid_traverse_rate_mm_per_min": 30000.00
+      },
+      "other": {
+        "approach_depart_distance_mm": 2.54,
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 175000.00,
+        "machine_length_mm": 6100.00,
+        "machine_width_mm": 3050.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 89.02,
+        "installation_factor_percent": 20.00,
+        "machine_uptime_percent": 80.00,
+        "annual_maintenance_factor_percent": 5.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "USA"
+      }
+    },
+    {
+      "name": "TechniDrill TDS 50",
+      "description": "3 hp, 3000 rpm, 48 in max hole depth",
+      "accounting": {
+        "labor_rate_usd_per_hr": 29.95,
+        "direct_overhead_rate_usd_per_hr": 12.21,
+        "indirect_overhead_rate_usd_per_hr": 18.61,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 0.50,
+        "index_time_s": 1.80,
+        "time_to_replace_dull_tool_s": 60.00,
+        "base_part_setup_time_hr": 0.05
+      },
+      "limits": {
+        "spindle_speed_rpm": 3000.00,
+        "min_diameter_mm": 3.00,
+        "max_diameter_mm": 19.05,
+        "max_drill_length_mm": 1219.20
+      },
+      "powers": {
+        "spindle_power_kW": 2.24,
+        "auxiliary_power_kW": 8.46
+      },
+      "rates": {
+        "rapid_traverse_rate_mm_per_min": 30000.00
+      },
+      "other": {
+        "approach_depart_distance_mm": 2.54,
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 175000.00,
+        "machine_length_mm": 6100.00,
+        "machine_width_mm": 3050.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 10.70,
+        "installation_factor_percent": 20.00,
+        "machine_uptime_percent": 80.00,
+        "annual_maintenance_factor_percent": 5.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "USA"
+      }
+    }
+  ]
+}

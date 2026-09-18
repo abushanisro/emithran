@@ -1,0 +1,109 @@
+{
+  "table_name": "tblGearQuality",
+  "description": "Mapping between old AGMA gear quality numbers, new AGMA quality numbers, and equivalent DIN quality numbers, with process constraints per quality level.",
+  "row_count": 11,
+  "qualities": [
+    {
+      "old_agma_quality_number": "Q10",
+      "new_agma_quality_number": "A7",
+      "din_quality_number": 7,
+      "comments": "Shaping or ...",
+      "must_grind": false,
+      "must_shave": true,
+      "multiple_starts_valid": true
+    },
+    {
+      "old_agma_quality_number": "Q11",
+      "new_agma_quality_number": "A6",
+      "din_quality_number": 6,
+      "comments": "Shaving",
+      "must_grind": false,
+      "must_shave": true,
+      "multiple_starts_valid": true
+    },
+    {
+      "old_agma_quality_number": "Q12",
+      "new_agma_quality_number": "A5",
+      "din_quality_number": 5,
+      "comments": "Grinding",
+      "must_grind": true,
+      "must_shave": false,
+      "multiple_starts_valid": true
+    },
+    {
+      "old_agma_quality_number": "Q13",
+      "new_agma_quality_number": "A4",
+      "din_quality_number": 4,
+      "comments": "Grinding",
+      "must_grind": true,
+      "must_shave": false,
+      "multiple_starts_valid": false
+    },
+    {
+      "old_agma_quality_number": "Q14",
+      "new_agma_quality_number": "A3",
+      "din_quality_number": 3,
+      "comments": "Grinding",
+      "must_grind": true,
+      "must_shave": false,
+      "multiple_starts_valid": false
+    },
+    {
+      "old_agma_quality_number": "Q15",
+      "new_agma_quality_number": "A2",
+      "din_quality_number": 2,
+      "comments": "Grinding",
+      "must_grind": true,
+      "must_shave": false,
+      "multiple_starts_valid": false
+    },
+    {
+      "old_agma_quality_number": "Q5",
+      "new_agma_quality_number": "A12",
+      "din_quality_number": 12,
+      "comments": "Spline rolling",
+      "must_grind": false,
+      "must_shave": false,
+      "multiple_starts_valid": true
+    },
+    {
+      "old_agma_quality_number": "Q6",
+      "new_agma_quality_number": "A11",
+      "din_quality_number": 11,
+      "comments": "Broaching ...",
+      "must_grind": false,
+      "must_shave": false,
+      "multiple_starts_valid": true
+    },
+    {
+      "old_agma_quality_number": "Q7",
+      "new_agma_quality_number": "A10",
+      "din_quality_number": 10,
+      "comments": "Hobbing, s...",
+      "must_grind": false,
+      "must_shave": false,
+      "multiple_starts_valid": true
+    },
+    {
+      "old_agma_quality_number": "Q8",
+      "new_agma_quality_number": "A9",
+      "din_quality_number": 9,
+      "comments": "Hobbing, s...",
+      "must_grind": false,
+      "must_shave": false,
+      "multiple_starts_valid": true
+    },
+    {
+      "old_agma_quality_number": "Q9",
+      "new_agma_quality_number": "A8",
+      "din_quality_number": 8,
+      "comments": "Hobbing, s...",
+      "must_grind": false,
+      "must_shave": false,
+      "multiple_starts_valid": true
+    }
+  ],
+  "data_quality_flags": [
+    "Comments column is truncated in the source UI for rows Q10 ('Shaping or ...'), Q6 ('Broaching ...'), Q7/Q8/Q9 ('Hobbing, s...'). Full text was not visible in the provided screenshot and has not been guessed or completed."
+  ]
+}

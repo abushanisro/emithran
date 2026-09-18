@@ -1,0 +1,566 @@
+{
+  "digital_factory": "USA reference export",
+  "work_center": "Threaded Wheel Gear Grinder",
+  "sector": "World Average",
+  "source_note": "Compiled from 3 eMithran Digital Factory Manager screenshots (Accounting/Limits/Powers/Standards/Other/Yields/Bottom Up Overhead Rate Inputs/Manufacturer Information tabs).",
+  "machines": [
+    {
+      "primary_id": {
+        "name": "Gleason 300 TWG",
+        "description": "Gleason 300 TWG"
+      },
+      "capability": {
+        "twg_capable": true,
+        "pg_capable": false
+      },
+      "accounting": {
+        "labor_rate_usd_hr": 36.30,
+        "direct_overhead_rate_usd_hr": 101.58,
+        "indirect_overhead_rate_usd_hr": 19.78,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "fixture_build_rate_usd_hr": 42.40,
+        "fixture_build_time_hr": 2.00,
+        "programming_rate_usd_hr": 31.60,
+        "programming_time_hr": 0.50,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "limits": {
+        "max_workpiece_diameter_mm": 300.00,
+        "rapid_traverse_rate_radial_mm_min": null,
+        "tool_change_time_s": 45.00,
+        "end_of_pass_dwell_s": 0.25,
+        "wheel_dress_time_pg_s": null,
+        "wheel_dress_time_twg_s": 900.00
+      },
+      "powers": {
+        "auxiliary_power_kw": 0.00
+      },
+      "standards": {
+        "setup_time_hr": 0.50,
+        "base_part_setup_time_hr": 0.01
+      },
+      "other": {
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 1800000.00,
+        "machine_length_mm": 4220.00,
+        "machine_width_mm": 5490.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kw": 25.00,
+        "installation_factor_pct": 20.00,
+        "machine_uptime_pct": 80.00,
+        "annual_maintenance_factor_pct": 3.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_pct": 0.00,
+        "supplies_cost_usd_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "USA"
+      }
+    },
+    {
+      "primary_id": {
+        "name": "Gleason Genesis 160TWG",
+        "description": "Gleason Genesis 160TWG"
+      },
+      "capability": {
+        "twg_capable": true,
+        "pg_capable": false
+      },
+      "accounting": {
+        "labor_rate_usd_hr": 36.30,
+        "direct_overhead_rate_usd_hr": 90.56,
+        "indirect_overhead_rate_usd_hr": 15.82,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "fixture_build_rate_usd_hr": 42.40,
+        "fixture_build_time_hr": 2.00,
+        "programming_rate_usd_hr": 31.60,
+        "programming_time_hr": 0.50,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "limits": {
+        "max_workpiece_diameter_mm": 160.00,
+        "rapid_traverse_rate_radial_mm_min": null,
+        "tool_change_time_s": 45.00,
+        "end_of_pass_dwell_s": 0.25,
+        "wheel_dress_time_pg_s": null,
+        "wheel_dress_time_twg_s": 900.00
+      },
+      "powers": {
+        "auxiliary_power_kw": 0.00
+      },
+      "standards": {
+        "setup_time_hr": 0.50,
+        "base_part_setup_time_hr": 0.01
+      },
+      "other": {
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 1600000.00,
+        "machine_length_mm": 3670.00,
+        "machine_width_mm": 2110.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kw": 24.00,
+        "installation_factor_pct": 20.00,
+        "machine_uptime_pct": 80.00,
+        "annual_maintenance_factor_pct": 3.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_pct": 0.00,
+        "supplies_cost_usd_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "USA"
+      }
+    },
+    {
+      "primary_id": {
+        "name": "Gleason P 2400 G",
+        "description": "Gleason P 2400 G"
+      },
+      "capability": {
+        "twg_capable": false,
+        "pg_capable": true
+      },
+      "accounting": {
+        "labor_rate_usd_hr": 36.30,
+        "direct_overhead_rate_usd_hr": 101.43,
+        "indirect_overhead_rate_usd_hr": 32.35,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "fixture_build_rate_usd_hr": 42.40,
+        "fixture_build_time_hr": 2.00,
+        "programming_rate_usd_hr": 31.60,
+        "programming_time_hr": 0.50,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "limits": {
+        "max_workpiece_diameter_mm": 2400.00,
+        "rapid_traverse_rate_radial_mm_min": 3000.00,
+        "tool_change_time_s": 45.00,
+        "end_of_pass_dwell_s": 0.25,
+        "wheel_dress_time_pg_s": 300.00,
+        "wheel_dress_time_twg_s": null
+      },
+      "powers": {
+        "auxiliary_power_kw": 0.00
+      },
+      "standards": {
+        "setup_time_hr": 0.50,
+        "base_part_setup_time_hr": 0.01
+      },
+      "other": {
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 1800000.00,
+        "machine_length_mm": 8200.00,
+        "machine_width_mm": 8800.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kw": 24.00,
+        "installation_factor_pct": 20.00,
+        "machine_uptime_pct": 80.00,
+        "annual_maintenance_factor_pct": 3.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_pct": 0.00,
+        "supplies_cost_usd_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "USA"
+      }
+    },
+    {
+      "primary_id": {
+        "name": "Gleason P 800 G",
+        "description": "Gleason P 800 G"
+      },
+      "capability": {
+        "twg_capable": false,
+        "pg_capable": true
+      },
+      "accounting": {
+        "labor_rate_usd_hr": 36.30,
+        "direct_overhead_rate_usd_hr": 90.56,
+        "indirect_overhead_rate_usd_hr": 28.41,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "fixture_build_rate_usd_hr": 42.40,
+        "fixture_build_time_hr": 2.00,
+        "programming_rate_usd_hr": 31.60,
+        "programming_time_hr": 0.50,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "limits": {
+        "max_workpiece_diameter_mm": 800.00,
+        "rapid_traverse_rate_radial_mm_min": 10000.00,
+        "tool_change_time_s": 45.00,
+        "end_of_pass_dwell_s": 0.25,
+        "wheel_dress_time_pg_s": 300.00,
+        "wheel_dress_time_twg_s": null
+      },
+      "powers": {
+        "auxiliary_power_kw": 0.00
+      },
+      "standards": {
+        "setup_time_hr": 0.50,
+        "base_part_setup_time_hr": 0.01
+      },
+      "other": {
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 1600000.00,
+        "machine_length_mm": 7100.00,
+        "machine_width_mm": 8000.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kw": 24.00,
+        "installation_factor_pct": 20.00,
+        "machine_uptime_pct": 80.00,
+        "annual_maintenance_factor_pct": 3.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_pct": 0.00,
+        "supplies_cost_usd_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "USA"
+      }
+    },
+    {
+      "primary_id": {
+        "name": "Gleason P 90 G",
+        "description": "Gleason P 90 G"
+      },
+      "capability": {
+        "twg_capable": true,
+        "pg_capable": true
+      },
+      "accounting": {
+        "labor_rate_usd_hr": 36.30,
+        "direct_overhead_rate_usd_hr": 78.18,
+        "indirect_overhead_rate_usd_hr": 17.44,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "fixture_build_rate_usd_hr": 42.40,
+        "fixture_build_time_hr": 2.00,
+        "programming_rate_usd_hr": 31.60,
+        "programming_time_hr": 0.50,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "limits": {
+        "max_workpiece_diameter_mm": 125.00,
+        "rapid_traverse_rate_radial_mm_min": 7500.00,
+        "tool_change_time_s": 45.00,
+        "end_of_pass_dwell_s": 0.25,
+        "wheel_dress_time_pg_s": 300.00,
+        "wheel_dress_time_twg_s": 900.00
+      },
+      "powers": {
+        "auxiliary_power_kw": 0.00
+      },
+      "standards": {
+        "setup_time_hr": 0.50,
+        "base_part_setup_time_hr": 0.01
+      },
+      "other": {
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 1400000.00,
+        "machine_length_mm": 4850.00,
+        "machine_width_mm": 2900.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kw": 14.00,
+        "installation_factor_pct": 20.00,
+        "machine_uptime_pct": 80.00,
+        "annual_maintenance_factor_pct": 3.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_pct": 0.00,
+        "supplies_cost_usd_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "USA"
+      }
+    },
+    {
+      "primary_id": {
+        "name": "Gleason Titan 1200G",
+        "description": "Gleason Titan 1200G"
+      },
+      "capability": {
+        "twg_capable": true,
+        "pg_capable": true
+      },
+      "accounting": {
+        "labor_rate_usd_hr": 36.30,
+        "direct_overhead_rate_usd_hr": 112.60,
+        "indirect_overhead_rate_usd_hr": 22.55,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "fixture_build_rate_usd_hr": 42.40,
+        "fixture_build_time_hr": 2.00,
+        "programming_rate_usd_hr": 31.60,
+        "programming_time_hr": 0.50,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "limits": {
+        "max_workpiece_diameter_mm": 1250.00,
+        "rapid_traverse_rate_radial_mm_min": 12000.00,
+        "tool_change_time_s": 45.00,
+        "end_of_pass_dwell_s": 0.25,
+        "wheel_dress_time_pg_s": 300.00,
+        "wheel_dress_time_twg_s": 900.00
+      },
+      "powers": {
+        "auxiliary_power_kw": 0.00
+      },
+      "standards": {
+        "setup_time_hr": 0.50,
+        "base_part_setup_time_hr": 0.01
+      },
+      "other": {
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 2000000.00,
+        "machine_length_mm": 6220.00,
+        "machine_width_mm": 5460.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kw": 26.00,
+        "installation_factor_pct": 20.00,
+        "machine_uptime_pct": 80.00,
+        "annual_maintenance_factor_pct": 3.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_pct": 0.00,
+        "supplies_cost_usd_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "USA"
+      }
+    },
+    {
+      "primary_id": {
+        "name": "Reishauer RZ 1000",
+        "description": "Reishauer RZ 1000"
+      },
+      "capability": {
+        "twg_capable": true,
+        "pg_capable": false
+      },
+      "accounting": {
+        "labor_rate_usd_hr": 36.30,
+        "direct_overhead_rate_usd_hr": 107.16,
+        "indirect_overhead_rate_usd_hr": 16.52,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "fixture_build_rate_usd_hr": 42.40,
+        "fixture_build_time_hr": 2.00,
+        "programming_rate_usd_hr": 31.60,
+        "programming_time_hr": 0.50,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "limits": {
+        "max_workpiece_diameter_mm": 1000.00,
+        "rapid_traverse_rate_radial_mm_min": null,
+        "tool_change_time_s": 45.00,
+        "end_of_pass_dwell_s": 0.25,
+        "wheel_dress_time_pg_s": null,
+        "wheel_dress_time_twg_s": 900.00
+      },
+      "powers": {
+        "auxiliary_power_kw": 0.00
+      },
+      "standards": {
+        "setup_time_hr": 0.50,
+        "base_part_setup_time_hr": 0.01
+      },
+      "other": {
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 1900000.00,
+        "machine_length_mm": 3800.00,
+        "machine_width_mm": 2760.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kw": 26.00,
+        "installation_factor_pct": 20.00,
+        "machine_uptime_pct": 80.00,
+        "annual_maintenance_factor_pct": 3.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_pct": 0.00,
+        "supplies_cost_usd_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Switzerland"
+      }
+    },
+    {
+      "primary_id": {
+        "name": "Reishauer RZ 550",
+        "description": "Reishauer RZ 550"
+      },
+      "capability": {
+        "twg_capable": true,
+        "pg_capable": false
+      },
+      "accounting": {
+        "labor_rate_usd_hr": 36.30,
+        "direct_overhead_rate_usd_hr": 95.99,
+        "indirect_overhead_rate_usd_hr": 16.43,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "fixture_build_rate_usd_hr": 42.40,
+        "fixture_build_time_hr": 2.00,
+        "programming_rate_usd_hr": 31.60,
+        "programming_time_hr": 0.50,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "limits": {
+        "max_workpiece_diameter_mm": 550.00,
+        "rapid_traverse_rate_radial_mm_min": null,
+        "tool_change_time_s": 45.00,
+        "end_of_pass_dwell_s": 0.25,
+        "wheel_dress_time_pg_s": null,
+        "wheel_dress_time_twg_s": 900.00
+      },
+      "powers": {
+        "auxiliary_power_kw": 0.00
+      },
+      "standards": {
+        "setup_time_hr": 0.50,
+        "base_part_setup_time_hr": 0.01
+      },
+      "other": {
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 1700000.00,
+        "machine_length_mm": 3660.00,
+        "machine_width_mm": 2760.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kw": 24.00,
+        "installation_factor_pct": 20.00,
+        "machine_uptime_pct": 80.00,
+        "annual_maintenance_factor_pct": 3.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_pct": 0.00,
+        "supplies_cost_usd_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Switzerland"
+      }
+    },
+    {
+      "primary_id": {
+        "name": "Reishauer RZ 60",
+        "description": "Reishauer RZ 60"
+      },
+      "capability": {
+        "twg_capable": true,
+        "pg_capable": false
+      },
+      "accounting": {
+        "labor_rate_usd_hr": 36.30,
+        "direct_overhead_rate_usd_hr": 83.62,
+        "indirect_overhead_rate_usd_hr": 16.43,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "fixture_build_rate_usd_hr": 42.40,
+        "fixture_build_time_hr": 2.00,
+        "programming_rate_usd_hr": 31.60,
+        "programming_time_hr": 0.50,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "limits": {
+        "max_workpiece_diameter_mm": 80.00,
+        "rapid_traverse_rate_radial_mm_min": null,
+        "tool_change_time_s": 45.00,
+        "end_of_pass_dwell_s": 0.25,
+        "wheel_dress_time_pg_s": null,
+        "wheel_dress_time_twg_s": 900.00
+      },
+      "powers": {
+        "auxiliary_power_kw": 0.00
+      },
+      "standards": {
+        "setup_time_hr": 0.50,
+        "base_part_setup_time_hr": 0.01
+      },
+      "other": {
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 1500000.00,
+        "machine_length_mm": 3660.00,
+        "machine_width_mm": 2760.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kw": 14.00,
+        "installation_factor_pct": 20.00,
+        "machine_uptime_pct": 80.00,
+        "annual_maintenance_factor_pct": 3.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_pct": 0.00,
+        "supplies_cost_usd_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Switzerland"
+      }
+    }
+  ]
+}

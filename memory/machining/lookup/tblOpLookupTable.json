@@ -1,0 +1,4377 @@
+[
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleBack Finish Turning//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleBack Finish Turning//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleBack Finish Turning//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleBack Rough Turning//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleCenter Drilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleComboVoid Machining//ComboVoid",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleDrilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleEdge Turning//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleEdge Turning/SimpleHole Edge Turning//Edge",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleFinish Turning//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleFinish Turning//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleFinish Turning//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleFinish Turning//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleID Turning//RingedHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleMultiplunging//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleMultiplunging/Ring Multiplunging//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleMultiplunging/Ring Multiplunging//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleMultiplunging/Ring Multiplunging//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleMultistep Holemaking//MultiStepHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleMultistep Holemaking/MultiStepHole Counterboring//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleMultistep Holemaking/MultiStepHole Groove Turning//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindlePecking//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindlePlunging//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindlePlunging/Ring Plunging//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindlePlunging/Ring Plunging//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindlePlunging/Ring Plunging//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindlePostdrill Rough Turning//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindlePretum Drilling//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindlePretum Drilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleReaming//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleRough Turning//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleRough Turning//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleSetup",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleStep Drilling//MultiStepHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleStep Drilling/MultiStepHole Step Drilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleStock Trim Turning//StockTrim",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleStock Trim Turning/StockTrim Parting//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleSurface Finishing//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleTapping//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleThread Turning//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleThread Turning//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis Bar Feed Lathe with Sub SpindleThread Turning//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheBack Finish Turning//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheBack Finish Turning//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheBack Finish Turning//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheBack Rough Turning//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheBack Rough Turning//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheBack Rough Turning//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheBack Rough Turning//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheCenter Drilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheComboVoid Machining//ComboVoid",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheDrilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheEdge Turning//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheEdge Turning/SimpleHole Edge Turning//Edge",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheEnd Machining//End",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheFinish Turning//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheFinish Turning//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheFinish Turning//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheFinish Turning//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheID Turning//RingedHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheMultiplunging//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheMultiplunging/Ring Multiplunging//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheMultiplunging/Ring Multiplunging//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheMultiplunging/Ring Multiplunging//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheMultistep Holemaking//MultiStepHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheMultistep Holemaking/MultiStepHole Counterboring//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheMultistep Holemaking/MultiStepHole Groove Turning//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LathePecking//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LathePlunging//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LathePlunging/Ring Plunging//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LathePlunging/Ring Plunging//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LathePlunging/Ring Plunging//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LathePostdrill Rough Turning//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LathePretum Drilling//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LathePretum Drilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheReaming//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheRough Turning//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheRough Turning//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheRough Turning//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheRough Turning//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheRough Turning//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheSetup",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheSetup/Stock Prep//StockTrim",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheStep Drilling//MultiStepHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheStep Drilling/MultiStepHole Step Drilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheSurface Finishing//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheTapping//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheThread Turning//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheThread Turning//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "2 Axis LatheThread Turning//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleBack Finish Turning//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleBack Finish Turning//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleBack Finish Turning//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleBack Rough Turning//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleBathtub Slot Milling//Keyway",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleBulk Milling",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleBulk Milling/Bulk Milling Op//BulkRemoval",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleCenter Drilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleChamfer Milling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleChamfer Milling/SimpleHole Mill Chamfering//Edge",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleComboVoid Machining//ComboVoid",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleCountersinking//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleCountersinking/SimpleHole Countersinking//Edge",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleDrilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleEdge Turning//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleEdge Turning/SimpleHole Edge Turning//Edge",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleFinish Turning//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleFinish Turning//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleFinish Turning//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleGeneral Mill Finishing//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleGeneral Mill Finishing//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleGeneral Mill Finishing//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleGeneral Mill Roughing//ComplexHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleID Turning//RingedHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleIndirect Filleting//CurvedSurface",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleIndirect Filleting//CurvedWall",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleMill Boring//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleMill Contouring//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleMill Contouring//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleMill Contouring//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleMill Facing//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleMultiplunging//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleMultiplunging/Ring Multiplunging//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleMultiplunging/Ring Multiplunging//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleMultiplunging/Ring Multiplunging//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleMultistep Holemaking//MultiStepHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleMultistep Holemaking/MultiStepHole Counterboring//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleMultistep Holemaking/MultiStepHole Groove Milling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleObround Slot Milling//Keyway",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindlePecking//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindlePlunging//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindlePlunging/Ring Plunging//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindlePlunging/Ring Plunging//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindlePlunging/Ring Plunging//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindlePostdrill Rough Turning//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindlePretum Drilling//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindlePretum Drilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleReaming//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleRough Milling//ComplexHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleRough Milling//Keyway",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleRough Turning//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleRough Turning//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleRough Turning//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleRough Turning//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleRough Turning//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleRound Milling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleRound Milling/SimpleHole Mill Rounding//Edge",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleRounding//CurvedSurface",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleRounding//CurvedWall",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleSetup",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleSide Milling//CurvedSurface",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleSide Milling//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleSide Milling//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleStep Drilling//MultiStepHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleStep Drilling/MultiStepHole Step Drilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleStock Trim Turning//StockTrim",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleStock Trim Turning/StockTrim Parting//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleSurface Finishing//ComplexHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleSurface Finishing//Keyway",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleSurface Finishing//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleTapping//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleThread Milling//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleThread Milling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleThread Turning//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleThread Turning//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleThread Turning//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis Bar Feed Lathe with Sub SpindleWoodruff Slot Milling//Keyway",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheBack Finish Turning//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheBack Finish Turning//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheBack Finish Turning//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheBack Rough Turning//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheBack Rough Turning//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheBack Rough Turning//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheBack Rough Turning//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheBathtub Slot Milling//Keyway",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheBulk Milling",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheBulk Milling/Bulk Milling Op//BulkRemoval",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheCenter Drilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheChamfer Milling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheChamfer Milling/SimpleHole Mill Chamfering//Edge",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheComboVoid Machining//ComboVoid",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheCountersinking//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheCountersinking/SimpleHole Countersinking//Edge",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheDrilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheEdge Turning//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheEdge Turning/SimpleHole Edge Turning//Edge",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheEnd Machining//End",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheFilleting//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheFilleting//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheFinish Turning//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheFinish Turning//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheFinish Turning//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheFinish Turning//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheGeneral Mill Finishing//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheGeneral Mill Finishing//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheGeneral Mill Finishing//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheGeneral Mill Roughing//ComplexHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheID Turning//RingedHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheIndirect Filleting//CurvedSurface",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheIndirect Filleting//CurvedWall",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheMill Boring//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheMill Contouring//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheMill Contouring//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheMill Contouring//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheMill Facing//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheMultiplunging//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheMultiplunging/Ring Multiplunging//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheMultiplunging/Ring Multiplunging//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheMultiplunging/Ring Multiplunging//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheMultistep Holemaking//MultiStepHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheMultistep Holemaking/MultiStepHole Counterboring//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheMultistep Holemaking/MultiStepHole Groove Milling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheMultistep Holemaking/MultiStepHole Groove Turning//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheObround Slot Milling//Keyway",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LathePecking//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LathePlunging//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LathePlunging/Ring Plunging//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LathePlunging/Ring Plunging//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LathePlunging/Ring Plunging//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LathePostdrill Rough Turning//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LathePretum Drilling//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LathePretum Drilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheReaming//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheRough Milling//ComplexHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheRough Milling//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheRough Milling//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheRough Milling//Keyway",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheRough Milling//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheRough Milling//Void",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheRough Turning//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheRough Turning//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheRough Turning//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheRough Turning//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheRough Turning//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheRound Milling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheRound Milling/SimpleHole Mill Rounding//Edge",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheRounding//CurvedSurface",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheRounding//CurvedWall",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheSetup",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheSetup/Stock Prep//StockTrim",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheSide Milling//CurvedSurface",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheSide Milling//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheSide Milling//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheStep Drilling//MultiStepHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheStep Drilling/MultiStepHole Step Drilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheSurface Finishing//ComplexHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheSurface Finishing//Keyway",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheSurface Finishing//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheTapping//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheThread Milling//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheThread Milling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheThread Turning//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheThread Turning//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheThread Turning//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis LatheWoodruff Slot Milling//Keyway",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillBathtub Slot Milling//Keyway",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillBoring//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillBulk Milling",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillBulk Milling/BulkRemoval Rough Milling//BulkRemovalCore",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillCenter Drilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillChamfering//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillChamfering/ComplexHole Chamfering//Edge",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillChamfering/SimpleHole Chamfering//Edge",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillComboVoid Machining//ComboVoid",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillContouring//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillContouring//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillContouring//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillCountersinking//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillCountersinking/SimpleHole Countersinking//Edge",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillDrilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillEnd Machining//End",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillFilleting//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillFilleting//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillGeneral Mill Finishing//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillGeneral Mill Finishing//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillGeneral Mill Finishing//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillGeneral Mill Roughing//ComplexHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillIndirect Filleting//CurvedSurface",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillIndirect Filleting//CurvedWall",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillMultistep Holemaking//MultiStepHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillMultistep Holemaking/MultiStepHole Counterboring//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillMultistep Holemaking/MultiStepHole Groove Milling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillObround Slot Milling//Keyway",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillPecking//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillPocket Milling//Pocket",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillPocket Milling/Pocket Rough Milling//PocketCore",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillRapid Rough Milling//StockTrim",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillReaming//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillRough Milling//ComplexHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillRough Milling//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillRough Milling//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillRough Milling//Keyway",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillRough Milling//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillRough Milling//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillRough Milling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillRough Milling//Void",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillRounding//CurvedSurface",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillRounding//CurvedWall",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillRounding//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillRounding/SimpleHole Rounding//Edge",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillSetup",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillSide Milling//CurvedWall",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillSide Milling//PlanarFace",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillSide Milling//SimpleHole",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillStep Drilling//MultiStepHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillStep Drilling/MultiStepHole Step Drilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillSurface Finishing//ComplexHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillSurface Finishing//Keyway",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillSurface Finishing//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillSurface Finishing/Ring Facing//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillSurface Finishing/Ring Side Milling//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillTapping//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillThread Milling//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillThread Milling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillWoodruff Slot Milling//Keyway",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillFull Slot Milling//ComplexHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillSlot Linear Ramping//ComplexHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillSlot Milling//ComplexHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillWall Finishing/ComplexHole Side Milling//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "3 Axis MillWall Finishing/ComplexHole Side Milling//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillBathtub Slot Milling//Keyway",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillBoring//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillBulk Milling",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillBulk Milling/BulkRemoval Rough Milling//BulkRemovalCore",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillCenter Drilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillChamfering//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillChamfering/ComplexHole Chamfering//Edge",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillChamfering/SimpleHole Chamfering//Edge",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillComboVoid Machining//ComboVoid",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillContouring//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillContouring//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillContouring//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillCountersinking//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillCountersinking/SimpleHole Countersinking//Edge",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillDrilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillEnd Machining//End",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillFilleting//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillFilleting//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillGeneral Mill Finishing//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillGeneral Mill Finishing//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillGeneral Mill Finishing//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillGeneral Mill Roughing//ComplexHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillIndirect Filleting//CurvedSurface",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillIndirect Filleting//CurvedWall",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillMultistep Holemaking//MultiStepHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillMultistep Holemaking/MultiStepHole Counterboring//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillMultistep Holemaking/MultiStepHole Groove Milling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillObround Slot Milling//Keyway",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillPecking//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillPocket Milling//Pocket",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillPocket Milling/Pocket Rough Milling//PocketCore",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillRapid Rough Milling//StockTrim",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillReaming//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillRough Milling//ComplexHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillRough Milling//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillRough Milling//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillRough Milling//Keyway",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillRough Milling//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillRough Milling//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillRough Milling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillRough Milling//Void",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillRounding//CurvedSurface",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillRounding//CurvedWall",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillRounding//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillRounding/SimpleHole Rounding//Edge",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillSetup",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillSide Milling//CurvedSurface",
+    "Pass1": null,
+    "Pass2": null,
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillSide Milling//CurvedWall",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillSide Milling//PlanarFace",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillSide Milling//SimpleHole",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillStep Drilling//MultiStepHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillStep Drilling/MultiStepHole Step Drilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillSurface Finishing//ComplexHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillSurface Finishing//Keyway",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillSurface Finishing//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillSurface Finishing/Ring Facing//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillSurface Finishing/Ring Side Milling//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillTapping//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillThread Milling//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillThread Milling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillSurface Finishing/Ring Side Milling//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillWoodruff Slot Milling//Keyway",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillFacing//CurvedWall",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "4 Axis MillFacing//PlanarFace",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillBathtub Slot Milling//Keyway",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillBoring//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillBulk Milling",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillBulk Milling/BulkRemoval Rough Milling//BulkRemovalCore",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillCenter Drilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillChamfering//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillChamfering/ComplexHole Chamfering//Edge",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillChamfering/SimpleHole Chamfering//Edge",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillComboVoid Machining//ComboVoid",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillContouring//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillContouring//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillContouring//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillCountersinking//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillCountersinking/SimpleHole Countersinking//Edge",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillDrilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillEnd Machining//End",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillFilleting//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillFilleting//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillGeneral Mill Finishing//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillGeneral Mill Finishing//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillGeneral Mill Finishing//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillGeneral Mill Roughing//ComplexHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillIndirect Filleting//CurvedSurface",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillIndirect Filleting//CurvedWall",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillMultistep Holemaking//MultiStepHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillMultistep Holemaking/MultiStepHole Counterboring//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillMultistep Holemaking/MultiStepHole Groove Milling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillObround Slot Milling//Keyway",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillPecking//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillPocket Milling//Pocket",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillPocket Milling/Pocket Rough Milling//PocketCore",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillRapid Rough Milling//StockTrim",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillReaming//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillRough Milling//ComplexHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillRough Milling//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillRough Milling//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillRough Milling//Keyway",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillRough Milling//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillRough Milling//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillRough Milling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillRough Milling//Void",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillRounding//CurvedSurface",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillRounding//CurvedWall",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillRounding//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillRounding/SimpleHole Rounding//Edge",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillSetup",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillSide Milling//CurvedSurface",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillSide Milling//CurvedWall",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillSide Milling//PlanarFace",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillSide Milling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillStep Drilling//MultiStepHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillStep Drilling/MultiStepHole Step Drilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillSurface Finishing//ComplexHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillSurface Finishing//Keyway",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillSurface Finishing//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillSurface Finishing/Ring Facing//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillSurface Finishing/Ring Side Milling//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillTapping//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillThread Milling//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillThread Milling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillSurface Finishing/Ring Side Milling//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillWoodruff Slot Milling//Keyway",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "5 Axis MillFacing//PlanarFace",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Cylindrical GrinderComboVoid Grinding//ComboVoid",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Cylindrical GrinderCylindrical Grinder//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Cylindrical GrinderOD Finish Plunge Grinding//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Cylindrical GrinderOD Finish Traverse Grinding//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Deep Bore MachineDeep Bore Machine//RingedHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Deep Bore MachineDrilling//ComboVoid",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Deep Bore MachineDrilling//RingedHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Deep Bore MachineMultistep Holemaking//MultiStepHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Deep Bore MachineSetup",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Deep Bore MachineTrepanning//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Drill PressBoring//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Drill PressCenter Drilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Drill PressComboVoid Machining//ComboVoid",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Drill PressCountersinking//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Drill PressCountersinking/SimpleHole Countersinking//Edge",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Drill PressDrilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Drill PressMultistep Holemaking//MultiStepHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Drill PressMultistep Holemaking/MultiStepHole Counterboring//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Drill PressPecking//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Drill PressReaming//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Drill PressSetup",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Drill PressStep Drilling//MultiStepHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Drill PressStep Drilling/MultiStepHole Step Drilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Drill PressTapping//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Gun DrillDrilling//ComboVoid",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Gun DrillDrilling//RingedHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Gun DrillDrilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Gun DrillMultistep Holemaking//MultiStepHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Gun DrillSetup",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Horizontal Tube HoningHoning//ComboVoid",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Horizontal Tube HoningHoning/ComboVoid Honing//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Horizontal Tube HoningHoning/ComboVoid Multistep Holemaking/MultiStepHole Honing//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Horizontal Tube HoningHoning//RingedHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Horizontal Tube HoningHoning//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Horizontal Tube HoningMultistep Holemaking//MultiStepHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Internal GrinderComboVoid Grinding//ComboVoid",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Internal GrinderFinish Grinding//MultiStepHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Internal GrinderID Finish Plunge Grinding//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Internal GrinderID Finish Plunge Grinding//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Internal GrinderID Finish Traverse Grinding//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Internal GrinderID Finish Traverse Grinding//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Internal GrinderID Grinding//RingedHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Internal GrinderInternal Grinder//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Jig BoreBoring//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Jig BoreCenter Drilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Jig BoreComboVoid Machining//ComboVoid",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Jig BoreCountersinking//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Jig BoreCountersinking/SimpleHole Countersinking//Edge",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Jig BoreDrilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Jig BoreMultistep Holemaking//MultiStepHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Jig BoreMultistep Holemaking/MultiStepHole Counterboring//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Jig BorePecking//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Jig BoreReaming//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Jig BoreSetup",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Jig BoreStep Drilling//MultiStepHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Jig BoreTapping//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Jig GrindFinish Grinding//MultiStepHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Jig GrindID Finish Plunge Grinding//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Jig GrindID Finish Traverse Grinding//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Reciprocating Surface GrinderFinish Plunge Grinding//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Reciprocating Surface GrinderFinish Traverse Grinding//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Reciprocating Surface GrinderReciprocating Surface Grinder//End",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Rotary Surface GrinderFinish Plunge Grinding//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Rotary Surface GrinderRotary Surface Grinder//End",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Rotor GrinderFinish Grinding//HeliGroove",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Simultaneous TurningGeneral Mill Finishing//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Simultaneous TurningGeneral Mill Finishing//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Simultaneous TurningGeneral Mill Finishing//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Simultaneous TurningRounding//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Simultaneous TurningRounding//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Simultaneous TurningSide Milling//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Single Index MillSingle Index Finish Milling//HeliGroove",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Single Index MillSingle Index Rough Milling//HeliGroove",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Special Inspection FeatureInspection//MultiStepHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Special Inspection FeatureInspection//RingedHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Special Inspection FeatureInspection//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Stock Prep LatheBack Rough Turning//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Stock Prep LatheMultiplunging//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Stock Prep LathePlunging//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Stock Prep LatheRough Turning//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Stock Prep LatheSetup",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Stock Prep LatheStock Prep//StockTrim",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Stock Prep LatheUnmachined//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Stock Prep MillRapid Rough Milling//StockTrim",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Stock Prep MillSetup",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Wire EDMCutting//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Wire EDMCutting//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "Wire EDMEnd Machining//End",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnBack Finish Turning//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnBack Finish Turning//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnBack Finish Turning//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnBack Rough Turning//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnBack Rough Turning//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnBack Rough Turning//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnBack Rough Turning//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnBathtub Slot Milling//Keyway",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnBulk Milling",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnBulk Milling/Bulk Milling Op//BulkRemoval",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnCenter Drilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnChamfer Milling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnChamfer Milling/SimpleHole Mill Chamfering//Edge",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnComboVoid Machining//ComboVoid",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnCountersinking//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnCountersinking/SimpleHole Countersinking//Edge",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnDrilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnEdge Turning//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnEdge Turning/SimpleHole Edge Turning//Edge",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnEnd Machining//End",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnFacing//CurvedWall",
+    "Pass1": null,
+    "Pass2": null,
+    "Pass3": null,
+    "Pass4": null
+  },
+  {
+    "OpName": "MillTurnFilleting//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnFilleting//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnFinish Turning//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnFinish Turning//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnFinish Turning//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnFinish Turning//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnGeneral Mill Finishing//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnGeneral Mill Finishing//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnGeneral Mill Finishing//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnGeneral Mill Roughing//ComplexHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnGun Drilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnID Turning//RingedHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnIndirect Filleting//CurvedSurface",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnIndirect Filleting//CurvedWall",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnMill Boring//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnMill Contouring//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnMill Contouring//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnMill Facing//PlanarFace",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnMill Grooving//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnMultiplunging//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnMultiplunging/Ring Multiplunging//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnMultiplunging/Ring Multiplunging//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnMultiplunging/Ring Multiplunging//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnMultistep Holemaking//MultiStepHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnMultistep Holemaking/MultiStepHole Counterboring//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnMultistep Holemaking/MultiStepHole Groove Milling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnMultistep Holemaking/MultiStepHole Groove Turning//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnObround Slot Milling//Keyway",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnPecking//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnPlunging//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnPlunging/Ring Plunging//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnPlunging/Ring Plunging//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnPlunging/Ring Plunging//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnPostdrill Rough Turning//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnPretum Drilling//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnPretum Drilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnReaming//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnRough Milling//ComplexHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnRough Milling//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnRough Milling//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnRough Milling//Keyway",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnRough Milling//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnRough Milling//Void",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnRough Turning//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnRough Turning//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnRough Turning//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnRough Turning//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnRough Turning//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnRound Milling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnRound Milling/SimpleHole Mill Rounding//Edge",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnRounding//CurvedSurface",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnRounding//CurvedWall",
+    "Pass1": "include",
+    "Pass2": "include",
+    "Pass3": "include",
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnSetup",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnSetup/Stock Prep//StockTrim",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnSide Milling//CurvedSurface",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnSide Milling//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnSide Milling//PlanarFace",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnStep Drilling//MultiStepHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnStep Drilling/MultiStepHole Step Drilling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnSurface Finishing//ComplexHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnSurface Finishing//Keyway",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnSurface Finishing//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnTapping//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnThread Milling//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnThread Milling//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnThread Turning//CurvedWall",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnThread Turning//Ring",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnThread Turning//SimpleHole",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  },
+  {
+    "OpName": "MillTurnWoodruff Slot Milling//Keyway",
+    "Pass1": null,
+    "Pass2": "include",
+    "Pass3": null,
+    "Pass4": "include"
+  }
+]

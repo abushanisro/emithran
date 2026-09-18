@@ -710,6 +710,21 @@ export const KEYWAY_BROACHING_SETUP_MIN = 0.6;
 // time — a disclosed simplification (approach/overtravel isn't modeled),
 // not a fabricated allowance.
 
+// Wire EDM — real, staged machine fleet (memory/machining/machine/
+// wire_edm_work_center_data.json, 6 machines: Fanuc 0id/1id, Makino DUO43,
+// Mitsubishi BA24/FA-50V/MD+PRO II). All 6 real machines report the
+// identical real setup_time_hr=0.5 (30min). Real, disclosed trigger: same
+// heat-treat-callout signal as Jig Grind (isRealHeatTreatmentCallout,
+// wire-edm-routing.ts), applied to a real "slot" feature instead of a
+// round bore — a hardened slot cannot be conventionally milled any more
+// than a hardened bore can be conventionally bored, and wire EDM (electrical
+// erosion, immune to material hardness) is the real substitute process.
+// Real per-material cutting physics (tblWireEDMing) gives real Roughing +
+// Finishing FeedRateMmPerMin, applied to the real cut-path length as one
+// rough pass + one finish pass — same 2-pass linear-physics shape as
+// Keyway Broaching above, not a fabricated formula.
+export const WIRE_EDM_SETUP_MIN = 30;
+
 // Real HSS reaming surface speed by material family — reaming is a distinct
 // finishing operation from drilling/tapping (lower speed, precision-focused,
 // minimal stock removal), not an approximation borrowed from the drilling
@@ -1010,6 +1025,20 @@ export const DEFAULT_COSTING_LOCATION = 'India';
 
 // CNC billet stock allowance per side (mm): saw-cut kerf + facing/skim clean-up.
 // Applied to each bounding-box dimension (2 × per-side) when sizing milled billets.
+// This is the SINGLE canonical source for this value -- blank-stock-
+// candidates.ts (billetFallback, selectBestAutoCandidate) and
+// bom-items.service.ts (buildCNCMilledAlternativeCandidate) all import this
+// constant directly, rather than each hardcoding their own copy of the same
+// number (a real, confirmed duplication found live 2026-09-18). No real
+// stock-allowance-by-material/machine/process/bar-feeder-presence table
+// exists anywhere in the reference corpus (checked directly against
+// memory/machining/) -- disclosed as a single class-level constant, not
+// fabricated per-machine data, until one is sourced. Real per-machine bar-
+// feeder capability data DOES exist (memory/machining/machine/
+// machiningusa.json's real limits.maxBarFeedingDiaMm/minBarFeedingDiaMm,
+// staged by migration 692) but is a real bar-diameter CAPABILITY range, not
+// a stock-allowance-in-mm value -- using it to size this allowance would be
+// inventing a number the data doesn't actually give.
 export const CNC_STOCK_ALLOWANCE_PER_SIDE_MM = 3;
 
 // ── Machine Registry ──────────────────────────────────────────────────────────
@@ -1240,6 +1269,10 @@ export const MACHINE_REGISTRY = {
   // comment and cost-cnc-engine.ts's Keyway Broaching line
   // (computeKeywayBroachingLine) for the real cutting physics.
   broach:         { commodityCodes: [],                                                                                              processGroupKeywords: ['Broaching', 'Machining'],                                                                                            machineClassKeywords: ['Broach'] },
+  // Real Wire EDM fleet (migrations 737/738/753, 6 machines, e.g. "Fanuc
+  // 0id") — see WIRE_EDM_SETUP_MIN's doc comment for the real hardened-
+  // slot trigger and disclosed physics.
+  wire_edm:       { commodityCodes: [],                                                                                              processGroupKeywords: ['EDM', 'Machining'],                                                                                                  machineClassKeywords: ['Wire EDM'] },
   // Genuine cleaning/degreasing equipment (ultrasonic cleaning tanks, vapor
   // degreasers) — NOT deburring (removes contaminants/residue, not burrs/
   // material). Was folded into 'deburring' by an incorrect keyword rule in

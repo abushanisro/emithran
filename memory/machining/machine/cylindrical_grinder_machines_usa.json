@@ -1,0 +1,361 @@
+{
+  "process_name": "cylindrical grinder",
+  "digital_factory": "USA reference export",
+  "sector": "World Average",
+  "machines": [
+    {
+      "name": "Flex Grind Schaudt M",
+      "description": "40.2 hp, 800 rpm, 118 in. max workpiece",
+      "accounting": {
+        "labor_rate_usd_per_hr": 29.95,
+        "direct_overhead_rate_usd_per_hr": 35.01,
+        "indirect_overhead_rate_usd_per_hr": 18.61,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 0.50,
+        "base_part_setup_time_hr": 0.05,
+        "alignment_time_s": 2.00
+      },
+      "rates": {
+        "rapid_traverse_rate_mm_per_min": 5080.00
+      },
+      "limits": {
+        "max_diameter_mm": 500.00,
+        "max_length_mm": 3000.00,
+        "max_mass_kg": 130.00,
+        "max_wheel_od_mm": 400.00,
+        "max_wheel_width_mm": 70.00,
+        "spindle_speed_rpm": 800.00
+      },
+      "powers": {
+        "spindle_power_kW": 30.00,
+        "auxiliary_power_kW": 41.43
+      },
+      "other": {
+        "approach_depart_distance_mm": 2.54,
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 400000.00,
+        "machine_length_mm": 6100.00,
+        "machine_width_mm": 3050.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 71.43,
+        "installation_factor_percent": 20.00,
+        "machine_uptime_percent": 80.00,
+        "annual_maintenance_factor_percent": 5.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Germany",
+        "data_source": "the system Bas... (truncated in source, not fully visible)"
+      }
+    },
+    {
+      "name": "Flex Grind Schaudt XXL",
+      "description": "40.2 hp, 800 rpm, 118 in. max workpiece",
+      "accounting": {
+        "labor_rate_usd_per_hr": 29.95,
+        "direct_overhead_rate_usd_per_hr": 35.01,
+        "indirect_overhead_rate_usd_per_hr": 18.61,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 0.50,
+        "base_part_setup_time_hr": 0.05,
+        "alignment_time_s": 2.00
+      },
+      "rates": {
+        "rapid_traverse_rate_mm_per_min": 5080.00
+      },
+      "limits": {
+        "max_diameter_mm": 1000.00,
+        "max_length_mm": 3000.00,
+        "max_mass_kg": 3000.00,
+        "max_wheel_od_mm": 900.00,
+        "max_wheel_width_mm": 300.00,
+        "spindle_speed_rpm": 800.00
+      },
+      "powers": {
+        "spindle_power_kW": 30.00,
+        "auxiliary_power_kW": 41.43
+      },
+      "other": {
+        "approach_depart_distance_mm": 2.54,
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 400000.00,
+        "machine_length_mm": 6100.00,
+        "machine_width_mm": 3050.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 71.43,
+        "installation_factor_percent": 20.00,
+        "machine_uptime_percent": 80.00,
+        "annual_maintenance_factor_percent": 5.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Germany",
+        "data_source": "the system Bas... (truncated in source, not fully visible)"
+      }
+    },
+    {
+      "name": "GL7 Toyoda",
+      "description": "29.5 hp, 630 rpm, 98 in. max workpiece",
+      "accounting": {
+        "labor_rate_usd_per_hr": 29.95,
+        "direct_overhead_rate_usd_per_hr": 33.64,
+        "indirect_overhead_rate_usd_per_hr": 19.56,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 0.50,
+        "base_part_setup_time_hr": 0.05,
+        "alignment_time_s": 2.00
+      },
+      "rates": {
+        "rapid_traverse_rate_mm_per_min": 5080.00
+      },
+      "limits": {
+        "max_diameter_mm": 400.00,
+        "max_length_mm": 2500.00,
+        "max_mass_kg": 500.00,
+        "max_wheel_od_mm": 915.00,
+        "max_wheel_width_mm": 250.00,
+        "spindle_speed_rpm": 630.00
+      },
+      "powers": {
+        "spindle_power_kW": 22.00,
+        "auxiliary_power_kW": 30.38
+      },
+      "other": {
+        "approach_depart_distance_mm": 2.54,
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 425000.00,
+        "machine_length_mm": 9140.00,
+        "machine_width_mm": 3660.00,
+        "footprint_allowance_factor": 2.00,
+        "machine_power_kW": 52.38,
+        "installation_factor_percent": 20.00,
+        "machine_uptime_percent": 80.00,
+        "annual_maintenance_factor_percent": 5.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Japan",
+        "data_source": "the system Bas... (truncated in source, not fully visible)"
+      }
+    },
+    {
+      "name": "Grindor Junker",
+      "description": "10 hp, 1000 rpm, 31 in. max workpiece",
+      "accounting": {
+        "labor_rate_usd_per_hr": 29.95,
+        "direct_overhead_rate_usd_per_hr": 14.79,
+        "indirect_overhead_rate_usd_per_hr": 18.12,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 0.50,
+        "base_part_setup_time_hr": 0.05,
+        "alignment_time_s": 10.00
+      },
+      "rates": {
+        "rapid_traverse_rate_mm_per_min": 5080.00
+      },
+      "limits": {
+        "max_diameter_mm": 180.00,
+        "max_length_mm": 800.00,
+        "max_mass_kg": 80.00,
+        "max_wheel_od_mm": 400.00,
+        "max_wheel_width_mm": 63.00,
+        "spindle_speed_rpm": 1000.00
+      },
+      "powers": {
+        "spindle_power_kW": 7.46,
+        "auxiliary_power_kW": 10.29
+      },
+      "other": {
+        "approach_depart_distance_mm": 2.54,
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 200000.00,
+        "machine_length_mm": 6100.00,
+        "machine_width_mm": 2740.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 17.75,
+        "installation_factor_percent": 20.00,
+        "machine_uptime_percent": 80.00,
+        "annual_maintenance_factor_percent": 5.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Germany",
+        "data_source": "the system Bas... (truncated in source, not fully visible)"
+      }
+    },
+    {
+      "name": "Toyoda G Cylindrical Grinder",
+      "description": "10.1 hp, 500 rpm, 39 in. max workpiece",
+      "accounting": {
+        "labor_rate_usd_per_hr": 29.95,
+        "direct_overhead_rate_usd_per_hr": 11.78,
+        "indirect_overhead_rate_usd_per_hr": 16.15,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 0.50,
+        "base_part_setup_time_hr": 0.05,
+        "alignment_time_s": 2.00
+      },
+      "rates": {
+        "rapid_traverse_rate_mm_per_min": 5080.00
+      },
+      "limits": {
+        "max_diameter_mm": 300.00,
+        "max_length_mm": 1000.00,
+        "max_mass_kg": 150.00,
+        "max_wheel_od_mm": 510.00,
+        "max_wheel_width_mm": 102.00,
+        "spindle_speed_rpm": 500.00
+      },
+      "powers": {
+        "spindle_power_kW": 7.50,
+        "auxiliary_power_kW": 10.36
+      },
+      "other": {
+        "approach_depart_distance_mm": 2.54,
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 150000.00,
+        "machine_length_mm": 4570.00,
+        "machine_width_mm": 1980.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 17.86,
+        "installation_factor_percent": 20.00,
+        "machine_uptime_percent": 80.00,
+        "annual_maintenance_factor_percent": 5.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Japan",
+        "data_source": "the system Bas... (truncated in source, not fully visible)"
+      }
+    },
+    {
+      "name": "Toyoda GE4 Cylindrical Grinder",
+      "description": "5 hp, 500 rpm, 59 in. max workpiece",
+      "accounting": {
+        "labor_rate_usd_per_hr": 29.95,
+        "direct_overhead_rate_usd_per_hr": 13.44,
+        "indirect_overhead_rate_usd_per_hr": 18.12,
+        "overhead_multiplier": 0.00,
+        "number_of_operators": 1.00,
+        "labor_time_standard": 1.00,
+        "wage_grade_name": null,
+        "work_center_labor_rate_factor": 1.00
+      },
+      "time": {
+        "setup_time_hr": 0.50,
+        "base_part_setup_time_hr": 0.05,
+        "alignment_time_s": 2.00
+      },
+      "rates": {
+        "rapid_traverse_rate_mm_per_min": 5080.00
+      },
+      "limits": {
+        "max_diameter_mm": 300.00,
+        "max_length_mm": 1500.00,
+        "max_mass_kg": 150.00,
+        "max_wheel_od_mm": 455.00,
+        "max_wheel_width_mm": 75.00,
+        "spindle_speed_rpm": 500.00
+      },
+      "powers": {
+        "spindle_power_kW": 3.70,
+        "auxiliary_power_kW": 5.11
+      },
+      "other": {
+        "approach_depart_distance_mm": 2.54,
+        "is_preferred": false
+      },
+      "yields": {
+        "avg_utilization": 0.50,
+        "good_part_yield": 1.00
+      },
+      "bottom_up_overhead_rate_inputs": {
+        "machine_price_usd": 200000.00,
+        "machine_length_mm": 6100.00,
+        "machine_width_mm": 2740.00,
+        "footprint_allowance_factor": 3.00,
+        "machine_power_kW": 8.81,
+        "installation_factor_percent": 20.00,
+        "machine_uptime_percent": 80.00,
+        "annual_maintenance_factor_percent": 5.00,
+        "machine_life_yr": 10,
+        "salvage_value_factor_percent": 0.00,
+        "supplies_cost_usd_per_yr": 0.00
+      },
+      "manufacturer_information": {
+        "machine_manufacturer_location": "Japan",
+        "data_source": "the system Bas... (truncated in source, not fully visible)"
+      }
+    }
+  ]
+}

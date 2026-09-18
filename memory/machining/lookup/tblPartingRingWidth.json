@@ -1,0 +1,5 @@
+[
+  { "DiameterMm": 25.00, "RingWidthMm": 2.50 },
+  { "DiameterMm": 50.00, "RingWidthMm": 5.00 },
+  { "DiameterMm": 110.00, "RingWidthMm": 10.00 }
+]

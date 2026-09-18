@@ -1,0 +1,122 @@
+[
+  {
+    "Operation Name": "Back Finish Turning",
+    "Factor": 0.7,
+    "Cutting Parameter Category": "Feed Factor"
+  },
+  {
+    "Operation Name": "Back Finish Turning",
+    "Factor": 0.7,
+    "Cutting Parameter Category": "Speed Factor"
+  },
+  {
+    "Operation Name": "Back Rough Turning",
+    "Factor": 0.7,
+    "Cutting Parameter Category": "Cut Depth Factor"
+  },
+  {
+    "Operation Name": "Back Rough Turning",
+    "Factor": 0.7,
+    "Cutting Parameter Category": "Feed Factor"
+  },
+  {
+    "Operation Name": "Back Rough Turning",
+    "Factor": 0.7,
+    "Cutting Parameter Category": "Speed Factor"
+  },
+  {
+    "Operation Name": "Finish Turning",
+    "Factor": 0.7,
+    "Cutting Parameter Category": "Feed Factor"
+  },
+  {
+    "Operation Name": "Finish Turning",
+    "Factor": 0.7,
+    "Cutting Parameter Category": "Speed Factor"
+  },
+  {
+    "Operation Name": "Multiplunging",
+    "Factor": 0.7,
+    "Cutting Parameter Category": "Cut Depth Factor"
+  },
+  {
+    "Operation Name": "Multiplunging",
+    "Factor": 0.7,
+    "Cutting Parameter Category": "Feed Factor"
+  },
+  {
+    "Operation Name": "Multiplunging",
+    "Factor": 0.7,
+    "Cutting Parameter Category": "Speed Factor"
+  },
+  {
+    "Operation Name": "Parting",
+    "Factor": 0.7,
+    "Cutting Parameter Category": "Cut Depth Factor"
+  },
+  {
+    "Operation Name": "Parting",
+    "Factor": 0.7,
+    "Cutting Parameter Category": "Feed Factor"
+  },
+  {
+    "Operation Name": "Parting",
+    "Factor": 0.7,
+    "Cutting Parameter Category": "Speed Factor"
+  },
+  {
+    "Operation Name": "Plunging",
+    "Factor": 0.7,
+    "Cutting Parameter Category": "Cut Depth Factor"
+  },
+  {
+    "Operation Name": "Plunging",
+    "Factor": 0.7,
+    "Cutting Parameter Category": "Feed Factor"
+  },
+  {
+    "Operation Name": "Plunging",
+    "Factor": 0.7,
+    "Cutting Parameter Category": "Speed Factor"
+  },
+  {
+    "Operation Name": "Postdrill Rough Turning",
+    "Factor": 0.7,
+    "Cutting Parameter Category": "Cut Depth Factor"
+  },
+  {
+    "Operation Name": "Postdrill Rough Turning",
+    "Factor": 0.7,
+    "Cutting Parameter Category": "Feed Factor"
+  },
+  {
+    "Operation Name": "Postdrill Rough Turning",
+    "Factor": 0.7,
+    "Cutting Parameter Category": "Speed Factor"
+  },
+  {
+    "Operation Name": "Rough Turning",
+    "Factor": 0.7,
+    "Cutting Parameter Category": "Cut Depth Factor"
+  },
+  {
+    "Operation Name": "Rough Turning",
+    "Factor": 0.7,
+    "Cutting Parameter Category": "Feed Factor"
+  },
+  {
+    "Operation Name": "Rough Turning",
+    "Factor": 0.7,
+    "Cutting Parameter Category": "Speed Factor"
+  },
+  {
+    "Operation Name": "Thread Turning",
+    "Factor": 0.7,
+    "Cutting Parameter Category": "Feed Factor"
+  },
+  {
+    "Operation Name": "Thread Turning",
+    "Factor": 0.7,
+    "Cutting Parameter Category": "Speed Factor"
+  }
+]

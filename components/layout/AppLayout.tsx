@@ -6,17 +6,28 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/providers/auth';
 import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
-import { Loader2, Menu, Bell, Search } from 'lucide-react';
+import { Loader2, Menu, Bell, Search, Settings, Building2, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { MithranAICreditsBar } from './MithranAICreditsBar';
+import { useProfile } from '@/lib/api/hooks/useProfile';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface AppLayoutProps {
   children: ReactNode;
 }
 
 export function AppLayout({ children }: AppLayoutProps) {
-  const { user, loading } = useAuth();
+  const { user, loading, signOut } = useAuth();
+  const { data: profile } = useProfile();
   const router = useRouter();
   const pathname = usePathname();
   const isFullscreen = pathname?.includes('/manufacturing-intelligence');
@@ -51,6 +62,25 @@ export function AppLayout({ children }: AppLayoutProps) {
 
     return undefined;
   }, [user, loading, router]);
+
+  const getUserDisplayName = () => {
+    const full = profile?.displayName || (user as any)?.user_metadata?.full_name;
+    if (full) return full;
+    if (user?.email) {
+      const prefix = user.email.split('@')[0] ?? '';
+      return prefix
+        .split(/[._-]/)
+        .map((p: string) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase())
+        .join(' ');
+    }
+    return 'User';
+  };
+
+  const userInitials =
+    (profile?.displayName || (user as any)?.user_metadata?.full_name)
+      ?.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
+    || user?.email?.[0]?.toUpperCase()
+    || 'U';
 
   // Show loading during auth resolution or when about to redirect
   if (loading || (!user && !shouldRedirect)) {
@@ -106,11 +136,63 @@ export function AppLayout({ children }: AppLayoutProps) {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground relative">
                     <Bell className="h-5 w-5" />
                     <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-primary rounded-full"></span>
                   </Button>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="flex items-center gap-1.5 rounded-full pl-1 pr-1 py-1 hover:bg-secondary/60 transition-colors outline-none">
+                        <Avatar className="h-7 w-7 border border-border">
+                          <AvatarImage src={profile?.avatarUrl ?? undefined} alt={getUserDisplayName()} />
+                          <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
+                            {userInitials}
+                          </AvatarFallback>
+                        </Avatar>
+                      </button>
+                    </DropdownMenuTrigger>
+
+                    <DropdownMenuContent
+                      align="end"
+                      sideOffset={8}
+                      className="w-60 rounded-xl border border-border bg-popover shadow-xl shadow-black/15 p-1"
+                    >
+                      <DropdownMenuLabel className="px-3 py-2 font-normal">
+                        <p className="text-sm font-medium text-foreground truncate leading-tight">{getUserDisplayName()}</p>
+                        <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                      </DropdownMenuLabel>
+
+                      <DropdownMenuSeparator />
+
+                      <DropdownMenuItem
+                        className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm cursor-pointer"
+                        onSelect={() => router.push('/settings')}
+                      >
+                        <Settings className="h-4 w-4 text-muted-foreground" />
+                        Settings
+                      </DropdownMenuItem>
+
+                      <DropdownMenuItem
+                        className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm cursor-pointer"
+                        onSelect={() => router.push('/settings?tab=organization')}
+                      >
+                        <Building2 className="h-4 w-4 text-muted-foreground" />
+                        Organization
+                      </DropdownMenuItem>
+
+                      <DropdownMenuSeparator />
+
+                      <DropdownMenuItem
+                        className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
+                        onSelect={() => signOut().catch(() => {})}
+                      >
+                        <LogOut className="h-4 w-4" />
+                        Log out
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </header>
               <MithranAICreditsBar />

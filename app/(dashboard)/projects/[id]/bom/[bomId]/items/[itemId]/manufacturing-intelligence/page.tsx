@@ -590,6 +590,39 @@ function materialLabel(material: string, materialGrade?: string | null): string 
   if (g.includes(m) || m.includes(g)) return materialGrade;
   return `${material} ${materialGrade}`;
 }
+// Display-only Material/Grade split for the Material Database table.
+// Root-caused live (2026-09-17): the "Generic ..." Digital Factory material
+// family (memory/database/Raw_Material_Database_june.json, 509 real rows)
+// was seeded with material_grade = NULL for every row — the full real name
+// (e.g. "Generic Aluminum - Honeycomb (Expanded 1)") lives in the `material`
+// column alone. This never touches m.material/m.materialGrade themselves
+// (search, alias matching, and apply-to-BOM below all keep using the real,
+// unmodified pair) — it only decides how these two columns present an
+// already-real name when materialGrade is genuinely absent.
+// Verified directly against all 509 real rows: 220 use ", " as a real
+// Material/Grade separator, 23 use " - ". The remaining ~266 (including
+// "Generic Aluminum Bronze" — a real, distinct alloy family, not "Aluminum"
+// with grade "Bronze" — and single-product names like "Generic Accura 60")
+// have no real separator; inventing one for those would fabricate a grade
+// that doesn't exist in the source data, so they correctly keep showing
+// the full name in Material with Grade as "—", same as before this split.
+function splitMaterialDisplay(
+  material: string,
+  materialGrade?: string | null,
+): { material: string; grade: string | null } {
+  if (materialGrade) return { material, grade: materialGrade };
+  const commaIdx = material.indexOf(',');
+  if (commaIdx > 0) {
+    return { material: material.slice(0, commaIdx).trim(), grade: material.slice(commaIdx + 1).trim() || null };
+  }
+  const dashMatch = material.match(/^(.+?)\s+-\s+(.+)$/);
+  if (dashMatch) {
+    // Both groups are mandatory (non-optional) in the regex above, so they
+    // are always present whenever dashMatch itself is truthy.
+    return { material: dashMatch[1]!.trim(), grade: dashMatch[2]!.trim() || null };
+  }
+  return { material, grade: null };
+}
 function fmtInt(n: number | undefined | null): string {
   if (n == null || isNaN(n)) return '—';
   return n.toLocaleString('en-IN');
@@ -673,6 +706,29 @@ function resolveFeatureOpHighlight(
   }
   if (op.featureType === 'laser_cut' || op.featureType === 'deburr_edge') {
     return buildFullModelHL('fb_outline', faceMap);
+  }
+  // Machining (CNC): op.featureType here is the real, per-part CAD
+  // feature_type the backend read straight off this same feature_graph_v2
+  // response (operation-sequencer.ts's `f.feature_type`, e.g.
+  // 'through_hole'/'blind_hole'/'tapped_hole'/'counterbore'/'countersink'/
+  // 'pocket'/'slot'/'chamfer') — not a fixed list hardcoded here. Matching
+  // directly on that field (both sides read the identical CAD vocabulary)
+  // means this works for every current and future Machining feature type
+  // with no per-type case to maintain. Narrow further by the real diameter
+  // embedded in the display name ("Drill Ø4.0mm ×2") when present, same
+  // 0.3mm tolerance convention as the PEM match above; pocket/slot rows have
+  // no diameter and match every occurrence of that feature type instead.
+  if (op.featureType) {
+    const typeFeatures = v2Features.filter((f) => f.feature_type === op.featureType);
+    if (typeFeatures.length) {
+      const m = op.name.match(/Ø([\d.]+)mm/);
+      if (m) {
+        const dia = parseFloat(m[1]!);
+        const matched = typeFeatures.filter((f) => Math.abs((f.diameter_mm ?? 0) - dia) < 0.3);
+        if (matched.length) return mergeFeaturesToHL(`fb_${op.featureType}_d${dia}`, matched);
+      }
+      return mergeFeaturesToHL(`fb_${op.featureType}_all`, typeFeatures);
+    }
   }
   return null;
 }
@@ -4651,8 +4707,8 @@ function RouteSelectionDialog({
   const [sortMode, setSortMode] = useState<RouteSortMode>('recommended');
   const wasOpenRef = useRef(false);
 
-  // Multi-route tree (aPriori-style: one real row per registered-engine
-  // route — cutting AND forming, matching route5.png's reference structure
+  // Multi-route tree (reference USA Digital Factory style: one real row per
+  // registered-engine route — cutting AND forming, matching route5.png's reference structure
   // where Prog Die/Tandem Die are real, visible rows too, not hidden).
   // adaptRoutesToTree validates allRoutesForTree's shape at this boundary
   // (RouteTreeValidationError) — a malformed route fails loudly to an empty
@@ -5451,13 +5507,50 @@ function MaterialPickerDialog({
 
   const groups = Array.from(new Set(materials.map((m) => m.materialGroup).filter(Boolean))).sort();
 
+  // Root-caused live (2026-09-18): searching "aluminium" (or "ALUMINIUM")
+  // returned 0 results even though every real aluminum-family row exists —
+  // spelled "Aluminum" throughout (verified directly against the real
+  // staged source, memory/sheetmetal/rawmetrial/rawmetalusa.json:
+  // "Aluminum, AA 1100", "Aluminum, AA 2219", etc., 29 real rows). A plain
+  // substring match can never bridge this: "aluminium" and "aluminum"
+  // diverge right after their shared "alumin" prefix, so neither is a
+  // substring of the other. Same real, verified American/British spelling
+  // variant list as raw-materials.service.ts's buildMaterialSearchOrClause
+  // (kept in sync by hand — this Next.js frontend and the NestJS backend
+  // are separate deployables with no shared TS package to hold one copy).
+  const SEARCH_SPELLING_VARIANTS: ReadonlyArray<readonly [string, string]> = [
+    ['aluminum', 'aluminium'],
+    ['fiber', 'fibre'],
+    ['sulfur', 'sulphur'],
+  ];
+  // Builds exactly two additional canonical forms in one linear pass each
+  // ("every known word rewritten to American spelling" / "...to British
+  // spelling") rather than one variant per matched word — a compound term
+  // like "aluminium fibre reinforced" must normalize BOTH words together
+  // (-> "aluminum fiber reinforced"), not just whichever pair a per-word
+  // loop happened to reach first. Same fix as raw-materials.service.ts's
+  // identical bug, caught by that file's own unit tests.
+  const expandSearchTermSpellingVariants = (term: string): string[] => {
+    const lower = term.toLowerCase();
+    let towardUs = lower;
+    let towardUk = lower;
+    for (const [us, uk] of SEARCH_SPELLING_VARIANTS) {
+      towardUs = towardUs.replace(new RegExp(uk, 'g'), us);
+      towardUk = towardUk.replace(new RegExp(us, 'g'), uk);
+    }
+    return [...new Set([lower, towardUs, towardUk])];
+  };
+  const searchVariants = search.trim() ? expandSearchTermSpellingVariants(search) : [];
+
   const filtered = materials.filter((m) => {
-    const q = search.toLowerCase();
-    const matchSearch = !q ||
-      m.material.toLowerCase().includes(q) ||
-      (m.materialGrade ?? '').toLowerCase().includes(q) ||
-      (m.materialGroup ?? '').toLowerCase().includes(q) ||
-      (m.materialDescription ?? '').toLowerCase().includes(q) ||
+    const haystacks = [
+      m.material.toLowerCase(),
+      (m.materialGrade ?? '').toLowerCase(),
+      (m.materialGroup ?? '').toLowerCase(),
+      (m.materialDescription ?? '').toLowerCase(),
+    ];
+    const matchSearch = searchVariants.length === 0 ||
+      searchVariants.some((q) => haystacks.some((h) => h.includes(q))) ||
       m.id === aliasMatchId;
     const matchGroup = !groupFilter || m.materialGroup === groupFilter;
     return matchSearch && matchGroup;
@@ -5570,6 +5663,7 @@ function MaterialPickerDialog({
                   {filtered.map((m) => {
                     const isActive = selected?.id === m.id;
                     const dens = m.densityKgM3 ?? (m.density ? m.density * 1000 : undefined);
+                    const disp = splitMaterialDisplay(m.material, m.materialGrade);
                     return (
                       <tr
                         key={m.id}
@@ -5582,8 +5676,8 @@ function MaterialPickerDialog({
                         )}
                       >
                         <td className="px-2.5 py-1.5 text-muted-foreground text-[10px]">{m.materialGroup ?? '—'}</td>
-                        <td className="px-2.5 py-1.5 font-medium">{m.material}</td>
-                        <td className="px-2.5 py-1.5 text-muted-foreground">{m.materialGrade ?? '—'}</td>
+                        <td className="px-2.5 py-1.5 font-medium">{disp.material}</td>
+                        <td className="px-2.5 py-1.5 text-muted-foreground">{disp.grade ?? '—'}</td>
                         <td className="px-2.5 py-1.5 text-right text-muted-foreground">
                           {dens ? `${dens.toFixed(0)}` : '—'}
                         </td>
@@ -6004,7 +6098,24 @@ function CostGuidePanel({
         const payload: CreateProcessCostDto = {
           bomItemId: item.id,
           opNbr: (i + 1) * 10,
-          operation: line.operation || line.process,
+          // ROOT CAUSE (confirmed live, 2026-09-18): `operation` is the field
+          // engine-generated lines identify themselves through (see this
+          // DTO's own doc comment: "engine-generated lines... NULL [category],
+          // identify themselves through `operation`"). line.operation is a
+          // real identity, but it's resolved PURELY by machine class
+          // (processIdentityByMachineClass, one entry per class) — every
+          // real, distinct line on the same machine (e.g. a 2-Axis Bar Feed
+          // Lathe's "Rough Turning"/"Finish Turning"/"Boring/Drilling") shares
+          // the identical class-level identity string. Saving that instead
+          // of line.process (the engine's own distinct per-line name)
+          // collapsed all three into one repeated label in the Manufacturing
+          // Process tree ("2 Axis Bar Feed Lathe with Sub Spindle" x3).
+          // line.process is always real and always distinct; prefer it.
+          // (`|| ''` only satisfies exactOptionalPropertyTypes' string
+          // requirement -- line.process is a required field on
+          // ProcessLineCost and always populated by makeLine(), so this
+          // fallback is never actually reached.)
+          operation: line.process || line.operation || '',
           processGroup: line.processGroup || deriveProcessGroupFromMachineClass(line.machineClass),
           processRoute: line.processRoute || line.process,
           // ROOT CAUSE (confirmed live): without this, the backend's own
@@ -7033,66 +7144,76 @@ function CostGuidePanel({
               )}
             </Section>
 
-            <Section title="Blank Thickness">
-              <div className="flex items-center justify-between text-[11px] py-1">
-                <span className="text-muted-foreground">CAD Thickness</span>
-                <span className="font-medium">{cadThicknessMm > 0 ? `${cadThicknessMm} mm` : '—'}</span>
-              </div>
-              <div className="flex items-center gap-2 py-1">
-                <span className="text-[11px] text-muted-foreground w-28 shrink-0">Manual Override</span>
-                {isEditingBlankThickness ? (
-                  <>
-                    <input
-                      autoFocus
-                      type="number"
-                      min="0"
-                      step="0.1"
-                      value={blankThickness}
-                      onChange={(e) => setBlankThickness(e.target.value)}
-                      onBlur={commitBlankThicknessOverride}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                        if (e.key === 'Escape') cancelBlankThicknessEdit();
-                      }}
-                      placeholder={cadThicknessMm > 0 ? String(cadThicknessMm) : '—'}
-                      className="flex-1 text-xs border border-border rounded px-2.5 py-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500"
-                    />
-                    <span className="text-xs text-muted-foreground shrink-0">mm</span>
-                  </>
-                ) : (
-                  <button
-                    onClick={() => setIsEditingBlankThickness(true)}
-                    className="flex-1 flex items-center justify-between text-xs border border-transparent hover:border-border rounded px-2.5 py-1.5 text-left group"
-                    title="Click to edit"
-                  >
-                    <span className={item.scenarioOverrides?.sheetThicknessMm != null ? 'font-medium' : 'text-muted-foreground'}>
-                      {item.scenarioOverrides?.sheetThicknessMm != null ? `${item.scenarioOverrides.sheetThicknessMm} mm` : 'Not set'}
-                    </span>
-                    <Edit className="h-3 w-3 text-muted-foreground group-hover:text-foreground shrink-0" />
-                  </button>
-                )}
-                {item.scenarioOverrides?.sheetThicknessMm != null && (
-                  <button
-                    onClick={() => { setBlankThickness(''); setIsEditingBlankThickness(false); patchScenarioOverrides.mutate({ id: item.id, patch: { sheetThicknessMm: null } }); }}
-                    title="Clear override — revert to CAD thickness"
-                    className="text-muted-foreground hover:text-destructive shrink-0"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                )}
-              </div>
-              <div className="flex items-center justify-between text-[11px] py-1 border-t border-border/50 mt-1 pt-1.5">
-                <span className="text-foreground font-medium">Effective Thickness</span>
-                <span className="font-semibold text-violet-400">{effectiveThicknessMm} mm</span>
-              </div>
-              <p className="text-[10px] text-muted-foreground/50 mt-0.5">Used for costing — override wins when set, else the real CAD value</p>
-            </Section>
+            {/* Sheet-metal-only: "thickness" is a sheet-metal concept (the flat
+                stock is defined by its thickness). A turned/milled part's real
+                stock is a bar/billet, shown by the family-aware "Blank Stock"
+                section below instead — showing this block for those parts
+                rendered as permanently empty noise (CAD Thickness "—",
+                Effective Thickness "0 mm"), never real stock information. */}
+            {(fg?.classification?.family === 'sheet_metal' || (summary?.sheetThicknessMm ?? 0) > 0) && (
+              <Section title="Blank Thickness">
+                <div className="flex items-center justify-between text-[11px] py-1">
+                  <span className="text-muted-foreground">CAD Thickness</span>
+                  <span className="font-medium">{cadThicknessMm > 0 ? `${cadThicknessMm} mm` : '—'}</span>
+                </div>
+                <div className="flex items-center gap-2 py-1">
+                  <span className="text-[11px] text-muted-foreground w-28 shrink-0">Manual Override</span>
+                  {isEditingBlankThickness ? (
+                    <>
+                      <input
+                        autoFocus
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        value={blankThickness}
+                        onChange={(e) => setBlankThickness(e.target.value)}
+                        onBlur={commitBlankThicknessOverride}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                          if (e.key === 'Escape') cancelBlankThicknessEdit();
+                        }}
+                        placeholder={cadThicknessMm > 0 ? String(cadThicknessMm) : '—'}
+                        className="flex-1 text-xs border border-border rounded px-2.5 py-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500"
+                      />
+                      <span className="text-xs text-muted-foreground shrink-0">mm</span>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => setIsEditingBlankThickness(true)}
+                      className="flex-1 flex items-center justify-between text-xs border border-transparent hover:border-border rounded px-2.5 py-1.5 text-left group"
+                      title="Click to edit"
+                    >
+                      <span className={item.scenarioOverrides?.sheetThicknessMm != null ? 'font-medium' : 'text-muted-foreground'}>
+                        {item.scenarioOverrides?.sheetThicknessMm != null ? `${item.scenarioOverrides.sheetThicknessMm} mm` : 'Not set'}
+                      </span>
+                      <Edit className="h-3 w-3 text-muted-foreground group-hover:text-foreground shrink-0" />
+                    </button>
+                  )}
+                  {item.scenarioOverrides?.sheetThicknessMm != null && (
+                    <button
+                      onClick={() => { setBlankThickness(''); setIsEditingBlankThickness(false); patchScenarioOverrides.mutate({ id: item.id, patch: { sheetThicknessMm: null } }); }}
+                      title="Clear override — revert to CAD thickness"
+                      className="text-muted-foreground hover:text-destructive shrink-0"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center justify-between text-[11px] py-1 border-t border-border/50 mt-1 pt-1.5">
+                  <span className="text-foreground font-medium">Effective Thickness</span>
+                  <span className="font-semibold text-violet-400">{effectiveThicknessMm} mm</span>
+                </div>
+                <p className="text-[10px] text-muted-foreground/50 mt-0.5">Used for costing — override wins when set, else the real CAD value</p>
+              </Section>
+            )}
 
             {cgpCostSummary?.blankSpec && (
               <Section title="Blank Stock">
                 <BlankStockSection
                   blank={cgpCostSummary.blankSpec}
                   currencySymbol={cgpCostSummary.currencySymbol ?? '₹'}
+                  stockFormOverride={(item.scenarioOverrides?.['stockForm'] as string | undefined) ?? null}
+                  onStockFormChange={(v) => patchScenarioOverrides.mutate({ id: item.id, patch: { stockForm: v } })}
                 />
               </Section>
             )}
@@ -9196,15 +9317,58 @@ function InvestmentTab({
 
 // ── BlankStockSection ─────────────────────────────────────────────────────────
 
-function BlankStockSection({ blank, currencySymbol }: { blank: BlankSpecDto; currencySymbol: string }) {
+// Stock forms BlankOptimizerService can actually source from real
+// stock_profiles data (migration 350) — kept in sync by hand with
+// StockForm in blank-optimizer.service.ts. 'Plate'/'Square Bar'/'Round
+// Tube' (shown in the reference USA Digital Factory tool this mirrors) are
+// deliberately NOT offered here: 'plate' has a schema column but zero real
+// seeded sizes, 'square_bar' isn't a distinct real form (a rectangular_bar
+// row with size_a == size_b already covers it), and 'round_tube' needs a
+// bore dimension nothing in stock_profiles or CAD extraction provides today
+// — offering them would either silently no-op or require fabricating stock
+// sizes that don't exist in the real reference data.
+const MACHINING_STOCK_FORM_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
+  { value: 'round_bar', label: 'Round Bar' },
+  { value: 'hex_bar', label: 'Hex Bar' },
+  { value: 'rectangular_bar', label: 'Rectangular Bar' },
+  { value: 'billet', label: 'Billet' },
+];
+
+function BlankStockSection({
+  blank, currencySymbol, stockFormOverride, onStockFormChange,
+}: {
+  blank: BlankSpecDto;
+  currencySymbol: string;
+  stockFormOverride: string | null;
+  onStockFormChange: (v: string | null) => void;
+}) {
   const FORM_LABELS: Record<string, string> = {
     sheet: 'Sheet', round_bar: 'Round Bar', hex_bar: 'Hex Bar',
     rectangular_bar: 'Rect Bar', billet: 'Billet',
     extrusion: 'Extrusion', casting: 'Casting', granules: 'Granules',
   };
   const label = FORM_LABELS[blank.form] ?? blank.form;
+  // The dropdown only applies to machining stock forms — a sheet-metal
+  // ('sheet') or injection-molding ('granules') blank has no bar/billet
+  // choice to make, so showing it there would be a dead control.
+  const isMachiningForm = MACHINING_STOCK_FORM_OPTIONS.some((o) => o.value === blank.form);
   return (
     <div className="space-y-1">
+      {isMachiningForm && (
+        <div className="flex items-center gap-2 py-0.5">
+          <span className="text-xs text-muted-foreground w-20 shrink-0">Stock Form</span>
+          <select
+            className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500 cursor-pointer"
+            value={stockFormOverride ?? ''}
+            onChange={(e) => onStockFormChange(e.target.value === '' ? null : e.target.value)}
+          >
+            <option value="">Let eMithran Decide</option>
+            {MACHINING_STOCK_FORM_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium font-mono">{blank.sizeLabel}</span>
         <span className="text-[10px] px-1.5 py-0.5 rounded border border-border bg-muted/40 text-muted-foreground">{label}</span>
@@ -9225,6 +9389,9 @@ function BlankStockSection({ blank, currencySymbol }: { blank: BlankSpecDto; cur
       </div>
       {blank.wasteKg > 0 && (
         <Row label="Chipscrap" value={`${blank.wasteKg.toFixed(3)} kg · ${currencySymbol}${blank.wasteCost.toFixed(0)}`} />
+      )}
+      {blank.stockFormOverrideNote && (
+        <p className="text-[10px] text-amber-600 dark:text-amber-500 leading-tight pt-0.5">{blank.stockFormOverrideNote}</p>
       )}
     </div>
   );

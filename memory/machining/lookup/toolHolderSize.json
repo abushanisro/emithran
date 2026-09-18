@@ -1,0 +1,67 @@
+[
+  {
+    "ToolHolderType": "Virtual Holder Slim Profile",
+    "ToolDiameterMm": 6.0,
+    "ToolHolderDiameterMm": 12.0
+  },
+  {
+    "ToolHolderType": "Virtual Holder Slim Profile",
+    "ToolDiameterMm": 12.0,
+    "ToolHolderDiameterMm": 20.0
+  },
+  {
+    "ToolHolderType": "Virtual Holder Slim Profile",
+    "ToolDiameterMm": 20.0,
+    "ToolHolderDiameterMm": 32.0
+  },
+  {
+    "ToolHolderType": "Virtual Holder Slim Profile",
+    "ToolDiameterMm": 34.0,
+    "ToolHolderDiameterMm": 70.0
+  },
+  {
+    "ToolHolderType": "Virtual Holder Standard",
+    "ToolDiameterMm": 7.0,
+    "ToolHolderDiameterMm": 19.0
+  },
+  {
+    "ToolHolderType": "Virtual Holder Standard",
+    "ToolDiameterMm": 10.0,
+    "ToolHolderDiameterMm": 28.0
+  },
+  {
+    "ToolHolderType": "Virtual Holder Standard",
+    "ToolDiameterMm": 13.0,
+    "ToolHolderDiameterMm": 34.0
+  },
+  {
+    "ToolHolderType": "Virtual Holder Standard",
+    "ToolDiameterMm": 16.0,
+    "ToolHolderDiameterMm": 42.0
+  },
+  {
+    "ToolHolderType": "Virtual Holder Standard",
+    "ToolDiameterMm": 20.0,
+    "ToolHolderDiameterMm": 50.0
+  },
+  {
+    "ToolHolderType": "Virtual Holder Standard",
+    "ToolDiameterMm": 26.0,
+    "ToolHolderDiameterMm": 63.0
+  },
+  {
+    "ToolHolderType": "Virtual Holder Standard",
+    "ToolDiameterMm": 34.0,
+    "ToolHolderDiameterMm": 80.0
+  },
+  {
+    "ToolHolderType": "Virtual Holder Standard",
+    "ToolDiameterMm": 100.0,
+    "ToolHolderDiameterMm": 100.0
+  },
+  {
+    "ToolHolderType": "Virtual Holder Standard",
+    "ToolDiameterMm": 10000.0,
+    "ToolHolderDiameterMm": 10000.0
+  }
+]
