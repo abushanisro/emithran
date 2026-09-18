@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ComboboxWithPresets } from '@/components/ui/combobox-with-presets';
-import { useCreateMHR, useUpdateMHR, useMHRRecord, useMHRReferenceDetail, useMHRCategories, useMHRProcessGroups, useMHRLocations, useMHRManufacturerCountries, useMHRWageGrades } from '@/lib/api/hooks';
+import { useCreateMHR, useUpdateMHR, useMHRRecord, useMHRReferenceDetail, useMHRCategories, useMHRCategoriesWithClass, useMHRProcessGroups, useMHRLocations, useMHRManufacturerCountries, useMHRWageGrades } from '@/lib/api/hooks';
 import { toast } from 'sonner';
 import { mhrFormSchema, type MHRFormData } from '@/lib/validations/mhrValidation';
 import { getCurrencyForLocation as getCurrencyInfo } from '@/lib/utils/currency-locale';
@@ -91,6 +91,19 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
   // domain's categories regardless of Process (281 of ~294 rows are Sheet
   // Metal, drowning out e.g. Machining's few).
   const { data: knownCategories = [] } = useMHRCategories(selectedGroup || undefined);
+  // Real category -> real machine_class pairs, same data as knownCategories
+  // above plus the class the cost engine's rate resolvers actually filter
+  // on. Used in onSubmit to resolve a chosen EXISTING category back to its
+  // real class for a brand-new record — see categoryToClass's own comment
+  // below and getDistinctCategoriesWithClass's doc comment for the bug this
+  // closes (a new record saved under a known category like "Inspection" was
+  // writing that display label itself as machine_class, which the resolvers'
+  // `.eq('machine_class', 'cmm')` filter can never match).
+  const { data: categoriesWithClass = [] } = useMHRCategoriesWithClass(selectedGroup || undefined);
+  const categoryToClass = useMemo(
+    () => new Map(categoriesWithClass.filter((c) => c.machineClass).map((c) => [c.category, c.machineClass as string])),
+    [categoriesWithClass],
+  );
 
   const {
     register, handleSubmit, reset, setValue, control, watch,
@@ -213,6 +226,17 @@ export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogPr
       // with a display string; an explicit edit is still respected as-is.
       if (existingRecord && data.machineClass === mhrCategoryOf(existingRecord)) {
         data.machineClass = existingRecord.machineClass || '';
+      } else if (data.machineClass && categoryToClass.has(data.machineClass)) {
+        // The Category field shows/accepts the human display label (e.g.
+        // "Inspection"), but machine_class is the internal slug the cost
+        // engine's rate resolvers filter on (e.g. "cmm") — resolving here
+        // is what makes selecting an EXISTING category reuse the same real
+        // class its other machines already bill under, instead of minting a
+        // new, permanently-unmatchable machine_class from the label itself.
+        // Only applies when the typed value matches a category real rows
+        // already use; a genuinely new category (no match here) is still
+        // saved as its own new class, unchanged from prior behaviour.
+        data.machineClass = categoryToClass.get(data.machineClass)!;
       }
       // MHR = Direct OH + Indirect OH, always (canonical, 2026-08-27) — no
       // longer a free-typed value. A brand-new record needs a real, nonzero

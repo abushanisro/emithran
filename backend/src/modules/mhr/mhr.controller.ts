@@ -48,6 +48,15 @@ export class MHRController {
     return this.mhrService.getDistinctCategories(token, processGroup || undefined);
   }
 
+  @Get('categories-with-class')
+  @ApiOperation({ summary: 'Get distinct real machine categories paired with their real underlying machine_class, so a form choosing an existing category can reuse its real class instead of saving the display label as a new one' })
+  async getCategoriesWithClass(
+    @Query('processGroup') processGroup: string | undefined,
+    @AccessToken() token: string,
+  ): Promise<Array<{ category: string; machineClass: string | null }>> {
+    return this.mhrService.getDistinctCategoriesWithClass(token, processGroup || undefined);
+  }
+
   @Get('process-groups')
   @ApiOperation({ summary: 'Get distinct real process_group values on file in MHR records' })
   async getProcessGroups(@AccessToken() token: string): Promise<string[]> {

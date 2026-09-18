@@ -129,6 +129,22 @@ export function useMHRCategories(processGroup?: string) {
   });
 }
 
+// Same categories as useMHRCategories, paired with each one's real
+// underlying machine_class — see mhrApi.getCategoriesWithClass's own doc
+// comment for why the plain-string list alone can't support resolving a
+// chosen existing category back to the real class a new record should save.
+export function useMHRCategoriesWithClass(processGroup?: string) {
+  return useQuery({
+    queryKey: [...mhrKeys.all, 'categories-with-class', processGroup ?? null],
+    queryFn: () => mhrApi.getCategoriesWithClass(processGroup),
+    staleTime: 1000 * 60 * 5,
+    retry: false,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: false,
+    throwOnError: false,
+  });
+}
+
 export function useMHRProcessGroups() {
   return useQuery({
     queryKey: [...mhrKeys.all, 'process-groups'],

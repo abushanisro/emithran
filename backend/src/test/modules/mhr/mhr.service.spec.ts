@@ -301,3 +301,68 @@ describe('MHRService.removeAll', () => {
     expect(result).toEqual({ deleted: 3 });
   });
 });
+
+// Regression coverage for the "Inspection" category bug (confirmed live,
+// 2026-09-18): a real cmm-classed row's benchmark_source_key-derived display
+// category ("Inspection") carried no way back to its real machine_class, so
+// MHRFormDialog saved a NEW record under that category with the literal
+// string "Inspection" as machine_class — a value the rate resolvers'
+// `.eq('machine_class', 'cmm')` filter can never match.
+function makeCategoriesSupabase(rows: any[]) {
+  const limitMock = jest.fn().mockResolvedValue({ data: rows, error: null });
+  const selectMock = jest.fn().mockReturnValue({ limit: limitMock });
+  const fromMock = jest.fn().mockReturnValue({ select: selectMock });
+  return {
+    service: { getClient: jest.fn().mockReturnValue({ from: fromMock }) } as unknown as SupabaseService,
+    fromMock,
+  };
+}
+
+describe('MHRService.getDistinctCategoriesWithClass', () => {
+  it('pairs a benchmark_source_key-derived category with its real machine_class, closing the "Inspection" bug', async () => {
+    const { service: supabaseService } = makeCategoriesSupabase([
+      { benchmark_source_key: 'Inspection:CMM Machine', machine_class: 'cmm', process_group: 'Machining' },
+      { benchmark_source_key: 'Inspection:Manual Inspection Bench', machine_class: 'cmm', process_group: 'Machining' },
+    ]);
+    const service = new MHRService(supabaseService, testLogger, makeExchangeRateService({ USD: 1 }), makeLhrService());
+
+    const result = await service.getDistinctCategoriesWithClass('token');
+
+    expect(result).toEqual([{ category: 'Inspection', machineClass: 'cmm' }]);
+  });
+
+  it('pairs a machine_class-fallback category (no benchmark key) with that same real machine_class', async () => {
+    const { service: supabaseService } = makeCategoriesSupabase([
+      { benchmark_source_key: null, machine_class: 'gun_drill', process_group: 'Machining' },
+    ]);
+    const service = new MHRService(supabaseService, testLogger, makeExchangeRateService({ USD: 1 }), makeLhrService());
+
+    const result = await service.getDistinctCategoriesWithClass('token');
+
+    expect(result).toEqual([{ category: 'Gun Drill', machineClass: 'gun_drill' }]);
+  });
+
+  it('scopes to the given process group exactly like getDistinctCategories already did', async () => {
+    const { service: supabaseService } = makeCategoriesSupabase([
+      { benchmark_source_key: 'Inspection:CMM Machine', machine_class: 'cmm', process_group: 'Machining' },
+      { benchmark_source_key: null, machine_class: 'fiber_laser', process_group: 'Sheet Metal' },
+    ]);
+    const service = new MHRService(supabaseService, testLogger, makeExchangeRateService({ USD: 1 }), makeLhrService());
+
+    const result = await service.getDistinctCategoriesWithClass('token', 'Machining');
+
+    expect(result).toEqual([{ category: 'Inspection', machineClass: 'cmm' }]);
+  });
+
+  it('getDistinctCategories (legacy string[] shape) is unchanged by the refactor', async () => {
+    const { service: supabaseService } = makeCategoriesSupabase([
+      { benchmark_source_key: 'Inspection:CMM Machine', machine_class: 'cmm', process_group: 'Machining' },
+      { benchmark_source_key: null, machine_class: 'gun_drill', process_group: 'Machining' },
+    ]);
+    const service = new MHRService(supabaseService, testLogger, makeExchangeRateService({ USD: 1 }), makeLhrService());
+
+    const result = await service.getDistinctCategories('token', 'Machining');
+
+    expect(result).toEqual(['Gun Drill', 'Inspection']);
+  });
+});
