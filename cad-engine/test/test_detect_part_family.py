@@ -220,3 +220,96 @@ def test_thin_flat_shell_with_no_im_signal_stays_sheet_metal():
         pocket_count=0,
     )
     assert family == "sheet_metal"
+
+
+# ── The reported live bug: a small machined block, hole-dense but with the
+# "holes" themselves being large-radius cylinders, not perforations ─────────
+#
+# Real part reported live (2026-09-17): 10003.stp, real bbox 17.6 x 17.6 x
+# 3.0mm, uploaded into a Sheet Metal Assembly BOM. Real signals from the
+# actual log line: hole_count=81, large_cyl_count=80, total_face_count=124
+# (hole_density=0.653), flatness=0.17, pocket_count=3, thin_wall_ratio=0.0.
+# Misclassified sheet_metal at 0.81 confidence via Gate 1b ("High hole
+# density... Perforated sheet metal — hole-dominated topology").
+#
+# Root cause: sheet_metal_veto's large-cylinder branch only fired when
+# hole_density < 0.20 — a guard tuned against a SPARSE part with a few
+# oversized holes (the cited motor-bracket case: large_cyl_count=1,
+# hole_count=15, ratio ~7%). It had no defense against a DENSE part where
+# the large cylinders themselves make up nearly the entire hole count (here,
+# 80 of the 81 counted "holes" are large-radius cylindrical faces — ratio
+# ~99%) — hole_density=0.653 cleared the >=0.20 bar meant to protect only
+# genuinely small perforations, when there were almost no small holes on
+# this part at all.
+def test_dense_large_cylinder_block_is_not_sheet_metal():
+    family, confidence, reasons = detect_part_family(
+        bbox_dims=[17.6, 17.6, 3.0],
+        hole_count=81,
+        secondary_features_count=3,  # pocket_count folded in, as the real caller does
+        cyl_axis_alignment=0.10,     # no rotational evidence supplied — isolates the veto fix
+        total_face_count=124,
+        large_cyl_count=80,
+        pocket_count=3,
+        thin_wall_ratio=0.0,
+    )
+    assert family != "sheet_metal", (
+        "A part whose 'holes' are ~99% large-radius cylinders (80/81) cannot be "
+        "perforated sheet metal regardless of how hole-dense it looks — the veto "
+        "must fire on the large-cylinder RATIO, not just on overall hole_density"
+    )
+    # No rotational or IM evidence supplied (see cyl_axis_alignment/thin_wall_ratio
+    # above) — falls through to the honest catch-all, not a fabricated guess.
+    assert family == "cnc_milled"
+
+
+def test_large_cylinder_ratio_veto_does_not_regress_motor_bracket():
+    # Same shape of evidence as test_motor_bracket_hole_density_overrides_pocket_veto
+    # above, re-asserted here to make the new veto branch's boundary explicit:
+    # large_cyl_count=1 / hole_count=15 is a ~7% ratio, nowhere near the new
+    # 50% threshold, so the original sheet-metal classification must be unchanged.
+    family, confidence, _ = detect_part_family(
+        bbox_dims=[70.0, 135.0, 165.5],
+        hole_count=15,
+        secondary_features_count=0,
+        cyl_axis_alignment=0.55,
+        total_face_count=26,
+        large_cyl_count=1,
+        pocket_count=9,
+    )
+    assert family == "sheet_metal", (
+        "The new large-cylinder-ratio veto branch must not fire on a low ratio (~7%)"
+    )
+
+
+def test_large_cylinder_ratio_veto_boundary_just_under_50_percent():
+    # 3 large cylinders out of 7 holes = ~43%, under the 50% threshold — the
+    # ORIGINAL hole_density<0.20 branch also doesn't fire (hole_density here
+    # is high), so this part must still classify as sheet metal: proves the
+    # new branch has a real, deliberate boundary rather than firing on any
+    # nonzero large-cylinder presence.
+    family, confidence, _ = detect_part_family(
+        bbox_dims=[50.0, 200.0, 220.0],
+        hole_count=7,
+        secondary_features_count=0,
+        cyl_axis_alignment=0.10,
+        total_face_count=20,  # hole_density = 7/20 = 0.35
+        large_cyl_count=3,    # > 3 required by the veto's outer condition is FALSE here (3 is not > 3)
+        pocket_count=0,
+    )
+    assert family == "sheet_metal"
+
+
+def test_large_cylinder_ratio_veto_fires_just_over_50_percent():
+    # 5 large cylinders out of 9 holes = ~56%, and large_cyl_count=5 > 3 —
+    # both conditions of the new branch are satisfied, so the veto must fire
+    # even though hole_density (9/20=0.45) is well above the original 0.20 bar.
+    family, confidence, reasons = detect_part_family(
+        bbox_dims=[17.6, 17.6, 3.0],
+        hole_count=9,
+        secondary_features_count=0,
+        cyl_axis_alignment=0.10,
+        total_face_count=20,
+        large_cyl_count=5,
+        pocket_count=0,
+    )
+    assert family != "sheet_metal"

@@ -912,6 +912,10 @@ export interface BlankSpecDto {
   calculatorVersion?: number;
   calculationTrace?: CalculationTraceStep[];
   confidence?: ConfidenceLevel;
+  // Machining only -- set when a "Stock Form" override (round/hex/rectangular
+  // bar) couldn't be honored with real stock_profiles data, so `form` above
+  // fell back to billet instead. See backend blank-spec.dto.ts.
+  stockFormOverrideNote?: string;
 }
 
 

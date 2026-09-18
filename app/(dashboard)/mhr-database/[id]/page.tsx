@@ -8,48 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, FileDown, FileText, Printer, Edit2, Save, X, AlertTriangle } from 'lucide-react';
 
-const FX_RATES_LOCAL_PER_USD: Record<string, number> = {
-  INR: 84.5, USD: 1.0, EUR: 0.92, CNY: 7.25, MXN: 17.5, GBP: 0.79,
-  JPY: 154, TWD: 32.5, KRW: 1380, AUD: 1.56, CAD: 1.37, BRL: 5.1,
-  THB: 36, MYR: 4.75, IDR: 15700, VND: 25300, SGD: 1.35, ZAR: 19.5,
-  TRY: 34, RUB: 91, SAR: 3.75, AED: 3.67, PLN: 4.0, CZK: 23.5, HUF: 365, RON: 4.6,
-};
-
-function getCurrencyFromLocation(location: string): { currency: string; symbol: string } {
-  const loc = (location || '').toLowerCase();
-  if (!loc || loc.includes('india') || loc.includes('bangalore') || loc.includes('pune') ||
-      loc.includes('chennai') || loc.includes('mumbai') || loc.includes('delhi') ||
-      loc.includes('hyderabad')) return { currency: 'INR', symbol: '$' };
-  if (loc.includes('china') || loc.includes('shenzhen') || loc.includes('shanghai') ||
-      loc.includes('beijing') || loc.includes('guangzhou')) return { currency: 'CNY', symbol: '¥' };
-  if (loc.includes('germany') || loc.includes('france') || loc.includes('europe') ||
-      loc.includes('spain') || loc.includes('italy') || loc.includes('netherlands') ||
-      loc.includes('austria') || loc.includes('belgium') || loc.includes('poland') ||
-      loc.includes('czech') || loc.includes('romania') || loc.includes('hungary') ||
-      loc.includes('sweden') || loc.includes('norway') || loc.includes('finland')) return { currency: 'EUR', symbol: '€' };
-  if (loc.includes('usa') || loc.includes('united states') || loc.includes('america') ||
-      loc.includes('us -')) return { currency: 'USD', symbol: '$' };
-  if (loc.includes('uk') || loc.includes('united kingdom') || loc.includes('britain')) return { currency: 'GBP', symbol: '£' };
-  if (loc.includes('japan')) return { currency: 'JPY', symbol: '¥' };
-  if (loc.includes('mexico')) return { currency: 'MXN', symbol: 'MX$' };
-  if (loc.includes('taiwan')) return { currency: 'TWD', symbol: 'NT$' };
-  if (loc.includes('korea')) return { currency: 'KRW', symbol: '₩' };
-  if (loc.includes('australia')) return { currency: 'AUD', symbol: 'A$' };
-  if (loc.includes('canada')) return { currency: 'CAD', symbol: 'CA$' };
-  if (loc.includes('brazil')) return { currency: 'BRL', symbol: 'R$' };
-  if (loc.includes('singapore')) return { currency: 'SGD', symbol: 'S$' };
-  if (loc.includes('thailand')) return { currency: 'THB', symbol: '฿' };
-  if (loc.includes('malaysia')) return { currency: 'MYR', symbol: 'RM' };
-  if (loc.includes('indonesia')) return { currency: 'IDR', symbol: 'Rp' };
-  if (loc.includes('vietnam')) return { currency: 'VND', symbol: '₫' };
-  if (loc.includes('south africa')) return { currency: 'ZAR', symbol: 'R' };
-  if (loc.includes('turkey')) return { currency: 'TRY', symbol: '₺' };
-  if (loc.includes('uae') || loc.includes('dubai')) return { currency: 'AED', symbol: 'AED' };
-  if (loc.includes('saudi')) return { currency: 'SAR', symbol: 'SR' };
-  return { currency: 'INR', symbol: '$' };
-}
 import { useMHRRecord, useUpdateMHR } from '@/lib/api/hooks';
+import { useFxRatesForCurrencies } from '@/lib/api/hooks/useFx';
 import { formatNumber } from '@/lib/utils';
+import { getCurrencyForLocation } from '@/lib/utils/currency-locale';
 import { exportSingleMHRToPDF } from '@/lib/utils/exportMHRToPDF';
 import { MHRFormDialog } from '@/components/features/mhr/MHRFormDialog';
 import { EditableValue } from '@/components/ui/editable-value';
@@ -73,6 +35,15 @@ export default function MHRDetailPage() {
 
   const { data: record, isLoading, error, isError } = useMHRRecord(id);
   const updateMHR = useUpdateMHR();
+
+  // Live reference FX rate (ECB/Frankfurter via useFxRatesForCurrencies) --
+  // same hook hr-rates/page.tsx already uses, never a hardcoded rate table.
+  // Called unconditionally (before the loading/error guard below) per the
+  // rules of hooks; record?.location is undefined until the record loads,
+  // and getCurrencyForLocation('') resolves to its own documented default.
+  const { currency: locCurr, symbol: locSym } = getCurrencyForLocation(record?.location || '');
+  const fxRates = useFxRatesForCurrencies([locCurr]);
+  const locPerUsd = fxRates[locCurr];
 
   useEffect(() => {
     if (record && !editableInputs) {
@@ -157,10 +128,10 @@ export default function MHRDetailPage() {
   };
 
   const handleFixUsdToInr = async () => {
-    if (!record?.machinePriceUsd) return;
-    const { currency } = getCurrencyFromLocation(record.location);
-    const localPerUsd = FX_RATES_LOCAL_PER_USD[currency] ?? 84.5;
-    const correctedLandedCost = Math.round(record.machinePriceUsd * localPerUsd);
+    // locPerUsd is the live reference rate resolved above -- never persist a
+    // corrected cost computed from an unavailable/loading rate.
+    if (!record?.machinePriceUsd || locPerUsd == null) return;
+    const correctedLandedCost = Math.round(record.machinePriceUsd * locPerUsd);
     try {
       await updateMHR.mutateAsync({ id, data: { landedMachineCost: correctedLandedCost, isManualEntry: false } });
       setEditableInputs(prev => prev ? { ...prev, landedMachineCost: correctedLandedCost } : prev);
@@ -243,15 +214,15 @@ export default function MHRDetailPage() {
 
   // Detect USD stored as INR: machine_price_usd > 0 but landed_machine_cost ≤ machine_price_usd × 20
   // (legitimate INR landed cost should be ~84.5× the USD price; anything below 20× is clearly USD)
-  const { currency: locCurr, symbol: locSym } = getCurrencyFromLocation(record.location);
-  const locPerUsd = FX_RATES_LOCAL_PER_USD[locCurr] ?? 84.5;
+  // locCurr/locSym/locPerUsd are resolved once, near the top of the component
+  // (hook rules), from the live reference FX rate -- never a hardcoded table.
   const isUsdStoredAsInr = !!(
     record.machinePriceUsd && record.machinePriceUsd > 0 &&
     record.landedMachineCost > 0 &&
     record.landedMachineCost < record.machinePriceUsd * 20
   );
-  const correctedLandedCost = record.machinePriceUsd
-    ? Math.round(record.machinePriceUsd * locPerUsd) : 0;
+  const correctedLandedCost = record.machinePriceUsd && locPerUsd != null
+    ? Math.round(record.machinePriceUsd * locPerUsd) : null;
 
   // Detect whether the Excel provided individual cost components or only aggregated totals
   const hasFixedBreakdown = calc.depreciationPerHour > 0 || calc.interestPerHour > 0 ||
@@ -404,7 +375,11 @@ export default function MHRDetailPage() {
             <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
             <span>
               <span className="font-semibold">Landed cost is stored in USD, not {locCurr}.</span>
-              {' '}Machine price ${record.machinePriceUsd?.toLocaleString()} USD → correct landed cost: {locSym}{correctedLandedCost.toLocaleString()} {locCurr}. MHR is being computed from the wrong base.
+              {' '}Machine price ${record.machinePriceUsd?.toLocaleString()} USD → correct landed cost:{' '}
+              {correctedLandedCost != null
+                ? `${locSym}${correctedLandedCost.toLocaleString()} ${locCurr}`
+                : `waiting on the live ${locCurr} reference rate…`}
+              . MHR is being computed from the wrong base.
             </span>
           </div>
           <Button
@@ -412,9 +387,13 @@ export default function MHRDetailPage() {
             variant="outline"
             className="shrink-0 border-amber-400 text-amber-800 hover:bg-amber-100"
             onClick={handleFixUsdToInr}
-            disabled={updateMHR.isPending}
+            disabled={updateMHR.isPending || locPerUsd == null}
           >
-            {updateMHR.isPending ? 'Fixing...' : `Fix: ×${locPerUsd} → ${locCurr}`}
+            {updateMHR.isPending
+              ? 'Fixing...'
+              : locPerUsd != null
+                ? `Fix: ×${locPerUsd} → ${locCurr}`
+                : 'Rate unavailable'}
           </Button>
         </div>
       )}

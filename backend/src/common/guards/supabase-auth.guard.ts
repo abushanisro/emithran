@@ -24,6 +24,17 @@ export class SupabaseAuthGuard implements CanActivate {
   ) {}
 
   /**
+   * The development auth bypass must never activate in production, regardless of
+   * whether ADMIN_FALLBACK_EMAIL happens to resolve to a real account. env.validation.ts
+   * already refuses to boot if that variable is set with NODE_ENV=production; this is the
+   * second, independent gate for the same rule, checked on every request rather than once
+   * at startup, so a request never authenticates as admin in production for any reason.
+   */
+  private get bypassAllowed(): boolean {
+    return process.env.NODE_ENV !== 'production';
+  }
+
+  /**
    * The real admin user's id, resolved once and awaited.
    *
    * This used to be kicked off in the constructor WITHOUT being awaited, so any
@@ -93,8 +104,12 @@ export class SupabaseAuthGuard implements CanActivate {
       token = request.query.token as string;
     }
 
-    // Development fallback: no token at all → use cached admin user
+    // Development fallback: no token at all → use cached admin user.
+    // Never applies in production — see `bypassAllowed`.
     if (!token) {
+      if (!this.bypassAllowed) {
+        throw new UnauthorizedException('Authentication required');
+      }
       request.user = await this.getAdminFallbackUser();
       request.accessToken = null;
       return true;
@@ -105,8 +120,14 @@ export class SupabaseAuthGuard implements CanActivate {
       request.user = user;
       request.accessToken = token;
       return true;
-    } catch {
-      // Token invalid → development fallback, no network call
+    } catch (err) {
+      // Token invalid → development fallback, no network call.
+      // Never applies in production — a bad token is rejected outright.
+      if (!this.bypassAllowed) {
+        throw err instanceof UnauthorizedException
+          ? err
+          : new UnauthorizedException('Invalid or expired token');
+      }
       request.user = await this.getAdminFallbackUser();
       request.accessToken = null;
       return true;

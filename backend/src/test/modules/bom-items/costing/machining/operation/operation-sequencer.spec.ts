@@ -93,6 +93,38 @@ describe('buildOperationSequence', () => {
     expect(names).not.toContain('Rigid Tap');
   });
 
+  it('carries the real CAD feature_type + diameter onto every hole-family op, for 3D-viewer highlight matching', () => {
+    const ops = buildOperationSequence([tappedHoleFeature(3, 4, 'M4')], 'aluminum');
+    const spotDrill = ops.find((o) => o.name === 'Spot Drill')!;
+    const drill = ops.find((o) => o.name === 'Drill')!;
+    const chamfer = ops.find((o) => o.name === 'Chamfer')!;
+    const rigidTap = ops.find((o) => o.name === 'Rigid Tap')!;
+    for (const op of [spotDrill, drill, chamfer, rigidTap]) {
+      expect(op.cadFeatureType).toBe('tapped_hole');
+      expect(op.diameterMm).toBe(4);
+    }
+  });
+
+  it('carries the real CAD feature_type (no diameter) onto pocket/slot ops', () => {
+    const ops = buildOperationSequence([pocketFeature(2, 8000)], 'mild_steel');
+    const rough = ops.find((o) => o.name === 'Pocket Rough')!;
+    expect(rough.cadFeatureType).toBe('pocket');
+    expect(rough.diameterMm).toBeUndefined();
+  });
+
+  it('through holes carry through_hole as cadFeatureType, distinct from tapped_hole', () => {
+    const ops = buildOperationSequence([throughHoleFeature(4, 6)], 'aluminum');
+    const drill = ops.find((o) => o.name === 'Drill')!;
+    expect(drill.cadFeatureType).toBe('through_hole');
+    expect(drill.diameterMm).toBe(6);
+  });
+
+  it('fixed ops (Face Mill, Deburr) carry no cadFeatureType — nothing to highlight for them', () => {
+    const ops = buildOperationSequence([tappedHoleFeature(1)], 'aluminum');
+    expect(ops.find((o) => o.name === 'Face Mill')!.cadFeatureType).toBeUndefined();
+    expect(ops.find((o) => o.name === 'Deburr')!.cadFeatureType).toBeUndefined();
+  });
+
   it('machinability factor 2.0 (Al 6061 vs mild steel) halves cycle time for pockets', () => {
     const features = [pocketFeature(1, 10_000)];
     const milSteel = buildOperationSequence(features, 'mild_steel', 1.0);

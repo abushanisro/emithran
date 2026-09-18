@@ -202,20 +202,23 @@ describe('classifyMachineRecord', () => {
     // Several more real Machining categories have since gained their own
     // dedicated cost engine and MACHINE_REGISTRY entry (gun_drill,
     // deep_bore_machine, manual_deburr, cylindrical_grinder, jig_bore,
-    // internal_grinder, broach — 2026-09-18/2026-09-17) — they now correctly
-    // resolve to THEMSELVES via Tier 0's exact-match path (a real class_key
-    // already equal to a real MachineClass, no keyword aliasing needed), not
-    // via MACHINING_CATEGORY_ALIAS.
+    // jig_grind, internal_grinder, broach, machining_millturn —
+    // 2026-09-17/2026-09-18) — they now correctly resolve to THEMSELVES via
+    // Tier 0's exact-match path (a real class_key already equal to a real
+    // MachineClass, no keyword aliasing needed), not via
+    // MACHINING_CATEGORY_ALIAS. machining_millturn keeps its own real,
+    // deliberately-renamed identity distinct from the pre-existing
+    // cnc_mill_turn bucket (a different real machine population, see
+    // migration 738's own comment) — Tier 0 exact match means the two
+    // classes' shared 'MillTurn' keyword never actually needs to
+    // disambiguate them.
     expect(classifyMachineRecord(real('m9', 'cylindrical_grinder', 'Flex Grind Schaudt M'))).toBe('cylindrical_grinder');
     expect(classifyMachineRecord(real('m8', 'broach', 'Pioneer VT1040'))).toBe('broach');
+    expect(classifyMachineRecord(real('m10', 'machining_millturn', 'GILDEMEISTER GMX 400 LINEAR'))).toBe('machining_millturn');
 
     // The remaining real Machining categories still have no dedicated cost
     // engine to alias into yet — correctly stay unclassified (a disclosed
-    // gap, not force-fit into an unrelated bucket). Spot-check a
-    // representative few, including MillTurn (deliberately NOT aliased to
-    // cnc_mill_turn despite its keyword-collision-avoidance rename to
-    // 'machining_millturn' — see MACHINING_CATEGORY_ALIAS's own doc comment).
-    expect(classifyMachineRecord(real('m10', 'machining_millturn', 'GILDEMEISTER GMX 400 LINEAR'))).toBeNull();
+    // gap, not force-fit into an unrelated bucket).
     expect(classifyMachineRecord(real('m11', '3_axis_router', 'Multicam 7000 Series CNC Router, Model 103'))).toBeNull();
   });
 

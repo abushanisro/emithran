@@ -52,6 +52,10 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   CAD_ENGINE_API_KEY: string = '';
+
+  @IsString()
+  @IsOptional()
+  ADMIN_FALLBACK_EMAIL: string = '';
 }
 
 export function validate(config: Record<string, unknown>) {
@@ -71,6 +75,13 @@ export function validate(config: Record<string, unknown>) {
     if (config.CORS_ORIGIN === 'http://localhost:3000' || config.CORS_ORIGIN === '*') {
       throw new Error(
         'SECURITY ERROR: CORS_ORIGIN must be set to your production domain, not localhost or *'
+      );
+    }
+
+    if (validatedConfig.ADMIN_FALLBACK_EMAIL) {
+      throw new Error(
+        'SECURITY ERROR: ADMIN_FALLBACK_EMAIL must not be set in production — it is a ' +
+        'development-only auth bypass. Remove it from the production environment configuration.'
       );
     }
   }

@@ -102,7 +102,14 @@ export class ResolverService {
           newMasterRef: newRef,
           materialCategory: candidate?.materialGroup?.toLowerCase().includes('plastic') ? 'PLASTIC_RUBBER' : 'FERROUS_NON_FERROUS',
           materialName: candidate?.material || extractProposedString(proposedMasters, newRef, 'material', ''),
-          materialGrade: candidate?.grade || candidate?.material || extractProposedString(proposedMasters, newRef, 'grade', ''),
+          // Real, disclosed gap instead of a category conflation: a matched
+          // candidate's own real `grade` column is the only thing that
+          // belongs in this slot. Falling back to candidate.material (the
+          // generic family name, e.g. "Aluminium") when grade is blank used
+          // to present a family as if it were a specific costable grade --
+          // the same shape of bug reported live (a generic material string
+          // that matches nothing in raw_materials and silently costs $0).
+          materialGrade: candidate?.grade || extractProposedString(proposedMasters, newRef, 'grade', ''),
           unitCost,
           grossUsage: line.grossUsageKg,
           netUsage: line.netUsageKg,
@@ -450,8 +457,23 @@ export class ResolverService {
   ): Promise<ReturnType<ResolverService['resolve']>> {
     if (!this.manufacturingRules || !brief) return pkg;
 
+    // Root cause (2026-09-18): this method fabricated a whole generic part
+    // (materialGrade 'IS2062 E250', a 100x50x5mm block, an M8x1.25 thread,
+    // a 10mm cutter, 500mm cut length, ...) whenever the brief's own real
+    // material/geometry data was absent, then fed those invented numbers
+    // into rulesEngine.evaluate() -- which CAN produce a real-looking
+    // `timingSource: 'machining_rules'` result from fake inputs, since the
+    // calculator's own validate() only checks structural validity (e.g. a
+    // positive diameter), not whether the number is real. That result then
+    // silently overwrote the line's honest 'ai_hint'/'default' cycle time.
+    // Fixed: only ever pass fields this codebase can trace to real
+    // brief/feature data; never invent a plausible-sounding substitute. A
+    // line this real data can't support stays at its original (disclosed)
+    // ai_hint/default timing instead of being silently "upgraded" on
+    // fabricated geometry.
     const rulesEngine = this.manufacturingRules; // capture before async context
-    const materialGrade = (brief as any).bomItem?.materialGrade ?? (brief as any).dfm?.materialGrade ?? 'IS2062 E250';
+    const materialGrade = (brief as any).bomItem?.materialGrade ?? (brief as any).dfm?.materialGrade ?? null;
+    if (!materialGrade) return pkg;
 
     const patchedLines = await Promise.all(
       pkg.draftLines.map(async (line) => {
@@ -464,31 +486,37 @@ export class ResolverService {
         const feat = featureId
           ? (brief as any).featureGraph?.features?.find((f: any) => f.id === featureId)
           : null;
+        // No real matched CAD feature for this line -- there is no real
+        // geometry to build a rules-engine input from. Leave the line at
+        // its existing disclosed timing rather than costing a fabricated
+        // generic block.
+        if (!feat) return line;
 
-        // Build geometry from feature record where available
-        const geometry = feat
-          ? {
-              diameterMm: feat.diameter ?? 0,
-              depthMm: feat.depth ?? 0,
-              holeCount: feat.count ?? 1,
-              majorDiameterMm: feat.diameter ?? 0,
-              pitchMm: 1.25, // thread pitch default; should come from feature.spec
-              threadSpec: feat.spec ?? 'M8×1.25',
-              lengthMm: (brief as any).dfm?.boundingBox?.lengthMm ?? 100,
-              materialRemovalMm: 2,
-              cutterDiameterMm: feat.diameter ?? 12,
-              cuttingLengthMm: (brief as any).dfm?.perimeterMm ?? 500,
-              widthMm: (brief as any).dfm?.boundingBox?.widthMm ?? 50,
-            }
-          : {
-              lengthMm: (brief as any).dfm?.boundingBox?.lengthMm ?? 100,
-              materialRemovalMm: 3,
-              diameterMm: (brief as any).dfm?.boundingBox?.widthMm ?? 50,
-              cutterDiameterMm: 10,
-              cuttingLengthMm: (brief as any).dfm?.perimeterMm ?? 200,
-              widthMm: (brief as any).dfm?.boundingBox?.widthMm ?? 50,
-              depthMm: 5,
-            };
+        const boundingBox = (brief as any).dfm?.boundingBox;
+        const geometry: Record<string, unknown> = {};
+        if (typeof feat.diameter === 'number') {
+          geometry.diameterMm = feat.diameter;
+          geometry.majorDiameterMm = feat.diameter;
+          // Real, disclosed inference (same category as this session's
+          // depth = diameter x ratio patterns): the cutting tool for a
+          // round feature is sized to that feature's own real diameter,
+          // not a separate invented cutter size.
+          geometry.cutterDiameterMm = feat.diameter;
+        }
+        if (typeof feat.depth === 'number') geometry.depthMm = feat.depth;
+        if (typeof feat.count === 'number') geometry.holeCount = feat.count;
+        if (typeof feat.spec === 'string' && feat.spec) {
+          geometry.threadSpec = feat.spec;
+          // Real thread pitch parsed from the feature's own real spec
+          // string (e.g. "M8x1.25" -> 1.25), never a hardcoded default.
+          const pitchMatch = /^M\d+(?:\.\d+)?[xX](\d+(?:\.\d+)?)$/.exec(feat.spec.trim());
+          if (pitchMatch) geometry.pitchMm = Number(pitchMatch[1]);
+        }
+        if (typeof boundingBox?.lengthMm === 'number') geometry.lengthMm = boundingBox.lengthMm;
+        if (typeof boundingBox?.widthMm === 'number') geometry.widthMm = boundingBox.widthMm;
+        if (typeof (brief as any).dfm?.perimeterMm === 'number') {
+          geometry.cuttingLengthMm = (brief as any).dfm.perimeterMm;
+        }
 
         try {
           const result = await rulesEngine.evaluate({

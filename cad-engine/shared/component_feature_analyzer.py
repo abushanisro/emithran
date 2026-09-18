@@ -55,7 +55,13 @@ def detect_part_family(
 
     large_cyl_count: number of cylindrical faces with radius > 15% of max bbox dimension.
       These represent external OD surfaces (turned diameters, large bores) — not sheet holes.
-      > 3 → hard veto on sheet_metal gates (a genuine sheet metal part has only small holes).
+      > 3 AND (hole_density < 0.20 OR large_cyl_count/hole_count >= 0.50) → hard veto on
+      sheet_metal gates. Two independent real failure modes, not one: a SPARSE part with a
+      few oversized holes among mostly-empty topology (hole_density low) is caught by the
+      first branch; a DENSE part whose "holes" are themselves mostly large-radius cylinders
+      (hole_density can be high, but almost none of those holes are actually small) is
+      caught by the second. A genuine perforated sheet's holes are small by definition —
+      being hole-dense is not sufficient if the holes themselves are large.
 
     pocket_count: number of prismatic pocket floor faces detected.
       > 2 → hard veto on sheet_metal gates (pockets require milling, not laser/punch).
@@ -176,7 +182,29 @@ def detect_part_family(
         and hole_count < max(20, pocket_count * 5)
         and hole_density < 0.50
     )
-    sheet_metal_veto = (large_cyl_count > 3 and hole_density < 0.20) or pockets_dominate
+    # Root-caused 2026-09-17 (a real reported part: 17.6x17.6x3mm block,
+    # hole_count=81, large_cyl_count=80, hole_density=0.653, flatness=0.17,
+    # total_face_count=124 -- misclassified sheet_metal at 0.81 confidence).
+    # The `hole_density < 0.20` gate above only protects against a SPARSE
+    # part with a few oversized holes slipping past the veto (its own cited
+    # case: a motor-mount bracket with ONE Ø70 shaft-clearance hole among 15
+    # total holes -- large_cyl_count=1, hole_count=15, ratio ~7%). It has no
+    # defense against the opposite failure: a hole-DENSE part where the
+    # large-radius cylinders themselves ARE almost the entire hole count
+    # (here, 80 of 81 "holes" are large-radius cylindrical faces) — hole_density
+    # was 0.653, comfortably clearing the >= 0.20 bar meant to protect only
+    # "a couple of oversized holes among many small ones", when in reality
+    # there were no small ones at all. A genuine perforated sheet's holes are
+    # small BY DEFINITION; a part whose holes are overwhelmingly large-radius
+    # cylinders cannot be one, regardless of how dense they are. Vetoing on
+    # the RATIO of large_cyl_count to hole_count (not on hole_density) closes
+    # this without touching the motor-bracket case (ratio ~7%, far under 50%).
+    large_cyl_fraction_of_holes = (large_cyl_count / hole_count) if hole_count > 0 else 0.0
+    sheet_metal_veto = (
+        (large_cyl_count > 3 and hole_density < 0.20)
+        or (large_cyl_count > 3 and large_cyl_fraction_of_holes >= 0.50)
+        or pockets_dominate
+    )
 
     # Gate 1b-abs — absolute hole count + moderately flat bbox.
     # Perforated brackets with flanges that inflate bbox height will have flatness 0.40–0.60

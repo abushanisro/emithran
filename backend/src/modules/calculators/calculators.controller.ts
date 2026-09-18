@@ -1,7 +1,6 @@
 interface User { id: string; email: string; [key: string]: any; }
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, Inject, forwardRef, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { ThrottlerGuard } from '@nestjs/throttler';
 import { CalculatorsServiceV2 } from './calculators.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
@@ -21,7 +20,6 @@ import {
 
 @ApiTags('Calculators')
 @ApiBearerAuth()
-@UseGuards(ThrottlerGuard)
 @Controller({ path: 'api/calculators', version: '1' })
 export class CalculatorsController {
   constructor(

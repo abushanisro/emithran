@@ -99,33 +99,47 @@ export function AppSidebar() {
     || user?.email?.[0]?.toUpperCase()
     || 'U';
 
-  const navItem = (item: { title: string; url: string; icon: React.ComponentType<{ className?: string }>; exact?: boolean }) => (
-    <SidebarMenuItem key={item.title}>
-      <SidebarMenuButton asChild isActive={isActive(item.url, item.exact)}>
-        <NavLink
-          to={item.url}
-          end={!!item.exact}
-          className={`sidebar-item group ${isActive(item.url, item.exact) ? 'sidebar-item-active' : ''}`}
-          activeClassName="sidebar-item-active"
-        >
-          <item.icon className={`h-4 w-4 shrink-0 transition-colors ${
-            isActive(item.url, item.exact)
-              ? 'text-primary'
-              : 'text-sidebar-foreground/60 group-hover:text-sidebar-foreground'
-          }`} />
-          {!collapsed && <span className="text-sm">{item.title}</span>}
-        </NavLink>
-      </SidebarMenuButton>
-    </SidebarMenuItem>
-  );
+  const navItem = (item: { title: string; url: string; icon: React.ComponentType<{ className?: string }>; exact?: boolean }) => {
+    const active = isActive(item.url, item.exact);
+    return (
+      <SidebarMenuItem key={item.title}>
+        <SidebarMenuButton asChild isActive={active}>
+          <NavLink
+            to={item.url}
+            end={!!item.exact}
+            className={`sidebar-item group relative flex items-center gap-3 rounded-lg px-2.5 py-2 transition-all ${
+              active
+                ? 'bg-primary/10 text-primary shadow-sm'
+                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
+            }`}
+            activeClassName="sidebar-item-active"
+          >
+            {active && (
+              <span className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-primary" />
+            )}
+            <item.icon className={`h-4 w-4 shrink-0 transition-colors ${
+              active ? 'text-primary' : 'text-sidebar-foreground/60 group-hover:text-sidebar-foreground'
+            }`} />
+            {!collapsed && <span className="text-sm font-medium">{item.title}</span>}
+          </NavLink>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    );
+  };
 
   return (
     <Sidebar className="border-r border-sidebar-border bg-sidebar">
       <SidebarHeader className="p-4">
-        {!collapsed && (
+        {!collapsed ? (
           <div className="flex-1 min-w-0">
             <h2 className="font-bold text-lg text-sidebar-foreground tracking-tight">mithran</h2>
             <p className="text-xs text-sidebar-foreground/50">One-Stop Solution</p>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center">
+            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+              <span className="text-sm font-bold text-primary">m</span>
+            </div>
           </div>
         )}
       </SidebarHeader>
@@ -134,20 +148,20 @@ export function AppSidebar() {
 
       <SidebarContent className="px-3 py-4">
         <SidebarGroup>
-          <SidebarGroupLabel className="text-sidebar-foreground/70 text-[11px] uppercase tracking-widest font-medium px-3 mb-2">
+          <SidebarGroupLabel className="text-sidebar-foreground/50 text-[10.5px] uppercase tracking-widest font-semibold px-2.5 mb-1.5">
             Main
           </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>{mainItems.map(navItem)}</SidebarMenu>
+            <SidebarMenu className="gap-0.5">{mainItems.map(navItem)}</SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup className="mt-6">
-          <SidebarGroupLabel className="text-sidebar-foreground/70 text-[11px] uppercase tracking-widest font-medium px-3 mb-2">
+        <SidebarGroup className="mt-5">
+          <SidebarGroupLabel className="text-sidebar-foreground/50 text-[10.5px] uppercase tracking-widest font-semibold px-2.5 mb-1.5">
             Database
           </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>{databaseItems.map(navItem)}</SidebarMenu>
+            <SidebarMenu className="gap-0.5">{databaseItems.map(navItem)}</SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
