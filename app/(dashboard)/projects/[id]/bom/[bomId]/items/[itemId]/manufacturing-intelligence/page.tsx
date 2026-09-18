@@ -159,6 +159,11 @@ interface ProcessTreeNode {
   // computeFeatureNodeVisual can match this row to its v2Features occurrences
   // for highlighting — matching by diameter, not by parsing the display label.
   holeDiameterMm?: number;
+  // Set on CNC canonical-operation feature nodes (built from real
+  // feature_graph_v2 entries carrying a backend-attached canonical_operation —
+  // see canonical-operation.ts) so a click can highlight the exact matching
+  // feature_graph_v2 entry by id instead of re-deriving a match by label/diameter.
+  v2FeatureId?: string;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -183,6 +188,16 @@ const SUB_OP: Record<string, string> = {
   'Inspection': 'As Inspected',
   'Tapping': 'As Tapped',
   'Surface Treatment': 'As Coated',
+};
+
+// Which feature_graph_v2 CNC feature_type buckets a given rec.process step
+// covers — every bucket listed for a given process resolves to the SAME
+// canonical_operation via canonical-operation.ts (verified: through_hole/
+// blind_hole/cross_hole all resolve to "Drilling // SimpleHole"), so taking
+// the first match's canonical_operation as the step's real label is safe.
+const CNC_PROCESS_TO_FEATURE_TYPES: Record<string, string[]> = {
+  Drilling: ['through_hole', 'blind_hole', 'cross_hole'],
+  Tapping: ['tapped_hole'],
 };
 
 // ── Surface Treatment KB ───────────────────────────────────────────────────────
@@ -1210,8 +1225,41 @@ function buildProcessTree(
     const machine = rec.process === 'Inspection'
       ? (needsCmm ? 'CMM' : 'Inspection Bench')
       : realMachineName ?? '—';
-    const subLabel = SUB_OP[rec.process] ?? 'As Processed';
     const featureNodes: ProcessTreeNode[] = [];
+
+    // Real per-feature canonical operations (e.g. "Drilling // SimpleHole"),
+    // sourced from feature_graph_v2 entries the backend already classified
+    // (canonical-operation.ts / auto-fill.service.ts's attachCanonicalOperations).
+    // Only CNC families carry these — Sheet Metal / Plastic Molding features
+    // never get a canonical_operation attached. Replaces the fabricated
+    // SUB_OP "As Drilled"/"As Tapped" label whenever real data exists; falls
+    // back to it when this part hasn't been through CAD feature extraction
+    // yet (a disclosed gap, not a guess dressed up as real data).
+    const isCNCFamilyRec = family !== 'sheet_metal' && family !== 'plastic_molded';
+    const cncFeatureTypesForProcess = CNC_PROCESS_TO_FEATURE_TYPES[rec.process];
+    const matchedCanonicalFeatures = isCNCFamilyRec && cncFeatureTypesForProcess
+      ? (fg?.feature_graph_v2?.features ?? []).filter(
+          (f) => cncFeatureTypesForProcess.includes(f.feature_type) && f.canonical_operation,
+        )
+      : [];
+    if (matchedCanonicalFeatures.length > 0) {
+      matchedCanonicalFeatures.forEach((f) => {
+        const count = f.occurrences.length;
+        const diaPart = f.diameter_mm != null ? ` — Ø${f.diameter_mm.toFixed(1)}` : '';
+        featureNodes.push({
+          id: `v2feat_${f.id}`,
+          kind: 'feature',
+          label: `${f.canonical_operation}${diaPart} ×${count}`,
+          factory, machine,
+          v2FeatureId: f.id,
+          attrs: [
+            { name: 'Count', value: String(count) },
+            ...(f.diameter_mm != null ? [{ name: 'Diameter', value: `${f.diameter_mm.toFixed(1)} mm` }] : []),
+          ],
+        });
+      });
+    }
+    const subLabel = matchedCanonicalFeatures[0]?.canonical_operation ?? SUB_OP[rec.process] ?? 'As Processed';
 
     // For CNC parts: which feature groups belong to this operation
     const OP_GROUPS: Record<string, string[]> = {
@@ -1564,7 +1612,11 @@ function buildProcessTree(
       });
     }
 
-    if (isTapping) {
+    if (isTapping && matchedCanonicalFeatures.length === 0) {
+      // Only shown when no real feature_graph_v2 tapped_hole data exists yet —
+      // once it does, the real "Tapping // SimpleHole ×N" node above already
+      // says what's actually detected, so this heuristic placeholder would be
+      // a second, weaker-evidence answer to the same question.
       const threadSpecs = (item.drawingIntelligence as any)?.threads as Array<{ size: string; pitch: number; count: number }> | undefined;
       const tappingHint = threadSpecs && threadSpecs.length > 0
         ? threadSpecs.map((t) => {
@@ -1853,6 +1905,13 @@ function computeFeatureNodeVisual(
     const hl = mergeFeaturesToHL(id, feats);
     return hl ? { highlight: hl, color } : null;
   };
+  // Real canonical-operation CNC feature nodes (v2feat_*, built from
+  // feature_graph_v2 entries the backend already classified) — match by the
+  // exact feature id tagged at build time, never by re-deriving from label.
+  if (node.v2FeatureId != null) {
+    const exact = v2Features.find((f) => f.id === node.v2FeatureId);
+    return exact ? merge(`hl-${node.v2FeatureId}`, [exact], '#f97316') : null;
+  }
   if (node.id === 'feat_tapping')
     return merge('hl-tapping',
       v2Features.filter((f) => f.feature_type === 'hole' && (f.diameter_mm ?? 99) <= 6.0), '#a855f7');
