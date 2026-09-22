@@ -48,7 +48,7 @@ export const TOOLS = [
       properties: {
         partFamily: {
           type: 'string',
-          enum: ['cnc_turned', 'cnc_milled', 'sheet_metal'],
+          enum: ['turned', 'milled', 'sheet_metal'],
         },
         rawMaterials: {
           type: 'array',

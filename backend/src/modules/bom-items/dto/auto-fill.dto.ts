@@ -23,7 +23,7 @@ export class AutoFillSuggestionsDto {
   materialId: string | null;
   density: number | null;
   processType: string;
-  familyClassification: string | null;     // detected part family (sheet_metal, cnc_milled, etc.)
+  familyClassification: string | null;     // detected part family (sheet_metal, milled, etc.)
   familyConfidence: number | null;         // 0–1 confidence from CAD engine
   makeBuy: 'make' | 'buy';
   itemType: 'assembly' | 'sub_assembly' | 'child_part';

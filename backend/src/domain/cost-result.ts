@@ -3,7 +3,7 @@
 // `CostSummaryDto`/`ProcessLineCost`/`CalculationTraceStep` in
 // cost-breakdown.dto.ts already are the shared cost-result shape across all
 // three real manufacturing engines (Sheet Metal's cost-engine.ts, CNC's
-// cost-cnc-engine.ts, Injection Molding's cost-injection-molding-engine.ts —
+// cost-machining-engine.ts, Injection Molding's cost-injection-molding-engine.ts —
 // all three import CostSummaryDto/ProcessLineCost from the same file and
 // build the same shape). New cross-domain code should import from here so
 // there is one canonical path, without duplicating or renaming the types

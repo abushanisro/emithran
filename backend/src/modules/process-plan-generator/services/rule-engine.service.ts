@@ -27,7 +27,7 @@ export class RuleEngineService {
     const mandatory: MandatoryOp[] = [];
     // Hole-making and tapping run on the mill for milled parts, on the lathe otherwise
     const holeMachine: MandatoryOp['machineCategoryHint'] =
-      family === 'cnc_milled' ? 'cnc_mill' : 'cnc_lathe';
+      family === 'milled' ? 'cnc_mill' : 'cnc_lathe';
 
     for (const f of graph.features) {
       switch (f.type) {

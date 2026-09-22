@@ -24,8 +24,21 @@ cad-engine/
   injection_molding/
     feature_extractor.py         — InjectionMoldedFeatureExtractor
   machining/
-    cnc_feature_recognizer.py    — CNCFeature/CNCFeatureTree/CNCFeatureRecognizer, whole file
+    machining_feature_recognizer.py — MachiningFeature/MachiningFeatureTree/
+                                       MachiningFeatureRecognizer orchestration
+                                       (renamed 2026-09-19 from cnc_feature_recognizer.py
+                                       per the "Machining is the canonical domain,
+                                       not CNC" architecture mandate)
+    feature_models.py            — MachiningFeatureType/MachiningFeature/MachiningFeatureTree
+                                    data shapes (own module since the same rename)
+    cnc_feature_recognizer.py    — DEPRECATED compatibility shim only (re-exports
+                                    the above under their old CNC* names); no new
+                                    imports of this module, no duplicate implementation
   shared/                        — cross-domain, not owned by one manufacturing family
+    machining_geometry.py        — hole/cone/counterbore classification + cylinder
+                                    collection primitives, extracted out of Machining
+                                    (2026-09-19) since Sheet Metal genuinely depends
+                                    on them directly — see below
     component_feature_analyzer.py — ComponentFeatureAnalyzer + detect_part_family()
     feature_contract.py          — additive versioned feature envelope
     drawing_analyzer.py          — 2D drawing/PDF title-block extraction
@@ -51,24 +64,44 @@ them — it was one file by accident of history, not by design:
 - `_annotate_tap_candidates()` (former lines 24–47) — private helper, called only
   from inside `SheetMetalFeatureExtractor`; moved with it.
 
-## Known intentional cross-domain dependency (not resolved in this refactor)
+## Known intentional cross-domain dependency (partially resolved 2026-09-19)
 
-`sheet_metal/feature_extractor.py` imports 5 symbols from
-`machining/cnc_feature_recognizer.py`:
+`sheet_metal/feature_extractor.py` and `sheet_metal/features/forming_spike.py`
+originally imported these symbols directly from Machining:
 
 ```python
 from machining.cnc_feature_recognizer import _TAP_DRILL_RANGES
 from machining.cnc_feature_recognizer import CNCFeatureRecognizer, CNCFeature, _detect_counterbores, _classify_cone
 ```
 
-This is real, pre-existing behavior (verified via the import graph before any file
+This was real, pre-existing behavior (verified via the import graph before any file
 moved) — Sheet Metal genuinely reuses Machining's tap/counterbore/cone
-classification logic today. It was **preserved exactly as-is** in this refactor:
+classification logic. It was preserved exactly as-is in the 2026-09-01 refactor:
 no wrapper, no duplication, no partial split of `cnc_feature_recognizer.py`.
 
-This is deliberate, **temporary architectural debt**, not the desired end state.
-The direction to move in later (a separate, dedicated task — not expanded into
-here) is:
+**2026-09-19 update:** the "move in later" direction below was executed as part
+of the "Machining is the canonical domain, not CNC" architecture mandate.
+`_TAP_DRILL_RANGES`, `classify_hole`/`_classify_hole`, `classify_cone`/
+`_classify_cone`, `detect_counterbores`/`_detect_counterbores`,
+`detect_multistep_holes`, and the raw `collect_cylinders` primitive underlying
+`_collect_cylinders` are now genuinely domain-neutral, living in
+`shared/machining_geometry.py` with **zero import dependency on
+`machining.feature_models`** — the direction described below, now real, not
+just aspirational. Sheet Metal's two call sites now import from
+`machining.machining_feature_recognizer` (which re-exports these
+`shared/machining_geometry.py` names unchanged, so this is not a duplicate
+implementation), and the class names are `MachiningFeatureRecognizer`/
+`MachiningFeature`.
+
+**Not yet moved, still a real cross-domain dependency:** both Sheet Metal call
+sites still instantiate `MachiningFeatureRecognizer()` directly to reach its
+`_collect_cylinders`/`_collect_cones` *methods* (thin delegating wrappers over
+the now-shared functions, kept as methods so this exact call pattern —
+`recognizer._collect_cylinders(...)` — didn't need to change). Promoting this
+from "instantiate a Machining class" to a true shared free function is real,
+further work, not done in this pass.
+
+The direction to move in later (for what remains) is still:
 
 ```
 Sheet Metal -> domain-neutral shared geometry/feature primitives
@@ -81,8 +114,9 @@ Sheet Metal -> Machining
 ```
 
 Only extract a symbol into `shared/` when it's genuinely cross-domain-owned —
-do not move `CNCFeatureRecognizer` (or the rest of `cnc_feature_recognizer.py`)
-into `shared/` merely because Sheet Metal happens to consume part of it today.
+do not move `MachiningFeatureRecognizer` (or the rest of
+`machining_feature_recognizer.py`) into `shared/` merely because Sheet Metal
+happens to consume part of it today.
 
 ## Verification performed (no OCC available in the refactor environment)
 

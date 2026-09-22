@@ -1448,8 +1448,8 @@ function ProcessPlanningPageContent() {
                                   <SelectItem value="auto">Auto-detect (material + geometry)</SelectItem>
                                   <SelectItem value="sheet_metal">Sheet Metal</SelectItem>
                                   <SelectItem value="plastic_molded">Injection Molding</SelectItem>
-                                  <SelectItem value="cnc_milled">CNC Milled</SelectItem>
-                                  <SelectItem value="cnc_turned">CNC Turned</SelectItem>
+                                  <SelectItem value="milled">Milled</SelectItem>
+                                  <SelectItem value="turned">Turned</SelectItem>
                                 </SelectContent>
                               </Select>
                             ) : (

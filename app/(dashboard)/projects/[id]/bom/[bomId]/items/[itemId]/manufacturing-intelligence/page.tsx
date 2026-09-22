@@ -45,6 +45,7 @@ import {
   type StoredProcessRow,
 } from '@/lib/costing/stored-process-lines';
 import { resolveLineSetup, roundSetupMinutes } from '@/lib/costing/process-line-setup';
+import { deriveMaterialUsage } from '@/lib/costing/material-usage';
 import { toast } from 'sonner';
 import { ModelViewer } from '@/components/ui/model-viewer';
 import { useBOMItem, useAnalysisVersion, useDFMScores, useMaterialIntelligence, useMaterialDensity, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useGdtAnalysis, useCostOverride, useApplyRoute, useApplyCustomRoute, useMachineOverride, costSummaryQueryKey, costSummaryUrl, type BlankSpecDto, type ProcessLineCost, type ApplyCustomRouteStep } from '@/lib/api/hooks/useBOMItems';
@@ -54,7 +55,8 @@ import { useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculat
 import { useSmLookupTables, type ReferenceTable } from '@/lib/api/hooks/useProcesses';
 import { resolveMhrUsdRate } from '@/lib/api/mhr';
 import type { GdtSeverity, CostSummaryDto, RouteComparisonDto, RouteResultDto, ResolvedCostingInputs } from '@/lib/api/hooks/useBOMItems';
-import { useRawMaterials, useMaterialAliases } from '@/lib/api/hooks/useRawMaterials';
+import { useRawMaterials } from '@/lib/api/hooks/useRawMaterials';
+import { useDebounce } from '@/lib/hooks/useDebounce';
 import type { RawMaterial } from '@/lib/api/hooks/useRawMaterials';
 import { useCreateRawMaterialCost, useRawMaterialCosts } from '@/lib/api/hooks/useRawMaterialCosts';
 import { getThreadIntelligence } from '@/lib/manufacturing-kb/thread-standards';
@@ -295,11 +297,11 @@ function resolveDisplayFamily(
   item: { materialGrade?: string | null; material?: string | null },
   fg: { classification?: { family?: string } } | null,
 ): string {
-  const family = fg?.classification?.family ?? 'cnc_milled';
+  const family = fg?.classification?.family ?? 'milled';
   if (family !== 'sheet_metal') return family;
   return isSheetFormableMaterial(`${item.materialGrade ?? ''} ${item.material ?? ''}`)
     ? family
-    : 'cnc_milled';
+    : 'milled';
 }
 
 // Resolve which SURFACE_TREATMENT_KB sequence applies. Explicit drawing coating wins;
@@ -363,8 +365,8 @@ const INSPECTION_KB: Record<string, KBFeature> = {
 // correct at their own grain; do not "fix" one to match the other.
 const FAMILY_GROUP: Record<string, string> = {
   sheet_metal: 'Sheet Metal',
-  cnc_milled: 'CNC Machining',
-  cnc_turned: 'CNC Turning',
+  milled: 'Machining',
+  turned: 'Turning',
   plastic_molded: 'Plastic Molding',
   casting: 'Die Casting',
   forging: 'Forging',
@@ -803,7 +805,7 @@ function FeatureBreakdown({
 // always reads 'Injection Moulded' for the plastic_molded family today).
 function familyLabel(f: string): string {
   const m: Record<string, string> = {
-    sheet_metal: 'Sheet Metal', cnc_milled: 'CNC Milled', cnc_turned: 'CNC Turned',
+    sheet_metal: 'Sheet Metal', milled: 'Milled', turned: 'Turned',
     mill_turn: 'Mill-Turn', plastic_molded: 'Injection Moulded',
     casting: 'Casting', forging: 'Forging',
     extrusion: 'Extrusion', weldment: 'Weldment', additive: 'Additive',
@@ -3137,6 +3139,7 @@ function CostSummaryTab({
         currencySymbol={sym}
         conversionRate={fromUsd}
         autoOpenCalculator={procDialogAutoOpenCalculator}
+        liveProcessLines={cost?.processLines}
       />
 
       {/* ── PACKAGING & LOGISTICS ── */}
@@ -4496,7 +4499,7 @@ const WORKFLOW_KB: Record<string, WorkflowStep[]> = {
   // evidence of a tapped hole, and keeping a second, looser definition of the
   // same operation is how the process tree came to show Tapping on a part the
   // quote correctly had no tapping for.
-  cnc_turned: [
+  turned: [
     {
       id: 'turning',
       category: 'Turning',
@@ -4539,7 +4542,7 @@ const WORKFLOW_KB: Record<string, WorkflowStep[]> = {
       ],
     },
   ],
-  cnc_milled: [
+  milled: [
     {
       id: 'milling',
       category: 'Milling',
@@ -5147,7 +5150,7 @@ function RouteSelectionDialog({
     onApplied();
   }
 
-  // ═══ Fixed-family path (cnc_turned/cnc_milled/etc. — unchanged UX,
+  // ═══ Fixed-family path (turned/milled/etc. — unchanged UX,
   // WORKFLOW_KB-driven) — kept for families not yet migrated to the real
   // comparison-driven model above. ═══════════════════════════════════════════
   const allSteps: WorkflowStep[] = WORKFLOW_KB[partFamily ?? ''] ?? [];
@@ -5406,7 +5409,7 @@ function RouteSelectionDialog({
             </div>
           </div>
         ) : (
-          /* Fixed-family path (cnc_turned / cnc_milled — WORKFLOW_KB-driven).
+          /* Fixed-family path (turned / milled — WORKFLOW_KB-driven).
              These families have exactly ONE route, so there is nothing to
              compare and no left pane to show; the step table is the whole
              surface. Its logic is untouched. */
@@ -5581,69 +5584,40 @@ function MaterialPickerDialog({
   const [groupFilter, setGroupFilter] = useState('');
   const [selected, setSelected] = useState<RawMaterial | null>(null);
 
-  const { data, isLoading } = useRawMaterials(open ? { limit: 1000 } : undefined);
-  const materials: RawMaterial[] = data?.items ?? [];
+  // Search is ranked SERVER-side (GET /raw-materials?search=) by the same
+  // deterministic material ranker the costing resolver uses: exact name >
+  // registered alias > designation ("6061" as a whole token) > cross-standard
+  // (ASTM/DIN/EN/JIS) > typed prefix, in both aluminum/aluminium spellings.
+  // This dialog used to filter client-side with a hand-synced copy of the
+  // spelling logic and NO ranking, so the grade the user meant could sit
+  // anywhere in an alphabetical list -- and could differ from the row costing
+  // actually picked. One ranker, one answer.
+  const { debouncedValue: debouncedSearch } = useDebounce(search.trim(), 250);
+  const isSearching = debouncedSearch.length > 0;
 
-  // This dialog filters client-side (fetches all materials once above) rather
-  // than calling the backend's search= param, so alias-aware matching (e.g.
-  // "AL6101" -> Generic Aluminum, ANSI 6101) has to be checked here directly --
-  // same normalization as raw-materials.service.ts's resolveAliasId().
-  const { data: aliases } = useMaterialAliases();
-  const normalize = (s: string) => s.toUpperCase().replace(/[\s-]/g, '');
-  const aliasMatchId = search.trim()
-    ? aliases?.find((a) => a.aliasNormalized === normalize(search))?.rawMaterialId
-    : undefined;
+  // Full catalog (cached): the un-searched browse view and the source of the
+  // Group filter list (which must not shrink to the current search's groups).
+  const { data: catalog, isLoading: catalogLoading } = useRawMaterials(open ? { limit: 1000 } : undefined);
+  const { data: searchData, isFetching: searchFetching } = useRawMaterials(
+    isSearching ? { search: debouncedSearch, limit: 1000 } : undefined,
+    { enabled: open && isSearching, keepPrevious: true },
+  );
+  const isLoading = isSearching ? searchFetching && !searchData : catalogLoading;
+  const materials: RawMaterial[] = isSearching ? (searchData?.items ?? []) : (catalog?.items ?? []);
 
-  const groups = Array.from(new Set(materials.map((m) => m.materialGroup).filter(Boolean))).sort();
+  const groups = Array.from(new Set((catalog?.items ?? []).map((m) => m.materialGroup).filter(Boolean))).sort();
 
-  // Root-caused live (2026-09-18): searching "aluminium" (or "ALUMINIUM")
-  // returned 0 results even though every real aluminum-family row exists —
-  // spelled "Aluminum" throughout (verified directly against the real
-  // staged source, memory/sheetmetal/rawmetrial/rawmetalusa.json:
-  // "Aluminum, AA 1100", "Aluminum, AA 2219", etc., 29 real rows). A plain
-  // substring match can never bridge this: "aluminium" and "aluminum"
-  // diverge right after their shared "alumin" prefix, so neither is a
-  // substring of the other. Same real, verified American/British spelling
-  // variant list as raw-materials.service.ts's buildMaterialSearchOrClause
-  // (kept in sync by hand — this Next.js frontend and the NestJS backend
-  // are separate deployables with no shared TS package to hold one copy).
-  const SEARCH_SPELLING_VARIANTS: ReadonlyArray<readonly [string, string]> = [
-    ['aluminum', 'aluminium'],
-    ['fiber', 'fibre'],
-    ['sulfur', 'sulphur'],
-  ];
-  // Builds exactly two additional canonical forms in one linear pass each
-  // ("every known word rewritten to American spelling" / "...to British
-  // spelling") rather than one variant per matched word — a compound term
-  // like "aluminium fibre reinforced" must normalize BOTH words together
-  // (-> "aluminum fiber reinforced"), not just whichever pair a per-word
-  // loop happened to reach first. Same fix as raw-materials.service.ts's
-  // identical bug, caught by that file's own unit tests.
-  const expandSearchTermSpellingVariants = (term: string): string[] => {
-    const lower = term.toLowerCase();
-    let towardUs = lower;
-    let towardUk = lower;
-    for (const [us, uk] of SEARCH_SPELLING_VARIANTS) {
-      towardUs = towardUs.replace(new RegExp(uk, 'g'), us);
-      towardUk = towardUk.replace(new RegExp(us, 'g'), uk);
-    }
-    return [...new Set([lower, towardUs, towardUk])];
+  const filtered = materials.filter((m) => !groupFilter || m.materialGroup === groupFilter);
+
+  const MATCH_TIER_LABEL: Record<string, string> = {
+    exact: 'Exact',
+    alias: 'Alias',
+    designation: 'Grade match',
+    standard: 'Standard match',
+    partial: 'Partial',
+    descriptive: 'Related',
+    substring: 'Contains',
   };
-  const searchVariants = search.trim() ? expandSearchTermSpellingVariants(search) : [];
-
-  const filtered = materials.filter((m) => {
-    const haystacks = [
-      m.material.toLowerCase(),
-      (m.materialGrade ?? '').toLowerCase(),
-      (m.materialGroup ?? '').toLowerCase(),
-      (m.materialDescription ?? '').toLowerCase(),
-    ];
-    const matchSearch = searchVariants.length === 0 ||
-      searchVariants.some((q) => haystacks.some((h) => h.includes(q))) ||
-      m.id === aliasMatchId;
-    const matchGroup = !groupFilter || m.materialGroup === groupFilter;
-    return matchSearch && matchGroup;
-  });
 
   // The detail panel must never show a material that isn't in the current
   // filtered list -- without this, changing the search after already having
@@ -5757,6 +5731,7 @@ function MaterialPickerDialog({
                       <tr
                         key={m.id}
                         onClick={() => setSelected(m)}
+                        title={isSearching ? m.matchReason : undefined}
                         className={cn(
                           'border-b cursor-pointer transition-colors text-xs',
                           isActive
@@ -5765,7 +5740,14 @@ function MaterialPickerDialog({
                         )}
                       >
                         <td className="px-2.5 py-1.5 text-muted-foreground text-[10px]">{m.materialGroup ?? '—'}</td>
-                        <td className="px-2.5 py-1.5 font-medium">{disp.material}</td>
+                        <td className="px-2.5 py-1.5 font-medium">
+                          {disp.material}
+                          {isSearching && m.matchTier && (
+                            <span className="ml-1.5 text-[9px] font-normal border border-border rounded px-1 py-0.5 text-muted-foreground align-middle">
+                              {MATCH_TIER_LABEL[m.matchTier] ?? m.matchTier}
+                            </span>
+                          )}
+                        </td>
                         <td className="px-2.5 py-1.5 text-muted-foreground">{disp.grade ?? '—'}</td>
                         <td className="px-2.5 py-1.5 text-right text-muted-foreground">
                           {dens ? `${dens.toFixed(0)}` : '—'}
@@ -6353,46 +6335,28 @@ function CostGuidePanel({
           return;
         }
       }
-      // Look up material — exact match first, then tokenized fallback for compound
-      // grade strings like "IS2062 E250 CRCA" that span multiple DB rows
-      // ("Mild Steel IS2062" + "CRCA Steel"). At least 2 tokens must match.
-      const gradeTokens = grade.split(/[\s\-\/]+/).filter((t: string) => t.length >= 3);
-      const tokenScore = (val: string | null | undefined) => {
-        if (!val) return 0;
-        const u = val.toUpperCase();
-        return gradeTokens.filter((t: string) => u.includes(t.toUpperCase())).length;
-      };
+      // Look up material -- exact name first (already-loaded caches), then the
+      // server's RANKED search for a loose grade ("6061", "IS2062 E250 CRCA").
+      // The ranker is the same deterministic one the costing engine resolves
+      // material with (exact > alias > designation > cross-standard > prefix,
+      // base grade over suffix variants), and it flags `matchIsBest` on a row
+      // ONLY when the term is unambiguous -- so this record and the engine
+      // agree on one row, and a bare family name ("ALUMINUM") selects nothing
+      // instead of whichever row sorted first. The old client-side token
+      // scoring broke ties by list order and only ran for multi-word grades.
       const exactMatchMat = (m: RawMaterial) =>
         materialLabel(m.material, m.materialGrade) === grade ||
         m.materialGrade === grade ||
         m.material === grade;
-      const tokenMatchMat = (m: RawMaterial) =>
-        tokenScore(m.materialGrade) + tokenScore(m.material) >= Math.max(1, Math.floor(gradeTokens.length / 2));
 
-      const bestToken = (items: RawMaterial[] | undefined) => {
-        if (!items || gradeTokens.length <= 1) return undefined;
-        return [...items]
-          .sort((a, b) =>
-            (tokenScore(b.materialGrade) + tokenScore(b.material)) -
-            (tokenScore(a.materialGrade) + tokenScore(a.material))
-          )
-          .find(tokenMatchMat);
-      };
-
-      // 1. Try the search-filtered cache (exact search match, fastest path)
-      // 2. Fall back to the broad validation cache (already in memory, avoids
-      //    PostgREST special-character issues in the search endpoint).
-      // 3. Last resort: direct API call (works after the PostgREST escaping fix is deployed)
       let mat: RawMaterial | undefined =
         allMatsData?.items?.find(exactMatchMat) ??
-        bestToken(allMatsData?.items) ??
-        dbMaterialsForValidation?.items?.find(exactMatchMat) ??
-        bestToken(dbMaterialsForValidation?.items);
+        dbMaterialsForValidation?.items?.find(exactMatchMat);
 
       if (!mat) {
         try {
           const resp = await apiClient.get<{ items: RawMaterial[] }>('/raw-materials', { params: { search: grade, limit: 10 } });
-          mat = resp?.items?.find(exactMatchMat) ?? bestToken(resp?.items);
+          mat = resp?.items?.find(exactMatchMat) ?? resp?.items?.find((m) => m.matchIsBest);
         } catch { /* lookup failure is non-fatal */ }
       }
 
@@ -6444,39 +6408,21 @@ function CostGuidePanel({
       const engineNetKg = rawEngineNetKg > 0 ? rawEngineNetKg : null;
       const cadWeight = typeof item.weight === 'number' && item.weight > 0 ? item.weight : null;
       const isSheetMetalPart = fg?.classification?.family === 'sheet_metal' || (summary?.sheetThicknessMm ?? 0) > 0;
-      // Only a genuine fallback -- used when the nesting engine hasn't
-      // resolved a real net weight for this part yet (cost summary still
-      // loading, or a non-sheet-metal part with no nesting concept at all).
-      // Never silently substituted when the real net weight IS available,
-      // which was the bug this whole block exists to fix.
-      const FALLBACK_SCRAP_PCT = 10;
-      let netUsage: number;
-      let grossUsage: number;
-      let scrap: number;
-      if (isSheetMetalPart && engineGrossKg !== null && engineNetKg !== null) {
-        grossUsage = parseFloat(engineGrossKg.toFixed(6));
-        netUsage   = parseFloat(engineNetKg.toFixed(6));
-        // Real scrap %, derived from the nesting engine's own gross/net
-        // weights -- never assumed. For an irregular part with real
-        // internal cutouts this can legitimately be far higher than 10%.
-        scrap = grossUsage > 0 ? parseFloat((((grossUsage - netUsage) / grossUsage) * 100).toFixed(2)) : 0;
-      } else if (item.volume && density) {
-        netUsage  = parseFloat(((item.volume * density) / 1e9).toFixed(6));
-        grossUsage = parseFloat((netUsage / (1 - FALLBACK_SCRAP_PCT / 100)).toFixed(6));
-        scrap = FALLBACK_SCRAP_PCT;
-      } else if (cadWeight != null) {
-        netUsage  = parseFloat(cadWeight.toFixed(6));
-        grossUsage = parseFloat((netUsage / (1 - FALLBACK_SCRAP_PCT / 100)).toFixed(6));
-        scrap = FALLBACK_SCRAP_PCT;
-      } else if (engineGrossKg != null) {
-        grossUsage = parseFloat(engineGrossKg.toFixed(6));
-        netUsage   = parseFloat((grossUsage * (1 - FALLBACK_SCRAP_PCT / 100)).toFixed(6));
-        scrap = FALLBACK_SCRAP_PCT;
-      } else {
-        netUsage = 0;
-        grossUsage = 0;
-        scrap = 0;
-      }
+      // Real sheet nesting, else the real machining stock the blank optimizer
+      // selected (stock volume x density -- the same figure the engine prices
+      // material on), else a disclosed net/(1-10%) estimate used only when
+      // neither exists yet (cost summary still loading, or density unresolved).
+      // See deriveMaterialUsage: the estimate must never override a real
+      // stock weight, which was the bug for machined parts.
+      const { grossUsage, netUsage, scrapPct: scrap } = deriveMaterialUsage({
+        blankSpec: freshSummary?.blankSpec,
+        isSheetMetal: isSheetMetalPart,
+        engineGrossKg,
+        engineNetKg,
+        itemVolumeMm3: item.volume,
+        densityKgM3: density,
+        cadWeightKg: cadWeight,
+      });
 
       // Location-based pricing. localCurr always matches the CURRENT factory's
       // own native currency (parsed from the same `factory` string as the
@@ -7466,6 +7412,26 @@ function CostGuidePanel({
               {matInputValue.trim() && (
                 <li>Material: <span className="text-foreground font-medium">{matInputValue.trim()}</span></li>
               )}
+              {/* Blank Stock (round bar/hex bar/rectangular bar/billet, or the
+                  Stock Form override) directly drives material cost — was
+                  visible in the left "Blank Stock" panel but never confirmed
+                  here, so Apply silently committed a stock decision the user
+                  never saw restated. Mirrors the panel's own numbers so this
+                  dialog can't drift from what's actually about to be locked in. */}
+              {cgpCostSummary?.blankSpec && (
+                <li>
+                  Blank stock:{' '}
+                  <span className="text-foreground font-medium">
+                    {cgpCostSummary.blankSpec.sizeLabel} ({BLANK_STOCK_FORM_LABELS[cgpCostSummary.blankSpec.form] ?? cgpCostSummary.blankSpec.form})
+                  </span>
+                  <span className="text-muted-foreground">
+                    {' '}· {cgpCostSummary.blankSpec.grossWeightKg.toFixed(3)} kg gross / {cgpCostSummary.blankSpec.netWeightKg.toFixed(3)} kg net · {cgpCostSummary.blankSpec.utilizationPct.toFixed(1)}% utilization
+                  </span>
+                  {(item.scenarioOverrides?.['stockForm'] as string | undefined) && (
+                    <span className="text-muted-foreground"> (Stock Form override)</span>
+                  )}
+                </li>
+              )}
               <li>
                 Currency: <span className="text-foreground font-medium">{scenarioCurrencyDraft}</span>
                 {resolvedFxRate && factoryCurrencyInfo && !isIdentityCurrency && (
@@ -7881,9 +7847,9 @@ function CNCFeatureTree({
 
   const familyLabel =
     cncFeatures?.family === 'mill_turn' ? 'Mill-Turn'
-    : cncFeatures?.family === 'cnc_turned' ? 'CNC Turned'
-    : cncFeatures?.family === 'cnc_milled' ? 'CNC Milled'
-    : 'CNC';
+    : cncFeatures?.family === 'turned' ? 'Turned'
+    : cncFeatures?.family === 'milled' ? 'Milled'
+    : 'Machining';
 
   function getDiameterDist(type: string): Array<{ d: string; count: number }> {
     const byDiameter: Record<string, number> = {};
@@ -9424,6 +9390,15 @@ const MACHINING_STOCK_FORM_OPTIONS: ReadonlyArray<{ value: string; label: string
   { value: 'billet', label: 'Billet' },
 ];
 
+// Module-level (not BlankStockSection-local) so the Apply-scenario
+// confirmation dialog can label a blank's form the same way the Blank
+// Stock panel itself does, without a second, divergent label map.
+const BLANK_STOCK_FORM_LABELS: Record<string, string> = {
+  sheet: 'Sheet', round_bar: 'Round Bar', hex_bar: 'Hex Bar',
+  rectangular_bar: 'Rect Bar', billet: 'Billet',
+  extrusion: 'Extrusion', casting: 'Casting', granules: 'Granules',
+};
+
 function BlankStockSection({
   blank, currencySymbol, stockFormOverride, onStockFormChange,
 }: {
@@ -9432,12 +9407,7 @@ function BlankStockSection({
   stockFormOverride: string | null;
   onStockFormChange: (v: string | null) => void;
 }) {
-  const FORM_LABELS: Record<string, string> = {
-    sheet: 'Sheet', round_bar: 'Round Bar', hex_bar: 'Hex Bar',
-    rectangular_bar: 'Rect Bar', billet: 'Billet',
-    extrusion: 'Extrusion', casting: 'Casting', granules: 'Granules',
-  };
-  const label = FORM_LABELS[blank.form] ?? blank.form;
+  const label = BLANK_STOCK_FORM_LABELS[blank.form] ?? blank.form;
   // The dropdown only applies to machining stock forms — a sheet-metal
   // ('sheet') or injection-molding ('granules') blank has no bar/billet
   // choice to make, so showing it there would be a dead control.
@@ -9599,9 +9569,9 @@ function AnalysisTabsPanel({
                 const roughKg = summaryForPartTab?.materialRemoval?.billetWeightKg ?? (() => {
                   if (finishKg == null) return null;
                   const fam: string = fg?.classification?.family ?? '';
-                  if (fam === 'cnc_turned') return finishKg * 2.5;
+                  if (fam === 'turned') return finishKg * 2.5;
                   if (fam === 'mill_turn')  return finishKg * 2.0;
-                  if (fam === 'cnc_milled') return finishKg * 1.5;
+                  if (fam === 'milled') return finishKg * 1.5;
                   if (fam === 'sheet_metal') return finishKg;
                   return finishKg * 1.1;
                 })();

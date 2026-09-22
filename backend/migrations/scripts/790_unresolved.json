@@ -1,0 +1,83 @@
+{
+  "counts": {
+    "Additive Manufacturing": {
+      "processes": 12,
+      "operations": 55
+    },
+    "Assembly": {
+      "processes": 21,
+      "operations": 34
+    },
+    "Part Assembly": {
+      "processes": 9,
+      "operations": 44
+    },
+    "Composites": {
+      "processes": 11,
+      "operations": 29
+    },
+    "PCB": {
+      "processes": 33,
+      "operations": 26
+    },
+    "Surface Treatment": {
+      "processes": 33,
+      "operations": 39
+    },
+    "Forging": {
+      "processes": 12,
+      "operations": 0
+    },
+    "Other Secondary Processes": {
+      "processes": 12,
+      "operations": 0
+    },
+    "Stock Machining": {
+      "processes": 2,
+      "operations": 3
+    }
+  },
+  "skippedProcesses": [
+    {
+      "group": "Additive Manufacturing",
+      "name": "User-Defined Process",
+      "reason": "UI placeholder, no data"
+    },
+    {
+      "group": "Assembly",
+      "name": "User-Defined Process",
+      "reason": "UI placeholder, no data"
+    },
+    {
+      "group": "Composites",
+      "name": "User-Defined Process",
+      "reason": "UI placeholder, no data"
+    },
+    {
+      "group": "PCB",
+      "name": "User-Defined Process",
+      "reason": "UI placeholder, no data"
+    },
+    {
+      "group": "Forging",
+      "name": "User-Defined Process",
+      "reason": "UI placeholder, no data"
+    },
+    {
+      "group": "Stock Machining",
+      "name": "User-Defined Process",
+      "reason": "UI placeholder, no data"
+    }
+  ],
+  "unresolvedOperations": [],
+  "notSeeded": [
+    {
+      "source": "2 Mold Molding",
+      "reason": "Only 3 operation rows (Source Component:As Supplied//...) and no process list, so there is no process to attach them to and no confirmed catalog group. Needs a decision."
+    },
+    {
+      "source": "Multi-Spindle Maching",
+      "reason": "multi_spindle_processes.csv and multi_spindle_operations.csv contain only a header and one placeholder row; nothing real to seed."
+    }
+  ]
+}

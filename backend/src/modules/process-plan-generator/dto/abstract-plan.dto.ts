@@ -11,7 +11,7 @@
  * instance with decorators.
  */
 
-export type PartFamilyHint = 'cnc_turned' | 'cnc_milled' | 'sheet_metal';
+export type PartFamilyHint = 'turned' | 'milled' | 'sheet_metal';
 
 export interface AbstractRawMaterialLine {
   candidateId?: string;          // 'rm-N' from CandidateSet

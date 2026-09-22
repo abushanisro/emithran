@@ -17,7 +17,7 @@ anywhere in this codebase, and building one from scratch (with no fixtures
 or prior art to validate against) is real, unproven work -- not a "reuse
 existing primitive" task the way Perforating turned out to be.
 
-What THIS spike does instead: reuses machining/cnc_feature_recognizer.py's
+What THIS spike does instead: reuses machining/machining_feature_recognizer.py's
 already-proven _collect_cylinders() blind_hole classification (the exact
 same call sheet_metal/feature_extractor.py's _detect_counterbore_countersink
 already makes) and asks whether a thickness-relative depth filter can
@@ -38,7 +38,7 @@ drawing callout, or confirmation of a genuine paired offset-wall structure
 distinguishing "material displaced" from "material removed").
 
 Scope: cylindrical blind cavities only. Conical candidates (louvers/vents
-with a flared profile) are NOT covered -- machining/cnc_feature_recognizer's
+with a flared profile) are NOT covered -- machining/machining_feature_recognizer's
 _collect_cones() does not report a depth/length field, so the same
 thickness-relative depth filter isn't directly available for cones without
 additional geometry work not attempted in this spike.
@@ -116,7 +116,7 @@ def _classify_candidates(
 ) -> List[Dict[str, Any]]:
     """
     Pure filtering core (no OCC access) -- takes the SAME dict shape
-    machining/cnc_feature_recognizer._collect_cylinders already returns
+    machining/machining_feature_recognizer._collect_cylinders already returns
     (radius, length, kind, centroid, face_indices, ...) and narrows it to
     the candidate set described in this module's docstring.
 
@@ -181,13 +181,13 @@ def detect_candidate_formed_features(
     known_hole_centroids_mm: Optional[List[Tuple[float, float, float]]] = None,
 ) -> List[Dict[str, Any]]:
     """
-    Real-OCC entry point. Reuses CNCFeatureRecognizer._collect_cylinders
+    Real-OCC entry point. Reuses MachiningFeatureRecognizer._collect_cylinders
     (the exact same call sheet_metal/feature_extractor.py's
     _detect_counterbore_countersink already makes) to get real blind-cavity
     geometry, then applies _classify_candidates' filtering. See module
     docstring for the honest scope/limitation this spike established.
     """
-    from machining.cnc_feature_recognizer import CNCFeatureRecognizer  # type: ignore
+    from machining.machining_feature_recognizer import MachiningFeatureRecognizer  # type: ignore
     from OCC.Core.BRepAdaptor import BRepAdaptor_Surface  # type: ignore
     from OCC.Core.GeomAbs import GeomAbs_Plane  # type: ignore
 
@@ -201,7 +201,7 @@ def detect_candidate_formed_features(
     mag = math.sqrt(nx * nx + ny * ny + nz * nz) or 1.0
     main_axis = (nx / mag, ny / mag, nz / mag)
 
-    recognizer = CNCFeatureRecognizer()
+    recognizer = MachiningFeatureRecognizer()
     bbox = {
         "xmin": bbox_minmax.get("xmin", 0.0), "xmax": bbox_minmax.get("xmax", 0.0),
         "ymin": bbox_minmax.get("ymin", 0.0), "ymax": bbox_minmax.get("ymax", 0.0),

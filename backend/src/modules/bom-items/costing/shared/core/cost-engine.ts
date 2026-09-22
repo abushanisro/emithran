@@ -108,6 +108,16 @@ export interface MHRRateInput {
   cutToLengthCycleConstS?: number | null;
   cutToLengthCycleMassCoeffSPerKg?: number | null;
   cutToLengthCutSpeedS?: number | null;
+  // The selected machine's own mhr_records.number_spindles / drum_index_time_s /
+  // transfer_time_s / stock_feed_time_s / speed_synchronization_time_s
+  // (migration 788, source: simultaneous_turning_usa.csv). Only
+  // simultaneous_turning reads these (real multi-station adjustment in
+  // computeTurningCostSummary); every other class leaves them null.
+  numberSpindles?: number | null;
+  drumIndexTimeS?: number | null;
+  transferTimeS?: number | null;
+  stockFeedTimeS?: number | null;
+  speedSynchronizationTimeS?: number | null;
   // The selected machine's own mhr_records.setup_time_hr (via
   // MachineCandidate — see its own doc comment). Generic across any class;
   // Compression Molding / Reaction Injection Molding are the first real

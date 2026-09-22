@@ -19,12 +19,12 @@ import { cachedRead } from './costing/shared/core/request-cache';
 import { resolveNetUsagePhysics } from './costing/sheet-metal/raw-material/sheet-metal-net-usage.physics';
 import type { TrueNestCandidate, TrueNestCostingSelection } from './costing/sheet-metal/machine/true-nest-costing.engine';
 import {
-  computeCNCMilledCostSummary, computeCNCTurnedCostSummary,
-  checkCNCCapability, computeRouteComplexityScore,
+  computeMillingCostSummary, computeTurningCostSummary,
+  checkMachiningCapability, computeRouteComplexityScore,
   requiredMilledMachineClass, meetsRequiredMilledClass, pickRecommendedRoute,
-  detectMaterialClass,
-} from './costing/machining/process/cost-cnc-engine';
-import type { CNCCostInput, MachineClassId } from './costing/machining/process/cost-cnc-engine';
+  detectMaterialClass, MILLING_DOUBLE_BILLED_ELSEWHERE, resolveOperationName,
+} from './costing/machining/process/cost-machining-engine';
+import type { MachiningCostInput, MachineClassId } from './costing/machining/process/cost-machining-engine';
 import { BlankOptimizerService } from './costing/sheet-metal/machine/blank-optimizer.service';
 import { buildOperationSequence, injectDrawingIntelligence } from './costing/machining/operation/operation-sequencer';
 import type { OperationLine } from './costing/machining/operation/operation-sequencer';
@@ -352,6 +352,49 @@ export class BOMItemsService {
 
     // Transform camelCase DTO to snake_case database columns
     const dbData = this.transformDtoToDb(updateBOMItemDto);
+
+    // Root cause (2026-09-19, confirmed live): a part's real net weight was
+    // never computed anywhere once a material grade was chosen.
+    // auto-fill.service.ts deliberately writes weight: 0 at CAD-import time
+    // ("Weight is NOT computed either, because it cannot be... weight
+    // follows once a real material is chosen and its real density
+    // applies") but no code path ever performed that follow-up — confirmed
+    // by grep: bom_items.weight is written 0 at import and never written
+    // again anywhere in this codebase. Every consumer reading (item as
+    // any).weight (Blank Stock "Net weight", the CNC capability weight
+    // gate, sustainability calcs) saw a permanent 0 regardless of real
+    // geometry — e.g. Blank Stock showing "Net weight: 0.000 kg" next to a
+    // real, nonzero Utilization % computed independently from real volume.
+    // materialGrade is committed through this single generic update
+    // endpoint (manufacturing-intelligence/page.tsx's own "Single commit
+    // point for Material Grade" — every picker only stages a value until
+    // Apply calls updateBOMItem), so this is the one real place to close
+    // the gap for good: resolve the real density for the grade being
+    // committed and persist the real weight in the SAME write, rather than
+    // leaving the column permanently stale and recomputing a display-only
+    // number wherever it's read.
+    const gradeBeingSet = (updateBOMItemDto.materialGrade ?? '').trim();
+    if (gradeBeingSet && updateBOMItemDto.weight === undefined) {
+      let volumeMm3 = updateBOMItemDto.volume;
+      let family: string | null = null;
+      if (volumeMm3 == null) {
+        const { data: existing } = await client
+          .from('bom_items')
+          .select('volume, family_classification')
+          .eq('id', id)
+          .maybeSingle();
+        volumeMm3 = (existing?.volume as number | null) ?? undefined;
+        family = (existing?.family_classification as string | null) ?? null;
+      }
+      if (volumeMm3 != null && volumeMm3 > 0) {
+        const densityKgM3 = await this.materialResolutionService.resolveDensityKgM3(
+          accessToken ?? '', gradeBeingSet, family ?? undefined,
+        );
+        if (densityKgM3 != null && densityKgM3 > 0) {
+          dbData.weight = Math.round((volumeMm3 / 1e9) * densityKgM3 * 1000) / 1000;
+        }
+      }
+    }
 
     const { data, error } = await client
       .from('bom_items')
@@ -1358,7 +1401,7 @@ export class BOMItemsService {
       }
     }
 
-    if (input.family === 'cnc_milled') {
+    if (input.family === 'milled') {
       const vmcReq = vmcRequirement({
         bboxXMm: input.bboxXMm,
         bboxYMm: input.bboxYMm,
@@ -1379,7 +1422,7 @@ export class BOMItemsService {
       for (const cls of millingClasses) requirements[cls] = vmcReq;
     }
 
-    if (input.family === 'cnc_turned' || input.family === 'mill_turn') {
+    if (input.family === 'turned' || input.family === 'mill_turn') {
       // Turned-part bbox: longest dim is the part length, the larger of the other two
       // is the turned diameter
       const dims = [input.bboxXMm, input.bboxYMm, input.bboxZMm].sort((a, b) => b - a);
@@ -2015,7 +2058,7 @@ export class BOMItemsService {
    * names a class can perform, for validating/sourcing the CNC cost
    * engine's own per-line operation labels (Rough Turning, Finish Turning,
    * Drilling, Parting, Tapping, ...) against the real catalog instead of
-   * trusting a hand-typed string in cost-cnc-engine.ts to still match it.
+   * trusting a hand-typed string in cost-machining-engine.ts to still match it.
    *
    * Non-critical, same resilience contract as resolveProcessIdentities: any
    * DB failure (including migration 754 not yet having been run against
@@ -2247,18 +2290,35 @@ export class BOMItemsService {
   // frontend's resolveFeatureOpHighlight matches directly against the same
   // real feature_type field on feature_graph_v2.features, since both sides
   // are reading the identical CAD-engine vocabulary.
-  private buildCNCFeatureBreakdown(featureOps: OperationLine[]): FeatureOp[] {
-    const excluded = new Set(['Face Mill', 'Deburr']);
+  private buildMachiningFeatureBreakdown(
+    featureOps: OperationLine[],
+    machineClass: string,
+    realOperationCategories: Record<string, string[]> | null | undefined,
+    warnings: string[],
+  ): FeatureOp[] {
+    // Was its own independently hand-kept ['Face Mill', 'Deburr'] set, which
+    // had drifted from the real one the cost engine itself uses
+    // (MILLING_DOUBLE_BILLED_ELSEWHERE, cost-machining-engine.ts) in both
+    // directions: it wrongly excluded "Face Mill" (real, billed time this
+    // line's own cost includes — the UI showed no line item at all for time
+    // that WAS charged) and wrongly included "Rigid Tap" (real time that is
+    // NOT part of this line's cost — a phantom "Tapping" row alongside the
+    // real, separately-billed Tapping category). Now shares the one real set.
     type Acc = { timeSec: number; instanceCount: number; diameterMm?: number; cadFeatureType?: string };
     const groups = new Map<string, Acc>();
 
     for (const op of featureOps) {
-      if (excluded.has(op.name)) continue;
-      // Collapse the 3-line pocket family and 2-line slot family into one entry each
-      let key = op.name;
-      if (op.name.startsWith('Pocket')) key = 'Pocket Mill';
-      else if (op.name.startsWith('Slot')) key = 'Slot Mill';
-      else if (op.name === 'Rigid Tap') key = 'Tapping';
+      if (MILLING_DOUBLE_BILLED_ELSEWHERE.has(op.name)) continue;
+      // Real operation names (Phase 4b rename) already collapse correctly on
+      // their own: pocket-rough and slot-rough are both really "Rough
+      // Milling" (the real catalog's own op name), pocket-finish-floor/wall
+      // are both really "Fine Finish Milling" — no artificial "Pocket
+      // Mill"/"Slot Mill" super-group needed anymore. What used to require
+      // hand-collapsing (3 pocket lines, 2 slot lines) is now just "group by
+      // the real name", which is what the code below already does — and it
+      // now correctly keeps Rough vs Fine Finish as two distinct real rows
+      // instead of merging a roughing pass and a finishing pass together.
+      const key = op.name;
       // Bucket hole-family ops by real diameter (rounded to 0.1mm) so distinct
       // hole sizes surface as separate, individually-highlightable rows —
       // the same bucketing discipline Sheet Metal's bend-radius grouping uses.
@@ -2272,18 +2332,37 @@ export class BOMItemsService {
       });
     }
 
+    // Validate each distinct real candidate name against the live
+    // process_taxonomy_operations catalog exactly once (not per occurrence —
+    // that would push the same disclosed-mismatch warning repeatedly for a
+    // part with several holes of the same type). Reuses the SAME
+    // resolveOperationName mechanism the turned path's Rough Turning/Finish
+    // Turning/Drilling/Tapping/Parting lines already trust — never a second,
+    // independently-invented validation. On an exact match this returns the
+    // candidate unchanged; on a mismatch it discloses a warning and still
+    // returns the candidate (never fabricates a different name, never blocks).
+    const resolvedNameCache = new Map<string, string>();
+    const resolveCached = (candidate: string): string => {
+      let resolved = resolvedNameCache.get(candidate);
+      if (resolved === undefined) {
+        resolved = resolveOperationName(machineClass, candidate, realOperationCategories, warnings);
+        resolvedNameCache.set(candidate, resolved);
+      }
+      return resolved;
+    };
+
     const result: FeatureOp[] = [];
     for (const [groupKey, { timeSec, diameterMm, cadFeatureType }] of groups) {
-      const key = groupKey.split('@')[0]!;
-      // Infer count from fixed unit times where possible (Spot Drill=5s, Chamfer=4-5s)
+      const key = resolveCached(groupKey.split('@')[0]!);
+      // Infer count from fixed unit times where possible (Center Drilling=5s, Chamfering=4-5s)
       let count = 1;
-      if (key === 'Spot Drill') count = Math.max(1, Math.round(timeSec / 5));
-      else if (key === 'Chamfer' && !diameterMm) count = Math.max(1, Math.round(timeSec / 4.5));
+      if (key === 'Center Drilling') count = Math.max(1, Math.round(timeSec / 5));
+      else if (key === 'Chamfering' && !diameterMm) count = Math.max(1, Math.round(timeSec / 4.5));
       const diaLabel = diameterMm ? ` Ø${diameterMm.toFixed(1)}mm` : '';
       const label = count > 1 ? `${key}${diaLabel} ×${count}` : `${key}${diaLabel}`;
       // Real CAD feature_type when this op traces to one detected feature;
-      // absent (never a guessed string) when it doesn't — e.g. "Adaptive
-      // Rough" from an unrecognized feature, which has no feature_type to
+      // absent (never a guessed string) when it doesn't — e.g. "Bulk
+      // Milling" from an unrecognized feature, which has no feature_type to
       // highlight against.
       result.push({
         name: label,
@@ -2892,7 +2971,7 @@ export class BOMItemsService {
     // all cylindrical faces (OD steps, groove IDs) — not just machined holes.
     const cncFeatureSummary = fg?.cnc_features?.feature_summary ?? null;
     const holeCount = (
-      cncFeatureSummary !== null && (family === 'cnc_milled' || family === 'cnc_turned' || family === 'mill_turn')
+      cncFeatureSummary !== null && (family === 'milled' || family === 'turned' || family === 'mill_turn')
         ? ((cncFeatureSummary.through_hole ?? 0) + (cncFeatureSummary.blind_hole ?? 0))
         : (summary.holeCount ?? item.holeCount ?? 0)
     ) as number;
@@ -2990,7 +3069,7 @@ export class BOMItemsService {
     // Audit trail — non-blocking; costing must never wait on or fail with it
     if (physics) void this.writeSelectionSnapshots(id, accessToken, mhrRates, location);
 
-    if (family === 'cnc_milled' || family === 'cnc_turned' || family === 'mill_turn') {
+    if (family === 'milled' || family === 'turned' || family === 'mill_turn') {
       const inspectionRules = await this.inspectionKnowledge.getInspectionRules(accessToken);
       const samplingPolicy = await this.resolveSamplingPolicy(item, accessToken);
 
@@ -3004,7 +3083,7 @@ export class BOMItemsService {
       const blankResult = await this.blankOptimizer.selectOptimalBlank(
         bbox,
         (item.volume ?? 0) as number,
-        family as 'cnc_milled' | 'cnc_turned' | 'mill_turn',
+        family as 'milled' | 'turned' | 'mill_turn',
         accessToken,
         resolveScenarioStockForm(item.scenarioOverrides),
       );
@@ -3033,7 +3112,7 @@ export class BOMItemsService {
       // (MachiningLookupService — tblCounterboring/tblChamfering/
       // tblDeburring/tblReaming) resolved once per part, reused across
       // every candidate machine class below via baseCncInput's spread.
-      const [counterboreTable, chamferParams, deburrParams, reamTable, gunDrillTable, deepBoreMaterials, cylindricalGrindingParams, jigBoreTable, broachingParams, wireEdmParams, turningParams] = await Promise.all([
+      const [counterboreTable, chamferParams, deburrParams, reamTable, gunDrillTable, deepBoreMaterials, cylindricalGrindingParams, jigBoreTable, broachingParams, wireEdmParams, turningParams, roundingParams] = await Promise.all([
         this.machiningLookup.getCounterboreTable(),
         this.machiningLookup.getChamferParams(matClass),
         this.machiningLookup.getDeburrParams(matClass),
@@ -3045,6 +3124,7 @@ export class BOMItemsService {
         this.machiningLookup.getBroachingParams(matClass),
         this.machiningLookup.getWireEdmParams(matClass),
         this.machiningLookup.getTurningParams(matClass),
+        this.machiningLookup.getRoundingParams(matClass),
       ]);
 
       const heatTreatment = ((item as any).heatTreatment ?? null) as string | null;
@@ -3066,6 +3146,7 @@ export class BOMItemsService {
       const rawFeatureOps = buildOperationSequence(
         wireEdmSplit.filteredFeatures, matClass, machinabilityFactor, grade,
         counterboreTable, chamferParams.dataFound ? chamferParams.linearSpeedMmPerSec : null,
+        roundingParams.dataFound ? roundingParams.linearSpeedMmPerSec : null,
       );
       // Fix 5: inject drawing intelligence overrides into the operation list
       const allFeatureOps = injectDrawingIntelligence(
@@ -3129,10 +3210,10 @@ export class BOMItemsService {
       // Finish Turning, Drilling, Parting, Tapping, ...) — used to confirm
       // the CNC cost engine's own per-line operation labels against the
       // live process_taxonomy_operations catalog instead of trusting a
-      // string literal in cost-cnc-engine.ts to still match it.
+      // string literal in cost-machining-engine.ts to still match it.
       const realOperationCategories = await this.resolveMachiningOperationCategories(accessToken, cncMachineClassesForIdentity);
 
-      const baseCncInput: Omit<CNCCostInput, 'mhrRate' | 'tappingRate'> = {
+      const baseCncInput: Omit<MachiningCostInput, 'mhrRate' | 'tappingRate'> = {
         volume: (item.volume ?? 0) as number,
         surfaceArea: (item.surfaceArea ?? 0) as number,
         maxLength: bbox.length,
@@ -3215,11 +3296,11 @@ export class BOMItemsService {
         ['3_axis_bar_feed_lathe_with_sub_spindle', mhrRates.latheBarFeed3ax],
       ]);
       const discoveredPrimaryClasses = await this.machineDiscoveryService.getEligibleClasses(
-        family === 'cnc_milled' ? 'primary_milling' : 'primary_turning', location, accessToken,
+        family === 'milled' ? 'primary_milling' : 'primary_turning', location, accessToken,
       );
       if (discoveredPrimaryClasses.length === 0) {
         throw new Error(
-          `No primary ${family === 'cnc_milled' ? 'milling' : 'turning'} machine classes discovered for ` +
+          `No primary ${family === 'milled' ? 'milling' : 'turning'} machine classes discovered for ` +
           `location "${location}" — process_taxonomy.machining_route_role (migration 780) and ` +
           'mhr_records.canonical_process_id (migration 781) must be run against the live database ' +
           'before Machining parts can be costed.',
@@ -3232,13 +3313,13 @@ export class BOMItemsService {
 
       const costedRoutes = candidateClasses.map(({ cls, rate }) => {
         const tappingRate = this.inheritCncTappingRate(mhrRates.tapping, rate);
-        const input: CNCCostInput = { ...baseCncInput, mhrRate: rate, tappingRate };
+        const input: MachiningCostInput = { ...baseCncInput, mhrRate: rate, tappingRate };
         const cost =
-          family === 'cnc_milled'
-            ? computeCNCMilledCostSummary(input, cls)
-            : computeCNCTurnedCostSummary(input, cls);
+          family === 'milled'
+            ? computeMillingCostSummary(input, cls)
+            : computeTurningCostSummary(input, cls);
         const selectedCandidate = rate.selection?.balanced?.candidate;
-        const envelope = checkCNCCapability(
+        const envelope = checkMachiningCapability(
           cls, baseCncInput.maxLength, baseCncInput.maxWidth, baseCncInput.maxHeight,
           baseCncInput.finishedWeightKg,
           selectedCandidate?.capability, selectedCandidate?.capabilitySource,
@@ -3258,7 +3339,7 @@ export class BOMItemsService {
         const hasRealRate = rate.source !== 'no_db_rate';
         const capable =
           envelope.overallCapable && hasRealRate &&
-          (family !== 'cnc_milled' || meetsRequiredMilledClass(cls, requiredClass));
+          (family !== 'milled' || meetsRequiredMilledClass(cls, requiredClass));
         return { cls, cost, capable, hasRealRate, totalCost: cost.totalCost, setupCount: cost.setupCount ?? 1 };
       });
 
@@ -3273,13 +3354,17 @@ export class BOMItemsService {
       }
       cncResult.warnings.push(...materialWarnings);
       this.attachMachineSelections(cncResult.processLines, mhrRates);
-      // Attach eMithran-style feature-level breakdown to the CNC Milling process line
+      // Attach eMithran-style feature-level breakdown to the primary milling
+      // process line. Was string-matching on the displayed process NAME
+      // ('CNC Milling'/.includes('Milling')/.includes('Turning')) — broke the
+      // moment that name became the real, class-specific process name
+      // (e.g. "5 Axis Mill", which does not contain the substring "Milling").
+      // Matching on the real resolved machineClass instead is strictly more
+      // correct and no longer coupled to what label happens to be displayed.
       if (featureOps && featureOps.length > 0) {
-        const breakdown = this.buildCNCFeatureBreakdown(featureOps);
+        const breakdown = this.buildMachiningFeatureBreakdown(featureOps, recommended.cls, realOperationCategories, cncResult.warnings);
         if (breakdown.length > 0) {
-          const millLine = cncResult.processLines.find(
-            (l) => l.process === 'CNC Milling' || l.process.includes('Milling') || l.process.includes('Turning'),
-          );
+          const millLine = cncResult.processLines.find((l) => l.machineClass === recommended.cls);
           if (millLine) millLine.featureBreakdown = breakdown;
         }
       }
@@ -3311,7 +3396,35 @@ export class BOMItemsService {
       if (blankResult.billetVolMm3 > 0) {
         const hasRealDensity = materialDensityKgM3 > 0;
         const blankGrossKg  = hasRealDensity ? blankResult.billetVolMm3 / 1e9 * materialDensityKgM3 : 0;
-        const blankNetKg    = ((item as any).weight ?? 0) as number;
+        let blankNetKg = ((item as any).weight ?? 0) as number;
+        // Root cause (confirmed live, 2026-09-19): bom_items.weight is written
+        // 0 at CAD-import time (density unknown yet — see
+        // auto-fill.service.ts's own "weight follows once a real material is
+        // chosen" comment) and nothing ever backfilled it once a real grade
+        // resolved a real density. update() now closes this for every FUTURE
+        // material-grade commit (see its own doc comment), but an item whose
+        // grade was already set before that fix landed still carries a stale
+        // weight: 0 forever — Blank Stock showed "Net weight: 0.000 kg" next
+        // to a real, nonzero Utilization % (blankResult.utilizationPct,
+        // derived independently from real volume). Self-heal it here, the
+        // same non-blocking-write-during-cost-summary pattern
+        // writeSelectionSnapshots already uses just above: compute once from
+        // the real part volume and the SAME resolved density already in
+        // scope, use it immediately for THIS response, and persist so every
+        // later read is correct without the user re-touching material grade.
+        if (blankNetKg <= 0 && hasRealDensity) {
+          const partVolMm3 = (item.volume ?? 0) as number;
+          if (partVolMm3 > 0) {
+            blankNetKg = Math.round((partVolMm3 / 1e9) * materialDensityKgM3 * 1000) / 1000;
+            void this.supabaseService.getClient(accessToken)
+              .from('bom_items')
+              .update({ weight: blankNetKg })
+              .eq('id', item.id)
+              .then(({ error }: { error: { message: string } | null }) => {
+                if (error) this.logger.warn(`Failed to backfill weight for ${item.id}: ${error.message}`);
+              });
+          }
+        }
         const blankWasteKg  = hasRealDensity ? Math.max(0, blankGrossKg - blankNetKg) : 0;
         const blankUtilPct  = hasRealDensity
           ? (blankResult.utilizationPct ?? (blankGrossKg > 0 ? (blankNetKg / blankGrossKg) * 100 : 0))
@@ -3328,6 +3441,8 @@ export class BOMItemsService {
           utilizationPct: Math.round(blankUtilPct * 10) / 10,
           wasteKg:        Math.round(blankWasteKg * 1000) / 1000,
           wasteCost:      this.r2(blankWasteKg * materialCostPerKg),
+          stockVolumeMm3: Math.round(blankResult.billetVolMm3),
+          ...(hasRealDensity ? { densityKgM3: materialDensityKgM3 } : {}),
           ...((formNote || densityGapNote)
             ? { stockFormOverrideNote: [formNote, densityGapNote].filter(Boolean).join(' ') }
             : {}),
@@ -4733,7 +4848,7 @@ export class BOMItemsService {
     // feature recognizer counts over raw cylinder count to keep summary ≡ route invariant.
     const cncFeatureSummaryRC = fg?.cnc_features?.feature_summary ?? null;
     const holeCount = (
-      cncFeatureSummaryRC !== null && (family === 'cnc_milled' || family === 'cnc_turned' || family === 'mill_turn')
+      cncFeatureSummaryRC !== null && (family === 'milled' || family === 'turned' || family === 'mill_turn')
         ? ((cncFeatureSummaryRC.through_hole ?? 0) + (cncFeatureSummaryRC.blind_hole ?? 0))
         : (summary.holeCount ?? item.holeCount ?? 0)
     ) as number;
@@ -5257,7 +5372,7 @@ export class BOMItemsService {
       this.resolveConsumablePrice(accessToken, 'garnet_abrasive', location, rates),
     ]);
 
-    if (family === 'cnc_milled' || family === 'cnc_turned' || family === 'mill_turn') {
+    if (family === 'milled' || family === 'turned' || family === 'mill_turn') {
       // Same rules + sampling policy as getCostSummary — totals must match line for line
       const inspection = {
         rules: await this.inspectionKnowledge.getInspectionRules(accessToken),
@@ -5278,8 +5393,8 @@ export class BOMItemsService {
         this.machiningLookup.getTurningParams(routeMatClass),
       ]);
       const routeDeburrLinearSpeed = routeDeburrParams.dataFound ? routeDeburrParams.linearSpeedMmPerSec : null;
-      if (family === 'cnc_milled') {
-        return attachToRoutes(await this.buildCNCMilledRoutes(
+      if (family === 'milled') {
+        return attachToRoutes(await this.buildMilledRoutes(
           id, item, fg, summary, grade, materialCostPerKg, materialDensityKgM3,
           materialSource, mhrRates, batchSize, comparisonWarnings, locInfo, location,
           inspection, cncSurfaceTreatmentDbRate, routeDeburrLinearSpeed, routeReamTable,
@@ -5287,7 +5402,7 @@ export class BOMItemsService {
           accessToken,
         ));
       }
-      return attachToRoutes(await this.buildCNCTurnedRoutes(
+      return attachToRoutes(await this.buildTurnedRoutes(
         id, item, fg, summary, grade, materialCostPerKg, materialDensityKgM3,
         materialSource, mhrRates, batchSize, comparisonWarnings, locInfo, location,
         inspection, cncSurfaceTreatmentDbRate, routeDeburrLinearSpeed, routeReamTable,
@@ -6636,7 +6751,7 @@ export class BOMItemsService {
     const grade = item.materialGrade ?? (item as any).material ?? null;
     const { family } = this.resolveEffectiveFamily({ item, fg, grade, sheetThicknessMm });
 
-    const isCNC = family === 'cnc_milled' || family === 'cnc_turned' || family === 'mill_turn';
+    const isCNC = family === 'milled' || family === 'turned' || family === 'mill_turn';
     const bbox  = { length: maxLength, width: maxWidth, height: maxHeight };
 
     // Phase 2: material density + MHR rates (parallel)
@@ -6657,7 +6772,7 @@ export class BOMItemsService {
     // Phase 3: blank optimizer for CNC primary routes (conditional)
     const blankResult = isCNC
       ? await this.blankOptimizer.selectOptimalBlank(
-          bbox, volume, family as 'cnc_milled' | 'cnc_turned' | 'mill_turn', accessToken,
+          bbox, volume, family as 'milled' | 'turned' | 'mill_turn', accessToken,
           resolveScenarioStockForm(item.scenarioOverrides),
         )
       : null;
@@ -6691,18 +6806,18 @@ export class BOMItemsService {
     const materialCostPerKg = comparison.materialCostPerKg;
     const materialSource    = comparison.materialSource;
 
-    // Cross-family: SM primary → CNC milled alternative (always feasible, typically higher cost)
+    // Cross-family: SM primary → Milled alternative (always feasible, typically higher cost)
     if (family === 'sheet_metal') {
-      const cncAlt = this.buildCNCMilledAlternativeCandidate({
+      const milledAlt = this.buildMilledAlternativeCandidate({
         volume, surfaceArea, maxLength, maxWidth, maxHeight, finishedWeightKg,
         holeCount: (summary.holeCount ?? item.holeCount ?? 0) as number,
         materialCostPerKg, materialDensityKgM3, materialSource, batchSize, mhrRates, location,
       });
-      if (cncAlt) candidates.push(cncAlt);
+      if (milledAlt) candidates.push(milledAlt);
     }
 
-    // Cross-family: CNC milled primary → SM alternative (only if flat pattern detected)
-    if (family === 'cnc_milled' && sheetThicknessMm > 0 && flatPatternAreaMm2 > 0) {
+    // Cross-family: Milled primary → SM alternative (only if flat pattern detected)
+    if (family === 'milled' && sheetThicknessMm > 0 && flatPatternAreaMm2 > 0) {
       const smAlt = this.buildSMAlternativeCandidate({
         flatPatternAreaMm2, sheetThicknessMm, finishedWeightKg,
         cutLengthMm: (summary.cutLengthMm ?? item.cutLengthMm ?? 0) as number,
@@ -6792,7 +6907,7 @@ export class BOMItemsService {
     };
   }
 
-  private buildCNCMilledAlternativeCandidate(args: {
+  private buildMilledAlternativeCandidate(args: {
     volume: number; surfaceArea: number;
     maxLength: number; maxWidth: number; maxHeight: number;
     finishedWeightKg: number; holeCount: number;
@@ -6806,7 +6921,7 @@ export class BOMItemsService {
             batchSize, mhrRates, location } = args;
 
     // Same real, single canonical stock allowance constant used everywhere
-    // else in this domain (blank-stock-candidates.ts, cost-cnc-engine.ts) --
+    // else in this domain (blank-stock-candidates.ts, cost-machining-engine.ts) --
     // was a separately-hardcoded literal `6` here.
     const allow     = CNC_STOCK_ALLOWANCE_PER_SIDE_MM * 2;
     const billetVol = (maxLength + allow) * (maxWidth + allow) * (maxHeight + allow);
@@ -6819,12 +6934,12 @@ export class BOMItemsService {
     const blankGrossKg = materialDensityKgM3 > 0 ? billetVol / 1e9 * materialDensityKgM3 : 0;
     const wasteKg      = Math.max(0, blankGrossKg - finishedWeightKg);
 
-    const cncInput: CNCCostInput = {
+    const cncInput: MachiningCostInput = {
       volume, surfaceArea, maxLength, maxWidth, maxHeight,
       holeCount, holeGroups: [], pocketCount: 0,
       materialGrade: null, materialCostPerKg, materialDensityKgM3, materialSource,
       threads: [], tightestToleranceMm: null, gdtFeatureCount: 0,
-      batchSize, family: 'cnc_milled', finishedWeightKg,
+      batchSize, family: 'milled', finishedWeightKg,
       deburrRate: preferRealRate(mhrRates.manualDeburr, mhrRates.deburring), inspectionRate: preferRealRate(mhrRates.machiningInspection, mhrRates.inspection),
       surfaceTreatment: null, surfaceTreatmentDbRate: null,
       samplingPerN: undefined, samplingPolicy: undefined,
@@ -6833,7 +6948,7 @@ export class BOMItemsService {
       mhrRate: mhrRates.cnc3ax, tappingRate: mhrRates.tapping,
     };
 
-    const cost = computeCNCMilledCostSummary(cncInput, '3_axis_mill' as MachineClassId);
+    const cost = computeMillingCostSummary(cncInput, '3_axis_mill' as MachineClassId);
     const blankSpec: BlankSpecDto = {
       form:           'billet',
       sizeLabel:      blankResult.sizeLabel,
@@ -7011,7 +7126,7 @@ export class BOMItemsService {
     if (drawingThreads.length > 0) return this.normalizeThreadSpecs(drawingThreads);
     // Drawing not yet analyzed — synthesize from geometry-detected tapped holes.
     // depth_mm/through are real, already-computed fields on the CAD engine's
-    // tapped_hole feature (cnc_feature_recognizer.py) — carried through here
+    // tapped_hole feature (machining_feature_recognizer.py) — carried through here
     // instead of discarding them down to just the spec string.
     const cncFeatures = (fg?.cnc_features?.features ?? []) as Array<{ type: string; params: any }>;
     const tapped = cncFeatures.filter((f) => f.type === 'tapped_hole');
@@ -7135,7 +7250,7 @@ export class BOMItemsService {
       .join(' ');
   }
 
-  private async buildCNCMilledRoutes(
+  private async buildMilledRoutes(
     id: string,
     item: any,
     fg: any,
@@ -7177,7 +7292,7 @@ export class BOMItemsService {
     const maxHeight = ((item as any).maxHeight ?? 0) as number;
     const finishedWeightKg = ((item as any).weight ?? 0) as number;
 
-    const baseInput: Omit<CNCCostInput, 'mhrRate' | 'tappingRate'> = {
+    const baseInput: Omit<MachiningCostInput, 'mhrRate' | 'tappingRate'> = {
       volume:               (item.volume ?? 0) as number,
       surfaceArea:          (item.surfaceArea ?? 0) as number,
       maxLength, maxWidth, maxHeight,
@@ -7194,7 +7309,7 @@ export class BOMItemsService {
       tightestToleranceMm:  ((item as any).tightestToleranceMm ?? null) as number | null,
       gdtFeatureCount:      (fg?.cnc_features?.feature_summary?.gdt_features ?? 0) as number,
       batchSize,
-      family:               'cnc_milled',
+      family:               'milled',
       finishedWeightKg,
       // Same preference as getCostSummary — must match line for line.
       deburrRate:           preferRealRate(mhrRates.manualDeburr, mhrRates.deburring),
@@ -7254,12 +7369,12 @@ export class BOMItemsService {
 
     const routes: RouteResultDto[] = milledMachineClasses.map((mc) => {
       const routeRate = primaryRateByClass.get(mc)!;
-      const cost = computeCNCMilledCostSummary(
+      const cost = computeMillingCostSummary(
         { ...baseInput, mhrRate: routeRate, tappingRate: this.inheritCncTappingRate(mhrRates.tapping, routeRate) },
         mc,
       );
       const routeCandidate = routeRate.selection?.balanced?.candidate;
-      const envelope = checkCNCCapability(
+      const envelope = checkMachiningCapability(
         mc, maxLength, maxWidth, maxHeight, finishedWeightKg,
         routeCandidate?.capability, routeCandidate?.capabilitySource,
       );
@@ -7357,7 +7472,7 @@ export class BOMItemsService {
     };
   }
 
-  private async buildCNCTurnedRoutes(
+  private async buildTurnedRoutes(
     id: string,
     item: any,
     fg: any,
@@ -7404,7 +7519,7 @@ export class BOMItemsService {
     const maxHeight = ((item as any).maxHeight ?? 0) as number;
     const finishedWeightKg = ((item as any).weight ?? 0) as number;
 
-    const baseInput: Omit<CNCCostInput, 'mhrRate' | 'tappingRate'> = {
+    const baseInput: Omit<MachiningCostInput, 'mhrRate' | 'tappingRate'> = {
       volume:               (item.volume ?? 0) as number,
       surfaceArea:          (item.surfaceArea ?? 0) as number,
       maxLength, maxWidth, maxHeight,
@@ -7419,7 +7534,7 @@ export class BOMItemsService {
       tightestToleranceMm:  ((item as any).tightestToleranceMm ?? null) as number | null,
       gdtFeatureCount:      (fg?.cnc_features?.feature_summary?.gdt_features ?? 0) as number,
       batchSize,
-      family:               'cnc_turned',
+      family:               'turned',
       finishedWeightKg,
       // Same preference as getCostSummary — must match line for line.
       deburrRate:           preferRealRate(mhrRates.manualDeburr, mhrRates.deburring),
@@ -7478,12 +7593,12 @@ export class BOMItemsService {
 
     const routes: RouteResultDto[] = machineClasses.map((mc) => {
       const routeRate = primaryRateByClass.get(mc)!;
-      const cost = computeCNCTurnedCostSummary(
+      const cost = computeTurningCostSummary(
         { ...baseInput, mhrRate: routeRate, tappingRate: this.inheritCncTappingRate(mhrRates.tapping, routeRate) },
         mc,
       );
       const routeCandidate = routeRate.selection?.balanced?.candidate;
-      const capability = checkCNCCapability(
+      const capability = checkMachiningCapability(
         mc, maxLength, maxWidth, maxHeight, finishedWeightKg,
         routeCandidate?.capability, routeCandidate?.capabilitySource,
       );
@@ -8734,14 +8849,17 @@ export class BOMItemsService {
       const db = this.supabaseService.getClient(accessToken);
 
       // Step 1: Query process_calculator_mappings for the canonical operation name.
-      // 'Post Processing' and 'Sheet Metal' are the process DB groups containing
+      // 'Surface Treatment' and 'Sheet Metal' are the process DB groups containing
       // surface treatment operations (anodize, powder coat, plating, passivation, etc.).
+      // Migration 790 moved the generic Surface Treatment operation out of the
+      // retired 'Post Processing' group and seeded the real Surface Treatment
+      // process list under its own group.
       if (rawCallout?.trim()) {
         const calloutLower = rawCallout.trim().toLowerCase();
         const { data: pcmOps } = await db
           .from('process_calculator_mappings')
           .select('operation')
-          .in('process_group', ['Post Processing', 'Sheet Metal'])
+          .in('process_group', ['Surface Treatment', 'Sheet Metal'])
           .eq('is_active', true);
 
         // Longest-match wins: avoids short noise words (e.g. 'coat' matching 'Clearcoat')

@@ -780,6 +780,59 @@ export class ProcessesService {
   }
 
   /**
+   * PostgREST caps any unpaginated select at its project default max-rows
+   * (1000) regardless of how many rows actually match the filter — a plain
+   * `.in('canonical_process_id', ids)` on process_taxonomy_operations
+   * silently truncates once the table crosses that count (confirmed live:
+   * 1,656 real rows total), and since no `.order()` is applied the 1000
+   * rows returned are in an arbitrary physical order, so entire canonical
+   * processes' operations can come back empty even though their rows exist
+   * — this is what made "5 Axis Mill"/"Wire EDM" show a default machine but
+   * no operations despite both having complete, correct DB data. Pages
+   * through with `.range()` until a page returns fewer than PAGE_SIZE rows.
+   */
+  private async fetchAllRows(
+    client: ReturnType<SupabaseService['getClient']>,
+    table: string,
+    select: string,
+    canonicalIds: string[],
+  ): Promise<any[]> {
+    const PAGE_SIZE = 1000;
+    const all: any[] = [];
+    // The id list travels in the request URL, so it is sent in batches rather
+    // than all at once: the page lists every catalog group, and a few hundred
+    // uuids in one .in() is several KB of query string.
+    for (const ids of this.chunkIds(canonicalIds)) {
+      let from = 0;
+      for (;;) {
+        const { data, error } = await client
+          .from(table)
+          .select(select)
+          .in('canonical_process_id', ids)
+          // Stable order: offset paging over an unordered result may skip or
+          // repeat rows between pages once a batch exceeds PAGE_SIZE.
+          .order('id', { ascending: true })
+          .range(from, from + PAGE_SIZE - 1);
+        if (error) {
+          this.logger.error(`Error paginating ${table}: ${error.message}`, 'ProcessesService');
+          throw new InternalServerErrorException(`Failed to fetch ${table}: ${error.message}`);
+        }
+        all.push(...(data ?? []));
+        if (!data || data.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
+    }
+    return all;
+  }
+
+  /** Splits an id list into batches small enough to keep a PostgREST URL short. */
+  private chunkIds(ids: string[], size = 60): string[][] {
+    const out: string[][] = [];
+    for (let i = 0; i < ids.length; i += size) out.push(ids.slice(i, i + size));
+    return out;
+  }
+
+  /**
    * Batched taxonomy lookup for the Process page's operation pills — one
    * pair of queries for the whole page of mappings instead of N, keyed by
    * canonical_process_id (migration 610's FK on process_calculator_mappings,
@@ -799,11 +852,18 @@ export class ProcessesService {
     const canonicalIds = Array.from(new Set(rows.map((r) => r.canonical_process_id).filter(Boolean)));
     if (canonicalIds.length === 0) return result;
 
-    const [{ data: taxonomyRows }, { data: operationRows }, { data: aliasRows }] = await Promise.all([
-      client.from('process_taxonomy').select('id, default_machine_name, default_tool_shop_name, roadmap_status').in('id', canonicalIds),
-      client.from('process_taxonomy_operations').select('canonical_process_id, operation_category, feature_type, raw_compound_string').in('canonical_process_id', canonicalIds),
-      client.from('process_taxonomy_aliases').select('canonical_process_id, alias, source').in('canonical_process_id', canonicalIds),
+    const batches = this.chunkIds(canonicalIds);
+    const [taxonomyResults, operationRows, aliasResults] = await Promise.all([
+      Promise.all(batches.map((ids) =>
+        client.from('process_taxonomy').select('id, process_name, default_machine_name, default_tool_shop_name, roadmap_status').in('id', ids),
+      )),
+      this.fetchAllRows(client, 'process_taxonomy_operations', 'canonical_process_id, operation_category, feature_type, raw_compound_string', canonicalIds),
+      Promise.all(batches.map((ids) =>
+        client.from('process_taxonomy_aliases').select('canonical_process_id, alias, source').in('canonical_process_id', ids),
+      )),
     ]);
+    const taxonomyRows = taxonomyResults.flatMap((r) => r.data ?? []);
+    const aliasRows = aliasResults.flatMap((r) => r.data ?? []);
 
     const operationsByCanonicalId = new Map<string, { operationCategory: string | null; featureType: string | null; raw: string }[]>();
     for (const op of operationRows ?? []) {
@@ -820,6 +880,7 @@ export class ProcessesService {
 
     for (const t of taxonomyRows ?? []) {
       result.set(t.id, {
+        processName: t.process_name,
         defaultMachineName: t.default_machine_name ?? null,
         defaultToolShopName: t.default_tool_shop_name ?? null,
         roadmapStatus: t.roadmap_status,

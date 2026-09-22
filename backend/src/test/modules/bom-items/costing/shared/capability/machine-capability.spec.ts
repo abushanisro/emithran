@@ -53,7 +53,7 @@ describe('checkMachineCapability — turret punch tonnage', () => {
   });
 });
 
-// Root-caused 2026-09-16: cost-cnc-engine.ts's checkCNCCapability used to be
+// Root-caused 2026-09-16: cost-machining-engine.ts's checkMachiningCapability used to be
 // the only domain-level check in the platform still using a hardcoded
 // per-CLASS bounding box (MACHINE_ENVELOPE) instead of real per-machine
 // capability — these branches (added the same day, migration 755 stages the

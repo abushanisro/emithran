@@ -333,7 +333,7 @@ export class QueryRawMaterialsDto {
   @IsString()
   sortOrder?: 'asc' | 'desc';
 
-  @ApiPropertyOptional({ description: 'Manufacturing family for form ranking: sheet_metal, cnc_milled, cnc_turned, casting, forging, injection_moulded' })
+  @ApiPropertyOptional({ description: 'Manufacturing family for form ranking: sheet_metal, milled, turned, casting, forging, injection_moulded' })
   @IsOptional()
   @IsString()
   partFamily?: string;

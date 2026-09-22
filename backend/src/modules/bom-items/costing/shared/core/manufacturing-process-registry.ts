@@ -19,8 +19,8 @@ import { CounterboringEngine } from '../../sheet-metal/operation/counterboring-e
 import { CountersinkingEngine } from '../../sheet-metal/operation/countersinking-engine';
 import { ReamingEngine } from '../../sheet-metal/operation/reaming-engine';
 import { PemInsertionEngine } from '../../sheet-metal/operation/pem-insertion-engine';
-import { CncMillingEngine } from '../../machining/process/cnc-milling-registry-engine';
-import { CncTurningEngine } from '../../machining/process/cnc-turning-registry-engine';
+import { MillingEngine } from '../../machining/process/milling-registry-engine';
+import { TurningEngine } from '../../machining/process/turning-registry-engine';
 import { InjectionMoldingEngine } from '../../plastic-molding/process/injection-molding-registry-engine';
 import { InspectionRegistryEngine } from '../process/inspection-registry-engine';
 import { SurfaceTreatmentEngine } from '../process/surface-treatment-registry-engine';
@@ -53,7 +53,7 @@ import { SurfaceTreatmentEngine } from '../process/surface-treatment-registry-en
 // CNC/Injection-Molding/Inspection/Surface-Treatment (Platform Architecture
 // Remediation Phase 1, "fix the pattern across all three domains" — sheet
 // metal, CNC/Machining, Injection Molding): thin conformance wrappers around
-// the existing real, tested cost functions (computeCNCMilledCostSummary,
+// the existing real, tested cost functions (computeMillingCostSummary,
 // computeInjectionMoldedCostSummary, finalizeInspectionLine,
 // computeSurfaceTreatmentLine) — no formula rewrites, see each wrapper
 // file's own doc comment. CNC/IM use TResult = CostSummaryDto (they already
@@ -92,13 +92,18 @@ export const MANUFACTURING_PROCESS_REGISTRY: ManufacturingProcessEngine<any, any
   // Real, granular primary CNC classes — replaces the deleted 6-member
   // cnc_3ax_vmc/cnc_4ax_vmc/cnc_5ax_mc/cnc_lathe/cnc_lathe_live/cnc_mill_turn
   // registrations (Machining Engine Re-Architecture).
-  new CncMillingEngine('3_axis_mill'),
-  new CncMillingEngine('4_axis_mill'),
-  new CncMillingEngine('5_axis_mill'),
-  new CncTurningEngine('2_axis_lathe'),
-  new CncTurningEngine('3_axis_lathe'),
-  new CncTurningEngine('2_axis_bar_feed_lathe_with_sub_spindle'),
-  new CncTurningEngine('3_axis_bar_feed_lathe_with_sub_spindle'),
+  new MillingEngine('3_axis_mill'),
+  new MillingEngine('4_axis_mill'),
+  new MillingEngine('5_axis_mill'),
+  new TurningEngine('2_axis_lathe'),
+  new TurningEngine('3_axis_lathe'),
+  new TurningEngine('2_axis_bar_feed_lathe_with_sub_spindle'),
+  new TurningEngine('3_axis_bar_feed_lathe_with_sub_spindle'),
+  // Real, DISTINCT multi-spindle automatic-lathe fleet — see its own
+  // MACHINE_REGISTRY entry (default-rates.constants.ts) for the full real
+  // machine/rate/physics provenance. Reuses computeTurningCostSummary
+  // unchanged, same archetype as the other granular turning classes above.
+  new TurningEngine('simultaneous_turning'),
   new InjectionMoldingEngine(),
   new InspectionRegistryEngine(),
   new SurfaceTreatmentEngine(),

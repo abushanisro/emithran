@@ -61,7 +61,7 @@ SelectScrollDownButton.displayName = SelectPrimitive.ScrollDownButton.displayNam
 const SelectContent = React.forwardRef<
   React.ComponentRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
->(({ className, children, position = "popper", ...props }, ref) => (
+>(({ className, children, position = "popper", side = "bottom", avoidCollisions = false, ...props }, ref) => (
   <SelectPrimitive.Portal>
     <SelectPrimitive.Content
       ref={ref}
@@ -72,6 +72,15 @@ const SelectContent = React.forwardRef<
         className,
       )}
       position={position}
+      side={side}
+      // Radix defaults avoidCollisions to true, which flips the panel to
+      // open upward whenever the trigger is near the bottom of a tall/
+      // scrollable container (e.g. this app's dialogs) — the reported
+      // "dropdown opens upward" behavior. Defaulting to false here fixes
+      // every Select app-wide at the shared primitive, not per-instance;
+      // a caller can still pass avoidCollisions explicitly to opt back in
+      // for a specific dropdown that genuinely needs collision flipping.
+      avoidCollisions={avoidCollisions}
       {...props}
     >
       <SelectScrollUpButton />

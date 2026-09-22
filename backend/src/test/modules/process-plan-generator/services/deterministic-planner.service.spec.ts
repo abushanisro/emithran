@@ -12,7 +12,7 @@ import type { PartFamilyRoutingTemplate, RouteStep } from '../../../../modules/m
 function makeTemplate(steps: RouteStep[]): PartFamilyRoutingTemplate {
   return {
     id: 'tpl-cnc-std',
-    part_family: 'cnc_milled',
+    part_family: 'milled',
     template_name: 'CNC Milled (standard)',
     complexity_level: 'standard',
     routing_sequence: steps,
@@ -63,7 +63,7 @@ function makeBrief(overrides: {
     },
     dfm: { holeCount: 107, slotCount: 0, cutLengthMm: 0, pocketCount: 4 },
     drawing: { available: false },
-    scope: { family: overrides.family ?? 'cnc_milled', inScope: true, reason: 'milled block', confidence: 0.95 },
+    scope: { family: overrides.family ?? 'milled', inScope: true, reason: 'milled block', confidence: 0.95 },
     featureGraph: {
       features: overrides.features ?? BOOM_CLAMP_FEATURES,
       buildSources: ['drawing', 'bom'],

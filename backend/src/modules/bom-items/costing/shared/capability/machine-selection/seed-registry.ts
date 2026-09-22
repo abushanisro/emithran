@@ -318,6 +318,7 @@ export const MACHINE_CLASS_DEFAULTS: Record<MachineClass, Partial<MachineCapabil
   jig_bore:       {},
   jig_grind:      {},
   machining_millturn: {},
+  simultaneous_turning: {},
   wire_edm:       {},
   internal_grinder: {},
   broach:         {},

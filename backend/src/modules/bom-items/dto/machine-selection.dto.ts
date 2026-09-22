@@ -53,6 +53,16 @@ export interface MachineCandidate {
   cutToLengthCycleConstS: number | null;
   cutToLengthCycleMassCoeffSPerKg: number | null;
   cutToLengthCutSpeedS: number | null;
+  // mhr_records.number_spindles / drum_index_time_s / transfer_time_s /
+  // stock_feed_time_s / speed_synchronization_time_s — real per-machine
+  // multi-spindle automatic-lathe config (migration 788, source:
+  // simultaneous_turning_usa.csv). null for every other machine class, or a
+  // simultaneous_turning machine this hasn't been sourced for yet.
+  numberSpindles: number | null;
+  drumIndexTimeS: number | null;
+  transferTimeS: number | null;
+  stockFeedTimeS: number | null;
+  speedSynchronizationTimeS: number | null;
   // mhr_records.setup_time_hr — real per-machine setup time, generically
   // available for any class (2026-09-02, added for Compression Molding /
   // Reaction Injection Molding, which have no per-operation lookup table

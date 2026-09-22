@@ -78,12 +78,12 @@ describe('RuleEngineService — family-aware machine hints', () => {
   };
 
   it('taps on the mill for milled parts', () => {
-    const ops = svc.evaluate(graph([thread]), undefined, undefined, 'cnc_milled');
+    const ops = svc.evaluate(graph([thread]), undefined, undefined, 'milled');
     expect(ops.find((o) => /tapping/i.test(o.operationHint))!.machineCategoryHint).toBe('cnc_mill');
   });
 
   it('taps on the lathe for turned parts (and when family is unknown)', () => {
-    const turned = svc.evaluate(graph([thread]), undefined, undefined, 'cnc_turned');
+    const turned = svc.evaluate(graph([thread]), undefined, undefined, 'turned');
     expect(turned.find((o) => /tapping/i.test(o.operationHint))!.machineCategoryHint).toBe('cnc_lathe');
     const unknown = svc.evaluate(graph([thread]));
     expect(unknown.find((o) => /tapping/i.test(o.operationHint))!.machineCategoryHint).toBe('cnc_lathe');
@@ -110,7 +110,7 @@ describe('FeatureGraphService — GD&T upgrades the INSPECT feature to CMM', () 
         available: overrides.available ?? true,
         gdt: overrides.gdt ?? [],
       },
-      scope: { family: 'cnc_milled', inScope: true, reason: '', confidence: 0.9 },
+      scope: { family: 'milled', inScope: true, reason: '', confidence: 0.9 },
     } as unknown as EngineeringBrief;
   }
 

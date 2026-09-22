@@ -6,8 +6,8 @@
  */
 
 export type PartFamily =
-  | 'cnc_turned'
-  | 'cnc_milled'
+  | 'turned'
+  | 'milled'
   | 'sheet_metal'
   | 'plastic_molded'
   | 'out_of_scope';

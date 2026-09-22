@@ -100,6 +100,10 @@ export class QueryProcessCalculatorMappingsDto {
 // genuinely has none of either — an honest "no further detail available",
 // never fabricated.
 export interface ProcessTaxonomyHint {
+  // Canonical process name (process_taxonomy.process_name). A mapping row whose
+  // own operation equals this IS the canonical process; a different-named row
+  // sharing the id is a duplicate/alias row.
+  processName: string;
   defaultMachineName: string | null;
   defaultToolShopName: string | null;
   roadmapStatus: string;

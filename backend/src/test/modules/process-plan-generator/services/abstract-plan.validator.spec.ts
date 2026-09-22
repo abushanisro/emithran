@@ -6,7 +6,7 @@ const candidates: CandidateSet = {
     { candidateId: 'rm-1', dbId: 'mat-abc', materialGroup: 'Ferrous & Non-Ferrous', material: 'Aluminium 6061', grade: '6061-T6', densityKgPerM3: 2700, unitCostInrPerKg: 342, location: 'India-Bangalore', score: 0.9 },
   ],
   machines: [
-    { candidateId: 'mc-1', dbId: 'mhr-abc', machineName: 'ASC Lathe 320', commodityCode: 'LATHE', description: 'CNC Lathe', rateInrPerHour: 540, location: 'India-Bangalore', processFamily: 'cnc_turned', score: 0.9 },
+    { candidateId: 'mc-1', dbId: 'mhr-abc', machineName: 'ASC Lathe 320', commodityCode: 'LATHE', description: 'CNC Lathe', rateInrPerHour: 540, location: 'India-Bangalore', processFamily: 'turned', score: 0.9 },
   ],
   labour: [
     { candidateId: 'lb-1', dbId: 'lhr-abc', labourType: 'Skilled', labourCode: 'SKL-01', lhrInrPerHour: 62, location: 'India-Bangalore', score: 0.9 },
@@ -21,7 +21,7 @@ const candidates: CandidateSet = {
 };
 
 const validPlan = {
-  partFamily: 'cnc_turned',
+  partFamily: 'turned',
   rawMaterials: [{
     candidateId: 'rm-1',
     grossUsageKg: 0.0033,
@@ -55,7 +55,7 @@ describe('validateAbstractPlan', () => {
   it('accepts a valid plan', () => {
     const r = validateAbstractPlan(validPlan, candidates);
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.plan.partFamily).toBe('cnc_turned');
+    if (r.ok) expect(r.plan.partFamily).toBe('turned');
   });
 
   it('rejects unknown rm candidateId', () => {

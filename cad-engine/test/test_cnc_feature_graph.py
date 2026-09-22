@@ -1,18 +1,18 @@
 """
-Tests for machining.cnc_feature_recognizer's feature_graph_v2 synthesis --
-build_feature_graph_v2_from_cnc, plus the classifier fixes it depends on
+Tests for machining.machining_feature_recognizer's feature_graph_v2 synthesis --
+build_machining_feature_graph_v2, plus the classifier fixes it depends on
 (_classify_cone, _detect_counterbores, _classify_prismatic,
 _classify_prismatic_turned).
 
 Root-caused 2026-09-16: real detectors exist for every CNC feature type the
 costing pipeline (operation-sequencer.ts / cost-cnc-engine.ts) needs, but
-build_feature_graph_v2_from_cnc collapsed through_hole/blind_hole/
+build_machining_feature_graph_v2 collapsed through_hole/blind_hole/
 tapped_hole/cross_hole/counterbore into one generic "hole" string
 (operation-sequencer.ts's switch has no "hole" case -- it matches the exact
 type strings), and counterbore/countersink/chamfer/pocket/slot/keyway/
 radial_slot never carried a "centroid" key in their classifier-returned
-params at all (only the raw hole cylinders did), so build_feature_graph_v2_
-from_cnc's required-centroid check silently dropped every one of them --
+params at all (only the raw hole cylinders did), so
+build_machining_feature_graph_v2's required-centroid check silently dropped every one of them --
 worse than a mislabel, a total loss. Every test below is pure Python
 (synthetic dicts, no OCC) -- these functions take plain dicts in/out, no
 pythonocc-core dependency, matching test_forming_spike.py's established
@@ -22,14 +22,80 @@ import math
 
 import pytest
 
-from machining.cnc_feature_recognizer import (
-    build_feature_graph_v2_from_cnc,
+from machining.machining_feature_recognizer import (
+    build_machining_feature_graph_v2,
     _classify_cone,
     _detect_counterbores,
     _classify_prismatic,
     _classify_prismatic_turned,
     _extract_diam_depth,
 )
+
+
+# ── Phase 0 coverage fix: external_diameter / fillet / groove / ─────────────
+# pcd_hole_pattern were real, already-detected (real face_ids) but silently
+# dropped by this function before reaching operation-sequencer.ts. Real
+# geometry extraction (the _collect_toroids centroid computation) is covered
+# by test/test_toroid_centroid.py (real OCC); these test the synthesis-layer
+# passthrough logic added here, on plain dicts, same established scope as
+# every other test in this file.
+
+def test_external_diameter_survives_with_its_real_type_and_length_as_depth():
+    params = {"centroid": (0, 0, 0), "diameter_mm": 25.0, "length_mm": 40.0, "position_along_axis_mm": 5.0}
+    cnc_dict = {"features": [_cnc_feat("external_diameter", params)]}
+    graph = build_machining_feature_graph_v2(cnc_dict, bbox_center=(0, 0, 0), face_map_list=[], total_tris=0)
+    assert len(graph["features"]) == 1, "external_diameter feature was silently dropped"
+    entry = graph["features"][0]
+    assert entry["feature_type"] == "external_diameter"
+    assert entry["diameter_mm"] == pytest.approx(25.0)
+    assert entry["occurrences"][0]["depth_mm"] == pytest.approx(40.0)  # length_mm -> depth_mm
+
+
+@pytest.mark.parametrize("ftype", ["fillet", "groove"])
+def test_fillet_and_groove_survive_bucketed_by_major_diameter(ftype):
+    params = {"centroid": (5.0, 5.0, 0.0), "major_diameter_mm": 30.0, "radius_mm": 3.0}
+    cnc_dict = {"features": [_cnc_feat(ftype, params)]}
+    graph = build_machining_feature_graph_v2(cnc_dict, bbox_center=(0, 0, 0), face_map_list=[], total_tris=0)
+    assert len(graph["features"]) == 1, f"{ftype} feature was silently dropped"
+    entry = graph["features"][0]
+    assert entry["feature_type"] == ftype
+    assert entry["diameter_mm"] == pytest.approx(30.0)
+    assert entry["occurrences"][0]["radius_mm"] == pytest.approx(3.0)
+    # No fabricated material_removed_mm3 -- real arc-sweep data isn't extracted.
+    assert entry["occurrences"][0]["material_removed_mm3"] == 0.0
+
+
+def test_pcd_hole_pattern_survives_as_one_real_occurrence_with_real_hole_count():
+    """A PCD pattern's constituent bores are already absorbed by the time
+    this runs -- no per-hole centroid exists, so the real part bbox_center
+    is used as a disclosed positional fallback (not a fabricated per-hole
+    value)."""
+    params = {"pcd_mm": 60.0, "hole_count": 6, "hole_diameter_mm": 5.0, "depth_mm": 12.0}
+    cnc_dict = {"features": [_cnc_feat("pcd_hole_pattern", params, face_ids=[1, 2, 3, 4, 5, 6])]}
+    graph = build_machining_feature_graph_v2(cnc_dict, bbox_center=(1.0, 2.0, 3.0), face_map_list=[], total_tris=0)
+    assert len(graph["features"]) == 1, "pcd_hole_pattern feature was silently dropped"
+    entry = graph["features"][0]
+    assert entry["feature_type"] == "pcd_hole_pattern"
+    assert entry["diameter_mm"] == pytest.approx(5.0)
+    occ = entry["occurrences"][0]
+    assert occ["hole_count"] == 6
+    assert occ["pcd_mm"] == pytest.approx(60.0)
+    assert occ["depth_mm"] == pytest.approx(12.0)
+    assert occ["face_ids"] == [1, 2, 3, 4, 5, 6]  # real union of every constituent hole's faces
+    # Real bbox_center fallback used (not (0,0,0), not the individual hole's own centroid).
+    assert occ["centroid"] == [0.0, 0.0, 0.0]  # (1,2,3) - bbox_center(1,2,3) = 0 -- confirms it was actually applied
+
+
+def test_pcd_hole_pattern_without_a_real_diameter_is_not_silently_kept_as_a_fake_zero():
+    """A pattern genuinely missing hole_diameter_mm still gets a real
+    diameter_mm of 0.0 bucketed (not dropped) -- the function's contract for
+    every other diameter-bearing type is to bucket at 0.0 rather than raise,
+    so pcd_hole_pattern must not diverge from that without a real reason."""
+    params = {"pcd_mm": 60.0, "hole_count": 4}
+    cnc_dict = {"features": [_cnc_feat("pcd_hole_pattern", params)]}
+    graph = build_machining_feature_graph_v2(cnc_dict, bbox_center=(0, 0, 0), face_map_list=[], total_tris=0)
+    assert len(graph["features"]) == 1
+    assert graph["features"][0]["diameter_mm"] == 0.0
 
 
 # ── _classify_cone: centroid must be present, chamfer vs countersink ────────
@@ -173,7 +239,7 @@ def test_extract_diam_depth_chamfer_has_no_depth_concept():
     assert diam == 5.0 and depth == 0.0
 
 
-# ── build_feature_graph_v2_from_cnc: end-to-end type preservation ───────────
+# ── build_machining_feature_graph_v2: end-to-end type preservation ───────────
 
 def _cnc_feat(ftype, params, face_ids=None):
     return {"type": ftype, "params": params, "face_ids": face_ids or [1]}
@@ -192,7 +258,7 @@ def test_each_diameter_type_survives_with_its_real_type_string(ftype, params):
     became "hole"; countersink/chamfer were dropped entirely (no centroid).
     operation-sequencer.ts's switch only matches the real type strings."""
     cnc_dict = {"features": [_cnc_feat(ftype, params)]}
-    graph = build_feature_graph_v2_from_cnc(cnc_dict, bbox_center=(0, 0, 0), face_map_list=[], total_tris=0)
+    graph = build_machining_feature_graph_v2(cnc_dict, bbox_center=(0, 0, 0), face_map_list=[], total_tris=0)
     assert len(graph["features"]) == 1, f"{ftype} feature was silently dropped"
     assert graph["features"][0]["feature_type"] == ftype, (
         f"{ftype} was relabeled as {graph['features'][0]['feature_type']!r} instead of preserving its real type"
@@ -214,7 +280,7 @@ def test_pocket_and_slot_variants_map_to_what_operation_sequencer_actually_switc
     Broaching), so it is no longer folded into "slot"."""
     params = {"centroid": (0, 0, 0), "depth_mm": 5.0, "width_mm": 8.0, "length_mm": 30.0}
     cnc_dict = {"features": [_cnc_feat(raw_ftype, params)]}
-    graph = build_feature_graph_v2_from_cnc(cnc_dict, bbox_center=(0, 0, 0), face_map_list=[], total_tris=0)
+    graph = build_machining_feature_graph_v2(cnc_dict, bbox_center=(0, 0, 0), face_map_list=[], total_tris=0)
     assert len(graph["features"]) == 1, f"{raw_ftype} feature was silently dropped"
     assert graph["features"][0]["feature_type"] == expected_out
 
@@ -231,7 +297,7 @@ def test_keyway_survives_as_its_own_type_with_real_length_mm():
     test_classify_prismatic_keyway_carries_length_mm below)."""
     params = {"centroid": (0, 0, 0), "depth_mm": 4.0, "width_mm": 6.0, "length_mm": 40.0}
     cnc_dict = {"features": [_cnc_feat("keyway", params)]}
-    graph = build_feature_graph_v2_from_cnc(cnc_dict, bbox_center=(0, 0, 0), face_map_list=[], total_tris=0)
+    graph = build_machining_feature_graph_v2(cnc_dict, bbox_center=(0, 0, 0), face_map_list=[], total_tris=0)
     assert len(graph["features"]) == 1, "keyway feature was silently dropped"
     feat = graph["features"][0]
     assert feat["feature_type"] == "keyway"
@@ -257,7 +323,7 @@ def test_full_realistic_part_preserves_every_distinct_type_and_drops_nothing():
         _cnc_feat("keyway", {"centroid": (0, 60, 0), "depth_mm": 4.0, "width_mm": 6.0, "length_mm": 40.0}),
     ]
     cnc_dict = {"features": features}
-    graph = build_feature_graph_v2_from_cnc(cnc_dict, bbox_center=(0, 0, 0), face_map_list=[], total_tris=0)
+    graph = build_machining_feature_graph_v2(cnc_dict, bbox_center=(0, 0, 0), face_map_list=[], total_tris=0)
 
     by_type = {f["feature_type"]: f for f in graph["features"]}
     assert set(by_type.keys()) == {

@@ -208,7 +208,7 @@ describe('computeInspectionLine — Level 3 (GD&T, dormant until real extraction
 // article pass amortised into cycle time instead). That's genuinely correct
 // for visual/caliper/height_gauge (no offline-programming step exists), but
 // wrong for cmm — a real, unavoidable per-batch program recall + fixture +
-// datum-alignment event. cost-cnc-engine.ts's own separate Inspection line
+// datum-alignment event. cost-machining-engine.ts's own separate Inspection line
 // (which always assumes CMM) DID charge this, so the two engines diverged —
 // not because one was duplicated from the other, but because this shared
 // engine's blanket $0 rule didn't distinguish by method. Fixed by charging

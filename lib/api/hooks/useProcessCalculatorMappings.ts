@@ -8,6 +8,10 @@ import { apiClient } from '../client';
 // operations/aliases are empty arrays (not absent) when a linked row
 // genuinely has neither — an honest "no further detail", never fabricated.
 export interface ProcessTaxonomyHint {
+  // The canonical process name this row's mapping links to. Lets the UI tell a
+  // row that IS its own process from an inactive duplicate that shares the
+  // canonical row (see lib/processCatalog/operation-detail.ts).
+  processName: string;
   defaultMachineName: string | null;
   defaultToolShopName: string | null;
   roadmapStatus: string;

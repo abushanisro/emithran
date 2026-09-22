@@ -13,8 +13,8 @@
 
 export const FAMILY_PREFERRED_SHAPES: Record<string, string[]> = {
   sheet_metal:       ['sheets', 'coils', 'plates'],
-  cnc_milled:        ['plates', 'blocks', 'bars', 'ingots'],
-  cnc_turned:        ['bars', 'rods', 'tubes', 'profiles'],
+  milled:        ['plates', 'blocks', 'bars', 'ingots'],
+  turned:        ['bars', 'rods', 'tubes', 'profiles'],
   mill_turn:         ['bars', 'rods', 'tubes', 'profiles'],
   casting:           ['ingots'],
   forging:           ['bars', 'rods', 'ingots'],
@@ -23,8 +23,8 @@ export const FAMILY_PREFERRED_SHAPES: Record<string, string[]> = {
 };
 
 export const FAMILY_DISCOURAGED_SHAPES: Record<string, string[]> = {
-  cnc_milled:  ['sheets', 'coils'],
-  cnc_turned:  ['sheets', 'coils', 'plates'],
+  milled:  ['sheets', 'coils'],
+  turned:  ['sheets', 'coils', 'plates'],
   mill_turn:   ['sheets', 'coils', 'plates'],
   sheet_metal: ['bars', 'rods', 'blocks', 'ingots'],
 };

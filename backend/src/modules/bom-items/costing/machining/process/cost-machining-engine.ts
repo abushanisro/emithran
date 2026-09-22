@@ -22,6 +22,7 @@ import {
   INTERNAL_GRINDING_SETUP_MIN,
   KEYWAY_BROACHING_SETUP_MIN,
   WIRE_EDM_SETUP_MIN,
+  MACHINE_REGISTRY,
   type SurfaceTreatmentDbRate,
   type InspectionStagePolicy,
 } from '../../shared/core/default-rates.constants';
@@ -84,7 +85,7 @@ export function assertKnownMachineClass(value: string, knownClasses: ReadonlySet
   return value as MachineClassId;
 }
 
-export interface CNCCostInput {
+export interface MachiningCostInput {
   volume: number;          // mm³ (finish volume from CAD)
   surfaceArea: number;     // mm²
   maxLength: number;       // mm (bounding box)
@@ -270,9 +271,19 @@ export interface CNCCostInput {
   // against the real catalog for that machine class instead of trusting a
   // string literal written in this file to still match it.
   realOperationCategories?: Record<string, string[]> | null;
+  // Real, spindle-count-resolved multi-station splitting for Rough Turning
+  // on a Simultaneous Turning machine (MachiningLookupService.
+  // getMultiSpindleOpSplit('Ring', 'Rough Turning', mhrRate.numberSpindles),
+  // migration 785 — tblMultiSpindleOpSplitting/Thresholds). null/absent for
+  // every other machine class, or when the resolved machine has no real
+  // spindle count on file. Only Rough Turning is covered — no real per-hole
+  // depth is tracked for turned parts in this function (holeGroups here
+  // carries diameter only), so the SimpleHole/Drilling|Pecking threshold
+  // from the same real table is a disclosed gap, not silently applied.
+  roughTurningOpSplit?: { shouldSplit: boolean; numberOfOperations: number; thresholdRatio: number | null; dataFound: boolean } | null;
 }
 
-export interface CNCCapabilityResult {
+export interface MachiningCapabilityResult {
   overallCapable: boolean;
   machineCapabilityWarnings: string[];
 }
@@ -316,6 +327,33 @@ const TURNING_MRR: Record<MaterialClass, number> = {
   tool_steel:    5_000,
   plastic:      200_000,  // High surface speed; limited by chip clearance, not cutting force
 };
+
+// Real ops that buildOperationSequence() emits into the milling bucket's own
+// featureOps array but that are billed as their OWN dedicated process line at
+// their OWN dedicated rate elsewhere (Tapping at tappingRate, Deburring at
+// deburrRate — see computeMillingCostSummary's own doc comment on this
+// exact set, just below). Exported (not a local const) so
+// bom-items.service.ts's buildMachiningFeatureBreakdown — which builds the
+// UI-visible per-operation list for this SAME milling line — filters by
+// the exact same real set instead of an independently hand-kept copy that can
+// (and did) drift from this one.
+export const MILLING_DOUBLE_BILLED_ELSEWHERE = new Set(['Tapping', 'Deburr']);
+
+// The real process name for a machine class, per memory/machining/
+// processes.csv's own 43-process catalog (e.g. "3 Axis Mill", "5 Axis Mill",
+// "2 Axis Bar Feed Lathe with Sub Spindle") — MACHINE_REGISTRY's
+// machineClassKeywords[0] for every Machining class is already exactly that
+// real name (used elsewhere for MHR machine-name matching). Replaces the
+// generic, class-blind "CNC Milling"/"CNC Setup" literals that used to name
+// this line and its setup-fallback warning regardless of which real class
+// was actually selected and costed — a 5-axis-mill part previously showed
+// "CNC Milling", identical to a 3-axis-mill part, with no real process
+// distinction. Falls back to the raw class id only if a class is somehow
+// missing from the registry (never crashes on an unrecognized class).
+function realProcessName(machineClass: MachineClassId): string {
+  const entry = (MACHINE_REGISTRY as Record<string, { machineClassKeywords: readonly string[] }>)[machineClass as unknown as string];
+  return entry?.machineClassKeywords?.[0] ?? (machineClass as unknown as string);
+}
 
 // ── Drill cycle time (real, material-aware physics) ──────────────────────────
 // Replaces the previous flat per-diameter-bucket table (8/14/22/40 sec,
@@ -542,7 +580,7 @@ function computeDeepHoleLine(
 }
 
 // -- Cylindrical Grinding (new; turned parts only -- see CylindricalGrindingInput's
-// own doc comment on CNCCostInput for the real Ra<TURNING_MILLING_BEST_ACHIEVABLE_RA_UM
+// own doc comment on MachiningCostInput for the real Ra<TURNING_MILLING_BEST_ACHIEVABLE_RA_UM
 // trigger and MachiningLookupService.getCylindricalGrindingParams' real 2-hop
 // material-code bridge). Real traverse-grinding physics: part RPM from the
 // real workSpeedMMin (same rotary-motion identity as computeRotaryCycleSec's
@@ -698,7 +736,7 @@ function computeInternalGrindingLine(
 }
 
 // isRealHeatTreatmentCallout now lives in wire-edm-routing.ts (a lower-level
-// pure module, same "routing modules are pure, cost-cnc-engine.ts depends
+// pure module, same "routing modules are pure, cost-machining-engine.ts depends
 // on them" dependency direction as DeepHoleCandidate from deep-hole-
 // routing.ts below) -- Wire EDM's own real trigger needs the identical real
 // classifier Jig Grind already used, so it is now the single canonical
@@ -712,8 +750,8 @@ function computeInternalGrindingLine(
 // reuse as Internal Grinding above), applied to the smallest real hole
 // group with the real JIG_GRIND_NUM_REPETITIONS repeat-pass count on top —
 // same structure as computeJigBoreLine, different real physics source and
-// repeat count. The caller (see computeCNCMilledCostSummary/
-// computeCNCTurnedCostSummary) decides Jig Grind vs. Jig Boring BEFORE
+// repeat count. The caller (see computeMillingCostSummary/
+// computeTurningCostSummary) decides Jig Grind vs. Jig Boring BEFORE
 // calling either — mutually exclusive at the same real tolerance ceiling.
 function computeJigGrindLine(
   holeGroups: Array<{ diameter_mm: number; count: number }>,
@@ -818,7 +856,7 @@ function computeKeywayBroachingLine(
 // length), using real per-material Roughing/Finishing FeedRateMmPerMin
 // instead of a broach's cutting_speed_m_min. Real, disclosed trigger: only
 // ever populated with candidates when isRealHeatTreatmentCallout is true
-// (see wireEdmCandidates' own doc comment on CNCCostInput) — a hardened
+// (see wireEdmCandidates' own doc comment on MachiningCostInput) — a hardened
 // slot cannot be conventionally milled.
 function computeWireEdmCycleSec(
   lengthMm: number,
@@ -867,7 +905,7 @@ function computeWireEdmLine(
 
 // ── Per-machine constants ─────────────────────────────────────────────────────
 // Fixture costs are 0 until the cnc_fixture_rates table is seeded in a future
-// migration. The service will pass fixtureUnitCostLocal via CNCCostInput.
+// migration. The service will pass fixtureUnitCostLocal via MachiningCostInput.
 
 // setupCount * BASE_SETUP_MIN is the class_default tier of resolveSetupMinutes()
 // (engine-kernel.ts) — used only when the selected machine has no real,
@@ -897,6 +935,11 @@ const SETUP_COUNT: Record<string, number> = {
   '2_axis_lathe': 2, '3_axis_lathe': 2,
   '2_axis_bar_feed_lathe_with_sub_spindle': 1, '3_axis_bar_feed_lathe_with_sub_spindle': 1,
   machining_millturn: 1,
+  // A multi-spindle automatic completes every station in one continuous
+  // index cycle — no rechucking between operations (that's the whole real
+  // manufacturing advantage of the machine type), same as the bar-feed
+  // lathe classes above.
+  simultaneous_turning: 1,
 };
 
 const BASE_SETUP_MIN: Record<string, number> = {
@@ -904,6 +947,11 @@ const BASE_SETUP_MIN: Record<string, number> = {
   '2_axis_lathe': 15, '3_axis_lathe': 15,
   '2_axis_bar_feed_lathe_with_sub_spindle': 20, '3_axis_bar_feed_lathe_with_sub_spindle': 20,
   machining_millturn: 45,
+  // Real: all 14 real machines in simultaneous_turning_usa.csv report the
+  // identical real time.setup_time_hr = 2.0 (120 min) — used only as the
+  // class-default fallback tier, same disclosed-real-default precedent as
+  // machining_millturn's 45min above.
+  simultaneous_turning: 120,
 };
 
 // ── Machine capability envelopes ──────────────────────────────────────────────
@@ -928,6 +976,13 @@ const MACHINE_ENVELOPE: Record<string, { l: number; w: number; h: number; maxWei
   // machine FOOTPRINT dimensions, e.g. machine_length_mm/machine_width_mm —
   // a different real fact, not the part envelope), same disclosed gap.
   machining_millturn: { l: 600, w: 350, h: 350, maxWeightKg: 300 },
+  // Real, conservative: the MINIMUM max_length_mm/max_diameter_mm across all
+  // 14 real machines in simultaneous_turning_usa.csv (range 70-1000mm length,
+  // 22-90mm diameter) — same "conservative class default from real per-
+  // machine limits" discipline used elsewhere this session, not an invented
+  // envelope. No real machine weight-capacity data exists for this class
+  // either, so maxWeightKg reuses the same disclosed bar-feed-lathe default.
+  simultaneous_turning: { l: 70, w: 22, h: 22, maxWeightKg: 150 },
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -952,7 +1007,7 @@ function r3(n: number): number { return Math.round(n * 1000) / 1000; }
 // this environment, or a genuinely uncatalogued operation), discloses a
 // warning and keeps the engine's own verified name rather than blocking
 // the quote or inventing a different one.
-function resolveOperationName(
+export function resolveOperationName(
   machineClass: string,
   candidateName: string,
   realOperationCategories: Record<string, string[]> | null | undefined,
@@ -1010,7 +1065,7 @@ function makeLine(
 // that range for a common M4-M6 tap (2x of M4's 4mm ≈ 1.5x of M5.3), the
 // same "midpoint of a cited range, disclosed as an assumption" tier as
 // DRILL_FEED_MM_PER_REV in that same file.
-const CNC_BLIND_TAP_FALLBACK_DEPTH_MM = 8;
+const BLIND_TAP_FALLBACK_DEPTH_MM = 8;
 
 // Real, material- and thread-size-specific rigid-tapping physics
 // (computeTapCycleSec — ISO 965-1, sourced HSS tap-vendor surface speeds),
@@ -1018,8 +1073,8 @@ const CNC_BLIND_TAP_FALLBACK_DEPTH_MM = 8;
 // directly with no material factor). Uses each group's own real pitchMm/
 // depthMm when the caller supplied them (bom-items.service.ts's
 // resolveThreads already resolves these from CAD/drawing data — previously
-// discarded at the CNCCostInput.threads type boundary), falling back to the
-// standard ISO coarse-pitch series / CNC_BLIND_TAP_FALLBACK_DEPTH_MM only
+// discarded at the MachiningCostInput.threads type boundary), falling back to the
+// standard ISO coarse-pitch series / BLIND_TAP_FALLBACK_DEPTH_MM only
 // when genuinely absent. Tool-change time is charged once per distinct
 // thread-size group (matches bom-items.service.ts's buildTappingFeatureBreakdown,
 // which surfaces the same computeTapCycleSec() breakdown for display).
@@ -1028,7 +1083,7 @@ function computeTappingMin(
   materialGrade: string | null,
 ): number {
   const totalSec = threads.reduce((sum, t) => {
-    const b = computeTapCycleSec(t.size, t.count, t.pitchMm, t.depthMm, CNC_BLIND_TAP_FALLBACK_DEPTH_MM, materialGrade);
+    const b = computeTapCycleSec(t.size, t.count, t.pitchMm, t.depthMm, BLIND_TAP_FALLBACK_DEPTH_MM, materialGrade);
     return sum + b.totalSec;
   }, 0);
   return (totalSec + (threads.length > 0 ? TAP_UNLOAD_SEC : 0)) / 60;
@@ -1163,7 +1218,7 @@ export function computeRouteComplexityScore(
 // the real limits data for any of the 7 wired categories) — stays on the
 // class-level MACHINE_ENVELOPE default for every caller, a disclosed gap,
 // not fabricated per-machine data.
-export function checkCNCCapability(
+export function checkMachiningCapability(
   machineClass: MachineClassId,
   maxLength: number,
   maxWidth: number,
@@ -1171,7 +1226,7 @@ export function checkCNCCapability(
   weightKg: number,
   realCapability?: MachineCapability | null,
   capabilitySource?: 'imported' | 'seed' | 'default_class',
-): CNCCapabilityResult {
+): MachiningCapabilityResult {
   const env = MACHINE_ENVELOPE[machineClass];
   const warnings: string[] = [];
 
@@ -1188,7 +1243,7 @@ export function checkCNCCapability(
       ...(isTurning
         ? {
             // Same bar-stock diameter/length convention already used
-            // elsewhere in this file for turned parts (e.g. computeCNCTurnedCostSummary's
+            // elsewhere in this file for turned parts (e.g. computeTurningCostSummary's
             // fallbackDiamMm = max(maxWidth, maxHeight)) — the turning axis
             // is maxLength, the cross-section swing is the larger of the
             // other two bounding-box dimensions.
@@ -1225,10 +1280,10 @@ export function checkCNCCapability(
   return { overallCapable: warnings.length === 0, machineCapabilityWarnings: warnings };
 }
 
-// ── CNC Milled cost summary ──────────────────────────────────────────────────
+// ── Milled cost summary ──────────────────────────────────────────────────
 
-export function computeCNCMilledCostSummary(
-  input: CNCCostInput,
+export function computeMillingCostSummary(
+  input: MachiningCostInput,
   machineClass: MachineClassId,
 ): CostSummaryDto {
   const {
@@ -1283,7 +1338,7 @@ export function computeCNCMilledCostSummary(
   // Metal's sm_lookup_op_setup_time exists yet, so that tier is skipped).
   const setupCount = SETUP_COUNT[machineClass];
   const setupResolution = resolveSetupMinutes({
-    process: 'CNC Setup',
+    process: realProcessName(machineClass),
     machineSetupTimeHr: mhrRate.setupTimeHr,
     classDefaultMin: setupCount * BASE_SETUP_MIN[machineClass],
     machineName: mhrRate.machineName,
@@ -1308,23 +1363,18 @@ export function computeCNCMilledCostSummary(
   let cncMillingMin = 0;
   if (Array.isArray(input.featureOps) && input.featureOps.length > 0) {
     // Root-caused live (2026-09-18): buildOperationSequence() (the feature
-    // sequencer) emits its OWN "Rigid Tap" entry for every tapped hole (real
+    // sequencer) emits its OWN "Tapping" entry for every tapped hole (real
     // computeTapCycleSec physics) and an unconditional flat "Deburr" 90s
     // placeholder for every part — but this function ALSO independently
     // computes real Tapping time (computeTappingMin, same underlying
     // computeTapCycleSec physics, same threads) and real Deburring time
     // (tblDeburring-based deburrMin below), each billed as its OWN dedicated
     // process line at its OWN dedicated rate (tappingRate/deburrRate, not
-    // mhrRate). Summing the sequencer's full output into "CNC Milling"
-    // without excluding these double-billed every part with tapped holes or
-    // feature data: once folded into "CNC Milling" at the VMC rate, once
-    // again as "Tapping"/"Deburring" at their real rates. Counterbore/
-    // Chamfer/Pocket/Drill/Face Mill have no such separate line elsewhere in
-    // this function, so only these two names are excluded here.
-    const DOUBLE_BILLED_ELSEWHERE = new Set(['Rigid Tap', 'Deburr']);
+    // mhrRate) — see MILLING_DOUBLE_BILLED_ELSEWHERE's own doc comment
+    // above for why this exact set and why it's shared, not local.
     // 15% rapids/ATC overhead added on top of pure cutting time.
     const totalFeatureSec = input.featureOps
-      .filter((o) => !DOUBLE_BILLED_ELSEWHERE.has(o.name))
+      .filter((o) => !MILLING_DOUBLE_BILLED_ELSEWHERE.has(o.name))
       .reduce((s, o) => s + o.timeSec, 0);
     cncMillingMin = (totalFeatureSec / 60) * 1.15;
   } else {
@@ -1351,14 +1401,16 @@ export function computeCNCMilledCostSummary(
   // Setup always folds into this line (even when cncMillingMin itself is 0
   // and volume data is genuinely unavailable) so the real setup cost is
   // never silently dropped — see setupDisclosure's own doc comment above.
-  // "CNC Milling" stays a generic bucket, NOT run through resolveOperationName
-  // -- it deliberately sums roughing + all hole operations into one number
-  // (real per-operation Face/Rough/Finish Milling split needs the power-
-  // limited MRR model, staged variables.json + tblEngagementLengthPower,
-  // not yet built — a disclosed, known-generic gap, not a fabricated name).
+  // Named after the real, class-specific process (realProcessName — "3 Axis
+  // Mill"/"4 Axis Mill"/"5 Axis Mill", per memory/machining/processes.csv),
+  // not run through resolveOperationName -- it deliberately sums roughing +
+  // all hole operations into one number (real per-operation Face/Rough/
+  // Finish Milling split needs the power-limited MRR model, staged
+  // variables.json + tblEngagementLengthPower, not yet built — a disclosed,
+  // known-generic gap, not a fabricated name).
   if (cncMillingMin > 0 || setupCostVal > 0) {
     processLines.push(makeLine(
-      'CNC Milling', setupCostVal, r2((cncMillingMin / 60) * mhrRate.rate), cncMillingMin, mhrRate,
+      realProcessName(machineClass), setupCostVal, r2((cncMillingMin / 60) * mhrRate.rate), cncMillingMin, mhrRate,
       input.processIdentityByMachineClass, setupDisclosure,
     ));
   }
@@ -1416,7 +1468,7 @@ export function computeCNCMilledCostSummary(
     if (jigBoreLine) processLines.push(jigBoreLine);
   }
 
-  // ── Internal Grinding (new — bore/ID grinding; see CNCCostInput's own
+  // ── Internal Grinding (new — bore/ID grinding; see MachiningCostInput's own
   // doc comment) ───────────────────────────────────────────────────────────
   const internalGrindingLine = computeInternalGrindingLine(
     input.tightestRaMicron, holeGroups, input.cylindricalGrindingParams, input.internalGrindingRate,
@@ -1463,7 +1515,7 @@ export function computeCNCMilledCostSummary(
   if (deepBoreLine) processLines.push(deepBoreLine);
 
   // ── Keyway Broaching (new — real "keyway" occurrences pre-filtered out of
-  // fgv2Features by splitKeywayOccurrences; see CNCCostInput's own doc
+  // fgv2Features by splitKeywayOccurrences; see MachiningCostInput's own doc
   // comment) ────────────────────────────────────────────────────────────────
   const keywayLine = computeKeywayBroachingLine(
     input.keywayCandidates, input.broachingParams, input.broachRate, batchSize, warnings, input.processIdentityByMachineClass,
@@ -1472,7 +1524,7 @@ export function computeCNCMilledCostSummary(
 
   // ── Wire EDM (new — real "slot" occurrences pre-filtered out of
   // fgv2Features by splitWireEdmOccurrences ONLY when a real heat-treat
-  // callout is present; see CNCCostInput's own doc comment) ───────────────
+  // callout is present; see MachiningCostInput's own doc comment) ───────────────
   const wireEdmLine = computeWireEdmLine(
     input.wireEdmCandidates, input.wireEdmParams, input.wireEdmRate, batchSize, warnings, input.processIdentityByMachineClass,
   );
@@ -1542,10 +1594,10 @@ export function computeCNCMilledCostSummary(
   };
 }
 
-// ── CNC Turned cost summary ──────────────────────────────────────────────────
+// ── Turned cost summary ──────────────────────────────────────────────────
 
-export function computeCNCTurnedCostSummary(
-  input: CNCCostInput,
+export function computeTurningCostSummary(
+  input: MachiningCostInput,
   machineClass: MachineClassId,
 ): CostSummaryDto {
   const {
@@ -1603,7 +1655,7 @@ export function computeCNCTurnedCostSummary(
   // SETUP_COUNT×BASE_SETUP_MIN class default — see resolveSetupMinutes().
   const setupCount = SETUP_COUNT[machineClass];
   const setupResolution = resolveSetupMinutes({
-    process: 'CNC Setup',
+    process: realProcessName(machineClass),
     machineSetupTimeHr: mhrRate.setupTimeHr,
     classDefaultMin: setupCount * BASE_SETUP_MIN[machineClass],
     machineName: mhrRate.machineName,
@@ -1648,6 +1700,53 @@ export function computeCNCTurnedCostSummary(
     }
     const effectiveTurningMrr = TURNING_MRR[matClass] * machinabilityFactor;
     roughTurningMin = (materialRemovalMm3 / effectiveTurningMrr) * 1.2;
+  }
+
+  // ── Multi-spindle station split (Simultaneous Turning only) ───────────────
+  // Real, gated on the resolved machine's own real capability
+  // (mhrRate.numberSpindles, migration 788) — never a machineClass string
+  // check. When the real op-splitting table (migration 785) says this
+  // feature/operation combination splits across N stations at this real
+  // spindle count, AND the real removed-volume ratio crosses the real
+  // threshold, roughTurningMin is divided by N: the work is spread across N
+  // concurrent index positions, so the marginal per-part time contribution
+  // for THIS operation shrinks by roughly that factor (this is the
+  // real-data-driven approximation the source table supports — it does not
+  // simulate full station-to-station scheduling/bottlenecking).
+  //
+  // Approximation, disclosed: the real table's threshold is defined against
+  // a Ring FEATURE's own removed volume specifically, but turned-part
+  // feature extraction in this function does not separately break out a
+  // Ring feature's volume — materialRemovalMm3/barVolMm3 (the part's TOTAL
+  // turning removal ratio) is used as the closest real, already-computed
+  // proxy. Same "disclosed reuse of an adjacent real signal" precedent as
+  // Parting reusing finish_turning physics above.
+  if (input.roughTurningOpSplit?.dataFound && roughTurningMin > 0 && barVolMm3 > 0) {
+    const removalRatio = materialRemovalMm3 / barVolMm3;
+    if (input.roughTurningOpSplit.thresholdRatio != null && removalRatio >= input.roughTurningOpSplit.thresholdRatio) {
+      const n = input.roughTurningOpSplit.numberOfOperations;
+      if (n > 1) {
+        roughTurningMin = roughTurningMin / n;
+        warnings.push(
+          `Rough Turning split across ${n} stations (real removed-volume ratio ${(removalRatio * 100).toFixed(0)}% ≥ real threshold ${(input.roughTurningOpSplit.thresholdRatio * 100).toFixed(0)}%, per this machine's real ${mhrRate.numberSpindles}-spindle op-splitting data) — per-part time divided accordingly, not a full station-scheduling simulation.`,
+        );
+      }
+    }
+  }
+  // Real per-part index-cycle overhead (drum index + transfer + stock feed +
+  // speed sync, migration 788) — only present for a real Simultaneous
+  // Turning machine (mhrRate.numberSpindles set); every other class leaves
+  // these null and this line is skipped entirely, not zeroed.
+  if (mhrRate.numberSpindles != null) {
+    const indexCycleS = (mhrRate.drumIndexTimeS ?? 0) + (mhrRate.transferTimeS ?? 0)
+      + (mhrRate.stockFeedTimeS ?? 0) + (mhrRate.speedSynchronizationTimeS ?? 0);
+    if (indexCycleS > 0) {
+      const indexCycleMin = indexCycleS / 60;
+      processLines.push(makeLine(
+        resolveOperationName(machineClass, 'Index Transfer', input.realOperationCategories, warnings),
+        0, r2((indexCycleMin / 60) * mhrRate.rate), indexCycleMin, mhrRate, input.processIdentityByMachineClass,
+      ));
+    }
   }
   // Setup always folds into the first real turning line (even when its own
   // run time is 0) so the real setup cost is never silently dropped.
@@ -1803,7 +1902,7 @@ export function computeCNCTurnedCostSummary(
     }
   }
 
-  // ── Cylindrical Grinding (new; see CNCCostInput's own doc comment for
+  // ── Cylindrical Grinding (new; see MachiningCostInput's own doc comment for
   // the real Ra<TURNING_MILLING_BEST_ACHIEVABLE_RA_UM trigger). Turned
   // part's own real OD/length: max(maxWidth, maxHeight) is the diameter,
   // maxLength the ground length -- same bbox-to-cylinder convention the

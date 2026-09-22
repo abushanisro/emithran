@@ -8,7 +8,7 @@ Most tests exercise _classify_candidates directly (pure, synthetic dicts,
 no OCC) -- the same style bend_relationships.py's own test suite uses for
 its non-geometric assertions. One integration test builds real OCC geometry
 (a real partial-depth blind cylindrical pocket) to prove the wrapper's real
-CNCFeatureRecognizer._collect_cylinders reuse actually works end-to-end.
+MachiningFeatureRecognizer._collect_cylinders reuse actually works end-to-end.
 
 The critical test in this file is
 test_shallow_blind_hole_is_geometrically_identical_to_a_dimple_candidate --
@@ -163,7 +163,7 @@ def test_real_partial_depth_pocket_is_detected_as_a_candidate():
     (cut only partway through the thickness via a shorter cutting cylinder,
     not all the way -- a real, not synthetic, blind cavity), and confirm
     the full detect_candidate_formed_features() wrapper finds it via the
-    real CNCFeatureRecognizer._collect_cylinders reuse."""
+    real MachiningFeatureRecognizer._collect_cylinders reuse."""
     from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeCylinder  # type: ignore
     from OCC.Core.BRepAlgoAPI import BRepAlgoAPI_Cut  # type: ignore
     from OCC.Core.gp import gp_Pnt, gp_Ax2, gp_Dir  # type: ignore

@@ -69,6 +69,23 @@ export class RawMaterialResponseDto {
   @ApiProperty({ required: false, description: 'Shearing Strength in MPa' })
   shearingStrength?: number;
 
+  @ApiProperty({
+    required: false,
+    description: 'Search results only: how strongly this row matched the search term '
+      + '(exact, alias, designation, standard, partial, descriptive, substring).',
+  })
+  matchTier?: string;
+
+  @ApiProperty({ required: false, description: 'Search results only: the evidence behind matchTier.' })
+  matchReason?: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'Search results only: true on the single unambiguous best match; false on every row '
+      + 'when the search term cannot tell materially different materials apart (e.g. a bare family name).',
+  })
+  matchIsBest?: boolean;
+
   @ApiProperty({ required: false })
   astmStandard?: string;
 

@@ -1,0 +1,20 @@
+{
+  "counts": {
+    "Heat Treatment": {
+      "processes": 22,
+      "operations": 0
+    },
+    "Sheet Metal - Hydroforming": {
+      "processes": 5,
+      "operations": 71
+    }
+  },
+  "skippedProcesses": [
+    {
+      "group": "Sheet Metal - Hydroforming",
+      "name": "User-Defined Process",
+      "reason": "UI placeholder, no data"
+    }
+  ],
+  "unresolvedOperations": []
+}

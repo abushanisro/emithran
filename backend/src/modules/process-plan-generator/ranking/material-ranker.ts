@@ -34,13 +34,13 @@ export interface GeometrySignals {
 
 const COMPATIBLE_FORMS: Partial<Record<Exclude<PartFamily, 'out_of_scope'>, string[]>> = {
   sheet_metal: ['sheet', 'plate', 'coil', 'strip', 'blank'],
-  cnc_turned:  ['bar', 'rod', 'tube', 'billet'],
-  cnc_milled:  ['bar', 'block', 'plate', 'billet', 'blank'],
+  turned:  ['bar', 'rod', 'tube', 'billet'],
+  milled:  ['bar', 'block', 'plate', 'billet', 'blank'],
 };
 
 const PREFERRED_MATERIALS_BY_FAMILY: Record<Exclude<PartFamily, 'out_of_scope'>, string[]> = {
-  cnc_turned:       ['aluminium', 'aluminum', 'mild steel', 'ms', 'en8', 'en24', 'stainless', 'ss304', 'ss316', 'brass', 'copper', 'free cutting steel'],
-  cnc_milled:       ['aluminium', 'aluminum', 'mild steel', 'en8', 'en19', 'en24', 'stainless', 'ss304', 'ss316', 'p20', 'h13', 'tool steel'],
+  turned:       ['aluminium', 'aluminum', 'mild steel', 'ms', 'en8', 'en24', 'stainless', 'ss304', 'ss316', 'brass', 'copper', 'free cutting steel'],
+  milled:       ['aluminium', 'aluminum', 'mild steel', 'en8', 'en19', 'en24', 'stainless', 'ss304', 'ss316', 'p20', 'h13', 'tool steel'],
   sheet_metal:      ['mild steel', 'ms', 'cold rolled', 'crca', 'galvanized', 'galvanised', 'gi', 'stainless', 'ss304', 'aluminium sheet', 'aluminum sheet', 'aluminium 5052', 'aluminium 6061', 'aluminium 1100', 'aluminium 3003', 'aluminum 5052', 'aluminum 6061'],
   plastic_molded: ['abs', 'pp', 'polypropylene', 'pc', 'polycarbonate', 'nylon', 'pa6', 'pa66', 'pom', 'acetal', 'delrin', 'hdpe', 'ldpe', 'peek', 'tpu', 'tpe', 'plastic'],
 };
@@ -110,11 +110,11 @@ function formFactorScore(
     return 0.2; // bar / rod form for sheet_metal is wrong
   }
 
-  if (family === 'cnc_turned') {
+  if (family === 'turned') {
     return ['bar', 'rod', 'tube', 'billet'].some((f) => form.includes(f)) ? 1.0 : 0.3;
   }
 
-  if (family === 'cnc_milled') {
+  if (family === 'milled') {
     return ['bar', 'block', 'plate', 'billet', 'blank'].some((f) => form.includes(f)) ? 1.0 : 0.3;
   }
 

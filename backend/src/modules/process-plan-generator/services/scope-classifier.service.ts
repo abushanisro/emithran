@@ -7,7 +7,7 @@ import {
 } from '../dto/engineering-brief.dto';
 
 /**
- * Stage 1.5 — decides whether the part is in Phase-1 scope (CNC turned /
+ * Stage 1.5 — decides whether the part is in Phase-1 scope (turned /
  * milled / sheet metal) or out of scope (castings, forgings, composites,
  * complex assemblies, welded fab).
  *
@@ -62,16 +62,16 @@ export class ScopeClassifierService {
     //     The Python OCC engine computes flatness, hole density, and planar face fraction
     //     directly from geometry. Trust it over any BOM/name heuristic.
     //     CAVEAT: detected_family is persisted in geometry_analysis at upload time, so it
-    //     can predate classifier fixes. A "cnc_milled" verdict is NOT trusted when the
+    //     can predate classifier fixes. A "milled" verdict is NOT trusted when the
     //     geometry carries sheet-metal evidence no milled billet part can have (extreme
     //     low fill, extracted sheet thickness, or bends) — fall through to the geometry
     //     rules below, which will re-derive the family with their own reasons.
     if (dfm.cadDetectedFamily && dfm.cadDetectedFamily !== 'unknown') {
       const familyMap: Record<string, PartFamily | null> = {
         sheet_metal:       'sheet_metal',
-        cnc_turned:        'cnc_turned',
-        cnc_milled:        'cnc_milled',
-        mill_turn:         'cnc_turned',
+        turned:        'turned',
+        milled:        'milled',
+        mill_turn:         'turned',
         plastic_molded:  'plastic_molded',
       };
       const mapped = familyMap[dfm.cadDetectedFamily];
@@ -83,7 +83,7 @@ export class ScopeClassifierService {
           bb.lengthMm || Infinity, bb.widthMm || Infinity, bb.heightMm || Infinity,
         );
         const sheetContradiction =
-          mapped === 'cnc_milled' &&
+          mapped === 'milled' &&
           ((fill < 0.10 && storedMinDim < 200) ||
             (dfm.sheetThicknessMm > 0 && dfm.sheetThicknessMm < 10) ||
             (dfm.bendCount > 0 && fill < 0.30));
@@ -135,7 +135,7 @@ export class ScopeClassifierService {
     }
     if (/\b(bar\s*stock|round\s*bar|hex\s*bar|\brod\b|\bbillet\b)/.test(materialHint)) {
       return this.inScope(
-        'cnc_turned',
+        'turned',
         `Material "${bom.materialHint}" matches bar/rod stock keywords`,
         0.90,
       );
@@ -236,7 +236,7 @@ export class ScopeClassifierService {
       }
     }
 
-    // 6. CNC turned — cylindrical/rotational symmetry
+    // 6. Turned — cylindrical/rotational symmetry
     //    Heuristic: middle and short axes are ~equal (within 25%) AND
     //    longest axis is >= 1.4× the cross-section diameter. This catches
     //    pins, shafts, bushings, rollers.
@@ -244,16 +244,16 @@ export class ScopeClassifierService {
     const isLikelyCylinder = crossSectionRatio < 0.25 && maxDim >= 1.4 * minDim;
     if (isLikelyCylinder) {
       return this.inScope(
-        'cnc_turned',
+        'turned',
         `Rotational geometry (mid/min Δ=${(crossSectionRatio * 100).toFixed(0)}%, L/D=${(maxDim / minDim).toFixed(2)}) → turning`,
         0.8,
       );
     }
 
-    // 7. Anything else with reasonable size → CNC milled
+    // 7. Anything else with reasonable size → Milled
     if (volumeCm3 < 8000 && bom.itemType === 'child_part') {
       return this.inScope(
-        'cnc_milled',
+        'milled',
         `Prismatic geometry, child part, volume ${volumeCm3.toFixed(0)}cm³ → CNC milling`,
         complexity > 3 ? 0.75 : 0.65,
       );

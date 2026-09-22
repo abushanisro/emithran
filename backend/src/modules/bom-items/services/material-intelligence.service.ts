@@ -30,8 +30,8 @@ export class MaterialIntelligenceService {
     materialHint: string | null,
   ): Promise<MaterialCandidate[]> {
     const client = this.supabaseService.getClient(accessToken);
-    const safeFamily = ['sheet_metal', 'cnc_turned', 'cnc_milled'].includes(family)
-      ? (family as 'sheet_metal' | 'cnc_turned' | 'cnc_milled')
+    const safeFamily = ['sheet_metal', 'turned', 'milled'].includes(family)
+      ? (family as 'sheet_metal' | 'turned' | 'milled')
       : 'sheet_metal';
 
     // Use the same query pattern as retrieval.service.ts which is known to work:

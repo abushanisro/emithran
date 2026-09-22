@@ -276,7 +276,7 @@ export interface CuttingProcessResult {
 // line-contributor engines keep TResult = CuttingProcessResult.
 //
 // TGeometry/TCapabilityResult exist because CNC's real capability check
-// (bounding-box envelope + weight, checkCNCCapability in cost-cnc-engine.ts)
+// (bounding-box envelope + weight, checkMachiningCapability in cost-machining-engine.ts)
 // is genuinely, structurally incompatible with PartGeometryForCapability
 // (sheet-thickness/bend-length/UTS-shaped) — forcing CNC through that shape
 // would mean fabricating fields it has no real geometry for. Sheet-metal

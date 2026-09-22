@@ -46,7 +46,7 @@ export const MHR_RATE_MACHINE_CLASSES: readonly MachineClass[] = [
   '3_axis_mill', '4_axis_mill', '5_axis_mill',
   '2_axis_lathe', '3_axis_lathe', '2_axis_bar_feed_lathe_with_sub_spindle', '3_axis_bar_feed_lathe_with_sub_spindle',
   'injection_molding', 'compression_molding', 'structural_foam_molding', 'reaction_injection_molding', 'drill_press', 'pem_press', 'hole_forming',
-  'gun_drill', 'deep_bore_machine', 'manual_deburr', 'cylindrical_grinder', 'jig_bore', 'jig_grind', 'internal_grinder', 'broach', 'machining_millturn', 'wire_edm',
+  'gun_drill', 'deep_bore_machine', 'manual_deburr', 'cylindrical_grinder', 'jig_bore', 'jig_grind', 'internal_grinder', 'broach', 'machining_millturn', 'wire_edm', 'simultaneous_turning',
   'machining_inspection', 'special_inspection',
 ];
 
@@ -172,6 +172,13 @@ export class RateResolutionService {
     lathe3ax: MHRRateInput;
     latheBarFeed2ax: MHRRateInput;
     latheBarFeed3ax: MHRRateInput;
+    // Real, distinct multi-spindle automatic-lathe fleet (registered engine,
+    // real rate — see its own MACHINE_REGISTRY entry). Not yet in
+    // MachineDiscoveryService's discovered primary-candidate set, same
+    // current state as machining_millturn below — resolvable/costable when
+    // explicitly selected, not yet auto-offered as a route-comparison
+    // candidate.
+    simultaneousTurning: MHRRateInput;
     injectionMolding: MHRRateInput;
     compressionMolding: MHRRateInput;
     structuralFoamMolding: MHRRateInput;
@@ -287,6 +294,11 @@ export class RateResolutionService {
         cutToLengthCycleConstS: rate.cutToLengthCycleConstS ?? null,
         cutToLengthCycleMassCoeffSPerKg: rate.cutToLengthCycleMassCoeffSPerKg ?? null,
         cutToLengthCutSpeedS: rate.cutToLengthCutSpeedS ?? null,
+        numberSpindles: rate.numberSpindles ?? null,
+        drumIndexTimeS: rate.drumIndexTimeS ?? null,
+        transferTimeS: rate.transferTimeS ?? null,
+        stockFeedTimeS: rate.stockFeedTimeS ?? null,
+        speedSynchronizationTimeS: rate.speedSynchronizationTimeS ?? null,
         setupTimeHr: rate.setupTimeHr ?? null,
         directOverheadRate: rate.directOverheadRate ?? null,
         indirectOverheadRate: rate.indirectOverheadRate ?? null,
@@ -459,6 +471,7 @@ export class RateResolutionService {
         lathe3ax:         get('3_axis_lathe'),
         latheBarFeed2ax:  get('2_axis_bar_feed_lathe_with_sub_spindle'),
         latheBarFeed3ax:  get('3_axis_bar_feed_lathe_with_sub_spindle'),
+        simultaneousTurning: get('simultaneous_turning'),
         injectionMolding: get('injection_molding'),
         compressionMolding: get('compression_molding'),
         structuralFoamMolding: get('structural_foam_molding'),
@@ -515,6 +528,11 @@ export class RateResolutionService {
             cutToLengthCycleConstS: cand.cutToLengthCycleConstS,
             cutToLengthCycleMassCoeffSPerKg: cand.cutToLengthCycleMassCoeffSPerKg,
             cutToLengthCutSpeedS: cand.cutToLengthCutSpeedS,
+            numberSpindles: cand.numberSpindles,
+            drumIndexTimeS: cand.drumIndexTimeS,
+            transferTimeS: cand.transferTimeS,
+            stockFeedTimeS: cand.stockFeedTimeS,
+            speedSynchronizationTimeS: cand.speedSynchronizationTimeS,
             setupTimeHr: cand.setupTimeHr,
             // Carried so applyBenchmarkOverrideIfNeeded can recognise a rate
             // that IS the canonical Direct + Indirect sum (migration 581).

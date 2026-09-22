@@ -1245,13 +1245,13 @@ export const MACHINE_REGISTRY = {
   // anywhere in the staged corpus -- a genuine, disclosed gap, not wired.
   manual_deburr:  { commodityCodes: [],                                                                                              processGroupKeywords: ['Finishing', 'Deburring', 'Machining'],                                                                              machineClassKeywords: ['Manual Deburr'] },
   // Real Cylindrical Grinding fleet (migration 737/738/753, 6 machines,
-  // e.g. "Flex Grind Schaudt M") — see cost-cnc-engine.ts's Cylindrical
+  // e.g. "Flex Grind Schaudt M") — see cost-machining-engine.ts's Cylindrical
   // Grinding line for the real Ra<0.4µm trigger this feeds.
   cylindrical_grinder: { commodityCodes: [],                                                                                          processGroupKeywords: ['Grinding', 'Finishing', 'Machining'],                                                                              machineClassKeywords: ['Cylindrical Grind'] },
   // Real Jig Bore fleet (migrations 757/758, 4 machines, e.g. "SIP
   // Hydroptic 6A") — activated earlier this session; the cost engine that
   // consumes it (real tblBoringV2 Finish Boring physics x real repeat-pass
-  // count) is new — see cost-cnc-engine.ts's Jig Boring line.
+  // count) is new — see cost-machining-engine.ts's Jig Boring line.
   jig_bore:       { commodityCodes: [],                                                                                              processGroupKeywords: ['Drilling', 'Boring', 'Machining'],                                                                                 machineClassKeywords: ['Jig Bore'] },
   // Real Jig Grind fleet (migrations 737/738/753, 4 machines, default
   // "Hauser S3-DR") — see JIG_GRIND_NUM_REPETITIONS' doc comment for the
@@ -1266,7 +1266,7 @@ export const MACHINE_REGISTRY = {
   // H1560, Nachi NUV-20-23, Cell-Mate) — genuinely LINEAR stroke-based
   // physics (max_cutting_speed_m_per_min/max_stroke_length_mm), not rotary
   // like every other class above. See KEYWAY_BROACHING_SETUP_MIN's doc
-  // comment and cost-cnc-engine.ts's Keyway Broaching line
+  // comment and cost-machining-engine.ts's Keyway Broaching line
   // (computeKeywayBroachingLine) for the real cutting physics.
   broach:         { commodityCodes: [],                                                                                              processGroupKeywords: ['Broaching', 'Machining'],                                                                                            machineClassKeywords: ['Broach'] },
   // Real Wire EDM fleet (migrations 737/738/753, 6 machines, e.g. "Fanuc
@@ -1354,11 +1354,24 @@ export const MACHINE_REGISTRY = {
   '3_axis_lathe':   { commodityCodes: [], processGroupKeywords: ['Machining'], machineClassKeywords: ['3 Axis Lathe', '3-Axis Lathe'] },
   '2_axis_bar_feed_lathe_with_sub_spindle': { commodityCodes: [], processGroupKeywords: ['Machining'], machineClassKeywords: ['2 Axis Bar Feed Lathe with Sub Spindle'] },
   '3_axis_bar_feed_lathe_with_sub_spindle': { commodityCodes: [], processGroupKeywords: ['Machining'], machineClassKeywords: ['3 Axis Bar Feed Lathe with Sub Spindle'] },
+  // Real, DISTINCT multi-spindle automatic-lathe fleet (memory/machining/
+  // machine/simultaneous_turning_usa.csv, 9 real machines: DMG Mori
+  // GMC25ISM-6, Index MS16C-6/MS22-8/MS32-6/MS40-8, plus 4 "Virtual CNC
+  // Multi-Spindle" reference machines — real 6/8-spindle rates, staged via
+  // migrations 737/738, already active in process_calculator_mappings
+  // (migration 752, machine_class='simultaneous_turning'). Reuses
+  // computeTurningCostSummary unchanged (same real per-material turning/
+  // drilling physics as any other lathe) plus a real, disclosed multi-
+  // station adjustment gated on this class's own real
+  // slide_configuration.number_spindles capability (mhr_records, migration
+  // 788) — never a machine_class string check, matching the platform's
+  // "real capability question, never machine_name string matching" rule.
+  simultaneous_turning: { commodityCodes: [] as string[], processGroupKeywords: ['Machining'], machineClassKeywords: ['Simultaneous Turning', 'Multi-Spindle', 'Multi Spindle'] },
   // Real, DISTINCT "MillTurn" Machining-domain fleet (migrations 737/738/
   // 753, machine_class literal 'machining_millturn' — deliberately renamed
   // to avoid colliding with the pre-existing 'cnc_mill_turn' bucket above,
   // a different real machine population; see migration 738's own comment).
-  // Reuses computeCNCTurnedCostSummary unchanged — its real ops (Back
+  // Reuses computeTurningCostSummary unchanged — its real ops (Back
   // Finish Turning, Dovetail Milled, Polygon Turned, Rotary Broached, ...)
   // are the same real turning taxonomy already priced there, just on a
   // simultaneous mill+turn center rather than a lathe. Resolves via Tier 0
