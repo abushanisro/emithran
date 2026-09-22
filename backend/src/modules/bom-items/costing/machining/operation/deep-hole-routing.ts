@@ -3,7 +3,7 @@
 // standing rule against mocked-Supabase spec files).
 //
 // Root cause this closes (2026-09-18): the Machining Process page lists ~40
-// real machine categories, but only Milling/Turning (cost-cnc-engine.ts) had
+// real machine categories, but only Milling/Turning (cost-machining-engine.ts) had
 // a cost engine. Two of the real, staged-but-unused categories — "Gun
 // Drill" and "Deep Bore Machine" (real machine fleets, real
 // tblGunDrilling/deep_bore_drill_lookup physics, migrations 737/738/752/753
@@ -54,7 +54,7 @@ export interface DeepHoleSplitResult {
 
 // Real, sourced thresholds — not tuned/fabricated:
 // - LD > 5: cad-engine's own documented gun-drilling/deep-boring threshold
-//   (_annotate_hole_depth in cnc_feature_recognizer.py).
+//   (_annotate_hole_depth in machining_feature_recognizer.py).
 // - 50mm diameter split: the real Gun Drill fleet's own max diameter
 //   (memory/machining/machine/gun_drill_usa.json: 3-50mm) vs. the real Deep
 //   Bore Machine fleet's own min diameter (deep_bore_machine_usa.json:

@@ -19,7 +19,7 @@ export type ValidationResult =
   | { ok: true; plan: AbstractPlan }
   | { ok: false; errors: string[] };
 
-const PART_FAMILIES = ['cnc_turned', 'cnc_milled', 'sheet_metal'] as const;
+const PART_FAMILIES = ['turned', 'milled', 'sheet_metal'] as const;
 const TOOLING_TYPES = ['cutting_tool', 'fixture', 'jig', 'gauge', 'die', 'mold', 'other'] as const;
 const LOGISTICS_TYPES = ['packaging', 'inbound', 'outbound', 'storage'] as const;
 const TRANSPORT_MODES = ['road', 'rail', 'air', 'sea'] as const;

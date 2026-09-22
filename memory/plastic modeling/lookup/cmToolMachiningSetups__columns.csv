@@ -1,0 +1,4 @@
+name,file_path,value
+cmToolMachiningSetups,lookupTables/Component/cmToolMachiningSetups.csv,Name
+cmToolMachiningSetups,lookupTables/Component/cmToolMachiningSetups.csv,Number of Setups
+cmToolMachiningSetups,lookupTables/Component/cmToolMachiningSetups.csv,Setup Time (hr)

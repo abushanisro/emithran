@@ -1,0 +1,5 @@
+name,filePath,digitalFactory,rowCount,process,setupTimeMin
+machiningProcessSetupTime,lookupTables/Component/machiningProcessSetupTime.csv,USA reference export,4,cncMachiningLarge,60.0
+machiningProcessSetupTime,lookupTables/Component/machiningProcessSetupTime.csv,USA reference export,4,cncMachiningSmall,10.0
+machiningProcessSetupTime,lookupTables/Component/machiningProcessSetupTime.csv,USA reference export,4,grinding,5.0
+machiningProcessSetupTime,lookupTables/Component/machiningProcessSetupTime.csv,USA reference export,4,wireEdm,10.0

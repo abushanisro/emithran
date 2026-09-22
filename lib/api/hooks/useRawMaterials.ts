@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import { toast } from 'sonner';
 
@@ -54,6 +54,14 @@ export interface RawMaterial {
   enStandard?: string;
   jis_standard?: string;
   jisStandard?: string;
+  // Search results only (GET /raw-materials?search=): how strongly this row
+  // matched -- exact | alias | designation | standard | partial | descriptive |
+  // substring -- and the evidence, so the UI can explain a recommendation.
+  matchTier?: string;
+  matchReason?: string;
+  // True on the ONE row the ranker considers an unambiguous best match; false on
+  // every row when the term cannot tell materially different materials apart.
+  matchIsBest?: boolean;
   shape?: MaterialShape;
   stockForm?: string;
   matlState?: string;
@@ -150,9 +158,16 @@ export interface UpdateRawMaterialData extends Partial<CreateRawMaterialData> {}
 // QUERY HOOKS
 // ============================================================================
 
-export function useRawMaterials(params?: QueryRawMaterialsParams) {
+export function useRawMaterials(
+  params?: QueryRawMaterialsParams,
+  // enabled: skip the request entirely (default true, so every existing caller is unchanged).
+  // keepPrevious: keep showing the last result while a new search loads (no flicker while typing).
+  options?: { enabled?: boolean; keepPrevious?: boolean },
+) {
   return useQuery({
     queryKey: ['raw-materials', 'list', params],
+    enabled: options?.enabled ?? true,
+    ...(options?.keepPrevious ? { placeholderData: keepPreviousData } : {}),
     queryFn: async () => {
       const response = await apiClient.get<RawMaterialListResponse>('/raw-materials', { ...(params !== undefined ? { params } : {}) });
       return response;

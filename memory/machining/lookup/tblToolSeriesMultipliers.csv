@@ -1,0 +1,12 @@
+ToolSeries,ColumnName,Multiplier
+"Virtual Deep Drill, Carbide",depthMax,3.0
+"Virtual Dovetail Mill, AlTiN Coated",feedPerTooth,1.075
+"Virtual Dovetail Mill, AlTiN Coated",toolCost,1.07
+"Virtual Dovetail Mill, AlTiN Coated",toolLife,1.1
+"Virtual Dovetail Mill, Seal Groove",cuttingSpeed,1.0
+"Virtual Dovetail Mill, Seal Groove",feedPerTooth,1.0
+"Virtual Dovetail Mill, Seal Groove",toolLifeCost,1.0
+"Virtual Groove Mill, Reduced Shank",feedPerTooth,0.8
+"Virtual Groove Mill, Reduced Shank",maxGrooveDepth,1.8
+"Virtual Groove Mill, Reduced Shank",toolLife,0.8
+"Virtual Groove Mill, Reduced Shank",toolLifeCost,1.2

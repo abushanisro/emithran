@@ -1,0 +1,83 @@
+﻿Variable Name,String Value,Unit Type Name,Notes
+applyBreatherClothRate,7000,mm^2/s,The rate at which breather cloth material can be laid out over the ply stack.
+applyMoldReleaseRate,26000,mm^2/s,Rate at which the mold release agent is applied.
+applyReleaseFilmRate,7000,mm^2/s,The rate at which release film material can be laid out over the ply stack.
+applyReleasePeelPlyRate,7000,mm^2/s,The rate at which release peel ply material can be laid out over the ply stack.
+applyToolTackRate,24000,Area / s,Rate at which the tool tack agent is applied.
+applyVacuumBagRate,30,Velocity,The rate at which the edges of a vacuum bag can be taped down prior to Debulking or Vacuum Drop Testing.
+approxSquareRatio,0.75,,The ply aspect ratio threshold at which the bounding box of the ply in relation to the fiber orientation is approximated as a square.
+autoclavesIsShared,true,,Default option when determining whether the capacity of the Autoclave is shared with other parts.
+autoclaveSizeCapacitySafetyFactor,0.8,,Safety factor to ensure parts plus their tooling fit into the Autoclave. Set to any value between 0.01 and 1.00.
+averageAFPRapidTraverseTime,5,Time,The average time between finishing one course and starting the next in the Automated Fiber Placement process.
+averageATLRapidTraverseTime,5,Time,The average time between finishing one course and starting the next in the ATL process.
+coreHolePottingTime,40,Time,The standard time required to apply potting compound to honeycomb core for one hole.
+coreLayupRate,100,Velocity,The rate at which honeycomb cores are aligned with the template. Assumes only perimeter of core requires alignment.
+coreSpliceRate,0.100,m/s,The rate at which foaming adhesive can be applied during core splicing.
+coreTemplateLocationTime,120,Time,The time required to locate a core placement template on layup tool.
+cuttingDerateFactor,.8,,Derate factor applied to the Ultrasonic Cut machine cut rate if there are multiple raw material layers being cut.
+cycleTimeAdjustmentFactor,1,,Factor used to globally increase or decrease cycle time evaluations per process.
+debulkTime,20,min,The time required to conduct a single debulking task.
+defaultAFPProgrammingCost,0,Currency,The default cost to program an Automated Fibre Placement machine.
+defaultATLProgrammingCost,0,Currency,The default cost to program an Automated Tape Layup machine.
+defaultCoreMaterial,Generic Core Material,,The default core material type to be used. This is used as a fall back if the extracted core material type is not present in the material table.
+defaultCoreSpliceLength,0,Length,The default length of honeycomb butt joints which require foaming adhesive applied.
+defaultNumCorePottingRequired,0,,The default number of holes which require potting.
+defaultNumMoldReleaseCoats,3,,The default number of mold release coats applied to the tool during Mold Preparation.
+defaultNumPliesBeforeFirstDebulk,1,,Default number of plies to be laid up prior to the first Debulk operation.
+defaultNumPliesPerDebulkCycle,3,,Default number of plies per Debulk cycle.
+defaultRawMaterialStackCount,1,,The default value for the number of layers of raw material that are stacked during Ultrasonic Cut.
+defaultTrimAreaFactor,0.85,,The factor used to adapt the trim area according to the average proportion of plies that span across the entire area of the part.
+defaultTrimWidth,25.4,Length,The default width of ply material to be trimmed off the edge of the part to achieve final part dimensions.
+disableInvestmentAmortization,false,,"User override to disable amortization of all fixed costs to the individual part or assembly. By default, fixed costs are calculated per part for tooling, fixtures, and programming."
+finalInspectionRate,28000,Area/s,The rate at which the part's surface area is visually inspected.
+gearQualityDefaultAgmaNewStd,A8,,"A2, A3, A4, ... A11, A12"
+gearQualityDefaultAgmaOldStd,Q8,,"Q15, Q14, Q13, ... Q6, Q5"
+gearQualityDefaultDinStd,9,,"2, 3, 4, ... 11, 12"
+installVacuumPortTime,300,Time,The time required to install a vacuum port when bagging an in-process Composites part prior to Debulking or Vacuum Drop Testing.
+laborRateAdjustmentFactor,1,,Factor used to globally increase or decrease labor rate evaluations per process.
+manualCleaningAgentCoverageRatePerVolume,10000000,Area / L,The expected coverage rate for manual cleaning agent as specified by the supplier.
+manualLayupGuideMultiplier,1.1,,The multiplier which increases the ply layup time due to the use of manual layup guides.
+materialRollWidthAllowance,100,Length,The total allowance applied to the width of composite raw material rolls to account for material irregularities and unusable areas.
+minLayupRateFactorAFP,0.16,,"The de-rating factor applied to the AFP machine layup rate, denoting the minimum layup rate for a maximum complexity ply."
+minLayupRateFactorATL,0.16,,"The de-rating factor applied to the ATL machine layup rate, denoting the minimum layup rate for a maximum complexity ply."
+minimumCoreTrimWidth,25.4,Length,The minimum width of material that must be trimmed from each side of the core material stock. Used to calculate core material volume.
+moveIntoAutoclaveTime,300,Time,The typical amount of time required to move a part and fixture into the Autoclave. Set to any value greater than or equal to 0.
+overheadRateAdjustmentFactor,1,,Factor used to globally increase or decrease overhead rate evaluations per process.
+plyCurvatureDeviationThreshold,3,,Threshold for number of standard deviations between average and maximum ply curvature. Used to distinguish large yet uniform curvature.
+plyCurvatureLocalizedThreshold,0.01,,"Threshold for percentage of the area of the part, where it has curvature is close to the max below which curvature is classified as localized."
+plyCurvatureMildThreshold,1,,"Threshold for average ply curvature, below which a ply is classified as having mild curvature."
+plyIdentTime,8,Time,The amount of time typically required to manually ident an individual ply following Ultrasonic Cutting.
+plyMediumLimitArea,8000000,Area,"The area threshold above which a ply stops being considered a ""medium"" ply and starts being considered a ""large"" ply."
+plySmallLimitArea,800000,Area,"The area threshold above which a ply stops being considered a ""small"" ply and starts being considered a ""medium"" ply."
+plyUnloadTimeLarge,30,Time,"The amount of time typically required to manually unload a ""large"" ply plus its associated scrap raw material from the machine table and add the finished ply to a kit."
+plyUnloadTimeMedium,9,Time,"The amount of time typically required to manually unload a ""medium"" ply plus its associated scrap raw material from the machine table and add the finished ply to a kit."
+plyUnloadTimeSmall,3,Time,"The amount of time typically required to manually unload a ""small"" ply plus its associated scrap raw material from the machine table and add the finished ply to a kit."
+pottingDiameterAllowance,80,Length,The diameter of the area which will be potted per fastener location.
+rawMaterialHandlingTime,1200,Time,"The amount of time typically required to retrieve a roll of raw material from Cold Storage, move it to the Ultrasonic Cut cell, and load it onto the machine."
+resinCureRampDownFinishTemperature,40,Temperature,The resin's temperature at the end of the Autoclave Cure process. Set to any value greater than or equal to 0.
+resinCureRampUpStartTemperature,30,Temperature,The resin's temperature at the start of the Autoclave Cure process. Set to any value greater than or equal to 0.
+sealantTapeLengthMultiplier,1,,Factor used to multiply the length of sealant tape used in vacuum bagging.
+supportsDTC,true,,'true' or 'false' - only set to 'true' if this Digital Factory's cost model has been upgraded or configured to support aPriori's Design-to-Cost functionality.
+thermocoupleApplicationDensity,465000,Area,The area that each thermocouple can cover. Set to any value greater than 0.
+thermocoupleApplicationRate,30,Time,The rate at which an operator can apply (attach) a single thermocouple to the part.
+thermocoupleConnectionRate,20,Time,The time required to connect a single thermocouple to its sensor. Set to any value greater than 0.
+toolHeightAllowance,500,Length,The total height allowance applied to account for loading the part onto its tooling. Used to determine whether the tool will fit into the Autoclave. Set to any value greater than or equal to 0.
+toolPerimeterAllowance,150,Length,Sets the perimeter allowance to each side of the composite tooling to account for it extending beyond the part's perimeter. Set to any value greater than or equal to 0.
+toolTackCoverageRatePerVolume,17500000,Area/L,The expected coverage rate for tool tack agent as specified by the supplier.
+toolTackCureTime,35,Time,The amount of time required for the tool tack agent to cure before plies can be laid on the tool.
+unrollRawMaterialRate,1400,Velocity,The rate at which an operator can unroll raw material while pulling it down the length of the Ultrasonic Cut machine.
+usePreferredMachines,true,,"If true the model will first try to select a preferred machine. If false, the system chooses either the default machine or from the entire non-preferred set of machines."
+vacuumBagMaterialUnrollRate,300,Velocity,The rate at which vacuum bag raw material can be unrolled from the roll.
+vacuumBagRemovalRate,300,Velocity,The rate at which the edges of a vacuum bag can be un-taped following Debulking.
+vacuumDropTestHoldTime,20,min,The amount of hold time required for conducting the vacuum drop test.
+weightingAFPAngleVsAspect,0.2,,The weighting factor applied to material flexibility to determine material angle versus ply aspect ratio rating. Used to determine ply complexity in the Automated Fiber Placement process.
+weightingAFPMaterialFlexibility,0.1,,The weighting factor applied to material flexibility to determine material flexibility rating. Used to determine ply complexity in the Automated Fiber Placement process.
+weightingAFPPlyCutout,0.4,,The weighting factor applied to cutout ratio to determine cutout rating. Used to determine ply complexity in the Automated Fiber Placement process.
+weightingAFPPlyDeformation,0.3,,The weighting factor applied to curvature to determine ply deformation rating. Used to determine ply complexity in the Automated Fiber Placement process.
+weightingATLAngleVsAspect,0.2,,The weighting factor applied to material flexibility to determine material angle versus ply aspect ratio rating. Used to determine ply complexity in the Automated Tape Layup process.
+weightingATLMaterialFlexibility,0.1,,The weighting factor applied to material flexibility to determine material flexibility rating. Used to determine ply complexity in the Automated Tape Layup process.
+weightingATLPlyCutout,0.4,,The weighting factor applied to cutout ratio to determine cutout rating. Used to determine ply complexity in the Automated Tape Layup process.
+weightingATLPlyDeformation,0.3,,The weighting factor applied to curvature to determine ply deformation rating. Used to determine ply complexity in the Automated Tape Layup process.
+weightingHLUMaterialFlexibility,0.5,,The weighting factor applied to material flexibility to determine material flexibility rating. Used to determine ply complexity in the Hand Layup process.
+weightingHLUPlyCutout,0.1,,The weighting factor applied to cutout ratio to determine cutout rating. Used to determine ply complexity in the Hand Layup process.
+weightingHLUPlyDeformation,0.4,,The weighting factor applied to curvature to determine ply deformation rating. Used to determine ply complexity in the Hand Layup process.

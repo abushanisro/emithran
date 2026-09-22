@@ -1,0 +1,9 @@
+name,file_path,Num Pins,Tool Name
+tblpunchingTool,lookupTables/Component/punchingTool.csv,1.0,toolPins_1
+tblpunchingTool,lookupTables/Component/punchingTool.csv,4.0,toolPins_4
+tblpunchingTool,lookupTables/Component/punchingTool.csv,9.0,toolPins_9
+tblpunchingTool,lookupTables/Component/punchingTool.csv,16.0,toolPins_16
+tblpunchingTool,lookupTables/Component/punchingTool.csv,25.0,toolPins_25
+tblpunchingTool,lookupTables/Component/punchingTool.csv,36.0,toolPins_36
+tblpunchingTool,lookupTables/Component/punchingTool.csv,49.0,toolPins_49
+tblpunchingTool,lookupTables/Component/punchingTool.csv,64.0,toolPins_64

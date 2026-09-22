@@ -1,0 +1,5 @@
+name,file_path,multiplier,texture
+cmToolTexture,lookupTables/Component/cmToolTexture.csv,0.0,None
+cmToolTexture,lookupTables/Component/cmToolTexture.csv,0.5,Fine-Shallow
+cmToolTexture,lookupTables/Component/cmToolTexture.csv,0.9,Moderate-Medium
+cmToolTexture,lookupTables/Component/cmToolTexture.csv,1.0,Coarse-Deep

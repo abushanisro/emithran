@@ -1,0 +1,265 @@
+section,variableCount,variableName,stringValue,unitTypeName,notes
+Inherited,264,TWGMaxDiameterThreshold,1200,Length,Diameter threshold at or below which a gear will be feasible for Threaded Wheel Grinding.
+Inherited,264,TWGProductionVolumeThreshold,150,,Production volume threshold below which gears will be feasible for Profile Grinding.
+Inherited,264,absoluteMaxFilletRadius,300,Length,"Radius cap for indirect fillets - set to 0.25"" by default."
+Inherited,264,allowableSweepAreaDeltaPerc,3,,Allowable variance of sweep area from finished area as a percetage of finished area. Part of check for partially obstructed turned surfaces.
+Inherited,264,allowedAngleDeviationSetupAxisToolAxis,0,Angle,Allowed angle deviation between setup axis and tool axis when selecting setup axis in various contexts
+Inherited,264,applyMachiningNodeGcdFilter,false,,"If true, Fails junk/bogus GCDs immediately in the root node. Doesn't check otherwise."
+Inherited,264,areaOfSurfaceInSlotForFacing,0.9,,"If a Slot's floor is not at least this percentage contained within any Slot, we do not use the Slot's width for Facing Tool selection. This is applicable for Shared Floor Slots."
+Inherited,264,aspectRatioLimitRatio,10,,Used for setting Maximum Tool Sizes. Threshold for a part that is considered high aspect ratio. Compared to (Max / Mid Part sizes).
+Inherited,264,aspectRatioOfStandardParts,4,,Used for setting Maximum Tool Sizes. Threshold for a part that is not considered high aspect ratio. Compared to (Max / Mid Part sizes).
+Inherited,264,autoApplyMultiApproachOperations,true,,"'true' or 'false' - when 'false', surface GCDs will more commonly be flagged as Design-to-Cost issues. When 'true', aPriori will attempt to analyze surface finishing from multiple directions and/or using multiple tools and operations."
+Inherited,264,autoSelectExternalEdgesForAutomatedDeburr,false,,Auto selection of Sharp external edges for Automated Deburr (true/false)
+Inherited,264,autoSelectExternalEdgesForManualDeburr,false,,Auto selection of Sharp external edges for Manual Deburr (true/false)
+Inherited,264,autoSelectHoleEdgesForAutomatedDeburr,false,,Auto selection of a simpleHole's Sharp edges for Automated Deburr (true/false)
+Inherited,264,autoSelectHoleEdgesForManualDeburr,false,,Auto selection of a simpleHole's Sharp edges for Manual Deburr (true/false)
+Inherited,264,autoSelectInternalEdgesForAutomatedDeburr,false,,Auto selection of Sharp internal edges for Automated Deburr (true/false)
+Inherited,264,autoSelectInternalEdgesForManualDeburr,false,,Auto selection of Sharp internal edges for Manual Deburr (true/false)
+Inherited,264,backCounterboredHoleDiameterToThroatDiameterRatio,2.3,,Ratio of the diameter of hole to diameter of throat allowed for back counterbored holes
+Inherited,264,backCounterboredHoleLengthToThroatDiameterRatio,3.5,,Ratio of the throat length to throat diameter allowed for back counterbored holes
+Inherited,264,barFedLatheBatchSetupFactor,1.25,,Deprecated in CMV340
+Inherited,264,baseProgrammingTime,60,min,Minimum cost to prepare an NC Program
+Inherited,264,boreFeedAdjustment,1,,
+Inherited,264,boreSpeedAdjustment,1,,
+Inherited,264,clampingTime,2,Time,The time attributed to the machine center for clamping a part in a machine.
+Inherited,264,contouringAreaRatioThreshold,0.001,,Ratio of part surface area to GCD surface area to determine if contouring is feasible during Partially Automated Machining.
+Inherited,264,counterBoringToolChangeTime,1,min,"Total time to change back counterboring tool, this includes attaching and detaching the tool."
+Inherited,264,createSeparateStockPrepProcess,false,,false if stock should be trimmed on main process. true if a separate station for stock prep is required.
+Inherited,264,cutoutSharpCornerTouchupCycleTime,5,,The amount of time that it takes to touch up a sharp corner of a Cutout after Perimeter Machining the larger Cutout volume
+Inherited,264,cycleTimeAdjustmentFactor,1,,Factor used to globally increase or decrease cycle time evaluations per process.
+Inherited,264,deburrEdgeAngleCutOff,150,,Edge wall angle at which burrs do not typically occur.
+Inherited,264,defaultAxialToolPathOverride,false,,Overrides estimation of axial tool path for roughing operations if set to true. False by default.
+Inherited,264,defaultChemMillDesmutRinseTime,10,min,Default desmut rinse time used for chemcal milling etch cycle
+Inherited,264,defaultChemMillDesmutTime,10,min,Default desmut time used for chemcal milling etch cycle
+Inherited,264,defaultChemMillDryingTime,25,min,Default drying time used for chemcal milling etch cycle
+Inherited,264,defaultChemMillRinsingTime,25,min,Default rinsing time used for chemical milling etch cycle
+Inherited,264,defaultDrillConeAngle,59,Angle,Default cone angle of the drill tip
+Inherited,264,defaultEdgeDressingRate,10,mm/s,Default speed at which chemical milled pockets can be manually dressed
+Inherited,264,defaultExternalEdgeDeburrToolType,Wire Wheel Brush,,Default external edge deburring tool type.
+Inherited,264,defaultFinalInspectionTime,5,min,Final part quality visual inspection time
+Inherited,264,defaultIdentingTime,45,Time,Default time taken to ident part
+Inherited,264,defaultInspectionSampleRatio,0.25,,Percentage inspection ratio
+Inherited,264,defaultInspectionType,diametrical,,Default feature inspection method
+Inherited,264,defaultInternalEdgeDeburrToolType,Wire Tube Brush,,Default internal edge deburring tool type.
+Inherited,264,defaultNumDeburrPassesEdge,1,,The default number of passes to deburr an edge.
+Inherited,264,defaultNumDeburrPassesSurface,1,,The default number of passes it takes for the deburr tool to cover the entire surface area for surface deburring.
+Inherited,264,defaultNumFinishPasses,2,,The default value for the number of finish grinding passes for Threaded Wheel Gear Grinding.
+Inherited,264,defaultNumSemiFinishBoringPasses,2,,Default number of semi-finish boring passes for boring hole enlargement
+Inherited,264,defaultNumStarts,1,,Default number of starts (parallel rows of hob teeth) on a gear making hob
+Inherited,264,defaultNumberDeburrSetups,1,,Default number of deburring setups.
+Inherited,264,defaultPartsPerLoad,1,,
+Inherited,264,defaultRoughMillingCutParameterStrategy,Roughing - aPriori Traditional,,
+Inherited,264,defaultRoutingStrategyMode,Rough/Finish Each Setup --> [Heat Treat],,Controls default General Routing Strategy mode. 'Rough/Finish Each Setup --> [Heat Treat]' | 'All Rough Setups --> [Stress Relief] --> All Finish Setups --> [Heat Treat]' | '[Heat Treat] --> Rough/Finish Each Setup (mat hardness change)' | 'All Rough Setups --> All Finish Setups (mat hardness change)' [truncated in source]
+Inherited,264,defaultSparkTestTime,2,min,Default spark test time punishment
+Inherited,264,defaultSurfaceDeburrToolType,Wire Cup Brush,,Default surface debarring tool type.
+Inherited,264,defaultToolDeflectionAndHolderClearanceOverride,false,,"Overrides consideration of tool holder clearance when defining tool reach, and also overrides material removal rate adjustments based on tool deflection if set to true (for supported operations). False by default."
+Inherited,264,defaultToolUnitSystem,US,,Default standard unit system for virtual tool selection - 'metric' or 'US'
+Inherited,264,defaultUtilizationMethod,COMPUTED,,"Eligible values: ""COMPUTED"" & ""MACHINE_DEFAULT"""
+Inherited,264,defaultVirtualDrillingNumOfHoles,1,,Default number of holes for a Virtual Drilling Operation.
+Inherited,264,delicatePartRatio,8,,"If the part middle dimension over its smallest dimension is greater than this number, then it is delicate and drilling is only allowed up to a percentage of the part width."
+Inherited,264,demaskPeelTimeUpperCap,60,min,Time cap applied to demasking time calculation
+Inherited,264,difficultL2DRatio,12,,"The most difficult access tool reach to diameter ratio. Above this ratio, the tool reach is considered impossibly difficult."
+Inherited,264,disableInvestmentAmortization,false,,"User override to disable amortization of all fixed costs to the individual part or assembly. By default, fixed costs are calculated per part for tooling, fixtures, and programming."
+Inherited,264,dovetailMinimumNumberOfPasses,2,,The minimum number of passes per side for Finish Dovetail Milling. Set to 2 passes by default. Must always be an integer greater than 0.
+Inherited,264,dovetailNumberOfPassesIntercept,-0.93,,"The ""b"" term in the y = mx + b formula for the number of radial passes required to machine a dovetail."
+Inherited,264,dovetailNumberOfPassesSlope,4.81,,"The ""m"" term in the y = mx + b formula for the number of radial passes required to machine a dovetail. x is the ratio of (toolDepth / neckDiameter). Should always be a positive number."
+Inherited,264,drillFeedAdjustment,1,,
+Inherited,264,drillPressToolCenterTime,10,Time,Time to center drill press tool before back counterboring.
+Inherited,264,drillSpeedAdjustment,1,,
+Inherited,264,drillingSmallFilletThreshold,0.3,Length,Fillet radii less than this value will be ignored when assessing feasibility for drilling operations on MultiStepHoles.
+Inherited,264,easyL2DRatio,3,,"Small, non-zero access tool reach to diameter ratio. Below or equal to this ratio, the milling operation is considered easy."
+Inherited,264,edgeTurningTime,0.25,Time,"Small, non-zero allowance for turning an edge."
+Inherited,264,endmillSpeedAdjustment,1,,
+Inherited,264,enlargementDrillAsFractOfHole,0.70,,Controls the heuristic that determines the maximum diameter of the enlargement drill (before snapdown) as a fraction of the final hole diameter
+Inherited,264,extraSetupTime,0,Time,"Any constant setup time, s"
+Inherited,264,extrusionMillingPreference,false,,The variable controls whether to prune Milling processes when the primary process is Extrusions. When false 3 Axis and 5 Axis Mills will not automatically evaluate but can be manually selected.
+Inherited,264,extrusionRoutingingPreference,true,,The variable controls whether to prune Routering processes when the primary process is Extrusions. When false 3 Axis Router and 5 Axis Router will not automatically evaluate but can be manually selected.
+Inherited,264,facingToolCountIntercept,2.50,,"Intercept of the Facing Tool Count best fit line. By default, this value is added to (facingToolCountSlope * Distinct Tool Diameter)"
+Inherited,264,facingToolCountSlope,0.40,,"Slope of the Facing Tool Count best fit line. By default, this value is multiplied by the number of Distinct Tool Diameters."
+Inherited,264,failNotSupportedGcds,true,,"If true Not Supported GCDs will fail to cost, if false Not Supported GCDs will cost successfully as a No Cost Feature."
+Inherited,264,fallbackAxialCutDepth4Roughing,0.5,,Axial cut depth when a tool-material specific value is not provided in tblMilling
+Inherited,264,feedFearFactor,1,,"Used to scale down nominal feed rates. Warning, use only as a last resort."
+Inherited,264,filletAngleForBallEndMill,20,Angle,"If a Fillet Angle deviates from 90 degrees more than this amount, Roughing with a Ball End Mill may be required. This impacts only Pockets."
+Inherited,264,filletCoverageForFacingOfSlotFloor,0.25,,"If a Slot's largest fillet has a bend diameter greater than this percentage of the Slot's width, don't use the Slot Width for Facing Tool selection"
+Inherited,264,fineFinishMillingBaselineFeedFactor,1,,Factor of the baseline feed rate of Fine Finish Milling to be adjusted (in addition to the tolerance based adjustment that will also be made).
+Inherited,264,fineFinishMillingDisabled,false,,Disabling Fine Finish Milling will prevent additional milling passes being considered as an option to achieve tight tolerances.
+Inherited,264,finishAllowance,5,Length,
+Inherited,264,finishDovetailMillingCutEfficiency,0.95,,Average efficiency of Finish Dovetail Milling operation. 1.0 means there is no non-chipmaking portion of the toolpath. 0.95 means that 5% of the time the tool is sweeping over air or traveling over a previous toolpath portion.
+Inherited,264,finishGrindingDepth,0.1,Length,
+Inherited,264,finishingToolEngagementAbsolute,0.635,Length,"Amount of material, in mm, left on after roughing for the finishing tool to remove. This impacts only Rough Milling operations on Pockets and Slots and the Bulk Milling operation."
+Inherited,264,finishingToolEngagementPercent,0.15,,"Amount of the finishing tool radial engagement, as a percent, left on after roughing for the finishing tool to remove. This impacts only Rough Milling operations on Pockets and the Bulk Milling operation."
+Inherited,264,firstRunPenaltyFactor,0,,Extra time required to run a first machine cycle as part of manufacturing batch setup.
+Inherited,264,fixtureTimeAdjustmentForPerimeterMilling,1.25,,Adjustment factor for fixture cost when perimeter milling applied
+Inherited,264,flankGrindingMultiplier,8,,Dial used for calibrating the time required to grind one tooth flank in gear grinding.
+Inherited,264,flatEndMillContouringStepoverPercentage,5,,Stepover of the contouring operation as a percentage of the tool diameter when contouring is performed with a flat bottom mill
+Inherited,264,flatHoleBottoms,Flexible,,"""Literal"" or ""Flexible"""
+Inherited,264,fractionalAreaSetupTrigger,100,,Surface area / part area fraction that triggers the creation of an active surface setup axis
+Inherited,264,fullyMachinedAssyHole,100,,"Diameter <= this value is fully machined on assemblies, otherwise only trimming is applied."
+Inherited,264,gapDrilledRatio,8,,Ratio used to determine if two concentric holes that are drilled should be machined on the one setup axis. The higher the ratio the larger the gap between the two holes can be.
+Inherited,264,gapTappedRatio,3,,Ratio used to determine if two concentric holes that are tapped should be machined on the one setup axis. The higher the ratio the larger the gap between the two holes can be.
+Inherited,264,gearQualityDefaultAgmaNewStd,A8,,"A2, A3, A4, ... A11, A12"
+Inherited,264,gearQualityDefaultAgmaOldStd,Q8,,"Q15, Q14, Q13, ... Q6, Q5"
+Inherited,264,gearQualityDefaultDinStd,9,,"2, 3, 4, ... 11, 12"
+Inherited,264,genRemovalRateThreshold,64.5,,
+Inherited,264,generalFinishGrindingDepthFactor,5,,Factor of general finish grinding depth relative to the normal grinding depth
+Inherited,264,generalMillFinishingFeedFactor,0.8,,Feed factor for general mill finishing operations
+Inherited,264,generalRoughMillingFeedFactor,0.8,,Feed factor for general rough milling operations
+Inherited,264,grinderNestingEfficiency,0.5,,Efficiency at nesting parts onto a rotary grinder table
+Inherited,264,grooveMillHoleMaxProximity,100,Length,Threshold for proximity of coaxial holes for groove milling of simple hole
+Inherited,264,grooveMilledHoleThroatLengthToDiameterRatio,3.5,,Ratio of the throat length to throat diameter allowed for groove milled holes
+Inherited,264,grooveMilledHoleToThroatDiameterLimit,1.5,,Ratio of the diameter of hole to diameter of throat allowed for groove milled holes
+Inherited,264,groovingMillingCutEfficiency,0.95,,Average efficiency of Groove Milling operation. 1.0 means there is no non-chipmaking portion of the toolpath. 0.95 means that 5% of the time the tool is sweeping over air or traveling over a previous toolpath portion.
+Inherited,264,groovingToolClearance,0.1,,Clearance between tool and ring depth as a percentage of ring depth
+Inherited,264,gtolBestAchievableFactor,1.5,,Compensation factor to apply to the best achievable Gtol
+Inherited,264,gtolWorstAchievableFactor,0.75,,Compensation factor to apply to the worst achievable Gtol
+Inherited,264,hexFacets,6,,Number of facets on a hexagon
+Inherited,264,highCycleTimeThreshold,0.1,,
+Inherited,264,imposeLowerToolDiameterLimitForMilling,false,,"aPriori predicts the tool diameter for each GCD. For a number of reasons, that tool diameter can sometimes be artificially low. Enter 'false' to use the aPriori calculated value or 'true' to set a lower limit, as defined by plant.imposedLowerToolDiameterLimitForMilling"
+Inherited,264,imposedLowerToolDiameterLimitForMilling,2,Length,"If plant.imposeLowerToolDiameterLimitForMilling is set to 'true', this will be the default value for the lower tool diameter limit. It will be applied to all Milling operations on all parts unless the PSO on the Machining Branch Node is modified on a part specific basis."
+Inherited,264,insertCutDepthA,0.015,,Curve fit constant for cut depth compensation formula
+Inherited,264,insertCutDepthB,0.381,,Curve fit constant for cut depth compensation formula
+Inherited,264,insertCutDepthCeiling,9.525,,Largest allowable roughing insert cutDepth
+Inherited,264,jigBoreGrindPreferredMachineStyle,CNC,,'Manual' or 'CNC'
+Inherited,264,jigBoreMaxPartSetupTime,6,hr,
+Inherited,264,jigBoreMaxPosTol,0.0254,Length,
+Inherited,264,jigBoreMinPartSetupTime,2,hr,
+Inherited,264,jigBoreMinPosTol,0.005,Length,
+Inherited,264,laborRateAdjustmentFactor,1,,Factor used to globally increase or decrease the labor rate evaluations per process.
+Inherited,264,largeHoleMillingDiameterRatio,0.5,,Ideal mill diameter as a ratio of the milled hole diameter
+Inherited,264,lengthOfPeck,1,Length,
+Inherited,264,lineSealingBrushRate,20,mm/s,Line sealing rate using brush
+Inherited,264,lineSealingRollerRate,92903,mm^2/s,Line sealing rate using roller
+Inherited,264,loadProgram,900,Time,Average time to load the NC program (for Batch Setup)
+Inherited,264,machineCenterDoorClosingTime,3,Time,The time attributed to the machine center for closing a machine door.
+Inherited,264,machineCenterDoorOpeningTime,3,Time,The time attributed to the machine center for opening a machine door.
+Inherited,264,machiningAutomationLevel,Fully Automated,,Automation level for costing in Machining. Set to 'Fully Automated' or 'Semi Automated - principal setups only'.
+Inherited,264,maxAxiGrooveMillingTime,10800,Time,Maximum time allowed for general mill roughing or finishing of axigroove
+Inherited,264,maxContouringToolDiameter,50.8,,
+Inherited,264,maxFacingToolsDefault,6,,Maximum Number of Facing Tools for a Facing Tool Selection Algorithm
+Inherited,264,maxGunDrillingLength,1200,Length,Maximum length of gun drilling tool in the turn and mill machines
+Inherited,264,maxLinearToolSpeedFactor,0.50,,"Maximum allowed linear speed of the tool axis, as measured as a fraction of the maximum traverse speed. It should not exceed 1.0"
+Inherited,264,maxMillingLToDRatio,6,,Deprecated in CMV340.
+Inherited,264,maxNumStarts,7,,The maximum number of starts allowable for a threaded grinding wheel. Used in Hard Gear Finishing (Threaded Wheel Gear Grinding).
+Inherited,264,maxOblique4AMSetups,0,,
+Inherited,264,maxRoughingInsideDiaPercentile,0.85,,"Default maximum percentile of inside diameter to use for the large roughing mill, <= 1.00"
+Inherited,264,maxRoughingToolsDefault,5,,Default maximum number of roughing tools
+Inherited,264,maxRoundingToolRadius,30,Length,Maximum rounding tool radius
+Inherited,264,maxShavingWorkpieceSpeed,1000,RPM,Absolute maximum rotational speed of shaving workpiece whatsoever the machine selection.
+Inherited,264,maxSideMillingReach,160,Length,Max allowed side milling reach. Used to decide when to face if side milling is possible.
+Inherited,264,maxViseSize,406.4,Length,Threshold for changing from a default vise to default non modular clamping
+Inherited,264,millFeedAdjustment,1,,Global adjustment factor of mill feed
+Inherited,264,millSpeedAdjustment,1.0,,Global adjustment factor of mill speed
+Inherited,264,minAccessibleAreaRatioForNormalFacing,0.975,,Minimum ratio of accessible surface area compared to total surface area for the use of conventional Face Milling of a plane
+Inherited,264,minContouringAreaSingleTool,0.8,,Minimum fraction of an area's surface that is contoured by the smallest acceptable tool in which a second tool is not used.
+Inherited,264,minContouringMillDifference,0.5,,Minimum fractional difference between two contouring mills. ((Large Mill /Small Mill) - 1) >= minContouringMillDifference
+Inherited,264,minFMillDifference,0.5,,Minimum fractional difference between two finishing mills
+Inherited,264,minFacingToolsDefault,4,,Minimum Number of Facing Tools for a Facing Tool Selection Algorithm
+Inherited,264,minGMFCycleTime,0,Time,Min GMF cycle time punishment
+Inherited,264,minNumTeethForMultistart,12,,Minimum number of teeth on a gear in order to use multiple hob starts
+Inherited,264,minRMillDifference,0.15,,"Minimum fractional difference between two roughing mills, <= 1.00"
+Inherited,264,minRingCount2MMStockPrep,2,,Minimum number of Rings that must pass feasibility checks for Stock Prep Lathe process in order for the process to be used on the part at all.
+Inherited,264,minRoughingInsideDiaPercentile,0.5,,"If the small Pocket roughing mill is >= this value, it will be the only tool used for the Pocket."
+Inherited,264,minToolDiameterForCutoutBasedOnCurvedWall,4,Length,Smallest Curved Wall Bend Diameter which will influence tool diameter selection
+Inherited,264,multipassKeywayBroachingPositioningTime,25,Time,Time to pick the broach out of the 'basket' and reposition it and a shim in the hole for the next pass
+Inherited,264,numDwellsPerShapingStroke,2,,Number of dwells per each shaping stroke
+Inherited,264,numTeethPerRevolution,24,,Default number of teeth per revolution used to calculate numStarts in Gear Grinding
+Inherited,264,offsetsPerTool,5,,Average number of offsets to perform per tool (for Batch Setup)
+Inherited,264,overheadRateAdjustmentFactor,1,,Factor used to globally increase or decrease overhead rate evaluations per process.
+Inherited,264,oversizeStockThreshold,1.2,,
+Inherited,264,partSetupTimeAdjustmentFactor,1,,Part setup time adjustment factor
+Inherited,264,partSetupTimeMethod,weightAndSizeBased,,Method of part setup time calculation: 'weightAndSizeBased' or 'machineBased'
+Inherited,264,partSizeScalingFactor,0.12,,"Used for setting Maximum Tool Sizes for normal aspect ratio parts. % of part size (mid + min dimension), with some compensation for part aspect ratio."
+Inherited,264,partSizeScalingFactorHighAspectRatioParts,0.40,,"Used for setting Maximum Tool Sizes for high aspect ratio parts. % of part size (mid + min dimension), with some compensation for part aspect ratio."
+Inherited,264,partingCenterlineCarryThrough,0.635,Length,"Distance that the tool carries through the part centerline for Parting. 0.635mm = 0.025"""
+Inherited,264,partingLength,2,Length,
+Inherited,264,partingODstandOff,1.27,Length,"Distance that the tool stands off the OD of the part for Parting. 1.27mm = 0.050"""
+Inherited,264,passStepSafetyFactor,1,,>=1. Mold manufacturers tend to use 7 (very slow). '1' would be the fastest for a flat surface.
+Inherited,264,peckLiftAndLowerTime,0.25,Time,Time to lift and lower drill for each peck cycle
+Inherited,264,perimeterMillingAngularTolerance,5,Angle,The maximum allowed angle between a perimeter direction and a principle setup for perimeter milling to be allowed.
+Inherited,264,perpendicularCountFor3AM,4,,Maximum no of perpendicular setups for 3AM
+Inherited,264,pickTime,86.4,Time,Time to lift and lower a heavy part using a mechanical winch or sling
+Inherited,264,pickWeight,15.87,Mass,Threshold weight at which a mechanical lifting device is required for the part.
+Inherited,264,pilotRotaryBroachHoleDiamPercentIncreaseHex,1.03,,Ratio of the minor diameter of a hex polygon to the diameter of the pilot hole
+Inherited,264,pilotRotaryBroachHoleDiamPercentIncreaseSquare,1.1,,Ratio of the minor diameter of a square polygon to the diameter of the pilot hole
+Inherited,264,pilotRotaryBroachHoleLengthPercentIncrease,1.3,,Ratio of the length of the polygon to the length of the pilot hole
+Inherited,264,plungeShavingDwellCoeff,45,,An empirical coefficient for the calculation of plunge shaving dwell time. Typically it is between 20 and 70.
+Inherited,264,polygonTurningFeedAdjustment,1,,Feed factor for polygon turning operation
+Inherited,264,polygonTurningToolToWorkpieceRatio,3,,Diameter of the polygon cutter must be larger than the width across the flats by some factor to achieve greater dimensional accuracy
+Inherited,264,powerSafetyFactor,0.9,,
+Inherited,264,preferAggressiveDovetailCuttingMethod,true,,"If true, the Aggressive Cutting method (Cut both sides of the Dovetail on the first pass) will be chosen by default. If false, the Conservative method (Cut one single side of the dovetail on the first pass) will be chosen by default"
+Inherited,264,preferVirtualMachines,true,,"(true/false): [2AL, 3AL, 3AM, 4AM, 5AM, MillTurn] Controls machine selection - if true the model will first try to select a virtual machine, if present and feasible based on size constraints."
+Inherited,264,preturnDrillFraction,0.75,,Size of preturn drilling hole as a fraction of the final hole diameter
+Inherited,264,preturnDrillingRatio,0.33,,
+Inherited,264,probeFactor,0.5,,Time reduction factor in performing offsets with probes (for Batch Setup)
+Inherited,264,programmingFactor,6,,NC Programming time required that is proportional to the actual cycle time required to cut the part.
+Inherited,264,rapidTransferDistanceFactor,0.5,,Multiply by the part.boxLength to get the typical rapid tranfer distance
+Inherited,264,rapidTraverseRateGovernor,0.75,,Speed limiter applied to the machine rapid traverse rate when approaching or retracting during Profile Grinding.
+Inherited,264,recommendedDovetailSlotSizes,3,,Maximum count of dovetail slot sizes; drives design to cost metrics
+Inherited,264,recommendedDovetailSlotsCutWithTool,2,,Minimum count of dovetail slots cut with the same tool; drives design to cost metrics
+Inherited,264,recommendedPartAspectRatio,10,,Minimum recommended part aspect ratio for turned parts
+Inherited,264,repetitionsOfIndividualPartSetup,1,,Repetitions of Individual Part Setup
+Inherited,264,ringedHoleMaxVolumePercentDifference,0.4,,max allowed percent difference between RingedHole volume and combined volume of constituent gcds
+Inherited,264,rollabilityBrinellThreshold,700,,Spline materials above this threshold are not rollable
+Inherited,264,rollabilityRockwellCThreshold,63,,Spline materials above this threshold are not rollable
+Inherited,264,rollabilityTensileStrengthThreshold,300,,Spline materials above this threshold are not rollable
+Inherited,264,rotaryBroachFeedAdjustment,1,,Adjust rotary broach feed as per a calibration constant (default = 1)
+Inherited,264,roughBoringLowerDiameter,25.4,Length,"Below this diameter, boring enlargement is not used."
+Inherited,264,roughBoringToleranceThreshold,0.254,Length,"Below this tolerance level, for diametrical tolerance or positional tolerance, enlargement by boring is turned on."
+Inherited,264,roughBoringUpperDiameter,50.8,Length,"Upper threshold diameter for boring enlargement. Above this diameter, boring enlargement is not used."
+Inherited,264,roughingCutEfficiency,0.67,,Average efficiency of roughing operation. 1.0 means there is no non-chipmaking portion of the toolpath. 0.67 means that 1/3 of the time the tool is sweeping over air or traveling over a previous toolpath portion.
+Inherited,264,roughingL2DRatio,3,,Length to Diameter (L/D) Ratio for Roughing
+Inherited,264,ruleBasedRoutingSelectionFor3AM,true,,
+Inherited,264,ruleBasedRoutingSelectionForOtherRoutings,true,,
+Inherited,264,separateMaterialQualification2Model,true,,Controls default inclusion of 'Stock Prep Lathe' process for 2-Model machined parts - analogous to plant.createSeparateStockPrepProcess for Stock Machined parts.
+Inherited,264,setupTimePerTool,600,Time,Batch setup time per tool (for Batch Setup)
+Inherited,264,shaperStrokeLengthRatio,1.15,,Ratio of the shaper stroke length to the face width of the axigroove
+Inherited,264,shapingDwellTimePerStroke,0.15,,Time in seconds for the tool dwell time in shaping
+Inherited,264,sheetMetalShallowChamferThreshold,15,,Minimum edge chamfer angle for shallow chamfer recognition. Applicable to Sheet Metal routings.
+Inherited,264,singlePassKeywayBroachingPositioningTime,5,Time,"Time for the broach to reposition for the next pass, when there are more than one passes required."
+Inherited,264,sliverMaxArea,5,Area,Maximum size of a bogus sliver-shaped planar face
+Inherited,264,sliverMinConcavePerimeter,45,,Minimum percent concave perimeter for a sliver-shaped planar face (this filters out slits as not bogus)
+Inherited,264,sliverMinPerimeterToAreaRatio,125,,Minimum perimeter to area ratio of a bogus sliver-shaped planar face
+Inherited,264,slotMillingCutEfficiency,0.95,,Average efficiency of Slot Milling operation. 1.0 means there is no non-chipmaking portion of the toolpath. 0.95 means that 5% of the time the tool is sweeping over air or traveling over a previous toolpath portion.
+Inherited,264,slotRoughMillingFilletCoverageForTwoTools,0.3,,"The minimum amount of the slot width with a fillet needs to cover to still have 1 tool machine it. If the fillet covers less than this percentage of the slot width, it could trigger a second tool."
+Inherited,264,smDiameterGeneratorFactorForReduction,0.5,,Reduction factor for the small roughing tool that is associated with the cylinder volume
+Inherited,264,smallRMillVolumeFactor,3,,The volume factor for the small roughing tool that is associated with the cylinder volume
+Inherited,264,sparkOutMultiplier,2,,Sparkout time as a multiple of finish grinding time
+Inherited,264,speedSafetyFactor,0.9,,
+Inherited,264,spindlePowerBias,0.5,,"For machine selection, 0 to 1. 0 selects the cheapest hourly machine. 0.5 selects only machines more powerful than the average."
+Inherited,264,spindleRPMPercentageDifferenceLimit,10,,"The percentage difference limit for spindle revolutions per minute, above which two operations cannot occur simultaneously on the same spindle."
+Inherited,264,spindleSpeedBias,0.5,,"For machine selection, 0 to 1. 0 selects the cheapest hourly machine. 0.5 selects only machines faster than the average."
+Inherited,264,spindleSpeedGovernor,0.6,,Speed limiter applied to the workpiece spindle speed when indexing during Profile Grinding.
+Inherited,264,spiralBevelCutterDiameterToPitchDiameterRatio,1,,Ratio of the cutter diameter to the pitch diameter for spiral bevel gears
+Inherited,264,splineHobbingFeedFactor,0.5,,Adjustment factor which reduces tool feed for spline hobbing
+Inherited,264,splineRollingMaxModule,1.6,,Tooth module at which spline rolling becomes infeasible
+Inherited,264,splineRollingPressureAngle,20,,Angle below which spline rolling is feasible
+Inherited,264,squareFacets,4,,Number of facets on a square
+Inherited,264,squareGCDRatio,1,,The ratio of a true square GCD.
+Inherited,264,squarePocketRatioLowerThreshold,1.2,,The Lower threshold below which a pocket is considered 'square' when choosing tooling for Rough Milling.
+Inherited,264,squarePocketRatioUpperThreshold,1.5,,The Upper threshold above which a pocket is considered 'rectangular' when choosing tooling for Rough Milling.
+Inherited,264,straightBevelCutterDiameterToPitchDiameterRatio,1,,Ratio of the cutter diameter to the pitch diameter for spiral bevel
+Inherited,264,timePerWorldCoordinateOffset,300,Time,Average time to perform one World Coridinate offset (for Batch Setup)
+Inherited,264,toolCostAdjustment,1,,
+Inherited,264,toolDeflectionContributionFinishingAxialEngagement,0.3,,"If finishing cutting force is reduced because of tool deflection, this is the proportion of the reduction that will be contributed by the tool axial engagement. The sum of all finishing op contributions should equal 1."
+Inherited,264,toolDeflectionContributionFinishingFeed,0.7,,"If finishing cutting force is reduced because of tool deflection, this is the proportion of the reduction that will be contributed by the feed rate. The sum of all finishing op contributions should equal 1."
+Inherited,264,toolDeflectionContributionRoughingFeed,1,,"If roughing cutting force is reduced because of tool deflection, this is the proportion of the reduction that will be contributed by the feed rate."
+Inherited,264,toolDeflectionLimitFinishing,0.025,Length,Maximum amount of static tool deflection allowed for surface finishing operations.
+Inherited,264,toolDeflectionLimitRoughing,0.150,Length,Maximum amount of static tool deflection allowed for roughing operations.
+Inherited,264,toolDeflectionMinCuttingForceCompensation,0.2,,The minimum cutting force compensation factor that will be applied due to tool deflection. Should be between 0 and 1. The smaller the number the greater the potential reduction in cutting force.
+Inherited,264,toolHolderClearance,1,Length,Clearance between tool holder and part when calculating the required tool reach for an operation.
+Inherited,264,toolHolderLengthFactor,0.25,,Multiplied by the part length along the turning axis to determine the tool holder length for back work on Multi-Spindle Machining.
+Inherited,264,toolLifeAdjustment,1,,
+Inherited,264,toolReachReductionCheckThreshold,0.9,,A slim profile tool holder may be selected if the ratio of slim profile holder tool reach against standard holder tool reach is below this threshold.
+Inherited,264,toolReplacementTimeSwitch,1,,Switch for turning tool life replacement time on
+Inherited,264,trueSquarePocketInsideDiameterToSERWidthRatio,0.95,,Ratio of Inside Diameter to SER Width used to check if the pocket is a true square
+Inherited,264,turnableAreaPercentage,0.5,,Percentage of turnable area
+Inherited,264,turningFeedAdjustment,1,,
+Inherited,264,turningSpeedAdjustment,1,,
+Inherited,264,unclampingTime,2,Time,The time attributed to the machine center for unclamping a part in a machine.
+Inherited,264,useLegacyToolLifeCalculation,false,,Currently only impacts Drilling operations.
+Inherited,264,useNominalFeatureSize,false,,"If false the model will consider the size tolerance of holes and fillets when selecting a feasible tool, helping to reduce the total number of tools selected. If true the selected tool size will equal the nominal size of the feature."
+Inherited,264,usePreferredMachines,true,,"If true the model will first try to select a preferred machine. If false, the system chooses either the default machine or from the entire non-preferred set of machines."
+Inherited,264,useRapidRoughMilling,false,,
+Inherited,264,wheelWidthOverSurfaceLength,0.25,,Default traverse grinding wheel width as a function of surface to grind
+Inherited,264,workHolderBlowDownTime,10,Time,The time attributed to the machine center for removing chips from the work holder after a part has been machined.
+Inherited,264,zeroldRingedHoleDrillingThreshold,0.25,,Ring Length to maxDiameter transition ratio from radial roughing to drilling/axial roughing

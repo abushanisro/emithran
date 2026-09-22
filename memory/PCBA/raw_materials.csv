@@ -1,0 +1,14 @@
+Name,Source Name,Description,Cut Code,Material Type,Unit Cost (USD / kg),Cost Units,Base Cost Per Unit (USD),Length (mm),Width (mm),Overall Thickness (mm),Dielectric Thickness (mm),Combined Density (kg / m^3),Mass,Insulator,Number Of Plys,Hardness,Hardness System,Milling Speed (m / min),Data Source
+0.5ozCu,Generic 0.5ozCu,,33.1,Copper,13.174,Cost per Sq Meter,2.120,1000000.000,1295.000,0.018,0.000,8940,0.50,None,,0.00,Brinell,0.00,aPriori Baseline
+1.5ozCu,Generic 1.5ozCu,,33.1,Copper,12.595,Cost per Sq Meter,5.630,900000.000,1295.000,0.050,0.000,8940,1.50,None,,0.00,Brinell,0.00,aPriori Baseline
+1Ply-0.5ozCu-FR4,Generic 1Ply-0.5ozCu-FR4,,33.1,Copper,4.441,Cost per Sq Meter,13.860,2438.400,1219.200,1.618,1.600,1929,0.50,FR4,1,0.00,Brinell,0.00,aPriori Baseline
+1Ply-1.5ozCu-FR4,Generic 1Ply-1.5ozCu-FR4,,33.1,Copper,6.791,Cost per Sq Meter,23.140,2438.400,1219.200,1.650,1.600,2065,1.50,FR4,1,0.00,Brinell,0.00,aPriori Baseline
+1Ply-1ozCu-FR4,Generic 1Ply-1ozCu-FR4,,33.1,Copper,5.646,Cost per Sq Meter,18.480,2438.400,1219.200,1.635,1.600,2002,1.00,FR4,1,0.00,Brinell,0.00,aPriori Baseline
+1Ply-2ozCu-FR4,Generic 1Ply-2ozCu-FR4,,33.1,Copper,8.141,Cost per Sq Meter,29.190,2438.400,1219.200,1.670,1.600,2147,2.00,FR4,1,0.00,Brinell,0.00,aPriori Baseline
+1ozCu,Generic 1ozCu,,33.1,Copper,11.761,Cost per Sq Meter,3.680,900000.000,1295.000,0.035,0.000,8940,1.00,None,,0.00,Brinell,0.00,aPriori Baseline
+2Ply-0.5ozCu-FR4,Generic 2Ply-0.5ozCu-FR4,,33.1,Copper,4.452,Cost per Sq Meter,14.610,2438.400,1219.200,1.636,1.600,2006,0.50,FR4,2,0.00,Brinell,0.00,aPriori Baseline
+2Ply-1.5ozCu-FR4,Generic 2Ply-1.5ozCu-FR4,,33.1,Copper,6.329,Cost per Sq Meter,24.390,2438.400,1219.200,1.700,1.600,2267,1.50,FR4,2,0.00,Brinell,0.00,aPriori Baseline
+2Ply-1ozCu-FR4,Generic 2Ply-1ozCu-FR4,,33.1,Copper,5.433,Cost per Sq Meter,19.480,2438.400,1219.200,1.670,1.600,2147,1.00,FR4,2,0.00,Brinell,0.00,aPriori Baseline
+2Ply-2ozCu-FR4,Generic 2Ply-2ozCu-FR4,,33.1,Copper,7.307,Cost per Sq Meter,30.770,2438.400,1219.200,1.740,1.600,2420,2.00,FR4,2,0.00,Brinell,0.00,aPriori Baseline
+2ozCu,Generic 2ozCu,,33.1,Copper,12.736,Cost per Sq Meter,7.970,1295.000,550.000,0.070,0.000,8940,2.00,None,,0.00,Brinell,0.00,aPriori Baseline
+Panel,Generic Panel,,33.1,Copper,,Cost per Sq Meter,1.000,2438.400,1219.200,0.000,0.000,1850,0.00,None,,0.00,Brinell,0.00,aPriori Baseline

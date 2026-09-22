@@ -1,0 +1,287 @@
+﻿process,machine_name,description,workcenter,labor_rate_usd_per_hr,overhead_multiplier,direct_overhead_rate_usd_per_hr,indirect_overhead_rate_usd_per_hr,total_overhead_rate_usd_per_hr,labor_time_standard,number_of_operators,period_overhead_coefficient,work_center_labor_rate_factor,twg_capable,pg_capable,spindles_with_od_slide,setup_time_hr,feed_rate_mm_per_min,bed_height_mm,is_preferred,annual_maintenance_factor_pct,machine_manufacturer_location,fixture_build_rate_usd_per_hr,fixture_build_time_hr,programming_rate_usd_per_hr,programming_time_hr,review_note
+Demasking,DeMask Cell - 10m x 10m Footprint,10m x 10m Default demask cell,,1.65,0.0,0.25,3.77,4.02,,,,,,,,,,,,,,,,,,
+Demasking,DeMask Cell - 12m x 10m Footprint,12m x 10m Default demask cell,,1.65,0.0,0.25,4.36,4.6,,,,,,,,,,,,,,,,,,
+UNIDENTIFIED-01,Fortune 2225,Fortune 2225,,1.73,,9.81,6.9,,,,,,,,,,,,,,,,,,,Process name not visible; labor 1.73
+UNIDENTIFIED-01,Fortune 2235,Fortune 2235,,1.73,,9.81,6.91,,,,,,,,,,,,,,,,,,,Process name not visible; labor 1.73
+UNIDENTIFIED-01,Karmatorsk KJ1910,Karmatorsk KJ1910,,1.73,,27.62,7.56,,,,,,,,,,,,,,,,,,,Process name not visible; labor 1.73
+UNIDENTIFIED-01,Nanjing SZT2120Q,Nanjing SZT2120Q,,1.73,,49.8,5.94,,,,,,,,,,,,,,,,,,,Process name not visible; labor 1.73
+UNIDENTIFIED-01,Nanjing ZT2115Q,Nanjing ZT2115Q,,1.73,,27.95,8.92,,,,,,,,,,,,,,,,,,,Process name not visible; labor 1.73
+UNIDENTIFIED-01,Nanjing ZT2118Q,Nanjing ZT2118Q,,1.73,,40.48,4.8,,,,,,,,,,,,,,,,,,,Process name not visible; labor 1.73
+Cylindrical Grinding,Toyoda GE4 Cylindrical Grinder,"5 hp, 500 rpm, 59 in. max workpiece",,1.65,,10.8,2.32,,,,,,,,,,,,,,,,,,,
+Cylindrical Grinding,Toyoda G Cylindrical Grinder,"10.1 hp, 500 rpm, 39 in. max workpiece",,1.65,,9.49,2.15,,,,,,,,,,,,,,,,,,,
+Cylindrical Grinding,Grindor Junker,"10 hp, 1000 rpm, 31 in. max workpiece",,1.65,,11.91,2.32,,,,,,,,,,,,,,,,,,,Name as shown; likely 'Grinder Junker'
+Cylindrical Grinding,GLT Toyoda,"29.5 hp, 630 rpm, 98 in. max workpiece",,1.65,,27.12,2.81,,,,,,,,,,,,,,,,,,,
+Cylindrical Grinding,Flex Grind Schaudt XXL,"40.2 hp, 800 rpm, 118 in. max workpiece",,1.65,,28.26,2.49,,,,,,,,,,,,,,,,,,,
+Cylindrical Grinding,Flex Grind Schaudt M,"40.2 hp, 800 rpm, 118 in. max workpiece",,1.65,,28.26,2.49,,,,,,,,,,,,,,,,,,,
+Broaching,Nachi NIUV-20-23,Vertical internal broaching machines,Default,1.73,0.0,12.83,1.39,,,,,,,,,,,,,,,,,,,
+Broaching,Pioneer H1560,Horizontal broaching machine,Default,1.73,0.0,7.75,1.17,,,,,,,,,,,,,,,,,,,
+Broaching,Pioneer VT1040,Vertical Internal broaching machine,Default,1.73,0.0,6.04,1.1,,,,,,,,,,,,,,,,,,,
+Broaching,Cell-Mate,Vertical Pull-Type Broach,Default,1.73,0.0,11.24,1.48,,,,,,,,,,,,,,,,,,,
+Bevel Gear Cutting,Gleason Coniflex 104,Straight Bevel Gear Cutter,,1.73,,39.44,1.55,,,,,,,,,,,,,,,,,,,
+Bevel Gear Cutting,Gleason Phoenix II 275HC,Small Bevel Gear Cutting Machine,,1.73,,42.37,1.56,,,,,,,,,,,,,,,,,,,
+Bevel Gear Cutting,Gleason Phoenix II 800HC,Medium Bevel Gear Cutting Machine,,1.73,,66.02,2.23,,,,,,,,,,,,,,,,,,,
+Bevel Gear Cutting,Klingelnberg-Oerlikon C27,Small Bevel Gear Cutting Machine,,1.73,,43.04,1.51,,,,,,,,,,,,,,,,,,,
+Bevel Gear Cutting,Klingelnberg-Oerlikon C29,Small Bevel Gear Cutting Machine,,1.73,,43.04,1.55,,,,,,,,,,,,,,,,,,,
+Manual Bench Cell,Manual Bench Cell - 16m x 4m Footprint,16m x 4m manual bench cell,Default,1.73,0.0,0.37,2.73,3.1,1.0,2.0,0.0,,,,,,,,,,,,,,,
+Manual Bench Cell,Manual Bench Cell - 2m x 2m Footprint,2m x 2m manual bench cell,Default,1.73,0.0,0.12,0.98,1.1,1.0,1.0,0.0,,,,,,,,,,,,,,,
+Manual Bench Cell,Manual Bench Cell - 4m x 4m Footprint,4m x 4m manual bench cell,Default,1.73,0.0,0.12,1.33,1.45,1.0,1.0,0.0,,,,,,,,,,,,,,,
+Manual Bench Cell,Manual Bench Cell - 8m x 4m Footprint,8m x 4m manual bench cell,Default,1.73,0.0,0.25,1.79,2.04,1.0,1.0,0.0,,,,,,,,,,,,,,,
+Automated Deburring,Default Automated Deburr,,,1.65,,20.4,0.9,,,,,,,,,,,,,,,,,,,
+5 Axis Router,"Thermwood Multipurpose 60, 5' x 10'","7.5 hp, 18000 RPM, 120 in. table length",,2.75,,10.07,1.29,,,,,,,,,,,,,,,,,,,
+5 Axis Router,"Thermwood Multipurpose 60, 5' x 12'","10 hp, 18000 RPM, 144 in. table length",,2.75,,11.72,1.37,,,,,,,,,,,,,,,,,,,
+5 Axis Router,"Thermwood Multipurpose 60, 5' x 5'","7.5 hp, 18000 RPM, 60 in. table length",,2.75,,8.67,1.07,,,,,,,,,,,,,,,,,,,
+5 Axis Router,"Thermwood Multipurpose 90, 5' x 10'","21.5 hp, 24000 RPM, 120 in. table length",,2.75,,18.43,1.29,,,,,,,,,,,,,,,,,,,
+5 Axis Router,"Thermwood Multipurpose 90, 5' x 5'","12 hp, 24000 RPM, 60 in. table length",,2.75,,13.87,1.07,,,,,,,,,,,,,,,,,,,
+5 Axis Router,Virtual 5 Axis Router - Large,"21.5 hp, 24000 RPM, 120 in. table length",,2.75,,17.5,1.28,,,,,,,,,,,,,,,,,,,
+5 Axis Router,Virtual 5 Axis Router - Small,"7.5 hp, 18000 RPM, 60 in. table length",,2.75,,8.43,1.06,,,,,,,,,,,,,,,,,,,
+5 Axis Mill,DMG MORI DMU 105 monoBLOCK,"28.2hp, 15000 rpm, 41 in. table length",,2.75,,20.51,2.63,,,,,,,,,,,,,,,,,,,
+5 Axis Mill,DMG MORI DMU 125 monoBLOCK,"28.2hp, 15000 rpm, 48 in. table length",,2.75,,27.47,3.56,,,,,,,,,,,,,,,,,,,
+5 Axis Mill,DMG MORI DMU 60 eVo Linear,"46.9hp, 20000 rpm, 24 in. table length",,2.75,,21.49,2.66,,,,,,,,,,,,,,,,,,,
+5 Axis Mill,DMG MORI DMU 65 monoBLOCK,"28.2hp, 15000 rpm, 26 in. table length",,2.75,,22.63,1.68,,,,,,,,,,,,,,,,,,,
+5 Axis Mill,DMG MORI DMU 85 monoBLOCK,"28.2hp, 15000 rpm, 33 in. table length",,2.75,,22.12,2.08,,,,,,,,,,,,,,,,,,,
+5 Axis Mill,DMU 160 P duoBlock,"46.9hp, 10000 rpm, 63 in. table length",,2.75,,51.41,5.46,,,,,,,,,,,,,,,,,,,
+5 Axis Mill,DMU 40 eVo Linear,"55 hp, 18000 rpm, 450 mm table length",,2.75,,21.05,2.78,,,,,,,,,,,,,,,,,,,
+5 Axis Mill,DMU 600P,"42 kW, 12000 rpm, 5000 mm table length",,2.75,,62.77,13.67,,,,,,,,,,,,,,,,,,,
+5 Axis Mill,Fooke Endura 1005,"25 kW, 20000 rpm, 30000 mm table length",,2.75,,119.37,29.92,,,,,,,,,,,,,,,,,,,
+5 Axis Mill,Makino D300,"29.5hp, 15000 rpm, 12 in. table length",,2.75,,18.91,1.47,,,,,,,,,,,,,,,,,,,
+5 Axis Mill,Makino D500,"33.5hp, 14000 rpm, 20 in. table length",,2.75,,21.45,2.26,,,,,,,,,,,,,,,,,,,
+5 Axis Mill,Makino D800Z,"40.2hp, 14000 rpm, 30 in. table length",,2.75,,51.59,2.26,,,,,,,,,,,,,,,,,,,
+5 Axis Mill,Makino V33i-5XB,"20 hp, 20000 rpm, 8 in. table length",,2.75,,15.15,1.36,,,,,,,,,,,,,,,,,,,
+5 Axis Mill,Mazak Variaxis 500-5X II,"20 hp, 12000 rpm, 20 in. table length",,2.75,,17.4,1.57,,,,,,,,,,,,,,,,,,,
+5 Axis Mill,Mazak Variaxis 630-5X II,"20 hp, 12000 rpm, 29 in. table length",,2.75,,19.83,1.14,,,,,,,,,,,,,,,,,,,
+5 Axis Mill,Mazak Variaxis 630-5X II T,"39.3 hp, 18000 rpm, 29 in. table length",,2.75,,24.36,1.74,,,,,,,,,,,,,,,,,,,
+5 Axis Mill,Mazak Variaxis 730-5X II,"39.3 hp, 10000 rpm, 29 in. table length",,2.75,,27.66,2.06,,,,,,,,,,,,,,,,,,,
+5 Axis Mill,Mazak Vortex 1400,"50 hp, 10000 rpm, 157 in. table length",,2.75,,56.83,6.63,,,,,,,,,,,,,,,,,,,
+5 Axis Mill,Mazak Vortex 815/120,"50 hp, 10000 rpm, 128 in. table length",,2.75,,53.68,4.5,,,,,,,,,,,,,,,,,,,
+5 Axis Mill,Mazak Vortex 815/80,"50 hp, 10000 rpm, 88 in. table length",,2.75,,53.6,4.5,,,,,,,,,,,,,,,,,,,
+5 Axis Mill,Virtual 5 Axis Mill - Gantry,"46 hp, 20000 rpm, 30000 mm table length",,2.75,,53.39,7.41,,,,,,,,,,,,,,,,,,,
+5 Axis Mill,Virtual 5 Axis Mill - Large,"30 kw, 18000 rpm, 2032 mm table length",,2.75,,44.21,2.54,,,,,,,,,,,,,,,,,,,
+5 Axis Mill,Virtual 5 Axis Mill - Medium,"21 kw, 10000 rpm, 1016 mm table length",,2.75,,23.22,1.88,,,,,,,,,,,,,,,,,,,
+5 Axis Mill,Virtual 5 Axis Mill - Small,"21 kw, 10000 rpm, 584 mm table length",,2.75,,17.47,1.52,,,,,,,,,,,,,,,,,,,
+3 Axis Router,"Multicam 7000 Series CNC Router, Model 103","5.5 hp, 24000 rpm, 50 in. table length",,2.75,,5.39,1.21,,,,,,,,,,,,,,,,,,,
+3 Axis Router,"Multicam 7000 Series CNC Router, Model 306","20 hp, 32000 rpm, 84 in. table length",,2.75,,7.88,1.76,,,,,,,,,,,,,,,,,,,
+3 Axis Router,"Multicam APEX1R CNC Router, Model 103","4 hp, 24000 rpm, 48 in. table length",,2.75,,3.16,1.09,,,,,,,,,,,,,,,,,,,
+3 Axis Router,"Multicam APEX1R CNC Router, Model 304","10 hp, 24000 rpm, 83 in. table length",,2.75,,4.87,1.25,,,,,,,,,,,,,,,,,,,
+3 Axis Router,Virtual 3 Axis Router - Large,"20 hp, 32000 rpm, 84 in. table length",,2.75,,7.42,1.78,,,,,,,,,,,,,,,,,,,
+3 Axis Router,Virtual 3 Axis Router - Small,"5 hp, 24000 rpm, 48 in. table length",,2.75,,3.25,1.08,,,,,,,,,,,,,,,,,,,
+3 Axis Mill,Giddings & Lewis H60F,"38.9 hp, 2200 rpm, 72 in. table length",,2.75,,13.78,2.16,15.94,,,,,,,,,,,,,,,,,,
+3 Axis Mill,Giddings & Lewis H70F,"50 hp, 2200 rpm, 1000 in. table length",,2.75,,16.13,2.16,18.29,,,,,,,,,,,,,,,,,,Table length reads 1000 in.; may be 100 in.
+3 Axis Mill,Haas VF10/50,"30 hp, 5000 rpm, 12 in. table length",,2.75,,14.95,2.89,17.84,,,,,,,,,,,,,,,,,,
+3 Axis Mill,Hermle B300,"19 kW, 15000 rpm, 1000 mm table length",,2.75,,10.14,2.74,,,,,,,,,,,,,,,,,,,
+3 Axis Mill,Makino FB127,"25hp, 20000 rpm, 55 in. table length",,2.75,,18.11,1.88,,,,,,,,,,,,,,,,,,,
+3 Axis Mill,Makino IQ300,"12.7hp, 45000 rpm, 24 in. table length",,2.75,,13.8,1.27,,,,,,,,,,,,,,,,,,,
+3 Axis Mill,Makino IQ500,"8.3hp, 45000 rpm, 31 in. table length",,2.75,,14.49,1.36,,,,,,,,,,,,,,,,,,,
+3 Axis Mill,Makino V22,"11.3hp, 40000 rpm, 18 in. table length",,2.75,,8.57,1.12,,,,,,,,,,,,,,,,,,,
+3 Axis Mill,Makino V33i,"20.1hp, 20000 rpm, 30 in. table length",,2.75,,12.53,1.36,,,,,,,,,,,,,,,,,,,
+3 Axis Mill,Makino V56i,"24.8hp, 20000 rpm, 41 in. table length",,2.75,,15.07,1.42,,,,,,,,,,,,,,,,,,,
+3 Axis Mill,Mazak FH 12800,"50 hp, 7000 rpm, 98 in. table length",,2.75,,55.76,2.16,57.92,,,,,,,,,,,,,,,,,,
+3 Axis Mill,Mazak FH 6000,"40.2 hp, 10000 rpm, 20 in. table length",,2.75,,30.38,2.16,32.55,,,,,,,,,,,,,,,,,,
+3 Axis Mill,Mazak FH 8800,"50 hp, 10000 rpm, 31 in. table length",,2.75,,38.35,2.16,40.51,,,,,,,,,,,,,,,,,,
+3 Axis Mill,Mazak PFH M 5800,"30 hp, 12000 rpm, 31 in. table length",,2.75,,26.53,2.16,28.69,,,,,,,,,,,,,,,,,,Direct rate corrected from first read (28.53) to 26.53 using total 28.69
+3 Axis Mill,Mikron HSM 400,"16.1 hp, 30000 rpm, 11 in. table length",,2.75,,19.07,1.96,21.03,,,,,,,,,,,,,,,,,,
+3 Axis Mill,Okuma MB-46VA,"14.8hp, 8000 rpm, 30 in. table length",,2.75,,8.43,1.35,,,,,,,,,,,,,,,,,,,
+3 Axis Mill,Okuma MB-56VA,"14.8hp, 8000 rpm, 31 in. table length",,2.75,,9.74,1.56,,,,,,,,,,,,,,,,,,,
+3 Axis Mill,Okuma MB-66VA,"14.8hp, 8000 rpm, 60 in. table length",,2.75,,10.83,1.74,,,,,,,,,,,,,,,,,,,
+3 Axis Mill,Sodick MC940L,"5 hp, 40000 rpm, 30 in. table length",,2.75,,9.91,2.16,12.08,,,,,,,,,,,,,,,,,,
+3 Axis Mill,Virtual 3 Axis Mill - Large,"29.5hp, 18000 rpm, 80 in. table length",,2.75,,23.06,3.43,,,,,,,,,,,,,,,,,,,
+3 Axis Mill,Virtual 3 Axis Mill - Medium,"25hp, 12000 rpm, 40 in. table length",,2.75,,11.22,1.65,,,,,,,,,,,,,,,,,,,
+3 Axis Mill,Virtual 3 Axis Mill - Small,"25hp, 10000 rpm, 23 in. table length",,2.75,,9.86,1.47,,,,,,,,,,,,,,,,,,,
+3 Axis Lathe,Boehringer VDF 400,"67.1 hp, 2000 rpm, 118 in. max workpiece",,2.75,,32.81,2.48,,,,,,,,,,,,,,,,,,,
+3 Axis Lathe,Daewoo Puma 600,"60.3 hp, 1800 rpm, 63 in. max workpiece",,2.75,,16.93,2.21,,,,,,,,,,,,,,,,,,,
+3 Axis Lathe,Daewoo Puma 700,"60.3 hp, 1500 rpm, 63 in. max workpiece",,2.75,,21.83,2.69,,,,,,,,,,,,,,,,,,,
+3 Axis Lathe,Daewoo Puma 800,"60.3 hp, 750 rpm, 63 in. max workpiece",,2.75,,26.68,2.69,,,,,,,,,,,,,,,,,,,
+3 Axis Lathe,Daewoo Puma MX 2000/2500S,"34.9 hp, 5000 rpm, 40 in. max workpiece",,2.75,,23.36,2.32,,,,,,,,,,,,,,,,,,,
+3 Axis Lathe,Daewoo Puma MX 2000/2500T,"34.9 hp, 5000 rpm, 40 in. max workpiece",,2.75,,21.15,2.32,,,,,,,,,,,,,,,,,,,
+3 Axis Lathe,Haas SL 20,"20 hp, 4000 rpm, 12 in. max workpiece",,2.75,,7.23,1.02,,,,,,,,,,,,,,,,,,,
+3 Axis Lathe,Haas SL 40L,"24 hp, 2000 rpm, 80 in. max workpiece",,2.75,,15.66,2.25,,,,,,,,,,,,,,,,,,,
+3 Axis Lathe,Hardinge Quest 6/42 SP,"14.8 hp, 8000 rpm, 15 in. max workpiece",,2.75,,12.94,1.15,,,,,,,,,,,,,,,,,,,
+3 Axis Lathe,Hardinge Quest 8/51 SP,"20.1 hp, 8000 rpm, 24 in. max workpiece",,2.75,,14.74,1.15,,,,,,,,,,,,,,,,,,,
+3 Axis Lathe,INDEX Speedline C100,"25 kW, 7000 rpm, 200 mm max workpiece",,2.75,,10.95,2.02,,,,,,,,,,,,,,,,,,,
+3 Axis Lathe,Miyano BNC-20,"5 hp, 8000 rpm, 3 in. max workpiece",,2.75,,4.73,1.15,,,,,,,,,,,,,,,,,,,
+3 Axis Lathe,Miyano BND-20SS,"7.5 hp, 6500 rpm, 4 in. max workpiece",,2.75,,4.58,1.15,,,,,,,,,,,,,,,,,,,
+3 Axis Lathe,Miyano BND-34TS,"10.1 hp, 5000 rpm, 9 in. max workpiece",,2.75,,8.46,1.21,,,,,,,,,,,,,,,,,,,
+3 Axis Lathe,Miyano BND-34TR,"10.1 hp, 5000 rpm, 2 in. max workpiece",,2.75,,6.65,1.21,,,,,,,,,,,,,,,,,,,
+3 Axis Lathe,Okuma 2SP-V760EX (M),"40.2 hp, 2000 rpm, 30 in. max workpiece",,2.75,,20.75,1.74,,,,,,,,,,,,,,,,,,,
+3 Axis Lathe,Okuma LB2000 EXII (M) Cx300,"29.5 hp, 6000 rpm, 12 in. max workpiece",,2.75,,11.15,1.16,,,,,,,,,,,,,,,,,,,
+3 Axis Lathe,Okuma LB2000 EXII (M) Cx500,"29.5 hp, 6000 rpm, 21 in. max workpiece",,2.75,,11.46,1.21,,,,,,,,,,,,,,,,,,,
+3 Axis Lathe,Okuma LB3000 EXII (M) T,"29.5 hp, 5000 rpm, 10 in. max workpiece",,2.75,,11.57,1.28,,,,,,,,,,,,,,,,,,,
+3 Axis Lathe,Okuma V760EX (M),"40.2 hp, 2000 rpm, 30 in. max workpiece",,2.75,,15.07,1.3,,,,,,,,,,,,,,,,,,,
+3 Axis Lathe,Virtual 3 Axis Lathe - Large,"40 hp, 18000 rpm, 120 in. max workpiece",,2.75,,27.79,2.14,,,,,,,,,,,,,,,,,,,
+3 Axis Lathe,Virtual 3 Axis Lathe - Medium,"29.5 hp, 12000 rpm, 50 in. max workpiece",,2.75,,11.96,1.81,,,,,,,,,,,,,,,,,,,
+3 Axis Lathe,Virtual 3 Axis Lathe - Small,"20 hp, 10000 rpm, 25 in. max workpiece",,2.75,,7.32,1.18,,,,,,,,,,,,,,,,,,,
+Lathe with Bar Feeder,Haas DS-30 with BAR3010SS Feeder,"30 hp, 4800 rpm, 60 in. max workpiece",,2.75,,11.84,2.76,14.59,,,,,,,,,,,,,,,,,,Process name assigned by extractor; confirm
+Lathe with Bar Feeder,Haas DS-30SS with BAR3010SS Feeder,"30 hp, 4800 rpm, 60 in. max workpiece",,2.75,,12.08,2.76,14.84,,,,,,,,,,,,,,,,,,
+Lathe with Bar Feeder,Haas DS-30SSY with BAR3010SS Feeder,"30 hp, 4800 rpm, 60 in. max workpiece",,2.75,,13.29,2.76,16.05,,,,,,,,,,,,,,,,,,
+Lathe with Bar Feeder,Haas DS-30Y with BAR3010SS Feeder,"30 hp, 4800 rpm, 60 in. max workpiece",,2.75,,13.05,2.76,15.81,,,,,,,,,,,,,,,,,,
+2 Axis Lathe,Acra 2800 CET,"15 hp, 1000 rpm, 200 in. max workpiece",,2.75,,5.19,1.15,,,,,,,,,,,,,,,,,,,
+2 Axis Lathe,Acra 4400 HLA,"40 hp, 420 rpm, 200 in. max workpiece",,2.75,,10.59,1.15,,,,,,,,,,,,,,,,,,,
+2 Axis Lathe,Acra MT-34,"7.4 hp, 5000 rpm, 8 in. max workpiece",,2.75,,2.87,1.27,,,,,,,,,,,,,,,,,,,
+2 Axis Lathe,Amera-Seiki T-90,"60 hp, 1500 rpm, 118 in. max workpiece",,2.75,,15.65,1.63,,,,,,,,,,,,,,,,,,,
+2 Axis Lathe,Atrump 940C,"7.5 hp, 3600 rpm, 39 in. max workpiece",,2.75,,3.62,1.11,,,,,,,,,,,,,,,,,,,
+2 Axis Lathe,Binns & Berry Data 2000 - 1250,"69.7 hp, 750 rpm, 236 in. max workpiece",,2.75,,23.83,1.15,,,,,,,,,,,,,,,,,,,
+2 Axis Lathe,Binns & Berry Data 3000 - 1250,"69.7 hp, 1090 rpm, 59 in. max workpiece",,2.75,,26.26,1.15,,,,,,,,,,,,,,,,,,,
+2 Axis Lathe,DMG Mori Wasino G-07,"7.4hp, 6000 rpm, 4 in. max workpiece",,2.75,,5.82,1.07,,,,,,,,,,,,,,,,,,,
+2 Axis Lathe,DMG Mori Wasino J-1,"7.4hp, 6000 rpm, 7 in. max workpiece",,2.75,,5.63,1.08,,,,,,,,,,,,,,,,,,,
+2 Axis Lathe,Daewoo Puma 300 LC,"35 hp, 2800 rpm, 25 in. max workpiece",,2.75,,10.28,1.55,,,,,,,,,,,,,,,,,,,
+2 Axis Lathe,Danobat VTC-1600,"106 hp, 400 rpm, 63 in. max turning diameter",,2.75,,78.8,2.83,,,,,,,,,,,,,,,,,,,
+2 Axis Lathe,Danobat VTC-8000H,"245.7 hp, 35 rpm, 312 in. max turning diameter",,2.75,,245.92,36.82,,,,,,,,,,,,,,,,,,,
+2 Axis Lathe,INDEX SpeedLine ABC,"20 kW, 6000 rpm, 90 mm max workpiece",,2.75,,13.92,2.17,,,,,,,,,,,,,,,,,,,
+2 Axis Lathe,Mazak 6G,"7.4 hp, 7000 rpm, 2 in. max workpiece",,2.75,,2.6,1.35,,,,,,,,,,,,,,,,,,,
+2 Axis Lathe,Mazak 6T,"7.4 hp, 7000 rpm, 8 in. max workpiece",,2.75,,2.84,1.35,,,,,,,,,,,,,,,,,,,
+2 Axis Lathe,Mazak HQR-150MSY,"20 hp, 5000 rpm, 24 in. max workpiece",,2.75,,18.93,1.43,,,,,,,,,,,,,,,,,,,
+2 Axis Lathe,Mazak HQR-200MS,"25 hp, 5000 rpm, 24 in. max workpiece",,2.75,,23.0,1.66,,,,,,,,,,,,,,,,,,,
+2 Axis Lathe,Okuma Genos L250II,"14.8hp, 3000 rpm, 11 in. max workpiece",,2.75,,9.84,1.1,,,,,,,,,,,,,,,,,,,
+2 Axis Lathe,Okuma Genos L400II,"14.8hp, 3000 rpm, 20 in. max workpiece",,2.75,,11.33,1.23,,,,,,,,,,,,,,,,,,,
+2 Axis Lathe,Okuma HL - 20,"20 hp, 3000 rpm, 18 in. max workpiece",,2.75,,6.59,1.12,,,,,,,,,,,,,,,,,,,
+2 Axis Lathe,Okuma HL - 35,"20.1 hp, 3500 rpm, 24 in. max workpiece",,2.75,,7.77,1.21,,,,,,,,,,,,,,,,,,,
+2 Axis Lathe,Virtual 2 Axis Lathe - Large,"60hp, 1500 rpm, 120 in. max workpiece",,2.75,,25.35,2.14,,,,,,,,,,,,,,,,,,,
+2 Axis Lathe,Virtual 2 Axis Lathe - Medium,"35hp, 5000 rpm, 50 in. max workpiece",,2.75,,9.12,1.81,,,,,,,,,,,,,,,,,,,
+2 Axis Lathe,Virtual 2 Axis Lathe - Small,,,2.75,,5.38,1.16,,,,,,,,,,,,,,,,,,,Description not readable
+Drilling,Carlton 5 ft X 13 in,"10 hp, 1200 rpm, 60 in. Spindle to Col Surf",,1.65,,1.84,1.27,3.1,,,,,,,,,,,,,,,,,,
+Drilling,Cincinnati HD 8 X 20,"15 hp, 2180 rpm, 74 in. Spindle to Col Surf",,1.65,,2.51,1.25,3.76,,,,,,,,,,,,,,,,,,
+Drilling,Delta 15-331,"3 hp, 4700 rpm, 15 in. Spindle to Col Surf",,1.65,,0.58,0.99,1.56,,,,,,,,,,,,,,,,,,
+Drilling,Delta 15-344,"3 hp, 4700 rpm, 21 in. Spindle to Col Surf",,1.65,,0.65,1.0,1.65,,,,,,,,,,,,,,,,,,
+Drilling,Jet JDP- 20Vs,"2 hp, 3630 rpm, 29 in. Spindle to Col Surf",,1.65,,0.49,0.95,1.44,,,,,,,,,,,,,,,,,,
+Drilling,Knuth R100,"20.1 hp, 1000 rpm, 98 in. Spindle to Col Surf",,1.65,,3.2,1.54,4.75,,,,,,,,,,,,,,,,,,
+Drilling,Rigid,"1 hp, 3100 rpm, 10 in. Spindle to Col Surf",,1.65,,0.62,1.27,1.89,,,,,,,,,,,,,,,,,,
+Drilling,Sydexic SRD 350,"1.1 hp, 1500 rpm, 2 in. Spindle to Col Surf",,1.65,,0.44,1.27,1.7,,,,,,,,,,,,,,,,,,
+Drilling,Weiler Vo75,"10.1 hp, 2000 rpm, 15 in. Spindle to Col Surf",,1.65,,1.47,1.31,2.77,,,,,,,,,,,,,,,,,,
+Etching,Etch Cell - 1.8m x 1.0m x 1.2m Tank Size,"1.8m x 1.0m x 1.2m etch cell - etch, rinse, rinse, dry, desmut and desmut rinse tanks",,2.75,0.0,14.48,1.19,,,,,,,,,,,,,,,,,,,
+Etching,Etch Cell - 12.2m x 2.1m x 3.0m Tank Size,"12.2m x 2.1m x 3.0m etch cell - etch, rinse, rinse, dry, desmut and desmut rinse tanks",,2.75,0.0,174.81,5.41,,,,,,,,,,,,,,,,,,,
+Etching,Etch Cell - 3.6m x 2.1m x 2.4m Tank Size,"3.6m x 2.1m x 2.4m etch cell - etch, rinse, rinse, dry, desmut and desmut rinse tanks",,2.75,0.0,51.77,2.18,,,,,,,,,,,,,,,,,,,
+Etching,Etch Cell - 7.2m x 4.2m x 4.8m Tank Size,"7.2m x 4.2m x 4.8m etch cell - etch, rinse, rinse, dry, desmut and desmut rinse tanks",,2.75,0.0,196.74,6.14,,,,,,,,,,,,,,,,,,,
+Deep Hole Drilling,Honge XE 1200-CNC,"5.4 hp, 6000 rpm, 47 in max hole depth",,1.65,,6.01,3.48,,,,,,,,,,,,,,,,,,,
+Deep Hole Drilling,Honge XE 10000,"20.1 hp, 4000 rpm, 394 in max hole depth",,1.65,,12.52,4.53,,,,,,,,,,,,,,,,,,,
+Deep Hole Drilling,Honge XL 9999,"9.9 hp, 4000 rpm, 236 in max hole depth",,1.65,,8.02,2.49,,,,,,,,,,,,,,,,,,,
+Deep Hole Drilling,Honge Xt 2500-CNC,"8 hp, 6000 rpm, 98 in max hole depth",,1.65,,7.19,4.31,,,,,,,,,,,,,,,,,,,
+Deep Hole Drilling,TechniDrill HS 375 CR,"20.1 hp, 21000 rpm, 20 in max hole depth",,1.65,,19.31,2.49,,,,,,,,,,,,,,,,,,,
+Deep Hole Drilling,TechniDrill TDS 100,"10 hp, 3000 rpm, 60 in max hole depth",,1.65,,12.91,2.49,,,,,,,,,,,,,,,,,,,
+Deep Hole Drilling,TechniDrill TDS 200,"25 hp, 3000 rpm, 60 in max hole depth",,1.65,,19.53,2.49,,,,,,,,,,,,,,,,,,,
+Deep Hole Drilling,TechniDrill TDS 50,"3 hp, 3200 rpm, 48 in max hole depth",,1.65,,9.82,2.49,,,,,,,,,,,,,,,,,,,
+Gear Hobbing,Gleason Genesis 130H Vertical,"Gleason Genesis 11.5kW Hob, 4000 rpm",Default,1.73,,28.11,1.46,,,,,,,,,,,,,,,,,,,
+Gear Hobbing,Gleason Genesis 400GH Medium Cylindrical,"Gleason Genesis 400GH Medium Cylindrical 15 kW Hob, 1000 rpm",Default,1.73,,33.95,1.37,,,,,,,,,,,,,,,,,,,
+Gear Hobbing,Gleason P60 Horizontal,"Gleason P60 Horizontal 7.5 kW Hob, 5000 rpm",Default,1.73,,26.37,1.79,,,,,,,,,,,,,,,,,,,
+Gear Hobbing,Gleason P800 Large Cylindrical,"Gleason P800 Large Cylindrical 35 kW Hob, 220 rpm",Default,1.73,,49.89,4.36,,,,,,,,,,,,,,,,,,,
+UNIDENTIFIED-04,Danobat Overbeck IC/ID,"20.1 hp, 8000 rpm, 14 in. max workpiece",,1.65,,9.93,2.49,,,,,,,,,,,,,,,,,,,"Grinder-type machines (Danobat, FlexGrind, Kellenberger, Matrix, Studer); labor 1.65"
+UNIDENTIFIED-04,Danobat Overbeck IG,"10.1 hp, 8000 rpm, 7 in. max workpiece",,1.65,,8.61,2.49,,,,,,,,,,,,,,,,,,,"Grinder-type machines (Danobat, FlexGrind, Kellenberger, Matrix, Studer); labor 1.65"
+UNIDENTIFIED-04,FlexGrind M,"40.2 hp, 6700 rpm, 157 in. max workpiece",,1.65,,21.08,2.49,,,,,,,,,,,,,,,,,,,"Grinder-type machines (Danobat, FlexGrind, Kellenberger, Matrix, Studer); labor 1.65"
+UNIDENTIFIED-04,FlexGrind S,"13.4 hp, 8000 rpm, 63 in. max workpiece",,1.65,,17.54,2.49,,,,,,,,,,,,,,,,,,,"Grinder-type machines (Danobat, FlexGrind, Kellenberger, Matrix, Studer); labor 1.65"
+UNIDENTIFIED-04,Kellenberger KEL Universal,"49.6 hp, 120000 rpm, 59 in. max workpiece",,1.65,,22.33,1.88,,,,,,,,,,,,,,,,,,,"Grinder-type machines (Danobat, FlexGrind, Kellenberger, Matrix, Studer); labor 1.65"
+UNIDENTIFIED-04,Kellenberger KEL VARIA,"10.1 hp, 30000 rpm, 24 in. max workpiece",,1.65,,17.1,1.67,,,,,,,,,,,,,,,,,,,"Grinder-type machines (Danobat, FlexGrind, Kellenberger, Matrix, Studer); labor 1.65"
+UNIDENTIFIED-04,Matrix 6950,"16.1 hp, 100000 rpm, 12 in. max workpiece",,1.65,,17.9,1.93,,,,,,,,,,,,,,,,,,,"Grinder-type machines (Danobat, FlexGrind, Kellenberger, Matrix, Studer); labor 1.65"
+UNIDENTIFIED-04,Studer CT350,"16.1 hp, 7500 rpm, 22 in. max workpiece",,1.65,,17.9,2.49,,,,,,,,,,,,,,,,,,,"Grinder-type machines (Danobat, FlexGrind, Kellenberger, Matrix, Studer); labor 1.65"
+UNIDENTIFIED-04,Studer s120,"10.1 hp, 4000 rpm, 48 in. max workpiece",,1.65,,16.61,1.94,,,,,,,,,,,,,,,,,,,"Grinder-type machines (Danobat, FlexGrind, Kellenberger, Matrix, Studer); labor 1.65"
+UNIDENTIFIED-04,Studer s145,"13.4 hp, 12000 rpm, 6 in. max workpiece",,1.65,,16.33,2.17,,,,,,,,,,,,,,,,,,,"Grinder-type machines (Danobat, FlexGrind, Kellenberger, Matrix, Studer); labor 1.65"
+UNIDENTIFIED-05,Danobat RTU,"120.7 hp, 1200 rpm, 472 x 31 in. max workpiece",,1.73,0.0,13.88,1.27,,,,,,,,,,,,,,,,,,,"Machines: Danobat RTU, Delta LB/LP, Huron, Loeser FS, Wolters TFG; labor 1.73"
+UNIDENTIFIED-05,Delta LB 300,"3 hp, 3500 rpm, 12 x 13 in. max workpiece",,1.73,0.0,1.13,0.93,,,,,,,,,,,,,,,,,,,"Machines: Danobat RTU, Delta LB/LP, Huron, Loeser FS, Wolters TFG; labor 1.73"
+UNIDENTIFIED-05,Delta LP 500,"4 hp, 3500 rpm, 20 x 20 in. max workpiece",,1.73,0.0,1.59,0.95,,,,,,,,,,,,,,,,,,,"Machines: Danobat RTU, Delta LB/LP, Huron, Loeser FS, Wolters TFG; labor 1.73"
+UNIDENTIFIED-05,Huron 1730 x 930 x 550,"28.2 hp, 1500 rpm, 68 x 37 in. max workpiece",,1.73,0.0,5.1,1.27,,,,,,,,,,,,,,,,,,,"Machines: Danobat RTU, Delta LB/LP, Huron, Loeser FS, Wolters TFG; labor 1.73"
+UNIDENTIFIED-05,Huron 3200 x 1580 x 630,"48.3 hp, 1350 rpm, 126 x 62 in. max workpiece",,1.73,0.0,7.01,1.27,,,,,,,,,,,,,,,,,,,"Machines: Danobat RTU, Delta LB/LP, Huron, Loeser FS, Wolters TFG; labor 1.73"
+UNIDENTIFIED-05,Loeser FS 386,"10.1 hp, 4000 rpm, 6 x 6 in. max workpiece",,1.73,0.0,3.38,1.27,,,,,,,,,,,,,,,,,,,"Machines: Danobat RTU, Delta LB/LP, Huron, Loeser FS, Wolters TFG; labor 1.73"
+UNIDENTIFIED-05,Loeser FS 387,"14.8 hp, 4000 rpm, 12 x 6 in. max workpiece",,1.73,0.0,3.83,1.27,,,,,,,,,,,,,,,,,,,"Machines: Danobat RTU, Delta LB/LP, Huron, Loeser FS, Wolters TFG; labor 1.73"
+UNIDENTIFIED-05,Wolters TFG 150,"24.1 hp, 1200 rpm, 6 x 6 in. max workpiece",,1.73,0.0,13.93,1.16,,,,,,,,,,,,,,,,,,,"Machines: Danobat RTU, Delta LB/LP, Huron, Loeser FS, Wolters TFG; labor 1.73"
+UNIDENTIFIED-06,ABA Z&B MR,"14.8 hp, 275 rpm, 20 in. table dia",,1.65,0.0,17.68,2.49,,1.0,1.0,,,,,,,,,,,,,,,,"Machines: ABA Z&B, Danobat DAN-VTG/IEV, Delta LC/LF (table dia); labor 1.65"
+UNIDENTIFIED-06,ABA Z&B MRV,"34.9 hp, 100 rpm, 79 in. table dia",,1.65,0.0,20.68,2.49,,1.0,1.0,,,,,,,,,,,,,,,,"Machines: ABA Z&B, Danobat DAN-VTG/IEV, Delta LC/LF (table dia); labor 1.65"
+UNIDENTIFIED-06,Danobat DAN-VTG,"120.7 hp, 100 rpm, 59 in. table dia",,1.65,0.0,33.76,2.49,,1.0,1.0,,,,,,,,,,,,,,,,"Machines: ABA Z&B, Danobat DAN-VTG/IEV, Delta LC/LF (table dia); labor 1.65"
+UNIDENTIFIED-06,Danobat IEV,"23.5 hp, 275 rpm, 24 in. table dia",,1.65,0.0,19.27,2.49,,1.0,1.0,,,,,,,,,,,,,,,,"Machines: ABA Z&B, Danobat DAN-VTG/IEV, Delta LC/LF (table dia); labor 1.65"
+UNIDENTIFIED-06,Delta LC 500,"4 hp, 275 rpm, 20 in. table dia",,1.65,0.0,16.37,2.49,,1.0,1.0,,,,,,,,,,,,,,,,"Machines: ABA Z&B, Danobat DAN-VTG/IEV, Delta LC/LF (table dia); labor 1.65"
+UNIDENTIFIED-06,Delta LF 350,"4 hp, 350 rpm, 14 in. table dia",,1.65,0.0,16.37,2.49,,1.0,1.0,,,,,,,,,,,,,,,,"Machines: ABA Z&B, Danobat DAN-VTG/IEV, Delta LC/LF (table dia); labor 1.65"
+Jig Boring,SIP Hydroptic 6A,,Default,1.65,,7.44,1.09,8.52,,,,,,,,,,,,,,,,,,
+Jig Boring,Virtual CNC Jig Bore,,Default,1.65,,19.51,1.09,20.59,,,,,,,,,,,,,,,,,,
+Jig Boring,Virtual Manual Jig Bore,,Default,1.65,,7.44,1.09,8.52,,,,,,,,,,,,,,,,,,
+Jig Boring,YASDA YBM1218V Jig Bore,,Default,1.65,,19.51,1.09,20.59,,,,,,,,,,,,,,,,,,
+Jig Grinding,Hauser S3-DR,,,1.65,,7.75,1.09,,,,,,,,,,,,,,,,,,,
+Jig Grinding,Mitsui Seiki J4GDN CNC Jig Grinder,,,1.65,,14.24,1.09,,,,,,,,,,,,,,,,,,,
+Jig Grinding,Virtual CNC Jig Grinder,,,1.65,,14.24,1.09,,,,,,,,,,,,,,,,,,,
+Jig Grinding,Virtual Manual Jig Grinder,,,1.65,,7.75,1.09,,,,,,,,,,,,,,,,,,,
+Manual Deburring,Default Manual Deburr,,,1.65,,0.21,0.88,,,,,,,,,,,,,,,,,,,
+Curing and Drying,Curing Oven - 1.3m x 1.3m x 1.4m Useable Oven Size,1.3m x 1.3m x 1.4m electrically heated curing oven,,1.65,0.0,1.38,1.04,2.43,1.0,1.0,0.0,,,,,,,,,,,,,,,Process name assigned by extractor; confirm
+Curing and Drying,Curing Oven - 12.1m x 2.1m x 4.0m Useable Oven Size,12.1m x 2.1m x 4.0m electrically heated curing oven,,1.65,0.0,29.89,2.17,32.06,1.0,1.0,0.0,,,,,,,,,,,,,,,Process name assigned by extractor; confirm
+Curing and Drying,Curing Oven - 2.9m x 2.5m x 2.0m Useable Oven Size,2.9m x 2.5m x 2.0m electrically heated curing oven,,1.65,0.0,4.84,1.33,6.17,1.0,1.0,0.0,,,,,,,,,,,,,,,Process name assigned by extractor; confirm
+Curing and Drying,Curing Oven - 5.5m x 4.1m x 3.0m Useable Oven Size,5.5m x 4.1m x 3.0m electrically heated curing oven,,1.65,0.0,19.98,1.88,21.86,1.0,1.0,0.0,,,,,,,,,,,,,,,Process name assigned by extractor; confirm
+Curing and Drying,Curing Oven Overhead Conveyor - 5.9m x 3.3m x 2.8m Useable Oven Size,5.9m x 3.3m x 2.8m electrically heated curing oven with overhead conveyor system,,1.65,0.0,16.07,2.03,18.09,1.0,1.0,0.0,,,,,,,,,,,,,,,Process name assigned by extractor; confirm
+Curing and Drying,Drying Room - 1.3m x 1.3m x 1.4m Useable Drying Room Size,1.3m x 1.3m x 1.4m unheated drying room,,1.65,0.0,0.17,1.04,1.22,1.0,1.0,0.0,,,,,,,,,,,,,,,Process name assigned by extractor; confirm
+Curing and Drying,Drying Room - 12.1m x 2.1m x 4.0m Useable Drying Room Size,12.1m x 2.1m x 4.0m unheated drying room,,1.65,0.0,3.74,2.17,5.91,1.0,1.0,0.0,,,,,,,,,,,,,,,Process name assigned by extractor; confirm
+Curing and Drying,Drying Room - 2.9m x 2.5m x 2.0m Useable Drying Room Size,2.9m x 2.5m x 2.0m unheated drying room,,1.65,0.0,0.61,1.33,1.93,1.0,1.0,0.0,,,,,,,,,,,,,,,Process name assigned by extractor; confirm
+Curing and Drying,Drying Room - 5.5m x 4.1m x 3.0m Useable Drying Room Size,5.5m x 4.1m x 3.0m unheated drying room,,1.65,0.0,2.5,1.88,4.38,1.0,1.0,0.0,,,,,,,,,,,,,,,Process name assigned by extractor; confirm
+Curing and Drying,Drying Room Overhead Conveyor - 5.9m x 3.3m x 2.8m Useable Drying Room Size,5.9m x 3.3m x 2.8m unheated drying room with overhead conveyor system,,1.65,0.0,2.01,2.03,4.03,1.0,1.0,0.0,,,,,,,,,,,,,,,Process name assigned by extractor; confirm
+Mill Turn,GILDEMEISTER GMX 400 LINEAR,"80.3 hp, 4000 rpm, 62.4 in. max workpiece",,2.75,0.0,30.03,3.34,,,,,,,,,,,,,,,,,,,Process name taken from 'Virtual MillTurn'; confirm
+Mill Turn,INDEX RatioLine G200,"20 kW, 6000 rpm, 400 mm max workpiece",,2.75,0.0,27.42,1.65,,,,,,,,,,,,,,,,,,,Process name taken from 'Virtual MillTurn'; confirm
+Mill Turn,Mazak Integrex e-410H-S II,"34.9 hp, 4000 rpm, 120 in. max workpiece",,2.75,0.0,42.43,2.85,,,,,,,,,,,,,,,,,,,Process name taken from 'Virtual MillTurn'; confirm
+Mill Turn,Mazak Integrex e-500H-S II,"40.2 hp, 3800 rpm, 120 in. max workpiece",,2.75,0.0,53.21,3.81,,,,,,,,,,,,,,,,,,,Process name taken from 'Virtual MillTurn'; confirm
+Mill Turn,Mazak Integrex e-650H-S II,"80.3 hp, 1600 rpm, 160 in. max workpiece",,2.75,0.0,67.34,4.35,,,,,,,,,,,,,,,,,,,Process name taken from 'Virtual MillTurn'; confirm
+Mill Turn,Mazak Integrex e650,"49 hp, 10000 rpm, 160 in. max workpiece",,2.75,0.0,58.45,3.69,,,,,,,,,,,,,,,,,,,Process name taken from 'Virtual MillTurn'; confirm
+Mill Turn,Virtual MillTurn,"60.3 hp, 5000 rpm, 160 in. max workpiece",,2.75,0.0,40.51,1.66,,,,,,,,,,,,,,,,,,,Process name taken from 'Virtual MillTurn'; confirm
+Gear Grinding,Gleason 300 TWG,Gleason 300 TWG,,1.73,,87.67,2.89,,,,,,true,false,,,,,,,,,,,,
+Gear Grinding,Gleason Genesis 160TWG,Gleason Genesis 160TWG,,1.73,,78.15,1.54,,,,,,true,false,,,,,,,,,,,,
+Gear Grinding,Gleason P 2400 G,Gleason P 2400 G,,1.73,,87.55,7.16,,,,,,false,true,,,,,,,,,,,,
+Gear Grinding,Gleason P 3200 G,Gleason P 3200 G,,1.73,,96.95,10.18,,,,,,false,true,,,,,,,,,,,,
+Gear Grinding,Gleason P 6000 G,Gleason P 6000 G,,1.73,,120.44,7.16,,,,,,false,true,,,,,,,,,,,,
+Gear Grinding,Gleason P 800 G,Gleason P 800 G,,1.73,,78.15,5.82,,,,,,false,true,,,,,,,,,,,,
+Gear Grinding,Gleason P 90 G,Gleason P 90 G,,1.73,,67.52,2.09,,,,,,false,true,,,,,,,,,,,,
+Gear Grinding,Gleason Titan 1200G,Gleason Titan 1200G,,1.73,,97.2,3.83,,,,,,true,true,,,,,,,,,,,,
+Gear Grinding,Reishauer RZ 1000,Reishauer RZ 1000,,1.73,,92.3,1.78,,,,,,,,,,,,,,,,,,,TWG/PG flags not readable
+Gear Grinding,Reishauer RZ 550,Reishauer RZ 550,,1.73,,82.85,1.74,,,,,,,,,,,,,,,,,,,TWG/PG flags not readable
+Gear Grinding,Reishauer RZ 60,Reishauer RZ 60,,1.73,,72.21,1.74,,,,,,,,,,,,,,,,,,,TWG/PG flags not readable
+Laser Processing,Laser Scribe - 0.35m x 0.35m x 0.35m Bed Size,0.35m x 0.35m x 0.35m Bed Size Multi Axis Laser Processing System,Default,2.75,0.0,10.48,1.08,11.56,1.0,1.0,0.0,1.0,,,,0.25,7000,355,true,5.0,Virtual,,,,,Process name taken from description; confirm
+Laser Processing,Laserdyne Systems 450,0.35m x 0.35m x 0.35m Bed Size Multi Axis Laser Processing System,Default,2.75,0.0,10.48,1.08,11.56,1.0,1.0,0.0,1.0,,,,0.25,7000,355,true,5.0,USA,,,,,Process name taken from description; confirm
+Laser Processing,Laserdyne Systems 795XL,2m x 1m x 1m Bed Size Multi Axis Laser Processing System,Default,2.75,0.0,22.67,1.39,24.06,1.0,1.0,0.0,1.0,,,,0.5,10000,1000,false,5.0,USA,,,,,Process name taken from description; confirm
+Laser Processing,Laser Scribe - 1.5m x 1m x 1m Bed Size,1.5m x 1m x 1m Bed Size Multi Axis Laser Processing System,Default,2.75,0.0,21.46,1.34,22.8,1.0,1.0,0.0,1.0,,,,0.63,10000,1000,true,5.0,Virtual,,,,,Process name taken from description; confirm
+Laser Processing,Laserdyne Systems 795XS,1m x 1m x 1m Bed Size Multi Axis Laser Processing System,Default,2.75,0.0,20.25,1.3,21.55,1.0,1.0,0.0,1.0,,,,0.75,10000,1000,false,5.0,USA,,,,,Process name taken from description; confirm
+Laser Processing,Gantry Laser Scribe - 15m x 4m x 1.5m Bed Size,15m x 4m x 1.5m Bed Size Multi Axis Overhead Gantry Laser,Default,2.75,0.0,92.62,8.14,100.76,1.0,1.0,0.0,1.0,,,,1.0,10000,1500,true,5.0,Virtual,,,,,Process name taken from description; confirm
+Laser Processing,Gantry Laser Scribe - 2.4m x 1.8m x 0.9m Bed Size,2.4m x 1.8m x 0.9m Bed Size Multi Axis Overhead Gantry Laser,Default,2.75,0.0,39.11,1.88,40.99,1.0,1.0,0.0,1.0,,,,1.0,10000,900,true,5.0,Virtual,,,,,Process name taken from description; confirm
+Laser Processing,Laserdyne Systems 890,2.4m x 1.8m x 0.9m Bed Size Multi Axis Overhead Gantry Laser,Default,2.75,0.0,39.11,1.88,40.99,1.0,1.0,0.0,1.0,,,,1.0,10000,900,false,5.0,USA,,,,,Process name taken from description; confirm
+Laser Processing,mTorres TorresLaser,15m x 4m x 1.5m Bed Size Multi Axis Overhead Gantry Laser,Default,2.75,0.0,92.62,8.14,100.76,1.0,1.0,0.0,1.0,,,,1.0,10000,1500,false,5.0,Spain,,,,,Process name taken from description; confirm
+Gear Shaping,Gleason 800ES Shaper,Medium Cylindrical Shaping,Default,1.65,0.0,57.84,6.82,,1.0,1.0,,,,,,,,,,,,,,,,
+Gear Shaping,Gleason GP300S Shaper,Small Cylindrical Shaping,Default,1.65,0.0,55.1,3.54,,1.0,1.0,,,,,,,,,,,,,,,,
+Gear Shaping,Mitsubishi SE15A,Mitsubishi SE15A Shaper,Default,1.65,0.0,29.49,1.97,,1.0,1.0,,,,,,,,,,,,,,,,
+Gear Shaving,Gleason Genesis 130 SV,Small Gear Shaver,Default,1.73,0.0,34.07,1.43,,1.0,1.0,,1.0,,,,,,,,,,81.0,2.0,81.0,0.5,
+Gear Shaving,Gleason ZS300 Gear Shaver,Medium Gear Shaver,Default,1.73,0.0,37.41,1.57,,1.0,1.0,,1.0,,,,,,,,,,81.0,2.0,81.0,0.5,
+Multi-Spindle Turning,DMG Mori GMC2510M-6,"54hp, 8000 rpm, 1 in. max workpiece",,2.75,,41.84,1.55,,,,,,,,"1, 2, 3, 4, 5, 6",,,,,,,,,,,Model name low resolution
+Multi-Spindle Turning,Doosan Puma TT2500SY,"54 hp, 3000 rpm, 1.7 in. max workpiece",,2.75,,22.97,1.66,,,,,,,,"1, 2, 2",,,,,,,,,,,
+Multi-Spindle Turning,HAAS DS-30Y,"54 hp, 4500 rpm, 3 in. max workpiece",,2.75,,11.99,2.07,,,,,,,,"1, 1, 2, 2",,,,,,,,,,,
+Multi-Spindle Turning,Index MS16C-6,"80 hp, 10000 rpm, 0.9 in. max workpiece",,2.75,,54.6,1.16,,,,,,,,"1, 2, 3, 4, 5, 6",,,,,,,,,,,
+Multi-Spindle Turning,Index MS22-8,"74 hp, 10000 rpm, 0.9 in. max workpiece",,2.75,,92.04,1.46,,,,,,,,"1, 2, 3, 4, 5, 6, 7, 8",,,,,,,,,,,
+Multi-Spindle Turning,Index MS32-6,"78 hp, 8000 rpm, 1.3 in. max workpiece",,2.75,,72.28,1.44,,,,,,,,"1, 2, 3, 4, 5, 6",,,,,,,,,,,
+Multi-Spindle Turning,Index MS40-8,"66 hp, 7000 rpm, 1.6 in. max workpiece",,2.75,,100.24,1.61,,,,,,,,"1, 2, 3, 4, 5, 6, 7, 8",,,,,,,,,,,
+Multi-Spindle Turning,Tsugami M88SY,"103 hp, 4500 rpm, 2.6 in. max workpiece",,2.75,,10.14,1.26,,,,,,,,"1, 1, 2, 2",,,,,,,,,,,
+Multi-Spindle Turning,"Virtual CNC Multi-Spindle, 6 Spindle, Large","140 hp, 10000 rpm, 2 in. max workpiece",,2.75,,74.74,1.73,,,,,,,,"1, 2, 3, 4, 5, 6",,,,,,,,,,,
+Multi-Spindle Turning,"Virtual CNC Multi-Spindle, 6 Spindle, Small","38 hp, 6000 rpm, 0.6 in. max workpiece",,2.75,,43.78,1.16,,,,,,,,"1, 2, 3, 4, 5, 6",,,,,,,,,,,
+Multi-Spindle Turning,"Virtual CNC Multi-Spindle, 8 Spindle, Large","40 hp, 10000 rpm, 2 in. max workpiece",,2.75,,100.24,2.84,,,,,,,,"1, 2, 3, 4, 5, 6, 7, 8",,,,,,,,,,,
+Multi-Spindle Turning,"Virtual CNC Multi-Spindle, 8 Spindle, Small","126 hp, 6000 rpm, 0.9 in. max workpiece",,2.75,,80.85,1.47,,,,,,,,"1, 2, 3, 4, 5, 6, 7, 8",,,,,,,,,,,
+Multi-Spindle Turning,"Virtual CNC Turning Center with Sub Spindle, Large","54 hp, 5000 rpm, 3.2 in. max workpiece",,2.75,,25.39,2.04,,,,,,,,"1, 2, 2",,,,,,,,,,,
+Multi-Spindle Turning,"Virtual CNC Turning Center with Sub Spindle, Medium","40 hp, 4500 rpm, 2.6 in. max workpiece",,2.75,,15.28,1.47,,,,,,,,"1, 2, 2",,,,,,,,,,,
+Multi-Spindle Turning,"Virtual CNC Turning Center with Sub Spindle, Small","87 hp, 3500 rpm, 1.7 in. max workpiece",,2.75,,11.0,1.12,,,,,,,,"1, 2, 2",,,,,,,,,,,
+UNIDENTIFIED-03,Default,,,2.75,,0.86,0.88,,,,,,,,,,,,,,,,,,,Process name not visible; labor 2.75
+Spline Rolling,Yieh Chen YC-800,Rack-based spline rolling machine,Default,2.3,,10.22,1.85,,,,,,,,,,,,,,,,,,,
+UNIDENTIFIED-02,Default,,,2.3,,0.24,0.88,,,,,,,,,,,,,,,,,,,Process name not visible; labor 2.30 (same as Spline Rolling group)
+UNIDENTIFIED-07,Acra 2800 CET,"15 hp, 1000 rpm, 200 in. max workpiece",,1.73,,5.19,1.7,,,,,,,,,,,,,,,,,,,"Lathe list, labor 1.73, screenshot cut off after Miyano BND-34TR; same machines also appear under 2 Axis/3 Axis Lathe at labor 2.75"
+UNIDENTIFIED-07,Acra 4400 HLA,"39.9 hp, 420 rpm, 200 in. max workpiece",,1.73,,10.59,1.7,,,,,,,,,,,,,,,,,,,"Lathe list, labor 1.73, screenshot cut off after Miyano BND-34TR; same machines also appear under 2 Axis/3 Axis Lathe at labor 2.75"
+UNIDENTIFIED-07,Acra MT-34,"7.4 hp, 5000 rpm, 8 in. max workpiece",,1.73,,2.87,1.27,,,,,,,,,,,,,,,,,,,"Lathe list, labor 1.73, screenshot cut off after Miyano BND-34TR; same machines also appear under 2 Axis/3 Axis Lathe at labor 2.75"
+UNIDENTIFIED-07,Amera-Seiki T-90,"60 hp, 1500 rpm, 118 in. max workpiece",,1.73,,15.65,1.63,,,,,,,,,,,,,,,,,,,"Lathe list, labor 1.73, screenshot cut off after Miyano BND-34TR; same machines also appear under 2 Axis/3 Axis Lathe at labor 2.75"
+UNIDENTIFIED-07,Atrump 940C,"7.5 hp, 3600 rpm, 39 in. max workpiece",,1.73,,3.62,1.11,,,,,,,,,,,,,,,,,,,"Lathe list, labor 1.73, screenshot cut off after Miyano BND-34TR; same machines also appear under 2 Axis/3 Axis Lathe at labor 2.75"
+UNIDENTIFIED-07,Binns & Berry Data 2000 - 1250,"69.7 hp, 750 rpm, 236 in. max workpiece",,1.73,,23.83,1.15,,,,,,,,,,,,,,,,,,,"Lathe list, labor 1.73, screenshot cut off after Miyano BND-34TR; same machines also appear under 2 Axis/3 Axis Lathe at labor 2.75"
+UNIDENTIFIED-07,Binns & Berry Data 3000 - 1250,"69.7 hp, 1090 rpm, 59 in. max workpiece",,1.73,,26.26,1.15,,,,,,,,,,,,,,,,,,,"Lathe list, labor 1.73, screenshot cut off after Miyano BND-34TR; same machines also appear under 2 Axis/3 Axis Lathe at labor 2.75"
+UNIDENTIFIED-07,Boehringer VDF 400,"67.1 hp, 2000 rpm, 118 in. max workpiece",,1.73,,32.81,1.44,,,,,,,,,,,,,,,,,,,"Lathe list, labor 1.73, screenshot cut off after Miyano BND-34TR; same machines also appear under 2 Axis/3 Axis Lathe at labor 2.75"
+UNIDENTIFIED-07,Daewoo Puma 300 LC,"35 hp, 2800 rpm, 25 in. max workpiece",,1.73,,10.28,1.55,,,,,,,,,,,,,,,,,,,"Lathe list, labor 1.73, screenshot cut off after Miyano BND-34TR; same machines also appear under 2 Axis/3 Axis Lathe at labor 2.75"
+UNIDENTIFIED-07,Daewoo Puma 600,"60.3 hp, 1800 rpm, 63 in. max workpiece",,1.73,,16.93,2.21,,,,,,,,,,,,,,,,,,,"Lathe list, labor 1.73, screenshot cut off after Miyano BND-34TR; same machines also appear under 2 Axis/3 Axis Lathe at labor 2.75"
+UNIDENTIFIED-07,Daewoo Puma 700,"60.3 hp, 1500 rpm, 63 in. max workpiece",,1.73,,21.83,2.69,,,,,,,,,,,,,,,,,,,"Lathe list, labor 1.73, screenshot cut off after Miyano BND-34TR; same machines also appear under 2 Axis/3 Axis Lathe at labor 2.75"
+UNIDENTIFIED-07,Daewoo Puma 800,"60.3 hp, 750 rpm, 63 in. max workpiece",,1.73,,26.68,2.69,,,,,,,,,,,,,,,,,,,"Lathe list, labor 1.73, screenshot cut off after Miyano BND-34TR; same machines also appear under 2 Axis/3 Axis Lathe at labor 2.75"
+UNIDENTIFIED-07,Daewoo Puma MX 2000/2500S,"34.9 hp, 5000 rpm, 40 in. max workpiece",,1.73,,23.36,2.32,,,,,,,,,,,,,,,,,,,"Lathe list, labor 1.73, screenshot cut off after Miyano BND-34TR; same machines also appear under 2 Axis/3 Axis Lathe at labor 2.75"
+UNIDENTIFIED-07,Daewoo Puma MX 2000/2500T,"34.9 hp, 5000 rpm, 40 in. max workpiece",,1.73,,21.15,2.32,,,,,,,,,,,,,,,,,,,"Lathe list, labor 1.73, screenshot cut off after Miyano BND-34TR; same machines also appear under 2 Axis/3 Axis Lathe at labor 2.75"
+UNIDENTIFIED-07,Haas SL 20,"20 hp, 4000 rpm, 12 in. max workpiece",,1.73,,7.23,1.02,,,,,,,,,,,,,,,,,,,"Lathe list, labor 1.73, screenshot cut off after Miyano BND-34TR; same machines also appear under 2 Axis/3 Axis Lathe at labor 2.75"
+UNIDENTIFIED-07,Haas SL 40L,"40 hp, 2000 rpm, 80 in. max workpiece",,1.73,,15.66,2.25,,,,,,,,,,,,,,,,,,,"Lathe list, labor 1.73, screenshot cut off after Miyano BND-34TR; same machines also appear under 2 Axis/3 Axis Lathe at labor 2.75"
+UNIDENTIFIED-07,Hardinge Quest 6/42 SP,"14.8 hp, 6000 rpm, 15 in. max workpiece",,1.73,,12.94,1.12,,,,,,,,,,,,,,,,,,,"Lathe list, labor 1.73, screenshot cut off after Miyano BND-34TR; same machines also appear under 2 Axis/3 Axis Lathe at labor 2.75"
+UNIDENTIFIED-07,Hardinge Quest 8/51 SP,"20.1 hp, 8000 rpm, 24 in. max workpiece",,1.73,,14.74,1.15,,,,,,,,,,,,,,,,,,,"Lathe list, labor 1.73, screenshot cut off after Miyano BND-34TR; same machines also appear under 2 Axis/3 Axis Lathe at labor 2.75"
+UNIDENTIFIED-07,Mazak 6G,"7.4 hp, 7000 rpm, 2 in. max workpiece",,1.73,,2.6,1.35,,,,,,,,,,,,,,,,,,,"Lathe list, labor 1.73, screenshot cut off after Miyano BND-34TR; same machines also appear under 2 Axis/3 Axis Lathe at labor 2.75"
+UNIDENTIFIED-07,Mazak 6T,"7.4 hp, 7000 rpm, 8 in. max workpiece",,1.73,,2.84,1.35,,,,,,,,,,,,,,,,,,,"Lathe list, labor 1.73, screenshot cut off after Miyano BND-34TR; same machines also appear under 2 Axis/3 Axis Lathe at labor 2.75"
+UNIDENTIFIED-07,Miyano BNC-20,"5 hp, 8000 rpm, 3 in. max workpiece",,1.73,,4.73,1.15,,,,,,,,,,,,,,,,,,,"Lathe list, labor 1.73, screenshot cut off after Miyano BND-34TR; same machines also appear under 2 Axis/3 Axis Lathe at labor 2.75"
+UNIDENTIFIED-07,Miyano BND-20SS,"7.5 hp, 6500 rpm, 4 in. max workpiece",,1.73,,4.58,1.15,,,,,,,,,,,,,,,,,,,"Lathe list, labor 1.73, screenshot cut off after Miyano BND-34TR; same machines also appear under 2 Axis/3 Axis Lathe at labor 2.75"
+UNIDENTIFIED-07,Miyano BND-34TS,"10.1 hp, 5000 rpm, 9 in. max workpiece",,1.73,,8.46,1.21,,,,,,,,,,,,,,,,,,,"Lathe list, labor 1.73, screenshot cut off after Miyano BND-34TR; same machines also appear under 2 Axis/3 Axis Lathe at labor 2.75"
+UNIDENTIFIED-07,Miyano BND-34TR,"10.1 hp, 5000 rpm, 2 in. max workpiece",,1.73,,6.65,1.21,,,,,,,,,,,,,,,,,,,"Lathe list, labor 1.73, screenshot cut off after Miyano BND-34TR; same machines also appear under 2 Axis/3 Axis Lathe at labor 2.75"
+Wire EDM,Fanuc 0id,"16.1 hp, 28 in max part length, 24 in max part width",,2.75,,7.71,1.32,,,,,,,,,,,,,,,,,,,Process name inferred from machine models; confirm
+Wire EDM,Fanuc 1id,"20.1 hp, 30 in max part length, 24 in max part width",,2.75,,8.23,1.84,,,,,,,,,,,,,,,,,,,Process name inferred from machine models; confirm
+Wire EDM,Makino DUO43,"13.4 hp, 34 in max part length, 30 in max part width",,2.75,,7.48,2.49,,,,,,,,,,,,,,,,,,,Process name inferred from machine models; confirm
+Wire EDM,Mitsubishi BA24,"10.9 hp, 35 in max part length, 27 in max part width",,2.75,,7.0,2.49,,,,,,,,,,,,,,,,,,,Process name inferred from machine models; confirm
+Wire EDM,Mitsubishi FA-50V,"12.75 hp, 65 in max part length, 54 in max part width",,2.75,,7.16,2.49,,,,,,,,,,,,,,,,,,,Process name inferred from machine models; confirm
+Wire EDM,Mitsubishi MD+PRO II,"10.9 hp, 28 in max part length, 22 in max part width",,2.75,,7.0,2.49,,,,,,,,,,,,,,,,,,,Process name inferred from machine models; confirm

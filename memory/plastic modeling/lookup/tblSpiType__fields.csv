@@ -1,0 +1,4 @@
+name,sourceFilePath,digitalFactory,value
+tblSpiType,lookupTables/Component/tblSpiType.csv,aPriori USA,Spi Type
+tblSpiType,lookupTables/Component/tblSpiType.csv,aPriori USA,Num Annual Mold Cycles
+tblSpiType,lookupTables/Component/tblSpiType.csv,aPriori USA,Use Insert

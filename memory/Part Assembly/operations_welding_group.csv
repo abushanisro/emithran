@@ -1,0 +1,45 @@
+Process Name
+Bevel Cutting:Bevel Cutting//Blank
+Bevel Cutting:Bevel Cutting//Edge
+Bevel Cutting:Bevel Cutting//SimpleHole
+Finish Grinding:Finish Grinding//Blank
+Finish Grinding:Finish Grinding//Edge
+Finish Grinding:Finish Grinding//SimpleHole
+Grinding:Grinding//Blank
+Grinding:Grinding//Edge
+Grinding:Grinding//SimpleHole
+Laser Seam Welding:Laser Seam Welding//Blank
+Laser Seam Welding:Laser Seam Welding//Edge
+Manual MIG Welding:Bevel Groove Welding//Edge
+Manual MIG Welding:Fillet Welding//Edge
+Manual MIG Welding:Flared Bevel Groove Welding//Edge
+Manual MIG Welding:Flared V-Groove Welding//Edge
+Manual MIG Welding:Groove Welding//Blank
+Manual MIG Welding:J-Groove Welding//Edge
+Manual MIG Welding:Other Welding//Blank
+Manual MIG Welding:Plug Welding//SimpleHole
+Manual MIG Welding:Square Groove Welding//Edge
+Manual MIG Welding:Tack Welding//Edge
+Manual MIG Welding:U-Groove Welding//Edge
+Manual MIG Welding:V-Groove Welding//Edge
+Manual MIG Welding:Wrap Tie Welding//Edge
+Manual Spot Welding:Spot Welding//Blank
+Manual Spot Welding:Spot Welding//Edge
+Robotic MIG Welding:Bevel Groove Welding//Edge
+Robotic MIG Welding:Fillet Welding//Edge
+Robotic MIG Welding:Flared Bevel Groove Welding//Edge
+Robotic MIG Welding:Flared V-Groove Welding//Edge
+Robotic MIG Welding:Groove Welding//Blank
+Robotic MIG Welding:J-Groove Welding//Edge
+Robotic MIG Welding:Other Welding//Blank
+Robotic MIG Welding:Plug Welding//SimpleHole
+Robotic MIG Welding:Square Groove Welding//Edge
+Robotic MIG Welding:Tack Welding//Edge
+Robotic MIG Welding:U-Groove Welding//Edge
+Robotic MIG Welding:V-Groove Welding//Edge
+Robotic MIG Welding:Wrap Tie Welding//Edge
+Robotic Spot Welding:Spot Welding//Blank
+Robotic Spot Welding:Spot Welding//Edge
+Wire Brushing:Wire Brushing//Blank
+Wire Brushing:Wire Brushing//Edge
+Wire Brushing:Wire Brushing//SimpleHole

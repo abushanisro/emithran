@@ -1,0 +1,141 @@
+Cutting Rate (mm^2 / min),Material Cut Code Family,Material Type,Material Width (mm)
+967.74,10,Cast Iron,500.00
+967.74,15,Stainless Steel,300.00
+967.74,15,Stainless Steel,400.00
+967.74,15,Stainless Steel,500.00
+967.74,20,Heat Resistant Super Alloys,50.00
+967.74,20,Heat Resistant Super Alloys,100.00
+967.74,20,Heat Resistant Super Alloys,150.00
+967.74,20,Heat Resistant Super Alloys,250.00
+967.74,20,Heat Resistant Super Alloys,300.00
+967.74,20,Heat Resistant Super Alloys,400.00
+967.74,20,Heat Resistant Super Alloys,500.00
+967.74,23,Heat Resistant Super Alloys,50.00
+967.74,23,Heat Resistant Super Alloys,100.00
+967.74,23,Heat Resistant Super Alloys,150.00
+967.74,23,Heat Resistant Super Alloys,250.00
+967.74,23,Heat Resistant Super Alloys,300.00
+967.74,23,Heat Resistant Super Alloys,400.00
+967.74,23,Heat Resistant Super Alloys,500.00
+967.74,4,Steel,250.00
+967.74,4,Steel,300.00
+967.74,4,Steel,400.00
+967.74,4,Steel,500.00
+1290.32,4,Steel,100.00
+1290.32,4,Steel,150.00
+1612.90,10,Cast Iron,250.00
+1612.90,10,Cast Iron,300.00
+1612.90,10,Cast Iron,400.00
+1612.90,15,Stainless Steel,50.00
+1612.90,15,Stainless Steel,100.00
+1612.90,15,Stainless Steel,150.00
+1612.90,15,Stainless Steel,250.00
+1612.90,3,Steel,400.00
+1612.90,3,Steel,500.00
+1612.90,4,Steel,50.00
+1612.90,5,Stainless Steel,400.00
+1619.90,5,Stainless Steel,500.00
+2258.06,10,Cast Iron,50.00
+2258.06,10,Cast Iron,100.00
+2258.06,10,Cast Iron,150.00
+2258.06,3,Steel,250.00
+2258.06,3,Steel,300.00
+2258.06,5,Stainless Steel,250.00
+2258.06,5,Stainless Steel,300.00
+2580.64,34,Graphite,50.00
+2580.64,34,Graphite,100.00
+2580.64,34,Graphite,150.00
+2580.64,34,Graphite,250.00
+2580.64,34,Graphite,300.00
+2580.64,34,Graphite,400.00
+2580.64,34,Graphite,500.00
+2903.22,3,Steel,100.00
+2903.22,3,Steel,150.00
+2903.22,5,Stainless Steel,50.00
+2903.22,5,Stainless Steel,100.00
+2903.22,5,Stainless Steel,150.00
+2903.22,6,Steel,500.00
+2903.22,7,Cast Iron,500.00
+2903.22,8,Cast Iron,500.00
+2903.22,9,Cast Iron,500.00
+3548.38,1,Steel,500.00
+3548.38,2,Steel,500.00
+3548.38,3,Steel,50.00
+3548.38,33,Copper,500.00
+3548.38,6,Steel,300.00
+3548.38,6,Steel,400.00
+3548.38,7,Cast Iron,400.00
+3548.38,8,Cast Iron,400.00
+3548.38,9,Cast Iron,400.00
+3870.96,33,Copper,400.00
+4193.54,1,Steel,400.00
+4193.54,2,Steel,400.00
+4193.54,6,Steel,250.00
+4193.54,7,Cast Iron,250.00
+4193.54,7,Cast Iron,300.00
+4193.54,8,Cast Iron,250.00
+4193.54,8,Cast Iron,300.00
+4193.54,9,Cast Iron,250.00
+4193.54,9,Cast Iron,300.00
+4516.12,1,Steel,300.00
+4516.12,2,Steel,300.00
+4516.12,33,Copper,300.00
+4838.70,33,Copper,250.00
+4838.70,6,Steel,100.00
+4838.70,6,Steel,150.00
+4838.70,7,Cast Iron,150.00
+4838.70,8,Cast Iron,150.00
+4838.70,9,Cast Iron,150.00
+5161.28,1,Steel,250.00
+5161.28,2,Steel,250.00
+5483.86,6,Steel,50.00
+5483.86,7,Cast Iron,50.00
+5483.86,7,Cast Iron,100.00
+5483.86,8,Cast Iron,50.00
+5483.86,8,Cast Iron,100.00
+5483.86,9,Cast Iron,50.00
+5483.86,9,Cast Iron,100.00
+5806.44,1,Steel,150.00
+5806.44,2,Steel,150.00
+5806.44,33,Copper,100.00
+5806.44,33,Copper,150.00
+6129.02,1,Steel,100.00
+6129.02,2,Steel,100.00
+6451.60,1,Steel,50.00
+6451.60,2,Steel,50.00
+6451.60,33,Copper,50.00
+8064.50,30,Aluminum,50.00
+8064.50,30,Aluminum,100.00
+8064.50,30,Aluminum,150.00
+8064.50,30,Aluminum,250.00
+8064.50,30,Aluminum,300.00
+8064.50,30,Aluminum,400.00
+8064.50,30,Aluminum,500.00
+11612.88,41,Glass Filled Thermoplastic,50.00
+11612.88,41,Glass Filled Thermoplastic,100.00
+11612.88,41,Glass Filled Thermoplastic,150.00
+11612.88,41,Glass Filled Thermoplastic,250.00
+11612.88,41,Glass Filled Thermoplastic,300.00
+11612.88,41,Glass Filled Thermoplastic,400.00
+11612.88,41,Glass Filled Thermoplastic,500.00
+11612.88,42,Glass Filled Thermoset,50.00
+11612.88,42,Glass Filled Thermoset,100.00
+11612.88,42,Glass Filled Thermoset,150.00
+11612.88,42,Glass Filled Thermoset,250.00
+11612.88,42,Glass Filled Thermoset,300.00
+11612.88,42,Glass Filled Thermoset,400.00
+11612.88,42,Glass Filled Thermoset,500.00
+12258.04,51,Thermoplastic,50.00
+12258.04,51,Thermoplastic,100.00
+12258.04,51,Thermoplastic,150.00
+12258.04,51,Thermoplastic,250.00
+12258.04,51,Thermoplastic,300.00
+12258.04,51,Thermoplastic,400.00
+12258.04,51,Thermoplastic,500.00
+12258.04,52,Thermoset,50.00
+12258.04,52,Thermoset,100.00
+12258.04,52,Thermoset,150.00
+12258.04,52,Thermoset,250.00
+12258.04,52,Thermoset,300.00
+12258.04,52,Thermoset,400.00
+12258.04,52,Thermoset,500.00

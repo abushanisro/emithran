@@ -1,0 +1,75 @@
+ToolType,ToolSeries,HasInserts,MaxSeriesSizeMm,MinSeriesSizeMm,ParentToolSeriesName,Precedence,ToolMaterial,UnitSystem,Virtual
+Abrasive Rotary Disc,Virtual Abrasive Rotary Disc,False,0.0,0.0,,1.0,Stainless Steel,,True
+Ball End Mill,"Virtual Ball End Mill, Carbide",False,60.0,0.1,,1.0,Carbide,both,True
+Bevel Gear Cutter,Virtual Bevel Gear Cutter,False,500.0,50.0,,1.0,Carbide,both,True
+Bore,Corobore 820,True,306.0,35.0,,4.0,Carbide,both,False
+Bore,"Infinite Bore, Carbide",False,1000000.0,0.1,"Sandvik Duobore, inserts, pC14-C21",5.0,Carbide,both,True
+Bore,"Sandvik Duobore, inserts, pC14-C21",True,270.0,25.0,,3.0,Carbide,both,False
+Bore,"Sandvik Fine Boring, inserts, pC31",True,26.0,3.0,,2.0,Carbide,both,False
+Bore,"Virtual Bore, Carbide",False,306.0,0.1,"Sandvik Duobore, inserts, pC14-C21",1.0,Carbide,both,True
+Corner Chamfering Mill,Virtual Corner Chamfering Mill,False,0.0,0.0,,1.0,High Speed Steel,,True
+Corner Rounding Mill,Virtual Corner Rounding Mill,False,0.0,0.0,,1.0,High Speed Steel,,True
+Counterbore,Virtual Carbide Counterbore,False,306.0,0.1,,1.0,Carbide,both,True
+Counterbore,Virtual HSS Counterbore,False,75.0,3.0,,2.0,High Speed Steel,both,True
+Deburring Brush,Virtual Deburring Brush,False,381.0,19.0,,12.0,Stainless Steel,,True
+Deburring File,Virtual Deburring File,False,0.0,0.0,,10.0,Stainless Steel,,True
+Deburring Knife,Virtual Deburring Knife,False,0.0,0.0,,9.0,Stainless Steel,,True
+Deburring with Borescope,Virtual Deburring with Borescope,False,0.0,0.0,,11.0,Stainless Steel,,True
+Deep Bore Drill,"Virtual Deep Bore Drill, Carbide",True,500.0,50.0,,1.0,Carbide,both,True
+Deep Bore Trepan,"Virtual Deep Bore Trepan, Carbide",True,500.0,50.0,,1.0,Carbide,both,True
+Dovetail Mill,"Virtual Dovetail Mill, AlTiN Coated",False,25.4,0.0,"Virtual Dovetail Mill, Uncoated",2.0,Carbide,both,True
+Dovetail Mill,"Virtual Dovetail Mill, Uncoated",False,25.4,0.0,,1.0,Carbide,both,True
+EDM Wire,"Virtual EDM Wire, Zinc Coated Brass Wire Electrode, 0.1 mm dia",False,0.0,0.0,,5.0,Carbide,,True
+EDM Wire,"Virtual EDM Wire, Zinc Coated Brass Wire Electrode, 0.15 mm dia",False,0.0,0.0,,4.0,Carbide,,True
+EDM Wire,"Virtual EDM Wire, Zinc Coated Brass Wire Electrode, 0.2 mm dia",False,0.0,0.0,,3.0,Carbide,,True
+EDM Wire,"Virtual EDM Wire, Zinc Coated Brass Wire Electrode, 0.25 mm dia",False,0.0,0.0,,2.0,Carbide,,True
+EDM Wire,"Virtual EDM Wire, Zinc Coated Brass Wire Electrode, 0.3 mm dia",False,0.0,0.0,,1.0,Carbide,,True
+Face Mill,"Virtual Face Mill, Carbide",True,500.0,38.1,,30.0,Carbide,both,True
+Finish Bore,Sandvik CoroBore 824,True,20.0,1.0,,3.0,Carbide,both,False
+Finish Bore,Sandvik CoroBore 825,True,167.0,19.0,,1.0,Carbide,both,False
+Finish Bore,Sandvik CoroBore 825XL,True,1275.0,148.0,,2.0,Carbide,both,False
+Fir Tree Broach,"Virtual Fir Tree Broach, HSS",False,999.0,0.1,,1.0,High Speed Steel,both,True
+Flat End Mill,"Virtual Flat End Mill, Carbide",False,101.6,0.1,,10.0,Carbide,both,True
+Grinding Wheel,Virtual Cylindrical Grinding Wheel,False,900.0,300.0,,1.0,Unknown,both,True
+Grinding Wheel,Virtual PSG Grinding Wheel,False,900.0,300.0,,2.0,Ceramic,both,True
+Groove Mill,Virtual Groove Mill,True,50.0,0.0,,2.0,Carbide,both,True
+Groove Mill,"Virtual Groove Mill, Reduced Shank",True,90.0,0.0,Virtual Groove Mill,3.0,Carbide,both,True
+Grooving Insert,Virtual Grooving Insert,False,8.0,0.1,,1.0,Carbide,both,True
+Gun Drill,Virtual Gun Drill,True,152.4,0.79,,1.0,Carbide,both,True
+Hob,"Virtual Hob, HSS",True,999.0,0.1,,1.0,High Speed Steel,US,True
+Internal Gear Broach,"Virtual Internal Gear Broach, HSS",False,999.0,0.1,,1.0,High Speed Steel,both,True
+Keyseat Mill,Virtual Keyseat Mill,True,8.0,0.0,,1.0,Carbide,both,False
+Nylon Cup Brush,Virtual Deburring Nylon Cup Brush,False,381.0,19.0,,4.0,Nylon,,True
+Nylon End Brush,Virtual Deburring Nylon End Brush,False,381.0,19.0,,5.0,Nylon,,True
+Nylon Tube Brush,Virtual Deburring Nylon Tube Brush,False,381.0,19.0,,7.0,Nylon,,True
+Nylon Wheel Brush,Virtual Deburring Nylon Wheel Brush,False,381.0,19.0,,2.0,Nylon,,True
+Partoff Insert,Virtual Partoff Insert,False,8.0,0.1,,1.0,Carbide,both,True
+Polygon Turning Insert,Virtual Polygon Turning Insert,True,120.0,30.0,,1.0,Carbide,both,False
+Pull Type Keyway Broach,Virtual Pull Type Keyway Broach,False,0.0,0.0,,1.0,High Speed Steel,,True
+Ream,"Virtual Ream, Carbide",False,50.0,0.1,,1.0,Carbide,both,True
+Ream,"Virtual Ream, High Speed Steel",False,50.0,0.1,,2.0,High Speed Steel,both,True
+Rotary Broach,"Virtual Rotary Broach, HSS",False,20.0,0.1,,1.0,High Speed Steel,both,True
+Rotary Burr,Virtual Rotary Burr,False,0.0,0.0,,1.0,Stainless Steel,,True
+Rotor Grinding Wheel,Virtual Rotor Finish Grinding Wheel,True,500.0,50.0,,1.0,CBN,both,False
+Rough Bore,Corobore 820,True,306.0,25.0,,1.0,Carbide,both,False
+Rough Bore,CoroBore 820XL,True,1260.0,148.0,,2.0,Carbide,both,False
+Rough Bore,"Infinite Bore, Carbide",False,1000000.0,0.1,Corobore 820,5.0,Carbide,both,True
+Seal Groove Dovetail Mill,"Virtual Dovetail Mill, Seal Groove",False,25.4,0.0,"Virtual Dovetail Mill, Uncoated",1.0,Carbide,both,True
+Semi-Finish Bore,CoroBore 820XL,True,1260.0,148.0,,2.0,Carbide,both,False
+Semi-Finish Bore,"Infinite Bore, Carbide",False,1000000.0,0.1,"Sandvik Duobore, inserts, pC14-C21",5.0,Carbide,both,True
+Semi-Finish Bore,"Sandvik Duobore, inserts, pC14-C21",True,270.0,25.0,,1.0,Carbide,both,False
+Shaper Cutter,Virtual Shaper Cutter,False,500.0,50.0,,1.0,Carbide,both,True
+Shaving Cutter,Virtual Shaving Cutter,False,500.0,50.0,,1.0,Carbide,both,True
+Single Index Finishing Mill,Virtual Single Index Finishing Mill,True,500.0,50.0,,1.0,Carbide,both,False
+Single Index Roughing Mill,Virtual Single Index Roughing Mill,True,500.0,50.0,,1.0,Carbide,both,False
+Spline Rolling Rack,Virtual Spline Rolling Rack,False,500.0,50.0,,1.0,High Speed Steel,both,True
+Straight Drill,"Virtual Deep Drill, Carbide",False,50.0,0.1,"Virtual Drill, Carbide",9.0,Carbide,both,True
+Straight Drill,"Virtual Drill, Carbide",False,50.0,0.1,,3.0,Carbide,both,True
+Tap,"Virtual Tap, High Speed Steel",False,0.0,0.0,,1.0,High Speed Steel,,True
+Thread Chaser Insert,Virtual Thread Chaser Insert,False,0.0,0.0,,1.0,Carbide,,True
+Thread Mill,"Virtual Thread Mill, High Speed Steel",False,28.58,0.01,,1.0,High Speed Steel,both,True
+Turning Insert,Virtual Turning Insert,True,0.0,0.0,,1.0,Carbide,,False
+Wire Cup Brush,Virtual Deburring Wire Cup Brush,False,381.0,19.0,,3.0,Wire,,True
+Wire End Brush,Virtual Deburring Wire End Brush,False,381.0,19.0,,6.0,Wire,,True
+Wire Tube Brush,Virtual Deburring Wire Tube Brush,False,381.0,19.0,,8.0,Wire,,True
+Wire Wheel Brush,Virtual Deburring Wire Wheel Brush,False,381.0,19.0,,1.0,Wire,,True

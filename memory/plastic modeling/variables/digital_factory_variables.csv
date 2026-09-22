@@ -1,0 +1,304 @@
+variableName,stringValue,unitTypeName,notes
+GPPSMeltTemperature,230,Temperature,General Purpose Polystyrene (GPPS) Melting Temperature. Fall back default value used for calculating material shot details.
+GPPSSpecificHeat,2.3,J/(g*Temperature),General Purpose Polystyrene (GPPS) Specific Heat of Melt. Fall back default value used for calculating material shot details.
+aPlateCupCavityRatio,1,,The fractional percentage of the cavity height that is within the cavity plate for a cup shaped part. Valid inputs range from 0 to 1.
+aPlateFlatCavityRatio,0.5,,The fractional percentage of the cavity height that is within the cavity plate for a flat part. Valid inputs range from 0 to 1.
+aPlateMinThickness,85.725,Length,Minimum distance from the shallowest point of the cavity to the back of the cavity plate.
+applyLabelRate,5,Time,Rate at which an operator can apply one label.
+applyMoldReleaseRate,371612,,Rate at which a mold release agent is applied to the mold surface.
+areaCoveredPerEjectorPin,7903.21,Area,Area covered per ejector pin.
+bPlateMinThickness,85.725,Length,Minimum distance from the deepest point of the cavity to the back of the core plate.
+betweenPartsMoldBorder,76.2,Length,"3"" between parts in the mold"
+bottomClampPlateThickness,28.575,Length,
+cDimension,63.5,Length,
+cavityPlateDepthBorder,152.4,,"make 6"" also, same as core border"
+cavityTexture_IM,None,,The default textured mold cavity finish requirement. A tooling cost driver. Value must match the 'Texture Name' of an entry in the look-up table 'cavityTextures'.
+cavityTexture_RIM,None,,The default textured mold cavity finish requirement. A tooling cost driver. Value must match the 'Texture Name' of an entry in the look-up table 'cavityTextures'.
+cavityTexture_SFM,None,,The default textured mold cavity finish requirement. A tooling cost driver. Value must match the 'Texture Name' of an entry in the look-up table 'cavityTextures'.
+checkFlowRatioFeasibility,false,,If 'true' the cost model will check the feasibility of the calculated flow ratio against the maximum flow length ratio of the selected material and fail the costing appropriately. If 'false' flow ratio feasibility is not checked.
+clampForceSafetyFactor,1.1,,Multiplier of clamp pressure required to ensure that the machine is capable of applying the necessary mold pressure (10% safety factor).
+clampSpacing,127,,Default distance between adjacent clamps along the mold's parting line.
+clampingRate,2,,Rate at which a clamp can open or close. Determines the open and close mold cycle time.
+cmAPlateMinThickness,85.725,Length,Minimum distance from the shallowest point of the cavity to the back of the cavity plate. Used in the Compression Molding process routing.
+cmAirHoseCleaningRateArea,1000000,Area/Time,Rate at which operator can clean tool surface using air tool. Used in the Compression Molding process routing.
+cmAirHoseCleaningRateLinear,100,Length/Time,Rate at which operator can clean tool parting line perimeter using air tool. Used in the Compression Molding process routing.
+cmAutoIncludeManualFlashTrimming,true,,Default behavior to automatically include manual flash trimming of parts which do not include internal cutouts. Used in the Compression Molding process routing.
+cmBPlateMinThickness,85.725,Length,Minimum distance from the deepest point of the cavity to the back of the core plate. Used in the Compression Molding process routing.
+cmBottomClampThickness,75,Length,Bottom clamp plate thickness. Used in the Compression Molding process routing.
+cmCavityFinish,SPI B3 - Normal Semi-Gloss,,"Default finish applied to cavity surface for Compression Molding. Available options are contained in the ""Detailed Finish Name"" column of the SPIFinishes table."
+cmCavityTexture,None,,The default textured mold cavity finish requirement. A tooling cost driver. Value must match the 'Texture Name' of an entry in the look-up table 'cavityTextures'.
+cmChargeCuttingTime,5,Time,Time required to cut SMC material to required length or acquire a piece of BMC material for charge. Time is per charge piece. Used in the Compression Molding process routing.
+cmChargeWeighingTime,5,Time,Time required to weigh SMC or BMC material to specified charge weight. Time is per charge piece. Used in the Compression Molding process routing.
+cmClampPlateHoleSpacingLength,203.2,Length,Linear spacing of clamp plate mounting holes in lengthwise direction. Used in the Compression Molding process routing.
+cmClampPlateHoleSpacingWidth,152.4,Length,Linear spacing of clamp plate mounting holes in widthwise direction. Used in the Compression Molding process routing.
+cmClampPlateHolesMin,4,,Minimum number of holes in clamp plate. Used in the Compression Molding process routing.
+cmClampPlateOverhangAllowance,150,Length,Allowance added to mold base dimensions to define required clamp plate dimensions. Used in the Compression Molding process routing.
+cmColorantConcentrationPercent,5,,Colorant or pigment concentration percentage in raw SMC or BMC material.
+cmCounterboreHeaterLineTime,45,Time,The time required to counterbore a tool heater line hole. Used in the Compression Molding process.
+cmCounterboreSetupTime,1.5,hr,The time spent setting up the machine prior to counterboring the heater lines in the mold core or cavity. Used in the Compression Molding process routing.
+cmCutterPathComplexityFactorComplex,0.18,,Complexity factor applied to the base mold tool CNC time to increase this for complex molds. Complex mold are defined when parting line complexity is NON FLAT. Used in the Compression Molding process routing.
+cmCutterPathComplexityFactorSimple,0.1,,Complexity factor applied to the base mold tool CNC time to increase this for simple molds. Simple mold are defined when parting line complexity is FLAT. Used in the Compression Molding process routing.
+cmCyclindricalSimpleHoleSurfaceAreaRatio,0.3,,The threshold percentage for which a simple hole's surface area is considered reasonably equivalent to a cylindrical hole of the same diameter. Used to check the viability of simple holes for offline processing.
+cmDesignHrsRibInsertLarge,10,hr,Time required to design large rib insert. Time is per rib.
+cmDesignHrsRibInsertMedium,5,hr,Time required to design medium rib insert. Time is per rib.
+cmDesignHrsRibInsertSmall,3,hr,Time required to design small rib insert. Time is per rib.
+cmDesignHrsSurfaceTimeBase,5,hr,Minimum time required to design the surface of the mold tool. Used in the Compression Molding process routing.
+cmDesignHrsSurfaceTimeVents,0.125,hr,Time required to design mold tool surface for vents. Time is per vent. Used in the Compression Molding process routing.
+cmEjectionMethod,Air Poppets,,Default method for compression molding part ejection. Available options are Air Poppets or Hydraulic Ejector Pins. Used in the Compression Molding process routing.
+cmEjectorBoxRailHoleSpacing,203.2,Length,Linear spacing of holes in ejector box rails. Used in the Compression Molding process routing.
+cmEjectorBoxRailHolesMin,4,,Minimum number of holes in ejector box rails. Used in the Compression Molding process routing.
+cmEjectorBoxRailsHeight,152.4,Length,Default ejector box rails height. Used in the Compression Molding process routing.
+cmEjectorBoxRailsNumber,2,,Number of ejector box rails used in mold tool. Used in the Compression Molding process routing.
+cmEjectorBoxRailsWidth,76.2,Length,Default ejector box rails width. Used in the Compression Molding process routing.
+cmEjectorPinSpacing,7903.21,Area,Area covered per ejector pin. Used in the Compression Molding process routing.
+cmEjectorPlateSupportPillarDiameter,76.2,Length,Diameter of ejector plate support pillars. Used in the Compression Molding process routing.
+cmEjectorPlateThickness,25.4,Length,Default ejector plate thickness. This is the thickness of one plate. Used in the Compression Molding process routing.
+cmEjectorPlatesHoleSpacingLength,203.2,Length,Linear spacing of ejector plate mounting holes in lengthwise direction. Used in the Compression Molding process routing.
+cmEjectorPlatesHoleSpacingWidth,150,Length,Linear spacing of ejector plate mounting holes in widthwise direction. Used in the Compression Molding process routing.
+cmEjectorPlatesHolesMin,8,,Minimum number of holes in compression molding ejector plate. Used in the Compression Molding process routing.
+cmEjectorPlatesWidthReduction,152.4,Length,The difference in width between the tool cavity/core plates and the ejector plates. Used to calculate ejector plate width. Used in the Compression Molding process routing.
+cmFlashCavityThickness,0.1,Length,Thickness of the flash cavity in Flash type mold tools. Used in the Compression Molding process routing.
+cmFlashClosureFactor,1,,"Factor used to account for the complexity of a flash closure mold type. Affects charging time, part finishing, spotting cost, try out time, and design hours. Used within Compression Molding process routing."
+cmFlashRidgeAllowance,5,Length,Width of flash ridge allowance included in mold tool for tool types producing flash. Used in the Compression Molding process routing.
+cmFlashRidgeThicknessFlashType,0.08,Length,Thickness of the flash ridge in Flash type mold tools. Used in the Compression Molding process routing.
+cmFlashRidgeThicknessSemiPositiveType,0.06,Length,Thickness of the flash ridge in Semi-Positive type mold tools. Used in the Compression Molding process routing.
+cmHeaterLineDiameter,12.7,Length,The diameter of a tool heater line. Used in the Compression Molding process routing.
+cmHeaterLineDiameterAllowanceFactor,4,,Factor applied to the heater line diameter to determine the thickness allowance for the cavity (A Plate) and core (B Plate). Used in the Compression Molding process routing.
+cmHeaterLineDrillSetupTime,1,hr,The time spent setting up the machine prior to drilling the heater lines in the mold core or cavity. Used in the Compression Molding process routing.
+cmHeaterLineSpacing,63.5,Length,The average spacing between heater lines in the mold core and cavity. Used in the Compression Molding process routing.
+cmHighAspectRatioThreshold,3,,The threshold at which a parts length to width ratio is considered high aspect. Used in the determination of inward facing voids.
+cmInsertManualLoadingTime,8,Time,Time required to manually load an insert into the compression molding tool. Used in the Compression Molding process routing.
+cmInsertedComponentCost,0.25,Currency,Cost per individual inserted component loaded into the mold tool. Used in the Compression Molding process routing to calculate additional direct costs.
+cmInternalCutoutsCappedDefault,true,,Default behavior of how internal cutouts will be assumed. Available options are true or false. true assumes that all modelled internal cutouts are capped during the compression molding process.
+cmManualFlashTrimmingRate,75,Length/Time,Linear rate of manual flash removal. Used in the Compression Molding process routing.
+cmMaxDrawDirectionTangentAngle,5,Angle,Maximum deviation from draw direction where vector is still considered parallel to draw direction. Used in the Compression Molding process routing.
+cmMinReleaseAgentApplicationTime,5,Time,Minimum time to apply release agent to compression molding mold tool. Used in the Compression Molding process routing.
+cmMiscMoldWeightAdder,0.1,,Percentage of calculated mold weight added for additional miscellaneous components. Used in the Compression Molding process routing.
+cmMoldBaseLengthAllowance,150,Length,Allowance added to part length to define required mold base length. Used in the Compression Molding process routing.
+cmMoldBaseWidthAllowance,150,Length,Allowance added to part width to define required mold base width. Used in the Compression Molding process routing.
+cmMoldClosureType,Semi-Positive,,"Default mold closure type. Available options are Flash, Semi-Positive, Positive. Used in the Compression Molding process routing."
+cmMoldPlating,None,,
+cmMoldSurfaceCountThresholdAverage,2500,,Threshold of number of surfaces on the part which define the part as average complexity. Used in the Compression Molding process routing.
+cmMoldSurfaceCountThresholdSimple,500,,Threshold of number of surfaces on the part which define the part as simple complexity. Used in the Compression Molding process routing.
+cmPartingLineComplexityMultiplierFlat,0.013,,Scaling factor used to adjust design surface base hours for FLAT parting lines. Used in the Compression Molding process routing.
+cmPartingLineComplexityMultiplierNonFlat,0.026,,Scaling factor used to adjust design surface base hours for NON FLAT parting lines. Used in the Compression Molding process routing.
+cmPlateOverhangAllowance,75,Length,Allowance add to each side of top and bottom plates for overhanging the mold base. Used in the Compression Molding process routing.
+cmPositiveClosureFactor,1.3,,"Factor used to account for the complexity of a positive closure mold type. Affects charging time, part finishing, spotting cost, try out time, and design hours. Used within Compression Molding process routing."
+cmPressForceSafetyFactor,1.25,,Safety factor applied to the calculated required compression molding press force. This should remain greater than 1. Used in the Compression Molding process routing.
+cmReleaseAgentApplicationRate,800000,Area/Time,Rate at which mold release agent can be applied. Used in the Compression Molding process routing.
+cmRemoveBackingFilmTime,10,Time,Time required to remove backing film from SMC material. Time is per charge piece. Used in the Compression Molding process routing.
+cmSemiPositiveClosureFactor,1.15,,"Factor used to account for the complexity of a semi-positive closure mold type. Affects charging time, part finishing, spotting cost, try out time, and design hours. Used within Compression Molding process routing."
+cmSupportPillarCoveragePercentage,10,,Total percentage of ejector plate area which is covered by support pillars. Used in the Compression Molding process routing.
+cmTapHeaterLineTime,45,Time,The time spent tapping a single heater line. Used in the Compression Molding process routing.
+cmTapSetupTime,1.5,hr,The time spent setting up the machine prior to tapping the heater lines in the mold core or cavity. Used in the Compression Molding process routing.
+cmThermocouplesSpacing,4,m^2,Thermocouple spacing in mold base. Used in the Compression Molding process routing.
+cmTimePerTryoutBase,12,hr,Basic time required for compression molding tooling tryout for presses less than 5000kN. Used in the Compression Molding process routing.
+cmTopClampPlateThickness,75,,Top clamp plate thickness. Used in the Compression Molding process routing.
+cmTravelDistanceMultiplierCup,2.5,,Multiplier used to factor part height to determine required opening stroke for cup shaped parts. Used in the Compression Molding process routing.
+cmTravelDistanceMultiplierFlat,4,,Multiplier used to factor part height to determine required opening stroke for relatively flat parts. Used in the Compression Molding process routing.
+cmTryoutPressForceThreshold,5000,kN,Threshold of machine press force which would require additional try-out time per try-out. Used in the Compression Molding process routing.
+cmVentSpacing,76.2,Length,Linear spacing between vents. Used in the Compression Molding process routing.
+cmVoidDepthToHeightScalingFactor,2,,Factor used to scale a void's depth in the accessible direction when comparing to the void's projected area equivalent square length dimension. Increasing this value will result in voids with smaller depths being scaled proportionally.
+cmVoidLowCurvedSurfaceRatio,0.2,,Ratio of a void's curved surfaces' area to its total surface area which is considered low. Used to determine if a complex shape void is comparable to an extruded shape void.
+cmVoidPlanarFaceNormalParallelTolerance,20,Angle,Tolerance threshold to consider if a void's planar face's normal direction is parallel to its void accessible direction. Used to determine if a void has a planar bottom surface.
+cmVoidPlanarFaceSignificantAreaFraction,0.2,,"Ratio that determines if a planar face, with a normal direction parallel to its void accessible direction, is a significant proportion of the void's exposed area."
+cmmInspectionAdder,5,,Adder used for calculating required CMM hours for inspecting Slides and Lifters.
+cmmInspectionMultiplier,1.52,,Multiplier used for calculating required CMM hours for inspecting Slides and Lifters.
+colorantCost,0.75,CostPerMass,Cost of colorant per unit mass. The colorant cost is multiplied by the rough mass of the part to determine the total colorant cost.
+compressionMoldingExcessThicknessThreshold,25.4,Length,"1"" threshold for when a higher press force is required to drive material into mold crevasses."
+conventionalRunnerMaxPressureReductionFactor,0.15,,Maximum material injection pressure reduction factor for standard cold runners. Used to calculate 'adjustedInjectionPressure'. Starting point value is 0.15 signifying a 15% reduction from the selected material's max injection pressure.
+coreInstallRate,15,Time,Rate at which an operator can install one core.
+corePlateDepthBorder,152.4,,"6"" depth border"
+costPerHydraulicEjector,4200,Currency,
+costPerPorcerax,4800,Currency,
+costPerSVGHotDrop,6000,Currency,
+costPerStandardHotDrop,3750,Currency,
+costPerUnscrewingMechanism,4200,Currency,
+cupRatioThresholdMultiplier,1,,"Threshold at which the part is deemed as cup shaped. Multiplies the part nominal wall thickness and is compared to the maximum tool reach. If this variable is set to 0, all parts will be considered cup shaped."
+cutterPathHrsPerInsert,5,hr,CNC cutter path time per rib insert.
+cycleTimeAdjustmentFactor,1,,Factor used to globally increase or decrease cycle time evaluations per process.
+defaultCavityFinishIM,SPI B3 - Normal Semi-Gloss,,"Default finish applied to cavity surface for Injection Molding. Available options are contained in the ""Detailed Finish Name"" column of the SPIFinishes table."
+defaultCavityFinishRIM,SPI B3 - Normal Semi-Gloss,,"Default finish applied to cavity surface for Reaction Injection Molding. Available options are contained in the ""Detailed Finish Name"" column of the SPIFinishes table."
+defaultCavityFinishSFM,SPI B3 - Normal Semi-Gloss,,"Default finish applied to cavity surface for Structural Foam Molding. Available options are contained in the ""Detailed Finish Name"" column of the SPIFinishes table."
+defaultCostPerLabel,1.00,Currency,Default cost of applying one label to the part. User may override via Process Setup Options.
+defaultCustomMultiplier,0.6,,"Coefficient, in case of 'Standard Mold Base'"
+defaultEnableOverhangingClampingPlates,false,,"If true, oversized clamping plates sizes will be selected from table tblStandardMoldBaseSizes. If false, the clamping plates will be flush with the rest of the mold plates, and so actual width and length are used."
+defaultEnablePlasticFormingRegionInserts,true,,Default setting for whether or not to use inserts in the Plastic Forming Region of the mold base ('true' or 'false'). This value is referenced only if plant.defaultInsertMethod = SPECIFY.
+defaultFinishAreaPercentage,50,,Percentage of surface area that is finished. This is used as the default for the finishAreaPercentage PSO.
+defaultGatingType,Edge,,Specify if the Gate is placed at the edge or the center of the mold for a cold runner system. Select from 'Edge' and 'Center'.
+defaultHotDropLayout,Linear,,The default hot drop layout. Available options are 'Linear' or 'Square'.
+defaultHotDropType,Standard,,Default hot drop type. Available options are 'Standard' or 'SVG'.
+defaultInboundWaterlineMultiplier,1.25,,Default Multiplier of the Waterline Diameter for calculation the Inbound Allowance of the Plastic Forming Region.
+defaultInjectionPressure,130,Pressure,Default injection pressure for materials where injection pressure is not defined. Uses the value from ABS.
+defaultInsertCost,.12,Currency,Default cost of one insert. User may override via Process Setup Options.
+defaultInsertMethod,SPECIFY,,'LOOKUP' versus 'SPECIFY'. Default setting for whether the decision to use inserts in the Plastic Forming Region of the mold base is dynamically retrieved from a lookup table or is statically set to the same value for the plant.
+defaultMeltFlow,80,,Default melt flow for materials where melt flow is not defined. Uses the value from ABS.
+defaultMoldTemperatureIncrease,0,Temperature,This value is added on to the mold temperature variable that is used in the cooling time equation. It allows for local differences in mold temperatures that can occur in the event of limited access for cooling channels.
+defaultNumCavities,1,,Default value for the number of cavities in one mold. User may override via Process Setup Options.
+defaultNumDropBoxes,0,,Default number of drop boxes used by the plant.
+defaultNumLabels,0,,Default number of labels applied to the part. User may override via Process Setup Options.
+defaultNumTryOuts,3,,
+defaultNumberOfGatesPerCavity,1,,The default number of gating locations per cavity.
+defaultOutboundWaterlineMultiplier,1,,Default Multiplier of the Waterline Diameter for calculation the Outbound Allowance of the Plastic Forming Region.
+defaultPercentGas,0,,Default usage percentage by part weight for physical gas. Only applicable for Structural Foam Molding. User may override via Process Setup Options.
+defaultRegrindAllowance,0.25,,Default allowable percentage of runners and scrap allowed with virgin material. Input as a decimal. E.G. 0.25 instead of 25%.
+defaultRunnerAttachmentSide,Long,,Default side of the attachment of the runner to the cavity. Choose from 'Long' side of the cavity and 'Short' side of the cavity
+defaultRunnerSystem,Cold Runner,,The default runner system type. Available options are 'Cold Runner' or 'Hot Runner'.
+defaultTextureAreaPercentage,50,,Percentage of surface area that is textured. This is used as the default for the textureAreaPercentage PSO.
+defaultToolLife,260000,,The default number of shots per tool which is used to determine part material tool life. This is the median value of the available data relating to tool life by part material type.
+defaultUtilizationMethod,COMPUTED,,"Eligible values: ""COMPUTED"" & ""MACHINE_DEFAULT"""
+defaultWaterLineDiameter,8,Length,Default water line diameter used for calculation of the plastic forming region.
+deflectionThicknessMultiplier,0.5,,Factor used to determine whether a feature is small enough to deflect and does not require a lifter. Deflection thickness multiplier is multiplied by the average thickness of the part.
+densityCopper,8400,kg/m^3,Density of Copper electrodes
+densityGraphite,3514,kg/m^3,Density of graphite electrodes
+densityPolystyreneForShotSize,1040,Density,Industry standard density of General Purpose Polystyrene (GPPS) used to define shot size in grams
+disableInvestmentAmortization,false,,"User override to disable amortization of all fixed costs to the individual part or assembly. By default, fixed costs are calculated per part for tooling, fixtures, and programming."
+drawDirectionOrthogonalEpsilon,5,,Bundling parameters - angular difference in setup axes of features sharing a bundle
+drawDirectionOrthogonalEpsilonForLifters,10,Angle,Default value supporting Slide and Lifter bundling
+drawDirectionOrthogonalEpsilonForSlides,30,Angle,Default value supporting Slide and Lifter bundling
+dryCycleStrokeFactor,0.7,,Euromap 6 details the dry cycle time measurement. Within this standard there is a reference to the stroke being 70% of the maximum of the tie bar values.
+edmElectrodeVolumeBurn,0.05,,Percentage of electrode volume used for burning.
+ejectorDistanceFactor,3,,The coefficient used in finding a multiple of the part height to find the distance that the ejector pins should move.
+ejectorGuidePinsBushingsCost,30,Currency,
+ejectorPercentMaxMachineVelocity,50,,Ejector velocity as a percent of max machine velocity. Used to calculate the ejector plate component of cycle time.
+ejectorPinsCost,5,Currency,
+finishingLCStep,10000,,"Adjusts the learning curve for function finishingRateAdjustedByLC used to adjust the finishingRate. Measured in sq mm, the smaller this value, the less amount of surface area needs to be worked to reach the fastest finishing rate."
+flowRatioThresholdEasyFlow,200,,"Threshold for flow ratio above which the material is considered ""Easy"" flow and below which is considered ""Medium"" flow. Used in clamp force calculations."
+flowRatioThresholdMediumFlow,100,,"Threshold for flow ratio above which material is considered ""Medium"" flow and below which is considered ""Hard"" flow. Used in clamp force calculations."
+gasCost,0.0022,CostPerMass,Default cost per total mass of part for direct injection of gas. Only applicable for Structural Foam Molding. User may override via Process Setup Options.
+gearQualityDefaultAgmaNewStd,A8,,"A2, A3, A4, ... A11, A12"
+gearQualityDefaultAgmaOldStd,Q8,,"Q15, Q14, Q13, ... Q6, Q5"
+gearQualityDefaultDinStd,9,,"2, 3, 4, ... 11, 12"
+genericValidation,true,,'true' if the generic validation view should be used for parts costed in this process group in this Digital Factory
+gravityDropTime,1.25,Time,The time for a part to drop from the tool by gravity.
+gravityEject,Gravity,,Default value for the 'ejectMethod' PSO. The options for this variable are that the part removal can be 'Gravity' or 'Robotic'.
+hardFlowThreshold,130,,"Threshold for melt flow above which material is considered ""Hard"" flow, and below which is considered ""Medium"" flow. Used in clamp force calculations."
+highAspectRatioThreshold,0.50,,Parts with an aspect ratio equal to or above this threshold incur additional complexity during part ejection. Used to calculate nominal wall thickness. Default value is 0.50.
+hotRunnerMaxPressureReductionFactor,0.30,,Maximum material injection pressure reduction factor for hot runners. Used to calculate 'adjustedInjectionPressure'. Starting point value is 0.30 signifying a 30% reduction from the selected material's max injection pressure.
+injectionRateMultiplier,.25,,Multiplier used to downgrade the machine injection rate.
+insertInstallRate,10,Time,Rate at which an operator can install one insert.
+laborRateAdjustmentFactor,1,,Factor used to globally increase or decrease labor rate evaluations per process.
+largeBlindHoleDepthToDiaRatio,3,,Deprecated CMV290.
+largeCalcRibInsertElectrodeSize,117.1875,in^3,Size of large electrode rib insert
+largeInsertArea,36,,"6"" x 6"" area (volume = 6 x 6 x core plate height)"
+largeLifterVolume,1500,,volume of large slides - cubic inch
+largeSlideVolume,2000,,volume of large slides - cubic inch
+largeStandardRibInsertElectrodeSize,117.1875,in^3,Size of standard electrode in cubic inches
+largeThroughHoleDepthToDiaRatio,6,,Deprecated CMV290.
+leaderPinsShoulderBushingsCost,45,Currency,
+lifterBaseLength,15,Length,Default value for cost engine function parameter for slide and lifter bundling in Injection Molding
+lifterHeightAddendum,5,Length,Default value for cost engine function parameter for slide and lifter bundling in Injection Molding
+lifterInclineAngleDegrees,15,Angle,Default value for cost engine function parameter for slide and lifter bundling in Injection Molding
+lifterWidthAdd,25.4,Length,"1"" add to each part in cav layout if lifters present"
+limitSwitchesCost,50,Currency,
+locatingRingsCost,85,Currency,
+lowPressForceCutOff,500,,Tons below which only the smallest amount needs to be added to the thickness of the mold plates
+lowThicknessDevThreshold,0.30,Length,"Parts with an average thickness deviation, 'avgThicknessDev', equal to or below this threshold value are considered to have relatively uniform wall thickness. Used to calculate nominal wall thickness."
+machineTonageThresholdSmallMolds,700,,"Machine Tonage Threshold for Small Molds. Replaced by ""machineTonnageThresholdSmallMolds"" in cost model version 90 and later."
+machinedRibThreshold,20,Length,Threshold height at which a rib feature cannot be machined into the mold base and a mold base insert should be used.
+manifoldPlateThickness,94.1,Length,"Manifold plate thickness. Includes Riser Pads, Spacer Ring and Manifold. Used to calculate the total hot drop thickness."
+manualTrimRate,12.7,,Rate at which an operator can manually trim a hole.
+maxActionLength,500,,Bundling parameter - distance parallel to parting line between start and end of slide or lifter
+maxCorableHoleDiameter,381,Length,Maximum hole diameter that can be created using a core.
+maxCorePullStrokeLength,152.4,Length,Default value for cost engine function parameter for slide and lifter bundling in Injection Molding
+maxGCDPitch,50.8,Length,Bundling parameter - pitch between holes or voids
+maxGcdDistanceFromPartEdge,25.4,Length,Default value supporting Slide and Lifter bundling
+maxLifterDepthPitch,12.7,Length,Default value supporting Slide and Lifter bundling
+maxNoCoreInsertDiameter,6.35,Length,Maximum diameter for which an obscured hole may be inserted and not also require a core.
+maxRunnerDia,12.7,Length,Maximal Runner Diameter
+maxSlideDepthPitch,25.4,Length,Default value supporting Slide and Lifter bundling
+medThicknessDevThreshold,0.50,Length,"Parts with an average thickness deviation, 'avgThicknessDev', above this threshold are considered to have relatively non-uniform wall thickness. Used to calculate nominal wall thickness."
+mediumCalcRibInsertElectrodeSize,31.6875,in^3,Size of medium electrode rib insert
+mediumFlowThreshold,70,,"Threshold for melt flow below which material is considered ""Easy"" flow, and above which is ""Medium"" flow. Used in clamp force calculations."
+mediumInsertArea,9,,"3"" x 3"" area (volume = 3 x 3 x core plate height)"
+mediumLifterBundleWidthThreshold,127,Length,width threshold between a medium and large lifter bundle (based on 5 inches).
+mediumLifterVolume,500,,volume of medium slides - cubic inch
+mediumSlideBundleWidthThreshold,304.8,Length,width threshold between a medium and large slide bundle (based on 12 inches).
+mediumSlideVolume,1100,,volume of medium slides - cubic inch
+mediumStandardRibInsertElectrodeSize,31.6875,in^3,Size of medium electrode in cubic inches
+mediumVoidVolumeThreshold,5080,Length,
+minActionGcdsDepthOverlap,0,Length,Bundling parameters - minimal axial overlap of GCDs to be bundled on the same action (coplanar threshold)
+minInjectionPressure,27.57903,Pressure,Min adjusted injection pressure is 4000 PSI.
+minRunnerDia,2.032,Length,Minimal Runner Diameter
+minimumLifterClearance,64.77,Length,Bundling parameters - lifter clearance
+minimumPercentClampForceEasyFlow,12,,"The minimum percentage of clamp force applied for ""Easy"" flow materials. Used in clamp force calculations. Default value '12'."
+minimumPercentClampForceHardFlow,59,,"The minimum percentage of clamp force applied for ""Hard"" flow materials. Used in clamp force calculations. Default value '59'."
+minimumPercentClampForceMediumFlow,34,,"The minimum percentage of clamp force applied for ""Medium"" flow materials. Used in clamp force calculations. Default value '34'."
+minimumSlideClearance,196.75,Length,Bundling parameters - slide clearance
+minorInsertVolume,8,in^3,
+moldBaseNonRecurringCostRatio,0.65,,The ratio of non-recurring mold base cost to total mold base cost when using pocketed cavity set construction. Used to calculate standard mold base cost when plastic forming region inserts are used.
+nominalHeightFactor,3,,This factor is used to determine the tool's open travel distance in the presence of parts with nominal part height values. In this case the height of the part should be considered in determining the open travel distance.
+nominalWallThicknessFactor,1,,"A factor applied when calculating nominal wall thickness, default set to 1."
+nozzlePlateThickness,47.625,Length,Nozzle plate thickness. Used to calculate the total hot drop thickness.
+numEjectorCycles,1,,Number of ejector cycles. Used to calculate the ejector plate component of cycle time.
+numInsertElectrodesPerPocket,4,,"Unitless, number of electrodes per pocket, one per pocket corner"
+numLargeInsertsBurns,2,,"Unitless, number of large inserts burns"
+numMediumInsertsBurns,2,,"Unitless, number of medium inserts burns"
+numSmallInsertsBurns,2,,"Unitless, number of small inserts burns"
+overheadRateAdjustmentFactor,1,,Factor used to globally increase or decrease overhead time evaluations per process.
+percentFilled,75,,Percentage of the mold that is initially filled before foam expansion occurs. User may override via Process Setup Options.
+plasticFormingRegionInsertSetupTime,2,hr,Time required to setup tool material on CNC machine for machining of plastic forming region insert.
+plasticizingRateMultiplier,0.75,,Multiplier used to downgrade the machine plasticizing rate.
+pocketedInsertAssemblyHours,0.05,hr,Time required to assemble plastic forming region insert into retainer plate.
+quickHoseDisconnectsCost,3,Currency,
+recommendedShotSizeLimitLower,0,,Lower recommended percentage limit for barrel capacity
+recommendedShotSizeLimitUpper,0.75,,Upper recommended percentage limit for barrel capacity
+retractClearance,3.175,Length,Retract Clearance for calculating Slide Allowance (static value)
+returnPinsShoulderBushingsCost,35,Currency,
+robotClearanceFactor,1,,This factor is used to determine the tool's open travel distance in the presence of robotic ejection. Clearance is required to allow the head of the robot to access the part.
+robotGrabTime,2.5,Time,The time for a robot to remove the part from the tool.
+runnerRetentionTab,4.7625,Length,Overlapping Runner for Central Gating Runner System
+scrapTimeInMinutes_IM,15,min,Initial setup time for Injection Molding where parts are assumed to be scrap.
+scrapTimeInMinutes_RIM,30,min,Initial setup time for Reaction Injection Molding where parts are assumed to be scrap.
+scrapTimeInMinutes_SFM,30,min,Initial setup time for Structural Foam Molding where parts are assumed to be scrap.
+shotSizeSafetyFactor,1.02,,Multiplier of required shot size to account for material left in chamber etc.
+sideLocksCost,160,Currency,
+sleevePinsCost,65,Currency,
+slideCycleRate,100,Velocity,The rate at which the hydraulic slide can move.
+smallBlindHoleDepthToDiaRatio,2,,Deprecated CMV290.
+smallCalcRibInsertElectrodeSize,4.6875,in^3,Size of small electrode rib insert
+smallHeightPartFactor,1.1,,This factor is used to determine the tool's open travel distance in the presence of parts with small part height values. In this case the length of the part should be considered in determining the open travel distance.
+smallHoleDiamBorder,4.7625,Length,Diameter used as a border value for checking the ratio of hole depth to hole diameter.
+smallInsertArea,1,,"1"" x 1"" area (volume = 1 x 1 x core plate height)"
+smallLifterBundleWidthThreshold,76.2,Length,width threshold between a small and medium lifter bundle (based on 3 inches)
+smallLifterVolume,75,,volume of small slides - cubic inch
+smallPartMaxBoxLength,356,Length,Max Box Length of a Small Part
+smallPartMaxBoxWidth,305,Length,Max Box Width of a Small Part
+smallSlideBundleWidthThreshold,76.2,Length,width threshold between a small and medium slide bundle (based on 3 inches)
+smallSlideVolume,75,,volume of small slides - cubic inch
+smallStandardRibInsertElectrodeSize,4.6875,in^3,
+smallThroughHoleDepthToDiaRatio,4,,Deprecated CMV290.
+smallVoidVolumeThreshold,762,Length,
+socketHeadCapScrewsLongCost,10,Currency,
+socketHeadCapScrewsShortCost,1.5,Currency,
+spottingHrsPerInsert,1,hr,Time required for spotting individual rib insert.
+sprueBushingCost,70,Currency,
+sprueClearanceDia,38.1,Length,Diameter of the Sprue. Used for calculation of the Runner region for molds with a Runner system/cold runner or with more than one cavity.
+sprueDia,25.4,Length,Standard Sprue Diameter
+stopPinsCost,2,Currency,
+supportPillarsCost,45,Currency,
+supportPlateThickness,47.625,Length,
+supportsDTC,true,,'true' or 'false' - only set to 'true' if this Digital Factory's cost model has been upgraded or configured to support aPriori's Design-to-Cost functionality.
+supportsDTCPanelOutput,true,,True if CMV has DTC Advice Rules panel output information for UI macro to utilize.
+threePlateAdderMultiplier,0.9,,Multiplier used to ensure that the thickness of the third plate is always 90% of either the A plate or the B Plate (whichever has the smallest thickness)
+timePerTryoutBase,12,hr,basic hrs per tryout for <500T (x2 for bigger) - 3 tryouts
+toolBlastingRate,500,Time,Time in seconds to bead blast 1 square meter of tool. Used to calculate tool texturing time.
+toolChemicalEtchingRate,3,Time,Time in seconds to etch 1 micrometer of texture depth. Used to calculate tool texturing time.
+toolCleaningRate,2150,Time,Time in seconds to hand clean 1 square meter of tool. Used to calculate tool texturing time.
+toolDryingTime,1500,Time,Time in seconds to dry tool after cleaning. One-size fits all. Not area based. Used to calculate tool texturing time.
+toolMaskingRate,5285,Time,Time in seconds to mask 1 square meter of tool. Used to calculate tool texturing time.
+toolPhotoMaskUVExposureTime,1200,Time,Time in seconds to develop photomask. One-size fits all. Not area based. Used to calculate tool texturing time.
+toolShopRegionMultiplier,1,,Multiplier used to scale the overall mold cost based on the region in which the part is manufactured.
+topClampPlateThickness,28.575,Length,
+transitionAllowableThicknessVarianceFactor,0.33,,"This is a factor which dictates the allowable thickness variance between any two points when analyzing drastic thickness violations, e.g. 0.25 means that between two points, the thickness at the second point can vary by up to 25% relative to the first."
+transitionThicknessCheckLengthFactor,0.05,,This is a factor of the part length that determines the distance when checking for the variance of the part thickness between two points. E.g. if the part length is 250mm and the factor is 0.1 then a transition of 25mm is checked.
+trimStockAllowance,12.7,Length,Factor used to determine the perimeterStockAllowanceArea and addbackVolume.
+useMetricOrImperialValues,Metric,,Select the default System for choosing A Standard Mold Base Size from the lookup table tblStandardMoldBaseSizes. Choose from 'Metric' in mm and 'Imperial' in inches.
+usePreferredMachines,true,,"If true the model will first try to select a preferred machine. If false, the system chooses either the default machine or from the entire non-preferred set of machines."
+volumeAllowance,75,,Factor for comparing the part's bounding box volume to a void's bounding box volume and determining if the void represents the large center cavity of the part (which should be disregarded from certain calculations).
+waterBafflesCost,8,Currency,
+waterHosesCost,1.25,Currency,
+waterManifoldFittingsCost,2.5,Currency,
+waterManifoldsCost,55,Currency,
+widthOfCoolingChannel,11.1125,Length,
+regionMultiplier,0.96,,Multiplier used to scale the overall mold cost based on the region in which the part is manufactured.

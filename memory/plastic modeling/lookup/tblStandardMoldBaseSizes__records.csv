@@ -1,0 +1,130 @@
+name,sourceFilePath,digitalFactory,Mold Base Name,Reference Size,Reference Uom,Actual Width,Actual Length,Effective Window Width,Effective Window Length,Mold Base System,Overhanging Clamping Plate Width,Overhanging Clamping Plate Length
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,096X096,096 X 096,mm,95.0,95.0,55.0,55.0,Europe,156.0,156.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,100X130,100 X 130,mm,100.0,130.0,60.0,90.0,Europe,156.0,156.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,10X12,9 7/8 X 11 7/8,inches,9.88,11.88,7.0,8.88,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,10X16,9 7/8 X 16,inches,9.88,16.0,7.0,13.0,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,10X20,9 7/8 X 20,inches,9.88,20.0,7.0,17.0,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,10X8,9 7/8 X 8,inches,9.88,8.0,7.0,6.13,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,10X8,9 7/8 X 8,inches,9.88,8.0,7.88,6.13,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,11X12,10 7/8 X 12,inches,10.88,12.0,7.5,9.0,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,11X12,11 7/8 X 12,inches,11.88,12.0,8.5,9.0,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,11X14,10 7/8 X 14,inches,10.88,14.0,7.5,11.0,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,11X15,11 7/8 X 15,inches,11.88,15.0,8.5,12.0,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,11X18,10 7/8 X 18,inches,10.88,18.0,7.5,15.0,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,11X24,10 7/8 X 23 1/2,inches,10.88,23.5,7.5,20.0,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,126X156,126X156,mm,126.0,156.0,96.0,103.0,Europe,156.0,246.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,12X20,11 7/8 X 20,inches,11.88,20.0,8.5,17.0,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,12X24,11 7/8 X 23 1/2,inches,11.88,23.5,8.5,20.5,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,14X15,13 3/8 X 15,inches,13.38,15.0,9.63,12.0,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,14X18,13 3/8 X 18,inches,13.38,18.0,9.63,15.0,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,14X18,13 3/8 X 18,inches,13.38,20.75,9.63,17.75,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,14X24,13 3/8 X 23 1/2,inches,13.38,23.5,9.63,20.5,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,14X26,13 3/8 X 26,inches,13.38,26.0,9.63,23.0,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,14X30,13 3/8 X 29 1/2,inches,13.38,29.5,9.63,26.5,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,156X156,156 X 156,mm,156.0,156.0,92.0,116.0,Europe,206.0,246.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,156X196,156 X 196,mm,156.0,196.0,92.0,146.0,Europe,206.0,296.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,156X246,156 X 246,mm,156.0,246.0,92.0,196.0,Europe,196.0,296.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,156X296,156 X 296,mm,156.0,296.0,92.0,246.0,Europe,196.0,396.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,15X18,14 7/8 X 17 7/8,inches,14.88,17.88,11.88,14.88,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,15X24,14 7/8 X 23 3/4,inches,14.88,23.75,11.88,23.25,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,15X30,14 7/8 X 29 1/2,inches,14.88,29.5,11.88,26.5,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,16X16,15 7/8 X 16,inches,15.88,16.0,12.13,13.0,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,16X20,15 7/8 X 20,inches,15.88,20.0,12.13,17.0,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,16X24,15 7/8 X 23 1/2,inches,15.88,23.5,12.13,20.5,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,16X26,15 7/8 X 26,inches,15.88,26.0,12.13,23.0,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,16X30,15 7/8 X 29 1/2,inches,15.88,29.5,12.13,26.5,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,16X36,15 7/8 X 35 1/2,inches,15.88,35.5,12.13,32.5,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,17X24,16 1/2 X 23 3/4,inches,16.5,23.75,12.75,20.75,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,17X29,16 1/2 X 29 1/2,inches,16.5,29.5,12.75,26.5,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,18X18,17 7/8 X 18,inches,17.88,18.0,14.13,14.0,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,18X20,17 7/8 X 20,inches,17.88,20.0,14.13,16.0,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,18X24,17 7/8 X 23 1/2,inches,17.88,23.5,14.13,19.5,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,18X26,17 7/8 X 26,inches,17.88,26.0,14.13,22.0,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,18X30,17 7/8 X 29 1/2,inches,17.88,29.5,14.13,25.5,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,18X35,17 7/8 X 35 1/2,inches,17.88,35.5,14.13,31.5,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,190X246,190X246,mm,190.0,246.0,148.0,182.0,Europe,246.0,296.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,196X196,196 X 196,mm,196.0,196.0,120.0,146.0,Europe,246.0,296.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,196X246,196 X 246,mm,196.0,246.0,114.0,196.0,Europe,254.0,296.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,196X296,196 X 296,mm,196.0,296.0,110.0,246.0,Europe,246.0,396.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,196X346,196 X 346,mm,196.0,346.0,110.0,296.0,Europe,246.0,446.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,196X396,196 X 396,mm,196.0,396.0,110.0,346.0,Europe,246.0,446.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,20X24,19 1/2 X 23 3/4,inches,19.5,23.75,15.75,19.75,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,20X30,19 1/2 X 29 1/2,inches,19.5,29.5,15.75,25.5,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,20X36,19 1/2 X 35 1/2,inches,19.5,35.5,15.75,31.5,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,218X246,218 X 246,mm,218.0,246.0,142.0,196.0,Europe,276.0,296.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,218X296,218 X 296,mm,218.0,296.0,132.0,246.0,Europe,276.0,396.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,246X246,246 X 246,mm,246.0,246.0,160.0,196.0,Europe,296.0,296.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,246X296,246 X 296,mm,246.0,296.0,160.0,246.0,Europe,296.0,396.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,246X346,246 X 346,mm,246.0,346.0,160.0,296.0,Europe,296.0,446.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,246X396,246 X 396,mm,246.0,396.0,152.0,346.0,Europe,296.0,446.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,246X446,246 X 446,mm,246.0,446.0,160.0,396.0,Europe,296.0,446.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,246X496,246 X 496,mm,246.0,496.0,160.0,446.0,Europe,296.0,496.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,24X24,23 3/4 X 23 3/4,inches,23.75,23.75,20.0,19.75,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,24X30,23 3/4 X 29 1/2,inches,23.75,29.5,20.0,25.5,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,24X36,23 3/4 X 35 1/2,inches,23.75,35.5,20.0,31.5,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,296X296,296 X 296,mm,296.0,296.0,210.0,246.0,Europe,346.0,396.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,296X346,296 X 346,mm,296.0,346.0,210.0,296.0,Europe,346.0,446.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,296X396,296 X 396,mm,296.0,396.0,202.0,346.0,Europe,346.0,446.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,296X446,296 X 446,mm,296.0,446.0,210.0,396.0,Europe,346.0,496.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,296X496,296 X 496,mm,296.0,496.0,210.0,446.0,Europe,346.0,546.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,296X546,296 X 546,mm,296.0,546.0,210.0,496.0,Europe,346.0,596.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,296X596,296 X 596,mm,296.0,596.0,210.0,546.0,Europe,346.0,696.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,296X696,296 X 696,mm,296.0,696.0,210.0,546.0,Europe,346.0,696.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,346X346,346 X 346,mm,346.0,346.0,260.0,296.0,Europe,396.0,446.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,346X396,346 X 396,mm,346.0,396.0,222.0,320.0,Europe,396.0,446.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,346X446,346 X 446,mm,346.0,446.0,222.0,370.0,Europe,396.0,496.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,346X496,346 X 496,mm,346.0,496.0,222.0,420.0,Europe,396.0,546.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,346X546,346 X 546,mm,346.0,546.0,222.0,470.0,Europe,396.0,596.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,346X596,346 X 596,mm,346.0,596.0,222.0,470.0,Europe,396.0,696.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,346X696,346 X 696,mm,346.0,696.0,222.0,620.0,Europe,446.0,696.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,346X796,346 X 796,mm,346.0,796.0,222.0,720.0,Europe,446.0,796.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,396X396,396 X 396,mm,396.0,396.0,272.0,320.0,Europe,446.0,446.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,396X446,396 X 446,mm,396.0,446.0,272.0,370.0,Europe,446.0,496.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,396X496,396 X 496,mm,396.0,496.0,272.0,420.0,Europe,496.0,546.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,396X546,396 X 546,mm,396.0,546.0,272.0,470.0,Europe,496.0,596.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,396X596,396 X 596,mm,396.0,596.0,272.0,470.0,Europe,496.0,696.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,396X696,396 X 696,mm,396.0,696.0,272.0,620.0,Europe,496.0,696.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,396X796,396 X 796,mm,396.0,796.0,272.0,720.0,Europe,496.0,796.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,396X896,396 X 896,mm,396.0,896.0,272.0,820.0,Europe,496.0,896.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,3X4,3 1/2 X 3 3/4,inches,3.5,3.75,2.63,2.75,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,446X446,446 X 446,mm,446.0,446.0,322.0,370.0,Europe,546.0,596.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,446X496,446 X 496,mm,446.0,496.0,322.0,420.0,Europe,546.0,596.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,446X546,446 X 546,mm,446.0,546.0,322.0,470.0,Europe,546.0,546.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,446X596,446 X 596,mm,446.0,596.0,322.0,520.0,Europe,546.0,696.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,446X696,446 X 696,mm,446.0,696.0,322.0,620.0,Europe,546.0,696.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,446X796,446 X 796,mm,446.0,796.0,322.0,720.0,Europe,546.0,796.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,446X896,446 X 896,mm,446.0,896.0,322.0,820.0,Europe,546.0,896.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,496X496,496 X 496,mm,496.0,496.0,372.0,396.0,Europe,596.0,596.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,496X546,496 X 546,mm,496.0,546.0,372.0,446.0,Europe,596.0,546.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,496X596,496 X 596,mm,496.0,596.0,372.0,496.0,Europe,596.0,596.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,496X696,496 X 696,mm,496.0,696.0,372.0,596.0,Europe,596.0,696.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,496X796,496 X 796,mm,496.0,796.0,328.0,696.0,Europe,596.0,796.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,496X896,496 X 896,mm,496.0,896.0,328.0,796.0,Europe,596.0,896.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,496X996,496 X 996,mm,496.0,996.0,328.0,896.0,Europe,596.0,996.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,4X5,4 X 5,inches,4.0,5.0,3.25,3.19,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,546X546,546 X 546,mm,546.0,546.0,422.0,446.0,Europe,646.0,546.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,546X596,546 X 596,mm,546.0,596.0,422.0,496.0,Europe,646.0,596.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,546X696,546 X 696,mm,546.0,696.0,422.0,596.0,Europe,646.0,696.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,546X796,546 X 796,mm,546.0,796.0,378.0,696.0,Europe,646.0,796.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,546X896,546 X 896,mm,546.0,896.0,378.0,696.0,Europe,646.0,896.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,546X996,546 X 996,mm,546.0,996.0,378.0,796.0,Europe,646.0,996.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,596X596,596 X 596,mm,596.0,596.0,496.0,496.0,Europe,696.0,596.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,596X696,596 X 696,mm,596.0,696.0,472.0,596.0,Europe,696.0,696.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,596X796,596 X 796,mm,596.0,796.0,428.0,696.0,Europe,696.0,796.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,596X896,596 X 896,mm,596.0,896.0,428.0,796.0,Europe,696.0,896.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,596X996,596 X 996,mm,596.0,996.0,428.0,896.0,Europe,696.0,996.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,5X6,5 X 6,inches,5.0,6.0,3.25,5.0,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,5X8,5 X 8,inches,5.0,8.0,3.25,6.5,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,696X696,696 X 696,mm,696.0,696.0,528.0,596.0,Europe,796.0,696.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,696X796,696 X 796,mm,696.0,796.0,528.0,696.0,Europe,796.0,796.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,696X896,696 X 896,mm,696.0,896.0,528.0,796.0,Europe,796.0,896.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,696X996,696 X 996,mm,696.0,996.0,528.0,896.0,Europe,796.0,996.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,6X7,6 X 7,inches,6.0,7.0,5.13,4.63,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,6X8,6 X 8,inches,6.0,8.0,4.25,6.0,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,796X796,796 X 796,mm,796.0,796.0,628.0,696.0,Europe,896.0,796.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,796X896,796 X 896,mm,796.0,896.0,628.0,796.0,Europe,896.0,896.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,796X996,796 X 996,mm,796.0,996.0,628.0,896.0,Europe,896.0,996.0
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,8X10,8 X 9 7/8,inches,8.0,9.88,6.25,7.63,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,8X12,7 7/8 X 11 7/8,inches,7.88,11.88,5.38,9.25,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,8X8,7 7/8 X 7 7/8,inches,7.88,7.88,5.38,6.25,USA,,
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,9X12,9 X 11 7/8,inches,9.0,11.88,6.13,9.88,USA,,

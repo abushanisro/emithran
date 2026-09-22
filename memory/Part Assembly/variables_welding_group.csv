@@ -1,0 +1,9 @@
+Variable Name,String Value,Unit Type Name,Notes,Group
+arcEfficency,0.5,,Estimate of the percentage of welding wire that actually ends up in the weld. Adjusts weld deposition rate to account for loss due to spatter and evaporation. Used to calculate arcing time and tack time.,Inherited
+cycleTimeAdjustmentFactor,1,,Factor used to globally increase or decrease cycle time evaluations per process.,Inherited
+disableInvestmentAmortization,false,,"User override to disable amortization of all fixed costs to the individual part or assembly. By default, fixed costs are calculated per part for tooling, fixtures, and programming.",Inherited
+gearQualityDefaultAgmaNewStd,A8,,"A2, A3, A4, ... A11, A12",Inherited
+gearQualityDefaultAgmaOldStd,Q8,,"Q15, Q14, Q13, ... Q6, Q5",Inherited
+gearQualityDefaultDinStd,9,,"2, 3, 4, ... 11, 12",Inherited
+laborRateAdjustmentFactor,1,,Factor used to globally increase or decrease labor rate evaluations per process.,Inherited
+overheadRateAdjustmentFactor,1,,Factor used to globally increase or decrease overhead rate evaluations per process.,Inherited

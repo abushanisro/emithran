@@ -1,0 +1,48 @@
+source,table,operation_name_reference,operation_name
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,3D Laser Cutting,3D Laser:3D Laser Cutting//ComplexHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,3D Laser Cutting,3D Laser:3D Laser Cutting//SimpleHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Bend Brake,Bend Brake:Bending/Form
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Bend Brake,Bend Brake:Bending//MultiBend
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Bend Brake,Bend Brake:Bending//StraightBend
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Combi Perforating,Laser Punch:Perforating:Perforating//ComplexHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Combi Perforating,Laser Punch:Perforating:Perforating//SimpleHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Combi Perforating,Plasma Punch:Perforating:Perforating//ComplexHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Combi Perforating,Plasma Punch:Perforating:Perforating//SimpleHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Combi Punch,Laser Punch:Nibbling:Nibbling//ComplexHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Combi Punch,Laser Punch:Nibbling:Nibbling//SimpleHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Combi Punch,Laser Punch:Punching:Punching//ComplexHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Combi Punch,Laser Punch:Punching:Punching//SimpleHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Combi Punch,Plasma Punch:Nibbling:Nibbling//ComplexHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Combi Punch,Plasma Punch:Nibbling:Nibbling//SimpleHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Combi Punch,Plasma Punch:Punching:Punching//ComplexHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Combi Punch,Plasma Punch:Punching:Punching//SimpleHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Generic Press Piercing,Generic Press:Piercing//ComplexHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Generic Press Piercing,Generic Press:Piercing//SimpleHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Laser Cutting,Fiber Laser Cut:Fiber Laser Cutting//ComplexHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Laser Cutting,Fiber Laser Cut:Fiber Laser Cutting//SimpleHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Laser Cutting,Laser Cut:Laser Cutting//ComplexHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Laser Cutting,Laser Cut:Laser Cutting//SimpleHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Laser Cutting,Laser Punch:Laser Cut:Laser Cutting//ComplexHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Laser Cutting,Laser Punch:Laser Cut:Laser Cutting//SimpleHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Oxyfuel Cutting,OxyFuel Cut:OxyFuel Cutting//ComplexHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Oxyfuel Cutting,OxyFuel Cut:OxyFuel Cutting//SimpleHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Plasma Cutting,Plasma Cut:Plasma Cutting//ComplexHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Plasma Cutting,Plasma Cut:Plasma Cutting//SimpleHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Plasma Cutting,Plasma Punch:Plasma Cut:Plasma Cutting//ComplexHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Plasma Cutting,Plasma Punch:Plasma Cut:Plasma Cutting//SimpleHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Progressive Die Piercing,Progressive Die:Die Station:Cam Action Piercing//ComplexHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Progressive Die Piercing,Progressive Die:Die Station:Cam Action Piercing//SimpleHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Progressive Die Piercing,Progressive Die:Die Station:Piercing//ComplexHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Progressive Die Piercing,Progressive Die:Die Station:Piercing//SimpleHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Router,2 Axis Router:Router Cutting//ComplexHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Router,2 Axis Router:Router Cutting//SimpleHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Standard Press Piercing,Std Press:Std Press//ComplexHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Standard Press Piercing,Std Press:Std Press//SimpleHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Tandem Press Piercing,Tandem Press:Piercing//ComplexHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Tandem Press Piercing,Tandem Press:Piercing//SimpleHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Turret Perforating,Turret Press:Perforating:Perforating//ComplexHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Turret Perforating,Turret Press:Perforating:Perforating//SimpleHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Turret Punch,Turret Press:Punching:Punching//ComplexHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Turret Punch,Turret Press:Punching:Punching//SimpleHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Waterjet Cutting,Waterjet Cut:Waterjet Cutting//ComplexHole
+eMithran Digital Factory Manager - eMithran USA,tblDTCOperationNameReference,Waterjet Cutting,Waterjet Cut:Waterjet Cutting//SimpleHole

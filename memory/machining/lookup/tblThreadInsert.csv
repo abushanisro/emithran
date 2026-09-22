@@ -1,0 +1,39 @@
+ToolType,ToolSeries,ThreadForm,MmPerThreadMm,Passes,Pitch,PitchUnits,ToolLifeCostUSD
+Thread Chaser Insert,Virtual Thread Chaser Insert,Metric 60 deg,0.5,4,0.5,mm,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,Metric 60 deg,0.75,4,0.75,mm,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,Metric 60 deg,1.0,5,1.0,mm,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,Metric 60 deg,1.25,6,1.25,mm,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,Metric 60 deg,1.5,6,1.5,mm,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,Metric 60 deg,1.75,8,1.75,mm,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,Metric 60 deg,2.0,8,2.0,mm,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,Metric 60 deg,2.5,10,2.5,mm,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,Metric 60 deg,3.0,12,3.0,mm,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,Metric 60 deg,3.5,12,3.5,mm,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,Metric 60 deg,4.0,14,4.0,mm,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,Metric 60 deg,4.5,14,4.5,mm,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,Metric 60 deg,5.0,14,5.0,mm,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,Metric 60 deg,5.5,16,5.5,mm,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,Metric 60 deg,6.0,16,6.0,mm,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,NPT (INT),0.94,6,27.0,TPI,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,NPT (INT),1.41,8,18.0,TPI,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,NPT (INT),1.81,10,14.0,TPI,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,NPT (INT),2.21,12,11.5,TPI,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,NPT (INT),3.18,15,8.0,TPI,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,UN 60 deg,0.79,4,32.0,TPI,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,UN 60 deg,0.91,5,28.0,TPI,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,UN 60 deg,1.0,5,24.0,TPI,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,UN 60 deg,1.27,6,20.0,TPI,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,UN 60 deg,1.41,6,18.0,TPI,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,UN 60 deg,1.59,7,16.0,TPI,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,UN 60 deg,1.81,8,14.0,TPI,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,UN 60 deg,1.95,8,13.0,TPI,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,UN 60 deg,2.12,8,12.0,TPI,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,UN 60 deg,2.31,9,11.0,TPI,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,UN 60 deg,2.54,10,10.0,TPI,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,UN 60 deg,2.82,11,9.0,TPI,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,UN 60 deg,3.18,12,8.0,TPI,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,UN 60 deg,3.63,12,7.0,TPI,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,UN 60 deg,4.23,14,6.0,TPI,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,UN 60 deg,5.08,14,5.0,TPI,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,UN 60 deg,5.64,16,4.5,TPI,6.0
+Thread Chaser Insert,Virtual Thread Chaser Insert,UN 60 deg,6.35,16,4.0,TPI,6.0

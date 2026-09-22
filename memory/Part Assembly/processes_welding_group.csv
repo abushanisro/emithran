@@ -1,0 +1,10 @@
+Process Name,Default Tool Shop Name,Default Machine,Notes
+Bevel Cutting,,default,
+Finish Grinding,,default,
+Grinding,,default,
+Laser Seam Welding,,Default,
+Manual MIG Welding,,Default Mig Weld,
+Manual Spot Welding,,Default Spot Weld,
+Robotic MIG Welding,,Default Robotic Mig,
+Robotic Spot Welding,,Default Robotic Spot,
+Wire Brushing,,default,

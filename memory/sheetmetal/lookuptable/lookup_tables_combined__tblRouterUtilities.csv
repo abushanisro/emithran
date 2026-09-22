@@ -1,0 +1,9 @@
+Cutting Speed (m/min),Feed Per Tooth (mm),Material Family,Tool Diameter (mm)
+350.52,0.0254,Aluminum,3.0
+350.52,0.0254,Copper,3.0
+350.52,0.0508,Aluminum,6.0
+350.52,0.0508,Copper,6.0
+350.52,0.0635,Copper,10.0
+350.52,0.0762,Aluminum,10.0
+350.52,0.0762,Copper,12.0
+350.52,0.1016,Aluminum,12.0

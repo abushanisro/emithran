@@ -330,7 +330,7 @@ export function finalizeInspectionLine(input: InspectionInput, plan: InspectionP
   // unavoidable per-BATCH program recall + fixture + datum-alignment step
   // before ANY part can be measured, independent of sampling strategy — a
   // real cost this engine used to charge nothing for. (This was a genuine
-  // divergence from cost-cnc-engine.ts's own separate Inspection line, which
+  // divergence from cost-machining-engine.ts's own separate Inspection line, which
   // always assumes CMM and DID charge this — the root-cause fix is applying
   // the same real rule here, method-aware, not copying CNC's number as-is or
   // erasing CNC's charge to match this engine's old blanket $0.)

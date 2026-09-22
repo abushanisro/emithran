@@ -1,0 +1,97 @@
+Name,Source Name,Process,Description,Manufacturer,Cut Code,Material Type,Unit Cost (USD / kg),Cost Units,Base Cost Per Unit (USD),Density (kg / m^3),Tapped Density (kg / m^3),Hardness,Hardness System,Max Powder Cycles,Recycle Percentage,Data Source
+Accura 10,Generic Accura 10,SLA,"Clear Amber, Rigid",3D Systems,51.31,Accura,194.00,Cost per KG,194.00,1210.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Accura 25,Generic Accura 25,SLA,"White, Flexible",3D Systems,51.31,Accura,234.00,Cost per KG,234.00,1190.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Accura 40,Generic Accura 40,SLA,"Clear Amber, Nylon 6:6-Like",3D Systems,51.32,Accura,234.00,Cost per KG,234.00,1190.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Accura 48HTR,Generic Accura 48HTR,SLA,"Clear Amber, Automotive Testing",3D Systems,51.31,Accura,239.00,Cost per KG,239.00,1230.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Accura 50,Generic Accura 50,SLA,"Opaque White, ABS-Like",3D Systems,51.31,Accura,234.00,Cost per KG,234.00,1210.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Accura 55,Generic Accura 55,SLA,"White, ABS-Like",3D Systems,51.31,Accura,234.00,Cost per KG,234.00,1200.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Accura 60,Generic Accura 60,SLA,"Clear, Polycarbonate-Like",3D Systems,51.21,Accura,234.00,Cost per KG,234.00,1210.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Accura Bluestone,Generic Accura Bluestone,SLA,"High stiffness, heat and abrasion resistant, excellent chemical resistance",3D Systems,51.31,Accura,398.00,Cost per KG,398.00,1780.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Accura Clearvue,Generic Accura Clearvue,SLA,"Transparent, polycarbonate-like, Bio-Compatible,Dental",3D Systems,51.21,Accura,299.00,Cost per KG,299.00,1170.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Accura Peak,Generic Accura Peak,SLA,"High Temperature, Rigid, ceramic reinforced composite",3D Systems,51.31,Accura,325.00,Cost per KG,325.00,1360.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Accura Xtreme White 200,Generic Accura Xtreme White 200,SLA,Tough and Durable,3D Systems,51.31,Accura,313.00,Cost per KG,313.00,1180.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Aluminum AlSi10Mg,Generic Aluminum AlSi10Mg,DMLS,Typical casting alloy,NA,30.21,Aluminum Alloy,100.00,Cost per KG,100.00,2670.00,1550.00,75.00,Brinell,0.00,0.00,aPriori Baseline
+Bluestone,Generic Bluestone,SLA,"Opaque Blue, High Stiffness",3D Systems,51.31,Accura,289.00,Cost per KG,289.00,1780.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Castform PS,Generic Castform PS,SLS,"Metal Casting,Industrial, Styrene-based",3D Systems,51.31,CastForm,132.00,Cost per KG,132.00,860.00,460.00,30.00,Brinell,10.00,1.00,aPriori Baseline
+CeraMax,Generic CeraMax,SLA,"Opaque White, Plastic-Ceramic Composite",3D Systems,51.31,Accura,235.00,Cost per KG,235.00,1620.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Cobalt Chrome Dental,Generic Cobalt Chrome Dental,DMLS,Used in dental restorations,NA,20.33,Cobalt Chrome Alloy,625.00,Cost per KG,625.00,8500.00,5170.00,320.00,Brinell,0.00,0.00,aPriori Baseline
+Cobalt Chrome F75,Generic Cobalt Chrome F75,DMLS,Used in orthopedic implants,NA,20.33,Cobalt Chrome Alloy,330.00,Cost per KG,330.00,8300.00,5380.00,320.00,Brinell,0.00,0.00,aPriori Baseline
+Duraform EX,Generic Duraform EX,SLS,"Nylon, Tough, Durable, Polypropylene-like, impact-resistant",3D Systems,51.32,DuraForm,109.00,Cost per KG,109.00,1010.00,593.88,30.00,Brinell,5.00,0.45,aPriori Baseline
+Duraform FR1200,Generic Duraform FR1200,SLS,"Nylon, Flame retardant, excellent surface finish",3D Systems,51.32,DuraForm,109.00,Cost per KG,109.00,1020.00,599.76,30.00,Brinell,1.00,0.00,aPriori Baseline
+Duraform Flex,Generic Duraform Flex,SLS,"Elastomeirc, durable,  good tear resistance and burst strength",3D Systems,52.13,DuraForm,109.00,Cost per KG,109.00,440.00,440.00,30.00,Brinell,5.00,0.50,aPriori Baseline
+Duraform GF,Generic Duraform GF,SLS,"Composite, glass-filled engineering plastic, high stiffness",3D Systems,42.13,DuraForm,88.00,Cost per KG,88.00,1490.00,840.00,30.00,Brinell,3.00,0.25,aPriori Baseline
+Duraform HST,Generic Duraform HST,SLS,"Composite, High Temperature, excellent stiffness",3D Systems,51.31,DuraForm,109.00,Cost per KG,109.00,1200.00,705.60,30.00,Brinell,1.00,0.00,aPriori Baseline
+Duraform PA,Generic Duraform PA,SLS,"Nylon, Polypropylene-like, Tough, Durable, Bio-Compatible",3D Systems,51.32,DuraForm,132.00,Cost per KG,132.00,1030.00,590.00,30.00,Brinell,5.00,0.50,aPriori Baseline
+Duraform ProX AF,Generic Duraform ProX AF,SLS,"High stiffness aluminum-filled nylon, excellent surface finish",3D Systems,41.21,DuraForm,115.00,Cost per KG,115.00,1310.00,770.28,30.00,Brinell,1.00,0.00,aPriori Baseline
+Duraform ProX EX BLK,Generic Duraform ProX EX BLK,SLS,"Nylon, Tough, fatigue resistant",3D Systems,51.32,DuraForm,109.00,Cost per KG,109.00,1020.00,599.76,30.00,Brinell,5.00,0.45,aPriori Baseline
+Duraform ProX FR1200,Generic Duraform ProX FR1200,SLS,"Flame retardant Nylon-12 plastic, excellent surface finish",3D Systems,51.32,DuraForm,109.00,Cost per KG,109.00,1030.00,605.64,30.00,Brinell,1.00,0.00,aPriori Baseline
+Duraform ProX GF,Generic Duraform ProX GF,SLS,"Composite, glass-filled engineering plastic, high stiffness",3D Systems,42.13,DuraForm,77.00,Cost per KG,77.00,1330.00,782.04,30.00,Brinell,3.00,0.25,aPriori Baseline
+Duraform ProX HST,Generic Duraform ProX HST,SLS,"Composite, High Temperature, fiber-reinforced engineering plastic, excellent stiffness",3D Systems,51.31,DuraForm,109.00,Cost per KG,109.00,1120.00,658.56,30.00,Brinell,1.00,0.00,aPriori Baseline
+Duraform ProX PA,Generic Duraform ProX PA,SLS,"Nylon, Tough, Durable, Polypropylene-like, strong thermoplastic",3D Systems,51.32,DuraForm,109.00,Cost per KG,109.00,950.00,558.60,30.00,Brinell,5.00,0.50,aPriori Baseline
+Duraform TPU,Generic Duraform TPU,SLS,"Elastomeric, Durable, good tear resistance, surface finish",3D Systems,52.13,DuraForm,109.00,Cost per KG,109.00,780.00,458.64,30.00,Brinell,5.00,0.50,aPriori Baseline
+Maraging Steel 300-1.2709,Generic Maraging Steel 300-1.2709,DMLS,"Easily machinable, good mechanical properties,",NA,3.21,Maraging Steel Alloy,206.00,Cost per KG,206.00,8050.00,4960.00,300.00,Brinell,0.00,0.00,aPriori Baseline
+"Nickel Alloy, Inconel 718","Generic Nickel Alloy, Inconel 718",DMLS,"High strength, good corrosion resistance, weldability",NA,20.22,Nickel Alloy,224.00,Cost per KG,224.00,8150.00,5170.00,350.00,Brinell,0.00,0.00,aPriori Baseline
+"Nickel Alloy, Nickel Alloy In 625","Generic Nickel Alloy, Nickel Alloy In 625",DMLS,"High strength, aqueous corrosion resistance",NA,20.21,Nickel Alloy,224.00,Cost per KG,224.00,8400.00,5070.00,250.00,Brinell,0.00,0.00,aPriori Baseline
+"Nickel Alloy, Nickel Alloy X","Generic Nickel Alloy, Nickel Alloy X",DMLS,"High strength, high temp, oxidation resistant",NA,20.21,Nickel Alloy,225.00,Cost per KG,225.00,8200.00,5270.00,250.00,Brinell,0.00,0.00,aPriori Baseline
+Objet Dental Bio Compatible,Generic Objet Dental Bio Compatible,3D Printing,Bio compatible,Objet,51.31,Dental,384.00,Cost per KG,384.00,1170.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Objet Durus 430,Generic Objet Durus 430,3D Printing,Semi Rigid and Tough,Objet,51.31,Simulated Polypropylene,322.00,Cost per KG,322.00,1160.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Objet Rigid Translucent 720,Generic Objet Rigid Translucent 720,3D Printing,"Rigid, General Purpose, Transparent or Translucent",Objet,51.31,Vero,225.00,Cost per KG,225.00,1185.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Objet Rigid VeroBlack 875,Generic Objet Rigid VeroBlack 875,3D Printing,Rigid,Objet,51.31,Vero,250.00,Cost per KG,250.00,1175.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Objet Rigid VeroBlackPlus,Generic Objet Rigid VeroBlackPlus,3D Printing,Rigid,Objet,51.31,Vero,236.00,Cost per KG,236.00,1170.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Objet Rigid VeroBlue 840,Generic Objet Rigid VeroBlue 840,3D Printing,Rigid,Objet,51.31,Vero,250.00,Cost per KG,250.00,1185.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Objet Rigid VeroClear,Generic Objet Rigid VeroClear,3D Printing,Rigid,Objet,51.31,Vero,349.00,Cost per KG,349.00,1180.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Objet Rigid VeroCyan,Generic Objet Rigid VeroCyan,3D Printing,Rigid,Objet,51.31,Vero,236.00,Cost per KG,236.00,1170.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Objet Rigid VeroGray 850,Generic Objet Rigid VeroGray 850,3D Printing,Rigid,Objet,51.31,Vero,250.00,Cost per KG,250.00,1175.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Objet Rigid VeroMagenta,Generic Objet Rigid VeroMagenta,3D Printing,Rigid,Objet,51.31,Vero,236.00,Cost per KG,236.00,1170.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Objet Rigid VeroWhite 830,Generic Objet Rigid VeroWhite 830,3D Printing,Rigid,Objet,51.31,Vero,250.00,Cost per KG,250.00,1175.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Objet Rigid VeroYellow,Generic Objet Rigid VeroYellow,3D Printing,Rigid,Objet,51.31,Vero,236.00,Cost per KG,236.00,1170.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Objet Rigur 450,Generic Objet Rigur 450,3D Printing,Semi Rigid and Strong,Objet,51.31,Simulated Polypropylene,310.00,Cost per KG,310.00,1200.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Objet Rubber TangoBlack 973,Generic Objet Rubber TangoBlack 973,3D Printing,"Flexible, Rubber-Like",Objet,52.13,Tango,275.00,Cost per KG,275.00,1125.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Objet Rubber TangoBlackPlus 980,Generic Objet Rubber TangoBlackPlus 980,3D Printing,"Flexible, Wear Resistant",Objet,52.13,Tango,300.00,Cost per KG,300.00,1120.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Objet Rubber TangoGray 950,Generic Objet Rubber TangoGray 950,3D Printing,"Flexible, Rubber-Like",Objet,52.13,Tango,275.00,Cost per KG,275.00,1165.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Peek HP3,Generic Peek HP3,SLS,"Wear Resistant, Chemical Resistant",EOS,51.21,Polyaryletherketone,525.00,Cost per KG,525.00,1310.00,770.28,30.00,Brinell,1.00,0.00,aPriori Baseline
+Polyamide 11 PA 1101,Generic Polyamide 11 PA 1101,SLS,"White, General Purpose",EOS,51.32,Polyamide,88.00,Cost per KG,88.00,960.00,564.48,30.00,Brinell,5.00,0.45,aPriori Baseline
+Polyamide 12 PA 2200,Generic Polyamide 12 PA 2200,SLS,"Biocompatible, high mechanical & thermal load",EOS,51.32,Polyamide,88.00,Cost per KG,88.00,930.00,546.84,30.00,Brinell,5.00,0.50,aPriori Baseline
+Polyamide 12 PA 2201,Generic Polyamide 12 PA 2201,SLS,"Natural color, biocompatible,  high mechanical & thermal load",EOS,51.32,Polyamide,88.00,Cost per KG,88.00,930.00,546.84,30.00,Brinell,5.00,0.50,aPriori Baseline
+Polyamide 12 PA 2202 Black,Generic Polyamide 12 PA 2202 Black,SLS,"Black pigmented,  high mechanical & thermal load",EOS,51.32,Polyamide,88.00,Cost per KG,88.00,930.00,546.84,30.00,Brinell,5.00,0.50,aPriori Baseline
+Polyamide 12 PrimePart Plus,Generic Polyamide 12 PrimePart Plus,SLS,"Natural color,",EOS,51.32,Polyamide,119.00,Cost per KG,119.00,930.00,546.84,30.00,Brinell,7.00,0.70,aPriori Baseline
+"Polyamide 12, Al-Filled","Generic Polyamide 12, Al-Filled",SLS,"Grey, Highly Machinable",EOS,41.11,Polyamide,62.00,Cost per KG,62.00,1360.00,799.68,30.00,Brinell,1.00,0.00,aPriori Baseline
+"Polyamide 12, Black","Generic Polyamide 12, Black",SLS,Heat Stabilized,EOS,51.32,Polyamide,83.00,Cost per KG,83.00,980.00,576.24,30.00,Brinell,5.00,0.50,aPriori Baseline
+"Polyamide 12, Carbon-Filled","Generic Polyamide 12, Carbon-Filled",SLS,"Black, Electrically Conductive",EOS,41.11,Polyamide,139.00,Cost per KG,139.00,1040.00,611.52,30.00,Brinell,1.00,0.00,aPriori Baseline
+"Polyamide 12, Glass-Filled","Generic Polyamide 12, Glass-Filled",SLS,"White, High Stiffness, Durable",EOS,41.11,Polyamide,70.00,Cost per KG,70.00,1220.00,717.36,30.00,Brinell,3.00,0.25,aPriori Baseline
+"Polyamide 12, PA 2210 FR","Generic Polyamide 12, PA 2210 FR",SLS,"White, halogen free, contains chemical flame retardant",EOS,51.32,Polyamide,88.00,Cost per KG,88.00,930.00,546.84,30.00,Brinell,1.00,0.00,aPriori Baseline
+"Polyamide 12, PrimePart, Flame Ret.","Generic Polyamide 12, PrimePart, Flame Ret.",SLS,"White, material certificates available",EOS,51.32,Polyamide,110.00,Cost per KG,110.00,930.00,546.84,30.00,Brinell,1.00,0.00,aPriori Baseline
+Polystyrene Primecast 101,Generic Polystyrene Primecast 101,SLS,"Grey, Investment Casting",EOS,51.21,Polystyrene,95.00,Cost per KG,95.00,770.00,452.76,30.00,Brinell,10.00,1.00,aPriori Baseline
+Stainless Steel GP1,Generic Stainless Steel GP1,DMLS,"Good corrosion resistance, mechanical properties, ductility",NA,15.22,Stainless Steel Alloy,105.00,Cost per KG,105.00,7800.00,5300.00,330.00,Brinell,0.00,0.00,aPriori Baseline
+Stainless Steel Hardened 91RW,Generic Stainless Steel Hardened 91RW,DMLS,"Hardened, corrosion resistance",NA,3.21,Stainless Steel Alloy,318.00,Cost per KG,318.00,7700.00,4850.00,300.00,Brinell,0.00,0.00,aPriori Baseline
+"Stainless Steel, 15-5PH","Generic Stainless Steel, 15-5PH",DMLS,"High strength, high corrosion resistance",NA,5.22,Stainless Steel Alloy,120.00,Cost per KG,120.00,7700.00,4930.00,330.00,Brinell,0.00,0.00,aPriori Baseline
+"Stainless Steel, 17-4PH","Generic Stainless Steel, 17-4PH",DMLS,"High strength, high corrosion resistance",NA,15.22,Stainless Steel Alloy,105.00,Cost per KG,105.00,7770.00,4700.00,330.00,Brinell,0.00,0.00,aPriori Baseline
+"Stainless Steel, AISI 316L","Generic Stainless Steel, AISI 316L",DMLS,"Good corrosion resistance, weldability",NA,5.21,Stainless Steel Alloy,112.00,Cost per KG,112.00,7900.00,4700.00,200.00,Brinell,0.00,0.00,aPriori Baseline
+TPE Prime Part,Generic TPE Prime Part,SLS,"White, soft material flexible. Rubber flexibility",EOS,52.13,Polyetheramide,103.00,Cost per KG,103.00,950.00,558.60,30.00,Brinell,5.00,0.50,aPriori Baseline
+Titanium TI64ELI Grade 23,Generic Titanium TI64ELI Grade 23,DMLS,"Low weight, excellent corrosion resistance, high strength",NA,23.22,Titanium Alloy,645.00,Cost per KG,645.00,4410.00,2790.00,1050.00,Tensile Strength,0.00,0.00,aPriori Baseline
+"Titanium, Ti-6Al-4V","Generic Titanium, Ti-6Al-4V",DMLS,"Low weight, excellent corrosion resistance, high strength",NA,23.22,Titanium Alloy,584.00,Cost per KG,584.00,4410.00,2740.00,1050.00,Tensile Strength,0.00,0.00,aPriori Baseline
+"Titanium, Titanium Grade 2","Generic Titanium, Titanium Grade 2",DMLS,"Good strength to weight, corrosion resistance and ductility",NA,23.1,Titanium Alloy,531.00,Cost per KG,531.00,4500.00,2790.00,400.00,Tensile Strength,0.00,0.00,aPriori Baseline
+Visijet M3 Crystal,Generic Visijet M3 Crystal,3D Printing,"Translucent, Bio-Compatible",3D Systems,51.31,Visijet,300.00,Cost per KG,300.00,1020.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Visijet CE-BK,Generic Visijet CE-BK,3D Printing,Elastomeric,3D Systems,52.13,Visijet,275.00,Cost per KG,275.00,1120.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Visijet CE-NT,Generic Visijet CE-NT,3D Printing,Natural Rubber-like,3D Systems,52.13,Visijet,275.00,Cost per KG,275.00,1120.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Visijet CR-BK,Generic Visijet CR-BK,3D Printing,Rigid Black,3D Systems,51.31,Visijet,315.00,Cost per KG,315.00,1180.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Visijet CR-CL 200,Generic Visijet CR-CL 200,3D Printing,Rigid Clear,3D Systems,51.31,Visijet,315.00,Cost per KG,315.00,1180.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Visijet CR-WT 200,Generic Visijet CR-WT 200,3D Printing,Opaque White,3D Systems,51.31,Visijet,315.00,Cost per KG,315.00,1180.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Visijet M2 EBK,Generic Visijet M2 EBK,3D Printing,"Elastomeric, opaque black",3D Systems,52.13,Visijet,277.00,Cost per KG,277.00,1120.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Visijet M2 ENT,Generic Visijet M2 ENT,3D Printing,"Elastomeric, translucent, natural color",3D Systems,52.13,Visijet,277.00,Cost per KG,277.00,1120.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Visijet M2R-BK,Generic Visijet M2R-BK,3D Printing,"General purpose, Opaque, Black",3D Systems,51.31,Visijet,306.00,Cost per KG,306.00,1190.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Visijet M2R-CL,Generic Visijet M2R-CL,3D Printing,"General purpose, High contrast, rigid clear",3D Systems,51.31,Visijet,306.00,Cost per KG,306.00,1180.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Visijet M2R-GRY,Generic Visijet M2R-GRY,3D Printing,"General purpose, High contrast, rigid gray",3D Systems,51.31,Visijet,322.00,Cost per KG,322.00,1190.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Visijet M2R-WT,Generic Visijet M2R-WT,3D Printing,"General purpose, Opaque, White",3D Systems,51.31,Visijet,306.00,Cost per KG,306.00,1190.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Visijet M3 Black,Generic Visijet M3 Black,3D Printing,Polypropylene-like,3D Systems,51.31,Visijet,333.00,Cost per KG,333.00,1020.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Visijet M3 Proplast,Generic Visijet M3 Proplast,3D Printing,"General Purpose, Natural color rigid",3D Systems,51.31,Visijet,316.00,Cost per KG,316.00,1020.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Visijet M3 Techplast,Generic Visijet M3 Techplast,3D Printing,"General Purpose, Gray rigid",3D Systems,51.31,Visijet,316.00,Cost per KG,316.00,1020.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Visijet M3-X,Generic Visijet M3-X,3D Printing,"ABS-like, High Temperature",3D Systems,51.31,Visijet,333.00,Cost per KG,333.00,1040.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Visijet SL Black,Generic Visijet SL Black,SLA,"Rigid and tough, ABS-like",3D Systems,51.31,Visijet,384.00,Cost per KG,384.00,1150.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Visijet SL Clear,Generic Visijet SL Clear,SLA,"Transparent, polycarbonate-like, Bio-Compatible, Dental",3D Systems,51.31,Visijet,365.00,Cost per KG,365.00,1170.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Visijet SL Flex,Generic Visijet SL Flex,SLA,"General Purpose, Polypropylene-like",3D Systems,51.31,Visijet,418.00,Cost per KG,418.00,1190.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Visijet SL Hi-Temp,Generic Visijet SL Hi-Temp,SLA,"High-temperature, Rigid, stiff",3D Systems,51.31,Visijet,418.00,Cost per KG,418.00,1230.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Visijt M3 Navy,Generic Visijt M3 Navy,3D Printing,General Purpose Blue rigid,3D Systems,51.31,Visijet,316.00,Cost per KG,316.00,1020.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+Xtreme,Generic Xtreme,SLA,"Grey, Impact Resistant",3D Systems,51.21,Accura,234.00,Cost per KG,234.00,1190.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+accuGen,Generic accuGen,SLA,"Clear Amber, General Purpose",3D Systems,51.31,Accura,175.00,Cost per KG,175.00,1100.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline
+e-Stone,Generic e-Stone,SLA,"Peach, Dental Applications",3D Systems,51.31,Accura,235.00,Cost per KG,235.00,1190.00,0.00,30.00,Brinell,0.00,0.00,aPriori Baseline

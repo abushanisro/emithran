@@ -1,0 +1,6 @@
+name,sourceFilePath,digitalFactory,Edge Mold Border X (mm),Max Press Force (kN)
+tblEdgeMoldBorderX,lookupTables/Component/tblEdgeMoldBorderX.csv,aPriori USA,140.0,1494.6
+tblEdgeMoldBorderX,lookupTables/Component/tblEdgeMoldBorderX.csv,aPriori USA,165.0,2989.2
+tblEdgeMoldBorderX,lookupTables/Component/tblEdgeMoldBorderX.csv,aPriori USA,178.0,4982.0
+tblEdgeMoldBorderX,lookupTables/Component/tblEdgeMoldBorderX.csv,aPriori USA,190.0,14946.0
+tblEdgeMoldBorderX,lookupTables/Component/tblEdgeMoldBorderX.csv,aPriori USA,190.0,99999999.0

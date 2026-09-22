@@ -1,0 +1,3 @@
+name,sourceFilePath,digitalFactory,value
+tblHrsPerSqInchAverage,lookupTables/Component/tblHrsPerSqInchAverage.csv,aPriori USA,Hrs Per Sq Inch Average (hr)
+tblHrsPerSqInchAverage,lookupTables/Component/tblHrsPerSqInchAverage.csv,aPriori USA,Surface Area Average (in^2)

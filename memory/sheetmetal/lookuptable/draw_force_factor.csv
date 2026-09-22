@@ -1,0 +1,17 @@
+name,filePath,digitalFactory,rowCount,formDepthMm,factorK
+drawForceFactor,lookupTables/Component/drawForceFactor.csv,USA reference export,16,12.7,1.0
+drawForceFactor,lookupTables/Component/drawForceFactor.csv,USA reference export,16,25.4,1.0
+drawForceFactor,lookupTables/Component/drawForceFactor.csv,USA reference export,16,38.1,1.5
+drawForceFactor,lookupTables/Component/drawForceFactor.csv,USA reference export,16,50.8,1.5
+drawForceFactor,lookupTables/Component/drawForceFactor.csv,USA reference export,16,76.2,1.75
+drawForceFactor,lookupTables/Component/drawForceFactor.csv,USA reference export,16,101.6,2.0
+drawForceFactor,lookupTables/Component/drawForceFactor.csv,USA reference export,16,152.4,2.5
+drawForceFactor,lookupTables/Component/drawForceFactor.csv,USA reference export,16,203.2,2.75
+drawForceFactor,lookupTables/Component/drawForceFactor.csv,USA reference export,16,254.0,3.0
+drawForceFactor,lookupTables/Component/drawForceFactor.csv,USA reference export,16,304.8,3.25
+drawForceFactor,lookupTables/Component/drawForceFactor.csv,USA reference export,16,355.6,3.5
+drawForceFactor,lookupTables/Component/drawForceFactor.csv,USA reference export,16,406.4,3.75
+drawForceFactor,lookupTables/Component/drawForceFactor.csv,USA reference export,16,457.2,4.0
+drawForceFactor,lookupTables/Component/drawForceFactor.csv,USA reference export,16,508.0,4.25
+drawForceFactor,lookupTables/Component/drawForceFactor.csv,USA reference export,16,558.8,4.5
+drawForceFactor,lookupTables/Component/drawForceFactor.csv,USA reference export,16,609.6,4.75

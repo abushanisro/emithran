@@ -204,7 +204,7 @@ export class DeterministicPlannerService {
       if (mat.score < 0.4) {
         const suggestion = brief.scope.family === 'sheet_metal'
           ? 'CRCA/MS/GI/SS304 Sheet'
-          : brief.scope.family === 'cnc_turned'
+          : brief.scope.family === 'turned'
           ? 'Mild Steel/EN8/Stainless'
           : 'suitable material';
         materialWarning =
@@ -677,14 +677,14 @@ function machineTypeForFeatureType(featureType: string, family: string): string 
       return 'laser_cut';
     case 'AXIAL_HOLE': case 'CROSS_HOLE': case 'COUNTERBORE': case 'COUNTERSINK':
       return family === 'sheet_metal' ? 'laser_cut'
-           : family === 'cnc_turned'  ? 'cnc_lathe'
+           : family === 'turned'  ? 'cnc_lathe'
            : 'cnc_mill';
     case 'POCKET':
       return family === 'sheet_metal' ? 'laser_cut' : 'cnc_mill';
     case 'BEND': case 'FORM':
       return 'press_brake';
     case 'THREAD_INTERNAL': case 'THREAD_EXTERNAL':
-      return family === 'cnc_milled' ? 'cnc_mill' : 'cnc_lathe';
+      return family === 'milled' ? 'cnc_mill' : 'cnc_lathe';
     case 'OD_TURN': case 'FACE_TURN': case 'SHOULDER_TURN': case 'ID_BORE':
       return 'cnc_lathe';
     case 'GRIND': case 'SURFACE_FINISH_FINE': case 'HONE': case 'LAPP':

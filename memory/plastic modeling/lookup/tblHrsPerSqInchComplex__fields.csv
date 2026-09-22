@@ -1,0 +1,3 @@
+name,sourceFilePath,digitalFactory,value
+tblHrsPerSqInchComplex,lookupTables/Component/tblHrsPerSqInchComplex.csv,aPriori USA,Hrs Per Sq Inch Complex (hr)
+tblHrsPerSqInchComplex,lookupTables/Component/tblHrsPerSqInchComplex.csv,aPriori USA,Surface Area Complex (in^2)

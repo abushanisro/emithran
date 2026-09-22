@@ -1,0 +1,10 @@
+name,sourceFilePath,digitalFactory,value
+tblMoldBaseDesignHrs,lookupTables/Component/tblMoldBaseDesignHrs.csv,aPriori USA,Num Cav
+tblMoldBaseDesignHrs,lookupTables/Component/tblMoldBaseDesignHrs.csv,aPriori USA,Mold Base Wid (hr)
+tblMoldBaseDesignHrs,lookupTables/Component/tblMoldBaseDesignHrs.csv,aPriori USA,Std Base Design Hrs (hr)
+tblMoldBaseDesignHrs,lookupTables/Component/tblMoldBaseDesignHrs.csv,aPriori USA,Cust Base Design Hrs (hr)
+tblMoldBaseDesignHrs,lookupTables/Component/tblMoldBaseDesignHrs.csv,aPriori USA,Per Slide Design Hrs (hr)
+tblMoldBaseDesignHrs,lookupTables/Component/tblMoldBaseDesignHrs.csv,aPriori USA,Per Lifter Design Hrs (hr)
+tblMoldBaseDesignHrs,lookupTables/Component/tblMoldBaseDesignHrs.csv,aPriori USA,Hot Drop Design Hrs (hr)
+tblMoldBaseDesignHrs,lookupTables/Component/tblMoldBaseDesignHrs.csv,aPriori USA,Third Plate Design Hrs (hr)
+tblMoldBaseDesignHrs,lookupTables/Component/tblMoldBaseDesignHrs.csv,aPriori USA,Stripper Plate Design Hrs (hr)

@@ -1,0 +1,8 @@
+operation,metric,value,notes
+Other,minEdgeRadius,0.5,Multiplied by part thickness. Used to flag when an edge radius on a blank is too tight.
+Other,minUtilization,0.75,Used to flag when utilization is too low. Percentage represented as a decimal.
+Progressive Die,minEdgeRadius,0.5,Multiplied by part thickness. Used to flag when an edge radius on a blank is too tight.
+Shear Press,minEdgeRadius,0.5,Multiplied by part thickness. Used to flag when an edge radius on a blank is too tight.
+Stage Tooling,minEdgeRadius,0.5,Multiplied by part thickness. Used to flag when an edge radius on a blank is too tight.
+Tandem Die,minEdgeRadius,0.5,Multiplied by part thickness. Used to flag when an edge radius on a blank is too tight.
+Turret Press,minEdgeRadius,0.5,Multiplied by part thickness. Used to flag when an edge radius on a blank is too tight.

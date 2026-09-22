@@ -1,0 +1,72 @@
+﻿Digital Factory,Process Name
+aPriori USA,Coil Material Stock:As Supplied//CurvedSurface
+aPriori USA,Coil Material Stock:As Supplied//CurvedWall
+aPriori USA,Coil Material Stock:As Supplied//PlanarFace
+aPriori USA,Hydroform:Hydroform Deep Draw
+aPriori USA,Hydroform:Hydroform Deep Draw:Clean Tooling//ComplexHole
+aPriori USA,Hydroform:Hydroform Deep Draw:Clean Tooling//Form
+aPriori USA,Hydroform:Hydroform Deep Draw:Clean Tooling//SimpleHole
+aPriori USA,Hydroform:Hydroform Deep Draw:Clean Tooling//StraightBend
+aPriori USA,Hydroform:Hydroform Deep Draw:Deep Draw Forming//ComplexHole
+aPriori USA,Hydroform:Hydroform Deep Draw:Deep Draw Forming//Form
+aPriori USA,Hydroform:Hydroform Deep Draw:Deep Draw Forming//SimpleHole
+aPriori USA,Hydroform:Hydroform Deep Draw:Deep Draw Forming//StraightBend
+aPriori USA,Hydroform:Hydroform Deep Draw:Hand Adjusting//ComplexHole
+aPriori USA,Hydroform:Hydroform Deep Draw:Hand Adjusting//Form
+aPriori USA,Hydroform:Hydroform Deep Draw:Hand Adjusting//SimpleHole
+aPriori USA,Hydroform:Hydroform Deep Draw:Hand Adjusting//StraightBend
+aPriori USA,Hydroform:Hydroform Deep Draw:Loading//ComplexHole
+aPriori USA,Hydroform:Hydroform Deep Draw:Loading//Form
+aPriori USA,Hydroform:Hydroform Deep Draw:Loading//SimpleHole
+aPriori USA,Hydroform:Hydroform Deep Draw:Loading//StraightBend
+aPriori USA,Hydroform:Hydroform Deep Draw:Unloading//ComplexHole
+aPriori USA,Hydroform:Hydroform Deep Draw:Unloading//Form
+aPriori USA,Hydroform:Hydroform Deep Draw:Unloading//SimpleHole
+aPriori USA,Hydroform:Hydroform Deep Draw:Unloading//StraightBend
+aPriori USA,Hydroform:Hydroform Deep Draw:Visual Inspection//ComplexHole
+aPriori USA,Hydroform:Hydroform Deep Draw:Visual Inspection//Form
+aPriori USA,Hydroform:Hydroform Deep Draw:Visual Inspection//SimpleHole
+aPriori USA,Hydroform:Hydroform Deep Draw:Visual Inspection//StraightBend
+aPriori USA,Hydroform:Hydroform Fluid Cell
+aPriori USA,Hydroform:Hydroform Fluid Cell:Clean Tooling//ComplexHole
+aPriori USA,Hydroform:Hydroform Fluid Cell:Clean Tooling//Form
+aPriori USA,Hydroform:Hydroform Fluid Cell:Clean Tooling//SimpleHole
+aPriori USA,Hydroform:Hydroform Fluid Cell:Clean Tooling//StraightBend
+aPriori USA,Hydroform:Hydroform Fluid Cell:Fluid Cell Forming//ComplexHole
+aPriori USA,Hydroform:Hydroform Fluid Cell:Fluid Cell Forming//Form
+aPriori USA,Hydroform:Hydroform Fluid Cell:Fluid Cell Forming//SimpleHole
+aPriori USA,Hydroform:Hydroform Fluid Cell:Fluid Cell Forming//StraightBend
+aPriori USA,Hydroform:Hydroform Fluid Cell:Hand Adjusting//ComplexHole
+aPriori USA,Hydroform:Hydroform Fluid Cell:Hand Adjusting//Form
+aPriori USA,Hydroform:Hydroform Fluid Cell:Hand Adjusting//SimpleHole
+aPriori USA,Hydroform:Hydroform Fluid Cell:Hand Adjusting//StraightBend
+aPriori USA,Hydroform:Hydroform Fluid Cell:Loading//ComplexHole
+aPriori USA,Hydroform:Hydroform Fluid Cell:Loading//Form
+aPriori USA,Hydroform:Hydroform Fluid Cell:Loading//SimpleHole
+aPriori USA,Hydroform:Hydroform Fluid Cell:Loading//StraightBend
+aPriori USA,Hydroform:Hydroform Fluid Cell:Unloading//ComplexHole
+aPriori USA,Hydroform:Hydroform Fluid Cell:Unloading//Form
+aPriori USA,Hydroform:Hydroform Fluid Cell:Unloading//SimpleHole
+aPriori USA,Hydroform:Hydroform Fluid Cell:Unloading//StraightBend
+aPriori USA,Hydroform:Hydroform Fluid Cell:Visual Inspection//ComplexHole
+aPriori USA,Hydroform:Hydroform Fluid Cell:Visual Inspection//Form
+aPriori USA,Hydroform:Hydroform Fluid Cell:Visual Inspection//SimpleHole
+aPriori USA,Hydroform:Hydroform Fluid Cell:Visual Inspection//StraightBend
+aPriori USA,No Cost Feature:No Cost Feature//ComplexHole
+aPriori USA,No Cost Feature:No Cost Feature//CurvedSurface
+aPriori USA,No Cost Feature:No Cost Feature//CurvedWall
+aPriori USA,No Cost Feature:No Cost Feature//Edge
+aPriori USA,No Cost Feature:No Cost Feature//Form
+aPriori USA,No Cost Feature:No Cost Feature//PlanarFace
+aPriori USA,No Cost Feature:No Cost Feature//SimpleHole
+aPriori USA,No Cost Feature:No Cost Feature//StraightBend
+aPriori USA,Offline Blank:Blanking//Blank
+aPriori USA,Offline Blank:Piercing//ComplexHole
+aPriori USA,Offline Blank:Piercing//ComplexHole:As Pierced//CurvedWall
+aPriori USA,Offline Blank:Piercing//ComplexHole:As Pierced//Edge
+aPriori USA,Offline Blank:Piercing//ComplexHole:As Pierced//Edge:As Pierced//EdgeSegment
+aPriori USA,Offline Blank:Piercing//ComplexHole:As Pierced//PlanarFace
+aPriori USA,Offline Blank:Piercing//SimpleHole
+aPriori USA,Sheet Material Stock:As Supplied//CurvedSurface
+aPriori USA,Sheet Material Stock:As Supplied//CurvedWall
+aPriori USA,Sheet Material Stock:As Supplied//PlanarFace

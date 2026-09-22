@@ -1,0 +1,5 @@
+name,sourceFilePath,value
+tblDTCLimits,lookupTables/Component/tblDTCLimits.csv,Process
+tblDTCLimits,lookupTables/Component/tblDTCLimits.csv,Name
+tblDTCLimits,lookupTables/Component/tblDTCLimits.csv,Limit
+tblDTCLimits,lookupTables/Component/tblDTCLimits.csv,Notes

@@ -1,0 +1,7 @@
+_key,holeToBend,holeToBlank,holeToHole,largerHoleToBlank,largerHoleToBlankThreshold,largerHoleToHole,largerHoleToHoleThreshold,smallerHoleToBlank,smallerHoleToHole,uniqueHoleSizesMax
+common,1.5,1.0,2.0,,,,,,,
+generic_press_piercing,1.5,,,2.0,5.0,2.0,5.0,1.5,1.5,
+progressive_die_piercing,1.5,,,2.0,5.0,2.0,5.0,1.5,1.5,
+standard_press_piercing,1.5,,,2.0,5.0,2.0,5.0,1.5,1.5,
+tandem_press_piercing,1.5,,,2.0,5.0,2.0,5.0,1.5,1.5,
+other,1.0,1.0,1.0,,,,,,,1.0

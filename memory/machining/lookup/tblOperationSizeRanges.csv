@@ -1,0 +1,58 @@
+OperationName,LowerBound,UpperBound,Comment,ScaleSystem
+Boring Bar,0.0,7.0,Ratio of L/D,literal
+Bulk Milling,-1.0,-1.0,Mill diameter limits,literal
+Chamfer Milling,25.4,-1.0,Hole diameter,literal
+Contouring,0.0,12.0,Ball End Mill,% of part size
+Counterboring,2.0,76.2,Hole diameter,literal
+Counterboring Ratio,0.0,100.0,Hole diameter,% of part size
+Countersinking,0.25,25.4,Hole diameter,literal
+Deep Boring,38.1,-1.0,Minimum diameter,literal
+Deep Boring Ratio,4.0,-1.0,Ratio of L/D,literal
+Deep Drilling,3.0,-1.0,Ratio of L/D,literal
+Drilling,0.0,100.0,Straight Drill,% of part size
+Drilling,0.0,101.6,Straight Drill,absolute
+Facing,0.0,38.1,Flat End Mill,absolute
+Facing,38.1,508.0,Face Mill,absolute
+Filleting,0.0,12.0,Filleting,% of part size
+Finish Dovetail Milling,-1.0,1.0,Ratio of Neck Diameter / Major Diameter,absolute
+Finish Dovetail Milling,-1.0,1.05,Ratio of Dovetail Depth / Major Diameter,absolute
+Finish Dovetail Milling,-1.0,3.75,Ratio of Dovetail Depth / Neck Diameter,absolute
+Finish Dovetail Milling,0.0,25.4,Major Diameter Limit,absolute
+Finish Dovetail Milling,0.35,-1.0,Neck Diameter Limit,absolute
+Finish Dovetail Milling,30.0,80.0,Wall Angle,absolute
+Finish Milling,0.0,70.0,Flat End Mill,absolute
+Groove Milling,0.25,-1.0,Width of Groove,literal
+Groove Milling,0.254,-1.0,"Keyseat Mill, Width",absolute
+Groove Milling,4.0,-1.0,"Groove Mill, Width",absolute
+Gun Drilling,10.0,-1.0,Ratio of L/D,literal
+Internal Grinding,-1.0,3.0,Ratio of L/D,literal
+Jig Bore Drilling,0.0,101.6,Hole diameter,literal
+Jig Boring,6.35,-1.0,Hole diameter,literal
+Jig Grinding,-1.0,6.0,Ratio of L/D,literal
+Mill Boring,1.0,-1.0,Hole diameter,literal
+Multiplunging,-1.0,14.3,Width of Ring,literal
+Perimeter Milling,0.0,12.0,Mill diameter,% of part size
+Polygon Turning,0.0,120.0,Polygon Turning Insert,literal
+Postdrill Rough Turning,25.4,-1.0,Hole diameter,literal
+Profile Milling,0.0,38.1,Flat End Mill,absolute
+Reaming,0.25,25.4,Hole diameter,literal
+Rotary Broaching,0.0,20.0,Rotary Broach,absolute
+Rough Milling,0.0,38.1,Flat End Mill,absolute
+Rough Milling,0.0,60.0,Ball End Mill,absolute
+Rough Milling,0.0,76.1,Ball End Mill - Pocket,absolute
+Rough Milling,0.0,76.1,Flat End Mill - Pocket,absolute
+Rough Milling,38.1,508.0,Face Mill,absolute
+Rough Turning,0.0,-1.0,Width of Ring,literal
+Rounding,0.0,5.0,Rounding,% of part size
+Side Milling,0.0,12.0,Flat End Mill,% of part size
+Side Milling,0.0,76.2,Flat End Mill,absolute
+Slot Milling,0.0,12.0,Ball End Mill,% of part size
+Slot Milling,0.0,12.0,Flat End Mill,% of part size
+Slot Milling,0.0,60.0,Ball End Mill,absolute
+Slot Milling,0.0,101.6,Flat End Mill,absolute
+Slot Milling,101.6,-1.0,Face Mill,absolute
+Standard Drilling,-1.0,3.0,Ratio of L/D,literal
+Standard Drilling Dia,-1.0,20.0,Hole diameter,% of mid dim
+Tapping,0.25,25.4,Hole diameter,literal
+Thread Milling,4.2333,-1.0,Hole diameter,literal
+Thread Turning,0.25,-1.0,Hole diameter,literal

@@ -1,0 +1,5 @@
+name,file_path,value
+cmStandardToolingComponents,lookupTables/Component/cmStandardToolingComponents.csv,Name
+cmStandardToolingComponents,lookupTables/Component/cmStandardToolingComponents.csv,Unit Cost (USD)
+cmStandardToolingComponents,lookupTables/Component/cmStandardToolingComponents.csv,Quantity
+cmStandardToolingComponents,lookupTables/Component/cmStandardToolingComponents.csv,Notes

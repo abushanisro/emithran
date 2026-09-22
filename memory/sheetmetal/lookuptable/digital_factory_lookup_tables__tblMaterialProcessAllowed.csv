@@ -1,0 +1,8 @@
+Material Name Code,Laser Cut,Oxy Fuel Cut,Plasma Cut,Waterjet Cut,Fiber Laser Cut
+41,True,False,False,True,False
+42,True,False,False,True,False
+51,True,False,False,True,False
+52,True,False,False,True,False
+Aluminum,True,False,True,True,True
+Copper,True,False,True,True,True
+Stainless,True,False,True,True,True

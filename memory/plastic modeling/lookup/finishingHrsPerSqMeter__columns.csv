@@ -1,0 +1,4 @@
+name,file_path,value
+finishingHrsPerSqMeter,lookupTables/Component/finishingHrsPersqMeter.csv,Surface Area (m^2)
+finishingHrsPerSqMeter,lookupTables/Component/finishingHrsPersqMeter.csv,Hrs Per Sq Meter (hr / m^2)
+finishingHrsPerSqMeter,lookupTables/Component/finishingHrsPersqMeter.csv,Complexity

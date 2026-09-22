@@ -1,0 +1,11 @@
+name,sourceFilePath,digitalFactory,Hrs Per Sq Inch Complex (hr),Surface Area Complex (in^2)
+tblHrsPerSqInchComplex,lookupTables/Component/tblHrsPerSqInchComplex.csv,aPriori USA,0.09,3500.0
+tblHrsPerSqInchComplex,lookupTables/Component/tblHrsPerSqInchComplex.csv,aPriori USA,0.09,5000.0
+tblHrsPerSqInchComplex,lookupTables/Component/tblHrsPerSqInchComplex.csv,aPriori USA,0.09,99999999.0
+tblHrsPerSqInchComplex,lookupTables/Component/tblHrsPerSqInchComplex.csv,aPriori USA,0.102,3000.0
+tblHrsPerSqInchComplex,lookupTables/Component/tblHrsPerSqInchComplex.csv,aPriori USA,0.108,2500.0
+tblHrsPerSqInchComplex,lookupTables/Component/tblHrsPerSqInchComplex.csv,aPriori USA,0.114,1500.0
+tblHrsPerSqInchComplex,lookupTables/Component/tblHrsPerSqInchComplex.csv,aPriori USA,0.126,1000.0
+tblHrsPerSqInchComplex,lookupTables/Component/tblHrsPerSqInchComplex.csv,aPriori USA,0.156,500.0
+tblHrsPerSqInchComplex,lookupTables/Component/tblHrsPerSqInchComplex.csv,aPriori USA,0.18,250.0
+tblHrsPerSqInchComplex,lookupTables/Component/tblHrsPerSqInchComplex.csv,aPriori USA,0.21,100.0

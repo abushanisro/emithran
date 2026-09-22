@@ -1,0 +1,25 @@
+Operation Name,Factor,Cutting Parameter Category
+Back Finish Turning,0.7,Feed Factor
+Back Finish Turning,0.7,Speed Factor
+Back Rough Turning,0.7,Cut Depth Factor
+Back Rough Turning,0.7,Feed Factor
+Back Rough Turning,0.7,Speed Factor
+Finish Turning,0.7,Feed Factor
+Finish Turning,0.7,Speed Factor
+Multiplunging,0.7,Cut Depth Factor
+Multiplunging,0.7,Feed Factor
+Multiplunging,0.7,Speed Factor
+Parting,0.7,Cut Depth Factor
+Parting,0.7,Feed Factor
+Parting,0.7,Speed Factor
+Plunging,0.7,Cut Depth Factor
+Plunging,0.7,Feed Factor
+Plunging,0.7,Speed Factor
+Postdrill Rough Turning,0.7,Cut Depth Factor
+Postdrill Rough Turning,0.7,Feed Factor
+Postdrill Rough Turning,0.7,Speed Factor
+Rough Turning,0.7,Cut Depth Factor
+Rough Turning,0.7,Feed Factor
+Rough Turning,0.7,Speed Factor
+Thread Turning,0.7,Feed Factor
+Thread Turning,0.7,Speed Factor

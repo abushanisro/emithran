@@ -1,0 +1,116 @@
+﻿Rule Name,Threshold Name,Process Name,Material Type,Custom Field,Custom Value,Rule Type,Threshold Type,Critical,Major,Minor,Units,Notes
+HighBlindHoleLengthToDiameterRatio,Hole Length to Diameter Ratio,,,,,>,Ratio,,1.5,0.75,,Flagged when ratio of hole length-to-diameter exceeds permitted ratio.
+InaccessibleFeature,Inaccessible Feature,,,,,Boolean,Boolean,TRUE,,,,Flagged when forging an inaccessible feature creates a die lock condition.
+InsufficientCornerRadius,Min Corner Radius,,,,,<,Length,,2.79,,mm,Flagged when the radius of a corner exceeds the permitted radius.
+InsufficientCornerRadius,Min Corner Radius,,Aluminum,,,<,Length,,2.79,,mm,
+InsufficientCornerRadius,Min Corner Radius,,Heat Resistant Super Alloys,,,<,Length,,6.35,,mm,
+InsufficientCornerRadius,Min Corner Radius,,Magnesium,,,<,Length,,2.79,,mm,
+InsufficientCornerRadius,Min Corner Radius,,Steel,,,<,Length,,2.79,,mm,
+InsufficientCornerRadius,Min Corner Radius,,Titanium,,,<,Length,,4.06,,mm,
+InsufficientDraftAngle,Min Draft Angle,,,GCD Type,Simple Hole,<,Angle,0.01,5,,degrees,Flagged when draft angle for a Simple Hole exceeds permitted draft angle
+InsufficientDraftAngle,Min Draft Angle,,,GCD Type,Surface,<,Angle,0.01,5,,degrees,Flagged when draft angle for a Surface exceeds permitted draft angle
+InsufficientDraftAngle,Min Draft Angle,,Aluminum,GCD Type,Surface,<,Angle,0.01,3,,degrees,Flagged when draft angle for a Surface exceeds permitted draft angle
+InsufficientDraftAngle,Min Draft Angle,,Brass,GCD Type,Surface,<,Angle,0.01,3,,degrees,Flagged when draft angle for a Surface exceeds permitted draft angle
+InsufficientDraftAngle,Min Draft Angle,,Copper,GCD Type,Surface,<,Angle,0.01,3,,degrees,Flagged when draft angle for a Surface exceeds permitted draft angle
+InsufficientDraftAngle,Min Draft Angle,,Heat Resistant Super Alloys,GCD Type,Surface,<,Angle,0.01,7,,degrees,Flagged when draft angle for a Surface exceeds permitted draft angle
+InsufficientDraftAngle,Min Draft Angle,,Low-Alloy Steel,GCD Type,Simple Hole,<,Angle,0.01,7,,degrees,Flagged when draft angle for a Simple Hole exceeds permitted draft angle
+InsufficientDraftAngle,Min Draft Angle,,Low-Alloy Steel,GCD Type,Surface,<,Angle,0.01,5,,degrees,Flagged when draft angle for a Surface exceeds permitted draft angle
+InsufficientDraftAngle,Min Draft Angle,,Magnesium,GCD Type,Surface,<,Angle,0.01,3,,degrees,Flagged when draft angle for a Surface exceeds permitted draft angle
+InsufficientDraftAngle,Min Draft Angle,,Stainless Steel,GCD Type,Simple Hole,<,Angle,0.01,7,,degrees,Flagged when draft angle for a Simple Hole exceeds permitted draft angle
+InsufficientDraftAngle,Min Draft Angle,,Stainless Steel,GCD Type,Surface,<,Angle,0.01,5,,degrees,Flagged when draft angle for a Surface exceeds permitted draft angle
+InsufficientDraftAngle,Min Draft Angle,,Steel,GCD Type,Simple Hole,<,Angle,0.01,7,,degrees,Flagged when draft angle for a Simple Hole exceeds permitted draft angle
+InsufficientDraftAngle,Min Draft Angle,,Steel,GCD Type,Surface,<,Angle,0.01,5,,degrees,Flagged when draft angle for a Surface exceeds permitted draft angle
+InsufficientDraftAngle,Min Draft Angle,,Titanium,GCD Type,Surface,<,Angle,0.01,5,,degrees,Flagged when draft angle for a Surface exceeds permitted draft angle
+InsufficientDraftAngle,Min Draft Angle,,Unalloyed Steel,GCD Type,Simple Hole,<,Angle,0.01,7,,degrees,Flagged when draft angle for a Simple Hole exceeds permitted draft angle
+InsufficientDraftAngle,Min Draft Angle,,Unalloyed Steel,GCD Type,Surface,<,Angle,0.01,5,,degrees,Flagged when draft angle for a Surface exceeds permitted draft angle
+InsufficientFilletRadius,Min Fillet Radius,,,,,<,Length,,5.84,,mm,Flagged when the radius of a fillet exceeds the permitted radius.
+InsufficientFilletRadius,Min Fillet Radius,,Aluminum,,,<,Length,,4.83,,mm,
+InsufficientFilletRadius,Min Fillet Radius,,Heat Resistant Super Alloys,,,<,Length,,14.48,,mm,
+InsufficientFilletRadius,Min Fillet Radius,,Magnesium,,,<,Length,,7.11,,mm,
+InsufficientFilletRadius,Min Fillet Radius,,Steel,,,<,Length,,5.84,,mm,
+InsufficientFilletRadius,Min Fillet Radius,,Titanium,,,<,Length,,9.65,,mm,
+ThickSlug,Pierced Slug Thickness,,,,,Boolean,Boolean,,TRUE,,,Flagged when slug thickness exceeds recommended maximum.
+ThickWalledHole,Thick Walled Hole,,,,,Boolean,Boolean,TRUE,,,,Flagged when hole wall thickness exceeds recommended maximum.
+ThinSection,Min Wall Thickness,,Aluminum,Solid Shadow Area,3270.8,<=,Length,,2.794,,mm,
+ThinSection,Min Wall Thickness,,Aluminum,Solid Shadow Area,32708,<=,Length,,4.826,,mm,
+ThinSection,Min Wall Thickness,,Aluminum,Solid Shadow Area,327080,<=,Length,,8.636,,mm,
+ThinSection,Min Wall Thickness,,Aluminum,Solid Shadow Area,654.16,<=,Length,,2.54,,mm,
+ThinSection,Min Wall Thickness,,Aluminum,Solid Shadow Area,6541.6,<=,Length,,2.794,,mm,
+ThinSection,Min Wall Thickness,,Aluminum,Solid Shadow Area,65416,<=,Length,,5.334,,mm,
+ThinSection,Min Wall Thickness,,Brass,Solid Shadow Area,3270.8,<=,Length,,2.794,,mm,
+ThinSection,Min Wall Thickness,,Brass,Solid Shadow Area,32708,<=,Length,,4.826,,mm,
+ThinSection,Min Wall Thickness,,Brass,Solid Shadow Area,327080,<=,Length,,8.636,,mm,
+ThinSection,Min Wall Thickness,,Brass,Solid Shadow Area,654.16,<=,Length,,2.54,,mm,
+ThinSection,Min Wall Thickness,,Brass,Solid Shadow Area,6541.6,<=,Length,,2.794,,mm,
+ThinSection,Min Wall Thickness,,Brass,Solid Shadow Area,65416,<=,Length,,5.334,,mm,
+ThinSection,Min Wall Thickness,,Copper,Solid Shadow Area,3270.8,<=,Length,,2.794,,mm,
+ThinSection,Min Wall Thickness,,Copper,Solid Shadow Area,32708,<=,Length,,4.826,,mm,
+ThinSection,Min Wall Thickness,,Copper,Solid Shadow Area,327080,<=,Length,,8.636,,mm,
+ThinSection,Min Wall Thickness,,Copper,Solid Shadow Area,654.16,<=,Length,,2.54,,mm,
+ThinSection,Min Wall Thickness,,Copper,Solid Shadow Area,6541.6,<=,Length,,2.794,,mm,
+ThinSection,Min Wall Thickness,,Copper,Solid Shadow Area,65416,<=,Length,,5.334,,mm,
+ThinSection,Min Wall Thickness,,Ductile Iron,Solid Shadow Area,3270.8,<=,Length,,3.81,,mm,
+ThinSection,Min Wall Thickness,,Ductile Iron,Solid Shadow Area,32708,<=,Length,,6.858,,mm,
+ThinSection,Min Wall Thickness,,Ductile Iron,Solid Shadow Area,327080,<=,Length,,11.176,,mm,
+ThinSection,Min Wall Thickness,,Ductile Iron,Solid Shadow Area,654.16,<=,Length,,2.794,,mm,
+ThinSection,Min Wall Thickness,,Ductile Iron,Solid Shadow Area,6541.6,<=,Length,,4.572,,mm,
+ThinSection,Min Wall Thickness,,Ductile Iron,Solid Shadow Area,65416,<=,Length,,8.128,,mm,
+ThinSection,Min Wall Thickness,,Heat Resistant Super Alloys,Solid Shadow Area,3270.8,<=,Length,,6.35,,mm,
+ThinSection,Min Wall Thickness,,Heat Resistant Super Alloys,Solid Shadow Area,32708,<=,Length,,9.652,,mm,
+ThinSection,Min Wall Thickness,,Heat Resistant Super Alloys,Solid Shadow Area,327080,<=,Length,,19.05,,mm,
+ThinSection,Min Wall Thickness,,Heat Resistant Super Alloys,Solid Shadow Area,654.16,<=,Length,,6.35,,mm,
+ThinSection,Min Wall Thickness,,Heat Resistant Super Alloys,Solid Shadow Area,6541.6,<=,Length,,8.128,,mm,
+ThinSection,Min Wall Thickness,,Heat Resistant Super Alloys,Solid Shadow Area,65416,<=,Length,,11.176,,mm,
+ThinSection,Min Wall Thickness,,Low-Alloy Steel,Solid Shadow Area,3270.8,<=,Length,,3.81,,mm,
+ThinSection,Min Wall Thickness,,Low-Alloy Steel,Solid Shadow Area,32708,<=,Length,,6.858,,mm,
+ThinSection,Min Wall Thickness,,Low-Alloy Steel,Solid Shadow Area,327080,<=,Length,,11.176,,mm,
+ThinSection,Min Wall Thickness,,Low-Alloy Steel,Solid Shadow Area,654.16,<=,Length,,2.794,,mm,
+ThinSection,Min Wall Thickness,,Low-Alloy Steel,Solid Shadow Area,6541.6,<=,Length,,4.572,,mm,
+ThinSection,Min Wall Thickness,,Low-Alloy Steel,Solid Shadow Area,65416,<=,Length,,8.128,,mm,
+ThinSection,Min Wall Thickness,,Magnesium,Solid Shadow Area,3270.8,<=,Length,,2.794,,mm,
+ThinSection,Min Wall Thickness,,Magnesium,Solid Shadow Area,32708,<=,Length,,4.826,,mm,
+ThinSection,Min Wall Thickness,,Magnesium,Solid Shadow Area,327080,<=,Length,,8.636,,mm,
+ThinSection,Min Wall Thickness,,Magnesium,Solid Shadow Area,654.16,<=,Length,,2.54,,mm,
+ThinSection,Min Wall Thickness,,Magnesium,Solid Shadow Area,6541.6,<=,Length,,2.794,,mm,
+ThinSection,Min Wall Thickness,,Magnesium,Solid Shadow Area,65416,<=,Length,,5.334,,mm,
+ThinSection,Min Wall Thickness,,Stainless Steel,Solid Shadow Area,3270.8,<=,Length,,3.81,,mm,
+ThinSection,Min Wall Thickness,,Stainless Steel,Solid Shadow Area,32708,<=,Length,,6.858,,mm,
+ThinSection,Min Wall Thickness,,Stainless Steel,Solid Shadow Area,327080,<=,Length,,11.176,,mm,
+ThinSection,Min Wall Thickness,,Stainless Steel,Solid Shadow Area,654.16,<=,Length,,2.794,,mm,
+ThinSection,Min Wall Thickness,,Stainless Steel,Solid Shadow Area,6541.6,<=,Length,,4.572,,mm,
+ThinSection,Min Wall Thickness,,Stainless Steel,Solid Shadow Area,65416,<=,Length,,8.128,,mm,
+ThinSection,Min Wall Thickness,,Steel,Solid Shadow Area,3270.8,<=,Length,,3.81,,mm,
+ThinSection,Min Wall Thickness,,Steel,Solid Shadow Area,32708,<=,Length,,6.858,,mm,
+ThinSection,Min Wall Thickness,,Steel,Solid Shadow Area,327080,<=,Length,,11.176,,mm,
+ThinSection,Min Wall Thickness,,Steel,Solid Shadow Area,654.16,<=,Length,,2.794,,mm,
+ThinSection,Min Wall Thickness,,Steel,Solid Shadow Area,6541.6,<=,Length,,4.572,,mm,
+ThinSection,Min Wall Thickness,,Steel,Solid Shadow Area,65416,<=,Length,,8.128,,mm,
+ThinSection,Min Wall Thickness,,Titanium,Solid Shadow Area,3270.8,<=,Length,,6.35,,mm,
+ThinSection,Min Wall Thickness,,Titanium,Solid Shadow Area,32708,<=,Length,,7.366,,mm,
+ThinSection,Min Wall Thickness,,Titanium,Solid Shadow Area,327080,<=,Length,,14.732,,mm,
+ThinSection,Min Wall Thickness,,Titanium,Solid Shadow Area,654.16,<=,Length,,6.35,,mm,
+ThinSection,Min Wall Thickness,,Titanium,Solid Shadow Area,6541.6,<=,Length,,6.604,,mm,
+ThinSection,Min Wall Thickness,,Titanium,Solid Shadow Area,65416,<=,Length,,9.652,,mm,
+ThinSection,Min Wall Thickness,,Unalloyed Steel,Solid Shadow Area,3270.8,<=,Length,,3.81,,mm,
+ThinSection,Min Wall Thickness,,Unalloyed Steel,Solid Shadow Area,32708,<=,Length,,6.858,,mm,
+ThinSection,Min Wall Thickness,,Unalloyed Steel,Solid Shadow Area,327080,<=,Length,,11.176,,mm,
+ThinSection,Min Wall Thickness,,Unalloyed Steel,Solid Shadow Area,654.16,<=,Length,,2.794,,mm,
+ThinSection,Min Wall Thickness,,Unalloyed Steel,Solid Shadow Area,6541.6,<=,Length,,4.572,,mm,
+ThinSection,Min Wall Thickness,,Unalloyed Steel,Solid Shadow Area,65416,<=,Length,,8.128,,mm,
+Threaded,Threaded,,,,,Boolean,Boolean,TRUE,,,,
+TightToleranceCircularity,Tolerance - circularity,,,,,Boolean,Boolean,,TRUE,,,Flagged when circularity tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceConcentricity,Tolerance - concentricity,,,,,Boolean,Boolean,,TRUE,,,Flagged when concentricity tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceCoordinateTolerance,Tolerance - tolerance,,,,,Boolean,Boolean,,TRUE,,,Flagged when coordinate tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceCylindricity,Tolerance - cylindricity,,,,,Boolean,Boolean,,TRUE,,,Flagged when cylindricity tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceDiamTolerance,Tolerance - diamTolerance,,,,,Boolean,Boolean,,TRUE,,,Flagged when diametric tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceFlatness,Tolerance - flatness,,,,,Boolean,Boolean,,TRUE,,,Flagged when flatness tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceParallelism,Tolerance - parallelism,,,,,Boolean,Boolean,,TRUE,,,Flagged when parallelism tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightTolerancePerpendicularity,Tolerance - perpendicularity,,,,,Boolean,Boolean,,TRUE,,,Flagged when perpendicularity tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightTolerancePositionTolerance,Tolerance - positionTolerance,,,,,Boolean,Boolean,,TRUE,,,Flagged when position tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceProfileOfSurface,Tolerance - profileOfSurface,,,,,Boolean,Boolean,,TRUE,,,Flagged when profile of surface tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceRoughnessRa,Tolerance - roughness,,,,,Boolean,Boolean,,TRUE,,,Flagged when roughness Ra tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceRoughnessRz,Tolerance - roughnessRz,,,,,Boolean,Boolean,,TRUE,,,Flagged when roughness Rz tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceRunout,Tolerance - runout,,,,,Boolean,Boolean,,TRUE,,,Flagged when runout tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceStraightness,Tolerance - straightness,,,,,Boolean,Boolean,,TRUE,,,Flagged when straightness tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceSymmetry,Tolerance - symmetry,,,,,Boolean,Boolean,,TRUE,,,Flagged when symmetry tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceTotalRunout,Tolerance - totalRunout,,,,,Boolean,Boolean,,TRUE,,,Flagged when total runout tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities

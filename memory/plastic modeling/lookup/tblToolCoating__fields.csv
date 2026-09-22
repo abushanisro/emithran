@@ -1,0 +1,4 @@
+name,sourceFilePath,digitalFactory,value
+tblToolCoating,lookupTables/Component/tblToolCoating.csv,aPriori USA,Coating Cost Factor (USD / kg)
+tblToolCoating,lookupTables/Component/tblToolCoating.csv,aPriori USA,Coating Type
+tblToolCoating,lookupTables/Component/tblToolCoating.csv,aPriori USA,Tool Life Improvement Factor

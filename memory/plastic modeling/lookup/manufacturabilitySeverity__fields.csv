@@ -1,0 +1,14 @@
+name,sourceFilePath,digitalFactory,value
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,Rule Name
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,Threshold Name
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,Process Name
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,Material Type
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,Custom Field
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,Custom Value
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,Rule Type
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,Threshold Type
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,Critical
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,Major
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,Minor
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,Units
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,Notes

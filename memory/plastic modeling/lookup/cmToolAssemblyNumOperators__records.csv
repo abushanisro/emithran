@@ -1,0 +1,6 @@
+name,file_path,mold_base_area_m2,num_operators_required
+cmToolAssemblyNumOperators,lookupTables/Component/cmToolAssemblyNumOperators.csv,1.0,1.0
+cmToolAssemblyNumOperators,lookupTables/Component/cmToolAssemblyNumOperators.csv,2.0,2.0
+cmToolAssemblyNumOperators,lookupTables/Component/cmToolAssemblyNumOperators.csv,3.0,3.0
+cmToolAssemblyNumOperators,lookupTables/Component/cmToolAssemblyNumOperators.csv,4.0,4.0
+cmToolAssemblyNumOperators,lookupTables/Component/cmToolAssemblyNumOperators.csv,100.0,5.0

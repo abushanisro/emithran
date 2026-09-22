@@ -72,17 +72,17 @@ describe('ScopeClassifierService', () => {
     expect(out.inScope).toBe(true);
   });
 
-  it('classifies cylindrical pins as cnc_turned', () => {
+  it('classifies cylindrical pins as turned', () => {
     // 19 long, 8 wide ≈ 8 high — surface area for cylinder: 2πr² + 2πrL ≈ 578 mm²
     const out = svc.classify(
       makeBom({ dimensions: { lengthMm: 19, widthMm: 8, heightMm: 8 } }),
       makeDfm({ boundingBox: { lengthMm: 19, widthMm: 8, heightMm: 8 }, volumeMm3: 515, surfaceAreaMm2: 578 }),
     );
-    expect(out.family).toBe('cnc_turned');
+    expect(out.family).toBe('turned');
     expect(out.inScope).toBe(true);
   });
 
-  it('classifies prismatic small parts as cnc_milled', () => {
+  it('classifies prismatic small parts as milled', () => {
     const out = svc.classify(
       makeBom({ dimensions: { lengthMm: 50, widthMm: 40, heightMm: 25 } }),
       makeDfm({
@@ -92,7 +92,7 @@ describe('ScopeClassifierService', () => {
         holeCount: 4,
       }),
     );
-    expect(out.family).toBe('cnc_milled');
+    expect(out.family).toBe('milled');
     expect(out.inScope).toBe(true);
   });
 
@@ -110,7 +110,7 @@ describe('ScopeClassifierService', () => {
     expect(out.inScope).toBe(false);
   });
 
-  // Regression: "Rtp2 Mag2 Backframe" was misclassified as cnc_milled.
+  // Regression: "Rtp2 Mag2 Backframe" was misclassified as milled.
   // 414×264×50mm frame: high SA/Vol (1.33 mm⁻¹), low fill (2.56%), compound name ending in "frame".
   it('classifies "backframe" compound name as sheet_metal via name suffix', () => {
     const out = svc.classify(
@@ -159,7 +159,7 @@ describe('ScopeClassifierService', () => {
         holeCount: 4,
       }),
     );
-    expect(out.family).toBe('cnc_milled');
+    expect(out.family).toBe('milled');
     expect(out.inScope).toBe(true);
   });
 });

@@ -1,0 +1,5 @@
+name,sourceFilePath,digitalFactory,Cavity Plate Depth Border (in),Max Press Force (kN)
+tblCavityPlateDepthBorder,lookupTables/Component/tblCavityPlateDepthBorder.csv,aPriori USA,3.0,498.2
+tblCavityPlateDepthBorder,lookupTables/Component/tblCavityPlateDepthBorder.csv,aPriori USA,4.0,3985.6
+tblCavityPlateDepthBorder,lookupTables/Component/tblCavityPlateDepthBorder.csv,aPriori USA,5.0,14946.0
+tblCavityPlateDepthBorder,lookupTables/Component/tblCavityPlateDepthBorder.csv,aPriori USA,5.5,999999999.0

@@ -1,0 +1,5 @@
+name,file_path,value
+foamingAgents,lookupTables/Component/foamingAgents.csv,Agent Name
+foamingAgents,lookupTables/Component/foamingAgents.csv,Material Type
+foamingAgents,lookupTables/Component/foamingAgents.csv,Cost CFA (USD / kg)
+foamingAgents,lookupTables/Component/foamingAgents.csv,Percent CFA

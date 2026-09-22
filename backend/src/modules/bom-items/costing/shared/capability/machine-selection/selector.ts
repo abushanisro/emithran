@@ -60,6 +60,7 @@ const BASE_COLUMNS =
   'capacity_utilization_rate, operators, usd_lhr_total, ' +
   'press_cycle_time_s, handling_time_const_s, handling_time_mass_coeff_s_per_kg, setup_time_hr, ' +
   'cut_to_length_cycle_const_s, cut_to_length_cycle_mass_coeff_s_per_kg, cut_to_length_cut_speed_s, ' +
+  'number_spindles, drum_index_time_s, transfer_time_s, stock_feed_time_s, speed_synchronization_time_s, ' +
   // The two components the canonical MHR is DEFINED as (migration 581:
   // MHR = Direct Overhead + Indirect Overhead). Carried so the benchmark
   // override guard can tell a real, self-consistent machine rate apart from
@@ -82,7 +83,7 @@ const ALL_CLASSES = Object.keys(MACHINE_REGISTRY) as MachineClass[];
 // never satisfies. Result before this fix: all 314 real Machining machines
 // (old and new) were invisible to live quoting — they render correctly on
 // the HR Rates page (which reads mhr_records directly) but classifyMachineRecord
-// returned null for every one of them, so cost-cnc-engine.ts always priced
+// returned null for every one of them, so cost-machining-engine.ts always priced
 // off the class-default/benchmark rate instead of real machine data.
 //
 // FIXED (Machining Engine Re-Architecture): these 7 real categories are now
@@ -115,6 +116,11 @@ interface RawMachineRow {
   cut_to_length_cycle_const_s?: number | string | null;
   cut_to_length_cycle_mass_coeff_s_per_kg?: number | string | null;
   cut_to_length_cut_speed_s?: number | string | null;
+  number_spindles?: number | string | null;
+  drum_index_time_s?: number | string | null;
+  transfer_time_s?: number | string | null;
+  stock_feed_time_s?: number | string | null;
+  speed_synchronization_time_s?: number | string | null;
   setup_time_hr?: number | string | null;
   direct_overhead_rate?: number | string | null;
   indirect_overhead_rate?: number | string | null;
@@ -413,6 +419,11 @@ export async function fetchMachinePool(
       cutToLengthCycleConstS: num(raw.cut_to_length_cycle_const_s),
       cutToLengthCycleMassCoeffSPerKg: num(raw.cut_to_length_cycle_mass_coeff_s_per_kg),
       cutToLengthCutSpeedS: num(raw.cut_to_length_cut_speed_s),
+      numberSpindles: num(raw.number_spindles),
+      drumIndexTimeS: num(raw.drum_index_time_s),
+      transferTimeS: num(raw.transfer_time_s),
+      stockFeedTimeS: num(raw.stock_feed_time_s),
+      speedSynchronizationTimeS: num(raw.speed_synchronization_time_s),
       setupTimeHr: num(raw.setup_time_hr),
       directOverheadRate: num(raw.direct_overhead_rate),
       indirectOverheadRate: num(raw.indirect_overhead_rate),
@@ -1000,6 +1011,11 @@ function makeDefaultCandidate(_location: string, cls: MachineClass, fallbackRate
     cutToLengthCycleConstS: null,
     cutToLengthCycleMassCoeffSPerKg: null,
     cutToLengthCutSpeedS: null,
+    numberSpindles: null,
+    drumIndexTimeS: null,
+    transferTimeS: null,
+    stockFeedTimeS: null,
+    speedSynchronizationTimeS: null,
     setupTimeHr: null,
     directOverheadRate: null,
     indirectOverheadRate: null,

@@ -1,0 +1,29 @@
+﻿Cooling Rate (°C / min),Heating Rate (°C / min),Hold Temperature (°C),Hold Time (hr),Material Type
+,,253.00,,Lead
+,,286.00,,Zinc-Aluminum
+,,304.00,,Zinc
+,,447.00,,Magnesium
+,,455.00,2.00,Aluminum
+,,456.00,2.00,Aluminum Alloy
+,,693.00,,Bronze
+,,708.00,,Manganese Bronze
+,,720.00,,Brass
+,,832.00,,Aluminum Bronze
+,,864.00,,Gray Iron
+,,894.00,,Malleable Cast Iron
+,,916.00,,Ductile Iron
+,,1016.00,,Heat Resistant Super Alloys
+,,1104.00,,Cobalt Chrome Alloy
+,,1116.00,3.00,Stainless Steel Alloy
+,,1128.00,,Unalloyed Steel
+,,1136.00,,Galvanized Steel
+,,1136.00,,Low-Alloy Steel
+,,1163.00,,Generic
+,,1163.00,,Steel
+,,1300.00,,Titanium
+,,2060.00,,Maraging Steel Alloy
+,8.00,720.00,,Silicon Brass
+,8.00,1136.00,3.00,Stainless Steel
+5.00,5.00,828.00,,Copper
+5.00,5.00,1016.00,3.50,Nickel Alloy
+30.00,10.00,1300.00,2.00,Titanium Alloy

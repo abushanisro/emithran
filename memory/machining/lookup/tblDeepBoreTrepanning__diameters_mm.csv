@@ -1,0 +1,3 @@
+tool_type,tool_series,units.diameter,units.depth_max,units.specific_cutting_force,units.cutting_speed,units.feed,units.tool_life,units.tool_life_cost,depth_max_mm_by_diameter.50.0,depth_max_mm_by_diameter.600.0,tool_life_min,tool_life_cost_usd_by_diameter.50.0,tool_life_cost_usd_by_diameter.600.0,value
+Deep Bore Trepan,"Virtual Deep Bore Trepan, Carbide",mm,mm,N/mm^2,m/min,mm/rev,min,USD,10000.0,10000.0,15.0,20.0,20.0,50.0
+Deep Bore Trepan,"Virtual Deep Bore Trepan, Carbide",mm,mm,N/mm^2,m/min,mm/rev,min,USD,10000.0,10000.0,15.0,20.0,20.0,600.0

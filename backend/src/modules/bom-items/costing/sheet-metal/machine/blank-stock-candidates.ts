@@ -128,7 +128,7 @@ export function billetFallback(bbox: BoundingBox, partVolMm3: number): BlankResu
   // default-rates.constants.ts) applied on both sides of each dimension —
   // was a separately-hardcoded literal `6` here, duplicating the same
   // constant used elsewhere in this module (selectBestAutoCandidate below)
-  // and in cost-cnc-engine.ts, all meant to be the same real number. No real
+  // and in cost-machining-engine.ts, all meant to be the same real number. No real
   // stock-allowance-by-material/machine/process table exists in the
   // reference corpus (checked directly) -- this stays a single, disclosed,
   // class-level constant until one is sourced, not a fabricated table.

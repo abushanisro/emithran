@@ -1,0 +1,116 @@
+﻿Variable Name,String Value,Unit Type Name,Notes,Section,Deprecated
+angleStandardDeviationThreshold2_5D,11,,"The threshold used when classifying non-rotational 2.5D parts as having a smaller, or larger, Cross Sectional Analysis Angle Standard Deviation.",Inherited,No
+angleStdDevSeverityThreshold2_5D,30,,"The threshold for determining if a non-rotational 2.5D part has sudden changes in cross sectional area and should be defined with 3D part score that will give a higher complexity score. Defined using the Cross Sectional Analysis Angle Standard Deviation. If higher than this value, a 3D Part score will be calculated.",Inherited,No
+asForgedDiameterToDepthRatio,.5,,Deprecated in CMV280,Inherited,Yes
+bandSawKerfWidth,3.175,Length,Typical kerf width of band saw blade.,Inherited,No
+baseNumberOfHits,3,,The initial number of hits that a part starts out with. This is adjusted up or down based on partMultHeightRatio and materialTypeMultiplier.,Inherited,No
+blockingHitsFactor,.8,,A dial for adjusting the number blocking hits with respect to the number of upsetting and finishing hits when all 3 are enabled.,Inherited,No
+bottomDeadCenterAdjustmentFactor,0.6,,Deprecated in CMV270.,Inherited,Yes
+cavityCNCSetupTime,2,hr,The setup time for CNC machining the tool cavity. Used to calculate hard tooling cost for the Mechanical Press process.,Inherited,No
+closedDieFlashLandThicknessCoefficientA,1.13,,First coefficient used in the empirical equation for calculating flash land thickness based on the mass of the forged part in kg.,Inherited,No
+closedDieFlashLandThicknessCoefficientB,0.89,,Second coefficient used in the empirical equation for calculating flash land thickness based on the mass of the forged part in kg.,Inherited,No
+closedDieFlashLandThicknessCoefficientC,0.017,,Third coefficient used in the empirical equation for calculating flash land thickness based on the mass of the forged part in kg.,Inherited,No
+closedDieFlashLandWidthCoefficientA,3,,First coefficient used in the empirical equation for calculating flash land width based on the flash land thickness and the mass of the forged part in kg.,Inherited,No
+closedDieFlashLandWidthCoefficientB,1.25,,Second coefficient used in the empirical equation for calculating flash land width based on the flash land thickness and the mass of the forged part in kg.,Inherited,No
+closedDieFlashLandWidthCoefficientC,-1.09,,Third coefficient used in the empirical equation for calculating flash land width based on the flash land thickness and the mass of the forged part in kg.,Inherited,No
+cycleTimeAdjustmentFactor,1,,Factor used to globally increase or decrease cycle time evaluations per process.,Inherited,No
+defaultBilletRatio,.7,,Deprecated in CMV260,Inherited,Yes
+defaultRingRollingAxisOrientation,Either,,"Default axis orientation for the machine for Ring Rolling process. Valid inputs are 'Either', 'Horizontal' or 'Vertical'.",Inherited,No
+defaultUtilizationMethod,COMPUTED,,"Eligible values: ""COMPUTED"" & ""MACHINE_DEFAULT""",Inherited,No
+disableInvestmentAmortization,false,,"User override to disable amortization of all fixed costs to the individual part or assembly. By default, fixed costs are calculated per part for tooling, fixtures, and programming.",Inherited,No
+enableBlock,true,,User specified condition to enable blocking hits. User may specify to enable blocking hits within Process Setup Options.,Inherited,No
+enableScrapMaterialCredit,false,,Set to 'true' to enable Material Cost reduction due to sale of scrap mass of part.,Inherited,No
+enableScrapPartCredit,false,,Set to 'true' to enable Material Cost reduction due to sale of scrapped parts as a result of Good Part Yield.,Inherited,No
+enableUpset,true,,User specified condition to enable upsetting hits. User may specify to enable upsetting hits within Process Setup Options.,Inherited,No
+finishAllowance,0.25,Length,The depth of cut that is applied to features when finishing operations are included. Used to calculate volume removed by machining.,Inherited,No
+finishingHitsFactor,.8,,A dial for adjusting the number finishing hits with respect to the number of upsetting and blocking hits when all 3 are enabled.,Inherited,No
+forceDistributionAngle,20,Angle,The minimum angle required due to force distribution when calculating die block dimensions. Typical values are between 12-20 degrees.,Inherited,No
+frictionCoefficient,0.4,,Coefficient of friction between the Open Die Press machine's tooling and the surface of the part. Used to calculate the required press force to forge the part. Increasing frictionCoefficient will increase the force required.,Inherited,No
+gearQualityDefaultAgmaNewStd,A8,,"A2, A3, A4, ... A11, A12",Inherited,No
+gearQualityDefaultAgmaOldStd,Q8,,"Q15, Q14, Q13, ... Q6, Q5",Inherited,No
+gearQualityDefaultDinStd,9,,"2, 3, 4, ... 11, 12",Inherited,No
+genericValidation,true,,'true' if the generic validation view should be used for parts costed in this process group in this Digital Factory,Inherited,No
+hammerDieCostComp,1,,Cost compensation for dialing total cost of a hammer die up or down.,Inherited,No
+hammerToolLifeNumberOfParts,7500,,The number of parts that can be produced from each Hammer tool before the tooling needs refurbishing or replacing.,Inherited,No
+hideMaxThicknessData,true,,'true' or 'false' - set to 'true' so that Max Thickness Data is not considered in Design Guidance Thickness Panel and shown as 'n/a'.,Inherited,No
+impactEnergyFactorAdjustment,1,,Factor used to globally increase or decrease the impact energy factor used in Hammer process.,Inherited,No
+includePierceDieMaterial,false,,Setting used to indicate if material cost should be accounted for in the calculation of piercing die cost.,Inherited,No
+includeTrimDieMaterial,false,,Setting used to indicate if material cost should be accounted for in the calculation of trimming die cost.,Inherited,No
+inductionHeatMaxStockWidth,101.6,Length,The maximum width (diameter) of mult that can be heated via the Conveyor Induction Heat process.,Inherited,No
+inductionHeatMinMultRatio,2,,The minimum mult length to width (diameter) ratio to ensure it will remain flat in the Conveyor Induction Heat machine.,Inherited,No
+laborRateAdjustmentFactor,1,,Factor used to globally increase or decrease labor rate per process.,Inherited,No
+lineDeviationIsBentMinThreshold,0.33,,The minimum normalized line deviation on a Cross Sectional Analysis GCD that classifies the part as being bent in the line direction.,Inherited,No
+lineDeviationLineOfSymmetryMaxThreshold,0.12,,The maximum normalized line deviation on a Cross Sectional Analysis GCD that classifies the part as having a line of symmetry.,Inherited,No
+max3DComplexityScore,12,,The maximum complexity score that a part classified as 3D can have.,Inherited,No
+maxBilletRatio,3.5,,"Maximum ratio of length to width of mult. Used in stock selection. For a material stock to be valid, the billet ratio must be between the minimum and maximum allowable ratios.",Inherited,No
+maxBlockingDieAddOn,8000,Currency,Threshold above which the calculated cost of a blocking die cavity is not valid.,Inherited,No
+maxFinishDieCost,25000,Currency,Threshold above which the calculated cost of a finishing die is not valid.,Inherited,No
+maxForgedCurvedSurfaceRadius,2,Length,The maximum radius of a curved surface that can be created without machining.,Inherited,No
+maxForgedEdgeRadius,2,Length,The maximum radius of an edge that can be created without machining.,Inherited,No
+maxLengthWidthRatio,3,,Length to width ratio above which the mult orientation is set to flat.,Inherited,No
+maxNumStandardDeviationsRadiusMaxSeverity,2,,The maximum number of standard deviations that can be returned when calculating the z-score for the maximum radius from the average radius. All values under this are normalized between 0 and 1 with a linear relationship.,Inherited,No
+maxPierceDieCostWithMaterial,17000,Currency,Threshold above which the material based calculation of the piercing die cost is not valid.,Inherited,No
+maxPierceDieCostWithOutMaterial,11000,Currency,Threshold above which the non- material based calculation of the piercing die cost is not valid.,Inherited,No
+maxTrimDieCostWithMaterial,15000,Currency,Threshold above which the material based calculation of the trimming die cost is not valid.,Inherited,No
+maxTrimDieCostWithOutMaterial,4000,Currency,Threshold above which the non- material based calculation of the trimming die cost is not valid.,Inherited,No
+mechanicalPressBolsterPlateAddendumThickness,25.4,Length,The addendum separating the bolster plate perimeter and the press table perimeter on a Mechanical Press.,Inherited,No
+mechanicalPressForceReductionFactorMultiStation,0.7,,Factor that is applied to the maximum available press force for Mechanical Press machines when configured as a multi-station press. Accounts for a required reduction in force due to off-center loads and a safe limit on the applied press force.,Inherited,No
+mechanicalPressForceReductionFactorSingleStation,0.9,,Factor that is applied to the maximum available press force for Mechanical Press machines when configured as a single station press. Accounts for a safe limit on the applied press force.,Inherited,No
+mechanicalPressInterDieBlockSpacing,25.4,Length,The spacing between die blocks on a Mechanical Press table when multiple stations are used.,Inherited,No
+mechanicalPressNumberOfStations,3,,The number of forging stations used within the Mechanical Press.,Inherited,No
+mechanicalPressPartTransferHeightAllowance,152.4,Length,"The spacing required to allow transfer of parts to, from, and in between stations on a Mechanical Press.",Inherited,No
+mechanicalPressToolLifeNumberOfParts,7500,,The number of parts that can be produced from each Mechanical Press tool before the tooling needs refurbishing or replacing.,Inherited,No
+min3DComplexityScore,7,,The minimum complexity score that a part classified as 3D can have.,Inherited,No
+minAsForgedDiameter,6.35,Length,Deprecated in CMV280,Inherited,Yes
+minAverageMandrelVelocity,0.01,Velocity,Minimum average mandrel velocity for Ring Rolling. Used as the minimum value for the process setup option Average Mandrel Velocity.,Inherited,No
+minBilletRatio,.3,,"Minimum ratio of length to width of mult. Used in stock selection. For a material stock to be valid, the billet ratio must be between the minimum and maximum allowable ratios.",Inherited,No
+minBlockingDieAddOn,300,Currency,Threshold below which the calculated cost of a blocking die cavity is not valid.,Inherited,No
+minFinishDieCost,5000,Currency,Threshold below which the calculated cost of a finishing die is not valid.,Inherited,No
+minForgeableHoleDiameter,25.4,Length,Minimum diameter hole that can be formed in a forging operation.,Inherited,No
+minInsertDieCost,500,Currency,Threshold below which the calculated cost of an insert die is not valid.,Inherited,No
+minPierceDieCostWithMaterial,4000,Currency,Threshold below which the material based calculation of the piercing die cost is not valid.,Inherited,No
+minPierceDieCostWithOutMaterial,1000,Currency,Threshold below which the non- material based calculation of the piercing die cost is not valid.,Inherited,No
+minSlugThickness,12.7,Length,Deprecated in CMV250,Inherited,Yes
+minTrimDieCostWithMaterial,3000,Currency,Threshold below which the material based calculation of the trimming die cost is not valid.,Inherited,No
+minTrimDieCostWithOutMaterial,500,Currency,Threshold below which the non- material based calculation of the trimming die cost is not valid.,Inherited,No
+multLengthElongationFactor,1.61,,A factor that represents the elongation in mult length across the forging sequence. A maximum value of 10% is assumed for length elongation in a single stage with a maximum of 5 stages assumed. Used in valid stock selection to determine the minimum mult length.,Inherited,No
+numTemperatureIntervals,100,,The number of temperature intervals used when calculating the Reheat time. Increasing this value increases accuracy and computation time. Set to any integer value greater than 0.,Inherited,No
+openDiePressCalibrationTime,60,Time,The time spent calibrating the location of the mult on the Open Die machine. Used to calculate the cycle time for the Open Die Press process.,Inherited,No
+ovenPartSpacingFactor,0.50,,Factor applied to determine the minimum part spacing required in the oven. For Reheat it is applied to the preformed stock's diameter / width. Set to any value greater than or equal to 0.,Inherited,No
+ovenTemperatureOffset,100,Temperature,Temperature offset used to calculate the minimum oven temperature required to heat the selected material to its forging temperature. Set to any value greater than 0.,Inherited,No
+overheadRateAdjustmentFactor,1,,Factor used to globally increase or decrease overhead rate per process.,Inherited,No
+partLongitudinalRatioThreshold,2,,"The threshold ratio between the largest and next largest part box dimensions. If greater than this value, the part is classified as longitudinal. This will influence process selection.",Inherited,No
+pierceDiaToDepthRatio,.5,,Deprecated in CMV280,Inherited,Yes
+piercingDieCostComp,1,,Cost compensation for dialing total cost of a piercing die up or down.,Inherited,No
+planeDeviationIsBentMinThreshold,0.33,,The minimum normalized plane deviation on a Cross Sectional Analysis GCD that classifies the part as being bent in the plane direction.,Inherited,No
+planeDeviationLineOfSymmetryMaxThreshold,0.12,,The maximum normalized plane deviation on a Cross Sectional Analysis GCD that classifies the part as having a line of symmetry.,Inherited,No
+preformPunchDepthFactor,0.60,,Factor applied to the depth of a hole to calculate its punched depth before it is pierced. Used to calculate the punching force required in the Open Die Press process.,Inherited,No
+preheatFurnaceGasType,Natural Gas,,The type of fuel gas that is supplied to the burners in the Preheat Furnace.,Inherited,No
+preheatInitialTemperature,16,Temperature,Ambient temperature in a factory used to calculate the initial temperature of the stock prior to heating it.,Inherited,No
+pressToolLifeNumberOfParts,7500,,The number of parts that can be produced from each Press tool before the tooling needs refurbishing or replacing.,Inherited,No
+punchedHoleDiameterToDepthRatio,0.5,,Factor applied to a SimpleHole's depth to calculate the minimum required diameter to enable Punching operations in Open Die Press.,Inherited,No
+radiusCoefficientOfVariationThreshold2D,0.25,,"The threshold for classifying 2D parts as having a smaller, or larger, coefficient of variation for Cross Sectional Area Radius. Calculated as the standard deviation of the radius divided by the average radius.",Inherited,No
+radiusCoefficientOfVariationThreshold2_5D,0.25,,"The threshold for classifying non-rotational 2.5D parts as having a smaller, or larger, coefficient of variation for Cross Sectional Area Radius. Calculated as the standard deviation of the radius divided by the average radius.",Inherited,No
+reheatFurnaceGasType,Natural Gas,,The type of fuel gas that is supplied to the burners in the Reheat Furnace.,Inherited,No
+reheatInitialTempFactor,0.50,,Factor applied to the forging temperature of the selected material to calculate the starting temperature when calculating the time to reheat the part. Set to any value between 0.00 and 0.99.,Inherited,No
+ringRollCalibrationTime,60,Time,The time spent calibrating the location of the pre-formed mult on the Ring Rolling machine. Used to calculate the cycle time for the Ring Rolling process.,Inherited,No
+ringRollingHeightFactor,1.2,,Factor applied to the ring's final height to estimate the height of the preformed mult after is upset in the Open Die Press process.,Inherited,No
+roughingCNCRate,0.004,hr/in^3,Rough machining time per volume.,Inherited,No
+scaleLossAllowancePercentage,3,,"Material allowance for losses caused by scale formation when heating the mult using a gas furnace, represented as a percentage of the total forged volume (including flash).",Inherited,No
+scaleLossAllowancePercentageInductionHeating,1,,"Material allowance for losses caused by scale formation when heating the mult using induction heating, represented as a percentage of the total forged volume (including flash).",Inherited,No
+shapeFactorCoefficient,0.333,,Coefficient that is used to calculate the maximum required press force of the Open Die Press machine. Increasing shapeFactorCoefficient will increase the force required.,Inherited,No
+slugThicknessFactor,0.3,,Factor applied to a pierced feature's depth to calculate the slug thickness. Used to calculate the volume of material that is lost by piercing operations. Select a value between 0.01 - 1.00.,Inherited,No
+standardStockLength,6096,Length,Default standard stock length if no stock is available for computed utilization.,Inherited,No
+sumOfForceDistribution,0.4,,Deprecated in CMV270.,Inherited,Yes
+supportsDTC,true,,'true' or 'false' - only set to 'true' if this Digital Factory's cost model has been upgraded or configured to support aPriori's Design-to-Cost functionality.,Inherited,No
+surfaceAreaThreshold2D,0.95,,"A value between 0 and 1 representing the proportion of the part surface area that must be about a turning axis to classify the part as 2D, or axisymmetric.",Inherited,No
+surfaceAreaThreshold2_5D,0.75,,"A value between 0 and 1 representing the proportion of the part surface area that must be about a turning axis to classify the part as 2.5D, or near-axisymmetric.",Inherited,No
+trimDieCostComp,1,,Cost compensation for dialing total cost of a trimming die up or down.,Inherited,No
+trimToolLifeNumberOfParts,7500,,The number of parts that can be produced from each Trim tool before the tooling needs refurbishing or replacing.,Inherited,No
+upsetHeightFactor,4,,Deprecated in CMV250,Inherited,Yes
+usePreferredMachines,true,,"If true the model will first try to select a preferred machine. If false, the system chooses either the default machine or from the entire non-preferred set of machines.",Inherited,No
+validMaterialStocksListLimit,5,,The upper limit applied to the list of valid material stocks evaluated during each routing. A value of 0 will ignore stocks in the Digital Factory and use a virtual stock.,Inherited,No
+virtualMaterialStocksListLimit,3,,The upper limit applied to the list of virtual material stocks evaluated when no valid material stocks are found in the Digital Factory. A value of 0 will result in a failed costing event.,Inherited,No
+virtualStockForm,ROUND_BAR,,Setting used to determine if the default virtual stock is a round bar (ROUND_BAR) or square bar (SQUARE_BAR). Applies to the Closed Die Forging only (Ring Rolled Forging always uses a round bar).,Inherited,No
+voidAspectRatio,1,,Ratio of virtual diameter to virtual height.,Inherited,No
+regionMultiplier,1,,,New,No

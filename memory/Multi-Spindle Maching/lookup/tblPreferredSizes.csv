@@ -1,0 +1,815 @@
+Digital Factory,sizeMm,unitSystem,comment
+eMithran USA,0.3969,both,"1/64"""
+eMithran USA,0.3969,US,"1/64"""
+eMithran USA,0.7937,both,"1/32"""
+eMithran USA,0.7937,US,"1/32"""
+eMithran USA,1.0,both,1 mm
+eMithran USA,1.0,metric,1 mm
+eMithran USA,1.2,both,1.2 mm
+eMithran USA,1.2,metric,1.2 mm
+eMithran USA,1.5875,both,"1/16"""
+eMithran USA,1.5875,US,"1/16"""
+eMithran USA,1.6,both,1.6 mm
+eMithran USA,1.6,metric,1.6 mm
+eMithran USA,2.0,both,2 mm
+eMithran USA,2.0,metric,2 mm
+eMithran USA,2.3813,both,"3/32"""
+eMithran USA,2.3813,US,"3/32"""
+eMithran USA,2.5,both,2.5 mm
+eMithran USA,2.5,metric,2.5 mm
+eMithran USA,3.0,both,3 mm
+eMithran USA,3.0,metric,3 mm
+eMithran USA,3.175,both,"1/8"""
+eMithran USA,3.175,US,"1/8"""
+eMithran USA,3.9688,both,"5/32"""
+eMithran USA,3.9688,US,"5/32"""
+eMithran USA,4.0,both,4 mm
+eMithran USA,4.0,metric,4 mm
+eMithran USA,4.7625,both,"3/16"""
+eMithran USA,4.7625,US,"3/16"""
+eMithran USA,5.0,both,5 mm
+eMithran USA,5.0,metric,5 mm
+eMithran USA,6.0,both,6 mm
+eMithran USA,6.0,metric,6 mm
+eMithran USA,6.35,both,"1/4"""
+eMithran USA,6.35,US,"1/4"""
+eMithran USA,7.9375,both,"5/16"""
+eMithran USA,7.9375,US,"5/16"""
+eMithran USA,8.0,both,8 mm
+eMithran USA,8.0,metric,8 mm
+eMithran USA,9.525,both,"3/8"""
+eMithran USA,9.525,US,"3/8"""
+eMithran USA,10.0,both,10 mm
+eMithran USA,10.0,metric,10 mm
+eMithran USA,11.1125,both,"7/16"""
+eMithran USA,11.1125,US,"7/16"""
+eMithran USA,12.0,both,12 mm
+eMithran USA,12.0,metric,12 mm
+eMithran USA,12.7,both,"1/2"""
+eMithran USA,12.7,US,"1/2"""
+eMithran USA,14.2875,both,"9/16"""
+eMithran USA,14.2875,US,"9/16"""
+eMithran USA,15.875,both,"5/8"""
+eMithran USA,15.875,US,"5/8"""
+eMithran USA,16.0,both,16 mm
+eMithran USA,16.0,metric,16 mm
+eMithran USA,17.4625,both,"11/16"""
+eMithran USA,17.4625,US,"11/16"""
+eMithran USA,19.05,both,"3/4"""
+eMithran USA,19.05,US,"3/4"""
+eMithran USA,20.0,both,20 mm
+eMithran USA,20.0,metric,20 mm
+eMithran USA,22.225,both,"7/8"""
+eMithran USA,22.225,US,"7/8"""
+eMithran USA,25.0,both,25 mm
+eMithran USA,25.0,metric,25 mm
+eMithran USA,25.4,both,"1"""
+eMithran USA,25.4,US,"1"""
+eMithran USA,30.0,both,30 mm
+eMithran USA,30.0,metric,30 mm
+eMithran USA,31.75,both,"1.25"""
+eMithran USA,31.75,US,"1.25"""
+eMithran USA,35.0,both,35 mm
+eMithran USA,35.0,metric,35 mm
+eMithran USA,38.1,both,"1.5"""
+eMithran USA,38.1,US,"1.5"""
+eMithran USA,40.0,both,40 mm
+eMithran USA,40.0,metric,40 mm
+eMithran USA,44.45,both,"1.75"""
+eMithran USA,44.45,US,"1.75"""
+eMithran USA,45.0,both,45 mm
+eMithran USA,45.0,metric,45 mm
+eMithran USA,50.0,both,50 mm
+eMithran USA,50.0,metric,50 mm
+eMithran USA,50.8,both,"2"""
+eMithran USA,50.8,US,"2"""
+eMithran USA,55.0,both,55 mm
+eMithran USA,55.0,metric,55 mm
+eMithran USA,57.15,both,"2.25"""
+eMithran USA,57.15,US,"2.25"""
+eMithran USA,60.0,both,60 mm
+eMithran USA,60.0,metric,60 mm
+eMithran USA,63.5,both,"2.5"""
+eMithran USA,63.5,US,"2.5"""
+eMithran USA,65.0,both,65 mm
+eMithran USA,65.0,metric,65 mm
+eMithran USA,69.85,both,"2.75"""
+eMithran USA,69.85,US,"2.75"""
+eMithran USA,70.0,both,70 mm
+eMithran USA,70.0,metric,70 mm
+eMithran USA,75.0,both,75 mm
+eMithran USA,75.0,metric,75 mm
+eMithran USA,76.2,both,"3"""
+eMithran USA,76.2,US,"3"""
+eMithran USA,80.0,both,80 mm
+eMithran USA,80.0,metric,80 mm
+eMithran USA,82.55,both,"3.25"""
+eMithran USA,82.55,US,"3.25"""
+eMithran USA,88.9,both,"3.5"""
+eMithran USA,88.9,US,"3.5"""
+eMithran USA,90.0,both,90 mm
+eMithran USA,90.0,metric,90 mm
+eMithran USA,95.25,both,"3.75"""
+eMithran USA,95.25,US,"3.75"""
+eMithran USA,100.0,both,100 mm
+eMithran USA,100.0,metric,100 mm
+eMithran USA,101.6,both,"4"""
+eMithran USA,101.6,US,"4"""
+eMithran USA,105.0,both,105 mm
+eMithran USA,105.0,metric,105 mm
+eMithran USA,107.95,both,"4.25"""
+eMithran USA,107.95,US,"4.25"""
+eMithran USA,110.0,both,110 mm
+eMithran USA,110.0,metric,110 mm
+eMithran USA,114.3,both,"4.5"""
+eMithran USA,114.3,US,"4.5"""
+eMithran USA,120.0,both,120 mm
+eMithran USA,120.0,metric,120 mm
+eMithran USA,120.65,both,"4.75"""
+eMithran USA,120.65,US,"4.75"""
+eMithran USA,127.0,both,"5"""
+eMithran USA,127.0,US,"5"""
+eMithran USA,130.0,both,130 mm
+eMithran USA,130.0,metric,130 mm
+eMithran USA,133.35,both,"5.25"""
+eMithran USA,133.35,US,"5.25"""
+eMithran USA,139.7,both,"5.5"""
+eMithran USA,139.7,US,"5.5"""
+eMithran USA,140.0,both,140 mm
+eMithran USA,140.0,metric,140 mm
+eMithran USA,146.05,both,"5.75"""
+eMithran USA,146.05,US,"5.75"""
+eMithran USA,150.0,both,150 mm
+eMithran USA,150.0,metric,150 mm
+eMithran USA,152.4,both,"6"""
+eMithran USA,152.4,US,"6"""
+eMithran USA,160.0,both,160 mm
+eMithran USA,160.0,metric,160 mm
+eMithran USA,165.1,both,"6.5"""
+eMithran USA,165.1,US,"6.5"""
+eMithran USA,170.0,both,170 mm
+eMithran USA,170.0,metric,170 mm
+eMithran USA,177.8,both,"7"""
+eMithran USA,177.8,US,"7"""
+eMithran USA,180.0,both,180 mm
+eMithran USA,180.0,metric,180 mm
+eMithran USA,190.0,both,190 mm
+eMithran USA,190.0,metric,190 mm
+eMithran USA,190.5,both,"7.5"""
+eMithran USA,190.5,US,"7.5"""
+eMithran USA,200.0,both,200 mm
+eMithran USA,200.0,metric,200 mm
+eMithran USA,203.2,both,"8"""
+eMithran USA,203.2,US,"8"""
+eMithran USA,215.9,both,"8.5"""
+eMithran USA,215.9,US,"8.5"""
+eMithran USA,220.0,both,220 mm
+eMithran USA,220.0,metric,220 mm
+eMithran USA,228.6,both,"9"""
+eMithran USA,228.6,US,"9"""
+eMithran USA,240.0,both,240 mm
+eMithran USA,240.0,metric,240 mm
+eMithran USA,241.3,both,"9.5"""
+eMithran USA,241.3,US,"9.5"""
+eMithran USA,254.0,both,"10"""
+eMithran USA,254.0,US,"10"""
+eMithran USA,260.0,both,260 mm
+eMithran USA,260.0,metric,260 mm
+eMithran USA,266.7,both,"10.5"""
+eMithran USA,266.7,US,"10.5"""
+eMithran USA,279.4,both,"11"""
+eMithran USA,279.4,US,"11"""
+eMithran USA,280.0,both,280 mm
+eMithran USA,280.0,metric,280 mm
+eMithran USA,292.1,both,"11.5"""
+eMithran USA,292.1,US,"11.5"""
+eMithran USA,300.0,both,300 mm
+eMithran USA,300.0,metric,300 mm
+eMithran USA,304.8,both,"12"""
+eMithran USA,304.8,US,"12"""
+eMithran USA,317.5,both,"12.5"""
+eMithran USA,317.5,US,"12.5"""
+eMithran USA,320.0,both,320 mm
+eMithran USA,320.0,metric,320 mm
+eMithran USA,330.2,both,"13"""
+eMithran USA,330.2,US,"13"""
+eMithran USA,340.0,both,340 mm
+eMithran USA,340.0,metric,340 mm
+eMithran USA,342.9,both,"13.5"""
+eMithran USA,342.9,US,"13.5"""
+eMithran USA,355.6,both,"14"""
+eMithran USA,355.6,US,"14"""
+eMithran USA,360.0,both,360 mm
+eMithran USA,360.0,metric,360 mm
+eMithran USA,368.3,both,"14.5"""
+eMithran USA,368.3,US,"14.5"""
+eMithran USA,380.0,both,380 mm
+eMithran USA,380.0,metric,380 mm
+eMithran USA,381.0,both,"15"""
+eMithran USA,381.0,US,"15"""
+eMithran USA,393.7,both,"15.5"""
+eMithran USA,393.7,US,"15.5"""
+eMithran USA,400.0,both,400 mm
+eMithran USA,400.0,metric,400 mm
+eMithran USA,406.4,both,"16"""
+eMithran USA,406.4,US,"16"""
+eMithran USA,419.1,both,"16.5"""
+eMithran USA,419.1,US,"16.5"""
+eMithran USA,431.8,both,"17"""
+eMithran USA,431.8,US,"17"""
+eMithran USA,444.5,both,"17.5"""
+eMithran USA,444.5,US,"17.5"""
+eMithran USA,450.0,both,450 mm
+eMithran USA,450.0,metric,450 mm
+eMithran USA,457.2,both,"18"""
+eMithran USA,457.2,US,"18"""
+eMithran USA,469.9,both,"18.5"""
+eMithran USA,469.9,US,"18.5"""
+eMithran USA,482.6,both,"19.0"""
+eMithran USA,482.6,US,"19.0"""
+eMithran USA,495.3,both,"19.5"""
+eMithran USA,495.3,US,"19.5"""
+eMithran USA,500.0,both,500 mm
+eMithran USA,500.0,metric,500 mm
+eMithran USA,508.0,both,"20.0"""
+eMithran USA,508.0,US,"20.0"""
+eMithran USA,533.4,both,"21.0"""
+eMithran USA,533.4,US,"21.0"""
+eMithran USA,550.0,both,550 mm
+eMithran USA,550.0,metric,550 mm
+eMithran USA,558.8,both,"22.0"""
+eMithran USA,558.8,US,"22.0"""
+eMithran USA,584.2,both,"23.0"""
+eMithran USA,584.2,US,"23.0"""
+eMithran USA,600.0,both,600 mm
+eMithran USA,600.0,metric,600 mm
+eMithran USA,609.6,both,"24.0"""
+eMithran USA,609.6,US,"24.0"""
+eMithran USA,635.0,both,"635.0"""
+eMithran USA,635.0,US,"25.0"""
+eMithran USA,650.0,both,650 mm
+eMithran USA,650.0,metric,650 mm
+eMithran USA,660.4,both,"660.4.0"""
+eMithran USA,660.4,US,"26.0"""
+eMithran USA,685.8,both,"685.8.0"""
+eMithran USA,685.8,US,"27.0"""
+eMithran USA,700.0,both,700 mm
+eMithran USA,700.0,metric,700 mm
+eMithran USA,711.2,both,"711.2.0"""
+eMithran USA,711.2,US,"28.0"""
+eMithran USA,736.6,both,"736.6.0"""
+eMithran USA,736.6,US,"29.0"""
+eMithran USA,750.0,both,750 mm
+eMithran USA,750.0,metric,750 mm
+eMithran USA,762.0,both,"762.0"""
+eMithran USA,762.0,US,"30.0"""
+eMithran USA,787.4,both,"787.4.0"""
+eMithran USA,787.4,US,"31.0"""
+eMithran USA,800.0,both,800 mm
+eMithran USA,800.0,metric,800 mm
+eMithran USA,812.8,both,"812.8.0"""
+eMithran USA,812.8,US,"32.0"""
+eMithran USA,838.2,both,"838.2.0"""
+eMithran USA,838.2,US,"33.0"""
+eMithran USA,863.6,both,"863.6.0"""
+eMithran USA,863.6,US,"34.0"""
+eMithran USA,889.0,both,"889.0"""
+eMithran USA,889.0,US,"35.0"""
+eMithran USA,900.0,both,900 mm
+eMithran USA,900.0,metric,900 mm
+eMithran USA,914.4,both,"914.4.0"""
+eMithran USA,914.4,US,"36.0"""
+eMithran USA,939.8,both,"939.8.0"""
+eMithran USA,939.8,US,"37.0"""
+eMithran USA,965.2,both,"965.2.0"""
+eMithran USA,965.2,US,"38.0"""
+eMithran USA,990.6,both,"990.6.0"""
+eMithran USA,990.6,US,"39.0"""
+eMithran USA,1000.0,both,1000 mm
+eMithran USA,1000.0,metric,1000 mm
+eMithran USA,1016.0,both,"1016.0"""
+eMithran USA,1016.0,US,"40.0"""
+eMithran USA,1041.4,both,"1041.4.0"""
+eMithran USA,1041.4,US,"41.0"""
+eMithran USA,1050.0,both,1050 mm
+eMithran USA,1050.0,metric,1050 mm
+eMithran USA,1066.8,both,"1066.8.0"""
+eMithran USA,1066.8,US,"42.0"""
+eMithran USA,1092.2,both,"1092.2.0"""
+eMithran USA,1092.2,US,"43.0"""
+eMithran USA,1100.0,both,1100 mm
+eMithran USA,1100.0,metric,1100 mm
+eMithran USA,1117.6,both,"1117.6.0"""
+eMithran USA,1117.6,US,"44.0"""
+eMithran USA,1143.0,both,"1143.0"""
+eMithran USA,1143.0,US,"45.0"""
+eMithran USA,1168.4,both,"1168.4.0"""
+eMithran USA,1168.4,US,"46.0"""
+eMithran USA,1193.8,both,"1193.8.0"""
+eMithran USA,1193.8,US,"47.0"""
+eMithran USA,1200.0,both,1200 mm
+eMithran USA,1200.0,metric,1200 mm
+eMithran USA,1219.2,both,"1219.2.0"""
+eMithran USA,1219.2,US,"48.0"""
+eMithran USA,1244.6,both,"1244.6.0"""
+eMithran USA,1244.6,US,"49.0"""
+eMithran USA,1270.0,both,"1270.0"""
+eMithran USA,1270.0,US,"50.0"""
+eMithran USA,1295.4,both,"1295.4.0"""
+eMithran USA,1295.4,US,"51.0"""
+eMithran USA,1300.0,both,1300 mm
+eMithran USA,1300.0,metric,1300 mm
+eMithran USA,1320.8,both,"1320.8.0"""
+eMithran USA,1320.8,US,"52.0"""
+eMithran USA,1346.2,both,"1346.2.0"""
+eMithran USA,1346.2,US,"53.0"""
+eMithran USA,1371.6,both,"1371.6.0"""
+eMithran USA,1371.6,US,"54.0"""
+eMithran USA,1397.0,both,"1397.0"""
+eMithran USA,1397.0,US,"55.0"""
+eMithran USA,1400.0,both,1400 mm
+eMithran USA,1400.0,metric,1400 mm
+eMithran USA,1422.4,both,"1422.4.0"""
+eMithran USA,1422.4,US,"56.0"""
+eMithran USA,1447.8,both,"1447.8.0"""
+eMithran USA,1447.8,US,"57.0"""
+eMithran USA,1473.2,both,"1473.2.0"""
+eMithran USA,1473.2,US,"58.0"""
+eMithran USA,1498.6,both,"1498.6.0"""
+eMithran USA,1498.6,US,"59.0"""
+eMithran USA,1500.0,both,1500 mm
+eMithran USA,1500.0,metric,1500 mm
+eMithran USA,1524.0,both,"1524.0"""
+eMithran USA,1524.0,US,"60.0"""
+eMithran USA,1549.4,both,"1549.4.0"""
+eMithran USA,1549.4,US,"61.0"""
+eMithran USA,1574.8,both,"1574.8.0"""
+eMithran USA,1574.8,US,"62.0"""
+eMithran USA,1600.0,both,1600 mm
+eMithran USA,1600.0,metric,1600 mm
+eMithran USA,1600.2,both,"1600.2.0"""
+eMithran USA,1600.2,US,"63.0"""
+eMithran USA,1625.6,both,"1625.6.0"""
+eMithran USA,1625.6,US,"64.0"""
+eMithran USA,1651.0,both,"1651.0"""
+eMithran USA,1651.0,US,"65.0"""
+eMithran USA,1676.4,both,"1676.4.0"""
+eMithran USA,1676.4,US,"66.0"""
+eMithran USA,1700.0,both,1700 mm
+eMithran USA,1700.0,metric,1700 mm
+eMithran USA,1701.8,both,"1701.8.0"""
+eMithran USA,1701.8,US,"67.0"""
+eMithran USA,1727.2,both,"1727.2.0"""
+eMithran USA,1727.2,US,"68.0"""
+eMithran USA,1752.6,both,"1752.6.0"""
+eMithran USA,1752.6,US,"69.0"""
+eMithran USA,1778.0,both,"1778.0"""
+eMithran USA,1778.0,US,"70.0"""
+eMithran USA,1800.0,both,1800 mm
+eMithran USA,1800.0,metric,1800 mm
+eMithran USA,1803.4,both,"1803.4.0"""
+eMithran USA,1803.4,US,"71.0"""
+eMithran USA,1828.8,both,"1828.8.0"""
+eMithran USA,1828.8,US,"72.0"""
+eMithran USA,1854.2,both,"1854.2.0"""
+eMithran USA,1854.2,US,"73.0"""
+eMithran USA,1879.6,both,"1879.6.0"""
+eMithran USA,1879.6,US,"74.0"""
+eMithran USA,1900.0,both,1900 mm
+eMithran USA,1900.0,metric,1900 mm
+eMithran USA,1905.0,both,"1905.0"""
+eMithran USA,1905.0,US,"75.0"""
+eMithran USA,1930.4,both,"1930.4.0"""
+eMithran USA,1930.4,US,"76.0"""
+eMithran USA,1955.8,both,"1955.8.0"""
+eMithran USA,1955.8,US,"77.0"""
+eMithran USA,1981.2,both,"1981.2.0"""
+eMithran USA,1981.2,US,"78.0"""
+eMithran USA,2000.0,both,2000 mm
+eMithran USA,2000.0,metric,2000 mm
+eMithran USA,2006.6,both,"2006.6.0"""
+eMithran USA,2006.6,US,"79.0"""
+eMithran USA,2032.0,both,"2032.0"""
+eMithran USA,2032.0,US,"80.0"""
+eMithran USA,2057.4,both,"2057.4.0"""
+eMithran USA,2057.4,US,"81.0"""
+eMithran USA,2082.8,both,"2082.8.0"""
+eMithran USA,2082.8,US,"82.0"""
+eMithran USA,2108.2,both,"2108.2.0"""
+eMithran USA,2108.2,US,"83.0"""
+eMithran USA,2133.6,both,"2133.6.0"""
+eMithran USA,2133.6,US,"84.0"""
+eMithran USA,2159.0,both,"2159.0"""
+eMithran USA,2159.0,US,"85.0"""
+eMithran USA,2184.4,both,"2184.4.0"""
+eMithran USA,2184.4,US,"86.0"""
+eMithran USA,2200.0,both,2200 mm
+eMithran USA,2200.0,metric,2200 mm
+eMithran USA,2209.8,both,"2209.8.0"""
+eMithran USA,2209.8,US,"87.0"""
+eMithran USA,2235.2,both,"2235.2.0"""
+eMithran USA,2235.2,US,"88.0"""
+eMithran USA,2260.6,both,"2260.6.0"""
+eMithran USA,2260.6,US,"89.0"""
+eMithran USA,2286.0,both,"2286.0"""
+eMithran USA,2286.0,US,"90.0"""
+eMithran USA,2311.4,both,"2311.4.0"""
+eMithran USA,2311.4,US,"91.0"""
+eMithran USA,2336.8,both,"2336.8.0"""
+eMithran USA,2336.8,US,"92.0"""
+eMithran USA,2362.2,both,"2362.2.0"""
+eMithran USA,2362.2,US,"93.0"""
+eMithran USA,2387.6,both,"2387.6.0"""
+eMithran USA,2387.6,US,"94.0"""
+eMithran USA,2400.0,both,2400 mm
+eMithran USA,2400.0,metric,2400 mm
+eMithran USA,2413.0,both,"2413.0"""
+eMithran USA,2413.0,US,"95.0"""
+eMithran USA,2438.4,both,"2438.4.0"""
+eMithran USA,2438.4,US,"96.0"""
+eMithran USA,2463.8,both,"2463.8.0"""
+eMithran USA,2463.8,US,"97.0"""
+eMithran USA,2489.2,both,"2489.2.0"""
+eMithran USA,2489.2,US,"98.0"""
+eMithran USA,2514.6,both,"2514.6.0"""
+eMithran USA,2514.6,US,"99.0"""
+eMithran USA,2540.0,both,"2540.0"""
+eMithran USA,2540.0,US,"100.0"""
+eMithran USA,2565.4,both,"2565.4.0"""
+eMithran USA,2565.4,US,"101.0"""
+eMithran USA,2590.8,both,"2590.8.0"""
+eMithran USA,2590.8,US,"102.0"""
+eMithran USA,2600.0,both,2600 mm
+eMithran USA,2600.0,metric,2600 mm
+eMithran USA,2616.2,both,"2616.2.0"""
+eMithran USA,2616.2,US,"103.0"""
+eMithran USA,2641.6,both,"2641.6.0"""
+eMithran USA,2641.6,US,"104.0"""
+eMithran USA,2667.0,both,"2667.0"""
+eMithran USA,2667.0,US,"105.0"""
+eMithran USA,2692.4,both,"2692.4.0"""
+eMithran USA,2692.4,US,"106.0"""
+eMithran USA,2717.8,both,"2717.8.0"""
+eMithran USA,2717.8,US,"107.0"""
+eMithran USA,2743.2,both,"2743.2.0"""
+eMithran USA,2743.2,US,"108.0"""
+eMithran USA,2768.6,both,"2768.6.0"""
+eMithran USA,2768.6,US,"109.0"""
+eMithran USA,2794.0,both,"2794.0"""
+eMithran USA,2794.0,US,"110.0"""
+eMithran USA,2800.0,both,2800 mm
+eMithran USA,2800.0,metric,2800 mm
+eMithran USA,2819.4,both,"2819.4.0"""
+eMithran USA,2819.4,US,"111.0"""
+eMithran USA,2844.8,both,"2844.8.0"""
+eMithran USA,2844.8,US,"112.0"""
+eMithran USA,2870.2,both,"2870.2.0"""
+eMithran USA,2870.2,US,"113.0"""
+eMithran USA,2895.6,both,"2895.6.0"""
+eMithran USA,2895.6,US,"114.0"""
+eMithran USA,2921.0,both,"2921.0"""
+eMithran USA,2921.0,US,"115.0"""
+eMithran USA,2946.4,both,"2946.4.0"""
+eMithran USA,2946.4,US,"116.0"""
+eMithran USA,2971.8,both,"2971.8.0"""
+eMithran USA,2971.8,US,"117.0"""
+eMithran USA,2997.2,both,"2997.2.0"""
+eMithran USA,2997.2,US,"118.0"""
+eMithran USA,3000.0,both,3000 mm
+eMithran USA,3000.0,metric,3000 mm
+eMithran USA,3022.6,both,"3022.6.0"""
+eMithran USA,3022.6,US,"119.0"""
+eMithran USA,3048.0,both,"3048.0"""
+eMithran USA,3048.0,US,"120.0"""
+eMithran USA,3073.4,both,"3073.4.0"""
+eMithran USA,3073.4,US,"121.0"""
+eMithran USA,3098.8,both,"3098.8.0"""
+eMithran USA,3098.8,US,"122.0"""
+eMithran USA,3124.2,both,"3124.2.0"""
+eMithran USA,3124.2,US,"123.0"""
+eMithran USA,3149.6,both,"3149.6.0"""
+eMithran USA,3149.6,US,"124.0"""
+eMithran USA,3175.0,both,"3175.0"""
+eMithran USA,3175.0,US,"125.0"""
+eMithran USA,3200.0,both,3200 mm
+eMithran USA,3200.0,metric,3200 mm
+eMithran USA,3200.4,both,"3200.4.0"""
+eMithran USA,3200.4,US,"126.0"""
+eMithran USA,3225.8,both,"3225.8.0"""
+eMithran USA,3225.8,US,"127.0"""
+eMithran USA,3251.2,both,"3251.2.0"""
+eMithran USA,3251.2,US,"128.0"""
+eMithran USA,3276.6,both,"3276.6.0"""
+eMithran USA,3276.6,US,"129.0"""
+eMithran USA,3302.0,both,"3302.0"""
+eMithran USA,3302.0,US,"130.0"""
+eMithran USA,3327.4,both,"3327.4.0"""
+eMithran USA,3327.4,US,"131.0"""
+eMithran USA,3352.8,both,"3352.8.0"""
+eMithran USA,3352.8,US,"132.0"""
+eMithran USA,3378.2,both,"3378.2.0"""
+eMithran USA,3378.2,US,"133.0"""
+eMithran USA,3400.0,both,3400 mm
+eMithran USA,3400.0,metric,3400 mm
+eMithran USA,3403.6,both,"3403.6.0"""
+eMithran USA,3403.6,US,"134.0"""
+eMithran USA,3429.0,both,"3429.0"""
+eMithran USA,3429.0,US,"135.0"""
+eMithran USA,3454.4,both,"3454.4.0"""
+eMithran USA,3454.4,US,"136.0"""
+eMithran USA,3479.8,both,"3479.8.0"""
+eMithran USA,3479.8,US,"137.0"""
+eMithran USA,3505.2,both,"3505.2.0"""
+eMithran USA,3505.2,US,"138.0"""
+eMithran USA,3530.6,both,"3530.6.0"""
+eMithran USA,3530.6,US,"139.0"""
+eMithran USA,3556.0,both,"3556.0"""
+eMithran USA,3556.0,US,"140.0"""
+eMithran USA,3581.4,both,"3581.4.0"""
+eMithran USA,3581.4,US,"141.0"""
+eMithran USA,3600.0,both,3600 mm
+eMithran USA,3600.0,metric,3600 mm
+eMithran USA,3606.8,both,"3606.8.0"""
+eMithran USA,3606.8,US,"142.0"""
+eMithran USA,3632.2,both,"3632.2.0"""
+eMithran USA,3632.2,US,"143.0"""
+eMithran USA,3657.6,both,"3657.6.0"""
+eMithran USA,3657.6,US,"144.0"""
+eMithran USA,3683.0,both,"3683.0"""
+eMithran USA,3683.0,US,"145.0"""
+eMithran USA,3708.4,both,"3708.4.0"""
+eMithran USA,3708.4,US,"146.0"""
+eMithran USA,3733.8,both,"3733.8.0"""
+eMithran USA,3733.8,US,"147.0"""
+eMithran USA,3759.2,both,"3759.2.0"""
+eMithran USA,3759.2,US,"148.0"""
+eMithran USA,3784.6,both,"3784.6.0"""
+eMithran USA,3784.6,US,"149.0"""
+eMithran USA,3800.0,both,3800 mm
+eMithran USA,3800.0,metric,3800 mm
+eMithran USA,3810.0,both,"3810.0"""
+eMithran USA,3810.0,US,"150.0"""
+eMithran USA,3835.4,both,"3835.4.0"""
+eMithran USA,3835.4,US,"151.0"""
+eMithran USA,3860.8,both,"3860.8.0"""
+eMithran USA,3860.8,US,"152.0"""
+eMithran USA,3886.2,both,"3886.2.0"""
+eMithran USA,3886.2,US,"153.0"""
+eMithran USA,3911.6,both,"3911.6.0"""
+eMithran USA,3911.6,US,"154.0"""
+eMithran USA,3937.0,both,"3937.0"""
+eMithran USA,3937.0,US,"155.0"""
+eMithran USA,3962.4,both,"3962.4.0"""
+eMithran USA,3962.4,US,"156.0"""
+eMithran USA,3987.8,both,"3987.8.0"""
+eMithran USA,3987.8,US,"157.0"""
+eMithran USA,4000.0,both,4000 mm
+eMithran USA,4000.0,metric,4000 mm
+eMithran USA,4013.2,both,"4013.2.0"""
+eMithran USA,4013.2,US,"158.0"""
+eMithran USA,4038.6,both,"4038.6.0"""
+eMithran USA,4038.6,US,"159.0"""
+eMithran USA,4064.0,both,"4064.0"""
+eMithran USA,4064.0,US,"160.0"""
+eMithran USA,4089.4,both,"4089.4.0"""
+eMithran USA,4089.4,US,"161.0"""
+eMithran USA,4114.8,both,"4114.8.0"""
+eMithran USA,4114.8,US,"162.0"""
+eMithran USA,4140.2,both,"4140.2.0"""
+eMithran USA,4140.2,US,"163.0"""
+eMithran USA,4165.6,both,"4165.6.0"""
+eMithran USA,4165.6,US,"164.0"""
+eMithran USA,4191.0,both,"4191.0"""
+eMithran USA,4191.0,US,"165.0"""
+eMithran USA,4216.4,both,"4216.4.0"""
+eMithran USA,4216.4,US,"166.0"""
+eMithran USA,4241.8,both,"4241.8.0"""
+eMithran USA,4241.8,US,"167.0"""
+eMithran USA,4267.2,both,"4267.2.0"""
+eMithran USA,4267.2,US,"168.0"""
+eMithran USA,4292.6,both,"4292.6.0"""
+eMithran USA,4292.6,US,"169.0"""
+eMithran USA,4318.0,both,"4318.0"""
+eMithran USA,4318.0,US,"170.0"""
+eMithran USA,4343.4,both,"4343.4.0"""
+eMithran USA,4343.4,US,"171.0"""
+eMithran USA,4368.8,both,"4368.8.0"""
+eMithran USA,4368.8,US,"172.0"""
+eMithran USA,4394.2,both,"4394.2.0"""
+eMithran USA,4394.2,US,"173.0"""
+eMithran USA,4419.6,both,"4419.6.0"""
+eMithran USA,4419.6,US,"174.0"""
+eMithran USA,4445.0,both,"4445.0"""
+eMithran USA,4445.0,US,"175.0"""
+eMithran USA,4470.4,both,"4470.4.0"""
+eMithran USA,4470.4,US,"176.0"""
+eMithran USA,4495.8,both,"4495.8.0"""
+eMithran USA,4495.8,US,"177.0"""
+eMithran USA,4500.0,both,4500 mm
+eMithran USA,4500.0,metric,4500 mm
+eMithran USA,4521.2,both,"4521.2.0"""
+eMithran USA,4521.2,US,"178.0"""
+eMithran USA,4546.6,both,"4546.6.0"""
+eMithran USA,4546.6,US,"179.0"""
+eMithran USA,4572.0,both,"4572.0"""
+eMithran USA,4572.0,US,"180.0"""
+eMithran USA,4597.4,both,"4597.4.0"""
+eMithran USA,4597.4,US,"181.0"""
+eMithran USA,4622.8,both,"4622.8.0"""
+eMithran USA,4622.8,US,"182.0"""
+eMithran USA,4648.2,both,"4648.2.0"""
+eMithran USA,4648.2,US,"183.0"""
+eMithran USA,4673.6,both,"4673.6.0"""
+eMithran USA,4673.6,US,"184.0"""
+eMithran USA,4699.0,both,"4699.0"""
+eMithran USA,4699.0,US,"185.0"""
+eMithran USA,4724.4,both,"4724.4.0"""
+eMithran USA,4724.4,US,"186.0"""
+eMithran USA,4749.8,both,"4749.8.0"""
+eMithran USA,4749.8,US,"187.0"""
+eMithran USA,4775.2,both,"4775.2.0"""
+eMithran USA,4775.2,US,"188.0"""
+eMithran USA,4800.6,both,"4800.6.0"""
+eMithran USA,4800.6,US,"189.0"""
+eMithran USA,4826.0,both,"4826.0"""
+eMithran USA,4826.0,US,"190.0"""
+eMithran USA,4851.4,both,"4851.4.0"""
+eMithran USA,4851.4,US,"191.0"""
+eMithran USA,4876.8,both,"4876.8.0"""
+eMithran USA,4876.8,US,"192.0"""
+eMithran USA,4902.2,both,"4902.2.0"""
+eMithran USA,4902.2,US,"193.0"""
+eMithran USA,4927.6,both,"4927.6.0"""
+eMithran USA,4927.6,US,"194.0"""
+eMithran USA,4953.0,both,"4953.0"""
+eMithran USA,4953.0,US,"195.0"""
+eMithran USA,4978.4,both,"4978.4.0"""
+eMithran USA,4978.4,US,"196.0"""
+eMithran USA,5000.0,both,5000 mm
+eMithran USA,5000.0,metric,5000 mm
+eMithran USA,5003.8,both,"5003.8.0"""
+eMithran USA,5003.8,US,"197.0"""
+eMithran USA,5029.2,both,"5029.2.0"""
+eMithran USA,5029.2,US,"198.0"""
+eMithran USA,5054.6,both,"5054.6.0"""
+eMithran USA,5054.6,US,"199.0"""
+eMithran USA,5080.0,both,"5080.0"""
+eMithran USA,5080.0,US,"200.0"""
+eMithran USA,5105.4,both,"5105.4.0"""
+eMithran USA,5105.4,US,"201.0"""
+eMithran USA,5130.8,both,"5130.8.0"""
+eMithran USA,5130.8,US,"202.0"""
+eMithran USA,5156.2,both,"5156.2.0"""
+eMithran USA,5156.2,US,"203.0"""
+eMithran USA,5181.6,both,"5181.6.0"""
+eMithran USA,5181.6,US,"204.0"""
+eMithran USA,5207.0,both,"5207.0"""
+eMithran USA,5207.0,US,"205.0"""
+eMithran USA,5232.4,both,"5232.4.0"""
+eMithran USA,5232.4,US,"206.0"""
+eMithran USA,5257.8,both,"5257.8.0"""
+eMithran USA,5257.8,US,"207.0"""
+eMithran USA,5283.2,both,"5283.2.0"""
+eMithran USA,5283.2,US,"208.0"""
+eMithran USA,5308.6,both,"5308.6.0"""
+eMithran USA,5308.6,US,"209.0"""
+eMithran USA,5334.0,both,"5334.0"""
+eMithran USA,5334.0,US,"210.0"""
+eMithran USA,5359.4,both,"5359.4.0"""
+eMithran USA,5359.4,US,"211.0"""
+eMithran USA,5384.8,both,"5384.8.0"""
+eMithran USA,5384.8,US,"212.0"""
+eMithran USA,5410.2,both,"5410.2.0"""
+eMithran USA,5410.2,US,"213.0"""
+eMithran USA,5435.6,both,"5435.6.0"""
+eMithran USA,5435.6,US,"214.0"""
+eMithran USA,5461.0,both,"5461.0"""
+eMithran USA,5461.0,US,"215.0"""
+eMithran USA,5486.4,both,"5486.4.0"""
+eMithran USA,5486.4,US,"216.0"""
+eMithran USA,5500.0,both,5500 mm
+eMithran USA,5500.0,metric,5500 mm
+eMithran USA,5511.8,both,"5511.8.0"""
+eMithran USA,5511.8,US,"217.0"""
+eMithran USA,5537.2,both,"5537.2.0"""
+eMithran USA,5537.2,US,"218.0"""
+eMithran USA,5562.6,both,"5562.6.0"""
+eMithran USA,5562.6,US,"219.0"""
+eMithran USA,5588.0,both,"5588.0"""
+eMithran USA,5588.0,US,"220.0"""
+eMithran USA,5613.4,both,"5613.4.0"""
+eMithran USA,5613.4,US,"221.0"""
+eMithran USA,5638.8,both,"5638.8.0"""
+eMithran USA,5638.8,US,"222.0"""
+eMithran USA,5664.2,both,"5664.2.0"""
+eMithran USA,5664.2,US,"223.0"""
+eMithran USA,5689.6,both,"5689.6.0"""
+eMithran USA,5689.6,US,"224.0"""
+eMithran USA,5715.0,both,"5715.0"""
+eMithran USA,5715.0,US,"225.0"""
+eMithran USA,5740.4,both,"5740.4.0"""
+eMithran USA,5740.4,US,"226.0"""
+eMithran USA,5765.8,both,"5765.8.0"""
+eMithran USA,5765.8,US,"227.0"""
+eMithran USA,5791.2,both,"5791.2.0"""
+eMithran USA,5791.2,US,"228.0"""
+eMithran USA,5816.6,both,"5816.6.0"""
+eMithran USA,5816.6,US,"229.0"""
+eMithran USA,5842.0,both,"5842.0"""
+eMithran USA,5842.0,US,"230.0"""
+eMithran USA,5867.4,both,"5867.4.0"""
+eMithran USA,5867.4,US,"231.0"""
+eMithran USA,5892.8,both,"5892.8.0"""
+eMithran USA,5892.8,US,"232.0"""
+eMithran USA,5918.2,both,"5918.2.0"""
+eMithran USA,5918.2,US,"233.0"""
+eMithran USA,5943.6,both,"5943.6.0"""
+eMithran USA,5943.6,US,"234.0"""
+eMithran USA,5969.0,both,"5969.0"""
+eMithran USA,5969.0,US,"235.0"""
+eMithran USA,5994.4,both,"5994.4.0"""
+eMithran USA,5994.4,US,"236.0"""
+eMithran USA,6000.0,both,6000 mm
+eMithran USA,6000.0,metric,6000 mm
+eMithran USA,6019.8,both,"6019.8.0"""
+eMithran USA,6019.8,US,"237.0"""
+eMithran USA,6045.2,both,"6045.2.0"""
+eMithran USA,6045.2,US,"238.0"""
+eMithran USA,6070.6,both,"6070.6.0"""
+eMithran USA,6070.6,US,"239.0"""
+eMithran USA,6096.0,both,"6096.0"""
+eMithran USA,6096.0,US,"240.0"""
+eMithran USA,6121.4,both,"6121.4.0"""
+eMithran USA,6121.4,US,"241.0"""
+eMithran USA,6146.8,both,"6146.8.0"""
+eMithran USA,6146.8,US,"242.0"""
+eMithran USA,6172.2,both,"6172.2.0"""
+eMithran USA,6172.2,US,"243.0"""
+eMithran USA,6197.6,both,"6197.6.0"""
+eMithran USA,6197.6,US,"244.0"""
+eMithran USA,6223.0,both,"6223.0"""
+eMithran USA,6223.0,US,"245.0"""
+eMithran USA,6248.4,both,"6248.4.0"""
+eMithran USA,6248.4,US,"246.0"""
+eMithran USA,6273.8,both,"6273.8.0"""
+eMithran USA,6273.8,US,"247.0"""
+eMithran USA,6299.2,both,"6299.2.0"""
+eMithran USA,6299.2,US,"248.0"""
+eMithran USA,6324.6,both,"6324.6.0"""
+eMithran USA,6324.6,US,"249.0"""
+eMithran USA,6350.0,both,"6350.0"""
+eMithran USA,6350.0,US,"250.0"""
+eMithran USA,6375.4,both,"6375.4.0"""
+eMithran USA,6375.4,US,"251.0"""
+eMithran USA,6400.8,both,"6400.8.0"""
+eMithran USA,6400.8,US,"252.0"""
+eMithran USA,6426.2,both,"6426.2.0"""
+eMithran USA,6426.2,US,"253.0"""
+eMithran USA,6451.6,both,"6451.6.0"""
+eMithran USA,6451.6,US,"254.0"""
+eMithran USA,6477.0,both,"6477.0"""
+eMithran USA,6477.0,US,"255.0"""
+eMithran USA,6500.0,both,6500 mm
+eMithran USA,6500.0,metric,6500 mm
+eMithran USA,6502.4,both,"6502.4.0"""
+eMithran USA,6502.4,US,"256.0"""
+eMithran USA,6527.8,both,"6527.8.0"""
+eMithran USA,6527.8,US,"257.0"""
+eMithran USA,6553.2,both,"6553.2.0"""
+eMithran USA,6553.2,US,"258.0"""
+eMithran USA,6578.6,both,"6578.6.0"""
+eMithran USA,6578.6,US,"259.0"""
+eMithran USA,6604.0,both,"6604.0"""
+eMithran USA,6604.0,US,"260.0"""
+eMithran USA,6629.4,both,"6629.4.0"""
+eMithran USA,6629.4,US,"261.0"""
+eMithran USA,6654.8,both,"6654.8.0"""
+eMithran USA,6654.8,US,"262.0"""
+eMithran USA,6680.2,both,"6680.2.0"""
+eMithran USA,6680.2,US,"263.0"""
+eMithran USA,6705.6,both,"6705.6.0"""
+eMithran USA,6705.6,US,"264.0"""
+eMithran USA,6731.0,both,"6731.0"""
+eMithran USA,6731.0,US,"265.0"""
+eMithran USA,6756.4,both,"6756.4.0"""
+eMithran USA,6756.4,US,"266.0"""
+eMithran USA,6781.8,both,"6781.8.0"""
+eMithran USA,6781.8,US,"267.0"""
+eMithran USA,6807.2,both,"6807.2.0"""
+eMithran USA,6807.2,US,"268.0"""
+eMithran USA,6832.6,both,"6832.6.0"""
+eMithran USA,6832.6,US,"269.0"""
+eMithran USA,6858.0,both,"6858.0"""
+eMithran USA,6858.0,US,"270.0"""
+eMithran USA,6883.4,both,"6883.4.0"""
+eMithran USA,6883.4,US,"271.0"""
+eMithran USA,6908.8,both,"6908.8.0"""
+eMithran USA,6908.8,US,"272.0"""
+eMithran USA,6934.2,both,"6934.2.0"""
+eMithran USA,6934.2,US,"273.0"""
+eMithran USA,6959.6,both,"6959.6.0"""
+eMithran USA,6959.6,US,"274.0"""
+eMithran USA,6985.0,both,"6985.0"""
+eMithran USA,6985.0,US,"275.0"""
+eMithran USA,7000.0,both,7000 mm
+eMithran USA,7000.0,metric,7000 mm

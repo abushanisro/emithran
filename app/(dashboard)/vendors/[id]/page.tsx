@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import type { VendorEquipment } from '@/lib/api/vendors';
 import { EQUIPMENT_TYPES, EQUIPMENT_CATEGORIES, getAllCategories, getEquipmentTypesByCategory, getFieldsForCategory, type FieldConfig, type EquipmentCategory } from '@/lib/constants/equipment-types';
+import { normalizeWebsiteUrl } from '@/lib/utils/website-url';
 
 type TabType = 'basic' | 'equipment' | 'facility' | 'qms' | 'users' | 'docs';
 
@@ -276,11 +277,11 @@ export default function VendorDetailPage() {
                   <div>
                     <Label className="text-sm font-medium text-muted-foreground">Website</Label>
                     <p className="mt-1">
-                      {vendor.website ? (
-                        <a href={vendor.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                      {normalizeWebsiteUrl(vendor.website) ? (
+                        <a href={normalizeWebsiteUrl(vendor.website)!} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                           {vendor.website}
                         </a>
-                      ) : 'N/A'}
+                      ) : (vendor.website || 'N/A')}
                     </p>
                   </div>
                   <div>

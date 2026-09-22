@@ -1,0 +1,4 @@
+name,file_path,value
+cmToolMachiningRates,lookupTables/Component/cmToolMachiningRates.csv,Name
+cmToolMachiningRates,lookupTables/Component/cmToolMachiningRates.csv,Rate
+cmToolMachiningRates,lookupTables/Component/cmToolMachiningRates.csv,Units

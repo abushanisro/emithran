@@ -1,0 +1,4 @@
+name,sourceFilePath,digitalFactory,Tolerance Factor,Tolerance Name
+tblTolerances,lookupTables/Component/tblTolerances.csv,aPriori USA,0.25,"Low Tolerance +/-0.254 (+/-0.010"")"
+tblTolerances,lookupTables/Component/tblTolerances.csv,aPriori USA,0.45,"Medium Tolerance +/-0.127 (+/-0.005"")"
+tblTolerances,lookupTables/Component/tblTolerances.csv,aPriori USA,0.8,"High Tolerance +/-0.051 (+/-0.002"")"

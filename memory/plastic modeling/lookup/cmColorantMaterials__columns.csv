@@ -1,0 +1,4 @@
+name,file_path,value
+cmColorantMaterials,lookupTables/Component/cmColorantMaterials.csv,Colorant Type
+cmColorantMaterials,lookupTables/Component/cmColorantMaterials.csv,Unit Cost (USD / kg)
+cmColorantMaterials,lookupTables/Component/cmColorantMaterials.csv,Default Colorant

@@ -1,0 +1,10 @@
+﻿Variable Name,String Value,Unit Type Name,Notes
+cadModelMisalignmentSensitivity,82,,"The sensitivity level, 0-100, to CAD model misalignment"
+disableInvestmentAmortization,false,,"User override to disable amortization of all fixed costs to the individual part or assembly. By default, fixed costs are calculated per part for tooling, fixtures, and programming."
+gearQualityDefaultAgmaNewStd,A8,,"A2, A3, A4, ... A11, A12"
+gearQualityDefaultAgmaOldStd,Q8,,"Q15, Q14, Q13, ... Q6, Q5"
+gearQualityDefaultDinStd,9,,"2, 3, 4, ... 11, 12"
+overheadRateAdjustmentFactor,1,,Factor used to globally increase or decrease overhead rate per process.
+rollupSourceCostsInCategories,true,,'true' or 'false'. true: source component costs roll up into unique cost summary fields. false: source component Piece Part Cost or Fully Burdened Cost rolls up into material cost based on useSourceModelFBCAsMaterialCost setting.
+supportsDTC,true,,'true' or 'false' - only set to 'true' if this Digital Factory's cost model has been upgraded or configured to support aPriori's Design-to-Cost functionality.
+useSourceModelFBCAsMaterialCost,true,,"'true' or 'false'. User override to determine source model cost for material cost in 2-Model Machining. true: the Fully Burdened Cost will be used. false: the Piece Part Cost will be used. If rollupSourceCostsInCategories is true, then useSourceModelFBCAsMaterialCost has no impact."

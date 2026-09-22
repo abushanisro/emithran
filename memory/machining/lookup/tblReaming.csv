@@ -1,0 +1,317 @@
+ToolType,ToolSeries,MaterialCutCodeName,Hardness,HardnessSystem,DiameterMm,CuttingSpeedMPerMin,FeedMm,ToolLifeMin,ToolLifeCostUSD
+Ream,"Virtual Ream, Carbide",1.0,125.0,Brinell,3.0,22.6,0.15,15.0,6.0
+Ream,"Virtual Ream, Carbide",1.0,125.0,Brinell,50.0,22.6,0.9,15.0,6.0
+Ream,"Virtual Ream, Carbide",1.1,125.0,Brinell,3.0,21.0,0.15,15.0,6.0
+Ream,"Virtual Ream, Carbide",1.1,125.0,Brinell,50.0,21.0,0.9,15.0,6.0
+Ream,"Virtual Ream, Carbide",1.2,150.0,Brinell,3.0,17.9,0.2625,15.0,6.0
+Ream,"Virtual Ream, Carbide",1.2,150.0,Brinell,50.0,17.9,1.575,15.0,6.0
+Ream,"Virtual Ream, Carbide",1.3,170.0,Brinell,3.0,16.3,0.2625,15.0,6.0
+Ream,"Virtual Ream, Carbide",1.3,170.0,Brinell,50.0,16.3,1.575,15.0,6.0
+Ream,"Virtual Ream, Carbide",1.4,210.0,Brinell,3.0,16.3,0.2625,15.0,6.0
+Ream,"Virtual Ream, Carbide",1.4,210.0,Brinell,50.0,16.3,1.575,15.0,6.0
+Ream,"Virtual Ream, Carbide",1.5,300.0,Brinell,3.0,13.2,0.2625,15.0,6.0
+Ream,"Virtual Ream, Carbide",1.5,300.0,Brinell,50.0,13.2,1.575,15.0,6.0
+Ream,"Virtual Ream, Carbide",10.0,400.0,Brinell,3.0,8.8,0.2445,15.0,6.0
+Ream,"Virtual Ream, Carbide",10.0,400.0,Brinell,50.0,8.8,1.467,15.0,6.0
+Ream,"Virtual Ream, Carbide",10.1,400.0,Brinell,3.0,4.2,0.2445,15.0,6.0
+Ream,"Virtual Ream, Carbide",10.1,400.0,Brinell,50.0,4.2,1.467,15.0,6.0
+Ream,"Virtual Ream, Carbide",15.11,200.0,Brinell,3.0,14.3,0.2625,15.0,6.0
+Ream,"Virtual Ream, Carbide",15.11,200.0,Brinell,50.0,14.3,1.575,15.0,6.0
+Ream,"Virtual Ream, Carbide",15.12,330.0,Brinell,3.0,10.3,0.2625,15.0,6.0
+Ream,"Virtual Ream, Carbide",15.12,330.0,Brinell,50.0,10.3,1.575,15.0,6.0
+Ream,"Virtual Ream, Carbide",15.13,330.0,Brinell,3.0,10.7,0.2625,15.0,6.0
+Ream,"Virtual Ream, Carbide",15.13,330.0,Brinell,50.0,10.7,1.575,15.0,6.0
+Ream,"Virtual Ream, Carbide",15.21,200.0,Brinell,3.0,8.6,0.225,15.0,6.0
+Ream,"Virtual Ream, Carbide",15.21,200.0,Brinell,50.0,8.6,1.35,15.0,6.0
+Ream,"Virtual Ream, Carbide",15.22,330.0,Brinell,3.0,7.8,0.225,15.0,6.0
+Ream,"Virtual Ream, Carbide",15.22,330.0,Brinell,50.0,7.8,1.35,15.0,6.0
+Ream,"Virtual Ream, Carbide",15.23,330.0,Brinell,3.0,7.8,0.225,15.0,6.0
+Ream,"Virtual Ream, Carbide",15.23,330.0,Brinell,50.0,7.8,1.35,15.0,6.0
+Ream,"Virtual Ream, Carbide",15.51,230.0,Brinell,3.0,12.4,0.093,15.0,6.0
+Ream,"Virtual Ream, Carbide",15.51,230.0,Brinell,50.0,12.4,0.558,15.0,6.0
+Ream,"Virtual Ream, Carbide",15.52,260.0,Brinell,3.0,12.4,0.093,15.0,6.0
+Ream,"Virtual Ream, Carbide",15.52,260.0,Brinell,50.0,12.4,0.558,15.0,6.0
+Ream,"Virtual Ream, Carbide",2.1,180.0,Brinell,3.0,17.1,0.225,15.0,6.0
+Ream,"Virtual Ream, Carbide",2.1,180.0,Brinell,50.0,17.1,1.35,15.0,6.0
+Ream,"Virtual Ream, Carbide",2.12,210.0,Brinell,3.0,16.3,0.225,15.0,6.0
+Ream,"Virtual Ream, Carbide",2.12,210.0,Brinell,50.0,16.3,1.35,15.0,6.0
+Ream,"Virtual Ream, Carbide",2.2,330.0,Brinell,3.0,13.2,0.2625,15.0,6.0
+Ream,"Virtual Ream, Carbide",2.2,330.0,Brinell,50.0,13.2,1.575,15.0,6.0
+Ream,"Virtual Ream, Carbide",20.11,200.0,Brinell,3.0,2.5,0.15409,15.0,6.0
+Ream,"Virtual Ream, Carbide",20.11,200.0,Brinell,50.0,2.5,0.92454,15.0,6.0
+Ream,"Virtual Ream, Carbide",20.12,280.0,Brinell,3.0,3.0,0.15409,15.0,6.0
+Ream,"Virtual Ream, Carbide",20.12,280.0,Brinell,50.0,3.0,0.92454,15.0,6.0
+Ream,"Virtual Ream, Carbide",20.21,250.0,Brinell,3.0,3.9,0.13636,15.0,6.0
+Ream,"Virtual Ream, Carbide",20.21,250.0,Brinell,50.0,3.9,0.81818,15.0,6.0
+Ream,"Virtual Ream, Carbide",20.22,350.0,Brinell,3.0,3.9,0.13636,15.0,6.0
+Ream,"Virtual Ream, Carbide",20.22,350.0,Brinell,50.0,3.9,0.81818,15.0,6.0
+Ream,"Virtual Ream, Carbide",20.23,275.0,Brinell,3.0,3.9,0.13636,15.0,6.0
+Ream,"Virtual Ream, Carbide",20.23,275.0,Brinell,50.0,3.9,0.81818,15.0,6.0
+Ream,"Virtual Ream, Carbide",20.24,320.0,Brinell,3.0,3.9,0.13636,15.0,6.0
+Ream,"Virtual Ream, Carbide",20.24,320.0,Brinell,50.0,3.9,0.81818,15.0,6.0
+Ream,"Virtual Ream, Carbide",20.31,200.0,Brinell,3.0,2.5,0.15409,15.0,6.0
+Ream,"Virtual Ream, Carbide",20.31,200.0,Brinell,50.0,2.5,0.92454,15.0,6.0
+Ream,"Virtual Ream, Carbide",20.32,300.0,Brinell,3.0,0.9,0.17045,15.0,6.0
+Ream,"Virtual Ream, Carbide",20.32,300.0,Brinell,50.0,0.9,1.02273,15.0,6.0
+Ream,"Virtual Ream, Carbide",20.33,320.0,Brinell,3.0,0.4,0.17318,15.0,6.0
+Ream,"Virtual Ream, Carbide",20.33,320.0,Brinell,50.0,0.4,1.03909,15.0,6.0
+Ream,"Virtual Ream, Carbide",23.1,400.0,Tensile Strength,3.0,6.3,0.23863,15.0,6.0
+Ream,"Virtual Ream, Carbide",23.1,400.0,Tensile Strength,50.0,6.3,1.43182,15.0,6.0
+Ream,"Virtual Ream, Carbide",23.21,950.0,Tensile Strength,3.0,4.7,0.2625,15.0,6.0
+Ream,"Virtual Ream, Carbide",23.21,950.0,Tensile Strength,50.0,4.7,1.575,15.0,6.0
+Ream,"Virtual Ream, Carbide",23.22,1050.0,Tensile Strength,3.0,4.7,0.2625,15.0,6.0
+Ream,"Virtual Ream, Carbide",23.22,1050.0,Tensile Strength,50.0,4.7,1.575,15.0,6.0
+Ream,"Virtual Ream, Carbide",3.1,200.0,Brinell,3.0,22.2,0.2625,15.0,6.0
+Ream,"Virtual Ream, Carbide",3.1,200.0,Brinell,50.0,22.2,1.575,15.0,6.0
+Ream,"Virtual Ream, Carbide",3.11,200.0,Brinell,3.0,14.0,0.2625,15.0,6.0
+Ream,"Virtual Ream, Carbide",3.11,200.0,Brinell,50.0,14.0,1.575,15.0,6.0
+Ream,"Virtual Ream, Carbide",3.13,200.0,Brinell,3.0,7.4,0.207,15.0,6.0
+Ream,"Virtual Ream, Carbide",3.13,200.0,Brinell,50.0,7.4,1.242,15.0,6.0
+Ream,"Virtual Ream, Carbide",3.2,225.0,Brinell,3.0,14.8,0.225,15.0,6.0
+Ream,"Virtual Ream, Carbide",3.2,225.0,Brinell,50.0,14.8,1.35,15.0,6.0
+Ream,"Virtual Ream, Carbide",3.21,300.0,Brinell,3.0,10.1,0.225,15.0,6.0
+Ream,"Virtual Ream, Carbide",3.21,300.0,Brinell,50.0,10.1,1.35,15.0,6.0
+Ream,"Virtual Ream, Carbide",3.22,380.0,Brinell,3.0,6.4,0.375,15.0,6.0
+Ream,"Virtual Ream, Carbide",3.22,380.0,Brinell,50.0,6.4,2.25,15.0,6.0
+Ream,"Virtual Ream, Carbide",30.11,60.0,Brinell,3.0,27.2,0.3,15.0,6.0
+Ream,"Virtual Ream, Carbide",30.11,60.0,Brinell,50.0,27.2,1.8,15.0,6.0
+Ream,"Virtual Ream, Carbide",30.12,100.0,Brinell,3.0,27.2,0.3,15.0,6.0
+Ream,"Virtual Ream, Carbide",30.12,100.0,Brinell,50.0,27.2,1.8,15.0,6.0
+Ream,"Virtual Ream, Carbide",30.21,75.0,Brinell,3.0,23.3,0.3,15.0,6.0
+Ream,"Virtual Ream, Carbide",30.21,75.0,Brinell,50.0,23.3,1.8,15.0,6.0
+Ream,"Virtual Ream, Carbide",30.22,90.0,Brinell,3.0,23.3,0.3,15.0,6.0
+Ream,"Virtual Ream, Carbide",30.22,90.0,Brinell,50.0,23.3,1.8,15.0,6.0
+Ream,"Virtual Ream, Carbide",30.3,30.0,Brinell,3.0,49.1,0.9375,15.0,6.0
+Ream,"Virtual Ream, Carbide",30.3,30.0,Brinell,50.0,49.1,5.625,15.0,6.0
+Ream,"Virtual Ream, Carbide",30.41,130.0,Brinell,3.0,19.7,0.75,15.0,6.0
+Ream,"Virtual Ream, Carbide",30.41,130.0,Brinell,50.0,19.7,4.5,15.0,6.0
+Ream,"Virtual Ream, Carbide",30.42,130.0,Brinell,3.0,14.7,0.75,15.0,6.0
+Ream,"Virtual Ream, Carbide",30.42,130.0,Brinell,50.0,14.7,4.5,15.0,6.0
+Ream,"Virtual Ream, Carbide",33.1,110.0,Brinell,3.0,23.3,0.3,15.0,6.0
+Ream,"Virtual Ream, Carbide",33.1,110.0,Brinell,50.0,23.3,1.8,15.0,6.0
+Ream,"Virtual Ream, Carbide",33.2,90.0,Brinell,3.0,17.9,0.3,15.0,6.0
+Ream,"Virtual Ream, Carbide",33.2,90.0,Brinell,50.0,17.9,1.8,15.0,6.0
+Ream,"Virtual Ream, Carbide",33.3,100.0,Brinell,3.0,17.0,0.3,15.0,6.0
+Ream,"Virtual Ream, Carbide",33.3,100.0,Brinell,50.0,17.0,1.8,15.0,6.0
+Ream,"Virtual Ream, Carbide",34.0,515.0,Brinell,3.0,38.8,0.288,15.0,6.0
+Ream,"Virtual Ream, Carbide",34.0,515.0,Brinell,50.0,38.8,1.728,15.0,6.0
+Ream,"Virtual Ream, Carbide",4.0,55.0,Rockwell C,3.0,8.8,0.282,15.0,6.0
+Ream,"Virtual Ream, Carbide",4.0,55.0,Rockwell C,50.0,8.8,1.692,15.0,6.0
+Ream,"Virtual Ream, Carbide",4.1,59.0,Rockwell C,3.0,4.9,0.282,15.0,6.0
+Ream,"Virtual Ream, Carbide",4.1,59.0,Rockwell C,50.0,4.9,1.692,15.0,6.0
+Ream,"Virtual Ream, Carbide",41.11,30.0,Brinell,3.0,25.2,0.231,15.0,6.0
+Ream,"Virtual Ream, Carbide",41.11,30.0,Brinell,50.0,25.2,1.386,15.0,6.0
+Ream,"Virtual Ream, Carbide",41.21,30.0,Brinell,3.0,28.4,0.231,15.0,6.0
+Ream,"Virtual Ream, Carbide",41.21,30.0,Brinell,50.0,28.4,1.386,15.0,6.0
+Ream,"Virtual Ream, Carbide",42.11,30.0,Brinell,3.0,22.0,0.3465,15.0,6.0
+Ream,"Virtual Ream, Carbide",42.11,30.0,Brinell,50.0,22.0,2.079,15.0,6.0
+Ream,"Virtual Ream, Carbide",42.12,30.0,Brinell,3.0,28.4,0.231,15.0,6.0
+Ream,"Virtual Ream, Carbide",42.12,30.0,Brinell,50.0,28.4,1.386,15.0,6.0
+Ream,"Virtual Ream, Carbide",42.13,30.0,Brinell,3.0,28.4,0.231,15.0,6.0
+Ream,"Virtual Ream, Carbide",42.13,30.0,Brinell,50.0,28.4,1.386,15.0,6.0
+Ream,"Virtual Ream, Carbide",5.1,200.0,Brinell,3.0,9.7,0.2625,15.0,6.0
+Ream,"Virtual Ream, Carbide",5.1,200.0,Brinell,50.0,9.7,1.575,15.0,6.0
+Ream,"Virtual Ream, Carbide",5.11,200.0,Brinell,3.0,11.6,0.2625,15.0,6.0
+Ream,"Virtual Ream, Carbide",5.11,200.0,Brinell,50.0,11.6,1.575,15.0,6.0
+Ream,"Virtual Ream, Carbide",5.12,330.0,Brinell,3.0,11.4,0.2625,15.0,6.0
+Ream,"Virtual Ream, Carbide",5.12,330.0,Brinell,50.0,11.4,1.575,15.0,6.0
+Ream,"Virtual Ream, Carbide",5.13,330.0,Brinell,3.0,12.2,0.2625,15.0,6.0
+Ream,"Virtual Ream, Carbide",5.13,330.0,Brinell,50.0,12.2,1.575,15.0,6.0
+Ream,"Virtual Ream, Carbide",5.2,175.0,Brinell,3.0,17.3,0.2625,15.0,6.0
+Ream,"Virtual Ream, Carbide",5.2,175.0,Brinell,50.0,17.3,1.575,15.0,6.0
+Ream,"Virtual Ream, Carbide",5.21,200.0,Brinell,3.0,11.7,0.225,15.0,6.0
+Ream,"Virtual Ream, Carbide",5.21,200.0,Brinell,50.0,11.7,1.35,15.0,6.0
+Ream,"Virtual Ream, Carbide",5.22,330.0,Brinell,3.0,10.1,0.225,15.0,6.0
+Ream,"Virtual Ream, Carbide",5.22,330.0,Brinell,50.0,10.1,1.35,15.0,6.0
+Ream,"Virtual Ream, Carbide",5.23,200.0,Brinell,3.0,8.4,0.225,15.0,6.0
+Ream,"Virtual Ream, Carbide",5.23,200.0,Brinell,50.0,8.4,1.35,15.0,6.0
+Ream,"Virtual Ream, Carbide",5.51,230.0,Brinell,3.0,8.6,0.225,15.0,6.0
+Ream,"Virtual Ream, Carbide",5.51,230.0,Brinell,50.0,8.6,1.35,15.0,6.0
+Ream,"Virtual Ream, Carbide",5.52,260.0,Brinell,3.0,8.6,0.225,15.0,6.0
+Ream,"Virtual Ream, Carbide",5.52,260.0,Brinell,50.0,8.6,1.35,15.0,6.0
+Ream,"Virtual Ream, Carbide",51.21,30.0,Brinell,3.0,51.4,0.3465,15.0,6.0
+Ream,"Virtual Ream, Carbide",51.21,30.0,Brinell,50.0,51.4,2.079,15.0,6.0
+Ream,"Virtual Ream, Carbide",51.22,30.0,Brinell,3.0,51.4,0.3465,15.0,6.0
+Ream,"Virtual Ream, Carbide",51.22,30.0,Brinell,50.0,51.4,2.079,15.0,6.0
+Ream,"Virtual Ream, Carbide",51.31,30.0,Brinell,3.0,64.1,0.3465,15.0,6.0
+Ream,"Virtual Ream, Carbide",51.31,30.0,Brinell,50.0,64.1,2.079,15.0,6.0
+Ream,"Virtual Ream, Carbide",51.32,30.0,Brinell,3.0,64.1,0.3465,15.0,6.0
+Ream,"Virtual Ream, Carbide",51.32,30.0,Brinell,50.0,64.1,2.079,15.0,6.0
+Ream,"Virtual Ream, Carbide",52.11,30.0,Brinell,3.0,28.4,0.3465,15.0,6.0
+Ream,"Virtual Ream, Carbide",52.11,30.0,Brinell,50.0,28.4,2.079,15.0,6.0
+Ream,"Virtual Ream, Carbide",52.12,30.0,Brinell,3.0,35.7,0.3465,15.0,6.0
+Ream,"Virtual Ream, Carbide",52.12,30.0,Brinell,50.0,35.7,2.079,15.0,6.0
+Ream,"Virtual Ream, Carbide",52.13,30.0,Brinell,3.0,35.7,0.3465,15.0,6.0
+Ream,"Virtual Ream, Carbide",52.13,30.0,Brinell,50.0,35.7,2.079,15.0,6.0
+Ream,"Virtual Ream, Carbide",52.14,30.0,Brinell,3.0,35.7,0.231,15.0,6.0
+Ream,"Virtual Ream, Carbide",52.14,30.0,Brinell,50.0,35.7,1.386,15.0,6.0
+Ream,"Virtual Ream, Carbide",52.15,30.0,Brinell,3.0,48.3,0.3465,15.0,6.0
+Ream,"Virtual Ream, Carbide",52.15,30.0,Brinell,50.0,48.3,2.079,15.0,6.0
+Ream,"Virtual Ream, Carbide",52.21,30.0,Brinell,3.0,48.3,0.3465,15.0,6.0
+Ream,"Virtual Ream, Carbide",52.21,30.0,Brinell,50.0,48.3,2.079,15.0,6.0
+Ream,"Virtual Ream, Carbide",52.31,30.0,Brinell,3.0,64.1,0.3465,15.0,6.0
+Ream,"Virtual Ream, Carbide",52.31,30.0,Brinell,50.0,64.1,2.079,15.0,6.0
+Ream,"Virtual Ream, Carbide",52.32,30.0,Brinell,3.0,64.1,0.3465,15.0,6.0
+Ream,"Virtual Ream, Carbide",52.32,30.0,Brinell,50.0,64.1,2.079,15.0,6.0
+Ream,"Virtual Ream, Carbide",6.1,150.0,Brinell,3.0,15.6,0.15,15.0,6.0
+Ream,"Virtual Ream, Carbide",6.1,150.0,Brinell,50.0,15.6,0.9,15.0,6.0
+Ream,"Virtual Ream, Carbide",6.2,200.0,Brinell,3.0,12.4,0.225,15.0,6.0
+Ream,"Virtual Ream, Carbide",6.2,200.0,Brinell,50.0,12.4,1.35,15.0,6.0
+Ream,"Virtual Ream, Carbide",6.3,200.0,Brinell,3.0,8.8,0.207,15.0,6.0
+Ream,"Virtual Ream, Carbide",6.3,200.0,Brinell,50.0,8.8,1.242,15.0,6.0
+Ream,"Virtual Ream, Carbide",6.32,200.0,Brinell,3.0,5.8,0.207,15.0,6.0
+Ream,"Virtual Ream, Carbide",6.32,200.0,Brinell,50.0,5.8,1.242,15.0,6.0
+Ream,"Virtual Ream, Carbide",6.33,250.0,Brinell,3.0,4.7,0.207,15.0,6.0
+Ream,"Virtual Ream, Carbide",6.33,250.0,Brinell,50.0,4.7,1.242,15.0,6.0
+Ream,"Virtual Ream, Carbide",7.1,130.0,Brinell,3.0,13.2,0.3375,15.0,6.0
+Ream,"Virtual Ream, Carbide",7.1,130.0,Brinell,50.0,13.2,2.025,15.0,6.0
+Ream,"Virtual Ream, Carbide",7.2,230.0,Brinell,3.0,10.9,0.2625,15.0,6.0
+Ream,"Virtual Ream, Carbide",7.2,230.0,Brinell,50.0,10.9,1.575,15.0,6.0
+Ream,"Virtual Ream, Carbide",7.3,250.0,Brinell,3.0,10.5,0.1875,15.0,6.0
+Ream,"Virtual Ream, Carbide",7.3,250.0,Brinell,50.0,10.5,1.125,15.0,6.0
+Ream,"Virtual Ream, Carbide",8.1,180.0,Brinell,3.0,19.4,0.3375,15.0,6.0
+Ream,"Virtual Ream, Carbide",8.1,180.0,Brinell,50.0,19.4,2.025,15.0,6.0
+Ream,"Virtual Ream, Carbide",8.2,220.0,Brinell,3.0,13.2,0.2625,15.0,6.0
+Ream,"Virtual Ream, Carbide",8.2,220.0,Brinell,50.0,13.2,1.575,15.0,6.0
+Ream,"Virtual Ream, Carbide",8.3,175.0,Brinell,3.0,15.2,0.1875,15.0,6.0
+Ream,"Virtual Ream, Carbide",8.3,175.0,Brinell,50.0,15.2,1.125,15.0,6.0
+Ream,"Virtual Ream, Carbide",9.1,160.0,Brinell,3.0,12.3,0.2625,15.0,6.0
+Ream,"Virtual Ream, Carbide",9.1,160.0,Brinell,50.0,12.3,1.575,15.0,6.0
+Ream,"Virtual Ream, Carbide",9.2,250.0,Brinell,3.0,11.7,0.2625,15.0,6.0
+Ream,"Virtual Ream, Carbide",9.2,250.0,Brinell,50.0,11.7,1.575,15.0,6.0
+Ream,"Virtual Ream, Carbide",9.3,330.0,Brinell,3.0,8.8,0.1875,15.0,6.0
+Ream,"Virtual Ream, Carbide",9.3,330.0,Brinell,50.0,8.8,1.125,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",1.0,125.0,Brinell,3.0,19.3,0.15,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",1.0,125.0,Brinell,50.0,19.3,0.9,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",1.1,125.0,Brinell,3.0,18.0,0.15,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",1.1,125.0,Brinell,50.0,18.0,0.9,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",1.2,150.0,Brinell,3.0,15.3,0.2625,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",1.2,150.0,Brinell,50.0,15.3,1.575,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",1.3,170.0,Brinell,3.0,14.0,0.2625,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",1.3,170.0,Brinell,50.0,14.0,1.575,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",1.4,210.0,Brinell,3.0,14.0,0.2625,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",1.4,210.0,Brinell,50.0,14.0,1.575,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",1.5,300.0,Brinell,3.0,11.3,0.2625,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",1.5,300.0,Brinell,50.0,11.3,1.575,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",10.0,400.0,Brinell,3.0,7.5,0.2445,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",10.0,400.0,Brinell,50.0,7.5,1.467,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",10.1,400.0,Brinell,3.0,3.6,0.2445,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",10.1,400.0,Brinell,50.0,3.6,1.467,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",15.11,200.0,Brinell,3.0,12.2,0.2625,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",15.11,200.0,Brinell,50.0,12.2,1.575,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",15.12,330.0,Brinell,3.0,8.8,0.2625,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",15.12,330.0,Brinell,50.0,8.8,1.575,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",15.13,330.0,Brinell,3.0,9.2,0.2625,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",15.13,330.0,Brinell,50.0,9.2,1.575,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",15.21,200.0,Brinell,3.0,7.3,0.225,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",15.21,200.0,Brinell,50.0,7.3,1.35,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",15.22,330.0,Brinell,3.0,6.7,0.225,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",15.22,330.0,Brinell,50.0,6.7,1.35,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",15.23,330.0,Brinell,3.0,6.7,0.225,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",15.23,330.0,Brinell,50.0,6.7,1.35,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",15.51,230.0,Brinell,3.0,10.6,0.093,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",15.51,230.0,Brinell,50.0,10.6,0.558,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",15.52,260.0,Brinell,3.0,10.7,0.093,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",15.52,260.0,Brinell,50.0,10.7,0.558,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",2.1,180.0,Brinell,3.0,14.7,0.225,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",2.1,180.0,Brinell,50.0,14.7,1.35,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",2.12,210.0,Brinell,3.0,14.0,0.225,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",2.12,210.0,Brinell,50.0,14.0,1.35,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",30.41,130.0,Brinell,3.0,16.9,0.75,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",30.41,130.0,Brinell,50.0,16.9,4.5,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",30.42,130.0,Brinell,3.0,12.6,0.75,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",30.42,130.0,Brinell,50.0,12.6,4.5,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",33.1,110.0,Brinell,3.0,20.0,0.3,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",33.1,110.0,Brinell,50.0,20.0,1.8,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",33.2,90.0,Brinell,3.0,15.3,0.3,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",33.2,90.0,Brinell,50.0,15.3,1.8,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",33.3,100.0,Brinell,3.0,14.6,0.3,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",33.3,100.0,Brinell,50.0,14.6,1.8,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",34.0,515.0,Brinell,3.0,33.3,0.288,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",34.0,515.0,Brinell,50.0,33.3,1.728,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",4.0,55.0,Rockwell C,3.0,7.5,0.282,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",4.0,55.0,Rockwell C,50.0,7.5,1.692,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",4.1,59.0,Rockwell C,3.0,4.2,0.282,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",4.1,59.0,Rockwell C,50.0,4.2,1.692,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",41.11,30.0,Brinell,3.0,21.6,0.231,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",41.11,30.0,Brinell,50.0,21.6,1.386,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",41.21,30.0,Brinell,3.0,24.3,0.231,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",41.21,30.0,Brinell,50.0,24.3,1.386,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",42.11,30.0,Brinell,3.0,18.9,0.3465,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",42.11,30.0,Brinell,50.0,18.9,2.079,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",42.12,30.0,Brinell,3.0,24.3,0.231,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",42.12,30.0,Brinell,50.0,24.3,1.386,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",42.13,30.0,Brinell,3.0,24.3,0.231,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",42.13,30.0,Brinell,50.0,24.3,1.386,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",5.1,200.0,Brinell,3.0,8.3,0.2625,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",5.1,200.0,Brinell,50.0,8.3,1.575,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",5.11,200.0,Brinell,3.0,9.9,0.2625,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",5.11,200.0,Brinell,50.0,9.9,1.575,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",5.12,330.0,Brinell,3.0,9.8,0.2625,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",5.12,330.0,Brinell,50.0,9.8,1.575,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",5.13,330.0,Brinell,3.0,10.4,0.2625,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",5.13,330.0,Brinell,50.0,10.4,1.575,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",5.2,175.0,Brinell,3.0,14.8,0.2625,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",5.2,175.0,Brinell,50.0,14.8,1.575,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",5.21,200.0,Brinell,3.0,10.0,0.225,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",5.21,200.0,Brinell,50.0,10.0,1.35,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",5.22,330.0,Brinell,3.0,8.6,0.225,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",5.22,330.0,Brinell,50.0,8.6,1.35,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",5.23,200.0,Brinell,3.0,7.2,0.225,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",5.23,200.0,Brinell,50.0,7.2,1.35,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",5.51,230.0,Brinell,3.0,7.3,0.225,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",5.51,230.0,Brinell,50.0,7.3,1.35,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",5.52,260.0,Brinell,3.0,7.3,0.225,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",5.52,260.0,Brinell,50.0,7.3,1.35,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",51.21,30.0,Brinell,3.0,44.1,0.3465,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",51.21,30.0,Brinell,50.0,44.1,2.079,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",51.22,30.0,Brinell,3.0,44.1,0.3465,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",51.22,30.0,Brinell,50.0,44.1,2.079,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",51.31,30.0,Brinell,3.0,54.9,0.3465,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",51.31,30.0,Brinell,50.0,54.9,2.079,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",51.32,30.0,Brinell,3.0,54.9,0.3465,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",51.32,30.0,Brinell,50.0,54.9,2.079,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",52.11,30.0,Brinell,3.0,24.3,0.3465,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",52.11,30.0,Brinell,50.0,24.3,2.079,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",52.12,30.0,Brinell,3.0,30.6,0.3465,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",52.12,30.0,Brinell,50.0,30.6,2.079,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",52.13,30.0,Brinell,3.0,30.6,0.3465,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",52.13,30.0,Brinell,50.0,30.6,2.079,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",52.14,30.0,Brinell,3.0,30.6,0.231,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",52.14,30.0,Brinell,50.0,30.6,1.386,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",52.15,30.0,Brinell,3.0,41.4,0.3465,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",52.15,30.0,Brinell,50.0,41.4,2.079,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",52.21,30.0,Brinell,3.0,41.4,0.3465,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",52.21,30.0,Brinell,50.0,41.4,2.079,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",52.31,30.0,Brinell,3.0,54.9,0.3465,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",52.31,30.0,Brinell,50.0,54.9,2.079,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",52.32,30.0,Brinell,3.0,54.9,0.3465,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",52.32,30.0,Brinell,50.0,54.9,2.079,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",6.1,150.0,Brinell,3.0,13.3,0.15,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",6.1,150.0,Brinell,50.0,13.3,0.9,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",6.2,200.0,Brinell,3.0,10.7,0.225,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",6.2,200.0,Brinell,50.0,10.7,1.35,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",6.3,200.0,Brinell,3.0,7.6,0.207,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",6.3,200.0,Brinell,50.0,7.6,1.242,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",6.32,200.0,Brinell,3.0,5.0,0.207,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",6.32,200.0,Brinell,50.0,5.0,1.242,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",6.33,250.0,Brinell,3.0,4.0,0.207,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",6.33,250.0,Brinell,50.0,4.0,1.242,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",7.1,130.0,Brinell,3.0,11.3,0.3375,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",7.1,130.0,Brinell,50.0,11.3,2.025,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",7.2,230.0,Brinell,3.0,9.3,0.2625,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",7.2,230.0,Brinell,50.0,9.3,1.575,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",7.3,250.0,Brinell,3.0,9.0,0.1875,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",7.3,250.0,Brinell,50.0,9.0,1.125,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",8.1,180.0,Brinell,3.0,16.7,0.3375,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",8.1,180.0,Brinell,50.0,16.7,2.025,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",8.2,220.0,Brinell,3.0,11.3,0.2625,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",8.2,220.0,Brinell,50.0,11.3,1.575,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",8.3,175.0,Brinell,3.0,13.0,0.1875,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",8.3,175.0,Brinell,50.0,13.0,1.125,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",9.1,160.0,Brinell,3.0,10.6,0.2625,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",9.1,160.0,Brinell,50.0,10.6,1.575,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",9.2,250.0,Brinell,3.0,10.0,0.2625,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",9.2,250.0,Brinell,50.0,10.0,1.575,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",9.3,330.0,Brinell,3.0,7.5,0.1875,15.0,6.0
+Ream,"Virtual Ream, High Speed Steel",9.3,330.0,Brinell,50.0,7.5,1.125,15.0,6.0

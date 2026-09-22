@@ -1,0 +1,6 @@
+digital_factory,object_type,category_path,table_name,file_path,total_row_count,material_type,etch_rate_mm_min
+USA reference export,Lookup Table,Machining > Lookup Tables > Etch Cell (Etch Cell Cycle),tblChemicalMillingEtchingRates,lookupTables/Component/Etch Cell_Etch Cell Cycle/tblChemicalMillingEtchingRates.csv,5,Aluminum,0.0381
+USA reference export,Lookup Table,Machining > Lookup Tables > Etch Cell (Etch Cell Cycle),tblChemicalMillingEtchingRates,lookupTables/Component/Etch Cell_Etch Cell Cycle/tblChemicalMillingEtchingRates.csv,5,Copper,0.04
+USA reference export,Lookup Table,Machining > Lookup Tables > Etch Cell (Etch Cell Cycle),tblChemicalMillingEtchingRates,lookupTables/Component/Etch Cell_Etch Cell Cycle/tblChemicalMillingEtchingRates.csv,5,Stainless Steel,0.02
+USA reference export,Lookup Table,Machining > Lookup Tables > Etch Cell (Etch Cell Cycle),tblChemicalMillingEtchingRates,lookupTables/Component/Etch Cell_Etch Cell Cycle/tblChemicalMillingEtchingRates.csv,5,Steel,0.025
+USA reference export,Lookup Table,Machining > Lookup Tables > Etch Cell (Etch Cell Cycle),tblChemicalMillingEtchingRates,lookupTables/Component/Etch Cell_Etch Cell Cycle/tblChemicalMillingEtchingRates.csv,5,Titanium,0.0203

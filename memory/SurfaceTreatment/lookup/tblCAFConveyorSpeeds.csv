@@ -1,0 +1,6 @@
+﻿Action Name,Conveyor Speed (mm / s)
+Deburr,100.00
+Remove Oxide Skin,25.00
+Remove Slag,20.00
+Round Edges,15.00
+Surface Finish,35.00

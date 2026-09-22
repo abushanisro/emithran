@@ -21,6 +21,7 @@ import {
 import { useRawMaterials, useRawMaterialFilterOptions, useMaterialAliases, type RawMaterial } from '@/lib/api/hooks/useRawMaterials';
 import { useCostSummary, type CalculationTraceStep, type ConfidenceLevel } from '@/lib/api/hooks/useBOMItems';
 import { CalculationTracePanel } from './CalculationTracePanel';
+import { isStockDrivenBlank } from '@/lib/costing/material-usage';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { useCalculators, useCalculator, useExecuteCalculator } from '@/lib/api/hooks/useCalculators';
 import { useExchangeRates } from '@/lib/api/hooks/useExchangeRates';
@@ -227,6 +228,15 @@ export function RawMaterialDialog({
   // out of scope for the nesting engine, so the pre-existing manual formula
   // remains their only costing path.
   const isSheetMetalItem = nestingBlankSpec?.form === 'sheet';
+  // Machining: the blank optimizer selected a real stock (round bar / hex /
+  // rectangular / billet / extrusion) and material density resolved, so the
+  // stock's own weight IS Gross Usage -- the same figure the engine prices
+  // material on. net/(1-scrap%) is only a fallback for when no real stock
+  // exists (see deriveMaterialUsage).
+  const stockDriven = isStockDrivenBlank(nestingBlankSpec);
+  // Gross Usage is a derived (engine-owned) value, not a typed input.
+  const grossIsDerived = nestingIsTrustworthy || stockDriven;
+  const derivedGrossKg: number | null = grossIsDerived ? (nestingBlankSpec?.grossWeightKg ?? null) : null;
   const [materialGroup, setMaterialGroup] = useState<string>('');
   const [country, setCountry] = useState<string>('');
   const [selectedQuarter, setSelectedQuarter] = useState<string>('q1');
@@ -852,9 +862,11 @@ export function RawMaterialDialog({
     // guessed number — use only what the user actually typed into Gross
     // Usage. The net÷(1−scrap%) formula remains solely for genuinely
     // non-sheet-metal material records (out of scope for the nesting fix).
-    const gross = nestingIsTrustworthy
-      ? nestingBlankSpec.grossWeightKg
-      : isSheetMetalItem
+    // A manual override (Justify Gross Usage panel) replaces the derived
+    // value in the preview exactly as it does in what gets submitted.
+    const gross = grossIsDerived && !grossUsageOverridden && derivedGrossKg !== null
+      ? derivedGrossKg
+      : (isSheetMetalItem || grossIsDerived)
         ? (typeof grossUsage === 'number' ? grossUsage : 0)
         : (net > 0
           ? net / Math.max(1 - scrapPct / 100, 0.001)
@@ -878,7 +890,7 @@ export function RawMaterialDialog({
       previewCost: totalCostVal,
       previewBreakdown: { gross, grossMaterialCost, scrapAmount, reclaimValue, netMaterialCost, scrapAdjustment: 0, subtotal: netMaterialCost, overheadCost, totalCostVal, utilRate, effPerUnit, reclaimRateInvalid: reclaimRateInvalid ? 1 : 0 },
     };
-  }, [selectedMaterial, manualUnitCost, grossUsage, netUsage, scrap, overhead, reclaimRate, editData, country, exchangeRates, nestingIsTrustworthy, isSheetMetalItem, nestingBlankSpec, nestingCostSummary, location]);
+  }, [selectedMaterial, manualUnitCost, grossUsage, netUsage, scrap, overhead, reclaimRate, editData, country, exchangeRates, grossIsDerived, grossUsageOverridden, derivedGrossKg, isSheetMetalItem, nestingCostSummary, location]);
 
   const totalCost = previewCost;
 
@@ -888,13 +900,13 @@ export function RawMaterialDialog({
   // or not — see isSheetMetalItem's doc comment. When trustworthy nesting
   // exists, the dedicated effect below is the sole writer of grossUsage.
   useEffect(() => {
-    if (isSheetMetalItem) return;
+    if (isSheetMetalItem || stockDriven) return;
     const net = typeof netUsage === 'number' ? netUsage : 0;
     if (net > 0) {
       const s = typeof scrap === 'number' ? Math.min(scrap, 99.9) : 0;
       setGrossUsage(parseFloat((net / Math.max(1 - s / 100, 0.001)).toFixed(4)));
     }
-  }, [netUsage, scrap, isSheetMetalItem]);
+  }, [netUsage, scrap, isSheetMetalItem, stockDriven]);
 
   // Gross Usage from the real nesting engine's theoretical per-part yield —
   // the sole writer of grossUsage whenever a TRUSTWORTHY nesting result
@@ -905,11 +917,25 @@ export function RawMaterialDialog({
   // UNLESS the user has explicitly applied an override via the "Justify
   // Gross Usage" panel (grossUsageOverridden), in which case their entry is
   // the whole point and must not be silently clobbered on the next refetch.
+  // `open`/`editData` are deps so that re-opening the dialog (whose load
+  // effect above seeds the SAVED gross) re-asserts the derived value even
+  // when the cached derived number itself hasn't changed.
   useEffect(() => {
-    if (nestingIsTrustworthy && !grossUsageOverridden) {
-      setGrossUsage(nestingBlankSpec.grossWeightKg);
+    if (grossIsDerived && !grossUsageOverridden && derivedGrossKg !== null) {
+      setGrossUsage(derivedGrossKg);
     }
-  }, [nestingIsTrustworthy, nestingBlankSpec, grossUsageOverridden]);
+  }, [grossIsDerived, derivedGrossKg, grossUsageOverridden, open, editData]);
+
+  // Machining stock: Scrap % is derived from real gross/net (shown read-only
+  // below), so the SUBMITTED scrap must be that same derived figure -- not
+  // whatever stale/zero value the form state was seeded with. Follows
+  // grossUsage so a manual override stays consistent too.
+  useEffect(() => {
+    if (!stockDriven) return;
+    const g = typeof grossUsage === 'number' ? grossUsage : 0;
+    const n = typeof netUsage === 'number' ? netUsage : 0;
+    if (g > 0) setScrap(parseFloat((((g - n) / g) * 100).toFixed(2)));
+  }, [stockDriven, grossUsage, netUsage]);
 
   // Real, server-built audit trail for Gross Usage -- once
   // "Sheet Metal - Gross Material Usage (Nesting)" calculator's mapping is
@@ -1487,7 +1513,9 @@ export function RawMaterialDialog({
                       ? '(kg · manually overridden)'
                       : nestingIsTrustworthy
                         ? '(kg · from nesting engine, per part)'
-                        : isSheetMetalItem
+                        : stockDriven
+                          ? '(kg · auto-calculated from stock)'
+                          : isSheetMetalItem
                           ? '(kg · enter manually)'
                           : '(kg · auto-calculated)'}
                   </span>
@@ -1503,8 +1531,12 @@ export function RawMaterialDialog({
                     }}
                     placeholder={isSheetMetalItem && !nestingIsTrustworthy ? 'Enter gross usage — nesting unavailable/unverified' : 'Enter gross usage'}
                     className="flex-1"
-                    disabled={(nestingIsTrustworthy && !grossUsageOverridden) || (!selectedMaterialId && !editData)}
-                    title={nestingIsTrustworthy && !grossUsageOverridden ? 'Derived from the real nesting result — click the calculator icon to view the justification or override' : undefined}
+                    disabled={(grossIsDerived && !grossUsageOverridden) || (!selectedMaterialId && !editData)}
+                    title={grossIsDerived && !grossUsageOverridden
+                      ? (stockDriven
+                        ? 'Weight of the selected stock (stock volume × material density) — use "Edit — override manually" below to override'
+                        : 'Derived from the real nesting result — click the calculator icon to view the justification or override')
+                      : undefined}
                   />
                   <Button
                     type="button" variant="outline" size="icon"
@@ -1528,15 +1560,32 @@ export function RawMaterialDialog({
                     <CalculatorIcon className="h-4 w-4" />
                   </Button>
                 </div>
-                {nestingIsTrustworthy ? (
+                {grossIsDerived ? (
                   <div className="space-y-0.5">
-                    <p className="text-[11px] text-cyan-600 dark:text-cyan-400 font-mono">
-                      {nestingBlankSpec.sheetWidthMm}×{nestingBlankSpec.sheetLengthMm}mm sheet · {nestingBlankSpec.partsPerSheet} parts/sheet · {nestingBlankSpec.utilizationPct}% util · verified CAD flat pattern
-                    </p>
-                    {typeof nestingBlankSpec.sheetsRequired === 'number' && (
-                      <p className="text-[11px] text-muted-foreground font-mono">
-                        Batch: {nestingBlankSpec.sheetsRequired} sheet{nestingBlankSpec.sheetsRequired === 1 ? '' : 's'} required · {nestingBlankSpec.plannedParts} planned / {nestingBlankSpec.excessPositions} excess
-                      </p>
+                    {nestingIsTrustworthy && (
+                      <>
+                        <p className="text-[11px] text-cyan-600 dark:text-cyan-400 font-mono">
+                          {nestingBlankSpec.sheetWidthMm}×{nestingBlankSpec.sheetLengthMm}mm sheet · {nestingBlankSpec.partsPerSheet} parts/sheet · {nestingBlankSpec.utilizationPct}% util · verified CAD flat pattern
+                        </p>
+                        {typeof nestingBlankSpec.sheetsRequired === 'number' && (
+                          <p className="text-[11px] text-muted-foreground font-mono">
+                            Batch: {nestingBlankSpec.sheetsRequired} sheet{nestingBlankSpec.sheetsRequired === 1 ? '' : 's'} required · {nestingBlankSpec.plannedParts} planned / {nestingBlankSpec.excessPositions} excess
+                          </p>
+                        )}
+                      </>
+                    )}
+                    {stockDriven && nestingBlankSpec && (
+                      <>
+                        <p className="text-[11px] text-cyan-600 dark:text-cyan-400 font-mono">
+                          {nestingBlankSpec.sizeLabel} ({nestingBlankSpec.form.replace(/_/g, ' ')})
+                          {typeof nestingBlankSpec.stockVolumeMm3 === 'number' && typeof nestingBlankSpec.densityKgM3 === 'number'
+                            ? ` · ${nestingBlankSpec.stockVolumeMm3.toLocaleString()} mm³ × ${nestingBlankSpec.densityKgM3.toLocaleString()} kg/m³`
+                            : ''}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground font-mono">
+                          Net {nestingBlankSpec.netWeightKg.toFixed(3)} kg · Utilization {nestingBlankSpec.utilizationPct}% · Chip/Scrap {nestingBlankSpec.wasteKg.toFixed(3)} kg
+                        </p>
+                      </>
                     )}
                     {grossUsageOverridden ? (
                       <div className="rounded border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-2 space-y-0.5">
@@ -1544,11 +1593,11 @@ export function RawMaterialDialog({
                           ⚠ Manual Override — {typeof grossUsage === 'number' ? grossUsage.toFixed(4) : '—'} kg/part
                         </p>
                         <p className="text-[11px] text-muted-foreground">
-                          Calculated value: {nestingBlankSpec.grossWeightKg.toFixed(4)} kg/part
+                          Calculated value: {(derivedGrossKg ?? 0).toFixed(4)} kg/part
                         </p>
                         <p className="text-[11px] text-muted-foreground">
                           Difference: {typeof grossUsage === 'number'
-                            ? `${grossUsage - nestingBlankSpec.grossWeightKg >= 0 ? '+' : ''}${(grossUsage - nestingBlankSpec.grossWeightKg).toFixed(4)}`
+                            ? `${grossUsage - (derivedGrossKg ?? 0) >= 0 ? '+' : ''}${(grossUsage - (derivedGrossKg ?? 0)).toFixed(4)}`
                             : '—'} kg/part
                         </p>
                         {grossUsageOverrideReason && (
@@ -1566,7 +1615,7 @@ export function RawMaterialDialog({
                       <button
                         type="button"
                         onClick={() => {
-                          setGrossUsageEditDraft(nestingBlankSpec.grossWeightKg.toFixed(4));
+                          setGrossUsageEditDraft((derivedGrossKg ?? 0).toFixed(4));
                           setGrossUsageEditReasonDraft('');
                           setGrossUsageEditOpen((v) => !v);
                         }}
@@ -1579,7 +1628,7 @@ export function RawMaterialDialog({
                       <div className="rounded border border-border bg-muted/20 p-2 space-y-2">
                         <div>
                           <Label className="text-[10px]">Calculated Value</Label>
-                          <p className="text-[11px] font-mono tabular-nums">{nestingBlankSpec.grossWeightKg.toFixed(4)} kg/part</p>
+                          <p className="text-[11px] font-mono tabular-nums">{(derivedGrossKg ?? 0).toFixed(4)} kg/part</p>
                         </div>
                         <div>
                           <Label className="text-[10px]">Manual Override (kg/part)</Label>
@@ -1633,19 +1682,24 @@ export function RawMaterialDialog({
                 ) : (
                   <p className="text-[11px] text-muted-foreground">net ÷ (1 − scrap%) — includes material lost in process</p>
                 )}
+                {!grossIsDerived && !isSheetMetalItem && nestingBlankSpec?.stockFormOverrideNote && (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                    Selected stock weight unavailable — using the scrap-allowance estimate above. {nestingBlankSpec.stockFormOverrideNote}
+                  </p>
+                )}
               </div>
             </div>
 
             {/* Scrap, Reclaim Rate, Overhead */}
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-semibold" title={isSheetMetalItem ? 'Derived display: (Gross Usage − Net Usage) / Gross Usage — not an independent input for sheet-metal parts' : '% of gross lost as chips/trim/yield — drives Gross = Net ÷ (1 − scrap%)'}>
+                <label className="text-sm font-semibold" title={isSheetMetalItem || stockDriven ? 'Derived display: (Gross Usage − Net Usage) / Gross Usage — not an independent input for this part' : '% of gross lost as chips/trim/yield — drives Gross = Net ÷ (1 − scrap%)'}>
                   Scrap / Yield Loss %
                 </label>
                 <Input
                   type="number" step="0.01"
                   value={
-                    isSheetMetalItem
+                    isSheetMetalItem || stockDriven
                       ? (() => {
                         const g = typeof grossUsage === 'number' ? grossUsage : 0;
                         const n = typeof netUsage === 'number' ? netUsage : 0;
@@ -1654,9 +1708,9 @@ export function RawMaterialDialog({
                       : (scrap === '' ? '' : scrap.toString())
                   }
                   onChange={(e) => { const v = e.target.value; setScrap(v === '' ? '' : parseFloat(v) || 0); }}
-                  placeholder={isSheetMetalItem ? '—' : 'e.g. 10.5'}
-                  disabled={isSheetMetalItem || (!selectedMaterialId && !editData)}
-                  title={isSheetMetalItem ? 'Derived from Gross Usage and Net Usage — not independently editable for sheet-metal parts' : undefined}
+                  placeholder={isSheetMetalItem || stockDriven ? '—' : 'e.g. 10.5'}
+                  disabled={isSheetMetalItem || stockDriven || (!selectedMaterialId && !editData)}
+                  title={isSheetMetalItem || stockDriven ? 'Derived from Gross Usage and Net Usage — not independently editable for this part' : undefined}
                 />
               </div>
 

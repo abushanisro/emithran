@@ -1,0 +1,8 @@
+name,sourceFilePath,digitalFactory,Handling Time (s),Weight (kg)
+materialHandling,lookupTables/Component/materialHandling.csv,aPriori USA,5.0,0.45
+materialHandling,lookupTables/Component/materialHandling.csv,aPriori USA,5.0,4.55
+materialHandling,lookupTables/Component/materialHandling.csv,aPriori USA,15.0,22.73
+materialHandling,lookupTables/Component/materialHandling.csv,aPriori USA,20.0,45.45
+materialHandling,lookupTables/Component/materialHandling.csv,aPriori USA,23.0,113.64
+materialHandling,lookupTables/Component/materialHandling.csv,aPriori USA,27.0,227.27
+materialHandling,lookupTables/Component/materialHandling.csv,aPriori USA,30.0,454.55

@@ -1,0 +1,626 @@
+OpName,Pass1,Pass2,Pass3,Pass4
+2 Axis Bar Feed Lathe with Sub SpindleBack Finish Turning//CurvedSurface,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleBack Finish Turning//CurvedWall,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleBack Finish Turning//PlanarFace,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleBack Rough Turning//Ring,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleCenter Drilling//SimpleHole,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleComboVoid Machining//ComboVoid,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleDrilling//SimpleHole,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleEdge Turning//SimpleHole,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleEdge Turning/SimpleHole Edge Turning//Edge,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleFinish Turning//CurvedSurface,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleFinish Turning//CurvedWall,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleFinish Turning//PlanarFace,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleFinish Turning//SimpleHole,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleID Turning//RingedHole,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleMultiplunging//Ring,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleMultiplunging/Ring Multiplunging//CurvedSurface,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleMultiplunging/Ring Multiplunging//CurvedWall,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleMultiplunging/Ring Multiplunging//PlanarFace,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleMultistep Holemaking//MultiStepHole,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleMultistep Holemaking/MultiStepHole Counterboring//SimpleHole,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleMultistep Holemaking/MultiStepHole Groove Turning//SimpleHole,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindlePecking//SimpleHole,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindlePlunging//Ring,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindlePlunging/Ring Plunging//CurvedSurface,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindlePlunging/Ring Plunging//CurvedWall,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindlePlunging/Ring Plunging//PlanarFace,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindlePostdrill Rough Turning//SimpleHole,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindlePretum Drilling//Ring,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindlePretum Drilling//SimpleHole,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleReaming//SimpleHole,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleRough Turning//Ring,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleRough Turning//SimpleHole,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleSetup,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleStep Drilling//MultiStepHole,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleStep Drilling/MultiStepHole Step Drilling//SimpleHole,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleStock Trim Turning//StockTrim,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleStock Trim Turning/StockTrim Parting//Ring,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleSurface Finishing//Ring,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleTapping//SimpleHole,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleThread Turning//CurvedWall,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleThread Turning//Ring,,include,,include
+2 Axis Bar Feed Lathe with Sub SpindleThread Turning//SimpleHole,,include,,include
+2 Axis LatheBack Finish Turning//CurvedSurface,,include,,include
+2 Axis LatheBack Finish Turning//CurvedWall,,include,,include
+2 Axis LatheBack Finish Turning//PlanarFace,,include,,include
+2 Axis LatheBack Rough Turning//CurvedSurface,,include,,include
+2 Axis LatheBack Rough Turning//CurvedWall,,include,,include
+2 Axis LatheBack Rough Turning//PlanarFace,,include,,include
+2 Axis LatheBack Rough Turning//Ring,,include,,include
+2 Axis LatheCenter Drilling//SimpleHole,,include,,include
+2 Axis LatheComboVoid Machining//ComboVoid,,include,,include
+2 Axis LatheDrilling//SimpleHole,,include,,include
+2 Axis LatheEdge Turning//SimpleHole,,include,,include
+2 Axis LatheEdge Turning/SimpleHole Edge Turning//Edge,,include,,include
+2 Axis LatheEnd Machining//End,,include,,include
+2 Axis LatheFinish Turning//CurvedSurface,,include,,include
+2 Axis LatheFinish Turning//CurvedWall,,include,,include
+2 Axis LatheFinish Turning//PlanarFace,,include,,include
+2 Axis LatheFinish Turning//SimpleHole,,include,,include
+2 Axis LatheID Turning//RingedHole,,include,,include
+2 Axis LatheMultiplunging//Ring,,include,,include
+2 Axis LatheMultiplunging/Ring Multiplunging//CurvedSurface,,include,,include
+2 Axis LatheMultiplunging/Ring Multiplunging//CurvedWall,,include,,include
+2 Axis LatheMultiplunging/Ring Multiplunging//PlanarFace,,include,,include
+2 Axis LatheMultistep Holemaking//MultiStepHole,,include,,include
+2 Axis LatheMultistep Holemaking/MultiStepHole Counterboring//SimpleHole,,include,,include
+2 Axis LatheMultistep Holemaking/MultiStepHole Groove Turning//SimpleHole,,include,,include
+2 Axis LathePecking//SimpleHole,,include,,include
+2 Axis LathePlunging//Ring,,include,,include
+2 Axis LathePlunging/Ring Plunging//CurvedSurface,,include,,include
+2 Axis LathePlunging/Ring Plunging//CurvedWall,,include,,include
+2 Axis LathePlunging/Ring Plunging//PlanarFace,,include,,include
+2 Axis LathePostdrill Rough Turning//SimpleHole,,include,,include
+2 Axis LathePretum Drilling//Ring,,include,,include
+2 Axis LathePretum Drilling//SimpleHole,,include,,include
+2 Axis LatheReaming//SimpleHole,,include,,include
+2 Axis LatheRough Turning//CurvedSurface,,include,,include
+2 Axis LatheRough Turning//CurvedWall,,include,,include
+2 Axis LatheRough Turning//PlanarFace,,include,,include
+2 Axis LatheRough Turning//Ring,,include,,include
+2 Axis LatheRough Turning//SimpleHole,,include,,include
+2 Axis LatheSetup,,include,,include
+2 Axis LatheSetup/Stock Prep//StockTrim,,include,,include
+2 Axis LatheStep Drilling//MultiStepHole,,include,,include
+2 Axis LatheStep Drilling/MultiStepHole Step Drilling//SimpleHole,,include,,include
+2 Axis LatheSurface Finishing//Ring,,include,,include
+2 Axis LatheTapping//SimpleHole,,include,,include
+2 Axis LatheThread Turning//CurvedWall,,include,,include
+2 Axis LatheThread Turning//Ring,,include,,include
+2 Axis LatheThread Turning//SimpleHole,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleBack Finish Turning//CurvedSurface,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleBack Finish Turning//CurvedWall,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleBack Finish Turning//PlanarFace,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleBack Rough Turning//Ring,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleBathtub Slot Milling//Keyway,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleBulk Milling,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleBulk Milling/Bulk Milling Op//BulkRemoval,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleCenter Drilling//SimpleHole,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleChamfer Milling//SimpleHole,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleChamfer Milling/SimpleHole Mill Chamfering//Edge,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleComboVoid Machining//ComboVoid,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleCountersinking//SimpleHole,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleCountersinking/SimpleHole Countersinking//Edge,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleDrilling//SimpleHole,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleEdge Turning//SimpleHole,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleEdge Turning/SimpleHole Edge Turning//Edge,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleFinish Turning//CurvedSurface,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleFinish Turning//CurvedWall,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleFinish Turning//PlanarFace,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleGeneral Mill Finishing//CurvedSurface,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleGeneral Mill Finishing//CurvedWall,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleGeneral Mill Finishing//PlanarFace,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleGeneral Mill Roughing//ComplexHole,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleID Turning//RingedHole,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleIndirect Filleting//CurvedSurface,include,include,include,include
+3 Axis Bar Feed Lathe with Sub SpindleIndirect Filleting//CurvedWall,include,include,include,include
+3 Axis Bar Feed Lathe with Sub SpindleMill Boring//SimpleHole,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleMill Contouring//CurvedSurface,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleMill Contouring//CurvedWall,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleMill Contouring//PlanarFace,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleMill Facing//PlanarFace,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleMultiplunging//Ring,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleMultiplunging/Ring Multiplunging//CurvedSurface,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleMultiplunging/Ring Multiplunging//CurvedWall,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleMultiplunging/Ring Multiplunging//PlanarFace,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleMultistep Holemaking//MultiStepHole,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleMultistep Holemaking/MultiStepHole Counterboring//SimpleHole,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleMultistep Holemaking/MultiStepHole Groove Milling//SimpleHole,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleObround Slot Milling//Keyway,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindlePecking//SimpleHole,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindlePlunging//Ring,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindlePlunging/Ring Plunging//CurvedSurface,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindlePlunging/Ring Plunging//CurvedWall,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindlePlunging/Ring Plunging//PlanarFace,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindlePostdrill Rough Turning//SimpleHole,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindlePretum Drilling//Ring,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindlePretum Drilling//SimpleHole,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleReaming//SimpleHole,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleRough Milling//ComplexHole,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleRough Milling//Keyway,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleRough Turning//CurvedSurface,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleRough Turning//CurvedWall,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleRough Turning//PlanarFace,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleRough Turning//Ring,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleRough Turning//SimpleHole,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleRound Milling//SimpleHole,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleRound Milling/SimpleHole Mill Rounding//Edge,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleRounding//CurvedSurface,include,include,include,include
+3 Axis Bar Feed Lathe with Sub SpindleRounding//CurvedWall,include,include,include,include
+3 Axis Bar Feed Lathe with Sub SpindleSetup,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleSide Milling//CurvedSurface,include,include,include,include
+3 Axis Bar Feed Lathe with Sub SpindleSide Milling//CurvedWall,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleSide Milling//PlanarFace,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleStep Drilling//MultiStepHole,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleStep Drilling/MultiStepHole Step Drilling//SimpleHole,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleStock Trim Turning//StockTrim,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleStock Trim Turning/StockTrim Parting//Ring,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleSurface Finishing//ComplexHole,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleSurface Finishing//Keyway,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleSurface Finishing//Ring,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleTapping//SimpleHole,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleThread Milling//CurvedWall,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleThread Milling//SimpleHole,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleThread Turning//CurvedWall,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleThread Turning//Ring,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleThread Turning//SimpleHole,,include,,include
+3 Axis Bar Feed Lathe with Sub SpindleWoodruff Slot Milling//Keyway,,include,,include
+3 Axis LatheBack Finish Turning//CurvedSurface,,include,,include
+3 Axis LatheBack Finish Turning//CurvedWall,,include,,include
+3 Axis LatheBack Finish Turning//PlanarFace,,include,,include
+3 Axis LatheBack Rough Turning//CurvedSurface,,include,,include
+3 Axis LatheBack Rough Turning//CurvedWall,,include,,include
+3 Axis LatheBack Rough Turning//PlanarFace,,include,,include
+3 Axis LatheBack Rough Turning//Ring,,include,,include
+3 Axis LatheBathtub Slot Milling//Keyway,,include,,include
+3 Axis LatheBulk Milling,,include,,include
+3 Axis LatheBulk Milling/Bulk Milling Op//BulkRemoval,,include,,include
+3 Axis LatheCenter Drilling//SimpleHole,,include,,include
+3 Axis LatheChamfer Milling//SimpleHole,,include,,include
+3 Axis LatheChamfer Milling/SimpleHole Mill Chamfering//Edge,,include,,include
+3 Axis LatheComboVoid Machining//ComboVoid,,include,,include
+3 Axis LatheCountersinking//SimpleHole,,include,,include
+3 Axis LatheCountersinking/SimpleHole Countersinking//Edge,,include,,include
+3 Axis LatheDrilling//SimpleHole,,include,,include
+3 Axis LatheEdge Turning//SimpleHole,,include,,include
+3 Axis LatheEdge Turning/SimpleHole Edge Turning//Edge,,include,,include
+3 Axis LatheEnd Machining//End,,include,,include
+3 Axis LatheFilleting//CurvedSurface,,include,,include
+3 Axis LatheFilleting//CurvedWall,,include,,include
+3 Axis LatheFinish Turning//CurvedSurface,,include,,include
+3 Axis LatheFinish Turning//CurvedWall,,include,,include
+3 Axis LatheFinish Turning//PlanarFace,,include,,include
+3 Axis LatheFinish Turning//SimpleHole,,include,,include
+3 Axis LatheGeneral Mill Finishing//CurvedSurface,,include,,include
+3 Axis LatheGeneral Mill Finishing//CurvedWall,,include,,include
+3 Axis LatheGeneral Mill Finishing//PlanarFace,,include,,include
+3 Axis LatheGeneral Mill Roughing//ComplexHole,,include,,include
+3 Axis LatheID Turning//RingedHole,,include,,include
+3 Axis LatheIndirect Filleting//CurvedSurface,include,include,include,include
+3 Axis LatheIndirect Filleting//CurvedWall,include,include,include,include
+3 Axis LatheMill Boring//SimpleHole,,include,,include
+3 Axis LatheMill Contouring//CurvedSurface,,include,,include
+3 Axis LatheMill Contouring//CurvedWall,,include,,include
+3 Axis LatheMill Contouring//PlanarFace,,include,,include
+3 Axis LatheMill Facing//PlanarFace,,include,,include
+3 Axis LatheMultiplunging//Ring,,include,,include
+3 Axis LatheMultiplunging/Ring Multiplunging//CurvedSurface,,include,,include
+3 Axis LatheMultiplunging/Ring Multiplunging//CurvedWall,,include,,include
+3 Axis LatheMultiplunging/Ring Multiplunging//PlanarFace,,include,,include
+3 Axis LatheMultistep Holemaking//MultiStepHole,,include,,include
+3 Axis LatheMultistep Holemaking/MultiStepHole Counterboring//SimpleHole,,include,,include
+3 Axis LatheMultistep Holemaking/MultiStepHole Groove Milling//SimpleHole,,include,,include
+3 Axis LatheMultistep Holemaking/MultiStepHole Groove Turning//SimpleHole,,include,,include
+3 Axis LatheObround Slot Milling//Keyway,,include,,include
+3 Axis LathePecking//SimpleHole,,include,,include
+3 Axis LathePlunging//Ring,,include,,include
+3 Axis LathePlunging/Ring Plunging//CurvedSurface,,include,,include
+3 Axis LathePlunging/Ring Plunging//CurvedWall,,include,,include
+3 Axis LathePlunging/Ring Plunging//PlanarFace,,include,,include
+3 Axis LathePostdrill Rough Turning//SimpleHole,,include,,include
+3 Axis LathePretum Drilling//Ring,,include,,include
+3 Axis LathePretum Drilling//SimpleHole,,include,,include
+3 Axis LatheReaming//SimpleHole,,include,,include
+3 Axis LatheRough Milling//ComplexHole,,include,,include
+3 Axis LatheRough Milling//CurvedSurface,,include,,include
+3 Axis LatheRough Milling//CurvedWall,,include,,include
+3 Axis LatheRough Milling//Keyway,,include,,include
+3 Axis LatheRough Milling//PlanarFace,,include,,include
+3 Axis LatheRough Milling//Void,,include,,include
+3 Axis LatheRough Turning//CurvedSurface,,include,,include
+3 Axis LatheRough Turning//CurvedWall,,include,,include
+3 Axis LatheRough Turning//PlanarFace,,include,,include
+3 Axis LatheRough Turning//Ring,,include,,include
+3 Axis LatheRough Turning//SimpleHole,,include,,include
+3 Axis LatheRound Milling//SimpleHole,,include,,include
+3 Axis LatheRound Milling/SimpleHole Mill Rounding//Edge,,include,,include
+3 Axis LatheRounding//CurvedSurface,include,include,include,include
+3 Axis LatheRounding//CurvedWall,include,include,include,include
+3 Axis LatheSetup,,include,,include
+3 Axis LatheSetup/Stock Prep//StockTrim,,include,,include
+3 Axis LatheSide Milling//CurvedSurface,include,include,include,include
+3 Axis LatheSide Milling//CurvedWall,,include,,include
+3 Axis LatheSide Milling//PlanarFace,,include,,include
+3 Axis LatheStep Drilling//MultiStepHole,,include,,include
+3 Axis LatheStep Drilling/MultiStepHole Step Drilling//SimpleHole,,include,,include
+3 Axis LatheSurface Finishing//ComplexHole,,include,,include
+3 Axis LatheSurface Finishing//Keyway,,include,,include
+3 Axis LatheSurface Finishing//Ring,,include,,include
+3 Axis LatheTapping//SimpleHole,,include,,include
+3 Axis LatheThread Milling//CurvedWall,,include,,include
+3 Axis LatheThread Milling//SimpleHole,,include,,include
+3 Axis LatheThread Turning//CurvedWall,,include,,include
+3 Axis LatheThread Turning//Ring,,include,,include
+3 Axis LatheThread Turning//SimpleHole,,include,,include
+3 Axis LatheWoodruff Slot Milling//Keyway,,include,,include
+3 Axis MillBathtub Slot Milling//Keyway,,include,,include
+3 Axis MillBoring//SimpleHole,,include,,include
+3 Axis MillBulk Milling,,include,,include
+3 Axis MillBulk Milling/BulkRemoval Rough Milling//BulkRemovalCore,,include,,include
+3 Axis MillCenter Drilling//SimpleHole,,include,,include
+3 Axis MillChamfering//SimpleHole,,include,,include
+3 Axis MillChamfering/ComplexHole Chamfering//Edge,,include,,include
+3 Axis MillChamfering/SimpleHole Chamfering//Edge,,include,,include
+3 Axis MillComboVoid Machining//ComboVoid,,include,,include
+3 Axis MillContouring//CurvedSurface,,include,,include
+3 Axis MillContouring//CurvedWall,,include,,include
+3 Axis MillContouring//PlanarFace,,include,,include
+3 Axis MillCountersinking//SimpleHole,,include,,include
+3 Axis MillCountersinking/SimpleHole Countersinking//Edge,,include,,include
+3 Axis MillDrilling//SimpleHole,,include,,include
+3 Axis MillEnd Machining//End,,include,,include
+3 Axis MillFilleting//CurvedSurface,,include,,include
+3 Axis MillFilleting//CurvedWall,,include,,include
+3 Axis MillGeneral Mill Finishing//CurvedSurface,,include,,include
+3 Axis MillGeneral Mill Finishing//CurvedWall,,include,,include
+3 Axis MillGeneral Mill Finishing//PlanarFace,,include,,include
+3 Axis MillGeneral Mill Roughing//ComplexHole,,include,,include
+3 Axis MillIndirect Filleting//CurvedSurface,include,include,include,include
+3 Axis MillIndirect Filleting//CurvedWall,include,include,include,include
+3 Axis MillMultistep Holemaking//MultiStepHole,,include,,include
+3 Axis MillMultistep Holemaking/MultiStepHole Counterboring//SimpleHole,,include,,include
+3 Axis MillMultistep Holemaking/MultiStepHole Groove Milling//SimpleHole,,include,,include
+3 Axis MillObround Slot Milling//Keyway,,include,,include
+3 Axis MillPecking//SimpleHole,,include,,include
+3 Axis MillPocket Milling//Pocket,,include,,include
+3 Axis MillPocket Milling/Pocket Rough Milling//PocketCore,,include,,include
+3 Axis MillRapid Rough Milling//StockTrim,,include,,include
+3 Axis MillReaming//SimpleHole,,include,,include
+3 Axis MillRough Milling//ComplexHole,,include,,include
+3 Axis MillRough Milling//CurvedSurface,,include,,include
+3 Axis MillRough Milling//CurvedWall,,include,,include
+3 Axis MillRough Milling//Keyway,,include,,include
+3 Axis MillRough Milling//PlanarFace,,include,,include
+3 Axis MillRough Milling//Ring,,include,,include
+3 Axis MillRough Milling//SimpleHole,,include,,include
+3 Axis MillRough Milling//Void,,include,,include
+3 Axis MillRounding//CurvedSurface,include,include,include,include
+3 Axis MillRounding//CurvedWall,include,include,include,include
+3 Axis MillRounding//SimpleHole,,include,,include
+3 Axis MillRounding/SimpleHole Rounding//Edge,,include,,include
+3 Axis MillSetup,include,include,include,include
+3 Axis MillSide Milling//CurvedWall,include,include,include,include
+3 Axis MillSide Milling//PlanarFace,include,include,include,include
+3 Axis MillSide Milling//SimpleHole,include,include,include,include
+3 Axis MillStep Drilling//MultiStepHole,,include,,include
+3 Axis MillStep Drilling/MultiStepHole Step Drilling//SimpleHole,,include,,include
+3 Axis MillSurface Finishing//ComplexHole,,include,,include
+3 Axis MillSurface Finishing//Keyway,,include,,include
+3 Axis MillSurface Finishing//Ring,,include,,include
+3 Axis MillSurface Finishing/Ring Facing//PlanarFace,,include,,include
+3 Axis MillSurface Finishing/Ring Side Milling//CurvedWall,,include,,include
+3 Axis MillTapping//SimpleHole,,include,,include
+3 Axis MillThread Milling//CurvedWall,,include,,include
+3 Axis MillThread Milling//SimpleHole,,include,,include
+3 Axis MillWoodruff Slot Milling//Keyway,,include,,include
+3 Axis MillFull Slot Milling//ComplexHole,,include,include,include
+3 Axis MillSlot Linear Ramping//ComplexHole,,include,,include
+3 Axis MillSlot Milling//ComplexHole,,include,include,include
+3 Axis MillWall Finishing/ComplexHole Side Milling//CurvedWall,,include,include,include
+3 Axis MillWall Finishing/ComplexHole Side Milling//PlanarFace,,include,include,include
+4 Axis MillBathtub Slot Milling//Keyway,,include,,include
+4 Axis MillBoring//SimpleHole,,include,,include
+4 Axis MillBulk Milling,,include,,include
+4 Axis MillBulk Milling/BulkRemoval Rough Milling//BulkRemovalCore,,include,,include
+4 Axis MillCenter Drilling//SimpleHole,,include,,include
+4 Axis MillChamfering//SimpleHole,,include,,include
+4 Axis MillChamfering/ComplexHole Chamfering//Edge,,include,,include
+4 Axis MillChamfering/SimpleHole Chamfering//Edge,,include,,include
+4 Axis MillComboVoid Machining//ComboVoid,,include,,include
+4 Axis MillContouring//CurvedSurface,,include,,include
+4 Axis MillContouring//CurvedWall,,include,,include
+4 Axis MillContouring//PlanarFace,,include,,include
+4 Axis MillCountersinking//SimpleHole,,include,,include
+4 Axis MillCountersinking/SimpleHole Countersinking//Edge,,include,,include
+4 Axis MillDrilling//SimpleHole,,include,,include
+4 Axis MillEnd Machining//End,,include,,include
+4 Axis MillFilleting//CurvedSurface,,include,,include
+4 Axis MillFilleting//CurvedWall,,include,,include
+4 Axis MillGeneral Mill Finishing//CurvedSurface,,include,,include
+4 Axis MillGeneral Mill Finishing//CurvedWall,,include,,include
+4 Axis MillGeneral Mill Finishing//PlanarFace,,include,,include
+4 Axis MillGeneral Mill Roughing//ComplexHole,,include,,include
+4 Axis MillIndirect Filleting//CurvedSurface,include,include,include,include
+4 Axis MillIndirect Filleting//CurvedWall,include,include,include,include
+4 Axis MillMultistep Holemaking//MultiStepHole,,include,,include
+4 Axis MillMultistep Holemaking/MultiStepHole Counterboring//SimpleHole,,include,,include
+4 Axis MillMultistep Holemaking/MultiStepHole Groove Milling//SimpleHole,,include,,include
+4 Axis MillObround Slot Milling//Keyway,,include,,include
+4 Axis MillPecking//SimpleHole,,include,,include
+4 Axis MillPocket Milling//Pocket,,include,,include
+4 Axis MillPocket Milling/Pocket Rough Milling//PocketCore,,include,,include
+4 Axis MillRapid Rough Milling//StockTrim,,include,,include
+4 Axis MillReaming//SimpleHole,,include,,include
+4 Axis MillRough Milling//ComplexHole,,include,,include
+4 Axis MillRough Milling//CurvedSurface,,include,,include
+4 Axis MillRough Milling//CurvedWall,,include,,include
+4 Axis MillRough Milling//Keyway,,include,,include
+4 Axis MillRough Milling//PlanarFace,,include,,include
+4 Axis MillRough Milling//Ring,,include,,include
+4 Axis MillRough Milling//SimpleHole,,include,,include
+4 Axis MillRough Milling//Void,,include,,include
+4 Axis MillRounding//CurvedSurface,include,include,include,include
+4 Axis MillRounding//CurvedWall,include,include,include,include
+4 Axis MillRounding//SimpleHole,,include,,include
+4 Axis MillRounding/SimpleHole Rounding//Edge,,include,,include
+4 Axis MillSetup,,include,,include
+4 Axis MillSide Milling//CurvedSurface,,,include,include
+4 Axis MillSide Milling//CurvedWall,include,include,include,include
+4 Axis MillSide Milling//PlanarFace,include,include,include,include
+4 Axis MillSide Milling//SimpleHole,include,include,,include
+4 Axis MillStep Drilling//MultiStepHole,,include,,include
+4 Axis MillStep Drilling/MultiStepHole Step Drilling//SimpleHole,,include,,include
+4 Axis MillSurface Finishing//ComplexHole,,include,,include
+4 Axis MillSurface Finishing//Keyway,,include,,include
+4 Axis MillSurface Finishing//Ring,,include,,include
+4 Axis MillSurface Finishing/Ring Facing//PlanarFace,,include,,include
+4 Axis MillSurface Finishing/Ring Side Milling//CurvedWall,,include,,include
+4 Axis MillTapping//SimpleHole,,include,,include
+4 Axis MillThread Milling//CurvedWall,,include,,include
+4 Axis MillThread Milling//SimpleHole,,include,,include
+4 Axis MillSurface Finishing/Ring Side Milling//PlanarFace,,include,,include
+4 Axis MillWoodruff Slot Milling//Keyway,,include,,include
+4 Axis MillFacing//CurvedWall,include,include,include,include
+4 Axis MillFacing//PlanarFace,include,include,include,include
+5 Axis MillBathtub Slot Milling//Keyway,,include,,include
+5 Axis MillBoring//SimpleHole,,include,,include
+5 Axis MillBulk Milling,,include,,include
+5 Axis MillBulk Milling/BulkRemoval Rough Milling//BulkRemovalCore,,include,,include
+5 Axis MillCenter Drilling//SimpleHole,,include,,include
+5 Axis MillChamfering//SimpleHole,,include,,include
+5 Axis MillChamfering/ComplexHole Chamfering//Edge,,include,,include
+5 Axis MillChamfering/SimpleHole Chamfering//Edge,,include,,include
+5 Axis MillComboVoid Machining//ComboVoid,,include,,include
+5 Axis MillContouring//CurvedSurface,,include,,include
+5 Axis MillContouring//CurvedWall,,include,,include
+5 Axis MillContouring//PlanarFace,,include,,include
+5 Axis MillCountersinking//SimpleHole,,include,,include
+5 Axis MillCountersinking/SimpleHole Countersinking//Edge,,include,,include
+5 Axis MillDrilling//SimpleHole,,include,,include
+5 Axis MillEnd Machining//End,,include,,include
+5 Axis MillFilleting//CurvedSurface,,include,,include
+5 Axis MillFilleting//CurvedWall,,include,,include
+5 Axis MillGeneral Mill Finishing//CurvedSurface,,include,,include
+5 Axis MillGeneral Mill Finishing//CurvedWall,,include,,include
+5 Axis MillGeneral Mill Finishing//PlanarFace,,include,,include
+5 Axis MillGeneral Mill Roughing//ComplexHole,,include,,include
+5 Axis MillIndirect Filleting//CurvedSurface,include,include,include,include
+5 Axis MillIndirect Filleting//CurvedWall,include,include,include,include
+5 Axis MillMultistep Holemaking//MultiStepHole,,include,,include
+5 Axis MillMultistep Holemaking/MultiStepHole Counterboring//SimpleHole,,include,,include
+5 Axis MillMultistep Holemaking/MultiStepHole Groove Milling//SimpleHole,,include,,include
+5 Axis MillObround Slot Milling//Keyway,,include,,include
+5 Axis MillPecking//SimpleHole,,include,,include
+5 Axis MillPocket Milling//Pocket,,include,,include
+5 Axis MillPocket Milling/Pocket Rough Milling//PocketCore,,include,,include
+5 Axis MillRapid Rough Milling//StockTrim,,include,,include
+5 Axis MillReaming//SimpleHole,,include,,include
+5 Axis MillRough Milling//ComplexHole,,include,,include
+5 Axis MillRough Milling//CurvedSurface,,include,,include
+5 Axis MillRough Milling//CurvedWall,,include,,include
+5 Axis MillRough Milling//Keyway,,include,,include
+5 Axis MillRough Milling//PlanarFace,,include,,include
+5 Axis MillRough Milling//Ring,,include,,include
+5 Axis MillRough Milling//SimpleHole,,include,,include
+5 Axis MillRough Milling//Void,,include,,include
+5 Axis MillRounding//CurvedSurface,include,include,include,include
+5 Axis MillRounding//CurvedWall,include,include,include,include
+5 Axis MillRounding//SimpleHole,,include,,include
+5 Axis MillRounding/SimpleHole Rounding//Edge,,include,,include
+5 Axis MillSetup,,include,,include
+5 Axis MillSide Milling//CurvedSurface,include,include,,include
+5 Axis MillSide Milling//CurvedWall,include,include,include,include
+5 Axis MillSide Milling//PlanarFace,include,include,include,include
+5 Axis MillSide Milling//SimpleHole,,include,,include
+5 Axis MillStep Drilling//MultiStepHole,,include,,include
+5 Axis MillStep Drilling/MultiStepHole Step Drilling//SimpleHole,,include,,include
+5 Axis MillSurface Finishing//ComplexHole,,include,,include
+5 Axis MillSurface Finishing//Keyway,,include,,include
+5 Axis MillSurface Finishing//Ring,,include,,include
+5 Axis MillSurface Finishing/Ring Facing//PlanarFace,,include,,include
+5 Axis MillSurface Finishing/Ring Side Milling//CurvedWall,,include,,include
+5 Axis MillTapping//SimpleHole,,include,,include
+5 Axis MillThread Milling//CurvedWall,,include,,include
+5 Axis MillThread Milling//SimpleHole,,include,,include
+5 Axis MillSurface Finishing/Ring Side Milling//PlanarFace,,include,,include
+5 Axis MillWoodruff Slot Milling//Keyway,,include,,include
+5 Axis MillFacing//PlanarFace,include,include,include,include
+Cylindrical GrinderComboVoid Grinding//ComboVoid,,include,,include
+Cylindrical GrinderCylindrical Grinder//Ring,,include,,include
+Cylindrical GrinderOD Finish Plunge Grinding//CurvedWall,,include,,include
+Cylindrical GrinderOD Finish Traverse Grinding//CurvedWall,,include,,include
+Deep Bore MachineDeep Bore Machine//RingedHole,,include,,include
+Deep Bore MachineDrilling//ComboVoid,,include,,include
+Deep Bore MachineDrilling//RingedHole,,include,,include
+Deep Bore MachineMultistep Holemaking//MultiStepHole,,include,,include
+Deep Bore MachineSetup,,include,,include
+Deep Bore MachineTrepanning//SimpleHole,,include,,include
+Drill PressBoring//SimpleHole,,include,,include
+Drill PressCenter Drilling//SimpleHole,,include,,include
+Drill PressComboVoid Machining//ComboVoid,,include,,include
+Drill PressCountersinking//SimpleHole,,include,,include
+Drill PressCountersinking/SimpleHole Countersinking//Edge,,include,,include
+Drill PressDrilling//SimpleHole,,include,,include
+Drill PressMultistep Holemaking//MultiStepHole,,include,,include
+Drill PressMultistep Holemaking/MultiStepHole Counterboring//SimpleHole,,include,,include
+Drill PressPecking//SimpleHole,,include,,include
+Drill PressReaming//SimpleHole,,include,,include
+Drill PressSetup,,include,,include
+Drill PressStep Drilling//MultiStepHole,,include,,include
+Drill PressStep Drilling/MultiStepHole Step Drilling//SimpleHole,,include,,include
+Drill PressTapping//SimpleHole,,include,,include
+Gun DrillDrilling//ComboVoid,,include,,include
+Gun DrillDrilling//RingedHole,,include,,include
+Gun DrillDrilling//SimpleHole,,include,,include
+Gun DrillMultistep Holemaking//MultiStepHole,,include,,include
+Gun DrillSetup,,include,,include
+Horizontal Tube HoningHoning//ComboVoid,,include,,include
+Horizontal Tube HoningHoning/ComboVoid Honing//SimpleHole,,include,,include
+Horizontal Tube HoningHoning/ComboVoid Multistep Holemaking/MultiStepHole Honing//SimpleHole,,include,,include
+Horizontal Tube HoningHoning//RingedHole,,include,,include
+Horizontal Tube HoningHoning//SimpleHole,,include,,include
+Horizontal Tube HoningMultistep Holemaking//MultiStepHole,,include,,include
+Internal GrinderComboVoid Grinding//ComboVoid,,include,,include
+Internal GrinderFinish Grinding//MultiStepHole,,include,,include
+Internal GrinderID Finish Plunge Grinding//CurvedWall,,include,,include
+Internal GrinderID Finish Plunge Grinding//SimpleHole,,include,,include
+Internal GrinderID Finish Traverse Grinding//CurvedWall,,include,,include
+Internal GrinderID Finish Traverse Grinding//SimpleHole,,include,,include
+Internal GrinderID Grinding//RingedHole,,include,,include
+Internal GrinderInternal Grinder//Ring,,include,,include
+Jig BoreBoring//SimpleHole,,include,,include
+Jig BoreCenter Drilling//SimpleHole,,include,,include
+Jig BoreComboVoid Machining//ComboVoid,,include,,include
+Jig BoreCountersinking//SimpleHole,,include,,include
+Jig BoreCountersinking/SimpleHole Countersinking//Edge,,include,,include
+Jig BoreDrilling//SimpleHole,,include,,include
+Jig BoreMultistep Holemaking//MultiStepHole,,include,,include
+Jig BoreMultistep Holemaking/MultiStepHole Counterboring//SimpleHole,,include,,include
+Jig BorePecking//SimpleHole,,include,,include
+Jig BoreReaming//SimpleHole,,include,,include
+Jig BoreSetup,,include,,include
+Jig BoreStep Drilling//MultiStepHole,,include,,include
+Jig BoreTapping//SimpleHole,,include,,include
+Jig GrindFinish Grinding//MultiStepHole,,include,,include
+Jig GrindID Finish Plunge Grinding//SimpleHole,,include,,include
+Jig GrindID Finish Traverse Grinding//SimpleHole,,include,,include
+Reciprocating Surface GrinderFinish Plunge Grinding//PlanarFace,,include,,include
+Reciprocating Surface GrinderFinish Traverse Grinding//PlanarFace,,include,,include
+Reciprocating Surface GrinderReciprocating Surface Grinder//End,,include,,include
+Rotary Surface GrinderFinish Plunge Grinding//PlanarFace,,include,,include
+Rotary Surface GrinderRotary Surface Grinder//End,,include,,include
+Rotor GrinderFinish Grinding//HeliGroove,,include,,include
+Simultaneous TurningGeneral Mill Finishing//CurvedSurface,,include,,include
+Simultaneous TurningGeneral Mill Finishing//CurvedWall,,include,,include
+Simultaneous TurningGeneral Mill Finishing//PlanarFace,,include,,include
+Simultaneous TurningRounding//CurvedSurface,,include,,include
+Simultaneous TurningRounding//CurvedWall,,include,,include
+Simultaneous TurningSide Milling//CurvedSurface,,include,,include
+Single Index MillSingle Index Finish Milling//HeliGroove,,include,,include
+Single Index MillSingle Index Rough Milling//HeliGroove,,include,,include
+Special Inspection FeatureInspection//MultiStepHole,,include,,include
+Special Inspection FeatureInspection//RingedHole,,include,,include
+Special Inspection FeatureInspection//SimpleHole,,include,,include
+Stock Prep LatheBack Rough Turning//Ring,,include,,include
+Stock Prep LatheMultiplunging//Ring,,include,,include
+Stock Prep LathePlunging//Ring,,include,,include
+Stock Prep LatheRough Turning//CurvedSurface,,include,,include
+Stock Prep LatheSetup,,include,,include
+Stock Prep LatheStock Prep//StockTrim,,include,,include
+Stock Prep LatheUnmachined//Ring,,include,,include
+Stock Prep MillRapid Rough Milling//StockTrim,,include,,include
+Stock Prep MillSetup,,include,,include
+Wire EDMCutting//CurvedWall,,include,,include
+Wire EDMCutting//PlanarFace,,include,,include
+Wire EDMEnd Machining//End,,include,,include
+MillTurnBack Finish Turning//CurvedSurface,,include,,include
+MillTurnBack Finish Turning//CurvedWall,,include,,include
+MillTurnBack Finish Turning//PlanarFace,,include,,include
+MillTurnBack Rough Turning//CurvedSurface,,include,,include
+MillTurnBack Rough Turning//CurvedWall,,include,,include
+MillTurnBack Rough Turning//PlanarFace,,include,,include
+MillTurnBack Rough Turning//Ring,,include,,include
+MillTurnBathtub Slot Milling//Keyway,,include,,include
+MillTurnBulk Milling,,include,,include
+MillTurnBulk Milling/Bulk Milling Op//BulkRemoval,,include,,include
+MillTurnCenter Drilling//SimpleHole,,include,,include
+MillTurnChamfer Milling//SimpleHole,,include,,include
+MillTurnChamfer Milling/SimpleHole Mill Chamfering//Edge,,include,,include
+MillTurnComboVoid Machining//ComboVoid,,include,,include
+MillTurnCountersinking//SimpleHole,,include,,include
+MillTurnCountersinking/SimpleHole Countersinking//Edge,,include,,include
+MillTurnDrilling//SimpleHole,,include,,include
+MillTurnEdge Turning//SimpleHole,,include,,include
+MillTurnEdge Turning/SimpleHole Edge Turning//Edge,,include,,include
+MillTurnEnd Machining//End,,include,,include
+MillTurnFacing//CurvedWall,,,,
+MillTurnFilleting//CurvedSurface,,include,,include
+MillTurnFilleting//CurvedWall,,include,,include
+MillTurnFinish Turning//CurvedSurface,,include,,include
+MillTurnFinish Turning//CurvedWall,,include,,include
+MillTurnFinish Turning//PlanarFace,,include,,include
+MillTurnFinish Turning//SimpleHole,,include,,include
+MillTurnGeneral Mill Finishing//CurvedSurface,,include,,include
+MillTurnGeneral Mill Finishing//CurvedWall,,include,,include
+MillTurnGeneral Mill Finishing//PlanarFace,,include,,include
+MillTurnGeneral Mill Roughing//ComplexHole,,include,,include
+MillTurnGun Drilling//SimpleHole,,include,,include
+MillTurnID Turning//RingedHole,,include,,include
+MillTurnIndirect Filleting//CurvedSurface,include,include,include,include
+MillTurnIndirect Filleting//CurvedWall,include,include,include,include
+MillTurnMill Boring//SimpleHole,,include,,include
+MillTurnMill Contouring//CurvedSurface,,include,,include
+MillTurnMill Contouring//CurvedWall,,include,,include
+MillTurnMill Facing//PlanarFace,include,include,include,include
+MillTurnMill Grooving//Ring,,include,,include
+MillTurnMultiplunging//Ring,,include,,include
+MillTurnMultiplunging/Ring Multiplunging//CurvedSurface,,include,,include
+MillTurnMultiplunging/Ring Multiplunging//CurvedWall,,include,,include
+MillTurnMultiplunging/Ring Multiplunging//PlanarFace,,include,,include
+MillTurnMultistep Holemaking//MultiStepHole,,include,,include
+MillTurnMultistep Holemaking/MultiStepHole Counterboring//SimpleHole,,include,,include
+MillTurnMultistep Holemaking/MultiStepHole Groove Milling//SimpleHole,,include,,include
+MillTurnMultistep Holemaking/MultiStepHole Groove Turning//SimpleHole,,include,,include
+MillTurnObround Slot Milling//Keyway,,include,,include
+MillTurnPecking//SimpleHole,,include,,include
+MillTurnPlunging//Ring,,include,,include
+MillTurnPlunging/Ring Plunging//CurvedSurface,,include,,include
+MillTurnPlunging/Ring Plunging//CurvedWall,,include,,include
+MillTurnPlunging/Ring Plunging//PlanarFace,,include,,include
+MillTurnPostdrill Rough Turning//SimpleHole,,include,,include
+MillTurnPretum Drilling//Ring,,include,,include
+MillTurnPretum Drilling//SimpleHole,,include,,include
+MillTurnReaming//SimpleHole,,include,,include
+MillTurnRough Milling//ComplexHole,,include,,include
+MillTurnRough Milling//CurvedSurface,,include,,include
+MillTurnRough Milling//CurvedWall,,include,,include
+MillTurnRough Milling//Keyway,,include,,include
+MillTurnRough Milling//PlanarFace,,include,,include
+MillTurnRough Milling//Void,,include,,include
+MillTurnRough Turning//CurvedSurface,,include,,include
+MillTurnRough Turning//CurvedWall,,include,,include
+MillTurnRough Turning//PlanarFace,,include,,include
+MillTurnRough Turning//Ring,,include,,include
+MillTurnRough Turning//SimpleHole,,include,,include
+MillTurnRound Milling//SimpleHole,,include,,include
+MillTurnRound Milling/SimpleHole Mill Rounding//Edge,,include,,include
+MillTurnRounding//CurvedSurface,include,include,include,include
+MillTurnRounding//CurvedWall,include,include,include,include
+MillTurnSetup,,include,,include
+MillTurnSetup/Stock Prep//StockTrim,,include,,include
+MillTurnSide Milling//CurvedSurface,,include,,include
+MillTurnSide Milling//CurvedWall,,include,,include
+MillTurnSide Milling//PlanarFace,,include,,include
+MillTurnStep Drilling//MultiStepHole,,include,,include
+MillTurnStep Drilling/MultiStepHole Step Drilling//SimpleHole,,include,,include
+MillTurnSurface Finishing//ComplexHole,,include,,include
+MillTurnSurface Finishing//Keyway,,include,,include
+MillTurnSurface Finishing//Ring,,include,,include
+MillTurnTapping//SimpleHole,,include,,include
+MillTurnThread Milling//CurvedWall,,include,,include
+MillTurnThread Milling//SimpleHole,,include,,include
+MillTurnThread Turning//CurvedWall,,include,,include
+MillTurnThread Turning//Ring,,include,,include
+MillTurnThread Turning//SimpleHole,,include,,include
+MillTurnWoodruff Slot Milling//Keyway,,include,,include

@@ -1,0 +1,275 @@
+UnitSystem,SizeMm,Comment
+both,0.2,0.2 mm
+both,0.254,10 thousandths
+both,0.3,0.3 mm
+both,0.39688,"1/64"""
+both,0.4,0.4 mm
+both,0.5,0.5 mm
+both,0.508,20 thousandths
+both,0.6,0.6 mm
+both,0.7,0.7 mm
+both,0.762,30 thousandths
+both,0.79375,"1/32"""
+both,0.8,0.8 mm
+both,0.9,0.9 mm
+both,1.0,1 mm
+both,1.016,40 thousandths
+both,1.19063,"3/64"""
+both,1.2,1.2mm
+both,1.27,50 thousandths
+both,1.5,1.5 mm
+both,1.5875,"1/16"""
+both,1.98438,"5/64"""
+both,2.0,2 mm
+both,2.38125,"3/32"""
+both,2.5,2.5 mm
+both,2.54,"1/10"""
+both,3.0,3 mm
+both,3.175,"1/8"""
+both,3.5,3.5 mm
+both,3.96875,"5/32"""
+both,4.0,4 mm
+both,4.5,4.5 mm
+both,4.7625,"3/16"""
+both,5.0,5 mm
+both,5.55625,"7/32"""
+both,6.0,6 mm
+both,6.35,"1/4"""
+both,7.0,7 mm
+both,7.9375,"5/16"""
+both,8.0,8 mm
+both,9.0,9 mm
+both,9.525,"3/8"""
+both,10.0,10 mm
+both,11.1125,"7/16"""
+both,12.0,12 mm
+both,12.7,"1/2"""
+both,14.0,14 mm
+both,14.2875,"9/16"""
+both,15.0,15 mm
+both,15.875,"5/8"""
+both,16.0,16 mm
+both,17.4625,"11/16"""
+both,18.0,18 mm
+both,19.05,"3/4"""
+both,20.0,20 mm
+both,22.0,22 mm
+both,22.225,"7/8"""
+both,25.0,25 mm
+both,25.4,"1"""
+both,30.0,30 mm
+both,31.75,"1.25"""
+both,35.0,35 mm
+both,38.1,"1.5"""
+both,40.0,40 mm
+both,44.45,"1.75"""
+both,45.0,45 mm
+both,50.0,50 mm
+both,50.8,"2"""
+both,55.0,55 mm
+both,57.15,"2.25"""
+both,60.0,60 mm
+both,63.5,"2.5"""
+both,65.0,65 mm
+both,69.85,"2.75"""
+both,70.0,70 mm
+both,75.0,75 mm
+both,76.2,"3"""
+both,80.0,80 mm
+both,82.55,"3.25"""
+both,88.9,"3.5"""
+both,90.0,90 mm
+both,95.0,95 mm
+both,95.25,"3.75"""
+both,100.0,100 mm
+both,101.6,"4"""
+both,105.0,105 mm
+both,107.95,"4.25"""
+both,110.0,110 mm
+both,114.3,"4.5"""
+both,115.0,115 mm
+both,120.0,120 mm
+both,120.65,"4.75"""
+both,125.0,125 mm
+both,127.0,"5"""
+both,130.0,130 mm
+both,139.7,"5.5"""
+both,140.0,140 mm
+both,150.0,150 mm
+both,152.4,"6"""
+both,160.0,160 mm
+both,165.1,"6.5"""
+both,170.0,170 mm
+both,177.8,"7"""
+both,180.0,180 mm
+both,190.0,190 mm
+both,190.5,"7.5"""
+both,200.0,200 mm
+both,203.2,"8"""
+both,215.9,"8.5"""
+both,220.0,220 mm
+both,228.6,"9"""
+both,240.0,240 mm
+both,241.3,"9.5"""
+both,250.0,250 mm
+both,254.0,"10"""
+both,260.0,260 mm
+both,279.4,"11"""
+both,280.0,280 mm
+both,300.0,300 mm
+both,304.8,"12"""
+both,320.0,320 mm
+both,330.2,"13"""
+both,340.0,340 mm
+both,355.6,"14"""
+both,360.0,360 mm
+both,380.0,380 mm
+both,381.0,"15"""
+both,400.0,400 mm
+both,406.4,"16"""
+both,420.0,420 mm
+both,431.8,"17"""
+both,440.0,440 mm
+both,457.2,"18"""
+both,460.0,460 mm
+both,480.0,480 mm
+both,482.6,"19.0"""
+both,500.0,500 mm
+both,508.0,"20.0"""
+metric,0.2,0.2 mm
+metric,0.3,0.3 mm
+metric,0.4,0.4 mm
+metric,0.5,0.5 mm
+metric,0.6,0.6 mm
+metric,0.7,0.7 mm
+metric,0.8,0.8 mm
+metric,0.9,0.9 mm
+metric,1.0,1 mm
+metric,1.2,1.2mm
+metric,1.5,1.5 mm
+metric,2.0,2 mm
+metric,2.5,2.5 mm
+metric,3.0,3 mm
+metric,3.5,3.5 mm
+metric,4.0,4 mm
+metric,4.5,4.5 mm
+metric,5.0,5 mm
+metric,6.0,6 mm
+metric,7.0,7 mm
+metric,8.0,8 mm
+metric,9.0,9 mm
+metric,10.0,10 mm
+metric,12.0,12 mm
+metric,14.0,14 mm
+metric,15.0,15 mm
+metric,16.0,16 mm
+metric,18.0,18 mm
+metric,20.0,20 mm
+metric,22.0,22 mm
+metric,25.0,25 mm
+metric,30.0,30 mm
+metric,35.0,35 mm
+metric,40.0,40 mm
+metric,45.0,45 mm
+metric,50.0,50 mm
+metric,55.0,55 mm
+metric,60.0,60 mm
+metric,65.0,65 mm
+metric,70.0,70 mm
+metric,75.0,75 mm
+metric,80.0,80 mm
+metric,90.0,90 mm
+metric,95.0,95 mm
+metric,100.0,100 mm
+metric,105.0,105 mm
+metric,110.0,110 mm
+metric,115.0,115 mm
+metric,120.0,120 mm
+metric,125.0,125 mm
+metric,130.0,130 mm
+metric,140.0,140 mm
+metric,150.0,150 mm
+metric,160.0,160 mm
+metric,170.0,170 mm
+metric,180.0,180 mm
+metric,190.0,190 mm
+metric,200.0,200 mm
+metric,220.0,220 mm
+metric,240.0,240 mm
+metric,250.0,250 mm
+metric,260.0,260 mm
+metric,280.0,280 mm
+metric,300.0,300 mm
+metric,320.0,320 mm
+metric,340.0,340 mm
+metric,360.0,360 mm
+metric,380.0,380 mm
+metric,400.0,400 mm
+metric,420.0,420 mm
+metric,440.0,440 mm
+metric,460.0,460 mm
+metric,480.0,480 mm
+metric,500.0,500 mm
+US,0.254,10 thousandths
+US,0.39688,"1/64"""
+US,0.508,20 thousandths
+US,0.762,30 thousandths
+US,0.79375,"1/32"""
+US,1.016,40 thousandths
+US,1.19063,"3/64"""
+US,1.27,50 thousandths
+US,1.5875,"1/16"""
+US,1.98438,"5/64"""
+US,2.38125,"3/32"""
+US,2.54,"1/10"""
+US,3.175,"1/8"""
+US,3.96875,"5/32"""
+US,4.7625,"3/16"""
+US,5.55625,"7/32"""
+US,6.35,"1/4"""
+US,7.9375,"5/16"""
+US,9.525,"3/8"""
+US,11.1125,"7/16"""
+US,12.7,"1/2"""
+US,14.2875,"9/16"""
+US,15.875,"5/8"""
+US,17.4625,"11/16"""
+US,19.05,"3/4"""
+US,22.225,"7/8"""
+US,25.4,"1"""
+US,31.75,"1.25"""
+US,38.1,"1.5"""
+US,44.45,"1.75"""
+US,50.8,"2"""
+US,57.15,"2.25"""
+US,63.5,"2.5"""
+US,69.85,"2.75"""
+US,76.2,"3"""
+US,82.55,"3.25"""
+US,88.9,"3.5"""
+US,95.25,"3.75"""
+US,101.6,"4"""
+US,107.95,"4.25"""
+US,114.3,"4.5"""
+US,120.65,"4.75"""
+US,127.0,"5"""
+US,139.7,"5.5"""
+US,152.4,"6"""
+US,165.1,"6.5"""
+US,177.8,"7"""
+US,190.5,"7.5"""
+US,203.2,"8"""
+US,215.9,"8.5"""
+US,228.6,"9"""
+US,241.3,"9.5"""
+US,254.0,"10"""
+US,279.4,"11"""
+US,304.8,"12"""
+US,330.2,"13"""
+US,355.6,"14"""
+US,381.0,"15"""
+US,406.4,"16"""
+US,431.8,"17"""
+US,457.2,"18"""
+US,482.6,"19.0"""
+US,508.0,"20.0"""

@@ -1,0 +1,10 @@
+name,filePath,digitalFactory,rowCount,rawMaterialThicknessMm,rawMaterialType,numQualityLoops
+numQualityLoops,lookupTables/Component/numQualityLoops.csv,USA reference export,9,0.7,DP,5.0
+numQualityLoops,lookupTables/Component/numQualityLoops.csv,USA reference export,9,0.7,high strength,4.0
+numQualityLoops,lookupTables/Component/numQualityLoops.csv,USA reference export,9,0.7,mild steel,3.0
+numQualityLoops,lookupTables/Component/numQualityLoops.csv,USA reference export,9,4.0,DP,4.0
+numQualityLoops,lookupTables/Component/numQualityLoops.csv,USA reference export,9,4.0,high strength,3.0
+numQualityLoops,lookupTables/Component/numQualityLoops.csv,USA reference export,9,4.0,mild steel,2.0
+numQualityLoops,lookupTables/Component/numQualityLoops.csv,USA reference export,9,999.0,DP,5.0
+numQualityLoops,lookupTables/Component/numQualityLoops.csv,USA reference export,9,999.0,high strength,4.0
+numQualityLoops,lookupTables/Component/numQualityLoops.csv,USA reference export,9,999.0,mild steel,3.0

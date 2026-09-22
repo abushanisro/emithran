@@ -1,0 +1,54 @@
+Variable Name,String Value,Unit Type Name,Notes
+addendumRoundingThreshold,10,Angle,"Angular threshold (in degrees). Any blank addendum that is generated will have rounded corners if the blank has a sharp corner equal to or less than this angle."
+bandSawKerf,0.889,Length,The width of a band saw cut. This sets the minimum spacing between bar parts in the lengthwise direction of the bar stock.
+createSeparateStockPrepProcess,false,,false if stock should be trimmed on main process. true if a separate station for stock prep is required.
+cycleTimeAdjustmentFactor,1,,Factor to globally increase or decrease cycle time evaluations per process.
+defaultLaserPerimeterAllowance,10,Length,Standard perimeter cutting allowance (lead-in & lead-out) amount for Laser Cutting.
+defaultOxyFuelPerimeterAllowance,25,Length,Standard perimeter cutting allowance (lead-in & lead-out) amount for OxyFuel Cutting.
+defaultPlasmaPerimeterAllowance,3.175,Length,Standard perimeter cutting allowance (lead-in & lead-out) amount for Plasma Cutting.
+defaultPlateNestingStepAngle,15,Angle,The default step angle utilized for Plate Stock True-Part Nesting.
+defaultRoughingTechnique,All Bulk Milling,,Default roughing technique for removing part from plate stock. Choices: All Bulk Milling|Perimeter Milling with Dropoff|Plate Cutting with Dropoff
+defaultStockUnitSystem,US,,"Either 'metric', 'US', or 'both'.  Both is a mashup of the first two unit systems"
+defaultUtilizationMethod,TRUE_PART,,"Eligible values: ""TRUE_PART"", ""COMPUTED"" & ""MACHINE_DEFAULT"". TRUE_PART is only applicable to PLATE stock; it automatically falls back to COMPUTED in other contexts."
+defaultWaterjetPerimeterAllowance,5,Length,Standard perimeter cutting allowance (lead-in & lead-out) amount for Waterjet Cutting.
+disableInvestmentAmortization,false,,"User override to disable amortization of all fixed costs to the individual part or assembly. By default, fixed costs are calculated per part for tooling, fixtures, and programming."
+enableScrapMaterialCredit,false,,Set to 'true' to enable Material Cost reduction due to sale of scrap mass of part.
+enableScrapPartCredit,false,,Set to 'true' to enable Material Cost reduction due to sale of scrapped parts as a result of Good Part Yield.
+gearQualityDefaultAgmaNewStd,A8,,"A2, A3, A4, ... A11, A12"
+gearQualityDefaultAgmaOldStd,Q8,,"Q15, Q14, Q13, ... Q6, Q5"
+gearQualityDefaultDinStd,9,,"2, 3, 4, ... 11, 12"
+genericValidation,true,,'true' if the generic validation view should be used for parts costed in this process group in this Digital Factory
+hexMinStockWidthAllowance,0,,Minimum allowed stock width for any size hex part.
+hexPercentStockAllowance,0,,Stock thickness as a percent (%) of the maximum cross section dimension width. A value 5 means 5%
+hexSnapStockSize,false,,"Default condition for snapping to the next larger available size for selecting hex stock in Stock Machining.  A value of ""true"" means snap to the next available size if the calculated stock size isn't available."
+highResolutionNestingFactor,0.25,,"Default setting for use in determining if NestLib rectangular nesting algorithm should be tried in addition to the grid part algorithm. Lower values increase accuracy, but decrease performance. Refer to True-part Nesting and Very Small Parts and Calculations / Material Cost and Utilization in the Cost Model Guide."
+idStockTrimAllowance,0,Length,Default ID stockTrimAllowance set to zero
+kerfWidthMaxLaser,20,Length,Threshold for kerf Width that is used to calculate the kerf width for laser cutting.
+kerfWidthMaxOxyFuel,44.45,Length,Threshold for kerf width that is used to calculate the kerf width for oxyfuel cutting.
+kerfWidthMaxPlasma,30,Length,Threshold for kerf width that is used to calculate the kerf width for plasma cutting.
+kerfWidthMaxWaterjet,25,Length,Threshold for kerf width that is used to calculate the kerf width for waterjet cutting.
+laborRateAdjustmentFactor,1,,Factor to globally increase or decrease labor rate evaluations per process.
+largePartNestingFactor,1.0,,Percentage used by the 3rd party nesting software to specify the threshold between medium and large parts.
+laserKerf,0.5,,multiplier for laser kerf width calculations
+maxPartsPerBundleBandSaw,18,,Maximum number of parts allowed in a bundle of parts cut by a Band Saw.
+maxPlateLengthForNestedMilledParts,914.4,Length,Maximum allowable plate stock length for nested Plate Stock Parts that are perimeter milled. Default set to fit on medium sized virtual Mill.
+maxPlateTriggerHeightOverWidth,0.25,,Maximum part cross section height/width that will trigger the use of Plate Stock
+maxPlateWidthForNestedMilledParts,457.2,Length,Maximum allowable plate stock width for nested Plate Stock Parts that are perimeter milled. Default set to fit on medium sized virtual Mill.
+maxStockAllowance,3.175,Length,Maximum allowed stock thickness for any size part
+minPlateTriggerWidth,152.4,Length,Minimum part cross section width that will trigger the use of Plate Stock
+minStockAllowance,0.79375,Length,Minimum allowed stock thickness for any size part.
+overheadRateAdjustmentFactor,1,,Factor to globally increase or decrease overhead evaluations per process.
+oxyfuelKerf,1,,multiplier for oxyfuel kerf width calculations
+percentStockAllowance,5,,"Stock thickness as a percent (%) of the maximum cross section dimension (OD or max(width, height)). A value 5 means 5%"
+plasmaKerf,1.5,,multiplier for plasma kerf width calculations
+snapStockSize,true,,"Default condition for snapping to the next larger available size for selecting stock in Stock Machining.  A value of ""true"" means snap to the next available size if the calculated stock size isn't available."
+standardPlateLength,914.4,Length,"Default length for PLATE stock, used when virtual stock is created. For milling with drop off, the virtual stock is still limited by maxPlateLengthForNestedMilledParts."
+standardPlateWidth,457.2,Length,"Default width for PLATE stock, used when virtual stock is created. For milling with drop off, the virtual stock is still limited by maxPlateWidthForNestedMilledParts."
+standardStockLength,6096,Length,"Default length of virtual stock, used when useMinStockLength = false."
+stockHeightThreshold,20,Length,Threshold for stock height that is used to calculate the minimum hole diameter for laser cutting
+supportsDTC,true,,'true' or 'false' - only set to 'true' if this Digital Factory's cost model has been upgraded or configured to support aPriori's Design-to-Cost functionality.
+truePartNestMaxOutlinePoints,10000,,Max number of points in the blank outline sent to NestLib. This prevents an excessive number of outline points which can lead to a long nesting time.
+truePartNestMode,moderate,,"Used by the 3rd party nesting software to determine the number of trials performed during nesting. Valid values are ""minimal"", ""moderate"", and ""extended""."
+useMinStockLength,false,,"If true only virtual stocks will be used and they will have a length equal to the minimum possible stock length."
+waterjetKerf,0.625,,Multiplier for waterjet kerf width calculations
+waterjetWallThicknessToDepthRatio,.003,Length,Minimum allowable ratio of wall thickness to part thickness for a Waterjet Cut part.

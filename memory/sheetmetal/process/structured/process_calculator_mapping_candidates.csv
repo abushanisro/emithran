@@ -1,0 +1,25 @@
+﻿process_group,process_route,operation,machine,route_match,live_active,roadmap_status
+Sheet Metal,Cutting,2 Axis Router,Default Machine,exact,False,unwired
+Sheet Metal,Bending/Floating /Forming,2 Roll Bending,Faccin HCU 300 X 1,exact,True,thin
+Sheet Metal,Bending/Floating /Forming,3 Roll Bending,Faccin ASI/M 2513,exact,True,thin
+Sheet Metal,Laser Cutting,3D Laser,Default 3D Laser,exact,False,unwired
+Sheet Metal,Bending/Floating /Forming,4 Roll Bending,Knuth RBM 20/04 CNC,exact,True,thin
+Sheet Metal,Bending/Floating /Forming,Bend Brake,Default Bend Brake,exact,True,production
+Sheet Metal,,CTL,Default CTL,unassigned,,not_modeled
+Sheet Metal,Finishing,Deslag,Default Deslag,exact,True,thin
+Sheet Metal,Laser Cutting,Fiber Laser Cut,Laser Cutter - 4kW Fiber,exact,True,production
+Sheet Metal,Bending/Floating /Forming,Generic Press,Default Press,exact,False,unwired
+Sheet Metal,Laser Cutting,Laser Cut,Default Laser,exact,True,production
+Sheet Metal,Sheet Metal Fabrication,Laser Punch,Muratec Motorum Hybrid 2558 (2000W),exact,False,unwired
+Sheet Metal,Material Usage,Material Stock,Default Material Stock,exact,False,non_mfg
+Sheet Metal,Material Usage,No Cost Feature,,exact,False,non_mfg
+Sheet Metal,Cutting,OxyFuel Cut,Default Oxyfuel - 4 torch,exact,False,unwired
+Sheet Metal,Cutting,Plasma Cut,Default Plasma,exact,False,unwired
+Sheet Metal,Sheet Metal Fabrication,Plasma Punch,Whitney 3700 SST,exact,False,unwired
+Sheet Metal,Bending/Floating /Forming,Progressive Die,Default Press,exact,True,not_modeled
+Sheet Metal,Sheet Cutting,Shear,Default Shear,alias_confident,False,not_modeled
+Sheet Metal,Bending/Floating /Forming,Std Press,Default Press,exact,False,unwired
+Sheet Metal,Bending/Floating /Forming,Tandem Press,Default Press,exact,False,unwired
+Sheet Metal,Bending/Floating /Forming,Turret Press,Default Turret Press,exact,False,production
+Sheet Metal,,User-Defined Process,,unassigned,,non_mfg
+Sheet Metal,Cutting,Waterjet Cut,OMAX 2626,alias_confident,True,production

@@ -1,0 +1,35 @@
+﻿Process Name (raw),Process,Operation,Applies To
+Adhesive Bonding:Adhesive Bonding//ContactRegion,Adhesive Bonding,Adhesive Bonding,ContactRegion
+Adhesive Bonding:Clamping//ContactRegion,Adhesive Bonding,Clamping,ContactRegion
+Electron Beam Welding:Electron Beam Welding//Weld,Electron Beam Welding,Electron Beam Welding,Weld
+Fay Sealing:Fay Sealing//ContactRegion,Fay Sealing,Fay Sealing,ContactRegion
+Laser Welding:Laser Welding//Weld,Laser Welding,Laser Welding,Weld
+Lock Bolt:Lock Bolt Install//AssemblyComponentGcd,Lock Bolt,Lock Bolt Install,AssemblyComponentGcd
+Manual MIG Welding:Manual MIG Welding//Weld,Manual MIG Welding,Manual MIG Welding,Weld
+Manual Spot Welding:Manual Spot Welding//Weld,Manual Spot Welding,Manual Spot Welding,Weld
+Manual TIG Welding:Manual TIG Welding//Weld,Manual TIG Welding,Manual TIG Welding,Weld
+Mechanical Assembly:Mechanical Assembly//Stage,Mechanical Assembly,Mechanical Assembly,Stage
+Mechanical Assembly:Nut Insert//AssemblyComponentGcd,Mechanical Assembly,Nut Insert,AssemblyComponentGcd
+Mechanical Assembly:Press Fit//AssemblyComponentGcd,Mechanical Assembly,Press Fit,AssemblyComponentGcd
+Mechanical Assembly:Rivet//AssemblyComponentGcd,Mechanical Assembly,Rivet,AssemblyComponentGcd
+Mechanical Assembly:Screw Tighten - Manual//AssemblyComponentGcd,Mechanical Assembly,Screw Tighten - Manual,AssemblyComponentGcd
+Mechanical Assembly:Screw Tighten - Power//AssemblyComponentGcd,Mechanical Assembly,Screw Tighten - Power,AssemblyComponentGcd
+Mechanical Assembly:Snap Fit//AssemblyComponentGcd,Mechanical Assembly,Snap Fit,AssemblyComponentGcd
+Mechanical Assembly:Tab Bend//AssemblyComponentGcd,Mechanical Assembly,Tab Bend,AssemblyComponentGcd
+Mechanical Assembly:User-Defined Operation//AssemblyComponentGcd,Mechanical Assembly,User-Defined Operation,AssemblyComponentGcd
+No Cost Feature:No Cost Feature//Weld,No Cost Feature,No Cost Feature,Weld
+Pick and Place:Clamping//ContactGroup,Pick and Place,Clamping,ContactGroup
+Pick and Place:Load//AssemblyComponentGcd,Pick and Place,Load,AssemblyComponentGcd
+Pick and Place:Pick and Place//Stage,Pick and Place,Pick and Place,Stage
+Pick and Place:Pick and Place//Stage:Clamp//AssemblyComponentGcd,Pick and Place,Pick and Place,Stage:Clamp//AssemblyComponentGcd
+Robotic MIG Welding:Robotic MIG Welding//Weld,Robotic MIG Welding,Robotic MIG Welding,Weld
+Robotic Spot Welding:Robotic Spot Welding//Weld,Robotic Spot Welding,Robotic Spot Welding,Weld
+Robotic TIG Welding:Robotic TIG Welding//Weld,Robotic TIG Welding,Robotic TIG Welding,Weld
+Threaded Insert:Threaded Insert//AssemblyComponentGcd,Threaded Insert,Threaded Insert,AssemblyComponentGcd
+Threaded Insert:Threaded Insert//Stage,Threaded Insert,Threaded Insert,Stage
+Ultrasonic Welding:Ultrasonic Welding//AssemblyComponentGcd,Ultrasonic Welding,Ultrasonic Welding,AssemblyComponentGcd
+Ultrasonic Welding:Ultrasonic Welding//Stage,Ultrasonic Welding,Ultrasonic Welding,Stage
+Weld Clean Up:Grinding//Weld,Weld Clean Up,Grinding,Weld
+Weld Prep:Bevel Cutting//Weld,Weld Prep,Bevel Cutting,Weld
+Weld Prep:Grinding//Weld,Weld Prep,Grinding,Weld
+Weld Prep:Wire Brushing//Weld,Weld Prep,Wire Brushing,Weld

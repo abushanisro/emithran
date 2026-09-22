@@ -1,0 +1,7 @@
+name,filePath,loadTime_s,weight_kg
+tblMaterialHandling,lookupTables/Component/tblMaterialHandling.csv,0.0,0.0
+tblMaterialHandling,lookupTables/Component/tblMaterialHandling.csv,8.0,1.0
+tblMaterialHandling,lookupTables/Component/tblMaterialHandling.csv,16.0,5.0
+tblMaterialHandling,lookupTables/Component/tblMaterialHandling.csv,30.0,10.0
+tblMaterialHandling,lookupTables/Component/tblMaterialHandling.csv,38.0,27.0
+tblMaterialHandling,lookupTables/Component/tblMaterialHandling.csv,50.0,999999999

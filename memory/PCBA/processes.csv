@@ -1,0 +1,35 @@
+Process Name,Default Tool Shop Name,Default Machine
+Apply Photo Resist,,Hakuto Mach 630up
+Automated Optical Inspection,,CISM Phoenix HDI
+Automated Vision Inspection,,CISM Phoenix FI
+Bed of Nails,Default,Kyoritsu Focus -2000Plus
+Bench Operation,,Default
+Copper Plate and Tin Coat,,Plating Line - 10 Gating Cells - 4900mm x 640mm
+Cure Plugged Vias,,Aeolus Forced Air Conveyor Dryer BBC-Air 366C-4-2
+Cure Solder Mask,,Rack 1.2m x 1.2m x 1.2m - BedSize
+DES,,DES Line (25m x 1.7m)
+Desmear and Plate Through Holes,,Plating Line - 10 Gating Tanks - 4900mm x 640mm
+Develop Solder Mask,,Solder Mask Developer (8m x 1.7m)
+Dissolve Unexposed Photo Resist,,Photo Resist Developer (8m x 1.7m)
+Drill Circuit Holes,Default,Excellon HS 1L 2 heads 1 station
+Drill Registration Holes,,Excellon HS 1L 2 heads 1 station
+Electroless Nickel Immersion Gold,,High Capacity Plating Line
+Film Imaging,,Altix Afosa ies
+Flying Probe,,ATG- A5Neo Flying Probe Tester
+Hot Air Solder Leveling,,HASL Large
+Laser Drill Vias,,ESI 5335
+Material Stock,Default,Default
+No Cost Feature,,
+Organic Solderability Preservative,,OSP Line
+Oven Cure Layers,,Lauffer RMV 125
+Photolithography,,Altix Afosa ies
+Plug Vias,Default,ATMA PC 68
+Router,,GETECH ESR1000
+Screen Printing,Default,ATMA PC 68
+SES,,SES Line (22.5m x 2m)
+Silkscreen Cure,,Aeolus Forced Air Conveyor Dryer BBC-Air 366C-4-2
+Stamp,Default,Ascen ASPM-10T
+Surface Preparation,,Chemcut Model 604
+Tack Dry Solder Mask,,Rack 1.2m x 1.2m x 1.2m - BedSize
+User-Defined Process,,
+Wet Film Solder Mask,,ATMA PC 68

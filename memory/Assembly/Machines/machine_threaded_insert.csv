@@ -1,0 +1,31 @@
+﻿Field,Value
+Digital Factory,aPriori USA
+Sector,World Average
+Name,Default Threaded Insert
+Labor Rate (USD / hr),29.95
+Direct Overhead Rate (USD / hr),0.10
+Indirect Overhead Rate (USD / hr),18.61
+Overhead Multiplier,0.00
+Number of Operators,1.00
+Labor Time Standard,1.00
+Wage Grade Name,
+Work Center Labor Rate Factor,1.00
+Setup Time (hr),1.00
+Insert Time (s),4.00
+Is Virtual Machine,true
+Is Preferred,true
+Avg Utilization,0.00
+Good Part Yield,1.00
+Machine Price (USD),1000.00
+Machine Length (mm),6100.00
+Machine Width (mm),3050.00
+Footprint Allowance Factor,3.00
+Machine Power (kW),0.25
+Installation Percent (%),20.00
+Machine Uptime (%),80.00
+Annual Maintenance Percent (%),5.00
+Machine Life (yr),10.00
+Salvage Value Percent (%),0.00
+Supplies Cost (USD / yr),0.00
+Machine Manufacturer Location,USA
+Data Source,aPriori Baseline

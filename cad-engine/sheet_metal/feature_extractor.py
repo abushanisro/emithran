@@ -5,9 +5,12 @@ Split out of the former feature_extractors.py (2026-09-01 domain-boundary
 refactor) — SheetMetalFeatureExtractor + its private _annotate_tap_candidates
 helper, unchanged, verbatim. See ARCHITECTURE.md for the full split rationale
 and the intentional Sheet Metal -> Machining dependency this module still has
-(imports CNCFeatureRecognizer/CNCFeature/_detect_counterbores/_classify_cone
-from machining.cnc_feature_recognizer for shared hole-classification logic —
-preserved as-is, not something this refactor introduced or removed).
+(imports MachiningFeatureRecognizer/MachiningFeature/_detect_counterbores/
+_classify_cone from machining.machining_feature_recognizer, renamed
+2026-09-19 from CNCFeatureRecognizer/CNCFeature/cnc_feature_recognizer per
+the "Machining is the canonical domain, not CNC" architecture mandate, for
+shared hole-classification logic — preserved as-is otherwise, not something
+this refactor introduced or removed).
 """
 
 import logging
@@ -29,15 +32,15 @@ logger = logging.getLogger(__name__)
 def _annotate_tap_candidates(hole_groups: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Annotate hole groups whose diameter falls in a tap pre-drill band
-    (shared table from cnc_feature_recognizer) with 'tap_candidate_spec' and
-    return a [{spec, count}] summary.
+    (shared table from machining_feature_recognizer) with 'tap_candidate_spec'
+    and return a [{spec, count}] summary.
 
     RECOGNITION DATA ONLY — sheet metal is full of clearance holes whose sizes
     overlap tap-drill bands (M3 clearance Ø3.2–3.4 vs M4 tap drill Ø3.3), so the
     backend must NOT price tapping from these candidates alone; drawing thread
     callouts remain the authoritative source for sheet-metal tapping cost.
     """
-    from machining.cnc_feature_recognizer import _TAP_DRILL_RANGES
+    from machining.machining_feature_recognizer import _TAP_DRILL_RANGES
 
     tap_candidates: List[Dict[str, Any]] = []
     for g in hole_groups:
@@ -356,7 +359,7 @@ class SheetMetalFeatureExtractor:
         except Exception as e:
             logger.warning(f"[SheetMetal] slot detection failed: {e}")
 
-        # Counterbore / countersink: reuses cnc_feature_recognizer's coaxial-face
+        # Counterbore / countersink: reuses machining_feature_recognizer's coaxial-face
         # detection (proven on CNC parts) — same B-Rep topology pattern applies to
         # sheet metal. Additive only: does NOT change hole_count/pierce_count/laser
         # cycle time, which are already validated. Requires real STEP topology
@@ -826,7 +829,7 @@ class SheetMetalFeatureExtractor:
                     # antiparallel-pair test below never recognizes them as a pair
                     # and thickness/dominant-face detection silently falls back to
                     # a low-confidence guess. Same convention already used for
-                    # cylinders/cones in cnc_feature_recognizer.py.
+                    # cylinders/cones in machining_feature_recognizer.py.
                     if face.Orientation() != TopAbs_FORWARD:
                         nx, ny, nz = -nx, -ny, -nz
                     loc = plane.Location()
@@ -2050,7 +2053,7 @@ class SheetMetalFeatureExtractor:
         Detect counterbore (coaxial two-diameter bore pair) and countersink
         (cone + coaxial bore) features on a sheet-metal part.
 
-        Reuses cnc_feature_recognizer's cylinder/cone collectors and
+        Reuses machining_feature_recognizer's cylinder/cone collectors and
         classification helpers directly rather than reimplementing B-Rep
         topology analysis — the same coaxial-face pattern that already works
         for CNC-milled parts applies unchanged to a thin sheet; only the
@@ -2060,7 +2063,7 @@ class SheetMetalFeatureExtractor:
         Returns (counterbores, countersinks), each {"count": int, "groups": [...]}
         where groups are [{diameter_mm, count}] — same shape as hole_groups.
         """
-        from machining.cnc_feature_recognizer import CNCFeatureRecognizer, CNCFeature, _detect_counterbores, _classify_cone
+        from machining.machining_feature_recognizer import MachiningFeatureRecognizer, MachiningFeature, _detect_counterbores, _classify_cone
         from OCC.Core.BRepAdaptor import BRepAdaptor_Surface  # type: ignore
         from OCC.Core.GeomAbs import GeomAbs_Plane  # type: ignore
 
@@ -2072,7 +2075,7 @@ class SheetMetalFeatureExtractor:
         mag = math.sqrt(nx * nx + ny * ny + nz * nz) or 1.0
         main_axis = (nx / mag, ny / mag, nz / mag)
 
-        recognizer = CNCFeatureRecognizer()
+        recognizer = MachiningFeatureRecognizer()
         bbox = {
             "xmin": bbox_minmax.get("xmin", 0.0), "xmax": bbox_minmax.get("xmax", 0.0),
             "ymin": bbox_minmax.get("ymin", 0.0), "ymax": bbox_minmax.get("ymax", 0.0),
@@ -2081,13 +2084,13 @@ class SheetMetalFeatureExtractor:
         cylinders = recognizer._collect_cylinders(shape, main_axis, bbox)
         cones = recognizer._collect_cones(shape)
 
-        bore_features: List[CNCFeature] = []
+        bore_features: List[MachiningFeature] = []
         bore_id_to_cyl: Dict[str, Dict] = {}
         for idx, cyl in enumerate(cylinders):
             if cyl["kind"] not in ("through_hole", "blind_hole"):
                 continue
             fid = f"sm_bore_{idx}"
-            bore_features.append(CNCFeature(
+            bore_features.append(MachiningFeature(
                 id=fid,
                 type=cyl["kind"],
                 params={

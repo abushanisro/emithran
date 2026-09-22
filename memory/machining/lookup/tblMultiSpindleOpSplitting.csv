@@ -1,0 +1,10 @@
+Feature,Operation,MachineSpindles,NumberOfOperations
+Ring,Rough Turning,2.0,1.0
+Ring,Rough Turning,6.0,2.0
+Ring,Rough Turning,8.0,3.0
+SimpleHole,Drilling,2.0,1.0
+SimpleHole,Drilling,6.0,3.0
+SimpleHole,Drilling,8.0,3.0
+SimpleHole,Pecking,2.0,1.0
+SimpleHole,Pecking,6.0,3.0
+SimpleHole,Pecking,8.0,3.0

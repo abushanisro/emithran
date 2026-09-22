@@ -1,0 +1,4 @@
+﻿Spray Name,Spray Cost (USD),Volume (mL),Discharge Rate (g / s),Relative Density (g / cm^3),Spray Time Per Weld Length (s)
+Ambersil,6.00,400.00,0.90,1.03,0.05
+CRC,6.75,500.00,0.90,1.30,0.05
+Rocol,15.71,300.00,0.90,1.10,0.05

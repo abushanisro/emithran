@@ -1,0 +1,65 @@
+﻿process_route,operation,active
+Material Usage,Gross Usage,True
+Material Usage,Net Usage,True
+Material Usage,Material Stock,False
+Material Usage,No Cost Feature,False
+Forming,Hole Extrusion (Burring),True
+Drilling,Tapping,True
+Laser Cutting,Laser Cut,True
+Laser Cutting,Fiber Laser Cut,True
+Laser Cutting,3D Laser,False
+Sheet Cutting,Shearning,False
+Sheet Cutting,Fiber laser Cutting,False
+Sheet Cutting,Co2 Laser Cutting,False
+Sheet Cutting,Plasma Cutting,False
+Sheet Cutting,Blanking,False
+Sheet Cutting,3D Laser Cut,False
+Sheet Cutting,Shearing,False
+Sheet Cutting,Waterjet Cutting,False
+Bending/Floating /Forming,Bend Brake,True
+Bending/Floating /Forming,Stage Tool Bending,True
+Bending/Floating /Forming,Stage Tool Forming,True
+Bending/Floating /Forming,Roll Forming,True
+Bending/Floating /Forming,Deep Draw,True
+Bending/Floating /Forming,Laser Puch,False
+Bending/Floating /Forming,Turret Press,False
+Bending/Floating /Forming,Progressive die,True
+Bending/Floating /Forming,Offline Blank,True
+Bending/Floating /Forming,Stretch forming,True
+Bending/Floating /Forming,Hemming,True
+Bending/Floating /Forming,Flanging,True
+Bending/Floating /Forming,2 Roll Bending,True
+Bending/Floating /Forming,3 Roll Bending,True
+Bending/Floating /Forming,4 Roll Bending,True
+Bending/Floating /Forming,Generic Press,False
+Bending/Floating /Forming,Std Press,False
+Bending/Floating /Forming,Tandem Press,False
+Press Brake,Bend,True
+Press Brake,Form,True
+Press Brake,Press Brake Bend,True
+Raw Material,Sheet,True
+Raw Material,Flat,True
+Raw Material,Coil,True
+Raw Material,I-Beam,True
+Raw Material,H-Beam,True
+Raw Material,Angle (L-shape),True
+Raw Material,Channel (C-shape / U-shape),True
+Raw Material,T-Sections,True
+Raw Material,Z-Sections,True
+Finishing,Deburr,True
+Finishing,Edge Finish,True
+Finishing,Deslag,True
+Inspection,Inspect,True
+Inspection,Dimensional Inspect,True
+Surface Treatment,Powder Coat,True
+Surface Treatment,Paint,True
+Surface Treatment,Anodize,True
+Cutting,Waterjet Cutting,True
+Cutting,Abrasive Waterjet Cutting,True
+Cutting,Pure Waterjet Cutting (for soft materials),False
+Cutting,2 Axis Router,False
+Cutting,OxyFuel Cut,False
+Cutting,Plasma Cut,False
+Sheet Metal Fabrication,Turret Punching,True
+Sheet Metal Fabrication,Hole Punching,True
+Sheet Metal Fabrication,Nibbling,True

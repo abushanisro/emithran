@@ -1,0 +1,17 @@
+name,filePath,digitalFactory,rowCount,rateType,apaUsdPerKg,euUsdPerKg,naUsdPerKg,saUsdPerKg
+freightRates,lookupTables/Component/freightRates.csv,USA reference export,16,APA_APA,1.1,1.1,1.1,1.1
+freightRates,lookupTables/Component/freightRates.csv,USA reference export,16,EU_EU,1.1,1.1,1.1,1.1
+freightRates,lookupTables/Component/freightRates.csv,USA reference export,16,NA_NALand,1.1,1.1,1.1,1.1
+freightRates,lookupTables/Component/freightRates.csv,USA reference export,16,NA_SA,1.1,1.1,1.1,1.1
+freightRates,lookupTables/Component/freightRates.csv,USA reference export,16,SA_NASeaAir,1.1,1.1,1.1,1.1
+freightRates,lookupTables/Component/freightRates.csv,USA reference export,16,SA_SA,1.1,1.1,1.1,1.1
+freightRates,lookupTables/Component/freightRates.csv,USA reference export,16,APA_EU,6.6,6.6,6.6,6.6
+freightRates,lookupTables/Component/freightRates.csv,USA reference export,16,APA_NASeaAir,6.6,6.6,6.6,6.6
+freightRates,lookupTables/Component/freightRates.csv,USA reference export,16,APA_SA,6.6,6.6,6.6,6.6
+freightRates,lookupTables/Component/freightRates.csv,USA reference export,16,EU_APA,6.6,6.6,6.6,6.6
+freightRates,lookupTables/Component/freightRates.csv,USA reference export,16,EU_NASeaAir,6.6,6.6,6.6,6.6
+freightRates,lookupTables/Component/freightRates.csv,USA reference export,16,EU_SA,6.6,6.6,6.6,6.6
+freightRates,lookupTables/Component/freightRates.csv,USA reference export,16,NA_APA,6.6,6.6,6.6,6.6
+freightRates,lookupTables/Component/freightRates.csv,USA reference export,16,NA_EU,6.6,6.6,6.6,6.6
+freightRates,lookupTables/Component/freightRates.csv,USA reference export,16,SA_APA,6.6,6.6,6.6,6.6
+freightRates,lookupTables/Component/freightRates.csv,USA reference export,16,SA_EU,6.6,6.6,6.6,6.6

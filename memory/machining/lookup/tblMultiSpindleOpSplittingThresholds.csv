@@ -1,0 +1,4 @@
+Feature,Operation,EnableOperationSplitting,Threshold,ThresholdDescription
+Ring,Rough Turning,True,0.22,Ratio of ring removed volume to total removed volume
+SimpleHole,Drilling,True,0.8,Ratio of hole length to part length
+SimpleHole,Pecking,True,0.8,Ratio of hole length to part length

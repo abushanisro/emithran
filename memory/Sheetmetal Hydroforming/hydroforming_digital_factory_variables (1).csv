@@ -1,0 +1,175 @@
+﻿Variable Name,String Value,Unit Type Name,Notes
+assyHrsCompTransferDie,1.1,,Dial for modifying the tooling assembly hours.
+bendAngleFormingThreshold,60,,Angle threshold beyond which a flange that has significant curvature cannot be created by Fluid Cell
+bottomParallelHeight,101.6,Length,Height of lower parallels in Offline Blanking. Used to calculate minimum required shut height.
+bottomParallelSpacing,254,Length,Distance between bottom parallels.
+bottomParallelsAdder,3,,Adds 3 bottom parallels to take the place of what used to be wide parallels.
+bottomPlateHeight,12.7,Length,Thickness of the bottom plate.
+bottomPlateWidthAllowance,304.8,Length,amount added to each side of the die shoe width to determine the bottom plate width.
+bpCbores,0,,Quantity of counterbores per bottom parallel.
+bpDowels,4,,Quantity of dowels per bottom parallel.
+bpGrindingHrs,0,hr,Total time required for grinding operator labor per bottom parallel. Used to calculate the labor time of all die components.
+bpHoleDepth,50.8,Length,"Depth of holes in bottom parallels that are drilled, tapped, reamed."
+bpMillingHrsPerBp,.75,hr,Total time required for milling operator labor allocated to each bottom parallel.
+bpMillingHrsPerBpTransferDie,.33,hr,Total time required for milling operator labor to mill (2) bolt-down slots in a wide parallel.
+bpNTappedPerBp,5,,The quantity of tapped holes per narrow bottom parallel.
+bpTappedPerBp,2,,Quantity of tapped holes per bottom parallel.
+bpWTappedPerBp,7,,The quantity of tapped holes per wide bottom parallel.
+bplCboresPerBottomParallel,3,,The number of counterbored holes in the bottom plate for each bottom parallel.
+bplDowelsPerWideBp,2,,The quantity of bottom plate dowel holes per wide bottom parallel.
+bplPressLocatorHoles,2,,The number of press locator holes in the bottom plate.
+cappingToolCost,100,Currency,Cost of a single capping tool in Hydroforming
+compCoatingCost,1,,Dial for calibrating tooling coating cost
+compHeatTreatCost,2,,Dial for calibrating tooling heat treat cost
+cycleTimeAdjustmentFactor,1,,Factor used to globally increase or decrease cycle time evaluations per process.
+defaultDieSpacing,101.6,Length,Default distance from main surface to inside of upper die shoe.
+defaultEdgeMarginWidthMultiplier,1.5,,Default multiplier used for calculating stock size edgeMargin width as a function of blank thickness.
+defaultInspectionTime,20,Time,Default Inspection time during forming process
+defaultManualFormFormingRate,50,mm/min,Rate at which form can be manually created.
+defaultMaterialStateIsAnnealed,true,,"Default value for material forming state. If true, material is assumed to be formed in an annealed state. If false, material is formed in tempered condition."
+defaultNumPartPerFluidCellTray,1,,Default number of parts formed on the fluid cell tray in each cycle
+defaultPartSpacing,25.4,Length,Default distance from the part's lowest extremity from the main surface to the inside of the lower die shoe.
+defaultPartSpacingMultiplier,1.5,,Default setting of a multiplier used for calculating the spacing between adjacent nested parts.
+defaultProtectiveSheetRemovalApplicationRate,50,Velocity,The rate at which protective sheets are applied and removed
+defaultSheetStockPartSpacing,20,,Default part spacing for nested parts on Sheet Material Stock.
+defaultToolLife,3000000,,The default number of parts per tool which is used to determine tool life. This is the median value of the available data relating to tool life by part material type.
+defaultToolingCoatingType,Nitrided Steel,,Default type of coating applied to coated tooling components.
+defaultUtilizationMethod,TRUE_PART,,"Eligible values: ""COMPUTED"" (rectangular), ""TRUE_PART"" & ""MACHINE_DEFAULT"""
+defaultUtilizationStepAngle,90,Angle,"Default value for the process setup option ""setup.ComputedUtilizationStepAngle"" in all soft tooled processes."
+depthOfStepLimit,30,,How deep must a potential step be to become valid
+dialAllLabor,0.907518,,
+dialAllMaterial,0.907518,,Constant used to determine the material cost for processes.
+dialAssemblyLabor,1,,
+dialCncLabor,1,,
+dialCompFactor,1,,Intensity of compression.
+dialCompThreshold,10,,Quantity of components below which compression is turned off.
+dialDebugLabor,1,,
+dialDesignLabor,1,,
+dialDrillingLabor,1,,
+dialGrindingLabor,1,,
+dialLatheLabor,1,,
+dialMillingLabor,1,,
+dialReworkLabor,1,,
+dialSawingLabor,1,,
+dieAllowanceGap,25.4,Length,Gap height added to die height. Used to calculate minimum shut height.
+disableInvestmentAmortization,false,,"User override to disable amortization of all fixed costs to the individual part or assembly. By default, fixed costs are calculated per part for tooling, fixtures, and programming."
+drawRingThickness,25.4,Length,Thickness of Draw Rings in deep draw
+drawRingWidth,72.2,Length,The additional width of the draw ring around the forming region
+dutyRate,0,Currency,Rate for calculating duty on tooling
+enableScrapMaterialCredit,false,,Set to 'true' to enable Material Cost reduction due to sale of scrap mass of part.
+enableScrapPartCredit,false,,Set to 'true' to enable Material Cost reduction due to sale of scrapped parts as a result of Good Part Yield.
+excessiveCurvedFormThreshold,.75,,Default threshold value for determining the amount of curvature for a Form of subType = CURVED_BEND in Fluid Cell.
+flangeAngleThreshold,6,Angle,Threshold used to determine if a StraightBend or form/CURVED_BEND is a flange.
+fluidCellFormingRatioThreshold,.65,,Default threshold value for part depth-to-width ratio. Used to differentiate between Fluid Cell and Deep Draw Hydroforming.
+gearQualityDefaultAgmaNewStd,A8,,"A2, A3, A4, ... A11, A12"
+gearQualityDefaultAgmaOldStd,Q8,,"Q15, Q14, Q13, ... Q6, Q5"
+gearQualityDefaultDinStd,9,,"2, 3, 4, ... 11, 12"
+genericValidation,true,,'true' if the generic validation view should be used for parts costed in this process group in this Digital Factory
+grindingRate,45720,mm^2/hr,Rate at which a surface can be ground. (mm^2/hour)
+highCncProgramHours,1,,Time in hours required to write a CNC progamn of large size and complexity
+highStrengthMaterialTryoutMultiplierPercentage,10,,Percentage multiplier for affecting tooling tryout hours if high strength material is used for the piece part.
+highStrengthMatlDeratePercent,10,,Percentage by which the draw recuction percentage is further derated if the part material tensile strength is above the threshold.
+highStrengthMatlThreshold,344.74,MPa,Threshold for part material tensile strength at which the draw reduction percentage is further reduced.
+highStrengthMatlToolingCoatingType,DuplexVariantic,,Default type of coating applied to coated tooling components for high strength piece part material.
+holeToMainSurfaceEdgeProximityThreshold,3,,Threshold for the minimum distance that a hole can reside from the edge of the mainSurface in order to use a capping tool.
+hydroformHolderBaseDepth,30,mm,How deep is the base plate of the hydroform holder
+hydroformHolderGap,20,mm,"The gap between the hydroform holder and the hydroform tool in fluid cell, per side"
+hydroformHolderHeightAddendum,5,mm,The addendum of the holder added onto the overall forming height
+hydroformQualityLoopDisassyHours,0.25,hr,The time taken to disassemble the hydroform tooling during a quality loop
+hydroformQualityLoopInspectionHours,1,hr,The inspection time during a Hydroform quality loop
+hydroformQualityLoopPressDemountTime,0.5,hr,The time taken to demount the hydroform tooling during a quality loop
+hydroformQualityLoopReassemblyHours,1,hr,The time taken to reassemble the hydroform tooling during a quality loop
+hydroformQualityLoopSetupHours,1,hr,The time to set up the Hydroform Tooling quality loop
+hydroformToolDesignPrepHours,1.5,hr,The time taken to prepare Hydroform Tool Designs
+hydroformToolFormDesignHours,5,hr,The time taken to design the form of the Hydroform Tool
+hydroformToolModifyAdjustHours,2,hr,The time taken to modify and adjust the Hydroform Tool design
+hydroformToolNumBlankingAreaStations,1,,The number of blanking area stations in the hydroform tool build
+hydroformToolSpottingTimePerAreaFormStation,0.1872,hr,Spotting time per area for forms in the hydroform tool
+hydroformToolSpottingTimePerAreaNonForm,0.0468,hr,Spotting time per area for non forms in the hydroforming tool
+hydroformingToolingComponentStdCostMult,1,,Dial for modifying all tooling component standard costs in Hydroforming.
+intensifierPercentageMultiplier,0.7,,The percentage multiplier of total tool cost which determines the value of the intensifier cost
+kerfWidthMaxLaser,20,Length,Threshold for kerf width that is used to calculate the kerf width for laser cutting. Keep in sync with the same plant variable in Sheet Metal.
+laserKerfMultiplier,0.5,,Multiplier for laser cutting kerf width calculations. Keep in sync with the same plant variable in Sheet Metal.
+lowCncProgramHours,.25,,Time in hours required to write a CNC progamn of small size and complexity
+mainSurfAreaMultiplier,.75,,Multiplier used to determine percentage of the mainSurface comprised of an EMBOSS form. Used for determining whether addendum should be added to the blank.
+mediumCncProgramHours,.5,,Time in hours required to write a CNC progamn of medium size and complexity
+minBurnoutHoleDiameter,50.8,Length,"The minimum diameter hole that can be flame cut (burnout) in a die shoe, etc."
+minNumQualityLoops,2,,The default minimum number of Quality Loops used during Transfer Die tryout in the event that the blank's thickness and material type isn't found in the lookup table.
+minimumPartHeightPlusAllowance,50.8,Length,Minimum height (mm) that must be met or exceeded by adding post height and part height. Used to calculate minimum shut height.
+minimumStepLimit,30,Length,The limit at under which steps on the parts do not count towards number of draw calculations
+minimumToolCleanTime,5,Time,Minimum allowed time for manual tool cleaning. Used to handle cleaning times associated with tools for small parts.
+numSideMillingPasses,2,,Typical number of milling passes used for side milling.
+offlineBlankToolSpottingTimePerAreaFormStation,0.1872,hr,Spotting time for form stations for the offline blank tool
+offlineBlankToolSpottingTimePerAreaNonFormStation,0.0468,hr,Spotting time for non form stations in the offline blank tool
+offlineBlankingNumBlankingAreaStations,1,,Number of blanking area stations in the offline blank tool
+offlineBlankingQualityLoopDisassemblyHrs,2,hr,Time taken to disassemble the offline blank tooling during a quality loop
+overheadRateAdjustmentFactor,1,,Factor used to globally increase or decrease overhead rate per process.
+parallelCboresPerTopParallel,4,,Default quantity of parallel counterbores per top parallel.
+parallelCboresPerTransplate,4,,Default quantity of parallel counterbores per transplate.
+parallelHolesPerHour,7,,Quantity of holes per hour drilled into parallels.
+parallelLength,152.4,Length,Length of standard parallel.
+parallelTapsPerTopParallel,2,,Default quantity of parallel taps per top parallel.
+parallelTapsPerTransplate,4,,Default quantity of parallel taps per transplate.
+parallelThickness,38.1,,Thickness of standard parallel.
+parallelsWidth,38.1,Length,Unit width of the bottom parallels placed between the end parallels.
+partHeightAllowance,12.7,Length,Standard height of post component in Blanking Die. Used to calculated minimum required shut height.
+partProjectedAreaMultiplier,.85,,Multiplier for calculating part projected area threshold used in determining Deep Draw feasibility.
+partSurfaceAreaMultiplier,.75,,Multiplier used for comparing a form's surface area to the part's surface area. Used to determine if the part is mainly comprised of 1 form GCD.
+partialSheetUsageUtilization,Assume Full Sheet Utilization,,Determines default utilization behavior when batch size results in partial sheet usage . Available options are Assume Full Sheet Utilization or Average Batch Utilization.
+percentProfit,.1,,Multiplier used to calculate percent profit on tooling
+percentSGandA,.1,,Multiplier used to calculate percent SG&A on tooling
+percentTuning,.03,,Multiplier used to casiculate percent profite on offline blanking tooling
+percentageChangeBetweenValidSteps,0.65,,This is the minimum area reduction between two Xsections for a potential step to be detected.
+piercePunchRetainerCustomLengthThreshold,152.4,Length,Threshold value below which a fixed minimum number of screws will be used in a Custom Punch Retainer.
+postHeightMultiplier,2,,"Multiplier for calculating die height from post height. Default value is 2, meaning twice the post height must be allowed between die shoes."
+punchLengthStep,76.2,Length,Step increment for adding incremental screws to a Custom Punch Retainer in Transfer Die. (add another screw each time the Retainer length increases by this amount).
+rateBoring,1524,mm/hr,Rate at which a hole can be bored.
+rateCnc,762,mm/hr,Rate at which items can be CNC'ed.
+rateDrilling,9144,mm/hr,Rate at which a hole can be drilled.
+rateFacing,18288,mm^2/hr,Rate at which a face can be turned on a lathe. (mm^2/hour)
+rateMillingSide,114300,mm/hr,Rate at which a surface can be side milled.
+ratePrecisionMachining,152.4,,Rate at which items can be precision machined.
+rateReaming,3048,mm/hr,Rate at which a hole can be reamed.
+rateTapping,2286,mm/hr,Rate at which a hole can be tapped.
+rateWireEdm,3870.96,mm/hr,Rate at which items can be wire EDM'ed.
+requiredThrowPadDefault,true,,Default behavior to use throw pad during Fluid Cell process. Available options are true or false.
+routerToolDiameter,3.175,Length,Default diameter for tool used by the 2 Axis Router process. Keep in sync with the same plant variable in Sheet Metal.
+skirtLengthLimit,38.1,Length,"Limit to which a blank holder is applied, if skirt lengths are less than value no blanker holder is applied in fluid cell"
+smallHoleThreshold,2.54,Length,Diameter at which ejector-based perforators are needed.
+smallHoleThreshold2,3.18,Length,Diameter at which ejector-based perforators are needed.
+springDiameter,25.4,,Standard diameter of a spring.
+springLength,88.9,,Standard length of a spring.
+springPinsPerForm,3,,Quantity of spring pins required per form.
+springQty,10,,Quantity of springs required. Used to calculate the quantity of all die components.
+sqmmPerSqin,645.16,Length,Number of square millimeters in one square inch. Unit conversion.
+stampingHeightThreshold,101.6,Length,used to determine the post-blanking adapter height.
+standardLeadInAmount,10,Length,Standard lead-in & lead-out amount for Laser Cutting.
+standardSheetLength,2438.4,Length,Default standard sheet length if no stock is available for computed utilization.
+standardSheetWidth,1219.2,Length,Default standard sheet width if no stock is available for computed utilization.
+stdHeatTreatCostPerKgTransferDie,.23,CostPerMass,Typical cost per mass for standard oven based heat treating (hardening) of tooling components
+steelDensity,7861.092938,,Density of steel.
+tappedHolesPerForm,2,,Quantity of tapped holes per form.
+thicknessOfHydroformHolder,50,mm,The thickness of the material of the hydroform holder for fluid cell
+thresholdForGuidepins,0.4,,Thickness above which guide pins must be used.
+throwPadAddendum,75,mm,Throw Pad addendum
+throwPadApplicationRate,3000,mm^2/s,Application Rate of the Throw Pad
+throwPadRemovalRate,3000,mm^2/s,Removal rate of the throw pad
+toleranceDefaultPositionEdgeSegment,3,Length,Default true position tolerance applied to EdgeSegment GCD's in the event that no tolerance was available for extraction from the CAD model for the GCD.
+toleranceDefaultPositionHole,1.5,Length,Default true position tolerance range applied to SimpleHole and ComplexHole GCD's in the event that no tolerance was available for extraction from the CAD model for the GCD.
+toleranceLooseThresholdEdgeSegment,2,Length,Threshold tolerance for edgeSegment GCDs below which the edgeSegment requires post-forming trimming.
+toleranceLooseThresholdHole,2,Length,Threshold tolerance for hole GCDs below which the hole requires post-forming trimming.
+toolingComponentSizeThreshold,152.4,Length,For every add'l increment of this value beyond stockLifterCoilWidthThreshold include another additional stock lifter bar.
+topParallelWidth,111.252,,Width of top parallel.
+topParallelsAdder,3,,Adds 3 top parallels to take the place of what used to be wide parallels.
+tpCbores,0,,Quantity of counterbores per top parallel.
+tpCboresPerTp,4,,Quantity of counterbores required per top plate.
+tpCboresPerTransPlate,4,,Quantity of counterbores required per trans plate.
+tpCncHrs,0,,Number of CNC hours required per top parallel.
+tpDowels,0,,Quantity of dowels per top parallel.
+tpGrindingHrs,0,hr,Total time required for grinding operator labor per top parallel. Used to calculate the labor time of all die components.
+tpMillingHrs,0,,Total time required for milling operator labor per top parallel. Used to calculate the labor time of all die components.
+tpNTappedPerTp,0,,The quantity of tapped holes per narrow top parallel.
+tpTappedPerTp,2,,Quantity of tapped holes per top parallel.
+tpTappedPerTransPlate,4,,Quantity of tapped holes per trans plate.
+tpWTappedPerTp,0,,The quantity of tapped holes per wide top parallel.
+usePreferredMachines,true,,Use preferred machines in machine selection

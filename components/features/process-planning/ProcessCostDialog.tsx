@@ -226,6 +226,15 @@ interface ProcessCostDialogProps {
   // selected calculator, auto-filled from BOM data) instead of the plain edit
   // form — for callers whose entry point IS the cycle-time calculator icon.
   autoOpenCalculator?: boolean;
+  // The live cost engine's own real per-part operation lines
+  // (cost.processLines, computed from this part's actual CAD feature
+  // extraction — feature_graph_v2 through operation-sequencer.ts /
+  // cost-cnc-engine.ts). "3. Operation" is populated from THESE, not the
+  // generic reference catalog: an operation only appears here because this
+  // specific part's real detected geometry produced it. Each line's own
+  // featureBreakdown (when present) gives finer-grained real options, e.g.
+  // "Drilling Ø4.0mm ×2" instead of just "Drilling".
+  liveProcessLines?: Array<{ process: string; machineClass: string; cycleTimeMin: number; featureBreakdown?: Array<{ name: string; featureType: string; timeSec: number; count: number }> }>;
 }
 
 export function ProcessCostDialog({
@@ -239,6 +248,7 @@ export function ProcessCostDialog({
   currencySymbol = '$',
   conversionRate = 1,
   autoOpenCalculator,
+  liveProcessLines = [],
 }: ProcessCostDialogProps) {
   const [opNbr, setOpNbr] = useState<number>(0);
   // Locked to the Digital Factory location — no independent state. A free
@@ -262,6 +272,7 @@ export function ProcessCostDialog({
   // suggestion list and each row's own displayed category always agree.
   const [selectedGroup, setSelectedGroup] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedOperation, setSelectedOperation] = useState<string>('');
   const [selectedProcessCalculatorId, setSelectedProcessCalculatorId] = useState<string>('');
 
   // Preserved, NOT edited. Older rows were configured through the retired
@@ -648,6 +659,86 @@ export function ProcessCostDialog({
     [mhrRecords, selectedGroup, selectedCategory],
   );
 
+  // 3. Operation — NOT a browse of the generic reference catalog. Database-
+  // driven from this part's own real CAD feature extraction: the live cost
+  // engine already ran feature_graph_v2 through operation-sequencer.ts /
+  // cost-cnc-engine.ts and produced liveProcessLines, one real entry per
+  // operation this part's ACTUAL detected geometry needs (e.g. this part
+  // has 2 tapped holes -> a real "Tapping" line exists; a category with no
+  // matching live line means this part's geometry genuinely does not need
+  // that category's operations, not a data gap to paper over with the full
+  // catalog). Each real line's own featureBreakdown (when present) is
+  // exploded into its own option for finer real granularity, e.g. "Drilling
+  // Ø4.0mm ×2" as a distinct choice from "Drilling Ø8.0mm ×1" — both real,
+  // both already individually costed by the live engine.
+  // Real operation_category -> feature_type, from the same real
+  // process_taxonomy_operations data already fetched for this dialog
+  // (allMappingsData[].taxonomy.operations — migration 609/754). Used only
+  // to enrich the label ("Drilling // SimpleHole") with the catalog's own
+  // real feature-type pairing for a real operation name the live engine
+  // already computed — never invents a feature type when no real catalog
+  // row matches.
+  const catalogFeatureTypeByOperation = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const m of allMappingsData?.mappings ?? []) {
+      if (!m.machineClass || !categoryMachineClasses.has(m.machineClass)) continue;
+      for (const op of m.taxonomy?.operations ?? []) {
+        if (op.operationCategory && op.featureType && !map.has(op.operationCategory)) {
+          map.set(op.operationCategory, op.featureType);
+        }
+      }
+    }
+    return map;
+  }, [allMappingsData, categoryMachineClasses]);
+
+  const operationOptions = useMemo(() => {
+    if (!selectedCategory || categoryMachineClasses.size === 0) return [] as { value: string; label: string; cycleTimeMin: number }[];
+    const seen = new Map<string, { label: string; cycleTimeMin: number }>();
+    const withFeature = (name: string) => {
+      const featureType = catalogFeatureTypeByOperation.get(name);
+      return featureType ? `${name} // ${featureType}` : name;
+    };
+    for (const line of liveProcessLines) {
+      if (!categoryMachineClasses.has(line.machineClass)) continue;
+      if (line.featureBreakdown && line.featureBreakdown.length > 0) {
+        for (const fb of line.featureBreakdown) {
+          if (seen.has(fb.name)) continue;
+          // fb.name may carry a real diameter/count suffix ("Drilling Ø4.0mm
+          // ×2") — the catalog lookup key is the base operation name before
+          // that suffix; the displayed label keeps the full real fb.name and
+          // just appends the real feature type when a real catalog row for
+          // the base operation name has one.
+          const baseName = fb.name.split(' Ø')[0]!.split(' ×')[0]!.trim();
+          const featureType = catalogFeatureTypeByOperation.get(baseName);
+          const label = featureType ? `${fb.name} // ${featureType}` : fb.name;
+          seen.set(fb.name, { label, cycleTimeMin: fb.timeSec / 60 });
+        }
+      } else {
+        if (seen.has(line.process)) continue;
+        seen.set(line.process, { label: withFeature(line.process), cycleTimeMin: line.cycleTimeMin });
+      }
+    }
+    return Array.from(seen, ([value, v]) => ({ value, label: v.label, cycleTimeMin: v.cycleTimeMin }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [liveProcessLines, categoryMachineClasses, selectedCategory, catalogFeatureTypeByOperation]);
+
+  // Root cause of "selected in the backend but the field shows unselected":
+  // Radix Select only displays a value when it exactly matches one of its
+  // current SelectItems. liveProcessLines is this part's CURRENT live-engine
+  // output — if the route the part costs against today has shifted since
+  // this line was last saved (e.g. a different machine now wins, or the
+  // CAD re-ran), the real saved `operation` string can legitimately be
+  // absent from today's operationOptions. The state (selectedOperation) was
+  // never the problem; the OPTIONS LIST not containing a matching item was.
+  // Same root cause and same fix this file already established for Group/
+  // Category via withSaved() (line 612) — applied here too, so a real saved
+  // value is always selectable and always visibly shown, never silently
+  // blank.
+  const operationOptionsWithSaved = useMemo(() => {
+    if (!savedOperation || operationOptions.some((op) => op.value === savedOperation)) return operationOptions;
+    return [...operationOptions, { value: savedOperation, label: `${savedOperation} — saved, not in this part's current CAD extraction`, cycleTimeMin: 0 }];
+  }, [operationOptions, savedOperation]);
+
   const filteredMHR = useMemo(() => {
     // No machine ever applies to a Raw Material / Packing & Delivery / General-General
     // line — return no machines at all, including any previously-saved one, rather
@@ -935,6 +1026,20 @@ export function ProcessCostDialog({
       backfilledFromMachineRef.current = true;
     }
   }, [open, editData, editDataApplied, savedMHRRecord, selectedGroup, selectedCategory]);
+
+  // Pre-select "3. Operation" when editing an existing line, from its real
+  // saved operation string. operationOptionsWithSaved (withSaved() applied)
+  // guarantees a matching item always exists once savedOperation is known,
+  // so this no longer races against liveProcessLines loading — once per
+  // open, so it never overwrites a deliberate in-progress change.
+  const backfilledOperationRef = useRef(false);
+  useEffect(() => {
+    if (!open) { backfilledOperationRef.current = false; return; }
+    if (backfilledOperationRef.current) return;
+    if (!savedOperation || selectedOperation) return;
+    setSelectedOperation(savedOperation);
+    backfilledOperationRef.current = true;
+  }, [open, savedOperation, selectedOperation]);
 
   // Auto-select the top MHR match. Re-fires when the Category changes, so the
   // machine always belongs to the category actually chosen. Clears a stale
@@ -2280,6 +2385,16 @@ export function ProcessCostDialog({
       setSubmitError('Please enter a valid Parts/Cycle (greater than 0)');
       return;
     }
+    // Required whenever this part's real CAD feature extraction produced at
+    // least one candidate for the selected Category — "3. Operation" is not
+    // an optional browse field. When the category genuinely has no live,
+    // feature-derived line (not the currently costed route), there is
+    // nothing real to require a pick from, so a pre-existing saved value
+    // (if any) is preserved instead of being blocked on.
+    if (operationOptions.length > 0 && !selectedOperation) {
+      setSubmitError('Please select an Operation (3) — sourced from this part\'s real CAD feature extraction');
+      return;
+    }
     setSubmitError(null);
 
     onSubmit({
@@ -2288,13 +2403,14 @@ export function ProcessCostDialog({
       location,
       group: selectedGroup,
       category: selectedCategory,
-      // Written back exactly as loaded. These two columns belong to the
-      // retired Group/Route/Operation cascade; nothing on this form edits
-      // them, and blanking them would destroy the only identity a pre-719
-      // line has. Empty strings on anything created from here on, which is
-      // the honest value: this form never chose a route or an operation.
+      // processRoute is still written back exactly as loaded — this form has
+      // no Process Route step. operation is now database-driven from this
+      // part's real CAD feature extraction (the "3. Operation" step above,
+      // liveProcessLines) — required and used when real options exist; the
+      // pre-719 saved value is preserved only when this category has none
+      // (never silently blanked).
       processRoute: savedProcessRoute,
-      operation: savedOperation,
+      operation: selectedOperation || savedOperation,
       processCalculatorId: selectedProcessCalculatorId,
       mhrId: toUUID(selectedMHRId),
       // Benchmark (★) machine rows live in mhr_benchmark_rates, not mhr_records —
@@ -2503,6 +2619,7 @@ export function ProcessCostDialog({
                           value={selectedCategory}
                           onValueChange={(value) => {
                             setSelectedCategory(value);
+                            setSelectedOperation('');
                             setSelectedProcessCalculatorId('');
                           }}
                           disabled={!selectedGroup}
@@ -2566,6 +2683,49 @@ export function ProcessCostDialog({
                             {savedProcessRoute && savedOperation ? ' /' : null}
                             {savedOperation ? <> operation <span className="font-medium">{savedOperation}</span></> : null}
                             {' '}— preserved on save, not editable here.
+                          </p>
+                        )}
+                      </div>
+
+                      {/* 3. Operation — database-driven from this part's own real CAD
+                          feature extraction (liveProcessLines, computed by the live cost
+                          engine from feature_graph_v2), not a browse of the generic
+                          reference catalog. An empty list for a real category means this
+                          part's actual detected geometry does not need that category's
+                          operations right now (it is not the currently costed route for
+                          this part) — not a data gap, so no generic fallback list is
+                          substituted. Required whenever real options exist. */}
+                      <div className="space-y-2">
+                        <Label className="font-semibold">
+                          3. Operation
+                          {!selectedCategory && <span className="text-muted-foreground text-xs ml-2">(Select Category first)</span>}
+                        </Label>
+                        <Select
+                          value={selectedOperation}
+                          onValueChange={setSelectedOperation}
+                          disabled={!selectedCategory || operationOptionsWithSaved.length === 0}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder={operationOptionsWithSaved.length > 0 ? 'Select operation' : 'No CAD-detected operations for this category'} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {operationOptionsWithSaved.map((op) => (
+                              <SelectItem key={op.value} value={op.value}>
+                                {op.cycleTimeMin > 0 ? `${op.label} · ${op.cycleTimeMin.toFixed(2)} min` : op.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {selectedCategory && operationOptions.length === 0 && selectedOperation && (
+                          <p className="text-xs text-amber-600 dark:text-amber-500">
+                            &quot;{selectedOperation}&quot; is this line&apos;s saved operation — this part&apos;s current CAD feature
+                            extraction does not produce it for &quot;{selectedCategory}&quot; (not the currently costed route).
+                          </p>
+                        )}
+                        {selectedCategory && operationOptionsWithSaved.length === 0 && (
+                          <p className="text-xs text-amber-600 dark:text-amber-500">
+                            This part&apos;s real CAD feature extraction produced no operations for &quot;{selectedCategory}&quot; —
+                            it is not the currently costed route for this part.
                           </p>
                         )}
                       </div>

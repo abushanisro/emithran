@@ -1,0 +1,7 @@
+name,file_path,value
+tblMaterialProcessAllowed,lookupTables/Component/tblMaterialProcessAllowed.csv,Material Name Code
+tblMaterialProcessAllowed,lookupTables/Component/tblMaterialProcessAllowed.csv,Laser Cut
+tblMaterialProcessAllowed,lookupTables/Component/tblMaterialProcessAllowed.csv,Oxy Fuel Cut
+tblMaterialProcessAllowed,lookupTables/Component/tblMaterialProcessAllowed.csv,Plasma Cut
+tblMaterialProcessAllowed,lookupTables/Component/tblMaterialProcessAllowed.csv,Waterjet Cut
+tblMaterialProcessAllowed,lookupTables/Component/tblMaterialProcessAllowed.csv,Fiber Laser Cut

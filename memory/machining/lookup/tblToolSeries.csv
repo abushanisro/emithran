@@ -1,0 +1,45 @@
+ToolType,ToolSeries,Precedence,ParentToolSeries,IsChild,IsVirtual,ToolMaterial,UnitSystem
+Ball End Mill,"Coromill Carbide Ball Nose Finishing, pA78",3.0,"Virtual Ball End Mill, Carbide",True,False,Carbide,Metric
+Ball End Mill,"Coromill Insert Ball Nose, pA74",2.0,"Virtual Ball End Mill, Carbide",True,False,Carbide,Metric
+Ball End Mill,Coromill Plura Carbide Ball Nose pA168,1.0,"Virtual Ball End Mill, Carbide",True,False,Carbide,Metric
+Ball End Mill,"Niagara HSS Ball End Mill, B207",4.0,"Virtual Ball End Mill, High Speed Steel",True,False,High Speed Steel,US
+Ball End Mill,"Virtual Ball End Mill, Carbide",5.0,,False,True,Carbide,Dual
+Ball End Mill,"Virtual Ball End Mill, High Speed Steel",6.0,,False,True,High Speed Steel,Dual
+Bore,Corobore 820,1.0,,False,False,Carbide,Dual
+Bore,"Sandvik Duobore, inserts, pC14-C21",2.0,,False,False,Carbide,Dual
+Bore,"Sandvik Fine Boring, inserts, pC31",3.0,,False,False,Carbide,Dual
+Bore,"Virtual Bore, Carbide",4.0,"Sandvik Duobore, inserts, pC14-C21",True,True,Carbide,Dual
+Bore,"Virtual Bore, High Speed Steel",5.0,,False,True,High Speed Steel,Dual
+Corner Chamfering Mill,Virtual Corner Chamfering Mill,1.0,,False,True,High Speed Steel,Dual
+Corner Rounding Mill,Virtual Corner Rounding Mill,1.0,,False,True,High Speed Steel,Dual
+Counterbore,Virtual Carbide Counterbore,1.0,,False,True,Carbide,Dual
+Counterbore,Virtual HSS Counterbore,2.0,,False,True,High Speed Steel,Dual
+Face Mill,"CoroMill 245 Insert Close Pitch, pA14",1.0,"Virtual Face Mill, Carbide",True,False,Carbide,Metric
+Face Mill,"CoroMill 245 Insert Extra Close Pitch, pA14",2.0,"Virtual Face Mill, Carbide",True,True,Carbide,Metric
+Face Mill,"Virtual Face Mill, Carbide",3.0,,False,True,Carbide,Dual
+Flat End Mill,"CoroMill 390 Insert pA31, Capto",1.0,"Virtual Flat End Mill, Carbide",True,False,Carbide,Metric
+Flat End Mill,CoroMill Carbide Plura pA150,2.0,"Virtual Flat End Mill, Carbide",True,False,Carbide,Metric
+Flat End Mill,"Niagara HSS Flat End Mill, S203",3.0,"Virtual Flat End Mill, High Speed Steel",True,False,High Speed Steel,US
+Flat End Mill,"Virtual Flat End Mill, Carbide",4.0,,False,True,Carbide,Dual
+Flat End Mill,"Virtual Flat End Mill, High Speed Steel",5.0,,False,True,High Speed Steel,Dual
+Grooving Insert,Virtual Grooving Insert,1.0,,False,True,Carbide,Dual
+Ream,"Virtual Ream, Carbide",1.0,,False,True,Carbide,Dual
+Ream,"Virtual Ream, High Speed Steel",2.0,,False,True,High Speed Steel,Dual
+Straight Drill,Coromat Indexable U Drill R416 3xDc,1.0,"Virtual Drill, Carbide",True,False,Carbide,Metric
+Straight Drill,Guhring 245 Series HSS Twist Drills,2.0,"Virtual Twist Drill, High Speed Steel",True,False,High Speed Steel,US
+Straight Drill,"Kennametal HSS Jobber Twist Drill, Metric Sizes",4.0,"Virtual Twist Drill, High Speed Steel",True,False,High Speed Steel,Metric
+Straight Drill,"Kennametal HSS Jobber Twist Drill, US Sizes",3.0,"Virtual Twist Drill, High Speed Steel",True,False,High Speed Steel,US
+Straight Drill,Virtual Deep Twist Drill,5.0,"Virtual Twist Drill, High Speed Steel",True,True,High Speed Steel,Dual
+Straight Drill,"Virtual Drill, Carbide",1.0,,False,True,Carbide,Dual
+Straight Drill,"Virtual Twist Drill, High Speed Steel",2.0,,False,True,High Speed Steel,Dual
+Tap,"Virtual Tap, High Speed Steel",1.0,,False,True,High Speed Steel,Dual
+Thread Chaser Insert,Virtual Thread Chaser Insert,1.0,,False,True,Carbide,Dual
+Thread Mill,"Virtual Thread Mill, High Speed Steel",1.0,,False,True,High Speed Steel,Dual
+Turning Insert,Virtual Insert for Finish Turning,5.0,,False,True,Carbide,Dual
+Turning Insert,Virtual Insert for Heavy Rough Turning,4.0,,False,True,Carbide,Dual
+Turning Insert,Virtual Insert for Light Rough Turning,3.0,,False,True,Carbide,Dual
+Turning Insert,Virtual Insert for Medium Rough Turning,2.0,,False,True,Carbide,Dual
+Turning Insert,Virtual Insert for Typical Rough Turning,1.0,,False,True,Carbide,Dual
+Turning Insert,Virtual Turning Insert,6.0,,False,True,Carbide,Dual
+Twist Drill,Coromat Delta-C Carbide Twist Drills,1.0,"Virtual Drill, Carbide",True,False,Carbide,Metric
+Wire Brush,Virtual Wire Brush,1.0,,False,True,High Speed Steel,Dual

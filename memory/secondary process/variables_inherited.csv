@@ -1,0 +1,30 @@
+Variable Name,String Value,Unit Type Name,Notes
+CMMProgrammingTimePerTouch,20,Time,Default time to program probe on part
+basketNestingAllowance,38.1,Length,"The space required between the parts and the edges of the basket. Typically 1.5"""
+cycleTimeAdjustmentFactor,1,,Factor used to globally increase or decrease cycle time evaluations per process.
+defaultBubbleWrappingSpeed,101.6,Velocity,Default Bubble Wrapping Speed
+defaultCMMInspection,Smaller Sample Sizes (AQL Special Inspection),,Default CMM Inspection Type
+defaultCMMProbeTime,2,Time,Default time per probe touch on part
+defaultComponentsPerBag,1,,Default number of components
+defaultDeveloperDwellTime,10,min,Deprecated in CMV160
+defaultMachineEfficiency,0.8,,Default Efficiency of Machine Throughput
+defaultPenetrantDwellTime,10,min,Deprecated in CMV160
+defaultPercentToBeTested,100,,Default Percentage of Part to be inspected
+defaultUtilizationMethod,COMPUTED,,"Eligible values: ""COMPUTED"" & ""MACHINE_DEFAULT"""
+disableInvestmentAmortization,false,,"User override to disable amortization of all fixed costs to the individual part or assembly. By default, fixed costs are calculated per part for tooling, fixtures, and programming."
+gearQualityDefaultAgmaNewStd,A8,,"A2, A3, A4, ... A11, A12"
+gearQualityDefaultAgmaOldStd,Q8,,"Q15, Q14, Q13, ... Q6, Q5"
+gearQualityDefaultDinStd,9,,"2, 3, 4, ... 11, 12"
+laborRateAdjustmentFactor,1,,Factor used to globally increase or decrease labor rate evaluations per process.
+leakTestDwellRate,36,Time/Length,Time per millimeter of part wall thickness at which the test pressure must be maintained during a leak test.
+leakTestMaxDwellTime,7200,Time,Maximum time alloted for a leak test.
+leakTestMaxThickness,200,Length,Wall thickness threshold above which a leak test no longer uses the average dwell rate but instead uses the maximum dwell time.
+leakTestMinDwellTime,600,Time,Minimum time required for a leak test.
+leakTestMinThickness,16.7,Length,Wall thickness threshold below which a leak test no longer uses the average dwell rate but instead uses the minimum dwell time.
+maxPackedUnitsWeightPerCustomCarton,1000,kg,Maximum Packed Units inside a Custom Carton
+maxPackedUnitsWeightPerStandardCarton,90,kg,Maximum Packed Units inside a Standard Carton Available
+overheadRateAdjustmentFactor,1,,Factor used to globally increase or decrease overhead rate evaluations per process.
+preferVirtualMachines,true,,
+ultrasonicCleaningRinseTimePerPart,30,Time,Time taken to run each part under the tap to rinse of the cleaning fluid
+ultrasonicCleaningTimePerRun,600,Time,Time taken to ultrasonically clean the basket of parts
+visualInspectTimeStandard,5,min/m^2,Average time per surface area to visually inspect a part.

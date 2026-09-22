@@ -1,0 +1,407 @@
+Machine Name,Material Name,Process
+3D Systems ProX SLS 500,Duraform EX,SLS
+3D Systems ProX SLS 500,Duraform FR1200,SLS
+3D Systems ProX SLS 500,Duraform GF,SLS
+3D Systems ProX SLS 500,Duraform HST,SLS
+3D Systems ProX SLS 500,Duraform PA,SLS
+3D Systems ProX SLS 500,Duraform ProX AF,SLS
+3D Systems ProX SLS 500,Duraform ProX EX BLK,SLS
+3D Systems sPro 140,Duraform EX,SLS
+3D Systems sPro 140,Duraform FR1200,SLS
+3D Systems sPro 140,Duraform GF,SLS
+3D Systems sPro 140,Duraform HST,SLS
+3D Systems sPro 140,Duraform PA,SLS
+3D Systems sPro 140,Duraform ProX EX BLK,SLS
+3D Systems sPro 230,Duraform EX,SLS
+3D Systems sPro 230,Duraform FR1200,SLS
+3D Systems sPro 230,Duraform GF,SLS
+3D Systems sPro 230,Duraform HST,SLS
+3D Systems sPro 230,Duraform PA,SLS
+3D Systems sPro 230,Duraform ProX EX BLK,SLS
+3D Systems sPro 60 HD-HS,Castform PS,SLS
+3D Systems sPro 60 HD-HS,Duraform EX,SLS
+3D Systems sPro 60 HD-HS,Duraform Flex,SLS
+3D Systems sPro 60 HD-HS,Duraform FR1200,SLS
+3D Systems sPro 60 HD-HS,Duraform GF,SLS
+3D Systems sPro 60 HD-HS,Duraform HST,SLS
+3D Systems sPro 60 HD-HS,Duraform PA,SLS
+3D Systems sPro 60 HD-HS,Duraform ProX EX BLK,SLS
+3D Systems sPro 60 HD-HS,Duraform TPU,SLS
+Concept Laser M Line Factory,Aluminum AlSi10Mg,DMLS
+Concept Laser M Line Factory,"Stainless Steel, AISI 316L",DMLS
+Concept Laser M Line Factory,"Titanium, Ti-6Al-4V",DMLS
+Concept Laser M1 Cusing 200W,Maraging Steel 300-1.2709,DMLS
+Concept Laser M1 Cusing 200W,"Nickel Alloy, Inconel 718",DMLS
+Concept Laser M1 Cusing 200W,"Nickel Alloy, Nickel Alloy In 625",DMLS
+Concept Laser M1 Cusing 200W,"Stainless Steel, 17-4PH",DMLS
+Concept Laser M1 Cusing 200W,Stainless Steel Hardened 91RW,DMLS
+Concept Laser M1 Cusing 200W,"Stainless Steel, AISI 316L",DMLS
+Concept Laser M1 Cusing 400W,Maraging Steel 300-1.2709,DMLS
+Concept Laser M1 Cusing 400W,"Nickel Alloy, Inconel 718",DMLS
+Concept Laser M1 Cusing 400W,"Nickel Alloy, Nickel Alloy In 625",DMLS
+Concept Laser M1 Cusing 400W,"Stainless Steel, 17-4PH",DMLS
+Concept Laser M1 Cusing 400W,Stainless Steel Hardened 91RW,DMLS
+Concept Laser M1 Cusing 400W,"Stainless Steel, AISI 316L",DMLS
+Concept Laser M2 Cusing 200W,Aluminum AlSi10Mg,DMLS
+Concept Laser M2 Cusing 200W,Maraging Steel 300-1.2709,DMLS
+Concept Laser M2 Cusing 200W,"Nickel Alloy, Inconel 718",DMLS
+Concept Laser M2 Cusing 200W,"Nickel Alloy, Nickel Alloy In 625",DMLS
+Concept Laser M2 Cusing 200W,"Stainless Steel, 17-4PH",DMLS
+Concept Laser M2 Cusing 200W,Stainless Steel Hardened 91RW,DMLS
+Concept Laser M2 Cusing 200W,"Stainless Steel, AISI 316L",DMLS
+Concept Laser M2 Cusing 200W,"Titanium, Ti-6Al-4V",DMLS
+Concept Laser M2 Cusing 200W,"Titanium, Titanium Grade 2",DMLS
+Concept Laser M2 Cusing 400W,Aluminum AlSi10Mg,DMLS
+Concept Laser M2 Cusing 400W,Maraging Steel 300-1.2709,DMLS
+Concept Laser M2 Cusing 400W,"Nickel Alloy, Inconel 718",DMLS
+Concept Laser M2 Cusing 400W,"Nickel Alloy, Nickel Alloy In 625",DMLS
+Concept Laser M2 Cusing 400W,"Stainless Steel, 17-4PH",DMLS
+Concept Laser M2 Cusing 400W,Stainless Steel Hardened 91RW,DMLS
+Concept Laser M2 Cusing 400W,"Stainless Steel, AISI 316L",DMLS
+Concept Laser M2 Cusing 400W,"Titanium, Ti-6Al-4V",DMLS
+Concept Laser M2 Cusing 400W,"Titanium, Titanium Grade 2",DMLS
+Concept Laser M2 Cusing MultiLaser 2x200W,Aluminum AlSi10Mg,DMLS
+Concept Laser M2 Cusing MultiLaser 2x200W,Maraging Steel 300-1.2709,DMLS
+Concept Laser M2 Cusing MultiLaser 2x200W,"Nickel Alloy, Inconel 718",DMLS
+Concept Laser M2 Cusing MultiLaser 2x200W,"Stainless Steel, 17-4PH",DMLS
+Concept Laser M2 Cusing MultiLaser 2x200W,"Stainless Steel, AISI 316L",DMLS
+Concept Laser M2 Cusing MultiLaser 2x200W,"Titanium, Ti-6Al-4V",DMLS
+Concept Laser M2 Cusing MultiLaser 2x400W,Aluminum AlSi10Mg,DMLS
+Concept Laser M2 Cusing MultiLaser 2x400W,Maraging Steel 300-1.2709,DMLS
+Concept Laser M2 Cusing MultiLaser 2x400W,"Nickel Alloy, Inconel 718",DMLS
+Concept Laser M2 Cusing MultiLaser 2x400W,"Stainless Steel, 17-4PH",DMLS
+Concept Laser M2 Cusing MultiLaser 2x400W,"Stainless Steel, AISI 316L",DMLS
+Concept Laser M2 Cusing MultiLaser 2x400W,"Titanium, Ti-6Al-4V",DMLS
+Concept Laser X Line 2000R,Aluminum AlSi10Mg,DMLS
+Concept Laser X Line 2000R,"Nickel Alloy, Inconel 718",DMLS
+Concept Laser X Line 2000R,"Titanium, Ti-6Al-4V",DMLS
+Connex 1 Objet260,Objet Dental Bio Compatible,3D Printing
+Connex 1 Objet260,Objet Rigid VeroBlackPlus,3D Printing
+Connex 1 Objet260,Objet Rigid VeroBlue 840,3D Printing
+Connex 1 Objet260,Objet Rigid VeroClear,3D Printing
+Connex 1 Objet260,Objet Rigid VeroCyan,3D Printing
+Connex 1 Objet260,Objet Rigid VeroGray 850,3D Printing
+Connex 1 Objet260,Objet Rigid VeroMagenta,3D Printing
+Connex 1 Objet260,Objet Rigid VeroWhite 830,3D Printing
+Connex 1 Objet260,Objet Rigid VeroYellow,3D Printing
+Connex 1 Objet260,Objet Rubber TangoBlack 973,3D Printing
+Connex 1 Objet260,Objet Rubber TangoBlackPlus 980,3D Printing
+Connex 1 Objet260,Objet Rubber TangoGray 950,3D Printing
+Connex 1 Objet500,Objet Dental Bio Compatible,3D Printing
+Connex 1 Objet500,Objet Rigid VeroBlackPlus,3D Printing
+Connex 1 Objet500,Objet Rigid VeroBlue 840,3D Printing
+Connex 1 Objet500,Objet Rigid VeroClear,3D Printing
+Connex 1 Objet500,Objet Rigid VeroGray 850,3D Printing
+Connex 1 Objet500,Objet Rigid VeroWhite 830,3D Printing
+Connex 1 Objet500,Objet Rubber TangoBlack 973,3D Printing
+Connex 1 Objet500,Objet Rubber TangoBlackPlus 980,3D Printing
+Connex 1 Objet500,Objet Rubber TangoGray 950,3D Printing
+Connex 3 Objet 350,Objet Dental Bio Compatible,3D Printing
+Connex 3 Objet 350,Objet Durus 430,3D Printing
+Connex 3 Objet 350,Objet Rigid VeroBlackPlus,3D Printing
+Connex 3 Objet 350,Objet Rigid VeroBlue 840,3D Printing
+Connex 3 Objet 350,Objet Rigid VeroClear,3D Printing
+Connex 3 Objet 350,Objet Rigid VeroGray 850,3D Printing
+Connex 3 Objet 350,Objet Rigid VeroWhite 830,3D Printing
+Connex 3 Objet 350,Objet Rubber TangoBlack 973,3D Printing
+Connex 3 Objet 350,Objet Rubber TangoBlackPlus 980,3D Printing
+Connex 3 Objet 350,Objet Rubber TangoGray 950,3D Printing
+Connex 3 Objet 500,Objet Dental Bio Compatible,3D Printing
+Connex 3 Objet 500,Objet Durus 430,3D Printing
+Connex 3 Objet 500,Objet Rigid VeroBlackPlus,3D Printing
+Connex 3 Objet 500,Objet Rigid VeroBlue 840,3D Printing
+Connex 3 Objet 500,Objet Rigid VeroClear,3D Printing
+Connex 3 Objet 500,Objet Rigid VeroGray 850,3D Printing
+Connex 3 Objet 500,Objet Rigid VeroWhite 830,3D Printing
+Connex 3 Objet 500,Objet Rigur 450,3D Printing
+Connex 3 Objet 500,Objet Rubber TangoBlack 973,3D Printing
+Connex 3 Objet 500,Objet Rubber TangoBlackPlus 980,3D Printing
+Connex 3 Objet 500,Objet Rubber TangoGray 950,3D Printing
+Eden250,Objet Dental Bio Compatible,3D Printing
+Eden250,Objet Durus 430,3D Printing
+Eden250,Objet Rigid Translucent 720,3D Printing
+Eden250,Objet Rigid VeroBlack 875,3D Printing
+Eden250,Objet Rigid VeroBlue 840,3D Printing
+Eden250,Objet Rigid VeroClear,3D Printing
+Eden250,Objet Rigid VeroWhite 830,3D Printing
+Eden350,Objet Dental Bio Compatible,3D Printing
+Eden350,Objet Durus 430,3D Printing
+Eden350,Objet Rigid Translucent 720,3D Printing
+Eden350,Objet Rigid VeroBlack 875,3D Printing
+Eden350,Objet Rigid VeroBlackPlus,3D Printing
+Eden350,Objet Rigid VeroBlue 840,3D Printing
+Eden350,Objet Rigid VeroClear,3D Printing
+Eden350,Objet Rigid VeroCyan,3D Printing
+Eden350,Objet Rigid VeroGray 850,3D Printing
+Eden350,Objet Rigid VeroMagenta,3D Printing
+Eden350,Objet Rigid VeroWhite 830,3D Printing
+Eden350,Objet Rigid VeroYellow,3D Printing
+Eden350,Objet Rigur 450,3D Printing
+Eden350,Objet Rubber TangoBlack 973,3D Printing
+Eden350,Objet Rubber TangoBlackPlus 980,3D Printing
+Eden350,Objet Rubber TangoGray 950,3D Printing
+Eden500V,Objet Dental Bio Compatible,3D Printing
+Eden500V,Objet Durus 430,3D Printing
+Eden500V,Objet Rigid Translucent 720,3D Printing
+Eden500V,Objet Rigid VeroBlack 875,3D Printing
+Eden500V,Objet Rigid VeroBlackPlus,3D Printing
+Eden500V,Objet Rigid VeroBlue 840,3D Printing
+Eden500V,Objet Rigid VeroClear,3D Printing
+Eden500V,Objet Rigid VeroCyan,3D Printing
+Eden500V,Objet Rigid VeroGray 850,3D Printing
+Eden500V,Objet Rigid VeroMagenta,3D Printing
+Eden500V,Objet Rigid VeroWhite 830,3D Printing
+Eden500V,Objet Rigid VeroYellow,3D Printing
+Eden500V,Objet Rigur 450,3D Printing
+Eden500V,Objet Rubber TangoBlack 973,3D Printing
+Eden500V,Objet Rubber TangoBlackPlus 980,3D Printing
+Eden500V,Objet Rubber TangoGray 950,3D Printing
+EOS M 100,"Stainless Steel, AISI 316L",DMLS
+EOS M 100,"Titanium, Ti-6Al-4V",DMLS
+EOS M 290,Aluminum AlSi10Mg,DMLS
+EOS M 290,Cobalt Chrome F75,DMLS
+EOS M 290,Maraging Steel 300-1.2709,DMLS
+EOS M 290,"Nickel Alloy, Inconel 718",DMLS
+EOS M 290,"Nickel Alloy, Nickel Alloy In 625",DMLS
+EOS M 290,"Stainless Steel, 15-5PH",DMLS
+EOS M 290,"Stainless Steel, 17-4PH",DMLS
+EOS M 290,Stainless Steel GP1,DMLS
+EOS M 290,Stainless Steel Hardened 91RW,DMLS
+EOS M 290,"Stainless Steel, AISI 316L",DMLS
+EOS M 290,Titanium TI64ELI Grade 23,DMLS
+EOS M 290,"Titanium, Ti-6Al-4V",DMLS
+EOS M 290,"Titanium, Titanium Grade 2",DMLS
+EOS M 400,Aluminum AlSi10Mg,DMLS
+EOS M 400,Maraging Steel 300-1.2709,DMLS
+EOS M 400,"Nickel Alloy, Inconel 718",DMLS
+EOS M 400,Titanium TI64ELI Grade 23,DMLS
+EOS M 400,"Titanium, Ti-6Al-4V",DMLS
+EOS M 400-4,Aluminum AlSi10Mg,DMLS
+EOS M 400-4,Maraging Steel 300-1.2709,DMLS
+EOS M 400-4,"Nickel Alloy, Inconel 718",DMLS
+EOS M 400-4,"Nickel Alloy, Nickel Alloy X",DMLS
+EOS M 400-4,"Stainless Steel, AISI 316L",DMLS
+EOS M 400-4,"Titanium, Ti-6Al-4V",DMLS
+EOS M 400-4,"Titanium, Titanium Grade 2",DMLS
+EOSINT M 280,Aluminum AlSi10Mg,DMLS
+EOSINT M 280,Cobalt Chrome F75,DMLS
+EOSINT M 280,Maraging Steel 300-1.2709,DMLS
+EOSINT M 280,"Nickel Alloy, Inconel 718",DMLS
+EOSINT M 280,"Nickel Alloy, Nickel Alloy In 625",DMLS
+EOSINT M 280,"Stainless Steel, 15-5PH",DMLS
+EOSINT M 280,"Stainless Steel, 17-4PH",DMLS
+EOSINT M 280,Stainless Steel GP1,DMLS
+EOSINT M 280,Stainless Steel Hardened 91RW,DMLS
+EOSINT M 280,"Stainless Steel, AISI 316L",DMLS
+EOSINT M 280,Titanium TI64ELI Grade 23,DMLS
+EOSINT M 280,"Titanium, Ti-6Al-4V",DMLS
+EOSINT P395,Polyamide 11 PA 1101,SLS
+EOSINT P395,Polyamide 12 PA 2200,SLS
+EOSINT P395,Polyamide 12 PA 2201,SLS
+EOSINT P395,Polyamide 12 PA 2202 Black,SLS
+EOSINT P395,"Polyamide 12, Al-Filled",SLS
+EOSINT P395,"Polyamide 12, Glass-Filled",SLS
+EOSINT P395,"Polyamide 12, PA 2210 FR",SLS
+EOSINT P395,Polystyrene Primecast 101,SLS
+EOSINT P395,TPE Prime Part,SLS
+EOSINT P760,Polyamide 11 PA 1101,SLS
+EOSINT P760,Polyamide 12 PA 2200,SLS
+EOSINT P760,Polyamide 12 PA 2201,SLS
+EOSINT P760,"Polyamide 12, Al-Filled",SLS
+EOSINT P760,"Polyamide 12, Glass-Filled",SLS
+EOSINT P760,"Polyamide 12, PA 2210 FR",SLS
+EOSINT P760,Polystyrene Primecast 101,SLS
+EOSINT P760,TPE Prime Part,SLS
+Formiga P100,Polyamide 12 PA 2200,SLS
+Formiga P100,"Polyamide 12, Al-Filled",SLS
+Formiga P100,"Polyamide 12, Carbon-Filled",SLS
+Formiga P100,"Polyamide 12, Glass-Filled",SLS
+Formiga P100,"Polyamide 12, PA 2210 FR",SLS
+Formiga P100,Polystyrene Primecast 101,SLS
+Formiga P100,TPE Prime Part,SLS
+Formiga P110,Polyamide 12 PA 2200,SLS
+iPro 8000,Accura 25,SLA
+iPro 8000,Accura Clearvue,SLA
+iPro 8000,Accura Peak,SLA
+iPro 8000,Accura Xtreme White 200,SLA
+iPro 8000,CeraMax,SLA
+iPro 8000,Xtreme,SLA
+iPro 9000,Accura 25,SLA
+iPro 9000,Accura 48HTR,SLA
+iPro 9000,Accura 55,SLA
+iPro 9000,Accura 60,SLA
+iPro 9000,Bluestone,SLA
+iPro 9000,Xtreme,SLA
+iPro 9000XL,Accura 25,SLA
+iPro 9000XL,Accura 48HTR,SLA
+iPro 9000XL,Accura 55,SLA
+iPro 9000XL,Accura 60,SLA
+iPro 9000XL,Bluestone,SLA
+iPro 9000XL,Xtreme,SLA
+Objet 1000,Objet Rubber TangoBlack 973,3D Printing
+Objet 1000,Objet Rubber TangoBlackPlus 980,3D Printing
+Objet 1000,Objet Rubber TangoGray 950,3D Printing
+Objet 30 Prime,Objet Dental Bio Compatible,3D Printing
+Objet 30 Prime,Objet Rigid VeroBlack 875,3D Printing
+Objet 30 Prime,Objet Rigid VeroBlackPlus,3D Printing
+Objet 30 Prime,Objet Rigid VeroBlue 840,3D Printing
+Objet 30 Prime,Objet Rigid VeroClear,3D Printing
+Objet 30 Prime,Objet Rigid VeroCyan,3D Printing
+Objet 30 Prime,Objet Rigid VeroGray 850,3D Printing
+Objet 30 Prime,Objet Rigid VeroMagenta,3D Printing
+Objet 30 Prime,Objet Rigid VeroWhite 830,3D Printing
+Objet 30 Prime,Objet Rigid VeroYellow,3D Printing
+Objet 30 Prime,Objet Rigur 450,3D Printing
+Objet 30 Prime,Objet Rubber TangoBlack 973,3D Printing
+Objet 30 Prime,Objet Rubber TangoBlackPlus 980,3D Printing
+Objet 30 Prime,Objet Rubber TangoGray 950,3D Printing
+ProJet 7000HD,Visijet SL Black,SLA
+ProJet 7000HD,Visijet SL Clear,SLA
+ProJet 7000HD,Visijet SL Flex,SLA
+ProJet 7000HD,Visijet SL Hi-Temp,SLA
+ProJet MJP 2500,Visijet M2 EBK,3D Printing
+ProJet MJP 2500,Visijet M2 ENT,3D Printing
+ProJet MJP 2500,Visijet M2R-BK,3D Printing
+ProJet MJP 2500,Visijet M2R-CL,3D Printing
+ProJet MJP 2500,Visijet M2R-GRY,3D Printing
+ProJet MJP 2500,Visijet M2R-WT,3D Printing
+ProJet MJP 3600,Visijet M3 Crystal,3D Printing
+ProJet MJP 3600,Visijet M3 Black,3D Printing
+ProJet MJP 3600,Visijet M3 Proplast,3D Printing
+ProJet MJP 3600,Visijet M3 Techplast,3D Printing
+ProJet MJP 3600,Visijet M3-X,3D Printing
+ProJet MJP 3600,Visijt M3 Navy,3D Printing
+ProJet MJP 5600,Visijet CE-BK,3D Printing
+ProJet MJP 5600,Visijet CE-NT,3D Printing
+ProJet MJP 5600,Visijet CR-BK,3D Printing
+ProJet MJP 5600,Visijet CR-CL 200,3D Printing
+ProJet MJP 5600,Visijet CR-WT 200,3D Printing
+ProJet6000 HD,Visijet SL Black,SLA
+ProJet6000 HD,Visijet SL Clear,SLA
+ProJet6000 HD,Visijet SL Flex,SLA
+ProJet6000 HD,Visijet SL Hi-Temp,SLA
+ProX 800,Accura 25,SLA
+ProX 800,Accura 48HTR,SLA
+ProX 800,Accura 55,SLA
+ProX 800,Accura 60,SLA
+ProX 800,Accura Bluestone,SLA
+ProX 800,Accura Clearvue,SLA
+ProX 800,Accura Peak,SLA
+ProX 800,Accura Xtreme White 200,SLA
+ProX 800,Bluestone,SLA
+ProX 800,CeraMax,SLA
+ProX 800,e-Stone,SLA
+ProX 800,Xtreme,SLA
+ProX 950,Accura 25,SLA
+ProX 950,Accura 48HTR,SLA
+ProX 950,Accura 55,SLA
+ProX 950,Accura 60,SLA
+ProX 950,Accura Clearvue,SLA
+ProX 950,Accura Peak,SLA
+ProX 950,Accura Xtreme White 200,SLA
+ProX 950,e-Stone,SLA
+ProX 950,Xtreme,SLA
+ProX DMP 100,Cobalt Chrome Dental,DMLS
+ProX DMP 100,Cobalt Chrome F75,DMLS
+ProX DMP 100,"Stainless Steel, 17-4PH",DMLS
+ProX DMP 200,Cobalt Chrome Dental,DMLS
+ProX DMP 200,Cobalt Chrome F75,DMLS
+ProX DMP 200,Maraging Steel 300-1.2709,DMLS
+ProX DMP 200,"Stainless Steel, 17-4PH",DMLS
+ProX DMP 300,Cobalt Chrome Dental,DMLS
+ProX DMP 300,Cobalt Chrome F75,DMLS
+ProX DMP 300,Maraging Steel 300-1.2709,DMLS
+ProX DMP 300,"Stainless Steel, 17-4PH",DMLS
+ProX DMP 320,Aluminum AlSi10Mg,DMLS
+ProX DMP 320,Cobalt Chrome F75,DMLS
+ProX DMP 320,Maraging Steel 300-1.2709,DMLS
+ProX DMP 320,"Nickel Alloy, Inconel 718",DMLS
+ProX DMP 320,"Nickel Alloy, Nickel Alloy In 625",DMLS
+ProX DMP 320,"Stainless Steel, 17-4PH",DMLS
+ProX DMP 320,"Stainless Steel, AISI 316L",DMLS
+ProX DMP 320,Titanium TI64ELI Grade 23,DMLS
+ProX DMP 320,"Titanium, Ti-6Al-4V",DMLS
+Renishaw AM250-200W,Aluminum AlSi10Mg,DMLS
+Renishaw AM250-200W,Cobalt Chrome F75,DMLS
+Renishaw AM250-200W,Maraging Steel 300-1.2709,DMLS
+Renishaw AM250-200W,"Nickel Alloy, Inconel 718",DMLS
+Renishaw AM250-200W,"Nickel Alloy, Nickel Alloy In 625",DMLS
+Renishaw AM250-200W,"Stainless Steel, 17-4PH",DMLS
+Renishaw AM250-200W,"Stainless Steel, AISI 316L",DMLS
+Renishaw AM250-200W,"Titanium, Ti-6Al-4V",DMLS
+Renishaw AM250-200W,"Titanium, Titanium Grade 2",DMLS
+Renishaw AM250-400W,Aluminum AlSi10Mg,DMLS
+Renishaw AM250-400W,Cobalt Chrome F75,DMLS
+Renishaw AM250-400W,Maraging Steel 300-1.2709,DMLS
+Renishaw AM250-400W,"Nickel Alloy, Inconel 718",DMLS
+Renishaw AM250-400W,"Nickel Alloy, Nickel Alloy In 625",DMLS
+Renishaw AM250-400W,"Stainless Steel, 17-4PH",DMLS
+Renishaw AM250-400W,"Stainless Steel, AISI 316L",DMLS
+Renishaw AM250-400W,"Titanium, Ti-6Al-4V",DMLS
+Renishaw AM250-400W,"Titanium, Titanium Grade 2",DMLS
+Renishaw AM400,Aluminum AlSi10Mg,DMLS
+Renishaw AM400,Cobalt Chrome Dental,DMLS
+Renishaw AM400,Cobalt Chrome F75,DMLS
+Renishaw AM400,"Nickel Alloy, Inconel 718",DMLS
+Renishaw AM400,"Nickel Alloy, Nickel Alloy In 625",DMLS
+Renishaw AM400,"Stainless Steel, AISI 316L",DMLS
+Renishaw AM400,"Titanium, Ti-6Al-4V",DMLS
+Renishaw AM500M,Aluminum AlSi10Mg,DMLS
+Renishaw AM500M,Cobalt Chrome Dental,DMLS
+Renishaw AM500M,Cobalt Chrome F75,DMLS
+Renishaw AM500M,"Nickel Alloy, Inconel 718",DMLS
+Renishaw AM500M,"Nickel Alloy, Nickel Alloy In 625",DMLS
+Renishaw AM500M,"Titanium, Ti-6Al-4V",DMLS
+Sinterstation HiQ,Castform PS,SLS
+Sinterstation HiQ,Duraform GF,SLS
+Sinterstation HiQ,Duraform PA,SLS
+SLM 125,Aluminum AlSi10Mg,DMLS
+SLM 125,Cobalt Chrome Dental,DMLS
+SLM 125,Cobalt Chrome F75,DMLS
+SLM 125,Maraging Steel 300-1.2709,DMLS
+SLM 125,"Nickel Alloy, Inconel 718",DMLS
+SLM 125,"Nickel Alloy, Nickel Alloy In 625",DMLS
+SLM 125,"Nickel Alloy, Nickel Alloy X",DMLS
+SLM 125,"Stainless Steel, 15-5PH",DMLS
+SLM 125,"Stainless Steel, 17-4PH",DMLS
+SLM 125,"Stainless Steel, AISI 316L",DMLS
+SLM 125,Titanium TI64ELI Grade 23,DMLS
+SLM 125,"Titanium, Ti-6Al-4V",DMLS
+SLM 125,"Titanium, Titanium Grade 2",DMLS
+SLM 280,Aluminum AlSi10Mg,DMLS
+SLM 280,Cobalt Chrome Dental,DMLS
+SLM 280,Cobalt Chrome F75,DMLS
+SLM 280,Maraging Steel 300-1.2709,DMLS
+SLM 280,"Nickel Alloy, Inconel 718",DMLS
+SLM 280,"Nickel Alloy, Nickel Alloy In 625",DMLS
+SLM 280,"Nickel Alloy, Nickel Alloy X",DMLS
+SLM 280,"Stainless Steel, 15-5PH",DMLS
+SLM 280,"Stainless Steel, 17-4PH",DMLS
+SLM 280,"Stainless Steel, AISI 316L",DMLS
+SLM 280,Titanium TI64ELI Grade 23,DMLS
+SLM 280,"Titanium, Ti-6Al-4V",DMLS
+SLM 280,"Titanium, Titanium Grade 2",DMLS
+SLM 500,Aluminum AlSi10Mg,DMLS
+SLM 500,Cobalt Chrome Dental,DMLS
+SLM 500,Cobalt Chrome F75,DMLS
+SLM 500,Maraging Steel 300-1.2709,DMLS
+SLM 500,"Nickel Alloy, Inconel 718",DMLS
+SLM 500,"Nickel Alloy, Nickel Alloy In 625",DMLS
+SLM 500,"Nickel Alloy, Nickel Alloy X",DMLS
+SLM 500,"Stainless Steel, 15-5PH",DMLS
+SLM 500,"Stainless Steel, 17-4PH",DMLS
+SLM 500,"Stainless Steel, AISI 316L",DMLS
+SLM 500,Titanium TI64ELI Grade 23,DMLS
+SLM 500,"Titanium, Ti-6Al-4V",DMLS
+SLM 500,"Titanium, Titanium Grade 2",DMLS
+Viper,Accura 10,SLA
+Viper,Accura 25,SLA
+Viper,Accura 40,SLA
+Viper,Accura 48HTR,SLA
+Viper,Accura 50,SLA
+Viper,Accura 55,SLA
+Viper,Accura 60,SLA
+Viper,Accura Bluestone,SLA
+Viper,Accura Clearvue,SLA
+Viper,Accura Peak,SLA
+Viper,Accura Xtreme White 200,SLA

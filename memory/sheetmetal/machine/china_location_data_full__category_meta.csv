@@ -1,0 +1,5 @@
+category,note
+3 Roll Bender,Source image cropped off before 'Knuth KRM-5 30/4 (duplicate entry)' row seen in USA baseline; only one Knuth KRM-5 30/4 row visible here.
+Oxyfuel Cutting Machine,Row for 'Oxyfuel 3015 - 1 torch' name partially cropped in source (visible as '3015 - 1 torch') and 'kwang - KOBA PLUS 3015 - 1 torch' cropped; matched to closest USA baseline names.
+Plasma Punch,"Machine roster here differs from the USA baseline's Plasma Punch list (e.g. Ficep Tipo C16/C25 vs baseline's Ficep Tipo C23 x2, GAV 102 not present) — matched by closest name where possible; may reflect a different/updated source list."
+Waterjet Cutting Machine,Row order/names inferred from length-sorted labels cut off in source (e.g. 'Waterjet Cutter - 14000mm x 4...' matched to baseline's 14000mm x 4000mm entry). Verify name-to-value pairing against source if precision matters.

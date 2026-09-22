@@ -1,0 +1,62 @@
+Variable Name,String Value,Unit Type Name,Notes,Group
+baseSupportHeightManualRemoval,10,Length,The height of the support structures required for Manual Tool Base Removal.,Inherited
+baseSupportHeightPowerRemoval,10,Length,The height of the support structures required for Power Tool Base Removal.,Inherited
+baseSupportHeightWireEDM,1,Length,The height of the support structures required for Wire EDM.,Inherited
+curingMaxCureTime,1800,Time,Maximum time for part curing,Inherited
+cycleTimeAdjustmentFactor,1,,Factor used to globally increase or decrease cycle time evaluations per process.,Inherited
+defaultNumPrintHeadPasses,2,,Default number of print head passes before print head moved in width direction.,Inherited
+defaultUtilizationMethod,TRUE_PART,,"Eligible values: ""COMPUTED"",""MACHINE_DEFAULT"", or ""TRUE_PART"".",Inherited
+defaultUtilizationStepAngle,90,Angle,"Default value for the process setup option ""setup.ComputedUtilizationStepAngle"".",Inherited
+disableInvestmentAmortization,false,,"User override to disable amortization of all fixed costs to the individual part or assembly. By default, fixed costs are calculated per part for tooling, fixtures, and programming.",Inherited
+dmlsBuildPlatformHeight,25,Length,The default height of the build plate used in DMLS.,Inherited
+dmlsCoolChamberTime,3600,Time,Time taken to cool the build chamber to a safe temperature after sintering.,Inherited
+dmlsFitBuildPlateTime,1200,Time,The typical time it takes to fit and level the build plate in the machine bed.,Inherited
+dmlsHeatChamberTime,3600,Time,Time taken to heat the build chamber up to required temperature prior to sintering.,Inherited
+dmlsLatticeSpacingFactor,0.4,,Default percentage of volume used in lattice structure compared to solid material.,Inherited
+dmlsNumberAllowablePowderUsageCycles,20,,The number of allowable cycles of the virgin powder before it should be disposed of,Inherited
+dmlsPowderFeedRiseFactor,2.25,,A factor applied to the the layer thickness. Ensures the powder feed platform rises enough so there is enough powder to cover the build platform.,Inherited
+dmlsPowderLoadTime,300,Time,The typical time it takes to load metal powder into the powder chamber on the DMLS machine.,Inherited
+dmlsPowderLossToProcessInefficiency,0.4,,The percentage of the part and support volume that represents powder loss due to thermal damage and other inefficiencies.,Inherited
+dmlsPowderRecoatSpeedOver,76,Velocity,Speed of the recoating blade as a layer of powder is spread over the machine bed.,Inherited
+dmlsPowderRecoatSpeedReturn,200,Velocity,Speed of the recoating blade as the blade returns to the home position after sweeping a layer over the machine bed.,Inherited
+dmlsPowderTrappedInSupportStructures,0.25,,The percentage amount of the support volume representing powder that is trapped and unrecoverable.,Inherited
+dmlsPurgeDuration,1800,Time,The typical time taken to purge oxygen from the build chamber prior to the part construction phase.,Inherited
+gearQualityDefaultAgmaNewStd,A8,,"A2, A3, A4, ... A11, A12",Inherited
+gearQualityDefaultAgmaOldStd,Q8,,"Q15, Q14, Q13, ... Q6, Q5",Inherited
+gearQualityDefaultDinStd,9,,"2, 3, 4, ... 11, 12",Inherited
+genericValidation,true,,'true' if the generic validation view should be used for parts costed in this process group in this Digital Factory,Inherited
+handBreakOffRate,10,Area/Time,Area of the support structure that acts as a contact with the base plate that can be removed in one second.,Inherited
+handBreakOffTime,5,Time,Time to manually break off an individual support structure using hand tools.,Inherited
+handbreakoffPositioningTime,3,Time,Time taken to position hand tool to break off an individual support structure.,Inherited
+highComplexityAdjustment,1.1,,Adjustment factor to account for high complexity parts.,Inherited
+highMeltingModulus,0.667,,Ratio of surface area to volume for SLM parts to be considered high complexity.,Inherited
+laborRateAdjustmentFactor,1,,Factor used to globally increase or decrease labor rate evaluations per process.,Inherited
+loadFileAndSpliceTime,0.25,hr,The typical time it takes to load an STL file and for the splicing software to complete on a DMLS machine.,Inherited
+lowComplexityAdjustment,0.9,,Adjustment factor to account for low complexity parts.,Inherited
+lowMeltingModulus,0.167,,Ratio of surface area to volume for SLM parts to be considered low complexity.,Inherited
+maxLayerThickness,0.102,Length,Maximal possible thickness of a horizontal layer created by machine for Printing process.,Inherited
+minCleaningTime,60,Time,Minimal time for cleaning a part. Used for small parts.,Inherited
+minLayerThickness,0.013,Length,Minimal possible thickness of a horizontal layer created by machine for Printing process.,Inherited
+nestingAllowance,5,Length,Default distance between parts in nesting applied to each side of part,Inherited
+optimumModulus,0.333,,Optimum ratio of surface area to volume for cast parts.,Inherited
+overheadRateAdjustmentFactor,1,,Factor used to globally increase or decrease overhead rate evaluations per process.,Inherited
+powderSieveTimePerRun,900,Time,The time taken to sieve the powder into bottles after the powder is removed from the machine.,Inherited
+powderVacuumRemovalRate,300,Mass/hr,The Powder Removal Rate when recycling powder from the machine using the vacuum hose.,Inherited
+printingLatticeSpacingFactor,1,,Default percentage of volume used in lattice structure compared to solid material for Material Jetting (Printing) process.,Inherited
+printingPreprocessingTime,1200,Time,Default preprocessing time for 3D Printing,Inherited
+printingSupportMaterialCost,250,CostPerMass,Default support cost for 3D Printing,Inherited
+printingSupportMaterialDensity,1050,Mass/m^3,Default support density for 3D Printing,Inherited
+slaDefaultMaterialDensity,1100,Mass/m^3,Default material density for Stereolithography,Inherited
+slaHighLayerResolution,0.05,Length,High Resolution layer thickness for Stereolithography,Inherited
+slaPreprocessingTime,1200,Time,Default preprocessing time for Stereolithography,Inherited
+slaStandardLayerResolution,0.1,Length,Standard Resolution layer thickness for Stereolithography,Inherited
+slaSupportLayerThickness,0.1,Length,Default support thickness for Stereolithography,Inherited
+slaSupportVolumeFraction,0.05,,Default volume fraction for Stereolithography,Inherited
+slsBaseLayersHeight,15,Length,The default height of the powder between the build platform and the first part to be built.,Inherited
+slsCoolChamberTime,2180,Time,Time taken to cool the build chamber to a safe temperature after sintering.,Inherited
+slsFitBuildPlateTime,1200,Time,The typical time it takes to fit and level the build plate in the machine bed.,Inherited
+slsHeatChamberTime,4140,Time,Time taken to heat the build chamber up to required temperature prior to sintering.,Inherited
+slsLayerThickness,0.1,Length,Default layer thickness for Selective Laser Sintering,Inherited
+slsPowderFeedRiseFactor,2.25,,A factor applied to the layer thickness. Ensures the powder feed platform rises enough so there is enough powder to cover the build platform.,Inherited
+slsPrepBuildChamber,1200,Time,The typical time it takes to prepare the build chamber for printing parts including cleaning laser lens and lens cover.,Inherited
+usePreferredMachines,true,,"If true the model will first try to select a preferred machine. If false, the system chooses either the default machine or from the entire non-preferred set of machines.",Inherited

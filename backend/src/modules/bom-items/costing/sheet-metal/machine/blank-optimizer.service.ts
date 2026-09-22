@@ -17,7 +17,7 @@ export class BlankOptimizerService {
   async selectOptimalBlank(
     bbox: BoundingBox,
     partVolMm3: number,
-    family: "cnc_milled" | "cnc_turned" | "mill_turn",
+    family: "milled" | "turned" | "mill_turn",
     accessToken: string,
     // Cost Guide "Stock Form" manual override (bom_items.scenario_overrides.
     // stockForm — see resolveScenarioStockForm). null/undefined = "Let
@@ -37,7 +37,7 @@ export class BlankOptimizerService {
       if (profiles.length === 0) return billetFallback(bbox, partVolMm3);
 
       const candidates =
-        family === "cnc_turned" || family === "mill_turn"
+        family === "turned" || family === "mill_turn"
           // Turning: must fit inside a round bar diameter ≥ max(W, H) × 1.03
           ? roundBarCandidates(profiles, minDiam, barLen, partVolMm3)
           // Milled: try round bar (if roughly cylindrical), hex bar (if

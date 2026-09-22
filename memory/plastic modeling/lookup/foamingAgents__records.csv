@@ -1,0 +1,29 @@
+name,file_path,agent_name,material_type,cost_cfa_usd_per_kg,percent_cfa
+foamingAgents,lookupTables/Component/foamingAgents.csv,5-phenyltetrazole,Nylon,0.044,0.005
+foamingAgents,lookupTables/Component/foamingAgents.csv,5-phenyltetrazole,PBT,0.044,0.005
+foamingAgents,lookupTables/Component/foamingAgents.csv,5-phenyltetrazole,PET,0.044,0.005
+foamingAgents,lookupTables/Component/foamingAgents.csv,5-phenyltetrazole,Polycarbonate,0.044,0.005
+foamingAgents,lookupTables/Component/foamingAgents.csv,5-phenyltetrazole,PPS,0.044,0.005
+foamingAgents,lookupTables/Component/foamingAgents.csv,Azodicarbonamide,ABS,0.044,0.005
+foamingAgents,lookupTables/Component/foamingAgents.csv,Azodicarbonamide,Acetal,0.044,0.005
+foamingAgents,lookupTables/Component/foamingAgents.csv,Azodicarbonamide,Acrylic,0.044,0.005
+foamingAgents,lookupTables/Component/foamingAgents.csv,Azodicarbonamide,PBT,0.044,0.005
+foamingAgents,lookupTables/Component/foamingAgents.csv,Azodicarbonamide,PET,0.044,0.005
+foamingAgents,lookupTables/Component/foamingAgents.csv,Azodicarbonamide,Polypropylene,0.044,0.005
+foamingAgents,lookupTables/Component/foamingAgents.csv,Azodicarbonamide,Polystyrene,0.044,0.005
+foamingAgents,lookupTables/Component/foamingAgents.csv,Azodicarbonamide,PPS,0.044,0.005
+foamingAgents,lookupTables/Component/foamingAgents.csv,P-toluenesulfonylsemicarbazide,ABS,0.044,0.005
+foamingAgents,lookupTables/Component/foamingAgents.csv,P-toluenesulfonylsemicarbazide,Nylon,0.044,0.005
+foamingAgents,lookupTables/Component/foamingAgents.csv,P-toluenesulfonylsemicarbazide,Polypropylene,0.044,0.005
+foamingAgents,lookupTables/Component/foamingAgents.csv,P-toluenesulfonylsemicarbazide,Polystyrene,0.044,0.005
+foamingAgents,lookupTables/Component/foamingAgents.csv,Sodium bicarbonate/citric acid ester,ABS,0.044,0.005
+foamingAgents,lookupTables/Component/foamingAgents.csv,Sodium bicarbonate/citric acid ester,Nylon,0.044,0.005
+foamingAgents,lookupTables/Component/foamingAgents.csv,Sodium bicarbonate/citric acid ester,PBT,0.044,0.005
+foamingAgents,lookupTables/Component/foamingAgents.csv,Sodium bicarbonate/citric acid ester,PET,0.044,0.005
+foamingAgents,lookupTables/Component/foamingAgents.csv,Sodium bicarbonate/citric acid ester,Polypropylene,0.044,0.005
+foamingAgents,lookupTables/Component/foamingAgents.csv,Sodium bicarbonate/citric acid ester,Polystyrene,0.044,0.005
+foamingAgents,lookupTables/Component/foamingAgents.csv,Sodium bicarbonate/citric acid ester,PPS,0.044,0.005
+foamingAgents,lookupTables/Component/foamingAgents.csv,Sodium bicarbonate/citric acid ester,TPA,0.044,0.005
+foamingAgents,lookupTables/Component/foamingAgents.csv,Sodium bicarbonate/citric acid ester,TPE,0.044,0.005
+foamingAgents,lookupTables/Component/foamingAgents.csv,Sodium bicarbonate/citric acid ester,TPO,0.044,0.005
+foamingAgents,lookupTables/Component/foamingAgents.csv,Sodium bicarbonate/citric acid ester,TPU,0.044,0.005

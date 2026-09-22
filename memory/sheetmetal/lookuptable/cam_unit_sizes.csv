@@ -1,0 +1,7 @@
+name,filePath,digitalFactory,rowCount,camIdent,camFaceWidthMm,camFaceHeightMm,camUnitOverhangMm,camUnitWidthMm,camUnitLengthMm,camUnitShutHeightMm,camUnitWeightKg
+camUnitSizes,lookupTables/Component/camUnitSizes.csv,USA reference export,6,1000Series,1000.0,210.0,200.0,1000.0,370.0,385.0,543.0
+camUnitSizes,lookupTables/Component/camUnitSizes.csv,USA reference export,6,1200Series,1200.0,210.0,200.0,1200.0,370.0,385.0,733.0
+camUnitSizes,lookupTables/Component/camUnitSizes.csv,USA reference export,6,150Series,190.0,150.0,0.0,190.0,398.0,300.0,89.0
+camUnitSizes,lookupTables/Component/camUnitSizes.csv,USA reference export,6,300Series,400.0,180.0,0.0,400.0,479.0,375.0,222.0
+camUnitSizes,lookupTables/Component/camUnitSizes.csv,USA reference export,6,600Series,600.0,210.0,200.0,600.0,370.0,385.0,307.0
+camUnitSizes,lookupTables/Component/camUnitSizes.csv,USA reference export,6,800Series,800.0,210.0,200.0,800.0,370.0,385.0,422.0

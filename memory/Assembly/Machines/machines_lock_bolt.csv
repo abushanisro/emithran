@@ -1,0 +1,5 @@
+﻿Name,Labor Rate (USD / hr),Direct Overhead Rate (USD / hr),Indirect Overhead Rate (USD / hr),Overhead Multiplier,Number of Operators,Labor Time Standard,Wage Grade Name,Work Center Labor Rate Factor,Setup Time (hr),Lock Speed (s),Is Virtual Machine,Is Preferred,Avg Utilization,Good Part Yield,Machine Price (USD),Machine Length (mm),Machine Width (mm),Footprint Allowance Factor,Machine Power (kW),Installation Percent (%),Machine Uptime (%),Annual Maintenance Percent (%),Machine Life (yr),Salvage Value Percent (%),Supplies Cost (USD / yr),Machine Manufacturer Location
+Default Lock Bolt,29.95,0.24,13.87,0.00,1.00,1.00,,1.00,0.25,1.00,true,true,0.00,1.00,1885.09,580.00,400.00,2.00,0.83,20.00,80.00,5.00,10.00,0.00,0.00,USA
+Huck 2480L,29.95,0.24,13.87,0.00,1.00,1.00,,1.00,0.25,1.00,false,false,0.00,1.00,1885.09,580.00,400.00,2.00,0.83,20.00,80.00,5.00,10.00,0.00,0.00,USA
+Huck 2583,29.95,0.29,13.87,0.00,1.00,1.00,,1.00,0.25,1.00,false,false,0.00,1.00,2760.20,580.00,400.00,2.00,0.83,20.00,80.00,5.00,10.00,0.00,0.00,USA
+Huck 3585,29.95,0.33,13.87,0.00,1.00,1.00,,1.00,0.25,1.00,false,false,0.00,1.00,3308.11,580.00,400.00,2.00,0.83,20.00,80.00,5.00,10.00,0.00,0.00,USA

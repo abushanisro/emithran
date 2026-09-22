@@ -273,14 +273,14 @@ export class AutoFillService {
       // label (resolveDbDrivenProcessLabel) — never a hardcoded process-name
       // string; falls back to 'CNC Machining' only when the veto's own
       // disambiguation didn't land on a family the registry recognizes (it
-      // always picks 'plastic_molded' or 'cnc_milled' today, both covered).
+      // always picks 'plastic_molded' or 'milled' today, both covered).
       const vetoProcessType = await this.resolveDbDrivenProcessLabel(
-        cadFamilyClassification.family ?? 'cnc_milled',
+        cadFamilyClassification.family ?? 'milled',
         accessToken,
       );
       processSuggestion.processType = vetoProcessType ?? 'CNC Machining';
       this.logger.debug(
-        `[classify] Sheet-metal veto upheld: ${cadFamilyClassification.family ?? 'cnc_milled'} — ` +
+        `[classify] Sheet-metal veto upheld: ${cadFamilyClassification.family ?? 'milled'} — ` +
         `process → ${processSuggestion.processType}`,
       );
     }
@@ -632,7 +632,7 @@ export class AutoFillService {
     const featureGraph = {
       extractedAt: new Date().toISOString(),
       classification: {
-        family: family.family ?? 'cnc_milled',
+        family: family.family ?? 'milled',
         confidence: family.confidence ?? 0.65,
         signals,
         classificationSignals: cadMI?.classification_signals ?? undefined,
@@ -1442,8 +1442,8 @@ export class AutoFillService {
   // ever needed to confirm SOME real production row exists for that group).
   private static readonly CAD_FAMILY_TO_PROCESS_GROUP: Record<string, string> = {
     plastic_molded: 'Plastic Molding',
-    cnc_milled: 'Machining',
-    cnc_turned: 'Machining',
+    milled: 'Machining',
+    turned: 'Machining',
     mill_turn: 'Machining',
   };
 

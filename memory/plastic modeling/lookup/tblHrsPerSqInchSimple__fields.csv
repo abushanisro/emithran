@@ -1,0 +1,3 @@
+name,sourceFilePath,digitalFactory,value
+tblHrsPerSqInchSimple,lookupTables/Component/tblHrsPerSqInchSimple.csv,aPriori USA,Hrs Per Sq Inch Simple (hr)
+tblHrsPerSqInchSimple,lookupTables/Component/tblHrsPerSqInchSimple.csv,aPriori USA,Surface Area Simple (in^2)

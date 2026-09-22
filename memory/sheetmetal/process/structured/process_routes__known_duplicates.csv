@@ -1,0 +1,11 @@
+﻿operation,occurrence
+Waterjet Cutting,Sheet Cutting (inactive)
+Waterjet Cutting,Cutting (active)
+Plasma Cutting / Plasma Cut,"Sheet Cutting: ""Plasma Cutting"" (inactive)"
+Plasma Cutting / Plasma Cut,"Cutting: ""Plasma Cut"" (inactive)"
+Shearing / Shearning,"Sheet Cutting: ""Shearning"" (inactive)"
+Shearing / Shearning,"Sheet Cutting: ""Shearing"" (inactive)"
+3D Laser / 3D Laser Cut,"Laser Cutting: ""3D Laser"" (inactive)"
+3D Laser / 3D Laser Cut,"Sheet Cutting: ""3D Laser Cut"" (inactive)"
+Fiber Laser Cut / Fiber laser Cutting,"Laser Cutting: ""Fiber Laser Cut"" (active)"
+Fiber Laser Cut / Fiber laser Cutting,"Sheet Cutting: ""Fiber laser Cutting"" (inactive)"

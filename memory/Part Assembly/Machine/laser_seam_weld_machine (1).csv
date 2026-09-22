@@ -1,0 +1,32 @@
+parameter,value,unit
+Digital Factory,eMithran USA,
+Sector,World Average,
+Name,Default,
+Labor Rate,52.71,USD/hr
+Direct Overhead Rate,21.18,USD/hr
+Indirect Overhead Rate,25.76,USD/hr
+Overhead Multiplier,0.00,
+Number of Operators,1.00,
+Labor Time Standard,1.00,
+Wage Grade Name,,
+Work Center Labor Rate Factor,1.00,
+Setup Time,0.50,hr
+Index Time,15.00,
+Load Time,30.00,s
+Unload Time,15.00,s
+Power,2500.00,W
+Is Preferred,true,
+Good Part Yield,1.00,
+Machine Price,300000.00,USD
+Machine Length,9140.00,mm
+Machine Width,6100.00,mm
+Footprint Allowance Factor,2.50,
+Machine Power,20.00,kW
+Installation Factor,20.00,%
+Machine Uptime,80.00,%
+Annual Maintenance Factor,5.00,%
+Machine Life,10,yr
+Salvage Value Factor,0.00,%
+Supplies Cost,0.00,USD/yr
+Machine Manufacturer Location,USA,
+Data Source,eMithran Baseline,

@@ -1,0 +1,12 @@
+table_name,description,row_count,old_agma_quality_number,new_agma_quality_number,din_quality_number,comments,must_grind,must_shave,multiple_starts_valid
+tblGearQuality,"Mapping between old AGMA gear quality numbers, new AGMA quality numbers, and equivalent DIN quality numbers, with process constraints per quality level.",11,Q10,A7,7,Shaping or ...,False,True,True
+tblGearQuality,"Mapping between old AGMA gear quality numbers, new AGMA quality numbers, and equivalent DIN quality numbers, with process constraints per quality level.",11,Q11,A6,6,Shaving,False,True,True
+tblGearQuality,"Mapping between old AGMA gear quality numbers, new AGMA quality numbers, and equivalent DIN quality numbers, with process constraints per quality level.",11,Q12,A5,5,Grinding,True,False,True
+tblGearQuality,"Mapping between old AGMA gear quality numbers, new AGMA quality numbers, and equivalent DIN quality numbers, with process constraints per quality level.",11,Q13,A4,4,Grinding,True,False,False
+tblGearQuality,"Mapping between old AGMA gear quality numbers, new AGMA quality numbers, and equivalent DIN quality numbers, with process constraints per quality level.",11,Q14,A3,3,Grinding,True,False,False
+tblGearQuality,"Mapping between old AGMA gear quality numbers, new AGMA quality numbers, and equivalent DIN quality numbers, with process constraints per quality level.",11,Q15,A2,2,Grinding,True,False,False
+tblGearQuality,"Mapping between old AGMA gear quality numbers, new AGMA quality numbers, and equivalent DIN quality numbers, with process constraints per quality level.",11,Q5,A12,12,Spline rolling,False,False,True
+tblGearQuality,"Mapping between old AGMA gear quality numbers, new AGMA quality numbers, and equivalent DIN quality numbers, with process constraints per quality level.",11,Q6,A11,11,Broaching ...,False,False,True
+tblGearQuality,"Mapping between old AGMA gear quality numbers, new AGMA quality numbers, and equivalent DIN quality numbers, with process constraints per quality level.",11,Q7,A10,10,"Hobbing, s...",False,False,True
+tblGearQuality,"Mapping between old AGMA gear quality numbers, new AGMA quality numbers, and equivalent DIN quality numbers, with process constraints per quality level.",11,Q8,A9,9,"Hobbing, s...",False,False,True
+tblGearQuality,"Mapping between old AGMA gear quality numbers, new AGMA quality numbers, and equivalent DIN quality numbers, with process constraints per quality level.",11,Q9,A8,8,"Hobbing, s...",False,False,True

@@ -1,0 +1,35 @@
+﻿Variable Name,String Value,Unit Type Name,Notes
+agingPartNestingAllowance,13,Length,The additional allowance for nesting spacing for the Age Process.
+averageCoolingRate,13.3,Temperature/min,The average cooling rate for any materials without a material specific cooling rate. These materials are identified in the table tblMaterialTypeproperties where the data is set to -1. The value is an average of the available material specific data.
+averageHeatingRate,7.2,Temperature / min,The average heating rate for any materials without a material specific heating rate. These materials are identified in the table tblMaterialTypeproperties where the data is set to -1. The value is an average of the available material specific data.
+averageHoldTime,2.6,hr,The average hold time for any materials without a material specific hold time. These materials are identified in the table tblMaterialTypeproperties where the data is set to -1. The value is an average of the available material specific data.
+cycleTimeAdjustmentFactor,1,,Factor used to globally increase or decrease cycle time evaluations per process.
+defaultAgingTime,7,hr,Default aging time if Material Type does not exist in tblMaterialAgingTime.
+defaultPartLoadingMethod,Part Volume,,The default loading method for parts in the HIP furnace.
+defaultRoomTemperature,15,Temperature,The room temperature. Used along with the material hold temperature in the calculation for heating time.
+defaultUtilizationMethod,COMPUTED,,"Eligible values ""COMPUTED"" & ""MACHINE_DEFAULT""."
+disableInvestmentAmortization,false,,"User override to disable amortization of all fixed costs to the individual part or assembly. By default, fixed costs are calculated per part for tooling, fixtures, and programming."
+featureMaskTime,8,Time,Time to avoid hardening. The surface is painted with a chemical that prevents the selected surface from hardening. Used to calculate masking labor time.
+gearQualityDefaultAgmaNewStd,A8,,"A2, A3, A4, ... A11, A12"
+gearQualityDefaultAgmaOldStd,Q8,,"Q15, Q14, Q13, ... Q6, Q5"
+gearQualityDefaultDinStd,9,,"2, 3, 4, ... 11, 12"
+hipDefaultGasReusePercentage,0.95,,The default percentage of the argon gas that can be recycled and re-used.
+hipDefaultHoldPressure,100,MPa,The default hold pressure applied at the HIP parts.
+hipGasCylinderPressure,0.101325,MPa,The pressure of the argon gas cylinder used to pressurize the part.
+hipHorizontalNestingAllowance,13,Length,The additional allowance for nesting spacing in the horizontal direction.
+hipMaxPercentageSolidVolumeFromHotZoneVolume,0.6,,The maximum percentage of the total hot zone volume that can be utilized as space for solid parts. 0-1.
+hipProgrammingTime,0.25,hr,The time taken to prepare the HIP machine software prior to the cycle starting.
+hipVerticalNestingAllowance,10,Length,The additional allowance for nesting spacing in the vertical direction.
+laborRateAdjustmentFactor,1,,Factor used to globally increase or decrease labor rate evaluations per process.
+largePartsRackingRatePerHr,50,hr^-1,Number of parts weighing more than medium part threshold that can be racked or wired up per hour to be placed in the heat treatment furnace. Used to calculate the racking labor time.
+largePartsStraighteningRatePerHr,15,hr^-1,Number of parts weighing more than medium part threshold that can be straightened per hour. Parts are straightened one at a time. Used to calculate the straightening labor time.
+mediumPartsRackingRatePerHr,100,hr^-1,Number of parts weighing less than medium part threshold that can be racked or wired up per hour to be placed in the heat treatment furnace. Used to calculate the racking labor time.
+mediumPartsStraighteningRatePerHr,50,hr^-1,Number of parts weighing less than medium part threshold that can be straightened per hour. Parts are straightened one at a time. Used to calculate the straightening labor time.
+mediumPartsWeightLimit,11.4,Mass,"Weight limit for parts to be considered ""medium"", above which parts are considered ""large""."
+overheadRateAdjustmentFactor,1,,Factor used to globally increase or decrease overhead rate evaluations per process.
+pressurizingVesselTime,40,min,The time taken to pressurize the vessel up to the hold pressure.
+smallPartsRackingRatePerHr,200,hr^-1,Number of parts weighing less than small part threshold that can be racked or wired up per hour to be placed in the heat treatment furnace. Used to calculate the racking labor time.
+smallPartsStraighteningRatePerHr,75,hr^-1,Number of parts weighing less than small part threshold that can be straightened per hour. Parts are straightened one at a time. Used to calculate the straightening labor time.
+smallPartsWeightLimit,2.25,Mass,"Weight limit for parts to be considered ""small"", above which parts are considered ""medium"" or ""large""."
+usePreferredMachines,true,,"If true the model will first try to select a preferred machine. If false, the system chooses either the default machine or from the entire non-preferred set of machines."
+vacuumPurgeEqualize,9,min,The time taken to vacuum purge the vessel and to equalize the pressure between the gas inlet lines and the vessel.

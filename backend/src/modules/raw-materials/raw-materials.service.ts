@@ -8,74 +8,16 @@ import { FerrousContainerService } from './containers/ferrous-container.service'
 import { MATERIAL_CATEGORY_LABELS } from './constants/material-categories.constants';
 import { shapeRankForFamily } from './constants/material-shape-ranking';
 
-// Root-caused live (2026-09-18): searching "aluminium" (or "ALUMINIUM") in
-// the Material Database returned 0 results even though every real
-// aluminum-family row exists — spelled "Aluminum" throughout (verified
-// directly against the real staged source, memory/sheetmetal/rawmetrial/
-// rawmetalusa.json: "Aluminum, AA 1100", "Aluminum, AA 2219", etc., 29 real
-// rows). A plain ILIKE substring match can never bridge this: "aluminium"
-// and "aluminum" diverge right after their shared "alumin" prefix, so
-// neither is a substring of the other. This is not a fuzzy-matching
-// problem needing a nearest-neighbour guess (resolveAliasId's own
-// discipline below) — it is a real, well-established American/British
-// English spelling difference for the exact same material, and the fix is
-// to search BOTH real spellings, never to guess a wrong material.
-//
-// Every pair below is verified against real data already in this database
-// before being added — not a generic/invented list:
-//   aluminum/aluminium — the material_group/material text for every real
-//     ferrous & non-ferrous aluminum row (rawmetalusa.json).
-//   fiber/fibre — "Carbon Fiber"/"Glass Fiber" real plastic material rows
-//     (materials_final.json).
-//   sulfur/sulphur — no current row uses this word, but it is the other
-//     well-known AmE/BrE element-name pair relevant to alloy descriptions
-//     (e.g. free-machining steel grades are routinely described by sulfur
-//     content) — covered now rather than waiting for a second live report
-//     of the identical root cause.
-//
-// Module-level, pure, exported functions (not private class methods) so
-// they are independently unit-testable with zero Supabase/DB mocking —
-// this project's standing rule against new mocked-Supabase test files
-// means logic like this must live outside the injectable class to get real
-// test coverage at all.
-export const MATERIAL_SEARCH_SPELLING_VARIANTS: ReadonlyArray<readonly [string, string]> = [
-  ['aluminum', 'aluminium'],
-  ['fiber', 'fibre'],
-  ['sulfur', 'sulphur'],
-];
+import {
+  MATERIAL_SEARCH_SPELLING_VARIANTS,
+  expandSearchTermSpellingVariants,
+} from './material-search-spelling';
+import { orderByRelevance, rankableFromDbRow } from './material-search-ranking';
 
-// Expands a raw search term into every real spelling variant that could
-// appear in a real material name, so a real AmE/BrE wording difference
-// never produces a false "no results". Only ever ADDS variants — the
-// original term is always included unmodified as the first entry, so an
-// exact hit still behaves exactly as before.
-//
-// Builds exactly two additional canonical forms in one linear pass each —
-// "every known word rewritten to American spelling" and "...to British
-// spelling" — rather than one variant per matched word: a compound term
-// like "aluminium fibre reinforced" must normalize BOTH words together
-// (-> "aluminum fiber reinforced"), not just whichever pair the loop
-// happened to reach first.
-//
-// All generated variants are lowercase: the only two consumers of this
-// function (buildMaterialSearchOrClause's ILIKE, and the frontend
-// MaterialPickerDialog's already-lowercased haystack comparison) are both
-// case-insensitive by construction, so there is no real behavior to gain
-// from trying to transfer the original term's casing onto a rewritten
-// word — and a naive attempt at that produced this function's own real
-// bug (fixed 2026-09-18): a case-insensitive regex match still substitutes
-// its literal (lowercase) replacement text, so "ALUMINIUM" was silently
-// expanding to "aluminum", not "ALUMINUM" as an earlier version claimed.
-export function expandSearchTermSpellingVariants(term: string): string[] {
-  const lower = term.toLowerCase();
-  let towardUs = lower;
-  let towardUk = lower;
-  for (const [us, uk] of MATERIAL_SEARCH_SPELLING_VARIANTS) {
-    towardUs = towardUs.replace(new RegExp(uk, 'g'), us);
-    towardUk = towardUk.replace(new RegExp(us, 'g'), uk);
-  }
-  return [...new Set([term, lower, towardUs, towardUk])];
-}
+// Re-exported so existing importers (and the spelling spec) keep working;
+// the definitions live in material-search-spelling.ts so the search ranker
+// can use them without a circular import back into this service.
+export { MATERIAL_SEARCH_SPELLING_VARIANTS, expandSearchTermSpellingVariants };
 
 // Builds the real PostgREST OR-ILIKE clause across material/material_group/
 // material_grade for a search term, expanded across the real spelling
@@ -108,9 +50,9 @@ export class RawMaterialsService {
     private readonly ferrousContainer: FerrousContainerService,
   ) {}
 
-  // Full alias list for client-side alias-aware search (the material-picker
-  // dialog fetches all materials once and filters in the browser, rather than
-  // calling findAll()'s search= param -- so it needs the alias map directly).
+  // Full alias list. The material picker no longer needs it (search is ranked
+  // server-side by findAll(), alias-aware); kept for any client that still
+  // does its own alias matching.
   async getAliases(accessToken?: string): Promise<Array<{ aliasNormalized: string; rawMaterialId: string }>> {
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
@@ -164,8 +106,9 @@ export class RawMaterialsService {
     // inside the search term as literal characters, not filter-syntax tokens.
     // e.g. "Generic Stainless Steel, Alloy (X10CrNi18-8) Wrought/AM" would
     // otherwise split on the comma and be misread as nested grouping.
+    let aliasId: string | null = null;
     if (query.search) {
-      const aliasId = await this.resolveAliasId(query.search, accessToken);
+      aliasId = await this.resolveAliasId(query.search, accessToken);
       if (aliasId) {
         queryBuilder = queryBuilder.eq('id', aliasId);
       } else {
@@ -185,7 +128,30 @@ export class RawMaterialsService {
       throw new InternalServerErrorException(`Failed to fetch raw materials: ${error.message}`);
     }
 
-    const items = (data || []).map(row => RawMaterialResponseDto.fromDatabase(row));
+    const rows = data || [];
+
+    // A search is a recommendation problem, not just a filter: order by
+    // relevance (exact > alias > designation > cross-standard > prefix) so the
+    // grade the user meant is first, and say WHY each row matched. An explicit
+    // sortBy from the caller still wins -- relevance only replaces the
+    // default alphabetical order. Results are reordered, never dropped.
+    if (query.search && !query.sortBy) {
+      const ordered = orderByRelevance(
+        query.search,
+        rows,
+        rankableFromDbRow,
+        { aliasRowIds: aliasId ? new Set([aliasId]) : undefined },
+      );
+      const items = ordered.map(({ item, tier, reason, isBest }) => ({
+        ...RawMaterialResponseDto.fromDatabase(item),
+        matchTier: tier,
+        matchReason: reason,
+        matchIsBest: isBest,
+      }));
+      return { items, total: count || 0 };
+    }
+
+    const items = rows.map(row => RawMaterialResponseDto.fromDatabase(row));
 
     return { items, total: count || 0 };
   }
@@ -701,8 +667,9 @@ export class RawMaterialsService {
       queryBuilder = queryBuilder.ilike('material_group', `%${groupKeyword}%`);
     }
 
+    let aliasId: string | null = null;
     if (query.search) {
-      const aliasId = await this.resolveAliasId(query.search, accessToken);
+      aliasId = await this.resolveAliasId(query.search, accessToken);
       if (aliasId) {
         queryBuilder = queryBuilder.eq('id', aliasId);
       } else {
@@ -710,16 +677,37 @@ export class RawMaterialsService {
       }
     }
 
-    // Apply pagination
+    // Apply pagination. A SEARCH must be ranked across the whole match set
+    // before it is paged (a DB range() over alphabetical order would put the
+    // best match on whichever page its name happens to fall on), so a search
+    // fetches its matches (capped) and pages the ranked list in memory; a
+    // plain browse still pages in the database.
     const offset = (query.page - 1) * query.limit;
-    queryBuilder = queryBuilder.range(offset, offset + query.limit - 1);
-    queryBuilder = queryBuilder.order('material', { ascending: true });
+    if (query.search) {
+      queryBuilder = queryBuilder.order('material', { ascending: true }).limit(1000);
+    } else {
+      queryBuilder = queryBuilder.range(offset, offset + query.limit - 1);
+      queryBuilder = queryBuilder.order('material', { ascending: true });
+    }
 
-    const { data, error, count } = await queryBuilder;
+    const { data: fetched, error, count } = await queryBuilder;
 
     if (error) {
       this.logger.error(`Enhanced materials query failed: ${error.message}`, 'RawMaterialsService');
       throw new InternalServerErrorException(`Failed to fetch materials: ${error.message}`);
+    }
+
+    let data = fetched;
+    const matchInfo = new Map<string, { tier: string; reason: string; isBest: boolean }>();
+    if (query.search) {
+      const ordered = orderByRelevance(
+        query.search,
+        fetched || [],
+        rankableFromDbRow,
+        { family: query.partFamily, aliasRowIds: aliasId ? new Set([aliasId]) : undefined },
+      );
+      for (const { item, tier, reason, isBest } of ordered) matchInfo.set(item.id, { tier, reason, isBest });
+      data = ordered.slice(offset, offset + query.limit).map((o) => o.item);
     }
 
     // Transform data to match enhanced format with proper null handling
@@ -769,12 +757,17 @@ export class RawMaterialsService {
         status: 'active',
         createdAt: item.created_at || new Date().toISOString(),
         updatedAt: item.updated_at || new Date().toISOString(),
+        matchTier: matchInfo.get(item.id)?.tier,
+        matchReason: matchInfo.get(item.id)?.reason,
+        matchIsBest: matchInfo.get(item.id)?.isBest,
       };
     });
 
     // Form-based ranking by manufacturing family — shared with the BOM costing
     // material lookup so browse order and costing pick can never disagree.
-    if (query.partFamily) {
+    // (A search already applied the family as a ranking tie-break above;
+    // re-sorting here would undo relevance order.)
+    if (query.partFamily && !query.search) {
       const family = query.partFamily;
       transformedData.sort((a, b) => {
         const rankA = shapeRankForFamily(a.shape, family);

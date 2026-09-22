@@ -1,0 +1,122 @@
+﻿Variable Name,String Value,Unit Type Name,Notes
+annualTankChange,2,,Yearly change outs of water in the wash tank
+anodizingCoatingThicknessMax,0.2286,Length,Maximum coating thickness achievable in Anodizing
+anodizingCoatingThicknessTypeI,0.01016,Length,Minimum Anodizing coat thickness for Type I Anodizing.
+anodizingCoatingThicknessTypeII,0.02032,Length,Minimum Anodizing coat thickness for Type II Anodizing.
+anodizingCoatingThicknessTypeIII,0.04064,Length,Minimum Anodizing coat thickness for Type III Anodizing.
+anodizingRampTimeHighVolt,600,Time,The anodizing ramp time to reach 0-50 Volts
+anodizingRampTimeLowVolt,300,Time,The anodizing ramp time to reach 0-20 Volts
+asmBoundingBoxAreaRatio,5,,"A threshold value used to determine the exposed surface area of an assembly, to which surface treatments are then applied. The sum of the surface areas of the individual components is compared to the surface area of a rectangular bounding box which completely encloses the assembly. If this ratio is less than the threshold... [note truncated in screenshot]"
+blackOxideCoatingThickness,1,micron,The thickness of Black Oxide solution deposited on each part. Used to calculate the Black Oxide solution per part.
+blackOxideSolutionRatio,0.1,,The ratio of Black Oxide solution to water for the Black Oxide process. Used to calculate the Black Oxide solution cost per part.
+cadmiumDensity,8.64,g/cm^3,The density of cadmium used in Cadmium Plating. Used to calculate the mass of cadmium used.
+cafDefaultDeburrRequired,true,,Sets the default behavior for deburring parts in Conveyor Abrasive Finishing. True means parts need to be deburred by default.
+cafDefaultNumPasses,2,,Sets the default number of times the part passes through the Conveyor Abrasive Finishing machine if the process is included in the routing.
+cafDefaultRemoveOxideSkinRequired,false,,Sets the default behavior for removing oxide skins from parts in Conveyor Abrasive Finishing. True means parts need to have an oxide skin removing action performed on them by default.
+cafDefaultRemoveSlagRequired,false,,Sets the default behavior for removing slag from parts in Conveyor Abrasive Finishing. True means parts need to have a slag removing action performed on them by default.
+cafDefaultRoundEdgesRequired,true,,Sets the default behavior for rounding the edges of parts in Conveyor Abrasive Finishing. True means parts need to have their edges rounded by default.
+cafDefaultSurfaceFinishingRequired,true,,Sets the default behavior for surface finishing parts in Conveyor Abrasive Finishing. True means parts need to have a surface finishing action performed on them by default.
+cafPartSpacing,15,Length,The minimum distance between parts loaded onto the Conveyor Abrasive Finishing machine. Used to calculate the default number of nested parts.
+cleaningWipeCoverageRatePerEach,1000000,Area,The total surface area that can be cleaned with one cleaning wipe.
+conversionCoatingMinDrainTime,120,Time,The minimum time that parts must spend in each drainage zone in the Conversion Coating machine. Used to calculate maximum line speed.
+conversionCoatingMinRinseTime,120,Time,The minimum time that parts must spend in each rinsing stage in the Conversion Coating machine. Used to calculate maximum line speed.
+conversionCoatingSolutionReusePercent,99.90,,The percentage of solutions that can be reused after being sprayed onto the part during the Conversion Coating process. Used to calculate the cost of solutions used.
+conveyorLoadBarSpacing,900,Length,The spacing between load bars. The spacing is equal to the width of a walkway to allow thoroughfare between load bars.
+conveyorLoadBarWeightLimitPerLength,0.1,Mass / Length,Weight limit per length on the load bar for conveyor processes.
+conveyorMaxPartSpacing,300,Length,The maximum required spacing between parts hung onto the load bar for Conveyor Processes.
+conveyorMinPartSpacing,50,Length,The minimum required spacing between parts hung onto the load bar for Conveyor Processes.
+conveyorPartLoadingFactor,1,,Standard Load Time multiplier used to increase or decrease the Load Time to account for the relative difficulty in loading parts onto a conveyor system.
+conveyorPartSpacingFactor,0.5,,Factor applied to the width of the part to calculate the minimum spacing between parts on the load bars for Conveyor Processes.
+conveyorSpeedRateRatio,0.1,,Fraction of the maximum Speed Ratio
+cycleTimeAdjustmentFactor,1,,Factor to globally increase or decrease cycle time evaluations per process.
+defaultAbrasiveAdditive,Default Abrasive Additive,,Default Abrasive Additive used.
+defaultAbrasiveAdditiveRatioRate,0.001,hr^-1,Volumetric ratio consumption rate of Abrasive Additive per cubic mm of Vibratory Finishing container.
+defaultBlackOxidePartCleanTime,300,Time,Soak time of a batch of nested parts in the cleaning stage for the Black Oxide process. Used as the default for the Process Setup Option Part Cleaning Time.
+defaultBlackOxidePartSpacing,20,Length,The default spacing between parts for the Black Oxide process.
+defaultBlackOxideSupplementaryFinishTime,180,Time,Soak time of a batch of nested parts in the supplementary finish stage for the Black Oxide process. Used as the default for Process Setup Option Supplementary Finish Time.
+defaultConcurrentManualPaintCuring,true,,Sets the default behavior of curing within the Manual Painting process. 'true' means multiple parts can be cured concurrently. 'false' means parts are cured individually.
+defaultConveyorLoadBarLength,2000,Length,Default load bar length for the conveyor processes. Used as the default value for the Load Bar Length process setup option.
+defaultConveyorShotBlastLineSpeed,42,Velocity,The default line speed for the Conveyor Shot Blast process. Line speed can be overriden by the Line Speed process setup option.
+defaultFinishCoatCoverageFactor,1,,The default percentage of total part surface area to be coated with finish coat.
+defaultFractionOfSurfaceAreaPowderCoated,1,,The default fraction of the external surface area of the part that is powder coated if the Mask-Bench process is not included in the routing. Set to any value between 0.01 and 1.
+defaultFractionPartPainted,1,,Fraction of the total part surface area that is considered to be painted.
+defaultHandCleaningRate,30000,mm^2/Time,The default area based rate at which the part's paintable surface can be hand cleaned.
+defaultHandSandingRate,25000,mm^2 / Time,The default area based rate at which the part's paintable surface can be hand sanded.
+defaultHandSprayRateFinish,5555.5,mm^2 / Time,The default area based rate at which finish coat paint is applied via hand sprayer.
+defaultHandSprayRatePrimer,5555.5,mm^2 / Time,The default area based rate at which primer coat is applied via hand sprayer.
+defaultHangerHeightAllowance,300,Length,The default spacing of the hanger between top and bottom of the blast chamber for the Shot Blast process.
+defaultHangerLayerNestingAllowance,50,Length,The default spacing between layers of parts on the hanger for the Shot Blast process.
+defaultHangerWidthAllowance,300,Length,The default spacing of the hanger from the walls of the blast chamber for the Shot Blast process.
+defaultLaserEngravingLength,50,Length,Default Laser Engraving length. Default value for Engrave Length Process Setup Option.
+defaultLaserEngravingPasses,1,,Default number of Laser Engraving Passes. Default for Number of Passes Process Setup Option.
+defaultLaserEngravingSpeed,600,Velocity,Default Laser Engraving Speed. Default value for Engrave Speed Process Setup Option.
+defaultLaserEngravingStepInterval,0.15,Length,Default step interval distance for Laser Engraving. Default value for Step Interval Process Setup Option.
+defaultLaserEngravingWidth,10,Length,Default Laser Engraving width. Default value for Engrave Width Process Setup Option.
+defaultManualPaintSpacingFactor,0.5,,Factor of manual paint booth area that parts can occupy (due to spacing requirements). Populates default value for PSO manualPaintSpacingFactor.
+defaultMaskSprayCoverage,0.11375,L/m^2,Default spray masking coverage
+defaultMediaNoMaterialCutCode,Plastic,,Default Media Type selected for parts that do not have a cut code.
+defaultNumFinishCoats,1,,The default number of finish coats applied.
+defaultNumMaskantLayers,8,,Default number of maskant layers applied
+defaultNumPrimerCoats,1,,The default number of primer coats applied.
+defaultNumScreenPrintColors,1,,The default number of colors used in the screen print. This value provides the default number of colors used by the cost model but can be overriden via Process Setup Options.
+defaultNumberOfBlackOxideStages,7,,The default number of Black Oxide stages to transfer parts. Used to calculate the total transfer time for the Black Oxide process.
+defaultPaintingCoats,1,,Default number of painting coats for the Painting process.
+defaultPercentageOfSurfaceAreaElectroplated,100,,The default percentage of the total surface area that is treated by the Electroplating processes. Set to any integer value between 1 and 100.
+defaultPostBlackOxideRinseTime,180,Time,Soak time of a batch of nested parts in the post rinse stage for the Black Oxide process. Used as the default for Process Setup Option Post Black Oxide Rinse Time.
+defaultPowderCoatingClearCoatFlowRate,500,g/min,The default rate at which the selected clear coat powder is applied by each powder gun during the Powder Coat Cart process. Used to calculate cycle time.
+defaultPowderCoatingTopCoatFlowRate,500,g/min,The default rate at which the selected top coat powder is applied by each powder gun during the Powder Coat Cart process. Used to calculate cycle time.
+defaultPreBlackOxideRinse,180,Time,Soak time of a batch of nested parts in the pre rinse stage for the Black Oxide process. Used as the default for Process Setup Option Pre Black Oxide Rinse Time.
+defaultShotPeenArea,50,,Default Percentage of total surface area to be shot peened.
+defaultShotPeenMediaType,Chilled Iron,,
+defaultUtilizationMethod,COMPUTED,,"Eligible values: ""COMPUTED"" & ""MACHINE_DEFAULT"""
+defaultVibratoryFinishingMediaRatio,3,,Default media to parts ratio utilized by Vibratory Finishing process.
+degreaseSolventRatio,0.15,,Ratio of aqeuous cleaning solution added to water tank for washing process
+disableInvestmentAmortization,false,,"User override to disable amortization of all fixed costs to the individual part or assembly. By default, fixed costs are calculated per part for tooling, fixtures, and programming."
+dotPeenDefaultCharacters,10,,Default Dot Peen Characters for Process Setup Option numCharacters. The default mode is required to be 'user'.
+dotPeenTimePerCharacter,1.4,Time,Time to complete one character for the Dot Peen Process.
+dragEvaporativeLoss,0.000525,FlowRate,Solution loss due to evaporation.
+externalSurfaceAreaFactor,0.65,,Average ratio of external surface area to total surface area (used only for Bar & Tube Fab process group).
+gearQualityDefaultAgmaNewStd,A8,,"A2, A3, A4, ... A11, A12"
+gearQualityDefaultAgmaOldStd,Q8,,"Q15, Q14, Q13, ... Q6, Q5"
+gearQualityDefaultDinStd,9,,"2, 3, 4, ... 11, 12"
+highComplexityFactor,1.2,,The high complexity factor that can be applied when determining the part design complexity.
+highModulusRatio,4.0,,Factor applied to the optimum modulus to determine a high part modulus. Used to calculate the part complexity factor.
+inspectionRate,28000,Area/Time,The rate at which the part's surface area is visually inspected.
+laborRateAdjustmentFactor,1,,Factor to globally increase or decrease labor rate evaluations per process.
+manualPaintPartLoadTime,160,Time,Deprecated in CMV270.
+maskBenchMaxPlugLength,35,Length,The maximum plug length available for masking holes. Holes that are plugged in the Mask-Bench process and are shorter than this value will only require a single plug.
+maskBenchMaxPlugSize,65,Length,The maximum plug size available for masking holes. Holes that are smaller than this size will be plugged by default in the Mask-Bench process.
+maskTimePerFeature,5,Time,Average time to mask and unmask a feature. Used to calculate the total mask time based on the number of masked features.
+maxComplexityFactor,1.3,,The maximum complexity factor that can be applied when determining the part design complexity.
+maxModulusRatio,10,,Factor applied to the optimum modulus to determine the maximum part modulus. Used to calculate the part complexity factor.
+mediaSiftTime,900,Time,Time it take to manually sift through media for parts if the Vibratory Finishing Machine does not have an automatic separator.
+mediumComplexityFactor,1.1,,The medium complexity factor that can be applied when determining the part design complexity.
+mediumModulusRatio,2.5,,Factor applied to the optimum modulus to determine a medium part modulus. Used to calculate the part complexity factor.
+minComplexityFactor,0.9,,The minimum complexity factor that can be applied when determining the part design complexity.
+minimumInspectionTime,3,Time,The minimum time required to visually inspect a part. Used as a minimum value for the calculated inspection time.
+minimumManualOperationTime,5,Time,The minimum time required to complete a manual operation.
+optimumComplexityFactor,1.0,,The optimum complexity factor that can be applied when determining the part design complexity.
+overheadRateAdjustmentFactor,1,,Factor to globally increase or decrease overhead rate evaluations per process.
+percentRecycledShot,80,,Percent of shot recycled from shot peening 1 part
+plasticPlatingSurcharge,0.1,,A factor of the Total Application Cost Per Area that is added to account for the additional cost of pre-plating a plastic part prior to electroplating. This factor is only applied if the part is made of plastic.
+platingBarrelSizeLimit,76.2,Length,"Threshold limit for the length, width, and height of the part to determine if the part is small enough to be barrel plated."
+platingRackChargeSmallParts,0.07,Currency,Extra charge per part for plating small parts. Used to calculate the load / unload fee for barrel plating.
+powderCoatCartClearCoatType,CLEAR COAT,,The default powder coat cart clear coat type.
+powderCoatCartMaxPartSpacing,300,Length,The maximum required spacing between parts on the cart for the Powder Coat Cart process.
+powderCoatCartMinPartSpacing,50,Length,The minimum required spacing between parts on the cart for the Powder Coat Cart process.
+powderCoatCartSpacingFactor,0.5,,Factor applied to the width of the part to calculate the minimum spacing between parts on the cart for the Powder Coat Cart process.
+powderCoatCartTopCoatType,TOP COAT,,The default powder coat cart top coat type.
+powderCoatSprayEfficiency,0.8,,Fraction of powder spray that effectively covers parts; remainder is assumed wasted. Used to calculate the powder material usage per part.
+sandingDiskCoverageRatePerEach,9000000,Area,The total surface area that can be sanded using one sanding disk.
+screenPrintColorMultiplier,0.75,,Additional cost added to compensate for each additional color in screen printing. Used to calculate the screen printing cost.
+screenPrintComplexityMultiplier,.75,,Additional cost added to compensate for complex graphics and text in screen printing. Used to calculate the screen printing cost.
+shotBlastNumberOfBlastCyclesPartsOnHook,2,,The number of blast cycles required when a single part is loaded onto a hook for the Shot Blast process.
+shotBlastNumberOfBlastCyclesPartsOnHanger,1,,The number of blast cycles required when a batch of parts are loaded onto a hanger for the Shot Blast process.
+shotBlastNumberOfInstances,1,,The default number of instances when the Shot Blast process is manually included in the routing.
+smallMediaAttritionMultiplier,1.25,,"Adjustment multiplier for media attrition rate if Vibratory Finishing media is smaller than 3/8""."
+smallMediaDensityMultiplier,1.15,,"Adjustment multiplier for media density if Vibratory Finishing media is smaller than 3/8""."
+tackTimeAllowance,15,min,Time allowed for maskant to tack off between maskant spray layers.
+usePreferredMachines,true,,"If true the model will first try to select a preferred machine. If false, the system chooses either the default machine or from the entire non-preferred set of machines."
+vibratoryFinishingContainerFillPercent,95,,Percentage of container utilized for Vibratory Finishing Process. Used to give parts and media space to move.
+wetCoatPaintDensity,1.3,g/cm^3,The density of paint used in Wet Coat Line. Used to calculate mass of paint used.
+workingHoursPerYear,2820,,

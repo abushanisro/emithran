@@ -1,0 +1,45 @@
+﻿Level,Parent,Name,Node Type
+0,,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Generic Materials,Document
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Material Factors,Document
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Skill Levels,Document
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Industry Sectors,Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),2-Model Machining,Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Additive Manufacturing,Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Assembly,Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Assembly Molding,Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Assembly Plastic Molding,Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Bar & Tube Fab,Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Casting,Folder
+2,Casting,Variables,Document
+2,Casting,Wage Grade Associations,Document
+2,Casting,Lookup Tables,Folder
+2,Casting,Processes,Folder
+2,Casting,Operations,Folder
+2,Casting,Machines,Folder
+2,Casting,Materials,Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Casting - Die,Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Casting - Investment,Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Casting - Sand,Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Composites,Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Forging,Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Heat Treatment,Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Machining,Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Multi-Spindle Machining,Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Other Secondary Processes,Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),PCB,Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Part Assembly,Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Plastic Molding,Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Powder Metal,Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Rapid Prototyping,Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Roto & Blow Molding,Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Sheet Metal,Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Sheet Metal - Hydroforming,Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Sheet Metal - Roll Forming,Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Sheet Metal - Stretch Forming,Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Sheet Metal - Transfer Die,Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Sheet Plastic,Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Stock Machining,Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Surface Treatment,Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),User Guided,Folder
+1,aPriori USA (aP2025R1_SP03_F01_(2026-03)),Work Centers,Folder

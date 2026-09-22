@@ -1,0 +1,12 @@
+version,baseCurrency,active,currencyCode,description,rate,conversion,lastModifiedBy,lastModifiedTime
+Default,USD,False,BRL,Brazilian Real,3.2893,1 USD = 3.2893 BRL,admin,12/11/17 7:00 AM
+Default,USD,False,CAD,Canadian Dollar,1.2839,1 USD = 1.2839 CAD,admin,12/11/17 7:00 AM
+Default,USD,False,CNY,Chinese Renminbi Yuan,6.6082,1 USD = 6.6082 CNY,admin,12/11/17 7:00 AM
+Default,USD,True,EUR,Euro,0.8464,1 USD = 0.8464 EUR,fernando.sanchez,1/6/26 2:28 PM
+Default,USD,False,GBP,British Pound Sterling,0.7477,1 USD = 0.7477 GBP,admin,12/11/17 7:00 AM
+Default,USD,False,HKD,Hong Kong Dollar,7.8079,1 USD = 7.8079 HKD,admin,12/11/17 7:00 AM
+Default,USD,False,INR,Indian Rupee,64.3455,1 USD = 64.3455 INR,admin,12/11/17 7:00 AM
+Default,USD,False,JPY,Japanese Yen,113.3819,1 USD = 113.3819 JPY,admin,12/11/17 7:00 AM
+Default,USD,False,KRW,South Korean Won,1091.936,1 USD = 1091.9360 KRW,admin,12/11/17 7:00 AM
+Default,USD,False,MXN,Mexican Peso,18.9721,1 USD = 18.9721 MXN,admin,12/11/17 7:00 AM
+Default,USD,False,TWD,Taiwan NT Dollar,30.0128,1 USD = 30.0128 TWD,admin,12/11/17 7:00 AM

@@ -1,0 +1,244 @@
+﻿Name,Value,Description
+adapterQtyCboresLong,6.00,quantity of counter bores if adapter length > threshold.
+adapterQtyCboresShort,4.00,quantity of counter bores if adapter length < threshold.
+adapterQtyDowels,2.00,
+adapterQtyJackScrews,2.00,
+additionalStockGuideCbores,2.00,
+additionalStockGuideHeight,3.00,
+additionalStockGuideMultiplier,2.00,
+additionalStockGuideQtyDowels,2.00,
+additionalStockGuideQtyJackScrews,1.00,
+additionalStockGuideQtyTapped,0.00,
+additionalStockGuideWidth,2.00,
+addlStockGuideQtyCbores,2.00,
+bendingHeelHeight,63.50,
+bendingHeelQtyCbores,4.00,
+bendingHeelQtyDowels,0.00,
+bendingHeelQtyJackScrews,2.00,
+bendingHeelQtyTapped,2.00,
+bendingHeelWidth,63.50,
+bendingPunchHeight,114.30,
+bendingPunchQtyCboresLong,6.00,quantity of counter bores if punch length > threshold.
+bendingPunchQtyCboresShort,4.00,quantity of counter bores if punch length < threshold.
+bendingPunchQtyDowels,2.00,
+bendingPunchQtyJackScrews,1.00,
+bendingPunchWidth,139.70,
+binderGuidePinAssyFactor,762.00,
+binderGuidePinAssyQtyCbores,4.00,quantity of counter bored holes in a binder guide pin assembly.
+binderGuidePinAssyQtyIncrement,2.00,add this many binderGuidePinAssy's for every binderGuidePinAssyFactor of stripper_length.
+binderHeight,50.80,
+binderPinAssyQty,4.00,the number of binder pin assemblies per binder.
+binderQtyLiftingHoles,4.00,
+binderWidthAdder,12.70,
+blankAdapterLengthAdder,50.80,amount of stock added to each side of blank adapter length.
+blankAdapterPitchMultiplier,4.00,multiplier used in calculating the length of the blank adapter.
+blankAdapterQtyCbores,8.00,
+blankAdapterQtyDowels,2.00,
+blankAdapterQtyJackScrews,2.00,
+blankAdapterWidthAdder,50.80,amount of stock added to each side of blank adapter width.
+blankGage,6.00,The number of standard (without sensor) blank gages per station.
+blankGageWithSensor,2.00,The number of sensor equipt blank gages per station.
+blankHolderHeightAdder,20.00,
+blankHolderQtyCbores,4.00,
+blankHolderQtyDowels,2.00,
+blankHolderQtyJackScrews,2.00,
+blankPunchHeight,101.60,
+blankPunchQtyDowels,2.00,
+blankPunchQtyJackScrews,2.00,
+blankPunchQtyTapped,0.00,
+camPierceUnitQtyCbores,4.00,
+camStripperHeight,25.40,
+camStripperQtyCbores,0.00,
+camStripperQtyDowels,0.00,
+camStripperQtyJackScrews,0.00,
+camStripperQtyTapped,0.00,
+customPiercePunchLengthAdder,12.70,
+customPiercePunchQtyJackScrews,1.00,
+customPiercePunchWidthAdder,12.70,
+cutoffInsertHeight,76.20,
+cutoffInsertLength,50.80,
+cutoffInsertQtyCbores,0.00,
+cutoffInsertQtyDowels,0.00,
+cutoffInsertQtyJackScrews,0.00,
+cutoffInsertQtyTapped,0.00,
+cutoffInsertWidth,38.10,
+cutoffPunchInsertHolderHeight,101.60,
+cutoffPunchInsertHolderLength,76.20,
+cutoffPunchInsertHolderQtyCbores,2.00,
+cutoffPunchInsertHolderQtyDowels,2.00,
+cutoffPunchInsertHolderQtyJackScrews,1.00,
+cutoffPunchInsertHolderQtyTapped,0.00,
+cutoffPunchInsertHolderWidth,50.80,
+dieAllowanceAdderCamStation_large,460.00,Size allowance (mm) per side where cams exist for Cam Stations if large cams.
+dieAllowanceAdderCamStation_small,380.00,Size allowance (mm) per side where cams exist for Cam Stations if small cams.
+dieBlockHeight,76.20,
+dieBlockLengthAllowance,254.00,
+dieBlockQtyCboresLong,6.00,quantity of counter bores if die length > threshold.
+dieBlockQtyCboresShort,4.00,quantity of counter bores if die length < threshold.
+dieBlockQtyDowels,2.00,
+dieBlockQtyJackScrews,2.00,
+dieBlockQtyTapped,0.00,
+dieBlockWidthAllowance,609.60,
+dieLengthAllowanceDrawingStation,700.00,Length allowance (mm) for Drawing Stations.
+dieLengthAllowanceRestrikingFlangingStation,300.00,Length allowance (mm) for Restriking and Flanging Stations.
+dieLengthAllowanceTrimmingStation,600.00,Length allowance (mm) for standard Trimming Stations.
+dieShoeLengthAllowance,203.20,Standard amount of allowance added to each side of the die shoe in the length (dieLtoR) direction.
+dieShoeThicknessLarge,101.60,
+dieShoeThicknessMedium,88.90,
+dieShoeThicknessSmall,76.20,
+dieShoeWidthAllowance,304.80,Standard amount of allowance added to each side of the die shoe in the width (dieFtoB) direction.
+dieShoeWidthThresholdLower,"1,524.00",Lower size threshold for a die shoe. Used for determining the number of assembly hours. UOM = mm.
+dieShoeWidthThresholdUpper,"3,048.00",Upper size threshold for a die shoe. Used for determining the number of assembly hours. UOM = mm.
+dieSteelHeightTypical,50.80,
+dieWidthAllowanceDrawingStation,900.00,Width allowance (mm) for Drawing Stations.
+dieWidthAllowanceRestrikingFlangingStation,800.00,Width allowance (mm) for Restriking and Flanging Stations.
+dieWidthAllowanceTrimmingStation,750.00,Width allowance (mm) for standard Trimming Stations.
+drawPadBalanceBlockDiameter,38.10,
+drawPadBalanceBlockLength,25.40,
+drawPadBalanceBlockQtyCbores,1.00,
+drawPadBalanceBlockQtyDowels,0.00,
+drawPadBalanceBlockQtyJackScrews,0.00,
+drawPadBalanceBlockQtyPerForm,4.00,balances the stripper (pad) during deep drawing operations.
+drawPadBalanceBlockQtyTapped,0.00,
+formingPunchLengthAdder,25.40,amount of stock added to each side of forming punch length.
+formingPunchQtyCboresLong,50.80,quantity of counter bores if punch length > threshold.
+formingPunchQtyCboresShort,4.00,quantity of counter bores if punch length < threshold.
+formingPunchQtyDowels,2.00,
+formingPunchQtyJackScrews,2.00,
+formingPunchWidthAdder,25.40,amount of stock added to each side of forming punch width.
+gasSpringFlangedDiameter,50.80,
+gasSpringFlangedQtyCbores,4.00,quantity of counter bored holes in a stripper gas spring.
+gasSpringNonFlangedQtyCbores,2.00,
+guidePinAssy_large,76.20,Typical diameter for a large guide pin. UOM = mm.
+guidePinAssy_medium,63.50,Typical diameter for a medium guide pin. UOM = mm.
+guidePinAssy_small,50.80,Typical diameter for a small guide pin. UOM = mm.
+guidePinAssyQtyCbores,4.00,
+guidePinAssyQtyDowels,2.00,
+guidePinAssyQtyPerDieSet,4.00,
+holeDiameterM12,11.51,Diameter (mm) of an M12 standard threaded hole (1/2-20). Used for in-die tapping calculations.
+holeDiameterM2,1.78,Diameter (mm) of an M2 standard threaded hole (#2-56). Used for in-die tapping calculations.
+keeperBlockMinQty,4.00,
+keeperBlockQtyAdder,2.00,Add this many Keeper Blocks for incremental increases in stripper length.
+keeperBlockWidth,76.20,
+leadStockGuideCbores,2.00,
+leadStockGuideHeight,76.20,Lead stock guide is located in the stock feed area of a Prog Die.
+leadStockGuideLength,152.40,Lead stock guide is located in the stock feed area of a Prog Die.
+leadStockGuideQtyCbores,2.00,
+leadStockGuideQtyDowels,2.00,
+leadStockGuideQtyJackScrews,1.00,
+leadStockGuideQtyTapped,0.00,
+leadStockGuideWidth,44.45,Lead stock guide is located in the stock feed area of a Prog Die.
+lifterBarLengthThreshold,457.20,Length threshold at which more lifter pins are required.
+maxFormPunchHeight,101.60,
+maxPunchHeight,76.20,
+minGasSpringFlangedQty,6.00,minimum number of gas springs in a progressive die
+minParallelHeight,76.20,minimum required height for both top & bottom parallels.
+padBalanceBlock_dieLengthThreshold,"3,048.00",length threshold for dieLtoR value at which the number of pad balance blocks is toggled between padBalnaceBlockQtyLow and padBalanceBlockQtyHigh.
+padBalanceBlockDiameter,38.10,
+padBalanceBlockLengthAdder,25.40,
+padBalanceBlockQtyCbores,1.00,
+padBalanceBlockQtyDowels,0.00,
+padBalanceBlockQtyHigh,16.00,
+padBalanceBlockQtyJackScrews,0.00,
+padBalanceBlockQtyLow,12.00,
+padBalanceBlockQtyTapped,0.00,
+piercePunchBackingPlateCustomHeight,6.00,
+piercePunchBackingPlateCustomLengthAdder,25.40,
+piercePunchBackingPlateCustomQtyDowels,2.00,
+piercePunchBackingPlateCustomQtyJackScrews,0.00,
+piercePunchBackingPlateCustomQtyTapped,0.00,
+piercePunchBackingPlateCustomWidthAdder,25.40,
+piercePunchCustomHeight,101.60,
+piercePunchCustomLengthAdder,12.70,
+piercePunchCustomQtyCbores,2.00,
+piercePunchCustomQtyJackScrews,1.00,
+piercePunchCustomQtyTapped,0.00,
+piercePunchCustomWidthAdder,12.70,
+piercePunchLengthStandard,101.60,length of a standard pierce punch.
+piercePunchRetainerCustomHeight,38.10,
+piercePunchRetainerCustomLengthAdder,25.40,amount of stock added to each side of custom pierce punch retainer length.
+piercePunchRetainerCustomQtyCboresMin,2.00,
+piercePunchRetainerCustomQtyDowels,2.00,
+piercePunchRetainerCustomQtyJackScrews,2.00,
+piercePunchRetainerCustomQtyTapped,0.00,
+piercePunchRetainerCustomWidthAdder,25.40,amount of stock added to each side of custom pierce punch retainer width.
+piercePunchRetainerStandardQtyCbores,2.00,
+piercePunchRetainerStandardQtyDowels,1.00,
+pilotPinQtyPerCarrierStrip,1.00,
+pilotPinStandardDiameter,6.35,
+pitchStopQtyCbores,2.00,
+punchQtyCboresLong,6.00,
+punchQtyCboresShort,4.00,
+scoringPunchQtyCboresLong,6.00,
+scoringPunchQtyCboresShort,4.00,
+scoringPunchQtyDowels,2.00,
+scoringPunchQtyJackScrews,1.00,
+scoringPunchWidth,76.20,
+shedderPinAssyQtyPerPiercePunch,1.00,
+slugDeflectorHeight,38.10,
+slugDeflectorLength,50.80,
+slugDeflectorQtyCbores,2.00,
+slugDeflectorQtyDowels,0.00,
+slugDeflectorQtyJackScrews,0.00,
+slugDeflectorQtyTapped,0.00,
+slugDeflectorWidth,19.05,
+spoolQtyPerCamStripper,4.00,
+standardDieSteelHeight,50.80,
+stockLifterBarQtyCbores,2.00,
+stockLifterBarQtyDowels,0.00,
+stockLifterBarQtyJackScrews,0.00,
+stockLifterBarQtyTapped,0.00,
+stockLifterPinQtyPerBar,2.00,the number of lifter pins per stock lifter bar.
+stockLifterPinSlotLength,31.75,Length of the lifter pin slot in the lifter bar.
+stockLifterPinSlotWidth,15.88,Width of the lifter pin slot in the lifter bar.
+stopBlockDiameter,50.80,
+stopBlockPadHeight,25.40,
+stopBlockPadLength,76.20,
+stopBlockPadQtyCbores,2.00,
+stopBlockPadQtyDowels,0.00,
+stopBlockPadQtyJackScrews,0.00,
+stopBlockPadQtyTapped,0.00,
+stopBlockPadWidth,76.20,
+stopBlockQtyPerDieSet,4.00,
+stripperGuidePinAssyFactor,762.00,
+stripperGuidePinAssyQtyCbores,4.00,quantity of counter bored holes in a stripper guide pin assembly.
+stripperGuidePinAssyQtyIncrement,2.00,add this many stripperGuidePinAssy's for every stripperGuidePinAssyFactor of stripper_length.
+stripperHeight,50.80,
+stripperLengthIncreaseAdder,381.00,keeper BlockQtyAdder.
+stripperMinLengthThreshold,762.00,Length threshold for stripper below which a min num of Keeper Blocks will be used.
+stripperPinAssyFormingPunch,2.00,the number of stripper pin assemblies per forming punch.
+stripperQtyLiftingHoles,4.00,
+stripperWidthAdder,12.70,
+strippingWindowHeight,25.40,
+strippingWindowLengthAdder,38.10,
+strippingWindowQtyCbores,4.00,
+strippingWindowQtyDowels,2.00,
+strippingWindowQtyJackScrews,2.00,
+strippingWindowQtyTapped,0.00,
+strippingWindowWidthAdder,38.10,
+tappingUnitQtyCbores,4.00,number of counterbored holes per in-die tapping unit that require threaded mounting holes in the die shoe.
+thrustKeyLengthAdder,25.40,
+thrustKeyQtyCbores,1.00,
+thrustKeyWidth,19.05,
+tipDieHeight,2.00,
+tipDieLength,3.00,
+tipDieWidth,3.00,
+tipPunchHeight,4.00,
+tipPunchLength,3.00,
+tipPunchQtyCbores,2.00,
+tipPunchQtyDowels,2.00,
+tipPunchQtyJackScrews,1.00,
+tipPunchWidth,3.00,
+trimDieHeelLength,76.20,
+trimDieHeelQtyCbores,4.00,
+trimDieHeelQtyTapped,2.00,
+trimDieHeelWearPlateThickness,19.05,
+trimDieHeelWearPlateWidth,50.80,
+trimDieHeelWidthFactor,25.40,
+trimPunchHeight,101.60,
+trimPunchQtyDowels,2.00,
+trimPunchQtyJackScrews,2.00,
+trimPunchQtyTapped,0.00,
+trimPunchWidth,101.60,
+typicalTrimLengthLarge,304.80,Length of a typical large trim punch (12 inches).
+typicalTrimLengthSmall,203.20,Length of a typical small trim punch (8 inches).

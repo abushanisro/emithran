@@ -1,0 +1,7 @@
+name,file_path,colorant_type,unit_cost_usd_per_kg,default_colorant
+cmColorantMaterials,lookupTables/Component/cmColorantMaterials.csv,Carbon Black Pigment,5.22,False
+cmColorantMaterials,lookupTables/Component/cmColorantMaterials.csv,Chrome Color Pigment,4.01,False
+cmColorantMaterials,lookupTables/Component/cmColorantMaterials.csv,Inorganic Pigment,4.33,False
+cmColorantMaterials,lookupTables/Component/cmColorantMaterials.csv,None,0.0,True
+cmColorantMaterials,lookupTables/Component/cmColorantMaterials.csv,Organic Pigment,6.07,False
+cmColorantMaterials,lookupTables/Component/cmColorantMaterials.csv,Titanium Dioxide Pigment,4.49,False

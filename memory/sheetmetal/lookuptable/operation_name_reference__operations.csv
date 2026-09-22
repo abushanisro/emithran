@@ -1,0 +1,48 @@
+source,table,operation_name_reference,operation_name
+the reference source - USA reference export,tblDTCOperationNameReference,3D Laser Cutting,3D Laser:3D Laser Cutting//ComplexHole
+the reference source - USA reference export,tblDTCOperationNameReference,3D Laser Cutting,3D Laser:3D Laser Cutting//SimpleHole
+the reference source - USA reference export,tblDTCOperationNameReference,Bend Brake,Bend Brake:Bending/Form
+the reference source - USA reference export,tblDTCOperationNameReference,Bend Brake,Bend Brake:Bending//MultiBend
+the reference source - USA reference export,tblDTCOperationNameReference,Bend Brake,Bend Brake:Bending//StraightBend
+the reference source - USA reference export,tblDTCOperationNameReference,Combi Perforating,Laser Punch:Perforating:Perforating//ComplexHole
+the reference source - USA reference export,tblDTCOperationNameReference,Combi Perforating,Laser Punch:Perforating:Perforating//SimpleHole
+the reference source - USA reference export,tblDTCOperationNameReference,Combi Perforating,Plasma Punch:Perforating:Perforating//ComplexHole
+the reference source - USA reference export,tblDTCOperationNameReference,Combi Perforating,Plasma Punch:Perforating:Perforating//SimpleHole
+the reference source - USA reference export,tblDTCOperationNameReference,Combi Punch,Laser Punch:Nibbling:Nibbling//ComplexHole
+the reference source - USA reference export,tblDTCOperationNameReference,Combi Punch,Laser Punch:Nibbling:Nibbling//SimpleHole
+the reference source - USA reference export,tblDTCOperationNameReference,Combi Punch,Laser Punch:Punching:Punching//ComplexHole
+the reference source - USA reference export,tblDTCOperationNameReference,Combi Punch,Laser Punch:Punching:Punching//SimpleHole
+the reference source - USA reference export,tblDTCOperationNameReference,Combi Punch,Plasma Punch:Nibbling:Nibbling//ComplexHole
+the reference source - USA reference export,tblDTCOperationNameReference,Combi Punch,Plasma Punch:Nibbling:Nibbling//SimpleHole
+the reference source - USA reference export,tblDTCOperationNameReference,Combi Punch,Plasma Punch:Punching:Punching//ComplexHole
+the reference source - USA reference export,tblDTCOperationNameReference,Combi Punch,Plasma Punch:Punching:Punching//SimpleHole
+the reference source - USA reference export,tblDTCOperationNameReference,Generic Press Piercing,Generic Press:Piercing//ComplexHole
+the reference source - USA reference export,tblDTCOperationNameReference,Generic Press Piercing,Generic Press:Piercing//SimpleHole
+the reference source - USA reference export,tblDTCOperationNameReference,Laser Cutting,Fiber Laser Cut:Fiber Laser Cutting//ComplexHole
+the reference source - USA reference export,tblDTCOperationNameReference,Laser Cutting,Fiber Laser Cut:Fiber Laser Cutting//SimpleHole
+the reference source - USA reference export,tblDTCOperationNameReference,Laser Cutting,Laser Cut:Laser Cutting//ComplexHole
+the reference source - USA reference export,tblDTCOperationNameReference,Laser Cutting,Laser Cut:Laser Cutting//SimpleHole
+the reference source - USA reference export,tblDTCOperationNameReference,Laser Cutting,Laser Punch:Laser Cut:Laser Cutting//ComplexHole
+the reference source - USA reference export,tblDTCOperationNameReference,Laser Cutting,Laser Punch:Laser Cut:Laser Cutting//SimpleHole
+the reference source - USA reference export,tblDTCOperationNameReference,Oxyfuel Cutting,OxyFuel Cut:OxyFuel Cutting//ComplexHole
+the reference source - USA reference export,tblDTCOperationNameReference,Oxyfuel Cutting,OxyFuel Cut:OxyFuel Cutting//SimpleHole
+the reference source - USA reference export,tblDTCOperationNameReference,Plasma Cutting,Plasma Cut:Plasma Cutting//ComplexHole
+the reference source - USA reference export,tblDTCOperationNameReference,Plasma Cutting,Plasma Cut:Plasma Cutting//SimpleHole
+the reference source - USA reference export,tblDTCOperationNameReference,Plasma Cutting,Plasma Punch:Plasma Cut:Plasma Cutting//ComplexHole
+the reference source - USA reference export,tblDTCOperationNameReference,Plasma Cutting,Plasma Punch:Plasma Cut:Plasma Cutting//SimpleHole
+the reference source - USA reference export,tblDTCOperationNameReference,Progressive Die Piercing,Progressive Die:Die Station:Cam Action Piercing//ComplexHole
+the reference source - USA reference export,tblDTCOperationNameReference,Progressive Die Piercing,Progressive Die:Die Station:Cam Action Piercing//SimpleHole
+the reference source - USA reference export,tblDTCOperationNameReference,Progressive Die Piercing,Progressive Die:Die Station:Piercing//ComplexHole
+the reference source - USA reference export,tblDTCOperationNameReference,Progressive Die Piercing,Progressive Die:Die Station:Piercing//SimpleHole
+the reference source - USA reference export,tblDTCOperationNameReference,Router,2 Axis Router:Router Cutting//ComplexHole
+the reference source - USA reference export,tblDTCOperationNameReference,Router,2 Axis Router:Router Cutting//SimpleHole
+the reference source - USA reference export,tblDTCOperationNameReference,Standard Press Piercing,Std Press:Std Press//ComplexHole
+the reference source - USA reference export,tblDTCOperationNameReference,Standard Press Piercing,Std Press:Std Press//SimpleHole
+the reference source - USA reference export,tblDTCOperationNameReference,Tandem Press Piercing,Tandem Press:Piercing//ComplexHole
+the reference source - USA reference export,tblDTCOperationNameReference,Tandem Press Piercing,Tandem Press:Piercing//SimpleHole
+the reference source - USA reference export,tblDTCOperationNameReference,Turret Perforating,Turret Press:Perforating:Perforating//ComplexHole
+the reference source - USA reference export,tblDTCOperationNameReference,Turret Perforating,Turret Press:Perforating:Perforating//SimpleHole
+the reference source - USA reference export,tblDTCOperationNameReference,Turret Punch,Turret Press:Punching:Punching//ComplexHole
+the reference source - USA reference export,tblDTCOperationNameReference,Turret Punch,Turret Press:Punching:Punching//SimpleHole
+the reference source - USA reference export,tblDTCOperationNameReference,Waterjet Cutting,Waterjet Cut:Waterjet Cutting//ComplexHole
+the reference source - USA reference export,tblDTCOperationNameReference,Waterjet Cutting,Waterjet Cut:Waterjet Cutting//SimpleHole

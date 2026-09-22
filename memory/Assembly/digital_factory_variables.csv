@@ -1,0 +1,71 @@
+﻿Variable Name,String Value,Unit Type Name,Notes
+EBWDepthFactor,0.25,,Factor used to calculate welding speed from weld penetration and machine power
+EBWMaximumWeldDepth,100,Length,Maximum weld depth feasible for Electron Beam Welding
+EBWMinPartSpacing,50,Length,Minimum part spacing when multiple parts are loaded in the chamber
+EBWPowerFactor,5,,Factor used to calculate welding speed from weld penetration and machine power
+EBWSpeedFactor,1.5,,Factor used to calculate welding speed from weld penetration and machine power
+LWEfficiencyFactor,20,,Efficiency Factor used to calculate the welding speed from the power of the laser and depth of the weld
+LWMaximumWeldDepth,20,Length,Maximum weld depth achievable with Laser Welding
+LWMinPartSpacing,50,Length,Minimum part spacing when multiple parts are loaded on a pallet
+additionalClampAreaFraction,0.1,,If the area of a Contact Region gcd in relation to the possible area (length x width) is less than this value additional clamps are used.
+arcEfficiency,0.86,,Estimate of the percentage of welding wire that actually ends up in the weld. Adjusts weld deposition rate to account for loss due to spatter and evaporation. Used to calculate arcing time and tack time.
+clampForTackAndWeld,false,,"If true, there will be two clamping operations assigned to contact groups with an associated weld. One for tacking and one for welding."
+cycleTimeAdjustmentFactor,1,,Factor used to globally increase or decrease cycle time evaluations per process.
+defaultFixturePartNumberClampOperations,0,,Number of clamp operations applied to fixture part. Used to determine default behavior of fixturePartNumberClampOperations PSO.
+defaultFixtureVolumeFactor,1.1,,Factor applied to component geometry to derive fixture volume. Used to determine default value of fixtureVolume PSO.
+defaultHornMaterial,Aluminum 7075,,Material of ultrasonic horn. Used to determine default value of hornMaterial PSO.
+defaultHornTravelTime,3,Time,The total displacement time of the horn to initiate contact of the subcomponent and retract to starting position. Used to determine default value of hornTravelTime PSO.
+defaultMIGWeldingMaterialType,Steel,,Default material type of the assembly for MIG Welding. Material type must be defined as one of the material types from the list of materials specified in tblWeldTravelSpeed.
+defaultMachineTableConfiguration,Rotary,,"Default ultrasonic machine table configuration, Rotary or Bench. Used to populate default value of machineTableConfiguration PSO."
+defaultMigWeldingGasType,Argon,,Default type of shielding gas used for the MIG Welding processes. Gas type must be defined as one of the gases from the list of gas types specified in tblWeldTravelSpeed.
+defaultNumberWeldingReorientations,0,,Number of default reorientations required for Welding processes.
+defaultPercentBonded,100,,Default percent of a Contact Region surface area to be bonded.
+defaultResinThickness,0.002,m,Default thickness of resin on the bonded parts
+defaultStakeCrossSectionArea,100,Area,Standard cross sectional area of predeformed ultrasonic stake. Used to determine default value of stakeCrossSectionArea PSO.
+defaultTIGWeldingMaterialType,Steel,,Default material type of the assembly for TIG Welding. Material type must be defined as one of the material types from the list of materials specified in tblTigWelding.
+defaultTigWeldingGasType,Argon,,Default type of shielding gas used for the TIG Welding processes. Gas type must be defined as one of the gases from the list of gas types specified in tblTigWelding.
+defaultUltrasonicInsertionTime,1.5,Time,Time taken to create an ultrasonic insertion. Used to determine default value of hornUltrasonicTime PSO.
+defaultUltrasonicStakeTime,2,Time,Time taken to create an ultrasonic stake joint. Used to determine default value of hornUltrasonicTime PSO.
+defaultUltrasonicWeldTime,2,Time,Time taken to create standard ultrasonic weld joint. Used to determine default value of hornUltrasonicTime PSO.
+defaultWeldingAssemblyPosition,Flat,,Default position the assembly is placed before Welding. Position must be defined as one of the positions from the list of position types specified in tblTigWelding.
+degreaseApplicationRate,0.03,m^2/ min,Rate at which degrease solution is applied to the applicable area
+disableInvestmentAmortization,false,,"User override to disable amortization of all fixed costs to the individual part or assembly. By default, fixed costs are calculated per part for tooling, fixtures, and programming."
+displaySumNumOperators,false,,"When true, the Number of Operators display field on the Assembly Details tab will display a summation of the number of operators for all Pick and Place operations. When false, the maximum number of operators will be displayed. This has no effect on the cost."
+enableTackingWithRoboticWelding,true,,"Enable a tacking operation for Robotic Welding. True by default, so MIG and TIG Robotic Welding will apply a tacking operation prior to Welding."
+failWeldsWithZeroCrossSectionArea,true,,"User override to control the consideration of zero GCD values for welding. False by default, zero GCD values are ignored and welding successfully but with some costs neglected. If set to true, it checks to see if the cross section area is less than are equal to zero and fails to cost welding."
+gearQualityDefaultAgmaNewStd,A8,,"A2, A3, A4, ... A11, A12"
+gearQualityDefaultAgmaOldStd,Q8,,"Q15, Q14, Q13, ... Q6, Q5"
+gearQualityDefaultDinStd,9,,"2, 3, 4, ... 11, 12"
+gunCleanPerArcTime,0.3,,Time required for regular cleaning of weld spatter from the torch nozzle expressed as cleaning time to arc time ratio. May be found in the machine table field values and is used to calculate the gun clean time.
+gunPlacementTime,2,,Time to move the welding gun into position on a single weld. May be found in the machine table field values and is used to calculate the gun manipulation time.
+handlingMultiplier,1.15,,Default factor to account for standard handling difficulties while loading a part.
+hornOverhangInsertionFactor,3,,Factor applied to ultrasonic insert area to derive horn area for insertion.
+hornOverhangStakingFactor,2.5,,Factor applied to ultrasonic stake area to derive horn area for staking.
+hornOverhangWeldFactor,1.05,,Factor applied to subcomponent geometry to derive horn area for ultrasonic welding.
+hornWavelength,0.5,,Wavelength of ultrasonic horn at resonant frequency.
+insertionMultiplier,1.2,,
+isAutomatedReorientationDefault,false,,"Toggles whether or not the reorientation of an assembly during a non-robotic processes is automated. Automated accounts for a specific machine or system that reorients the assembly in a set amount of time (plant variable defaultAutomatedReorientationTime). When false, the lookup table componentLoadTime is utilized to determin... [truncated in screenshot]"
+laborRateAdjustmentFactor,1,,Factor used to globally increase or decrease labor rate per process.
+maxRivetDiameter,8,Length,Maximum diameter of a rivet
+maxUltrasonicAllowableLength,300,Length,Maximum ultrasonic butt joint length that can be achieved in one operation.
+minRivetDiameter,2,Length,Minimum diameter of a rivet
+nozzleFlowRate,0.01,kg/s,The amount of sealant dispensed per second
+overheadRateAdjustmentFactor,1,,Factor used to globally increase or decrease overhead rate per process.
+preferVirtualMachines,true,,"(true/false) : Controls machine selection - if true the model will first try to select a virtual machine, if present and feasible based on size constraints."
+reorientTime,9,Time,Time required to turn over / reorient the part based on user specifications. A user may override the reorient time within Process Setup Options.
+resinDensity,1100,kg/m^3,Density of resin
+resinMaterialFactor,1.1,,Factor for the loss of material during the application process
+sealantDensity,1570,kg/m^3,Density of sealant
+sealantFactor,0.1,,Percentage of the accumulated perimeter of all parts in the assembly.
+tigWeldArgonMixGasCostMultiplier,0.66,,Multiplier used to adjust the Gas Cost for TIG welding if an Argon CO2 mix is utilized.
+tigWeldHorizontalSpeedMultiplier,0.85,,Multiplier used to adjust the Travel Speed for TIG welding if the position of the assembly is horizontal.
+tigWeldHydrogenGasCostMultiplier,1.5,,Multiplier used to adjust the Gas Cost for TIG welding if Hydrogen is utilized.
+tigWeldOverheadSpeedMultiplier,0.7225,,Multiplier used to adjust the Travel Speed for TIG welding if the position of the assembly is overhead.
+ultrasonicStakePitch,75,Length,The distance between each ultrasonic stake joint. Used to determine default value of numberOfStakes PSO.
+weldAntiSpatterSprayEnabled,true,,"User override to enable/disable the use of anti-spatter spray for Welding. True by default, so MIG and TIG welding will incur an additional cost to expendable tooling costs."
+weldLinearFeedRate,true,,"User override to enable/disable linear feed rate calculation for weld time. True by default, so MIG and TIG welding uses linear cycle time calculation."
+weldNozzleCost,13.57,Currency,Estimated cost of a welding nozzle.
+weldNozzleReplacementRate,18,,Welding nozzles are replaced for every 18kg/40lbs of welding wire used.
+weldTipCost,0.32,Currency,Estimated cost of a welding tip.
+weldTipReplacementRate,9,,Welding tips are replaced for every 9kg/20lbs of welding wire used.
+weldingEfficiencyFactor,0.45,,"Factor to adjust Arc Time for welding to account for Fixturing, Clamping, Moving, Cooling, Extinguishing, Waiting, Inspection, and Straightening that occurs during the act of welding."

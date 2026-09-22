@@ -1,0 +1,2 @@
+table_name,description,row_count,value
+tblGearQuality,"Mapping between old AGMA gear quality numbers, new AGMA quality numbers, and equivalent DIN quality numbers, with process constraints per quality level.",11,"Comments column is truncated in the source UI for rows Q10 ('Shaping or ...'), Q6 ('Broaching ...'), Q7/Q8/Q9 ('Hobbing, s...'). Full text was not visible in the provided screenshot and has not been guessed or completed."

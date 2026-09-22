@@ -168,9 +168,9 @@ export class CreateBOMItemDto {
   @IsUUID()
   materialId?: string;
 
-  @ApiPropertyOptional({ example: 'sheet_metal', enum: ['sheet_metal', 'cnc_turned', 'cnc_milled'], description: 'Override the auto-detected manufacturing family. Null = auto-detect.' })
+  @ApiPropertyOptional({ example: 'sheet_metal', enum: ['sheet_metal', 'turned', 'milled'], description: 'Override the auto-detected manufacturing family. Null = auto-detect.' })
   @IsOptional()
-  @IsIn(['sheet_metal', 'cnc_turned', 'cnc_milled'])
+  @IsIn(['sheet_metal', 'turned', 'milled'])
   manufacturingFamilyOverride?: string | null;
 
   @ApiPropertyOptional({ example: 'drawing', description: 'Provenance of the material identification: cad | drawing | manual | estimate' })

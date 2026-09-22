@@ -1,0 +1,16 @@
+name,file_path,assembly_time_hr
+Air Poppet,lookupTables/Component/cmToolAssemblyTimes.csv,0.006
+Ejector Guide Pin And Bushing,lookupTables/Component/cmToolAssemblyTimes.csv,2.0
+Ejector Pin,lookupTables/Component/cmToolAssemblyTimes.csv,0.25
+Electrical Connections Or Switches,lookupTables/Component/cmToolAssemblyTimes.csv,1.5
+Guide Pin,lookupTables/Component/cmToolAssemblyTimes.csv,0.25
+Heater Lines,lookupTables/Component/cmToolAssemblyTimes.csv,0.25
+Hydraulic Cylinder,lookupTables/Component/cmToolAssemblyTimes.csv,10.0
+Leader Pins And Shoulder Bushings,lookupTables/Component/cmToolAssemblyTimes.csv,5.0
+Limit Switch,lookupTables/Component/cmToolAssemblyTimes.csv,1.0
+Return Pins And Shoulder Bushings,lookupTables/Component/cmToolAssemblyTimes.csv,1.0
+Rib Insert,lookupTables/Component/cmToolAssemblyTimes.csv,0.25
+Side Locks,lookupTables/Component/cmToolAssemblyTimes.csv,0.5
+Socket Head Screws Short,lookupTables/Component/cmToolAssemblyTimes.csv,0.01
+Support Pillar,lookupTables/Component/cmToolAssemblyTimes.csv,0.08
+Thermocouples,lookupTables/Component/cmToolAssemblyTimes.csv,0.02

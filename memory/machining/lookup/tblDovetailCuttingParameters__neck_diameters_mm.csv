@@ -1,0 +1,3 @@
+tool_type,tool_series,cut_type,units.neck_diameter,units.max_cutting_depth,units.depth_max,units.cutting_speed,units.feed_per_tooth,max_cutting_depth_mm,depth_max_mm,value
+Dovetail Mill,"Virtual Dovetail Mill, Uncoated",Finish Dovetail Milling,mm,mm,mm,m/min,mm,0.0,0.0,0.381
+Dovetail Mill,"Virtual Dovetail Mill, Uncoated",Finish Dovetail Milling,mm,mm,mm,m/min,mm,0.0,0.0,19.05

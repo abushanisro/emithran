@@ -21,6 +21,7 @@ const IndiaMap = dynamic(() => import('@/components/ui/india-map').then(mod => (
 });
 import { useCounterAnimation } from '@/hooks/use-counter-animation';
 import { EQUIPMENT_TYPES, getAllCategories } from '@/lib/constants/equipment-types';
+import { normalizeWebsiteUrl } from '@/lib/utils/website-url';
 
 export default function VendorsPage() {
   const router = useRouter();
@@ -864,7 +865,9 @@ export default function VendorsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {vendors.map(vendor => (
+                      {vendors.map(vendor => {
+                        const websiteUrl = normalizeWebsiteUrl(vendor.website);
+                        return (
                         <tr
                           key={vendor.id}
                           className="border-b hover:bg-primary/5 hover:border-l-2 hover:border-l-primary/40 cursor-pointer transition-colors"
@@ -872,9 +875,9 @@ export default function VendorsPage() {
                         >
                           <td className="py-3 px-4">
                             <div className="font-medium">{vendor.name}</div>
-                            {vendor.website && (
+                            {websiteUrl && (
                               <a
-                                href={vendor.website}
+                                href={websiteUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-xs text-blue-600 hover:underline flex items-center gap-1"
@@ -966,7 +969,8 @@ export default function VendorsPage() {
                             </Button>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

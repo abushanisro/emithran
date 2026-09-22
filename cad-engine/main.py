@@ -613,7 +613,16 @@ async def analyze_geometry_advanced(
 
             logger.info(f"Advanced analysis completed for {file.filename}")
 
-            # CNC feature recognition — runs only for non-sheet-metal families
+            # Machining feature recognition — runs only for non-sheet-metal
+            # families. STEP/3D CAD -> MachiningFeatureRecognizer ->
+            # MachiningFeatureTree (renamed 2026-09-19 from
+            # CNCFeatureRecognizer per the "Machining is the canonical
+            # domain, not CNC" architecture mandate). The response key
+            # "cnc_features" and the "cnc_turned"/"mill_turn"/"cnc_milled"
+            # family strings below are real, existing manufacturing/process
+            # classifications already read throughout the backend's
+            # DB-driven costing/taxonomy code -- deliberately left
+            # unchanged by this rename, not part of it.
             cnc_features_result = None
             try:
                 mfg_intel = (
@@ -622,11 +631,11 @@ async def analyze_geometry_advanced(
                 )
                 detected_family = mfg_intel.get("detected_family", "")
                 if detected_family in ("cnc_turned", "mill_turn", "cnc_milled"):
-                    from machining.cnc_feature_recognizer import CNCFeatureRecognizer  # type: ignore
-                    cnc_features_result = CNCFeatureRecognizer().recognize(shape, detected_family).to_dict()
+                    from machining.machining_feature_recognizer import MachiningFeatureRecognizer  # type: ignore
+                    cnc_features_result = MachiningFeatureRecognizer().recognize(shape, detected_family).to_dict()
                     # Embed face_map so the frontend can resolve face_ids → STL triangle ranges.
-                    # For sheet_metal this lives in feature_graph_v2.metadata.face_map; for CNC we
-                    # carry it here since the SheetMetalFeatureExtractor is never called.
+                    # For sheet_metal this lives in feature_graph_v2.metadata.face_map; for Machining
+                    # we carry it here since the SheetMetalFeatureExtractor is never called.
                     _holes = optimization_result.geometry_features.manufacturing_features.get('holes', {})
                     _face_map = _holes.get('face_map', [])
                     if _face_map:
@@ -637,14 +646,26 @@ async def analyze_geometry_advanced(
                         f"face_map_entries={len(_face_map)}"
                     )
                     try:
-                        from machining.cnc_feature_recognizer import build_feature_graph_v2_from_cnc, _part_bounding_box  # type: ignore
+                        from machining.machining_feature_recognizer import build_machining_feature_graph_v2, _part_bounding_box  # type: ignore
+                        from shared.stable_face_id import build_stable_face_id_map  # type: ignore
                         _bbox_raw = _part_bounding_box(shape)
                         _bcx = (_bbox_raw["xmin"] + _bbox_raw["xmax"]) / 2
                         _bcy = (_bbox_raw["ymin"] + _bbox_raw["ymax"]) / 2
                         _bcz = (_bbox_raw["zmin"] + _bbox_raw["zmax"]) / 2
                         _total_tris = sum(e.get("tri_count", 0) for e in _face_map)
-                        cnc_features_result["feature_graph_v2"] = build_feature_graph_v2_from_cnc(
-                            cnc_features_result, (_bcx, _bcy, _bcz), _face_map, _total_tris
+                        # Content-based face identity, stable across STEP
+                        # regeneration -- same module/pattern Sheet Metal
+                        # already proved (feature_extractor.py). Additive:
+                        # face_ids (raw OCC ordinals) stay the primary key
+                        # every existing consumer reads unchanged.
+                        try:
+                            _stable_face_ids = build_stable_face_id_map(shape)
+                        except Exception as _sfid_exc:
+                            logger.warning(f"[cnc_fgv2] stable_face_id build failed: {_sfid_exc}")
+                            _stable_face_ids = {}
+                        cnc_features_result["feature_graph_v2"] = build_machining_feature_graph_v2(
+                            cnc_features_result, (_bcx, _bcy, _bcz), _face_map, _total_tris,
+                            stable_face_ids=_stable_face_ids,
                         )
                         logger.info(
                             f"[cnc_fgv2] synthesised "

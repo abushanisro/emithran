@@ -1,0 +1,31 @@
+﻿Field,Value
+Digital Factory,aPriori USA
+Sector,World Average
+Name,Manual Cap Sealing
+Labor Rate (USD / hr),29.95
+Direct Overhead Rate (USD / hr),0.02
+Indirect Overhead Rate (USD / hr),13.83
+Overhead Multiplier,0.00
+Number of Operators,1.00
+Labor Time Standard,1.00
+Wage Grade Name,
+Work Center Labor Rate Factor,1.00
+Setup Time (hr),0.50
+Application Rate (s),2.00
+Is Preferred,true
+Is Virtual Machine,true
+Avg Utilization,0.00
+Good Part Yield,1.00
+Machine Price (USD),350.00
+Machine Length (mm),0.00
+Machine Width (mm),0.00
+Footprint Allowance Factor,1.00
+Machine Power (kW),0.00
+Installation Percent (%),0.00
+Machine Uptime (%),80.00
+Annual Maintenance Percent (%),5.00
+Machine Life (yr),10.00
+Salvage Value Percent (%),0.00
+Supplies Cost (USD / yr),0.00
+Machine Manufacturer Location,USA
+Data Source,aPriori Baseline

@@ -1,0 +1,97 @@
+name,sourceFilePath,digitalFactory,Rule Name,Threshold Name,Process Name,Material Type,Custom Field,Custom Value,Rule Type,Threshold Type,Critical,Major,Minor,Units,Notes
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ExternalUndercut,Void Trimming Die Lock,,,,,Boolean,Boolean,TRUE,,,,Flagged when trimming of Void creates die lock condition.
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,FlexibleUndercut,Flexible Undercut,,,,,Boolean,Boolean,,TRUE,,,Flagged when part has to flex to remove from tool due to inaccessible outside void.
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,HighBlindHoleLengthToDiameterRatio,Blind Hole LD Ratio,,,Hole Size,Large,>,Ratio,,4,3,,Flagged when ratio LD of a large blind hole exceeds recommended ratio.
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,HighBlindHoleLengthToDiameterRatio,Blind Hole LD Ratio,,,Hole Size,Small,>,Ratio,,3,2,,Flagged when ratio LD of a small blind hole exceeds recommended ratio.
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,HighFlowRatio,High Flow Ratio,,,,,Boolean,Boolean,TRUE,,,,Flagged when flow ratio is greater than selected material's flow length ratio.
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,HighHoleLengthToDiameterRatio,Hole LD Ratio,,,Hole Size,Large,>,Ratio,,8,6,,Flagged when ratio LD of a large hole exceeds recommended ratio.
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,HighHoleLengthToDiameterRatio,Hole LD Ratio,,,Hole Size,Small,>,Ratio,,6,4,,Flagged when ratio LD of a small hole exceeds recommended ratio.
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle,Compression Molding,,,,<,Angle,,0.01,1.5,degrees,Severity for compression molding
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle,Injection Molding,,,,<,Angle,0.01,0.5,1,degrees,Severity for injection molding process
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle,Injection Molding,ABS,,,<,Angle,0.01,0.5,1,degrees,Flagged when draft angle exceeds permitted draft angle
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle,Injection Molding,Acetal,,,<,Angle,0.01,0.5,1.5,degrees,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle,Injection Molding,Acrylic,,,<,Angle,0.01,1,2,degrees,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle,Injection Molding,Nylon,,,<,Angle,,0.01,1,degrees,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle,Injection Molding,Polycarbonate,,,<,Angle,0.01,1,2,degrees,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle,Injection Molding,Polypropylene,,,<,Angle,0.01,1,2,degrees,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle,Injection Molding,TPO,,,<,Angle,,0.01,1,degrees,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle,Injection Molding,TPU,,,<,Angle,,0.01,,degrees,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle,Reaction Injection Molding,,,,<,Angle,0.01,0.5,1,degrees,Severity for reaction injection molding process
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle,Structural Foam Molding,,,,<,Angle,0.01,0.5,1,degrees,Severity for structural foam molding process
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle,Structural Foam Molding,TPO,,,<,Angle,,0.01,1,degrees,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle,Structural Foam Molding,TPU,,,<,Angle,,0.01,,degrees,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle Textured,,,Texture Name,Mold-Tech-A-11000 10.2µm (402µin) depth,<,Angle,,0.01,1,degrees,Flagged when draft angle exceeds permitted draft angle for texture mold
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle Textured,,,Texture Name,Mold-Tech-A-11010 25.4µm (1000µin) depth,<,Angle,,0.01,1.5,degrees,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle Textured,,,Texture Name,Mold-Tech-A-11020 38.1µm (1500µin) depth,<,Angle,,0.01,2.5,degrees,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle Textured,,,Texture Name,Mold-Tech-A-11030 50.8µm (2000µin) depth,<,Angle,,0.01,3,degrees,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle Textured,,,Texture Name,Mold-Tech-A-11040 76.2µm (3000µin) depth,<,Angle,,0.01,4.5,degrees,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle Textured,,,Texture Name,Mold-Tech-A-11050 114.3µm (4500µin) depth,<,Angle,,0.01,6.5,degrees,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle Textured,,,Texture Name,Mold-Tech-B-11200 76.2µm (3000µin) depth,<,Angle,,0.01,4.5,degrees,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle Textured,,,Texture Name,Mold-Tech-B-11205 63.5µm (2500µin) depth,<,Angle,,0.01,4,degrees,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle Textured,,,Texture Name,Mold-Tech-B-11210 88.9µm (3500µin) depth,<,Angle,,0.01,5.5,degrees,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle Textured,,,Texture Name,Mold-Tech-B-11215 114.3µm (4500µin) depth,<,Angle,,0.01,6.5,degrees,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle Textured,,,Texture Name,Mold-Tech-B-11220 127µm (5000µin) depth,<,Angle,,0.01,7.5,degrees,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle Textured,,,Texture Name,Mold-Tech-B-11225 114.3µm (4500µin) depth,<,Angle,,0.01,6.5,degrees,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle Textured,,,Texture Name,Mold-Tech-C-11300 63.5µm (2500µin) depth,<,Angle,,0.01,3.5,degrees,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle Textured,,,Texture Name,Mold-Tech-C-11305 127µm (5000µin) depth,<,Angle,,0.01,7.5,degrees,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle Textured,,,Texture Name,Mold-Tech-C-11310 127µm (5000µin) depth,<,Angle,,0.01,7.5,degrees,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle Textured,,,Texture Name,Mold-Tech-C-11315 25.4µm (1000µin) depth,<,Angle,,0.01,1.5,degrees,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle Textured,,,Texture Name,Mold-Tech-C-11320 63.5µm (2500µin) depth,<,Angle,,0.01,4,degrees,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle Textured,,,Texture Name,Mold-Tech-C-11325 76.2µm (3000µin) depth,<,Angle,,0.01,4.5,degrees,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle Textured,,,Texture Name,Mold-Tech-D-11400 50.8µm (2000µin) depth,<,Angle,,0.01,3,degrees,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle Textured,,,Texture Name,Mold-Tech-D-11405 63.5µm (2500µin) depth,<,Angle,,0.01,4,degrees,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle Textured,,,Texture Name,Mold-Tech-D-11410 88.9µm (3500µin) depth,<,Angle,,0.01,5.5,degrees,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle Textured,,,Texture Name,Mold-Tech-D-11415 50.8µm (2000µin) depth,<,Angle,,0.01,3,degrees,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle Textured,,,Texture Name,Mold-Tech-D-11420 63.5µm (2500µin) depth,<,Angle,,0.01,4,degrees,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientDraftAngle,Draft Angle Textured,,,Texture Name,Mold-Tech-D-11425 88.9µm (3500µin) depth,<,Angle,,0.01,5.5,degrees,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InsufficientRegrindAvailable,Max Regrind In Process,,,,,Boolean,Boolean,,,TRUE,,Flagged when regrind % is greater than the calculated regrind % available.
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,InternalUndercut,Inaccessible Void,,,,,Boolean,Boolean,TRUE,,,,Flagged when trimming of Void is inaccessible from draw direction.
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,NonRegrindableMaterial,Incompatible Regrind Material,,,,,Boolean,Boolean,TRUE,,,,Flagged when regrind is specified for a material that cannot be reground.
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,SharpExternalEdge,Min External Radius,Compression Molding,,,,<,Length,,1.5,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,SharpExternalEdge,Min External Radius,Injection Molding,,,,<,Length,,0.381,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,SharpExternalEdge,Min External Radius,Reaction Injection Molding,,,,<,Length,,0.762,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,SharpExternalEdge,Min External Radius,Structural Foam Molding,,,,<,Length,,1.524,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,SharpInternalEdge,Min Internal Radius,Compression Molding,,,,<,Length,,2,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,SharpInternalEdge,Min Internal Radius,Injection Molding,,,,<,Length,,0.127,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,SharpInternalEdge,Min Internal Radius,Reaction Injection Molding,,,,<,Length,,1.5875,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,SharpInternalEdge,Min Internal Radius,Structural Foam Molding,,,,<,Length,,1.524,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThickSection,Max Wall Thickness,Compression Molding,,,,>,Length,,25,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThickSection,Max Wall Thickness,Injection Molding,ABS,,,>,Length,,3.556,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThickSection,Max Wall Thickness,Injection Molding,Acetal,,,>,Length,,3.048,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThickSection,Max Wall Thickness,Injection Molding,Acrylic,,,>,Length,,3.8,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThickSection,Max Wall Thickness,Injection Molding,Nylon,,,>,Length,,2.921,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThickSection,Max Wall Thickness,Injection Molding,PBT,,,>,Length,,3.175,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThickSection,Max Wall Thickness,Injection Molding,PET,,,>,Length,,3.175,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThickSection,Max Wall Thickness,Injection Molding,Polycarbonate,,,>,Length,,3.81,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThickSection,Max Wall Thickness,Injection Molding,Polypropylene,,,>,Length,,3.81,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThickSection,Max Wall Thickness,Injection Molding,Polystyrene,,,>,Length,,3.81,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThickSection,Max Wall Thickness,Injection Molding,PPS,,,>,Length,,4.572,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThickSection,Max Wall Thickness,Injection Molding,TPA,,,>,Length,,3.81,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThickSection,Max Wall Thickness,Injection Molding,TPE,,,>,Length,,3.81,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThickSection,Max Wall Thickness,Injection Molding,TPO,,,>,Length,,3.81,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThickSection,Max Wall Thickness,Injection Molding,TPS,,,>,Length,,3.81,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThickSection,Max Wall Thickness,Injection Molding,TPU,,,>,Length,,3.81,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThickSection,Max Wall Thickness,Injection Molding,TPV,,,>,Length,,3.81,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThickSection,Max Wall Thickness,Reaction Injection Molding,,,,>,Length,,50.8,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThickSection,Max Wall Thickness,Structural Foam Molding,,,,>,Length,,15,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThinSection,Min Wall Thickness,Compression Molding,,,,<,Length,,1.5,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThinSection,Min Wall Thickness,Injection Molding,ABS,,,<,Length,,1.143,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThinSection,Min Wall Thickness,Injection Molding,Acetal,,,<,Length,,0.762,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThinSection,Min Wall Thickness,Injection Molding,Acrylic,,,<,Length,,0.635,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThinSection,Min Wall Thickness,Injection Molding,Nylon,,,<,Length,,0.762,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThinSection,Min Wall Thickness,Injection Molding,PBT,,,<,Length,,0.762,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThinSection,Min Wall Thickness,Injection Molding,PET,,,<,Length,,0.762,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThinSection,Min Wall Thickness,Injection Molding,Polycarbonate,,,<,Length,,1.016,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThinSection,Min Wall Thickness,Injection Molding,Polypropylene,,,<,Length,,0.635,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThinSection,Min Wall Thickness,Injection Molding,Polystyrene,,,<,Length,,0.889,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThinSection,Min Wall Thickness,Injection Molding,PPS,,,<,Length,,0.508,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThinSection,Min Wall Thickness,Injection Molding,TPA,,,<,Length,,0.71,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThinSection,Min Wall Thickness,Injection Molding,TPE,,,<,Length,,0.71,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThinSection,Min Wall Thickness,Injection Molding,TPO,,,<,Length,,0.71,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThinSection,Min Wall Thickness,Injection Molding,TPS,,,<,Length,,0.71,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThinSection,Min Wall Thickness,Injection Molding,TPU,,,<,Length,,0.71,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThinSection,Min Wall Thickness,Injection Molding,TPV,,,<,Length,,0.71,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThinSection,Min Wall Thickness,Reaction Injection Molding,,,,<,Length,,1.524,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThinSection,Min Wall Thickness,Structural Foam Molding,,,,<,Length,,2.032,,mm,
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThinWallAroundHole,Hole Proximity,,,Proximity,Average Thickness,<,Factor,,1,2,,Flagged when hole proximity is less than the factor applied to the max of hole diameter or factor times average part thickness
+manufacturabilitySeverity,lookupTables/Component/manufacturabilitySeverity.csv,aPriori USA,ThinWallAroundHole,Hole Proximity,,,Proximity,Diameter,<,Factor,,1,,,Flagged when hole proximity is less than the factor applied to the max of hole diameter or factor times average part thickness

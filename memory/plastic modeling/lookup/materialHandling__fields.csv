@@ -1,0 +1,3 @@
+name,sourceFilePath,digitalFactory,value
+materialHandling,lookupTables/Component/materialHandling.csv,aPriori USA,Handling Time (s)
+materialHandling,lookupTables/Component/materialHandling.csv,aPriori USA,Weight (kg)

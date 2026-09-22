@@ -1,0 +1,3 @@
+﻿Clamp Type,Clamp Spacing (mm),Clamping Time (s),Use For Manual Processes,Use For Robotic Processes
+Automated,152.40,4.00,false,true
+Manual,152.40,10.00,true,false

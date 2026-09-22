@@ -1,0 +1,23 @@
+﻿Process Name,Wage Grade Name
+Adhesive Bonding,2 - Metal
+Cap Sealing,2 - Metal
+Electron Beam Welding,5 - Metal
+Fay Sealing,2 - Metal
+Fillet Sealing,2 - Metal
+Laser Welding,5 - Metal
+Lock Bolt,2 - Metal
+Manual MIG Welding,6 - Metal
+Manual Spot Welding,6 - Metal
+Manual TIG Welding,6 - Metal
+Mechanical Assembly,2 - Metal
+No Cost Feature,
+Pick and Place,2 - Metal
+Rivet,2 - Metal
+Robotic MIG Welding,5 - Metal
+Robotic Spot Welding,5 - Metal
+Robotic TIG Welding,5 - Metal
+Threaded Insert,2 - Metal
+Ultrasonic Welding,2 - Plastic
+User-Defined Process,
+Weld Clean Up,2 - Metal
+Weld Prep,2 - Metal

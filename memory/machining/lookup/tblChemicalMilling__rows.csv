@@ -1,0 +1,4 @@
+digital_factory,object_type,category_path,table_name,file_path,total_row_count,component_area_mm2,manual_clean_rate_mm2_s,peel_rate_mm2_s
+USA reference export,Lookup Table,Machining > Lookup Tables,tblChemicalMilling,lookupTables/Component/tblChemicalMilling.csv,3,1000000.0,50000.0,4166.0
+USA reference export,Lookup Table,Machining > Lookup Tables,tblChemicalMilling,lookupTables/Component/tblChemicalMilling.csv,3,5000000.0,35000.0,4166.0
+USA reference export,Lookup Table,Machining > Lookup Tables,tblChemicalMilling,lookupTables/Component/tblChemicalMilling.csv,3,50000000.0,20000.0,4166.0

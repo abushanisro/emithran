@@ -1,4 +1,4 @@
-import type { MaterialClass } from '../process/cost-cnc-engine';
+import type { MaterialClass } from '../process/cost-machining-engine';
 
 // Real Machining lookup tables (tblCounterboring/tblReaming/tblChamfering/
 // tblDeburring) key their real speed/feed/tool-life rows by a numeric

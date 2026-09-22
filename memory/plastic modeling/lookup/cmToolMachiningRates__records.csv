@@ -1,0 +1,19 @@
+name,file_path,rate,units
+Cavity Core Plate General Machining,lookupTables/Component/cmToolMachiningRates.csv,0.32,m2/hr
+Cavity Core Plate Roughing,lookupTables/Component/cmToolMachiningRates.csv,68306.0,mm3/min
+Chamfering General Machining,lookupTables/Component/cmToolMachiningRates.csv,12.7,m/hr
+Clamp Plate General Machining,lookupTables/Component/cmToolMachiningRates.csv,2.9,m2/hr
+Coarse Texture Finishing,lookupTables/Component/cmToolMachiningRates.csv,15500.0,S/m2
+Coordinate Measuring,lookupTables/Component/cmToolMachiningRates.csv,0.1,m2/hr
+EDM Electrode Burn,lookupTables/Component/cmToolMachiningRates.csv,68.28,mm3/min
+Ejector Box Plates General Machining,lookupTables/Component/cmToolMachiningRates.csv,2.9,m2/hr
+Ejector Box Rails General Machining,lookupTables/Component/cmToolMachiningRates.csv,2.9,m2/hr
+Guide Pin Hole Drilling,lookupTables/Component/cmToolMachiningRates.csv,25.4,mm/min
+Heater Line Drilling,lookupTables/Component/cmToolMachiningRates.csv,25.4,mm/min
+Insert Pocket Machining,lookupTables/Component/cmToolMachiningRates.csv,136612.0,mm3/min
+Parting Line Spotting Average,lookupTables/Component/cmToolMachiningRates.csv,0.03,m2/hr
+Parting Line Spotting Complex,lookupTables/Component/cmToolMachiningRates.csv,0.02,m2/hr
+Parting Line Spotting Simple,lookupTables/Component/cmToolMachiningRates.csv,0.04,m2/hr
+Rib CNC Machining,lookupTables/Component/cmToolMachiningRates.csv,17076.0,mm3/min
+Standard Hole Drilling,lookupTables/Component/cmToolMachiningRates.csv,57.15,mm/min
+Vent General Machining,lookupTables/Component/cmToolMachiningRates.csv,0.25,each

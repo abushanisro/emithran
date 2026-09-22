@@ -1,0 +1,16 @@
+table_name,tool_type,tool_series,units.diameter,units.groove_width,units.cutting_speed,units.feed,units.depth_max,units.tool_life,units.tool_life_cost,depth_max_mm,tool_life_min,radial_cut_depth_mm,cut_type,position,diameter_mm,max_groove_depth_mm,min_groove_width_mm,max_groove_width_mm,num_teeth,tool_life_cost_usd
+tblGrooveMilling,Groove Mill,Virtual Groove Mill,mm,mm,m/min,mm/rev,mm,min,USD,50.0,15,0.5,Groove Milling,1,40,10.0,2.0,8.0,4,40.0
+tblGrooveMilling,Groove Mill,Virtual Groove Mill,mm,mm,m/min,mm/rev,mm,min,USD,50.0,15,0.5,Groove Milling,2,50,12.5,2.0,8.0,4,40.0
+tblGrooveMilling,Groove Mill,Virtual Groove Mill,mm,mm,m/min,mm/rev,mm,min,USD,50.0,15,0.5,Groove Milling,3,60,15.0,2.0,8.0,5,45.0
+tblGrooveMilling,Groove Mill,Virtual Groove Mill,mm,mm,m/min,mm/rev,mm,min,USD,50.0,15,0.5,Groove Milling,4,70,17.5,2.0,8.0,5,45.0
+tblGrooveMilling,Groove Mill,Virtual Groove Mill,mm,mm,m/min,mm/rev,mm,min,USD,50.0,15,0.5,Groove Milling,5,80,20.0,1.5,4.0,7,75.0
+tblGrooveMilling,Groove Mill,Virtual Groove Mill,mm,mm,m/min,mm/rev,mm,min,USD,50.0,15,0.5,Groove Milling,6,80,20.0,4.0,12.0,4,50.0
+tblGrooveMilling,Groove Mill,Virtual Groove Mill,mm,mm,m/min,mm/rev,mm,min,USD,50.0,15,0.5,Groove Milling,7,100,25.0,1.5,4.0,9,85.0
+tblGrooveMilling,Groove Mill,Virtual Groove Mill,mm,mm,m/min,mm/rev,mm,min,USD,50.0,15,0.5,Groove Milling,8,100,25.0,4.0,12.0,5,55.0
+tblGrooveMilling,Groove Mill,Virtual Groove Mill,mm,mm,m/min,mm/rev,mm,min,USD,50.0,15,0.5,Groove Milling,9,100,25.0,12.0,14.0,5,75.0
+tblGrooveMilling,Groove Mill,Virtual Groove Mill,mm,mm,m/min,mm/rev,mm,min,USD,50.0,15,0.5,Groove Milling,10,125,31.25,4.0,12.0,6,60.0
+tblGrooveMilling,Groove Mill,Virtual Groove Mill,mm,mm,m/min,mm/rev,mm,min,USD,50.0,15,0.5,Groove Milling,11,125,31.25,12.0,16.0,6,75.0
+tblGrooveMilling,Groove Mill,Virtual Groove Mill,mm,mm,m/min,mm/rev,mm,min,USD,50.0,15,0.5,Groove Milling,12,160,40.0,4.0,12.0,8,65.0
+tblGrooveMilling,Groove Mill,Virtual Groove Mill,mm,mm,m/min,mm/rev,mm,min,USD,50.0,15,0.5,Groove Milling,13,160,40.0,12.0,25.0,7,85.0
+tblGrooveMilling,Groove Mill,Virtual Groove Mill,mm,mm,m/min,mm/rev,mm,min,USD,50.0,15,0.5,Groove Milling,14,200,50.0,4.0,12.0,9,70.0
+tblGrooveMilling,Groove Mill,Virtual Groove Mill,mm,mm,m/min,mm/rev,mm,min,USD,50.0,15,0.5,Groove Milling,15,200,50.0,12.0,25.0,8,100.0

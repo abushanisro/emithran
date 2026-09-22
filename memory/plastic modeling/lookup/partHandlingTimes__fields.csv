@@ -1,0 +1,4 @@
+name,sourceFilePath,digitalFactory,value
+partHandlingTimes,lookupTables/Component/partHandlingTimes.csv,aPriori USA,Part Handling Time (s)
+partHandlingTimes,lookupTables/Component/partHandlingTimes.csv,aPriori USA,Box Length (mm)
+partHandlingTimes,lookupTables/Component/partHandlingTimes.csv,aPriori USA,Box Width (mm)

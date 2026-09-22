@@ -1,0 +1,5 @@
+name,filePath,value
+tblMaterialHandlingBySize,lookupTables/Component/tblMaterialHandlingBySize.csv,length_mm
+tblMaterialHandlingBySize,lookupTables/Component/tblMaterialHandlingBySize.csv,width_mm
+tblMaterialHandlingBySize,lookupTables/Component/tblMaterialHandlingBySize.csv,thickness_mm
+tblMaterialHandlingBySize,lookupTables/Component/tblMaterialHandlingBySize.csv,handlingTime_s

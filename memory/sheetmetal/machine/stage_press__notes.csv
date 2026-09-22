@@ -1,0 +1,5 @@
+dataset,version,source,currency,value
+stage_press,1,eProni Digital Factory Manager screenshots supplied in conversation,USD,16 press records staged from the supplied screenshots.
+stage_press,1,eProni Digital Factory Manager screenshots supplied in conversation,USD,machine_hour_rate_usd_per_hr equals direct_overhead_rate_usd_per_hr + indirect_overhead_rate_usd_per_hr.
+stage_press,1,eProni Digital Factory Manager screenshots supplied in conversation,USD,Blank Wage Grade Name is represented as null.
+stage_press,1,eProni Digital Factory Manager screenshots supplied in conversation,USD,No values were invented for fields not visible in the screenshots.

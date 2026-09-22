@@ -1,0 +1,17 @@
+table_name,tool_type,tool_series,units.dressing_life,units.dressing_time,units.plunge_infeed,units.radial_depth_of_cut,units.spark_out_time,units.traverse_infeed,units.wheel_diameter,units.wheel_speed,units.wheel_width,units.work_speed,dressing_life_min,dressing_time_s,radial_depth_of_cut_mm,spark_out_time_s,wheel_diameter_mm,wheel_speed_m_min,wheel_width_mm,material_cut_code,cut_type,axial_feed,plunge_infeed_mm_rev,traverse_infeed_mm,work_speed_m_min
+tblGrinding,Grinding Wheel,Virtual Cylindrical Grinding Wheel,min,s,mm/rev,mm,s,mm,mm,m/min,mm,m/min,10,60,0.254,5.0,400,1552,60,1.1,Finishing,0.17,0.0051,0.0127,30
+tblGrinding,Grinding Wheel,Virtual Cylindrical Grinding Wheel,min,s,mm/rev,mm,s,mm,mm,m/min,mm,m/min,10,60,0.254,5.0,400,1552,60,1.2,Finishing,0.13,0.0051,0.0076,21
+tblGrinding,Grinding Wheel,Virtual Cylindrical Grinding Wheel,min,s,mm/rev,mm,s,mm,mm,m/min,mm,m/min,10,60,0.254,5.0,400,1552,60,2.2,Finishing,0.13,0.0006,0.0076,30
+tblGrinding,Grinding Wheel,Virtual Cylindrical Grinding Wheel,min,s,mm/rev,mm,s,mm,mm,m/min,mm,m/min,10,60,0.254,5.0,400,1552,60,3.11,Finishing,0.17,0.0006,0.0127,21
+tblGrinding,Grinding Wheel,Virtual Cylindrical Grinding Wheel,min,s,mm/rev,mm,s,mm,mm,m/min,mm,m/min,10,60,0.254,5.0,400,1552,60,30.11,Finishing,0.17,0.0051,0.0076,46
+tblGrinding,Grinding Wheel,Virtual Cylindrical Grinding Wheel,min,s,mm/rev,mm,s,mm,mm,m/min,mm,m/min,10,60,0.254,5.0,400,1552,60,30.12,Finishing,0.13,0.0051,0.0076,46
+tblGrinding,Grinding Wheel,Virtual Cylindrical Grinding Wheel,min,s,mm/rev,mm,s,mm,mm,m/min,mm,m/min,10,60,0.254,5.0,400,1552,60,30.21,Finishing,0.17,0.0051,0.0076,46
+tblGrinding,Grinding Wheel,Virtual Cylindrical Grinding Wheel,min,s,mm/rev,mm,s,mm,mm,m/min,mm,m/min,10,60,0.254,5.0,400,1552,60,30.22,Finishing,0.13,0.0051,0.0076,46
+tblGrinding,Grinding Wheel,Virtual Cylindrical Grinding Wheel,min,s,mm/rev,mm,s,mm,mm,m/min,mm,m/min,10,60,0.254,5.0,400,1552,60,33.1,Finishing,0.17,0.0051,0.0076,30
+tblGrinding,Grinding Wheel,Virtual Cylindrical Grinding Wheel,min,s,mm/rev,mm,s,mm,mm,m/min,mm,m/min,10,60,0.254,5.0,400,1552,60,33.2,Finishing,0.17,0.0051,0.0076,30
+tblGrinding,Grinding Wheel,Virtual Cylindrical Grinding Wheel,min,s,mm/rev,mm,s,mm,mm,m/min,mm,m/min,10,60,0.254,5.0,400,1552,60,33.3,Finishing,0.17,0.0051,0.0076,30
+tblGrinding,Grinding Wheel,Virtual Cylindrical Grinding Wheel,min,s,mm/rev,mm,s,mm,mm,m/min,mm,m/min,10,60,0.254,5.0,400,1552,60,5.21,Finishing,0.17,0.0006,0.0051,15
+tblGrinding,Grinding Wheel,Virtual Cylindrical Grinding Wheel,min,s,mm/rev,mm,s,mm,mm,m/min,mm,m/min,10,60,0.254,5.0,400,1552,60,6.1,Finishing,0.17,0.0013,0.0127,30
+tblGrinding,Grinding Wheel,Virtual Cylindrical Grinding Wheel,min,s,mm/rev,mm,s,mm,mm,m/min,mm,m/min,10,60,0.254,5.0,400,1552,60,6.3,Finishing,0.17,0.0006,0.0127,21
+tblGrinding,Grinding Wheel,Virtual Cylindrical Grinding Wheel,min,s,mm/rev,mm,s,mm,mm,m/min,mm,m/min,10,60,0.254,5.0,400,1552,60,7.2,Finishing,0.17,0.0051,0.0127,30
+tblGrinding,Grinding Wheel,Virtual Cylindrical Grinding Wheel,min,s,mm/rev,mm,s,mm,mm,m/min,mm,m/min,10,60,0.254,5.0,400,1552,60,8.1,Finishing,0.17,0.0013,0.0076,30

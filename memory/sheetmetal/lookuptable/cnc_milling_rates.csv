@@ -1,0 +1,11 @@
+name,filePath,digitalFactory,rowCount,areaMm2,profilingRateMm2PerHr,pocketingRateMm2PerHr
+cncMillingRates,lookupTables/Component/cncMillingRates.csv,USA reference export,10,64516.0,21505.0,21505.0
+cncMillingRates,lookupTables/Component/cncMillingRates.csv,USA reference export,10,161290.0,25602.0,25602.0
+cncMillingRates,lookupTables/Component/cncMillingRates.csv,USA reference export,10,322580.0,31625.0,31625.0
+cncMillingRates,lookupTables/Component/cncMillingRates.csv,USA reference export,10,645160.0,41356.0,41356.0
+cncMillingRates,lookupTables/Component/cncMillingRates.csv,USA reference export,10,967740.0,48876.0,48876.0
+cncMillingRates,lookupTables/Component/cncMillingRates.csv,USA reference export,10,1612900.0,53763.0,53763.0
+cncMillingRates,lookupTables/Component/cncMillingRates.csv,USA reference export,10,1935480.0,59737.0,59737.0
+cncMillingRates,lookupTables/Component/cncMillingRates.csv,USA reference export,10,2258060.0,67204.0,67204.0
+cncMillingRates,lookupTables/Component/cncMillingRates.csv,USA reference export,10,3225800.0,67204.0,67204.0
+cncMillingRates,lookupTables/Component/cncMillingRates.csv,USA reference export,10,3870960.0,70126.0,70126.0

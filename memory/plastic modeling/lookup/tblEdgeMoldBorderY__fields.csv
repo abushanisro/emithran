@@ -1,0 +1,3 @@
+name,sourceFilePath,digitalFactory,value
+tblEdgeMoldBorderY,lookupTables/Component/tblEdgeMoldBorderY.csv,aPriori USA,Edge Mold Border Y (mm)
+tblEdgeMoldBorderY,lookupTables/Component/tblEdgeMoldBorderY.csv,aPriori USA,Max Press Force (kN)

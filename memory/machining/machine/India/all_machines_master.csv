@@ -1,0 +1,413 @@
+﻿Machine,Labor_Rate_USD_per_hr,Overhead_Multiplier,Direct_Overhead_Rate_USD_per_hr,Indirect_Overhead_Rate_USD_per_hr
+Accurl Hydraulic Press HBP-40,1.49,0.00,2.44,1.10
+Accurl Hydraulic Press HSP-200,1.49,0.00,12.43,1.34
+Accurl Hydraulic Press HSP-250,1.49,0.00,15.85,1.38
+Accurl Hydraulic Press HSP-315,1.49,0.00,19.87,1.92
+Accurl Hydraulic Press HSP-400,1.49,0.00,24.86,1.71
+Accurl Hydraulic Press HSP-500,1.49,0.00,31.70,1.57
+Accurl Hydraulic Press HSP-630,1.49,0.00,38.01,2.12
+Accurl Hydraulic Press HSP-800,1.49,0.00,47.99,2.04
+Hydraulic Compression Molding Press - 10000kN | 2.0m x 1.8m,1.49,0.00,68.14,2.04
+Hydraulic Compression Molding Press - 20000kN | 3.0m x 2.0m,1.49,0.00,123.90,3.09
+Hydraulic Compression Molding Press - 3000kN | 1.25m x 1.0m,1.49,0.00,17.04,1.38
+Hydraulic Compression Molding Press - 30000kN | 3.4m x 2.4m,1.49,0.00,175.94,5.02
+Hydraulic Compression Molding Press - 40000kN | 4.0m x 3.0m,1.49,0.00,241.61,5.02
+Hydraulic Compression Molding Press - 5000kN | 1.8m x 1.2m,1.49,0.00,30.46,1.64
+Hydraulic Compression Molding Press - 50000kN | 5.0m x 3.0m,1.49,0.00,322.14,7.99
+Hydraulic Compression Molding Press - 8000kN | 2.4m x 1.7m,1.49,0.00,47.50,2.10
+Pengda Hydraulic Press YP78-1000,1.49,0.00,68.14,2.04
+Pengda Hydraulic Press YP78-1500,1.49,0.00,97.88,2.46
+Pengda Hydraulic Press YP78-2000,1.49,0.00,123.90,3.09
+Pengda Hydraulic Press YP78-2500,1.49,0.00,146.20,4.36
+Pengda Hydraulic Press YP78-3000,1.49,0.00,175.94,5.02
+Pengda Hydraulic Press YP78-4000,1.49,0.00,241.61,5.02
+Pengda Hydraulic Press YP78-500,1.49,0.00,47.50,1.68
+Arburg Allrounder 221 K,1.65,,4.11,1.07
+Arburg Allrounder 270 C 300 - 100,1.65,,3.86,1.18
+Arburg Allrounder 320 C 800 - 250,1.65,,6.57,1.18
+Arburg Allrounder 370 C 800 - 250,1.65,,7.51,1.43
+Arburg Allrounder 420 C 1300 - 350,1.65,,11.48,1.26
+Arburg Allrounder 520 C 2000 - 800,1.65,,16.82,1.48
+Engel DUO 130000 / 5500,1.65,,225.97,6.81
+Engel DUO 16050 / 2300,1.65,,151.29,4.47
+Engel DUO 2550 / 850,1.65,,39.65,2.13
+Engel DUO 25050 / 3200,1.65,,215.30,5.74
+Engel DUO 4550 / 900,1.65,0.00,59.90,2.58
+Engel DUO 7050 / 1500,1.65,0.00,96.64,3.36
+Engel DUO 75050 / 4000,1.65,0.00,269.75,7.49
+"Injection Molder 1,000kN Clamp Force",1.65,0.00,6.61,1.19
+"Injection Molder 2,000kN Clamp Force",1.65,0.00,16.10,1.60
+"Injection Molder 3,500kN Clamp Force",1.65,0.00,23.55,2.17
+"Injection Molder 5,000kN Clamp Force",1.65,0.00,36.76,2.90
+"Injection Molder 7,500kN Clamp Force",1.65,0.00,55.17,4.53
+"Injection Molder 10,000kN Clamp Force",1.65,0.00,92.34,6.36
+"Injection Molder 30,000kN Clamp Force",1.65,0.00,173.85,8.93
+"Injection Molder 50,000kN Clamp Force",1.65,0.00,306.15,11.05
+Kawaguchi KM50,1.65,0.00,4.40,1.06
+Kawaguchi KM80,1.65,0.00,6.63,1.09
+Kawaguchi KM100,1.65,0.00,8.23,1.16
+Kawaguchi KM140,1.65,0.00,10.77,1.24
+Kawaguchi KM180,1.65,0.00,13.96,1.30
+Kawaguchi KM220,1.65,0.00,16.21,1.36
+Kawaguchi KM280,1.65,0.00,20.14,1.51
+Kawaguchi KM360,1.65,0.00,25.50,1.60
+Kawaguchi KM450,1.65,0.00,31.56,1.68
+Kawaguchi KM550,1.65,0.00,38.61,1.77
+Kawaguchi KM650,1.65,0.00,46.77,1.90
+KraussMaffei 35 CX - 180,1.65,0.00,4.01,1.16
+KraussMaffei 50 AX - 100,1.65,0.00,4.28,1.26
+KraussMaffei 160 CX - 380,1.65,0.00,11.61,1.29
+KraussMaffei 200 AX - 1400,1.65,0.00,15.97,1.72
+KraussMaffei 240 EX - 1000,1.65,0.00,23.90,1.82
+KraussMaffei 300 AX - 2000,1.65,0.00,23.27,1.99
+KraussMaffei 350 CX - 2000,1.65,0.00,25.70,1.77
+KraussMaffei 650 CX - 8100,1.65,0.00,44.11,2.61
+KraussMaffei 1000 MX - 17200,1.65,0.00,84.68,3.40
+KraussMaffei 1600 MX - 12000,1.65,0.00,99.36,4.05
+KraussMaffei 3200 MX - 24500,1.65,0.00,165.22,6.01
+KraussMaffei 4000 MX - 75000,1.65,0.00,206.41,7.38
+Milacron 225,1.65,0.00,15.31,1.49
+Milacron 310 WP,1.65,0.00,22.17,1.73
+Milacron 450,1.65,0.00,30.44,1.77
+Milacron 550,1.65,0.00,39.50,2.03
+Milacron 580 WP,1.65,0.00,40.91,2.23
+Milacron 725,1.65,0.00,47.70,2.31
+Milacron 880 WP,1.65,0.00,59.84,2.35
+Milacron 1000,1.65,0.00,63.03,2.99
+Milacron 1100,1.65,0.00,65.96,2.99
+Milacron 1500,1.65,0.00,87.27,3.29
+Milacron 1760,1.65,0.00,99.21,3.96
+Milacron 2200,1.65,0.00,123.20,4.91
+Milacron 3000,1.65,0.00,164.03,5.56
+Milacron 3500,1.65,0.00,181.37,5.56
+Milacron 4000,1.65,0.00,207.77,6.10
+Milacron MAGNA T170,1.65,0.00,11.96,2.14
+Milacron MAGNA T225,1.65,0.00,15.91,2.88
+Milacron MAGNA T310,1.65,0.00,22.53,4.32
+Milacron MAGNA T310WP,1.65,0.00,21.12,3.65
+Milacron MAGNA T450,1.65,0.00,28.15,3.61
+Milacron Power line 220,1.65,0.00,15.00,3.60
+Milacron Power line 330,1.65,0.00,20.52,3.60
+Milacron Power line 440,1.65,0.00,32.34,3.60
+Milacron Power line 550,1.65,0.00,37.48,4.16
+Milacron Power line 750,1.65,0.00,52.00,5.01
+Milacron Power line 935,1.65,0.00,60.93,5.52
+Milacron Power line 1125,1.65,0.00,80.82,3.63
+Netstal Synergy 600,1.65,0.00,9.57,1.50
+Netstal Synergy 900,1.65,0.00,10.10,1.50
+Netstal Synergy 1000,1.65,0.00,11.69,1.80
+Netstal Synergy 1200,1.65,0.00,12.71,1.45
+Netstal Synergy 1500,1.65,0.00,19.80,1.74
+Netstal Synergy 2000,1.65,0.00,24.69,2.60
+Toyo TM-100H2,1.65,0.00,7.98,1.15
+Toyo TM-180H2,1.65,0.00,12.84,1.23
+Toyo TM-220H2,1.65,0.00,16.11,1.29
+Toyo TM-350H2,1.65,0.00,25.25,1.47
+Gusmer-Decker Reactor IP-40,1.65,,4.29,0.89
+"Reaction Injection Molder - 10,000kN Clamp Force",1.65,,4.29,0.89
+"Structural Foam Molder - 5,000kN Clamp Force",1.65,0.00,87.65,3.52
+"Structural Foam Molder - 7,500kN Clamp Force",1.65,0.00,110.92,4.52
+"Structural Foam Molder - 10,000kN Clamp Force",1.65,0.00,135.27,5.26
+"Structural Foam Molder - 25,000kN Clamp Force",1.65,0.00,156.37,6.41
+Milacron LP500M-423,1.65,0.00,85.30,3.82
+Milacron LP750MWP-646,1.65,0.00,112.50,5.07
+Milacron LP750MWP-2x630,1.65,0.00,169.52,6.39
+Milacron LP1000MWP-660,1.65,0.00,120.49,4.91
+Milacron LP1000MSWP-2x630,1.65,0.00,158.91,6.39
+Milacron LP1000MWP-2x630,1.65,0.00,182.47,6.39
+Milacron LP1500MHP-2x630,1.65,0.00,192.98,6.39
+Milacron LP2500MHMWP-2x646,1.65,0.00,190.50,7.27
+Uniloy 750M-646,1.65,0.00,101.35,3.54
+Uniloy 750MSWP-2x423,1.65,0.00,125.44,4.65
+Uniloy 750MSWP-2x646,1.65,0.00,113.74,6.40
+Uniloy 800MSWP-2x423,1.65,0.00,121.18,4.15
+Uniloy 800MWP-2x630,1.65,0.00,113.74,6.14
+Uniloy 1000MHP-660,1.65,0.00,116.79,5.39
+Uniloy 1000MSWP-2x423,1.65,0.00,134.12,4.15
+Uniloy 1000MWP-2x646,1.65,0.00,139.08,4.89
+DeMask Cell - 10m x 10m Footprint,1.65,0.00,0.25,3.77
+DeMask Cell - 12m x 10m Footprint,1.65,0.00,0.25,4.36
+Fortune 2225,1.73,,9.81,6.90
+Fortune 2235,1.73,,9.81,6.91
+Karmatorsk KJ1910,1.73,,27.62,7.56
+Nanjing SZT2120Q,1.73,,49.80,5.94
+Nanjing ZT2115Q,1.73,,27.95,8.92
+Nanjing ZT2118Q,1.73,,40.48,4.80
+Toyoda GE4 Cylindrical Grinder,1.65,,10.80,2.32
+Toyoda G Cylindrical Grinder,1.65,,9.49,2.15
+Grindor Junker,1.65,,11.91,2.32
+GLT Toyoda,1.65,,27.12,2.81
+Flex Grind Schaudt XXL,1.65,,28.26,2.49
+Flex Grind Schaudt M,1.65,,28.26,2.49
+Nachi NIUV-20-23,1.73,0.00,12.83,1.39
+Pioneer H1560,1.73,0.00,7.75,1.17
+Pioneer VT1040,1.73,0.00,6.04,1.10
+Cell-Mate,1.73,0.00,11.24,1.48
+Gleason Coniflex 104,1.73,,39.44,1.55
+Gleason Phoenix II 275HC,1.73,,42.37,1.56
+Gleason Phoenix II 800HC,1.73,,66.02,2.23
+Klingelnberg-Oerlikon C27,1.73,,43.04,1.51
+Klingelnberg-Oerlikon C29,1.73,,43.04,1.55
+Manual Bench Cell - 16m x 4m Footprint,1.73,0.00,0.37,2.73
+Manual Bench Cell - 2m x 2m Footprint,1.73,0.00,0.12,0.98
+Manual Bench Cell - 4m x 4m Footprint,1.73,0.00,0.12,1.33
+Manual Bench Cell - 8m x 4m Footprint,1.73,0.00,0.25,1.79
+Default Automated Deburr,1.65,,20.40,0.90
+"Thermwood Multipurpose 60, 5' x 10'",2.75,,10.07,1.29
+"Thermwood Multipurpose 60, 5' x 12'",2.75,,11.72,1.37
+"Thermwood Multipurpose 60, 5' x 5'",2.75,,8.67,1.07
+"Thermwood Multipurpose 90, 5' x 10'",2.75,,18.43,1.29
+"Thermwood Multipurpose 90, 5' x 5'",2.75,,13.87,1.07
+Virtual 5 Axis Router - Large,2.75,,17.50,1.28
+Virtual 5 Axis Router - Small,2.75,,8.43,1.06
+DMG MORI DMU 105 monoBLOCK,2.75,,20.51,2.63
+DMG MORI DMU 125 monoBLOCK,2.75,,27.47,3.56
+DMG MORI DMU 60 eVo Linear,2.75,,21.49,2.66
+DMG MORI DMU 65 monoBLOCK,2.75,,22.63,1.68
+DMG MORI DMU 85 monoBLOCK,2.75,,22.12,2.08
+DMU 160 P duoBlock,2.75,,51.41,5.46
+DMU 40 eVo Linear,2.75,,21.05,2.78
+DMU 600P,2.75,,62.77,13.67
+Fooke Endura 1005,2.75,,119.37,29.92
+Makino D300,2.75,,18.91,1.47
+Makino D500,2.75,,21.45,2.26
+Makino D800Z,2.75,,51.59,2.26
+Makino V33i-5XB,2.75,,15.15,1.36
+Mazak Variaxis 500-5X II,2.75,,17.40,1.57
+Mazak Variaxis 630-5X II,2.75,,19.83,1.14
+Mazak Variaxis 630-5X II T,2.75,,24.36,1.74
+Mazak Variaxis 730-5X II,2.75,,27.66,2.06
+Mazak Vortex 1400,2.75,,56.83,6.63
+Mazak Vortex 815/120,2.75,,53.68,4.50
+Mazak Vortex 815/80,2.75,,53.60,4.50
+Virtual 5 Axis Mill - Gantry,2.75,,53.39,7.41
+Virtual 5 Axis Mill - Large,2.75,,44.21,2.54
+Virtual 5 Axis Mill - Medium,2.75,,23.22,1.88
+Virtual 5 Axis Mill - Small,2.75,,17.47,1.52
+"Multicam 7000 Series CNC Router, Model 103",2.75,,5.39,1.21
+"Multicam 7000 Series CNC Router, Model 306",2.75,,7.88,1.76
+"Multicam APEX1R CNC Router, Model 103",2.75,,3.16,1.09
+"Multicam APEX1R CNC Router, Model 304",2.75,,4.87,1.25
+Virtual 3 Axis Router - Large,2.75,,7.42,1.78
+Virtual 3 Axis Router - Small,2.75,,3.25,1.08
+Giddings & Lewis H60F,2.75,,13.78,2.16
+Giddings & Lewis H70F,2.75,,16.13,2.16
+Haas VF10/50,2.75,,14.95,2.89
+Hermle B300,2.75,,10.14,2.74
+Makino FB127,2.75,,18.11,1.88
+Makino IQ300,2.75,,13.80,1.27
+Makino IQ500,2.75,,14.49,1.36
+Makino V22,2.75,,8.57,1.12
+Makino V33i,2.75,,12.53,1.36
+Makino V56i,2.75,,15.07,1.42
+Mazak FH 12800,2.75,,55.76,2.16
+Mazak FH 6000,2.75,,30.38,2.16
+Mazak FH 8800,2.75,,38.35,2.16
+Mazak PFH M 5800,2.75,,26.53,2.16
+Mikron HSM 400,2.75,,19.07,1.96
+Okuma MB-46VA,2.75,,8.43,1.35
+Okuma MB-56VA,2.75,,9.74,1.56
+Okuma MB-66VA,2.75,,10.83,1.74
+Sodick MC940L,2.75,,9.91,2.16
+Virtual 3 Axis Mill - Large,2.75,,23.06,3.43
+Virtual 3 Axis Mill - Medium,2.75,,11.22,1.65
+Virtual 3 Axis Mill - Small,2.75,,9.86,1.47
+Boehringer VDF 400,2.75,,32.81,2.48
+Daewoo Puma 600,2.75,,16.93,2.21
+Daewoo Puma 700,2.75,,21.83,2.69
+Daewoo Puma 800,2.75,,26.68,2.69
+Daewoo Puma MX 2000/2500S,2.75,,23.36,2.32
+Daewoo Puma MX 2000/2500T,2.75,,21.15,2.32
+Haas SL 20,2.75,,7.23,1.02
+Haas SL 40L,2.75,,15.66,2.25
+Hardinge Quest 6/42 SP,2.75,,12.94,1.15
+Hardinge Quest 8/51 SP,2.75,,14.74,1.15
+INDEX Speedline C100,2.75,,10.95,2.02
+Miyano BNC-20,2.75,,4.73,1.15
+Miyano BND-20SS,2.75,,4.58,1.15
+Miyano BND-34TS,2.75,,8.46,1.21
+Miyano BND-34TR,2.75,,6.65,1.21
+Okuma 2SP-V760EX (M),2.75,,20.75,1.74
+Okuma LB2000 EXII (M) Cx300,2.75,,11.15,1.16
+Okuma LB2000 EXII (M) Cx500,2.75,,11.46,1.21
+Okuma LB3000 EXII (M) T,2.75,,11.57,1.28
+Okuma V760EX (M),2.75,,15.07,1.30
+Virtual 3 Axis Lathe - Large,2.75,,27.79,2.14
+Virtual 3 Axis Lathe - Medium,2.75,,11.96,1.81
+Virtual 3 Axis Lathe - Small,2.75,,7.32,1.18
+Haas DS-30 with BAR3010SS Feeder,2.75,,11.84,2.76
+Haas DS-30SS with BAR3010SS Feeder,2.75,,12.08,2.76
+Haas DS-30SSY with BAR3010SS Feeder,2.75,,13.29,2.76
+Haas DS-30Y with BAR3010SS Feeder,2.75,,13.05,2.76
+Acra 2800 CET,2.75,,5.19,1.15
+Acra 4400 HLA,2.75,,10.59,1.15
+Acra MT-34,2.75,,2.87,1.27
+Amera-Seiki T-90,2.75,,15.65,1.63
+Atrump 940C,2.75,,3.62,1.11
+Binns & Berry Data 2000 - 1250,2.75,,23.83,1.15
+Binns & Berry Data 3000 - 1250,2.75,,26.26,1.15
+DMG Mori Wasino G-07,2.75,,5.82,1.07
+DMG Mori Wasino J-1,2.75,,5.63,1.08
+Daewoo Puma 300 LC,2.75,,10.28,1.55
+Danobat VTC-1600,2.75,,78.80,2.83
+Danobat VTC-8000H,2.75,,245.92,36.82
+INDEX SpeedLine ABC,2.75,,13.92,2.17
+Mazak 6G,2.75,,2.60,1.35
+Mazak 6T,2.75,,2.84,1.35
+Mazak HQR-150MSY,2.75,,18.93,1.43
+Mazak HQR-200MS,2.75,,23.00,1.66
+Okuma Genos L250II,2.75,,9.84,1.10
+Okuma Genos L400II,2.75,,11.33,1.23
+Okuma HL - 20,2.75,,6.59,1.12
+Okuma HL - 35,2.75,,7.77,1.21
+Virtual 2 Axis Lathe - Large,2.75,,25.35,2.14
+Virtual 2 Axis Lathe - Medium,2.75,,9.12,1.81
+Virtual 2 Axis Lathe - Small,2.75,,5.38,1.16
+Carlton 5 ft X 13 in,1.65,,1.84,1.27
+Cincinnati HD 8 X 20,1.65,,2.51,1.25
+Delta 15-331,1.65,,0.58,0.99
+Delta 15-344,1.65,,0.65,1.00
+Jet JDP- 20Vs,1.65,,0.49,0.95
+Knuth R100,1.65,,3.20,1.54
+Rigid,1.65,,0.62,1.27
+Sydexic SRD 350,1.65,,0.44,1.27
+Weiler Vo75,1.65,,1.47,1.31
+Etch Cell - 1.8m x 1.0m x 1.2m Tank Size,2.75,0.00,14.48,1.19
+Etch Cell - 12.2m x 2.1m x 3.0m Tank Size,2.75,0.00,174.81,5.41
+Etch Cell - 3.6m x 2.1m x 2.4m Tank Size,2.75,0.00,51.77,2.18
+Etch Cell - 7.2m x 4.2m x 4.8m Tank Size,2.75,0.00,196.74,6.14
+Honge XE 1200-CNC,1.65,,6.01,3.48
+Honge XE 10000,1.65,,12.52,4.53
+Honge XL 9999,1.65,,8.02,2.49
+Honge Xt 2500-CNC,1.65,,7.19,4.31
+TechniDrill HS 375 CR,1.65,,19.31,2.49
+TechniDrill TDS 100,1.65,,12.91,2.49
+TechniDrill TDS 200,1.65,,19.53,2.49
+TechniDrill TDS 50,1.65,,9.82,2.49
+Gleason Genesis 130H Vertical,1.73,,28.11,1.46
+Gleason Genesis 400GH Medium Cylindrical,1.73,,33.95,1.37
+Gleason P60 Horizontal,1.73,,26.37,1.79
+Gleason P800 Large Cylindrical,1.73,,49.89,4.36
+Danobat Overbeck IC/ID,1.65,,9.93,2.49
+Danobat Overbeck IG,1.65,,8.61,2.49
+FlexGrind M,1.65,,21.08,2.49
+FlexGrind S,1.65,,17.54,2.49
+Kellenberger KEL Universal,1.65,,22.33,1.88
+Kellenberger KEL VARIA,1.65,,17.10,1.67
+Matrix 6950,1.65,,17.90,1.93
+Studer CT350,1.65,,17.90,2.49
+Studer s120,1.65,,16.61,1.94
+Studer s145,1.65,,16.33,2.17
+Danobat RTU,1.73,0.00,13.88,1.27
+Delta LB 300,1.73,0.00,1.13,0.93
+Delta LP 500,1.73,0.00,1.59,0.95
+Huron 1730 x 930 x 550,1.73,0.00,5.10,1.27
+Huron 3200 x 1580 x 630,1.73,0.00,7.01,1.27
+Loeser FS 386,1.73,0.00,3.38,1.27
+Loeser FS 387,1.73,0.00,3.83,1.27
+Wolters TFG 150,1.73,0.00,13.93,1.16
+ABA Z&B MR,1.65,0.00,17.68,2.49
+ABA Z&B MRV,1.65,0.00,20.68,2.49
+Danobat DAN-VTG,1.65,0.00,33.76,2.49
+Danobat IEV,1.65,0.00,19.27,2.49
+Delta LC 500,1.65,0.00,16.37,2.49
+Delta LF 350,1.65,0.00,16.37,2.49
+SIP Hydroptic 6A,1.65,,7.44,1.09
+Virtual CNC Jig Bore,1.65,,19.51,1.09
+Virtual Manual Jig Bore,1.65,,7.44,1.09
+YASDA YBM1218V Jig Bore,1.65,,19.51,1.09
+Hauser S3-DR,1.65,,7.75,1.09
+Mitsui Seiki J4GDN CNC Jig Grinder,1.65,,14.24,1.09
+Virtual CNC Jig Grinder,1.65,,14.24,1.09
+Virtual Manual Jig Grinder,1.65,,7.75,1.09
+Default Manual Deburr,1.65,,0.21,0.88
+Curing Oven - 1.3m x 1.3m x 1.4m Useable Oven Size,1.65,0.00,1.38,1.04
+Curing Oven - 12.1m x 2.1m x 4.0m Useable Oven Size,1.65,0.00,29.89,2.17
+Curing Oven - 2.9m x 2.5m x 2.0m Useable Oven Size,1.65,0.00,4.84,1.33
+Curing Oven - 5.5m x 4.1m x 3.0m Useable Oven Size,1.65,0.00,19.98,1.88
+Curing Oven Overhead Conveyor - 5.9m x 3.3m x 2.8m Useable Oven Size,1.65,0.00,16.07,2.03
+Drying Room - 1.3m x 1.3m x 1.4m Useable Drying Room Size,1.65,0.00,0.17,1.04
+Drying Room - 12.1m x 2.1m x 4.0m Useable Drying Room Size,1.65,0.00,3.74,2.17
+Drying Room - 2.9m x 2.5m x 2.0m Useable Drying Room Size,1.65,0.00,0.61,1.33
+Drying Room - 5.5m x 4.1m x 3.0m Useable Drying Room Size,1.65,0.00,2.50,1.88
+Drying Room Overhead Conveyor - 5.9m x 3.3m x 2.8m Useable Drying Room Size,1.65,0.00,2.01,2.03
+GILDEMEISTER GMX 400 LINEAR,2.75,0.00,30.03,3.34
+INDEX RatioLine G200,2.75,0.00,27.42,1.65
+Mazak Integrex e-410H-S II,2.75,0.00,42.43,2.85
+Mazak Integrex e-500H-S II,2.75,0.00,53.21,3.81
+Mazak Integrex e-650H-S II,2.75,0.00,67.34,4.35
+Mazak Integrex e650,2.75,0.00,58.45,3.69
+Virtual MillTurn,2.75,0.00,40.51,1.66
+Gleason 300 TWG,1.73,,87.67,2.89
+Gleason Genesis 160TWG,1.73,,78.15,1.54
+Gleason P 2400 G,1.73,,87.55,7.16
+Gleason P 3200 G,1.73,,96.95,10.18
+Gleason P 6000 G,1.73,,120.44,7.16
+Gleason P 800 G,1.73,,78.15,5.82
+Gleason P 90 G,1.73,,67.52,2.09
+Gleason Titan 1200G,1.73,,97.20,3.83
+Reishauer RZ 1000,1.73,,92.30,1.78
+Reishauer RZ 550,1.73,,82.85,1.74
+Reishauer RZ 60,1.73,,72.21,1.74
+Laser Scribe - 0.35m x 0.35m x 0.35m Bed Size,2.75,0.00,10.48,1.08
+Laserdyne Systems 450,2.75,0.00,10.48,1.08
+Laserdyne Systems 795XL,2.75,0.00,22.67,1.39
+Laser Scribe - 1.5m x 1m x 1m Bed Size,2.75,0.00,21.46,1.34
+Laserdyne Systems 795XS,2.75,0.00,20.25,1.30
+Gantry Laser Scribe - 15m x 4m x 1.5m Bed Size,2.75,0.00,92.62,8.14
+Gantry Laser Scribe - 2.4m x 1.8m x 0.9m Bed Size,2.75,0.00,39.11,1.88
+Laserdyne Systems 890,2.75,0.00,39.11,1.88
+mTorres TorresLaser,2.75,0.00,92.62,8.14
+Gleason 800ES Shaper,1.65,0.00,57.84,6.82
+Gleason GP300S Shaper,1.65,0.00,55.10,3.54
+Mitsubishi SE15A,1.65,0.00,29.49,1.97
+Gleason Genesis 130 SV,1.73,0.00,34.07,1.43
+Gleason ZS300 Gear Shaver,1.73,0.00,37.41,1.57
+DMG Mori GMC2510M-6,2.75,,41.84,1.55
+Doosan Puma TT2500SY,2.75,,22.97,1.66
+HAAS DS-30Y,2.75,,11.99,2.07
+Index MS16C-6,2.75,,54.60,1.16
+Index MS22-8,2.75,,92.04,1.46
+Index MS32-6,2.75,,72.28,1.44
+Index MS40-8,2.75,,100.24,1.61
+Tsugami M88SY,2.75,,10.14,1.26
+"Virtual CNC Multi-Spindle, 6 Spindle, Large",2.75,,74.74,1.73
+"Virtual CNC Multi-Spindle, 6 Spindle, Small",2.75,,43.78,1.16
+"Virtual CNC Multi-Spindle, 8 Spindle, Large",2.75,,100.24,2.84
+"Virtual CNC Multi-Spindle, 8 Spindle, Small",2.75,,80.85,1.47
+"Virtual CNC Turning Center with Sub Spindle, Large",2.75,,25.39,2.04
+"Virtual CNC Turning Center with Sub Spindle, Medium",2.75,,15.28,1.47
+"Virtual CNC Turning Center with Sub Spindle, Small",2.75,,11.00,1.12
+Default,2.75,,0.86,0.88
+Yieh Chen YC-800,2.30,,10.22,1.85
+Default,2.30,,0.24,0.88
+Acra 2800 CET,1.73,,5.19,1.70
+Acra 4400 HLA,1.73,,10.59,1.70
+Acra MT-34,1.73,,2.87,1.27
+Amera-Seiki T-90,1.73,,15.65,1.63
+Atrump 940C,1.73,,3.62,1.11
+Binns & Berry Data 2000 - 1250,1.73,,23.83,1.15
+Binns & Berry Data 3000 - 1250,1.73,,26.26,1.15
+Boehringer VDF 400,1.73,,32.81,1.44
+Daewoo Puma 300 LC,1.73,,10.28,1.55
+Daewoo Puma 600,1.73,,16.93,2.21
+Daewoo Puma 700,1.73,,21.83,2.69
+Daewoo Puma 800,1.73,,26.68,2.69
+Daewoo Puma MX 2000/2500S,1.73,,23.36,2.32
+Daewoo Puma MX 2000/2500T,1.73,,21.15,2.32
+Haas SL 20,1.73,,7.23,1.02
+Haas SL 40L,1.73,,15.66,2.25
+Hardinge Quest 6/42 SP,1.73,,12.94,1.12
+Hardinge Quest 8/51 SP,1.73,,14.74,1.15
+Mazak 6G,1.73,,2.60,1.35
+Mazak 6T,1.73,,2.84,1.35
+Miyano BNC-20,1.73,,4.73,1.15
+Miyano BND-20SS,1.73,,4.58,1.15
+Miyano BND-34TS,1.73,,8.46,1.21
+Miyano BND-34TR,1.73,,6.65,1.21
+Fanuc 0id,2.75,,7.71,1.32
+Fanuc 1id,2.75,,8.23,1.84
+Makino DUO43,2.75,,7.48,2.49
+Mitsubishi BA24,2.75,,7.00,2.49
+Mitsubishi FA-50V,2.75,,7.16,2.49
+Mitsubishi MD+PRO II,2.75,,7.00,2.49

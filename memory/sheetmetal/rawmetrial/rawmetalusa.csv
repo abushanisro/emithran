@@ -1,0 +1,102 @@
+PrimaryID,OtherID,UnitCost_USD_kg,Density_kg_m3,CostUnits,BaseCostPerUnit_USD,ScrapPct,Hardness,HardnessSystem,TYS_MPa,UTS_MPa,ShearStrength_MPa,YoungsModulus_MPa,PoissonsRatio,K_MPa,n_exp,R_Lankford,MillingSpeed_m_min,DataSource
+"Aluminum, AA 1100","Generic Aluminum, AA 1100",5.961,2700,Cost per KG,5.961,9.0,60.0,Brinell,89.0,128.0,74.5,69000.0,0.33,191.4,0.21,0.7,0.0,eMithran Baseline
+"Aluminum, AA 2219","Generic Aluminum, AA 2219",6.499,3100,Cost per KG,6.499,9.0,60.0,Brinell,239.0,330.0,195.0,69000.0,0.33,341.1,0.22,0.71,0.0,eMithran Baseline
+"Aluminum, AA 3105","Generic Aluminum, AA 3105",5.864,2800,Cost per KG,5.864,9.0,60.0,Brinell,133.0,180.0,108.5,69000.0,0.33,191.4,0.21,0.7,0.0,eMithran Baseline
+"Aluminum, AA 383.0","Generic Aluminum, AA 383.0",5.748,2800,Cost per KG,5.748,9.0,60.0,Brinell,160.0,290.0,190.0,69000.0,0.33,341.1,0.22,0.71,0.0,eMithran Baseline
+"Aluminum, AA 7003","Generic Aluminum, AA 7003",5.726,2700,Cost per KG,5.726,9.0,60.0,Brinell,305.0,370.0,227.0,69000.0,0.32,341.1,0.21,0.71,0.0,eMithran Baseline
+"Aluminum, ANSI 1050A","Generic Aluminum, ANSI 1050A",5.955,2700,Cost per KG,5.955,9.0,60.0,Brinell,87.0,120.0,73.0,69000.0,0.33,187.0,0.21,0.7,0.0,eMithran Baseline
+"Aluminum, ANSI 2007","Generic Aluminum, ANSI 2007",6.169,2850,Cost per KG,6.169,9.0,60.0,Brinell,260.0,405.0,230.0,69000.0,0.33,341.1,0.21,0.71,0.0,eMithran Baseline
+"Aluminum, ANSI 2017","Generic Aluminum, ANSI 2017",6.217,2700,Cost per KG,6.217,9.0,60.0,Brinell,170.0,315.0,276.0,69000.0,0.33,341.1,0.22,0.71,0.0,eMithran Baseline
+"Aluminum, ANSI 2024","Generic Aluminum, ANSI 2024",6.235,2770,Cost per KG,6.235,9.0,60.0,Brinell,294.0,375.0,304.0,69000.0,0.33,341.1,0.22,0.71,0.0,eMithran Baseline
+"Aluminum, ANSI 2030","Generic Aluminum, ANSI 2030",6.168,2820,Cost per KG,6.168,9.0,60.0,Brinell,260.0,405.0,230.0,69000.0,0.33,341.1,0.21,0.71,0.0,eMithran Baseline
+"Aluminum, ANSI 3003","Generic Aluminum, ANSI 3003",5.842,2730,Cost per KG,5.842,9.0,60.0,Brinell,145.0,152.0,96.5,69000.0,0.33,191.4,0.21,0.7,0.0,eMithran Baseline
+"Aluminum, ANSI 3103","Generic Aluminum, ANSI 3103",5.835,2730,Cost per KG,5.835,9.0,60.0,Brinell,120.0,170.0,97.5,69000.0,0.33,191.4,0.22,0.71,0.0,eMithran Baseline
+"Aluminum, ANSI 5005","Generic Aluminum, ANSI 5005",6.063,2690,Cost per KG,6.063,9.0,60.0,Brinell,141.0,180.0,108.0,69000.0,0.33,191.4,0.21,0.7,0.0,eMithran Baseline
+"Aluminum, ANSI 5005A","Generic Aluminum, ANSI 5005A",5.904,2700,Cost per KG,5.904,9.0,60.0,Brinell,127.0,180.0,108.0,69000.0,0.33,191.4,0.22,0.71,0.0,eMithran Baseline
+"Aluminum, ANSI 5019","Generic Aluminum, ANSI 5019",5.663,2630,Cost per KG,5.663,9.0,60.0,Brinell,215.0,325.0,195.0,69000.0,0.33,191.4,0.21,0.7,0.0,eMithran Baseline
+"Aluminum, ANSI 5052","Generic Aluminum, ANSI 5052",5.846,2680,Cost per KG,5.846,9.0,60.0,Brinell,193.0,228.0,160.0,69000.0,0.33,341.1,0.21,0.71,0.0,eMithran Baseline
+"Aluminum, ANSI 5083","Generic Aluminum, ANSI 5083",5.755,2700,Cost per KG,5.755,9.0,60.0,Brinell,240.0,345.0,206.0,69000.0,0.33,341.1,0.22,0.71,0.0,eMithran Baseline
+"Aluminum, ANSI 5119","Generic Aluminum, ANSI 5119",5.747,2640,Cost per KG,5.747,9.0,60.0,Brinell,215.0,325.0,159.0,69000.0,0.33,341.1,0.21,0.71,0.0,eMithran Baseline
+"Aluminum, ANSI 5251","Generic Aluminum, ANSI 5251",5.844,2680,Cost per KG,5.844,9.0,60.0,Brinell,160.0,230.0,159.0,69000.0,0.33,138.0,0.21,0.71,0.0,eMithran Baseline
+"Aluminum, ANSI 5454","Generic Aluminum, ANSI 5454",5.816,2700,Cost per KG,5.816,9.0,60.0,Brinell,195.0,300.0,165.0,69000.0,0.33,230.0,0.21,0.71,0.0,eMithran Baseline
+"Aluminum, ANSI 5754","Generic Aluminum, ANSI 5754",5.979,2750,Cost per KG,5.979,9.0,60.0,Brinell,186.0,270.0,150.0,69000.0,0.33,227.0,0.21,0.71,0.0,eMithran Baseline
+"Aluminum, ANSI 6012","Generic Aluminum, ANSI 6012",5.818,2750,Cost per KG,5.818,9.0,60.0,Brinell,190.0,280.0,227.0,69000.0,0.33,341.1,0.21,0.71,0.0,eMithran Baseline
+"Aluminum, ANSI 6060","Generic Aluminum, ANSI 6060",5.91,2700,Cost per KG,5.91,9.0,60.0,Brinell,121.0,180.0,140.0,69000.0,0.33,341.1,0.22,0.71,0.0,eMithran Baseline
+"Aluminum, ANSI 6061","Generic Aluminum, ANSI 6061",5.875,2700,Cost per KG,5.875,9.0,60.0,Brinell,276.0,310.0,230.0,69000.0,0.33,341.1,0.22,0.71,0.0,eMithran Baseline
+"Aluminum, ANSI 6082","Generic Aluminum, ANSI 6082",5.819,2700,Cost per KG,5.819,9.0,60.0,Brinell,178.0,290.0,210.0,69000.0,0.33,341.1,0.22,0.71,0.0,eMithran Baseline
+"Aluminum, ANSI 7020","Generic Aluminum, ANSI 7020",5.785,2770,Cost per KG,5.785,9.0,60.0,Brinell,215.0,290.0,221.0,69000.0,0.33,341.1,0.22,0.71,0.0,eMithran Baseline
+"Aluminum, ANSI 7022","Generic Aluminum, ANSI 7022",5.789,2780,Cost per KG,5.789,9.0,60.0,Brinell,344.0,505.0,344.0,69000.0,0.33,341.1,0.22,0.71,0.0,eMithran Baseline
+"Aluminum, ANSI 7050","Generic Aluminum, ANSI 7050",6.054,2700,Cost per KG,6.054,9.0,60.0,Brinell,425.0,525.0,344.0,69000.0,0.33,341.1,0.22,0.71,0.0,eMithran Baseline
+"Aluminum, ANSI 7075","Generic Aluminum, ANSI 7075",5.831,2810,Cost per KG,5.831,9.0,60.0,Brinell,320.0,410.0,371.0,69000.0,0.33,341.1,0.22,0.71,0.0,eMithran Baseline
+"Brass, UNS C36000","Generic Brass, UNS C36000",9.603,8200,Cost per KG,9.603,31.0,200.0,Brinell,430.0,260.0,280.0,115000.0,0.29,317.0,0.54,0.99,0.0,eMithran Baseline
+C60,Generic C60,1.481,7570,Cost per KG,1.481,4.0,170.0,Brinell,480.0,675.0,543.0,207000.0,0.21,543.0,0.21,0.0,0.0,eMithran Baseline
+C60E,Generic C60E,1.651,7895,Cost per KG,1.651,4.0,170.0,Brinell,515.0,665.0,517.2,207000.0,0.21,543.0,0.21,0.0,0.0,eMithran Baseline
+"Copper, UNS C11000","Generic Copper, UNS C11000",11.313,8930,Cost per KG,11.313,100.0,100.0,Brinell,345.0,207.0,115000.0,115000.0,0.33,317.0,0.54,0.99,0.0,eMithran Baseline
+"Copper, UNS C18150","Generic Copper, UNS C18150",13.61,8930,Cost per KG,13.61,100.0,100.0,Brinell,345.0,415.0,289.0,115000.0,0.33,317.0,0.54,0.99,0.0,eMithran Baseline
+"Copper, UNS C27200","Generic Copper, UNS C27200",11.332,8930,Cost per KG,11.332,100.0,100.0,Brinell,345.0,420.0,289.0,115000.0,0.33,317.0,0.54,0.99,0.0,eMithran Baseline
+"Copper, UNS C28000","Generic Copper, UNS C28000",10.768,8930,Cost per KG,10.768,100.0,100.0,Brinell,240.0,606.0,289.0,115000.0,0.35,317.0,0.34,0.99,0.0,eMithran Baseline
+"Copper, UNS C51900","Generic Copper, UNS C51900",17.91,8930,Cost per KG,17.91,100.0,100.0,Brinell,586.0,606.0,289.0,115000.0,0.33,317.0,0.34,0.99,0.0,eMithran Baseline
+"Copper, UNS C62730","Generic Copper, UNS C62730",14.431,8930,Cost per KG,14.431,100.0,100.0,Brinell,270.0,640.0,289.0,115000.0,0.34,317.0,0.34,0.99,0.0,eMithran Baseline
+"Galv. Steel, Hot Worked, AISI 1010","Generic Galv. Steel, Hot Worked, AISI 1010",1.667,7850,Cost per KG,1.667,4.0,125.0,Brinell,165.0,324.0,194.4,207000.0,0.28,543.0,0.21,1.0,0.0,eMithran Baseline
+"Galv. Steel, Hot Worked, AISI 1012","Generic Galv. Steel, Hot Worked, AISI 1012",1.667,7850,Cost per KG,1.667,4.0,125.0,Brinell,165.0,204.0,204.0,207000.0,0.21,543.0,0.21,1.0,0.0,eMithran Baseline
+"Galv. Steel, Hot Worked, AISI 1020","Generic Galv. Steel, Hot Worked, AISI 1020",1.796,7850,Cost per KG,1.796,4.0,125.0,Brinell,165.0,360.0,216.0,207000.0,0.21,543.0,0.21,1.0,0.0,eMithran Baseline
+"Galv. Steel, Hot Worked, DX51D","Generic Galv. Steel, Hot Worked, DX51D",1.836,7800,Cost per KG,1.836,4.0,170.0,Brinell,528.0,565.0,528.0,207000.0,0.29,543.0,0.23,1.0,0.0,eMithran Baseline
+"Galv. Steel, Hot Worked, DX54","Generic Galv. Steel, Hot Worked, DX54",1.698,7800,Cost per KG,1.698,4.0,220.0,Brinell,580.0,690.0,470.0,207000.0,0.29,470.3,0.23,1.34,0.0,eMithran Baseline
+Hastelloy C-276,Generic Hastelloy C-276,28.193,8890,Cost per KG,28.193,12.0,275.0,Brinell,407.0,471.0,205.0,1149000.0,0.31,1149.0,0.14,1.0,0.0,eMithran Baseline
+Hastelloy X,Generic Hastelloy X,22.683,8220,Cost per KG,22.683,12.0,200.0,Brinell,407.0,517.2,207000.0,1149000.0,0.31,1149.0,0.14,1.0,0.0,eMithran Baseline
+Haynes alloy 230,Generic Haynes alloy 230,24.312,8970,Cost per KG,24.312,12.0,190.0,Brinell,460.0,862.0,517.2,1149000.0,0.32,1149.0,0.14,1.0,0.0,eMithran Baseline
+Inconel 625,Generic Inconel 625,21.243,8440,Cost per KG,21.243,9.0,195.0,Brinell,1017.0,1275.0,765.0,207000.0,0.19,1235.0,0.19,1.0,0.0,eMithran Baseline
+Inconel 718,Generic Inconel 718,15.123,8190,Cost per KG,15.123,9.0,350.0,Brinell,1004.0,1126.0,303.0,200000.0,0.28,1426.0,0.5,1.0,0.0,eMithran Baseline
+"Stainless Steel, 15-5PH","Generic Stainless Steel, 15-5PH",3.42,7873,Cost per KG,3.42,11.0,330.0,Brinell,915.0,1150.0,700.0,200000.0,0.28,1426.0,0.5,1.0,0.0,eMithran Baseline
+"Stainless Steel, 17-4PH","Generic Stainless Steel, 17-4PH",7.185,7800,Cost per KG,7.185,11.0,345.0,Brinell,1145.0,1335.0,801.0,200000.0,0.28,1426.0,0.5,1.0,0.0,eMithran Baseline
+"Stainless Steel, 440B","Generic Stainless Steel, 440B",3.318,8073,Cost per KG,3.318,11.0,260.0,Brinell,250.0,540.0,310.0,200000.0,0.28,1426.0,0.5,1.0,0.0,eMithran Baseline
+"Stainless Steel, A240","Generic Stainless Steel, A240",2.385,7900,Cost per KG,2.385,11.0,260.0,Brinell,500.0,540.0,310.0,200000.0,0.28,1426.0,0.5,1.0,0.0,eMithran Baseline
+"Stainless Steel, A351 CF8","Generic Stainless Steel, A351 CF8",3.157,7880,Cost per KG,3.157,11.0,260.0,Brinell,675.0,1030.0,648.0,200000.0,0.28,1426.0,0.5,1.0,0.0,eMithran Baseline
+"Stainless Steel, AISI 301","Generic Stainless Steel, AISI 301",3.642,7900,Cost per KG,3.642,11.0,330.0,Brinell,330.0,680.0,387.0,200000.0,0.28,1426.0,0.5,1.0,0.0,eMithran Baseline
+"Stainless Steel, AISI 303","Generic Stainless Steel, AISI 303",3.796,8073,Cost per KG,3.796,11.0,175.0,Brinell,215.0,505.0,303.0,200000.0,0.28,1426.0,0.5,1.0,0.0,eMithran Baseline
+"Stainless Steel, AISI 304","Generic Stainless Steel, AISI 304",3.848,8073,Cost per KG,3.848,9.0,210.0,Brinell,210.0,564.0,525.0,200000.0,0.27,1426.0,0.5,1.0,0.0,eMithran Baseline
+"Stainless Steel, AISI 304L","Generic Stainless Steel, AISI 304L",4.003,8000,Cost per KG,4.003,9.0,235.0,Brinell,170.0,547.0,347.0,200000.0,0.27,1426.0,0.5,1.0,0.0,eMithran Baseline
+"Stainless Steel, AISI 316","Generic Stainless Steel, AISI 316",6.394,8073,Cost per KG,6.394,9.0,290.0,Brinell,290.0,558.0,334.0,200000.0,0.27,1426.0,0.5,1.0,0.0,eMithran Baseline
+"Stainless Steel, AISI 316L","Generic Stainless Steel, AISI 316L",6.394,8000,Cost per KG,6.394,9.0,535.0,Brinell,535.0,885.0,610.0,207000.0,0.29,479.3,0.23,1.34,0.0,eMithran Baseline
+"Stainless Steel, AISI 316Ti","Generic Stainless Steel, AISI 316Ti",6.121,8000,Cost per KG,6.121,9.0,295.0,Brinell,295.0,460.0,280.0,207000.0,0.29,479.3,0.23,1.34,0.0,eMithran Baseline
+"Stainless Steel, AISI 321","Generic Stainless Steel, AISI 321",6.128,7900,Cost per KG,6.128,9.0,260.0,Brinell,260.0,530.0,280.0,207000.0,0.29,479.3,0.23,4.59,0.0,eMithran Baseline
+"Stainless Steel, AISI 441","Generic Stainless Steel, AISI 441",2.677,7700,Cost per KG,2.677,9.0,528.0,Brinell,528.0,560.0,520.0,207000.0,0.29,543.0,0.23,0.0,0.0,eMithran Baseline
+"Steel, AISI 1035","Generic Steel, AISI 1035",1.479,7870,Cost per KG,1.479,4.0,150.0,Brinell,530.0,785.0,540.0,207000.0,0.29,543.0,0.21,0.99,0.0,eMithran Baseline
+"Steel, AISI 4140, Medium-Carbon","Generic Steel, AISI 4140, Medium-Carbon",0.968,7900,Cost per KG,0.968,4.0,180.0,Brinell,825.0,491.0,200.0,207000.0,0.29,543.0,0.21,0.99,0.0,eMithran Baseline
+"Steel, Cold Worked, AISI 1005","Generic Steel, Cold Worked, AISI 1005",1.473,7900,Cost per KG,1.473,4.0,95.0,Brinell,260.0,330.0,210.0,207000.0,0.23,479.3,1.34,0.0,0.0,eMithran Baseline
+"Steel, Cold Worked, AISI 1008","Generic Steel, Cold Worked, AISI 1008",1.88,7900,Cost per KG,1.88,4.0,125.0,Brinell,305.0,370.0,222.0,207000.0,0.23,479.3,1.34,4.59,0.0,eMithran Baseline
+"Steel, Cold Worked, AISI 1010","Generic Steel, Cold Worked, AISI 1010",1.681,7900,Cost per KG,1.681,4.0,125.0,Brinell,305.0,370.0,222.0,207000.0,0.23,479.3,1.34,4.59,0.0,eMithran Baseline
+"Steel, Cold Worked, AISI 1012","Generic Steel, Cold Worked, AISI 1012",1.681,7900,Cost per KG,1.681,4.0,130.0,Brinell,400.0,480.0,252.0,207000.0,0.23,479.3,1.34,0.0,0.0,eMithran Baseline
+"Steel, Cold Worked, AISI 1018","Generic Steel, Cold Worked, AISI 1018",1.781,7900,Cost per KG,1.781,4.0,130.0,Brinell,350.0,480.0,252.0,207000.0,0.23,479.3,1.34,0.0,0.0,eMithran Baseline
+"Steel, Cold Worked, AISI 1020","Generic Steel, Cold Worked, AISI 1020",1.688,7900,Cost per KG,1.688,4.0,220.0,Brinell,650.0,790.0,470.0,207000.0,0.29,470.3,0.23,1.34,0.0,eMithran Baseline
+"Steel, Cold Worked, AISI 1050","Generic Steel, Cold Worked, AISI 1050",1.688,7900,Cost per KG,1.688,4.0,210.0,Brinell,560.0,690.0,420.0,207000.0,0.29,470.3,0.23,1.34,0.0,eMithran Baseline
+"Steel, Cold Worked, AISI 4130","Generic Steel, Cold Worked, AISI 4130",1.594,7850,Cost per KG,1.694,4.0,220.0,Brinell,650.0,790.0,470.0,207000.0,0.29,470.3,0.23,1.34,0.0,eMithran Baseline
+"Steel, Cold Worked, AISI 4340","Generic Steel, Cold Worked, AISI 4340",2.026,7850,Cost per KG,2.026,4.0,330.0,Brinell,350.0,420.0,202.0,207000.0,0.29,479.3,0.23,1.34,0.0,eMithran Baseline
+"Steel, Cold Worked, AISI 5210","Generic Steel, Cold Worked, AISI 5210",1.542,7850,Cost per KG,1.542,4.0,207.0,Brinell,530.0,620.0,371.0,207000.0,0.29,479.3,0.23,1.34,0.0,eMithran Baseline
+"Steel, Cold Worked, AISI 8620","Generic Steel, Cold Worked, AISI 8620",1.767,7900,Cost per KG,1.767,4.0,125.0,Brinell,180.0,360.0,216.0,207000.0,0.21,543.0,0.21,1.0,0.0,eMithran Baseline
+"Steel, Cold Worked, DC06","Generic Steel, Cold Worked, DC06",1.495,7900,Cost per KG,1.495,4.0,125.0,Brinell,180.0,310.0,144.0,207000.0,0.23,543.0,0.21,1.0,0.0,eMithran Baseline
+"Steel, Hot Worked, AISI 1006","Generic Steel, Hot Worked, AISI 1006",1.473,7850,Cost per KG,1.473,4.0,125.0,Brinell,240.0,335.0,221.0,207000.0,0.28,543.0,0.21,0.99,0.0,eMithran Baseline
+"Steel, Hot Worked, AISI 1008","Generic Steel, Hot Worked, AISI 1008",1.474,7850,Cost per KG,1.474,4.0,125.0,Brinell,245.0,350.0,229.0,207000.0,0.28,543.0,0.21,0.99,0.0,eMithran Baseline
+"Steel, Hot Worked, AISI 1010","Generic Steel, Hot Worked, AISI 1010",1.49,7850,Cost per KG,1.49,4.0,125.0,Brinell,185.0,330.0,198.0,207000.0,0.28,543.0,0.23,4.59,0.0,eMithran Baseline
+"Steel, Hot Worked, AISI 1012","Generic Steel, Hot Worked, AISI 1012",1.568,7900,Cost per KG,1.568,4.0,130.0,Brinell,205.0,380.0,228.0,207000.0,0.28,543.0,0.21,0.99,0.0,eMithran Baseline
+"Steel, Hot Worked, AISI 1018","Generic Steel, Hot Worked, AISI 1018",1.479,7900,Cost per KG,1.479,4.0,150.0,Brinell,470.0,665.0,414.0,207000.0,0.28,543.0,0.21,0.99,0.0,eMithran Baseline
+"Steel, Hot Worked, AISI 1020","Generic Steel, Hot Worked, AISI 1020",1.481,7900,Cost per KG,1.481,4.0,150.0,Brinell,455.0,450.0,439.0,207000.0,0.28,543.0,0.21,0.99,0.0,eMithran Baseline
+"Steel, Hot Worked, AISI 1042","Generic Steel, Hot Worked, AISI 1042",1.651,7870,Cost per KG,1.651,4.0,200.0,Brinell,515.0,690.0,450.0,207000.0,0.28,543.0,0.23,0.99,0.0,eMithran Baseline
+"Steel, Hot Worked, AISI 1045","Generic Steel, Hot Worked, AISI 1045",1.645,7870,Cost per KG,1.645,4.0,200.0,Brinell,390.0,725.0,620.0,207000.0,0.28,543.0,0.21,0.99,0.0,eMithran Baseline
+"Steel, Hot Worked, AISI 1049","Generic Steel, Hot Worked, AISI 1049",1.481,7870,Cost per KG,1.481,4.0,200.0,Brinell,545.0,785.0,620.0,207000.0,0.28,543.0,0.21,0.99,0.0,eMithran Baseline
+"Steel, Hot Worked, AISI 1050","Generic Steel, Hot Worked, AISI 1050",1.488,7870,Cost per KG,1.488,4.0,125.0,Brinell,415.0,540.0,324.0,207000.0,0.28,543.0,0.21,0.99,0.0,eMithran Baseline
+"Steel, Hot Worked, AISI 1075","Generic Steel, Hot Worked, AISI 1075",1.494,7870,Cost per KG,1.494,4.0,125.0,Brinell,235.0,395.0,233.0,207000.0,0.28,543.0,0.21,0.99,0.0,eMithran Baseline
+"Steel, Hot Worked, AISI 1095","Generic Steel, Hot Worked, AISI 1095",1.491,7870,Cost per KG,1.491,4.0,1034.0,Brinell,1034.0,1158.0,694.8,207000.0,0.29,543.0,0.21,0.99,0.0,eMithran Baseline
+"Steel, Hot Worked, AISI 1213","Generic Steel, Hot Worked, AISI 1213",1.726,7850,Cost per KG,1.726,4.0,125.0,Brinell,825.0,870.0,541.4,207000.0,0.28,543.0,0.21,0.99,0.0,eMithran Baseline
+"Steel, Hot Worked, AISI 12L13","Generic Steel, Hot Worked, AISI 12L13",1.726,7850,Cost per KG,1.726,4.0,180.0,Brinell,735.0,930.0,491.4,207000.0,0.28,543.0,0.23,4.59,0.0,eMithran Baseline
+"Steel, Hot Worked, AISI 1513","Generic Steel, Hot Worked, AISI 1513",1.534,7850,Cost per KG,1.534,4.0,180.0,Brinell,380.0,731.0,672.0,207000.0,0.28,543.0,0.21,0.0,0.0,eMithran Baseline
+"Steel, Hot Worked, AISI 4140","Generic Steel, Hot Worked, AISI 4140",1.586,7900,Cost per KG,1.586,4.0,125.0,Brinell,250.0,550.0,330.0,207000.0,0.28,543.0,0.21,0.0,0.0,eMithran Baseline
+"Steel, Hot Worked, AISI 4140H","Generic Steel, Hot Worked, AISI 4140H",1.477,7900,Cost per KG,1.477,4.0,210.0,Brinell,405.0,684.0,684.0,207000.0,0.23,543.0,0.3,0.0,0.0,eMithran Baseline
+"Steel, Hot Worked, AISI 5115","Generic Steel, Hot Worked, AISI 5115",1.491,7850,Cost per KG,1.491,4.0,210.0,Brinell,305.0,305.0,305.0,207000.0,0.32,718.4,0.32,4.59,0.0,eMithran Baseline
+"Steel, Hot Worked, AISI 6150","Generic Steel, Hot Worked, AISI 6150",1.578,7850,Cost per KG,1.578,4.0,210.0,Brinell,880.0,995.0,597.0,120000.0,0.32,718.4,0.32,4.59,0.0,eMithran Baseline
+"Steel, Hot Worked, ASTM A36","Generic Steel, Hot Worked, ASTM A36",1.597,7900,Cost per KG,1.597,4.0,115.0,Brinell,210.0,305.0,210.0,207000.0,0.23,479.3,4.59,0.0,0.0,eMithran Baseline
+"Steel, Hot Worked, ASTM A572 Grade 50","Generic Steel, Hot Worked, ASTM A572 Grade 50",1.491,7900,Cost per KG,28.056,2.0,310.0,Tensile Strength,827.0,861.0,496.2,116000.0,0.34,716.4,4.59,0.0,0.0,eMithran Baseline
+"Steel, Hot Worked, Grade S235JR","Generic Steel, Hot Worked, Grade S235JR",1.578,7900,Cost per KG,27.653,2.0,950.0,Tensile Strength,880.0,995.0,597.0,120000.0,0.32,718.4,0.32,4.59,0.0,eMithran Baseline
+"Steel, Hot Worked, S900MC","Generic Steel, Hot Worked, S900MC",1.597,7900,,,,,,,,,,,,,,,
+"Titanium, Ti-5Al-2.5Sn","Generic Titanium, Ti-5Al-2.5Sn",28.056,4480,,,,,,,,,,,,,,,
+"Titanium, Ti-6Al-4V","Generic Titanium, Ti-6Al-4V",27.653,4430,,,,,,,,,,,,,,,

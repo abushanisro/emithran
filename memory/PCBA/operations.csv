@@ -1,0 +1,27 @@
+Process Name
+Apply Photo Resist:Photo Resist Applying//Layer
+Automated Optical Inspection:AOI//Layer
+Bench Operation:Assemble And Press Layers
+Bench Operation:Layer Assembly-Pressing//Layer
+Copper Plate and Tin Coat:Copper Plating and Tin Coating//CommonHoleGroup
+Copper Plate and Tin Coat:Copper Plating and Tin Coating//Contour
+Cure Plugged Vias:Via Plugging Curing//CommonHoleGroup
+DES:Develop Etch Strip//Layer
+Desmear and Plate Through Holes:Desmearing and Electroless Through Hole Plating//CommonHoleGroup
+Desmear and Plate Through Holes:Desmearing and Electroless Through Hole Plating//Contour
+Dissolve Unexposed Photo Resist:Unexposed Photo Resist Dissolving//Layer
+Drill Circuit Holes:Circuit Hole Drilling//CommonHoleGroup
+Drill Circuit Holes:Circuit Hole Drilling//Contour
+Laser Drill Vias:Via Laser Drilling//CommonHoleGroup
+Material Stock:Layer Material//Layer
+No Cost Feature:No Cost Feature//CommonHoleGroup
+No Cost Feature:No Cost Feature//Contour
+Oven Cure Layers:Layer Curing//Layer
+Photolithography:UV Exposure//Layer
+Plug Vias:Via Plugging Screen Printing//CommonHoleGroup
+Router:Routering//CommonHoleGroup
+Router:Routering//Contour
+SES:Strip Etch Strip//Layer
+Stamp:As Stamped//CommonHoleGroup
+Stamp:As Stamped//Contour
+Surface Preparation:Prep Surface//Layer

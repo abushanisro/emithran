@@ -1,0 +1,3 @@
+digital_factory,object_type,category_path,table_name,file_path,total_row_count,value
+USA reference export,Lookup Table,Machining > Lookup Tables > Etch Cell (Etch Cell Cycle),tblChemicalMillingEtchingRates,lookupTables/Component/Etch Cell_Etch Cell Cycle/tblChemicalMillingEtchingRates.csv,5,Material Type
+USA reference export,Lookup Table,Machining > Lookup Tables > Etch Cell (Etch Cell Cycle),tblChemicalMillingEtchingRates,lookupTables/Component/Etch Cell_Etch Cell Cycle/tblChemicalMillingEtchingRates.csv,5,Etch Rate (mm/min)

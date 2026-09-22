@@ -1,0 +1,8 @@
+name,coeffA,coeffB,coeffC,densityKgPerM3,hardness,heightMultiplier,machinabilityIndex,materialCostUsdPerKg,materialTypeName,toolLifeFactor,ejectorBoxCostFactor,moldBaseCostFactor
+AISI 1020,-0.0015,13.976,2324.4,7850.0,143.0,22.6,0.75,1.54,Steel,0.7,0.8,0.85
+AISI 4140,-0.0015,13.976,2324.4,7850.0,197.0,22.6,1.0,1.72,Steel,1.0,1.0,1.0
+AISI H13,-0.0015,13.976,2324.4,7800.0,262.0,22.6,1.15,2.88,Steel,1.6,1.15,1.2
+AISI P20,-0.0015,13.976,2324.4,7850.0,300.0,22.6,1.0,1.86,Steel,1.0,1.0,1.0
+Aluminum 7075,-0.0015,13.976,2324.4,2810.0,150.0,22.6,0.5,4.31,Aluminum,0.1,0.7,0.5
+Epoxy,-0.0015,13.976,2324.4,1500.0,50.0,22.6,0.55,5.67,Polyepoxid,0.003,0.0,0.35
+UNS S42000,-0.0015,13.976,2324.4,7800.0,241.0,22.6,1.25,2.13,Steel,1.6,1.2,1.3

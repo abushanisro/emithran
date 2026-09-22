@@ -1,0 +1,2 @@
+table_name,tool_type,tool_series,units.cut_depth,units.cutting_speed,units.entering_angle,units.feed_rate,units.nose_radius,units.specific_cutting_force,units.tool_life,units.tool_life_cost,nose_radius_mm,tool_life_min,tool_life_cost_usd,value
+tblGeneralTurning,Turning Insert,Virtual Turning Insert,mm,m/min,deg,mm/rev,mm,N/mm^2,min,USD,0.79,35,6.0,This table covers the standard 91-code material list. Material code '60.0' (present in the Straight Drill and Engagement Length Power tables) does not appear here.

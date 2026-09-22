@@ -5,7 +5,7 @@ export type FeatureType =
   | 'hardware';
 
 export type ManufacturingFamily =
-  | 'sheet_metal' | 'cnc_milled' | 'cnc_turned'
+  | 'sheet_metal' | 'milled' | 'turned'
   | 'plastic_molded' | 'casting' | 'forging'
   | 'extrusion' | 'weldment' | 'additive';
 
@@ -48,8 +48,8 @@ export type FeatureCategory =
   | 'thin_web'    // pair of holes with true edge-to-edge gap < 1.5x sheet thickness — detected, geo_v40+
   | 'im_undercut'   // injection molding undercut face (DFM)
   | 'im_undrafted'  // injection molding undrafted face (DFM)
-  // CNC-bucketed types — from cad-engine/machining/cnc_feature_recognizer.py's
-  // build_feature_graph_v2_from_cnc (the only producer of these on feature_graph_v2).
+  // CNC-bucketed types — from cad-engine/machining/machining_feature_recognizer.py's
+  // build_machining_feature_graph_v2 (the only producer of these on feature_graph_v2).
   // 'pocket'/'slot' above already cover the CNC pocket/slot/keyway/radial_slot bucket.
   | 'through_hole'
   | 'blind_hole'

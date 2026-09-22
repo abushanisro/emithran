@@ -1,0 +1,4 @@
+name,sourceFilePath,Process,Name,Limit,Notes
+tblDTCLimits,lookupTables/Component/tblDTCLimits.csv,Compression Molding,Cutout Utilization Threshold,0.8,Used to flag when material utilization beneath a threshold where a part would benefit from cutouts not being capped.
+tblDTCLimits,lookupTables/Component/tblDTCLimits.csv,Compression Molding,Max Thickness Cure Time,3.0,Multiplied by the max thickness of the majority of the part. Used to flag when the part has an excessively thick portion in relation to the majority of the part which will increase the cure time.
+tblDTCLimits,lookupTables/Component/tblDTCLimits.csv,Other,Blind Hole LD Ratio,2.0,Deprecated in CMV290. Used to flag when blind holes have high LD ratios.

@@ -1,0 +1,109 @@
+﻿Variable Name,String Value,Unit Type Name,Notes
+bottomProtectivePlateThickness,0,Length,The default thickness of bottom protective plate for Routing.
+caseNestingSpacing_cureSolderMask,50.8,Length,The spacing between the nested cases of panels which is required to allow air to circulate.
+cellPanelSpacingWidthwise,10,Length,The widthwise spacing between the panels when immersed in the Copper Plate and Tin Coat machine. Used to determine how many panels may be nested side by side in each cell.
+copperLayerThicknessSnapTolerance,0.05,oz,The allowable tolerance that the cost model uses when selecting a copper material from the Digital Factory. If an exact match is not found for the extracted Layer GCD thickness then a material within this tolerance range is considered.
+coreLayerThicknessSnapTolerance,0.15,Length,The allowable tolerance that the cost model uses when selecting a core material from the Digital Factory. If an exact match is not found for the extracted Layer GCD dielectric thickness then a material within this tolerance range is considered.
+cureOvenCycleTime,10800,Time,Default amount of time required to run one cure oven cycle (to cure PCB layers together).
+cureOvenLoadTime,60,Time,Default amount of time required to load one PCB stack into the layer curing oven.
+cycleTimeAdjustmentFactor,1,,Factor used to globally increase or decrease cycle time evaluations per process.
+defaultAoiInspectionSpeed,106,Area/s,The default AOI Machine Inspection Speed. This is an average value of inspection speed.
+defaultAoiPanelRotationTime,2,Time,The default time taken to rotate the panel so the second side of the panel can be scanned.
+defaultApplyResistAdditonalPanelSpacing,200,Length,The default additional spacing between panels when loaded onto the apply photo resist conveyor system.
+defaultAreaForOneHole,8,Area,Default area required for one circuit hole.
+defaultArrayLength,279.4,Length,Default length of the array if array depanelization is enabled.
+defaultArrayWidth,215.9,Length,Default width of the array if array depanelization is enabled.
+defaultAviInspectionSpeed,110,Length/Time,The default AVI Machine Inspection Speed. This is an average value of inspection speed.
+defaultAviPanelRotationTime,2,Time,The default time taken to rotate the panel so the second side of the panel can be scanned.
+defaultBoardThickness,1.6,Length,The default overall thickness for the board. This will be the target board thickness unless overrides are modified on Layer GCD PSOs.
+defaultConveyorPanelSpacingLength,200,Length,The default spacing between panels when loaded onto a conveyor system.
+defaultConveyorPanelSpacingWidth,100,Length,The default width spacing between panels when loading to the conveyor system for simultaneous processing.
+defaultCopperDensity,8940,kg/m^3,Default density of the copper.
+defaultCopperLayerWeight,1,oz,Default copper weight for each layer.
+defaultDevelopSolderMaskConveyorPanelSpacingLength,200,Length,The default spacing between panels when loaded onto the develop solder mask conveyor system.
+defaultEnableArrayDepanelization,true,,Switch for enabling/disabling the array depanelization. Valid values are true or false.
+defaultEnableViaPlugging,false,,Switch for enabling/disabling the inclusion of Via Plugging of Plated Holes in the final layer processing cycle. Valid values are true or false.
+defaultFilmDismountTime,10,Time,Default time to dismount a film from a panel after expose the Solder Mask.
+defaultFilmMountTime,15,Time,Default time to mount a film on a panel before expose the Solder Mask.
+defaultGlassTransitionTemp,Standard: x < 150Tg,,Default value of the glass transition temperature.
+defaultHolesPlatingThicknessExternalLayers,1/2 oz - 18 µm,,Default plating thickness required for holes on external layers.
+defaultHolesPlatingThicknessInternalLayers,3/8 oz - 12 µm,,Default plating thickness required for holes on internal layers.
+defaultInsulatorDensity,1850,kg/m^3,Default density of the insulation material.
+defaultMeasurementSpeed,50,cycles/Time,Default number of measurements per time made by flying probe testing machine.
+defaultNestingType,True Part,,The default nesting option for nesting PCB parts on panel stock. Available options are Rectangular and True Part.
+defaultNumArms,2,,Default number of probes used for flying probe testing.
+defaultNumFilmImagingSides,2,,The default number of sides of a panel that will require Film Imaging.
+defaultNumPassesDevelopSolderMask,1,,The default number of passes required on the Develop Solder Mask machine per panel.
+defaultNumPassesOSP,1,,Default number of passes required on the organic solderability preservative machine per panel.
+defaultNumSidesPlugged,1,,Default number of sides of the panel requiring via plugging.
+defaultNumSimultaneousPanels,1,,The default number of panel raw material stacks that are being stacked for simultaneous processing.
+defaultNumSolderMaskSides,2,,The default number of sides of the board that will have a solder mask applied.
+defaultNumTestCores,1,,Default number of parallel machine cores that can test boards at the same time.
+defaultNumberOfPanelsPerCase_cureSolderMask,24,,The default number of panels that can be held in the case that is loaded into the solder mask curing oven.
+defaultNumberPanelsLoadedDESConveyor,1,,Default number of panels loaded to the DES conveyor system to be processed simultaneously.
+defaultNumberPanelsLoadedDevelopSolderMaskConveyor,1,,Default number of panels loaded to the develop solder mask conveyor system to be processed simultaneously.
+defaultNumberPanelsLoadedDissolvingConveyor,1,,Default number of panels loaded to the dissolving conveyor system to be processed simultaneously.
+defaultNumberPanelsLoadedOSPConveyor,1,,Default number of panels loaded to the organic solderability preservative conveyor system to be processed simultaneously.
+defaultNumberPanelsLoadedSESConveyor,1,,Default number of panels loaded to the SES conveyor system to be processed simultaneously.
+defaultOSPConveyorPanelSpacingLength,200,Length,The default spacing between panels when loaded onto the organic solderability preservative conveyor system.
+defaultPanelDryTime,120,Time,Default time to dry a panel after apply the Solder Mask.
+defaultPanelSheetPerimeterLengthMultiLayer,25.4,Length,The default border in the length direction around the panel that is unused when nesting parts on multi-layer boards i.e. boards with more than 2 layers.
+defaultPanelSheetPerimeterLengthNonMultiLayer,12.7,Length,The default border in the length direction around the panel that is unused when nesting parts on non multi-layer boards i.e. boards with 1 or 2 layers.
+defaultPanelSheetPerimeterWidthMultiLayer,25.4,Length,The default border in the width direction around the panel that is unused when nesting parts on multi-layer boards i.e. boards with more than 2 layers.
+defaultPanelSheetPerimeterWidthNonMultiLayer,12.7,Length,The default border in the width direction around the panel that is unused when nesting parts on non multi-layer boards i.e. boards with 1 or 2 layers.
+defaultPanelSheetRectangularNestingSpacing,2.54,Length,The default spacing between parts when using rectangular nesting.
+defaultPanelSheetTruePartNestingSpacing,2.54,Length,The default spacing between parts when using true part nesting.
+defaultPanelSpacingInCase_cureSolderMask,15,Length,The default spacing between panels in each case in the solder mask curing oven.
+defaultPhotoResistExposeTime,20,Time,Default time to expose a photo resist on a panel(s).
+defaultPlatingRate,18,micron/hr,Default plating rate.
+defaultPrePregDensity,2250,kg/m^3,Default density of the prepreg.
+defaultProberAssemblyTime,16,hr,Default time to assemble a prober tool for Bed of Nails testing.
+defaultSilkscreenThickness,0.01,Length,The default thickness of each silkscreen layer applied to the board.
+defaultSolderMaskCureTime,3600,Time,The default time taken to cure all panels in the solder mask curing oven.
+defaultSolderMaskExposeTime,60,Time,Default time to expose a solder mask on a panel(s).
+defaultSolerMaskDensity,1900,kg/m^3,Default density of the solder mask.
+defaultSolderMaskThickness,0.025,Length,The default thickness of each individual layer of solder mask.
+defaultStampingTime,5,Time,Default time to cut boards from a panel with using a stamp.
+defaultTestTime,5,Time,Default time to perform a Bed of Nails test.
+defaultUtilizationStepAngle,180,Angle,Default angle increment to be used when trying different part orientations on a panel (or array) for true part nesting.
+dipTankPanelSpacingLengthwise,25.4,Length,The lengthwise spacing between the panels when immersed (includes panel thickness). Used to determine how many panels may be nested in front of each other in the tank.
+dipTankPanelSpacingWidthwise,10,Length,The widthwise spacing between the panels when immersed. Used to determine how many panels may be nested side by side in the tank.
+disableInvestmentAmortization,false,,"User override to disable amortization of all fixed costs to the individual part or assembly. By default, fixed costs are calculated per part for tooling, fixtures, and programming."
+drillCircuitHolesToolChangeTime,5,Time,Time required to change the drilling tool.
+drillingRate_circuitHoles,4,,The default number of circuit holes that can be created per second by the drilling machine.
+drillingRate_registrationHoles,2,,The default number of registration holes that can be created per second by the drilling machine.
+drillingStepOver,0.1,Length,Distance between adjacent holes when drilling a Contour GCD.
+electrolessNickelTime,1500,Time,Default time panel spends in nickel electroplating bath during Electroless Nickel Immersion Gold.
+electrolessThroughHoleCopperPlateTime,1800,Time,Default time a panel spends in the electroless copper tank during the Desmear and Plate Through Holes process. This is the gating (bottleneck) step in the process that is used to determine Cycle Time.
+fixPinMountTime,5,Time,Time to insert a single fixing pin into the registration hole before routing.
+gearQualityDefaultAgmaNewStd,A8,,"A2, A3, A4, ... A11, A12"
+gearQualityDefaultAgmaOldStd,Q8,,"Q15, Q14, Q13, ... Q6, Q5"
+gearQualityDefaultDinStd,9,,"2, 3, 4, ... 11, 12"
+laborRateAdjustmentFactor,1,,Factor used to globally increase or decrease labor rate evaluations per process.
+laserDrillViasAlignmentTime,5,Time,Time to realign the panel and update laser settings between drilling microvias.
+loadBottomProtectivePlateTime,10,Time,Default amount of time required to load the bottom protective plate into the drilling machine.
+loadBottomSeparatingPlateTime,10,Time,Default amount of time required to load the bottom separating plate onto the workbench.
+loadSingleLayerRawMaterialTime,10,Time,Default amount of time required to load a single panel of raw material into the drilling machine.
+loadTopProtectivePlateTime,10,Time,Default amount of time required to load the top protective plate into the drilling machine.
+loadTopSeparatingPlateTime,10,Time,Default amount of time required to load the top separating plate onto the workbench.
+loadTopWeightedPlateTime,15,Time,Default amount of time required to load the top weighted plate onto the top of the layer materials stack.
+machineTableLengthMargin_drillCircuitHoles,25.4,Length,The margin allowed in the length direction on each end of the Drill Circuit Holes machine table for clamping.
+machineTableLengthMargin_drillRegHoles,25.4,Length,The margin allowed in the length direction on each end of the Drill Registration Holes machine table for clamping.
+machineTableLengthSpace_expose,25.4,Length,The space in the machine length direction between panels during exposing.
+machineTableWidthMargin_drillCircuitHoles,25.4,Length,The margin allowed in the width direction on each end of the Drill Circuit Holes machine table for clamping.
+machineTableWidthMargin_drillRegHoles,25.4,Length,The margin allowed in the width direction on each end of the Drill Registration Holes machine table for clamping.
+maxDrilledHoleSize,6.579,Length,Max hole diameter that can be drilled.
+maxFlyingProbeProductionVolume,100000,,Maximum recommended production volume for Flying Probe testing.
+ovenCeilingSpacing_cureSolderMask,152.4,Length,The default space required at the top of the inside of the oven that allows air to circulate around the panels being cured.
+ovenPerimeterSpacing_cureSolderMask,50.8,Length,The spacing around the perimeter of the oven bed which is required to allow air to circulate around the oven.
+ovenShelfSpacing_cureSolderMask,228.6,Length,The spacing between shelves in the solder mask curing oven that is required to allow air to circulate between the cases on each shelf.
+overheadRateAdjustmentFactor,1,,Factor used to globally increase or decrease overhead rate evaluations per process.
+protectivePlateMaterialThickness,3.175,Length,The default thickness of protective plates used during Registration Hole Drilling.
+standardBoardUnloadTime,5,Time,Standard time required to unload a single board from a depanelization machine.
+standardPanelLoadTime,15,Time,Standard time required to load a single panel into a machine.
+totalNumRegistrationHolesPerArray,4,,Default total number of registration holes drilled per Array.
+totalNumRegistrationHolesPerPanel,3,,Default total number of registration holes drilled per panel.
+usePreferredMachines,true,,"If true the model will first try to select a preferred machine. If false, the system chooses either the default machine or from the entire non-preferred set of machines."
+viaDrillingUpperDiameterLimit,0.15,Length,The maximum via diameter that can be laser drilled.
+viaMaxDepthNumberOfLayers,2,,The maximum number of layers that a via can be laser drilled through.
+wetFilmSolderMaskCleanTime,60,Time,Default time to remove any dust or tarnish before apply the Solder Mask.

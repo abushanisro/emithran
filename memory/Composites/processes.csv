@@ -1,0 +1,13 @@
+﻿Process Name,Default Tool Shop Name,Default Machine,Notes
+Autoclave Cure,,ASC Process Systems EC 0.9m x 1.5m,
+Automated Fiber Placement,default,Automated Fiber Placement Machine - 11.4m x 4.2m x 4.2m,
+Automated Tape Layup,default,Automated Tape Layup Machine - 16m x 5.3m x 1.6m,
+Bench Operation,,Manual Bench Cell - 16m x 4m,
+Final Vacuum Bag,default,,
+Hand Layup,default,Clean Room Area - 16m x 4m,
+Mold Preparation,default,Mold Preparation Area 16m x 4m,
+No Cost Feature,,,
+Tool Clean,default,Tool Clean Area: Adapt 1000W Laser - 16m x 4m,
+Ultrasonic Cut,,American GFM CM10 - 1.8m x 1.8m,
+User-Defined Process,,,
+Vacuum Bag,default,,

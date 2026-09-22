@@ -1,0 +1,24 @@
+variableName,stringValue,unitTypeName,notes,notesTruncated
+defaultStockUnitSystem,US,,"Either 'metric', 'US', or 'both'.  Both is a mashup of the first two unit systems",False
+disableInvestmentAmortization,false,,"User override to disable amortization of all fixed costs to the individual part or assembly. By default, fixed costs are calculated per part for tooling, fixtures, and prog",True
+enableScrapMaterialCredit,false,,Set to 'true' to enable Material Cost reduction due to sale of scrap mass of part.,False
+enableScrapPartCredit,false,,Set to 'true' to enable Material Cost reduction due to sale of scrapped parts as a result of Good Part Yield.,False
+finishingOnHexStock,false,,"If true, finish machining will be applied to hex features, if false it will be left as supplied",False
+finishingOnSquareStock,false,,"If true, finish machining will be applied to square features, if false it will be left as supplied",False
+gearQualityDefaultAgmaNewStd,A8,,"A2, A3, A4, ... A11, A12",False
+gearQualityDefaultAgmaOldStd,Q8,,"Q15, Q14, Q13, ... Q6, Q5",False
+gearQualityDefaultDinStd,9,,"2, 3, 4, ... 11, 12",False
+hexMinStockWidthAllowance,0,,Minimum allowed stock width for any size hex part.,False
+hexPercentStockAllowance,0,,Stock thickness as a percent (%) of the maximum cross section dimension width. A value 5 means 5%,False
+hexSnapStockSize,false,,"Default condition for snapping to the next larger available size for selecting hex stock in Stock Machining.  A value of ""true"" means snap to the next available size if",True
+idStockTrimAllowance,0,Length,Default ID stockTrimAllowance set to zero,False
+maxStockAllowance,3.175,Length,Maximum allowed stock thickness for any size part,False
+minStockAllowance,0.79375,Length,Minimum allowed stock thickness for any size part.,False
+overheadRateAdjustmentFactor,1,,Factor to globally increase or decrease overhead evaluations per process.,False
+percentStockAllowance,5,,"Stock thickness as a percent (%) of the maximum cross section dimension (OD or max(width, height)). A value 5 means 5%",False
+snapStockSize,true,,"Default condition for snapping to the next larger available size for selecting stock in Stock Machining.  A value of ""true"" means snap to the next available size if the",True
+squareMinStockWidthAllowance,0,,Minimum allowed stock width for any size square part.,False
+squarePercentStockAllowance,0,,Stock thickness as a percent (%) of the maximum cross section dimension width. A value 5 means,False
+standardStockLength,4500,Length,Default length of virtual stock,False
+supportsDTC,true,,'true' or 'false' - only set to 'true' if this Digital Factory's cost model has been upgraded or configured to support eMithran's Design-to-Cost functionality.,False
+unassociatedBulkRemovalThresholdRatio,0.05,,"If the volume of Bulk Removal is a) Less than this ratio (Decimal form) of the Removed Volume and b) Has no related surfaces, the Bulk Removal will be neglected",True

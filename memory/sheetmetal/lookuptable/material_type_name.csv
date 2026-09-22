@@ -1,0 +1,11 @@
+name,filePath,digitalFactory,rowCount,materialName,rawMaterialType
+materialTypeName,lookupTables/Component/materialTypeName.csv,USA reference export,10,DP,DP
+materialTypeName,lookupTables/Component/materialTypeName.csv,USA reference export,10,Stainless- 304,high strength
+materialTypeName,lookupTables/Component/materialTypeName.csv,USA reference export,10,Stainless- 316,high strength
+materialTypeName,lookupTables/Component/materialTypeName.csv,USA reference export,10,Stainless- 316L,high strength
+materialTypeName,lookupTables/Component/materialTypeName.csv,USA reference export,10,Steel- CR- 1010,mild steel
+materialTypeName,lookupTables/Component/materialTypeName.csv,USA reference export,10,Steel- CR- 1012,mild steel
+materialTypeName,lookupTables/Component/materialTypeName.csv,USA reference export,10,Steel- CR- 1020,mild steel
+materialTypeName,lookupTables/Component/materialTypeName.csv,USA reference export,10,Steel- HR- 1010,mild steel
+materialTypeName,lookupTables/Component/materialTypeName.csv,USA reference export,10,Steel- HR- 1012,mild steel
+materialTypeName,lookupTables/Component/materialTypeName.csv,USA reference export,10,Steel- HR- 1020,mild steel

@@ -1,0 +1,6 @@
+name,file_path,Material Ultimate Tensile Strength (MPa),Min Diameter To Thickness Ratio
+tblMinHoleDiameterRatio,lookupTables/Component/tblMinHoleDiameterRatio.csv,0.0,1.0
+tblMinHoleDiameterRatio,lookupTables/Component/tblMinHoleDiameterRatio.csv,220.0,1.0
+tblMinHoleDiameterRatio,lookupTables/Component/tblMinHoleDiameterRatio.csv,345.0,1.5
+tblMinHoleDiameterRatio,lookupTables/Component/tblMinHoleDiameterRatio.csv,655.0,2.0
+tblMinHoleDiameterRatio,lookupTables/Component/tblMinHoleDiameterRatio.csv,999999999.0,2.0

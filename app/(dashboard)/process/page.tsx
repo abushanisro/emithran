@@ -49,6 +49,7 @@ import { toast } from 'sonner';
 import { InlineReferenceTableEditor } from '@/components/features/calculators/builder/InlineReferenceTableEditor';
 import { useAuth } from '@/lib/providers/auth';
 import { adaptMappingsToProcessCatalogTree } from '@/lib/processCatalog/process-catalog-tree';
+import { hasOperationDetail } from '@/lib/processCatalog/operation-detail';
 
 // Helper function to convert snake_case to camelCase
 const snakeToCamel = (str: string): string => {
@@ -993,17 +994,12 @@ export default function ProcessPage() {
                       <div className="p-3">
                               <div className="flex flex-wrap gap-1.5 items-start">
                                 {ops.map((op) => {
-                                  // Inactive rows must never show taxonomy detail, even when they
-                                  // share a canonical_process_id with an active row (the correct,
-                                  // intended shape once duplicates are consolidated onto one real
-                                  // canonical row -- e.g. Laser Puch now correctly shares Laser
-                                  // Punch's canonical row, same as Waterjet Cutting's two routes
-                                  // always have). Without this gate, an inactive duplicate would
-                                  // inherit and display its active counterpart's full detail,
-                                  // including an alias list that reads as self-referential on the
-                                  // duplicate's own pill.
-                                  const hasDetail = op.isActive !== false
-                                    && !!(op.taxonomy && (op.taxonomy.operations.length > 0 || op.taxonomy.aliases.length > 0 || op.taxonomy.defaultMachineName));
+                                  // Detail is offered for active rows, and for an inactive row that IS
+                                  // its own canonical process (a real process seeded from a source
+                                  // folder that has no costing engine yet). An inactive DUPLICATE that
+                                  // merely shares another row canonical id (Laser Puch -> Laser Punch)
+                                  // still shows none -- see hasOperationDetail.
+                                  const hasDetail = hasOperationDetail(op);
                                   const isExpanded = expandedOpId === op.id;
                                   return (
                                   <Fragment key={op.id}>
@@ -1015,7 +1011,9 @@ export default function ProcessPage() {
                                     }`}
                                     title={
                                       op.isActive === false
-                                        ? 'Inactive — not offered for costing'
+                                        ? (hasDetail
+                                          ? 'Inactive — not offered for costing. Click the operation name to see its feature types and default machine'
+                                          : 'Inactive — not offered for costing')
                                         : hasDetail
                                         ? 'Click the operation name to see feature types, aliases, and default machine'
                                         : 'No feature-type/alias/default-machine detail on file for this operation yet'
@@ -1265,7 +1263,30 @@ export default function ProcessPage() {
               // is honest ("pick a group first, or type a new route"); a list of
               // every route in the database is not.
               const availableRoutes = (pickerGroupNode?.children ?? []).map(r => r.label).sort();
-              const availableOps = (pickerRouteNode?.children ?? []).map(o => o.label).sort();
+              // Real per-feature-type operation names (process_taxonomy_operations,
+              // migration 609/754) for the selected route — additive to the tree's
+              // own operation nodes, not a replacement. A group like Machining has
+              // exactly one process_calculator_mappings row per route today (its
+              // own "operation" column just duplicates the route name, since no
+              // calculator is wired per real operation yet — see the taxonomy
+              // panel this same page already renders), so the tree above offers
+              // only that one duplicate string. The real, feature-type-granular
+              // names live one join away on the SAME mapping row's taxonomy hint,
+              // already fetched for the expanded-pill panel — reused here rather
+              // than re-derived, so this can never drift from what that panel
+              // shows. Same "<Category> // <FeatureType>" display convention.
+              const routeTaxonomyOps = new Set<string>();
+              for (const m of allMappingsForPicker?.mappings ?? []) {
+                if (m.processGroup !== mappingFormData.processGroup || m.processRoute !== mappingFormData.processRoute) continue;
+                for (const op of m.taxonomy?.operations ?? []) {
+                  const label = `${op.operationCategory ?? '(bare)'}${op.featureType ? ` // ${op.featureType}` : ''}`;
+                  routeTaxonomyOps.add(label);
+                }
+              }
+              const availableOps = Array.from(new Set([
+                ...(pickerRouteNode?.children ?? []).map(o => o.label),
+                ...routeTaxonomyOps,
+              ])).sort();
               return (
                 <>
                   <div className="grid gap-2">

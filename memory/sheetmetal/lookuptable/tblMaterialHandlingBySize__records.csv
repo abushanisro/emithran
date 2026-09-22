@@ -1,0 +1,11 @@
+name,filePath,length_mm,width_mm,thickness_mm,handlingTime_s
+tblMaterialHandlingBySize,lookupTables/Component/tblMaterialHandlingBySize.csv,75.0,75.0,3.18,14.77
+tblMaterialHandlingBySize,lookupTables/Component/tblMaterialHandlingBySize.csv,100.0,100.0,3.18,11.53
+tblMaterialHandlingBySize,lookupTables/Component/tblMaterialHandlingBySize.csv,150.0,150.0,3.18,7.01
+tblMaterialHandlingBySize,lookupTables/Component/tblMaterialHandlingBySize.csv,200.0,200.0,3.18,4.75
+tblMaterialHandlingBySize,lookupTables/Component/tblMaterialHandlingBySize.csv,250.0,250.0,3.18,4.36
+tblMaterialHandlingBySize,lookupTables/Component/tblMaterialHandlingBySize.csv,300.0,300.0,3.18,5.42
+tblMaterialHandlingBySize,lookupTables/Component/tblMaterialHandlingBySize.csv,350.0,350.0,3.18,7.54
+tblMaterialHandlingBySize,lookupTables/Component/tblMaterialHandlingBySize.csv,400.0,400.0,3.18,10.29
+tblMaterialHandlingBySize,lookupTables/Component/tblMaterialHandlingBySize.csv,450.0,450.0,3.18,13.28
+tblMaterialHandlingBySize,lookupTables/Component/tblMaterialHandlingBySize.csv,500.0,500.0,3.18,16.1

@@ -1,0 +1,22 @@
+operation,metric,value
+Bend Brake,bendAdviceAngleLimit,135.0
+Bend Brake,bendAdviceFactor,2.5
+Bend Brake,bendFlapLengthMin,2.5
+Bend Brake,deformationsInsideMax,3.0
+Bend Brake,hemDiameterMax,1.0
+Bend Brake,hemReturnFlangeLengthMin,10.0
+Bend Brake,maxBendRadius,42.0
+Bend Brake,rolledHemOpeningMin,1.0
+Bend Brake,teardropHemOpeningMin,0.25
+Other,bendFlapLengthMin,2.0
+Other,closedHemDiameterThreshold,0.1
+Other,hemDiameterMax,1.0
+Other,hemReturnFlangeLengthMin,4.0
+Other,returnBendAngleMin,90.0
+Other,returnBendClockAngleSeparationMax,30.0
+Other,returnBendDistanceMax,1000.0
+Other,rolledHemOpeningMin,1.0
+Other,teardropHemMaxAngle,225.0
+Other,teardropHemOpeningMin,0.25
+Other,uniqueBendRadiiMax,1.0
+Stamping,deformationsInsideMax,3.0

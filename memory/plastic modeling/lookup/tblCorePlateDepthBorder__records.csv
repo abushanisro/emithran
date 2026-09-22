@@ -1,0 +1,5 @@
+name,sourceFilePath,digitalFactory,Core Plate Depth Border (in),Max Press Force (kN)
+tblCorePlateDepthBorder,lookupTables/Component/tblCorePlateDepthBorder.csv,aPriori USA,3.0,498.2
+tblCorePlateDepthBorder,lookupTables/Component/tblCorePlateDepthBorder.csv,aPriori USA,4.0,3985.6
+tblCorePlateDepthBorder,lookupTables/Component/tblCorePlateDepthBorder.csv,aPriori USA,5.0,14946.0
+tblCorePlateDepthBorder,lookupTables/Component/tblCorePlateDepthBorder.csv,aPriori USA,5.5,999999999.0

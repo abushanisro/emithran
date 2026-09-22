@@ -117,7 +117,7 @@ export interface GenerationResponse {
   status: GenerationStatus;
   model: string;
   scopeDecision: {
-    family: 'cnc_turned' | 'cnc_milled' | 'sheet_metal' | 'out_of_scope';
+    family: 'turned' | 'milled' | 'sheet_metal' | 'out_of_scope';
     inScope: boolean;
     reason: string;
     confidence: number;

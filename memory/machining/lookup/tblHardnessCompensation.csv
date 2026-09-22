@@ -1,0 +1,21 @@
+Material Cut Code Family,Hardness System,Speed Adj Slope
+1,Brinell,-0.0025
+10,Brinell,-0.0034
+15,Brinell,-0.0025
+2,Brinell,-0.0027
+20,Brinell,-0.0027
+23,Tensile Strength,-0.0014
+3,Brinell,-0.0042
+30,Brinell,-0.009
+33,Brinell,-0.00442
+34,Brinell,0.0
+4,Rockwell C,-0.0125
+41,Brinell,0.0
+42,Brinell,0.0
+5,Brinell,-0.0038
+51,Brinell,0.0
+52,Brinell,0.0
+6,Brinell,-0.0057
+7,Brinell,-0.0035
+8,Brinell,-0.0044
+9,Brinell,-0.0013

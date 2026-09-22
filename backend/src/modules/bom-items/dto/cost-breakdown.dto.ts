@@ -420,7 +420,7 @@ export interface CostSummaryDto {
 
   // See CostStatus's own doc comment. Optional on the same convention as
   // currency/toUsdRate below — the per-family engines (cost-engine.ts,
-  // cost-cnc-engine.ts, cost-injection-molding-engine.ts) build this DTO
+  // cost-machining-engine.ts, cost-injection-molding-engine.ts) build this DTO
   // before normalizeCostSummaryToCurrency fills it in; always present by the time
   // a getCostSummary response reaches a caller.
   costStatus?: CostStatus;
@@ -592,7 +592,7 @@ export interface ToolingCostDto {
  * inputs it was computed at.
  *
  * Deliberately a separate type rather than a field on CostSummaryDto. The
- * engines (cost-engine, cost-cnc-engine, cost-injection-molding-engine) build a
+ * engines (cost-engine, cost-machining-engine, cost-injection-molding-engine) build a
  * CostSummaryDto from parameters they are handed; they never perform input
  * resolution and have nothing truthful to put in this field. Only the service
  * entry point that called resolveCostingInputs does, so only it can widen an

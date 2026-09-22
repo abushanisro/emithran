@@ -1,0 +1,89 @@
+Tool Type,Tool Series,Diameter (mm),Material Cut Code Name,Hardness,Hardness System,Cut Type,Cutting Speed (m / min),Max Cutting Depth (mm),Depth Max (mm),Rake Angle (deg),Tool Life (min),Tool Life Cost (USD),Num Teeth,Feed Per Tooth (mm),Axial Cut Depth,Radial Cut Depth,Construction
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,1.0,125,Brinell,Finishing,97.8,0.200,0.800,30,83,4.06,4,0.00058,0.00,0.00,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,1.0,125,Brinell,Roughing - aPriori Traditional,72.1,0.200,0.800,30,83,4.06,3,0.00072,1.00,0.20,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,1.0,125,Brinell,Slotting,72.1,0.200,0.800,30,83,4.06,3,0.00072,1.00,1.00,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,1.1,125,Brinell,Finishing,95.0,0.200,0.800,30,83,4.06,4,0.00058,0.00,0.00,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,1.1,125,Brinell,Roughing - aPriori Traditional,70.0,0.200,0.800,30,83,4.06,3,0.00072,1.00,0.20,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,1.1,125,Brinell,Slotting,70.0,0.200,0.800,30,83,4.06,3,0.00072,1.00,1.00,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,1.2,150,Brinell,Finishing,85.2,0.200,0.800,30,83,4.06,4,0.00058,0.00,0.00,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,1.2,150,Brinell,Roughing - aPriori Traditional,62.8,0.200,0.800,30,83,4.06,3,0.00072,1.00,0.20,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,1.2,150,Brinell,Slotting,62.8,0.200,0.800,30,83,4.06,3,0.00072,1.00,1.00,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,1.3,170,Brinell,Finishing,81.8,0.200,0.800,30,83,4.06,4,0.00058,0.00,0.00,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,1.3,170,Brinell,Roughing - aPriori Traditional,60.3,0.200,0.800,30,83,4.06,3,0.00072,1.00,0.20,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,1.3,170,Brinell,Slotting,60.3,0.200,0.800,30,83,4.06,3,0.00072,1.00,1.00,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,1.4,210,Brinell,Finishing,70.5,0.200,0.800,30,83,4.06,4,0.00058,0.00,0.00,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,1.4,210,Brinell,Roughing - aPriori Traditional,51.9,0.200,0.800,30,83,4.06,3,0.00072,1.00,0.20,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,1.4,210,Brinell,Slotting,51.9,0.200,0.800,30,83,4.06,3,0.00072,1.00,1.00,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,1.5,300,Brinell,Finishing,52.9,0.200,0.800,30,83,4.06,4,0.00058,0.00,0.00,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,1.5,300,Brinell,Roughing - aPriori Traditional,39.0,0.200,0.800,30,83,4.06,3,0.00072,1.00,0.20,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,1.5,300,Brinell,Slotting,39.0,0.200,0.800,30,83,4.06,3,0.00072,1.00,1.00,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,10.0,400,Brinell,Finishing,8.3,0.200,0.800,30,83,4.06,4,0.00058,0.00,0.00,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,10.0,400,Brinell,Roughing - aPriori Traditional,6.1,0.200,0.800,30,83,4.06,3,0.00072,1.00,0.20,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,10.0,400,Brinell,Slotting,6.1,0.200,0.800,30,83,4.06,3,0.00072,1.00,1.00,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,10.1,400,Brinell,Finishing,8.3,0.200,0.800,30,83,4.06,4,0.00058,0.00,0.00,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,10.1,400,Brinell,Roughing - aPriori Traditional,6.1,0.200,0.800,30,83,4.06,3,0.00072,1.00,0.20,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,10.1,400,Brinell,Slotting,6.1,0.200,0.800,30,83,4.06,3,0.00072,1.00,1.00,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,15.11,200,Brinell,Finishing,49.3,0.200,0.800,30,83,4.06,5,0.00028,0.00,0.00,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,15.11,200,Brinell,Roughing - aPriori Traditional,41.2,0.200,0.800,30,83,4.06,4,0.00034,1.00,0.20,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,15.11,200,Brinell,Slotting,41.2,0.200,0.800,30,83,4.06,4,0.00034,1.00,1.00,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,15.12,330,Brinell,Finishing,28.1,0.200,0.800,30,83,4.06,5,0.00028,0.00,0.00,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,15.12,330,Brinell,Roughing - aPriori Traditional,23.5,0.200,0.800,30,83,4.06,4,0.00034,1.00,0.20,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,15.12,330,Brinell,Slotting,23.5,0.200,0.800,30,83,4.06,4,0.00034,1.00,1.00,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,15.13,330,Brinell,Finishing,30.6,0.200,0.800,30,83,4.06,5,0.00028,0.00,0.00,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,15.13,330,Brinell,Roughing - aPriori Traditional,25.6,0.200,0.800,30,83,4.06,4,0.00034,1.00,0.20,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,15.13,330,Brinell,Slotting,25.6,0.200,0.800,30,83,4.06,4,0.00034,1.00,1.00,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,15.21,200,Brinell,Finishing,27.7,0.200,0.800,30,83,4.06,5,0.00028,0.00,0.00,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,15.21,200,Brinell,Roughing - aPriori Traditional,23.2,0.200,0.800,30,83,4.06,4,0.00034,1.00,0.20,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,15.21,200,Brinell,Slotting,23.2,0.200,0.800,30,83,4.06,4,0.00034,1.00,1.00,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,15.22,330,Brinell,Finishing,26.9,0.200,0.800,30,83,4.06,5,0.00028,0.00,0.00,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,15.22,330,Brinell,Roughing - aPriori Traditional,22.5,0.200,0.800,30,83,4.06,4,0.00034,1.00,0.20,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,15.22,330,Brinell,Slotting,22.5,0.200,0.800,30,83,4.06,4,0.00034,1.00,1.00,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,15.23,330,Brinell,Finishing,20.0,0.200,0.800,30,83,4.06,5,0.00028,0.00,0.00,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,15.23,330,Brinell,Roughing - aPriori Traditional,16.7,0.200,0.800,30,83,4.06,4,0.00034,1.00,0.20,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,15.23,330,Brinell,Slotting,16.7,0.200,0.800,30,83,4.06,4,0.00034,1.00,1.00,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,15.51,230,Brinell,Finishing,46.8,0.200,0.800,30,83,4.06,5,0.00028,0.00,0.00,Solid
+Ball End Mill,"Virtual Ball End Mill, Carbide",0.100,15.51,230,Brinell,Roughing - aPriori Traditional,39.2,0.200,0.800,30,83,4.06,4,0.00034,1.00,0.20,Solid
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,5.21,200,Brinell,Roughing - High Feed/High Speed,213.4,76.200,228.000,30,83,3.75,6,0.88900,0.01,0.75,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,5.21,200,Brinell,Roughing - High Volume Milling,213.4,76.200,228.000,30,83,3.75,6,0.20320,1.00,0.03,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,5.21,200,Brinell,Side Milling,73.9,71.000,457.200,-,83,3.75,5,0.15266,0.00,0.00,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,5.22,330,Brinell,Roughing - High Feed/High Speed,126.9,76.200,228.000,30,83,3.75,6,0.88900,0.01,0.75,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,5.22,330,Brinell,Roughing - High Volume Milling,126.9,76.200,228.000,30,83,3.75,6,0.20320,1.00,0.03,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,5.22,330,Brinell,Side Milling,44.0,71.000,457.200,-,83,3.75,5,0.15266,0.00,0.00,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,5.23,200,Brinell,Roughing - High Feed/High Speed,84.5,76.200,228.000,30,83,3.75,6,0.88900,0.01,0.75,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,5.23,200,Brinell,Roughing - High Volume Milling,84.5,76.200,228.000,30,83,3.75,6,0.20320,1.00,0.03,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,5.23,200,Brinell,Side Milling,29.3,71.000,457.200,-,83,3.75,5,0.15266,0.00,0.00,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,5.51,230,Brinell,Roughing - High Feed/High Speed,213.8,76.200,228.000,30,83,3.75,6,0.88900,0.01,0.75,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,5.51,230,Brinell,Roughing - High Volume Milling,213.8,76.200,228.000,30,83,3.75,6,0.20320,1.00,0.03,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,5.51,230,Brinell,Side Milling,74.1,71.000,457.200,-,83,3.75,5,0.15266,0.00,0.00,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,5.52,260,Brinell,Roughing - High Feed/High Speed,189.5,76.200,228.000,30,83,3.75,6,0.88900,0.01,0.75,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,5.52,260,Brinell,Roughing - High Volume Milling,189.5,76.200,228.000,30,83,3.75,6,0.20320,1.00,0.03,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,5.52,260,Brinell,Side Milling,65.7,71.000,457.200,-,83,3.75,5,0.15266,0.00,0.00,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,51.21,30,Brinell,Side Milling,321.2,71.000,457.200,-,83,3.75,3,0.17614,0.00,0.00,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,51.22,30,Brinell,Side Milling,321.2,71.000,457.200,-,83,3.75,3,0.17614,0.00,0.00,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,51.31,30,Brinell,Side Milling,399.8,71.000,457.200,-,83,3.75,3,0.17614,0.00,0.00,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,51.32,30,Brinell,Side Milling,399.8,71.000,457.200,-,83,3.75,3,0.17614,0.00,0.00,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,52.11,30,Brinell,Side Milling,176.9,71.000,457.200,-,83,3.75,3,0.17614,0.00,0.00,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,52.12,30,Brinell,Side Milling,222.9,71.000,457.200,-,83,3.75,3,0.17614,0.00,0.00,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,52.13,30,Brinell,Side Milling,222.9,71.000,457.200,-,83,3.75,3,0.17614,0.00,0.00,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,52.14,30,Brinell,Side Milling,222.9,71.000,457.200,-,83,3.75,3,0.11743,0.00,0.00,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,52.15,30,Brinell,Side Milling,301.4,71.000,457.200,-,83,3.75,3,0.17614,0.00,0.00,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,52.21,30,Brinell,Side Milling,301.4,71.000,457.200,-,83,3.75,3,0.17614,0.00,0.00,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,52.31,30,Brinell,Side Milling,399.8,71.000,457.200,-,83,3.75,3,0.17614,0.00,0.00,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,52.32,30,Brinell,Side Milling,399.8,71.000,457.200,-,83,3.75,3,0.17614,0.00,0.00,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,6.1,150,Brinell,Side Milling,103.6,71.000,457.200,-,83,3.75,4,0.15266,0.00,0.00,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,6.2,200,Brinell,Side Milling,82.2,71.000,457.200,-,83,3.75,4,0.15266,0.00,0.00,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,6.3,200,Brinell,Side Milling,60.3,71.000,457.200,-,83,3.75,4,0.15266,0.00,0.00,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,6.32,200,Brinell,Roughing - High Feed/High Speed,86.5,76.200,228.000,30,83,3.75,6,0.88900,0.01,0.75,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,6.32,200,Brinell,Roughing - High Volume Milling,86.5,76.200,228.000,30,83,3.75,6,0.20320,1.00,0.03,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,6.32,200,Brinell,Side Milling,30.0,71.000,457.200,-,83,3.75,5,0.15266,0.00,0.00,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,6.33,250,Brinell,Side Milling,29.3,71.000,457.200,-,83,3.75,4,0.15266,0.00,0.00,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,60.0,16,Brinell,Side Milling,128.4,71.000,457.200,-,83,3.75,3,0.14655,0.00,0.00,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,7.1,130,Brinell,Side Milling,65.4,71.000,457.200,-,83,3.75,4,0.15266,0.00,0.00,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,7.2,230,Brinell,Side Milling,52.9,71.000,457.200,-,83,3.75,4,0.15266,0.00,0.00,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,7.3,250,Brinell,Side Milling,48.6,71.000,457.200,-,83,3.75,4,0.15266,0.00,0.00,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,8.1,180,Brinell,Side Milling,69.9,71.000,457.200,-,83,3.75,4,0.15266,0.00,0.00,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,8.2,220,Brinell,Side Milling,64.2,71.000,457.200,-,83,3.75,4,0.15266,0.00,0.00,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,8.3,175,Brinell,Side Milling,48.4,71.000,457.200,-,83,3.75,4,0.15266,0.00,0.00,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,9.1,160,Brinell,Side Milling,103.6,71.000,457.200,-,83,3.75,4,0.22899,0.00,0.00,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,9.2,250,Brinell,Side Milling,82.2,71.000,457.200,-,83,3.75,4,0.22899,0.00,0.00,Insert-Based
+Flat End Mill,"Virtual Flat End Mill, Carbide",76.200,9.3,330,Brinell,Side Milling,60.3,71.000,457.200,-,83,3.75,4,0.22899,0.00,0.00,Insert-Based

@@ -1,0 +1,13 @@
+name,sourceFilePath,digitalFactory,Part Handling Time (s),Box Length (mm),Box Width (mm)
+partHandlingTimes,lookupTables/Component/partHandlingTimes.csv,aPriori USA,10.0,179.6,179.6
+partHandlingTimes,lookupTables/Component/partHandlingTimes.csv,aPriori USA,12.0,304.8,179.6
+partHandlingTimes,lookupTables/Component/partHandlingTimes.csv,aPriori USA,15.0,304.8,304.8
+partHandlingTimes,lookupTables/Component/partHandlingTimes.csv,aPriori USA,20.0,914.4,304.8
+partHandlingTimes,lookupTables/Component/partHandlingTimes.csv,aPriori USA,25.0,914.4,914.4
+partHandlingTimes,lookupTables/Component/partHandlingTimes.csv,aPriori USA,40.0,1828.8,609.6
+partHandlingTimes,lookupTables/Component/partHandlingTimes.csv,aPriori USA,50.0,1828.8,1828.8
+partHandlingTimes,lookupTables/Component/partHandlingTimes.csv,aPriori USA,70.0,4572.0,914.4
+partHandlingTimes,lookupTables/Component/partHandlingTimes.csv,aPriori USA,80.0,4572.0,1828.8
+partHandlingTimes,lookupTables/Component/partHandlingTimes.csv,aPriori USA,210.0,15240.0,1828.8
+partHandlingTimes,lookupTables/Component/partHandlingTimes.csv,aPriori USA,240.0,30480.0,1828.8
+partHandlingTimes,lookupTables/Component/partHandlingTimes.csv,aPriori USA,300.0,999999999.0,999999999.0

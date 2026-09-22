@@ -1,0 +1,27 @@
+﻿Material Type Name,Can Black Oxide,Can Chromate Coat,Can Phosphate Coat
+Aluminum,false,true,true
+Aluminum Alloy,false,true,true
+Aluminum Bronze,false,true,true
+Brass,false,true,true
+Bronze,false,true,false
+Copper,true,true,false
+Ductile Iron,true,false,true
+Galvanized Steel,false,true,true
+Generic,true,true,true
+Gray Iron,true,false,true
+Heat Resistant Sup...,false,true,true
+Low-Alloy Steel,true,false,true
+Magnesium,false,true,true
+Malleable Cast Iron,true,false,true
+Manganese Bronze,false,true,false
+Maraging Steel Alloy,true,false,true
+Nickel Alloy,false,true,false
+Silicon Brass,false,true,false
+Stainless Steel,true,true,true
+Stainless Steel Alloy,true,true,true
+Steel,true,false,true
+Titanium,false,true,true
+Titanium Alloy,false,true,true
+Unalloyed Steel,false,false,true
+Zinc,false,true,true
+Zinc-Aluminum,false,true,true

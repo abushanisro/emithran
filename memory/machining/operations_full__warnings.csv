@@ -1,0 +1,3 @@
+section,operationCount,value
+Operations,1174,"Source screenshots for '3 Axis Bar Feed Lathe with Sub Spindle' show a gap between 'Plunging//Ring' and 'Slide Machining//SlideBundle' - intermediate rows (Plunging expansions, Postdrill/Preturn Drilling, Reaming, Rotary Broaching, Rough Turning variants, Setup) were not captured in the supplied screenshots and are not included here."
+Operations,1174,"All rows have an empty Notes field, matching the source table (Notes column was blank throughout)."

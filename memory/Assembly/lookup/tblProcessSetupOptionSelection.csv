@@ -1,0 +1,15 @@
+﻿PSO Reference Key,Selection Name,Priority
+gasType,Argon,1.00
+gasType,Argon CO2 Mix,2.00
+gasType,Hydrogen,3.00
+mechOpObstructSelection,No obstructed access or vision problem,1.00
+mechOpObstructSelection,Obstructed access AND vision problems,3.00
+mechOpObstructSelection,Obstructed access OR vision problems,2.00
+position,Flat,1.00
+position,Horizontal,2.00
+position,Overhead,3.00
+ultrasonicMachineTableConfiguration,Bench,2.00
+ultrasonicMachineTableConfiguration,Rotary,1.00
+ultrasonicWeldingType,Insertion,2.00
+ultrasonicWeldingType,Staking,3.00
+ultrasonicWeldingType,Welding,1.00

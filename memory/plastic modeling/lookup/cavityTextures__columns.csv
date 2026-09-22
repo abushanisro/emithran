@@ -1,0 +1,5 @@
+name,file_path,value
+cavityTextures,LookupTables/Component/cavityTextures.csv,Texture Name
+cavityTextures,LookupTables/Component/cavityTextures.csv,Standard
+cavityTextures,LookupTables/Component/cavityTextures.csv,Pattern
+cavityTextures,LookupTables/Component/cavityTextures.csv,Texture Depth (mm)

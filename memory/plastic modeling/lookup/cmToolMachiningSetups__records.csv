@@ -1,0 +1,19 @@
+name,file_path,number_of_setups,setup_time_hr
+Cavity Plate CNC,lookupTables/Component/cmToolMachiningSetups.csv,1.0,2.0
+Cavity Plate General Machining,lookupTables/Component/cmToolMachiningSetups.csv,2.0,1.0
+Clamp Plate Drilling,lookupTables/Component/cmToolMachiningSetups.csv,1.0,1.0
+Clamp Plate General Machining,lookupTables/Component/cmToolMachiningSetups.csv,2.0,1.0
+Core Plate CNC,lookupTables/Component/cmToolMachiningSetups.csv,2.0,2.0
+Core Plate General Machining,lookupTables/Component/cmToolMachiningSetups.csv,2.0,1.0
+Edge Chamfer General Machining,lookupTables/Component/cmToolMachiningSetups.csv,1.0,0.5
+Ejector Box Plates Drilling,lookupTables/Component/cmToolMachiningSetups.csv,1.0,1.0
+Ejector Box Plates General Machining,lookupTables/Component/cmToolMachiningSetups.csv,1.0,1.0
+Ejector Box Rails Drilling,lookupTables/Component/cmToolMachiningSetups.csv,1.0,1.0
+Ejector Box Rails General Machining,lookupTables/Component/cmToolMachiningSetups.csv,1.0,1.0
+Guide Pin Boring,lookupTables/Component/cmToolMachiningSetups.csv,1.0,0.5
+Guide Pin Drilling,lookupTables/Component/cmToolMachiningSetups.csv,1.0,1.0
+Insert Pocket,lookupTables/Component/cmToolMachiningSetups.csv,2.0,1.0
+Parting Line Spotting,lookupTables/Component/cmToolMachiningSetups.csv,1.0,2.0
+Support Pillars,lookupTables/Component/cmToolMachiningSetups.csv,1.0,0.1
+Tool Insert Machining,lookupTables/Component/cmToolMachiningSetups.csv,1.0,0.5
+Vent Machining,lookupTables/Component/cmToolMachiningSetups.csv,1.0,1.0

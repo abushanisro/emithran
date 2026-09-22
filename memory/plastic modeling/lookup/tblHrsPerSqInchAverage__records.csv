@@ -1,0 +1,11 @@
+name,sourceFilePath,digitalFactory,Hrs Per Sq Inch Average (hr),Surface Area Average (in^2)
+tblHrsPerSqInchAverage,lookupTables/Component/tblHrsPerSqInchAverage.csv,aPriori USA,0.054,99999999.0
+tblHrsPerSqInchAverage,lookupTables/Component/tblHrsPerSqInchAverage.csv,aPriori USA,0.06,5000.0
+tblHrsPerSqInchAverage,lookupTables/Component/tblHrsPerSqInchAverage.csv,aPriori USA,0.066,3500.0
+tblHrsPerSqInchAverage,lookupTables/Component/tblHrsPerSqInchAverage.csv,aPriori USA,0.072,3000.0
+tblHrsPerSqInchAverage,lookupTables/Component/tblHrsPerSqInchAverage.csv,aPriori USA,0.078,2500.0
+tblHrsPerSqInchAverage,lookupTables/Component/tblHrsPerSqInchAverage.csv,aPriori USA,0.09,1500.0
+tblHrsPerSqInchAverage,lookupTables/Component/tblHrsPerSqInchAverage.csv,aPriori USA,0.102,1000.0
+tblHrsPerSqInchAverage,lookupTables/Component/tblHrsPerSqInchAverage.csv,aPriori USA,0.126,500.0
+tblHrsPerSqInchAverage,lookupTables/Component/tblHrsPerSqInchAverage.csv,aPriori USA,0.156,250.0
+tblHrsPerSqInchAverage,lookupTables/Component/tblHrsPerSqInchAverage.csv,aPriori USA,0.18,100.0

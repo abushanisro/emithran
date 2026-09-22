@@ -1,0 +1,23 @@
+﻿Process Name,Default Tool Shop Name,Default Machine
+Additional Temper,,defaultAdditionalTemper
+Age,,Virtual Oven - Large
+Atmosphere Oil Harden,,defaultAtmosphericOilHarden
+Carbonitride,,defaultCarbonitride
+Carburize,,defaultCarburize
+Certification,,defaultCertification
+Cryogenic Freeze,,defaultCryogenicFreeze
+High Speed Steel Harden,,defaultHighSpeedSteelHarden
+High Temp Vacuum Anneal,,defaultHighTempVacuumAnneal
+Hot Isostatic Pressing,,HIP Graphite Furnace 1100x2500
+Induction Harden,,defaultInductionHarden
+Low Temp Vacuum Anneal,,defaultLowTempVacuumAnneal
+Solution,,defaultSolutionHeatTreat
+Spring Steel Harden,,defaultSpringSteelHarden
+Stainless Steel Harden,,defaultStainlessSteelHarden
+Standard Anneal,,standardAnneal
+Standard Temper,,standardTemper
+Straighten,,defaultStraightening
+Stress Relief,,defaultStressRelieve
+Vacuum Air Harden,,defaultVacuumAirHarden
+Vacuum Air Harden with High Temper,,defaultVacuumAirHardenWithHighTemper
+Vacuum Temper,,defaultVacuumTemper

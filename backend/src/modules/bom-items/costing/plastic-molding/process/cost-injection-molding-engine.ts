@@ -3,7 +3,7 @@
 // Consumes the routed process tree from routing-engine.ts and prices exactly
 // the operations the route selected — the tree decides WHAT happens, this file
 // decides what each step COSTS. Same layering as sheet metal and CNC: route
-// first, cost the route. Mirrors cost-cnc-engine.ts's conventions (makeLine
+// first, cost the route. Mirrors cost-machining-engine.ts's conventions (makeLine
 // process lines, r2/r3 rounding, CostSummaryDto output) so this family costs
 // like every other one from the API consumer's point of view.
 //

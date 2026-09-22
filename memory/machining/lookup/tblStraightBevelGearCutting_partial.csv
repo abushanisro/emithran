@@ -1,0 +1,728 @@
+Material Cut Code Name,Tool Type,Tool Series,Cut Type,Diameter (mm),Hardness,Hardness System,Cutting Speed (m / min),Feed Per Tooth (mm),Blades Per Side,Tool Life (min),Tool Life Cost (USD)
+1.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,125.00,Brinell,62.2,0.064,4,15.00,4.00
+1.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,125.00,Brinell,62.2,0.064,8,15.00,4.00
+1.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,125.00,Brinell,62.2,0.064,8,15.00,4.00
+1.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,125.00,Brinell,62.2,0.064,8,15.00,4.00
+1.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,125.00,Brinell,62.2,0.064,8,15.00,4.00
+1.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,125.00,Brinell,62.2,0.064,8,15.00,4.00
+1.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,125.00,Brinell,62.2,0.064,8,15.00,4.00
+1.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,125.00,Brinell,62.2,0.064,8,15.00,4.00
+1.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,125.00,Brinell,62.2,0.064,8,15.00,4.00
+1.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,125.00,Brinell,62.2,0.064,10,15.00,4.00
+1.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,125.00,Brinell,62.2,0.064,10,15.00,4.00
+1.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,125.00,Brinell,62.2,0.064,10,15.00,4.00
+1.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,125.00,Brinell,62.2,0.064,10,15.00,4.00
+1.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,125.00,Brinell,62.2,0.064,16,15.00,4.00
+1.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,125.00,Brinell,62.2,0.064,16,15.00,4.00
+1.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,125.00,Brinell,62.2,0.064,16,15.00,4.00
+1.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,125.00,Brinell,62.2,0.064,16,15.00,4.00
+1.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,125.00,Brinell,57.9,0.064,4,15.00,4.00
+1.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,125.00,Brinell,57.9,0.064,8,15.00,4.00
+1.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,125.00,Brinell,57.9,0.064,8,15.00,4.00
+1.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,125.00,Brinell,57.9,0.064,8,15.00,4.00
+1.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,125.00,Brinell,57.9,0.064,8,15.00,4.00
+1.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,125.00,Brinell,57.9,0.064,8,15.00,4.00
+1.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,125.00,Brinell,57.9,0.064,8,15.00,4.00
+1.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,125.00,Brinell,57.9,0.064,8,15.00,4.00
+1.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,125.00,Brinell,57.9,0.064,8,15.00,4.00
+1.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,125.00,Brinell,57.9,0.064,10,15.00,4.00
+1.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,125.00,Brinell,57.9,0.064,10,15.00,4.00
+1.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,125.00,Brinell,57.9,0.064,10,15.00,4.00
+1.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,125.00,Brinell,57.9,0.064,10,15.00,4.00
+1.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,125.00,Brinell,57.9,0.064,16,15.00,4.00
+1.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,125.00,Brinell,57.9,0.064,16,15.00,4.00
+1.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,125.00,Brinell,57.9,0.064,16,15.00,4.00
+1.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,125.00,Brinell,57.9,0.064,16,15.00,4.00
+1.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,150.00,Brinell,49.3,0.111,4,15.00,4.00
+1.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,150.00,Brinell,49.3,0.111,8,15.00,4.00
+1.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,150.00,Brinell,49.3,0.111,8,15.00,4.00
+1.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,150.00,Brinell,49.3,0.111,8,15.00,4.00
+1.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,150.00,Brinell,49.3,0.111,8,15.00,4.00
+1.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,150.00,Brinell,49.3,0.111,8,15.00,4.00
+1.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,150.00,Brinell,49.3,0.111,8,15.00,4.00
+1.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,150.00,Brinell,49.3,0.111,8,15.00,4.00
+1.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,150.00,Brinell,49.3,0.111,8,15.00,4.00
+1.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,150.00,Brinell,49.3,0.111,10,15.00,4.00
+23.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,400.00,Tensile Strength,17.3,0.101,8,15.00,4.00
+23.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,400.00,Tensile Strength,17.3,0.101,8,15.00,4.00
+23.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,400.00,Tensile Strength,17.3,0.101,8,15.00,4.00
+23.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,400.00,Tensile Strength,17.3,0.101,10,15.00,4.00
+23.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,400.00,Tensile Strength,17.3,0.101,10,15.00,4.00
+23.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,400.00,Tensile Strength,17.3,0.101,10,15.00,4.00
+23.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,400.00,Tensile Strength,17.3,0.101,10,15.00,4.00
+23.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,400.00,Tensile Strength,17.3,0.101,16,15.00,4.00
+23.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,400.00,Tensile Strength,17.3,0.101,16,15.00,4.00
+23.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,400.00,Tensile Strength,17.3,0.101,16,15.00,4.00
+23.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,400.00,Tensile Strength,17.3,0.101,16,15.00,4.00
+23.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,950.00,Tensile Strength,12.9,0.111,4,15.00,4.00
+23.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,950.00,Tensile Strength,12.9,0.111,8,15.00,4.00
+23.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,950.00,Tensile Strength,12.9,0.111,8,15.00,4.00
+23.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,950.00,Tensile Strength,12.9,0.111,8,15.00,4.00
+23.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,950.00,Tensile Strength,12.9,0.111,8,15.00,4.00
+23.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,950.00,Tensile Strength,12.9,0.111,8,15.00,4.00
+23.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,950.00,Tensile Strength,12.9,0.111,8,15.00,4.00
+23.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,950.00,Tensile Strength,12.9,0.111,8,15.00,4.00
+23.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,950.00,Tensile Strength,12.9,0.111,8,15.00,4.00
+23.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,950.00,Tensile Strength,12.9,0.111,10,15.00,4.00
+23.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,950.00,Tensile Strength,12.9,0.111,10,15.00,4.00
+23.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,950.00,Tensile Strength,12.9,0.111,10,15.00,4.00
+23.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,950.00,Tensile Strength,12.9,0.111,10,15.00,4.00
+23.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,950.00,Tensile Strength,12.9,0.111,16,15.00,4.00
+23.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,950.00,Tensile Strength,12.9,0.111,16,15.00,4.00
+23.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,950.00,Tensile Strength,12.9,0.111,16,15.00,4.00
+23.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,950.00,Tensile Strength,12.9,0.111,16,15.00,4.00
+23.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,1050.00,Tensile Strength,12.9,0.111,4,15.00,4.00
+23.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,1050.00,Tensile Strength,12.9,0.111,8,15.00,4.00
+23.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,1050.00,Tensile Strength,12.9,0.111,8,15.00,4.00
+23.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,1050.00,Tensile Strength,12.9,0.111,8,15.00,4.00
+23.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,1050.00,Tensile Strength,12.9,0.111,8,15.00,4.00
+23.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,1050.00,Tensile Strength,12.9,0.111,8,15.00,4.00
+23.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,1050.00,Tensile Strength,12.9,0.111,8,15.00,4.00
+23.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,1050.00,Tensile Strength,12.9,0.111,8,15.00,4.00
+23.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,1050.00,Tensile Strength,12.9,0.111,8,15.00,4.00
+23.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,1050.00,Tensile Strength,12.9,0.111,10,15.00,4.00
+23.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,1050.00,Tensile Strength,12.9,0.111,10,15.00,4.00
+23.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,1050.00,Tensile Strength,12.9,0.111,10,15.00,4.00
+23.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,1050.00,Tensile Strength,12.9,0.111,10,15.00,4.00
+23.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,1050.00,Tensile Strength,12.9,0.111,16,15.00,4.00
+23.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,1050.00,Tensile Strength,12.9,0.111,16,15.00,4.00
+34.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,515.00,Brinell,107.1,0.122,16,15.00,4.00
+34.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,515.00,Brinell,107.1,0.122,16,15.00,4.00
+34.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,515.00,Brinell,107.1,0.122,16,15.00,4.00
+34.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,515.00,Brinell,107.1,0.122,16,15.00,4.00
+4.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,55.00,Rockwell C,24.1,0.119,4,15.00,4.00
+4.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,55.00,Rockwell C,24.1,0.119,8,15.00,4.00
+4.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,55.00,Rockwell C,24.1,0.119,8,15.00,4.00
+4.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,55.00,Rockwell C,24.1,0.119,8,15.00,4.00
+4.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,55.00,Rockwell C,24.1,0.119,8,15.00,4.00
+4.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,55.00,Rockwell C,24.1,0.119,8,15.00,4.00
+4.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,55.00,Rockwell C,24.1,0.119,8,15.00,4.00
+4.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,55.00,Rockwell C,24.1,0.119,8,15.00,4.00
+4.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,55.00,Rockwell C,24.1,0.119,8,15.00,4.00
+4.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,55.00,Rockwell C,24.1,0.119,10,15.00,4.00
+4.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,55.00,Rockwell C,24.1,0.119,10,15.00,4.00
+4.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,55.00,Rockwell C,24.1,0.119,10,15.00,4.00
+4.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,55.00,Rockwell C,24.1,0.119,10,15.00,4.00
+4.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,55.00,Rockwell C,24.1,0.119,16,15.00,4.00
+4.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,55.00,Rockwell C,24.1,0.119,16,15.00,4.00
+4.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,55.00,Rockwell C,24.1,0.119,16,15.00,4.00
+4.0,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,55.00,Rockwell C,24.1,0.119,16,15.00,4.00
+4.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,59.00,Rockwell C,13.6,0.119,4,15.00,4.00
+4.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,59.00,Rockwell C,13.6,0.119,8,15.00,4.00
+4.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,59.00,Rockwell C,13.6,0.119,8,15.00,4.00
+4.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,59.00,Rockwell C,13.6,0.119,8,15.00,4.00
+4.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,59.00,Rockwell C,13.6,0.119,8,15.00,4.00
+4.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,59.00,Rockwell C,13.6,0.119,8,15.00,4.00
+4.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,59.00,Rockwell C,13.6,0.119,8,15.00,4.00
+4.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,59.00,Rockwell C,13.6,0.119,8,15.00,4.00
+4.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,59.00,Rockwell C,13.6,0.119,8,15.00,4.00
+4.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,59.00,Rockwell C,13.6,0.119,10,15.00,4.00
+4.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,59.00,Rockwell C,13.6,0.119,10,15.00,4.00
+4.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,59.00,Rockwell C,13.6,0.119,10,15.00,4.00
+4.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,59.00,Rockwell C,13.6,0.119,10,15.00,4.00
+4.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,59.00,Rockwell C,13.6,0.119,16,15.00,4.00
+4.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,59.00,Rockwell C,13.6,0.119,16,15.00,4.00
+4.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,59.00,Rockwell C,13.6,0.119,16,15.00,4.00
+4.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,59.00,Rockwell C,13.6,0.119,16,15.00,4.00
+41.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,30.00,Brinell,69.5,0.098,4,15.00,4.00
+41.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,30.00,Brinell,69.5,0.098,8,15.00,4.00
+41.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,30.00,Brinell,69.5,0.098,8,15.00,4.00
+41.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,30.00,Brinell,69.5,0.098,8,15.00,4.00
+41.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,30.00,Brinell,69.5,0.098,8,15.00,4.00
+5.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,200.00,Brinell,26.7,0.111,16,15.00,4.00
+5.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,200.00,Brinell,26.7,0.111,16,15.00,4.00
+5.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,200.00,Brinell,31.8,0.111,4,15.00,4.00
+5.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,200.00,Brinell,31.8,0.111,8,15.00,4.00
+5.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,200.00,Brinell,31.8,0.111,8,15.00,4.00
+5.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,200.00,Brinell,31.8,0.111,8,15.00,4.00
+5.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,200.00,Brinell,31.8,0.111,8,15.00,4.00
+5.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,200.00,Brinell,31.8,0.111,8,15.00,4.00
+5.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,200.00,Brinell,31.8,0.111,8,15.00,4.00
+5.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,200.00,Brinell,31.8,0.111,8,15.00,4.00
+5.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,200.00,Brinell,31.8,0.111,8,15.00,4.00
+5.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,200.00,Brinell,31.8,0.111,10,15.00,4.00
+5.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,200.00,Brinell,31.8,0.111,10,15.00,4.00
+5.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,200.00,Brinell,31.8,0.111,10,15.00,4.00
+5.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,200.00,Brinell,31.8,0.111,10,15.00,4.00
+5.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,200.00,Brinell,31.8,0.111,16,15.00,4.00
+5.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,200.00,Brinell,31.8,0.111,16,15.00,4.00
+5.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,200.00,Brinell,31.8,0.111,16,15.00,4.00
+5.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,200.00,Brinell,31.8,0.111,16,15.00,4.00
+5.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,330.00,Brinell,31.4,0.111,4,15.00,4.00
+5.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,330.00,Brinell,31.4,0.111,8,15.00,4.00
+5.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,330.00,Brinell,31.4,0.111,8,15.00,4.00
+5.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,330.00,Brinell,31.4,0.111,8,15.00,4.00
+5.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,330.00,Brinell,31.4,0.111,8,15.00,4.00
+5.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,330.00,Brinell,31.4,0.111,8,15.00,4.00
+5.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,330.00,Brinell,31.4,0.111,8,15.00,4.00
+5.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,330.00,Brinell,31.4,0.111,8,15.00,4.00
+5.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,330.00,Brinell,31.4,0.111,8,15.00,4.00
+5.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,330.00,Brinell,31.4,0.111,10,15.00,4.00
+5.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,330.00,Brinell,31.4,0.111,10,15.00,4.00
+5.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,330.00,Brinell,31.4,0.111,10,15.00,4.00
+5.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,330.00,Brinell,31.4,0.111,10,15.00,4.00
+5.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,330.00,Brinell,31.4,0.111,16,15.00,4.00
+5.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,330.00,Brinell,31.4,0.111,16,15.00,4.00
+5.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,330.00,Brinell,31.4,0.111,16,15.00,4.00
+5.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,330.00,Brinell,31.4,0.111,16,15.00,4.00
+5.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,330.00,Brinell,33.5,0.111,4,15.00,4.00
+5.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,330.00,Brinell,33.5,0.111,8,15.00,4.00
+5.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,330.00,Brinell,33.5,0.111,8,15.00,4.00
+5.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,330.00,Brinell,33.5,0.111,8,15.00,4.00
+5.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,330.00,Brinell,33.5,0.111,8,15.00,4.00
+5.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,330.00,Brinell,33.5,0.111,8,15.00,4.00
+5.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,330.00,Brinell,33.5,0.111,8,15.00,4.00
+5.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,330.00,Brinell,33.5,0.111,8,15.00,4.00
+5.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,330.00,Brinell,33.5,0.111,8,15.00,4.00
+5.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,330.00,Brinell,33.5,0.111,10,15.00,4.00
+5.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,330.00,Brinell,33.5,0.111,10,15.00,4.00
+5.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,330.00,Brinell,33.5,0.111,10,15.00,4.00
+5.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,330.00,Brinell,33.5,0.111,10,15.00,4.00
+5.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,330.00,Brinell,33.5,0.111,16,15.00,4.00
+5.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,330.00,Brinell,33.5,0.111,16,15.00,4.00
+5.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,330.00,Brinell,33.5,0.111,16,15.00,4.00
+5.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,330.00,Brinell,33.5,0.111,16,15.00,4.00
+5.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,175.00,Brinell,47.6,0.111,4,15.00,4.00
+5.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,175.00,Brinell,47.6,0.111,8,15.00,4.00
+5.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,175.00,Brinell,47.6,0.111,8,15.00,4.00
+5.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,175.00,Brinell,47.6,0.111,8,15.00,4.00
+5.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,175.00,Brinell,47.6,0.111,8,15.00,4.00
+5.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,175.00,Brinell,47.6,0.111,8,15.00,4.00
+5.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,175.00,Brinell,47.6,0.111,8,15.00,4.00
+5.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,175.00,Brinell,47.6,0.111,8,15.00,4.00
+5.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,175.00,Brinell,47.6,0.111,8,15.00,4.00
+5.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,175.00,Brinell,47.6,0.111,10,15.00,4.00
+5.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,175.00,Brinell,47.6,0.111,10,15.00,4.00
+5.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,175.00,Brinell,47.6,0.111,10,15.00,4.00
+5.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,175.00,Brinell,47.6,0.111,10,15.00,4.00
+5.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,175.00,Brinell,47.6,0.111,16,15.00,4.00
+5.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,175.00,Brinell,47.6,0.111,16,15.00,4.00
+5.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,175.00,Brinell,47.6,0.111,16,15.00,4.00
+5.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,175.00,Brinell,47.6,0.111,16,15.00,4.00
+5.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,200.00,Brinell,32.1,0.095,4,15.00,4.00
+5.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,200.00,Brinell,32.1,0.095,8,15.00,4.00
+5.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,200.00,Brinell,32.1,0.095,8,15.00,4.00
+5.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,200.00,Brinell,32.1,0.095,8,15.00,4.00
+5.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,200.00,Brinell,32.1,0.095,8,15.00,4.00
+5.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,200.00,Brinell,32.1,0.095,8,15.00,4.00
+5.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,200.00,Brinell,32.1,0.095,8,15.00,4.00
+5.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,200.00,Brinell,32.1,0.095,8,15.00,4.00
+5.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,200.00,Brinell,32.1,0.095,8,15.00,4.00
+5.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,200.00,Brinell,32.1,0.095,10,15.00,4.00
+5.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,200.00,Brinell,32.1,0.095,10,15.00,4.00
+5.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,200.00,Brinell,32.1,0.095,10,15.00,4.00
+5.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,200.00,Brinell,32.1,0.095,10,15.00,4.00
+5.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,200.00,Brinell,32.1,0.095,16,15.00,4.00
+5.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,200.00,Brinell,32.1,0.095,16,15.00,4.00
+5.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,200.00,Brinell,32.1,0.095,16,15.00,4.00
+5.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,200.00,Brinell,32.1,0.095,16,15.00,4.00
+5.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,330.00,Brinell,27.7,0.095,4,15.00,4.00
+5.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,330.00,Brinell,27.7,0.095,8,15.00,4.00
+5.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,330.00,Brinell,27.7,0.095,8,15.00,4.00
+5.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,330.00,Brinell,27.7,0.095,8,15.00,4.00
+5.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,330.00,Brinell,27.7,0.095,8,15.00,4.00
+5.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,330.00,Brinell,27.7,0.095,8,15.00,4.00
+5.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,330.00,Brinell,27.7,0.095,8,15.00,4.00
+5.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,330.00,Brinell,27.7,0.095,8,15.00,4.00
+5.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,330.00,Brinell,27.7,0.095,8,15.00,4.00
+5.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,330.00,Brinell,27.7,0.095,10,15.00,4.00
+5.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,330.00,Brinell,27.7,0.095,10,15.00,4.00
+5.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,330.00,Brinell,27.7,0.095,10,15.00,4.00
+5.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,330.00,Brinell,27.7,0.095,10,15.00,4.00
+5.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,330.00,Brinell,27.7,0.095,16,15.00,4.00
+5.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,330.00,Brinell,27.7,0.095,16,15.00,4.00
+5.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,330.00,Brinell,27.7,0.095,16,15.00,4.00
+5.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,330.00,Brinell,27.7,0.095,16,15.00,4.00
+5.23,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,200.00,Brinell,23.1,0.095,4,15.00,4.00
+5.23,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,200.00,Brinell,23.1,0.095,8,15.00,4.00
+5.23,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,200.00,Brinell,23.1,0.095,8,15.00,4.00
+5.23,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,200.00,Brinell,23.1,0.095,8,15.00,4.00
+5.23,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,200.00,Brinell,23.1,0.095,8,15.00,4.00
+5.23,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,200.00,Brinell,23.1,0.095,8,15.00,4.00
+5.23,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,200.00,Brinell,23.1,0.095,8,15.00,4.00
+5.23,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,200.00,Brinell,23.1,0.095,8,15.00,4.00
+5.23,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,200.00,Brinell,23.1,0.095,8,15.00,4.00
+5.23,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,200.00,Brinell,23.1,0.095,10,15.00,4.00
+5.23,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,200.00,Brinell,23.1,0.095,10,15.00,4.00
+5.23,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,200.00,Brinell,23.1,0.095,10,15.00,4.00
+5.23,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,200.00,Brinell,23.1,0.095,10,15.00,4.00
+5.23,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,200.00,Brinell,23.1,0.095,16,15.00,4.00
+5.23,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,200.00,Brinell,23.1,0.095,16,15.00,4.00
+5.23,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,200.00,Brinell,23.1,0.095,16,15.00,4.00
+5.23,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,200.00,Brinell,23.1,0.095,16,15.00,4.00
+5.51,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,230.00,Brinell,23.6,0.095,4,15.00,4.00
+5.51,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,230.00,Brinell,23.6,0.095,8,15.00,4.00
+5.51,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,230.00,Brinell,23.6,0.095,8,15.00,4.00
+5.51,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,230.00,Brinell,23.6,0.095,8,15.00,4.00
+5.51,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,230.00,Brinell,23.6,0.095,8,15.00,4.00
+5.51,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,230.00,Brinell,23.6,0.095,8,15.00,4.00
+5.51,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,230.00,Brinell,23.6,0.095,8,15.00,4.00
+5.51,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,230.00,Brinell,23.6,0.095,8,15.00,4.00
+5.51,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,230.00,Brinell,23.6,0.095,8,15.00,4.00
+5.51,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,230.00,Brinell,23.6,0.095,10,15.00,4.00
+5.51,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,230.00,Brinell,23.6,0.095,10,15.00,4.00
+5.51,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,230.00,Brinell,23.6,0.095,10,15.00,4.00
+5.51,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,230.00,Brinell,23.6,0.095,10,15.00,4.00
+5.51,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,230.00,Brinell,23.6,0.095,16,15.00,4.00
+5.51,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,230.00,Brinell,23.6,0.095,16,15.00,4.00
+5.51,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,230.00,Brinell,23.6,0.095,16,15.00,4.00
+5.51,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,230.00,Brinell,23.6,0.095,16,15.00,4.00
+5.52,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,260.00,Brinell,23.6,0.095,4,15.00,4.00
+5.52,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,260.00,Brinell,23.6,0.095,8,15.00,4.00
+5.52,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,260.00,Brinell,23.6,0.095,8,15.00,4.00
+5.52,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,260.00,Brinell,23.6,0.095,8,15.00,4.00
+5.52,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,260.00,Brinell,23.6,0.095,8,15.00,4.00
+5.52,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,260.00,Brinell,23.6,0.095,8,15.00,4.00
+5.52,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,260.00,Brinell,23.6,0.095,8,15.00,4.00
+5.52,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,260.00,Brinell,23.6,0.095,8,15.00,4.00
+5.52,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,260.00,Brinell,23.6,0.095,8,15.00,4.00
+5.52,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,260.00,Brinell,23.6,0.095,10,15.00,4.00
+5.52,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,260.00,Brinell,23.6,0.095,10,15.00,4.00
+5.52,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,260.00,Brinell,23.6,0.095,10,15.00,4.00
+5.52,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,260.00,Brinell,23.6,0.095,10,15.00,4.00
+5.52,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,260.00,Brinell,23.6,0.095,16,15.00,4.00
+5.52,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,260.00,Brinell,23.6,0.095,16,15.00,4.00
+5.52,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,260.00,Brinell,23.6,0.095,16,15.00,4.00
+5.52,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,260.00,Brinell,23.6,0.095,16,15.00,4.00
+51.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,30.00,Brinell,141.9,0.147,4,15.00,4.00
+51.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,30.00,Brinell,141.9,0.147,8,15.00,4.00
+51.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,30.00,Brinell,141.9,0.147,8,15.00,4.00
+51.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,30.00,Brinell,141.9,0.147,8,15.00,4.00
+51.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,30.00,Brinell,141.9,0.147,8,15.00,4.00
+51.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,30.00,Brinell,141.9,0.147,8,15.00,4.00
+51.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,30.00,Brinell,141.9,0.147,8,15.00,4.00
+51.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,30.00,Brinell,141.9,0.147,8,15.00,4.00
+51.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,30.00,Brinell,141.9,0.147,8,15.00,4.00
+51.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,30.00,Brinell,141.9,0.147,10,15.00,4.00
+51.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,30.00,Brinell,141.9,0.147,10,15.00,4.00
+51.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,30.00,Brinell,141.9,0.147,10,15.00,4.00
+51.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,30.00,Brinell,141.9,0.147,10,15.00,4.00
+51.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,30.00,Brinell,141.9,0.147,16,15.00,4.00
+51.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,30.00,Brinell,141.9,0.147,16,15.00,4.00
+51.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,30.00,Brinell,141.9,0.147,16,15.00,4.00
+51.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,30.00,Brinell,141.9,0.147,16,15.00,4.00
+51.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,30.00,Brinell,141.9,0.147,4,15.00,4.00
+51.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,30.00,Brinell,141.9,0.147,8,15.00,4.00
+51.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,30.00,Brinell,141.9,0.147,8,15.00,4.00
+51.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,30.00,Brinell,141.9,0.147,8,15.00,4.00
+51.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,30.00,Brinell,141.9,0.147,8,15.00,4.00
+51.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,30.00,Brinell,141.9,0.147,8,15.00,4.00
+51.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,30.00,Brinell,141.9,0.147,8,15.00,4.00
+51.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,30.00,Brinell,141.9,0.147,8,15.00,4.00
+51.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,30.00,Brinell,141.9,0.147,8,15.00,4.00
+51.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,30.00,Brinell,141.9,0.147,10,15.00,4.00
+51.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,30.00,Brinell,141.9,0.147,10,15.00,4.00
+51.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,30.00,Brinell,141.9,0.147,10,15.00,4.00
+51.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,30.00,Brinell,141.9,0.147,10,15.00,4.00
+51.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,30.00,Brinell,141.9,0.147,16,15.00,4.00
+51.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,30.00,Brinell,141.9,0.147,16,15.00,4.00
+51.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,30.00,Brinell,141.9,0.147,16,15.00,4.00
+51.22,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,30.00,Brinell,141.9,0.147,16,15.00,4.00
+51.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,30.00,Brinell,176.6,0.147,4,15.00,4.00
+51.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,30.00,Brinell,176.6,0.147,8,15.00,4.00
+51.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,30.00,Brinell,176.6,0.147,8,15.00,4.00
+51.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,30.00,Brinell,176.6,0.147,8,15.00,4.00
+51.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,30.00,Brinell,176.6,0.147,8,15.00,4.00
+51.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,30.00,Brinell,176.6,0.147,8,15.00,4.00
+51.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,30.00,Brinell,176.6,0.147,8,15.00,4.00
+51.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,30.00,Brinell,176.6,0.147,8,15.00,4.00
+51.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,30.00,Brinell,176.6,0.147,8,15.00,4.00
+51.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,30.00,Brinell,176.6,0.147,10,15.00,4.00
+51.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,30.00,Brinell,176.6,0.147,10,15.00,4.00
+51.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,30.00,Brinell,176.6,0.147,10,15.00,4.00
+51.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,30.00,Brinell,176.6,0.147,10,15.00,4.00
+51.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,30.00,Brinell,176.6,0.147,16,15.00,4.00
+51.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,30.00,Brinell,176.6,0.147,16,15.00,4.00
+51.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,30.00,Brinell,176.6,0.147,16,15.00,4.00
+51.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,30.00,Brinell,176.6,0.147,16,15.00,4.00
+51.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,30.00,Brinell,176.6,0.147,4,15.00,4.00
+51.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,30.00,Brinell,176.6,0.147,8,15.00,4.00
+51.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,30.00,Brinell,176.6,0.147,8,15.00,4.00
+51.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,30.00,Brinell,176.6,0.147,8,15.00,4.00
+51.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,30.00,Brinell,176.6,0.147,8,15.00,4.00
+51.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,30.00,Brinell,176.6,0.147,8,15.00,4.00
+51.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,30.00,Brinell,176.6,0.147,8,15.00,4.00
+51.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,30.00,Brinell,176.6,0.147,8,15.00,4.00
+51.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,30.00,Brinell,176.6,0.147,8,15.00,4.00
+51.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,30.00,Brinell,176.6,0.147,10,15.00,4.00
+51.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,30.00,Brinell,176.6,0.147,10,15.00,4.00
+51.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,30.00,Brinell,176.6,0.147,10,15.00,4.00
+51.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,30.00,Brinell,176.6,0.147,10,15.00,4.00
+51.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,30.00,Brinell,176.6,0.147,16,15.00,4.00
+51.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,30.00,Brinell,176.6,0.147,16,15.00,4.00
+51.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,30.00,Brinell,176.6,0.147,16,15.00,4.00
+51.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,30.00,Brinell,176.6,0.147,16,15.00,4.00
+52.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,30.00,Brinell,78.2,0.147,4,15.00,4.00
+52.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,30.00,Brinell,78.2,0.147,8,15.00,4.00
+52.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,30.00,Brinell,78.2,0.147,8,15.00,4.00
+52.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,30.00,Brinell,78.2,0.147,8,15.00,4.00
+52.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,30.00,Brinell,78.2,0.147,8,15.00,4.00
+52.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,30.00,Brinell,78.2,0.147,8,15.00,4.00
+52.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,30.00,Brinell,78.2,0.147,8,15.00,4.00
+52.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,30.00,Brinell,78.2,0.147,8,15.00,4.00
+52.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,30.00,Brinell,78.2,0.147,8,15.00,4.00
+52.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,30.00,Brinell,78.2,0.147,10,15.00,4.00
+52.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,30.00,Brinell,78.2,0.147,10,15.00,4.00
+52.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,30.00,Brinell,78.2,0.147,10,15.00,4.00
+52.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,30.00,Brinell,78.2,0.147,10,15.00,4.00
+52.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,30.00,Brinell,78.2,0.147,16,15.00,4.00
+52.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,30.00,Brinell,78.2,0.147,16,15.00,4.00
+52.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,30.00,Brinell,78.2,0.147,16,15.00,4.00
+52.11,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,30.00,Brinell,78.2,0.147,16,15.00,4.00
+52.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,30.00,Brinell,98.5,0.147,4,15.00,4.00
+52.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,30.00,Brinell,98.5,0.147,8,15.00,4.00
+52.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,30.00,Brinell,98.5,0.147,8,15.00,4.00
+52.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,30.00,Brinell,98.5,0.147,8,15.00,4.00
+52.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,30.00,Brinell,98.5,0.147,8,15.00,4.00
+52.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,30.00,Brinell,98.5,0.147,8,15.00,4.00
+52.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,30.00,Brinell,98.5,0.147,8,15.00,4.00
+52.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,30.00,Brinell,98.5,0.147,8,15.00,4.00
+52.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,30.00,Brinell,98.5,0.147,8,15.00,4.00
+52.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,30.00,Brinell,98.5,0.147,10,15.00,4.00
+52.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,30.00,Brinell,98.5,0.147,10,15.00,4.00
+52.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,30.00,Brinell,98.5,0.147,10,15.00,4.00
+52.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,30.00,Brinell,98.5,0.147,10,15.00,4.00
+52.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,30.00,Brinell,98.5,0.147,16,15.00,4.00
+52.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,30.00,Brinell,98.5,0.147,16,15.00,4.00
+52.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,30.00,Brinell,98.5,0.147,16,15.00,4.00
+52.12,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,30.00,Brinell,98.5,0.147,16,15.00,4.00
+52.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,30.00,Brinell,98.5,0.147,4,15.00,4.00
+52.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,30.00,Brinell,98.5,0.147,8,15.00,4.00
+52.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,30.00,Brinell,98.5,0.147,8,15.00,4.00
+52.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,30.00,Brinell,98.5,0.147,8,15.00,4.00
+52.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,30.00,Brinell,98.5,0.147,8,15.00,4.00
+52.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,30.00,Brinell,98.5,0.147,8,15.00,4.00
+52.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,30.00,Brinell,98.5,0.147,8,15.00,4.00
+52.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,30.00,Brinell,98.5,0.147,8,15.00,4.00
+52.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,30.00,Brinell,98.5,0.147,8,15.00,4.00
+52.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,30.00,Brinell,98.5,0.147,10,15.00,4.00
+52.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,30.00,Brinell,98.5,0.147,10,15.00,4.00
+52.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,30.00,Brinell,98.5,0.147,10,15.00,4.00
+52.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,30.00,Brinell,98.5,0.147,10,15.00,4.00
+52.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,30.00,Brinell,98.5,0.147,16,15.00,4.00
+52.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,30.00,Brinell,98.5,0.147,16,15.00,4.00
+52.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,30.00,Brinell,98.5,0.147,16,15.00,4.00
+52.13,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,30.00,Brinell,98.5,0.147,16,15.00,4.00
+52.14,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,30.00,Brinell,98.5,0.098,4,15.00,4.00
+52.14,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,30.00,Brinell,98.5,0.098,8,15.00,4.00
+52.14,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,30.00,Brinell,98.5,0.098,8,15.00,4.00
+52.14,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,30.00,Brinell,98.5,0.098,8,15.00,4.00
+52.14,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,30.00,Brinell,98.5,0.098,8,15.00,4.00
+52.14,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,30.00,Brinell,98.5,0.098,8,15.00,4.00
+52.14,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,30.00,Brinell,98.5,0.098,8,15.00,4.00
+52.14,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,30.00,Brinell,98.5,0.098,8,15.00,4.00
+52.14,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,30.00,Brinell,98.5,0.098,8,15.00,4.00
+52.14,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,30.00,Brinell,98.5,0.098,10,15.00,4.00
+52.14,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,30.00,Brinell,98.5,0.098,10,15.00,4.00
+52.14,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,30.00,Brinell,98.5,0.098,10,15.00,4.00
+52.14,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,30.00,Brinell,98.5,0.098,10,15.00,4.00
+52.14,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,30.00,Brinell,98.5,0.098,16,15.00,4.00
+52.14,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,30.00,Brinell,98.5,0.098,16,15.00,4.00
+52.14,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,30.00,Brinell,98.5,0.098,16,15.00,4.00
+52.14,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,30.00,Brinell,98.5,0.098,16,15.00,4.00
+52.15,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,30.00,Brinell,133.2,0.147,4,15.00,4.00
+52.15,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,30.00,Brinell,133.2,0.147,8,15.00,4.00
+52.15,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,30.00,Brinell,133.2,0.147,8,15.00,4.00
+52.15,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,30.00,Brinell,133.2,0.147,8,15.00,4.00
+52.15,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,30.00,Brinell,133.2,0.147,8,15.00,4.00
+52.15,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,30.00,Brinell,133.2,0.147,8,15.00,4.00
+52.15,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,30.00,Brinell,133.2,0.147,8,15.00,4.00
+52.15,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,30.00,Brinell,133.2,0.147,8,15.00,4.00
+52.15,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,30.00,Brinell,133.2,0.147,8,15.00,4.00
+52.15,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,30.00,Brinell,133.2,0.147,10,15.00,4.00
+52.15,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,30.00,Brinell,133.2,0.147,10,15.00,4.00
+52.15,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,30.00,Brinell,133.2,0.147,10,15.00,4.00
+52.15,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,30.00,Brinell,133.2,0.147,10,15.00,4.00
+52.15,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,30.00,Brinell,133.2,0.147,16,15.00,4.00
+52.15,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,30.00,Brinell,133.2,0.147,16,15.00,4.00
+52.15,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,30.00,Brinell,133.2,0.147,16,15.00,4.00
+52.15,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,30.00,Brinell,133.2,0.147,16,15.00,4.00
+52.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,30.00,Brinell,133.2,0.147,4,15.00,4.00
+52.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,30.00,Brinell,133.2,0.147,8,15.00,4.00
+52.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,30.00,Brinell,133.2,0.147,8,15.00,4.00
+52.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,30.00,Brinell,133.2,0.147,8,15.00,4.00
+52.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,30.00,Brinell,133.2,0.147,8,15.00,4.00
+52.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,30.00,Brinell,133.2,0.147,8,15.00,4.00
+52.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,30.00,Brinell,133.2,0.147,8,15.00,4.00
+52.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,30.00,Brinell,133.2,0.147,8,15.00,4.00
+52.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,30.00,Brinell,133.2,0.147,8,15.00,4.00
+52.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,30.00,Brinell,133.2,0.147,10,15.00,4.00
+52.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,30.00,Brinell,133.2,0.147,10,15.00,4.00
+52.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,30.00,Brinell,133.2,0.147,10,15.00,4.00
+52.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,30.00,Brinell,133.2,0.147,10,15.00,4.00
+52.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,30.00,Brinell,133.2,0.147,16,15.00,4.00
+52.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,30.00,Brinell,133.2,0.147,16,15.00,4.00
+52.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,30.00,Brinell,133.2,0.147,16,15.00,4.00
+52.21,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,30.00,Brinell,133.2,0.147,16,15.00,4.00
+52.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,30.00,Brinell,176.6,0.147,4,15.00,4.00
+52.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,30.00,Brinell,176.6,0.147,8,15.00,4.00
+52.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,30.00,Brinell,176.6,0.147,8,15.00,4.00
+52.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,30.00,Brinell,176.6,0.147,8,15.00,4.00
+52.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,30.00,Brinell,176.6,0.147,8,15.00,4.00
+52.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,30.00,Brinell,176.6,0.147,8,15.00,4.00
+52.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,30.00,Brinell,176.6,0.147,8,15.00,4.00
+52.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,30.00,Brinell,176.6,0.147,8,15.00,4.00
+52.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,30.00,Brinell,176.6,0.147,8,15.00,4.00
+52.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,30.00,Brinell,176.6,0.147,10,15.00,4.00
+52.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,30.00,Brinell,176.6,0.147,10,15.00,4.00
+52.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,30.00,Brinell,176.6,0.147,10,15.00,4.00
+52.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,30.00,Brinell,176.6,0.147,10,15.00,4.00
+52.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,30.00,Brinell,176.6,0.147,16,15.00,4.00
+52.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,30.00,Brinell,176.6,0.147,16,15.00,4.00
+52.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,30.00,Brinell,176.6,0.147,16,15.00,4.00
+52.31,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,30.00,Brinell,176.6,0.147,16,15.00,4.00
+52.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,30.00,Brinell,176.6,0.147,4,15.00,4.00
+52.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,30.00,Brinell,176.6,0.147,8,15.00,4.00
+52.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,30.00,Brinell,176.6,0.147,8,15.00,4.00
+52.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,30.00,Brinell,176.6,0.147,8,15.00,4.00
+52.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,30.00,Brinell,176.6,0.147,8,15.00,4.00
+52.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,30.00,Brinell,176.6,0.147,8,15.00,4.00
+52.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,30.00,Brinell,176.6,0.147,8,15.00,4.00
+52.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,30.00,Brinell,176.6,0.147,8,15.00,4.00
+52.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,30.00,Brinell,176.6,0.147,8,15.00,4.00
+52.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,30.00,Brinell,176.6,0.147,10,15.00,4.00
+52.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,30.00,Brinell,176.6,0.147,10,15.00,4.00
+52.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,30.00,Brinell,176.6,0.147,10,15.00,4.00
+52.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,30.00,Brinell,176.6,0.147,10,15.00,4.00
+52.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,30.00,Brinell,176.6,0.147,16,15.00,4.00
+52.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,30.00,Brinell,176.6,0.147,16,15.00,4.00
+52.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,30.00,Brinell,176.6,0.147,16,15.00,4.00
+52.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,30.00,Brinell,176.6,0.147,16,15.00,4.00
+6.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,150.00,Brinell,42.9,0.064,4,15.00,4.00
+6.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,150.00,Brinell,42.9,0.064,8,15.00,4.00
+6.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,150.00,Brinell,42.9,0.064,8,15.00,4.00
+6.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,150.00,Brinell,42.9,0.064,8,15.00,4.00
+6.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,150.00,Brinell,42.9,0.064,8,15.00,4.00
+6.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,150.00,Brinell,42.9,0.064,8,15.00,4.00
+6.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,150.00,Brinell,42.9,0.064,8,15.00,4.00
+6.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,150.00,Brinell,42.9,0.064,8,15.00,4.00
+6.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,150.00,Brinell,42.9,0.064,8,15.00,4.00
+6.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,150.00,Brinell,42.9,0.064,10,15.00,4.00
+6.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,150.00,Brinell,42.9,0.064,10,15.00,4.00
+6.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,150.00,Brinell,42.9,0.064,10,15.00,4.00
+6.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,150.00,Brinell,42.9,0.064,10,15.00,4.00
+6.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,150.00,Brinell,42.9,0.064,16,15.00,4.00
+6.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,150.00,Brinell,42.9,0.064,16,15.00,4.00
+6.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,150.00,Brinell,42.9,0.064,16,15.00,4.00
+6.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,150.00,Brinell,42.9,0.064,16,15.00,4.00
+6.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,200.00,Brinell,34.3,0.095,4,15.00,4.00
+6.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,200.00,Brinell,34.3,0.095,8,15.00,4.00
+6.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,200.00,Brinell,34.3,0.095,8,15.00,4.00
+6.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,200.00,Brinell,34.3,0.095,8,15.00,4.00
+6.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,200.00,Brinell,34.3,0.095,8,15.00,4.00
+6.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,200.00,Brinell,34.3,0.095,8,15.00,4.00
+6.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,200.00,Brinell,34.3,0.095,8,15.00,4.00
+6.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,200.00,Brinell,34.3,0.095,8,15.00,4.00
+6.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,200.00,Brinell,34.3,0.095,8,15.00,4.00
+6.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,200.00,Brinell,34.3,0.095,10,15.00,4.00
+6.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,200.00,Brinell,34.3,0.095,10,15.00,4.00
+6.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,200.00,Brinell,34.3,0.095,10,15.00,4.00
+6.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,200.00,Brinell,34.3,0.095,10,15.00,4.00
+6.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,200.00,Brinell,34.3,0.095,16,15.00,4.00
+6.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,200.00,Brinell,34.3,0.095,16,15.00,4.00
+6.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,200.00,Brinell,34.3,0.095,16,15.00,4.00
+6.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,200.00,Brinell,34.3,0.095,16,15.00,4.00
+6.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,200.00,Brinell,24.3,0.088,4,15.00,4.00
+6.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,200.00,Brinell,24.3,0.088,8,15.00,4.00
+6.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,200.00,Brinell,24.3,0.088,8,15.00,4.00
+6.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,200.00,Brinell,24.3,0.088,8,15.00,4.00
+6.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,200.00,Brinell,24.3,0.088,8,15.00,4.00
+6.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,200.00,Brinell,24.3,0.088,8,15.00,4.00
+6.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,200.00,Brinell,24.3,0.088,8,15.00,4.00
+6.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,200.00,Brinell,24.3,0.088,8,15.00,4.00
+6.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,200.00,Brinell,24.3,0.088,8,15.00,4.00
+6.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,200.00,Brinell,24.3,0.088,10,15.00,4.00
+6.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,200.00,Brinell,24.3,0.088,10,15.00,4.00
+6.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,200.00,Brinell,24.3,0.088,10,15.00,4.00
+6.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,200.00,Brinell,24.3,0.088,10,15.00,4.00
+6.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,200.00,Brinell,24.3,0.088,16,15.00,4.00
+6.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,200.00,Brinell,24.3,0.088,16,15.00,4.00
+6.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,200.00,Brinell,24.3,0.088,16,15.00,4.00
+6.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,200.00,Brinell,24.3,0.088,16,15.00,4.00
+6.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,200.00,Brinell,16.1,0.088,4,15.00,4.00
+6.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,200.00,Brinell,16.1,0.088,8,15.00,4.00
+6.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,200.00,Brinell,16.1,0.088,8,15.00,4.00
+6.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,200.00,Brinell,16.1,0.088,8,15.00,4.00
+6.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,200.00,Brinell,16.1,0.088,8,15.00,4.00
+6.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,200.00,Brinell,16.1,0.088,8,15.00,4.00
+6.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,200.00,Brinell,16.1,0.088,8,15.00,4.00
+6.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,200.00,Brinell,16.1,0.088,8,15.00,4.00
+6.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,200.00,Brinell,16.1,0.088,8,15.00,4.00
+6.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,200.00,Brinell,16.1,0.088,10,15.00,4.00
+6.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,200.00,Brinell,16.1,0.088,10,15.00,4.00
+6.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,200.00,Brinell,16.1,0.088,10,15.00,4.00
+6.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,200.00,Brinell,16.1,0.088,10,15.00,4.00
+6.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,200.00,Brinell,16.1,0.088,16,15.00,4.00
+6.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,200.00,Brinell,16.1,0.088,16,15.00,4.00
+6.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,200.00,Brinell,16.1,0.088,16,15.00,4.00
+6.32,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,200.00,Brinell,16.1,0.088,16,15.00,4.00
+6.33,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,250.00,Brinell,12.9,0.088,4,15.00,4.00
+6.33,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,250.00,Brinell,12.9,0.088,8,15.00,4.00
+6.33,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,250.00,Brinell,12.9,0.088,8,15.00,4.00
+6.33,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,250.00,Brinell,12.9,0.088,8,15.00,4.00
+6.33,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,250.00,Brinell,12.9,0.088,8,15.00,4.00
+6.33,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,250.00,Brinell,12.9,0.088,8,15.00,4.00
+6.33,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,250.00,Brinell,12.9,0.088,8,15.00,4.00
+6.33,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,250.00,Brinell,12.9,0.088,8,15.00,4.00
+6.33,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,250.00,Brinell,12.9,0.088,8,15.00,4.00
+6.33,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,250.00,Brinell,12.9,0.088,10,15.00,4.00
+6.33,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,250.00,Brinell,12.9,0.088,10,15.00,4.00
+6.33,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,250.00,Brinell,12.9,0.088,10,15.00,4.00
+6.33,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,250.00,Brinell,12.9,0.088,10,15.00,4.00
+6.33,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,250.00,Brinell,12.9,0.088,16,15.00,4.00
+6.33,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,250.00,Brinell,12.9,0.088,16,15.00,4.00
+6.33,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,250.00,Brinell,12.9,0.088,16,15.00,4.00
+6.33,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,250.00,Brinell,12.9,0.088,16,15.00,4.00
+7.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,130.00,Brinell,36.5,0.143,4,15.00,4.00
+7.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,130.00,Brinell,36.5,0.143,8,15.00,4.00
+7.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,130.00,Brinell,36.5,0.143,8,15.00,4.00
+7.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,130.00,Brinell,36.5,0.143,8,15.00,4.00
+7.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,130.00,Brinell,36.5,0.143,8,15.00,4.00
+7.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,130.00,Brinell,36.5,0.143,8,15.00,4.00
+7.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,130.00,Brinell,36.5,0.143,8,15.00,4.00
+7.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,130.00,Brinell,36.5,0.143,8,15.00,4.00
+7.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,130.00,Brinell,36.5,0.143,8,15.00,4.00
+7.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,130.00,Brinell,36.5,0.143,10,15.00,4.00
+7.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,130.00,Brinell,36.5,0.143,10,15.00,4.00
+7.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,130.00,Brinell,36.5,0.143,10,15.00,4.00
+7.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,130.00,Brinell,36.5,0.143,10,15.00,4.00
+7.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,130.00,Brinell,36.5,0.143,16,15.00,4.00
+7.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,130.00,Brinell,36.5,0.143,16,15.00,4.00
+7.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,130.00,Brinell,36.5,0.143,16,15.00,4.00
+7.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,130.00,Brinell,36.5,0.143,16,15.00,4.00
+7.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,230.00,Brinell,30.0,0.111,4,15.00,4.00
+7.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,230.00,Brinell,30.0,0.111,8,15.00,4.00
+7.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,230.00,Brinell,30.0,0.111,8,15.00,4.00
+7.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,230.00,Brinell,30.0,0.111,8,15.00,4.00
+7.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,230.00,Brinell,30.0,0.111,8,15.00,4.00
+7.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,230.00,Brinell,30.0,0.111,8,15.00,4.00
+7.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,230.00,Brinell,30.0,0.111,8,15.00,4.00
+7.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,230.00,Brinell,30.0,0.111,8,15.00,4.00
+7.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,230.00,Brinell,30.0,0.111,8,15.00,4.00
+7.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,230.00,Brinell,30.0,0.111,10,15.00,4.00
+7.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,230.00,Brinell,30.0,0.111,10,15.00,4.00
+7.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,230.00,Brinell,30.0,0.111,10,15.00,4.00
+7.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,230.00,Brinell,30.0,0.111,10,15.00,4.00
+7.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,230.00,Brinell,30.0,0.111,16,15.00,4.00
+7.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,230.00,Brinell,30.0,0.111,16,15.00,4.00
+7.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,230.00,Brinell,30.0,0.111,16,15.00,4.00
+7.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,230.00,Brinell,30.0,0.111,16,15.00,4.00
+7.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,250.00,Brinell,29.0,0.079,4,15.00,4.00
+7.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,250.00,Brinell,29.0,0.079,8,15.00,4.00
+7.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,250.00,Brinell,29.0,0.079,8,15.00,4.00
+7.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,250.00,Brinell,29.0,0.079,8,15.00,4.00
+7.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,250.00,Brinell,29.0,0.079,8,15.00,4.00
+7.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,250.00,Brinell,29.0,0.079,8,15.00,4.00
+7.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,250.00,Brinell,29.0,0.079,8,15.00,4.00
+7.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,250.00,Brinell,29.0,0.079,8,15.00,4.00
+7.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,250.00,Brinell,29.0,0.079,8,15.00,4.00
+7.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,250.00,Brinell,29.0,0.079,10,15.00,4.00
+7.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,250.00,Brinell,29.0,0.079,10,15.00,4.00
+7.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,250.00,Brinell,29.0,0.079,10,15.00,4.00
+7.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,250.00,Brinell,29.0,0.079,10,15.00,4.00
+7.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,250.00,Brinell,29.0,0.079,16,15.00,4.00
+7.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,250.00,Brinell,29.0,0.079,16,15.00,4.00
+7.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,250.00,Brinell,29.0,0.079,16,15.00,4.00
+7.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,250.00,Brinell,29.0,0.079,16,15.00,4.00
+8.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,180.00,Brinell,53.6,0.143,4,15.00,4.00
+8.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,180.00,Brinell,53.6,0.143,8,15.00,4.00
+8.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,180.00,Brinell,53.6,0.143,8,15.00,4.00
+8.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,180.00,Brinell,53.6,0.143,8,15.00,4.00
+8.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,180.00,Brinell,53.6,0.143,8,15.00,4.00
+8.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,180.00,Brinell,53.6,0.143,8,15.00,4.00
+8.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,180.00,Brinell,53.6,0.143,8,15.00,4.00
+8.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,180.00,Brinell,53.6,0.143,8,15.00,4.00
+8.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,180.00,Brinell,53.6,0.143,8,15.00,4.00
+8.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,180.00,Brinell,53.6,0.143,10,15.00,4.00
+8.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,180.00,Brinell,53.6,0.143,10,15.00,4.00
+8.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,180.00,Brinell,53.6,0.143,10,15.00,4.00
+8.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,180.00,Brinell,53.6,0.143,10,15.00,4.00
+8.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,180.00,Brinell,53.6,0.143,16,15.00,4.00
+8.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,180.00,Brinell,53.6,0.143,16,15.00,4.00
+8.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,180.00,Brinell,53.6,0.143,16,15.00,4.00
+8.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,180.00,Brinell,53.6,0.143,16,15.00,4.00
+8.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,220.00,Brinell,36.5,0.111,4,15.00,4.00
+8.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,220.00,Brinell,36.5,0.111,8,15.00,4.00
+8.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,220.00,Brinell,36.5,0.111,8,15.00,4.00
+8.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,220.00,Brinell,36.5,0.111,8,15.00,4.00
+8.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,220.00,Brinell,36.5,0.111,8,15.00,4.00
+8.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,220.00,Brinell,36.5,0.111,8,15.00,4.00
+8.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,220.00,Brinell,36.5,0.111,8,15.00,4.00
+8.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,220.00,Brinell,36.5,0.111,8,15.00,4.00
+8.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,220.00,Brinell,36.5,0.111,8,15.00,4.00
+8.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,220.00,Brinell,36.5,0.111,10,15.00,4.00
+8.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,220.00,Brinell,36.5,0.111,10,15.00,4.00
+8.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,220.00,Brinell,36.5,0.111,10,15.00,4.00
+8.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,220.00,Brinell,36.5,0.111,10,15.00,4.00
+8.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,220.00,Brinell,36.5,0.111,16,15.00,4.00
+8.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,220.00,Brinell,36.5,0.111,16,15.00,4.00
+8.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,220.00,Brinell,36.5,0.111,16,15.00,4.00
+8.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,220.00,Brinell,36.5,0.111,16,15.00,4.00
+8.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,175.00,Brinell,41.8,0.079,4,15.00,4.00
+8.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,175.00,Brinell,41.8,0.079,8,15.00,4.00
+8.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,175.00,Brinell,41.8,0.079,8,15.00,4.00
+8.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,175.00,Brinell,41.8,0.079,8,15.00,4.00
+8.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,175.00,Brinell,41.8,0.079,8,15.00,4.00
+8.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,175.00,Brinell,41.8,0.079,8,15.00,4.00
+8.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,175.00,Brinell,41.8,0.079,8,15.00,4.00
+8.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,175.00,Brinell,41.8,0.079,8,15.00,4.00
+8.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,175.00,Brinell,41.8,0.079,8,15.00,4.00
+8.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,175.00,Brinell,41.8,0.079,10,15.00,4.00
+8.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,175.00,Brinell,41.8,0.079,10,15.00,4.00
+8.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,175.00,Brinell,41.8,0.079,10,15.00,4.00
+8.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,175.00,Brinell,41.8,0.079,10,15.00,4.00
+8.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,175.00,Brinell,41.8,0.079,16,15.00,4.00
+8.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,175.00,Brinell,41.8,0.079,16,15.00,4.00
+8.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,175.00,Brinell,41.8,0.079,16,15.00,4.00
+8.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,175.00,Brinell,41.8,0.079,16,15.00,4.00
+9.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,160.00,Brinell,34.0,0.111,4,15.00,4.00
+9.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,160.00,Brinell,34.0,0.111,8,15.00,4.00
+9.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,160.00,Brinell,34.0,0.111,8,15.00,4.00
+9.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,160.00,Brinell,34.0,0.111,8,15.00,4.00
+9.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,160.00,Brinell,34.0,0.111,8,15.00,4.00
+9.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,160.00,Brinell,34.0,0.111,8,15.00,4.00
+9.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,160.00,Brinell,34.0,0.111,8,15.00,4.00
+9.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,160.00,Brinell,34.0,0.111,8,15.00,4.00
+9.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,160.00,Brinell,34.0,0.111,8,15.00,4.00
+9.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,160.00,Brinell,34.0,0.111,10,15.00,4.00
+9.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,160.00,Brinell,34.0,0.111,10,15.00,4.00
+9.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,160.00,Brinell,34.0,0.111,10,15.00,4.00
+9.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,160.00,Brinell,34.0,0.111,10,15.00,4.00
+9.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,160.00,Brinell,34.0,0.111,16,15.00,4.00
+9.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,160.00,Brinell,34.0,0.111,16,15.00,4.00
+9.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,160.00,Brinell,34.0,0.111,16,15.00,4.00
+9.1,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,160.00,Brinell,34.0,0.111,16,15.00,4.00
+9.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,250.00,Brinell,32.2,0.111,4,15.00,4.00
+9.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,250.00,Brinell,32.2,0.111,8,15.00,4.00
+9.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,250.00,Brinell,32.2,0.111,8,15.00,4.00
+9.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,250.00,Brinell,32.2,0.111,8,15.00,4.00
+9.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,250.00,Brinell,32.2,0.111,8,15.00,4.00
+9.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,250.00,Brinell,32.2,0.111,8,15.00,4.00
+9.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,250.00,Brinell,32.2,0.111,8,15.00,4.00
+9.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,250.00,Brinell,32.2,0.111,8,15.00,4.00
+9.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,250.00,Brinell,32.2,0.111,8,15.00,4.00
+9.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,250.00,Brinell,32.2,0.111,10,15.00,4.00
+9.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,250.00,Brinell,32.2,0.111,10,15.00,4.00
+9.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,250.00,Brinell,32.2,0.111,10,15.00,4.00
+9.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,250.00,Brinell,32.2,0.111,10,15.00,4.00
+9.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,250.00,Brinell,32.2,0.111,16,15.00,4.00
+9.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,250.00,Brinell,32.2,0.111,16,15.00,4.00
+9.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,250.00,Brinell,32.2,0.111,16,15.00,4.00
+9.2,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,250.00,Brinell,32.2,0.111,16,15.00,4.00
+9.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,12.70,330.00,Brinell,24.1,0.079,4,15.00,4.00
+9.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,27.94,330.00,Brinell,24.1,0.079,8,15.00,4.00
+9.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,33.02,330.00,Brinell,24.1,0.079,8,15.00,4.00
+9.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,38.10,330.00,Brinell,24.1,0.079,8,15.00,4.00
+9.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,50.80,330.00,Brinell,24.1,0.079,8,15.00,4.00
+9.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,63.50,330.00,Brinell,24.1,0.079,8,15.00,4.00
+9.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,69.85,330.00,Brinell,24.1,0.079,8,15.00,4.00
+9.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,76.20,330.00,Brinell,24.1,0.079,8,15.00,4.00
+9.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,88.90,330.00,Brinell,24.1,0.079,8,15.00,4.00
+9.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,101.60,330.00,Brinell,24.1,0.079,10,15.00,4.00
+9.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,114.30,330.00,Brinell,24.1,0.079,10,15.00,4.00
+9.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,127.00,330.00,Brinell,24.1,0.079,10,15.00,4.00
+9.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,139.70,330.00,Brinell,24.1,0.079,10,15.00,4.00
+9.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,152.40,330.00,Brinell,24.1,0.079,16,15.00,4.00
+9.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,165.10,330.00,Brinell,24.1,0.079,16,15.00,4.00
+9.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,177.80,330.00,Brinell,24.1,0.079,16,15.00,4.00
+9.3,Bevel Gear Cutter,Virtual Bevel Gear Cutter,Standard,190.50,330.00,Brinell,24.1,0.079,16,15.00,4.00

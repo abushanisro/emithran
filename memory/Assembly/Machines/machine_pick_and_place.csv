@@ -1,0 +1,28 @@
+﻿Field,Value
+Digital Factory,aPriori USA
+Sector,World Average
+Name,Default Pick and Place
+Labor Rate (USD / hr),29.95
+Direct Overhead Rate (USD / hr),0.00
+Indirect Overhead Rate (USD / hr),24.55
+Overhead Multiplier,0.00
+Number of Operators,1.00
+Labor Time Standard,1.00
+Wage Grade Name,
+Work Center Labor Rate Factor,1.00
+Setup Time (hr),0.00
+Is Preferred,true
+Good Part Yield,1.00
+Machine Price (USD),0.00
+Machine Length (mm),6100.00
+Machine Width (mm),3050.00
+Footprint Allowance Factor,3.00
+Machine Power (kW),0.00
+Installation Factor (%),20.00
+Machine Uptime (%),60.00
+Annual Maintenance Factor (%),5.00
+Machine Life (yr),10
+Salvage Value Factor (%),0.00
+Supplies Cost (USD / yr),0.00
+Machine Manufacturer Location,USA
+Data Source,aPriori Baseline

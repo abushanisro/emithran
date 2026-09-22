@@ -18,7 +18,7 @@
 // sequencer that would cost it with the wrong physics, every keyway
 // occurrence is pulled out here — before buildOperationSequence ever sees
 // it — and costed by a dedicated Keyway Broaching process line instead
-// (computeKeywayBroachingLine in cost-cnc-engine.ts). Without this split,
+// (computeKeywayBroachingLine in cost-machining-engine.ts). Without this split,
 // an un-intercepted "keyway" feature_type would fall into
 // operation-sequencer.ts's `default:` case (generic volume-based Adaptive
 // Rough costing) — a real, worse regression than the old slot-collapse,

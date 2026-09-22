@@ -1,0 +1,11 @@
+name,sourceFilePath,digitalFactory,Coating Cost Factor (USD / kg),Coating Type,Tool Life Improvement Factor
+tblToolCoating,lookupTables/Component/tblToolCoating.csv,aPriori USA,0.0,None,1.0
+tblToolCoating,lookupTables/Component/tblToolCoating.csv,aPriori USA,1.9,Tribo-coating,1.1
+tblToolCoating,lookupTables/Component/tblToolCoating.csv,aPriori USA,2.8,Electroless Nickel,1.4
+tblToolCoating,lookupTables/Component/tblToolCoating.csv,aPriori USA,3.5,Electroless Teflon,1.7
+tblToolCoating,lookupTables/Component/tblToolCoating.csv,aPriori USA,4.1,Nitrided Steel,1.9
+tblToolCoating,lookupTables/Component/tblToolCoating.csv,aPriori USA,4.4,Electroplated Chromium,2.0
+tblToolCoating,lookupTables/Component/tblToolCoating.csv,aPriori USA,6.9,Plasma Sprayed,3.0
+tblToolCoating,lookupTables/Component/tblToolCoating.csv,aPriori USA,18.2,PVD TiN,7.2
+tblToolCoating,lookupTables/Component/tblToolCoating.csv,aPriori USA,19.1,CVD TiC,7.5
+tblToolCoating,lookupTables/Component/tblToolCoating.csv,aPriori USA,26.6,DuplexVariantic,14.4

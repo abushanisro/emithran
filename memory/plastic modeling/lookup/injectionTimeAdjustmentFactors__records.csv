@@ -1,0 +1,10 @@
+name,file_path,attribute,number,adjustment_factor
+injectionTimeAdjustmentFactors,lookupTables/Component/injectionTimeAdjustmentFactors.csv,Cavities Per Mold,3,1.0
+injectionTimeAdjustmentFactors,lookupTables/Component/injectionTimeAdjustmentFactors.csv,Cavities Per Mold,5,1.02
+injectionTimeAdjustmentFactors,lookupTables/Component/injectionTimeAdjustmentFactors.csv,Cavities Per Mold,8,1.05
+injectionTimeAdjustmentFactors,lookupTables/Component/injectionTimeAdjustmentFactors.csv,Cavities Per Mold,999999,1.1
+injectionTimeAdjustmentFactors,lookupTables/Component/injectionTimeAdjustmentFactors.csv,Gates Per Cavity,1,0.6
+injectionTimeAdjustmentFactors,lookupTables/Component/injectionTimeAdjustmentFactors.csv,Gates Per Cavity,2,0.4
+injectionTimeAdjustmentFactors,lookupTables/Component/injectionTimeAdjustmentFactors.csv,Gates Per Cavity,3,0.3
+injectionTimeAdjustmentFactors,lookupTables/Component/injectionTimeAdjustmentFactors.csv,Gates Per Cavity,4,0.25
+injectionTimeAdjustmentFactors,lookupTables/Component/injectionTimeAdjustmentFactors.csv,Gates Per Cavity,999999,0.25

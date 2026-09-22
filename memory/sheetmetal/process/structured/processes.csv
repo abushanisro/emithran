@@ -1,0 +1,25 @@
+﻿process_name,default_machine,tool_shop_name,machine_entry1_tool_shop_name,machine_entry1_machine,machine_entry2_tool_shop_name,machine_entry2_machine,operation_count,roadmap_status,status_note,process_route,route_match,live_active
+2 Axis Router,Default Machine,Default Tool Shop Name,Default Tool Shop Name,Default Machine,,"2 Axis Router - 18,000 RPM",3,unwired,"mapping row inactive, no cost path",Cutting,exact,False
+2 Roll Bending,Faccin HCU 300 X 1,,,Faccin HCU 300 X 1,,,3,thin,"substituted through a single-row Roll Forming calculator, no material/thickness axis",Bending/Floating /Forming,exact,True
+3 Roll Bending,Faccin ASI/M 2513,,,Faccin ASI/M 2513,,,5,thin,"substituted through a single-row Roll Forming calculator, no material/thickness axis",Bending/Floating /Forming,exact,True
+3D Laser,Default 3D Laser,,,Default 3D Laser,,,2,unwired,"mapping row inactive, no cost path",Laser Cutting,exact,False
+4 Roll Bending,Knuth RBM 20/04 CNC,,,Knuth RBM 20/04 CNC,,,4,thin,"substituted through a single-row Roll Forming calculator, no material/thickness axis",Bending/Floating /Forming,exact,True
+Bend Brake,Default Bend Brake,,,Default Bend Brake,,,5,production,"inline cost engine (cost-engine.ts), DB-first capability selector",Bending/Floating /Forming,exact,True
+CTL,Default CTL,,,Default CTL,,,0,not_modeled,absent from process_calculator_mappings entirely,,unassigned,
+Deslag,Default Deslag,,,Default Deslag,,,3,thin,"folded into a generic deburring line, no real formula",Finishing,exact,True
+Fiber Laser Cut,Laser Cutter - 4kW Fiber,Default,Default,Laser Cutter - 4kW Fiber,,,8,production,"dedicated cost engine, DB-first capability selector",Laser Cutting,exact,True
+Generic Press,Default Press,StageDiemaker1,StageDiemaker1,Default Press,,,49,unwired,"mapping row inactive, no cost path",Bending/Floating /Forming,exact,False
+Laser Cut,Default Laser,,,Default Laser,,,9,production,"dedicated cost engine, DB-first capability selector",Laser Cutting,exact,True
+Laser Punch,Muratec Motorum Hybrid 2558 (2000W),,,Muratec Motorum Hybrid 2558 (2000W),,,37,unwired,"mapping row inactive, no cost path",Sheet Metal Fabrication,exact,False
+Material Stock,Default Material Stock,,,Default Material Stock,,,6,non_mfg,"system marker, not a manufacturing process",Material Usage,exact,False
+No Cost Feature,,,,,,,11,non_mfg,"system marker, not a manufacturing process",Material Usage,exact,False
+OxyFuel Cut,Default Oxyfuel - 4 torch,,,Default Oxyfuel - 4 torch,,,9,unwired,"mapping row inactive, no cost path",Cutting,exact,False
+Plasma Cut,Default Plasma,,,Default Plasma,,,9,unwired,"mapping row inactive, no cost path",Cutting,exact,False
+Plasma Punch,Whitney 3700 SST,,,Whitney 3700 SST,,,37,unwired,"mapping row inactive, no cost path",Sheet Metal Fabrication,exact,False
+Progressive Die,Default Press,Default,Default,Default Press,,,83,not_modeled,absent + known case-duplication bug,Bending/Floating /Forming,exact,True
+Shear,Default Shear,,,Default Shear,,,1,not_modeled,deactivated — no distinct shearing path exists,Sheet Cutting,alias_confident,False
+Std Press,Default Press,Diemaker1,Diemaker1,Default Press,,,11,unwired,"mapping row inactive, no cost path",Bending/Floating /Forming,exact,False
+Tandem Press,Default Press,StageDiemaker1,StageDiemaker1,Default Press,,,49,unwired,"mapping row inactive, no cost path",Bending/Floating /Forming,exact,False
+Turret Press,Default Turret Press,,,Default Turret Press,,,35,production,"dedicated cost engine, DB-first capability selector",Bending/Floating /Forming,exact,False
+User-Defined Process,,,,,,,0,non_mfg,staging-only marker,,unassigned,
+Waterjet Cut,OMAX 2626,,,OMAX 2626,,,12,production,"dedicated cost engine, DB-first capability selector",Cutting,alias_confident,True

@@ -1,0 +1,12 @@
+﻿Material Type Name,Heat Time Coefficient (s / mm^2),Induction Coil Efficiency (%)
+Aluminum,0.0054,40.00
+Brass,0.0058,50.00
+Copper,0.0062,40.00
+Ductile Iron,0.0401,75.00
+Heat Resistant Super Alloys,0.0408,73.00
+Low-Alloy Steel,0.0466,87.50
+Magnesium,0.0048,39.00
+Stainless Steel,0.0182,60.00
+Steel,0.04,87.50
+Titanium,0.0407,65.00
+Unalloyed Steel,0.0466,87.50

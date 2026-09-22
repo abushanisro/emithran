@@ -1,0 +1,5 @@
+name,filePath,digitalFactory,rowCount,plateThicknessMm,rateUsd
+burnProfileBaseCharge,lookupTables/Component/burnProfileBaseCharge.csv,USA reference export,4,50.8,7.0
+burnProfileBaseCharge,lookupTables/Component/burnProfileBaseCharge.csv,USA reference export,4,88.9,7.0
+burnProfileBaseCharge,lookupTables/Component/burnProfileBaseCharge.csv,USA reference export,4,152.4,27.0
+burnProfileBaseCharge,lookupTables/Component/burnProfileBaseCharge.csv,USA reference export,4,25400.0,27.0

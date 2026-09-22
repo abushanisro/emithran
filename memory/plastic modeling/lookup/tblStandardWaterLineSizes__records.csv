@@ -1,0 +1,5 @@
+name,sourceFilePath,digitalFactory,Water Line Diameter (mm)
+tblStandardWaterLineSizes,lookupTables/Component/tblStandardWaterLineSizes.csv,aPriori USA,6.0
+tblStandardWaterLineSizes,lookupTables/Component/tblStandardWaterLineSizes.csv,aPriori USA,8.0
+tblStandardWaterLineSizes,lookupTables/Component/tblStandardWaterLineSizes.csv,aPriori USA,10.0
+tblStandardWaterLineSizes,lookupTables/Component/tblStandardWaterLineSizes.csv,aPriori USA,12.0

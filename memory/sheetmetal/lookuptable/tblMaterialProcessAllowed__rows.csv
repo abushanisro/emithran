@@ -1,0 +1,8 @@
+name,file_path,Material Name Code,Laser Cut,Oxy Fuel Cut,Plasma Cut,Waterjet Cut,Fiber Laser Cut
+tblMaterialProcessAllowed,lookupTables/Component/tblMaterialProcessAllowed.csv,41,True,False,False,True,False
+tblMaterialProcessAllowed,lookupTables/Component/tblMaterialProcessAllowed.csv,42,True,False,False,True,False
+tblMaterialProcessAllowed,lookupTables/Component/tblMaterialProcessAllowed.csv,51,True,False,False,True,False
+tblMaterialProcessAllowed,lookupTables/Component/tblMaterialProcessAllowed.csv,52,True,False,False,True,False
+tblMaterialProcessAllowed,lookupTables/Component/tblMaterialProcessAllowed.csv,Aluminum,True,False,True,True,True
+tblMaterialProcessAllowed,lookupTables/Component/tblMaterialProcessAllowed.csv,Copper,True,False,True,True,True
+tblMaterialProcessAllowed,lookupTables/Component/tblMaterialProcessAllowed.csv,Stainless,True,False,True,True,True

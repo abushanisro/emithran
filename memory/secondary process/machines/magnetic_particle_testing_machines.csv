@@ -1,0 +1,4 @@
+Primary ID (Name),Labor Rate (USD / hr),Direct Overhead Rate (USD / hr),Indirect Overhead Rate (USD / hr),Overhead Multiplier,Number of Operators,Labor Time Standard,Wage Grade Name,Work Center Labor Rate Factor,Setup Time (hr),Is Preferred,Avg Utilization,Good Part Yield,Machine Price (USD),Machine Length (mm),Machine Width (mm),Footprint Allowance Factor,Machine Power (kW),Installation Factor (%),Machine Uptime (%),Annual Maintenance Factor (%),Machine Life (yr),Salvage Value Factor (%),Supplies Cost (USD / yr),Machine Manufacturer Location
+WHM-4102,43.21,4.69,15.13,0.00,1.00,1.00,,1.00,0.00,false,1.00,1.00,20000.00,3150.00,1600.00,3.00,23.00,20.00,80.00,5.00,10,0.00,0.00,USA
+WHM-4400,43.21,4.38,14.50,0.00,1.00,1.00,,1.00,0.00,false,1.00,1.00,15000.00,1620.00,1600.00,3.00,23.00,20.00,80.00,5.00,10,0.00,0.00,USA
+WHM-4600,43.21,4.53,14.81,0.00,1.00,1.00,,1.00,0.00,false,1.00,1.00,17500.00,2390.00,1600.00,3.00,23.00,20.00,80.00,5.00,10,0.00,0.00,USA

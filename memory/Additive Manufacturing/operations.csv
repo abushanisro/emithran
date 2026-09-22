@@ -1,0 +1,56 @@
+Process Name
+Breakoff:Breakoff//SupportStructure
+Laser Sintering:As Sintered//AxiGroove
+Laser Sintering:As Sintered//BuildDirection
+Laser Sintering:As Sintered//CurvedSurface
+Laser Sintering:As Sintered//CurvedWall
+Laser Sintering:As Sintered//Keyway
+Laser Sintering:As Sintered//MultiStepHole
+Laser Sintering:As Sintered//Perimeter
+Laser Sintering:As Sintered//PlanarFace
+Laser Sintering:As Sintered//Ring
+Laser Sintering:As Sintered//RingedHole
+Laser Sintering:As Sintered//SimpleHole
+Laser Sintering:As Sintered//Void
+Manual Tool Base Removal:Base Removal Manual//SupportStructure
+Metal Sintering:As Sintered//AxiGroove
+Metal Sintering:As Sintered//BuildDirection
+Metal Sintering:As Sintered//CurvedSurface
+Metal Sintering:As Sintered//CurvedWall
+Metal Sintering:As Sintered//Keyway
+Metal Sintering:As Sintered//MultiStepHole
+Metal Sintering:As Sintered//Perimeter
+Metal Sintering:As Sintered//PlanarFace
+Metal Sintering:As Sintered//Ring
+Metal Sintering:As Sintered//RingedHole
+Metal Sintering:As Sintered//SimpleHole
+Metal Sintering:As Sintered//SupportStructure
+Metal Sintering:As Sintered//Void
+No Cost Feature:No Cost Feature//SupportStructure
+Power Tool Base Removal:Base Removal Powered//SupportStructure
+Printing:As Printed//AxiGroove
+Printing:As Printed//BuildDirection
+Printing:As Printed//CurvedSurface
+Printing:As Printed//CurvedWall
+Printing:As Printed//Keyway
+Printing:As Printed//MultiStepHole
+Printing:As Printed//Perimeter
+Printing:As Printed//PlanarFace
+Printing:As Printed//Ring
+Printing:As Printed//RingedHole
+Printing:As Printed//SimpleHole
+Printing:As Printed//SupportStructure
+Printing:As Printed//Void
+Resin Curing:As Cured//AxiGroove
+Resin Curing:As Cured//BuildDirection
+Resin Curing:As Cured//CurvedSurface
+Resin Curing:As Cured//CurvedWall
+Resin Curing:As Cured//Keyway
+Resin Curing:As Cured//MultiStepHole
+Resin Curing:As Cured//Perimeter
+Resin Curing:As Cured//PlanarFace
+Resin Curing:As Cured//Ring
+Resin Curing:As Cured//RingedHole
+Resin Curing:As Cured//SimpleHole
+Resin Curing:As Cured//SupportStructure
+Resin Curing:As Cured//Void

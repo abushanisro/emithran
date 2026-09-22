@@ -1,0 +1,2 @@
+name,assemblyRateUsdPerHr,cmMrateUsdPerHr,defaultToolMaterialName,description,designRateUsdPerHr,dutyRateUsdPerKg,edmMaterialCostCarbonUsdPerIn3,edmMaterialCostCopperUsdPerIn3,edmRateUsdPerHr,freightRateUsdPerKg,gunDrillRateUsdPerHr,heatTreatRateUsdPerKg,highToleranceFactor,lowToleranceFactor,machiningRateUsdPerHr,markUpRate,mediumToleranceFactor,moldMin,regionMultiplier,sGandARate,stressReliefRateUsdPerKg,tryoutRateUsdPerHr
+Default,76.81,76.81,AISI P20,,64.73,0.0,2.25,3.81,74.3,0.0,65.04,2.11,0.8,0.25,100.55,6.0,0.45,8.0,1.0,12.77,2.11,76.81

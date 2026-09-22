@@ -1,0 +1,11 @@
+name,sourceFilePath,digitalFactory,value
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,Mold Base Name
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,Reference Size
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,Reference Uom
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,Actual Width
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,Actual Length
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,Effective Window Width
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,Effective Window Length
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,Mold Base System
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,Overhanging Clamping Plate Width
+tblStandardMoldBaseSizes,lookupTables/Component/tblStandardMoldBaseSizes.csv,aPriori USA,Overhanging Clamping Plate Length

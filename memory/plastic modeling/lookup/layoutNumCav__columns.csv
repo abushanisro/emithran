@@ -1,0 +1,6 @@
+name,file_path,value
+layoutNumCav,lookupTables/Component/layoutNumCav.csv,Cavities Length Wise
+layoutNumCav,lookupTables/Component/layoutNumCav.csv,Cavities Width Wise
+layoutNumCav,lookupTables/Component/layoutNumCav.csv,Coefficient Runner Region Width
+layoutNumCav,lookupTables/Component/layoutNumCav.csv,Number of Cavities
+layoutNumCav,lookupTables/Component/layoutNumCav.csv,Layout Balance

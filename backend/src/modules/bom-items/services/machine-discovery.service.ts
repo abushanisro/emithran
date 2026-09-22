@@ -25,7 +25,7 @@ export type MachiningRouteRole = 'primary_milling' | 'primary_turning' | 'second
  *
  * Deliberately answers only "what classes exist and are priceable" — NOT
  * "what's physically feasible for this specific part" (that stays exactly
- * where it already lives: checkCNCCapability/checkMachineCapability's
+ * where it already lives: checkMachiningCapability/checkMachineCapability's
  * per-candidate envelope check, unchanged by this service).
  */
 @Injectable()

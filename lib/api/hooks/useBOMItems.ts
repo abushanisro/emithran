@@ -924,6 +924,11 @@ export interface BlankSpecDto {
   // bar) couldn't be honored with real stock_profiles data, so `form` above
   // fell back to billet instead. See backend blank-spec.dto.ts.
   stockFormOverrideNote?: string;
+  // Machining only -- the inputs grossWeightKg was computed from
+  // (stockVolumeMm3 / 1e9 x densityKgM3). densityKgM3 is absent when the
+  // material grade hasn't resolved to a real density. See backend blank-spec.dto.ts.
+  stockVolumeMm3?: number;
+  densityKgM3?: number;
 }
 
 

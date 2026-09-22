@@ -1,0 +1,5 @@
+name,sourceFilePath,digitalFactory,value
+tblSlideSizes,lookupTables/Component/tblSlideSizes.csv,aPriori USA,Core Pin Dia (mm)
+tblSlideSizes,lookupTables/Component/tblSlideSizes.csv,aPriori USA,Core Retainer Thickness (mm)
+tblSlideSizes,lookupTables/Component/tblSlideSizes.csv,aPriori USA,Wear Plate Thickness (mm)
+tblSlideSizes,lookupTables/Component/tblSlideSizes.csv,aPriori USA,Slide Body Length (mm)

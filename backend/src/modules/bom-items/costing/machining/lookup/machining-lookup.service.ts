@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../../../../common/supabase/supabase.service';
-import type { MaterialClass } from '../process/cost-cnc-engine';
+import type { MaterialClass } from '../process/cost-machining-engine';
 import {
   MACHINING_MATERIAL_HARDNESS_HB,
   nearestByHardness,
@@ -11,7 +11,7 @@ import {
 // The real hardness-bridge constants/matchers this service uses live in
 // machining-material-hardness.ts — a plain, framework-free module (no
 // NestJS @Injectable, no SupabaseService) so operation-sequencer.ts and
-// cost-cnc-engine.ts (pure, no-DB-calls sync engines) can import the same
+// cost-machining-engine.ts (pure, no-DB-calls sync engines) can import the same
 // real logic directly without depending on this injectable service class.
 // Re-exported here for any existing caller of this file expecting them
 // from this module.
@@ -168,7 +168,7 @@ export class MachiningLookupService {
     };
   }
 
-  // Raw rows — cost-cnc-engine.ts resolves the real diameter to ream AFTER
+  // Raw rows — cost-machining-engine.ts resolves the real diameter to ream AFTER
   // choosing the smallest real hole group (see computeReamCycleSec's own
   // doc comment), so it needs the table, not a single pre-resolved rate.
   async getReamTable(): Promise<any[] | null> {
@@ -195,6 +195,24 @@ export class MachiningLookupService {
     const row = nearestByHardness(rows, MACHINING_MATERIAL_HARDNESS_HB[materialClass]);
     if (!row || typeof row.linear_speed_mm_s !== 'number') return noData;
     return { linearSpeedMmPerSec: row.linear_speed_mm_s, dataFound: true };
+  }
+
+  // ── Corner Rounding Mill (tblCornerRoundingMill.json, 91 real rows) —
+  // same real hardness-only shape as tblChamfering/tblDeburring above (no
+  // diameter axis; a fillet/corner-round pass is rated by real linear edge
+  // speed) — just real PascalCase field names (Hardness/LinearSpeedMmPerS)
+  // from this source file instead of the snake_case the other two use, a
+  // real source-file difference, not a typo. Was staged (migration 743)
+  // but never queried by any engine code — operation-sequencer.ts's
+  // Filleting/Groove Milling cases used a flat "count * 8 sec" placeholder
+  // with no real rate table behind it at all.
+  async getRoundingParams(materialClass: MaterialClass): Promise<EdgeToolParams> {
+    const noData: EdgeToolParams = { linearSpeedMmPerSec: 0, dataFound: false };
+    const rows = await this.loadTable('tblCornerRoundingMill');
+    if (!rows?.length) return noData;
+    const row = nearestByHardness(rows, MACHINING_MATERIAL_HARDNESS_HB[materialClass]) as any;
+    if (!row || typeof row.LinearSpeedMmPerS !== 'number') return noData;
+    return { linearSpeedMmPerSec: row.LinearSpeedMmPerS, dataFound: true };
   }
 
   // ── Gun Drilling (tblGunDrilling.json, 270 real rows, flat per-(material,
@@ -412,6 +430,42 @@ export class MachiningLookupService {
       finishCutDepthMm: finish.cut_depth_mm,
       finishCuttingSpeedMPerMin: finish.cutting_speed_m_min,
       finishFeedMmPerRev: finish.feed_rate_mm_rev,
+      dataFound: true,
+    };
+  }
+
+  // ── Multi-spindle op-splitting (tblMultiSpindleOpSplitting /
+  // tblMultiSpindleOpSplittingThresholds, migration 785, source:
+  // memory/machining/lookup/) — real spindle-count-driven station-split
+  // rules for a Simultaneous Turning machine. Exact match on real spindle
+  // count (the real table only has entries for 2/6/8, and every real
+  // machine in simultaneous_turning_usa.csv reports a spindle count in
+  // that same set — no interpolation needed or performed). Returns
+  // dataFound:false (never a guessed split) when the feature/operation
+  // pair has no real row, or the machine's real spindle count has no exact
+  // real entry for that pair.
+  async getMultiSpindleOpSplit(
+    feature: string,
+    operation: string,
+    spindleCount: number,
+  ): Promise<{ shouldSplit: boolean; numberOfOperations: number; thresholdRatio: number | null; dataFound: boolean }> {
+    const noData = { shouldSplit: false, numberOfOperations: 1, thresholdRatio: null, dataFound: false };
+    const [splitRows, thresholdRows] = await Promise.all([
+      this.loadTable('tblMultiSpindleOpSplitting'),
+      this.loadTable('tblMultiSpindleOpSplittingThresholds'),
+    ]);
+    const thresholdRow = thresholdRows?.find(
+      (r: any) => r.feature === feature && r.operation === operation,
+    );
+    if (!thresholdRow || thresholdRow.enable_operation_splitting !== true) return noData;
+    const splitRow = splitRows?.find(
+      (r: any) => r.feature === feature && r.operation === operation && Number(r.machine_spindles) === spindleCount,
+    );
+    if (!splitRow) return noData;
+    return {
+      shouldSplit: true,
+      numberOfOperations: Number(splitRow.number_of_operations) || 1,
+      thresholdRatio: Number(thresholdRow.threshold),
       dataFound: true,
     };
   }

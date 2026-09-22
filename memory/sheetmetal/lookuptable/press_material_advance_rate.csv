@@ -1,0 +1,7 @@
+name,filePath,digitalFactory,rowCount,partLengthMm,strokesPerMinute
+pressMaterialAdvanceRate,lookupTables/Component/Progressive Die/pressMaterialAdvanceRate.csv,USA reference export,6,0.0,60.0
+pressMaterialAdvanceRate,lookupTables/Component/Progressive Die/pressMaterialAdvanceRate.csv,USA reference export,6,50.8,60.0
+pressMaterialAdvanceRate,lookupTables/Component/Progressive Die/pressMaterialAdvanceRate.csv,USA reference export,6,101.6,30.0
+pressMaterialAdvanceRate,lookupTables/Component/Progressive Die/pressMaterialAdvanceRate.csv,USA reference export,6,152.4,20.0
+pressMaterialAdvanceRate,lookupTables/Component/Progressive Die/pressMaterialAdvanceRate.csv,USA reference export,6,304.8,10.0
+pressMaterialAdvanceRate,lookupTables/Component/Progressive Die/pressMaterialAdvanceRate.csv,USA reference export,6,999999999.0,5.0

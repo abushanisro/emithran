@@ -72,4 +72,11 @@ export interface BlankSpecDto {
   // requested form WAS honored, and always absent on the ordinary
   // "Let eMithran Decide" auto-select path.
   stockFormOverrideNote?: string;
+  // Machining only -- the two inputs grossWeightKg above was computed from
+  // (stockVolumeMm3 / 1e9 x densityKgM3), exposed so a UI can show the
+  // calculation verbatim instead of back-deriving it. densityKgM3 is absent
+  // when the material grade hasn't resolved to a real raw_materials density
+  // (grossWeightKg is then honestly 0, see stockFormOverrideNote).
+  stockVolumeMm3?: number;
+  densityKgM3?: number;
 }

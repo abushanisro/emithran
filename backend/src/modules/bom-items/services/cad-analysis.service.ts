@@ -853,7 +853,7 @@ export class CADAnalysisService {
     // ── Simplified family detection — mirrors Python detect_part_family() ──
     // Without OCC topology we lose hole density and planar face fraction.
     // Flatness + fill fraction + SA/Vol are sufficient for the main families.
-    let detectedFamily = 'cnc_milled';
+    let detectedFamily = 'milled';
     let familyConfidence = 0.60;
     let classificationReason = 'Default STL heuristic — no strong geometry signal; upload STEP for accurate classification';
 
@@ -874,9 +874,9 @@ export class CADAnalysisService {
       classificationReason = `High SA/Vol ratio (${saVolRatio.toFixed(2)}) + flat bbox → sheet metal panel/frame`;
     } else if (elongation > 2.5 && flatness > 0.20) {
       // Elongated and not flat: rod, shaft, or turned part
-      detectedFamily = 'cnc_turned';
+      detectedFamily = 'turned';
       familyConfidence = 0.70;
-      classificationReason = `Elongated geometry (L/W=${elongation.toFixed(2)}) + not flat → CNC turned`;
+      classificationReason = `Elongated geometry (L/W=${elongation.toFixed(2)}) + not flat → turned`;
     }
 
     // Sheet thickness: only populate when min dim is plausibly a material gauge (< 10 mm).

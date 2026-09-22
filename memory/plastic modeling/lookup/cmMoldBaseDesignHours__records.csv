@@ -1,0 +1,15 @@
+name,file_path,base_design_hrs_hr,mold_base_area_mm2
+cmMoldBaseDesignHours,lookupTables/Component/cmMoldBaseDesignHours.csv,3.24,59253.12
+cmMoldBaseDesignHours,lookupTables/Component/cmMoldBaseDesignHours.csv,3.48,181782.72
+cmMoldBaseDesignHours,lookupTables/Component/cmMoldBaseDesignHours.csv,3.72,371246.4
+cmMoldBaseDesignHours,lookupTables/Component/cmMoldBaseDesignHours.csv,3.96,627644.16
+cmMoldBaseDesignHours,lookupTables/Component/cmMoldBaseDesignHours.csv,4.0,783640.8
+cmMoldBaseDesignHours,lookupTables/Component/cmMoldBaseDesignHours.csv,4.19,973104.48
+cmMoldBaseDesignHours,lookupTables/Component/cmMoldBaseDesignHours.csv,4.38,1162568.16
+cmMoldBaseDesignHours,lookupTables/Component/cmMoldBaseDesignHours.csv,4.57,1352031.84
+cmMoldBaseDesignHours,lookupTables/Component/cmMoldBaseDesignHours.csv,4.76,1541495.52
+cmMoldBaseDesignHours,lookupTables/Component/cmMoldBaseDesignHours.csv,4.95,1730959.2
+cmMoldBaseDesignHours,lookupTables/Component/cmMoldBaseDesignHours.csv,5.14,1920422.88
+cmMoldBaseDesignHours,lookupTables/Component/cmMoldBaseDesignHours.csv,5.33,2109886.56
+cmMoldBaseDesignHours,lookupTables/Component/cmMoldBaseDesignHours.csv,5.57,2354958.05
+cmMoldBaseDesignHours,lookupTables/Component/cmMoldBaseDesignHours.csv,6.0,999999999.0

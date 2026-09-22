@@ -1,6 +1,6 @@
 /**
  * Maps a CNC-detected feature (feature_graph_v2's bucketed `feature_type` —
- * see cad-engine/machining/cnc_feature_recognizer.py's build_feature_graph_v2_from_cnc,
+ * see cad-engine/machining/machining_feature_recognizer.py's build_machining_feature_graph_v2,
  * which is the only function that ever produces these 10 values) to the real
  * "Operation // FeatureType" string it corresponds to in the canonical
  * reference catalog (memory/machining/operations_full.json / the DB mirror
@@ -17,7 +17,7 @@
  * real gap, not something to fabricate a value for.
  *
  * external_diameter, fillet, groove, pcd_hole_pattern, radial_slot are real
- * CNCFeature types the CAD engine can detect but build_feature_graph_v2_from_cnc
+ * MachiningFeature types the CAD engine can detect but build_machining_feature_graph_v2
  * does not currently bucket into feature_graph_v2 (radial_slot folds into
  * "slot"; the rest never reach this payload today) — no entry is fabricated
  * for them here.
@@ -50,7 +50,7 @@ const TURNING_OPERATION_BY_FEATURE_TYPE: Readonly<Record<string, string>> = {
 };
 
 export function machiningRouteFamilyOf(cadFamily: string | null | undefined): MachiningRouteFamily {
-  return cadFamily === 'cnc_turned' || cadFamily === 'mill_turn' ? 'turning' : 'milling';
+  return cadFamily === 'turned' || cadFamily === 'mill_turn' ? 'turning' : 'milling';
 }
 
 /** Returns null (not a fallback guess) when featureType isn't one of the 10 real values above. */

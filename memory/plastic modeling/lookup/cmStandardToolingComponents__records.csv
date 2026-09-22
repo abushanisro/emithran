@@ -1,0 +1,11 @@
+name,file_path,unit_cost_usd,quantity,notes
+Air Poppet,lookupTables/Component/cmStandardToolingComponents.csv,25.0,30.0,
+Ejector Guide Pin Bushing,lookupTables/Component/cmStandardToolingComponents.csv,30.0,6.0,
+Ejector Pin,lookupTables/Component/cmStandardToolingComponents.csv,5.0,,Ejector Pin quantities are calculated in the cost model
+Electrical Connection Or Switch,lookupTables/Component/cmStandardToolingComponents.csv,,1.0,Cost included in machine price
+Guide Bush,lookupTables/Component/cmStandardToolingComponents.csv,100.0,4.0,
+Guide Pin,lookupTables/Component/cmStandardToolingComponents.csv,100.0,4.0,
+Hydraulic Cylinder,lookupTables/Component/cmStandardToolingComponents.csv,350.0,4.0,
+Limit Switch,lookupTables/Component/cmStandardToolingComponents.csv,50.0,4.0,
+Return Pin And Shoulder Bushing,lookupTables/Component/cmStandardToolingComponents.csv,35.0,6.0,
+Side Lock,lookupTables/Component/cmStandardToolingComponents.csv,160.0,4.0,

@@ -1,0 +1,20 @@
+table_name,tool_type,tool_series,cut_type,units.tool_diameter,units.tool_length,units.tool_cost,units.tool_life,tool_life_s,construction,tool_diameter_mm,tool_length_mm,number_of_teeth,tool_cost_usd
+tblDovetailToolParameters,Dovetail Mill,"Virtual Dovetail Mill, Uncoated",Finish Dovetail Milling,mm,mm,USD,s,3600.0,Solid,0.79375,38.1,2,64.99
+tblDovetailToolParameters,Dovetail Mill,"Virtual Dovetail Mill, Uncoated",Finish Dovetail Milling,mm,mm,USD,s,3600.0,Solid,1.5875,38.1,2,64.65
+tblDovetailToolParameters,Dovetail Mill,"Virtual Dovetail Mill, Uncoated",Finish Dovetail Milling,mm,mm,USD,s,3600.0,Solid,1.984375,38.1,2,64.72
+tblDovetailToolParameters,Dovetail Mill,"Virtual Dovetail Mill, Uncoated",Finish Dovetail Milling,mm,mm,USD,s,3600.0,Solid,2.38125,38.1,2,64.96
+tblDovetailToolParameters,Dovetail Mill,"Virtual Dovetail Mill, Uncoated",Finish Dovetail Milling,mm,mm,USD,s,3600.0,Solid,3.175,38.1,2,65.9
+tblDovetailToolParameters,Dovetail Mill,"Virtual Dovetail Mill, Uncoated",Finish Dovetail Milling,mm,mm,USD,s,3600.0,Solid,3.96875,50.8,2,67.48
+tblDovetailToolParameters,Dovetail Mill,"Virtual Dovetail Mill, Uncoated",Finish Dovetail Milling,mm,mm,USD,s,3600.0,Solid,4.7625,50.8,2,69.71
+tblDovetailToolParameters,Dovetail Mill,"Virtual Dovetail Mill, Uncoated",Finish Dovetail Milling,mm,mm,USD,s,3600.0,Solid,6.35,50.8,2,76.07
+tblDovetailToolParameters,Dovetail Mill,"Virtual Dovetail Mill, Uncoated",Finish Dovetail Milling,mm,mm,USD,s,3600.0,Solid,7.9375,63.5,3,84.99
+tblDovetailToolParameters,Dovetail Mill,"Virtual Dovetail Mill, Uncoated",Finish Dovetail Milling,mm,mm,USD,s,3600.0,Solid,9.525,63.5,3,96.47
+tblDovetailToolParameters,Dovetail Mill,"Virtual Dovetail Mill, Uncoated",Finish Dovetail Milling,mm,mm,USD,s,3600.0,Solid,11.1125,69.85,3,110.51
+tblDovetailToolParameters,Dovetail Mill,"Virtual Dovetail Mill, Uncoated",Finish Dovetail Milling,mm,mm,USD,s,3600.0,Solid,12.7,76.2,4,127.11
+tblDovetailToolParameters,Dovetail Mill,"Virtual Dovetail Mill, Uncoated",Finish Dovetail Milling,mm,mm,USD,s,3600.0,Solid,14.2875,76.2,4,146.27
+tblDovetailToolParameters,Dovetail Mill,"Virtual Dovetail Mill, Uncoated",Finish Dovetail Milling,mm,mm,USD,s,3600.0,Solid,15.875,76.2,4,167.98
+tblDovetailToolParameters,Dovetail Mill,"Virtual Dovetail Mill, Uncoated",Finish Dovetail Milling,mm,mm,USD,s,3600.0,Solid,17.4625,76.2,4,192.26
+tblDovetailToolParameters,Dovetail Mill,"Virtual Dovetail Mill, Uncoated",Finish Dovetail Milling,mm,mm,USD,s,3600.0,Solid,19.05,76.2,4,219.09
+tblDovetailToolParameters,Dovetail Mill,"Virtual Dovetail Mill, Uncoated",Finish Dovetail Milling,mm,mm,USD,s,3600.0,Solid,20.6375,82.55,4,248.48
+tblDovetailToolParameters,Dovetail Mill,"Virtual Dovetail Mill, Uncoated",Finish Dovetail Milling,mm,mm,USD,s,3600.0,Solid,22.225,88.9,4,280.43
+tblDovetailToolParameters,Dovetail Mill,"Virtual Dovetail Mill, Uncoated",Finish Dovetail Milling,mm,mm,USD,s,3600.0,Solid,23.8125,95.25,4,314.94

@@ -1,0 +1,74 @@
+﻿Equipment,Equipment Description,Weight (kg),Part Max Dimension (mm),Num Operators,Load Time (s),Unload Time (s),Reorientation Time (s)
+Lifting Aid 1,Non-powered devices such as a manual lift harness.,25.00,915.00,1.00,20.00,20.00,20.00
+Lifting Aid 1,Non-powered devices such as a manual lift harness.,25.00,1830.00,1.00,30.00,30.00,30.00
+Lifting Aid 1,Non-powered devices such as a manual lift harness.,30.00,915.00,1.00,20.00,20.00,20.00
+Lifting Aid 1,Non-powered devices such as a manual lift harness.,30.00,1830.00,1.00,30.00,30.00,30.00
+Lifting Aid 1,Non-powered devices such as a manual lift harness.,40.00,915.00,1.00,25.00,25.00,25.00
+Lifting Aid 1,Non-powered devices such as a manual lift harness.,40.00,1830.00,1.00,35.00,35.00,35.00
+Lifting Aid 1,Non-powered devices such as a manual lift harness.,50.00,915.00,1.00,25.00,25.00,25.00
+Lifting Aid 1,Non-powered devices such as a manual lift harness.,50.00,1830.00,1.00,40.00,40.00,40.00
+Lifting Aid 1,Non-powered devices such as a manual lift harness.,60.00,915.00,1.00,30.00,30.00,30.00
+Lifting Aid 1,Non-powered devices such as a manual lift harness.,60.00,1830.00,1.00,45.00,45.00,45.00
+Lifting Aid 1,Non-powered devices such as a manual lift harness.,70.00,915.00,1.00,35.00,35.00,35.00
+Lifting Aid 1,Non-powered devices such as a manual lift harness.,70.00,1830.00,1.00,55.00,55.00,55.00
+Lifting Aid 1,Non-powered devices such as a manual lift harness.,80.00,915.00,1.00,40.00,40.00,40.00
+Lifting Aid 1,Non-powered devices such as a manual lift harness.,80.00,1830.00,1.00,60.00,60.00,60.00
+Lifting Aid 1,Non-powered devices such as a manual lift harness.,90.00,915.00,1.00,45.00,45.00,45.00
+Lifting Aid 1,Non-powered devices such as a manual lift harness.,90.00,1830.00,1.00,65.00,65.00,65.00
+Lifting Aid 1,Non-powered devices such as a manual lift harness.,100.00,915.00,1.00,50.00,50.00,50.00
+Lifting Aid 1,Non-powered devices such as a manual lift harness.,100.00,1830.00,1.00,75.00,75.00,75.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",25.00,3048.00,2.00,35.00,35.00,35.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",30.00,3048.00,2.00,40.00,40.00,40.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",40.00,3048.00,2.00,45.00,45.00,45.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",50.00,3048.00,2.00,50.00,50.00,50.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",60.00,3048.00,2.00,60.00,60.00,60.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",70.00,3048.00,2.00,70.00,70.00,70.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",80.00,3048.00,2.00,80.00,80.00,80.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",90.00,3048.00,2.00,90.00,90.00,90.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",100.00,3048.00,2.00,100.00,100.00,100.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",150.00,915.00,1.00,55.00,55.00,55.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",150.00,1830.00,1.00,80.00,80.00,80.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",150.00,3048.00,2.00,110.00,110.00,110.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",200.00,915.00,1.00,60.00,60.00,60.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",200.00,1830.00,1.00,90.00,90.00,90.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",200.00,3048.00,2.00,120.00,120.00,120.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",250.00,915.00,1.00,85.00,85.00,85.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",250.00,1830.00,1.00,125.00,125.00,125.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",250.00,3048.00,2.00,165.00,165.00,165.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",300.00,915.00,1.00,105.00,105.00,105.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",300.00,1830.00,1.00,160.00,160.00,160.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",300.00,3048.00,2.00,215.00,215.00,215.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",400.00,915.00,1.00,130.00,130.00,130.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",400.00,1830.00,1.00,195.00,195.00,195.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",400.00,3048.00,2.00,260.00,260.00,260.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",500.00,915.00,1.00,155.00,155.00,155.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",500.00,1830.00,1.00,230.00,230.00,230.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",500.00,3048.00,2.00,310.00,310.00,310.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",600.00,915.00,1.00,205.00,205.00,205.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",600.00,1830.00,1.00,305.00,305.00,305.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",600.00,3048.00,2.00,405.00,405.00,405.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",700.00,915.00,1.00,250.00,250.00,250.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",700.00,1830.00,1.00,375.00,375.00,375.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",700.00,3048.00,2.00,500.00,500.00,500.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",800.00,915.00,1.00,300.00,300.00,300.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",800.00,1830.00,1.00,450.00,450.00,450.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",800.00,3048.00,2.00,595.00,595.00,595.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",900.00,915.00,1.00,345.00,345.00,345.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",900.00,1830.00,1.00,520.00,520.00,520.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",900.00,3048.00,2.00,695.00,695.00,695.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",1000.00,915.00,1.00,440.00,440.00,440.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",1000.00,1830.00,1.00,665.00,665.00,665.00
+Lifting Aid 2,"Small powered devices such as hoists, electric winches, forklifts, etc.",1000.00,3048.00,2.00,885.00,885.00,885.00
+Lifting Aid 3,"Large powered devices such as cranes, gantries, etc.",5000.00,3048.00,2.00,395.00,395.00,395.00
+None,No equipment.,5.00,915.00,1.00,10.00,10.00,10.00
+None,No equipment.,5.00,1830.00,2.00,15.00,15.00,15.00
+None,No equipment.,5.00,3048.00,2.00,20.00,20.00,20.00
+None,No equipment.,10.00,915.00,1.00,10.00,10.00,10.00
+None,No equipment.,10.00,1830.00,2.00,15.00,15.00,15.00
+None,No equipment.,10.00,3048.00,2.00,25.00,25.00,25.00
+None,No equipment.,15.00,915.00,1.00,15.00,15.00,15.00
+None,No equipment.,15.00,1830.00,2.00,20.00,20.00,20.00
+None,No equipment.,15.00,3048.00,2.00,25.00,25.00,25.00
+None,No equipment.,20.00,915.00,1.00,15.00,15.00,15.00
+None,No equipment.,20.00,1830.00,2.00,25.00,25.00,25.00
+None,No equipment.,20.00,3048.00,2.00,30.00,30.00,30.00

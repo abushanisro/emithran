@@ -1,0 +1,14 @@
+name,sourceFilePath,digitalFactory,Finish Name,Standard,Hrs Per Sq Meter (hr / m^2)
+SPIFinishes,lookupTables/Component/SPIFinishes.csv,aPriori USA,As - Machined,None,0.0
+SPIFinishes,lookupTables/Component/SPIFinishes.csv,aPriori USA,SPI A1 - Super High Gloss,SPI A1,1400.0
+SPIFinishes,lookupTables/Component/SPIFinishes.csv,aPriori USA,SPI A2 - High Gloss,SPI A2,1300.0
+SPIFinishes,lookupTables/Component/SPIFinishes.csv,aPriori USA,SPI A3 - Normal Gloss,SPI A3,1200.0
+SPIFinishes,lookupTables/Component/SPIFinishes.csv,aPriori USA,SPI B1 - Fine Semi-Gloss,SPI B1,950.0
+SPIFinishes,lookupTables/Component/SPIFinishes.csv,aPriori USA,SPI B2 - Medium Semi-Gloss,SPI B2,775.0
+SPIFinishes,lookupTables/Component/SPIFinishes.csv,aPriori USA,SPI B3 - Normal Semi-Gloss,SPI B3,600.0
+SPIFinishes,lookupTables/Component/SPIFinishes.csv,aPriori USA,SPI C1 - Fine Matte,SPI C1,375.0
+SPIFinishes,lookupTables/Component/SPIFinishes.csv,aPriori USA,SPI C2 - Medium Matte,SPI C2,245.0
+SPIFinishes,lookupTables/Component/SPIFinishes.csv,aPriori USA,SPI C3 - Normal Matte,SPI C3,200.0
+SPIFinishes,lookupTables/Component/SPIFinishes.csv,aPriori USA,SPI D1 - Satin,SPI D1,187.5
+SPIFinishes,lookupTables/Component/SPIFinishes.csv,aPriori USA,SPI D2 - Dull,SPI D2,98.0
+SPIFinishes,lookupTables/Component/SPIFinishes.csv,aPriori USA,SPI D3 - Rough,SPI D3,50.0

@@ -1,0 +1,6 @@
+name,labor_rate_usd_hr,direct_overhead_rate_usd_hr,indirect_overhead_rate_usd_hr,overhead_multiplier,number_of_operators,labor_time_standard,wage_grade_name,work_center_labor_rate_factor,setup_time_hr,gun_clean_time_per_arc_s,gun_placement_time_s,spot_weld_time_s,is_preferred,good_part_yield,machine_price_usd,machine_length_mm,machine_width_mm,footprint_allowance_factor,machine_power_kw,installation_factor_pct,machine_uptime_pct,annual_maintenance_factor_pct,machine_life_yr,salvage_value_factor_pct,supplies_cost_usd_yr,machine_manufacturer_location
+Default Spot Weld,52.71,1.74,15.10,0.00,1.00,1.00,,1.00,1.00,0.00,2.00,0.96,true,1.00,3700.00,970.00,610.00,25.00,10.00,20.00,80.00,5.00,10,0.00,0.00,USA
+LMSW (Miller- 152mm tongs),52.71,1.55,15.02,0.00,1.00,1.00,,1.00,1.00,0.00,2.00,0.96,false,1.00,696.00,910.00,610.00,25.00,10.00,20.00,80.00,5.00,10,0.00,0.00,USA
+MSW (Miller- 152 mm tongs),52.71,1.55,15.02,0.00,1.00,1.00,,1.00,1.00,0.00,2.00,0.96,false,1.00,605.00,910.00,610.00,25.00,10.00,20.00,80.00,5.00,10,0.00,0.00,USA
+SSW (Miller- 152 mm tongs),52.71,5.46,15.02,0.00,1.00,1.00,,1.00,1.00,0.00,2.00,0.96,false,1.00,5340.00,910.00,610.00,25.00,34.00,20.00,80.00,5.00,10,0.00,0.00,USA
+SSW (Miller- 305 mm tongs),52.71,1.83,15.02,0.00,1.00,1.00,,1.00,1.00,0.00,2.00,0.96,false,1.00,5340.00,910.00,610.00,25.00,10.00,20.00,80.00,5.00,10,0.00,0.00,USA

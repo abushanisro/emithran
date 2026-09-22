@@ -1,0 +1,11 @@
+Coating Cost Factor (USD/kg),Coating Type,Tool Life Improvement Factor
+1.0,None,1.0
+1.9,Tribo-coating,1.4
+2.8,Electroless Nickel,1.2
+3.5,Electroless Teflon,1.5
+4.1,Nitrided Steel,1.1
+4.4,Electroplated Chromium,1.3
+6.9,Plasma Sprayed,1.4
+10.2,PVD TiN,1.6
+19.1,CVD TiC,1.9
+25.0,Duplex/Variants,1.4

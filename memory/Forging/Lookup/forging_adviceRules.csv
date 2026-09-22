@@ -1,0 +1,26 @@
+﻿Digital Factory,Table Name,File Path,Advice Rule Name,Enabled
+aPriori USA,adviceRules,lookupTables/Component/adviceRules.csv,HighBlindHoleLengthToDiameterRatio,true
+aPriori USA,adviceRules,lookupTables/Component/adviceRules.csv,InaccessibleFeature,true
+aPriori USA,adviceRules,lookupTables/Component/adviceRules.csv,InsufficientCornerRadius,true
+aPriori USA,adviceRules,lookupTables/Component/adviceRules.csv,InsufficientDraftAngle,true
+aPriori USA,adviceRules,lookupTables/Component/adviceRules.csv,InsufficientFilletRadius,true
+aPriori USA,adviceRules,lookupTables/Component/adviceRules.csv,ThickSlug,true
+aPriori USA,adviceRules,lookupTables/Component/adviceRules.csv,ThickWalledHole,true
+aPriori USA,adviceRules,lookupTables/Component/adviceRules.csv,ThinSection,true
+aPriori USA,adviceRules,lookupTables/Component/adviceRules.csv,Threaded,true
+aPriori USA,adviceRules,lookupTables/Component/adviceRules.csv,TightToleranceCircularity,true
+aPriori USA,adviceRules,lookupTables/Component/adviceRules.csv,TightToleranceConcentricity,true
+aPriori USA,adviceRules,lookupTables/Component/adviceRules.csv,TightToleranceCoordinateTolerance,true
+aPriori USA,adviceRules,lookupTables/Component/adviceRules.csv,TightToleranceCylindricity,true
+aPriori USA,adviceRules,lookupTables/Component/adviceRules.csv,TightToleranceDiamTolerance,true
+aPriori USA,adviceRules,lookupTables/Component/adviceRules.csv,TightToleranceFlatness,true
+aPriori USA,adviceRules,lookupTables/Component/adviceRules.csv,TightToleranceParallelism,true
+aPriori USA,adviceRules,lookupTables/Component/adviceRules.csv,TightTolerancePerpendicularity,true
+aPriori USA,adviceRules,lookupTables/Component/adviceRules.csv,TightTolerancePositionTolerance,true
+aPriori USA,adviceRules,lookupTables/Component/adviceRules.csv,TightToleranceProfileOfSurface,true
+aPriori USA,adviceRules,lookupTables/Component/adviceRules.csv,TightToleranceRoughnessRa,true
+aPriori USA,adviceRules,lookupTables/Component/adviceRules.csv,TightToleranceRoughnessRz,true
+aPriori USA,adviceRules,lookupTables/Component/adviceRules.csv,TightToleranceRunout,true
+aPriori USA,adviceRules,lookupTables/Component/adviceRules.csv,TightToleranceStraightness,true
+aPriori USA,adviceRules,lookupTables/Component/adviceRules.csv,TightToleranceSymmetry,true
+aPriori USA,adviceRules,lookupTables/Component/adviceRules.csv,TightToleranceTotalRunout,true

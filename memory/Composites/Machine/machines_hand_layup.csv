@@ -1,0 +1,9 @@
+﻿Name,Labor Rate (USD / hr),Setup Time (hr),Useable Length (mm),Useable Width (mm),Has Laser Projection,Avg Utilization,Good Part Yield,Is Preferred,Machine Price (USD),Machine Length (mm),Machine Width (mm),Footprint Allowance Factor,Machine Power (kW),Installation Factor (%),Machine Uptime (%),Annual Maintenance Factor (%),Machine Life (yr),Salvage Value Factor (%),Supplies Cost (USD / yr),Machine Manufacturer Location
+Clean Room Area - 16m x 4m,47.36,1.00,16000.00,4000.00,false,1.00,1.00,true,2755558.00,32000.00,8000.00,1.00,51.20,20.00,80.00,5.00,10,0.00,0.00,Virtual
+Clean Room Area - 2m x 2m,47.36,0.50,2000.00,2000.00,false,1.00,1.00,true,172222.00,4000.00,4000.00,1.00,3.20,20.00,80.00,5.00,10,0.00,0.00,Virtual
+Clean Room Area - 4m x 4m,47.36,0.50,4000.00,4000.00,false,1.00,1.00,true,688889.00,8000.00,8000.00,1.00,12.80,20.00,80.00,5.00,10,0.00,0.00,Virtual
+Clean Room Area - 8m x 4m,47.36,1.00,8000.00,4000.00,false,1.00,1.00,true,1377779.00,16000.00,8000.00,1.00,25.60,20.00,80.00,5.00,10,0.00,0.00,Virtual
+Clean Room Area with Laser Projection - 16m x 4m,47.36,1.00,16000.00,4000.00,true,1.00,1.00,true,2975558.00,32000.00,8000.00,1.00,51.60,20.00,80.00,5.00,10,0.00,0.00,Virtual
+Clean Room Area with Laser Projection - 2m x 2m,47.36,0.50,2000.00,2000.00,true,1.00,1.00,true,226222.00,4000.00,4000.00,1.00,3.32,20.00,80.00,5.00,10,0.00,0.00,Virtual
+Clean Room Area with Laser Projection - 4m x 4m,47.36,0.50,4000.00,4000.00,true,1.00,1.00,true,739889.00,8000.00,8000.00,1.00,12.99,20.00,80.00,5.00,10,0.00,0.00,Virtual
+Clean Room Area with Laser Projection - 8m x 4m,47.36,1.00,8000.00,4000.00,true,1.00,1.00,true,1487779.00,16000.00,8000.00,1.00,25.80,20.00,80.00,5.00,10,0.00,0.00,Virtual

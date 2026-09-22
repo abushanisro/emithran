@@ -1,0 +1,3 @@
+name,sourceFilePath,digitalFactory,value
+tblGrillInsertTypes,lookupTables/Component/tblGrillInsertTypes.csv,aPriori USA,Grill Area (in^2)
+tblGrillInsertTypes,lookupTables/Component/tblGrillInsertTypes.csv,aPriori USA,Grill Insert Size
