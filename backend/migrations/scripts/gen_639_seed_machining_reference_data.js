@@ -1,7 +1,7 @@
 // Generator: seeds machining_reference_data (migration 638's schema) from
 // the real Machining reference data file.
 //
-//   'variable'  <- memory/machining/variables.json (264 named engineering
+//   'variable'  <- memory/Machining/variables.csv (264 named engineering
 //                  constants -- same shape as sm_reference_data's and
 //                  im_reference_data's own 'variable' category)
 //
@@ -10,9 +10,8 @@
 // datasets (sm_reference_data migration 479, im_reference_data migration
 // 637 -- same snapshot family, same neutral non-vendor label).
 //
-// Dollar-quoting (not standard '...' escaping) for all free-text fields --
-// see gen_637_seed_im_reference_data.js's header comment for why: a real
-// source note can end on its own embedded quoted phrase, which standard
+// Dollar-quoting (not standard '...' escaping) for all free-text fields: a
+// real source note can end on its own embedded quoted phrase, which standard
 // apostrophe-doubling turns into 3+ consecutive single quotes at the
 // string boundary. That is unambiguous to real Postgres but breaks some
 // SQL editors' client-side statement-splitting. Dollar-quoting needs no
@@ -24,7 +23,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const VARS_FILE = path.join(__dirname, '../../../memory/machining/variables.json');
+const { readDoc } = require('./lib/memory-csv');
+
+const VARS_FILE = path.join(__dirname, '../../../memory/Machining/variables.csv');
 const OUT_SQL = path.join(__dirname, '../639_seed_machining_reference_data.sql');
 
 const SOURCE_REGION = 'USA';
@@ -57,7 +58,7 @@ function sanitize(v) {
 
 const rows = [];
 
-const varsData = JSON.parse(fs.readFileSync(VARS_FILE, 'utf8'));
+const varsData = readDoc(VARS_FILE, { list: 'variables', scalars: ['section', 'variableCount'], strings: ['stringValue'] });
 for (const v of varsData.variables) {
   rows.push({
     category: 'variable',

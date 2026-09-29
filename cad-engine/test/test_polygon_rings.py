@@ -12,7 +12,7 @@ a genuine broached polygon from an ordinary square/rectangular milled
 pocket. Both are real closed rings of congruent-area, mutually adjacent
 planar walls -- the difference is the intended tooling/process, not the
 geometry. Kept as a documented, tested spike (same precedent as
-sheet_metal/features/gusset_spike.py) for a future pass with an additional
+not wired into extraction) for a future pass with an additional
 real disambiguating signal, called directly here at the unit level (not
 through the full recognizer pipeline, which never invokes it).
 
@@ -142,3 +142,34 @@ def test_KNOWN_LIMITATION_an_ordinary_pocket_is_also_reported_as_a_ring():
     rings = _detect(part)
     assert len(rings) == 1
     assert rings[0]["side_count"] == 4
+
+
+def test_hex_socket_geometry_socket_kind_across_flats_and_depth():
+    r = _detect(_box_with_hex_socket())[0]
+    assert r["kind"] == "socket"
+    assert abs(r["across_flats_mm"] - 8.0 * math.sqrt(3)) < 0.01  # radius-8 hexagon
+    assert abs(r["depth_mm"] - 10.0) < 0.01
+    assert [abs(round(c, 3)) for c in r["axis"]] == [0.0, 0.0, 1.0]
+
+
+def test_hex_boss_is_a_boss():
+    r = _detect(_box_with_hex_boss())[0]
+    assert r["kind"] == "boss"
+    assert abs(r["across_flats_mm"] - 8.0 * math.sqrt(3)) < 0.01
+    assert abs(r["depth_mm"] - 10.0) < 0.01
+
+
+def test_square_socket_across_flats_is_its_width():
+    r = _detect(_box_with_square_socket())[0]
+    assert r["kind"] == "socket"
+    assert abs(r["across_flats_mm"] - 12.0) < 0.01
+    assert abs(r["depth_mm"] - 8.0) < 0.01
+
+
+def test_recognizer_attaches_rings_as_candidates_not_features():
+    from machining.machining_feature_recognizer import MachiningFeatureRecognizer
+    tree = MachiningFeatureRecognizer().recognize(_box_with_hex_socket(), "milled")
+    d = tree.to_dict()
+    assert len(d["polygon_candidates"]) == 1
+    assert d["polygon_candidates"][0]["kind"] == "socket"
+    assert all(f["type"] != "Polygon" for f in d["features"])

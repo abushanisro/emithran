@@ -6,7 +6,8 @@ import { addAoaSheet, createWorkbook, downloadWorkbook } from '@/lib/utils/excel
 import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
 import {
   effectiveProcessGroupOf,
-  processGroupOptionsFrom,
+  buildHrRatesIndex,
+  optionsKeepingSelection,
 } from '@/lib/processCatalog/hr-rates-process-selection';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -163,8 +164,8 @@ export default function HRRatesPage() {
   // group. Shared with Edit Process Cost, which derives its Process picker from
   // the identical rule over the identical query.
   const mhrProcessGroupOptions = useMemo(
-    () => processGroupOptionsFrom(mhrData?.records ?? []),
-    [mhrData?.records],
+    () => optionsKeepingSelection(buildHrRatesIndex(mhrData?.records ?? []).processGroups, mhrProcessGroupFilter),
+    [mhrData?.records, mhrProcessGroupFilter],
   );
 
   // Live ECB/Frankfurter reference rates for every distinct currency the

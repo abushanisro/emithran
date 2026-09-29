@@ -597,22 +597,22 @@ export function BOMItemDialog({
     }
 
     const filled = new Set<string>();
-    const geometryAvailable = r.cadEngineAvailable;
     setFormData(prev => {
       const patch: Partial<typeof prev> = {};
       // Name and part number always come from filename — safe regardless of CAD state
       if (!prev.name) { patch.name = r.suggestions.name; filled.add('name'); }
       if (!prev.partNumber) { patch.partNumber = r.suggestions.partNumber; filled.add('partNumber'); }
-      // Geometry fields: only fill when CAD engine was online and returned real data
-      if (geometryAvailable && !prev.volume) { patch.volume = r.geometry.volume; filled.add('volume'); }
+      // Geometry fields. A result only exists when the CAD engine analysed the
+      // file: the backend answers 503/422 otherwise and nothing is filled.
+      if (!prev.volume) { patch.volume = r.geometry.volume; filled.add('volume'); }
       // Only a real, positive weight. The backend sends 0 for "not known",
       // because weight needs a density and density needs a material the
       // engineer has not chosen yet.
-      if (geometryAvailable && !prev.weight && r.geometry.weight > 0) { patch.weight = r.geometry.weight; filled.add('weight'); }
-      if (geometryAvailable && !prev.surfaceArea) { patch.surfaceArea = r.geometry.surfaceArea; filled.add('surfaceArea'); }
-      if (geometryAvailable && !prev.maxLength) { patch.maxLength = r.geometry.boundingBox.length; filled.add('maxLength'); }
-      if (geometryAvailable && !prev.maxWidth) { patch.maxWidth = r.geometry.boundingBox.width; filled.add('maxWidth'); }
-      if (geometryAvailable && !prev.maxHeight) { patch.maxHeight = r.geometry.boundingBox.height; filled.add('maxHeight'); }
+      if (!prev.weight && r.geometry.weight > 0) { patch.weight = r.geometry.weight; filled.add('weight'); }
+      if (!prev.surfaceArea) { patch.surfaceArea = r.geometry.surfaceArea; filled.add('surfaceArea'); }
+      if (!prev.maxLength) { patch.maxLength = r.geometry.boundingBox.length; filled.add('maxLength'); }
+      if (!prev.maxWidth) { patch.maxWidth = r.geometry.boundingBox.width; filled.add('maxWidth'); }
+      if (!prev.maxHeight) { patch.maxHeight = r.geometry.boundingBox.height; filled.add('maxHeight'); }
       // Material grade is NOT auto-filled, and is no longer suggested at all.
       //
       // The backend used to run suggestMaterial(), which never read the CAD file:
@@ -625,41 +625,34 @@ export function BOMItemDialog({
       // grade to fill and no badge to show. The engineer picks the material,
       // which is also what makes Weight meaningful: weight = volume x density,
       // and density is a property of the material, not of the solid.
-      // makeBuy and itemType are safe defaults — fill always
-      if (!prev.makeBuy || prev.makeBuy === 'make') {
-        patch.makeBuy = r.suggestions.makeBuy;
-        filled.add('makeBuy');
-      }
-      if (r.suggestions.itemType) {
-        patch.itemType = r.suggestions.itemType as BOMItemType;
-        filled.add('itemType');
-      }
-      // Process type and sheet metal features require real geometry
-      if (geometryAvailable && !prev.processType && r.suggestions.processType) {
+      // Make/buy and item type are the engineer's decisions: nothing in the
+      // CAD file states them, so they are never filled from it. (They used
+      // to come from a volume-threshold rule: "assembly" above 10,000 cm3.)
+      if (!prev.processType && r.suggestions.processType) {
         patch.processType = r.suggestions.processType;
         filled.add('processType');
       }
-      if (geometryAvailable && !prev.holeCount && r.geometry.holeCount > 0) {
+      if (!prev.holeCount && r.geometry.holeCount > 0) {
         patch.holeCount = r.geometry.holeCount;
         filled.add('holeCount');
       }
-      if (geometryAvailable && !prev.bendCount && r.geometry.bendCount > 0) {
+      if (!prev.bendCount && r.geometry.bendCount > 0) {
         patch.bendCount = r.geometry.bendCount;
         filled.add('bendCount');
       }
-      if (geometryAvailable && !prev.cutLengthMm && r.geometry.cutLengthMm > 0) {
+      if (!prev.cutLengthMm && r.geometry.cutLengthMm > 0) {
         patch.cutLengthMm = r.geometry.cutLengthMm;
         filled.add('cutLengthMm');
       }
-      if (geometryAvailable && !prev.sheetThicknessMm && r.geometry.sheetThicknessMm > 0) {
+      if (!prev.sheetThicknessMm && r.geometry.sheetThicknessMm > 0) {
         patch.sheetThicknessMm = r.geometry.sheetThicknessMm;
         filled.add('sheetThicknessMm');
       }
-      if (geometryAvailable && !prev.pierceCount && r.geometry.pierceCount > 0) {
+      if (!prev.pierceCount && r.geometry.pierceCount > 0) {
         patch.pierceCount = r.geometry.pierceCount;
         filled.add('pierceCount');
       }
-      if (geometryAvailable && !prev.flatPatternAreaMm2 && r.geometry.flatPatternAreaMm2 > 0) {
+      if (!prev.flatPatternAreaMm2 && r.geometry.flatPatternAreaMm2 > 0) {
         patch.flatPatternAreaMm2 = r.geometry.flatPatternAreaMm2;
         filled.add('flatPatternAreaMm2');
       }
@@ -671,15 +664,14 @@ export function BOMItemDialog({
       filled.forEach(f => { next[f] = { source: 'cad' }; });
       return next;
     });
+    // Only the process type carries a real confidence: the CAD engine's own
+    // family-classification confidence. Geometry is measured, not estimated,
+    // so it gets no score (it used to get a fixed 0.9).
     setFieldConfidences(prev => {
       const next = { ...prev };
-      const geoFields = ['volume','weight','surfaceArea','maxLength','maxWidth','maxHeight','holeCount','bendCount','cutLengthMm','sheetThicknessMm','pierceCount','flatPatternAreaMm2'];
-      filled.forEach(f => {
-        if (geoFields.includes(f)) next[f] = r.confidence.geometry;
-        else if (f === 'material' || f === 'materialGrade') next[f] = r.confidence.material;
-        else if (f === 'processType') next[f] = r.confidence.process;
-        else next[f] = r.confidence.overall;
-      });
+      if (filled.has('processType') && r.suggestions.familyConfidence != null) {
+        next.processType = r.suggestions.familyConfidence;
+      }
       return next;
     });
     setAutoFilledFields(filled);
@@ -712,18 +704,14 @@ export function BOMItemDialog({
         setActiveFileId(item.id);
         populateFormFromResult(result);
       }
-      // Surface CAD engine errors (e.g. FreeCAD not installed for SLDPRT)
-      if (!result.cadEngineAvailable && result.cadEngineError) {
-        toast.warning('Geometry extraction unavailable', {
-          description: result.cadEngineError,
-          duration: 10000,
-        });
-      }
     } catch (e: any) {
-      updatePendingFileStatus(item.id, 'error', e?.message ?? 'Analysis failed');
+      const reason: string = e?.message ?? 'Analysis failed';
+      updatePendingFileStatus(item.id, 'error', reason);
+      // Show the real reason the backend reported -- a valid file can fail for
+      // reasons that have nothing to do with its format.
       toast.error(`Could not analyze ${item.file.name}`, {
-        description: 'Check that the file is a valid STEP / STL / IGES and try again.',
-        duration: 5000,
+        description: reason,
+        duration: 10000,
       });
     }
   }, [updatePendingFileStatus, updatePendingFileResult, populateFormFromResult]);
@@ -781,8 +769,9 @@ export function BOMItemDialog({
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: handleFileDrop,
     accept: {
-      'application/octet-stream': ['.step', '.stp', '.stl', '.iges', '.igs', '.obj', '.dxf', '.dwg', '.sldprt'],
-      'application/x-sldprt': ['.sldprt'],
+      // STEP/STP are analysed by the CAD engine (the only 3D formats it reads);
+      // DXF/DWG are stored as the 2D drawing, not analysed.
+      'application/octet-stream': ['.step', '.stp', '.dxf', '.dwg'],
     },
     maxSize: 100 * 1024 * 1024,
     multiple: true,
@@ -1326,7 +1315,8 @@ export function BOMItemDialog({
           bomId,
           name: r.suggestions.name,
           partNumber: r.suggestions.partNumber,
-          itemType: (r.suggestions.itemType as BOMItemType) || BOMItemType.CHILD_PART,
+          // The Type and Make/Buy the engineer set in this dialog apply to every file.
+          itemType: formData.itemType,
           parentItemId: finalParentId || undefined,
           quantity: 1,
           // No annualVolume. A bulk import has nobody to ask, and 1000 was not
@@ -1338,7 +1328,7 @@ export function BOMItemDialog({
           // Deliberately absent — see the single-file path above. The CAD
           // file's embedded material is a placeholder, not a specification,
           // and must not arrive as the item's costing grade.
-          makeBuy: r.suggestions.makeBuy || 'make',
+          makeBuy: formData.makeBuy,
           weight: r.geometry.weight || undefined,
           maxLength: r.geometry.boundingBox.length || undefined,
           maxWidth: r.geometry.boundingBox.width || undefined,
@@ -1433,7 +1423,7 @@ export function BOMItemDialog({
               <div className="flex items-center justify-between">
                 <Label className="flex items-center gap-2">
                   <Package className="h-4 w-4" />
-                  3D Models / CAD (STEP, STL, IGES, OBJ, DXF, DWG, SLDPRT)
+                  3D Model (STEP) · 2D drawing (DXF, DWG)
                   {pendingFiles.length > 0 && (
                     <Badge variant="secondary" className="text-xs ml-1">
                       {pendingFiles.length} file{pendingFiles.length !== 1 ? 's' : ''}
@@ -1458,9 +1448,9 @@ export function BOMItemDialog({
                   <div className="flex flex-col items-center gap-2 text-muted-foreground py-2">
                     <Package className="h-7 w-7 opacity-50" />
                     <p className="text-sm font-medium">
-                      {isDragActive ? 'Drop files here…' : 'Drop STEP / STL / IGES / SLDPRT / DXF / DWG files, or click to browse'}
+                      {isDragActive ? 'Drop files here…' : 'Drop STEP (.step / .stp) or DXF / DWG files, or click to browse'}
                     </p>
-                    <p className="text-xs">Multiple files supported · 100 MB max each · DXF/DWG saved as drawing · STEP/STL/SLDPRT auto-fills form</p>
+                    <p className="text-xs">Multiple files supported · 100 MB max each · STEP is analysed by the CAD engine and fills the form · DXF/DWG are stored as the drawing only (not analysed)</p>
                   </div>
                 ) : (
                   <div className="space-y-1" onClick={(e) => e.stopPropagation()}>
@@ -1495,7 +1485,7 @@ export function BOMItemDialog({
                           /* Process family only. No material badge: nothing in the CAD
                              file states a grade, so there is nothing here to show
                              until the engineer picks one. */
-                          <Badge variant="secondary" className="text-xs shrink-0">{pf.result.suggestions.processType}</Badge>
+                          <Badge variant="secondary" className="text-xs shrink-0">{pf.result.suggestions.suggestedMachine ?? pf.result.suggestions.processType ?? 'Unclassified'}</Badge>
                         ) : null}
                         {pf.status === 'error' && (
                           <span className="text-xs text-red-500 shrink-0 max-w-[100px] truncate" title={pf.error}>
@@ -1517,16 +1507,6 @@ export function BOMItemDialog({
                   </div>
                 )}
               </div>
-              {activeResult?.costs?.estimatedUnitCost != null && activeResult.cadEngineAvailable && (
-                <div className="rounded-md bg-muted/50 border px-3 py-2 flex items-center justify-between">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Est. unit cost
-                  </p>
-                  <span className="font-mono font-semibold text-sm text-primary">
-                    $ {activeResult.costs.estimatedUnitCost.toFixed(2)}
-                  </span>
-                </div>
-              )}
             </div>
 
             {/* Name + Part Number — side by side */}

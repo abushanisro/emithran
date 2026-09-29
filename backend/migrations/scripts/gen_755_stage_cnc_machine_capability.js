@@ -47,7 +47,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const SRC_FILE = path.join(__dirname, '../../../memory/machining/machine/machiningusa.json');
+const { readRecords, groupRecords } = require('./lib/memory-csv');
+
+const SRC_FILE = path.join(__dirname, '../../../memory/Machining/machine/machiningusa.csv');
 const OUT_SQL = path.join(__dirname, '../755_stage_cnc_machine_capability.sql');
 
 const LATHE_CLASS_BY_CATEGORY = {
@@ -72,7 +74,7 @@ function sqlNum(v) {
   return Number.isFinite(n) ? String(n) : 'NULL';
 }
 
-const data = JSON.parse(fs.readFileSync(SRC_FILE, 'utf8'));
+const data = { machineCategories: groupRecords(readRecords(SRC_FILE), 'categoryName', 'machines', ['categoryName', 'digitalFactory', 'sector']) };
 
 const lathRows = [];
 const millRows = [];

@@ -1,351 +1,192 @@
-// Benchmark regression tests for the injection molding cost engine.
-// These lock in golden values before Phase 2 changes. All inputs are
-// representative of real parts; tolerances are ±10% (cost models are
-// heuristics, not measurements).
+// Injection molding cost engine, on real inputs only: presses from
+// memory/Plastic Modeling/machine/injection_molding_machines.csv (clamp, shot,
+// injection rate, dry cycle, machine hour rate), materials from
+// materials_final.csv (reference cost, density, thermal and clamp properties)
+// and the staged Plastic reference. Quoted in USD.
 //
 // Run: npm run test -- injection-molding-benchmark
 
 import {
   computeInjectionMoldedCostSummary,
-  recommendCavityCount,
   recommendMoldClass,
 } from '../../../../../../modules/bom-items/costing/plastic-molding/process/cost-injection-molding-engine';
 import type { InjectionMoldingCostInput } from '../../../../../../modules/bom-items/costing/plastic-molding/process/cost-injection-molding-engine';
+import { realMaterialClamp, realPlasticReference, realPress, realResinInputs } from '../real-plastic-reference';
 
-// Fixture MHR rates (realistic INR rates, not defaults)
-const mockMhr = (rate: number) => ({
-  rate,
-  source: 'mhr_database' as const,
-  machineClass: 'injection_molding',
-  machineName: 'Arburg Allrounder 570',
-  commodityCode: null,
-});
-const mockDeburr = (rate: number) => ({
-  rate,
-  source: 'mhr_database' as const,
-  machineClass: 'deburring',
-  machineName: 'Deburring Bench',
-  commodityCode: null,
-});
-const mockInspection = (rate: number) => ({
-  rate,
-  source: 'mhr_database' as const,
-  machineClass: 'cmm',
-  machineName: 'Inspection Bench',
-  commodityCode: null,
-});
+const REF = realPlasticReference();
 
-const BASE_RATES = {
-  mhrRate: mockMhr(3500),
-  deburrRate: mockDeburr(800),
-  inspectionRate: mockInspection(600),
-};
+type Press = ReturnType<typeof realPress>;
+const SMALL = realPress('Arburg Allrounder 221 K');             // 338 kN, 37.69 g
+const MID = realPress('Arburg Allrounder 420 C 1300 - 350');    // 1300 kN, 117 g
+const LARGE = realPress('Arburg Allrounder 520 C 2000 - 800');  // 2000 kN, 353 g
 
-// ── Cavity count unit tests ────────────────────────────────────────────────────
+const MATERIALS = {
+  PP: { reference: 'Polypropylene G-P H', costUsdPerKg: 1.077, densityKgM3: 910, type: 'Polypropylene' },
+  ABS: { reference: 'ABS', costUsdPerKg: 3.046, densityKgM3: 1040, type: 'ABS' },
+  PA66: { reference: 'Nylon, Type 66', costUsdPerKg: 4.363, densityKgM3: 1346, type: 'Nylon' },
+} as const;
 
-describe('recommendCavityCount', () => {
-  it('case 1 — small part, low volume → 1 cavity', () => {
-    const { count, constrainedBy } = recommendCavityCount({
-      projectedAreaMm2: 12000,   // 120 cm²
-      annualVolume: 10_000,
-      clampTonnageKN: 570,       // 57T Arburg 570
-      shotCapacityCm3: 51,
-      partVolumeMm3: 5_000,
-      gateType: 'edge',
-    });
-    expect(count).toBe(1);
-    expect(['economic', 'clamp', 'shot_capacity']).toContain(constrainedBy);
-  });
+const rate = (machineClass: string, rateUsd: number, machineName: string | null) =>
+  ({ rate: rateUsd, source: 'mhr_database' as const, machineClass, machineName, commodityCode: null });
 
-  it('case 2 — high volume, large machine → 4+ cavities', () => {
-    const { count } = recommendCavityCount({
-      projectedAreaMm2: 8000,    // 80 cm²
-      annualVolume: 500_000,
-      clampTonnageKN: 2000,      // 200T machine
-      shotCapacityCm3: 180,
-      partVolumeMm3: 3_000,
-      gateType: 'hot_tip',
-    });
-    expect(count).toBeGreaterThanOrEqual(4);
-  });
+function input(material: keyof typeof MATERIALS, press: Press, name: string, overrides: Partial<InjectionMoldingCostInput> = {}): InjectionMoldingCostInput {
+  const m = MATERIALS[material];
+  return {
+    volume: 10_000,
+    surfaceArea: 50_000,
+    wallThicknessNominalMm: 2.0,
+    materialGrade: material,
+    materialCostPerKg: m.costUsdPerKg,
+    materialDensityKgM3: m.densityKgM3,
+    materialSource: 'db',
+    batchSize: 1000,
+    family: 'plastic_molded',
+    mhrRate: rate('injection_molding', press.mhrUsd, name),
+    deburrRate: rate('deburring', 0, null),
+    inspectionRate: rate('cmm', 0, null),
+    machineClampTonnes: press.maxTonnage,
+    machineShotCapacityG: press.shotCapacityGrams,
+    pressTiming: press.timing,
+    goodPartYield: press.goodPartYield,
+    materialClamp: realMaterialClamp(m.reference),
+    realResinInputs: realResinInputs(m.reference),
+    materialType: m.type,
+    plasticReference: REF,
+    location: 'USA',
+    signals: { projectedAreaMm2: 2000, undercutCount: 0 },
+    annualVolume: 10_000,
+    productionLifeYears: 3,
+    ...overrides,
+  };
+}
 
-  it('shot capacity constraint — large part on small machine → 1 cavity', () => {
-    const { count, constrainedBy } = recommendCavityCount({
-      projectedAreaMm2: 5000,
-      annualVolume: 200_000,
-      clampTonnageKN: 800,
-      shotCapacityCm3: 60,       // only 60 cm³ capacity
-      partVolumeMm3: 50_000,     // 50 cm³ part → barely fits 1 shot
-      gateType: 'edge',
-    });
-    expect(count).toBe(1);
-    expect(constrainedBy).toBe('shot_capacity');
+describe('recommendMoldClass — tblSpiType lifetime cycles', () => {
+  it('picks the cheapest class whose rating covers the lifetime shots', () => {
+    expect(recommendMoldClass(400, REF.spiClasses, null, null).moldClass).toBe('Class105');
+    expect(recommendMoldClass(50_000, REF.spiClasses, null, null).moldClass).toBe('Class104');
+    expect(recommendMoldClass(400_000, REF.spiClasses, null, null).moldClass).toBe('Class103');
+    expect(recommendMoldClass(800_000, REF.spiClasses, null, null).moldClass).toBe('Class102');
   });
 });
-
-// ── Mold class unit tests ─────────────────────────────────────────────────────
-
-describe('recommendMoldClass', () => {
-  it('prototype volume → Class 105', () => {
-    const cls = recommendMoldClass(400, null, null);
-    expect(cls).toBe('Class105');
-  });
-
-  it('low production → Class 104', () => {
-    const cls = recommendMoldClass(50_000, null, null);
-    expect(cls).toBe('Class104');
-  });
-
-  it('medium production → Class 103', () => {
-    const cls = recommendMoldClass(400_000, null, null);
-    expect(cls).toBe('Class103');
-  });
-
-  it('high production + complex parting → bumped up from Class 103', () => {
-    const cls = recommendMoldClass(400_000, 0.7, 3);
-    // Should bump from Class 103 → Class 102
-    expect(['Class101', 'Class102']).toContain(cls);
-  });
-
-  it('very high production → Class 101 or 102', () => {
-    const cls = recommendMoldClass(800_000, null, null);
-    expect(['Class101', 'Class102']).toContain(cls);
-  });
-});
-
-// ── Full cost engine golden-value tests ──────────────────────────────────────
 
 describe('computeInjectionMoldedCostSummary', () => {
-  function baseInput(overrides: Partial<InjectionMoldingCostInput>): InjectionMoldingCostInput {
-    return {
-      volume: 10_000,               // 10 cm³
-      surfaceArea: 50_000,
-      wallThicknessNominalMm: 2.0,
-      materialGrade: 'PP',
-      materialCostPerKg: 150,       // INR/kg
-      materialDensityKgM3: 900,
-      materialSource: 'db',
-      batchSize: 1000,
-      family: 'plastic_molded',
-      ...BASE_RATES,
-      clampTonnageKN: 570,
-      shotCapacityCm3: 51,
-      ...overrides,
+  it('a sized PP part is complete: cycle from the press and material, clamp from the reference model', () => {
+    const r = computeInjectionMoldedCostSummary(input('PP', MID, 'Arburg Allrounder 420 C 1300 - 350'));
+    const im = r.injectionMolding!;
+    expect(r.processLines.every((l) => !l.physicsGap)).toBe(true);
+    expect(im.flowClass).toBe('easy'); // PP flow ratio 290
+    expect(im.cycleTimeSec).toBeGreaterThan(0);
+    const line = r.processLines.find((l) => l.process === 'Injection Molding')!;
+    expect(line.calculationTrace?.map((t) => t.fieldName)).toContain('Mold Open/Close Time');
+    expect(line.hourlyRate).toBeCloseTo(MID.mhrUsd, 6);
+  });
+
+  it('molds the reference defaultNumCavities whatever the volume (no volume rule of thumb)', () => {
+    const proto = computeInjectionMoldedCostSummary(input('PP', LARGE, 'x', { annualVolume: 200, productionLifeYears: 1 }));
+    const mass = computeInjectionMoldedCostSummary(input('PP', LARGE, 'x', { annualVolume: 1_000_000, productionLifeYears: 2 }));
+    for (const r of [proto, mass]) {
+      expect(r.injectionMolding!.cavityCount).toBe(REF.defaultNumCavities);
+      expect(r.injectionMolding!.cavityConstrainedBy).toBe('default');
+    }
+  });
+
+  it('uses the user cavity count when it is a reference mold layout, and reports one that is not', () => {
+    const two = computeInjectionMoldedCostSummary(input('PP', LARGE, 'x', { cavityCountOverride: 2 }));
+    expect(REF.cavityLayouts).toContain(2);
+    expect(two.injectionMolding!.cavityCount).toBe(2);
+    expect(two.injectionMolding!.cavityConstrainedBy).toBe('user');
+    expect(two.injectionMolding!.cavityLayouts).toEqual(REF.cavityLayouts);
+    expect(two.processLines.every((l) => !l.physicsGap)).toBe(true);
+
+    const three = computeInjectionMoldedCostSummary(input('PP', LARGE, 'x', { cavityCountOverride: 3 }));
+    expect(REF.cavityLayouts).not.toContain(3);
+    const g = three.processLines[0]!.physicsGap;
+    expect(g?.gapType === 'unsupported_operation' ? g.reason : null).toMatch(/3 cavities has no reference mold layout/);
+    expect(three.injectionMolding!.cavityCount).toBe(3); // reported as asked, never swapped for the default
+  });
+
+  it('sizes clamp with the reference model: ABS is Medium flow, 34% of 127.5 MPa', () => {
+    const r = computeInjectionMoldedCostSummary(input('ABS', MID, 'Arburg Allrounder 420 C 1300 - 350', { signals: { projectedAreaMm2: 8000 } }));
+    const im = r.injectionMolding!;
+    expect(im.flowClass).toBe('medium');
+    expect(im.cavityPressureMpa).toBeCloseTo(127.5 * 0.34, 2);
+    expect(im.clampRequiredT).toBeCloseTo((8000 * im.cavityCount * 127.5 * 0.34 * 1.1) / 9806.65, 0);
+  });
+
+  it('marks the molding line incomplete when the press cannot hold one cavity', () => {
+    // 8000 mm² of ABS needs ~39 t; the Arburg 221 K is 34.5 t.
+    const r = computeInjectionMoldedCostSummary(input('ABS', SMALL, 'Arburg Allrounder 221 K', { signals: { projectedAreaMm2: 8000 } }));
+    const line = r.processLines.find((l) => l.process === 'Injection Molding')!;
+    expect(line.physicsGap?.gapType === 'unsupported_operation' && line.physicsGap.reason).toMatch(/cannot hold 1 cavity closed: it needs 38.9 t/);
+    expect(r.injectionMolding!.cavityConstrainedBy).toBe('unverified');
+  });
+
+  it('marks the line incomplete, never substitutes a value, when material, press timing, wall or volume are missing', () => {
+    const noClamp = computeInjectionMoldedCostSummary(input('PP', MID, 'x', { materialClamp: { injectionPressureMaxMpa: null, flowLengthRatio: null, referenceMaterial: null } }));
+    const noTiming = computeInjectionMoldedCostSummary(input('PP', MID, 'x', { pressTiming: null }));
+    const noWall = computeInjectionMoldedCostSummary(input('PP', MID, 'x', { wallThicknessNominalMm: 0 }));
+    const reason = (r: ReturnType<typeof computeInjectionMoldedCostSummary>) => {
+      const g = r.processLines.find((l) => l.process === 'Injection Molding')!.physicsGap;
+      return g?.gapType === 'unsupported_operation' ? g.reason : null;
     };
-  }
-
-  it('case 1 — PP bracket, 10k/yr, simple → cycle time within physics range', () => {
-    const result = computeInjectionMoldedCostSummary(baseInput({
-      annualVolume: 10_000,
-      productionLifeYears: 3,
-    }));
-    const cycleTimeSec = result.injectionMolding!.cycleTimeSec;
-    // PP 2mm wall: Menges ≈ 7.5s cool + fill + pack + eject ≈ 14–20s total
-    expect(cycleTimeSec).toBeGreaterThan(8);
-    expect(cycleTimeSec).toBeLessThan(30);
-    expect(result.injectionMolding!.cavityCount).toBe(1);
-    expect(result.tooling?.moldClass).toBe('Class104');
+    expect(reason(noClamp)).toMatch(/Clamp force not derivable/);
+    expect(reason(noTiming)).toMatch(/press injection rate/);
+    expect(reason(noWall)).toMatch(/nominal wall thickness/);
   });
 
-  it('case 2 — ABS housing, hygroscopic resin → drying routed', () => {
-    const result = computeInjectionMoldedCostSummary(baseInput({
-      materialGrade: 'ABS',
-      materialDensityKgM3: 1050,
-      annualVolume: 50_000,
-      productionLifeYears: 5,
-      clampTonnageKN: 1500,
-      shotCapacityCm3: 135,
-      batchSize: 5000,
-    }));
-    // Material Drying is routed (real signal: ABS is hygroscopic) but not
-    // costed (no sourced drying-time data) — disclosed as a warning instead
-    // of a fabricated process line (2026-09-11).
-    expect(result.processTree!.operations.map((o) => o.id)).toContain('material_drying');
-    expect(result.processLines.find((l) => l.process === 'Material Drying')).toBeUndefined();
-    expect(result.warnings.some((w) => /Material Drying/.test(w))).toBe(true);
-    // Multi-cavity expected at 50k/yr with 150T machine
-    expect(result.injectionMolding!.cavityCount).toBeGreaterThanOrEqual(1);
+  it('prices per good part with the press good-part yield, and is incomplete without it', () => {
+    const full = computeInjectionMoldedCostSummary(input('PP', MID, 'x'));
+    const half = computeInjectionMoldedCostSummary(input('PP', MID, 'x', { goodPartYield: 0.5 }));
+    const none = computeInjectionMoldedCostSummary(input('PP', MID, 'x', { goodPartYield: null }));
+    expect(MID.goodPartYield).toBe(1);
+    expect(half.materialCost).toBeCloseTo(full.materialCost * 2, 1);
+    expect(half.processLines[0]!.cycleTimeMin).toBeCloseTo(full.processLines[0]!.cycleTimeMin * 2, 1);
+    const g = none.processLines[0]!.physicsGap;
+    expect(g?.gapType === 'unsupported_operation' ? g.reason : null).toMatch(/good-part yield/);
   });
 
-  it('case 3 — PA66 connector, 1 undercut → side action routed', () => {
-    const result = computeInjectionMoldedCostSummary(baseInput({
-      materialGrade: 'PA66',
-      materialDensityKgM3: 1140,
-      annualVolume: 20_000,
-      productionLifeYears: 5,
-      signals: {
-        undercutCount: 1,
-        partingComplexity: 0.3,
-        projectedAreaMm2: 8000,
-      },
-    }));
-    // Side Action is routed (real signal: 1 undercut) but not costed (no
-    // sourced actuation-time data) — disclosed as a warning instead of a
-    // fabricated process line (2026-09-11).
-    expect(result.processTree!.operations.map((o) => o.id)).toContain('side_action');
-    expect(result.processLines.find((l) => l.process.includes('Side Action'))).toBeUndefined();
-    expect(result.warnings.some((w) => /Side Action/.test(w))).toBe(true);
+  it('checks shot size in GPPS-equivalent grams, from the two melt densities', () => {
+    const r = computeInjectionMoldedCostSummary(input('PA66', MID, 'Arburg Allrounder 420 C 1300 - 350'));
+    const im = r.injectionMolding!;
+    const pa66Melt = realResinInputs('Nylon, Type 66').densityOfMeltKgM3!;
+    const shotKg = r.grossWeightKg;
+    expect(im.shotRequiredG).toBeCloseTo(shotKg * 1000 * (REF.cycleModel.gppsMeltDensityKgM3 / pa66Melt) * REF.shotSizeSafetyFactor * im.cavityCount, 0);
   });
 
-  it('case 4 — prototype PP, 200/yr → mold Class 105, tooling dominant warning', () => {
-    const result = computeInjectionMoldedCostSummary(baseInput({
-      annualVolume: 200,
-      productionLifeYears: 1,
-    }));
-    expect(result.tooling?.moldClass).toBe('Class105');
-    const toolingDominantWarning = result.warnings.some((w) => w.includes('Tooling-dominated'));
-    expect(toolingDominantWarning).toBe(true);
+  it('uses the reference default runner (cold, edge gate) unless the part has a gate signal', () => {
+    const cold = computeInjectionMoldedCostSummary(input('PP', MID, 'x'));
+    const hot = computeInjectionMoldedCostSummary(input('PP', MID, 'x', { signals: { projectedAreaMm2: 2000, gateType: 'hot_tip' } }));
+    expect(cold.injectionMolding!.runnerSystemType).toBe('cold');
+    expect(cold.injectionMolding!.gateType).toBe('edge');
+    expect(cold.injectionMolding!.runnerScrapKg).toBeGreaterThan(hot.injectionMolding!.runnerScrapKg);
+    expect(hot.injectionMolding!.runnerSystemType).toBe('hot');
   });
 
-  // mold-tooling-engine.ts wiring (2026-09-10): moldCostUsd is now derived
-  // from a real, itemized purchased-component BOM instead of a flat
-  // uncited SPI_MOLD_CLASSES.baseCostUsd constant.
-  it('mold cost is derived from the real mold-tooling BOM subtotal, not a flat per-class constant', () => {
-    const result = computeInjectionMoldedCostSummary(baseInput({
-      annualVolume: 10_000,
-      productionLifeYears: 3,
-      signals: { projectedAreaMm2: 8000, undercutCount: 0 },
-    }));
-    // Real fixed-baseline components (Air Poppet, Ejector Guide Pin Bushing,
-    // Guide Bush, Guide Pin, Limit Switch, Return Pin And Shoulder Bushing)
-    // price to a real, non-zero, non-flat-class-constant subtotal.
-    expect(result.tooling?.moldBomSubtotalUsd).toBeGreaterThan(0);
-    expect(result.tooling?.moldCostUsd).toBeGreaterThan(0);
-    // No SPI-class flat baseCostUsd figure (50_000/25_000/12_000/5_000/1_500)
-    // survives — moldCostUsd now equals the real itemized BOM subtotal
-    // (single cavity here, so no +35%/cavity scaling applies).
-    expect(result.tooling?.moldCostUsd).toBe(result.tooling?.moldBomSubtotalUsd);
-    expect([50_000, 25_000, 12_000, 5_000, 1_500]).not.toContain(result.tooling?.moldCostUsd);
-    // Real design/machining/assembly hours are disclosed, never priced.
-    expect(result.tooling?.moldEstimatedDesignHrs).toBeGreaterThan(0);
-    expect(result.tooling?.moldEstimatedMachiningHrs).toBeGreaterThan(0);
-    // Ejector Pin's quantity is not derivable from any sourced table — real,
-    // disclosed gap, not a fabricated count.
-    expect(result.tooling?.moldMissingComponents).toEqual(
-      expect.arrayContaining([expect.stringContaining('Ejector Pin')]),
-    );
+  it('prices USA toolroom labour and every mold the job wears out (tblToolLife)', () => {
+    const r = computeInjectionMoldedCostSummary(input('ABS', MID, 'x', { annualVolume: 500_000, productionLifeYears: 1 }));
+    const t = r.tooling!;
+    expect(t.moldToolLifeShots).toBe(144_000);
+    expect(t.moldsRequired).toBe(Math.ceil((500_000 / r.injectionMolding!.cavityCount) / 144_000));
+    expect(t.moldLabourCostUsd).toBeGreaterThan(0);
+    expect(t.moldCostUsd).toBeCloseTo((t.moldBomSubtotalUsd! + t.moldLabourCostUsd!) * t.moldsRequired!, 1);
   });
 
-  it('mold cost scales with real side-action hardware only when the part has an undercut', () => {
-    const withoutUndercut = computeInjectionMoldedCostSummary(baseInput({
-      annualVolume: 10_000,
-      productionLifeYears: 3,
-      signals: { projectedAreaMm2: 8000, undercutCount: 0 },
-    }));
-    const withUndercut = computeInjectionMoldedCostSummary(baseInput({
-      annualVolume: 10_000,
-      productionLifeYears: 3,
-      signals: { projectedAreaMm2: 8000, undercutCount: 1 },
-    }));
-    // Hydraulic Cylinder + Side Lock (real per-undercut hardware) only price
-    // in when the part genuinely has an undercut requiring a slide.
-    expect(withUndercut.tooling!.moldBomSubtotalUsd!).toBeGreaterThan(
-      withoutUndercut.tooling!.moldBomSubtotalUsd!,
-    );
+  it('prices side-action hardware only when the part has an undercut', () => {
+    const without = computeInjectionMoldedCostSummary(input('PP', MID, 'x'));
+    const withUndercut = computeInjectionMoldedCostSummary(input('PP', MID, 'x', { signals: { projectedAreaMm2: 2000, undercutCount: 1 } }));
+    expect(withUndercut.tooling!.moldBomSubtotalUsd!).toBeGreaterThan(without.tooling!.moldBomSubtotalUsd!);
+    expect(without.tooling!.moldMissingComponents).toEqual(expect.arrayContaining([expect.stringContaining('Ejector Pin')]));
   });
 
-  it('case 5 — runner scrap: hot runner has 0 scrap, cold runner has scrap', () => {
-    const coldResult = computeInjectionMoldedCostSummary(baseInput({
-      materialGrade: 'PP',   // → edge gate (cold runner)
-    }));
-    const hotResult = computeInjectionMoldedCostSummary(baseInput({
-      materialGrade: 'PC',   // → hot tip gate
-    }));
-    expect(coldResult.injectionMolding!.runnerScrapKg).toBeGreaterThan(0);
-    expect(hotResult.injectionMolding!.runnerScrapKg).toBe(0);
-    expect(hotResult.injectionMolding!.runnerSystemType).toBe('hot');
-    expect(coldResult.injectionMolding!.runnerSystemType).toBe('cold');
-  });
-
-  it('case 7 — LSR gasket, 2mm wall: lsr_compound_dosing + secondary_cure_oven; no material_drying; cycle 20–40s', () => {
-    const result = computeInjectionMoldedCostSummary(baseInput({
-      materialGrade: 'LSR',
-      wallThicknessNominalMm: 2.0,
-      annualVolume: 5000,
-    }));
-    const im = result.injectionMolding!;
-    const tree = result.processTree!;
-    const opIds = tree.operations.map((o) => o.id);
-    expect(im.moldingSubtype).toBe('lsr');
-    expect(opIds).toContain('lsr_compound_dosing');
-    expect(opIds).toContain('secondary_cure_oven');
-    expect(opIds).not.toContain('material_drying');
-    expect(im.cycleTimeSec).toBeGreaterThanOrEqual(20);
-    expect(im.cycleTimeSec).toBeLessThanOrEqual(60);  // 2mm wall, Arrhenius + fill + eject
-    // LSR Compound Dosing is routed (real signal: LSR moldingSubtype) but not
-    // costed (no sourced dosing-time data) — disclosed as a warning instead
-    // of a fabricated process line (2026-09-11).
-    const lineLabels = result.processLines.map((l) => l.process);
-    expect(lineLabels.some((l) => /lsr.*dosing/i.test(l))).toBe(false);
-    expect(result.warnings.some((w) => /LSR Compound Dosing/.test(w))).toBe(true);
-  });
-
-  it('case 8 — insert housing, 3 inserts: insert_loading routed; insert process lines present', () => {
-    const result = computeInjectionMoldedCostSummary(baseInput({
-      materialGrade: 'ABS',
-      moldingSubtype: 'insert',
-      signals: { insertCount: 3, undercutCount: 0 },
-    }));
-    const im = result.injectionMolding!;
-    const opIds = result.processTree!.operations.map((o) => o.id);
-    expect(im.moldingSubtype).toBe('insert');
-    expect(opIds).toContain('insert_loading');
-    expect(opIds).toContain('insert_inspection');
-    // Insert Loading is routed (real signal: 3 inserts, insert subtype) but
-    // not costed (no sourced loading-time data) — disclosed as a warning
-    // instead of a fabricated process line (2026-09-11).
-    expect(result.processLines.find((l) => /insert.*load/i.test(l.process))).toBeUndefined();
-    expect(result.warnings.some((w) => /Insert Loading/.test(w))).toBe(true);
-  });
-
-  it('case 9 — unscrewing cores: core_unscrewing routed; mold class bumped vs baseline', () => {
-    const baseline = computeInjectionMoldedCostSummary(baseInput({
-      materialGrade: 'PP',
-      annualVolume: 10000,
-      productionLifeYears: 3,
-      signals: { undercutCount: 0 },
-    }));
-
-    const result = computeInjectionMoldedCostSummary(baseInput({
-      materialGrade: 'PP',
-      annualVolume: 10000,
-      productionLifeYears: 3,
-      signals: { undercutCount: 0, unscrewingCoreCount: 2 },
-    }));
-    const opIds = result.processTree!.operations.map((o) => o.id);
-    expect(result.injectionMolding!.moldingSubtype).toBe('unscrewing');
-    expect(opIds).toContain('core_unscrewing');
-    // Mold class should be at least as durable as baseline (unscrewing cores bump it up)
-    const moldClassOrder = ['Class105', 'Class104', 'Class103', 'Class102', 'Class101'];
-    const baselineIdx = moldClassOrder.indexOf(baseline.tooling!.moldClass);
-    const resultIdx   = moldClassOrder.indexOf(result.tooling!.moldClass);
-    expect(resultIdx).toBeGreaterThanOrEqual(baselineIdx);
-  });
-
-  it('case 10 — overmold stub: routingWarning present; moldingSubtype: overmold', () => {
-    const result = computeInjectionMoldedCostSummary(baseInput({
-      materialGrade: 'ABS',
-      moldingSubtype: 'overmold',
-    }));
-    const im = result.injectionMolding!;
-    const tree = result.processTree!;
-    expect(im.moldingSubtype).toBe('overmold');
-    expect(tree.routingWarnings.some((w) => /overmold/i.test(w))).toBe(true);
-  });
-
-  it('case 6 — cost confidence degrades with missing signals', () => {
-    const goodResult = computeInjectionMoldedCostSummary(baseInput({
-      wallThicknessNominalMm: 2.0,
-      signals: { undercutCount: 0, partingComplexity: 0.1 },
-    }));
-    const poorResult = computeInjectionMoldedCostSummary(baseInput({
-      wallThicknessNominalMm: 0,   // not measured
-      ...BASE_RATES,
-      mhrRate: { ...BASE_RATES.mhrRate, source: 'default_rate', machineName: null },
-    }));
-    expect(goodResult.injectionMolding!.costConfidence).toBeGreaterThan(
-      poorResult.injectionMolding!.costConfidence,
-    );
-    expect(poorResult.injectionMolding!.costConfidence).toBeLessThan(0.70);
+  it('routes the real secondary signals: hygroscopic resin -> drying, undercut -> side action, inserts', () => {
+    const abs = computeInjectionMoldedCostSummary(input('ABS', MID, 'x'));
+    const pa = computeInjectionMoldedCostSummary(input('PA66', MID, 'x', { signals: { projectedAreaMm2: 2000, undercutCount: 1 } }));
+    const ins = computeInjectionMoldedCostSummary(input('ABS', MID, 'x', { moldingSubtype: 'insert', signals: { projectedAreaMm2: 2000, insertCount: 3 } }));
+    expect(abs.processTree!.operations.map((o) => o.id)).toContain('material_drying');
+    expect(pa.processTree!.operations.map((o) => o.id)).toContain('side_action');
+    expect(ins.processTree!.operations.map((o) => o.id)).toContain('insert_loading');
+    // Routed but not costed: disclosed, never a fabricated line.
+    expect(abs.processLines.find((l) => l.process === 'Material Drying')).toBeUndefined();
+    expect(abs.warnings.some((w) => /Material Drying/.test(w))).toBe(true);
   });
 });

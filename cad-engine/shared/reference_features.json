@@ -1,0 +1,1600 @@
+{
+  "_generated_by": "cad-engine/scripts/build_reference_features.py -- do not hand-edit",
+  "sources": {
+    "sheet_metal": {
+      "path": "memory/sheetmetal/process/process_operations.csv",
+      "sha256": "69f4300a639b93b0f27a47c42a4909d1475fb053bea92983ef72d6e102538bf9"
+    },
+    "machining": {
+      "path": "memory/machining/operations_full__operations.csv",
+      "sha256": "c55e538eead93fe0a0213e9fc0c7a910e748694552617463eea0517c76a00e88"
+    }
+  },
+  "domains": {
+    "sheet_metal": {
+      "row_count": 391,
+      "feature_types": {
+        "Blank": {
+          "child_features": [
+            "Edge"
+          ],
+          "machines": [
+            "2 Axis Router",
+            "Deslag",
+            "Fiber Laser Cut",
+            "Generic Press",
+            "Laser Cut",
+            "Laser Punch",
+            "Material Stock",
+            "No Cost Feature",
+            "OxyFuel Cut",
+            "Plasma Cut",
+            "Plasma Punch",
+            "Progressive Die",
+            "Shear",
+            "Std Press",
+            "Tandem Press",
+            "Turret Press",
+            "Waterjet Cut"
+          ],
+          "operations": [
+            "As Supplied",
+            "Blanking",
+            "Coining",
+            "Deslag",
+            "Die Station:Addendum Trimming Post-Forming",
+            "Die Station:Blanking",
+            "Die Station:Blanking Piloting",
+            "Die Station:Cam Action Trimming",
+            "Die Station:Coining",
+            "Die Station:Cutoff",
+            "Die Station:Edge Trimming",
+            "Die Station:Full Blanking",
+            "Die Station:Piloting",
+            "Die Station:Piloting Edge Trimming",
+            "Die Station:Post Form Trimming",
+            "Die Station:Re Piloting",
+            "Die Station:Tipping",
+            "Die Station:Tipping Back",
+            "Die Station:Trimming",
+            "Die Station:Trimming Piloting",
+            "Fiber Laser Bevel Cutting",
+            "Fiber Laser Cutting",
+            "Laser Bevel Cutting",
+            "Laser Cut:Laser Cutting",
+            "Laser Cutting",
+            "Nibbling:Nibbling",
+            "No Cost Feature",
+            "OxyFuel Bevel Cutting",
+            "OxyFuel Cutting",
+            "Plasma Bevel Cutting",
+            "Plasma Cut:Plasma Cutting",
+            "Plasma Cutting",
+            "Punching:Punching",
+            "Router Cutting",
+            "Shear",
+            "Std Press",
+            "Trimming",
+            "Waterjet Bevel Cutting",
+            "Waterjet Cutting"
+          ],
+          "parent_features": []
+        },
+        "ComplexHole": {
+          "child_features": [
+            "Edge"
+          ],
+          "machines": [
+            "2 Axis Router",
+            "3D Laser",
+            "Deslag",
+            "Fiber Laser Cut",
+            "Generic Press",
+            "Laser Cut",
+            "Laser Punch",
+            "Material Stock",
+            "No Cost Feature",
+            "OxyFuel Cut",
+            "Plasma Cut",
+            "Plasma Punch",
+            "Progressive Die",
+            "Std Press",
+            "Tandem Press",
+            "Turret Press",
+            "Waterjet Cut"
+          ],
+          "operations": [
+            "3D Laser Cutting",
+            "As Supplied",
+            "Coining",
+            "Countersinking:Countersinking",
+            "Deslag",
+            "Die Station:Cam Action Piercing",
+            "Die Station:Coining",
+            "Die Station:Extruding",
+            "Die Station:Piercing",
+            "Die Station:Trimming",
+            "Extruding",
+            "Fiber Laser Bevel Cutting",
+            "Fiber Laser Cutting",
+            "Flanging:Flanging",
+            "Laser Bevel Cutting",
+            "Laser Cut:Laser Cutting",
+            "Laser Cutting",
+            "Nibbling:Nibbling",
+            "No Cost Feature",
+            "OxyFuel Bevel Cutting",
+            "OxyFuel Cutting",
+            "Perforating:Perforating",
+            "Piercing",
+            "Plasma Bevel Cutting",
+            "Plasma Cut:Plasma Cutting",
+            "Plasma Cutting",
+            "Punching:Punching",
+            "Router Cutting",
+            "Std Press",
+            "Trimming",
+            "Waterjet Bevel Cutting",
+            "Waterjet Cutting"
+          ],
+          "parent_features": []
+        },
+        "CurvedSurface": {
+          "child_features": [],
+          "machines": [
+            "2 Roll Bending",
+            "3 Roll Bending",
+            "4 Roll Bending",
+            "Bend Brake",
+            "Generic Press",
+            "Laser Punch",
+            "Material Stock",
+            "Plasma Punch",
+            "Progressive Die",
+            "Std Press",
+            "Tandem Press",
+            "Turret Press"
+          ],
+          "operations": [
+            "As Formed",
+            "As Supplied",
+            "Die Station:As Formed"
+          ],
+          "parent_features": [
+            "Form",
+            "StraightBend"
+          ]
+        },
+        "CurvedWall": {
+          "child_features": [],
+          "machines": [
+            "2 Roll Bending",
+            "3 Roll Bending",
+            "4 Roll Bending",
+            "Bend Brake",
+            "Generic Press",
+            "Laser Punch",
+            "Material Stock",
+            "Plasma Punch",
+            "Progressive Die",
+            "Std Press",
+            "Tandem Press",
+            "Turret Press"
+          ],
+          "operations": [
+            "As Formed",
+            "As Supplied",
+            "Die Station:As Formed"
+          ],
+          "parent_features": [
+            "Form",
+            "StraightBend"
+          ]
+        },
+        "Edge": {
+          "child_features": [],
+          "machines": [
+            "Fiber Laser Cut",
+            "Laser Cut",
+            "Laser Punch",
+            "No Cost Feature",
+            "OxyFuel Cut",
+            "Plasma Cut",
+            "Plasma Punch",
+            "Turret Press",
+            "Waterjet Cut"
+          ],
+          "operations": [
+            "Fiber Laser Bevel Cutting",
+            "Laser Bevel Cutting",
+            "Laser Cutting",
+            "Nibbling",
+            "No Cost Feature",
+            "OxyFuel Bevel Cutting",
+            "Plasma Bevel Cutting",
+            "Plasma Cutting",
+            "Punching",
+            "Waterjet Bevel Cutting"
+          ],
+          "parent_features": [
+            "Blank",
+            "ComplexHole",
+            "SimpleHole"
+          ]
+        },
+        "FinishedPart": {
+          "child_features": [],
+          "machines": [
+            "Waterjet Cut"
+          ],
+          "operations": [
+            "Waterjet Cutting"
+          ],
+          "parent_features": []
+        },
+        "Form": {
+          "child_features": [
+            "CurvedSurface",
+            "CurvedWall",
+            "PlanarFace"
+          ],
+          "machines": [
+            "3 Roll Bending",
+            "4 Roll Bending",
+            "Bend Brake",
+            "Generic Press",
+            "Laser Punch",
+            "No Cost Feature",
+            "Plasma Punch",
+            "Progressive Die",
+            "Std Press",
+            "Tandem Press",
+            "Turret Press"
+          ],
+          "operations": [
+            "3 Roll Bending",
+            "4 Roll Bending",
+            "Bending",
+            "Cam Action Bending",
+            "Die Station:Bending",
+            "Die Station:Cam Action Bending",
+            "Die Station:Deep Drawing",
+            "Die Station:DownOverBending",
+            "Die Station:Drawing",
+            "Die Station:Embossing",
+            "Die Station:Forming",
+            "Die Station:Gusset Forming",
+            "Die Station:Restriking",
+            "Die Station:Scoring",
+            "Die Station:Setting",
+            "Die Station:Side Action Forming",
+            "Die Station:Stamping",
+            "DownOverBending",
+            "Embossing",
+            "Forming",
+            "Forming:Forming",
+            "Lancing:Lancing",
+            "No Cost Feature",
+            "Restriking",
+            "Scoring",
+            "Setting",
+            "Side Action Forming",
+            "Stamping",
+            "Std Press"
+          ],
+          "parent_features": []
+        },
+        "Lance": {
+          "child_features": [],
+          "machines": [
+            "Laser Punch",
+            "No Cost Feature",
+            "Plasma Punch",
+            "Std Press",
+            "Turret Press"
+          ],
+          "operations": [
+            "Lancing:Lancing",
+            "No Cost Feature",
+            "Std Press"
+          ],
+          "parent_features": []
+        },
+        "MultiBend": {
+          "child_features": [],
+          "machines": [
+            "Bend Brake",
+            "Generic Press",
+            "No Cost Feature",
+            "Progressive Die",
+            "Tandem Press"
+          ],
+          "operations": [
+            "Bending",
+            "Die Station:Embossing",
+            "Die Station:Forming",
+            "Die Station:Restriking",
+            "Embossing",
+            "Forming",
+            "No Cost Feature",
+            "Restriking"
+          ],
+          "parent_features": []
+        },
+        "MultiStepHole": {
+          "child_features": [],
+          "machines": [
+            "Fiber Laser Cut",
+            "Laser Cut",
+            "Laser Punch",
+            "No Cost Feature",
+            "OxyFuel Cut",
+            "Plasma Cut",
+            "Plasma Punch",
+            "Turret Press",
+            "Waterjet Cut"
+          ],
+          "operations": [
+            "Fiber Laser Cut",
+            "Laser Cut",
+            "No Cost Feature",
+            "OxyFuel Cutting",
+            "Plasma Cut",
+            "Punching:Punching",
+            "Waterjet Cut"
+          ],
+          "parent_features": []
+        },
+        "NotSupported": {
+          "child_features": [],
+          "machines": [
+            "No Cost Feature"
+          ],
+          "operations": [
+            "No Cost Feature"
+          ],
+          "parent_features": []
+        },
+        "PartingLine": {
+          "child_features": [],
+          "machines": [
+            "Waterjet Cut"
+          ],
+          "operations": [
+            "Waterjet Cutting"
+          ],
+          "parent_features": []
+        },
+        "Perimeter": {
+          "child_features": [],
+          "machines": [
+            "Laser Cut",
+            "OxyFuel Cut",
+            "Plasma Cut",
+            "Waterjet Cut"
+          ],
+          "operations": [
+            "Laser Cutting",
+            "OxyFuel Cutting",
+            "Plasma Cutting",
+            "Waterjet Cutting"
+          ],
+          "parent_features": []
+        },
+        "PlanarFace": {
+          "child_features": [],
+          "machines": [
+            "Generic Press",
+            "Laser Punch",
+            "Material Stock",
+            "Plasma Punch",
+            "Progressive Die",
+            "Std Press",
+            "Tandem Press",
+            "Turret Press"
+          ],
+          "operations": [
+            "As Formed",
+            "As Supplied",
+            "Die Station:As Formed"
+          ],
+          "parent_features": [
+            "Form"
+          ]
+        },
+        "ShearForm": {
+          "child_features": [],
+          "machines": [
+            "Generic Press",
+            "No Cost Feature",
+            "Progressive Die",
+            "Tandem Press"
+          ],
+          "operations": [
+            "Die Station:Embossing",
+            "Die Station:Forming",
+            "Die Station:Restriking",
+            "Die Station:Stamping",
+            "Embossing",
+            "Forming",
+            "No Cost Feature",
+            "Restriking",
+            "Stamping"
+          ],
+          "parent_features": []
+        },
+        "SimpleHole": {
+          "child_features": [
+            "Edge"
+          ],
+          "machines": [
+            "2 Axis Router",
+            "3D Laser",
+            "Deslag",
+            "Fiber Laser Cut",
+            "Generic Press",
+            "Laser Cut",
+            "Laser Punch",
+            "Material Stock",
+            "No Cost Feature",
+            "OxyFuel Cut",
+            "Plasma Cut",
+            "Plasma Punch",
+            "Progressive Die",
+            "Std Press",
+            "Tandem Press",
+            "Turret Press",
+            "Waterjet Cut"
+          ],
+          "operations": [
+            "3D Laser Cutting",
+            "As Supplied",
+            "CounterSinking",
+            "Countersinking:Countersinking",
+            "Deslag",
+            "Die Station:Cam Action Piercing",
+            "Die Station:Coining",
+            "Die Station:CounterSinking",
+            "Die Station:Extruding",
+            "Die Station:Piercing",
+            "Die Station:Shaving",
+            "Die Station:Tapping",
+            "Extruding",
+            "Fiber Laser Bevel Cutting",
+            "Fiber Laser Cutting",
+            "Flanging:Flanging",
+            "Laser Bevel Cutting",
+            "Laser Cut:Laser Cutting",
+            "Laser Cutting",
+            "Nibbling:Nibbling",
+            "No Cost Feature",
+            "OxyFuel Bevel Cutting",
+            "OxyFuel Cutting",
+            "Perforating:Perforating",
+            "Piercing",
+            "Plasma Bevel Cutting",
+            "Plasma Cut:Plasma Cutting",
+            "Plasma Cutting",
+            "Punching:Punching",
+            "Router Cutting",
+            "Std Press",
+            "Tapping:Tapping",
+            "Waterjet Bevel Cutting",
+            "Waterjet Cutting"
+          ],
+          "parent_features": []
+        },
+        "StraightBend": {
+          "child_features": [
+            "CurvedSurface",
+            "CurvedWall"
+          ],
+          "machines": [
+            "2 Roll Bending",
+            "3 Roll Bending",
+            "4 Roll Bending",
+            "Bend Brake",
+            "Generic Press",
+            "No Cost Feature",
+            "Progressive Die",
+            "Std Press",
+            "Tandem Press"
+          ],
+          "operations": [
+            "2 Roll Bending",
+            "3 Roll Bending",
+            "4 Roll Bending",
+            "Bending",
+            "Cam Action Bending",
+            "CamOverBending",
+            "Die Station:Bending",
+            "Die Station:Cam Action Bending",
+            "Die Station:CamOverBending",
+            "Die Station:DownOverBending",
+            "Die Station:Gusset Bending",
+            "Die Station:Gusset Forming",
+            "Die Station:Idle",
+            "Die Station:Restriking",
+            "Die Station:Scoring",
+            "Die Station:Setting",
+            "DownOverBending",
+            "No Cost Feature",
+            "Scoring",
+            "Setting",
+            "Std Press"
+          ],
+          "parent_features": []
+        },
+        "Void": {
+          "child_features": [],
+          "machines": [
+            "Waterjet Cut"
+          ],
+          "operations": [
+            "Waterjet Cutting"
+          ],
+          "parent_features": []
+        }
+      },
+      "rows_without_feature": [
+        "3 Roll Bending:Coil Uncoil",
+        "Generic Press:Lancing/Lance",
+        "Laser Punch:Countersinking",
+        "Laser Punch:Flanging",
+        "Laser Punch:Forming",
+        "Laser Punch:Lancing",
+        "Laser Punch:Laser Cut",
+        "Laser Punch:Nibbling",
+        "Laser Punch:Perforating",
+        "Laser Punch:Punching",
+        "Laser Punch:Tapping",
+        "Plasma Punch:Countersinking",
+        "Plasma Punch:Flanging",
+        "Plasma Punch:Forming",
+        "Plasma Punch:Lancing",
+        "Plasma Punch:Nibbling",
+        "Plasma Punch:Perforating",
+        "Plasma Punch:Plasma Cut",
+        "Plasma Punch:Punching",
+        "Plasma Punch:Tapping",
+        "Progressive Die:Die Station",
+        "Progressive Die:Die Station:Lancing/Lance",
+        "Tandem Press:Lancing/Lance",
+        "Turret Press:Countersinking",
+        "Turret Press:Flanging",
+        "Turret Press:Forming",
+        "Turret Press:Lancing",
+        "Turret Press:Nibbling",
+        "Turret Press:Perforating",
+        "Turret Press:Punching",
+        "Turret Press:Tapping"
+      ]
+    },
+    "machining": {
+      "row_count": 1174,
+      "feature_types": {
+        "AxiGroove": {
+          "child_features": [],
+          "machines": [
+            "3 Axis Lathe",
+            "3 Axis Mill",
+            "4 Axis Mill",
+            "5 Axis Mill",
+            "Bevel Gear Cutting Machine",
+            "Broach",
+            "Hob Machine",
+            "MillTurn",
+            "No Cost Feature",
+            "Profile Gear Grinder",
+            "Shaper",
+            "Shaver",
+            "Spline Roller",
+            "Threaded Wheel Gear Grinder",
+            "Wire EDM"
+          ],
+          "operations": [
+            "Cutting",
+            "General Mill Roughing",
+            "No Cost Feature",
+            "Profile Grinding",
+            "Setup:External AxiGroove Broaching",
+            "Setup:Hobbing",
+            "Setup:Internal Gear Broaching",
+            "Setup:Shaping",
+            "Setup:Shaving",
+            "Setup:Spiral BG Face Milling",
+            "Setup:Spline Rolling",
+            "Setup:Straight BG Face Milling",
+            "Surface Finishing",
+            "Threaded Wheel Grinding"
+          ],
+          "parent_features": []
+        },
+        "Blank": {
+          "child_features": [],
+          "machines": [
+            "3 Axis Mill",
+            "5 Axis Mill",
+            "Automated Deburr",
+            "Bench Operation",
+            "DeMask",
+            "Manual Deburr",
+            "Mask Cure"
+          ],
+          "operations": [
+            "Automated Deburring",
+            "Chamfering",
+            "Cleaning",
+            "Curing",
+            "Final Inspecting",
+            "Identing",
+            "Line Sealing",
+            "Manual Deburring",
+            "Peeling Residual Maskant",
+            "Profile Milling",
+            "Spark Testing"
+          ],
+          "parent_features": []
+        },
+        "BuildDirection": {
+          "child_features": [],
+          "machines": [
+            "3 Axis Mill",
+            "5 Axis Mill",
+            "Wire EDM"
+          ],
+          "operations": [
+            "Base Plate Facing Op",
+            "Base Plate Removal Wire EDM"
+          ],
+          "parent_features": []
+        },
+        "BulkRemoval": {
+          "child_features": [],
+          "machines": [
+            "3 Axis Bar Feed Lathe with Sub Spindle",
+            "3 Axis Lathe",
+            "3 Axis Mill",
+            "4 Axis Mill",
+            "5 Axis Mill",
+            "MillTurn",
+            "No Cost Feature",
+            "Simultaneous Turning"
+          ],
+          "operations": [
+            "Bulk Milling Op",
+            "Bulk Milling:Bulk Milling Op",
+            "No Cost Feature"
+          ],
+          "parent_features": []
+        },
+        "CamBundle": {
+          "child_features": [],
+          "machines": [
+            "3 Axis Mill",
+            "Automated Deburr",
+            "Drill Press",
+            "Internal Grinder",
+            "Manual Deburr"
+          ],
+          "operations": [
+            "Automated Deburring",
+            "Cam Machining",
+            "Manual Deburring"
+          ],
+          "parent_features": []
+        },
+        "ComboVoid": {
+          "child_features": [],
+          "machines": [
+            "2 Axis Bar Feed Lathe with Sub Spindle",
+            "2 Axis Lathe",
+            "3 Axis Bar Feed Lathe with Sub Spindle",
+            "3 Axis Lathe",
+            "3 Axis Mill",
+            "4 Axis Mill",
+            "5 Axis Mill",
+            "Automated Deburr",
+            "Cylindrical Grinder",
+            "Deep Bore Machine",
+            "Drill Press",
+            "Gun Drill",
+            "Internal Grinder",
+            "Jig Bore",
+            "Manual Deburr",
+            "MillTurn",
+            "No Cost Feature"
+          ],
+          "operations": [
+            "Automated Deburring",
+            "ComboVoid Grinding",
+            "ComboVoid Machining",
+            "Drilling",
+            "Manual Deburring",
+            "No Cost Feature"
+          ],
+          "parent_features": []
+        },
+        "ComplexHole": {
+          "child_features": [
+            "Edge"
+          ],
+          "machines": [
+            "3 Axis Bar Feed Lathe with Sub Spindle",
+            "3 Axis Lathe",
+            "3 Axis Mill",
+            "4 Axis Mill",
+            "5 Axis Mill",
+            "Automated Deburr",
+            "Manual Deburr",
+            "MillTurn",
+            "No Cost Feature"
+          ],
+          "operations": [
+            "Automated Deburring",
+            "Chamfering",
+            "General Mill Roughing",
+            "Manual Deburring",
+            "No Cost Feature",
+            "Rough Milling",
+            "Rounding",
+            "Surface Finishing"
+          ],
+          "parent_features": []
+        },
+        "Core": {
+          "child_features": [],
+          "machines": [
+            "5 Axis Mill"
+          ],
+          "operations": [
+            "Finish Milling",
+            "Rough Milling"
+          ],
+          "parent_features": []
+        },
+        "CoreBundle": {
+          "child_features": [],
+          "machines": [
+            "2 Axis Bar Feed Lathe with Sub Spindle",
+            "2 Axis Lathe",
+            "3 Axis Bar Feed Lathe with Sub Spindle",
+            "3 Axis Lathe",
+            "3 Axis Mill",
+            "4 Axis Mill",
+            "5 Axis Mill",
+            "Automated Deburr",
+            "Deep Bore Machine",
+            "Drill Press",
+            "Gun Drill",
+            "Internal Grinder",
+            "Manual Deburr",
+            "MillTurn",
+            "Stock Prep Lathe"
+          ],
+          "operations": [
+            "Automated Deburring",
+            "Core Machining",
+            "Manual Deburring"
+          ],
+          "parent_features": []
+        },
+        "CurvedSurface": {
+          "child_features": [],
+          "machines": [
+            "2 Axis Bar Feed Lathe with Sub Spindle",
+            "2 Axis Lathe",
+            "3 Axis Bar Feed Lathe with Sub Spindle",
+            "3 Axis Lathe",
+            "3 Axis Mill",
+            "3 Axis Router",
+            "4 Axis Mill",
+            "5 Axis Mill",
+            "5 Axis Router",
+            "Automated Deburr",
+            "Bench Operation",
+            "DeMask",
+            "Etch Cell",
+            "Manual Deburr",
+            "MillTurn",
+            "No Cost Feature",
+            "Scribe",
+            "Simultaneous Turning"
+          ],
+          "operations": [
+            "As Dovetail Milled",
+            "As Edge Treated",
+            "As Milled",
+            "As Polygon Turned",
+            "As Routered",
+            "Automated Surface Deburring",
+            "Back Finish Turning",
+            "Back Rough Turning",
+            "Back Semi-Finish Turning",
+            "Bulk Milling Surface",
+            "Chamfer Milling",
+            "Contouring",
+            "Dressing Edges",
+            "Etch Cell Cycle:Depth Inspecting",
+            "Etch Cell Cycle:Drying",
+            "Etch Cell Cycle:Pocket Etching",
+            "Etch Cell Cycle:Pocket Peeling",
+            "Etch Cell Cycle:Rinsing",
+            "Filleting",
+            "Fine Finish Milling",
+            "Finish Turning",
+            "General Mill Finishing",
+            "Indirect Filleting",
+            "Line Sealing",
+            "Manual Surface Deburring",
+            "Mill Contouring",
+            "Multiplunging",
+            "No Cost Feature",
+            "Plunging",
+            "Rough Milling",
+            "Rough Turning",
+            "Rounding",
+            "Scribing",
+            "Semi-Finish Turning",
+            "Side Milling",
+            "Undercut Milling"
+          ],
+          "parent_features": [
+            "Ring",
+            "SimpleHole"
+          ]
+        },
+        "CurvedWall": {
+          "child_features": [],
+          "machines": [
+            "2 Axis Bar Feed Lathe with Sub Spindle",
+            "2 Axis Lathe",
+            "3 Axis Bar Feed Lathe with Sub Spindle",
+            "3 Axis Lathe",
+            "3 Axis Mill",
+            "3 Axis Router",
+            "4 Axis Mill",
+            "5 Axis Mill",
+            "5 Axis Router",
+            "Automated Deburr",
+            "Bench Operation",
+            "Cylindrical Grinder",
+            "DeMask",
+            "Etch Cell",
+            "Internal Grinder",
+            "Manual Deburr",
+            "MillTurn",
+            "No Cost Feature",
+            "Perimeter Cut",
+            "Scribe",
+            "Simultaneous Turning",
+            "Wire EDM"
+          ],
+          "operations": [
+            "As Dovetail Milled",
+            "As Milled",
+            "As Perimeter Cut",
+            "As Polygon Turned",
+            "As Routered",
+            "As Wire EDM Cut",
+            "Automated Surface Deburring",
+            "Back Finish Turning",
+            "Back Rough Turning",
+            "Back Semi-Finish Turning",
+            "Bulk Milling Surface",
+            "Contouring",
+            "Cutting",
+            "Dressing Edges",
+            "Etch Cell Cycle:Depth Inspecting",
+            "Etch Cell Cycle:Drying",
+            "Etch Cell Cycle:Pocket Etching",
+            "Etch Cell Cycle:Pocket Peeling",
+            "Etch Cell Cycle:Rinsing",
+            "Facing",
+            "Filleting",
+            "Fine Finish Milling",
+            "Finish Turning",
+            "General Mill Finishing",
+            "ID Finish Plunge Grinding",
+            "ID Finish Traverse Grinding",
+            "Indirect Filleting",
+            "Line Sealing",
+            "Manual Surface Deburring",
+            "Mill Contouring",
+            "Multiplunging",
+            "No Cost Feature",
+            "OD Finish Plunge Grinding",
+            "OD Finish Traverse Grinding",
+            "Perimeter Cut",
+            "Plunging",
+            "Rough Milling",
+            "Rough Turning",
+            "Rounding",
+            "Scribing",
+            "Semi-Finish Turning",
+            "Side Milling",
+            "Thread Milling",
+            "Thread Turning",
+            "Undercut Milling"
+          ],
+          "parent_features": [
+            "Ring",
+            "SimpleHole"
+          ]
+        },
+        "Cutout": {
+          "child_features": [],
+          "machines": [
+            "3 Axis Mill",
+            "3 Axis Router",
+            "5 Axis Mill",
+            "5 Axis Router",
+            "No Cost Feature"
+          ],
+          "operations": [
+            "No Cost Feature",
+            "Perimeter Milling",
+            "Perimeter Routering",
+            "Rough Milling",
+            "Routering",
+            "Sharp Corner Touchup"
+          ],
+          "parent_features": []
+        },
+        "Edge": {
+          "child_features": [],
+          "machines": [
+            "2 Axis Bar Feed Lathe with Sub Spindle",
+            "2 Axis Lathe",
+            "3 Axis Bar Feed Lathe with Sub Spindle",
+            "3 Axis Lathe",
+            "3 Axis Mill",
+            "4 Axis Mill",
+            "5 Axis Mill",
+            "Automated Deburr",
+            "Drill Press",
+            "Jig Bore",
+            "Manual Deburr",
+            "MillTurn",
+            "No Cost Feature",
+            "Simultaneous Turning"
+          ],
+          "operations": [
+            "Automated Edge Deburring",
+            "Chamfering",
+            "Countersinking",
+            "Edge Turning",
+            "Manual Edge Deburring",
+            "Mill Chamfering",
+            "Mill Rounding",
+            "No Cost Feature",
+            "Rounding"
+          ],
+          "parent_features": [
+            "ComplexHole",
+            "SimpleHole"
+          ]
+        },
+        "End": {
+          "child_features": [],
+          "machines": [
+            "2 Axis Lathe",
+            "3 Axis Lathe",
+            "3 Axis Mill",
+            "4 Axis Mill",
+            "5 Axis Mill",
+            "MillTurn",
+            "No Cost Feature",
+            "Reciprocating Surface Grinder",
+            "Rotary Surface Grinder",
+            "Wire EDM"
+          ],
+          "operations": [
+            "End Machining",
+            "No Cost Feature",
+            "Reciprocating Surface Grinder",
+            "Rotary Surface Grinder"
+          ],
+          "parent_features": []
+        },
+        "FinishedPart": {
+          "child_features": [],
+          "machines": [
+            "5 Axis Mill"
+          ],
+          "operations": [
+            "Profile Milling"
+          ],
+          "parent_features": []
+        },
+        "Flat": {
+          "child_features": [],
+          "machines": [
+            "3 Axis Lathe",
+            "3 Axis Mill",
+            "4 Axis Mill",
+            "5 Axis Mill",
+            "Automated Deburr",
+            "Cylindrical Grinder",
+            "Internal Grinder",
+            "Manual Deburr",
+            "MillTurn",
+            "No Cost Feature",
+            "Reciprocating Surface Grinder",
+            "Rotary Surface Grinder",
+            "Wire EDM"
+          ],
+          "operations": [
+            "Automated Deburring:Automated Deburring",
+            "Cylindrical Grinder",
+            "Internal Grinder",
+            "Manual Deburring:Manual Deburring",
+            "No Cost Feature",
+            "Reciprocating Surface Grinder",
+            "Rotary Surface Grinder",
+            "Setup:Rough Milling",
+            "Setup:Surface Finishing",
+            "Surface Finishing",
+            "Wire EDM"
+          ],
+          "parent_features": []
+        },
+        "Form": {
+          "child_features": [],
+          "machines": [
+            "3 Axis Mill",
+            "Bench Operation",
+            "DeMask",
+            "Etch Cell",
+            "Scribe"
+          ],
+          "operations": [
+            "Dressing Edges",
+            "Etch Cell Cycle:Depth Inspecting",
+            "Etch Cell Cycle:Drying",
+            "Etch Cell Cycle:Pocket Etching",
+            "Etch Cell Cycle:Pocket Peeling",
+            "Etch Cell Cycle:Rinsing",
+            "Line Sealing",
+            "Rough Milling",
+            "Scribing",
+            "Setup:Form Machining",
+            "Surface Finishing"
+          ],
+          "parent_features": []
+        },
+        "Keyway": {
+          "child_features": [],
+          "machines": [
+            "3 Axis Bar Feed Lathe with Sub Spindle",
+            "3 Axis Lathe",
+            "3 Axis Mill",
+            "4 Axis Mill",
+            "5 Axis Mill",
+            "Broach",
+            "MillTurn",
+            "No Cost Feature",
+            "Simultaneous Turning"
+          ],
+          "operations": [
+            "Bathtub Slot Milling",
+            "No Cost Feature",
+            "Obround Slot Milling",
+            "Rough Milling",
+            "Setup:Multipass Keyway Broaching",
+            "Setup:Single Pass Keyway Broaching",
+            "Surface Finishing",
+            "Woodruff Slot Milling"
+          ],
+          "parent_features": []
+        },
+        "MultiStepHole": {
+          "child_features": [
+            "SimpleHole"
+          ],
+          "machines": [
+            "2 Axis Bar Feed Lathe with Sub Spindle",
+            "2 Axis Lathe",
+            "3 Axis Bar Feed Lathe with Sub Spindle",
+            "3 Axis Lathe",
+            "3 Axis Mill",
+            "3 Axis Router",
+            "4 Axis Mill",
+            "5 Axis Mill",
+            "5 Axis Router",
+            "Automated Deburr",
+            "Deep Bore Machine",
+            "Drill Press",
+            "Gun Drill",
+            "Internal Grinder",
+            "Jig Bore",
+            "Jig Grind",
+            "Manual Deburr",
+            "MillTurn",
+            "No Cost Feature",
+            "Simultaneous Turning",
+            "Special Inspection",
+            "Wire EDM"
+          ],
+          "operations": [
+            "Automated Deburring",
+            "Feature Inspection",
+            "Finish Grinding",
+            "Manual Deburring",
+            "Multistep Holemaking",
+            "No Cost Feature",
+            "Port Cutting",
+            "Step Drilling",
+            "Wire EDM Cutting"
+          ],
+          "parent_features": []
+        },
+        "NotSupported": {
+          "child_features": [],
+          "machines": [
+            "No Cost Feature"
+          ],
+          "operations": [
+            "No Cost Feature"
+          ],
+          "parent_features": []
+        },
+        "Perimeter": {
+          "child_features": [],
+          "machines": [
+            "3 Axis Mill",
+            "4 Axis Mill",
+            "5 Axis Mill",
+            "Wire EDM"
+          ],
+          "operations": [
+            "Cutting",
+            "Perimeter Milling"
+          ],
+          "parent_features": []
+        },
+        "PlanarFace": {
+          "child_features": [],
+          "machines": [
+            "2 Axis Bar Feed Lathe with Sub Spindle",
+            "2 Axis Lathe",
+            "3 Axis Bar Feed Lathe with Sub Spindle",
+            "3 Axis Lathe",
+            "3 Axis Mill",
+            "3 Axis Router",
+            "4 Axis Mill",
+            "5 Axis Mill",
+            "5 Axis Router",
+            "Automated Deburr",
+            "Bench Operation",
+            "DeMask",
+            "Etch Cell",
+            "Manual Deburr",
+            "MillTurn",
+            "No Cost Feature",
+            "Perimeter Cut",
+            "Reciprocating Surface Grinder",
+            "Rotary Surface Grinder",
+            "Scribe",
+            "Simultaneous Turning",
+            "Wire EDM"
+          ],
+          "operations": [
+            "As Dovetail Milled",
+            "As Milled",
+            "As Perimeter Cut",
+            "As Polygon Turned",
+            "As Rotary Broached",
+            "As Routered",
+            "As Wire EDM Cut",
+            "Automated Surface Deburring",
+            "Back Finish Turning",
+            "Back Rough Turning",
+            "Back Semi-Finish Turning",
+            "Bulk Milling Surface",
+            "Chamfer Milling",
+            "Contouring",
+            "Corner Picking",
+            "Cutting",
+            "Dressing Edges",
+            "Etch Cell Cycle:Depth Inspecting",
+            "Etch Cell Cycle:Drying",
+            "Etch Cell Cycle:Pocket Etching",
+            "Etch Cell Cycle:Pocket Peeling",
+            "Etch Cell Cycle:Rinsing",
+            "Facing",
+            "Fine Finish Milling",
+            "Finish Plunge Grinding",
+            "Finish Traverse Grinding",
+            "Finish Turning",
+            "General Mill Finishing",
+            "Line Sealing",
+            "Manual Surface Deburring",
+            "Mill Contouring",
+            "Mill Facing",
+            "Mill Grooving",
+            "Multiplunging",
+            "No Cost Feature",
+            "Perimeter Cut",
+            "Plunging",
+            "Rough Milling",
+            "Rough Turning",
+            "Scribing",
+            "Semi-Finish Turning",
+            "Side Milling",
+            "Undercut Milling"
+          ],
+          "parent_features": [
+            "Ring"
+          ]
+        },
+        "PocketV2": {
+          "child_features": [],
+          "machines": [
+            "3 Axis Bar Feed Lathe with Sub Spindle",
+            "3 Axis Lathe",
+            "3 Axis Mill",
+            "4 Axis Mill",
+            "5 Axis Mill",
+            "MillTurn",
+            "No Cost Feature",
+            "Simultaneous Turning"
+          ],
+          "operations": [
+            "General Rough Milling",
+            "No Cost Feature",
+            "Rough Milling"
+          ],
+          "parent_features": []
+        },
+        "Polygon": {
+          "child_features": [],
+          "machines": [
+            "2 Axis Bar Feed Lathe with Sub Spindle",
+            "2 Axis Lathe",
+            "3 Axis Lathe",
+            "3 Axis Mill",
+            "4 Axis Mill",
+            "5 Axis Mill",
+            "MillTurn",
+            "No Cost Feature",
+            "Simultaneous Turning"
+          ],
+          "operations": [
+            "No Cost Feature",
+            "Polygon Turning",
+            "Rotary Broaching",
+            "Rough Milling"
+          ],
+          "parent_features": []
+        },
+        "Ring": {
+          "child_features": [
+            "CurvedSurface",
+            "CurvedWall",
+            "PlanarFace"
+          ],
+          "machines": [
+            "2 Axis Bar Feed Lathe with Sub Spindle",
+            "2 Axis Lathe",
+            "3 Axis Bar Feed Lathe with Sub Spindle",
+            "3 Axis Lathe",
+            "3 Axis Mill",
+            "4 Axis Mill",
+            "5 Axis Mill",
+            "Automated Deburr",
+            "Cylindrical Grinder",
+            "Internal Grinder",
+            "Jig Bore",
+            "Manual Deburr",
+            "MillTurn",
+            "No Cost Feature",
+            "Reciprocating Surface Grinder",
+            "Rotary Surface Grinder",
+            "Simultaneous Turning",
+            "Stock Prep Lathe"
+          ],
+          "operations": [
+            "Automated Deburring:Automated Deburring",
+            "Back Rough Turning",
+            "Cylindrical Grinder",
+            "Internal Grinder",
+            "Manual Deburring:Manual Deburring",
+            "Multiplunging",
+            "No Cost Feature",
+            "Parting",
+            "Plunging",
+            "Preturn Drilling",
+            "Reciprocating Surface Grinder",
+            "Rotary Surface Grinder",
+            "Rough Milling",
+            "Rough Turning",
+            "Setup:Jig Boring",
+            "Surface Finishing",
+            "Thread Turning"
+          ],
+          "parent_features": [
+            "StockTrim"
+          ]
+        },
+        "RingedHole": {
+          "child_features": [],
+          "machines": [
+            "2 Axis Bar Feed Lathe with Sub Spindle",
+            "2 Axis Lathe",
+            "3 Axis Bar Feed Lathe with Sub Spindle",
+            "3 Axis Lathe",
+            "3 Axis Mill",
+            "5 Axis Mill",
+            "Automated Deburr",
+            "Deep Bore Machine",
+            "Gun Drill",
+            "Internal Grinder",
+            "Manual Deburr",
+            "MillTurn",
+            "Simultaneous Turning",
+            "Special Inspection",
+            "Wire EDM"
+          ],
+          "operations": [
+            "Automated Deburring",
+            "Deep Bore Machine",
+            "Drilling",
+            "Feature Inspection",
+            "ID Grinding",
+            "ID Turning",
+            "Manual Deburring",
+            "Surface Finishing",
+            "Wire EDM Cutting"
+          ],
+          "parent_features": []
+        },
+        "SimpleHole": {
+          "child_features": [
+            "CurvedSurface",
+            "CurvedWall",
+            "Edge"
+          ],
+          "machines": [
+            "2 Axis Bar Feed Lathe with Sub Spindle",
+            "2 Axis Lathe",
+            "3 Axis Bar Feed Lathe with Sub Spindle",
+            "3 Axis Lathe",
+            "3 Axis Mill",
+            "3 Axis Router",
+            "4 Axis Mill",
+            "5 Axis Mill",
+            "5 Axis Router",
+            "Automated Deburr",
+            "Deep Bore Machine",
+            "Drill Press",
+            "Gun Drill",
+            "Internal Grinder",
+            "Jig Bore",
+            "Jig Grind",
+            "Manual Deburr",
+            "MillTurn",
+            "No Cost Feature",
+            "Simultaneous Turning",
+            "Special Inspection",
+            "Wire EDM"
+          ],
+          "operations": [
+            "Automated Deburring",
+            "Back Counterboring",
+            "Boring",
+            "Center Drilling",
+            "Chamfer Milling",
+            "Chamfering",
+            "Counterboring",
+            "Countersinking",
+            "Cutting",
+            "Drilling",
+            "Edge Turning",
+            "Feature Inspection",
+            "Finish Boring",
+            "Finish Turning",
+            "Groove Milling",
+            "Groove Turning",
+            "Gun Drilling",
+            "Hole Bottom Finishing",
+            "ID Finish Plunge Grinding",
+            "ID Finish Traverse Grinding",
+            "Manual Deburring",
+            "Mill Boring",
+            "No Cost Feature",
+            "Pecking",
+            "Perimeter Routering",
+            "Port Cutting",
+            "Postdrill Rough Turning",
+            "Preturn Drilling",
+            "Reaming",
+            "Rough Boring",
+            "Rough Milling",
+            "Rough Turning",
+            "Round Milling",
+            "Rounding",
+            "Routering",
+            "Semi-Finish Boring",
+            "Step Drilling",
+            "Surface Finishing",
+            "Tapping",
+            "Thread Milling",
+            "Thread Turning",
+            "Trepanning"
+          ],
+          "parent_features": [
+            "MultiStepHole"
+          ]
+        },
+        "SlideBundle": {
+          "child_features": [],
+          "machines": [
+            "2 Axis Bar Feed Lathe with Sub Spindle",
+            "2 Axis Lathe",
+            "3 Axis Bar Feed Lathe with Sub Spindle",
+            "3 Axis Lathe",
+            "3 Axis Mill",
+            "4 Axis Mill",
+            "5 Axis Mill",
+            "Automated Deburr",
+            "Deep Bore Machine",
+            "Drill Press",
+            "Gun Drill",
+            "Internal Grinder",
+            "Manual Deburr",
+            "MillTurn",
+            "Stock Prep Lathe"
+          ],
+          "operations": [
+            "Automated Deburring",
+            "Manual Deburring",
+            "Slide Machining"
+          ],
+          "parent_features": []
+        },
+        "Slot": {
+          "child_features": [],
+          "machines": [
+            "3 Axis Bar Feed Lathe with Sub Spindle",
+            "3 Axis Lathe",
+            "3 Axis Mill",
+            "4 Axis Mill",
+            "5 Axis Mill",
+            "MillTurn",
+            "No Cost Feature",
+            "Perimeter Cut",
+            "Simultaneous Turning",
+            "Wire EDM"
+          ],
+          "operations": [
+            "As Perimeter Cut",
+            "As Wire EDM Cut",
+            "Dovetail Edge Rounding",
+            "Finish Dovetail Milling",
+            "General Finish Dovetail Milling",
+            "General Rough Milling",
+            "Groove Milling",
+            "No Cost Feature",
+            "Rough Milling",
+            "Slot Milling",
+            "Wire EDM Cutting"
+          ],
+          "parent_features": []
+        },
+        "StockTrim": {
+          "child_features": [
+            "Ring"
+          ],
+          "machines": [
+            "2 Axis Bar Feed Lathe with Sub Spindle",
+            "2 Axis Lathe",
+            "3 Axis Bar Feed Lathe with Sub Spindle",
+            "3 Axis Lathe",
+            "3 Axis Mill",
+            "4 Axis Mill",
+            "5 Axis Mill",
+            "MillTurn",
+            "Simultaneous Turning",
+            "Stock Prep Lathe",
+            "Stock Prep Mill"
+          ],
+          "operations": [
+            "Parting",
+            "Rough Milling",
+            "Rough Turning",
+            "Setup:Stock Prep",
+            "Stock Prep",
+            "Stock Trim Turning"
+          ],
+          "parent_features": []
+        },
+        "Void": {
+          "child_features": [],
+          "machines": [
+            "3 Axis Lathe",
+            "3 Axis Mill",
+            "4 Axis Mill",
+            "5 Axis Mill",
+            "MillTurn",
+            "No Cost Feature"
+          ],
+          "operations": [
+            "No Cost Feature",
+            "Rough Milling"
+          ],
+          "parent_features": []
+        },
+        "Workpiece": {
+          "child_features": [],
+          "machines": [
+            "Simultaneous Turning"
+          ],
+          "operations": [
+            "Drum Index",
+            "Part Eject",
+            "Stock Feed",
+            "Tool Positioning",
+            "Transfer to Back Work",
+            "Transfer to Part Eject"
+          ],
+          "parent_features": []
+        }
+      },
+      "rows_without_feature": [
+        "2 Axis Bar Feed Lathe with Sub Spindle:Setup",
+        "2 Axis Lathe:Setup",
+        "3 Axis Bar Feed Lathe with Sub Spindle:Bulk Milling",
+        "3 Axis Lathe:Bulk Milling",
+        "3 Axis Lathe:Setup",
+        "3 Axis Mill:Bulk Milling",
+        "3 Axis Mill:Setup",
+        "3 Axis Mill:Virtual Boring Op",
+        "3 Axis Mill:Virtual Bulk Milling Op",
+        "3 Axis Mill:Virtual Contouring Op",
+        "3 Axis Mill:Virtual Drilling Op",
+        "3 Axis Mill:Virtual Facing Op",
+        "3 Axis Mill:Virtual Reaming Op",
+        "3 Axis Mill:Virtual Side Milling Op",
+        "3 Axis Mill:Virtual Tapping Op",
+        "3 Axis Router:Setup",
+        "4 Axis Mill:Bulk Milling",
+        "4 Axis Mill:Setup",
+        "5 Axis Mill:Bulk Milling",
+        "5 Axis Mill:Setup",
+        "5 Axis Router:Setup",
+        "Automated Deburr:Automated Deburring",
+        "Automated Deburr:Virtual Automated Edge Deburring Op",
+        "Bevel Gear Cutting Machine:Setup",
+        "Broach:Setup",
+        "Cylindrical Grinder:Grinding Setup",
+        "Deep Bore Machine:Setup",
+        "Drill Press:Setup",
+        "Etch Cell:Etch Cell Cycle",
+        "Gun Drill:Setup",
+        "Hob Machine:Setup",
+        "Internal Grinder:Grinding Setup",
+        "Jig Bore:Setup",
+        "Jig Grind:Grinding Setup",
+        "Manual Deburr:Manual Deburring",
+        "Manual Deburr:Virtual Manual Edge Deburring Op",
+        "MillTurn:Bulk Milling",
+        "MillTurn:Setup",
+        "Profile Gear Grinder:Grinding Setup",
+        "Reciprocating Surface Grinder:Grinding Setup",
+        "Rotary Surface Grinder:Grinding Setup",
+        "Shaper:Setup",
+        "Shaver:Setup",
+        "Simultaneous Turning:Slide",
+        "Spline Roller:Setup",
+        "Stock Prep Lathe:Setup",
+        "Stock Prep Mill:Setup",
+        "Threaded Wheel Gear Grinder:Grinding Setup"
+      ],
+      "source_capture_warnings": [
+        "Source screenshots for '3 Axis Bar Feed Lathe with Sub Spindle' show a gap between 'Plunging//Ring' and 'Slide Machining//SlideBundle' - intermediate rows (Plunging expansions, Postdrill/Preturn Drilling, Reaming, Rotary Broaching, Rough Turning variants, Setup) were not captured in the supplied screenshots and are not included here.",
+        "All rows have an empty Notes field, matching the source table (Notes column was blank throughout)."
+      ]
+    }
+  }
+}

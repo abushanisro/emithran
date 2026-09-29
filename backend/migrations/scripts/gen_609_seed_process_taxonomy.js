@@ -65,16 +65,17 @@ const path = require('path');
 const SCRIPTS_DIR = __dirname;
 const REPO_ROOT = path.join(__dirname, '..', '..', '..');
 const SM_STRUCTURED_DIR = path.join(REPO_ROOT, 'memory', 'sheetmetal', 'process', 'structured');
-const IM_PROCESS_DIR = path.join(REPO_ROOT, 'memory', 'Injection', 'process');
-const MACHINING_DIR = path.join(REPO_ROOT, 'memory', 'machining');
+const IM_PROCESS_DIR = path.join(REPO_ROOT, 'memory', 'Plastic Modeling', 'process');
+const MACHINING_DIR = path.join(REPO_ROOT, 'memory', 'Machining');
+const { readRecords } = require('./lib/memory-csv');
 
 const liveSnapshot = JSON.parse(fs.readFileSync(path.join(SCRIPTS_DIR, '609_live_process_calculator_mappings_snapshot.json'), 'utf8'));
 const smOfflineProcesses = JSON.parse(fs.readFileSync(path.join(SM_STRUCTURED_DIR, 'processes.json'), 'utf8'));
 const smOfflineOperations = JSON.parse(fs.readFileSync(path.join(SM_STRUCTURED_DIR, 'operations.json'), 'utf8'));
-const imOfflineProcesses = JSON.parse(fs.readFileSync(path.join(IM_PROCESS_DIR, 'digital_factory_processes_and_rates.json'), 'utf8')).digitalFactory_UnionGermany.processes;
-const imOfflineOperations = JSON.parse(fs.readFileSync(path.join(IM_PROCESS_DIR, 'digital_factory_operations.json'), 'utf8')).operations;
-const machOfflineProcesses = JSON.parse(fs.readFileSync(path.join(MACHINING_DIR, 'processes.json'), 'utf8')).processes;
-const machOfflineOperationsRaw = JSON.parse(fs.readFileSync(path.join(MACHINING_DIR, 'operations_full.json'), 'utf8')).operations;
+const imOfflineProcesses = readRecords(path.join(IM_PROCESS_DIR, 'digital_factory_processes_union_germany.csv'));
+const imOfflineOperations = readRecords(path.join(IM_PROCESS_DIR, 'digital_factory_operations.csv'));
+const machOfflineProcesses = readRecords(path.join(MACHINING_DIR, 'processes.csv'));
+const machOfflineOperationsRaw = readRecords(path.join(MACHINING_DIR, 'operations_full__operations.csv'));
 
 function norm(s) { return s.trim().toLowerCase().replace(/\s+/g, ' '); }
 function sqlStr(v) {

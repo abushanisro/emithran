@@ -79,6 +79,13 @@ export class RawMaterialsController {
     return this.rawMaterialsService.getAliases(token);
   }
 
+  // Before @Get(':id'). Stock-form prices by location (material_stock_prices, migration 833).
+  @Get('stock-prices')
+  @ApiOperation({ summary: 'Material price by stock form and location (reference data, migration 833)' })
+  async getStockPrices(@AccessToken() token: string, @Query('location') location?: string) {
+    return this.rawMaterialsService.getStockPrices(token, location);
+  }
+
   @Get('categories')
   @ApiOperation({ summary: 'Get available material categories' })
   @ApiResponse({ status: 200, description: 'Material categories retrieved successfully' })

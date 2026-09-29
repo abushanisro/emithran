@@ -18,9 +18,9 @@ For a milled part's faces NOT already claimed by a discrete detector (hole
 walls, counterbore/countersink/chamfer cones, fillet/groove toroids, pocket/
 slot/keyway floors), classifies each remaining face by its real OCC surface
 type:
-  - GeomAbs_Plane                          -> "planar_face"
-  - GeomAbs_Cylinder / Cone / Torus        -> "curved_wall"
-  - GeomAbs_BSplineSurface / BezierSurface -> "curved_surface"
+  - GeomAbs_Plane                          -> "PlanarFace"
+  - GeomAbs_Cylinder / Cone / Torus        -> "CurvedWall"
+  - GeomAbs_BSplineSurface / BezierSurface -> "CurvedSurface"
 Any other real surface type (GeomAbs_Sphere, SurfaceOfRevolution,
 SurfaceOfExtrusion, OffsetSurface) is a disclosed, genuinely unclassified
 gap here -- never silently bucketed into the nearest guess.
@@ -28,7 +28,7 @@ gap here -- never silently bucketed into the nearest guess.
 Contiguous same-classified faces (connected via a shared real edge) are
 grouped into ONE machinable region per connected component, not emitted as
 one feature per raw face -- a milled top face made of several NURBS patches
-must not look like dozens of distinct "planar_face" features. This grouping
+must not look like dozens of distinct "PlanarFace" features. This grouping
 is real geometric adjacency work (shared-edge topology), the same technique
 sheet_metal/bend_relationships.py already uses for Sheet Metal.
 
@@ -149,11 +149,11 @@ def _classify_surface_type(geomabs_type: Any) -> Optional[str]:
         GeomAbs_BSplineSurface, GeomAbs_BezierSurface,
     )
     if geomabs_type == GeomAbs_Plane:
-        return "planar_face"
+        return "PlanarFace"
     if geomabs_type in (GeomAbs_Cylinder, GeomAbs_Cone, GeomAbs_Torus):
-        return "curved_wall"
+        return "CurvedWall"
     if geomabs_type in (GeomAbs_BSplineSurface, GeomAbs_BezierSurface):
-        return "curved_surface"
+        return "CurvedSurface"
     return None
 
 
@@ -198,7 +198,7 @@ def _build_face_graph(shape, claimed_face_ids: Set[int]):
             ftype = _classify_surface_type(adaptor.GetType())
             if ftype:
                 surface_type[idx] = ftype
-                if ftype == "planar_face":
+                if ftype == "PlanarFace":
                     plane = adaptor.Plane()
                     n = plane.Axis().Direction()
                     loc = plane.Location()
@@ -237,7 +237,7 @@ def classify_and_group_milled_faces(shape, claimed_face_ids: Set[int]) -> List[D
     in this recognizer (hole walls, cone/chamfer/countersink, toroids,
     prismatic pocket floors, polygon rings) -- passed in by the caller as
     the union of every already-emitted feature's face_ids, so a hole's own
-    cylindrical wall never also emits as a generic "curved_wall" milling
+    cylindrical wall never also emits as a generic "CurvedWall" milling
     region.
 
     Returns a list of real region dicts:
@@ -263,7 +263,7 @@ def classify_and_group_milled_faces(shape, claimed_face_ids: Set[int]) -> List[D
     adjacency: Dict[int, Set[int]] = {i: set() for i in surface_type}
     for a, neighbors in raw_adjacency.items():
         for b in neighbors:
-            if surface_type[a] == "planar_face" and not _planes_coincide(plane_eq[a], plane_eq[b]):
+            if surface_type[a] == "PlanarFace" and not _planes_coincide(plane_eq[a], plane_eq[b]):
                 continue
             adjacency[a].add(b)
 
@@ -327,9 +327,11 @@ def detect_polygon_rings(
     part_bbox: Optional[Dict[str, float]] = None,
 ) -> List[Dict]:
     """
-    NOT WIRED INTO MachiningFeatureRecognizer -- a documented, real, tested spike
-    only (same status as sheet_metal/features/gusset_spike.py), kept for a
-    future pass that has an additional real signal to disambiguate. Real
+    Emitted by MachiningFeatureRecognizer.recognize() only as
+    MachiningFeatureTree.polygon_candidates -- never as features. The backend
+    treats a candidate as a polygon only when the drawing carries a polygon
+    callout (drawing_intelligence.polygon_callout), the additional signal
+    this detector needs (product decision 2026-09-29). Real
     testing (test_polygon_rings.py) found this detector's own geometric
     signal CANNOT reliably distinguish a genuine rotary-broached polygon
     feature from an ordinary square/rectangular milled pocket -- both are,
@@ -401,7 +403,7 @@ def detect_polygon_rings(
 
     faces, surface_type, _plane_eq, raw_adjacency = _build_face_graph(shape, claimed_face_ids)
 
-    planar_nodes = {i for i, t in surface_type.items() if t == "planar_face"}
+    planar_nodes = {i for i, t in surface_type.items() if t == "PlanarFace"}
     if len(planar_nodes) < 3:
         return []
 
@@ -500,6 +502,7 @@ def detect_polygon_rings(
         rings.append({
             "face_indices": sorted(component),
             "side_count": len(component),
+            **_polygon_ring_geometry(faces, component, face_area, (wx / total_area, wy / total_area, wz / total_area)),
             "area_mm2": round(total_area, 3),
             "centroid": (
                 round(wx / total_area, 3),
@@ -513,6 +516,97 @@ def detect_polygon_rings(
         })
 
     return rings
+
+
+def _polygon_ring_geometry(faces, component, face_area, ring_centroid) -> Dict:
+    """
+    What a polygon ring is, from its own walls:
+      axis             the direction every wall is parallel to (cross product of
+                       two non-parallel wall normals)
+      kind             "socket" when every wall's outward normal (the face's own
+                       orientation applied) points toward the ring's centre --
+                       material outside, a void inside (a broached hole); "boss"
+                       when every one points away (material inside); else
+                       "unknown"
+      depth_mm         the walls' extent along the axis (their vertices)
+      across_flats_mm  the distance between two opposite parallel walls; for an
+                       odd side count (no opposite walls) the regular-polygon
+                       value side / tan(pi / n), side = mean wall area / depth
+    """
+    from OCC.Core.BRepAdaptor import BRepAdaptor_Surface  # type: ignore
+    from OCC.Core.BRepGProp import brepgprop  # type: ignore
+    from OCC.Core.GProp import GProp_GProps  # type: ignore
+    from OCC.Core.TopAbs import TopAbs_REVERSED, TopAbs_VERTEX  # type: ignore
+    from OCC.Core.TopExp import TopExp_Explorer  # type: ignore
+    from OCC.Core.BRep import BRep_Tool  # type: ignore
+    from OCC.Core.TopoDS import topods  # type: ignore
+    import math
+
+    planes = []  # (outward unit normal, plane offset along it, face centroid)
+    for fi in component:
+        face = faces[fi]
+        pl = BRepAdaptor_Surface(face).Plane()
+        d = pl.Axis().Direction()
+        n = [d.X(), d.Y(), d.Z()]
+        if face.Orientation() == TopAbs_REVERSED:
+            n = [-c for c in n]
+        loc = pl.Location()
+        offset = n[0] * loc.X() + n[1] * loc.Y() + n[2] * loc.Z()
+        props = GProp_GProps()
+        brepgprop.SurfaceProperties(face, props)
+        cg = props.CentreOfMass()
+        planes.append((n, offset, (cg.X(), cg.Y(), cg.Z())))
+
+    axis = None
+    for i in range(len(planes)):
+        for j in range(i + 1, len(planes)):
+            a, b = planes[i][0], planes[j][0]
+            c = [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+            norm = math.sqrt(sum(x * x for x in c))
+            if norm > 0.1:
+                axis = [x / norm for x in c]
+                break
+        if axis:
+            break
+    if axis is None:
+        return {"kind": "unknown", "axis": None, "depth_mm": None, "across_flats_mm": None}
+
+    signs = [
+        n[0] * (cg[0] - ring_centroid[0]) + n[1] * (cg[1] - ring_centroid[1]) + n[2] * (cg[2] - ring_centroid[2])
+        for n, _o, cg in planes
+    ]
+    kind = "socket" if all(x < 0 for x in signs) else "boss" if all(x > 0 for x in signs) else "unknown"
+
+    proj = []
+    for fi in component:
+        exp = TopExp_Explorer(faces[fi], TopAbs_VERTEX)
+        while exp.More():
+            p = BRep_Tool.Pnt(topods.Vertex(exp.Current()))
+            proj.append(p.X() * axis[0] + p.Y() * axis[1] + p.Z() * axis[2])
+            exp.Next()
+    depth = (max(proj) - min(proj)) if proj else None
+
+    across = None
+    for i in range(len(planes)):
+        for j in range(i + 1, len(planes)):
+            a, b = planes[i][0], planes[j][0]
+            dot = a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+            if dot < -0.999:  # opposite walls: outward normals anti-parallel
+                across = abs(planes[i][1] + planes[j][1])
+                break
+        if across is not None:
+            break
+    n_sides = len(component)
+    if across is None and depth and depth > 0:
+        side = (sum(face_area[fi] for fi in component) / n_sides) / depth
+        across = side / math.tan(math.pi / n_sides)
+
+    return {
+        "kind": kind,
+        "axis": [round(x, 6) for x in axis],
+        "depth_mm": round(depth, 3) if depth is not None else None,
+        "across_flats_mm": round(across, 3) if across is not None else None,
+    }
 
 
 def detect_cutout_rings(
@@ -567,7 +661,7 @@ def detect_cutout_rings(
 
     wall_nodes: Set[int] = set()
     for i, t in surface_type.items():
-        if t != "planar_face":
+        if t != "PlanarFace":
             continue
         (nx, ny, nz), _offset = plane_eq[i]
         if abs(nx * ax + ny * ay + nz * az) < _WALL_AXIS_DOT_TOL:

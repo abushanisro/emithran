@@ -1,3 +1,5 @@
+import { machiningStockPriceForm, resolveStockPrice, type StockPriceRow } from '../costing/machining/stock-price';
+import type { MaterialClampProperties } from '../costing/plastic-molding/clamp-force';
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../../common/supabase/supabase.service';
 import type { RateSnapshot } from '../../../common/exchange-rate/exchange-rate.service';
@@ -15,7 +17,7 @@ import { expandSearchTermSpellingVariants } from '../../raw-materials/material-s
 
 interface MatchedMaterialRow {
   id: string;
-  material: string | null; materialGrade: string | null; materialGroup: string | null;
+  material: string | null; materialGrade: string | null; materialGroup: string | null; materialType: string | null;
   astmStandard: string | null; dinStandard: string | null; enStandard: string | null; jisStandard: string | null;
   hasCost: boolean;
   shape: string | null; locCost: number | null; indiaCost: number | null; densityKgM3: number | null;
@@ -23,6 +25,8 @@ interface MatchedMaterialRow {
   meltingTempC: number | null; moldTempC: number | null; ejectDeflectionTempC: number | null;
   specificHeatMeltJgC: number | null; thermalConductivityMeltWMK: number | null;
   cureTimeMinFromMaterial: number | null;
+  imInjectionPressureMaxMpa: number | null; imFlowLengthRatio: number | null; imReferenceMaterial: string | null;
+  imDensityOfMeltKgM3: number | null;
 }
 
 interface MaterialMatch {
@@ -47,6 +51,33 @@ export class MaterialResolutionService {
   private materialCureTimeColumnAvailable: boolean | null = null;
 
   constructor(private readonly supabaseService: SupabaseService) {}
+
+  // Migration 831's reference clamp properties (im_*). Requested only once the
+  // columns exist, so material resolution keeps working before 831 runs; the
+  // clamp model then reports the missing properties instead of sizing a press.
+  private materialImColumnsAvailable: boolean | null = null;
+  private async checkMaterialImColumnsAvailable(client: ReturnType<SupabaseService['getClient']>): Promise<boolean> {
+    if (this.materialImColumnsAvailable != null) return this.materialImColumnsAvailable;
+    const { error } = await client.from('raw_materials').select('im_flow_length_ratio').limit(1);
+    this.materialImColumnsAvailable = !(error && /column|schema cache/i.test(error.message));
+    return this.materialImColumnsAvailable;
+  }
+
+  // Stock-form prices for one location (material_stock_prices, migration 833).
+  // Reference data, cached per location; a read error (e.g. before 833 runs)
+  // is not cached and leaves no stock price.
+  private stockPrices = new Map<string, StockPriceRow[]>();
+  private async loadStockPrices(client: ReturnType<SupabaseService['getClient']>, location: string): Promise<StockPriceRow[]> {
+    const hit = this.stockPrices.get(location);
+    if (hit) return hit;
+    const { data, error } = await client.from('material_stock_prices')
+      .select('raw_material_name, stock_form, location, price_per_kg, currency_code, source')
+      .eq('location', location).not('raw_material_name', 'is', null);
+    if (error) return [];
+    const rows = (data ?? []) as StockPriceRow[];
+    this.stockPrices.set(location, rows);
+    return rows;
+  }
 
   private async checkMaterialCureTimeColumnAvailable(client: ReturnType<SupabaseService['getClient']>): Promise<boolean> {
     if (this.materialCureTimeColumnAvailable != null) return this.materialCureTimeColumnAvailable;
@@ -136,6 +167,7 @@ export class MaterialResolutionService {
     materialCol: string,
   ): Promise<MaterialMatch> {
     const cureTimeColumnAvailable = await this.checkMaterialCureTimeColumnAvailable(client);
+    const imColumnsAvailable = await this.checkMaterialImColumnsAvailable(client);
     const g = grade.trim();
     // melting_temp_c/mold_temp_c/specific_heat_melt/thermal_conductivity_melt:
     // real, per-grade Injection Molding thermal properties, already
@@ -147,9 +179,8 @@ export class MaterialResolutionService {
     // every family already shares — a second, family-gated query would
     // be a second source of truth.
     //
-    // cure_time_min: migration 619's new column (compression-molding-
-    // relevant thermoset grades only, see
-    // gen_619_seed_material_cure_time.js) — only requested when
+    // cure_time_min: migration 619's new column (thermoset grades, values
+    // from the memory/ reference, migration 835) — only requested when
     // checkMaterialCureTimeColumnAvailable() has confirmed it exists, so
     // this resolver keeps working correctly against a database that
     // hasn't had migration 619 applied yet (never a crash, never a
@@ -157,8 +188,9 @@ export class MaterialResolutionService {
     //
     // id/material/material_group/*_standard: identity columns the ranker
     // needs to score a candidate (materialCol above is only the COST column).
-    const selectCols = `${materialCol}, id, material, material_group, astm_standard, din_standard, en_standard, jis_standard, cost_india, cost, density, density_kg_m3, shape, material_grade, shearing_strength, ultimate_tensile_strength, shear_strength_mpa, uts_mpa, melting_temp_c, mold_temp_c, specific_heat_melt, thermal_conductivity_melt, eject_deflection_temp_c` +
-      (cureTimeColumnAvailable ? `, cure_time_min` : '');
+    const selectCols = `${materialCol}, id, material, material_group, material_type, astm_standard, din_standard, en_standard, jis_standard, cost_india, cost, density, density_kg_m3, shape, material_grade, shearing_strength, ultimate_tensile_strength, shear_strength_mpa, uts_mpa, melting_temp_c, mold_temp_c, specific_heat_melt, thermal_conductivity_melt, eject_deflection_temp_c` +
+      (cureTimeColumnAvailable ? `, cure_time_min` : '') +
+      (imColumnsAvailable ? `, im_injection_pressure_max_mpa, im_flow_length_ratio, im_density_of_melt_kg_m3, im_reference_material` : '');
 
     // Alias lookup first — e.g. "AL6101" has no substring in common with its
     // real row ("Generic Aluminum, ANSI 6101"), so none of the ilike attempts
@@ -274,12 +306,14 @@ export class MaterialResolutionService {
       const specificHeatMeltJgC = (row.specific_heat_melt as number | null) ?? null;
       const thermalConductivityMeltWMK = (row.thermal_conductivity_melt as number | null) ?? null;
       const cureTimeMinFromMaterial = (row.cure_time_min as number | null) ?? null;
+      const numOrNull = (v: unknown) => (v == null ? null : Number(v));
       return {
         // ranker identity
         id: row.id as string,
         material: (row.material as string | null) ?? null,
         materialGrade: (row.material_grade as string | null) ?? null,
         materialGroup: (row.material_group as string | null) ?? null,
+        materialType: (row.material_type as string | null) ?? null,
         astmStandard: (row.astm_standard as string | null) ?? null,
         dinStandard: (row.din_standard as string | null) ?? null,
         enStandard: (row.en_standard as string | null) ?? null,
@@ -288,6 +322,10 @@ export class MaterialResolutionService {
         // resolved properties
         shape: (row.shape as string | null) ?? null, locCost, indiaCost, densityKgM3, shearStrengthMpa, utsMpa,
         meltingTempC, moldTempC, ejectDeflectionTempC, specificHeatMeltJgC, thermalConductivityMeltWMK, cureTimeMinFromMaterial,
+        imInjectionPressureMaxMpa: numOrNull(row.im_injection_pressure_max_mpa),
+        imFlowLengthRatio: numOrNull(row.im_flow_length_ratio),
+        imReferenceMaterial: (row.im_reference_material as string | null) ?? null,
+        imDensityOfMeltKgM3: numOrNull(row.im_density_of_melt_kg_m3),
       };
     });
 
@@ -350,6 +388,23 @@ export class MaterialResolutionService {
   // Returns null (never a fabricated density) when the grade has no real
   // raw_materials match — callers must treat null as "cannot compute weight
   // yet", never substitute an assumed material's density.
+  /**
+   * raw_materials.cut_code (the cutting-parameter code; its integer part is the
+   * cut-code family) for this grade, from the SAME matched row every other
+   * material property comes from. null when the grade matches no row or the
+   * row carries no code.
+   */
+  async resolveCutCode(accessToken: string, grade: string, family: string = 'unknown'): Promise<{ cutCode: number | null; materialName: string | null; materialGroup: string | null }> {
+    const g = grade?.trim();
+    if (!g) return { cutCode: null, materialName: null, materialGroup: null };
+    const client = this.supabaseService.getClient(accessToken);
+    const { row } = await this.matchBestRawMaterialRow(client, g, family, 'cost');
+    if (!row) return { cutCode: null, materialName: null, materialGroup: null };
+    const { data } = await client.from('raw_materials').select('cut_code').eq('id', row.id).maybeSingle();
+    const code = data?.cut_code != null ? Number(data.cut_code) : NaN;
+    return { cutCode: Number.isFinite(code) ? code : null, materialName: row.materialGrade ?? row.material, materialGroup: row.materialGroup };
+  }
+
   async resolveDensityKgM3(accessToken: string, grade: string, family: string = 'unknown'): Promise<number | null> {
     const g = grade?.trim();
     if (!g) return null;
@@ -369,6 +424,8 @@ export class MaterialResolutionService {
     materialCol: string;
     rates: RateSnapshot;
     locCurrencyCode: string;
+    /** Quote location (e.g. India): picks the stock-form price (material_stock_prices). */
+    location: string;
     warnings: string[];
   }): Promise<{
     materialCostPerKg: number; materialDensityKgM3: number; materialSource: 'db' | 'default';
@@ -390,11 +447,17 @@ export class MaterialResolutionService {
     // has no real value on file — see thermalSource/cureTimeSource for why.
     meltingTempC: number | null; moldTempC: number | null; ejectionTempC: number | null;
     specificHeatMeltJgC: number | null; thermalConductivityMeltWMK: number | null;
+    /** Melt density (migration 831, reference material); null when not on file. */
+    densityOfMeltKgM3: number | null;
     thermalSource: 'db' | 'unavailable';
     cureTimeMinFromMaterial: number | null;
     cureTimeSource: 'db' | 'unavailable' | 'column_not_migrated';
+    /** raw_materials.material_type of the matched row (e.g. ABS, Nylon); null when no row matched. */
+    materialType: string | null;
+    /** Reference clamp properties (migration 831); nulls when not on file for this material. */
+    clampProperties: MaterialClampProperties;
   }> {
-    const { accessToken, grade, family, materialCol, rates, locCurrencyCode, warnings } = input;
+    const { accessToken, grade, family, materialCol, rates, locCurrencyCode, location, warnings } = input;
 
     let ambiguityNote: string | null = null;
     if (grade) {
@@ -433,10 +496,24 @@ export class MaterialResolutionService {
             );
           }
           const hasThermal = best.meltingTempC != null && best.moldTempC != null;
+          // A machined part is priced on the stock it is cut from: the stock-form
+          // price at this location when one is on file (stock-price.ts), converted
+          // at today's FX snapshot; else the material's raw_materials price.
+          const locationStockPrices = await this.loadStockPrices(client, location);
+          const stock = resolveStockPrice(locationStockPrices, best.material, family, location);
+          if (stock) {
+            warnings.push(
+              `Material priced on ${stock.form.replace('_', ' ')} stock for ${location}: ${stock.pricePerKg} ${stock.currencyCode}/kg (${stock.source}).`,
+            );
+          } else if (machiningStockPriceForm(family) && locationStockPrices.length > 0) {
+            warnings.push(`No ${machiningStockPriceForm(family)!.replace('_', ' ')} stock price on file for "${best.material ?? grade}" in ${location}; priced from raw_materials.`);
+          }
           return {
-            materialCostPerKg: hasCost
-              ? (best.locCost != null && best.locCost > 0 ? best.locCost : (best.indiaCost as number) * rates.convertStrict('INR', locCurrencyCode))
-              : 0,
+            materialCostPerKg: stock
+              ? stock.pricePerKg * rates.convertStrict(stock.currencyCode, locCurrencyCode)
+              : hasCost
+                ? (best.locCost != null && best.locCost > 0 ? best.locCost : (best.indiaCost as number) * rates.convertStrict('INR', locCurrencyCode))
+                : 0,
             materialDensityKgM3: best.densityKgM3 as number,
             materialSource: 'db',
             utsMpa: hasUts ? (best.utsMpa as number) : familyUts,
@@ -444,11 +521,18 @@ export class MaterialResolutionService {
             utsSource: hasUts ? 'db' : (familyUts != null ? 'family_default' : 'unavailable'),
             meltingTempC: best.meltingTempC, moldTempC: best.moldTempC, ejectionTempC: best.ejectDeflectionTempC,
             specificHeatMeltJgC: best.specificHeatMeltJgC, thermalConductivityMeltWMK: best.thermalConductivityMeltWMK,
+            densityOfMeltKgM3: best.imDensityOfMeltKgM3,
             thermalSource: hasThermal ? 'db' : 'unavailable',
             cureTimeMinFromMaterial: best.cureTimeMinFromMaterial,
             cureTimeSource: best.cureTimeMinFromMaterial != null
               ? 'db'
               : (cureTimeColumnAvailable ? 'unavailable' : 'column_not_migrated'),
+            materialType: best.materialType,
+            clampProperties: {
+              injectionPressureMaxMpa: best.imInjectionPressureMaxMpa,
+              flowLengthRatio: best.imFlowLengthRatio,
+              referenceMaterial: best.imReferenceMaterial,
+            },
           };
         }
       } catch {
@@ -479,9 +563,12 @@ export class MaterialResolutionService {
       shearStrengthMpa: null,
       utsSource: notFoundFamilyUts != null ? 'family_default' : 'unavailable',
       meltingTempC: null, moldTempC: null, ejectionTempC: null, specificHeatMeltJgC: null, thermalConductivityMeltWMK: null,
+      densityOfMeltKgM3: null,
       thermalSource: 'unavailable',
       cureTimeMinFromMaterial: null,
       cureTimeSource: 'unavailable',
+      materialType: null,
+      clampProperties: { injectionPressureMaxMpa: null, flowLengthRatio: null, referenceMaterial: null },
     };
   }
 }

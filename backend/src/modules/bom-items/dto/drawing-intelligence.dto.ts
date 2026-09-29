@@ -99,6 +99,30 @@ export class DrawingIntelligenceDto {
   @IsString()
   coating!: string;
 
+  // Chemical milling callout text ("CHEM MILL", ...) or "None". Optional:
+  // drawings analyzed before the analyzer reported it have no such field.
+  @IsOptional()
+  @IsString()
+  chemical_milling?: string;
+
+  // Gear quality ("A8" / "Q10" / "DIN7" or "None"), gear shaving / shaping
+  // callouts and a polygon callout — optional for the same reason.
+  @IsOptional()
+  @IsString()
+  gear_quality?: string;
+
+  @IsOptional()
+  @IsString()
+  gear_shaving?: string;
+
+  @IsOptional()
+  @IsString()
+  gear_shaping?: string;
+
+  @IsOptional()
+  @IsString()
+  polygon_callout?: string;
+
   @IsString()
   complexity!: string;
 

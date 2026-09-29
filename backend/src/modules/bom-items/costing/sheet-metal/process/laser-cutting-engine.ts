@@ -1,4 +1,4 @@
-import { LASER_SETUP_MIN, DEFAULT_YIELD_PCT } from '../../shared/core/default-rates.constants';
+import { DEFAULT_YIELD_PCT } from '../../shared/core/default-rates.constants';
 import type { MHRRateInput } from '../../shared/core/cost-engine';
 import type { ProcessLineCost, PhysicsGap, ConfidenceLevel } from '../../../dto/cost-breakdown.dto';
 import type { CuttingProcessContext, CuttingProcessResult } from '../../shared/core/manufacturing-process.types';
@@ -82,7 +82,6 @@ export function computeLaserCuttingCost(input: LaserCuttingInput): LaserCuttingR
     process: "Laser Cutting",
     machineSetupTimeHr: rate.setupTimeHr,
     operationSetupMin: input.setupMin,
-    classDefaultMin: LASER_SETUP_MIN,
     machineName: rate.machineName,
   });
   const setupMin = setup.setupMin;

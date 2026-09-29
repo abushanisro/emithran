@@ -1,7 +1,7 @@
 import { IsString, IsOptional, IsInt, Min, IsIn, IsArray, ArrayMinSize, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import type { RouteId } from './route-comparison.dto';
-import { getCuttingRouteIds, getFormingRouteIds } from '../costing/shared/core/manufacturing-process-registry';
+import { getCuttingRouteIds, getFormingRouteIds, getMachiningRouteIds } from '../costing/shared/core/manufacturing-process-registry';
 import { LOCATION_INFO } from '../costing/shared/core/default-rates.constants';
 
 // The locations this system holds real rate and material-cost data for, taken
@@ -18,8 +18,7 @@ const SUPPORTED_LOCATIONS = Object.keys(LOCATION_INFO);
 export const VALID_ROUTE_IDS: RouteId[] = [
   ...getCuttingRouteIds(),
   ...getFormingRouteIds(),
-  'cnc-3ax', 'cnc-4ax', 'cnc-5ax',
-  'cnc-lathe', 'cnc-lathe-lt', 'cnc-mill-turn',
+  ...getMachiningRouteIds(),
   'injection-molding', 'im-small-50t', 'im-standard-200t', 'im-large-500t',
 ];
 

@@ -1,6 +1,5 @@
 import { computeLaserCuttingCost, Co2LaserCuttingEngine, ThreeDLaserCuttingEngine, type LaserCuttingInput } from '../../../../../../modules/bom-items/costing/sheet-metal/process/laser-cutting-engine';
 import type { UnsupportedOperationGap } from '../../../../../../modules/bom-items/dto/cost-breakdown.dto';
-import { LASER_SETUP_MIN } from '../../../../../../modules/bom-items/costing/shared/core/default-rates.constants';
 import type { MHRRateInput } from '../../../../../../modules/bom-items/costing/shared/core/cost-engine';
 
 function baseInput(overrides: Partial<LaserCuttingInput> = {}): LaserCuttingInput {
@@ -56,17 +55,15 @@ describe('computeLaserCuttingCost — direct-labor cost (Track B Phase 1 bug fix
     expect(line.runCost).toBeCloseTo(((input.cuttingSecFromCalculator! / 3600) * rateNoLabor.rate), 5);
   });
 
-  it('falls back to LASER_SETUP_MIN with a disclosed warning when no setupMin is supplied', () => {
+  it('does not cost setup, and says so, when no real setup time resolved', () => {
     const input = baseInput({ laserRate: rateWithLabor, setupMin: undefined });
     const result = computeLaserCuttingCost(input);
     // Disclosed because NEITHER real source resolved: no per-machine
     // setup_time_hr on this rate and no sm_lookup_op_setup_time row.
-    expect(result.warnings.some((w) => w.startsWith('Laser Cutting: setup time from fallback'))).toBe(true);
-    expect(result.processLines[0]!.setupTimeMin).toBeCloseTo(LASER_SETUP_MIN, 5);
-    expect(result.processLines[0]!.setupTimeSource).toBe('class_default');
-    const dlrMin = rateWithLabor.labourRate! / 60;
-    const expectedSetupCost = (LASER_SETUP_MIN / 60) * rateWithLabor.rate / input.batchSize + dlrMin * LASER_SETUP_MIN / input.batchSize;
-    expect(result.processLines[0].setupCost).toBeCloseTo(expectedSetupCost, 5);
+    expect(result.warnings.some((w) => w.startsWith('Laser Cutting: setup not costed'))).toBe(true);
+    expect(result.processLines[0]!.setupTimeMin).toBe(0);
+    expect(result.processLines[0]!.setupTimeSource).toBe('none');
+    expect(result.processLines[0].setupCost).toBe(0);
   });
 
   it('returns no process lines when there is nothing to cut', () => {

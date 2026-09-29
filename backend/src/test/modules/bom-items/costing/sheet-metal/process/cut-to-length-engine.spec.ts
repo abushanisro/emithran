@@ -1,5 +1,4 @@
 import { computeCutToLengthCost, CutToLengthEngine, type CutToLengthInput } from '../../../../../../modules/bom-items/costing/sheet-metal/process/cut-to-length-engine';
-import { CUT_TO_LENGTH_SETUP_MIN } from '../../../../../../modules/bom-items/costing/shared/core/default-rates.constants';
 import type { MHRRateInput } from '../../../../../../modules/bom-items/costing/shared/core/cost-engine';
 
 function baseInput(overrides: Partial<CutToLengthInput> = {}): CutToLengthInput {
@@ -86,18 +85,20 @@ describe('computeCutToLengthCost — real per-machine setup time', () => {
   it('uses the real per-machine setup_time_hr (converted to minutes) without a fallback warning', () => {
     const result = computeCutToLengthCost(baseInput({ ctlRate }));
     expect(result.processLines[0]!.setupTimeMin).toBeCloseTo(0.14 * 60, 6);
-    expect(result.warnings.some((w) => w.includes('setup time'))).toBe(false);
+    expect(result.warnings.some((w) => w.includes('setup not costed'))).toBe(false);
   });
 
-  it('falls back to CUT_TO_LENGTH_SETUP_MIN with a disclosed warning when no real setup time resolves', () => {
+  it('does not cost setup, and says so, when no real setup time resolved', () => {
     const rateNoSetup: MHRRateInput = {
       rate: 45, source: 'mhr_database', machineClass: 'cut_to_length',
       machineName: 'Some Other CTL', commodityCode: null,
       cutToLengthCycleConstS: -3.69, cutToLengthCycleMassCoeffSPerKg: 0.98, cutToLengthCutSpeedS: 25,
     };
     const result = computeCutToLengthCost(baseInput({ ctlRate: rateNoSetup }));
-    expect(result.processLines[0]!.setupTimeMin).toBeCloseTo(CUT_TO_LENGTH_SETUP_MIN, 6);
-    expect(result.warnings.some((w) => w.toLowerCase().includes('setup'))).toBe(true);
+    expect(result.processLines[0]!.setupTimeMin).toBe(0);
+    expect(result.processLines[0]!.setupTimeSource).toBe('none');
+    expect(result.processLines[0]!.setupCost).toBe(0);
+    expect(result.warnings.some((w) => w.includes('setup not costed'))).toBe(true);
   });
 });
 

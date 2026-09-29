@@ -95,8 +95,8 @@ def test_milled_path_now_detects_fillets_too():
     a real 'fillet' MachiningFeature with real face_ids."""
     shape, _ = _make_filleted_cylinder()
     recognizer = MachiningFeatureRecognizer()
-    tree = recognizer.recognize(shape, family="cnc_milled")
-    fillet_features = [f for f in tree.features if f.type == "fillet"]
+    tree = recognizer.recognize(shape, family="milled")
+    fillet_features = [f for f in tree.features if (f.type, f.variant) == ("Edge", "round")]
     assert len(fillet_features) >= 1
     feat = fillet_features[0]
     assert len(feat.face_ids) >= 1

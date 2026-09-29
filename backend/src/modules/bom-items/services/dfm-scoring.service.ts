@@ -78,7 +78,9 @@ export class DFMScoringService {
         const missing: string[] = [];
         if (!isCNC && !thicknessKnown) missing.push('sheet thickness');
 
-        if (f.feature_type === 'hole') {
+        // Reference catalog feature types (cad-engine/shared/reference_features.json):
+        // SimpleHole covers sheet-metal and machining round holes alike.
+        if (f.feature_type === 'SimpleHole') {
           const diameterKnown = typeof f.diameter_mm === 'number' && f.diameter_mm > 0;
           if (!diameterKnown) missing.push('hole diameter');
           const diameter = diameterKnown ? (f.diameter_mm as number) : 5;
@@ -87,7 +89,7 @@ export class DFMScoringService {
             : this.scoreSheetMetalHole(occ, i, diameter, t, utsMpa);
           return missing.length ? this.flagIncompleteGeometry(result, missing) : result;
         }
-        if (f.feature_type === 'bend') {
+        if (f.feature_type === 'StraightBend') {
           const radiusKnown = typeof f.radius_mm === 'number' && f.radius_mm > 0;
           if (!radiusKnown) missing.push('bend radius');
           const radius = radiusKnown ? (f.radius_mm as number) : t;

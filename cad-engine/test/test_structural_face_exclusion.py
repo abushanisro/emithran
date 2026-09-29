@@ -36,9 +36,9 @@ def test_plain_box_yields_zero_features_not_two_fabricated_pockets():
     correct, desired behavior, not a regression of this fix -- only
     pocket/slot/keyway must stay empty here."""
     box = BRepPrimAPI_MakeBox(60.0, 50.0, 20.0).Shape()
-    tree = MachiningFeatureRecognizer().recognize(box, "cnc_milled")
+    tree = MachiningFeatureRecognizer().recognize(box, "milled")
 
-    pocket_like = [f for f in tree.features if f.type in ("pocket", "slot", "keyway")]
+    pocket_like = [f for f in tree.features if f.type in ("PocketV2", "Slot", "Keyway")]
     assert pocket_like == [], (
         f"a plain box has no real pocket/slot/keyway -- got {[(f.type, f.params) for f in pocket_like]}"
     )
@@ -49,9 +49,9 @@ def test_plain_cylinder_yields_no_fabricated_keyway_on_its_own_end_faces():
     has two real flat end faces (normal parallel to the rotation axis) --
     neither is a real keyway."""
     cyl = BRepPrimAPI_MakeCylinder(15.0, 40.0).Shape()
-    tree = MachiningFeatureRecognizer().recognize(cyl, "cnc_turned")
+    tree = MachiningFeatureRecognizer().recognize(cyl, "turned")
 
-    pocket_like = [f for f in tree.features if f.type in ("keyway", "radial_slot")]
+    pocket_like = [f for f in tree.features if f.type in ("Keyway", "Slot")]
     assert pocket_like == [], (
         f"a plain round bar has no real keyway/radial_slot -- got {[(f.type, f.params) for f in pocket_like]}"
     )
@@ -66,8 +66,8 @@ def test_real_pocket_recessed_from_the_boundary_is_still_correctly_detected():
     tool = BRepPrimAPI_MakeBox(gp_Pnt(20.0, 17.5, 12.0), 20.0, 15.0, 8.0).Shape()
     part = BRepAlgoAPI_Cut(box, tool).Shape()
 
-    tree = MachiningFeatureRecognizer().recognize(part, "cnc_milled")
-    pockets = [f for f in tree.features if f.type == "pocket"]
+    tree = MachiningFeatureRecognizer().recognize(part, "milled")
+    pockets = [f for f in tree.features if f.type == "PocketV2"]
 
     assert len(pockets) == 1, (
         f"exactly one real pocket floor was cut, and the part's own top/bottom "

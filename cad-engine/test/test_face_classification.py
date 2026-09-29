@@ -15,7 +15,7 @@ onto a box's top face, the resulting shouldered/annular top region gets
 classified "pocket" by the existing, unrelated _classify_prismatic
 heuristic (any axis-parallel planar face that is not at the part's true
 outer bbox extreme along that axis, and is not elongated enough for slot/
-keyway, defaults to "pocket") rather than "planar_face" — a real, separate,
+keyway, defaults to "pocket") rather than "PlanarFace" — a real, separate,
 lower-priority gap in that pre-existing classifier's coarse heuristic. Not
 in Phase 3's scope (face_classification.py only ever sees faces NOT already
 claimed by another detector, and correctly excludes this one since it was
@@ -30,11 +30,11 @@ from machining.face_classification import classify_and_group_milled_faces
 
 
 def _recognize(shape):
-    return MachiningFeatureRecognizer().recognize(shape, "cnc_milled")
+    return MachiningFeatureRecognizer().recognize(shape, "milled")
 
 
-def _by_type(tree, ftype):
-    return [f for f in tree.features if f.type == ftype]
+def _by_type(tree, ftype, variant=None):
+    return [f for f in tree.features if f.type == ftype and (variant is None or f.variant == variant)]
 
 
 def test_plain_box_yields_six_distinct_planar_face_regions_not_one_blob():
@@ -44,7 +44,7 @@ def test_plain_box_yields_six_distinct_planar_face_regions_not_one_blob():
     distinct plane must stay its own region."""
     box = BRepPrimAPI_MakeBox(60.0, 50.0, 20.0).Shape()
     tree = _recognize(box)
-    regions = _by_type(tree, "planar_face")
+    regions = _by_type(tree, "PlanarFace")
 
     assert len(regions) == 6, f"a plain box has 6 real distinct planes -- got {len(regions)}"
     areas = sorted(round(f.params["area_mm2"], 1) for f in regions)
@@ -60,7 +60,7 @@ def test_adjacent_but_non_coplanar_faces_stay_separate_even_though_they_touch():
     top face and one of its side walls) must never merge."""
     box = BRepPrimAPI_MakeBox(60.0, 50.0, 20.0).Shape()
     tree = _recognize(box)
-    regions = _by_type(tree, "planar_face")
+    regions = _by_type(tree, "PlanarFace")
     face_id_sets = [set(f.face_ids) for f in regions]
     assert all(len(s) == 1 for s in face_id_sets), (
         "every region here must be a single real face -- any region with >1 "
@@ -78,7 +78,7 @@ def test_pocket_opening_leaves_one_correctly_holed_planar_region():
     part = BRepAlgoAPI_Cut(box, tool).Shape()
     tree = _recognize(part)
 
-    regions = _by_type(tree, "planar_face")
+    regions = _by_type(tree, "PlanarFace")
     top_region = [f for f in regions if abs(f.params["centroid"][2] - 20.0) < 0.01]
     assert len(top_region) == 1
     assert top_region[0].params["area_mm2"] == 3000.0 - (20.0 * 15.0)
@@ -88,7 +88,7 @@ def test_pocket_opening_leaves_one_correctly_holed_planar_region():
     # into the outer shell, not dropped.
     assert len(regions) == 6 + 4  # 6 outer faces (minus the claimed floor) + 4 real walls
     # The claimed floor itself must never double-appear as a planar_face.
-    pocket_floor_ids = set(_by_type(tree, "pocket")[0].face_ids)
+    pocket_floor_ids = set(_by_type(tree, "PocketV2")[0].face_ids)
     for f in regions:
         assert not (set(f.face_ids) & pocket_floor_ids)
 
@@ -104,7 +104,7 @@ def test_real_cylindrical_boss_is_classified_curved_wall_with_real_area():
     part = BRepAlgoAPI_Fuse(box, boss).Shape()
     tree = _recognize(part)
 
-    walls = _by_type(tree, "curved_wall")
+    walls = _by_type(tree, "CurvedWall")
     assert len(walls) == 1
     w = walls[0]
     import math
@@ -113,7 +113,7 @@ def test_real_cylindrical_boss_is_classified_curved_wall_with_real_area():
     assert len(w.face_ids) == 1
 
     # The boss's own flat top cap is a real, separate planar_face region.
-    caps = [f for f in _by_type(tree, "planar_face") if abs(f.params["area_mm2"] - math.pi * 10.0 ** 2) < 0.5]
+    caps = [f for f in _by_type(tree, "PlanarFace") if abs(f.params["area_mm2"] - math.pi * 10.0 ** 2) < 0.5]
     assert len(caps) == 1
 
 
@@ -129,11 +129,11 @@ def test_a_hole_wall_is_never_double_counted_as_a_curved_wall_region():
 
     hole_face_ids = set()
     for f in tree.features:
-        if f.type in ("through_hole", "blind_hole", "tapped_hole"):
+        if f.type == "SimpleHole" and f.variant in ("through", "blind", "threaded"):
             hole_face_ids.update(f.face_ids)
     assert hole_face_ids, "fixture must actually produce a real detected hole"
 
-    for f in _by_type(tree, "curved_wall"):
+    for f in _by_type(tree, "CurvedWall"):
         assert not (set(f.face_ids) & hole_face_ids)
 
 

@@ -35,7 +35,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const MACHINE_DIR = path.join(__dirname, '../../../memory/machining/machine');
+const { readDoc, MACHINING_MACHINE_FILE_SCALARS } = require('./lib/memory-csv');
+
+const MACHINE_DIR = path.join(__dirname, '../../../memory/Machining/machine');
 const OUT_SQL = path.join(__dirname, '../737_stage_machining_machine_reference_detail_remaining.sql');
 
 const SOURCE_REGION = 'USA';
@@ -44,32 +46,32 @@ const SOURCE_VERSION = '2026-03';
 // file -> real category label, exactly as memory/machining/wage_grade_associations.json
 // and memory/machining/processes.json spell each real station name.
 const FILES = {
-  'broach_machines_usa.json': 'Broach',
-  'cylindrical_grinder_machines_usa.json': 'Cylindrical Grinder',
-  'deep_bore_machine_usa.json': 'Deep Bore Machine',
-  'demask_usa.json': 'DeMask',
-  'drill_press_usa.json': 'Drill Press',
-  'etch_cell_usa.json': 'Etch Cell',
-  'gun_drill_usa.json': 'Gun Drill',
-  'hob_machine_usa.json': 'Hob Machine',
-  'inspection_usa.json': 'Inspection',
-  'internal_grinder_usa.json': 'Internal Grinder',
-  'jig_grind_usa.json': 'Jig Grind',
-  'manual_deburr_usa.json': 'Manual Deburr',
-  'mask_cure_usa.json': 'Mask Cure',
-  'millturn_usa.json': 'MillTurn',
-  'profile_gear_grinder_usa.json': 'Profile Gear Grinder',
-  'reciprocating_surface_grinder_usa.json': 'Reciprocating Surface Grinder',
-  'rotary_surface_grinder_usa.json': 'Rotary Surface Grinder',
-  'scribe_usa.json': 'Scribe',
-  'shaper_usa.json': 'Shaper',
-  'simultaneous_turning_usa.json': 'Simultaneous Turning',
-  'special_inspection_usa.json': 'Special Inspection',
-  'spline_roller_usa.json': 'Spline Roller',
-  'stock_prep_lathe_usa.json': 'Stock Prep Lathe',
-  'stock_prep_mill_work_center_data.json': 'Stock Prep Mill',
-  'threaded_wheel_gear_grinder_work_center_data.json': 'Threaded Wheel Gear Grinder',
-  'wire_edm_work_center_data.json': 'Wire EDM',
+  'broach_machines_usa.csv': 'Broach',
+  'cylindrical_grinder_machines_usa.csv': 'Cylindrical Grinder',
+  'deep_bore_machine_usa.csv': 'Deep Bore Machine',
+  'demask_usa.csv': 'DeMask',
+  'drill_press_usa.csv': 'Drill Press',
+  'etch_cell_usa.csv': 'Etch Cell',
+  'gun_drill_usa.csv': 'Gun Drill',
+  'hob_machine_usa.csv': 'Hob Machine',
+  'inspection_usa.csv': 'Inspection',
+  'internal_grinder_usa.csv': 'Internal Grinder',
+  'jig_grind_usa.csv': 'Jig Grind',
+  'manual_deburr_usa.csv': 'Manual Deburr',
+  'mask_cure_usa.csv': 'Mask Cure',
+  'millturn_usa.csv': 'MillTurn',
+  'profile_gear_grinder_usa.csv': 'Profile Gear Grinder',
+  'reciprocating_surface_grinder_usa.csv': 'Reciprocating Surface Grinder',
+  'rotary_surface_grinder_usa.csv': 'Rotary Surface Grinder',
+  'scribe_usa.csv': 'Scribe',
+  'shaper_usa.csv': 'Shaper',
+  'simultaneous_turning_usa.csv': 'Simultaneous Turning',
+  'special_inspection_usa.csv': 'Special Inspection',
+  'spline_roller_usa.csv': 'Spline Roller',
+  'stock_prep_lathe_usa.csv': 'Stock Prep Lathe',
+  'stock_prep_mill_work_center_data.csv': 'Stock Prep Mill',
+  'threaded_wheel_gear_grinder_work_center_data.csv': 'Threaded Wheel Gear Grinder',
+  'wire_edm_work_center_data.csv': 'Wire EDM',
 };
 
 function sqlStr(v) {
@@ -100,7 +102,7 @@ function bu(m) {
 const rows = [];
 for (const [file, categoryLabel] of Object.entries(FILES)) {
   const fullPath = path.join(MACHINE_DIR, file);
-  const data = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
+  const data = readDoc(fullPath, { list: 'machines', scalars: MACHINING_MACHINE_FILE_SCALARS });
   for (const m of data.machines) {
     const { name } = machineIdentity(m);
     if (!name) continue;

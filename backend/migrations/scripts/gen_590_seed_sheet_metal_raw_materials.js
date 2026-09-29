@@ -16,10 +16,12 @@
 const fs = require('fs');
 const path = require('path');
 
-const SRC = path.join(__dirname, '..', '..', '..', 'memory', 'sheetmetal', 'rawmetrial', 'rawmetalusa.json');
+const { readRecords } = require('./lib/memory-csv');
+
+const SRC = path.join(__dirname, '..', '..', '..', 'memory', 'Sheetmetal', 'rawmetrial', 'rawmetalusa.csv');
 const OUT = path.join(__dirname, '..', '590_seed_sheet_metal_raw_materials.sql');
 
-const data = JSON.parse(fs.readFileSync(SRC, 'utf8'));
+const data = readRecords(SRC);
 
 function materialType(primaryId) {
   const idx = primaryId.indexOf(',');
@@ -232,7 +234,7 @@ for (const row of data) {
 const sql = `-- ============================================================================
 -- Migration 590: Seed Sheet Metal raw-material property reference data (2026-08-28)
 --
--- Source: memory/sheetmetal/rawmetrial/rawmetalusa.json -- 101 USA-region raw
+-- Source: memory/Sheetmetal/rawmetrial/rawmetalusa.csv -- 101 USA-region raw
 -- material property rows (aluminum/steel/stainless/galvanized steel/copper/
 -- brass/titanium/nickel-superalloy grades), each carrying density, cost,
 -- hardness, UTS/YTS/shear strength, elastic modulus, Poisson's ratio, and

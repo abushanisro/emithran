@@ -8,7 +8,7 @@ import { computeDeburringCost } from '../../../../../../modules/bom-items/costin
 import type { MHRRateInput } from '../../../../../../modules/bom-items/costing/shared/core/cost-engine';
 
 // Every secondary-op engine used to take ONE pre-collapsed `fallbackSetupMin`
-// (`opSetupMinByOp?.x ?? X_SETUP_MIN`) and never report the setup it charged.
+// (`opSetupMinByOp?.x ??` a per-class constant) and never report the setup it charged.
 // Two consequences, both fixed 2026-09-05 and pinned here:
 //   - the selected machine's own real mhr_records.setup_time_hr was never
 //     consulted, so two machines of a class always cost identical setup;
@@ -33,32 +33,32 @@ const ENGINES = [
   {
     name: 'Tapping',
     run: (r: MHRRateInput, extra: Record<string, unknown>) =>
-      computeTappingCost({ tapCount: 4, batchSize: 10, rate: r, cycleTimeSecFromCalculator: 12, fallbackSetupMin: 10, ...extra } as never),
+      computeTappingCost({ tapCount: 4, batchSize: 10, rate: r, cycleTimeSecFromCalculator: 12, ...extra } as never),
   },
   {
     name: 'PEM Insertion',
     run: (r: MHRRateInput, extra: Record<string, unknown>) =>
-      computePemInsertionCost({ pemCount: 3, batchSize: 10, rate: r, cycleTimeSecFromCalculator: 12, fallbackSetupMin: 5, ...extra } as never),
+      computePemInsertionCost({ pemCount: 3, batchSize: 10, rate: r, cycleTimeSecFromCalculator: 12, ...extra } as never),
   },
   {
     name: 'Hole Extrusion (Burring)',
     run: (r: MHRRateInput, extra: Record<string, unknown>) =>
-      computeHoleExtrusionCost({ extrudedFlangeCount: 2, batchSize: 10, rate: r, cycleTimeSecFromCalculator: 12, fallbackSetupMin: 5, ...extra } as never),
+      computeHoleExtrusionCost({ extrudedFlangeCount: 2, batchSize: 10, rate: r, cycleTimeSecFromCalculator: 12, ...extra } as never),
   },
   {
     name: 'Counterboring',
     run: (r: MHRRateInput, extra: Record<string, unknown>) =>
-      computeCounterboringCost({ counterboreCount: 2, batchSize: 10, rate: r, cycleTimeSecFromCalculator: 12, fallbackSetupMin: 5, ...extra } as never),
+      computeCounterboringCost({ counterboreCount: 2, batchSize: 10, rate: r, cycleTimeSecFromCalculator: 12, ...extra } as never),
   },
   {
     name: 'Countersinking',
     run: (r: MHRRateInput, extra: Record<string, unknown>) =>
-      computeCountersinkingCost({ countersinkCount: 2, batchSize: 10, rate: r, cycleTimeSecFromCalculator: 12, fallbackSetupMin: 5, ...extra } as never),
+      computeCountersinkingCost({ countersinkCount: 2, batchSize: 10, rate: r, cycleTimeSecFromCalculator: 12, ...extra } as never),
   },
   {
     name: 'Reaming',
     run: (r: MHRRateInput, extra: Record<string, unknown>) =>
-      computeReamingCost({ reamCount: 2, batchSize: 10, rate: r, cycleTimeSecFromCalculator: 12, fallbackSetupMin: 8, ...extra } as never),
+      computeReamingCost({ reamCount: 2, batchSize: 10, rate: r, cycleTimeSecFromCalculator: 12, ...extra } as never),
   },
 ] as const;
 
@@ -77,10 +77,12 @@ describe.each(ENGINES.map((e) => [e.name, e] as const))(
       expect(line.setupTimeSource).toBe('operation_lookup');
     });
 
-    it('falls to the cited class constant last, and discloses that it did', () => {
+    it('does not cost setup, and says so, when no real setup time resolved', () => {
       const result = engine.run(rate({ setupTimeHr: null }), { operationSetupMin: null });
-      expect(result.processLines[0]!.setupTimeSource).toBe('class_default');
-      expect(result.warnings.some((w) => w.includes('setup time from fallback'))).toBe(true);
+      expect(result.processLines[0]!.setupTimeMin).toBe(0);
+      expect(result.processLines[0]!.setupTimeSource).toBe('none');
+      expect(result.processLines[0]!.setupCost).toBe(0);
+      expect(result.warnings.some((w) => w.includes('setup not costed'))).toBe(true);
     });
 
     it('reports the UN-amortised batch setup while charging the amortised cost', () => {

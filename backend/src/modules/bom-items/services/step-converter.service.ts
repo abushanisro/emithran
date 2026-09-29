@@ -156,18 +156,23 @@ export class StepConverterService {
   }
 
   /**
-   * Check if a file is a STEP file based on extension
+   * The only 3D formats the CAD engine can actually analyse (STEPControl_Reader).
+   *
+   * IGES was listed here but never worked: the engine's validator rejects any
+   * file without an ISO-10303 header (every real IGES file) and it has no
+   * IGES reader at all. SLDPRT needs SolidWorks or FreeCAD on the engine host;
+   * the Docker image has neither, so it always failed there. STL/OBJ are
+   * meshes with no B-Rep topology: nothing can be recognised from them.
    */
+  static readonly ANALYSABLE_EXTENSIONS: readonly string[] = ['step', 'stp'];
+
   isStepFile(filename: string): boolean {
     const ext = filename.toLowerCase().split('.').pop();
-    return ['step', 'stp', 'iges', 'igs', 'sldprt'].includes(ext || '');
+    return StepConverterService.ANALYSABLE_EXTENSIONS.includes(ext || '');
   }
 
-  /**
-   * Get supported CAD file extensions
-   */
   getSupportedExtensions(): string[] {
-    return ['step', 'stp', 'iges', 'igs', 'sldprt'];
+    return [...StepConverterService.ANALYSABLE_EXTENSIONS];
   }
 
   /**

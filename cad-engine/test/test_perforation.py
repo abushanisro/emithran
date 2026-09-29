@@ -293,6 +293,6 @@ def test_real_step_geometry_plate_with_hole_grid_end_to_end():
 
     fgv2 = result["feature_graph_v2"]
     assert fgv2 is not None
-    perforation_features = [f for f in fgv2["features"] if f["feature_type"] == "perforation"]
+    perforation_features = [f for f in fgv2["features"] if (f["feature_type"], f["variant"]) == ("SimpleHole", "perforated")]
     assert len(perforation_features) == 1
     assert len(perforation_features[0]["occurrences"]) == expected_holes

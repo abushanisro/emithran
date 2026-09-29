@@ -13,12 +13,14 @@ import {
   injectDrawingIntelligence,
   type OperationLine,
 } from '../../../../../../modules/bom-items/costing/machining/operation/operation-sequencer';
+import { specAsCalculators } from '../../../../../../modules/bom-items/costing/machining/calculators/machining-calculator-spec';
+import { realDrillingTable, realTappingTable } from '../real-reference-tables';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function tappedHoleFeature(count = 1, diamMm = 4, spec = 'M4'): object {
   return {
-    feature_type: 'tapped_hole',
+    feature_type: 'SimpleHole', variant: 'threaded',
     diameter_mm: diamMm,
     occurrences: Array.from({ length: count }, (_, i) => ({
       centroid: [i * 10, 0, 0],
@@ -32,7 +34,7 @@ function tappedHoleFeature(count = 1, diamMm = 4, spec = 'M4'): object {
 
 function pocketFeature(count = 1, removedMm3Each = 5000): object {
   return {
-    feature_type: 'pocket',
+    feature_type: 'PocketV2', variant: 'default',
     diameter_mm: 0,
     occurrences: Array.from({ length: count }, () => ({
       depth_mm: 10,
@@ -43,7 +45,7 @@ function pocketFeature(count = 1, removedMm3Each = 5000): object {
 
 function throughHoleFeature(count = 1, diamMm = 6): object {
   return {
-    feature_type: 'through_hole',
+    feature_type: 'SimpleHole', variant: 'through',
     diameter_mm: diamMm,
     occurrences: Array.from({ length: count }, () => ({
       depth_mm: 20,
@@ -52,13 +54,14 @@ function throughHoleFeature(count = 1, diamMm = 6): object {
   };
 }
 
-// Real cad-engine shape (Phase 3, face_classification.py): planar_face/
-// curved_wall/curved_surface regions carry a real classified area_mm2 per
+// Real cad-engine shape (face_classification.py): PlanarFace/CurvedWall/
+// CurvedSurface regions carry a real classified area_mm2 per
 // occurrence, no diameter, material_removed_mm3 honestly 0.0 (classifying a
 // face does not reveal how much stock sat above it).
-function faceRegionFeature(ftype: 'planar_face' | 'curved_wall' | 'curved_surface', areaMm2 = 2000): object {
+function faceRegionFeature(ftype: 'PlanarFace' | 'CurvedWall' | 'CurvedSurface', areaMm2 = 2000): object {
   return {
     feature_type: ftype,
+    variant: 'default',
     occurrences: [{ centroid: [0, 0, 0], area_mm2: areaMm2, material_removed_mm3: 0 }],
   };
 }
@@ -67,7 +70,7 @@ function faceRegionFeature(ftype: 'planar_face' | 'curved_wall' | 'curved_surfac
 // through-opening, real total wall area_mm2 + side_count, no diameter.
 function cutoutFeature(areaMm2 = 1120, sideCount = 4): object {
   return {
-    feature_type: 'cutout',
+    feature_type: 'Cutout', variant: 'default',
     occurrences: [{ centroid: [0, 0, 0], area_mm2: areaMm2, side_count: sideCount, material_removed_mm3: 0 }],
   };
 }
@@ -77,18 +80,20 @@ function cutoutFeature(areaMm2 = 1120, sideCount = 4): object {
 // decreasing diameter, NOT a single scalar diameter_mm/depth_mm.
 function multiStepHoleFeature(steps: Array<{ diameter_mm: number; depth_mm: number }>): object {
   return {
-    feature_type: 'multi_step_hole',
+    feature_type: 'MultiStepHole', variant: 'stepped',
     occurrences: [{ centroid: [0, 0, 0], steps, step_count: steps.length, material_removed_mm3: 0 }],
   };
 }
 
-// Real cad-engine shape: build_feature_graph_v2_from_cnc buckets fillet/
-// groove by major_diameter_mm (entry.diameter_mm), material_removed_mm3
+// Real cad-engine shape: build_machining_feature_graph_v2 buckets toroidal
+// features (Edge/round = convex blend, Slot/groove = concave recess) by major_diameter_mm (entry.diameter_mm), material_removed_mm3
 // honestly 0.0 (never extracted for toroidal blends) — see that function's
 // own doc comment.
-function toroidFeature(ftype: 'fillet' | 'groove', count = 1, majorDiamMm = 30): object {
+function toroidFeature(kind: 'fillet' | 'groove', count = 1, majorDiamMm = 30): object {
+  const [featureType, variant] = kind === 'fillet' ? ['Edge', 'round'] : ['Slot', 'groove'];
   return {
-    feature_type: ftype,
+    feature_type: featureType,
+    variant,
     diameter_mm: majorDiamMm,
     occurrences: Array.from({ length: count }, () => ({
       radius_mm: 4,
@@ -145,7 +150,7 @@ describe('buildOperationSequence', () => {
     const chamfer = ops.find((o) => o.name === 'Chamfering')!;
     const rigidTap = ops.find((o) => o.name === 'Tapping')!;
     for (const op of [spotDrill, drill, chamfer, rigidTap]) {
-      expect(op.cadFeatureType).toBe('tapped_hole');
+      expect(op.cadFeatureType).toBe('SimpleHole');
       expect(op.diameterMm).toBe(4);
     }
   });
@@ -153,7 +158,7 @@ describe('buildOperationSequence', () => {
   it('carries the real CAD feature_type (no diameter) onto pocket/slot ops', () => {
     const ops = buildOperationSequence([pocketFeature(2, 8000)], 'mild_steel');
     const rough = ops.find((o) => o.name === 'Rough Milling')!;
-    expect(rough.cadFeatureType).toBe('pocket');
+    expect(rough.cadFeatureType).toBe('PocketV2');
     expect(rough.diameterMm).toBeUndefined();
   });
 
@@ -167,34 +172,34 @@ describe('buildOperationSequence', () => {
     // split proves this file no longer conflates them.
     const filletRound = filletOps.find((o) => o.name === 'Filleting')!;
     expect(filletRound).toBeDefined();
-    expect(filletRound.cadFeatureType).toBe('fillet');
+    expect(filletRound.cadFeatureType).toBe('Edge');
     expect(filletRound.diameterMm).toBe(30);
     expect(filletRound.timeSec).toBeGreaterThan(0);
 
     const grooveRound = grooveOps.find((o) => o.name === 'Groove Milling')!;
     expect(grooveRound).toBeDefined();
-    expect(grooveRound.cadFeatureType).toBe('groove');
+    expect(grooveRound.cadFeatureType).toBe('Slot');
     expect(grooveRound.diameterMm).toBe(18);
   });
 
   it('generates real area-driven ops for planar_face/curved_wall/curved_surface regions (Phase 3)', () => {
-    const planarOps = buildOperationSequence([faceRegionFeature('planar_face', 3000)], 'aluminum');
-    const wallOps = buildOperationSequence([faceRegionFeature('curved_wall', 900)], 'aluminum');
-    const surfaceOps = buildOperationSequence([faceRegionFeature('curved_surface', 500)], 'aluminum');
+    const planarOps = buildOperationSequence([faceRegionFeature('PlanarFace', 3000)], 'aluminum');
+    const wallOps = buildOperationSequence([faceRegionFeature('CurvedWall', 900)], 'aluminum');
+    const surfaceOps = buildOperationSequence([faceRegionFeature('CurvedSurface', 500)], 'aluminum');
 
     const face = planarOps.find((o) => o.name === 'Fine Finish Milling')!;
     expect(face).toBeDefined();
-    expect(face.cadFeatureType).toBe('planar_face');
+    expect(face.cadFeatureType).toBe('PlanarFace');
     expect(face.timeSec).toBeGreaterThan(0);
 
     const wall = wallOps.find((o) => o.name === 'Contouring')!;
     expect(wall).toBeDefined();
-    expect(wall.cadFeatureType).toBe('curved_wall');
+    expect(wall.cadFeatureType).toBe('CurvedWall');
     expect(wall.timeSec).toBeGreaterThan(0);
 
     const surface = surfaceOps.find((o) => o.name === 'Contouring')!;
     expect(surface).toBeDefined();
-    expect(surface.cadFeatureType).toBe('curved_surface');
+    expect(surface.cadFeatureType).toBe('CurvedSurface');
     expect(surface.timeSec).toBeGreaterThan(0);
 
     // Larger real area -> more real time, not a flat constant.
@@ -202,7 +207,7 @@ describe('buildOperationSequence', () => {
   });
 
   it('a zero-area face region contributes zero time, not a fabricated fallback', () => {
-    const ops = buildOperationSequence([faceRegionFeature('planar_face', 0)], 'aluminum');
+    const ops = buildOperationSequence([faceRegionFeature('PlanarFace', 0)], 'aluminum');
     const face = ops.find((o) => o.name === 'Fine Finish Milling')!;
     expect(face.timeSec).toBe(0);
   });
@@ -214,10 +219,10 @@ describe('buildOperationSequence', () => {
         { diameter_mm: 10, depth_mm: 10 },
         { diameter_mm: 6, depth_mm: 10 },
       ])],
-      'mild_steel',
+      'mild_steel', 1.0, null, null, null, null, realDrillingTable(), specAsCalculators(),
     );
-    const spotDrill = ops.find((o) => o.name === 'Center Drilling' && o.cadFeatureType === 'multi_step_hole')!;
-    const drill = ops.find((o) => o.name === 'Drilling' && o.cadFeatureType === 'multi_step_hole')!;
+    const spotDrill = ops.find((o) => o.name === 'Center Drilling' && o.cadFeatureType === 'MultiStepHole')!;
+    const drill = ops.find((o) => o.name === 'Drilling' && o.cadFeatureType === 'MultiStepHole')!;
     expect(spotDrill).toBeDefined();
     expect(spotDrill.timeSec).toBe(5); // one real spot-drill per hole assembly, not per step
     expect(drill).toBeDefined();
@@ -228,9 +233,9 @@ describe('buildOperationSequence', () => {
     // not just the first.
     const singleStepOps = buildOperationSequence(
       [multiStepHoleFeature([{ diameter_mm: 16, depth_mm: 8 }])],
-      'mild_steel',
+      'mild_steel', 1.0, null, null, null, null, realDrillingTable(), specAsCalculators(),
     );
-    const singleDrill = singleStepOps.find((o) => o.name === 'Drilling' && o.cadFeatureType === 'multi_step_hole')!;
+    const singleDrill = singleStepOps.find((o) => o.name === 'Drilling' && o.cadFeatureType === 'MultiStepHole')!;
     expect(drill.timeSec).toBeGreaterThan(singleDrill.timeSec);
   });
 
@@ -238,7 +243,7 @@ describe('buildOperationSequence', () => {
     const ops = buildOperationSequence([cutoutFeature(1120, 4)], 'aluminum');
     const perimeter = ops.find((o) => o.name === 'Perimeter Milling')!;
     expect(perimeter).toBeDefined();
-    expect(perimeter.cadFeatureType).toBe('cutout');
+    expect(perimeter.cadFeatureType).toBe('Cutout');
     expect(perimeter.timeSec).toBeGreaterThan(0);
 
     const zeroArea = buildOperationSequence([cutoutFeature(0, 4)], 'aluminum');
@@ -249,7 +254,7 @@ describe('buildOperationSequence', () => {
   it('through holes carry through_hole as cadFeatureType, distinct from tapped_hole', () => {
     const ops = buildOperationSequence([throughHoleFeature(4, 6)], 'aluminum');
     const drill = ops.find((o) => o.name === 'Drilling')!;
-    expect(drill.cadFeatureType).toBe('through_hole');
+    expect(drill.cadFeatureType).toBe('SimpleHole');
     expect(drill.diameterMm).toBe(6);
   });
 
@@ -329,14 +334,23 @@ describe('injectDrawingIntelligence', () => {
     expect(rough.timeSec).toBe(200); // unchanged
   });
 
-  it('adds Rigid Tap when drawing has thread callout and no tap in ops', () => {
+  it('adds Tapping for a drawing thread callout, priced from tblTapping when the depth is known', () => {
     const opsWithoutTap = baseOps.filter((o) => o.name !== 'Tapping');
     const result = injectDrawingIntelligence(opsWithoutTap, {
-      threads: [{ spec: 'M6', count: 2 }],
-    });
+      threads: [{ spec: 'M6', count: 2, depthMm: 12 }],
+    }, 'AISI 1018', realTappingTable(), specAsCalculators());
     const tap = result.find((o) => o.name === 'Tapping');
     expect(tap).toBeDefined();
-    expect(tap!.timeSec).toBeGreaterThan(0); // TAP_CYCLE_SEC.M6 = 10s × 2
+    expect(tap!.timeSec).toBeGreaterThan(0);
+    expect(tap!.missing).toBeUndefined();
+  });
+
+  it('adds an unpriced Tapping op naming the missing depth for a callout without one', () => {
+    const opsWithoutTap = baseOps.filter((o) => o.name !== 'Tapping');
+    const tap = injectDrawingIntelligence(opsWithoutTap, { threads: [{ spec: 'M6', count: 2 }] }, 'AISI 1018', realTappingTable(), specAsCalculators())
+      .find((o) => o.name === 'Tapping')!;
+    expect(tap.timeSec).toBe(0);
+    expect(tap.missing).toContain('Thread Depth');
   });
 
   it('does NOT add duplicate Rigid Tap when one already exists', () => {
@@ -372,7 +386,7 @@ describe('injectDrawingIntelligence', () => {
 // isn't available.
 function counterboreFeature(count = 1, diamMm = 10): object {
   return {
-    feature_type: 'counterbore',
+    feature_type: 'MultiStepHole', variant: 'counterbore',
     diameter_mm: diamMm,
     occurrences: Array.from({ length: count }, () => ({
       depth_mm: 5,
@@ -384,6 +398,9 @@ function counterboreFeature(count = 1, diamMm = 10): object {
 const COUNTERBORE_TABLE = [
   { tool_type: 'Counterbore', material_cut_code_name: '1.0', hardness: 125, hardness_system: 'Brinell', diameter_mm: 10, cutting_speed_m_min: 75.2, feed_mm_rev: 0.15, depth_max_mm: 38 },
   { tool_type: 'Counterbore', material_cut_code_name: '15.0', hardness: 275, hardness_system: 'Brinell', diameter_mm: 10, cutting_speed_m_min: 25.0, feed_mm_rev: 0.08, depth_max_mm: 38 },
+  // Real row copied verbatim from memory/Machining/lookup (tblCounterboring__rows.csv): the aluminum-range
+  // entry, so an aluminum part is inside the table's own hardness range.
+  { tool_type: 'Counterbore', material_cut_code_name: '30.11', hardness: 60, hardness_system: 'Brinell', diameter_mm: 6.3, cutting_speed_m_min: 90.8, feed_mm_rev: 0.3, depth_max_mm: 38 },
 ];
 
 describe('Counterbore — real tblCounterboring physics vs the previous flat fallback', () => {
@@ -415,14 +432,14 @@ const CHAMFER_LINEAR_SPEED = 10.7; // real tblChamfering value, material_cut_cod
 
 describe('Chamfer — real tblChamfering physics vs the previous flat fallback', () => {
   it('falls back to the flat constant when no real linear speed is provided', () => {
-    const ops = buildOperationSequence([{ feature_type: 'chamfer', diameter_mm: 10, occurrences: [{}] }], 'aluminum');
+    const ops = buildOperationSequence([{ feature_type: 'Edge', variant: 'chamfer', diameter_mm: 10, occurrences: [{}] }], 'aluminum');
     const chamfer = ops.find((o) => o.name === 'Chamfering')!;
     expect(chamfer.timeSec).toBeCloseTo(5, 3); // count(1) * 5
   });
 
   it('uses real diameter-derived edge length / real linear speed when provided', () => {
     const ops = buildOperationSequence(
-      [{ feature_type: 'chamfer', diameter_mm: 10, occurrences: [{}] }],
+      [{ feature_type: 'Edge', variant: 'chamfer', diameter_mm: 10, occurrences: [{}] }],
       'aluminum', 1.0, null, null, CHAMFER_LINEAR_SPEED,
     );
     const chamfer = ops.find((o) => o.name === 'Chamfering')!;
@@ -470,5 +487,76 @@ describe('Corner Rounding (Filleting/Groove Milling) — real tblCornerRoundingM
     const groove = ops.find((o) => o.name === 'Groove Milling')!;
     expect(groove.timeSec).toBeCloseTo(Math.PI * 18 / ROUNDING_LINEAR_SPEED, 2);
     expect(groove.timeSec).not.toBeCloseTo(8, 1);
+  });
+});
+
+// ── Reference-vocabulary dispatch: hole shapes that previously had no case ───
+// Before the reference-vocabulary migration, "cross_hole" and
+// "pcd_hole_pattern" had no switch case: a cross hole fell to Bulk Milling of
+// its volume and a PCD pattern (material_removed_mm3 = 0) produced no op at
+// all, so every hole in a bolt circle was costed at zero.
+describe('buildOperationSequence — SimpleHole cross / pcd_pattern', () => {
+  it('drills a cross hole like any other plain hole', () => {
+    const ops = buildOperationSequence([
+      { feature_type: 'SimpleHole', variant: 'cross', diameter_mm: 6,
+        occurrences: [{ depth_mm: 20, material_removed_mm3: 565 }] },
+    ], 'aluminum');
+    const drill = ops.find((o) => o.name === 'Drilling')!;
+    expect(drill).toBeDefined();
+    expect(drill.cadFeatureType).toBe('SimpleHole');
+    expect(ops.some((o) => o.name === 'Bulk Milling')).toBe(false);
+  });
+
+  it('drills every real hole a PCD pattern stands for (hole_count), not one', () => {
+    const pattern = (holeCount: number) => [{
+      feature_type: 'SimpleHole', variant: 'pcd_pattern', diameter_mm: 6,
+      occurrences: [{ depth_mm: 12, hole_count: holeCount, material_removed_mm3: 0 }],
+    }];
+    const six = buildOperationSequence(pattern(6), 'aluminum');
+    const three = buildOperationSequence(pattern(3), 'aluminum');
+    const spot6 = six.find((o) => o.name === 'Center Drilling')!;
+    const spot3 = three.find((o) => o.name === 'Center Drilling')!;
+    expect(spot6.timeSec).toBe(6 * 5);
+    expect(spot3.timeSec).toBe(3 * 5);
+    expect(six.find((o) => o.name === 'Drilling')!.timeSec)
+      .toBeCloseTo(2 * three.find((o) => o.name === 'Drilling')!.timeSec, 6);
+  });
+});
+
+describe('OperationLine.count', () => {
+  it('carries the real instance count of the feature each line came from', () => {
+    const ops = buildOperationSequence([tappedHoleFeature(3)], 'mild_steel');
+    const tapLines = ops.filter((o) => o.cadFeatureType === 'SimpleHole');
+    expect(tapLines.length).toBeGreaterThan(0);
+    for (const o of tapLines) expect(o.count).toBe(3);
+  });
+
+  it('counts every hole a PCD pattern stands for', () => {
+    const pcd = {
+      feature_type: 'SimpleHole', variant: 'pcd_pattern', diameter_mm: 6,
+      occurrences: [{ hole_count: 6, depth_mm: 12 }, { hole_count: 4, depth_mm: 12 }],
+    };
+    const ops = buildOperationSequence([pcd], 'mild_steel');
+    const centerDrill = ops.find((o) => o.name === 'Center Drilling');
+    expect(centerDrill?.count).toBe(10);
+  });
+});
+
+describe('OperationLine.featureIds', () => {
+  it('names the exact feature_graph_v2 entry each op machines', () => {
+    const a = { ...tappedHoleFeature(2), id: 'SimpleHole_threaded_0' };
+    const b = { feature_type: 'PocketV2', variant: 'default', id: 'PocketV2_default_0', occurrences: [{ material_removed_mm3: 500 }] };
+    const ops = buildOperationSequence([a, b], 'mild_steel');
+    const holeOps = ops.filter((o) => o.cadFeatureType === 'SimpleHole');
+    const pocketOps = ops.filter((o) => o.cadFeatureType === 'PocketV2');
+    expect(holeOps.length).toBeGreaterThan(0);
+    expect(pocketOps.length).toBeGreaterThan(0);
+    for (const o of holeOps) expect(o.featureIds).toEqual(['SimpleHole_threaded_0']);
+    for (const o of pocketOps) expect(o.featureIds).toEqual(['PocketV2_default_0']);
+  });
+
+  it('leaves fixed ops (not tied to one feature) without feature ids', () => {
+    const ops = buildOperationSequence([{ ...tappedHoleFeature(1), id: 'x' }], 'mild_steel');
+    expect(ops.find((o) => o.source === 'fixed')?.featureIds).toBeUndefined();
   });
 });

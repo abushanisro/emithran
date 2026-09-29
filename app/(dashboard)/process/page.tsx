@@ -25,6 +25,9 @@ import {
   useBulkUpdateTableRows,
   useCreateProcess,
   useDomainVariables,
+  useReferenceLookup,
+  useReferenceDomains,
+  type ReferenceDomain,
   type ReferenceTable,
 } from '@/lib/api/hooks/useProcesses';
 import {
@@ -47,6 +50,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { InlineReferenceTableEditor } from '@/components/features/calculators/builder/InlineReferenceTableEditor';
+import { ExchangeRatesCard } from '@/components/features/process/ExchangeRatesCard';
 import { useAuth } from '@/lib/providers/auth';
 import { adaptMappingsToProcessCatalogTree } from '@/lib/processCatalog/process-catalog-tree';
 import { hasOperationDetail } from '@/lib/processCatalog/operation-detail';
@@ -127,7 +131,11 @@ export default function ProcessPage() {
   // above Process Calculator Mappings — with a visible count so it's
   // discoverable without pushing the primary content down by default.
   const [isVariablesExpanded, setIsVariablesExpanded] = useState(false);
-  const [variablesDomain, setVariablesDomain] = useState<'sheet_metal' | 'injection_molding' | 'machining'>('sheet_metal');
+  const [variablesDomain, setVariablesDomain] = useState<ReferenceDomain>('sheet_metal');
+  // A staged lookup table opened from the reference-data list (its key).
+  const [openLookupKey, setOpenLookupKey] = useState<string | null>(null);
+  const { data: referenceDomains } = useReferenceDomains();
+  const { data: openLookup, isLoading: openLookupLoading } = useReferenceLookup(variablesDomain, openLookupKey);
   const [variablesSearch, setVariablesSearch] = useState('');
   const [variablesCategory, setVariablesCategory] = useState<string>('');
   const { data: variablesData, isLoading: variablesLoading } = useDomainVariables(
@@ -659,6 +667,9 @@ export default function ProcessPage() {
       </div>
 
       <div className="space-y-6">
+        {/* BUDGET EXCHANGE RATES — exchange_rates (migration 803) */}
+        <ExchangeRatesCard />
+
         {/* DOMAIN REFERENCE VARIABLES — sm_reference_data / im_reference_data */}
         <Card>
           <CardHeader>
@@ -684,28 +695,17 @@ export default function ProcessPage() {
           </CardHeader>
           {isVariablesExpanded && (
             <CardContent>
-              <div className="flex items-center gap-2 mb-4">
-                <Button
-                  variant={variablesDomain === 'sheet_metal' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => { setVariablesDomain('sheet_metal'); setVariablesCategory(''); }}
-                >
-                  Sheet Metal
-                </Button>
-                <Button
-                  variant={variablesDomain === 'injection_molding' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => { setVariablesDomain('injection_molding'); setVariablesCategory(''); }}
-                >
-                  Plastic Molding
-                </Button>
-                <Button
-                  variant={variablesDomain === 'machining' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => { setVariablesDomain('machining'); setVariablesCategory(''); }}
-                >
-                  Machining
-                </Button>
+              <div className="flex items-center gap-2 mb-4 flex-wrap">
+                {(referenceDomains ?? []).map((d) => (
+                  <Button
+                    key={d.key}
+                    variant={variablesDomain === d.key ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => { setVariablesDomain(d.key); setVariablesCategory(''); }}
+                  >
+                    {d.label}
+                  </Button>
+                ))}
               </div>
 
               {variablesData && variablesData.categories.length > 1 && (
@@ -764,7 +764,13 @@ export default function ProcessPage() {
                       {variablesData.variables.map((v) => (
                         <TableRow key={v.id}>
                           <TableCell className="font-mono text-xs whitespace-nowrap">{v.key}</TableCell>
-                          <TableCell className="font-mono text-xs">{v.value ?? '—'}</TableCell>
+                          <TableCell className="font-mono text-xs">
+                            {v.category === 'lookup_table' ? (
+                              <button type="button" className="text-primary underline" onClick={() => setOpenLookupKey(v.key)}>
+                                View {v.value ?? ''} rows
+                              </button>
+                            ) : (v.value ?? '—')}
+                          </TableCell>
                           <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{v.unitType || '—'}</TableCell>
                           <TableCell className="text-xs text-muted-foreground">{v.notes || '—'}</TableCell>
                         </TableRow>
@@ -1149,6 +1155,42 @@ export default function ProcessPage() {
 
 
       </div>
+
+      {/* STAGED REFERENCE LOOKUP TABLE */}
+      <Dialog open={openLookupKey != null} onOpenChange={(open) => { if (!open) setOpenLookupKey(null); }}>
+        <DialogContent className="sm:max-w-[900px]">
+          <DialogHeader>
+            <DialogTitle>{openLookupKey}</DialogTitle>
+            <DialogDescription>
+              {openLookup ? `${openLookup.rows.length} rows · source version ${openLookup.sourceVersion}` : 'Staged reference lookup table'}
+            </DialogDescription>
+          </DialogHeader>
+          {openLookupLoading || !openLookup ? (
+            <div className="flex items-center justify-center py-8 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin mr-2" />Loading…
+            </div>
+          ) : (
+            <div className="border rounded-md max-h-[60vh] overflow-auto">
+              <Table>
+                <TableHeader className="sticky top-0 bg-background">
+                  <TableRow>
+                    {openLookup.columns.map((c) => <TableHead key={c} className="whitespace-nowrap">{c}</TableHead>)}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {openLookup.rows.map((r, i) => (
+                    <TableRow key={i}>
+                      {openLookup.columns.map((c) => (
+                        <TableCell key={c} className="font-mono text-xs whitespace-nowrap">{r[c] == null ? '—' : String(r[c])}</TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* IMPORT EXCEL DIALOG */}
       <Dialog open={isImportDialogOpen} onOpenChange={(open) => { if (!open) { setIsImportDialogOpen(false); setPendingImportFile(null); } }}>

@@ -229,38 +229,41 @@ export class MHRService {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    let queryBuilder = this.supabaseService
-      .getClient(accessToken)
-      .from('mhr_records')
-      .select('*', { count: 'exact' })
-      .order('created_at', { ascending: false })
-      .range(from, to);
+    // PostgREST returns at most 1000 rows per request (Supabase max-rows),
+    // whatever range is asked for. One request for `limit` rows therefore
+    // silently returned only the newest 1000: with 1734 USA machines the HR
+    // Rates table and the Process picker lost every older machine (all of
+    // Sheet Metal, Machining and Plastic Molding). The range is read in pages
+    // of PAGE rows instead, ordered by created_at then id so pages never
+    // overlap or skip rows that share a created_at (seeded machines do).
+    const PAGE = 1000;
+    const buildQuery = (rangeFrom: number, rangeTo: number) => {
+      let q = this.supabaseService
+        .getClient(accessToken)
+        .from('mhr_records')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: true })
+        .range(rangeFrom, rangeTo);
+      if (query.search) q = q.or(`machine_name.ilike.%${query.search}%,machine_description.ilike.%${query.search}%`);
+      if (query.location) q = q.eq('location', query.location);
+      if (query.currency) q = q.eq('currency', query.currency);
+      if (query.commodityCode) q = q.eq('commodity_code', query.commodityCode);
+      if (query.processGroup) q = q.eq('process_group', query.processGroup);
+      if (query.machineClass) q = q.eq('machine_class', query.machineClass);
+      return q;
+    };
 
-    if (query.search) {
-      queryBuilder = queryBuilder.or(`machine_name.ilike.%${query.search}%,machine_description.ilike.%${query.search}%`);
+    const data: any[] = [];
+    let count: number | null = null;
+    let error: { message: string } | null = null;
+    for (let start = from; start <= to; start += PAGE) {
+      const res = await buildQuery(start, Math.min(start + PAGE - 1, to));
+      if (res.error) { error = res.error; break; }
+      if (count == null) count = res.count ?? null;
+      data.push(...(res.data ?? []));
+      if (!res.data || res.data.length < Math.min(PAGE, to - start + 1)) break;
     }
-
-    if (query.location) {
-      queryBuilder = queryBuilder.eq('location', query.location);
-    }
-
-    if (query.currency) {
-      queryBuilder = queryBuilder.eq('currency', query.currency);
-    }
-
-    if (query.commodityCode) {
-      queryBuilder = queryBuilder.eq('commodity_code', query.commodityCode);
-    }
-
-    if (query.processGroup) {
-      queryBuilder = queryBuilder.eq('process_group', query.processGroup);
-    }
-
-    if (query.machineClass) {
-      queryBuilder = queryBuilder.eq('machine_class', query.machineClass);
-    }
-
-    const { data, error, count } = await queryBuilder;
 
     if (error) {
       this.logger.error(`Error fetching MHR records: ${error.message}`, 'MHRService');
@@ -444,10 +447,11 @@ export class MHRService {
         return { found: true, sourceKey: smMatches[0].key, raw: smMatches[0].raw ?? null };
       }
 
-      // Injection Molding's real 127-machine dataset (migration 633) has no
-      // benchmark_source_key set, so it only ever reaches this name-match
-      // fallback — mirrors the sm_reference_data block above exactly, just
-      // against im_reference_data category='machine' (migration 648).
+      // The Plastic Molding presses (migration 633) are keyed
+      // "<Category>:<Machine>" (633 / 734), but their full source record is
+      // staged in im_reference_data category='machine' (migration 648) under
+      // its own keys, so it is found by name — mirrors the sm_reference_data
+      // block above.
       const { data: imData } = await client
         .from('im_reference_data')
         .select('key, raw')
@@ -1109,7 +1113,7 @@ export class MHRService {
 
     // Sheet name → commodity code for the multi-sheet eMithran format
     const SHEET_COMMODITY: Record<string, string> = {
-      '01_machining': 'CNC Machining', '02_sheet_metal': 'Sheet Metal',
+      '01_machining': 'Machining', '02_sheet_metal': 'Sheet Metal',
       '03_die_casting': 'Die Casting', '04_invest_cast': 'Investment Casting',
       '05_sand_casting': 'Sand Casting', '06_forging': 'Forging',
       '07_additive': 'Additive Manufacturing', '08_plastic_mold': 'Plastic Molding',
@@ -1838,36 +1842,6 @@ export class MHRService {
     press_brake: 'Bend Press Brake',
   };
 
-  // Real process group each machine_class fallback belongs to — verified
-  // against the actual process_calculator_mappings taxonomy (2026-08-27):
-  // fiber_laser/press_brake are Sheet Metal (same domain as their verified
-  // category above); cnc_lathe/cnc_3ax_vmc/cnc_5ax_mc are Machining;
-  // injection_molding is Plastic Molding (migration 647 — renamed from
-  // "Plastic & Rubber"); cmm and deburring are Post Processing (real
-  // "Inspection"/"Deburring" routes under that group).
-  // benchmark_source_key rows need no entry here — 100% of
-  // machine_library.json is Sheet Metal (CLAUDE.md's domain-by-domain
-  // roadmap), so any row with a benchmark match is always that group.
-  private static readonly MACHINE_CLASS_PROCESS_GROUP: Record<string, string> = {
-    fiber_laser: 'Sheet Metal',
-    press_brake: 'Sheet Metal',
-    // Real, granular primary CNC classes — replaces the deleted
-    // cnc_lathe/cnc_3ax_vmc/cnc_5ax_mc entries (Machining Engine
-    // Re-Architecture). Also closes a pre-existing gap: the old map never
-    // had entries for cnc_4ax_vmc/cnc_lathe_live/cnc_mill_turn either —
-    // every granular class this project promoted is covered here now.
-    '2_axis_lathe': 'Machining',
-    '3_axis_lathe': 'Machining',
-    '2_axis_bar_feed_lathe_with_sub_spindle': 'Machining',
-    '3_axis_bar_feed_lathe_with_sub_spindle': 'Machining',
-    '3_axis_mill': 'Machining',
-    '4_axis_mill': 'Machining',
-    '5_axis_mill': 'Machining',
-    injection_molding: 'Plastic Molding',
-    cmm: 'Post Processing',
-    deburring: 'Post Processing',
-  };
-
   private static humanizeMachineClass(machineClass: string): string {
     return machineClass
       .split('_')
@@ -1888,18 +1862,8 @@ export class MHRService {
    * shares.
    *
    * `processGroup`, when given, scopes the result to that real process
-   * group — preferred source is the row's own real process_group column
-   * (a direct, reliable value across every domain as of migrations
-   * 646/647 for Plastic Molding and 694 for Machining). Only legacy rows
-   * with process_group still NULL fall back to the older heuristic
-   * (MACHINE_CLASS_PROCESS_GROUP for machine_class rows, or "Sheet Metal"
-   * for any benchmark_source_key row — real when this heuristic was
-   * written, since 100% of benchmark_source_key rows were Sheet Metal at
-   * the time, but no longer: migration 693 gave Machining's 141 real rows
-   * a benchmark_source_key too, which silently miscategorized every one
-   * of them as "Sheet Metal" here until this fix, hiding all of
-   * Machining's real categories from the form's Category field whenever
-   * "Machining" was the selected Process).
+   * group — the row's own process_group, else its commodity_code, the rule
+   * HR Rates itself groups by. A row with neither has no group.
    */
   async getDistinctCategories(accessToken: string, processGroup?: string): Promise<string[]> {
     const withClass = await this.getDistinctCategoriesWithClass(accessToken, processGroup);
@@ -1934,7 +1898,7 @@ export class MHRService {
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
       .from('mhr_records')
-      .select('benchmark_source_key, machine_class, process_group')
+      .select('benchmark_source_key, machine_class, process_group, commodity_code')
       .limit(20000);
 
     if (error) {
@@ -1945,8 +1909,9 @@ export class MHRService {
     const machineClassByCategory = new Map<string, string | null>();
     for (const r of (data ?? []) as any[]) {
       const fromKey = r.benchmark_source_key?.split(':')[0]?.trim();
-      const rowGroup = r.process_group
-        || (fromKey ? 'Sheet Metal' : (r.machine_class ? MHRService.MACHINE_CLASS_PROCESS_GROUP[r.machine_class] : undefined));
+      // Same group rule as the HR Rates table and the Process picker
+      // (effectiveProcessGroupOf): the row's process_group, else its commodity_code.
+      const rowGroup = r.process_group || r.commodity_code || undefined;
       if (processGroup && rowGroup !== processGroup) continue;
       const category = fromKey
         || (r.machine_class ? (MHRService.VERIFIED_CLASS_CATEGORY[r.machine_class] ?? MHRService.humanizeMachineClass(r.machine_class)) : null);

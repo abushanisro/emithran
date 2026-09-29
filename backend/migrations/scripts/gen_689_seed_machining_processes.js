@@ -26,7 +26,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const PROC_FILE = path.join(__dirname, '../../../memory/machining/processes.json');
+const { readDoc } = require('./lib/memory-csv');
+
+const PROC_FILE = path.join(__dirname, '../../../memory/Machining/processes.csv');
 const OUT_SQL = path.join(__dirname, '../689_seed_machining_processes.sql');
 
 const SOURCE_REGION = 'USA';
@@ -40,7 +42,7 @@ function sqlJsonb(obj) {
   return `$jsonb$${JSON.stringify(obj)}$jsonb$::jsonb`;
 }
 
-const data = JSON.parse(fs.readFileSync(PROC_FILE, 'utf8'));
+const data = readDoc(PROC_FILE, { list: 'processes', scalars: ['section', 'processCount'] });
 
 const rows = data.processes.map((r) => {
   const name = r.processName;

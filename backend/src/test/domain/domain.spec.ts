@@ -23,7 +23,7 @@ describe('canonical cost-result domain contract', () => {
     machineName: 'Trumpf TruLaser 3030',
     commodityCode: null,
     labourRate: 8.5,
-    labourRateSource: 'lhr_database',
+    labourRateSource: 'mhr_machine_specific',
   };
 
   const cncMilledLine: ProcessLineCost = {
@@ -33,7 +33,7 @@ describe('canonical cost-result domain contract', () => {
     totalCost: 75,
     cycleTimeMin: 6.1,
     hourlyRate: 45,
-    rateSource: 'default_rate',
+    rateSource: 'mhr_database',
     machineClass: '3_axis_mill',
     machineName: null,
     commodityCode: null,
@@ -46,7 +46,7 @@ describe('canonical cost-result domain contract', () => {
     totalCost: 42.1,
     cycleTimeMin: 0.5,
     hourlyRate: 30,
-    rateSource: 'tier_synthetic',
+    rateSource: 'mhr_database',
     machineClass: 'injection_molding',
     machineName: null,
     commodityCode: null,
@@ -98,15 +98,9 @@ describe('canonical cost-result domain contract', () => {
 
   it('maps every real rateSource/labourRateSource value to a provenance tier with no silent fallthrough', () => {
     expect(provenanceOfMhrSource('mhr_database')).toBe('REAL');
-    expect(provenanceOfMhrSource('benchmark_override')).toBe('BENCHMARK');
-    expect(provenanceOfMhrSource('default_rate')).toBe('BENCHMARK');
-    expect(provenanceOfMhrSource('tier_synthetic')).toBe('ESTIMATE');
     expect(provenanceOfMhrSource('no_db_rate')).toBe('NO_RATE');
 
-    expect(provenanceOfLhrSource('lhr_database')).toBe('REAL');
     expect(provenanceOfLhrSource('mhr_machine_specific')).toBe('REAL');
-    expect(provenanceOfLhrSource('lhr_benchmark')).toBe('BENCHMARK');
-    expect(provenanceOfLhrSource('lhr_cross_location')).toBe('REFERENCE');
     expect(provenanceOfLhrSource('no_lhr_rate')).toBe('NO_RATE');
     expect(provenanceOfLhrSource(null)).toBe('NO_RATE');
     expect(provenanceOfLhrSource(undefined)).toBe('NO_RATE');

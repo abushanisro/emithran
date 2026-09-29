@@ -6,10 +6,12 @@
 const fs = require('fs');
 const path = require('path');
 
-const SRC = path.resolve(__dirname, '../../../memory/sheetmetal/lookuptable/sheet_metal_nesting_cut_rate_combined.json');
+const { readDoc } = require('./lib/memory-csv');
+
+const SRC = path.resolve(__dirname, '../../../memory/Sheetmetal/lookuptable/sheet_metal_nesting_cut_rate_combined__rows.csv');
 const OUT = path.resolve(__dirname, '../727_seed_co2_laser_cut_data.sql');
 
-const data = JSON.parse(fs.readFileSync(SRC, 'utf8'));
+const data = readDoc(SRC, { list: 'rows', scalars: ['name', 'filePath', 'digitalFactory', 'status', 'rowCount'], strings: ['materialCutCodeFamily'] });
 const rows = data.rows.filter((r) => r.machineType === 'Laser Cut');
 
 // Matches normaliseLaserMaterial()'s real material vocabulary
@@ -41,7 +43,7 @@ const header = `-- =============================================================
 -- ============================================================================
 -- ROOT CAUSE / SOURCE
 --
--- memory/sheetmetal/lookuptable/sheet_metal_nesting_cut_rate_combined.json
+-- memory/Sheetmetal/lookuptable/sheet_metal_nesting_cut_rate_combined__rows.csv
 -- (added 2026-08-20, after migration 457) is a real, carefully-extracted
 -- reference dataset (rows dropped rather than guessed whenever a screenshot-
 -- sourced value couldn't be confirmed pixel-for-pixel — see its own

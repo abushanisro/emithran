@@ -195,6 +195,26 @@ export function useMaterialAliases() {
   });
 }
 
+/** Material price by stock form and location (material_stock_prices, migration 833). */
+export interface MaterialStockPrice {
+  referenceMaterial: string;
+  /** The raw_materials row it prices, or null when no row matched (not used in costing). */
+  rawMaterialName: string | null;
+  stockForm: string;
+  location: string;
+  pricePerKg: number;
+  currencyCode: string;
+  source: string;
+}
+
+export function useMaterialStockPrices() {
+  return useQuery({
+    queryKey: ['raw-materials', 'stock-prices'],
+    queryFn: async () => (await apiClient.get<MaterialStockPrice[]>('/raw-materials/stock-prices')) ?? [],
+    staleTime: 1000 * 60 * 30,
+  });
+}
+
 export function useRawMaterial(id: string | undefined) {
   return useQuery({
     queryKey: ['raw-materials', 'detail', id],

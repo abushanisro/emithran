@@ -23,7 +23,9 @@
 // this session, distinct from the older '2026-03' JSON-file-sourced
 // im_reference_data 'variable'/'rate_profile'/'tool_material' batch).
 //
-// Dollar-quoting for all free-text fields -- see gen_637's header for why.
+// Dollar-quoting for all free-text fields: a source note ending on its own
+// quoted phrase becomes ''' at the string boundary under standard escaping,
+// which desyncs the SQL editor's client-side statement splitting.
 
 const fs = require('fs');
 const path = require('path');

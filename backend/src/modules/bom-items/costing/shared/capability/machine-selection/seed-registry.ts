@@ -320,7 +320,10 @@ export const MACHINE_CLASS_DEFAULTS: Record<MachineClass, Partial<MachineCapabil
   machining_millturn: {},
   simultaneous_turning: {},
   wire_edm:       {},
+  hob_machine:    {},
   internal_grinder: {},
+  reciprocating_surface_grinder: {},
+  shaver: {},
   broach:         {},
   // No real per-machine or class-level envelope data on file for either
   // (rate-only classes — see MACHINE_REGISTRY's doc comments in

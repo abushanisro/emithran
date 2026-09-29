@@ -22,7 +22,6 @@ export interface PressBrakeInput {
   // emitted with cycleTimeMin 0 and the gap attached, never a guessed value.
   cycleTimeSecFromCalculator?: number;
   setupTimeMinFromCalculator?: number;
-  fallbackSetupMin: number; // toolSetupBrakeMin, per-batch — used only when setupTimeMinFromCalculator is absent
   /** Real sm_lookup_op_setup_time minutes for bending, when a row exists. */
   operationSetupMin?: number | null;
   calculatorId?: string | null;
@@ -76,7 +75,6 @@ export function computePressBrakeCost(input: PressBrakeInput): PressBrakeResult 
     calculatorSetupMin: calculatorSetupMinPerPiece === null ? null : calculatorSetupMinPerPiece * batch,
     machineSetupTimeHr: input.rate.setupTimeHr,
     operationSetupMin: input.operationSetupMin,
-    classDefaultMin: input.fallbackSetupMin,
     machineName: input.rate.machineName,
   });
   if (setup.warning) warnings.push(setup.warning);

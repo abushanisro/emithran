@@ -34,7 +34,6 @@ export interface KeywayOccurrenceLike {
 
 export interface KeywayFeatureLike {
   feature_type?: string;
-  type?: string;
   occurrences?: KeywayOccurrenceLike[];
   [key: string]: unknown;
 }
@@ -69,8 +68,7 @@ export function splitKeywayOccurrences(
 
   for (const raw of fgv2Features) {
     const f = raw as KeywayFeatureLike;
-    const ft = (f.feature_type ?? f.type ?? '').toString().toLowerCase();
-    if (ft !== 'keyway') {
+    if (f.feature_type !== 'Keyway') {
       filteredFeatures.push(raw);
       continue;
     }

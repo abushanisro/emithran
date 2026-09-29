@@ -2,7 +2,6 @@ import {
   ROLLUP_REPORTING_CURRENCY,
   declareCostRecordCurrency,
   overlayRejectionReason,
-  resolveBenchmarkLabourRate,
   resolvePersistedCostCurrencyBasis,
   rollupRejectionReason,
 } from '../../../../../../modules/bom-items/costing/shared/core/persisted-currency-contract';
@@ -295,69 +294,3 @@ describe('declareCostRecordCurrency (migration 708)', () => {
   });
 });
 
-/* ────────────────────────────────────────────────────────────────────────────
- * Rate-column denomination (P1b-v)
- *
- * Every row below is a REAL lhr_benchmark_rates row, read from the live table:
- *
- *   India / Sheet Metal   lhr 144.46 INR/hr   lhr_usd_effective 1.73 USD/hr
- *   India / Deburr        lhr 137.78 INR/hr   lhr_usd_effective 1.65 USD/hr
- *   USA   / Sheet Metal   lhr  46.67 USD/hr   lhr_usd_effective 46.67 USD/hr
- *
- * 144.46 / 1.73 = 83.5, the same FX factor as the double-conversion this
- * programme started from -- which is the point: picking the wrong column is
- * not a rounding difference, it is the whole conversion.
- * ──────────────────────────────────────────────────────────────────────────── */
-describe('resolveBenchmarkLabourRate (P1b-v rate denomination)', () => {
-  const indiaSheetMetal = { lhr: 144.46, lhr_usd_effective: 1.73, currency: 'INR' };
-  const indiaDeburr = { lhr: 137.78, lhr_usd_effective: 1.65, currency: 'INR' };
-  const usaSheetMetal = { lhr: 46.67, lhr_usd_effective: 46.67, currency: 'USD' };
-
-  // The defect: applyRoute persists factory-LOCAL money since P1b-iv-c, and the
-  // previous rule handed it the USD column anyway, so direct_rate summed an INR
-  // machine rate with a USD labour rate.
-  it('returns the LOCAL rate when the row is persisted in its own currency', () => {
-    expect(resolveBenchmarkLabourRate(indiaSheetMetal, 'INR')).toBe(144.46);
-    expect(resolveBenchmarkLabourRate(indiaDeburr, 'INR')).toBe(137.78);
-  });
-
-  it('returns the USD rate when the caller is persisting USD', () => {
-    expect(resolveBenchmarkLabourRate(indiaSheetMetal, 'USD')).toBe(1.73);
-    expect(resolveBenchmarkLabourRate(indiaDeburr, 'USD')).toBe(1.65);
-  });
-
-  // A USD factory is where the old rule was accidentally correct, so it has to
-  // keep producing exactly the same number or this is a behaviour change on the
-  // default path rather than a fix.
-  it('is unchanged for a USD factory, where both columns agree', () => {
-    expect(resolveBenchmarkLabourRate(usaSheetMetal, 'USD')).toBe(46.67);
-  });
-
-  // The whole reason this returns a rate-or-null rather than a fallback: a
-  // labour rate in the wrong currency is a different number, not a degraded
-  // one. 0 is a visible gap; 1.73-instead-of-144.46 is a silent 83.5x error.
-  it('refuses rather than substituting when neither column is the target currency', () => {
-    expect(resolveBenchmarkLabourRate(indiaSheetMetal, 'CNY')).toBeNull();
-    expect(resolveBenchmarkLabourRate({ lhr: 0, lhr_usd_effective: 0, currency: 'INR' }, 'USD')).toBeNull();
-    expect(resolveBenchmarkLabourRate({ lhr: null, lhr_usd_effective: null, currency: null }, 'USD')).toBeNull();
-  });
-
-  // Pre-707 seed rows carry no currency of their own. They are fetched by
-  // location, so the only currency they can be in is the one being asked for --
-  // that is an assumption about the fetch, not a conversion.
-  it('accepts a currency-less row at face value', () => {
-    expect(resolveBenchmarkLabourRate({ lhr: 46.67, lhr_usd_effective: null, currency: null }, 'USD')).toBe(46.67);
-  });
-
-  // direct_rate = machine_rate + labor_rate. The invariant that makes that sum
-  // meaningful is that both halves are in the row's declared currency.
-  it('keeps direct_rate a single-currency sum', () => {
-    const machineRateLocalInr = 1600;
-    const labour = resolveBenchmarkLabourRate(indiaSheetMetal, 'INR');
-    expect(labour).not.toBeNull();
-    expect(machineRateLocalInr + labour!).toBeCloseTo(1744.46, 2);
-
-    // What the superseded rule produced: INR + USD.
-    expect(machineRateLocalInr + 1.73).toBeCloseTo(1601.73, 2);
-  });
-});

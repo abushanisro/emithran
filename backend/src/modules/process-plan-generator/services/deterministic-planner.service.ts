@@ -13,7 +13,6 @@ import {
   DEBURR_SEC_PER_METRE, DEBURR_SEC_PER_PIERCE, TAP_CYCLE_SEC,
   classifyMaterialFamily, INSPECTION_SAMPLING_DEFAULT,
 } from '../../bom-items/costing/shared/core/default-rates.constants';
-import { computeCycleTime } from '../../bom-items/costing/plastic-molding/process/cycle-time';
 import { CycleTimeLibraryService } from './cycle-time-library.service';
 
 /**
@@ -63,7 +62,6 @@ export class DeterministicPlannerService {
 
     // Pre-compute IM cycle phases once (Menges formula) — shared across all IM op steps.
     // Lazy-evaluated to avoid import overhead for non-IM routes.
-    const imCycleCache: IMCycleCache = {};
 
     // What the route already covers — template steps first, merged ops appended.
     // mergeMandatoryOps dedups against this so rule-engine ops never duplicate steps.
@@ -112,7 +110,7 @@ export class DeterministicPlannerService {
       // Compute physics-based cycle time for each machine type.
       // All physics ops are tagged timingSource = 'planner_physics' so the resolver
       // promotes them above the geometry-heuristic tier.
-      const physicsResult = computePhysicsCycleSec(step.machine_type, step.process, brief, imCycleCache, this.ctLib);
+      const physicsResult = computePhysicsCycleSec(step.machine_type, step.process, brief, this.ctLib);
       const cycleSec    = physicsResult?.sec;
       const timingSource = physicsResult ? 'planner_physics' : undefined;
 
@@ -488,15 +486,6 @@ function monthlyBatch(brief: EngineeringBrief): number {
   return Math.max(10, Math.min(Math.round(annual / 12), 500));
 }
 
-// ── IM cycle-time cache ───────────────────────────────────────────────────────
-// Avoids re-running the Menges formula for every IM op in the same route.
-
-interface IMCycleCache {
-  fillSec?:  number;
-  packSec?:  number;
-  coolSec?:  number;
-  ejectSec?: number;
-}
 
 // ── Per-machine-type physics cycle-time dispatch ──────────────────────────────
 // Returns { sec } when physics can be computed from brief geometry, or null
@@ -506,7 +495,6 @@ function computePhysicsCycleSec(
   machineType: string,
   stepProcess: string,
   brief: EngineeringBrief,
-  imCache: IMCycleCache,
   ctLib?: CycleTimeLibraryService,
 ): { sec: number } | null {
   const dfm = brief.dfm;
@@ -603,25 +591,17 @@ function computePhysicsCycleSec(
     }
 
     // ── IM — individual phase ops ─────────────────────────────────────────────
-    case 'injection': {
-      if (!imCache.fillSec) populateIMCache(imCache, dfm, mat);
-      return imCache.fillSec != null ? { sec: Math.max(1, imCache.fillSec) } : null;
-    }
+    // No planner physics: injection-molding cycle time needs the selected press
+    // (injection rate, dry cycle) and the material's reference thermal data,
+    // which the plan brief does not carry. The cost engine (cycle-time.ts)
+    // computes it; the planner leaves these steps to the resolver's other tiers.
+    case 'injection':
     case 'packing_holding':
-    case 'pack': {
-      if (!imCache.packSec) populateIMCache(imCache, dfm, mat);
-      return imCache.packSec != null ? { sec: Math.max(2, imCache.packSec) } : null;
-    }
-    case 'cooling': {
-      if (!imCache.coolSec) populateIMCache(imCache, dfm, mat);
-      return imCache.coolSec != null ? { sec: Math.max(3, imCache.coolSec) } : null;
-    }
-    case 'ejection': {
-      return { sec: 3 }; // mold open + ejector stroke + part drop
-    }
-    case 'mold_setup': {
-      return { sec: 3600 }; // 60 min mold change + purge + first-shot setup
-    }
+    case 'pack':
+    case 'cooling':
+    case 'ejection':
+    case 'mold_setup':
+      return null;
 
     default: {
       // Tapping — check if this step is a tap op even if machineType is cnc_mill/cnc_lathe
@@ -638,28 +618,6 @@ function computePhysicsCycleSec(
   }
 }
 
-// Populates IM cache once per plan call using Menges formula
-function populateIMCache(cache: IMCycleCache, dfm: EngineeringBrief['dfm'], mat: string | null): void {
-  // sheetThicknessMm is repurposed as wall thickness proxy for IM parts (the CAD engine
-  // sets it from the uniform-wall analysis). Fall back to 2.5mm (typical consumer plastic).
-  const wallMm   = dfm.sheetThicknessMm > 0 ? dfm.sheetThicknessMm : 2.5;
-  const bb       = dfm.boundingBox;
-  if (!bb) return;
-  const dims     = [bb.lengthMm, bb.widthMm, bb.heightMm].filter((d) => d > 0).sort((a, b) => b - a);
-  if (dims.length < 2) return;
-  const result = computeCycleTime({
-    wallMm,
-    longestBboxMm:  dims[0],
-    bboxMidMm:      dims[1],
-    volumeMm3:      dfm.volumeMm3,
-    projectedAreaMm2: null,
-    grade: mat,
-  });
-  cache.fillSec  = result.fillSec;
-  cache.packSec  = result.packSec;
-  cache.coolSec  = result.coolSec;
-  cache.ejectSec = result.ejectSec;
-}
 
 /**
  * Maps the DB `material_family` value (from raw_materials.material_family) or

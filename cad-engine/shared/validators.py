@@ -17,8 +17,11 @@ STEP_MAGIC_NUMBERS = [
     b'ISO-10303-28;',  # XML STEP
 ]
 
-# Allowed file extensions
-ALLOWED_EXTENSIONS = {'.step', '.stp', '.iges', '.igs', '.sldprt'}
+# Allowed file extensions. IGES is not here: StepReader has only a
+# STEPControl_Reader, and a real IGES file has no ISO-10303 header, so it was
+# listed but always rejected. SLDPRT is converted to STEP first
+# (sldprt_converter: SolidWorks COM or FreeCAD on the host, else a 422).
+ALLOWED_EXTENSIONS = {'.step', '.stp', '.sldprt'}
 
 # Extensions that bypass STEP magic number check (proprietary binary formats)
 BINARY_NATIVE_EXTENSIONS = {'.sldprt'}
@@ -108,7 +111,7 @@ class FileValidator:
             if not is_valid:
                 raise InvalidFileTypeError(
                     "File content does not match STEP format. "
-                    "Please upload a valid STEP/IGES file."
+                    "Please upload a valid STEP file."
                 )
 
         except IOError as e:

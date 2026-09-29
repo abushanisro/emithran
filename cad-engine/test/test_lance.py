@@ -1,6 +1,6 @@
 """
 Tests for sheet_metal.features.lance -- the paired base-panel-enclosure
-recognition test that promotes lancing_spike.py's candidates past
+recognition test that promotes lance.py stage 1's candidates past
 'ambiguous'. See that module's docstring for the full reasoning.
 
 Real B-Rep throughout for the core topological primitive
@@ -11,7 +11,7 @@ base panel. A notch cut so it merges into the plate's OUTER boundary produces
 no inner wire at all -- exactly the signature an ordinary edge/corner tab
 produces.
 
-HONEST, DISCLOSED GAP (same as lancing_spike.py's own docstring): running
+HONEST, DISCLOSED GAP (same as lance.py stage 1's own docstring): running
 `detect_lances` end-to-end against a genuine fused, tilted lance solid was
 not attempted here -- constructing a guaranteed-manifold fused solid of that
 shape is itself nontrivial OCC boolean-operation work, independent of

@@ -13,6 +13,8 @@ import math
 from collections import defaultdict
 from typing import Dict, List, Optional, Tuple, Any
 
+from shared.part_family import MILLED, MILL_TURN, PLASTIC_MOLDED, SHEET_METAL, TURNED
+
 logger = logging.getLogger(__name__)
 
 
@@ -34,12 +36,12 @@ def detect_part_family(
     Heuristic family classification from bounding-box geometry + cylindrical face signals.
 
     Returns (family, confidence, reasons) where:
-      family    — 'sheet_metal' | 'cnc_turned' | 'cnc_milled' | 'mill_turn' | 'injection_molded'
+      family    — a shared/part_family.py value: sheet_metal | turned | milled | mill_turn | plastic_molded
       confidence — 0–1 score
       reasons   — human-readable list explaining which signals fired
 
     secondary_features_count: cross holes (non-axial cylinders) + pocket count.
-      > 0 elevates cnc_turned → mill_turn.
+      > 0 elevates turned → mill_turn.
 
     cyl_axis_alignment: fraction of cyl faces sharing the dominant axis (0–1).
       > 0.60 → rotationally symmetric (turned part regardless of elongation).
@@ -76,7 +78,7 @@ def detect_part_family(
       produces one sharp, overwhelming bin (one gauge everywhere); a molded shell + ribs +
       bosses produces several close-but-distinct thin bins (nominal wall, rib walls, boss
       walls — all thin, none identical). High thin_wall_ratio with no single dominant bin is
-      evidence for injection_molded, not sheet_metal.
+      evidence for plastic_molded, not sheet_metal.
 
     draft_face_ratio: fraction of "vertical" walls (relative to the shortest bbox axis, the
       likely mold pull direction) sitting at a small non-zero angle (roughly 0.3°–5°) off
@@ -86,7 +88,7 @@ def detect_part_family(
     """
     dims = sorted(d for d in bbox_dims if d > 0)
     if len(dims) < 3:
-        return "cnc_milled", 0.50, ["Insufficient bounding box data — defaulting to cnc_milled"]
+        return MILLED, 0.50, ["Insufficient bounding box data — defaulting to milled"]
 
     flatness = dims[0] / dims[2]               # min / max  — low = flat
     elongation = dims[2] / max(dims[1], 1.0)   # max / mid  — high = rod-like
@@ -121,7 +123,7 @@ def detect_part_family(
     # win on the stronger real signal instead of being pre-empted here.
     if flatness < 0.15:
         confidence = min(0.95, 0.60 + (0.15 - flatness) * 2.0)
-        candidates.append(("sheet_metal", round(confidence, 3), [
+        candidates.append((SHEET_METAL, round(confidence, 3), [
             f"Very flat cross-section (flatness={flatness:.2f} < 0.15)",
         ]))
 
@@ -138,7 +140,7 @@ def detect_part_family(
             and cyl_axis_alignment < 0.50
             and large_cyl_count == 0):
         confidence = min(0.88, 0.72 + min(hole_density, 0.80) * 0.18)
-        candidates.append(("sheet_metal", round(confidence, 3), [
+        candidates.append((SHEET_METAL, round(confidence, 3), [
             f"Cylindrical-face-dominated topology ({hole_density:.0%} of faces) "
             f"with flat-ish bbox (flatness={flatness:.2f}) and non-rotational alignment "
             f"(cyl_alignment={cyl_axis_alignment:.2f}) — bend-rich or perforated sheet metal",
@@ -213,7 +215,7 @@ def detect_part_family(
     # NOT applied when external OD cylinders are detected (sheet_metal_veto).
     if not sheet_metal_veto and hole_count > 20 and flatness < 0.60:
         confidence = min(0.85, 0.70 + min(hole_count, 200) / 2000)
-        candidates.append(("sheet_metal", round(confidence, 3), [
+        candidates.append((SHEET_METAL, round(confidence, 3), [
             f"High absolute hole count ({hole_count}) with flat-ish bbox "
             f"(flatness={flatness:.2f}) — perforated sheet metal",
         ]))
@@ -221,7 +223,7 @@ def detect_part_family(
     # Gate 1b — hole density + moderately flat bbox (catches cases below 20-hole threshold).
     if not sheet_metal_veto and hole_density > 0.20 and flatness < 0.60:
         confidence = min(0.88, 0.68 + max(0, 0.60 - flatness) * 0.3)
-        candidates.append(("sheet_metal", round(confidence, 3), [
+        candidates.append((SHEET_METAL, round(confidence, 3), [
             f"High hole density ({hole_count}/{total_face_count} faces = {hole_density:.0%}) "
             f"with flat-ish bbox (flatness={flatness:.2f})",
             "Perforated sheet metal — hole-dominated topology",
@@ -235,7 +237,7 @@ def detect_part_family(
     # clearly sheet metal — the original 0.35 cutoff was too tight for formed enclosures.
     if not sheet_metal_veto and planar_face_fraction > 0.70 and flatness < 0.48:
         confidence = min(0.82, 0.62 + (0.48 - flatness) * 0.4 + planar_face_fraction * 0.1)
-        candidates.append(("sheet_metal", round(confidence, 3), [
+        candidates.append((SHEET_METAL, round(confidence, 3), [
             f"Predominantly planar surfaces ({planar_face_fraction:.0%}) "
             f"with flat-ish bbox (flatness={flatness:.2f})",
             "Surface topology consistent with sheet metal",
@@ -258,7 +260,7 @@ def detect_part_family(
                 and not (cyl_axis_alignment > 0.65 and rotational_face_ratio > 0.35)
                 and dims[0] / dims[2] < 0.80):
             _conf = round(min(0.85, 0.65 + (0.10 - _fill_ratio) * 5.0), 3)
-            candidates.append(("sheet_metal", _conf, [
+            candidates.append((SHEET_METAL, _conf, [
                 f"Very low fill ratio ({_fill_ratio:.3f} < 0.10): part occupies "
                 f"{_fill_ratio:.1%} of bounding box — formed sheet metal bracket/enclosure",
                 f"Majority planar faces ({planar_face_fraction:.0%}) confirm non-solid topology",
@@ -279,9 +281,9 @@ def detect_part_family(
             reasons.append(
                 f"Secondary machining features detected (count={secondary_features_count})"
             )
-            candidates.append(("mill_turn", 0.75, reasons))
+            candidates.append((MILL_TURN, 0.75, reasons))
         else:
-            candidates.append(("cnc_turned", 0.80, reasons))
+            candidates.append((TURNED, 0.80, reasons))
 
     if elongation > 2.5 and flatness > 0.20:
         reasons = [
@@ -292,14 +294,14 @@ def detect_part_family(
             reasons.append(
                 f"Secondary machining features detected (count={secondary_features_count})"
             )
-            candidates.append(("mill_turn", 0.72, reasons))
+            candidates.append((MILL_TURN, 0.72, reasons))
         else:
-            candidates.append(("cnc_turned", 0.75, reasons))
+            candidates.append((TURNED, 0.75, reasons))
 
     # Injection-molded shell: not flat enough for the sheet-metal gates above, not
     # rotationally dominant enough for the disc/turned gates above — a thin shell
     # with ribs/bosses/draft reads as a non-flat, non-rotational solid today and
-    # falls all the way to the cnc_milled catch-all below. Two independent signals
+    # falls all the way to the milled catch-all below. Two independent signals
     # distinguish it from a genuinely milled block: (1) a molded shell's wall pairs
     # cluster into several close-but-distinct thin bins rather than one dominant
     # gauge (thin_wall_ratio) or one solid mass, and (2) ribs/bosses inflate the
@@ -321,7 +323,7 @@ def detect_part_family(
             and (draft_face_ratio > 0.30 or pocket_count >= 3)):
         # Confidence ceiling widened from the original gate's 0.72 cap
         # (2026-09-10, scored-comparison rewrite): that cap was calibrated
-        # only against this function's own catch-all fallback (cnc_milled,
+        # only against this function's own catch-all fallback (milled,
         # 0.65) — the sole competitor whenever this gate fired under the old
         # sequential design. In a scored comparison this same evidence must
         # also be able to outweigh a genuinely flat part's sheet-metal score
@@ -342,9 +344,9 @@ def detect_part_family(
             reasons.append(f"Drafted walls detected (draft_face_ratio={draft_face_ratio:.2f} > 0.30)")
         else:
             reasons.append(f"Elevated pocket count ({pocket_count}) consistent with ribs/bosses")
-        candidates.append(("injection_molded", round(confidence, 3), reasons))
+        candidates.append((PLASTIC_MOLDED, round(confidence, 3), reasons))
 
-    candidates.append(("cnc_milled", 0.65, [
+    candidates.append((MILLED, 0.65, [
         f"No strong rotational or sheet-metal signal "
         f"(flatness={flatness:.2f}, elongation={elongation:.2f}, "
         f"circularity={circularity:.2f}, "
@@ -353,7 +355,7 @@ def detect_part_family(
     ]))
 
     # ── Highest-scoring family wins ─────────────────────────────────────────
-    # cnc_milled's catch-all above always contributes a candidate, so this
+    # milled's catch-all above always contributes a candidate, so this
     # list is never empty. Ties resolve to whichever real signal was
     # evaluated first (stable, deterministic — same part always classifies
     # the same way), never to a fabricated tiebreaker.
@@ -787,7 +789,8 @@ class ComponentFeatureAnalyzer:
             for i, occ in enumerate(feat.get("occurrences") or []):
                 c = occ.get("centroid", [0, 0, 0])
                 instances.append({
-                    "id": self._feature_label(ftype, diam, i),
+                    # Unique per occurrence: the feature entry's own id + 1-based index.
+                    "id": f"{feat.get('id', ftype)}_{i + 1}",
                     "ftype": ftype,
                     "cx": float(c[0]) if len(c) > 0 else 0.0,
                     "cy": float(c[1]) if len(c) > 1 else 0.0,
@@ -1119,7 +1122,7 @@ class ComponentFeatureAnalyzer:
         seen_ends_on: set = set()
         for feat_id in blank_adjacent_features:
             inst_match = next((i for i in instances if i["id"] == feat_id), None)
-            if inst_match and inst_match["ftype"] == "bend":
+            if inst_match and inst_match["ftype"] == "StraightBend":
                 seen_ends_on.add(feat_id)
                 relations.append({
                     "type": "ends_on",
@@ -1137,7 +1140,7 @@ class ComponentFeatureAnalyzer:
             # so a consumer can tell this apart from a real OCC-measured
             # relation instead of treating it as equally precise.
             for inst in instances:
-                if inst["ftype"] == "bend":
+                if inst["ftype"] == "StraightBend":
                     seen_ends_on.add(inst["id"])
                     relations.append({
                         "type": "ends_on",
@@ -1149,7 +1152,7 @@ class ComponentFeatureAnalyzer:
         # ── 3. intersects ──────────────────────────────────────────────────
         # blank_1 contains every non-bend feature (holes, slots drill through blank plane)
         for inst in instances:
-            if inst["ftype"] != "bend":
+            if inst["ftype"] != "StraightBend":
                 relations.append({
                     "type": "intersects",
                     "source_id": "blank_1",
@@ -1276,21 +1279,3 @@ class ComponentFeatureAnalyzer:
                 })
 
         return relations[:300]  # 300 entries: ~9 types × richer per-feature data
-
-    @staticmethod
-    def _feature_label(
-        ftype: str,
-        diam: Optional[Any],
-        occurrence_idx: int,
-    ) -> str:
-        idx = occurrence_idx + 1
-        if ftype == "hole":
-            d = float(diam) if diam is not None else 0.0
-            return f"complexHole_{idx}" if d > 10.0 else f"simpleHole_{idx}"
-        if ftype == "bend":
-            return f"straightBend_{idx}"
-        if ftype == "slot":
-            return f"slot_{idx}"
-        if ftype == "pocket":
-            return f"pocket_{idx}"
-        return f"feature_{idx}"

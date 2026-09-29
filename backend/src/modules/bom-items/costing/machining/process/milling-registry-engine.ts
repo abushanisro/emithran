@@ -34,7 +34,7 @@ export class MillingEngine implements ManufacturingProcessEngine<
   // NOT MachineClassId. Casting to MachineClassId happens only at the two
   // call sites below, into cost-machining-engine.ts's own functions.
   readonly machineClass: MachineClass;
-  readonly processFamily = 'cnc_milling';
+  readonly processFamily = 'milling';
 
   constructor(machineClass: string) {
     this.machineClass = machineClass as MachineClass;

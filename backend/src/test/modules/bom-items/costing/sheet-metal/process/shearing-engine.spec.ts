@@ -47,15 +47,17 @@ describe('computePressStrokeCost — Shearing (real shear_speed-derived cycle ti
     expect(result.warnings.some((w) => w.includes('Unclassified Shear'))).toBe(true);
   });
 
-  it('falls back to SHEARING_SETUP_MIN (not PRESS_STROKE_SETUP_MIN) and discloses it when no real setup time was resolved', () => {
+  it('does not cost setup, and says so, when no real setup time resolved', () => {
     const result = computePressStrokeCost('Shearing', 'shear', {
       numberOfStrokes: SHEARING_CUTS_PER_BLANK,
       batchSize: 100,
       pressRate: realShearRate(),
     });
 
-    expect(result.warnings.some((w) => w.includes('setup time from fallback'))).toBe(true);
-    expect(result.processLines[0]!.setupCost).toBeGreaterThan(0);
+    expect(result.warnings.some((w) => w.includes('setup not costed'))).toBe(true);
+    expect(result.processLines[0]!.setupTimeMin).toBe(0);
+    expect(result.processLines[0]!.setupTimeSource).toBe('none');
+    expect(result.processLines[0]!.setupCost).toBe(0);
   });
 
   it('uses a real resolved setup time without warning when provided', () => {
@@ -65,7 +67,7 @@ describe('computePressStrokeCost — Shearing (real shear_speed-derived cycle ti
       pressRate: realShearRate(),
       setupMin: 22.8,
     });
-    expect(result.warnings.some((w) => w.includes('setup time from fallback'))).toBe(false);
+    expect(result.warnings.some((w) => w.includes('setup not costed'))).toBe(false);
   });
 });
 

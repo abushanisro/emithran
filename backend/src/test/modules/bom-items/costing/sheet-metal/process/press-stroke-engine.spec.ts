@@ -61,14 +61,17 @@ describe('computePressStrokeCost — real per-machine cycle time', () => {
     expect(result.cuttingMin).toBeCloseTo(expectedMin, 6);
   });
 
-  it('falls back to PRESS_STROKE_SETUP_MIN and discloses it when no real setup time was resolved', () => {
+  it('does not cost setup, and says so, when no real setup time resolved', () => {
     const result = computePressStrokeCost('Standard Press', 'standard_press', baseInput({ setupMin: undefined }));
-    expect(result.warnings.some((w) => w.includes('setup time from fallback'))).toBe(true);
+    expect(result.warnings.some((w) => w.includes('setup not costed'))).toBe(true);
+    expect(result.processLines[0]!.setupTimeMin).toBe(0);
+    expect(result.processLines[0]!.setupTimeSource).toBe('none');
+    expect(result.processLines[0]!.setupCost).toBe(0);
   });
 
   it('uses a real resolved setup time without warning when provided', () => {
     const result = computePressStrokeCost('Standard Press', 'standard_press', baseInput({ setupMin: 45 }));
-    expect(result.warnings.some((w) => w.includes('setup time from fallback'))).toBe(false);
+    expect(result.warnings.some((w) => w.includes('setup not costed'))).toBe(false);
   });
 });
 
@@ -160,7 +163,7 @@ describe('computePressStrokeCost — Progressive Die Press (real strokes_per_min
 // setup_time_hr varies 0.47-0.72hr (28.2-43.2min) across the 14 safe
 // machines, correlating with press-force tier — unlike Standard/Tandem
 // Press, where the real value genuinely is uniform (0.5hr/30min). Collapsing
-// it to one shared PRESS_STROKE_SETUP_MIN=30 constant was wrong.
+// it to one shared 30min class constant was wrong.
 describe('computePressStrokeCost — Progressive Die Press real per-machine setup time', () => {
   it('uses the real per-machine setup time when no op-level setupMin is resolved', () => {
     // "Progressive Die Press - 5,000kN Press Force" real setup_time_hr=0.53 -> 31.8min
@@ -170,7 +173,9 @@ describe('computePressStrokeCost — Progressive Die Press real per-machine setu
       pressRate: realProgressiveDieRate(),
       progressiveDieSetupMinFromMachine: 31.8,
     });
-    expect(result.warnings.some((w) => w.includes('setup time from generic fallback'))).toBe(false);
+    expect(result.warnings.some((w) => w.includes('setup not costed'))).toBe(false);
+    expect(result.processLines[0]!.setupTimeMin).toBeCloseTo(31.8, 6);
+    expect(result.processLines[0]!.setupTimeSource).toBe('machine');
   });
 
   it('prefers the op-level setupMin over the real per-machine value when both are present', () => {
@@ -181,33 +186,35 @@ describe('computePressStrokeCost — Progressive Die Press real per-machine setu
       setupMin: 40,
       progressiveDieSetupMinFromMachine: 31.8,
     });
-    expect(result.warnings.some((w) => w.includes('setup time from generic fallback'))).toBe(false);
-    expect(result.warnings.some((w) => w.includes('setup time from fallback'))).toBe(false);
+    expect(result.warnings.some((w) => w.includes('setup not costed'))).toBe(false);
   });
 
-  it('falls back to the generic 30min constant, with a disclosed warning citing the real range, when neither resolves', () => {
+  it('does not cost setup, and says so, when neither the op-level nor the real per-machine setup time resolves', () => {
     const result = computePressStrokeCost('Progressive Die', 'progressive_die_press', {
       numberOfStrokes: 1,
       batchSize: 500,
       pressRate: realProgressiveDieRate(),
     });
-    expect(result.warnings.some((w) => w.includes('setup time from generic fallback (30min)') && w.includes('28.2-43.2min'))).toBe(true);
+    expect(result.processLines[0]!.setupTimeMin).toBe(0);
+    expect(result.processLines[0]!.setupTimeSource).toBe('none');
+    expect(result.processLines[0]!.setupCost).toBe(0);
+    // The shared resolveSetupMinutes disclosure, naming both real sources
+    // that were missing — no Progressive-Die-specific generic-constant message.
+    expect(result.warnings.some((w) =>
+      w.startsWith('Progressive Die: setup not costed')
+      && w.includes('setup_time_hr')
+      && w.includes('sm_lookup_op_setup_time'))).toBe(true);
   });
 
-  it('does not apply the Progressive-Die-specific fallback message to Standard/Tandem Press (their uniform value is correct as-is)', () => {
+  it('Standard/Tandem Press push the same shared resolver disclosure when no real setup time resolves', () => {
     const result = computePressStrokeCost('Standard Press', 'standard_press', {
       numberOfStrokes: 1,
       batchSize: 250,
       pressRate: realRate(),
     });
-    expect(result.warnings.some((w) => w.includes('setup time from generic fallback'))).toBe(false);
-    // Asserts the intent, not the exact sentence: this engine now emits the
-    // SHARED resolveSetupMinutes disclosure (as the other sixteen do), which
-    // keeps the established "setup time from fallback" marker and additionally
-    // names both real sources that were missing. Pinning the old wording here
-    // would pin a string that no longer lives in this engine.
+    expect(result.processLines[0]!.setupTimeSource).toBe('none');
     expect(result.warnings.some((w) =>
-      w.startsWith('Standard Press: setup time from fallback')
+      w.startsWith('Standard Press: setup not costed')
       && w.includes('setup_time_hr')
       && w.includes('sm_lookup_op_setup_time'))).toBe(true);
   });

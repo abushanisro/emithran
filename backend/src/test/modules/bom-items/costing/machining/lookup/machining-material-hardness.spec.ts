@@ -26,13 +26,16 @@ describe('MACHINING_MATERIAL_HARDNESS_HB — every MaterialClass has a real or d
     expect(MACHINING_MATERIAL_HARDNESS_HB.mild_steel).toBeLessThan(MACHINING_MATERIAL_HARDNESS_HB.stainless);
   });
 
-  it('titanium/tool_steel sentinel sits above every real class (conservative hardest/slowest fallback)', () => {
-    expect(MACHINING_MATERIAL_HARDNESS_HB.titanium).toBeGreaterThan(MACHINING_MATERIAL_HARDNESS_HB.stainless);
-    expect(MACHINING_MATERIAL_HARDNESS_HB.tool_steel).toBeGreaterThan(MACHINING_MATERIAL_HARDNESS_HB.stainless);
+  it('titanium, tool steel and plastic carry no hardness (no reference data) rather than a stand-in', () => {
+    expect(MACHINING_MATERIAL_HARDNESS_HB.titanium).toBeNaN();
+    expect(MACHINING_MATERIAL_HARDNESS_HB.tool_steel).toBeNaN();
+    expect(MACHINING_MATERIAL_HARDNESS_HB.plastic).toBeNaN();
   });
 
-  it('plastic sentinel sits below every real class (conservative softest/fastest fallback)', () => {
-    expect(MACHINING_MATERIAL_HARDNESS_HB.plastic).toBeLessThan(MACHINING_MATERIAL_HARDNESS_HB.aluminum);
+  it('so every matcher reports them missing instead of borrowing the hardest/softest row', () => {
+    const rows = [{ hardness: 30, diameter_mm: 6 }, { hardness: 1050, diameter_mm: 6 }];
+    expect(nearestByHardness(rows, MACHINING_MATERIAL_HARDNESS_HB.titanium)).toBeNull();
+    expect(nearestByDiameterThenHardness(rows, 6, MACHINING_MATERIAL_HARDNESS_HB.plastic)).toBeNull();
   });
 });
 
@@ -49,12 +52,17 @@ describe('nearestByHardness', () => {
   });
 
   it('handles the CamelCase Hardness field (tblReaming shape), not just snake_case', () => {
-    expect(nearestByHardness(rows, 999)?.id).toBe('hard-capitalized-field');
+    expect(nearestByHardness(rows, 480)?.id).toBe('hard-capitalized-field');
   });
 
   it('skips rows with no real hardness field rather than treating them as a match', () => {
-    const withGap = [{ id: 'no-hardness', foo: 1 }, { hardness: 200, id: 'real' }];
-    expect(nearestByHardness(withGap, 150)?.id).toBe('real');
+    const withGap = [{ id: 'no-hardness', foo: 1 }, { hardness: 150, id: 'real-low' }, { hardness: 200, id: 'real' }];
+    expect(nearestByHardness(withGap, 190)?.id).toBe('real');
+  });
+
+  it('never extrapolates past the table: a hardness outside its range is missing', () => {
+    expect(nearestByHardness(rows, 100)).toBeNull(); // below 125
+    expect(nearestByHardness(rows, 999)).toBeNull(); // above 500
   });
 
   it('returns null when no row has any real hardness data', () => {
@@ -72,11 +80,16 @@ describe('nearestByDiameterThenHardness', () => {
 
   it('matches the real nearest diameter first, then real nearest hardness among that diameter', () => {
     expect(nearestByDiameterThenHardness(rows, 6, 130)?.id).toBe('d6-soft');
-    expect(nearestByDiameterThenHardness(rows, 6, 999)?.id).toBe('d6-hard');
+    expect(nearestByDiameterThenHardness(rows, 6, 260)?.id).toBe('d6-hard');
   });
 
   it('handles the CamelCase DiameterMm/Hardness fields (tblReaming), not just snake_case', () => {
-    expect(nearestByDiameterThenHardness(rows, 10, 999)?.id).toBe('d10-hard-camelcase');
+    expect(nearestByDiameterThenHardness(rows, 10, 480)?.id).toBe('d10-hard-camelcase');
+  });
+
+  it('never extrapolates past the table: a diameter outside its range is missing', () => {
+    expect(nearestByDiameterThenHardness(rows, 4, 130)).toBeNull();  // below 6
+    expect(nearestByDiameterThenHardness(rows, 12, 130)).toBeNull(); // above 10
   });
 
   it('picks the real nearest diameter even when not exact', () => {

@@ -1,10 +1,7 @@
 import {
-  TAPPING_SETUP_MIN, MATERIAL_OVERHEAD_PCT, UTILIZATION_ADVISORY_THRESHOLD_PCT,
+  MATERIAL_OVERHEAD_PCT, UTILIZATION_ADVISORY_THRESHOLD_PCT,
   RATES_SOURCE_LABEL, DEFAULT_YIELD_PCT,
-  COUNTERBORE_SETUP_MIN, COUNTERSINK_SETUP_MIN, PEM_INSERTION_SETUP_MIN,
-  BURRING_SETUP_MIN,
-  TIGHT_TOLERANCE_REAM_THRESHOLD_MM, REAM_SETUP_MIN,
-} from './default-rates.constants';
+  TIGHT_TOLERANCE_REAM_THRESHOLD_MM, } from './default-rates.constants';
 import type { InspectionResult } from '../process/inspection-engine';
 import {
   ENERGY_KWH_PER_HR, GRID_CO2_KG_PER_KWH,
@@ -35,47 +32,21 @@ import { computePemInsertionCost } from '../../sheet-metal/operation/pem-inserti
 import { computeLaserCuttingCost } from '../../sheet-metal/process/laser-cutting-engine';
 import { overlayRejectionReason, type PersistedCostCurrencyBasis } from './persisted-currency-contract';
 
-// P0.6 (Machine Economics, provenance-visibility phase) — mirrors MHRRateInput's
-// own `source` tiering, but for the labor-rate side (resolveLHRRates' 4-pass
-// resolution in bom-items.service.ts), which previously collapsed to a bare
-// number with zero visibility into which pass actually won.
-// 'mhr_machine_specific' — this exact machine's own usd_lhr_total
-// (mhr_records, sourced from machine_library.json's labor_rate_usd_hr for
-// benchmarked rows) — an explicit, approved override that takes precedence
-// over the location+process_group lhr_records/lhr_benchmark_rates lookup for
-// that specific machine's operations, per user decision 2026-08-27.
-// 'wage_grade_bucket' — resolveWageGradeBucketRates (2026-09-03): average
-// real usd_lhr_total across all mhr_records rows (this location) sharing
-// this class's real, sourced wage_grade value (Sheet Metal: migration 643;
-// Injection Molding: migration 645). Used only when no specific machine
-// rate exists; sits above the process_group fallback below it in
-// precedence.
-export type LhrRateSource = 'lhr_database' | 'lhr_benchmark' | 'lhr_cross_location' | 'no_lhr_rate' | 'mhr_machine_specific' | 'wage_grade_bucket';
-
-/**
- * The 3-tier labour-rate precedence (bom-items.service.ts's buildOutput,
- * extracted for isolated unit testing): a specific machine's own real rate
- * always wins; failing that, a real wage-grade bucket average (Sheet
- * Metal/Injection Molding only, where real data exists); failing that, the
- * process_group fallback. Never fabricates a rate — every tier is either a
- * real resolved number or absent, and absence here means the caller has no
- * rate for this class at all (source stays 'no_lhr_rate').
- */
-export function resolveLabourRate(
-  perMachineLhr: number | null | undefined,
-  wageGradeBucketRate: number | null | undefined,
-  processGroupRate: { rate: number; source: LhrRateSource } | null | undefined,
-): { rate: number | null; source: LhrRateSource } {
-  if (perMachineLhr != null) return { rate: perMachineLhr, source: 'mhr_machine_specific' };
-  if (wageGradeBucketRate != null) return { rate: wageGradeBucketRate, source: 'wage_grade_bucket' };
-  if (processGroupRate != null) return { rate: processGroupRate.rate, source: processGroupRate.source };
-  return { rate: null, source: 'no_lhr_rate' };
-}
+// Where a line's labour rate came from. Labour is only ever the selected
+// machine's own usd_lhr_total (memory/-backed mhr_records row, migration 805);
+// there is no process-group, wage-grade or benchmark labour fallback.
+export type LhrRateSource = 'mhr_machine_specific' | 'no_lhr_rate';
 
 export interface MHRRateInput {
   rate: number;
-  source: 'mhr_database' | 'default_rate' | 'no_db_rate' | 'tier_synthetic' | 'benchmark_override';
+  source: 'mhr_database' | 'no_db_rate';
   machineClass: string;
+  // Class of the machine this operation actually runs on, when that differs
+  // from machineClass — e.g. rigid tapping priced on the machining centre that
+  // milled/turned the part (inheritCncTappingRate). The operation's Process /
+  // Category / Operation identity is that machine's catalog entry, not the
+  // operation class's (whose catalog row may belong to another domain).
+  hostMachineClass?: string;
   machineName: string | null;
   commodityCode: string | null;
   selection?: import('../../../dto/machine-selection.dto').MachineSelectionResult;
@@ -473,7 +444,7 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
     materialDensityKgM3, materialSource, threads, batchSize, family,
     nestingResult,
     handlingTimeMin = 0.25,
-    toolSetupBrakeMin = 10,
+    toolSetupBrakeMin,
     // 0, not a sampling percentage. This defaulted to 0.08, so a caller that
     // omitted it silently inspected 8% of every batch and multiplied that into
     // the QA term of every process line. Sampling comes from
@@ -630,7 +601,7 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
     processIdentity: input.processIdentityByMachineClass?.[pbRate.machineClass],
     cycleTimeSecFromCalculator: input.pressBrakeCycleTimeSecFromCalculator,
     setupTimeMinFromCalculator: input.pressBrakeSetupTimeMinFromCalculator,
-    fallbackSetupMin: toolSetupBrakeMin,
+    operationSetupMin: toolSetupBrakeMin ?? null,
     calculatorId: input.pressBrakeCalculatorId,
     calculatorVersion: input.pressBrakeCalculatorVersion,
     physicsGap: input.pressBrakePhysicsGap,
@@ -984,7 +955,7 @@ function buildLineFromAppliedRecord(
       : r2(Number(row.direct_rate ?? 0)),
     labourRate: row.line_labour_rate != null ? Number(row.line_labour_rate) : undefined,
     setupTimeSource: row.setup_time_source ?? undefined,
-    rateSource: row.mhr_id ? 'mhr_database' : 'default_rate',
+    rateSource: row.mhr_id ? 'mhr_database' : 'no_db_rate',
     machineClass: row.machine_class,
     machineName: row.machine_name ?? null,
     commodityCode: null,

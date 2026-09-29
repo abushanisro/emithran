@@ -14,7 +14,6 @@ export interface TappingInput {
   rate: MHRRateInput;
   processIdentity?: { processGroup: string; processRoute: string; operation: string };
   cycleTimeSecFromCalculator?: number;
-  fallbackSetupMin: number; // opSetupMinByOp?.tapping ?? TAPPING_SETUP_MIN, per-batch
   /** Real sm_lookup_op_setup_time minutes for this operation, when a row exists. */
   operationSetupMin?: number | null;
   calculatorId?: string | null;
@@ -60,7 +59,6 @@ export function computeTappingCost(input: TappingInput): TappingResult {
     process: 'Tapping',
     machineSetupTimeHr: input.rate.setupTimeHr,
     operationSetupMin: input.operationSetupMin,
-    classDefaultMin: input.fallbackSetupMin,
     machineName: input.rate.machineName,
   });
   if (setup.warning) warnings.push(setup.warning);

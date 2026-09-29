@@ -76,8 +76,8 @@ CONFIDENCE IS NOT UNIFORM, AND THIS MODULE SAYS SO
                                               disclose it; never counted as a
                                               detection.
 
-This mirrors the house convention already set by forming_spike.py /
-lancing_spike.py / gusset_spike.py: a candidate that cannot be told apart from
+This mirrors the house convention already set by formed_feature.py /
+lance.py: a candidate that cannot be told apart from
 something else stays 'ambiguous' rather than being guessed either way.
 
 A KNOWN LIMIT

@@ -1,4 +1,4 @@
-import { LASER_PUNCH_SETUP_MIN, DEFAULT_YIELD_PCT } from '../../shared/core/default-rates.constants';
+import { DEFAULT_YIELD_PCT } from '../../shared/core/default-rates.constants';
 import type { MHRRateInput } from '../../shared/core/cost-engine';
 import type { ProcessLineCost } from '../../../dto/cost-breakdown.dto';
 import type { CuttingProcessContext, CuttingProcessResult } from '../../shared/core/manufacturing-process.types';
@@ -23,9 +23,9 @@ export interface LaserPunchInput {
   toolChangeSec?: number;
   // Per-batch setup time (min) — resolved by the caller from
   // sm_lookup_op_setup_time via SheetMetalLookupService.getOpSetupTime
-  // ('laser_punch'). Falls back to LASER_PUNCH_SETUP_MIN with a disclosed
-  // warning when no row is seeded yet — same convention as every other
-  // cutting engine's setupMin.
+  // ('laser_punch'). The selected machine's
+  // real per-machine setup_time_hr wins; with neither, setup is not costed
+  // (resolveSetupMinutes returns source 'none' with a warning).
   setupMin?: number;
   dlrPerHr?: number;
   qairPerHr?: number;
@@ -76,7 +76,6 @@ export function computeLaserPunchCost(input: LaserPunchInput): LaserPunchResult 
     process: "Laser Punch",
     machineSetupTimeHr: rate.setupTimeHr,
     operationSetupMin: input.setupMin,
-    classDefaultMin: LASER_PUNCH_SETUP_MIN,
     machineName: rate.machineName,
   });
   const setupMin = setup.setupMin;

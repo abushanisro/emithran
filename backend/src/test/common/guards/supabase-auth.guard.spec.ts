@@ -103,4 +103,26 @@ describe('SupabaseAuthGuard', () => {
     const request = { headers: {} };
     await expect(guard.canActivate(makeContext(request))).rejects.toThrow(UnauthorizedException);
   });
+
+  it('retries the admin lookup after a failed one instead of rejecting every later request', async () => {
+    // A transient outage (confirmed live: getaddrinfo ENOTFOUND for the
+    // Supabase host) makes the first lookup return null; once the network is
+    // back, the next request must resolve the account again.
+    process.env.NODE_ENV = 'development';
+    const supabaseService = makeSupabaseService({ adminFallbackEmail: 'admin@example.com' });
+    (supabaseService.getAdminUserId as jest.Mock)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce('admin-uuid-1');
+    const guard = new SupabaseAuthGuard(makeReflector(false), supabaseService);
+
+    await expect(guard.canActivate(makeContext({ headers: {} }))).rejects.toThrow(UnauthorizedException);
+
+    const request = { headers: {} };
+    await expect(guard.canActivate(makeContext(request))).resolves.toBe(true);
+    expect(request).toHaveProperty('user.id', 'admin-uuid-1');
+
+    // A resolved id is kept: no further lookups.
+    await guard.canActivate(makeContext({ headers: {} }));
+    expect(supabaseService.getAdminUserId).toHaveBeenCalledTimes(2);
+  });
 });

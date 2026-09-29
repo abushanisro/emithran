@@ -80,8 +80,10 @@
 const fs = require('fs');
 const path = require('path');
 
-const PROC_FILE = path.join(__dirname, '../../../memory/machining/processes.json');
-const OPS_FILE = path.join(__dirname, '../../../memory/machining/operations_full.json');
+const { readDoc } = require('./lib/memory-csv');
+
+const PROC_FILE = path.join(__dirname, '../../../memory/Machining/processes.csv');
+const OPS_FILE = path.join(__dirname, '../../../memory/Machining/operations_full__operations.csv');
 const OUT_SQL = path.join(__dirname, '../691_seed_machining_process_taxonomy_and_mappings.sql');
 
 function sqlStr(v) {
@@ -102,8 +104,8 @@ function parseCompoundOperationString(raw) {
   return { process, operationCategory: leaf.operation, featureType: leaf.feature };
 }
 
-const procData = JSON.parse(fs.readFileSync(PROC_FILE, 'utf8'));
-const opsData = JSON.parse(fs.readFileSync(OPS_FILE, 'utf8'));
+const procData = readDoc(PROC_FILE, { list: 'processes', scalars: ['section', 'processCount'] });
+const opsData = readDoc(OPS_FILE, { list: 'operations', scalars: ['section', 'operationCount'] });
 
 const stations = procData.processes.map((p) => ({
   name: p.processName,

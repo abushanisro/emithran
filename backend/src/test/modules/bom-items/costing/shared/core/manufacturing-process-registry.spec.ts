@@ -1,4 +1,6 @@
-import { MANUFACTURING_PROCESS_REGISTRY, getEnginesForFamily } from '../../../../../../modules/bom-items/costing/shared/core/manufacturing-process-registry';
+import 'reflect-metadata';
+import { MANUFACTURING_PROCESS_REGISTRY, getEnginesForFamily, getMachiningRouteIds } from '../../../../../../modules/bom-items/costing/shared/core/manufacturing-process-registry';
+import { VALID_ROUTE_IDS } from '../../../../../../modules/bom-items/dto/apply-route.dto';
 
 // Platform Architecture Remediation Phase 1 (engine registry unification,
 // Rule 8/9) — guards against a future process getting a real engine written
@@ -11,8 +13,8 @@ describe('MANUFACTURING_PROCESS_REGISTRY — registry completeness', () => {
       'sheet_metal_cutting',
       'sheet_metal_forming',
       'sheet_metal_secondary_ops',
-      'cnc_milling',
-      'cnc_turning',
+      'milling',
+      'turning',
       'injection_molding',
       'inspection',
       'surface_treatment',
@@ -28,11 +30,11 @@ describe('MANUFACTURING_PROCESS_REGISTRY — registry completeness', () => {
   // 3_axis_lathe/2_axis_bar_feed_lathe_with_sub_spindle/
   // 3_axis_bar_feed_lathe_with_sub_spindle, since the coarse cnc_lathe/
   // cnc_lathe_live buckets each mapped to two real, distinct categories).
-  it('registers one engine per real granular machine class for cnc_milling (3) and cnc_turning (5)', () => {
-    expect(getEnginesForFamily('cnc_milling')).toHaveLength(3);
+  it('registers one engine per real granular machine class for milling (3) and turning (5)', () => {
+    expect(getEnginesForFamily('milling')).toHaveLength(3);
     // 5th real turning class: simultaneous_turning (multi-spindle automatic
     // lathe fleet — simultaneous_turning_usa.csv, 15 real machines).
-    expect(getEnginesForFamily('cnc_turning')).toHaveLength(5);
+    expect(getEnginesForFamily('turning')).toHaveLength(5);
   });
 
   it('every registered engine has a non-empty machineClass and processFamily', () => {
@@ -47,5 +49,23 @@ describe('MANUFACTURING_PROCESS_REGISTRY — registry completeness', () => {
   it('registers exactly the 8 secondary-op engines this phase extracted from cost-engine.ts', () => {
     const secondaryOps = getEnginesForFamily('sheet_metal_secondary_ops');
     expect(secondaryOps).toHaveLength(8);
+  });
+});
+
+// Machining routes are identified by their catalog machine class (the id the
+// milled/turned route comparison emits), so an apply request for any route
+// the comparison offers passes DTO validation -- the legacy cnc-* ids, which
+// the comparison never produced, are gone.
+describe('machining route ids', () => {
+  it('are exactly the registered milling and turning machine classes', () => {
+    expect(getMachiningRouteIds().sort()).toEqual([
+      '2_axis_bar_feed_lathe_with_sub_spindle', '2_axis_lathe', '3_axis_bar_feed_lathe_with_sub_spindle',
+      '3_axis_lathe', '3_axis_mill', '4_axis_mill', '5_axis_mill', 'simultaneous_turning',
+    ]);
+  });
+
+  it('are all accepted by apply-route validation, and no legacy cnc-* id is', () => {
+    for (const id of getMachiningRouteIds()) expect(VALID_ROUTE_IDS).toContain(id);
+    expect(VALID_ROUTE_IDS.filter((id) => id.startsWith('cnc-'))).toEqual([]);
   });
 });

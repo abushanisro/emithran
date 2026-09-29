@@ -3,7 +3,7 @@ import { SupabaseService } from '../../common/supabase/supabase.service';
 import { CreateBOMItemDto, UpdateBOMItemDto } from './dto/bom-items.dto';
 import { BOMItemResponseDto, BOMItemListResponseDto } from './dto/bom-item-response.dto';
 import type { CalculationTraceStep, PhysicsGap, UnsupportedOperationGap, ManufacturingPhysicsResult, ConfidenceLevel, ResolutionStatus, LookupResolution, ValidatedInput } from './dto/cost-breakdown.dto';
-import { computeCostSummary, computeSustainability, applyPersistedRouteToSummary, selectAppliedGeneration, detectAppliedGenerationDrift, resolveLabourRate } from './costing/shared/core/cost-engine';
+import { computeCostSummary, computeSustainability, applyPersistedRouteToSummary, selectAppliedGeneration, detectAppliedGenerationDrift } from './costing/shared/core/cost-engine';
 import type { MHRRateInput, AppliedProcessCostRecord, LhrRateSource } from './costing/shared/core/cost-engine';
 import { planInspection, finalizeInspectionLine } from './costing/shared/process/inspection-engine';
 import type { InspectionInput } from './costing/shared/process/inspection-engine';
@@ -13,7 +13,7 @@ import { PHYSICS_REGISTRY } from '../calculators/physics-registry';
 import { SheetMetalLookupService, roundUpToStandardTonnageClass } from './costing/sheet-metal/lookup/sheet-metal-lookup.service';
 import { MachiningLookupService } from './costing/machining/lookup/machining-lookup.service';
 import type { LaserCutParams } from './costing/sheet-metal/lookup/sheet-metal-lookup.service';
-import { computeNesting, resolveNestingDimensions, EDGE_ALLOWANCE_MM, STANDARD_SHEETS, isTrueNestCostingCacheValid, trueNestInputFingerprint, computePartAllowanceMm } from './costing/sheet-metal/machine/sheet-metal-nesting.engine';
+import { computeNesting, resolveNestingDimensions, EDGE_ALLOWANCE_MM, STANDARD_SHEETS, isTrueNestCostingCacheValid, trueNestInputFingerprint, computePartAllowanceMm, GROSS_USAGE_SPACING_PROCESS } from './costing/sheet-metal/machine/sheet-metal-nesting.engine';
 import { selectBestTrueNestCandidate } from './costing/sheet-metal/machine/true-nest-costing.engine';
 import { cachedRead } from './costing/shared/core/request-cache';
 import { resolveNetUsagePhysics } from './costing/sheet-metal/raw-material/sheet-metal-net-usage.physics';
@@ -21,40 +21,51 @@ import type { TrueNestCandidate, TrueNestCostingSelection } from './costing/shee
 import {
   computeMillingCostSummary, computeTurningCostSummary,
   checkMachiningCapability, computeRouteComplexityScore,
-  requiredMilledMachineClass, meetsRequiredMilledClass, pickRecommendedRoute,
+  meetsRequiredMilledClass, pickRecommendedRoute,
   detectMaterialClass, MILLING_DOUBLE_BILLED_ELSEWHERE, resolveOperationName,
 } from './costing/machining/process/cost-machining-engine';
 import type { MachiningCostInput, MachineClassId } from './costing/machining/process/cost-machining-engine';
+import { machiningFeatureCounts } from './costing/machining/operation/machining-feature-counts';
+import { requiredMilledClassFromToolAxes } from './costing/machining/setup-axis-rule';
+import { PlasticReferenceService } from './costing/plastic-molding/lookup/plastic-reference.service';
+import { SecondaryProcessService } from './services/secondary-process.service';
+import { resolveGdtCallouts } from './costing/shared/physics/gdt-callouts';
+import type { MachiningCalculators } from './costing/machining/calculators/machining-calculator';
+import { loadMachiningCalculatorSpec } from './costing/machining/calculators/machining-calculator-spec';
+import type { KeywayBroachReference } from './costing/machining/calculators/machining-lookup-seeds';
+import { chemicalMillingCallout, splitChemicallyMilledPockets } from './costing/chemical-milling/chemical-milling-engine';
+import { resolveGearRoute } from './costing/machining/operation/gear-routing';
+import { polygonCallout, resolvePolygons, splitPolygonPockets } from './costing/machining/operation/polygon-routing';
+import { machiningLookupSeeds } from './costing/machining/calculators/machining-lookup-seeds';
+import type { MachiningCalculatorInputsDto } from './dto/machining-calculator-inputs.dto';
 import { BlankOptimizerService } from './costing/sheet-metal/machine/blank-optimizer.service';
 import { buildOperationSequence, injectDrawingIntelligence } from './costing/machining/operation/operation-sequencer';
 import type { OperationLine } from './costing/machining/operation/operation-sequencer';
-import { splitDeepHoleOccurrences } from './costing/machining/operation/deep-hole-routing';
+import { splitDeepHoleOccurrences, resolveDeepHoleRules } from './costing/machining/operation/deep-hole-routing';
 import { splitKeywayOccurrences } from './costing/machining/operation/keyway-routing';
 import { splitWireEdmOccurrences } from './costing/machining/operation/wire-edm-routing';
-import { computeInjectionMoldedCostSummary, IM_RUNNER_SCRAP_PCT, recommendCavityCount } from './costing/plastic-molding/process/cost-injection-molding-engine';
+import { computeInjectionMoldedCostSummary, IM_RUNNER_SCRAP_PCT } from './costing/plastic-molding/process/cost-injection-molding-engine';
 import { computeCompressionMoldingCost } from './costing/plastic-molding/process/cost-compression-molding-engine';
 import { computeReactionInjectionMoldingCost } from './costing/plastic-molding/process/cost-reaction-injection-molding-engine';
 import type { InjectionMoldingCostInput } from './costing/plastic-molding/process/cost-injection-molding-engine';
 import { isPlasticGrade } from './costing/plastic-molding/process/process-tree';
 import {
   selectIMmachinesByTier,
-  resolveMaterialClampFactor,
   type IMSelectionRequirements,
 } from './costing/plastic-molding/machine/machine-selector-im';
+import { requiredClampForce, type MaterialClampProperties } from './costing/plastic-molding/clamp-force';
+import { shotGppsGramsPerCavity, shotWeightKgPerPart } from './costing/plastic-molding/shot-size';
 import {
   MATERIAL_OVERHEAD_PCT, RATES_SOURCE_LABEL,
   DEBURR_SEC_PER_METRE, DEBURR_SEC_PER_PIERCE,
-  TAPPING_SETUP_MIN, computeTapCycleSec, resolveTapPhysicsInputs, TAP_UNLOAD_SEC,
+  computeTapCycleSec, resolveTapPhysicsInputs, TAP_UNLOAD_SEC, isoCoarsePitchMm,
   resolveDrillingSpeedFeed, COUNTERSINK_SPEED_FACTOR, HOLE_OP_UNLOAD_SEC,
   resolveReamPhysicsInputs, TIGHT_TOLERANCE_REAM_THRESHOLD_MM,
   MACHINE_REGISTRY, LOCATION_INFO, CURRENCY_SYMBOLS,
-  DEFAULT_COSTING_LOCATION, benchmarkRateWarning, lhrRateWarning,
-  type RateWarnThresholds, DEFAULT_RATE_WARN_THRESHOLDS,
+  DEFAULT_COSTING_LOCATION,
   resolveUtsMpa, isSheetFormableMaterial, estimateBendTonnage,
-  estimateBurlTonnage, estimateBurlDiameterMm, BURRING_SETUP_MIN,
-  type SurfaceTreatmentDbRate, classifySurfaceTreatment,
+  estimateBurlTonnage, estimateBurlDiameterMm, type SurfaceTreatmentDbRate,
   classifyInspectionResource, DEFAULT_YIELD_PCT,
-  PRESS_BRAKE_SETUP_MIN, CNC_STOCK_ALLOWANCE_PER_SIDE_MM,
 } from './costing/shared/core/default-rates.constants';
 import type { MachineClass } from './costing/shared/core/default-rates.constants';
 import { checkMachineCapability } from './costing/shared/capability/machine-capability';
@@ -70,7 +81,7 @@ import { computePressBrakeCost } from './costing/sheet-metal/process/press-brake
 import { computeDeburringCost } from './costing/sheet-metal/operation/deburring-engine';
 import { computeHoleExtrusionCost } from './costing/sheet-metal/operation/hole-extrusion-engine';
 import { computeTappingCost } from './costing/sheet-metal/operation/tapping-engine';
-import { resolveEffectiveSheetThicknessMm, resolveScenarioFxSnapshot, resolveScenarioStockForm } from './costing/shared/physics/scenario-overrides';
+import { resolveEffectiveSheetThicknessMm, resolveScenarioFxSnapshot, resolveScenarioStockForm, resolveScenarioCavityCount } from './costing/shared/physics/scenario-overrides';
 import { overlayRejectionReason, PersistedMoneyRow } from './costing/shared/core/persisted-currency-contract';
 import { resolveCostingInputs } from './costing/shared/physics/costing-inputs';
 import type { CostSummaryDto, CostSummaryResponseDto, ProcessLineCost, FeatureOp, CostStatus } from './dto/cost-breakdown.dto';
@@ -90,7 +101,7 @@ import {
   punchingRequirement, waterjetRequirement, shearRequirement, plasmaCutRequirement, laserPunchRequirement,
   pressFormingRequirement, rollBendingRequirement,
 } from './costing/shared/capability/machine-selection/physics';
-import { findRouteDataGaps, selectRecommendedRoute, shouldAddSeparatePressBrakeLine, decideBenchmarkOverride, rollBendingGeometryCapability, rolledFormNeedsRollBender, routeProducesBlank, preferRealRate } from './costing/shared/core/engine-kernel';
+import { findRouteDataGaps, selectRecommendedRoute, shouldAddSeparatePressBrakeLine, rollBendingGeometryCapability, rolledFormNeedsRollBender, routeProducesBlank, preferRealRate } from './costing/shared/core/engine-kernel';
 import { computeProgressiveDieToolingCost, progressiveDieToolingDataGap, buildProgressiveDieToolingLine } from './costing/sheet-metal/process/progressive-die-tooling-engine';
 import { composeFeatureDrivenOperations, composeOperationSequence } from './costing/sheet-metal/operation/feature-driven-operations';
 import {
@@ -98,7 +109,7 @@ import {
 } from './costing/shared/capability/machine-selection/physics';
 import type { MachineRequirement } from './costing/shared/capability/machine-selection/physics';
 import { explainCandidate, fetchMachinePool, selectMachine } from './costing/shared/capability/machine-selection/selector';
-import { EMPTY_CAPABILITY, MACHINE_CLASS_DEFAULTS, lookupSeedCapability } from './costing/shared/capability/machine-selection/seed-registry';
+import { EMPTY_CAPABILITY, MACHINE_CLASS_DEFAULTS } from './costing/shared/capability/machine-selection/seed-registry';
 import type { CapabilityCheck, MachineCandidate, MachineRecommendation, MachineSelectionResult } from './dto/machine-selection.dto';
 import {
   shapeRankForFamily,
@@ -110,6 +121,7 @@ import { RateResolutionService } from './services/rate-resolution.service';
 import { CalculatorCatalogService } from './services/calculator-catalog.service';
 import { MaterialResolutionService } from './services/material-resolution.service';
 import { MachineDiscoveryService } from './services/machine-discovery.service';
+import { billetFallback } from './costing/sheet-metal/machine/blank-stock-candidates';
 
 @Injectable()
 export class BOMItemsService {
@@ -173,6 +185,8 @@ export class BOMItemsService {
     private readonly calculatorCatalogService: CalculatorCatalogService,
     private readonly materialResolutionService: MaterialResolutionService,
     private readonly machineDiscoveryService: MachineDiscoveryService,
+    private readonly secondaryProcessService: SecondaryProcessService,
+    private readonly plasticReferenceService: PlasticReferenceService,
   ) { }
 
   /**
@@ -1042,6 +1056,7 @@ export class BOMItemsService {
       cheapest: convRecommendation(ms.cheapest),
       fastest: convRecommendation(ms.fastest),
       alternatives: ms.alternatives.map(convCandidate),
+      ...(ms.ranking ? { ranking: ms.ranking.map((r) => ({ ...r, hourlyRate: conv(r.hourlyRate) })) } : {}),
     };
   }
 
@@ -1074,38 +1089,24 @@ export class BOMItemsService {
     scenarioOverrides: Record<string, unknown> | null | undefined,
     localCurrencyCode: string,
     rates: RateSnapshot,
-  ): { currency: string; currencySymbol: string; rate: number; usdToDisplayRate: number; inrToDisplayRate?: number } {
-    // inrToDisplayRate uses convertOptional (never convertStrict) — it's an
-    // additive convenience for frontend consumers converting INR-denominated
-    // constants (e.g. the Investment/NRE tab), not something every cost-
-    // summary request depends on. A factory whose local currency is already
-    // USD has always worked with zero exchange_rates dependency (see the
-    // localCurrencyCode === 'USD' branch below, pre-existing); requiring an
-    // INR->USD rate on file just to compute this one optional field would be
-    // a new, unrelated way for the whole request to fail loudly.
+  ): { currency: string; currencySymbol: string; rate: number; usdToDisplayRate: number } {
     const snapshot = resolveScenarioFxSnapshot(scenarioOverrides);
     if (snapshot && snapshot.factoryCurrency === localCurrencyCode) {
       const currency = snapshot.scenarioCurrency;
-      const inrToCurrency = currency === 'INR' ? 1 : rates.convertOptional('INR', localCurrencyCode);
       return {
         currency,
         currencySymbol: CURRENCY_SYMBOLS[currency] ?? currency,
         rate: snapshot.rate,
         usdToDisplayRate: currency === 'USD' ? 1 : rates.convertStrict('USD', localCurrencyCode) * snapshot.rate,
-        inrToDisplayRate: inrToCurrency == null ? undefined : inrToCurrency * snapshot.rate,
       };
     }
     if (localCurrencyCode === 'USD') {
-      return {
-        currency: 'USD', currencySymbol: '$', rate: 1, usdToDisplayRate: 1,
-        inrToDisplayRate: rates.convertOptional('INR', 'USD') ?? undefined,
-      };
+      return { currency: 'USD', currencySymbol: '$', rate: 1, usdToDisplayRate: 1 };
     }
     return {
       currency: 'USD', currencySymbol: '$',
       rate: rates.convertStrict(localCurrencyCode, 'USD'),
       usdToDisplayRate: 1,
-      inrToDisplayRate: rates.convertOptional('INR', 'USD') ?? undefined,
     };
   }
 
@@ -1122,10 +1123,10 @@ export class BOMItemsService {
     // computed before either return branch below.
     const incompleteProcesses = dto.processLines.filter((l) => !!l.physicsGap).map((l) => l.process);
     const costStatus: CostStatus = incompleteProcesses.length > 0 ? 'incomplete' : 'complete';
-    const { currency, currencySymbol, rate, usdToDisplayRate, inrToDisplayRate } = this.resolveDisplayCurrency(scenarioOverrides, localCurrencyCode, rates);
+    const { currency, currencySymbol, rate, usdToDisplayRate } = this.resolveDisplayCurrency(scenarioOverrides, localCurrencyCode, rates);
     if (currency === localCurrencyCode) {
       return {
-        ...dto, currency, currencySymbol, toUsdRate: 1, usdToDisplayRate, inrToDisplayRate,
+        ...dto, currency, currencySymbol, toUsdRate: 1, usdToDisplayRate,
         costStatus, incompleteProcesses: incompleteProcesses.length ? incompleteProcesses : undefined,
       };
     }
@@ -1156,7 +1157,6 @@ export class BOMItemsService {
       currencySymbol,
       toUsdRate: rate,
       usdToDisplayRate,
-      inrToDisplayRate,
     };
   }
 
@@ -1202,12 +1202,6 @@ export class BOMItemsService {
     };
   }
 
-  // Kill switch for the capability-based selector: set ENABLE_PHYSICS_MACHINE_SELECTION=false
-  // to revert to the legacy lowest-rate lookup without a redeploy of code changes.
-  private physicsSelectionEnabled(): boolean {
-    return process.env.ENABLE_PHYSICS_MACHINE_SELECTION !== 'false';
-  }
-
 
   // Compute the physical requirement each machine class must meet for this part.
   // Classes absent from the map are gated as 'generic' (no dimensional constraint).
@@ -1222,6 +1216,8 @@ export class BOMItemsService {
     bboxXMm: number;
     bboxYMm: number;
     bboxZMm: number;
+    // Turned parts: the CAD turned diameter and axial length (resolveTurnedGeometry).
+    turnedGeometry?: { diameterMm: number; lengthMm: number } | null;
     weightKg: number;
     // Real per-bend lengths from the cad-engine's bend clustering (see
     // RawGeometry.bendLengths) — sized to the LONGEST real bend line, since a
@@ -1237,6 +1233,9 @@ export class BOMItemsService {
     // selection can never silently disagree with the displayed/costed
     // tonnage. null flows through as "UTS-dependent checks skipped".
     utsMpa: number | null;
+    // The material's reference clamp properties (raw_materials, migration 831),
+    // from the same resolveMaterialForFamily row.
+    materialClamp: MaterialClampProperties;
     // Feature-driven hole extrusion (burring) — see estimateBurlDiameterMm's
     // own doc comment (default-rates.ts) for how burlDiameterMm is derived;
     // callers pass the SAME value already used for the $ cost calculation.
@@ -1423,10 +1422,13 @@ export class BOMItemsService {
     }
 
     if (input.family === 'turned' || input.family === 'mill_turn') {
-      // Turned-part bbox: longest dim is the part length, the larger of the other two
-      // is the turned diameter
+      // The CAD turned diameter and length along the turning axis; the
+      // bounding box (longest side = length) only when the part has no
+      // recognised turned-diameter feature.
       const dims = [input.bboxXMm, input.bboxYMm, input.bboxZMm].sort((a, b) => b - a);
-      const latheReq = latheRequirement({ maxDiameterMm: dims[1], maxLengthMm: dims[0] });
+      const latheReq = input.turnedGeometry
+        ? latheRequirement({ maxDiameterMm: input.turnedGeometry.diameterMm, maxLengthMm: input.turnedGeometry.lengthMm })
+        : latheRequirement({ maxDiameterMm: dims[1]!, maxLengthMm: dims[0]! });
       const turningClasses = await this.machineDiscoveryService.getEligibleClasses(
         'primary_turning', input.location, input.accessToken,
       );
@@ -1439,18 +1441,19 @@ export class BOMItemsService {
       // in the actual pull direction is a Phase 2 refinement (see plan doc).
       const dims = [input.bboxXMm, input.bboxYMm, input.bboxZMm].sort((a, b) => b - a);
       const projectedAreaMm2 = dims[0] * dims[1];
+      // Reference clamp force, one cavity, cold runner (cavities and gate are not
+      // known before a press is chosen): the same function every clamp check calls.
+      const ref = (await this.plasticReferenceService.getReference());
+      const clamp = ref.reference
+        ? requiredClampForce({
+            model: ref.reference.clampModel, material: input.materialClamp, materialLabel: input.grade ?? 'this material',
+            projectedAreaMm2, cavityCount: 1, runner: 'cold',
+          })
+        : { derivable: false as const, reason: `Clamp force not derivable: Plastic reference data missing (${ref.missing.join('; ')}).` };
       const imRequirement = injectionMoldingRequirement({
         projectedAreaMm2,
-        // Real, sourced per-polymer-family clamp factor (Rosato/Brydson/
-        // Griff/SPI) — the SAME table evaluateIMCandidate uses to score
-        // machines during route comparison. Fixes a real, confirmed live gap
-        // (2026-09-11): the machine that actually gets SELECTED for the
-        // applied quote used to be gated on a separate, cruder, uncited
-        // 8-entry table (physics.ts's own former classifyResinFamily/
-        // MATERIAL_PRESSURE_FACTOR_TON_CM2), so "which machine is physically
-        // capable" and "how does this route compare to alternatives" could
-        // disagree on the same part's same material.
-        materialClampFactor: resolveMaterialClampFactor(input.grade),
+        clampTonnageRequired: clamp.derivable ? clamp.requiredTonnes : null,
+        clampNotDerivableReason: clamp.derivable ? null : clamp.reason,
         // Shot weight = finished part + runner allowance (same constant the
         // cost engine's material model uses — one number, not two copies).
         shotWeightG: input.weightKg > 0
@@ -1918,23 +1921,19 @@ export class BOMItemsService {
   }
 
   // Delegates to RateResolutionService — see that class for the real
-  // implementation and doc comment. Kept as a same-named private wrapper
-  // (identical signature and default) so every existing call site and every
-  // `Awaited<ReturnType<typeof this.resolveMHRRates>>` type reference in this
-  // file is unaffected by the extraction.
+  // implementation and doc comment. Kept as a same-named private wrapper so
+  // every `Awaited<ReturnType<typeof this.resolveMHRRates>>` type reference in
+  // this file is unaffected by the extraction.
   private async resolveMHRRates(
     accessToken: string,
-    location = 'USA',
+    location: string,
     physics: {
       requirements: Partial<Record<MachineClass, MachineRequirement>>;
       overrides: Map<string, string>;
     } | undefined,
-    family: string | undefined,
     fxRates: RateSnapshot,
-    warnings: string[] = [],
-    thresholds: RateWarnThresholds = DEFAULT_RATE_WARN_THRESHOLDS,
   ) {
-    return this.rateResolutionService.resolveMHRRates(accessToken, location, physics, family, fxRates, warnings, thresholds);
+    return this.rateResolutionService.resolveMHRRates(accessToken, location, physics, fxRates);
   }
 
   // Delegates to RateResolutionService — see that class for the real
@@ -2119,6 +2118,7 @@ export class BOMItemsService {
     materialCol: string;
     rates: RateSnapshot;
     locCurrencyCode: string;
+    location: string;
     warnings: string[];
   }) {
     return this.materialResolutionService.resolveMaterialForFamily(input);
@@ -2133,74 +2133,33 @@ export class BOMItemsService {
       rate: primary.rate,
       source: primary.source,
       machineClass: tapping.machineClass,
+      hostMachineClass: primary.machineClass,
       machineName: primary.machineName,
       commodityCode: primary.commodityCode,
+      // The operator is the machining centre's own — carry its real labour
+      // rate, or tapping labour would silently be uncosted.
+      labourRate: primary.labourRate ?? null,
+      labourRateSource: primary.labourRateSource ?? 'no_lhr_rate',
     };
   }
 
-  // Delegates to RateResolutionService — see that class for the real
-  // implementation and doc comment. Kept as a same-named private wrapper so
-  // every existing call site in this file is unaffected by the extraction.
-  private async loadRateWarnThresholds(accessToken: string, warnings: string[]): Promise<RateWarnThresholds> {
-    return this.rateResolutionService.loadRateWarnThresholds(accessToken, warnings);
-  }
 
-  // Surface implausible DB rates (broken imports — the migration-327 bug class)
-  // and benchmark-priced lines on the summary. Never clamps: the MHR DB stays
-  // authoritative, but a rate 50%+ off the location benchmark must be visible
-  // on the document a quote is read from, not only in a machine-detail popup.
+  // Names every line whose machine has no real HR Rates row for this location.
+  // Machine rates come only from memory/-backed mhr_records rows (migration
+  // 805), so there is nothing to compare a real rate against and nothing
+  // substituted for a missing one — a missing machine is reported, not priced.
   private appendRateWarnings(
     result: { processLines: ProcessLineCost[]; warnings: string[] },
     location: string,
-    benchmarkMap?: Map<string, number>,
-    thresholds: RateWarnThresholds = DEFAULT_RATE_WARN_THRESHOLDS,
   ): void {
-    const seen = new Set<string>();
-    const benchmarkPriced: string[] = [];
-    const benchmarkOverridden: string[] = [];
-    // Distinct from benchmarkPriced: these lines have NO rate at all (no machine,
-    // no benchmark) — cost is a genuine $0, not something "priced" at any rate.
-    // Must never be folded into the benchmarkPriced message below, which claims
-    // benchmark pricing was applied.
-    const noRateOnFile: string[] = [];
+    const noMachine = new Set<string>();
     for (const line of result.processLines) {
-      const key = `${line.machineClass}:${line.hourlyRate}:${line.rateSource}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      if (line.rateSource === 'mhr_database') {
-        const warning = benchmarkRateWarning(line.machineClass, location, line.hourlyRate, line.machineName, benchmarkMap?.get(line.machineClass), thresholds);
-        if (warning && !result.warnings.includes(warning)) result.warnings.push(warning);
-      } else if (line.rateSource === 'benchmark_override') {
-        // DB rate was anomalously low (< 50% of benchmark) — overridden to location benchmark.
-        // Surface as a single consolidated info note, not per-line noise.
-        benchmarkOverridden.push(line.machineClass.replace(/_/g, ' '));
-      } else if (line.rateSource === 'no_db_rate') {
-        noRateOnFile.push(line.machineClass.replace(/_/g, ' '));
-      } else if (line.rateSource !== 'tier_synthetic' && line.rateSource !== 'tooling_amortization') {
-        // 'tier_synthetic' = route comparison benchmark slot with no DB machine — expected, suppress.
-        // 'tooling_amortization' = a real, non-zero hard-tooling cost, not a machine rate at all —
-        // its own warnings (progressive-die-tooling-engine.ts's SCOPE_WARNING etc.) already disclose
-        // it; reporting it here too under "no rate on file" would misrepresent a real cost as a gap.
-        benchmarkPriced.push(line.machineClass.replace(/_/g, ' '));
-      }
+      if (line.rateSource === 'no_db_rate') noMachine.add(line.machineClass.replace(/_/g, ' '));
     }
-    if (benchmarkOverridden.length > 0) {
+    if (noMachine.size > 0) {
       result.warnings.push(
-        `Using ${location} benchmark MHR rates for: ${[...new Set(benchmarkOverridden)].join(', ')} — ` +
-        `DB rates were more than 50% below benchmark (likely entered for a different region). ` +
-        `Verify MHR records for ${location} to quote on actual shop rates.`,
-      );
-    }
-    if (benchmarkPriced.length > 0) {
-      result.warnings.push(
-        `No capable MHR machine on file in ${location} for: ${[...new Set(benchmarkPriced)].join(', ')} — ` +
-        `priced at ${location} benchmark rates. Import MHR records for ${location} to quote on actual equipment.`,
-      );
-    }
-    if (noRateOnFile.length > 0) {
-      result.warnings.push(
-        `No MHR machine or benchmark rate on file in ${location} for: ${[...new Set(noRateOnFile)].join(', ')} — ` +
-        `these process costs are $0. Add an MHR record or a ${location} benchmark rate to quote on them.`,
+        `No machine in HR Rates for ${location} for: ${[...noMachine].join(', ')} — these operations carry ` +
+        `no machine cost. Add the machines to memory/ and seed them to cost them.`,
       );
     }
   }
@@ -2283,8 +2242,8 @@ export class BOMItemsService {
   // featureType on each returned FeatureOp is the real, per-part CAD
   // feature_type this specific op was generated from (operation-sequencer.ts
   // reads it straight off feature_graph_v2 as `f.feature_type` — the CAD
-  // engine's own live detection result, e.g. 'through_hole'/'tapped_hole'/
-  // 'pocket'/'slot' — and carries it onto OperationLine.cadFeatureType).
+  // engine's own live detection result, e.g. 'SimpleHole'/'MultiStepHole'/
+  // 'PocketV2'/'Slot' — and carries it onto OperationLine.cadFeatureType).
   // No static op-name→feature-type table here: that value is dynamic,
   // per-part data, not a fixed mapping this engine should hardcode — the
   // frontend's resolveFeatureOpHighlight matches directly against the same
@@ -2304,7 +2263,7 @@ export class BOMItemsService {
     // that WAS charged) and wrongly included "Rigid Tap" (real time that is
     // NOT part of this line's cost — a phantom "Tapping" row alongside the
     // real, separately-billed Tapping category). Now shares the one real set.
-    type Acc = { timeSec: number; instanceCount: number; diameterMm?: number; cadFeatureType?: string };
+    type Acc = { timeSec: number; count: number; diameterMm?: number; cadFeatureType?: string; featureIds: string[] };
     const groups = new Map<string, Acc>();
 
     for (const op of featureOps) {
@@ -2325,10 +2284,13 @@ export class BOMItemsService {
       const diaBucket = op.diameterMm ? Math.round(op.diameterMm * 10) / 10 : undefined;
       const groupKey = diaBucket !== undefined ? `${key}@${diaBucket}` : key;
       const g = groups.get(groupKey);
-      if (g) { g.timeSec += op.timeSec; g.instanceCount++; }
+      if (g) {
+        g.timeSec += op.timeSec; g.count += op.count ?? 1;
+        for (const id of op.featureIds ?? []) if (!g.featureIds.includes(id)) g.featureIds.push(id);
+      }
       else groups.set(groupKey, {
-        timeSec: op.timeSec, instanceCount: 1, diameterMm: diaBucket,
-        cadFeatureType: op.cadFeatureType,
+        timeSec: op.timeSec, count: op.count ?? 1, diameterMm: diaBucket,
+        cadFeatureType: op.cadFeatureType, featureIds: [...(op.featureIds ?? [])],
       });
     }
 
@@ -2352,12 +2314,8 @@ export class BOMItemsService {
     };
 
     const result: FeatureOp[] = [];
-    for (const [groupKey, { timeSec, diameterMm, cadFeatureType }] of groups) {
+    for (const [groupKey, { timeSec, count, diameterMm, cadFeatureType, featureIds }] of groups) {
       const key = resolveCached(groupKey.split('@')[0]!);
-      // Infer count from fixed unit times where possible (Center Drilling=5s, Chamfering=4-5s)
-      let count = 1;
-      if (key === 'Center Drilling') count = Math.max(1, Math.round(timeSec / 5));
-      else if (key === 'Chamfering' && !diameterMm) count = Math.max(1, Math.round(timeSec / 4.5));
       const diaLabel = diameterMm ? ` Ø${diameterMm.toFixed(1)}mm` : '';
       const label = count > 1 ? `${key}${diaLabel} ×${count}` : `${key}${diaLabel}`;
       // Real CAD feature_type when this op traces to one detected feature;
@@ -2369,6 +2327,7 @@ export class BOMItemsService {
         timeSec: Math.round(timeSec),
         featureType: cadFeatureType ?? '',
         count,
+        ...(featureIds.length ? { featureIds } : {}),
       });
     }
     return result;
@@ -2769,6 +2728,8 @@ export class BOMItemsService {
   // labeled path -- this calculator represents the true-shape half only.
   static readonly GROSS_USAGE_GAP_REASON =
     'Unable to calculate true-shape gross usage — verified flat pattern required';
+  static readonly PART_SPACING_GAP =
+    `Nesting part spacing not staged: tblPartSpacing (migration 518) has no ${GROSS_USAGE_SPACING_PROCESS} row`;
 
   /**
    * "Sheet Metal - Gross Material Usage (Nesting)" calculator's physics_key
@@ -2808,7 +2769,8 @@ export class BOMItemsService {
     const item = await this.findOne(ctx.itemId, ctx.userId, ctx.accessToken);
     const summary = ((item.featureGraph as any)?.summary) ?? {};
 
-    const kerfMm = computePartAllowanceMm(thicknessMm);
+    const kerfMm = computePartAllowanceMm(await this.smLookup.getPartSpacingTable(), thicknessMm);
+    if (kerfMm == null) return { _gapReason: GAP_REASON, _internalReason: BOMItemsService.PART_SPACING_GAP };
     const trueShape = await this.resolveTrueShapeNestCosting(
       ctx.itemId, summary, netWeightKg, densityKgM3, thicknessMm,
       kerfMm, edgeMarginMm, ctx.userId, ctx.accessToken,
@@ -2969,10 +2931,10 @@ export class BOMItemsService {
     // Fix 1: For CNC parts, prefer the feature recognizer's breakdown (through + blind holes)
     // over the raw cylinder count from manufacturing_features.holes.count which includes
     // all cylindrical faces (OD steps, groove IDs) — not just machined holes.
-    const cncFeatureSummary = fg?.cnc_features?.feature_summary ?? null;
+    const cncFeatureSummary = machiningFeatureCounts(fg?.machining_features);
     const holeCount = (
       cncFeatureSummary !== null && (family === 'milled' || family === 'turned' || family === 'mill_turn')
-        ? ((cncFeatureSummary.through_hole ?? 0) + (cncFeatureSummary.blind_hole ?? 0))
+        ? cncFeatureSummary.drilledHoles
         : (summary.holeCount ?? item.holeCount ?? 0)
     ) as number;
     // Drawing analysis returns threads as [{ spec, count }] or [{ size, count }] — normalise to { size, count }
@@ -3009,7 +2971,7 @@ export class BOMItemsService {
     if (familyResolution.warning) materialWarnings.push(familyResolution.warning);
     const {
       materialCostPerKg, materialDensityKgM3, materialSource, utsMpa, shearStrengthMpa,
-      meltingTempC, moldTempC, ejectionTempC, specificHeatMeltJgC, thermalConductivityMeltWMK,
+      meltingTempC, moldTempC, ejectionTempC, specificHeatMeltJgC, thermalConductivityMeltWMK, densityOfMeltKgM3, materialType, clampProperties,
       // cureTimeMinFromMaterial deliberately NOT destructured here: this
       // primary quote path has no per-item Compression Molding / RIM process
       // dispatch yet (only getRouteComparison() exposes those as alternate
@@ -3023,6 +2985,7 @@ export class BOMItemsService {
         materialCol: locInfo.materialCol,
         rates,
         locCurrencyCode: locInfo.code,
+        location,
         warnings: materialWarnings,
       });
     // Real per-grade Injection Molding thermal properties (Phase 1
@@ -3030,14 +2993,12 @@ export class BOMItemsService {
     // materialCostPerKg/materialDensityKgM3 above, never a second lookup.
     // Harmless (unused) for every non-Injection-Molding-family quote.
     const realResinInputs = {
-      meltingTempC, moldTempC, ejectionTempC, specificHeatMeltJgC, thermalConductivityMeltWMK,
-      densityKgM3: materialDensityKgM3 > 0 ? materialDensityKgM3 : null,
+      meltingTempC, moldTempC, ejectionTempC, specificHeatMeltJgC, thermalConductivityMeltWMK, densityOfMeltKgM3,
     };
 
     const costOverrides = await this.fetchCostOverrides(id, accessToken, location);
 
-    const physics = this.physicsSelectionEnabled()
-      ? {
+    const physics = {
           requirements: await this.buildPartRequirements({
             family,
             grade,
@@ -3049,9 +3010,15 @@ export class BOMItemsService {
             bboxXMm: (((item as any).maxLength ?? 0) as number),
             bboxYMm: (((item as any).maxWidth ?? 0) as number),
             bboxZMm: (((item as any).maxHeight ?? 0) as number),
+            turnedGeometry: this.resolveTurnedGeometry(fg, {
+              length: ((item as any).maxLength ?? 0) as number,
+              width: ((item as any).maxWidth ?? 0) as number,
+              height: ((item as any).maxHeight ?? 0) as number,
+            }),
             weightKg: (((item as any).weight ?? 0) as number),
             bendLengthsMm: (fg?.summary?.bendLengths ?? []) as number[],
             utsMpa,
+            materialClamp: clampProperties,
             extrudedFlangeCount: fg?.summary?.extrudedFlangeCount ?? 0,
             burlDiameterMm: estimateBurlDiameterMm(threads, (fg?.summary?.holeDiameters ?? []) as number[]),
             cutLengthMm,
@@ -3060,14 +3027,12 @@ export class BOMItemsService {
             accessToken,
           }),
           overrides: await this.fetchMachineOverrides(id, accessToken, location),
-        }
-      : undefined;
+        };
 
-    const rateWarnThresholds = await this.loadRateWarnThresholds(accessToken, materialWarnings);
-    const mhrRates = await this.resolveMHRRates(accessToken, location, physics, family, rates, materialWarnings, rateWarnThresholds);
+    const mhrRates = await this.resolveMHRRates(accessToken, location, physics, rates);
 
     // Audit trail — non-blocking; costing must never wait on or fail with it
-    if (physics) void this.writeSelectionSnapshots(id, accessToken, mhrRates, location);
+    void this.writeSelectionSnapshots(id, accessToken, mhrRates, location);
 
     if (family === 'milled' || family === 'turned' || family === 'mill_turn') {
       const inspectionRules = await this.inspectionKnowledge.getInspectionRules(accessToken);
@@ -3086,33 +3051,34 @@ export class BOMItemsService {
         family as 'milled' | 'turned' | 'mill_turn',
         accessToken,
         resolveScenarioStockForm(item.scenarioOverrides),
+        this.resolveTurnedGeometry(fg, bbox),
       );
 
       // Fix 3 + 4: Feature-based cycle time from feature_graph_v2.
-      // machinabilityRating from cnc_features.material_machinability or raw_materials.
+      // machinabilityRating from machining_features.material_machinability or raw_materials.
       const matClass = detectMaterialClass(grade);
-      const machinabilityRating = (fg?.cnc_features?.material_machinability ?? null) as number | null;
+      const machinabilityRating = (fg?.machining_features?.material_machinability ?? null) as number | null;
       const machinabilityFactor = machinabilityRating != null ? machinabilityRating / 75 : 1.0;
 
       // Normalize FGV2 once — auto-fill stores it at root-level (featureGraph.feature_graph_v2)
-      // AND it is embedded inside cnc_features. Resolve once and use the single variable
+      // AND it is embedded inside machining_features. Resolve once and use the single variable
       // everywhere so every consumer is consistent and this fallback chain isn't duplicated.
-      const normalizedFGV2 = fg?.feature_graph_v2 ?? fg?.cnc_features?.feature_graph_v2 ?? null;
+      const normalizedFGV2 = fg?.feature_graph_v2 ?? fg?.machining_features?.feature_graph_v2 ?? null;
       const fgv2Features = (normalizedFGV2?.features ?? null) as unknown[] | null;
 
       // Stage 2 pipeline log — confirms which storage path had the data
       this.logger.debug(
         `[fgv2] root=${fg?.feature_graph_v2 ? 'present' : 'null'} ` +
-        `nested=${fg?.cnc_features?.feature_graph_v2 ? 'present' : 'null'} ` +
+        `nested=${fg?.machining_features?.feature_graph_v2 ? 'present' : 'null'} ` +
         `features=${fgv2Features?.length ?? 'null'} ` +
-        `cncKeys=${Object.keys(fg?.cnc_features ?? {}).join(',')}`,
+        `cncKeys=${Object.keys(fg?.machining_features ?? {}).join(',')}`,
       );
 
       // Real, hardness-matched Counterbore/Chamfer/Deburr/Ream data
       // (MachiningLookupService — tblCounterboring/tblChamfering/
       // tblDeburring/tblReaming) resolved once per part, reused across
       // every candidate machine class below via baseCncInput's spread.
-      const [counterboreTable, chamferParams, deburrParams, reamTable, gunDrillTable, deepBoreMaterials, cylindricalGrindingParams, jigBoreTable, broachingParams, wireEdmParams, turningParams, roundingParams] = await Promise.all([
+      const [counterboreTable, chamferParams, deburrParams, reamTable, gunDrillTable, deepBoreMaterials, cylindricalGrindingParams, internalGrindingParams, jigBoreTable, keywayBroach, wireEdmParams, turningParams, roundingParams, drillingTable, tappingTable, surfaceGrindingParams, operationSizeRanges, capabilityRuleSet] = await Promise.all([
         this.machiningLookup.getCounterboreTable(),
         this.machiningLookup.getChamferParams(matClass),
         this.machiningLookup.getDeburrParams(matClass),
@@ -3120,20 +3086,35 @@ export class BOMItemsService {
         this.machiningLookup.getGunDrillingTable(),
         this.machiningLookup.getDeepBoreMaterials(),
         this.machiningLookup.getCylindricalGrindingParams(matClass),
+        this.machiningLookup.getInternalGrindingParams(matClass),
         this.machiningLookup.getFinishBoringTable(),
-        this.machiningLookup.getBroachingParams(matClass),
+        this.machiningLookup.getKeywayBroachReference(),
         this.machiningLookup.getWireEdmParams(matClass),
         this.machiningLookup.getTurningParams(matClass),
         this.machiningLookup.getRoundingParams(matClass),
+        this.machiningLookup.getDrillingTable(),
+        this.machiningLookup.getTappingTable(),
+        this.machiningLookup.getSurfaceGrindingParams(matClass),
+        this.machiningLookup.getOperationSizeRanges(),
+        this.machiningLookup.getCapabilityRules(),
       ]);
+      const machiningCalculators = await this.resolveMachiningCalculators(accessToken);
+      const deepHoleRules = resolveDeepHoleRules(operationSizeRanges);
+      if (deepHoleRules.missing.length > 0) {
+        materialWarnings.push(
+          `Deep-hole routing (Gun Drilling / Deep Bore) not applied — tblOperationSizeRanges is missing: ` +
+          `${deepHoleRules.missing.join(', ')}. Deep holes are costed as ordinary drilling.`,
+        );
+      }
 
       const heatTreatment = ((item as any).heatTreatment ?? null) as string | null;
 
       // Deep-hole routing (Gun Drilling / Deep Bore Machine — see
-      // deep-hole-routing.ts): split any real L/D>5 occurrences out BEFORE
+      // deep-hole-routing.ts): split occurrences inside the reference
+      // Gun Drilling / Deep Boring size ranges (tblOperationSizeRanges) out BEFORE
       // building the regular operation sequence, so they're never double-
       // counted as a regular "Drill" op inside "CNC Milling" too.
-      const deepHoleSplit = splitDeepHoleOccurrences(fgv2Features);
+      const deepHoleSplit = splitDeepHoleOccurrences(fgv2Features, deepHoleRules.rules);
       // Keyway Broaching (see keyway-routing.ts): same pre-filter pattern,
       // chained after the deep-hole split so both filters compose —
       // fgv2Features can carry both a deep hole AND a keyway on the same part.
@@ -3142,17 +3123,37 @@ export class BOMItemsService {
       // after the keyway split — only pulls real "slot" occurrences when a
       // real heat-treat callout is present; otherwise a no-op pass-through.
       const wireEdmSplit = splitWireEdmOccurrences(keywaySplit.filteredFeatures, heatTreatment);
+      // Chemical milling (drawing callout): pockets are etched, not milled —
+      // priced on the Secondary Processes page (chemical-milling-engine.ts).
+      const polygonSplit = splitPolygonPockets(wireEdmSplit.filteredFeatures, fg?.machining_features?.polygon_candidates, polygonCallout((item as any).drawingIntelligence));
+      if (polygonSplit.removedPocketOccurrences > 0) {
+        materialWarnings.push(`Polygon callout: ${polygonSplit.removedPocketOccurrences} pocket(s) are polygon sockets — rotary broached, not milled.`);
+      }
+      const chemSplit = splitChemicallyMilledPockets(polygonSplit.filteredFeatures, chemicalMillingCallout((item as any).drawingIntelligence));
+      if (chemSplit.etchedPocketGroups > 0) {
+        materialWarnings.push(`Chemical milling callout: ${chemSplit.etchedPocketGroups} pocket group(s) are etched, not milled — see Mask Cure / Scribe / Etch Cell / DeMask on the Secondary Processes page.`);
+      }
 
       const rawFeatureOps = buildOperationSequence(
-        wireEdmSplit.filteredFeatures, matClass, machinabilityFactor, grade,
+        chemSplit.filteredFeatures, matClass, machinabilityFactor, grade,
         counterboreTable, chamferParams.dataFound ? chamferParams.linearSpeedMmPerSec : null,
         roundingParams.dataFound ? roundingParams.linearSpeedMmPerSec : null,
+        drillingTable,
+        machiningCalculators,
+        tappingTable,
       );
+      // Ops the sequencer could not price from real inputs (missing CAD
+      // measurement or lookup row) — reported, never estimated.
+      const unpricedOpWarnings = rawFeatureOps
+        .filter((o) => o.missing)
+        .map((o) => `${o.name} not priced — missing real input: ${o.missing}.`);
       // Fix 5: inject drawing intelligence overrides into the operation list
       const allFeatureOps = injectDrawingIntelligence(
         rawFeatureOps,
         item.drawingIntelligence as Record<string, any> | null,
         grade,
+        tappingTable,
+        machiningCalculators,
       );
 
       // Stage 3 pipeline log — confirms what the operation sequencer produced
@@ -3183,13 +3184,7 @@ export class BOMItemsService {
       );
 
       const surfaceTreatmentDbRate = await this.resolveSurfaceTreatmentDbRate(
-        accessToken,
-        classifySurfaceTreatment(this.resolveSurfaceTreatment(item)),
-        location,
-        rates,
-        this.resolveSurfaceTreatment(item),
-        (item.surfaceArea ?? 0) as number,
-        batchSize,
+        accessToken, item, location, this.resolveSurfaceTreatment(item), batchSize,
       );
 
       const cncMachineClassesForIdentity = [
@@ -3220,15 +3215,16 @@ export class BOMItemsService {
         maxWidth:  bbox.width,
         maxHeight: bbox.height,
         holeCount,
-        holeGroups: (summary.holeGroups ?? []) as Array<{ diameter_mm: number; count: number }>,
-        pocketCount: (fg?.cnc_features?.feature_summary?.pockets ?? 0) as number,
+        holeGroups: this.resolveMachiningHoleGroups(fg, summary),
+        sharpEdgeLengthMm: (fg?.machining_features?.edges?.sharp_edge_length_mm ?? null) as number | null,
+        pocketCount: machiningFeatureCounts(fg?.machining_features)?.pockets ?? 0,
         materialGrade: grade,
         materialCostPerKg,
         materialDensityKgM3,
         materialSource,
         threads: this.resolveThreads(threads, fg),
         tightestToleranceMm: ((item as any).tightestToleranceMm ?? null) as number | null,
-        gdtFeatureCount: (fg?.cnc_features?.feature_summary?.gdt_features ?? 0) as number,
+        gdtFeatureCount: resolveGdtCallouts(fg, item.drawingIntelligence).length,
         batchSize,
         family,
         finishedWeightKg: ((item as any).weight ?? 0) as number,
@@ -3241,14 +3237,25 @@ export class BOMItemsService {
         surfaceTreatmentDbRate,
         samplingPerN: this.resolveSamplingPerN(item),
         samplingPolicy,
-        gdtFeatures: this.extractGdtFeatures(item, inspectionRules),
+        gdtFeatures: this.extractGdtFeatures(item, fg, inspectionRules),
         location,
         blankResult,
         machinabilityRating: machinabilityRating ?? undefined,
         featureOps: featureOps,
         processIdentityByMachineClass: cncProcessIdentities,
         deburrLinearSpeedMmPerSec: deburrParams.dataFound ? deburrParams.linearSpeedMmPerSec : null,
+        deburrMaterialCutCode: deburrParams.dataFound ? deburrParams.materialCutCode ?? null : null,
         reamTable,
+        drillingTable,
+        tappingTable,
+        machiningCalculators,
+        workholderTable: await this.machiningLookup.getWorkholderTable(),
+        toothForms: this.resolveToothForms(fg),
+        hobRate: mhrRates.hobMachine,
+        hobbing: await this.machiningLookup.getHobbingReference(),
+        ...(await this.gearInputs(item, mhrRates)),
+        partoffTable: await this.machiningLookup.getPartoffTable(),
+        turnedGeometry: this.resolveTurnedGeometry(fg, bbox),
         gunDrillCandidates: deepHoleSplit.gunDrillCandidates,
         deepBoreCandidates: deepHoleSplit.deepBoreCandidates,
         gunDrillTable,
@@ -3260,11 +3267,18 @@ export class BOMItemsService {
         cylindricalGrindingRate: mhrRates.cylindricalGrinder,
         jigBoreTable,
         jigBoreRate: mhrRates.jigBore,
+        capabilityRules: capabilityRuleSet.rules,
+        capabilityRulesMissing: capabilityRuleSet.missing,
         heatTreatment,
         jigGrindRate: mhrRates.jigGrind,
+        internalGrindingParams,
         internalGrindingRate: mhrRates.internalGrinder,
+        planarFaces: this.resolvePlanarFaces(fg),
+        surfaceGrindingParams,
+        surfaceGrindingRate: mhrRates.surfaceGrinder,
+        ...(await this.polygonInputs(item, fg)),
         keywayCandidates: keywaySplit.keywayCandidates,
-        broachingParams,
+        keywayBroach,
         broachRate: mhrRates.broach,
         wireEdmCandidates: wireEdmSplit.wireEdmCandidates,
         wireEdmParams,
@@ -3278,8 +3292,10 @@ export class BOMItemsService {
       // candidates, gated by the class the part's features demand). The old
       // difficulty-only pick here diverged from Route Comparison's lowest-cost
       // badge — two prices for the same part is a P0 for quoting.
-      const pockets = (fg?.cnc_features?.feature_summary?.pockets ?? 0) as number;
-      const requiredClass = requiredMilledMachineClass(fg?.difficultyLevel as string | null, pockets);
+      const axisRequirement = requiredMilledClassFromToolAxes(
+        fg?.feature_graph_v2?.features, (await this.machiningLookup.getSetupAxisRule()).rule,
+      );
+      const requiredClass = axisRequirement.required as MachineClassId | null;
 
       // Discovered from the database (real mhr_records rows joined through
       // process_taxonomy.machining_route_role), not a fixed 3-member array —
@@ -3294,6 +3310,7 @@ export class BOMItemsService {
         ['3_axis_lathe', mhrRates.lathe3ax],
         ['2_axis_bar_feed_lathe_with_sub_spindle', mhrRates.latheBarFeed2ax],
         ['3_axis_bar_feed_lathe_with_sub_spindle', mhrRates.latheBarFeed3ax],
+        ['machining_millturn', mhrRates.machiningMillturn],
       ]);
       const discoveredPrimaryClasses = await this.machineDiscoveryService.getEligibleClasses(
         family === 'milled' ? 'primary_milling' : 'primary_turning', location, accessToken,
@@ -3352,7 +3369,8 @@ export class BOMItemsService {
             : 'No costed route fully satisfies the part envelope/complexity — showing the closest option; review machine capability.',
         );
       }
-      cncResult.warnings.push(...materialWarnings);
+      cncResult.warnings.push(...materialWarnings, ...unpricedOpWarnings);
+      if (family === 'milled' && !requiredClass) cncResult.warnings.push(axisRequirement.reason);
       this.attachMachineSelections(cncResult.processLines, mhrRates);
       // Attach eMithran-style feature-level breakdown to the primary milling
       // process line. Was string-matching on the displayed process NAME
@@ -3361,7 +3379,12 @@ export class BOMItemsService {
       // (e.g. "5 Axis Mill", which does not contain the substring "Milling").
       // Matching on the real resolved machineClass instead is strictly more
       // correct and no longer coupled to what label happens to be displayed.
-      if (featureOps && featureOps.length > 0) {
+      // The sequencer's ops are milling operations (Facing, Rough Milling,
+      // Center Drilling, ...): they describe a milled route only. A turned
+      // route's lines carry their own per-operation calculation trace, so a
+      // milling breakdown is never attached to a lathe line.
+      const recommendedIsMilling = getEnginesForFamily('milling').some((e) => e.machineClass === recommended.cls);
+      if (featureOps && featureOps.length > 0 && recommendedIsMilling) {
         const breakdown = this.buildMachiningFeatureBreakdown(featureOps, recommended.cls, realOperationCategories, cncResult.warnings);
         if (breakdown.length > 0) {
           const millLine = cncResult.processLines.find((l) => l.machineClass === recommended.cls);
@@ -3377,7 +3400,7 @@ export class BOMItemsService {
           if (line.process === 'Tapping') line.machineSelection = tapSelection;
         }
       }
-      this.appendRateWarnings(cncResult, location, mhrRates.benchmarkMap, rateWarnThresholds);
+      this.appendRateWarnings(cncResult, location);
       this.applyCostOverrides(cncResult, costOverrides);
       if (costOverrides.size > 0) cncResult.costOverrides = Object.fromEntries(costOverrides);
       // Root cause (confirmed live, 2026-09-18): the real stock FORM/SIZE
@@ -3460,49 +3483,28 @@ export class BOMItemsService {
         ((item as any).maxWidth ?? 0) as number,
         ((item as any).maxHeight ?? 0) as number,
       ].sort((a, b) => b - a);
-      // Real, confirmed live gap (2026-09-11): this used to look up machine
-      // capability by NAME against seed-registry.ts's ~40-entry regex pattern
-      // list (lookupSeedCapability) — a name-guessing fallback meant for a
-      // machine with no real DB row at all. But mhrRates.injectionMolding was
-      // already resolved (physics-based selectMachine(), above) against the
-      // REAL machine pool, and that resolution already carries the exact
-      // machine's own real mhr_records.max_tonnage/shot_capacity_grams on
-      // its candidate — the name-pattern lookup was silently discarding that
-      // real, already-resolved data and re-guessing from the name string
-      // instead, which is exactly why an unlisted real machine name (e.g.
-      // "Netstal Synergy 1200", not one of the ~40 patterns) fell through to
-      // undefined every time, regardless of what was actually in the DB for
-      // it. Read the real, already-resolved capability directly; only fall
-      // back to the name-pattern guess for the genuine gap that mechanism
-      // exists for — a class-default/synthetic candidate with no real DB row
-      // to read from at all.
+      // The selected press's real clamp tonnage and shot capacity, from its own
+      // machine record. No name-pattern guess and no "0.9 x tonnage" shot rule:
+      // without them the engine does not size cavities and marks the molding
+      // line incomplete.
       const selectedImCandidate = mhrRates.injectionMolding.selection?.balanced?.candidate;
-      const machineSpec = selectedImCandidate?.capability?.maxTonnage != null
-        ? selectedImCandidate.capability
-        : lookupSeedCapability(mhrRates.injectionMolding.machineName);
-      // Tonnage from machine name → kN (1 metric ton = 10 kN).
-      const clampTonnageKN = machineSpec?.maxTonnage != null ? machineSpec.maxTonnage * 10 : undefined;
-      // Shot capacity: real mhr_records.shot_capacity_grams when the resolved
-      // candidate has one, converted to cm³ via this part's real material
-      // density (same real conversion getRouteComparison's tier loop already
-      // uses) — else the ~0.9 × tonnage industry rule of thumb (see
-      // cost-injection-molding-engine.ts) used only for the seed/synthetic
-      // fallback path, which has no real shot-capacity column to read.
-      const shotCapacityCm3 = selectedImCandidate?.capability?.shotCapacityGrams != null && materialDensityKgM3 > 0
-        ? selectedImCandidate.capability.shotCapacityGrams / (materialDensityKgM3 / 1000)
-        : machineSpec?.maxTonnage != null ? machineSpec.maxTonnage * 0.9 : undefined;
+      const machineClampTonnes = selectedImCandidate?.capability?.maxTonnage ?? null;
+      const machineShotCapacityG = selectedImCandidate?.capability?.shotCapacityGrams ?? null;
+      // The press's own HR Rates row: injection rate, dry cycle, good-part yield.
+      const pressRecord = selectedImCandidate?.machineId
+        ? (await this.plasticReferenceService.getPressRecords(this.supabaseService.getClient(accessToken), [selectedImCandidate.machineId])).get(selectedImCandidate.machineId) ?? null
+        : null;
 
-      // Wall thickness: prefer CAD-extracted nominal value. When unavailable (0),
-      // fall back to the minimum bounding-box dimension — for flat/thin-walled
-      // parts like covers and housings this is physically correct. Cap at 20mm
-      // so a thick block doesn't misidentify its section height as a wall.
-      const cadWallMm = (summary.wallThicknessNominalMm ?? 0) as number;
-      const bboxMinMm = imBbox[2] ?? 0;
-      const effectiveWallMm = cadWallMm > 0
-        ? cadWallMm
-        : (bboxMinMm > 0 && bboxMinMm <= 20 ? bboxMinMm : 0);
+      // Wall thickness: the CAD nominal wall only. Without it the cycle time is
+      // not derivable and the engine says so (no bounding-box stand-in).
+      const effectiveWallMm = (summary.wallThicknessNominalMm ?? 0) as number;
 
+      const activePlasticRef = await this.plasticReferenceService.getReference();
       const imInput: InjectionMoldingCostInput = {
+        plasticReference: activePlasticRef.reference,
+        plasticReferenceMissing: activePlasticRef.missing,
+        location,
+        materialType,
         volume: (item.volume ?? 0) as number,
         surfaceArea: (item.surfaceArea ?? 0) as number,
         wallThicknessNominalMm: effectiveWallMm,
@@ -3515,8 +3517,12 @@ export class BOMItemsService {
         mhrRate: mhrRates.injectionMolding,
         deburrRate: mhrRates.deburring,
         inspectionRate: mhrRates.inspection,
-        clampTonnageKN,
-        shotCapacityCm3,
+        machineClampTonnes,
+        machineShotCapacityG,
+        pressTiming: pressRecord,
+        goodPartYield: pressRecord?.goodPartYield ?? null,
+        cavityCountOverride: resolveScenarioCavityCount(item.scenarioOverrides),
+        materialClamp: clampProperties,
         // Tooling amortization — both values come from the canonical costing
         // input resolver above, never re-read from the item or hardcoded here.
         annualVolume: annualVolume ?? undefined,
@@ -3549,58 +3555,11 @@ export class BOMItemsService {
       const imResult = { ...computeInjectionMoldedCostSummary(imInput), ...currencyMeta };
       imResult.warnings.push(...materialWarnings);
 
-      // Real clamp/shot tonnage math for the ACTIVE quote's selected machine —
-      // same per-polymer-family clamp-factor table and formula
-      // (resolveMaterialClampFactor, machine-selector-im.ts) evaluateIMCandidate
-      // already uses to accept/reject/score machines during route comparison
-      // (getRouteComparison, below). Confirmed live gap (2026-09-11): this
-      // single active/applied quote never ran that real per-material formula
-      // at all — only the cruder melting-point-tiered "Estimated clamp force"
-      // warning text (which has no per-material factor, no cavity-count
-      // scaling, no real selected-machine tonnage). Both numbers can diverge
-      // for materials outside the two crude Tm bands, and neither was ever
-      // shown as a structured, sourced number a user could inspect — just a
-      // pre-formatted warning sentence. Computed only when a real projected
-      // area exists (same gate the warning text above already uses).
-      if (imResult.injectionMolding && imBbox[0] * imBbox[1] > 0) {
-        const projAreaCm2 = (imBbox[0] * imBbox[1]) / 100;
-        const materialClampFactor = resolveMaterialClampFactor(grade);
-        const cavityCount = imResult.injectionMolding.cavityCount;
-        const clampRequiredT = projAreaCm2 * cavityCount * materialClampFactor * 1.15;
-        const clampMachineT = machineSpec?.maxTonnage ?? null;
-        const clampUtilPct = clampMachineT != null && clampMachineT > 0
-          ? Math.round((clampRequiredT / clampMachineT) * 1000) / 10
-          : null;
-
-        // Shot requirement: this engine's own per-part gross (shot) weight —
-        // grossWeightKg already includes ITS OWN runner-scrap% allowance
-        // (see runnerPct above) — extended to a full multi-cavity shot with
-        // the same 1.10 real-world margin evaluateIMCandidate applies.
-        // Deliberately NOT re-deriving runner weight via the tier-loop's
-        // separate real-geometry method (estimateRunnerVolumeCm3) — that is a
-        // different, also-real runner-accounting convention, and mixing the
-        // two would double-count the runner allowance.
-        const shotRequiredG = imResult.grossWeightKg * 1000 * cavityCount * 1.10;
-        const shotMachineG = machineSpec?.shotCapacityGrams ?? null;
-        const shotUtilPct = shotMachineG != null && shotMachineG > 0
-          ? Math.round((shotRequiredG / shotMachineG) * 1000) / 10
-          : null;
-
-        imResult.injectionMolding = {
-          ...imResult.injectionMolding,
-          projectedAreaCm2: Math.round(projAreaCm2 * 10) / 10,
-          materialClampFactor,
-          clampRequiredT: Math.round(clampRequiredT * 10) / 10,
-          clampMachineT,
-          clampUtilPct,
-          shotRequiredG: Math.round(shotRequiredG * 10) / 10,
-          shotMachineG,
-          shotUtilPct,
-        };
-      }
+      // Clamp / shot sizing against the selected press is computed by the engine
+      // (reference clamp model, clamp-force.ts) and returned on injectionMolding.
 
       this.attachMachineSelections(imResult.processLines, mhrRates);
-      this.appendRateWarnings(imResult, location, mhrRates.benchmarkMap, rateWarnThresholds);
+      this.appendRateWarnings(imResult, location);
       this.applyCostOverrides(imResult, costOverrides);
       if (costOverrides.size > 0) imResult.costOverrides = Object.fromEntries(costOverrides);
       return {
@@ -4111,7 +4070,10 @@ export class BOMItemsService {
       ? 0
       : smNetWeightCalc?.outputs['Net Usage'] ??
         (flatPatternAreaMm2 * sheetThicknessMm / 1e9) * materialDensityKgM3;
-    let smNestingResult = hasValidDimensions && smNetWeightKg > 0
+    const smPartAllowanceMm = hasValidDimensions
+      ? computePartAllowanceMm(await this.smLookup.getPartSpacingTable(), sheetThicknessMm)
+      : null;
+    let smNestingResult = hasValidDimensions && smNetWeightKg > 0 && smPartAllowanceMm != null
       ? computeNesting({
           flatPatternLengthMm: nestLMm,
           flatPatternWidthMm: nestWMm || Math.sqrt(flatPatternAreaMm2),
@@ -4121,6 +4083,7 @@ export class BOMItemsService {
           materialPricePerKg: materialCostPerKg,
           scrapPricePerKg: smScrapPricePerKg,
           quantityRequired: batchSize,
+          partAllowanceMm: smPartAllowanceMm,
         })
       : undefined;
 
@@ -4137,8 +4100,11 @@ export class BOMItemsService {
     let smCalculatorVersion: number | undefined;
     let smCalculationTrace: CalculationTraceStep[] | undefined;
     let smCalculatorConfidence: ConfidenceLevel | undefined;
-    if (hasValidDimensions && smNetWeightKg > 0) {
-      const partAllowanceMm = computePartAllowanceMm(sheetThicknessMm);
+    if (hasValidDimensions && smNetWeightKg > 0 && smPartAllowanceMm == null) {
+      smNestingFallbackReason = BOMItemsService.PART_SPACING_GAP;
+    }
+    if (hasValidDimensions && smNetWeightKg > 0 && smPartAllowanceMm != null) {
+      const partAllowanceMm = smPartAllowanceMm;
       const hasQty = typeof batchSize === 'number' && batchSize > 0;
       // Gross usage resolves through the "Sheet Metal - Gross Material Usage
       // (Nesting)" calculator (physics_key='sheet_metal_gross_usage_nesting')
@@ -4249,13 +4215,7 @@ export class BOMItemsService {
 
     const smTreatment = this.resolveSurfaceTreatment(item);
     const smSurfaceTreatmentDbRate = await this.resolveSurfaceTreatmentDbRate(
-      accessToken,
-      classifySurfaceTreatment(smTreatment),
-      location,
-      rates,
-      smTreatment,
-      (item.surfaceArea ?? 0) as number,
-      batchSize,
+      accessToken, item, location, smTreatment, batchSize,
     );
     const smProcessIdentities = await this.resolveProcessIdentities(accessToken, [
       mhrRates.laser.machineClass,
@@ -4281,14 +4241,8 @@ export class BOMItemsService {
       ? smRealBendLengths.map((len, i) => ({ lengthMm: len, radiusMm: smBendRadiiForInspection[i] }))
       : Array.from({ length: bendCount }, () => ({}));
     const smDrawingIntel = (item.drawingIntelligence ?? null) as Record<string, any> | null;
-    // gdt_callouts is real today but always [] — cad-engine/drawing_analyzer.py's
-    // GD&T extraction (Module 3) isn't built yet. Mapped defensively so this
-    // engine is ready the moment real data arrives, without assuming a shape
-    // that was never actually produced.
-    const smGdtCallouts = ((smDrawingIntel?.gdt_callouts ?? []) as any[]).map((c) => ({
-      type: String(c.type ?? c.symbol ?? ''),
-      toleranceMm: Number(c.toleranceMm ?? c.tolerance_mm ?? 0),
-    }));
+    // GD&T: STEP-model PMI, else drawing callouts (resolveGdtCallouts).
+    const smGdtCallouts = resolveGdtCallouts(fg, item.drawingIntelligence).map((c) => ({ type: c.type, toleranceMm: c.toleranceMm }));
     const smCmmRate = await this.resolveCmmSpecificRate(accessToken, location, rates, materialWarnings);
     const smGenericInspectionRate = await this.resolveGenericInspectionRate(accessToken, location, rates, materialWarnings);
 
@@ -4642,7 +4596,7 @@ export class BOMItemsService {
       );
     }
     await this.attachSavedMachineExplanations(smResult.processLines, id, accessToken, location);
-    this.appendRateWarnings(smResult, location, mhrRates.benchmarkMap, rateWarnThresholds);
+    this.appendRateWarnings(smResult, location);
     this.applyCostOverrides(smResult, costOverrides);
     if (costOverrides.size > 0) smResult.costOverrides = Object.fromEntries(costOverrides);
     if (flatPatternAreaMm2 > 0 && sheetThicknessMm > 0 && materialDensityKgM3 > 0) {
@@ -4846,10 +4800,10 @@ export class BOMItemsService {
     const measuredFlatAreaMm2 = (summary.flatPatternAreaMm2 ?? item.flatPatternAreaMm2 ?? 0) as number;
     // Fix 1 (route comparison): same CNC hole-count logic as getCostSummary — prefer
     // feature recognizer counts over raw cylinder count to keep summary ≡ route invariant.
-    const cncFeatureSummaryRC = fg?.cnc_features?.feature_summary ?? null;
+    const cncFeatureSummaryRC = machiningFeatureCounts(fg?.machining_features);
     const holeCount = (
       cncFeatureSummaryRC !== null && (family === 'milled' || family === 'turned' || family === 'mill_turn')
-        ? ((cncFeatureSummaryRC.through_hole ?? 0) + (cncFeatureSummaryRC.blind_hole ?? 0))
+        ? cncFeatureSummaryRC.drilledHoles
         : (summary.holeCount ?? item.holeCount ?? 0)
     ) as number;
 
@@ -4907,6 +4861,9 @@ export class BOMItemsService {
       meltingTempC: rcMeltingTempC, moldTempC: rcMoldTempC, ejectionTempC: rcEjectionTempC,
       specificHeatMeltJgC: rcSpecificHeatMeltJgC, thermalConductivityMeltWMK: rcThermalConductivityMeltWMK,
       cureTimeMinFromMaterial: rcCureTimeMinFromMaterial,
+      materialType: rcMaterialType,
+      clampProperties: rcClampProperties,
+      densityOfMeltKgM3: rcDensityOfMeltKgM3,
     } = await this.resolveMaterialForFamily({
         accessToken,
         grade,
@@ -4914,6 +4871,7 @@ export class BOMItemsService {
         materialCol: locInfo.materialCol,
         rates,
         locCurrencyCode: locInfo.code,
+        location,
         warnings: comparisonWarnings,
       });
     // Real per-grade Injection Molding thermal/cure-time properties — same
@@ -4921,7 +4879,7 @@ export class BOMItemsService {
     const rcRealResinInputs = {
       meltingTempC: rcMeltingTempC, moldTempC: rcMoldTempC, ejectionTempC: rcEjectionTempC,
       specificHeatMeltJgC: rcSpecificHeatMeltJgC, thermalConductivityMeltWMK: rcThermalConductivityMeltWMK,
-      densityKgM3: materialDensityKgM3 > 0 ? materialDensityKgM3 : null,
+      densityOfMeltKgM3: rcDensityOfMeltKgM3,
     };
 
     const realMaxBendLengthMm = ((fg?.summary?.bendLengths ?? []) as number[]).length > 0
@@ -4965,8 +4923,10 @@ export class BOMItemsService {
     // already plays in cost-engine.ts — never a substitute for a resolvable
     // true-shape result.
     let grossWeightKg = netWeightKg * (1 + MATERIAL_OVERHEAD_PCT / 100);
-    if (family === 'sheet_metal' && netWeightKg > 0) {
-      const partAllowanceMm = computePartAllowanceMm(sheetThicknessMm);
+    const partAllowanceMm = family === 'sheet_metal' && netWeightKg > 0
+      ? computePartAllowanceMm(await this.smLookup.getPartSpacingTable(), sheetThicknessMm)
+      : null;
+    if (partAllowanceMm != null) {
       const trueShape = await this.resolveTrueShapeNestCosting(
         item.id, summary, netWeightKg, materialDensityKgM3, sheetThicknessMm,
         partAllowanceMm, EDGE_ALLOWANCE_MM, userId, accessToken,
@@ -4978,8 +4938,7 @@ export class BOMItemsService {
     const materialCost = this.r2(grossWeightKg * materialCostPerKg);
 
     // ── MHR rates ──────────────────────────────────────────────────────────────
-    const physics = this.physicsSelectionEnabled()
-      ? {
+    const physics = {
           requirements: await this.buildPartRequirements({
             family,
             grade,
@@ -4991,9 +4950,15 @@ export class BOMItemsService {
             bboxXMm: (((item as any).maxLength ?? 0) as number),
             bboxYMm: (((item as any).maxWidth ?? 0) as number),
             bboxZMm: (((item as any).maxHeight ?? 0) as number),
+            turnedGeometry: this.resolveTurnedGeometry(fg, {
+              length: ((item as any).maxLength ?? 0) as number,
+              width: ((item as any).maxWidth ?? 0) as number,
+              height: ((item as any).maxHeight ?? 0) as number,
+            }),
             weightKg: (((item as any).weight ?? 0) as number),
             bendLengthsMm: (fg?.summary?.bendLengths ?? []) as number[],
             utsMpa,
+            materialClamp: rcClampProperties,
             extrudedFlangeCount: fg?.summary?.extrudedFlangeCount ?? 0,
             burlDiameterMm: estimateBurlDiameterMm(threads, (fg?.summary?.holeDiameters ?? []) as number[]),
             cutLengthMm,
@@ -5002,11 +4967,9 @@ export class BOMItemsService {
             accessToken,
           }),
           overrides: await this.fetchMachineOverrides(id, accessToken, location),
-        }
-      : undefined;
+        };
 
-    const rateWarnThresholds = await this.loadRateWarnThresholds(accessToken, comparisonWarnings);
-    const mhrRates = await this.resolveMHRRates(accessToken, location, physics, family, rates, comparisonWarnings, rateWarnThresholds);
+    const mhrRates = await this.resolveMHRRates(accessToken, location, physics, rates);
 
     // ── Shared eMithranTerms() context (Platform Architecture Remediation
     // Phase 1, engine registry unification) — resolved ONCE here, identically
@@ -5310,8 +5273,6 @@ export class BOMItemsService {
       this.appendRateWarnings(
         { processLines: dto.routes.flatMap((r) => r.processLines), warnings: dto.comparisonWarnings },
         location,
-        mhrRates.benchmarkMap,
-        rateWarnThresholds,
       );
       // Snapshot the pre-conversion routes for applyRoute (P1b-iv-c). Taken
       // here, immediately before the one conversion point, so what the writer
@@ -5361,13 +5322,7 @@ export class BOMItemsService {
     // Both are non-blocking: null / 0 triggers warnings in the cost engine, not crashes.
     const [cncSurfaceTreatmentDbRate, waterjetAbrasivePricePerKg] = await Promise.all([
       this.resolveSurfaceTreatmentDbRate(
-        accessToken,
-        classifySurfaceTreatment(this.resolveSurfaceTreatment(item)),
-        location,
-        rates,
-        this.resolveSurfaceTreatment(item),
-        (item.surfaceArea ?? 0) as number,
-        batchSize,
+        accessToken, item, location, this.resolveSurfaceTreatment(item), batchSize,
       ),
       this.resolveConsumablePrice(accessToken, 'garnet_abrasive', location, rates),
     ]);
@@ -5383,12 +5338,13 @@ export class BOMItemsService {
       // primary quote (see this file's own "Single source of truth" rule
       // for CNC route selection).
       const routeMatClass = detectMaterialClass(grade);
-      const [routeDeburrParams, routeReamTable, routeCylindricalGrindingParams, routeJigBoreTable, routeBroachingParams, routeWireEdmParams, routeTurningParams] = await Promise.all([
+      const [routeDeburrParams, routeReamTable, routeCylindricalGrindingParams, routeInternalGrindingParams, routeJigBoreTable, routeKeywayBroach, routeWireEdmParams, routeTurningParams] = await Promise.all([
         this.machiningLookup.getDeburrParams(routeMatClass),
         this.machiningLookup.getReamTable(),
         this.machiningLookup.getCylindricalGrindingParams(routeMatClass),
+        this.machiningLookup.getInternalGrindingParams(routeMatClass),
         this.machiningLookup.getFinishBoringTable(),
-        this.machiningLookup.getBroachingParams(routeMatClass),
+        this.machiningLookup.getKeywayBroachReference(),
         this.machiningLookup.getWireEdmParams(routeMatClass),
         this.machiningLookup.getTurningParams(routeMatClass),
       ]);
@@ -5398,7 +5354,7 @@ export class BOMItemsService {
           id, item, fg, summary, grade, materialCostPerKg, materialDensityKgM3,
           materialSource, mhrRates, batchSize, comparisonWarnings, locInfo, location,
           inspection, cncSurfaceTreatmentDbRate, routeDeburrLinearSpeed, routeReamTable,
-          routeJigBoreTable, routeCylindricalGrindingParams, routeBroachingParams, routeWireEdmParams,
+          routeJigBoreTable, routeCylindricalGrindingParams, routeInternalGrindingParams, routeKeywayBroach, routeWireEdmParams,
           accessToken,
         ));
       }
@@ -5406,7 +5362,7 @@ export class BOMItemsService {
         id, item, fg, summary, grade, materialCostPerKg, materialDensityKgM3,
         materialSource, mhrRates, batchSize, comparisonWarnings, locInfo, location,
         inspection, cncSurfaceTreatmentDbRate, routeDeburrLinearSpeed, routeReamTable,
-        routeCylindricalGrindingParams, routeJigBoreTable, routeBroachingParams, routeWireEdmParams,
+        routeCylindricalGrindingParams, routeInternalGrindingParams, routeJigBoreTable, routeKeywayBroach, routeWireEdmParams,
         routeTurningParams,
         accessToken,
       ));
@@ -5418,7 +5374,7 @@ export class BOMItemsService {
         materialCostPerKg: 0, materialSource,
         currency: locInfo.code, currencySymbol: locInfo.symbol,
         routes: [{
-          routeId: 'cnc-3ax' as const,
+          routeId: '3_axis_mill' as const,
           routeLabel: 'Upload 3D Model for Routing',
           processFamily: 'cutting' as const,
           toolingVolumeNote: null,
@@ -5451,11 +5407,8 @@ export class BOMItemsService {
         ((item as any).maxWidth ?? 0) as number,
         ((item as any).maxHeight ?? 0) as number,
       ].sort((a, b) => b - a);
-      const cadWallMmRC = (summary.wallThicknessNominalMm ?? 0) as number;
-      const bboxMinMmRC = imBboxRC[2] ?? 0;
-      const effectiveWallMmRC = cadWallMmRC > 0
-        ? cadWallMmRC
-        : (bboxMinMmRC > 0 && bboxMinMmRC <= 20 ? bboxMinMmRC : 0);
+      // CAD nominal wall only (see the active quote).
+      const effectiveWallMmRC = (summary.wallThicknessNominalMm ?? 0) as number;
       const projectedAreaMm2 = imBboxRC[0] * imBboxRC[1] > 0 ? imBboxRC[0] * imBboxRC[1] : null;
       const partVolumeMm3 = (item.volume ?? 0) as number;
 
@@ -5472,36 +5425,22 @@ export class BOMItemsService {
         insertCount: (summary.insertCandidateCount as number) > 0 ? (summary.insertCandidateCount as number) : null,
       };
 
-      // Cavity count estimation for pre-selection clamp requirement
-      const cavityCountEst = projectedAreaMm2 != null
-        ? recommendCavityCount({
-            projectedAreaMm2,
-            // DOCUMENTED GAP (2026-09-06): a fabricated 10,000/yr stand-in for
-            // parts with no real annual volume on file. Left in place only
-            // because removing it honestly requires changing
-            // recommendCavityCount's contract so the economic constraint can
-            // simply not bind — an injection-molding engine change outside this
-            // change's scope. It affects machine PRE-SELECTION only, never a
-            // quoted sheet-metal cost. The volume itself is now the resolved
-            // canonical input rather than a re-read of the item.
-            annualVolume: annualVolume ?? 10_000,
-            clampTonnageKN: 2000, // neutral 200T baseline for pre-selection
-            shotCapacityCm3: 180,
-            partVolumeMm3,
-            gateType: 'edge',
-          }).count
-        : 1;
-
-      // Runner volume estimate: 10% of part volume for cold runner; 0 for hot
-      const runnerVolumeMm3 = partVolumeMm3 * 0.10;
-
-      const imReq: IMSelectionRequirements = {
+      const plasticRefSet = await this.plasticReferenceService.getReference();
+      const plasticRef = plasticRefSet.reference;
+      // Presses are pre-selected on a single-cavity basis (cavities depend on the
+      // press); each tier's engine run then sizes cavities against its real press.
+      const imReq: Omit<IMSelectionRequirements, 'clampModel'> = {
         projectedAreaMm2,
-        cavityCount: cavityCountEst,
-        partVolumeMm3,
-        runnerVolumeMm3,
-        materialDensityKgM3,
-        materialGrade: grade,
+        cavityCount: 1,
+        // Same shot rule the engine uses (shot-size.ts), cold runner, one cavity.
+        shotGppsGPerCavity: shotGppsGramsPerCavity({
+          shotWeightKg: shotWeightKgPerPart((partVolumeMm3 / 1e9) * materialDensityKgM3, 'cold'),
+          meltDensityKgM3: rcDensityOfMeltKgM3,
+          reference: plasticRef,
+        }),
+        material: rcClampProperties,
+        materialLabel: grade ?? 'this material',
+        runner: 'cold',
         partLengthMm: imBboxRC[0] > 0 ? imBboxRC[0] : null,  // largest bbox dim
         partWidthMm: imBboxRC[1] > 0 ? imBboxRC[1] : null,
         partHeightMm: imBboxRC[2] > 0 ? imBboxRC[2] : null,
@@ -5511,39 +5450,66 @@ export class BOMItemsService {
 
       // Fetch machine pool and run tier-based 4-constraint selection.
       // Each tier (Small ≤120T / Standard 121–350T / Large 351T+) picks the best
-      // DB machine in range; falls back to a synthetic class rate when the DB has
-      // no machine for that tier so the comparison always shows 3 routes.
-      let tierResults: ReturnType<typeof selectIMmachinesByTier> = [];
-      try {
-        const pool = await fetchMachinePool(this.supabaseService.getClient(accessToken), location);
-        tierResults = selectIMmachinesByTier(pool, imReq);
-      } catch (e) {
-        this.logger.warn(
-          `IM machine selection failed, using synthetic fallback: ${e instanceof Error ? e.message : e}`,
-        );
+      // real HR Rates press in range. A tier with no real press — or whose press
+      // has no real clamp/shot capacity on file — is NOT offered: there is no
+      // synthetic press, rate multiplier or stand-in clamp/shot spec.
+      const pool = await fetchMachinePool(this.supabaseService.getClient(accessToken), location);
+      if (!plasticRef) {
+        comparisonWarnings.push(`Injection presses not evaluated: Plastic reference data missing (${plasticRefSet.missing.join('; ')}).`);
       }
-
-      // If pool fetch failed entirely, seed an empty tier structure
-      if (tierResults.length === 0) {
-        tierResults = [
-          { tierId: 'small',  tierLabel: 'Small Press',    evaluation: null, syntheticTonnageT: 100  },
-          { tierId: 'medium', tierLabel: 'Standard Press', evaluation: null, syntheticTonnageT: 200  },
-          { tierId: 'large',  tierLabel: 'Large Press',    evaluation: null, syntheticTonnageT: 500  },
-        ];
-      }
-
-      // MHR rate multipliers relative to the DB-selected standard rate
-      // USA reference: 100T≈$65/hr (0.76×), 200T≈$85/hr (1.0×), 500T≈$130/hr (1.53×)
-      // These ratios hold across all locations since they scale from the same baseline.
-      const baseMhrRate = mhrRates.injectionMolding.rate;
-      const TIER_RATE_MULT: Record<string, number> = { small: 0.76, medium: 1.00, large: 1.53 };
-
-      // Synthetic clamp/shot specs per tier (used when no DB machine exists)
-      const TIER_SPECS: Record<string, { clampKN: number; shotCm3: number; label: string }> = {
-        small:  { clampKN: 1000, shotCm3: 90,  label: 'Small Press (100T)'    },
-        medium: { clampKN: 2000, shotCm3: 180, label: 'Standard Press (200T)' },
-        large:  { clampKN: 5000, shotCm3: 450, label: 'Large Press (500T)'    },
+      const tiers = (plasticRef ? selectIMmachinesByTier(pool, {
+        ...imReq,
+        clampModel: plasticRef.clampModel,
+      }) : []);
+      const sfmCandidate = mhrRates.structuralFoamMolding.selection?.balanced?.candidate;
+      const pressRecordsRC = await this.plasticReferenceService.getPressRecords(
+        this.supabaseService.getClient(accessToken),
+        [...tiers.flatMap((t) => t.candidates.map((e) => e.candidate.machineId ?? '')), sfmCandidate?.machineId ?? ''],
+      );
+      const imCommon: Omit<InjectionMoldingCostInput, 'mhrRate' | 'machineClampTonnes' | 'machineShotCapacityG' | 'pressTiming'> = {
+        volume: partVolumeMm3, surfaceArea: (item.surfaceArea ?? 0) as number,
+        wallThicknessNominalMm: effectiveWallMmRC, materialGrade: grade,
+        materialCostPerKg, materialDensityKgM3, materialSource, batchSize, family,
+        plasticReference: plasticRef, plasticReferenceMissing: plasticRefSet.missing,
+        location, materialType: rcMaterialType,
+        cavityCountOverride: resolveScenarioCavityCount(item.scenarioOverrides),
+        deburrRate: mhrRates.deburring, inspectionRate: mhrRates.inspection,
+        materialClamp: rcClampProperties,
+        annualVolume: annualVolume ?? undefined, productionLifeYears,
+        bboxMaxMm: imBboxRC[0], bboxMidMm: imBboxRC[1], signals: imSignals,
+        currencySymbol: locInfo.symbol,
+        realResinInputs: rcRealResinInputs,
       };
+      // Each tier offers the press with the lowest cost per part among its
+      // capable real presses, costed by the engine itself: no utilization sweet
+      // spot or score weights (the mold is the same whichever press runs it). A
+      // tier with no capable press shows its largest press as not feasible, with
+      // the reasons.
+      const realTiers = tiers.flatMap((tier) => {
+        const real = tier.candidates.filter((e) => e.candidate.machineId && e.candidate.capability.maxTonnage != null && e.candidate.capability.shotCapacityGrams != null);
+        if (real.length === 0) {
+          comparisonWarnings.push(`No ${tier.tierLabel} injection press with clamp tonnage and shot size in HR Rates for ${location} — that size is not offered.`);
+          return [];
+        }
+        const capablePresses = real.filter((e) => e.capable);
+        const costed = (capablePresses.length > 0 ? capablePresses : [real[0]!]).map((ev) => {
+          const cand = ev.candidate;
+          const cost = computeInjectionMoldedCostSummary({
+            ...imCommon,
+            mhrRate: {
+              rate: cand.hourlyRate, source: 'mhr_database',
+              machineClass: 'injection_molding', machineName: cand.machineName, commodityCode: cand.commodityCode,
+            },
+            machineClampTonnes: cand.capability.maxTonnage, machineShotCapacityG: cand.capability.shotCapacityGrams,
+            pressTiming: cand.machineId ? pressRecordsRC.get(cand.machineId) ?? null : null,
+            goodPartYield: cand.machineId ? pressRecordsRC.get(cand.machineId)?.goodPartYield ?? null : null,
+          });
+          const complete = cost.processLines.every((l) => !l.physicsGap);
+          return { tier, ev, cost, complete };
+        });
+        costed.sort((a, b) => (a.complete !== b.complete ? (a.complete ? -1 : 1) : a.cost.totalCost - b.cost.totalCost));
+        return [costed[0]!];
+      });
 
       const TIER_ROUTE_IDS: Record<string, 'im-small-50t' | 'im-standard-200t' | 'im-large-500t'> = {
         small:  'im-small-50t',
@@ -5551,49 +5517,13 @@ export class BOMItemsService {
         large:  'im-large-500t',
       };
 
-      const imRoutes: RouteResultDto[] = tierResults.map((tier) => {
-        const ev = tier.evaluation;
-        const cand = ev?.candidate;
-        const spec = TIER_SPECS[tier.tierId]!;
-        const mult = TIER_RATE_MULT[tier.tierId] ?? 1.0;
-
-        const mhrRate: InjectionMoldingCostInput['mhrRate'] = cand
-          ? { rate: cand.hourlyRate, source: cand.machineId ? 'mhr_database' : 'default_rate',
-              machineClass: 'injection_molding', machineName: cand.machineName, commodityCode: cand.commodityCode }
-          : { rate: Math.round(baseMhrRate * mult), source: 'tier_synthetic',
-              machineClass: 'injection_molding', machineName: null, commodityCode: null };
-
-        // maxTonnage is metric tonnes-force (derived from the real clampingForceKn
-        // via / 9.80665 at import time — migration 633 / selector.ts:307's same real
-        // SI conversion) — reverse it with the same constant, not a rounded "×10"
-        // (that introduced a ~2% round-trip error vs. the real per-machine kN value).
-        const clampKN = cand?.capability.maxTonnage != null
-          ? cand.capability.maxTonnage * 9.80665
-          : spec.clampKN;
-        const shotCm3 = cand?.capability.shotCapacityGrams != null
-          ? cand.capability.shotCapacityGrams / (materialDensityKgM3 / 1000)
-          : spec.shotCm3;
-
-        const imInput: InjectionMoldingCostInput = {
-          volume: partVolumeMm3, surfaceArea: (item.surfaceArea ?? 0) as number,
-          wallThicknessNominalMm: effectiveWallMmRC, materialGrade: grade,
-          materialCostPerKg, materialDensityKgM3, materialSource, batchSize, family,
-          mhrRate, deburrRate: mhrRates.deburring, inspectionRate: mhrRates.inspection,
-          clampTonnageKN: clampKN, shotCapacityCm3: shotCm3,
-          annualVolume: annualVolume ?? undefined, productionLifeYears,
-          bboxMaxMm: imBboxRC[0], bboxMidMm: imBboxRC[1], signals: imSignals,
-          currencySymbol: locInfo.symbol,
-          realResinInputs: rcRealResinInputs,
-        };
-        const cost = computeInjectionMoldedCostSummary(imInput);
+      const imRoutes: RouteResultDto[] = realTiers.map(({ tier, ev, cost }) => {
+        const cand = ev.candidate;
         cost.warnings.push(...comparisonWarnings);
-        if (ev && !ev.capable) cost.warnings.push(...ev.blockReasons.map((r) => `⚠ ${r}`));
+        if (!ev.capable) cost.warnings.push(...ev.blockReasons.map((r) => `⚠ ${r}`));
 
-        const isSynthetic = cand == null;
-        const capable = ev ? ev.capable : true; // synthetic routes are always marked capable
-        const routeLabel = cand?.machineName
-          ? `${tier.tierLabel} — ${cand.machineName}`
-          : spec.label;
+        const capable = ev.capable;
+        const routeLabel = `${tier.tierLabel} — ${cand.machineName}`;
 
         return {
           routeId: TIER_ROUTE_IDS[tier.tierId]!,
@@ -5614,10 +5544,10 @@ export class BOMItemsService {
           badges: { lowestCost: false, fastest: false, bestQuality: false },
           capability: {
             cuttingCapable: capable, pressBrakeCapable: capable, overallCapable: capable,
-            confidence: isSynthetic ? 'low' : cand!.capabilitySource === 'imported' ? 'high' : 'medium',
-            estimatedTonnage: cand?.capability.maxTonnage ?? tier.syntheticTonnageT,
+            confidence: cand.capabilitySource === 'imported' ? 'high' : 'medium',
+            estimatedTonnage: cand.capability.maxTonnage,
             reasonCodes: capable ? [] : ['DIMENSIONS_UNAVAILABLE' as const],
-            warnings: ev?.blockReasons ?? [],
+            warnings: ev.blockReasons,
           },
           warnings: cost.warnings, ratesSource: cost.ratesSource,
           sustainability: cost.sustainability ? {
@@ -5631,15 +5561,15 @@ export class BOMItemsService {
           // above, now exposed so the frontend can show the actual tonnage
           // math instead of just the pass/fail badge.
           injectionMolding: {
-            clampRequiredT: ev?.clampRequiredT ?? null,
-            clampMachineT: ev?.clampMachineT ?? tier.syntheticTonnageT,
-            clampUtilPct: ev?.clampUtil != null ? Math.round(ev.clampUtil * 1000) / 10 : null,
-            shotRequiredG: ev?.shotRequiredG ?? null,
-            shotMachineG: ev?.shotMachineG ?? null,
-            shotUtilPct: ev?.shotUtil != null ? Math.round(ev.shotUtil * 1000) / 10 : null,
-            cavityCount: cost.injectionMolding?.cavityCount ?? cavityCountEst,
+            clampRequiredT: ev.clampRequiredT ?? null,
+            clampMachineT: ev.clampMachineT,
+            clampUtilPct: ev.clampUtil != null ? Math.round(ev.clampUtil * 1000) / 10 : null,
+            shotRequiredG: ev.shotRequiredG ?? null,
+            shotMachineG: ev.shotMachineG ?? null,
+            shotUtilPct: ev.shotUtil != null ? Math.round(ev.shotUtil * 1000) / 10 : null,
+            cavityCount: cost.injectionMolding?.cavityCount ?? 1,
             gateType: cost.injectionMolding?.gateType ?? 'edge',
-            machineDataSource: isSynthetic ? 'synthetic' : 'imported',
+            machineDataSource: 'imported',
           },
         } satisfies RouteResultDto;
       });
@@ -5745,7 +5675,15 @@ export class BOMItemsService {
         volume: partVolumeMm3, surfaceArea: (item.surfaceArea ?? 0) as number,
         wallThicknessNominalMm: effectiveWallMmRC, materialGrade: grade,
         materialCostPerKg, materialDensityKgM3, materialSource, batchSize, family,
+        plasticReference: plasticRef, plasticReferenceMissing: plasticRefSet.missing,
+        location, materialType: rcMaterialType,
+        cavityCountOverride: resolveScenarioCavityCount(item.scenarioOverrides),
         mhrRate: mhrRates.structuralFoamMolding, deburrRate: mhrRates.deburring, inspectionRate: mhrRates.inspection,
+        machineClampTonnes: sfmCandidate?.capability?.maxTonnage ?? null,
+        machineShotCapacityG: sfmCandidate?.capability?.shotCapacityGrams ?? null,
+        pressTiming: sfmCandidate?.machineId ? pressRecordsRC.get(sfmCandidate.machineId) ?? null : null,
+        goodPartYield: sfmCandidate?.machineId ? pressRecordsRC.get(sfmCandidate.machineId)?.goodPartYield ?? null : null,
+        materialClamp: rcClampProperties,
         annualVolume: annualVolume ?? undefined, productionLifeYears,
         bboxMaxMm: imBboxRC[0], bboxMidMm: imBboxRC[1], signals: imSignals,
         currencySymbol: locInfo.symbol,
@@ -5804,23 +5742,9 @@ export class BOMItemsService {
           feasibleRoutes.forEach((r) => { r.badges.lowestCost = r.totalCost === minFeasibleCost; });
         }
         capableRoutes.reduce((a, b) => a.cycleTimes.totalMin < b.cycleTimes.totalMin ? a : b).badges.fastest = true;
-        // bestQuality = DB machine with clamp utilisation closest to 60-85% sweet spot
-        const capableTiers = tierResults.filter((t) =>
-          t.evaluation?.capable || t.evaluation == null,
-        );
-        const bestTier = capableTiers
-          .filter((t) => t.evaluation != null)
-          .sort((a, b) => {
-            const au = a.evaluation!.clampUtil;
-            const bu = b.evaluation!.clampUtil;
-            const aInRange = au != null && au >= 0.60 && au <= 0.85 ? 1 : 0;
-            const bInRange = bu != null && bu >= 0.60 && bu <= 0.85 ? 1 : 0;
-            return bInRange - aInRange || b.evaluation!.score - a.evaluation!.score;
-          })[0];
-        const qualRoute = bestTier
-          ? imRoutes[tierResults.indexOf(bestTier)]
-          : capableRoutes[capableRoutes.length - 1];
-        if (qualRoute) qualRoute.badges.bestQuality = true;
+        // No bestQuality badge for molding routes: the reference data gives no
+        // quality measure between presses (the former clamp-utilization sweet
+        // spot and score were invented).
       }
 
       const imGrossKg = (partVolumeMm3 / 1e9) * materialDensityKgM3 * (1 + MATERIAL_OVERHEAD_PCT / 100);
@@ -6018,10 +5942,9 @@ export class BOMItemsService {
         rate: pbRate,
         cycleTimeSecFromCalculator: typeof rcCycleTimeSec === 'number' ? rcCycleTimeSec : undefined,
         setupTimeMinFromCalculator: typeof rcSetupTimeSec === 'number' ? rcSetupTimeSec : undefined,
-        // The cited class constant when sm_lookup_op_setup_time has no
-        // press_brake row — resolveOpSetupMin now reports that miss as null
-        // rather than as 0 minutes.
-        fallbackSetupMin: rcPbSetupMin.minutes ?? PRESS_BRAKE_SETUP_MIN,
+        // Real sm_lookup_op_setup_time press_brake row; null on a miss (setup
+        // then comes from the machine, or is not costed — no class constant).
+        operationSetupMin: rcPbSetupMin.minutes ?? null,
         calculatorId: rcBendCalc.calculatorId,
         calculatorVersion: rcBendCalc.calculatorVersion,
         physicsGap: rcBendCalc.gap,
@@ -6157,10 +6080,7 @@ export class BOMItemsService {
       const rcBendLengths = (summary.bendLengths ?? []) as number[];
       const rcBendRadii = (summary.bendRadii ?? []) as number[];
       const rcDrawingIntel = (item.drawingIntelligence ?? null) as Record<string, any> | null;
-      const rcGdtCallouts = ((rcDrawingIntel?.gdt_callouts ?? []) as any[]).map((c) => ({
-        type: String(c.type ?? c.symbol ?? ''),
-        toleranceMm: Number(c.toleranceMm ?? c.tolerance_mm ?? 0),
-      }));
+      const rcGdtCallouts = resolveGdtCallouts(fg, item.drawingIntelligence).map((c) => ({ type: c.type, toleranceMm: c.toleranceMm }));
       const rcCmmRate = await this.resolveCmmSpecificRate(accessToken, location, rates, comparisonWarnings);
       const rcGenericInspectionRate = await this.resolveGenericInspectionRate(accessToken, location, rates, comparisonWarnings);
       const rcInspectionInput: InspectionInput = {
@@ -6764,9 +6684,10 @@ export class BOMItemsService {
         materialCol: locInfo.materialCol,
         rates,
         locCurrencyCode: locInfo.code,
+        location,
         warnings: [],
       }),
-      this.resolveMHRRates(accessToken, location, undefined, family, rates),
+      this.resolveMHRRates(accessToken, location, undefined, rates),
     ]);
 
     // Phase 3: blank optimizer for CNC primary routes (conditional)
@@ -6774,6 +6695,7 @@ export class BOMItemsService {
       ? await this.blankOptimizer.selectOptimalBlank(
           bbox, volume, family as 'milled' | 'turned' | 'mill_turn', accessToken,
           resolveScenarioStockForm(item.scenarioOverrides),
+          this.resolveTurnedGeometry(fg, bbox),
         )
       : null;
 
@@ -6808,10 +6730,12 @@ export class BOMItemsService {
 
     // Cross-family: SM primary → Milled alternative (always feasible, typically higher cost)
     if (family === 'sheet_metal') {
+      const milledAllowance = await this.blankOptimizer.stockAllowanceFor({ length: maxLength, width: maxWidth, height: maxHeight });
       const milledAlt = this.buildMilledAlternativeCandidate({
         volume, surfaceArea, maxLength, maxWidth, maxHeight, finishedWeightKg,
         holeCount: (summary.holeCount ?? item.holeCount ?? 0) as number,
         materialCostPerKg, materialDensityKgM3, materialSource, batchSize, mhrRates, location,
+        stockAllowancePerSideMm: milledAllowance.allowancePerSideMm,
       });
       if (milledAlt) candidates.push(milledAlt);
     }
@@ -6915,22 +6839,17 @@ export class BOMItemsService {
     materialSource: 'db' | 'default'; batchSize: number;
     mhrRates: Awaited<ReturnType<typeof this.resolveMHRRates>>;
     location: string;
+    /** Reference per-side stock allowance (BlankOptimizerService.stockAllowanceFor); null = rule not staged. */
+    stockAllowancePerSideMm: number | null;
   }): CandidateRouteDto | null {
     const { volume, surfaceArea, maxLength, maxWidth, maxHeight, finishedWeightKg,
             holeCount, materialCostPerKg, materialDensityKgM3, materialSource,
-            batchSize, mhrRates, location } = args;
+            batchSize, mhrRates, location, stockAllowancePerSideMm } = args;
 
-    // Same real, single canonical stock allowance constant used everywhere
-    // else in this domain (blank-stock-candidates.ts, cost-machining-engine.ts) --
-    // was a separately-hardcoded literal `6` here.
-    const allow     = CNC_STOCK_ALLOWANCE_PER_SIDE_MM * 2;
-    const billetVol = (maxLength + allow) * (maxWidth + allow) * (maxHeight + allow);
-    const blankResult = {
-      form:         'billet',
-      sizeLabel:    `${Math.round(maxLength + allow)}×${Math.round(maxWidth + allow)}×${Math.round(maxHeight + allow)} billet`,
-      billetVolMm3: billetVol,
-      utilizationPct: billetVol > 0 && volume > 0 ? Math.min(100, (volume / billetVol) * 100) : null,
-    };
+    // The ONE bounding-box billet definition (blank-stock-candidates.ts),
+    // with the reference stock-allowance rule — not a copy of its formula.
+    const blankResult = billetFallback({ length: maxLength, width: maxWidth, height: maxHeight }, volume, stockAllowancePerSideMm);
+    const billetVol = blankResult.billetVolMm3;
     const blankGrossKg = materialDensityKgM3 > 0 ? billetVol / 1e9 * materialDensityKgM3 : 0;
     const wasteKg      = Math.max(0, blankGrossKg - finishedWeightKg);
 
@@ -6960,10 +6879,10 @@ export class BOMItemsService {
     };
 
     return {
-      candidateId:      'alt-cnc-3ax',
+      candidateId:      'alt-3_axis_mill',
       blankSpec,
       routeLabel:       '3-Axis Milling (from billet)',
-      routeId:          'cnc-3ax',
+      routeId:          '3_axis_mill',
       processLines:     cost.processLines,
       totalCost:        cost.totalCost,
       materialCost:     cost.materialCost,
@@ -7040,7 +6959,7 @@ export class BOMItemsService {
     const client = this.supabaseService.getClient(accessToken);
     const { data: rows, error } = await client
       .from("bom_items")
-      .select("id, drawing_intelligence")
+      .select("id, drawing_intelligence, feature_graph")
       .eq("id", id)
       .limit(1);
     if (error) throw new NotFoundException(`BOM item ${id} not found`);
@@ -7048,12 +6967,12 @@ export class BOMItemsService {
     if (!item) throw new NotFoundException(`BOM item ${id} not found`);
 
     const di = (item as any).drawing_intelligence as Record<string, any> | null;
-    const rawCallouts: any[] = di?.gdt_callouts ?? [];
+    const callouts = resolveGdtCallouts((item as any).feature_graph, di);
     const generalTolerance: string | null = di?.general_tolerances ?? null;
 
     const INSPECTION_PRIORITY: InspectionMethod[] = ["cmm", "height_gauge", "caliper", "visual"];
 
-    if (rawCallouts.length === 0) {
+    if (callouts.length === 0) {
       return {
         bomItemId: id,
         source: "no_data",
@@ -7072,16 +6991,13 @@ export class BOMItemsService {
     // DB-backed rule bands (inspection_rules) with the code matrix as fallback —
     // the same resolution the cost engine's inspection line uses.
     const inspectionRules = await this.inspectionKnowledge.getInspectionRules(accessToken);
-    const features: GdtFeatureDto[] = rawCallouts.map((c) => {
-      const derived = resolveInspectionRule(inspectionRules, c.type ?? "", c.tolerance ?? 0);
-      return {
-        type: (c.type ?? "unknown").trim().toLowerCase(),
-        toleranceMm: c.tolerance ?? 0,
-        datum: c.datum ?? "",
-        confidence: typeof c.confidence === "number" ? c.confidence : null,
-        ...derived,
-      };
-    });
+    const features: GdtFeatureDto[] = callouts.map((c) => ({
+      type: c.type,
+      toleranceMm: c.toleranceMm,
+      datum: c.datum,
+      confidence: c.confidence,
+      ...resolveInspectionRule(inspectionRules, c.type, c.toleranceMm),
+    }));
 
     const overallSeverity = features.reduce<GdtSeverity>(
       (best, f) => SEVERITY_RANK[f.severity] > SEVERITY_RANK[best] ? f.severity : best,
@@ -7106,7 +7022,7 @@ export class BOMItemsService {
 
     return {
       bomItemId: id,
-      source: "drawing_intelligence",
+      source: callouts[0]!.source === "step_pmi" ? "step_pmi" : "drawing_intelligence",
       features,
       overallSeverity,
       maxCostImpactPercent: maxFeature.costImpactPercent,
@@ -7119,6 +7035,324 @@ export class BOMItemsService {
     };
   }
 
+  /**
+   * Drilled-hole groups for machining costing, taken from the part's CAD
+   * machining features (cad-engine machining_feature_recognizer): the real
+   * diameter, occurrence count and real hole depth of every drilled
+   * SimpleHole, grouped by diameter (0.1 mm), keeping the deepest occurrence's
+   * depth for the group. Parts whose stored feature graph predates machining
+   * features keep summary.holeGroups, which carries no depth — drilling then
+   * reports that missing CAD depth as a gap rather than assuming one.
+   */
+  /**
+   * Turned part geometry from CAD, for the lathe cycle-time physics:
+   *   diameter — the largest turned outer diameter the cad-engine recognised
+   *              (machining_features Ring:outer_diameter);
+   *   length   — the bounding-box extent along the turning axis: the box
+   *              dimension furthest from that diameter (the other two span
+   *              the diameter), e.g. 3.0 mm for a 17.6 × 17.6 × 3.0 mm disc.
+   * Without a recognised turned diameter both fall back to the CAD bounding
+   * box (largest cross-section / longest side), and the source says so.
+   */
+  private resolveTurnedGeometry(
+    fg: any,
+    bbox: { length: number; width: number; height: number },
+  ): { diameterMm: number; lengthMm: number; diameterSource: string; lengthSource: string } | null {
+    const dims = [bbox.length, bbox.width, bbox.height].filter((d) => d > 0);
+    if (dims.length < 3) return null;
+    const rings = (Array.isArray(fg?.machining_features?.features) ? fg.machining_features.features : [])
+      .filter((f: any) => f?.type === 'Ring' && f.variant === 'outer_diameter' && Number(f.params?.diameter_mm) > 0);
+    if (rings.length === 0) {
+      return {
+        diameterMm: Math.max(bbox.width, bbox.height),
+        lengthMm: bbox.length,
+        diameterSource: 'CAD: bounding-box cross-section (no turned-diameter feature recognised)',
+        lengthSource: 'CAD: bounding-box length (no turned-diameter feature recognised)',
+      };
+    }
+    const diameter = Math.max(...rings.map((f: any) => Number(f.params.diameter_mm)));
+    const length = dims.reduce((best, d) => (Math.abs(d - diameter) > Math.abs(best - diameter) ? d : best), dims[0]!);
+    return {
+      diameterMm: diameter,
+      lengthMm: length,
+      diameterSource: 'CAD: largest turned outer diameter (Ring feature)',
+      lengthSource: 'CAD: bounding-box extent along the turning axis',
+    };
+  }
+
+  /**
+   * The machining calculators, per catalog operation, from the one shared
+   * calculator catalog fetch: every Machining process_calculator_mappings row
+   * that carries a calculator, with that calculator's fields (the stored
+   * formulas the machining engine evaluates — migration 804).
+   */
+  private async resolveMachiningCalculators(accessToken: string): Promise<MachiningCalculators> {
+    const catalog = await this.loadCalculatorCatalog(accessToken);
+    const out: MachiningCalculators = {};
+    // Only rows on a machining station class (the calculators migration 804
+    // maps). Older Machining rows on another class — e.g. the Tapping rows on
+    // class 'tapping' bound to the Sheet Metal tapping calculator (migration
+    // 702) — are not machining calculators and must not take an operation.
+    const stations = loadMachiningCalculatorSpec().stations;
+    for (const m of catalog.mappings as any[]) {
+      if (m.process_group !== 'Machining' || !m.calculator_id || out[m.operation] || !(m.machine_class in stations)) continue;
+      const calc = (catalog.calculators as any[]).find((c) => c.id === m.calculator_id);
+      const fields = (catalog.fields as any[]).filter((f) => f.calculator_id === m.calculator_id);
+      if (!calc || fields.length === 0) continue;
+      out[m.operation] = { calculatorId: calc.id, name: calc.name, version: calc.version ?? 1, fields };
+    }
+    return out;
+  }
+
+  /**
+   * The inputs of one machining calculator for this part, from the database:
+   * the part's own CAD measurements for the calculator's key inputs (unless
+   * the caller passes its own keys — the engineer editing Hole Diameter in
+   * the dialog), and every lookup-table input resolved from
+   * machining_reference_data by the SAME resolver the cost engine uses
+   * (machining-lookup-seeds.ts). Anything that cannot be resolved is named in
+   * `missing` with the reason — never filled with a stand-in.
+   */
+  async resolveMachiningCalculatorInputs(
+    id: string,
+    calculatorId: string,
+    keys: Record<string, number>,
+    userId: string,
+    accessToken: string,
+    location?: string,
+    batchSize?: number,
+  ): Promise<MachiningCalculatorInputsDto> {
+    const item = await this.findOne(id, userId, accessToken);
+    const calculators = await this.resolveMachiningCalculators(accessToken);
+    const operation = Object.keys(calculators).find((op) => calculators[op]!.calculatorId === calculatorId);
+    if (!operation) {
+      throw new BadRequestException(`Calculator ${calculatorId} is not a machining calculator mapped in process_calculator_mappings`);
+    }
+    const def = calculators[operation]!;
+    const inputFields = new Set(def.fields.filter((f) => f.field_type !== 'calculated').map((f) => f.field_name));
+    const matClass = detectMaterialClass((item as any).materialGrade ?? null);
+    const fg = (item as any).featureGraph ?? {};
+    const inputs: Record<string, number> = {};
+    const provenance: Record<string, string> = {};
+    const set = (field: string, value: number | null | undefined, source: string) => {
+      if (!inputFields.has(field) || value == null || !Number.isFinite(value) || value <= 0) return;
+      inputs[field] = value;
+      provenance[field] = source;
+    };
+
+    // CAD key inputs of this part (the engineer's own keys take precedence).
+    const HOLE_OPS = new Set(['Drilling', 'Reaming', 'Jig Boring', 'Gun Drilling', 'Deep Bore Machine']);
+    const BORE_GRIND_OPS = new Set(['Internal Grinding', 'Jig Grind']);
+    const holeGroups = this.resolveMachiningHoleGroups(fg, fg?.summary ?? {});
+    if ((HOLE_OPS.has(operation) || BORE_GRIND_OPS.has(operation)) && holeGroups.length > 0) {
+      const g = holeGroups.reduce((a, b) => (b.diameter_mm < a.diameter_mm ? b : a));
+      const note = 'CAD: smallest drilled-hole group';
+      if (HOLE_OPS.has(operation)) {
+        set('Hole Diameter', g.diameter_mm, `${note} — diameter`);
+        set('Hole Depth', g.depth_mm, `${note} — depth`);
+        set('Holes', g.count, `${note} — holes of this diameter`);
+      } else {
+        set('Grind Diameter', g.diameter_mm, `${note} — bore diameter`);
+        set('Grind Length', g.depth_mm, `${note} — bore depth`);
+        set('Surfaces', g.count, `${note} — bores of this diameter`);
+      }
+    }
+    if (['Rough Turning', 'Finish Turning', 'Cylindrical Grinding'].includes(operation)) {
+      const turned = this.resolveTurnedGeometry(fg, {
+        length: Number((item as any).maxLength) || 0, width: Number((item as any).maxWidth) || 0, height: Number((item as any).maxHeight) || 0,
+      });
+      if (turned) {
+        set('Turned Diameter', turned.diameterMm, turned.diameterSource);
+        set('Turned Length', turned.lengthMm, turned.lengthSource);
+        set('Grind Diameter', turned.diameterMm, turned.diameterSource);
+        set('Grind Length', turned.lengthMm, turned.lengthSource);
+        if (operation === 'Cylindrical Grinding') set('Surfaces', 1, 'CAD: turned outer diameter');
+      }
+    }
+    if (operation === 'Hobbing' || operation === 'Shaving') {
+      const t = this.resolveToothForms(fg)[0];
+      const note = 'CAD: first recognised tooth form (AxiGroove)';
+      set('Teeth', t?.tooth_count, `${note} — teeth`);
+      set('Face Width', t?.face_width_mm, `${note} — face width`);
+      set('Module', t ? t.tip_diameter_mm / (t.tooth_count + 2) : null, `${note} — tip diameter / (teeth + 2)`);
+      set('Tooth Depth', t?.root_diameter_mm != null ? (t.tip_diameter_mm - t.root_diameter_mm) / 2 : null, `${note} — (tip - root) / 2`);
+    }
+    if (operation === 'Surface Grinding') {
+      const face = this.resolvePlanarFaces(fg).sort((a, b) => b.lengthMm * b.widthMm - a.lengthMm * a.widthMm)[0];
+      const note = 'CAD: largest planar-face group';
+      set('Grind Length', face?.lengthMm, `${note} — longest extent`);
+      set('Grind Width', face?.widthMm, `${note} — area / longest extent`);
+      set('Faces', face?.count, `${note} — faces of this size`);
+    }
+    if (operation === 'Tapping') {
+      const drawingThreads = ((item as any).drawingIntelligence?.threads ?? []) as Array<{ size: string; count: number; pitchMm?: number }>;
+      const t = this.resolveThreads(drawingThreads, fg)[0];
+      const d = t ? Number(/^M\s*(\d+(?:\.\d+)?)/i.exec(t.size)?.[1]) : NaN;
+      const note = `${drawingThreads.length > 0 ? 'Drawing' : 'CAD'}: first thread group${t ? ` (${t.size})` : ''}`;
+      set('Thread Diameter', d, `${note} — nominal diameter`);
+      set('Thread Pitch', t?.pitchMm ?? (Number.isFinite(d) ? isoCoarsePitchMm(d) : null), t?.pitchMm != null ? `${note} — pitch` : `${note} — ISO 261 coarse pitch`);
+      set('Thread Depth', t?.depthMm, `${note} — depth`);
+      set('Threads', t?.count, `${note} — threads of this size`);
+    }
+    if (operation === 'Deburring') {
+      set('Sharp Edge Length', Number(fg?.machining_features?.edges?.sharp_edge_length_mm),
+        'CAD: total length of sharp B-Rep edges (seams and tangent edges excluded)');
+    }
+    // What the cost engine itself used for this part (same costing as the
+    // page): this calculator's own line, verbatim; and the engine-derived
+    // inputs every line shares (the blank optimizer's bar, the resolved batch).
+    const engineMatches: Record<string, { table: string; row: Record<string, string | number> }> = {};
+    const unresolved: string[] = [];
+    if (location && Object.keys(keys).length === 0) {
+      try {
+        const summary = await this.getCostSummary(id, userId, accessToken, batchSize, location);
+        const lines = (summary as any).processLines as ProcessLineCost[] ?? [];
+        const own = lines.find((l) => l.calculatorId === calculatorId && l.calculationTrace?.length);
+        const SHARED = new Set(['Bar Diameter', 'Batch Size']);
+        const stepsOf = (l: ProcessLineCost) => (l.calculationTrace ?? []).filter((st) => st.kind === 'input' && typeof st.value === 'number');
+        for (const st of own ? stepsOf(own) : []) {
+          if (!inputFields.has(st.fieldName)) continue;
+          inputs[st.fieldName] = st.value as number;
+          provenance[st.fieldName] = st.source ?? 'Cost engine';
+        }
+        if (own?.lookupMatches) Object.assign(engineMatches, own.lookupMatches);
+        for (const l of lines) {
+          for (const st of stepsOf(l)) {
+            if (SHARED.has(st.fieldName) && !(st.fieldName in inputs)) set(st.fieldName, st.value as number, st.source ?? 'Cost engine');
+          }
+        }
+        const resolvedBatch = (summary as any).resolvedInputs?.batchSize;
+        if (!('Batch Size' in inputs)) set('Batch Size', Number(resolvedBatch), 'Costing inputs: resolved batch size');
+      } catch (err: any) {
+        unresolved.push(`Cost engine run for ${location} failed: ${err?.message ?? String(err)}`);
+      }
+    }
+    for (const [field, value] of Object.entries(keys)) {
+      if (inputFields.has(field) && Number.isFinite(value)) { inputs[field] = value; provenance[field] = 'Entered in the calculator'; }
+    }
+
+    // Lookup-table inputs, keyed by the inputs above.
+    const [drillingTable, tappingTable, reamTable, finishBoringTable, gunDrillTable, deepBoreMaterials, partoffTable, workholderTable,
+      turningParams, grindingParams, internalGrindingParams, surfaceGrindingParams, hobbing, gearReference, keywayBroach, wireEdmParams, deburrParams] = await Promise.all([
+      this.machiningLookup.getDrillingTable(),
+      this.machiningLookup.getTappingTable(),
+      this.machiningLookup.getReamTable(),
+      this.machiningLookup.getFinishBoringTable(),
+      this.machiningLookup.getGunDrillingTable(),
+      this.machiningLookup.getDeepBoreMaterials(),
+      this.machiningLookup.getPartoffTable(),
+      this.machiningLookup.getWorkholderTable(),
+      this.machiningLookup.getTurningParams(matClass),
+      this.machiningLookup.getCylindricalGrindingParams(matClass),
+      this.machiningLookup.getInternalGrindingParams(matClass),
+      this.machiningLookup.getSurfaceGrindingParams(matClass),
+      this.machiningLookup.getHobbingReference(),
+      this.machiningLookup.getGearReference(),
+      this.machiningLookup.getKeywayBroachReference(),
+      this.machiningLookup.getWireEdmParams(matClass),
+      this.machiningLookup.getDeburrParams(matClass),
+    ]);
+    const lookup = machiningLookupSeeds(operation, {
+      matClass, drillingTable, tappingTable, reamTable, finishBoringTable, gunDrillTable, deepBoreMaterials, partoffTable, workholderTable,
+      turningParams, grindingParams, internalGrindingParams, surfaceGrindingParams, hobbing, shaving: gearReference.shaving, keywayBroach, wireEdmParams, deburrParams,
+      capabilityRules: (await this.machiningLookup.getCapabilityRules()).rules,
+    }, inputs);
+    const lookupMatches: Record<string, { table: string; row: Record<string, string | number> }> = { ...engineMatches };
+    for (const [field, seed] of Object.entries(lookup?.seeds ?? {})) {
+      if (!inputFields.has(field) || (field in engineMatches && Object.keys(keys).length === 0)) continue;
+      inputs[field] = seed.value;
+      provenance[field] = seed.source;
+      if (seed.match) lookupMatches[field] = seed.match;
+    }
+
+    const missing = [...unresolved, ...(lookup?.missing ?? []).filter((m) => !Object.keys(inputs).some((f) => m.startsWith(`${f}`)))];
+    for (const f of def.fields) {
+      if (f.field_type === 'calculated' || f.field_name in inputs) continue;
+      if (f.default_value != null && f.default_value !== '') continue;
+      if (!missing.some((m) => m.includes(f.field_name))) missing.push(`${f.field_name}: not on this part (${f.data_source ?? 'input'}) — enter it`);
+    }
+    return { calculatorId, operation, materialClass: matClass, inputs, provenance, lookupMatches, missing };
+  }
+
+  /** Gear/spline teeth the cad-engine recognised (machining_features AxiGroove), with their measured geometry. */
+  /**
+   * Every CAD planar face region (machining_features PlanarFace: area_mm2 and
+   * bounding box), as surface-grinding faces: length = the longest bounding-box
+   * extent, width = area / length (exact for a rectangle, area-preserving
+   * otherwise), grouped by size. A region with no area or extent is skipped.
+   */
+  private resolvePlanarFaces(fg: any): Array<{ lengthMm: number; widthMm: number; count: number }> {
+    const features = Array.isArray(fg?.machining_features?.features) ? fg.machining_features.features : [];
+    const groups = new Map<string, { lengthMm: number; widthMm: number; count: number }>();
+    for (const f of features) {
+      if (f?.type !== 'PlanarFace') continue;
+      const area = Number(f.params?.area_mm2);
+      const b = f.params?.bbox;
+      if (!(area > 0) || !b) continue;
+      const lengthMm = Math.max(b.xmax - b.xmin, b.ymax - b.ymin, b.zmax - b.zmin);
+      if (!(lengthMm > 0)) continue;
+      const face = { lengthMm: Math.round(lengthMm * 10) / 10, widthMm: Math.round((area / lengthMm) * 10) / 10 };
+      const key = `${face.lengthMm}x${face.widthMm}`;
+      const g = groups.get(key) ?? { ...face, count: 0 };
+      g.count += 1;
+      groups.set(key, g);
+    }
+    return [...groups.values()];
+  }
+
+  /** Polygon sockets / bosses (CAD candidates kept by a drawing polygon callout) and the rotary-broach reference. */
+  private async polygonInputs(item: any, fg: any) {
+    const polygons = resolvePolygons(fg?.machining_features?.polygon_candidates, polygonCallout(item?.drawingIntelligence));
+    return { polygons, rotaryBroach: polygons.length > 0 ? await this.machiningLookup.getRotaryBroachReference() : null };
+  }
+
+  /** Gear route (tblGearQuality + drawing gear callouts), shaving reference and Shaver rate. */
+  private async gearInputs(item: any, mhrRates: { shaver: MHRRateInput }) {
+    const gear = await this.machiningLookup.getGearReference();
+    return {
+      gearRoute: resolveGearRoute(item?.drawingIntelligence, gear.qualityRows, gear.defaultQuality),
+      shaving: gear.shaving,
+      shaverRate: mhrRates.shaver,
+    };
+  }
+
+  private resolveToothForms(fg: any): Array<{ tooth_count: number; tip_diameter_mm: number; root_diameter_mm?: number; face_width_mm: number }> {
+    const features = Array.isArray(fg?.machining_features?.features) ? fg.machining_features.features : [];
+    return features
+      .filter((f: any) => f?.type === 'AxiGroove' && Number(f.params?.tooth_count) > 0)
+      .map((f: any) => ({
+        tooth_count: Number(f.params.tooth_count),
+        tip_diameter_mm: Number(f.params.tip_diameter_mm),
+        ...(f.params.root_diameter_mm != null ? { root_diameter_mm: Number(f.params.root_diameter_mm) } : {}),
+        face_width_mm: Number(f.params.face_width_mm),
+      }));
+  }
+
+  private resolveMachiningHoleGroups(
+    fg: any,
+    summary: any,
+  ): Array<{ diameter_mm: number; count: number; depth_mm?: number }> {
+    const features = fg?.machining_features?.features;
+    if (!Array.isArray(features)) {
+      return (summary?.holeGroups ?? []) as Array<{ diameter_mm: number; count: number }>;
+    }
+    const DRILLED = new Set(['through', 'blind', 'threaded', 'cross', 'pcd_pattern']);
+    const groups = new Map<number, { diameter_mm: number; count: number; depth_mm?: number }>();
+    for (const f of features) {
+      if (f?.type !== 'SimpleHole' || !DRILLED.has(f.variant)) continue;
+      const diameter = Number(f.params?.diameter_mm);
+      if (!(diameter > 0)) continue;
+      const key = Math.round(diameter * 10) / 10;
+      const count = f.variant === 'pcd_pattern' ? Math.max(1, Number(f.params?.hole_count) || 1) : 1;
+      const depth = Number(f.params?.depth_mm);
+      const g = groups.get(key) ?? { diameter_mm: key, count: 0 };
+      g.count += count;
+      if (depth > 0) g.depth_mm = Math.max(g.depth_mm ?? 0, depth);
+      groups.set(key, g);
+    }
+    return [...groups.values()];
+  }
+
   private resolveThreads(
     drawingThreads: Array<{ size: string; count: number; pitchMm?: number }>,
     fg: any,
@@ -7126,13 +7360,15 @@ export class BOMItemsService {
     if (drawingThreads.length > 0) return this.normalizeThreadSpecs(drawingThreads);
     // Drawing not yet analyzed — synthesize from geometry-detected tapped holes.
     // depth_mm/through are real, already-computed fields on the CAD engine's
-    // tapped_hole feature (machining_feature_recognizer.py) — carried through here
+    // threaded SimpleHole feature (machining_feature_recognizer.py) — carried through here
     // instead of discarding them down to just the spec string.
-    const cncFeatures = (fg?.cnc_features?.features ?? []) as Array<{ type: string; params: any }>;
-    const tapped = cncFeatures.filter((f) => f.type === 'tapped_hole');
+    const cncFeatures = (fg?.machining_features?.features ?? []) as Array<{ type: string; variant: string; params: any }>;
+    const tapped = cncFeatures.filter((f) => f.type === 'SimpleHole' && f.variant === 'threaded');
     if (tapped.length === 0) return [];
     const raw = tapped.map((f) => ({
-      size: String(f.params?.spec ?? 'M3'),
+      // No thread spec on the feature = size unknown: tapping names it as a
+      // missing input rather than pricing an assumed size.
+      size: String(f.params?.spec ?? ''),
       count: 1,
       depthMm: (Number(f.params?.depth_mm) || 0) > 0 ? Number(f.params.depth_mm) : undefined,
       isThrough: Boolean(f.params?.through),
@@ -7152,7 +7388,7 @@ export class BOMItemsService {
     for (const t of threads) {
       const raw = String(t.size ?? (t as any).spec ?? '').trim().toUpperCase();
       const metric = raw.match(/^M\s*(\d+(?:\.\d+)?)/);
-      const key = metric ? `M${metric[1]}` : (raw || 'M3');
+      const key = metric ? `M${metric[1]}` : (raw || 'size not given');
       const count = Number(t.count) || 0;
       if (count <= 0) continue;
       const g: Group = groups[key] ?? { count: 0, pitchMm: t.pitchMm, depthSum: 0, depthCount: 0, throughCount: 0 };
@@ -7176,14 +7412,13 @@ export class BOMItemsService {
   // rule bands; the code matrix in gdt-severity.ts remains the fallback.
   private extractGdtFeatures(
     item: any,
+    fg: unknown,
     rules: InspectionRuleRow[] = [],
   ): Array<{ symbol: string; tolerance: number; timeMin?: number }> {
-    const callouts = ((item?.drawingIntelligence as any)?.gdt_callouts ?? []) as any[];
-    return callouts
-      .filter((c) => c && typeof c.tolerance === 'number' && c.tolerance > 0)
+    return resolveGdtCallouts(fg, item?.drawingIntelligence)
       .map((c) => {
-        const symbol = String(c.type ?? '');
-        const tolerance = Number(c.tolerance);
+        const symbol = c.type;
+        const tolerance = c.toleranceMm;
         return {
           symbol,
           tolerance,
@@ -7232,6 +7467,12 @@ export class BOMItemsService {
   // (di.surfaceFinishRa.value / di.surface_finish_ra) — resolved here too
   // so the turned path's Cylindrical Grinding trigger sees the same real
   // value, not a second, independent reading of the same field.
+  /** Finishing-process capability rules for MachiningCostInput (capability-rules.ts). */
+  private async machiningCapabilityInput() {
+    const r = await this.machiningLookup.getCapabilityRules();
+    return { capabilityRules: r.rules, capabilityRulesMissing: r.missing };
+  }
+
   private resolveTightestRaMicron(item: any): number | null {
     const di = item?.drawingIntelligence as any;
     const raValue = di?.surfaceFinishRa?.value ?? di?.surface_finish_ra ?? null;
@@ -7273,14 +7514,18 @@ export class BOMItemsService {
       workSpeedMMin: number; roughInfeedMm: number; finishInfeedMm: number;
       roughAxialFeedRevMm: number; finishAxialFeedRevMm: number; dataFound: boolean;
     } | null,
-    broachingParams?: { roughCuttingSpeedMPerMin: number; finishCuttingSpeedMPerMin: number; dataFound: boolean } | null,
+    internalGrindingParams?: {
+      workSpeedMMin: number; roughInfeedMm: number; finishInfeedMm: number;
+      roughAxialFeedRevMm: number; finishAxialFeedRevMm: number; dataFound: boolean;
+    } | null,
+    keywayBroach?: KeywayBroachReference | null,
     wireEdmParams?: { roughFeedRateMmPerMin: number; finishFeedRateMmPerMin: number; dataFound: boolean } | null,
     accessToken: string = '',
   ): Promise<Omit<RouteComparisonDto, 'recommendedRouteId'>> {
     // Fix 1: milled parts always use feature recognizer hole count (not raw cylinder count)
-    const milledCncSummary = fg?.cnc_features?.feature_summary ?? null;
+    const milledCncSummary = machiningFeatureCounts(fg?.machining_features);
     const holeCount = milledCncSummary !== null
-      ? ((milledCncSummary.through_hole ?? 0) + (milledCncSummary.blind_hole ?? 0))
+      ? milledCncSummary.drilledHoles
       : (summary.holeCount ?? item.holeCount ?? 0) as number;
     const threads = ((item.drawingIntelligence as any)?.threads ?? []).map((t: any) => ({
       size: String(t.size ?? t.spec ?? '').trim(),
@@ -7297,8 +7542,9 @@ export class BOMItemsService {
       surfaceArea:          (item.surfaceArea ?? 0) as number,
       maxLength, maxWidth, maxHeight,
       holeCount,
-      holeGroups:           (summary.holeGroups ?? []) as Array<{ diameter_mm: number; count: number }>,
-      pocketCount:          (fg?.cnc_features?.feature_summary?.pockets ?? 0) as number,
+      holeGroups:           this.resolveMachiningHoleGroups(fg, summary),
+      sharpEdgeLengthMm:    (fg?.machining_features?.edges?.sharp_edge_length_mm ?? null) as number | null,
+      pocketCount:          machiningFeatureCounts(fg?.machining_features)?.pockets ?? 0,
       materialGrade:        grade,
       materialCostPerKg,
       materialDensityKgM3,
@@ -7307,7 +7553,7 @@ export class BOMItemsService {
       // when the drawing is not analysed; totals must match line for line.
       threads: this.resolveThreads(threads, fg),
       tightestToleranceMm:  ((item as any).tightestToleranceMm ?? null) as number | null,
-      gdtFeatureCount:      (fg?.cnc_features?.feature_summary?.gdt_features ?? 0) as number,
+      gdtFeatureCount:      resolveGdtCallouts(fg, item.drawingIntelligence).length,
       batchSize,
       family:               'milled',
       finishedWeightKg,
@@ -7318,20 +7564,31 @@ export class BOMItemsService {
       surfaceTreatmentDbRate: surfaceTreatmentDbRate ?? null,
       samplingPerN:         this.resolveSamplingPerN(item),
       samplingPolicy:       inspection?.policy,
-      gdtFeatures:          this.extractGdtFeatures(item, inspection?.rules ?? []),
+      gdtFeatures:          this.extractGdtFeatures(item, fg, inspection?.rules ?? []),
       location,
       deburrLinearSpeedMmPerSec: deburrLinearSpeedMmPerSec ?? null,
+      deburrMaterialCutCode: (await this.machiningLookup.getDeburrParams(detectMaterialClass(grade))).materialCutCode ?? null,
       reamTable: reamTable ?? null,
+      drillingTable: await this.machiningLookup.getDrillingTable(),
+      tappingTable: await this.machiningLookup.getTappingTable(),
+      machiningCalculators: await this.resolveMachiningCalculators(accessToken),
+      workholderTable: await this.machiningLookup.getWorkholderTable(),
       jigBoreTable: jigBoreTable ?? null,
       jigBoreRate: mhrRates.jigBore,
+      ...(await this.machiningCapabilityInput()),
       heatTreatment: ((item as any).heatTreatment ?? null) as string | null,
       jigGrindRate: mhrRates.jigGrind,
       // Same real Ra signal + real grinding physics getCostSummary resolves
       // — must match line for line.
       tightestRaMicron: this.resolveTightestRaMicron(item),
       cylindricalGrindingParams: cylindricalGrindingParams ?? null,
+      internalGrindingParams: internalGrindingParams ?? null,
       internalGrindingRate: mhrRates.internalGrinder,
-      broachingParams: broachingParams ?? null,
+      planarFaces: this.resolvePlanarFaces(fg),
+      surfaceGrindingParams: await this.machiningLookup.getSurfaceGrindingParams(detectMaterialClass(grade)),
+      surfaceGrindingRate: mhrRates.surfaceGrinder,
+      ...(await this.polygonInputs(item, fg)),
+      keywayBroach: keywayBroach ?? null,
       broachRate: mhrRates.broach,
       wireEdmParams: wireEdmParams ?? null,
       wireEdmRate: mhrRates.wireEdm,
@@ -7360,10 +7617,13 @@ export class BOMItemsService {
       .filter((cls) => primaryRateByClass.has(cls))
       .map((cls) => cls as MachineClassId);
 
-    const pocketCount = (fg?.cnc_features?.feature_summary?.pockets ?? 0) as number;
+    const pocketCount = machiningFeatureCounts(fg?.machining_features)?.pockets ?? 0;
     // Same feature gate the cost summary uses — a route below the class the
     // part's features demand must not win the lowest-cost badge.
-    const requiredClass = requiredMilledMachineClass(fg?.difficultyLevel as string | null, pocketCount);
+    const axisRequirement = requiredMilledClassFromToolAxes(
+      fg?.feature_graph_v2?.features, (await this.machiningLookup.getSetupAxisRule()).rule,
+    );
+    const requiredClass = axisRequirement.required as MachineClassId | null;
 
     const threadCount = baseInput.threads.reduce((s, t) => s + t.count, 0);
 
@@ -7380,11 +7640,12 @@ export class BOMItemsService {
       );
       const meetsClass = meetsRequiredMilledClass(mc, requiredClass);
       const capabilityWarnings = [...envelope.machineCapabilityWarnings];
-      if (!meetsClass) {
+      if (!meetsClass && requiredClass) {
         capabilityWarnings.push(
-          `Part complexity requires ${requiredClass.replace(/_/g, ' ')} or higher — this route cannot produce all features in economic cycle times.`,
+          `Features need a ${requiredClass.replace(/_/g, ' ')} or higher: ${axisRequirement.reason}`,
         );
       }
+      if (!requiredClass) capabilityWarnings.push(axisRequirement.reason);
       const overallCapable = envelope.overallCapable && meetsClass;
       const routeSetups = cost.setupCount ?? 1;
       return {
@@ -7494,8 +7755,12 @@ export class BOMItemsService {
       workSpeedMMin: number; roughInfeedMm: number; finishInfeedMm: number;
       roughAxialFeedRevMm: number; finishAxialFeedRevMm: number; dataFound: boolean;
     } | null,
+    internalGrindingParams?: {
+      workSpeedMMin: number; roughInfeedMm: number; finishInfeedMm: number;
+      roughAxialFeedRevMm: number; finishAxialFeedRevMm: number; dataFound: boolean;
+    } | null,
     jigBoreTable?: any[] | null,
-    broachingParams?: { roughCuttingSpeedMPerMin: number; finishCuttingSpeedMPerMin: number; dataFound: boolean } | null,
+    keywayBroach?: KeywayBroachReference | null,
     wireEdmParams?: { roughFeedRateMmPerMin: number; finishFeedRateMmPerMin: number; dataFound: boolean } | null,
     turningParams?: {
       roughCutDepthMm: number; roughCuttingSpeedMPerMin: number; roughFeedMmPerRev: number;
@@ -7505,9 +7770,9 @@ export class BOMItemsService {
     accessToken: string = '',
   ): Promise<Omit<RouteComparisonDto, 'recommendedRouteId'>> {
     // Fix 1: turned parts also use feature recognizer hole count
-    const turnedCncSummary = fg?.cnc_features?.feature_summary ?? null;
+    const turnedCncSummary = machiningFeatureCounts(fg?.machining_features);
     const holeCount = turnedCncSummary !== null
-      ? ((turnedCncSummary.through_hole ?? 0) + (turnedCncSummary.blind_hole ?? 0))
+      ? turnedCncSummary.drilledHoles
       : (summary.holeCount ?? item.holeCount ?? 0) as number;
     const drawingThreads = ((item.drawingIntelligence as any)?.threads ?? []).map((t: any) => ({
       size: String(t.size ?? t.spec ?? '').trim(),
@@ -7524,7 +7789,8 @@ export class BOMItemsService {
       surfaceArea:          (item.surfaceArea ?? 0) as number,
       maxLength, maxWidth, maxHeight,
       holeCount,
-      holeGroups:           (summary.holeGroups ?? []) as Array<{ diameter_mm: number; count: number }>,
+      holeGroups:           this.resolveMachiningHoleGroups(fg, summary),
+      sharpEdgeLengthMm:    (fg?.machining_features?.edges?.sharp_edge_length_mm ?? null) as number | null,
       pocketCount:          0,
       materialGrade:        grade,
       materialCostPerKg,
@@ -7532,9 +7798,15 @@ export class BOMItemsService {
       materialSource,
       threads: this.resolveThreads(drawingThreads, fg),
       tightestToleranceMm:  ((item as any).tightestToleranceMm ?? null) as number | null,
-      gdtFeatureCount:      (fg?.cnc_features?.feature_summary?.gdt_features ?? 0) as number,
+      gdtFeatureCount:      resolveGdtCallouts(fg, item.drawingIntelligence).length,
       batchSize,
       family:               'turned',
+      toothForms:           this.resolveToothForms(fg),
+      hobRate:              mhrRates.hobMachine,
+      hobbing:              await this.machiningLookup.getHobbingReference(),
+      ...(await this.gearInputs(item, mhrRates)),
+      turnedGeometry:       this.resolveTurnedGeometry(fg, { length: maxLength, width: maxWidth, height: maxHeight }),
+      partoffTable:         await this.machiningLookup.getPartoffTable(),
       finishedWeightKg,
       // Same preference as getCostSummary — must match line for line.
       deburrRate:           preferRealRate(mhrRates.manualDeburr, mhrRates.deburring),
@@ -7543,10 +7815,15 @@ export class BOMItemsService {
       surfaceTreatmentDbRate: surfaceTreatmentDbRate ?? null,
       samplingPerN:         this.resolveSamplingPerN(item),
       samplingPolicy:       inspection?.policy,
-      gdtFeatures:          this.extractGdtFeatures(item, inspection?.rules ?? []),
+      gdtFeatures:          this.extractGdtFeatures(item, fg, inspection?.rules ?? []),
       location,
       deburrLinearSpeedMmPerSec: deburrLinearSpeedMmPerSec ?? null,
+      deburrMaterialCutCode: (await this.machiningLookup.getDeburrParams(detectMaterialClass(grade))).materialCutCode ?? null,
       reamTable: reamTable ?? null,
+      drillingTable: await this.machiningLookup.getDrillingTable(),
+      tappingTable: await this.machiningLookup.getTappingTable(),
+      machiningCalculators: await this.resolveMachiningCalculators(accessToken),
+      workholderTable: await this.machiningLookup.getWorkholderTable(),
       // Same real Ra signal + real grinding physics getCostSummary resolves
       // — must match line for line.
       tightestRaMicron: this.resolveTightestRaMicron(item),
@@ -7554,10 +7831,16 @@ export class BOMItemsService {
       cylindricalGrindingRate: mhrRates.cylindricalGrinder,
       jigBoreTable: jigBoreTable ?? null,
       jigBoreRate: mhrRates.jigBore,
+      ...(await this.machiningCapabilityInput()),
       heatTreatment: ((item as any).heatTreatment ?? null) as string | null,
       jigGrindRate: mhrRates.jigGrind,
+      internalGrindingParams: internalGrindingParams ?? null,
       internalGrindingRate: mhrRates.internalGrinder,
-      broachingParams: broachingParams ?? null,
+      planarFaces: this.resolvePlanarFaces(fg),
+      surfaceGrindingParams: await this.machiningLookup.getSurfaceGrindingParams(detectMaterialClass(grade)),
+      surfaceGrindingRate: mhrRates.surfaceGrinder,
+      ...(await this.polygonInputs(item, fg)),
+      keywayBroach: keywayBroach ?? null,
       broachRate: mhrRates.broach,
       wireEdmParams: wireEdmParams ?? null,
       wireEdmRate: mhrRates.wireEdm,
@@ -7573,6 +7856,7 @@ export class BOMItemsService {
       ['3_axis_lathe', mhrRates.lathe3ax],
       ['2_axis_bar_feed_lathe_with_sub_spindle', mhrRates.latheBarFeed2ax],
       ['3_axis_bar_feed_lathe_with_sub_spindle', mhrRates.latheBarFeed3ax],
+      ['machining_millturn', mhrRates.machiningMillturn],
     ]);
     const discoveredTurnedClasses = await this.machineDiscoveryService.getEligibleClasses(
       'primary_turning', location, accessToken,
@@ -8825,138 +9109,50 @@ export class BOMItemsService {
     };
   }
 
-  // Resolves surface treatment rate from surface_treatment_rates DB table (migration 362).
-  // Table stores rates in USD/m²; result is converted to local currency via LOCATION_INFO FX pivot.
-  //
-  // Resolution order (avoids hardcoded regex keys where possible):
-  //   1. If rawCallout provided: fuzzy-match against process_calculator_mappings.operation
-  //      (process DB canonical names) then look up surface_treatment_rates.process_operation.
-  //   2. Fallback: treatmentKey (regex-derived internal key) → surface_treatment_rates.treatment_type.
-  //   3. Returns null when no DB row found — computeSurfaceTreatmentLine emits a warning.
+  // The drawing's surface-treatment callout, costed from memory/SurfaceTreatment
+  // (migrations 819/820) by the surface-treatment engine: the callout is
+  // matched to a reference process, and that process's per-part cost for this
+  // part (per-area price, or machine time x the reference machine rate) is
+  // returned in the location currency. null when the callout names no
+  // reference process; a process the reference cannot cost comes back with a
+  // gap instead of a number. Replaces the surface_treatment_rates table
+  // (migration 362) and its regex key lookup.
   private async resolveSurfaceTreatmentDbRate(
     accessToken: string,
-    treatmentKey: string | null,
+    item: any,
     location: string,
-    rates: RateSnapshot,
-    rawCallout?: string | null,
-    surfaceAreaMm2 = 0,
-    batchSize = 1,
-  ): Promise<SurfaceTreatmentDbRate | null> {
-    if (!treatmentKey && !rawCallout?.trim()) return null;
-    try {
-      const locInfo = LOCATION_INFO[location] ?? LOCATION_INFO['USA']!;
-      const usdToLocal = rates.convertStrict('USD', locInfo.code);
-      const db = this.supabaseService.getClient(accessToken);
-
-      // Step 1: Query process_calculator_mappings for the canonical operation name.
-      // 'Surface Treatment' and 'Sheet Metal' are the process DB groups containing
-      // surface treatment operations (anodize, powder coat, plating, passivation, etc.).
-      // Migration 790 moved the generic Surface Treatment operation out of the
-      // retired 'Post Processing' group and seeded the real Surface Treatment
-      // process list under its own group.
-      if (rawCallout?.trim()) {
-        const calloutLower = rawCallout.trim().toLowerCase();
-        const { data: pcmOps } = await db
-          .from('process_calculator_mappings')
-          .select('operation')
-          .in('process_group', ['Surface Treatment', 'Sheet Metal'])
-          .eq('is_active', true);
-
-        // Longest-match wins: avoids short noise words (e.g. 'coat' matching 'Clearcoat')
-        let resolvedProcessOp: string | null = null;
-        let bestLen = 0;
-        for (const row of pcmOps ?? []) {
-          const op = (row.operation as string | null) ?? '';
-          const opLower = op.toLowerCase();
-          if (opLower && calloutLower.includes(opLower) && op.length > bestLen) {
-            resolvedProcessOp = op;
-            bestLen = op.length;
-          }
-        }
-
-        if (resolvedProcessOp) {
-          for (const loc of [location, '__default__']) {
-            const { data } = await db
-              .from('surface_treatment_rates')
-              .select('treatment_type, label, rate_per_m2_usd, min_lot_charge_usd')
-              .eq('process_operation', resolvedProcessOp)
-              .eq('location', loc)
-              .maybeSingle();
-            if (data) {
-              return this.enrichSurfaceTreatmentRate(accessToken, {
-                treatmentType: data.treatment_type as string,
-                label: data.label as string,
-                ratePerM2Local: Number(data.rate_per_m2_usd) * usdToLocal,
-                minLotChargeLocal: Number(data.min_lot_charge_usd) * usdToLocal,
-              }, surfaceAreaMm2, batchSize);
-            }
-          }
-        }
-      }
-
-      // Step 2: Fallback — regex-derived treatment_type key.
-      if (!treatmentKey) return null;
-      for (const loc of [location, '__default__']) {
-        const { data } = await db
-          .from('surface_treatment_rates')
-          .select('treatment_type, label, rate_per_m2_usd, min_lot_charge_usd')
-          .eq('treatment_type', treatmentKey)
-          .eq('location', loc)
-          .maybeSingle();
-        if (data) {
-          return this.enrichSurfaceTreatmentRate(accessToken, {
-            treatmentType: data.treatment_type as string,
-            label: data.label as string,
-            ratePerM2Local: Number(data.rate_per_m2_usd) * usdToLocal,
-            minLotChargeLocal: Number(data.min_lot_charge_usd) * usdToLocal,
-          }, surfaceAreaMm2, batchSize);
-        }
-      }
-    } catch { /* non-critical */ }
-    return null;
-  }
-
-  // Resolves the real "Post Processing - Surface Treatment" calculator's
-  // Total Cost (area×rate vs. amortized min-lot, via resolvePhysicsQuantity)
-  // for this part's real surface area/batch size, and merges it onto the
-  // raw DB rate — the ONE enrichment point resolveSurfaceTreatmentDbRate's
-  // two return sites both go through, so every caller gets it for free.
-  // Skips the calculator call (returns `rate` unenriched) when surface area
-  // isn't known yet — computeSurfaceTreatmentLine's own "area unknown" guard
-  // already warns and skips the line entirely in that case, so there is
-  // nothing real to seed the calculator with.
-  private async enrichSurfaceTreatmentRate(
-    accessToken: string,
-    rate: SurfaceTreatmentDbRate,
-    surfaceAreaMm2: number,
+    callout: string | null | undefined,
     batchSize: number,
-  ): Promise<SurfaceTreatmentDbRate> {
-    if (surfaceAreaMm2 <= 0) return rate;
-    const calc = await this.resolvePhysicsQuantity(accessToken, {
-      machineClass: 'surface_treatment',
-      process: 'Surface Treatment',
-      targetFieldNames: ['Total Cost'],
-      seedScope: {
-        'Surface Area': surfaceAreaMm2,
-        'Rate Per M2': rate.ratePerM2Local,
-        'Min Lot Charge': rate.minLotChargeLocal,
-        'Lot Size': batchSize,
-      },
-      seedProvenance: {
-        'Surface Area': 'CAD 3D surface area (bom_items.surface_area)',
-        'Rate Per M2': `surface_treatment_rates — real rate for "${rate.label}" at this location`,
-        'Min Lot Charge': `surface_treatment_rates — same row as Rate Per M2`,
-        'Lot Size': 'Batch size for this quote',
-      },
+  ): Promise<SurfaceTreatmentDbRate | null> {
+    if (!callout?.trim()) return null;
+    const { process, line } = await this.secondaryProcessService.surfaceTreatmentForCallout({
+      item, location, batchSize, accessToken, callout,
     });
+    if (!process) return null;
+    const base = { treatmentType: line?.machineClass ?? process, label: process, machineName: line?.machine?.name ?? null };
+    if (!line || line.status !== 'costed' || line.local.costPerPart == null) {
+      return {
+        ...base,
+        confidence: 'unsupported',
+        resolutionStatus: 'unsupported_operation',
+        gap: {
+          gapType: 'unsupported_operation',
+          process,
+          machineClass: base.treatmentType,
+          reason: line?.reason ?? 'The surface-treatment engine returned no result for this process.',
+        },
+      };
+    }
+    const hourly = line.local.machineRate != null && line.local.laborRate != null && line.machine
+      ? line.local.machineRate + line.local.laborRate * line.machine.operators
+      : undefined;
     return {
-      ...rate,
-      totalCostFromCalculatorLocal: calc.outputs['Total Cost'],
-      calculatorId: calc.calculatorId,
-      calculatorVersion: calc.calculatorVersion,
-      gap: calc.gap,
-      confidence: calc.confidence,
-      resolutionStatus: calc.resolutionStatus,
+      ...base,
+      totalCostFromCalculatorLocal: line.local.costPerPart,
+      ...(line.cycleTimeSec != null ? { cycleTimeMin: line.cycleTimeSec / 60 } : {}),
+      ...(hourly != null ? { hourlyRateLocal: hourly } : {}),
+      confidence: 'verified',
+      resolutionStatus: 'resolved',
     };
   }
 

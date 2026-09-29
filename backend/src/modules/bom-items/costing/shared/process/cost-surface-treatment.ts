@@ -1,20 +1,16 @@
-import { classifySurfaceTreatment, type SurfaceTreatmentDbRate } from '../core/default-rates.constants';
+import type { SurfaceTreatmentDbRate } from '../core/default-rates.constants';
 import type { ProcessLineCost } from '../../../dto/cost-breakdown.dto';
 
 function r2(n: number): number { return Math.round(n * 100) / 100; }
 
-// Surface treatment process line (anodize / plating / powder coat / coating)
-// — a Manufacturing Calculator returning area/rate/cost outputs, deliberately
-// NOT a cycle-time model (there is no real per-part machine cycle for a
-// subcontracted-style area treatment). The actual area×rate vs. amortized
-// min-lot arithmetic lives in the real "Post Processing - Surface Treatment"
-// calculator now, resolved by BomItemsService.enrichSurfaceTreatmentRate()
-// via resolvePhysicsQuantity — this function only assembles the ProcessLineCost
-// shape from that already-resolved result, same convention as every other
-// migrated process (Deburring/PEM/Burring/...). `dbRate` is resolved by the
-// service from surface_treatment_rates table; when null, or when the
-// treatment/area can't be classified/measured, the cost is omitted with a
-// warning rather than silently using a hardcoded rate.
+// Surface treatment process line for the drawing's treatment callout. The
+// callout has already been matched to a reference process from
+// memory/SurfaceTreatment and costed by the surface-treatment engine
+// (BomItemsService.resolveSurfaceTreatmentDbRate -> SecondaryProcessService):
+// a per-area price for plating/e-coat, or machine time x the reference
+// machine rate for the timed processes. This function only assembles the
+// ProcessLineCost shape. Nothing here chooses a rate: an unmatched callout or
+// a process the reference cannot cost is a warning, never a default price.
 export function computeSurfaceTreatmentLine(
   surfaceTreatment: string | null,
   surfaceAreaMm2: number,
@@ -24,13 +20,11 @@ export function computeSurfaceTreatmentLine(
   dbRate?: SurfaceTreatmentDbRate | null,
 ): ProcessLineCost | null {
   const trimmed = surfaceTreatment?.trim() ?? '';
-  const key = classifySurfaceTreatment(surfaceTreatment);
-  if (!key) {
-    if (trimmed && !/^(none|n\/a|na|nil|no|-|as.?required)$/i.test(trimmed)) {
-      warnings.push(
-        `Surface treatment callout "${trimmed}" not recognized — treatment cost NOT included; verify before quoting.`,
-      );
-    }
+  if (!trimmed || /^(none|n\/a|na|nil|no|-|as.?required)$/i.test(trimmed)) return null;
+  if (!dbRate) {
+    warnings.push(
+      `Surface treatment callout "${trimmed}" does not name a reference surface-treatment process (memory/SurfaceTreatment) — treatment cost NOT included; verify before quoting.`,
+    );
     return null;
   }
   if (surfaceAreaMm2 <= 0) {
@@ -39,68 +33,43 @@ export function computeSurfaceTreatmentLine(
     );
     return null;
   }
-  if (!dbRate) {
-    warnings.push(
-      `Surface treatment "${trimmed}" (${key}) has no rate in ${location} — add a row to surface_treatment_rates table to cost this operation.`,
-    );
-    return null;
-  }
+
+  const base = {
+    process: `Surface Treatment (${dbRate.label})`,
+    // No machine setup is charged here: a priced plating/e-coat service has
+    // none, and a timed process's setup is spread into its per-part cost.
+    setupTimeMin: 0,
+    setupTimeSource: 'none' as const,
+    setupCost: 0,
+    rateSource: 'mhr_database' as const,
+    machineClass: dbRate.treatmentType,
+    machineName: dbRate.machineName,
+    commodityCode: null,
+    ...(dbRate.confidence ? { confidence: dbRate.confidence } : {}),
+  };
 
   const totalCost = dbRate.totalCostFromCalculatorLocal;
   if (typeof totalCost !== 'number' || !Number.isFinite(totalCost)) {
-    // The calculator couldn't resolve a real cost (no calculator registered
-    // for machine_class='surface_treatment', or a formula/config problem) —
-    // still emit the line (never silently omit it) with cost 0 and the real
-    // structured gap attached, matching every other migrated process.
     const gap = dbRate.gap;
-    if (gap) {
-      warnings.push(gap.gapType === 'missing_lookup'
-        ? `Surface treatment "${trimmed}" (${key}) cost unavailable — ${gap.requiredAction}`
-        : `Surface treatment "${trimmed}" (${key}) cost unavailable — ${gap.reason}`);
-    } else {
-      warnings.push(`Surface treatment "${trimmed}" (${key}) cost unavailable — no calculator result and no reported gap (unexpected; check resolvePhysicsQuantity).`);
-    }
+    warnings.push(gap
+      ? `Surface treatment "${trimmed}" (${dbRate.label}) cost unavailable — ${gap.gapType === 'missing_lookup' ? gap.requiredAction : gap.reason}`
+      : `Surface treatment "${trimmed}" (${dbRate.label}) cost unavailable.`);
     return {
-      process: `Surface Treatment (${dbRate.label})`,
-      // Explicitly zero, not absent. A dip/coat line is priced per m2 against a
-      // minimum lot charge and has no machine setup — that is a real statement
-      // about this process, and stating it is what lets the write path tell it
-      // apart from an engine that simply failed to resolve a setup time.
-      setupTimeMin: 0,
-      setupTimeSource: 'class_default' as const,
-      setupCost: 0,
+      ...base,
       runCost: 0,
       totalCost: 0,
       cycleTimeMin: 0,
       hourlyRate: 0,
-      rateSource: 'mhr_database',
-      machineClass: 'surface_treatment',
-      machineName: null,
-      commodityCode: null,
-      ...(dbRate.calculatorId ? { calculatorId: dbRate.calculatorId } : {}),
-      ...(dbRate.calculatorVersion != null ? { calculatorVersion: dbRate.calculatorVersion } : {}),
       ...(gap ? { physicsGap: gap } : {}),
-      ...(dbRate.confidence ? { confidence: dbRate.confidence } : {}),
     };
   }
 
   const perPart = r2(totalCost);
   return {
-    process: `Surface Treatment (${dbRate.label})`,
-    // See the same field on the unavailable-cost branch above.
-    setupTimeMin: 0,
-    setupTimeSource: 'class_default' as const,
-    setupCost: 0,
+    ...base,
     runCost: perPart,
     totalCost: perPart,
-    cycleTimeMin: 0,
-    hourlyRate: 0,
-    rateSource: 'mhr_database',
-    machineClass: 'surface_treatment',
-    machineName: null,
-    commodityCode: null,
-    ...(dbRate.calculatorId ? { calculatorId: dbRate.calculatorId } : {}),
-    ...(dbRate.calculatorVersion != null ? { calculatorVersion: dbRate.calculatorVersion } : {}),
-    ...(dbRate.confidence ? { confidence: dbRate.confidence } : {}),
+    cycleTimeMin: dbRate.cycleTimeMin ?? 0,
+    hourlyRate: dbRate.hourlyRateLocal ?? 0,
   };
 }

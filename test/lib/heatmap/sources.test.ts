@@ -21,7 +21,8 @@ function fg(overrides: { edge_clearance_mm?: number | null; nearest_bend_distanc
       features: [
         {
           id: 'hole_d5',
-          feature_type: 'hole',
+          feature_type: 'SimpleHole',
+          variant: 'through',
           occurrences: [
             {
               centroid: [10, 20, 0],
@@ -45,7 +46,7 @@ function dfmScores(riskScore: number): DFMScoresResponse {
     features: [
       {
         featureId: 'hole_d5',
-        featureType: 'hole',
+        featureType: 'SimpleHole',
         occurrences: [
           { occurrenceIndex: 0, riskScore, riskLevel: 'low', riskFactors: [] },
         ],

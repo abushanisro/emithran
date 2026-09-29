@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useState, useEffect, useMemo, useCallback, useRef, Fragment, type ReactNode } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, Fragment } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
@@ -48,8 +48,11 @@ import { resolveLineSetup, roundSetupMinutes } from '@/lib/costing/process-line-
 import { deriveMaterialUsage } from '@/lib/costing/material-usage';
 import { toast } from 'sonner';
 import { ModelViewer } from '@/components/ui/model-viewer';
-import { useBOMItem, useAnalysisVersion, useDFMScores, useMaterialIntelligence, useMaterialDensity, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useGdtAnalysis, useCostOverride, useApplyRoute, useApplyCustomRoute, useMachineOverride, costSummaryQueryKey, costSummaryUrl, type BlankSpecDto, type ProcessLineCost, type ApplyCustomRouteStep } from '@/lib/api/hooks/useBOMItems';
-import { useMHRRecords, useMHRBenchmark } from '@/lib/api/hooks/useMHR';
+import { useBOMItem, useAnalysisVersion, useDFMScores, useMaterialIntelligence, useMaterialDensity, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useGdtAnalysis, useCostOverride, useApplyRoute, useApplyCustomRoute, useMachineOverride, costSummaryQueryKey, costSummaryUrl, type BlankSpecDto, type InjectionMoldingBreakdown, type ProcessLineCost, type ApplyCustomRouteStep } from '@/lib/api/hooks/useBOMItems';
+import { useMHRRecords, useMHRRecord } from '@/lib/api/hooks/useMHR';
+import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
+import { groupFeaturesByType, featureSelectionKey, resolveFeatureSelection, findFeatureByFaceId } from '@/lib/features/machining-feature-tree';
+import { effectiveProcessGroupOf } from '@/lib/processCatalog/hr-rates-process-selection';
 import { useFactoryCurrency, useFactories, useCurrencies, useFxRate, useRefreshFxRate, useFxRateOnDemand, type FxRateType } from '@/lib/api/hooks/useFx';
 import { useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculatorMappings';
 import { useSmLookupTables, type ReferenceTable } from '@/lib/api/hooks/useProcesses';
@@ -60,6 +63,8 @@ import { useDebounce } from '@/lib/hooks/useDebounce';
 import type { RawMaterial } from '@/lib/api/hooks/useRawMaterials';
 import { useCreateRawMaterialCost, useRawMaterialCosts } from '@/lib/api/hooks/useRawMaterialCosts';
 import { getThreadIntelligence } from '@/lib/manufacturing-kb/thread-standards';
+import { SecondaryProcessesPanel, type SecondaryHighlight } from '@/components/features/manufacturing-intelligence/SecondaryProcessesPanel';
+import { useSecondaryProcesses, useNre, type SecondaryProcessLine } from '@/lib/api/hooks/useSecondaryProcesses';
 import { suggestMaterialCandidates, type MaterialSuggestion } from '@/lib/manufacturing-kb/material-candidates';
 import type { ClearanceHole } from '@/lib/api/vave';
 import { apiClient, ApiError } from '@/lib/api/client';
@@ -77,7 +82,8 @@ import { usePackagingLogisticsCosts } from '@/lib/api/hooks/usePackagingLogistic
 import { useProcuredPartsCosts } from '@/lib/api/hooks/useProcuredPartsCosts';
 import { useToolingCosts } from '@/lib/api/hooks/useToolingCosts';
 import type { BOMItem } from '@/lib/api/hooks/useBOMItems';
-import type { FeatureGraph, FeatureGraphSummary, DFMWarning, DFMSeverity, ValidationResult, ManufacturingFeature, HoleGroup, HoleGroupLocation, BendFeature, FeatureNodeV2, FaceMapEntry, FeatureCategory, DFMScoresResponse } from '@/lib/types/manufacturing';
+import { isBend, isBlankProfile, isExtrudedHole, isPlainHole, type FeatureGraphEntryLike } from '@/lib/features/feature-graph';
+import type { FeatureGraph, FeatureGraphSummary, DFMWarning, DFMSeverity, ValidationResult, ManufacturingFeature, HoleGroup, HoleGroupLocation, BendFeature, FeatureNodeV2, FaceMapEntry, DFMScoresResponse } from '@/lib/types/manufacturing';
 import { hasDfmRiskFactor } from '@/lib/dfm/hasRiskFactor';
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -117,40 +123,14 @@ interface ManualRouteOption {
   // complete, self-contained multi-line quotes (no separate cutting +
   // additional-steps composition the way Sheet Metal's dynamic path needs).
   // Distinct from dynamicCuttingRouteId (Sheet Metal's composed-route
-  // identity) and from KB_TO_APPLY_ROUTE (the legacy fixed-family lookup) —
-  // this is the real id itself, sourced straight from the backend's own
+  // identity) — this is the real id itself, sourced straight from the backend's own
   // route-comparison result, never a second hand-kept mapping table.
   directApplyRouteId?: string;
 }
 
-interface RouteScoringContext {
-  summary: FeatureGraphSummary;
-  item: BOMItem;
-  batchSize: number;
-  /**
-   * bom_items.annual_volume, the authoritative figure — `null` when the part
-   * genuinely has none on file. Carried explicitly so the volume-dependent
-   * branches below can decline to score rather than reading absence as a real
-   * quantity.
-   */
-  annualVolume: number | null;
-}
-
-interface RouteScore {
-  costScore: number;
-  leadTimeScore: number;
-  qualityScore: number;
-  flexScore: number;
-  toolingScore: number;
-  totalScore: number;
-  confidence: number;
-  scoreFactors: string[];
-  reasons: string[];
-}
-
 interface ProcessTreeNode {
   id: string;
-  kind: 'part' | 'group' | 'operation' | 'sub_op' | 'feature';
+  kind: 'part' | 'group' | 'operation' | 'feature';
   label: string;
   factory?: string;
   machine?: string;
@@ -166,120 +146,22 @@ interface ProcessTreeNode {
   // see canonical-operation.ts) so a click can highlight the exact matching
   // feature_graph_v2 entry by id instead of re-deriving a match by label/diameter.
   v2FeatureId?: string;
+  // Machining catalog-type nodes: the exact feature_graph_v2 ids they group.
+  v2FeatureIds?: string[];
+  // A process that acts on the whole part surface (cleaning, NDT, packaging).
+  wholePart?: boolean;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
-const SUB_OP: Record<string, string> = {
-  'Fiber Laser Cutting': 'As Cut',
-  'Sheet Metal Laser Cutting': 'As Cut',
-  'CNC Press Brake': 'As Bent',
-  'Sheet Metal Bending': 'As Bent',
-  'Injection Moulding': 'As Moulded',
-  'Injection Molding': 'As Moulded',
-  'Material Drying': 'As Dried',
-  'Gate Trimming': 'As Trimmed',
-  'Deflashing': 'As Deflashed',
-  'Insert Installation': 'As Assembled',
-  'CNC Milling': 'As Machined',
-  'CNC Machining': 'As Machined',
-  'CNC Turning': 'As Turned',
-  'Die Casting': 'As Cast',
-  'Deburring': 'As Finished',
-  'Drilling': 'As Drilled',
-  'Inspection': 'As Inspected',
-  'Tapping': 'As Tapped',
-  'Surface Treatment': 'As Coated',
-};
-
-// Which feature_graph_v2 CNC feature_type buckets a given rec.process step
-// covers — every bucket listed for a given process resolves to the SAME
-// canonical_operation via canonical-operation.ts (verified: through_hole/
-// blind_hole/cross_hole all resolve to "Drilling // SimpleHole"), so taking
-// the first match's canonical_operation as the step's real label is safe.
-const CNC_PROCESS_TO_FEATURE_TYPES: Record<string, string[]> = {
-  Drilling: ['through_hole', 'blind_hole', 'cross_hole'],
-  Tapping: ['tapped_hole'],
-};
-
-// ── Surface Treatment KB ───────────────────────────────────────────────────────
-// Keyed by treatment process name. Phase 2: ctx.coatingType from drawing drives lookup.
-
-type KBFeature = { label: string; machine?: string; attrs: Array<{ name: string; value: string }> };
-
-const SURFACE_TREATMENT_KB: Record<string, KBFeature[]> = {
-  'Zinc + Powder Coat': [
-    {
-      label: 'Zinc Phosphating',
-      machine: 'Phosphating Tank',
-      attrs: [
-        { name: 'Type',    value: 'Chemical conversion coating' },
-        { name: 'Purpose', value: 'Corrosion inhibition + paint adhesion' },
-        { name: 'Substrate', value: 'Carbon / mild steel only' },
-      ],
-    },
-    {
-      label: 'Powder Coating',
-      machine: 'Powder Coat Booth',
-      attrs: [
-        { name: 'Finish',   value: 'RAL (per drawing)' },
-        { name: 'DFT',      value: '60–80 µm' },
-        { name: 'Adhesion', value: 'Cross-cut ISO 2409 Class 0' },
-      ],
-    },
-  ],
-  'Anodize': [
-    {
-      label: 'Anodizing',
-      machine: 'Anodizing Line',
-      attrs: [
-        { name: 'Type',      value: 'Type II sulfuric (per drawing)' },
-        { name: 'Thickness', value: '10–25 µm' },
-        { name: 'Substrate', value: 'Aluminium alloys' },
-      ],
-    },
-  ],
-  'Powder Coat Only': [
-    {
-      label: 'Powder Coating',
-      machine: 'Powder Coat Booth',
-      attrs: [
-        { name: 'Pre-treatment', value: 'Chromate conversion (aluminium)' },
-        { name: 'Finish',        value: 'RAL (per drawing)' },
-        { name: 'DFT',           value: '60–80 µm' },
-      ],
-    },
-  ],
-};
-
-// Default treatment sequence for carbon steels (CRCA, MS, IS2062, DC01)
-const CARBON_STEEL_TREATMENT_KEY = 'Zinc + Powder Coat';
-
-// Carbon/mild steel grades that corrode bare and default to Zinc + Powder Coat
-// SECC/SPCC/SGCC/SPHC/SPCE: JIS G3141/G3302/G3313 cold-rolled and
-// galvanized/electrogalvanized mild-steel sheet codes — same substrate
-// family as CRCA/IS2062/DC01, just JIS-coded instead of IS/EN-coded.
-const RUSTY_MATERIALS = ['CRCA', 'MS', 'IS2062', 'DC01', 'SECC', 'SPCC', 'SGCC', 'SPHC', 'SPCE'];
-
-type SubstrateClass = 'aluminum' | 'stainless' | 'carbon_steel' | 'unknown';
-
-// Substrate classification drives surface-treatment defaults. Zinc phosphating is a
-// steel-only chemistry — it must never be applied to aluminium or stainless.
-function classifySubstrate(materialText: string): SubstrateClass {
-  const m = materialText.toUpperCase();
-  if (m.trim().length === 0) return 'unknown';
-  // T6 (ANSI H35.1 temper designation) is exclusive to heat-treatable
-  // aluminum alloys — real parts here are stored as e.g. "T6 - Sheet" with
-  // no alloy number, so match the temper code itself.
-  if (/ALUMIN|(^|[^A-Z0-9])(AA\s?\d{4}|AL)([^A-Z]|$)|6061|6063|5052|5754|7075|2024|\bT6\b/.test(m)) {
-    return 'aluminum';
-  }
-  if (/STAINLESS|(^|[^A-Z])SS([^A-Z]|$)|304|316|430|17-4/.test(m)) return 'stainless';
-  if (RUSTY_MATERIALS.some((k) => m.includes(k)) || /MILD|EN\s?8|S235|S355|HR\b|CR[1-5]\b/.test(m)) {
-    return 'carbon_steel';
-  }
-  return 'unknown';
-}
+// SUB_OP ("As Cut"/"As Processed"/"As Inspected"...), MACHINING_PROCESS_TO_
+// FEATURE_KEYS, SURFACE_TREATMENT_KB and INSPECTION_KB were here: hand-written
+// step names, coating sequences, inspection methods and machines ("Inspection
+// Bench", "Powder Coat Booth", "Calipers / height gauge") shown in the process
+// tree as if they were this part's data. Deleted 2026-09-27 - every node under
+// an operation now comes from that operation's own cost line (featureBreakdown
+// + its featureIds) or from real CAD/drawing extraction, and a step with
+// neither says so instead of showing a stand-in.
 
 // Cast alloys that can never run a laser + press-brake route, however flat the
 // geometry looks (ALBC bronze plate ≙ sheet steel to the geometric classifier).
@@ -295,67 +177,16 @@ function isSheetFormableMaterial(materialText: string): boolean {
 // this page must go through here or a bronze plate gets a press-brake route.
 function resolveDisplayFamily(
   item: { materialGrade?: string | null; material?: string | null },
-  fg: { classification?: { family?: string } } | null,
+  fg: { classification?: { family?: string | null } } | null,
 ): string {
-  const family = fg?.classification?.family ?? 'milled';
+  // '' = the CAD engine did not classify this part. Never defaulted to
+  // 'milled': that showed every unanalysed/unclassified part as Machining.
+  const family = fg?.classification?.family ?? '';
   if (family !== 'sheet_metal') return family;
   return isSheetFormableMaterial(`${item.materialGrade ?? ''} ${item.material ?? ''}`)
     ? family
     : 'milled';
 }
-
-// Resolve which SURFACE_TREATMENT_KB sequence applies. Explicit drawing coating wins;
-// otherwise the substrate decides (aluminium → anodize, steel → zinc + powder coat).
-function resolveTreatmentKey(substrate: SubstrateClass, coating: string | null | undefined): string {
-  const c = (coating ?? '').toLowerCase();
-  if (coating && SURFACE_TREATMENT_KB[coating]) return coating;
-  if (c.includes('anodiz')) return 'Anodize';
-  if (c.includes('powder')) return substrate === 'aluminum' ? 'Powder Coat Only' : CARBON_STEEL_TREATMENT_KEY;
-  if (substrate === 'aluminum') return 'Anodize';
-  return CARBON_STEEL_TREATMENT_KEY;
-}
-
-// ── Inspection KB ──────────────────────────────────────────────────────────────
-// Composable inspection templates. Phase 2: driven by drawing quality requirements.
-
-const INSPECTION_KB: Record<string, KBFeature> = {
-  // Default for general-tolerance parts (no GD&T frames, no tight tolerances)
-  dimensional: {
-    label: 'Dimensional Inspection',
-    machine: 'Inspection Bench',
-    attrs: [
-      { name: 'Scope',  value: 'Critical holes + bends' },
-      { name: 'Method', value: 'Calipers / height gauge / Go-NoGo gauge' },
-    ],
-  },
-  // Upgraded only when the drawing carries GD&T callouts or tolerance ≤ 0.10 mm
-  // (same gate as backend feature-graph.service.ts CMM rule)
-  dimensional_cmm: {
-    label: 'CMM Inspection',
-    machine: 'CMM',
-    attrs: [
-      { name: 'Scope',  value: 'GD&T callouts + critical dimensions' },
-      { name: 'Method', value: 'CMM per drawing datum scheme' },
-    ],
-  },
-  visual: {
-    label: 'Visual Inspection',
-    machine: 'Inspection Bench',
-    attrs: [
-      { name: 'Scope',  value: 'Surface finish, coating adhesion' },
-      { name: 'Method', value: 'Visual + cross-cut test' },
-    ],
-  },
-  coating_thickness: {
-    label: 'Coating Thickness Check',
-    machine: 'Elcometer',
-    attrs: [
-      { name: 'Method',          value: 'Elcometer / magnetic gauge' },
-      { name: 'Accept criteria', value: '60–80 µm DFT' },
-      { name: 'Frequency',       value: '5 pieces per batch' },
-    ],
-  },
-};
 
 // CATEGORY-level label (the umbrella domain a CAD family belongs to — matches
 // process_taxonomy.process_group, migration 733). 'Plastic Molding' covers
@@ -402,180 +233,6 @@ const DEFAULT_VALIDATION_CONFIG: ValidationConfig = {
 // registered engines. Its process names are also the canonical ones the cost
 // lines carry, which this table's were not. See activeOverrideProcesses.
 
-// Maps a fixed-family (WORKFLOW_KB) option id → apply-route DTO id accepted
-// by the backend. Only ever consulted by the fixed-family path below
-// (handleApplyFixed) — the sheet-metal dynamic path (handleSetRouteDynamic)
-// always sets dynamicCuttingRouteId, so applyScenario's branch that reads
-// this map is unreachable for any sheet-metal route id. The three 'sm-*'
-// entries that used to sit here (sm-laser/sm-turret/sm-waterjet, left over
-// from the deleted KB_ROUTE_ALTERNATIVES table) were exactly that: dead,
-// stale keys nothing could ever look up — real sheet-metal route ids
-// (sm-laser, sm-laser-cut, sm-laser-3d, sm-oxyfuel, sm-shear,
-// sm-cut-to-length, sm-laser-punch, sm-plasma, sm-plasma-punch, sm-router,
-// sm-standard-press, sm-tandem-press, sm-progressive-die, sm-roll-bending-2/
-// 3/4 — manufacturing-process-registry.ts's ROUTE_ID_FOR_CLASS) are resolved
-// entirely through applyCustomRoute/dynamicCuttingRouteId instead. Removed
-// 2026-09-10 rather than kept "in sync" with a registry this map structurally
-// cannot reach.
-// Grinding has no backend route, so it's absent — clicking it only updates local UI.
-const KB_TO_APPLY_ROUTE: Record<string, string> = {
-  'cm-3axis':    'cnc-3ax',
-  'cm-4axis':    'cnc-4ax',
-  'cm-5axis':    'cnc-5ax',
-  'ct-2axis':    'cnc-lathe',
-  'ct-livetools': 'cnc-lathe-lt',
-};
-
-// ── Route Scoring Engine ───────────────────────────────────────────────────────
-
-function clamp(v: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, v));
-}
-
-function computeConfidence(item: BOMItem, summary: FeatureGraphSummary): number {
-  let score = 100;
-  if (!item.materialGrade && !item.material) score -= 40;
-  else if (!item.materialGrade) score -= 15;
-  if (!item.annualVolume) score -= 20;
-  if (!summary.sheetThicknessMm) score -= 15;
-  if (!summary.holeCount) score -= 10;
-  return Math.max(10, score);
-}
-
-function computeRouteScore(routeId: string, ctx: RouteScoringContext): RouteScore {
-  const { summary, item, batchSize, annualVolume } = ctx;
-  const uniqueDiameters = summary.holeGroups?.length ?? 0;
-  const holeCount = summary.holeCount;
-  const thickness = summary.sheetThicknessMm;
-  // `null` = no annual volume on file. This used to be `item.annualVolume ?? 0`,
-  // which made an ABSENT volume score as a real one: 0 satisfies `volume < 5_000`,
-  // so every part with no volume recorded silently collected the low-volume
-  // "no tooling amortization needed" bonus (and the matching punch-die penalty)
-  // as though someone had entered a genuinely tiny order. Each volume branch now
-  // requires a real figure. No weight or threshold is changed.
-  const volume = annualVolume;
-  const matStr = `${item.materialGrade ?? ''} ${item.material ?? ''}`.toUpperCase();
-  const isHeatSensitive = ['STAINLESS', 'INCONEL', 'TITANIUM', 'SPRING', 'HARDENED'].some((m) => matStr.includes(m));
-  const isThick = thickness > 8;
-  const confidence = computeConfidence(item, summary);
-
-  if (routeId === 'sm-laser') {
-    // Base scores
-    let costBase = 85;
-    let leadBase = 90;
-    let qualBase = 92;
-
-    const scoreFactors: string[] = [];
-    const reasons: string[] = [];
-
-    // Volume signal
-    if (volume !== null && volume < 5_000) { costBase += 5; scoreFactors.push(`Low volume (${volume.toLocaleString()} pcs) — no tooling amortization needed`); }
-    if (volume !== null && volume > 50_000) { costBase -= 10; scoreFactors.push(`High volume (${volume.toLocaleString()} pcs) — laser cost disadvantage at scale`); }
-
-    // Hole signals — laser excels with diverse, dense holes
-    if (holeCount > 150) { costBase += 8; scoreFactors.push(`${holeCount} holes — laser pierce cycle well-suited`); }
-    if (uniqueDiameters > 10) { costBase += 8; scoreFactors.push(`${uniqueDiameters} unique hole sizes — no die investment; laser unaffected`); }
-    else if (uniqueDiameters > 5) { costBase += 4; scoreFactors.push(`${uniqueDiameters} unique hole diameters — no die investment`); }
-
-    // Cut length signal
-    const cutLength = summary.cutLengthMm;
-    if (cutLength > 3_000) { leadBase += 3; scoreFactors.push(`Long cut profile (${Math.round(cutLength)} mm) — fiber laser cycle efficient`); }
-
-    // Material / thickness penalties
-    if (isHeatSensitive) { qualBase -= 4; scoreFactors.push(`Heat-sensitive material — HAZ risk reduces quality score`); }
-    if (isThick) { leadBase -= 5; scoreFactors.push(`Thick sheet (${thickness} mm) — edge quality degrades above 8 mm`); }
-
-    const costScore = clamp(costBase, 0, 100);
-    const leadTimeScore = clamp(leadBase, 0, 100);
-    const qualityScore = clamp(qualBase, 0, 100);
-    const flexScore = 95;
-    const toolingScore = 100;
-    const totalScore = Math.round(costScore * 0.35 + leadTimeScore * 0.20 + qualityScore * 0.20 + flexScore * 0.15 + toolingScore * 0.10);
-
-    if (uniqueDiameters > 0) reasons.push(`${uniqueDiameters} unique hole size${uniqueDiameters > 1 ? 's' : ''} — no die investment needed`);
-    if (holeCount > 50) reasons.push(`${holeCount} holes at high pierce speed`);
-    if (volume !== null && volume > 0 && volume < 10_000) reasons.push(`Volume ${volume.toLocaleString()} pcs — no tooling amortization required`);
-    if (batchSize > 0 && batchSize < 100) reasons.push(`Batch of ${batchSize} pcs — instant changeover`);
-    reasons.push('Profile changes are program edits — no hard tooling');
-    return { costScore, leadTimeScore, qualityScore, flexScore, toolingScore, totalScore, confidence, scoreFactors, reasons };
-  }
-
-  if (routeId === 'sm-turret') {
-    let costBase = 70;
-    let leadBase = 75;
-
-    const scoreFactors: string[] = [];
-    const reasons: string[] = [];
-
-    // Volume signal — turret wins at scale with simple hole sets
-    if (volume !== null && volume > 50_000) { costBase += 12; scoreFactors.push(`High volume (${volume.toLocaleString()} pcs) — tooling cost fully amortized`); }
-    if (volume !== null && volume < 5_000 && volume > 0) { costBase -= 10; scoreFactors.push(`Low volume — punch-die tooling not amortized`); }
-
-    // Hole diversity — turret penalized by unique diameters
-    const diePenalty = Math.min(20, uniqueDiameters * 2);
-    costBase -= diePenalty;
-    leadBase -= diePenalty;
-    if (uniqueDiameters > 5) scoreFactors.push(`${uniqueDiameters} unique diameters → ${uniqueDiameters} punch-die sets required`);
-
-    // Simple repeating patterns at high volume — turret strength
-    if (uniqueDiameters <= 3 && holeCount > 100) {
-      costBase += 15;
-      scoreFactors.push(`Simple hole set (${uniqueDiameters} sizes × ${holeCount} hits) — high-speed turret cycle`);
-    }
-    // Large flat blanks favour turret throughput
-    if (summary.flatPatternAreaMm2 > 100_000) {
-      leadBase += 5;
-      scoreFactors.push(`Large flat pattern (${fmtInt(summary.flatPatternAreaMm2)} mm²) — high blank utilisation per stroke`);
-    }
-    // Thin sheet — turret strokes faster
-    if (thickness < 1.5 && thickness > 0) { leadBase += 5; scoreFactors.push(`Thin sheet (${thickness} mm) — high strokes/min`); }
-
-    const costScore = clamp(costBase, 0, 100);
-    const leadTimeScore = clamp(leadBase, 0, 100);
-    const qualityScore = 80;
-    const flexScore = clamp(65 - Math.min(30, uniqueDiameters * 3), 0, 100);
-    const toolingScore = clamp(40 - Math.min(30, uniqueDiameters * 3), 0, 100);
-    const totalScore = Math.round(costScore * 0.35 + leadTimeScore * 0.20 + qualityScore * 0.20 + flexScore * 0.15 + toolingScore * 0.10);
-
-    if (volume !== null && volume > 50_000) reasons.push(`Volume ${volume.toLocaleString()} pcs — tooling amortized`);
-    if (uniqueDiameters > 5) reasons.push(`${uniqueDiameters} unique diameters → tooling budget required`);
-    if (uniqueDiameters <= 3 && holeCount > 100) reasons.push(`Simple hole pattern (${uniqueDiameters} sizes, ${holeCount} hits) — turret strength`);
-    if (thickness < 1.5 && thickness > 0) reasons.push(`Thin sheet ${thickness} mm — high strokes/min lowers cycle time`);
-    return { costScore, leadTimeScore, qualityScore, flexScore, toolingScore, totalScore, confidence, scoreFactors, reasons };
-  }
-
-  if (routeId === 'sm-waterjet') {
-    let qualBase = 88;
-    let leadBase = 50;
-
-    const scoreFactors: string[] = [];
-    const reasons: string[] = [];
-
-    if (isHeatSensitive) { qualBase += 8; scoreFactors.push(`Heat-sensitive material — waterjet has no HAZ`); }
-    if (isThick) { leadBase += 8; scoreFactors.push(`Thick sheet (${thickness} mm) — laser edge quality degrades above 8 mm`); }
-
-    // Short complex profiles suit waterjet
-    const cutLength = summary.cutLengthMm;
-    if (cutLength > 0 && cutLength < 1_000) { leadBase += 5; scoreFactors.push(`Short complex profile (${Math.round(cutLength)} mm) — waterjet contour advantage`); }
-
-    if (!isHeatSensitive && !isThick) scoreFactors.push(`Standard material and thickness — waterjet cost penalty not offset`);
-
-    const costScore = 45;
-    const leadTimeScore = clamp(leadBase, 0, 100);
-    const qualityScore = clamp(qualBase, 0, 100);
-    const flexScore = 70;
-    const toolingScore = 100;
-    const totalScore = Math.round(costScore * 0.35 + leadTimeScore * 0.20 + qualityScore * 0.20 + flexScore * 0.15 + toolingScore * 0.10);
-
-    if (isHeatSensitive) reasons.push('No heat-affected zone — preserves material properties');
-    if (isThick) reasons.push(`Thick section ${thickness} mm — laser degrades above 8 mm`);
-    if (!isHeatSensitive && !isThick) reasons.push('Laser offers lower cost and faster cycle on this material');
-    reasons.push('No hard tooling — any shape cuts without dies');
-    return { costScore, leadTimeScore, qualityScore, flexScore, toolingScore, totalScore, confidence, scoreFactors, reasons };
-  }
-
-  return { costScore: 75, leadTimeScore: 75, qualityScore: 80, flexScore: 75, toolingScore: 75, totalScore: 76, confidence: 50, scoreFactors: [], reasons: [] };
-}
 
 const RIGHT_TABS = [
   { key: 'copilot',       label: '✦ Copilot'   },
@@ -585,6 +242,7 @@ const RIGHT_TABS = [
   { key: 'sustainability', label: 'Sustain'     },
   { key: 'detail',        label: 'Detail'       },
   { key: 'investment',    label: 'Invest'       },
+  { key: 'secondary',     label: 'Secondary'    },
   { key: 'vendor_network', label: 'Vendors'     },
 ] as const;
 type RightTabKey = (typeof RIGHT_TABS)[number]['key'];
@@ -660,30 +318,36 @@ function machineDisplayLabel(proc: { machineName?: string | null; mhrId?: string
   if (proc.mhrId) return 'Machine name unavailable';
   return 'Manual rate — not linked to a machine';
 }
-// machineClass (e.g. 'fiber_laser') is a machine-table key, not a process_group —
-// never store it directly as processGroup (that produced the "Group: fiber_laser"
-// bug). Mirrors backend's deriveProcessGroupFromMachineClass in
-// bom-items.controller.ts, expanded to the fuller machine_class vocabulary
-// introduced by migrations 369/371.
-function deriveProcessGroupFromMachineClass(machineClass: string | null | undefined): string {
-  if (!machineClass) return '';
-  const sheetMetal = ['fiber_laser', 'co2_laser', 'plasma', 'waterjet', 'press_brake', 'turret_punch', 'roll_forming', 'deep_draw', 'band_saw'];
-  // Real, granular primary CNC classes — replaces the deleted 6-member
-  // cnc_lathe/cnc_lathe_live/cnc_mill_turn/cnc_3ax_vmc/cnc_4ax_vmc/cnc_5ax_mc
-  // set (Machining Engine Re-Architecture).
-  const machining = [
-    '2_axis_lathe', '3_axis_lathe', '2_axis_bar_feed_lathe_with_sub_spindle', '3_axis_bar_feed_lathe_with_sub_spindle',
-    '3_axis_mill', '4_axis_mill', '5_axis_mill', 'grinding', 'drill_press', 'tapping', 'edm',
-  ];
-  const assembly = ['welding', 'manual_assembly', 'adhesive_bonding', 'electrical_assembly'];
-  const postProcessing = ['cmm', 'ndt_test', 'heat_treat_furnace', 'anodize', 'powder_coat', 'plating', 'chem_treatment', 'laser_marking', 'deburring'];
-  const plastics = ['injection_molding', 'thermoforming', 'blow_molding', 'extrusion', 'rotational_molding', 'rubber_molding', 'compression_molding'];
-  if (sheetMetal.includes(machineClass)) return 'Sheet Metal';
-  if (machining.includes(machineClass)) return 'Machining';
-  if (assembly.includes(machineClass)) return 'Assembly';
-  if (postProcessing.includes(machineClass)) return 'Post Processing';
-  if (plastics.includes(machineClass)) return 'Plastic Molding';
-  return '';
+// Process › Category › Operation for a saved process row, read only from the
+// database: the HR Rates machine the line is linked to (the machine that
+// actually does the work) first, then the row's own saved catalog values
+// (process_group, category, and process_route — which for Machining is the
+// machine category). A level with no real value is omitted, never guessed.
+function ProcessHierarchyLabel({ proc }: {
+  proc: { processGroup?: string | null; category?: string | null; processRoute?: string | null; operation?: string | null; mhrId?: string | null; machineId?: string | null };
+}) {
+  const mhrId = proc.mhrId || proc.machineId || '';
+  const { data: machine } = useMHRRecord(mhrId, { enabled: !!mhrId });
+  const derivedGroup = machine ? effectiveProcessGroupOf(machine as any) : '-';
+  const derivedCategory = machine ? mhrCategoryOf(machine as any) : '-';
+  const group = (derivedGroup !== '-' ? derivedGroup : '') || proc.processGroup || '';
+  const category = (derivedCategory !== '-' ? derivedCategory : '') || proc.category || proc.processRoute || '';
+  const operation = proc.operation || '';
+  const levels = [group, category, operation].filter(Boolean);
+  if (levels.length === 0) return <>Process</>;
+  return (
+    <>
+      {levels.map((lvl, i) => {
+        const isLast = i === levels.length - 1;
+        return (
+          <Fragment key={i}>
+            {i > 0 && <span className="text-muted-foreground/50 mx-1">›</span>}
+            <span className={isLast ? 'text-foreground' : 'text-muted-foreground'}>{lvl}</span>
+          </Fragment>
+        );
+      })}
+    </>
+  );
 }
 // Maps one FeatureBreakdown row to the 3D-viewer highlight it represents, so
 // clicking "Bend R1mm x2" shows exactly those 2 bends (not every bend in the
@@ -693,12 +357,12 @@ function deriveProcessGroupFromMachineClass(machineClass: string | null | undefi
 // nothing to highlight (feature graph not loaded, or an unrecognized type),
 // which the caller uses to disable the row rather than showing a dead click.
 function resolveFeatureOpHighlight(
-  op: { name: string; featureType: string },
+  op: { name: string; featureType: string; featureIds?: string[] | undefined },
   v2Features: FeatureNodeV2[],
   faceMap: FaceMapEntry[],
 ): FeatureNodeV2 | null {
   if (op.featureType === 'bend') {
-    const bendFeatures = v2Features.filter((f) => f.feature_type === 'bend');
+    const bendFeatures = v2Features.filter(isBend);
     const m = op.name.match(/R([\d.]+)mm/);
     if (m) {
       const bucket = parseFloat(m[1]!);
@@ -708,7 +372,7 @@ function resolveFeatureOpHighlight(
     return mergeFeaturesToHL('fb_bend_all', bendFeatures);
   }
   if (op.featureType === 'pierce' || op.featureType === 'deburr_pierce') {
-    return mergeFeaturesToHL('fb_holes', v2Features.filter((f) => f.feature_type === 'hole'));
+    return mergeFeaturesToHL('fb_holes', v2Features.filter(isPlainHole));
   }
   if (op.featureType === 'pem_insertion') {
     // buildPemFeatureBreakdown (bom-items.service.ts) names each row
@@ -718,7 +382,7 @@ function resolveFeatureOpHighlight(
     // bucket-matching pattern as bend/radius above. The feature graph has no
     // separate "this hole is a PEM insertion point" tag, so diameter is the
     // real, available signal — not a guess.
-    const holeFeatures = v2Features.filter((f) => f.feature_type === 'hole');
+    const holeFeatures = v2Features.filter(isPlainHole);
     const m = op.name.match(/Ø([\d.]+)mm/);
     if (m) {
       const dia = parseFloat(m[1]!);
@@ -730,28 +394,14 @@ function resolveFeatureOpHighlight(
   if (op.featureType === 'laser_cut' || op.featureType === 'deburr_edge') {
     return buildFullModelHL('fb_outline', faceMap);
   }
-  // Machining (CNC): op.featureType here is the real, per-part CAD
-  // feature_type the backend read straight off this same feature_graph_v2
-  // response (operation-sequencer.ts's `f.feature_type`, e.g.
-  // 'through_hole'/'blind_hole'/'tapped_hole'/'counterbore'/'countersink'/
-  // 'pocket'/'slot'/'chamfer') — not a fixed list hardcoded here. Matching
-  // directly on that field (both sides read the identical CAD vocabulary)
-  // means this works for every current and future Machining feature type
-  // with no per-type case to maintain. Narrow further by the real diameter
-  // embedded in the display name ("Drill Ø4.0mm ×2") when present, same
-  // 0.3mm tolerance convention as the PEM match above; pocket/slot rows have
-  // no diameter and match every occurrence of that feature type instead.
-  if (op.featureType) {
-    const typeFeatures = v2Features.filter((f) => f.feature_type === op.featureType);
-    if (typeFeatures.length) {
-      const m = op.name.match(/Ø([\d.]+)mm/);
-      if (m) {
-        const dia = parseFloat(m[1]!);
-        const matched = typeFeatures.filter((f) => Math.abs((f.diameter_mm ?? 0) - dia) < 0.3);
-        if (matched.length) return mergeFeaturesToHL(`fb_${op.featureType}_d${dia}`, matched);
-      }
-      return mergeFeaturesToHL(`fb_${op.featureType}_all`, typeFeatures);
-    }
+  // Machining: the backend names the exact feature_graph_v2 entries each
+  // operation machines (FeatureOp.featureIds, from the sequencer), so the
+  // highlight is exactly those occurrences — never every feature of a type,
+  // and never a diameter parsed back out of the display label.
+  if (op.featureIds?.length) {
+    const ids = new Set(op.featureIds);
+    const matched = v2Features.filter((f) => ids.has(f.id));
+    if (matched.length) return mergeFeaturesToHL(`fb_${op.featureIds.join('_')}`, matched);
   }
   return null;
 }
@@ -768,7 +418,7 @@ function FeatureBreakdown({
   fg,
   onSelectHighlight,
 }: {
-  items: Array<{ name: string; timeSec: number; featureType: string; count: number }> | undefined;
+  items: Array<{ name: string; timeSec: number; featureType: string; count: number; featureIds?: string[] | undefined }> | undefined;
   fg?: FeatureGraph | null | undefined;
   onSelectHighlight?: ((node: FeatureNodeV2 | null) => void) | undefined;
 }) {
@@ -972,7 +622,7 @@ function featureToTreeNode(f: ManufacturingFeature, factory: string, machine: st
     // Cutting') — falls back to 'Laser Cutting' only when the caller has no
     // process context at all, so existing non-cutting callers (bend/hole
     // features, which never read realCutSec/timeSplit below) are unaffected.
-    const cuttingProcessName = processName ?? 'Laser Cutting';
+    const cuttingProcessName = processName ?? '—';
     const realCutSec = realCutTimeSec(cost, cuttingProcessName);
     const timeSplit = realCutTimeSplit(cost, cuttingProcessName);
     return {
@@ -1060,7 +710,7 @@ function featureToTreeNode(f: ManufacturingFeature, factory: string, machine: st
         { name: 'Diameter', value: r.diameter_mm != null ? `${r.diameter_mm.toFixed(1)} mm` : '—' },
         { name: 'Count', value: String(r.count) },
         { name: 'Hole Type', value: typeLabel ?? 'Through' },
-        { name: 'Process', value: typeLabel ?? 'Laser Pierce' },
+        { name: 'Process', value: typeLabel ?? processName ?? '—' },
         { name: 'Est. Cycle Time', value: formatEstCycleTime(realSec, true) },
       ],
     };
@@ -1136,9 +786,10 @@ function buildProcessTree(
   cost?: CostSummaryDto | null,
   materialDensityGcm3?: number | null,
   procRecords?: Array<{ opNbr?: number; category?: string; operation?: string; processGroup?: string; machineName?: string; isActive?: boolean }> | null,
+  secondaryLines?: SecondaryProcessLine[] | null,
 ): ProcessTreeNode {
   const family = resolveDisplayFamily(item, fg);
-  const groupLabel = FAMILY_GROUP[family] ?? 'Manufacturing';
+  const groupLabel = FAMILY_GROUP[family] ?? 'Unclassified';
   // The process list is the APPLIED (or explicitly chosen) route, else the
   // cad-engine's own recommendations. Nothing is added to either.
   //
@@ -1218,120 +869,74 @@ function buildProcessTree(
     ?? costRecs
     ?? [];
 
-  const substrate = classifySubstrate(`${item.materialGrade ?? ''} ${item.material ?? ''}`);
-  const routeHasCoating = recs.some((r) => r.process === 'Surface Treatment');
-  // CMM only on GD&T callouts or tolerance ≤ 0.10 mm — same gate as the backend
-  // feature graph (feature-graph.service.ts). General-tolerance parts get manual.
-  const gdtCallouts = (item.drawingIntelligence?.gdt_callouts ?? []).filter(
-    (g) => typeof g.tolerance === 'number' && g.tolerance > 0,
+  // Machined families: every operation's features come from the backend's own
+  // per-line featureIds (the operation sequencer). A line that reports none
+  // yet (the turned path; Tapping) gets the part's unattributed features under
+  // the part's first operation - the line that bills its machining - never a
+  // frontend process-name-to-feature table. Which operation counts as
+  // machining is decided by the part family, not by the step name containing
+  // "Milling"/"Machining": that substring test skipped real steps such as
+  // "4 Axis Mill", which is why they showed no features at all.
+  const isMachiningFamily = family !== '' && family !== 'sheet_metal' && family !== 'plastic_molded';
+  const v2All = fg?.feature_graph_v2?.features ?? [];
+  const v2ById = new Map(v2All.map((f) => [f.id, f]));
+  const lineForRec = (process: string) => cost?.processLines?.find((l) => l.process === process);
+  const claimedIds = new Set(
+    recs.flatMap((r) => (lineForRec(r.process)?.featureBreakdown ?? []).flatMap((b) => b.featureIds ?? [])),
   );
-  const needsCmm =
-    gdtCallouts.length > 0 ||
-    (item.tightestToleranceMm != null && item.tightestToleranceMm > 0 && item.tightestToleranceMm <= 0.10);
+
+  const featureLeaf = (idPrefix: string, f: FeatureNodeV2, machine: string): ProcessTreeNode => {
+    const occ = f.occurrences.length;
+    const dia = f.diameter_mm != null ? ` Ø${f.diameter_mm.toFixed(1)}` : '';
+    const variant = f.variant ? ` (${f.variant})` : '';
+    return {
+      id: `${idPrefix}_${f.id}`,
+      kind: 'feature',
+      label: `${f.canonical_operation ?? String(f.feature_type)}${variant}${dia} ×${occ}`,
+      factory, machine,
+      v2FeatureIds: [f.id],
+      attrs: [
+        { name: 'Feature', value: String(f.feature_type) },
+        ...(f.variant ? [{ name: 'Variant', value: f.variant }] : []),
+        ...(f.canonical_operation ? [{ name: 'Operation', value: f.canonical_operation }] : []),
+        { name: 'Occurrences', value: String(occ) },
+        ...(f.diameter_mm != null ? [{ name: 'Diameter', value: `${f.diameter_mm.toFixed(1)} mm` }] : []),
+      ],
+    };
+  };
+  // Type group ("SimpleHole ×12") -> one row per real feature_graph_v2 entry.
+  const typeGroupNodes = (idPrefix: string, features: FeatureNodeV2[], machine: string): ProcessTreeNode[] =>
+    groupFeaturesByType(features).map((g) => {
+      const members = g.variants.flatMap((v) => v.features);
+      return {
+        id: `${idPrefix}_${g.type}`,
+        kind: 'feature' as const,
+        label: `${g.type} ×${g.occurrenceCount}`,
+        factory, machine,
+        v2FeatureIds: members.map((f) => f.id),
+        attrs: [
+          { name: 'Count', value: String(g.occurrenceCount) },
+          ...g.variants.map((v) => ({ name: v.variant, value: `×${v.occurrenceCount}` })),
+        ],
+        children: members.map((f) => featureLeaf(`${idPrefix}_${g.type}`, f, machine)),
+      };
+    });
 
   const operations: ProcessTreeNode[] = recs.map((rec, opIdx) => {
     const isSheetMetal = family === 'sheet_metal';
     const isCutting = rec.process.includes('Laser') || rec.process.includes('Cutting');
     const isBending = rec.process.includes('Press Brake') || rec.process.includes('Bending');
-    const isTurning = rec.process.includes('Turning');
-    const isMilling = !isTurning && (rec.process.includes('Milling') || rec.process.includes('Machining'));
-    const isMolding = rec.process.includes('Moulding') || rec.process.includes('Molding');
-    // Real, confirmed live bug (2026-09-11): this whole IM feature-detail
-    // block (Moulded Part / Undercuts / Undrafted Faces — the CAD-detected,
-    // click-to-highlight nodes) was gated on `isMolding` alone, which matched
-    // a single coarse CAD-recommendation entry like "Injection Molding".
-    // Once real per-step operations (Mold Setup/Injection/Packing/Cooling/
-    // Ejection — the SAME cost.processLines fallback added this session)
-    // replaced that coarse entry, none of their real names contain
-    // "Molding"/"Moulding", so `isMolding` was never true again and this
-    // entire block silently stopped running — the CAD engine kept computing
-    // real undercut/undrafted/wall-thickness data, but it had nowhere left
-    // to attach to in the tree.
-    //
-    // A second exact-name match (`rec.process === 'Injection'`) was tried
-    // next, but has the identical fragility one level down: once `recs`
-    // preferred the item's own REAL stored process_cost_records (see
-    // storedRecs above) over the engine's full hypothetical step list, a
-    // part whose engineer added Mold Setup/Packing/Cooling/Ejection/
-    // Inspections by hand — without ever adding a line literally named
-    // "Injection" — has no rec named "Injection" at all, so that match
-    // failed too, even though this is unambiguously an injection-molded
-    // part. This geometry (Moulded Part / Undercuts / Undrafted Faces) is
-    // PART-level, not specific to any one named step — it belongs wherever
-    // the first real operation in this part's own resolved list is, whatever
-    // that operation happens to be named or however many/few steps the
-    // engineer chose to add.
-    const isFirstOpForFamily = family === 'plastic_molded' && opIdx === 0;
+    // Moulded-part geometry is PART-level: it belongs to the part's first
+    // resolved operation, whatever the engineer named or however many steps
+    // they added (exact-name gates on "Injection"/"Molding" silently dropped it).
+    const isFirstOpForMolded = family === 'plastic_molded' && opIdx === 0;
 
-    // Only the real, DB-resolved machine from the live cost engine is ever
-    // shown here — no fabricated placeholder. Matched by EXACT process name
-    // against cost.processLines[].process (both machineName and
-    // machineClass are read straight off that same real, backend-resolved
-    // line — nothing here classifies or guesses a machine class from the
-    // process label). This used to hardcode a family lookup ('Cutting' ->
-    // always 'Laser Cutting') that silently pulled the laser's machine onto a
-    // Waterjet Cutting step; matching on the actual name this tree is already
-    // using (rec.process, itself now sourced from the applied route when one
-    // exists — see appliedRouteProcessNames at the buildProcessTree call site)
-    // removes the guesswork entirely instead of trading one guess for another.
-    // A machine that hasn't been resolved yet shows '—', never a plausible-
-    // looking specific spec (e.g. "Fiber Laser 6kW") that was never selected.
-    const matchedCostLine = cost?.processLines?.find((l) => l.process === rec.process);
-    // The real stored row's own machine wins over the engine's own recompute
-    // whenever both exist for the same process label — see storedMachineByProcess.
-    const realMachineName = storedMachineByProcess.get(rec.process) ?? matchedCostLine?.machineName ?? null;
-    const machine = rec.process === 'Inspection'
-      ? (needsCmm ? 'CMM' : 'Inspection Bench')
-      : realMachineName ?? '—';
+    // Only the real machine: the stored row's own machine, else the live cost
+    // line's DB-resolved machine, else '—'. Matched by exact process name.
+    const matchedCostLine = lineForRec(rec.process);
+    const machine = storedMachineByProcess.get(rec.process) ?? matchedCostLine?.machineName ?? '—';
+    const breakdown = matchedCostLine?.featureBreakdown ?? [];
     const featureNodes: ProcessTreeNode[] = [];
-
-    // Real per-feature canonical operations (e.g. "Drilling // SimpleHole"),
-    // sourced from feature_graph_v2 entries the backend already classified
-    // (canonical-operation.ts / auto-fill.service.ts's attachCanonicalOperations).
-    // Only CNC families carry these — Sheet Metal / Plastic Molding features
-    // never get a canonical_operation attached. Replaces the fabricated
-    // SUB_OP "As Drilled"/"As Tapped" label whenever real data exists; falls
-    // back to it when this part hasn't been through CAD feature extraction
-    // yet (a disclosed gap, not a guess dressed up as real data).
-    const isCNCFamilyRec = family !== 'sheet_metal' && family !== 'plastic_molded';
-    const cncFeatureTypesForProcess = CNC_PROCESS_TO_FEATURE_TYPES[rec.process];
-    const matchedCanonicalFeatures = isCNCFamilyRec && cncFeatureTypesForProcess
-      ? (fg?.feature_graph_v2?.features ?? []).filter(
-          (f) => cncFeatureTypesForProcess.includes(f.feature_type) && f.canonical_operation,
-        )
-      : [];
-    if (matchedCanonicalFeatures.length > 0) {
-      matchedCanonicalFeatures.forEach((f) => {
-        const count = f.occurrences.length;
-        const diaPart = f.diameter_mm != null ? ` — Ø${f.diameter_mm.toFixed(1)}` : '';
-        featureNodes.push({
-          id: `v2feat_${f.id}`,
-          kind: 'feature',
-          label: `${f.canonical_operation}${diaPart} ×${count}`,
-          factory, machine,
-          v2FeatureId: f.id,
-          attrs: [
-            { name: 'Count', value: String(count) },
-            ...(f.diameter_mm != null ? [{ name: 'Diameter', value: `${f.diameter_mm.toFixed(1)} mm` }] : []),
-          ],
-        });
-      });
-    }
-    const subLabel = matchedCanonicalFeatures[0]?.canonical_operation ?? SUB_OP[rec.process] ?? 'As Processed';
-
-    // For CNC parts: which feature groups belong to this operation
-    const OP_GROUPS: Record<string, string[]> = {
-      turning:  ['Turning', 'Boring'],
-      milling:  (family as string) === 'mill_turn' ? ['Cross-Drilling', 'Milling', 'Finishing'] : ['Turning', 'Boring', 'Cross-Drilling', 'Milling', 'Finishing'],
-      drilling: ['Cross-Drilling'],
-    };
-    const ALL_CNC_GROUPS: Array<{ label: string; types: string[] }> = [
-      { label: 'Turning',        types: ['external_diameter', 'groove', 'fillet'] },
-      { label: 'Boring',         types: ['through_hole', 'blind_hole'] },
-      { label: 'Cross-Drilling', types: ['cross_hole', 'pcd_hole_pattern'] },
-      { label: 'Milling',        types: ['slot', 'radial_slot', 'keyway', 'pocket'] },
-      { label: 'Finishing',      types: ['counterbore', 'countersink', 'chamfer'] },
-    ];
 
     if (isSheetMetal && isCutting) {
       const flatFeat = (fg?.features ?? []).find((f) => f.type === 'flat_pattern') ?? null;
@@ -1385,7 +990,7 @@ function buildProcessTree(
             attrs: [
               { name: 'Diameter',        value: `${g.diameter_mm.toFixed(1)} mm` },
               { name: 'Count',           value: String(g.count) },
-              { name: 'Process',         value: 'Laser Pierce' },
+              { name: 'Process',         value: rec.process },
               { name: 'Est. Cycle Time', value: formatEstCycleTime(realPierceCycleTimeSec(g.count, cost), true) },
             ],
           });
@@ -1406,7 +1011,7 @@ function buildProcessTree(
               attrs: [
                 { name: 'Diameter',        value: `${d} mm` },
                 { name: 'Count',           value: String(count) },
-                { name: 'Process',         value: 'Laser Pierce' },
+                { name: 'Process',         value: rec.process },
                 { name: 'Est. Cycle Time', value: formatEstCycleTime(realPierceCycleTimeSec(count, cost), true) },
               ],
             });
@@ -1414,7 +1019,7 @@ function buildProcessTree(
         } else if (summary.holeCount > 0) {
           holeNodes.push({
             id: 'feat_holes', kind: 'feature', label: `Holes (${summary.holeCount})`, factory, machine,
-            attrs: [{ name: 'Count', value: String(summary.holeCount) }, { name: 'Process', value: 'Laser' }],
+            attrs: [{ name: 'Count', value: String(summary.holeCount) }, { name: 'Process', value: rec.process }],
           });
         }
       }
@@ -1459,60 +1064,37 @@ function buildProcessTree(
           });
         }
       }
-    } else if (isTurning || isMilling) {
-      const cncFts = (fg as any)?.cnc_features;
-      if (cncFts) {
-        const cncSum: Record<string, number> = cncFts.feature_summary ?? {};
-        const cncFeatureArr: any[] = cncFts.features ?? [];
-        const opKey = isTurning ? 'turning' : 'milling';
-        const allowedGroupLabels = new Set(OP_GROUPS[opKey] ?? []);
-        ALL_CNC_GROUPS
-          .filter(({ label }) => allowedGroupLabels.has(label))
-          .forEach(({ label, types }) => {
-            const groupCount = types.reduce((s, t) => s + (cncSum[t] ?? 0), 0);
-            if (groupCount === 0) return;
-            const diaMap: Record<string, number> = {};
-            for (const f of cncFeatureArr) {
-              if (!types.includes(f.type)) continue;
-              const d = f.params?.diameter_mm;
-              if (d != null) { const k = `Ø${Number(d).toFixed(1)}`; diaMap[k] = (diaMap[k] ?? 0) + 1; }
-            }
-            const diaAttrs = Object.entries(diaMap)
-              .sort(([a], [b]) => parseFloat(a.slice(1)) - parseFloat(b.slice(1)))
-              .slice(0, 4)
-              .map(([d, c]) => ({ name: d, value: `×${c}` }));
-            featureNodes.push({
-              id: `cnc_${opKey}_${label.toLowerCase().replace(/[^a-z]/g, '_')}`,
-              kind: 'feature' as const,
-              label: `${label} ×${groupCount}`,
-              factory,
-              machine,
-              attrs: [{ name: 'Count', value: String(groupCount) }, ...diaAttrs],
-            });
+    } else if (isMachiningFamily) {
+      if (breakdown.some((b) => (b.featureIds ?? []).length > 0)) {
+        // Real per-operation breakdown ("Spot Drill ×8", "Pocket Mill ×2", ...),
+        // each row carrying the exact feature ids it machines and its real time.
+        breakdown.forEach((b, i) => {
+          const feats = (b.featureIds ?? []).map((id) => v2ById.get(id)).filter((f): f is FeatureNodeV2 => f != null);
+          featureNodes.push({
+            id: `machining_line_${opIdx}_${i}`,
+            kind: 'feature',
+            label: b.name,
+            factory, machine,
+            ...(feats.length > 0 ? { v2FeatureIds: feats.map((f) => f.id) } : {}),
+            attrs: [
+              { name: 'Count', value: String(b.count) },
+              { name: 'Time', value: formatEstCycleTime(b.timeSec) },
+            ],
+            ...(feats.length > 0 ? { children: typeGroupNodes(`machining_type_${opIdx}_${i}`, feats, machine) } : {}),
           });
-      } else if (isMilling && summary.holeCount > 0) {
-        featureNodes.push({
-          id: 'feat_holes_m', kind: 'feature', label: `Holes (${summary.holeCount})`, factory, machine,
-          attrs: [{ name: 'Count', value: String(summary.holeCount) }, { name: 'Process', value: 'Drilling' }],
         });
+      } else if (opIdx === 0) {
+        const unclaimed = v2All.filter((f) => !claimedIds.has(f.id));
+        featureNodes.push(...typeGroupNodes(`machining_type_${opIdx}`, unclaimed, machine));
       }
-    } else if (isMolding || isFirstOpForFamily) {
-      // ── In-cycle sub-ops as feature nodes ──────────────────────────────────
-      // Each step in the molding cycle gets its own feature row so the cost
-      // engineer can see WHAT drives cycle time without opening the cost panel.
-      // Real, sourced-once-then-shared IM feature values, used below by both
-      // the synthetic sub-step nodes (isMolding-only path) and the always-
-      // relevant Moulded Part/Undercuts/Undrafted nodes (both paths).
-      const wall = summary.wallThicknessNominalMm ?? 2.0;
+    } else if (isFirstOpForMolded) {
+      const wall = summary.wallThicknessNominalMm ?? null;
       const wallMin = summary.wallThicknessMinMm;
       const wallMax = summary.wallThicknessMaxMm;
       const bossCount = summary.holeOrBossCount ?? 0;
       const ribCount = (summary as any).ribCount ?? (summary as any).ribCountProxy ?? 0;
       const volMm3 = (item.volume as number | null | undefined) ?? 0;
-      // Real density for THIS item's own material grade (material_density_
-      // lookup / raw_materials via useMaterialDensity) — no fabricated
-      // material-agnostic default. massG stays 0 (displayed as '—' below)
-      // when no real density has resolved yet, rather than guessing.
+      // Real density for this item's own grade (useMaterialDensity); '—' until resolved.
       const densityGcm3 = materialDensityGcm3 ?? null;
       const massG = volMm3 > 0 && densityGcm3 != null ? Math.round((volMm3 / 1e3) * densityGcm3 * 10) / 10 : 0;
       const undercutCount = (summary as any).undercutFaceCount ?? 0;
@@ -1520,65 +1102,16 @@ function buildProcessTree(
       const avgDraftDeg = (summary as any).avgDraftAngleDeg ?? null;
       const partingComplexity = (summary as any).partingComplexity ?? null;
 
-      // Synthetic sub-step documentation nodes — only meaningful when `recs`
-      // came from a single coarse CAD recommendation (isMolding, e.g. one
-      // "Injection Molding" entry with no real per-step breakdown yet). Once
-      // real per-step operations exist (Mold Setup/Injection/Packing/Cooling/
-      // Ejection as their own top-level tree nodes, sourced from real
-      // cost.processLines), these would be pure duplicates of those real
-      // nodes — so they're gated on isMolding specifically, not the broader
-      // isMolding || isFirstOpForFamily this whole branch runs under.
-      if (isMolding) {
-      featureNodes.push({
-        id: 'feat_im_setup', kind: 'feature', label: 'Mold Setup',
-        factory, machine,
-        attrs: [
-          { name: 'Std. time',  value: '60 min (amortized per batch)' },
-          { name: 'Cavities',   value: 'Estimated from clamp tonnage + batch (see Cost tab)' },
-          { name: 'Includes',   value: 'Mount mold, clamp, trial shots, process stabilization' },
-        ],
-      });
-      featureNodes.push({
-        id: 'feat_im_injection', kind: 'feature', label: 'Injection (Fill)',
-        factory, machine,
-        attrs: [
-          { name: 'Fill time', value: 'Computed via flow-length model (see Cost tab)' },
-          { name: 'Gate',      value: 'Auto-recommended from geometry + material (see Cost tab)' },
-        ],
-      });
-      featureNodes.push({
-        id: 'feat_im_packing', kind: 'feature', label: 'Packing / Holding',
-        factory, machine,
-        attrs: [
-          { name: 'Hold time', value: '35% of cooling time (gate-freeze proxy — Menges)' },
-          { name: 'Purpose',   value: 'Compensate volumetric shrinkage; prevent sink marks' },
-        ],
-      });
-      featureNodes.push({
-        id: 'feat_im_cooling', kind: 'feature', label: 'Cooling',
-        factory, machine,
-        attrs: [
-          { name: 'Cool time', value: 'Menges formula: t = (wall²/π²α) × ln(4(Tm-Tw)/π(Te-Tw))' },
-          { name: 'Wall (nom)', value: `${fmt(wall, 1)} mm` },
-          ...(wallMin != null && wallMax != null
-            ? [{ name: 'Wall range', value: `${fmt(wallMin, 1)} – ${fmt(wallMax, 1)} mm` }]
-            : []),
-          { name: 'Note', value: 'Uniform wall → shorter cycle; thick bosses/ribs → longer' },
-        ],
-      });
-      featureNodes.push({
-        id: 'feat_im_ejection', kind: 'feature', label: 'Ejection',
-        factory, machine,
-        attrs: [{ name: 'Eject time', value: '~2.5 sec (mold open + ejector stroke + part release)' }],
-      });
-      }
       featureNodes.push({
         id: 'feat_im_part', kind: 'feature', label: 'Moulded Part',
         factory, machine,
         attrs: [
           { name: 'Volume',    value: volMm3 > 0 ? `${fmtInt(volMm3)} mm³` : '—' },
           { name: 'Est. mass', value: massG > 0 ? `${massG} g (net part)` : '—' },
-          { name: 'Wall nom.', value: `${fmt(wall, 1)} mm` },
+          ...(wall != null ? [{ name: 'Wall nom.', value: `${fmt(wall, 1)} mm` }] : []),
+          ...(wallMin != null && wallMax != null
+            ? [{ name: 'Wall range', value: `${fmt(wallMin, 1)} – ${fmt(wallMax, 1)} mm` }]
+            : []),
           ...(partingComplexity != null ? [{ name: 'Parting complexity', value: `${Math.round(partingComplexity * 100)}%` }] : []),
           ...(bossCount > 0 ? [{ name: 'Bosses / holes', value: String(bossCount) }] : []),
           ...(ribCount > 0  ? [{ name: 'Ribs (detected)', value: String(ribCount) }] : []),
@@ -1591,7 +1124,6 @@ function buildProcessTree(
           id: 'feat_im_undercut', kind: 'feature', label: `Undercuts (${undercutCount} face${undercutCount > 1 ? 's' : ''})`,
           factory, machine,
           attrs: [
-            { name: 'Severity', value: 'High — requires slide or lifter' },
             // Classification rule (cad-engine/injection_molding/feature_extractor.py's
             // UNDERCUT_NEG_DOT_THRESHOLD), not a per-part measurement — every face
             // counted above already exceeds this by construction.
@@ -1605,7 +1137,6 @@ function buildProcessTree(
           id: 'feat_im_undrafted', kind: 'feature', label: `Undrafted Faces (${undraftedCount})`,
           factory, machine,
           attrs: [
-            { name: 'Severity', value: 'Medium — ejection stick risk' },
             // Classification rule (UNDRAFTED_ABS_DOT_THRESHOLD), not a per-part
             // measurement — paired with the part's own real average draft angle
             // below when the CAD engine resolved one (avg_draft_angle_deg).
@@ -1617,148 +1148,56 @@ function buildProcessTree(
       }
     }
 
-    // ── Secondary operation feature nodes (KB-backed) ─────────────────────────
-
-    const isTapping = rec.process === 'Tapping';
-    const isSurfaceTreatment = rec.process === 'Surface Treatment';
-    const isInspection = rec.process === 'Inspection';
-    const isMaterialDrying = rec.process === 'Material Drying';
-    const isGateTrimming = rec.process === 'Gate Trimming';
-
-    if (isMaterialDrying) {
-      const grade = (item.materialGrade ?? item.material ?? '').toUpperCase();
-      const dryParams: Record<string, { temp: string; time: string; target: string }> = {
-        PA66: { temp: '80°C',  time: '4 h',  target: '<0.20% moisture' },
-        PA6:  { temp: '80°C',  time: '4 h',  target: '<0.20% moisture' },
-        PC:   { temp: '120°C', time: '4 h',  target: '<0.02% moisture' },
-        ABS:  { temp: '80°C',  time: '2–3 h', target: '<0.10% moisture' },
-        PET:  { temp: '160°C', time: '4 h',  target: '<0.02% moisture' },
-        PBT:  { temp: '120°C', time: '3 h',  target: '<0.04% moisture' },
-        PEEK: { temp: '150°C', time: '3 h',  target: '<0.02% moisture' },
-        TPU:  { temp: '90°C',  time: '2 h',  target: '<0.05% moisture' },
-        PMMA: { temp: '80°C',  time: '4 h',  target: '<0.10% moisture' },
-      };
-      const key = Object.keys(dryParams).find((k) => grade.includes(k));
-      const params = key ? dryParams[key]! : null;
-      featureNodes.push({
-        id: 'feat_im_dry_resin', kind: 'feature', label: 'Hygroscopic Resin — Pre-Drying',
-        factory, machine,
-        attrs: [
-          { name: 'Material',  value: item.materialGrade ?? item.material ?? '—' },
-          { name: 'Dryer',     value: 'Dehumidifying hopper dryer (unattended operation)' },
-          ...(params
-            ? [
-                { name: 'Temp',    value: params.temp },
-                { name: 'Time',    value: params.time },
-                { name: 'Target',  value: params.target },
-              ]
-            : [{ name: 'Params', value: 'Refer to material datasheet (grade not in table)' }]),
-          { name: 'Risk if skipped', value: 'Splay / voids / hydrolysis / loss of mechanical properties' },
-        ],
-      });
-    }
-
-    if (isGateTrimming) {
-      featureNodes.push({
-        id: 'feat_im_gate', kind: 'feature', label: 'Gate Vestige',
-        factory, machine,
-        attrs: [
-          { name: 'Gate type',  value: 'Cold runner gate (auto-recommended from geometry — see Cost tab)' },
-          { name: 'Vestige',    value: 'Trim flush to part surface; max protrusion per drawing' },
-          { name: 'Note',       value: 'Hot-tip / sub gates self-de-gate (this step suppressed for those types)' },
-        ],
-      });
-    }
-
-    if (isTapping && matchedCanonicalFeatures.length === 0) {
-      // Only shown when no real feature_graph_v2 tapped_hole data exists yet —
-      // once it does, the real "Tapping // SimpleHole ×N" node above already
-      // says what's actually detected, so this heuristic placeholder would be
-      // a second, weaker-evidence answer to the same question.
-      const threadSpecs = (item.drawingIntelligence as any)?.threads as Array<{ size: string; pitch: number; count: number }> | undefined;
-      const tappingHint = threadSpecs && threadSpecs.length > 0
-        ? threadSpecs.map((t) => {
-            const intel = getThreadIntelligence(t.size, t.pitch);
-            const drill = intel.tapDrillMm != null ? ` | Tap drill: Ø${intel.tapDrillMm}` : '';
-            return `${t.size} pitch ${t.pitch}mm ×${t.count}${drill}`;
-          }).join('; ')
-        : 'Requires drawing review';
-      featureNodes.push({
-        id: 'feat_tapping', kind: 'feature',
-        label: 'Potential tapping features',
-        factory, machine,
-        attrs: [
-          { name: 'Basis',           value: `Ø≤6 mm holes present, thickness ${fmt(summary.sheetThicknessMm, 1)} mm < 3 mm` },
-          { name: 'Thread callouts', value: tappingHint },
-          { name: 'Class of fit',    value: threadSpecs && threadSpecs.length > 0 ? '6H (ISO 965-1)' : '—' },
-          { name: 'Inspection',      value: threadSpecs && threadSpecs.length > 0 ? 'Go/No-Go Thread Gauge' : 'Confirm from drawing' },
-        ],
-      });
-    }
-
-    if (isSurfaceTreatment) {
-      const matStr = `${item.materialGrade ?? ''} ${item.material ?? ''}`.trim();
-      const materialUnknownHere = matStr.length === 0;
-      const coatingKey = resolveTreatmentKey(substrate, item.coating);
-      const steps = SURFACE_TREATMENT_KB[coatingKey] ?? [];
-      steps.forEach((step, i) => {
-        const attrs = materialUnknownHere && i === 0
-          ? [...step.attrs, { name: 'Note', value: 'Material unknown — verify treatment type from drawing' }]
-          : step.attrs;
-        featureNodes.push({ id: `feat_surface_${i}`, kind: 'feature', label: step.label, factory, machine: step.machine ?? machine, attrs });
-      });
-    }
-
-    if (isInspection) {
-      if (family === 'plastic_molded') {
-        // Injection-molded QC: visual → dimensional → weight check (routing engine baseline).
+    // A secondary process (CMM, cleaning, NDT, packaging): what it acts on, from
+    // the secondary-process engine's own result for this step.
+    const secondary = featureNodes.length === 0
+      ? secondaryLines?.find((l) => l.process === rec.process && l.status === 'costed')
+      : undefined;
+    if (secondary) {
+      const feats = secondary.featureIds.map((id) => v2ById.get(id)).filter((f): f is FeatureNodeV2 => f != null);
+      if (feats.length > 0) featureNodes.push(...typeGroupNodes(`secfeat_${opIdx}`, feats, machine));
+      else if (secondary.highlight === 'whole_part') {
         featureNodes.push({
-          id: 'feat_im_visual', kind: 'feature', label: 'Visual Inspection',
-          factory, machine,
-          attrs: [
-            { name: 'Check for', value: 'Splay, sink marks, short shots, flash, colour streaks, weld lines' },
-            { name: 'Method',    value: '100% visual (operator)' },
-            { name: 'Est. time', value: '~10 sec / part' },
-          ],
-        });
-        featureNodes.push({
-          id: 'feat_im_dimensional', kind: 'feature', label: 'Dimensional Inspection',
-          factory, machine,
-          attrs: [
-            { name: 'Scope',     value: 'Critical dimensions vs drawing — shrinkage compensation verification' },
-            { name: 'Method',    value: 'Calipers + height gauge; CMM for GD&T callouts' },
-            { name: 'Frequency', value: 'First article + 1-in-10 in-process' },
-            { name: 'Est. time', value: '~5 min / batch setup + per-part criticals' },
-          ],
-        });
-        featureNodes.push({
-          id: 'feat_im_weight', kind: 'feature', label: 'Weight Check',
-          factory, machine,
-          attrs: [
-            { name: 'Method',  value: 'Precision scale (±0.1 g)' },
-            { name: 'Purpose', value: 'Shot weight monitoring — detects short shots and pack pressure drift' },
-            { name: 'Est. time', value: '~5 sec / part' },
-          ],
-        });
-      } else {
-        // Coating-thickness check exists only when the route actually coats the part;
-        // CMM only when GD&T / tight tolerance demands it (needsCmm computed above).
-        const templates: KBFeature[] = [
-          needsCmm ? INSPECTION_KB.dimensional_cmm! : INSPECTION_KB.dimensional!,
-          INSPECTION_KB.visual!,
-          ...(routeHasCoating ? [INSPECTION_KB.coating_thickness!] : []),
-        ];
-        templates.forEach((tmpl, i) => {
-          featureNodes.push({ id: `feat_insp_${i}`, kind: 'feature', label: tmpl.label, factory, machine: tmpl.machine ?? machine, attrs: tmpl.attrs });
+          id: `secondary_part_${opIdx}`, kind: 'feature', label: 'Whole part surface', factory, machine, wholePart: true,
+          attrs: secondary.trace.map((t) => ({ name: t.label, value: `${t.value}${t.unit ? ` ${t.unit}` : ''}` })),
         });
       }
     }
 
-    const subOp: ProcessTreeNode = {
-      id: `subop_${opIdx}`, kind: 'sub_op', label: subLabel,
-      ...(featureNodes.length > 0 ? { children: featureNodes } : {}),
-    };
-    return { id: `op_${opIdx}`, kind: 'operation', label: rec.process, factory, machine, children: [subOp] };
+    // Any step not covered above: its own cost line's feature breakdown, as is.
+    if (featureNodes.length === 0 && breakdown.length > 0) {
+      breakdown.forEach((b, i) => {
+        const ids = (b.featureIds ?? []).filter((id) => v2ById.has(id));
+        featureNodes.push({
+          id: `line_${opIdx}_${i}`,
+          kind: 'feature',
+          label: b.name,
+          factory, machine,
+          ...(ids.length > 0 ? { v2FeatureIds: ids } : {}),
+          attrs: [
+            { name: 'Count', value: String(b.count) },
+            { name: 'Time', value: formatEstCycleTime(b.timeSec) },
+          ],
+        });
+      });
+    }
+    // Nothing real to show: say so, rather than a stand-in step name.
+    if (featureNodes.length === 0) {
+      featureNodes.push({
+        id: `nodata_${opIdx}`,
+        kind: 'feature',
+        label: 'No feature data',
+        factory, machine,
+        attrs: [{
+          name: 'Reason',
+          value: matchedCostLine
+            ? 'The cost engine reports no per-feature breakdown for this step.'
+            : 'No live cost line for this step yet - nothing to break down.',
+        }],
+      });
+    }
+
+    return { id: `op_${opIdx}`, kind: 'operation', label: rec.process, factory, machine, children: featureNodes };
   });
 
   // Inject Threaded Features from drawing intelligence for CNC families.
@@ -1774,8 +1213,7 @@ function buildProcessTree(
   // the same physical operation broke the Process → Machine → Operation
   // hierarchy the rest of the tree follows. Thread Features now nests
   // UNDER the real Tapping operation and inherits its real machine.
-  const isCNCFamily = family !== 'sheet_metal' && family !== 'plastic_molded';
-  const diThreadSpecs = isCNCFamily
+  const diThreadSpecs = isMachiningFamily
     ? ((item.drawingIntelligence as any)?.threads as Array<{ size: string; pitch: number; count: number }> | undefined)
     : undefined;
   if (diThreadSpecs && diThreadSpecs.length > 0) {
@@ -1793,14 +1231,12 @@ function buildProcessTree(
       attrs: [
         { name: 'Specification', value: `${t.size} × ${t.pitch}` },
         { name: 'Count',         value: String(t.count) },
-        { name: 'Operation',     value: /helicoil/i.test(t.size) ? 'Helicoil Insert' : 'Tapping' },
-        { name: 'Inspection',    value: 'Thread Plug Gauge' },
       ],
     }));
     const threadSubOp: ProcessTreeNode = {
-      id: 'subop_threads',
-      kind: 'sub_op',
-      label: 'Thread Features',
+      id: 'thread_features',
+      kind: 'feature',
+      label: 'Drawing thread callouts',
       children: threadChildren,
     };
     if (tappingOp) {
@@ -1874,7 +1310,7 @@ type OperationVisual = { highlight: FeatureNodeV2; color: string } | null;
 
 function buildFullModelHL(id: string, faceMap: FaceMapEntry[]): FeatureNodeV2 | null {
   if (!faceMap.length) return null;
-  return { id, feature_type: 'hole', occurrences: [{ centroid: [0, 0, 0] as [number, number, number], face_ids: faceMap.map((e) => e.face_id) }] };
+  return { id, feature_type: 'Blank', occurrences: [{ centroid: [0, 0, 0] as [number, number, number], face_ids: faceMap.map((e) => e.face_id) }] };
 }
 
 function computeOperationVisual(
@@ -1888,16 +1324,16 @@ function computeOperationVisual(
     return hl ? { highlight: hl, color } : null;
   };
   if (l.includes('laser') || l.includes('cutting') || l.includes('punch') || l.includes('waterjet'))
-    return merge('op-cutting', v2Features.filter((f) => f.feature_type === 'hole' || f.feature_type === 'cut_profile'), '#3b82f6');
+    return merge('op-cutting', v2Features.filter((f) => isPlainHole(f) || isBlankProfile(f)), '#3b82f6');
   if (l.includes('press brake') || l.includes('bending'))
-    return merge('op-bending', v2Features.filter((f) => f.feature_type === 'bend'), '#eab308');
+    return merge('op-bending', v2Features.filter(isBend), '#eab308');
   if (l.includes('tapping'))
     return merge('op-tapping',
-      v2Features.filter((f) => f.feature_type === 'hole' && (f.diameter_mm ?? 99) <= 6.0), '#a855f7');
+      v2Features.filter((f) => isPlainHole(f) && (f.diameter_mm ?? 99) <= 6.0), '#a855f7');
   if (l.includes('deburr')) {
     // Phase 2: replace with true edge highlight (EdgeHighlight component exists in EDrawingsViewer)
     return merge('op-deburr',
-      v2Features.filter((f) => f.feature_type === 'hole' || f.feature_type === 'bend'), '#06b6d4');
+      v2Features.filter((f) => isPlainHole(f) || isBend(f)), '#06b6d4');
   }
   if (l.includes('surface treatment') || l.includes('coating')) {
     const hl = buildFullModelHL('op-surface', faceMap);
@@ -1958,7 +1394,6 @@ function computeFeatureNodeVisual(
   v2Features: FeatureNodeV2[],
   faceMap: FaceMapEntry[],
 ): OperationVisual {
-  const l = node.label.toLowerCase();
   const merge = (id: string, feats: FeatureNodeV2[], color: string): OperationVisual => {
     const hl = mergeFeaturesToHL(id, feats);
     return hl ? { highlight: hl, color } : null;
@@ -1970,36 +1405,19 @@ function computeFeatureNodeVisual(
     const exact = v2Features.find((f) => f.id === node.v2FeatureId);
     return exact ? merge(`hl-${node.v2FeatureId}`, [exact], '#f97316') : null;
   }
-  if (node.id === 'feat_tapping')
-    return merge('hl-tapping',
-      v2Features.filter((f) => f.feature_type === 'hole' && (f.diameter_mm ?? 99) <= 6.0), '#a855f7');
-  if (node.id.startsWith('feat_surface_')) {
-    const hl = buildFullModelHL('hl-surface', faceMap);
-    if (!hl) return null;
-    const color = l.includes('zinc') ? '#86efac' : '#93c5fd';
-    return { highlight: hl, color };
+  if (node.v2FeatureIds?.length) {
+    const ids = new Set(node.v2FeatureIds);
+    return merge(`hl-${node.id}`, v2Features.filter((f) => ids.has(f.id)), '#d97706');
   }
-  if (node.id.startsWith('feat_insp_')) {
-    if (l.includes('dimensional'))
-      return merge('hl-dimensional', v2Features, '#e2e8f0');
-    // Visual Inspection + Coating Thickness Check → full model tint
-    const hl = buildFullModelHL('hl-inspect-surface', faceMap);
-    return hl ? { highlight: hl, color: '#e2e8f0' } : null;
+  if (node.wholePart) {
+    const hl = buildFullModelHL(`hl-${node.id}`, faceMap);
+    return hl ? { highlight: hl, color: '#22d3ee' } : null;
   }
   // ── Injection molding feature nodes ──
-  if (node.id === 'feat_im_part' || node.id === 'feat_im_injection' || node.id === 'feat_im_cooling') {
+  if (node.id === 'feat_im_part') {
     const hl = buildFullModelHL('hl-im-part', faceMap);
     return hl ? { highlight: hl, color: '#f97316' } : null; // orange — molded geometry
   }
-  if (node.id === 'feat_im_gate') {
-    const hl = buildFullModelHL('hl-im-gate', faceMap);
-    return hl ? { highlight: hl, color: '#eab308' } : null; // yellow — gate location
-  }
-  if (node.id === 'feat_im_visual' || node.id === 'feat_im_dimensional' || node.id === 'feat_im_weight') {
-    const hl = buildFullModelHL('hl-im-inspect', faceMap);
-    return hl ? { highlight: hl, color: '#e2e8f0' } : null; // light — quality overlay
-  }
-  if (node.id === 'feat_im_dry_resin') return null; // Pre-process — no geometry
   // Individual hole-diameter-group rows ("Ø1.6 × 24") nested under Flat
   // Pattern — previously fell through every branch above to `return null`,
   // so clicking one never highlighted anything at all. Match by diameter
@@ -2012,7 +1430,7 @@ function computeFeatureNodeVisual(
     // (e.g. 1.6 stored as 1.5999999999999999 on one side).
     const targetD = Math.round(node.holeDiameterMm * 10) / 10;
     const matches = v2Features.filter(
-      (f) => f.feature_type === 'hole' && f.diameter_mm != null && Math.round(f.diameter_mm * 10) / 10 === targetD,
+      (f) => isPlainHole(f) && f.diameter_mm != null && Math.round(f.diameter_mm * 10) / 10 === targetD,
     );
     const hl = mergeFeaturesToHL(`hl-hole-${targetD}`, matches);
     if (hl) return { highlight: hl, color: '#3b82f6' };
@@ -2032,7 +1450,7 @@ function computeFeatureNodeVisual(
     // the full-model tint only when the part has neither (e.g.
     // feature_graph_v2 not yet computed for this part), so clicking Flat
     // Pattern always shows something.
-    const cutFeatures = v2Features.filter((f) => f.feature_type === 'hole' || f.feature_type === 'cut_profile');
+    const cutFeatures = v2Features.filter((f) => isPlainHole(f) || isBlankProfile(f));
     const holeHl = mergeFeaturesToHL('hl-flat-pattern', cutFeatures);
     if (holeHl) return { highlight: holeHl, color: '#38bdf8' }; // sky blue — unfolded blank
     const hl = buildFullModelHL('hl-flat-pattern', faceMap);
@@ -2043,28 +1461,14 @@ function computeFeatureNodeVisual(
 
 function getVizLabel(node: ProcessTreeNode): string | null {
   const l = node.label.toLowerCase();
-  if (node.id === 'feat_tapping') return 'Candidate tapped holes (Ø ≤ 6 mm)';
-  if (node.id.startsWith('feat_surface_')) {
-    if (l.includes('zinc')) return 'Zinc Phosphating — full exterior surface';
-    if (l.includes('powder')) return 'Powder Coating — full exterior surface';
-    return 'Surface treatment — full exterior surface';
-  }
-  if (node.id.startsWith('feat_insp_')) {
-    if (l.includes('dimensional')) return 'Dimensional Inspection — holes & bends';
-    if (l.includes('visual')) return 'Visual Inspection — full exterior surface';
-    if (l.includes('coating thickness')) return 'Coating Thickness — full exterior surface';
-  }
   if (node.id === 'feat_im_part') return 'Moulded part — full cavity geometry';
-  if (node.id === 'feat_im_injection') return 'Cavity fill — full mold geometry';
-  if (node.id === 'feat_im_cooling') return 'Cooling — full part surface (wall thickness drives cycle time)';
-  if (node.id === 'feat_im_gate') return 'Gate vestige location — full part surface';
-  if (node.id === 'feat_im_visual') return 'Visual Inspection — full exterior surface';
-  if (node.id === 'feat_im_dimensional') return 'Dimensional Inspection — critical features vs drawing';
-  if (node.id === 'feat_im_weight') return 'Weight Check — full part (shot weight monitoring)';
+  if (node.id.startsWith('secondary_') || node.id.startsWith('secfeat_')) {
+    return `${node.label} — ${node.wholePart ? 'whole part surface' : 'measured features'}`;
+  }
   if (node.kind === 'operation') {
     if (l.includes('laser') || l.includes('cutting')) return 'Pierce holes';
     if (l.includes('press brake') || l.includes('bending')) return 'Bend lines';
-    if (l.includes('tapping')) return 'Candidate tapped holes (Ø ≤ 6 mm)';
+    if (l.includes('tapping')) return 'Tapped holes';
     if (l.includes('deburr')) return 'All cut edges — holes & bends';
     if (l.includes('surface treatment') || l.includes('coating')) return 'Full exterior surface';
     if (l.includes('inspection')) return 'Holes & bends (geometric features)';
@@ -2215,6 +1619,24 @@ function CostSummaryTab({
     const pct = (v: number) => totalCost > 0 ? (v / totalCost) * 100 : 0;
     return { matRate, matCost, scrapLoss, lines, totalProcess, totalCost, pct };
   }, [cost, appliedRoute, matRateOverride, procOverrides]);
+
+  // Per machining calculator, the inputs the engine gave it on this part (its
+  // line's trace): values, sources and lookup rows. Opening that calculator in
+  // the process dialog shows exactly these instead of blank fields.
+  const engineCalculators = useMemo(() => {
+    const out: Record<string, { calculatorId: string; inputs: Record<string, number | string>; provenance: Record<string, string>; lookupMatches: Record<string, { table: string; row: Record<string, string | number> }> }> = {};
+    for (const line of eff?.lines ?? []) {
+      if (!line.calculatorId || !line.calculationTrace?.length || out[line.calculatorId]) continue;
+      const inputs = line.calculationTrace.filter((st) => st.kind === 'input' && st.value != null);
+      out[line.calculatorId] = {
+        calculatorId: line.calculatorId,
+        inputs: Object.fromEntries(inputs.map((st) => [st.fieldName, st.value as number | string])),
+        provenance: Object.fromEntries(inputs.filter((st) => st.source).map((st) => [st.fieldName, st.source as string])),
+        lookupMatches: line.lookupMatches ?? {},
+      };
+    }
+    return out;
+  }, [eff]);
 
   const [expandedProcs, setExpandedProcs] = useState<Set<string>>(new Set());
   const toggleProc = (key: string) =>
@@ -2495,13 +1917,6 @@ function CostSummaryTab({
         </div>
       )}
 
-      {/* ── Benchmark rate override notice ── */}
-      {cost.processLines?.some((l) => l.rateSource === 'benchmark_override') && (
-        <div className="flex items-center gap-1.5 text-[11px] text-sky-600 dark:text-sky-400 pt-2 pb-1">
-          <span>ℹ</span>
-          <span>Using {factory} benchmark MHR rates — verify machine records for actual shop rates</span>
-        </div>
-      )}
 
       {/* ── Grand total header ──
           costStatus === 'incomplete' means at least one required process has
@@ -2761,18 +2176,13 @@ function CostSummaryTab({
                 <div className="flex-1 min-w-0 pr-2">
                   <div className="flex items-baseline gap-1.5">
                     <span className="text-[10px] tabular-nums text-muted-foreground/50 font-mono w-5 shrink-0 text-right">{opNbr}</span>
-                    <span className="text-sm text-foreground">
-                      {/* category is the real identity for a manually-added line
-                          (ProcessCostDialog's "2. Category" picker, migration 719) —
-                          operation is only ever set on an engine-generated line, and
-                          processGroup is the coarse domain label, a last resort. A
-                          real, confirmed live bug (2026-09-10): this previously
-                          checked operation first, so every manually-added line (which
-                          intentionally leaves operation blank) fell all the way to
-                          processGroup — e.g. a Plastic Molding part's manually-added
-                          line displayed as "Plastic Molding" (the domain) instead of
-                          the real category actually picked (e.g. "Injection Molding"). */}
-                      {isExpanded ? '▾' : '▸'} {proc.category || proc.operation || proc.processGroup || 'Process'}
+                    <span className="text-sm text-foreground min-w-0">
+                      {/* Full Process › Category › Operation chain, matching the
+                          edit dialog's three pickers — never collapsed to one
+                          level (a manually-added line leaves operation blank, an
+                          engine line may leave category blank; showing only one
+                          level hid which of the three it was). */}
+                      {isExpanded ? '▾' : '▸'} <ProcessHierarchyLabel proc={proc} />
                     </span>
                   </div>
                   <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5 flex-wrap pl-[26px]">
@@ -2811,7 +2221,6 @@ function CostSummaryTab({
               <div className="pl-9 pr-4 py-2 bg-muted/10 border-b border-border/20 space-y-3">
                 {/* eMithran-style feature-level sub-operations — same as the live engine rows */}
                 <FeatureBreakdown items={matchedEngineLine?.featureBreakdown} fg={fg} onSelectHighlight={onSelectHighlight} />
-                {matchedEngineLine && <CalculationTracePanel line={matchedEngineLine} />}
                 {/* Full end-to-end calculation export — only offered when the live engine
                     actually has a real DB-calculator audit trail for this process (Laser
                     Cutting, Press Brake so far); no placeholder button for processes that
@@ -2920,6 +2329,16 @@ function CostSummaryTab({
                           // dropped real precision the schema already supports).
                           ...(liveCycleSec != null ? { ...proc, cycleTime: Math.round(liveCycleSec * 100) / 100 } : proc),
                           ...(matchedEngineLine?.featureBreakdown ? { featureBreakdown: matchedEngineLine.featureBreakdown } : {}),
+                          // A machining line was computed BY a database calculator:
+                          // open that calculator with the engine's own inputs, their
+                          // sources, and the lookup rows they came from.
+                          ...(matchedEngineLine?.calculatorId && engineCalculators[matchedEngineLine.calculatorId]
+                            ? { engineCalculator: engineCalculators[matchedEngineLine.calculatorId] }
+                            : {}),
+                          // Every other machining line's calculator too, so picking a
+                          // different calculator in the dropdown opens it with the
+                          // inputs the engine used for that line.
+                          engineCalculators,
                         });
                         setProcDialogAutoOpenCalculator(true);
                         setProcDialogOpen(true);
@@ -2932,6 +2351,10 @@ function CostSummaryTab({
                   </div>
                   <span className="text-xs tabular-nums text-foreground shrink-0">{cycleMin ?? '—'}</span>
                 </div>
+                {/* Why this cycle time: every input with its source (CAD /
+                    lookup table / machine record / disclosed assumption) and
+                    each formula, straight from the engine line that computed it. */}
+                {matchedEngineLine && <CalculationTracePanel line={matchedEngineLine} />}
                 {(heads > 1 || ppc > 1) && (
                   <div className="flex items-baseline justify-between gap-2 min-w-0">
                     <span className="text-xs text-muted-foreground truncate min-w-0">Heads × Parts/Cycle</span>
@@ -2951,9 +2374,9 @@ function CostSummaryTab({
                     {matchedEngineLine?.setupTimeSource === 'operation_lookup' && (
                       <span className="ml-1 text-[10px] text-muted-foreground/70">· per-operation</span>
                     )}
-                    {matchedEngineLine?.setupTimeSource === 'class_default' && (
-                      <span className="ml-1 text-[10px] text-amber-500/90" title="No real setup_time_hr on file for this machine and no per-operation row — this is a class default, not measured.">
-                        · class default
+                    {matchedEngineLine?.setupTimeSource === 'none' && (
+                      <span className="ml-1 text-[10px] text-amber-500/90" title="No real setup_time_hr on file for this machine and no per-operation row — setup is not costed.">
+                        · setup not costed
                       </span>
                     )}
                   </span>
@@ -2990,17 +2413,18 @@ function CostSummaryTab({
                     {cost.injectionMolding.clampRequiredT != null ? (
                       <div className="flex items-baseline justify-between gap-2 min-w-0">
                         <span className="text-xs text-muted-foreground truncate min-w-0">
-                          Required{cost.injectionMolding.materialClampFactor != null
-                            ? ` (${fmt(cost.injectionMolding.projectedAreaCm2, 0)} cm² × ${cost.injectionMolding.cavityCount} cav × ${cost.injectionMolding.materialClampFactor.toFixed(2)} t/cm² × 1.15)`
+                          Required{cost.injectionMolding.flowClass && cost.injectionMolding.cavityPressureMpa != null
+                            ? ` (${fmt(cost.injectionMolding.projectedAreaCm2, 0)} cm² × ${cost.injectionMolding.cavityCount} cav × ${fmt(cost.injectionMolding.cavityPressureMpa, 1)} MPa, ${cost.injectionMolding.flowClass} flow)`
                             : ''}
                         </span>
                         <span className="text-xs tabular-nums text-foreground shrink-0">
                           {fmt(cost.injectionMolding.clampRequiredT, 0)}T
                         </span>
                       </div>
-                    ) : (
-                      <p className="text-[11px] italic text-muted-foreground/60">
-                        Real clamp requirement unavailable — no projected area on file yet.
+                    ) : null}
+                    {cost.injectionMolding.clampTrace && (
+                      <p className={cn('text-[11px] leading-snug', cost.injectionMolding.clampRequiredT != null ? 'text-muted-foreground/70' : 'italic text-muted-foreground/60')}>
+                        {cost.injectionMolding.clampTrace}
                       </p>
                     )}
                     {cost.injectionMolding.clampMachineT != null && (
@@ -3243,17 +2667,17 @@ function RouteComparisonCard({
   // Click-to-highlight for the "Detected Geometry" rows below — reuses the same
   // FeatureNodeV2/mergeFeaturesToHL mechanism the Feature breakdown rows already
   // use (see FeatureBreakdown/resolveFeatureOpHighlight above). Only feature
-  // types that carry real OCC face_ids in feature_graph_v2 are clickable: hole,
-  // bend, extruded_flange (geo_v40+). Internal profiles have no per-wire face_id
+  // types that carry real OCC face_ids in feature_graph_v2 are clickable:
+  // plain holes, bends, extruded-collar holes (geo_v40+). Internal profiles have no per-wire face_id
   // plumbing yet (_face_breakdown only accumulates aggregate length/count, not
   // per-wire face identity) — that row stays plain text until that OCC-side work
   // is done, disclosed rather than silently faked.
   const v2Features = fg?.feature_graph_v2?.features ?? [];
-  const highlightFor = (featureType: string): FeatureNodeV2 | null =>
-    onSelectHighlight ? mergeFeaturesToHL(`detected_${featureType}`, v2Features.filter((f) => f.feature_type === featureType)) : null;
-  const bendHL = highlightFor('bend');
-  const holeHL = highlightFor('hole');
-  const extrusionHL = highlightFor('extruded_flange');
+  const highlightFor = (key: string, match: (f: FeatureGraphEntryLike) => boolean): FeatureNodeV2 | null =>
+    onSelectHighlight ? mergeFeaturesToHL(`detected_${key}`, v2Features.filter(match)) : null;
+  const bendHL = highlightFor('bend', isBend);
+  const holeHL = highlightFor('hole', isPlainHole);
+  const extrusionHL = highlightFor('extruded', isExtrudedHole);
   const detectedRow = (label: string, highlight: FeatureNodeV2 | null) => (
     <button
       type="button"
@@ -3582,11 +3006,11 @@ function RouteComparisonCard({
                     {line.machineName && <span>{line.machineName}</span>}
                     <span className="tabular-nums">{fmt(line.cycleTimeMin, 1)} min</span>
                     <span className="tabular-nums">{sym}{fmt(line.hourlyRate, 0)}/hr</span>
-                    <span className={line.rateSource === 'mhr_database' ? 'text-emerald-600' : line.rateSource === 'tier_synthetic' ? 'text-slate-400' : line.rateSource === 'no_db_rate' ? 'text-red-600' : 'text-amber-600'}>
-                      {line.rateSource === 'mhr_database' ? 'MHR DB'
-                        : line.rateSource === 'tier_synthetic' ? 'Benchmark'
-                        : line.rateSource === 'no_db_rate' ? 'no rate on file'
-                        : 'est.'}
+                    <span className={line.rateSource === 'mhr_database' ? 'text-emerald-600' : line.rateSource === 'no_db_rate' ? 'text-red-600' : 'text-muted-foreground'}>
+                      {line.rateSource === 'mhr_database' ? 'HR Rates machine'
+                        : line.rateSource === 'no_db_rate' ? 'no machine in HR Rates'
+                        : line.rateSource === 'tooling_amortization' ? 'tooling'
+                        : 'allowance'}
                     </span>
                   </div>
                 </div>
@@ -4014,7 +3438,7 @@ function ReferenceTableMini({ table }: { table: ReferenceTable }) {
 }
 
 function GdtFunctionalTab({
-  item, fg, summary,
+  item, summary,
 }: {
   item: BOMItem;
   fg: FeatureGraph | null;
@@ -4063,7 +3487,7 @@ function GdtFunctionalTab({
   const noteLines = rawNotes.split(/\d+\)/).map((s) => s.trim()).filter(Boolean);
   const hasDrawingControls = generalTolerance || tightestToleranceMm !== null || noteLines.length > 0;
 
-  const hasGdtFcf = gdt?.source === 'drawing_intelligence' && (gdt.features?.length ?? 0) > 0;
+  const hasGdtFcf = gdt?.source !== undefined && gdt.source !== 'no_data' && (gdt.features?.length ?? 0) > 0;
 
   if (!hasCad && !hasDrawingControls && !hasGdtFcf) {
     if (isLoading) return (
@@ -4097,9 +3521,6 @@ function GdtFunctionalTab({
                 label="Complexity"
                 value={item.complexity.charAt(0).toUpperCase() + item.complexity.slice(1)}
               />
-            )}
-            {fg?.difficultyLevel && (
-              <Row label="Difficulty" value={fg.difficultyLevel.replace(/_/g, ' ')} />
             )}
             {summary.sheetThicknessMm > 0 && (
               <Row label="Sheet Thickness" value={`${summary.sheetThicknessMm} mm`} />
@@ -4437,7 +3858,7 @@ function TreeRow({
           </div>
         </td>
         <td className="px-2 py-1 text-muted-foreground text-[11px] truncate max-w-0 w-28">
-          {node.kind !== 'sub_op' ? (node.factory ?? factory) : ''}
+          {node.factory ?? factory}
         </td>
         <td className="px-2 py-1 text-muted-foreground text-[11px] truncate max-w-0 w-40">
           {node.machine ?? ''}
@@ -4449,30 +3870,6 @@ function TreeRow({
       ))}
     </>
   );
-}
-
-// ── Workflow Builder KB ────────────────────────────────────────────────────────
-
-interface WorkflowStepOption {
-  id: string;
-  process: string;
-  label: string;
-  machine?: string;
-  // Real mhr_records machine_class key (default-rates.ts's machine registry) —
-  // when set, RouteSelectionDialog resolves the real machine name/rate for
-  // this class+location instead of showing the static `machine` placeholder.
-  machineClassKey?: string;
-  isDefault: boolean;
-  costNote?: string;
-  constraintNote?: string;
-}
-
-interface WorkflowStep {
-  id: string;
-  category: string;
-  visible: (ctx: RouteScoringContext | null) => boolean;
-  contextHint: (ctx: RouteScoringContext | null) => string;
-  options: WorkflowStepOption[];
 }
 
 // The 4 real Plastic Molding machine_class slugs (migration 633/645/734) —
@@ -4488,110 +3885,6 @@ const IM_MACHINE_CLASSES = new Set(['injection_molding', 'compression_molding', 
 // this list updated alongside that DTO array, never independently guessed.
 const IM_DIRECT_APPLY_ROUTE_IDS = new Set(['im-small-50t', 'im-standard-200t', 'im-large-500t']);
 
-const WORKFLOW_KB: Record<string, WorkflowStep[]> = {
-  // sheet_metal was here. Removed 2026-09-07: dead for its own family (the
-  // dialog renders the comparison-driven pane for isSheetMetal — see the
-  // branch at the RouteSelectionDialog body — so these steps never displayed)
-  // AND divergent where it mattered. Its Tapping step was gated on
-  // `tappingCandidateCount`, a Ø<=6mm-holes-in-thin-sheet heuristic, while the
-  // canonical composer gates Tapping on `input.threads.length` — real thread
-  // features off drawingIntelligence.threads. A small clearance hole is not
-  // evidence of a tapped hole, and keeping a second, looser definition of the
-  // same operation is how the process tree came to show Tapping on a part the
-  // quote correctly had no tapping for.
-  turned: [
-    {
-      id: 'turning',
-      category: 'Turning',
-      visible: () => true,
-      contextHint: () => 'Primary stock removal',
-      options: [
-        {
-          id: '2axis', process: 'CNC Turning', label: 'CNC Lathe (2-Axis)',
-          machine: 'CNC Lathe', isDefault: true,
-        },
-        {
-          id: 'livetools', process: 'CNC Turning', label: 'Turn-Mill (Live Tooling)',
-          machine: 'CNC Turn-Mill', isDefault: false,
-          costNote: 'Cross-holes, flats, or keyways in a single setup',
-        },
-      ],
-    },
-    {
-      id: 'finishing-ct',
-      category: 'Finishing',
-      visible: () => true,
-      contextHint: () => '',
-      options: [
-        {
-          id: 'deburr-ct', process: 'Deburring', label: 'Deburring',
-          machine: 'Deburring Station', isDefault: true,
-        },
-      ],
-    },
-    {
-      id: 'inspection-ct',
-      category: 'Inspection',
-      visible: () => true,
-      contextHint: () => '',
-      options: [
-        {
-          id: 'dim-ct', process: 'Inspection', label: 'Dimensional Inspection',
-          machine: 'CMM', isDefault: true,
-        },
-      ],
-    },
-  ],
-  milled: [
-    {
-      id: 'milling',
-      category: 'Milling',
-      visible: () => true,
-      contextHint: () => 'Primary material removal',
-      options: [
-        {
-          id: '3axis', process: 'CNC Milling', label: '3-Axis Milling',
-          machine: 'CNC Milling Center', isDefault: true,
-        },
-        {
-          id: '4axis', process: 'CNC Milling', label: '4-Axis Milling',
-          machine: 'CNC 4-Axis Machining Center', isDefault: false,
-          costNote: 'Helical features or continuous 4th-axis indexing required',
-        },
-        {
-          id: '5axis', process: 'CNC Milling', label: '5-Axis Milling',
-          machine: 'CNC 5-Axis Machining Center', isDefault: false,
-          costNote: 'Complex contoured surfaces — single-setup advantage',
-          constraintNote: 'Highest machine cost — justify with complex surface requirements',
-        },
-      ],
-    },
-    {
-      id: 'finishing-cm',
-      category: 'Finishing',
-      visible: () => true,
-      contextHint: () => '',
-      options: [
-        {
-          id: 'deburr-cm', process: 'Deburring', label: 'Deburring',
-          machine: 'Deburring Station', isDefault: true,
-        },
-      ],
-    },
-    {
-      id: 'inspection-cm',
-      category: 'Inspection',
-      visible: () => true,
-      contextHint: () => '',
-      options: [
-        {
-          id: 'dim-cm', process: 'Inspection', label: 'Dimensional Inspection',
-          machine: 'CMM', isDefault: true,
-        },
-      ],
-    },
-  ],
-};
 
 // ── Dynamic route step model (sheet_metal only — real, DB-driven, no
 // hardcoded option lists) ────────────────────────────────────────────────────
@@ -4628,22 +3921,6 @@ function cuttingMachineClassToRouteId(routes: Pick<RouteResultDto, 'routeId' | '
   }
   return map;
 }
-// Tied to computeRouteScore's hand-authored engineering judgment below (real
-// tooling-amortization/HAZ/edge-quality tradeoffs specific to these 3 methods)
-// — NOT structural like the two functions above, so deliberately NOT derived
-// from the live route list: a future 4th registered engine needs its own real
-// scoring heuristic added to computeRouteScore (and a literal added here) before
-// it's meaningful to rank, same as it needs its own real cost formula on the
-// backend. Iterating whatever the API happens to return would silently score
-// an unresearched method using computeRouteScore's neutral 76/100 default,
-// which is exactly the "fabricated confidence" this whole registry redesign
-// was meant to prevent.
-// CUTTING_ROUTE_IDS was here — the three route ids computeRouteScore had
-// hand-authored score bases for, ranked to pick the Workflow Builder default.
-// Removed 2026-09-07: the backend recommends from all ten registered cutting
-// engines using real cost, capability and data completeness, so a three-entry
-// frontend ranking is both narrower and a second opinion on a decision that
-// already has an owner.
 
 // Real physical ordering already encoded elsewhere in this codebase
 // (cost-engine.ts's real processLines sequence, autoCompleteRoute's insertion
@@ -4683,7 +3960,7 @@ function orderingWarnings(orderedProcesses: string[]): Record<string, string> {
 // ── RouteSelectionDialog (Workflow Builder) ────────────────────────────────────
 
 function RouteSelectionDialog({
-  open, onClose, onApplied, partFamily, currentRouteId, onSelectRoute, scoringCtx, factory = 'USA',
+  open, onClose, onApplied, partFamily, currentRouteId, onSelectRoute, factory = 'USA',
   itemId, batchSize, existingCuttingRouteId, existingSteps,
 }: {
   open: boolean;
@@ -4701,7 +3978,6 @@ function RouteSelectionDialog({
   currentRouteId: string | null;
   onSelectRoute: (route: ManualRouteOption) => void;
   cost: CostSummaryDto | null;
-  scoringCtx: RouteScoringContext | null;
   factory?: string;
   itemId?: string;
   batchSize: number | undefined;
@@ -4714,17 +3990,19 @@ function RouteSelectionDialog({
   existingSteps?: ManualRouteOption['dynamicSteps'];
 }) {
   const isSheetMetal = partFamily === 'sheet_metal';
-  // Real, confirmed live gap (2026-09-11): the Workflow Builder rendered a
-  // completely empty table for injection-molded parts — WORKFLOW_KB (the
-  // fixed-family fallback path) has no 'plastic_molded' entry, and the
-  // real comparison-driven pane above it is gated to isSheetMetal only. The
-  // backend's getRouteComparison() already computes real, priced IM routes
+  // Plastic-molded parts: the backend's getRouteComparison() computes real, priced IM routes
   // for this exact item (3 real tonnage-tier presses using the real
   // injection_molding machine class, plus Compression/Reaction Injection/
   // Structural Foam Molding for cost comparison — see bom-items.service.ts's
   // imRoutes assembly) through the SAME endpoint useRouteComparison already
   // calls — this was a frontend wiring gap, not a missing backend capability.
   const isIM = partFamily === 'plastic_molded';
+  // Machined parts: getRouteComparison() prices one complete route per real
+  // catalog machine class (3 Axis Mill, 2 Axis Lathe, ... -- the registered
+  // milling/turning engines), each already a full multi-line quote, exactly
+  // like the plastic-molding routes. Both use the same complete-route pane.
+  const isMachining = partFamily === 'milled' || partFamily === 'turned' || partFamily === 'mill_turn';
+  const isCompleteRouteFamily = isIM || isMachining;
 
   // ── Universal real machine/rate resolution — ONE fetch each, no fixed
   // per-class array. The old array existed because React hooks can't be
@@ -4733,24 +4011,17 @@ function RouteSelectionDialog({
   // class for the location when omitted. Filtering client-side per row
   // removes that ceiling structurally, which is what actually made dynamic
   // (any number of, any class) steps possible.
-  const allMhr = useMHRRecords({ location: factory, limit: 300 }, { enabled: open });
-  const allBenchmark = useMHRBenchmark(factory, undefined, { enabled: open });
-  const resolveForClass = (cls: string): { id: string; machineName: string; rate: number; isBenchmark: boolean } | null => {
+  // Real HR Rates machines only (memory/-backed, migration 805). A class with
+  // no machine at this location resolves to null — never a benchmark row.
+  // Same fetch size as ProcessCostDialog, so a real machine is never missing
+  // because the list was cut short.
+  const allMhr = useMHRRecords({ location: factory, limit: 10000 }, { enabled: open });
+  const resolveForClass = (cls: string): { id: string; machineName: string; rate: number } | null => {
     const own = (allMhr.data?.records ?? []).filter((r) => r.machineClass === cls);
-    const bm = (allBenchmark.data ?? []).filter((r) => r.machineClass === cls);
-    if (own.length > 0) {
-      const cheapest = [...own].sort((a, b) => resolveMhrUsdRate(a) - resolveMhrUsdRate(b))[0]!;
-      return { id: cheapest.id, machineName: cheapest.machineName, rate: resolveMhrUsdRate(cheapest), isBenchmark: false };
-    }
-    if (bm.length > 0) {
-      const cheapest = [...bm].sort((a, b) => (a.calculations?.totalMachineHourRate ?? 0) - (b.calculations?.totalMachineHourRate ?? 0))[0]!;
-      return { id: cheapest.id, machineName: cheapest.machineName, rate: cheapest.calculations?.totalMachineHourRate ?? 0, isBenchmark: true };
-    }
-    return null;
+    if (own.length === 0) return null;
+    const cheapest = [...own].sort((a, b) => resolveMhrUsdRate(a) - resolveMhrUsdRate(b))[0]!;
+    return { id: cheapest.id, machineName: cheapest.machineName, rate: resolveMhrUsdRate(cheapest) };
   };
-  // Old fixed-family path still keys into this by machineClassKey — kept
-  // working via resolveForClass instead of the retired per-class object.
-  const resolvedMachine: Record<string, { id: string; machineName: string; rate: number; isBenchmark: boolean } | null> = {};
 
   // ═══ Dynamic path (sheet_metal): real, comparison-driven steps ═══════════
   // "Add Step" can only ever offer operations from this real, already-
@@ -4760,7 +4031,7 @@ function RouteSelectionDialog({
   // this part's real geometry, not by cutting method), so any one route's
   // full line set (minus its own cutting line) is the real universe of
   // addable operations; cutting itself gets exactly 3 real alternatives.
-  const comparison = useRouteComparison((isSheetMetal || isIM) ? itemId : undefined, batchSize, factory);
+  const comparison = useRouteComparison((isSheetMetal || isCompleteRouteFamily) ? itemId : undefined, batchSize, factory);
   // Real 'forming' routes (Standard/Tandem/Progressive-Die Press, Roll
   // Bending — see RouteResultDto.processFamily) have NO Press Brake/
   // Deburring/Inspection lines of their own (they're complete single-
@@ -4843,6 +4114,17 @@ function RouteSelectionDialog({
         // against that real 35/38-material compatibility set). Shown for
         // honest cost comparison, not offered as a switchable route here —
         // same disclosed-constraint pattern as the forming-route branch above.
+        if (isMachining) {
+          const dto = allRoutesForTree.find((r) => r.routeId === node.id);
+          if (dto && !dto.isFeasible) {
+            return {
+              ...node,
+              selectable: false,
+              selectionNote: dto.warnings?.[0] ?? 'This machine cannot produce the part (capability check failed).',
+            };
+          }
+          return node;
+        }
         if (isIM && !IM_DIRECT_APPLY_ROUTE_IDS.has(node.id)) {
           return {
             ...node,
@@ -4860,7 +4142,7 @@ function RouteSelectionDialog({
       }
       return [];
     }
-  }, [allRoutesForTree, isIM]);
+  }, [allRoutesForTree, isIM, isMachining]);
   // The selected route as the comparison list itself models it, plus the raw
   // DTO behind it — the editor needs route-level material cost and the display
   // currency, which are real fields on RouteResultDto that the tree adapter's
@@ -4896,10 +4178,6 @@ function RouteSelectionDialog({
     setCuttingRouteId(routeId);
   }
 
-  // Real, CAD-derived best cutting route for THIS part's geometry (tonnage,
-  // thickness, hole count, etc. — see computeRouteScore) — recomputed from
-  // live scoringCtx, never cached from a prior selection, so it always
-  // reflects the part actually loaded in the dialog.
   // The backend's own recommendation — selectRecommendedRoute: the cheapest
   // candidate that is both physically capable and fully costed, from real
   // rates, real machine capability and real cycle times.
@@ -4911,9 +4189,6 @@ function RouteSelectionDialog({
   // who applied that pre-selection without changing it applied a route chosen
   // by those literals. Two recommenders for one decision, and this was the one
   // the user saw first.
-  //
-  // computeRouteScore still renders its per-route score breakdown as advisory
-  // commentary; it no longer picks anything.
   // The backend recommendation (selectRecommendedRoute, bom-items.service.ts's
   // attachToRoutes) is restricted to processFamily === 'cutting' by explicit
   // product decision: a FORMING route (Roll Bending / Standard / Tandem /
@@ -5150,57 +4425,6 @@ function RouteSelectionDialog({
     onApplied();
   }
 
-  // ═══ Fixed-family path (turned/milled/etc. — unchanged UX,
-  // WORKFLOW_KB-driven) — kept for families not yet migrated to the real
-  // comparison-driven model above. ═══════════════════════════════════════════
-  const allSteps: WorkflowStep[] = WORKFLOW_KB[partFamily ?? ''] ?? [];
-  const visibleSteps = allSteps.filter((s) => s.visible(scoringCtx));
-  for (const step of visibleSteps) {
-    for (const opt of step.options) {
-      if (opt.machineClassKey) resolvedMachine[opt.machineClassKey] = resolveForClass(opt.machineClassKey);
-    }
-  }
-
-  const [selectedPerStep, setSelectedPerStep] = useState<Record<string, string>>(() => {
-    const init: Record<string, string> = {};
-    for (const step of allSteps) {
-      const def = step.options.find((o) => o.isDefault) ?? step.options[0];
-      if (def) init[step.id] = def.id;
-    }
-    return init;
-  });
-
-  const cuttingScores = scoringCtx ? {
-    'fiber-laser':  computeRouteScore('sm-laser',   scoringCtx).totalScore,
-    'turret-punch': computeRouteScore('sm-turret',  scoringCtx).totalScore,
-    'waterjet':     computeRouteScore('sm-waterjet', scoringCtx).totalScore,
-  } : null;
-  const recommendedOptionId: Record<string, string> = {};
-  if (cuttingScores) {
-    const best = Object.entries(cuttingScores).sort((a, b) => b[1] - a[1])[0];
-    if (best) recommendedOptionId['cutting'] = best[0];
-  }
-
-  const appliedProcesses = visibleSteps
-    .map((step) => {
-      const selId = selectedPerStep[step.id] ?? step.options.find((o) => o.isDefault)?.id;
-      return step.options.find((o) => o.id === selId)?.process ?? '';
-    })
-    .filter((p) => p.length > 0);
-
-  // Real machine name per applied process — for the compact flow diagram,
-  // which is keyed by process name rather than machineClassKey.
-  const fixedProcessToMachineName: Record<string, string> = {};
-  for (const step of visibleSteps) {
-    const selId = selectedPerStep[step.id] ?? step.options.find((o) => o.isDefault)?.id;
-    const opt = step.options.find((o) => o.id === selId);
-    if (!opt?.process) continue;
-    const real = opt.machineClassKey ? resolvedMachine[opt.machineClassKey] : null;
-    fixedProcessToMachineName[opt.process] = real?.machineName ?? opt.machine ?? '';
-  }
-
-  const fixedFlowNodes = ['Raw Blank', ...appliedProcesses, 'Finished Part'];
-
   // ═══ Dynamic path: the route-defining first operation, as an editor step ═══
   // Shown pinned at the head of the chain rather than as a separate read-only
   // list above it, so each operation appears exactly once. It carries the same
@@ -5225,63 +4449,33 @@ function RouteSelectionDialog({
     };
   })();
 
-  // Only the fixed-family (WORKFLOW_KB) path still renders a standalone flow
-  // ribbon; the dynamic path's lives inside RouteStepEditor, driven by the
-  // real edited chain.
-  const flowNodes = fixedFlowNodes;
-  const processToMachineName = fixedProcessToMachineName;
-
-  function handleApplyFixed() {
-    const label = visibleSteps
-      .map((step) => {
-        const selId = selectedPerStep[step.id] ?? step.options.find((o) => o.isDefault)?.id;
-        return step.options.find((o) => o.id === selId)?.label ?? '';
-      })
-      .filter(Boolean)
-      .slice(0, 3)
-      .join(' + ');
-    // Real machine picked per step where a real mhr_records/benchmark machine
-    // was resolved — carried on the route so the parent can apply it via
-    // useMachineOverride AFTER apply-route creates the process_cost_records
-    // rows (machine-override updates an existing row, so firing it here,
-    // before apply-route runs, would silently do nothing).
-    const machineOverrides: { processKey: string; mhrRecordId: string }[] = [];
-    for (const step of visibleSteps) {
-      const selId = selectedPerStep[step.id] ?? step.options.find((o) => o.isDefault)?.id;
-      const opt = step.options.find((o) => o.id === selId);
-      if (opt?.machineClassKey && resolvedMachine[opt.machineClassKey]) {
-        machineOverrides.push({ processKey: opt.machineClassKey, mhrRecordId: resolvedMachine[opt.machineClassKey]!.id });
-      }
-    }
-    const route: ManualRouteOption = {
-      id: `custom-${Date.now()}`,
-      label: label || 'Custom Workflow',
-      complexityLevel: 'standard',
-      isRecommended: false,
-      processes: appliedProcesses,
-      rationale: 'Custom workflow — assembled step by step',
-      machineOverrides,
-    };
-    onSelectRoute(route);
-    onApplied();
-  }
-
   // ═══ IM path (plastic_molded): pick one of the real, priced routes
   // getRouteComparison() already computed — no per-step composition, since
   // each real IM route (a real registered engine: Injection Molding at 3
   // tonnage tiers, or Compression/Reaction Injection/Structural Foam
   // Molding) is already a complete, self-contained multi-line quote (Mold
   // Setup/Injection/Packing/Cooling/Ejection/Inspections all included). ═══
-  function handleApplyIM() {
+  // A complete route can be set when apply-route accepts it: for plastic,
+  // one of the 3 injection tonnage tiers; for machining, any feasible
+  // catalog-machine route (apply-route.dto.ts validates against the same
+  // registered milling/turning engines the comparison priced).
+  const isCompleteRouteApplicable = (routeId: string | null): boolean => {
+    if (!routeId) return false;
+    if (isIM) return IM_DIRECT_APPLY_ROUTE_IDS.has(routeId);
+    if (isMachining) return allRoutesForTree.some((r) => r.routeId === routeId && r.isFeasible);
+    return false;
+  };
+
+  function handleApplyCompleteRoute() {
     const selected = allRoutesForTree.find((r) => r.routeId === cuttingRouteId);
-    if (!selected || !IM_DIRECT_APPLY_ROUTE_IDS.has(selected.routeId)) return;
+    if (!selected || !isCompleteRouteApplicable(selected.routeId)) return;
     const route: ManualRouteOption = {
       id: `custom-${Date.now()}`,
       label: selected.routeLabel,
       complexityLevel: 'standard',
       isRecommended: false,
       processes: selected.processLines.map((l) => l.process),
-      rationale: 'Injection Molding route — selected in Workflow Builder',
+      rationale: `${selected.routeLabel} route — selected in Workflow Builder`,
       directApplyRouteId: selected.routeId,
     };
     onSelectRoute(route);
@@ -5289,7 +4483,7 @@ function RouteSelectionDialog({
   }
 
   const canSetDynamicRoute = !!cuttingRouteId && !!additionalSteps && !!dynamicCuttingStep;
-  const canSetIMRoute = !!cuttingRouteId && IM_DIRECT_APPLY_ROUTE_IDS.has(cuttingRouteId);
+  const canSetCompleteRoute = isCompleteRouteApplicable(cuttingRouteId);
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -5310,7 +4504,9 @@ function RouteSelectionDialog({
               ? 'Compare every route priced for this part, then adjust the chosen route’s operations.'
               : isIM
                 ? 'Compare every real molding route priced for this part, then set one as the applied route.'
-                : 'Choose the operation for each step. The process flow updates live.'}
+                : isMachining
+                  ? 'Compare every machine route priced for this part, then set one as the applied route.'
+                  : 'No priced routes are available for this part family yet.'}
           </p>
         </DialogHeader>
 
@@ -5351,12 +4547,12 @@ function RouteSelectionDialog({
               previouslyAppliedLabel={previouslyAppliedRouteLabel}
             />
           </div>
-        ) : isIM ? (
-          /* IM path (plastic_molded): a real, priced route list — no
-             per-step composition pane, since each real route here is already
-             a complete quote (see handleApplyIM's own comment). The right
-             pane is a read-only view of the selected route's real
-             processLines, not an editor. */
+        ) : isCompleteRouteFamily ? (
+          /* Complete-route path (plastic_molded, milled/turned/mill_turn): a
+             real, priced route list — no per-step composition pane, since
+             each real route here is already a complete quote (see
+             handleApplyCompleteRoute). The right pane is a read-only view of
+             the selected route's real processLines, not an editor. */
           <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[minmax(320px,400px)_1fr] divide-y md:divide-y-0 md:divide-x divide-border/60">
             <RouteCompareList
               nodes={routeTree}
@@ -5368,9 +4564,12 @@ function RouteSelectionDialog({
               currencySymbol={currencySymbol}
               isLoading={comparison.isLoading}
               errorMessage={comparison.error instanceof Error ? comparison.error.message : null}
-              cuttingGroupMeta={{
+              cuttingGroupMeta={isIM ? {
                 title: 'Molding process',
                 description: 'Real, priced alternatives for this part. Only the injection tonnage tiers can be set here — Compression/Reaction Injection/Structural Foam Molding are shown for cost comparison only (see the note on each row).',
+              } : {
+                title: 'Machine',
+                description: 'One real, priced route per catalog machine for this part. Machines that cannot produce it stay listed with the reason.',
               }}
             />
             <div className="flex-1 min-h-0 overflow-y-auto p-4">
@@ -5399,7 +4598,7 @@ function RouteSelectionDialog({
                       ))}
                     </tbody>
                   </table>
-                  {!IM_DIRECT_APPLY_ROUTE_IDS.has(selectedRouteDto.routeId) && (
+                  {!isCompleteRouteApplicable(selectedRouteDto.routeId) && (
                     <p className="mt-3 text-[11px] leading-snug text-muted-foreground">
                       This process cannot be set from here — see the note on its row in the list.
                     </p>
@@ -5409,130 +4608,10 @@ function RouteSelectionDialog({
             </div>
           </div>
         ) : (
-          /* Fixed-family path (turned / milled — WORKFLOW_KB-driven).
-             These families have exactly ONE route, so there is nothing to
-             compare and no left pane to show; the step table is the whole
-             surface. Its logic is untouched. */
-          <div className="flex-1 min-h-0 overflow-y-auto">
-            <div className="border-b bg-muted/20 px-4 py-2.5">
-              <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
-                {flowNodes.map((proc, i) => (
-                  <Fragment key={proc + String(i)}>
-                    <div className={cn(
-                      'shrink-0 rounded border px-2 py-1',
-                      i === 0 || i === flowNodes.length - 1
-                        ? 'border-border/60 bg-muted/40 text-muted-foreground'
-                        : 'border-violet-500/40 bg-violet-500/10',
-                    )}>
-                      <div className="text-[10px] font-medium leading-tight whitespace-nowrap">{proc}</div>
-                      {processToMachineName[proc] && (
-                        <div className="mt-0.5 max-w-[120px] truncate text-[9px] leading-tight text-muted-foreground">
-                          {processToMachineName[proc]}
-                        </div>
-                      )}
-                    </div>
-                    {i < flowNodes.length - 1 && (
-                      <span aria-hidden className="shrink-0 px-0.5 text-[10px] text-muted-foreground/50">→</span>
-                    )}
-                  </Fragment>
-                ))}
-              </div>
-            </div>
-          <table className="w-full text-sm border-collapse">
-            <thead>
-              <tr className="border-b bg-muted/50 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                <th className="px-3 py-2 text-left w-6">#</th>
-                <th className="px-3 py-2 text-left w-28">Step</th>
-                <th className="px-3 py-2 text-left">Operation</th>
-                <th className="px-3 py-2 text-left w-36">Machine / Resource</th>
-                <th className="px-3 py-2 text-left w-24">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibleSteps.map((step, idx) => {
-                const selectedId = selectedPerStep[step.id] ?? step.options.find((o) => o.isDefault)?.id;
-                const selectedOpt = step.options.find((o) => o.id === selectedId);
-                const hint = step.contextHint(scoringCtx);
-                const isRec = recommendedOptionId[step.id]
-                  ? selectedId === recommendedOptionId[step.id]
-                  : selectedOpt?.isDefault ?? false;
-                return (
-                  <tr key={step.id} className="border-b hover:bg-muted/20 transition-colors align-top">
-                    {/* # */}
-                    <td className="px-3 py-2.5 text-[11px] text-muted-foreground/60">{idx + 1}</td>
-
-                    {/* Step label */}
-                    <td className="px-3 py-2.5">
-                      <div className="text-xs font-medium leading-tight">{step.category}</div>
-                      {hint && (
-                        <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{hint}</div>
-                      )}
-                    </td>
-
-                    {/* Operation dropdown + notes */}
-                    <td className="px-3 py-2.5">
-                      <select
-                        value={selectedId ?? ''}
-                        onChange={(e) => setSelectedPerStep((prev) => ({ ...prev, [step.id]: e.target.value }))}
-                        className="w-full text-xs bg-background border border-border rounded px-2 py-1 focus:border-violet-500 focus:outline-none cursor-pointer"
-                      >
-                        {step.options.map((opt) => (
-                          <option key={opt.id} value={opt.id}>{opt.label}</option>
-                        ))}
-                      </select>
-                      {selectedOpt?.constraintNote && (
-                        <p className="text-[10px] text-orange-400/80 mt-1 leading-snug">
-                          ⚠ {selectedOpt.constraintNote}
-                        </p>
-                      )}
-                      {selectedOpt?.costNote && (
-                        <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">
-                          {selectedOpt.costNote}
-                        </p>
-                      )}
-                    </td>
-
-                    {/* Machine — real mhr_records/benchmark name+rate when this
-                        option has a machineClassKey; static text otherwise
-                        (e.g. Folding Machine, Surface Treatment — no clean
-                        single machine_class mapping exists for those yet) */}
-                    <td className="px-3 py-2.5 text-xs text-muted-foreground leading-tight">
-                      {selectedOpt?.machineClassKey ? (
-                        resolvedMachine[selectedOpt.machineClassKey] ? (
-                          <>
-                            <div>{resolvedMachine[selectedOpt.machineClassKey]!.machineName}</div>
-                            <div className="text-[10px] tabular-nums">
-                              ${resolvedMachine[selectedOpt.machineClassKey]!.rate.toFixed(2)}/hr
-                              {resolvedMachine[selectedOpt.machineClassKey]!.isBenchmark ? ' ★' : ''}
-                            </div>
-                          </>
-                        ) : (
-                          <span className="italic text-muted-foreground/60">No machine on file</span>
-                        )
-                      ) : (selectedOpt?.machine ?? '—')}
-                    </td>
-
-                    {/* Status badge */}
-                    <td className="px-3 py-2.5">
-                      {!selectedOpt?.process ? (
-                        <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-medium bg-slate-700/30 text-slate-400 border border-slate-600/30">
-                          Skipped
-                        </span>
-                      ) : isRec ? (
-                        <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-medium bg-blue-600/20 text-blue-400 border border-blue-500/30">
-                          Recommended
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-medium bg-violet-600/20 text-violet-400 border border-violet-500/30">
-                          Custom
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div className="flex-1 min-h-0 overflow-y-auto p-4">
+            <p className="text-xs text-muted-foreground">
+              No priced routes are available for this part family yet.
+            </p>
           </div>
         )}
 
@@ -5549,8 +4628,8 @@ function RouteSelectionDialog({
           <div className="flex shrink-0 justify-end gap-2">
             <Button variant="outline" onClick={onClose}>Cancel</Button>
             <Button
-              onClick={() => { if (isSheetMetal) handleSetRouteDynamic(); else if (isIM) handleApplyIM(); else handleApplyFixed(); }}
-              disabled={(isSheetMetal && !canSetDynamicRoute) || (isIM && !canSetIMRoute)}
+              onClick={() => { if (isSheetMetal) handleSetRouteDynamic(); else if (isCompleteRouteFamily) handleApplyCompleteRoute(); }}
+              disabled={isSheetMetal ? !canSetDynamicRoute : !canSetCompleteRoute}
             >
               Set Route
             </Button>
@@ -6187,7 +5266,12 @@ function CostGuidePanel({
           // ProcessLineCost and always populated by makeLine(), so this
           // fallback is never actually reached.)
           operation: line.process || line.operation || '',
-          processGroup: line.processGroup || deriveProcessGroupFromMachineClass(line.machineClass),
+          // The machine's own HR Rates group (what the Process picker lists),
+          // else the catalog identity. Neither = left empty: the dialog then
+          // reads it off the linked machine. Never guessed from the class.
+          ...((line.machineSelection?.balanced?.candidate?.processGroup ?? line.processGroup)
+            ? { processGroup: (line.machineSelection?.balanced?.candidate?.processGroup ?? line.processGroup)! }
+            : {}),
           processRoute: line.processRoute || line.process,
           // ROOT CAUSE (confirmed live): without this, the backend's own
           // create() does getCurrencyForLocation(undefined ?? '') -> 'USD',
@@ -7238,6 +6322,16 @@ function CostGuidePanel({
               </Section>
             )}
 
+            {(cgpCostSummary?.injectionMolding?.cavityLayouts?.length ?? 0) > 0 && (
+              <Section title="Mold Cavities">
+                <MoldCavitiesSection
+                  im={cgpCostSummary!.injectionMolding!}
+                  override={(item.scenarioOverrides?.['cavityCount'] as number | undefined) ?? null}
+                  onChange={(v) => patchScenarioOverrides.mutate({ id: item.id, patch: { cavityCount: v } })}
+                />
+              </Section>
+            )}
+
             <Section title="Volume and Batch Size">
               <InputRow label="Annual Volume" value={annualVolumeDraft} onChange={setAnnualVolumeDraft} onBlur={commitAnnualVolume} />
               {/* Shows the batch size the engine actually priced against -- which
@@ -7632,116 +6726,58 @@ function SustainabilityTab({ item, batchSize, factory }: { item: BOMItem; batchS
   );
 }
 
-// ── CNCFeatureTree ────────────────────────────────────────────────────────────
+// ── MachiningFeatureTreePanel ────────────────────────────────────────────────────────────
 
-const CNC_FEATURE_GROUPS: Array<{ label: string; types: string[] }> = [
-  { label: 'Turning',        types: ['external_diameter', 'groove', 'fillet'] },
-  { label: 'Boring',         types: ['through_hole', 'blind_hole'] },
-  { label: 'Cross-Drilling', types: ['cross_hole', 'pcd_hole_pattern'] },
-  { label: 'Milling',        types: ['slot', 'radial_slot', 'keyway', 'pocket'] },
-  { label: 'Finishing',      types: ['counterbore', 'countersink', 'chamfer'] },
-];
-
-const CNC_TYPE_LABELS: Record<string, string> = {
-  through_hole:    'Through Hole',
-  blind_hole:      'Blind Hole',
-  external_diameter: 'Outer Diameter',
-  groove:          'Groove',
-  fillet:          'Fillet',
-  cross_hole:      'Cross Hole',
-  pcd_hole_pattern:'PCD Pattern',
-  counterbore:     'Counterbore',
-  countersink:     'Countersink',
-  chamfer:         'Chamfer',
-  slot:            'Slot',
-  pocket:          'Pocket',
-  keyway:          'Keyway',
-  radial_slot:     'Radial Slot',
-};
-
-const CNC_GROUP_META: Record<string, { operation: string; setup: 'Low' | 'Medium' | 'High'; inspection: string }> = {
-  'Turning':        { operation: 'CNC Turning',   setup: 'Low',    inspection: 'Vernier Caliper' },
-  'Boring':         { operation: 'Drilling',       setup: 'Low',    inspection: 'Plug Gauge' },
-  'Cross-Drilling': { operation: 'Cross Drilling', setup: 'Medium', inspection: 'Plug Gauge' },
-  'Milling':        { operation: 'CNC Milling',    setup: 'Medium', inspection: 'CMM' },
-  'Finishing':      { operation: 'CNC Finishing',  setup: 'Low',    inspection: 'Depth Gauge' },
-};
-
-function CNCFeatureInspectorPanel({ selectedId, fg }: { selectedId: string; fg: FeatureGraph }) {
-  const idTail = selectedId.replace(/^cnc_[^_]+_/, ''); // "cnc_turning_boring" → "boring"
-  const group = CNC_FEATURE_GROUPS.find(
-    (g) => g.label.toLowerCase().replace(/[^a-z]/g, '_') === idTail,
-  );
-  const cncFeats: any[] = (fg as any)?.cnc_features?.features ?? [];
-  if (!group) return null;
-
-  const matching = cncFeats.filter((f: any) => group.types.includes(f.type));
+// Detail for a machining catalog-type node in the process tree: exactly the
+// feature_graph_v2 entries that node groups (ProcessTreeNode.v2FeatureIds).
+function MachiningFeatureInspectorPanel({ featureIds, fg }: { featureIds: string[]; fg: FeatureGraph }) {
+  const ids = new Set(featureIds);
+  const matching = (fg.feature_graph_v2?.features ?? []).filter((f) => ids.has(f.id));
   if (matching.length === 0) return null;
+  const groups = groupFeaturesByType(matching);
+  const total = groups.reduce((s, g) => s + g.occurrenceCount, 0);
 
-  const typeCounts: Record<string, number> = {};
-  for (const f of matching) typeCounts[f.type] = (typeCounts[f.type] ?? 0) + 1;
-  const typeEntries = Object.entries(typeCounts).sort(([, a], [, b]) => b - a);
-
-  const diamCounts: Record<string, number> = {};
+  const diamCounts = new Map<string, number>();
   for (const f of matching) {
-    const d = f.params?.diameter_mm ?? f.params?.major_diameter_mm;
-    if (d != null) {
-      const key = `Ø${Number(d).toFixed(1)}`;
-      diamCounts[key] = (diamCounts[key] ?? 0) + 1;
-    }
+    if (f.diameter_mm == null) continue;
+    const key = `Ø${f.diameter_mm.toFixed(1)}`;
+    diamCounts.set(key, (diamCounts.get(key) ?? 0) + f.occurrences.length);
   }
-  const diamEntries = Object.entries(diamCounts).sort(
-    ([a], [b]) => parseFloat(a.slice(1)) - parseFloat(b.slice(1)),
-  );
-
-  const meta = CNC_GROUP_META[group.label] ?? { operation: 'CNC', setup: 'Low' as const, inspection: '—' };
-  const primaryType =
-    typeEntries.length === 1 && typeEntries[0]
-      ? (CNC_TYPE_LABELS[typeEntries[0][0]] ?? group.label)
-      : group.label;
+  const diamEntries = [...diamCounts.entries()].sort(([a], [b]) => parseFloat(a.slice(1)) - parseFloat(b.slice(1)));
   const maxDiamCount = Math.max(...diamEntries.map(([, c]) => c), 1);
-
-  const setupColor =
-    meta.setup === 'Low' ? 'text-green-400' : meta.setup === 'Medium' ? 'text-amber-400' : 'text-red-400';
-  const setupDot =
-    meta.setup === 'Low' ? 'bg-green-400' : meta.setup === 'Medium' ? 'bg-amber-400' : 'bg-red-400';
+  // Catalog operations the backend attached to these entries
+  // (canonical-operation.ts, verified against the operations catalog).
+  const catalogOperations = [...new Set(matching.map((f) => f.canonical_operation).filter((o): o is string => !!o))];
 
   return (
     <div className="divide-y divide-border/50">
-      {/* Type + Count row */}
       <div className="px-3 py-3 flex items-start gap-4">
         <div className="flex-1 min-w-0">
           <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-1">Feature Information</div>
-          <div className="text-base font-semibold text-foreground leading-tight">{primaryType}</div>
-          {typeEntries.length > 1 && (
-            <div className="mt-1 flex flex-col gap-0.5">
-              {typeEntries.map(([type, count]) => (
-                <div key={type} className="text-[10px] text-muted-foreground">
-                  {CNC_TYPE_LABELS[type] ?? type} ×{count}
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="text-base font-semibold text-foreground leading-tight">{groups.map((g) => g.type).join(', ')}</div>
+          <div className="mt-1 flex flex-col gap-0.5">
+            {groups.flatMap((g) => g.variants.map((v) => (
+              <div key={`${g.type}:${v.variant}`} className="text-[10px] text-muted-foreground">
+                {g.type} · {v.variant} ×{v.occurrenceCount}
+              </div>
+            )))}
+          </div>
         </div>
         <div className="text-right shrink-0">
           <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-1">Count</div>
-          <div className="text-3xl font-bold text-foreground tabular-nums leading-none">{matching.length}</div>
+          <div className="text-3xl font-bold text-foreground tabular-nums leading-none">{total}</div>
         </div>
       </div>
 
-      {/* Diameter breakdown */}
       {diamEntries.length > 0 && (
         <div className="px-3 py-3">
           <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-2">Diameter</div>
           <div className="flex flex-col gap-2">
-            {diamEntries.slice(0, 6).map(([d, count]) => (
+            {diamEntries.map(([d, count]) => (
               <div key={d} className="flex items-center gap-2">
                 <span className="text-[11px] font-mono text-cyan-400 w-10 shrink-0">{d}</span>
                 <div className="flex-1 h-[3px] bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-amber-400/70 rounded-full"
-                    style={{ width: `${(count / maxDiamCount) * 100}%` }}
-                  />
+                  <div className="h-full bg-amber-400/70 rounded-full" style={{ width: `${(count / maxDiamCount) * 100}%` }} />
                 </div>
                 <span className="text-[11px] text-muted-foreground tabular-nums w-6 text-right">×{count}</span>
               </div>
@@ -7750,25 +6786,11 @@ function CNCFeatureInspectorPanel({ selectedId, fg }: { selectedId: string; fg: 
         </div>
       )}
 
-      {/* Operation */}
       <div className="px-3 py-2.5 flex items-baseline gap-2">
         <span className="text-[10px] text-muted-foreground w-28 shrink-0">Operation</span>
-        <span className="text-[11px] font-medium text-foreground">{meta.operation}</span>
-      </div>
-
-      {/* Estimated Setup */}
-      <div className="px-3 py-2.5 flex items-center gap-2">
-        <span className="text-[10px] text-muted-foreground w-28 shrink-0">Estimated Setup</span>
-        <span className={`text-[11px] font-semibold flex items-center gap-1.5 ${setupColor}`}>
-          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${setupDot}`} />
-          {meta.setup}
+        <span className="text-[11px] font-medium text-foreground">
+          {catalogOperations.length > 0 ? catalogOperations.join(', ') : '—'}
         </span>
-      </div>
-
-      {/* Inspection */}
-      <div className="px-3 py-2.5 flex items-baseline gap-2">
-        <span className="text-[10px] text-muted-foreground w-28 shrink-0">Inspection</span>
-        <span className="text-[11px] font-medium text-foreground">{meta.inspection}</span>
       </div>
     </div>
   );
@@ -7809,19 +6831,6 @@ function ThreadFeatureInspectorPanel({ selectedId, item }: { selectedId: string;
         <span className="text-[11px] font-medium text-foreground">{isHelicoil ? 'Helicoil Insert' : 'Tapping'}</span>
       </div>
 
-      <div className="px-3 py-2.5 flex items-center gap-2">
-        <span className="text-[10px] text-muted-foreground w-28 shrink-0">Estimated Setup</span>
-        <span className="text-[11px] font-semibold flex items-center gap-1.5 text-amber-400">
-          <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-amber-400" />
-          Medium
-        </span>
-      </div>
-
-      <div className="px-3 py-2.5 flex items-baseline gap-2">
-        <span className="text-[10px] text-muted-foreground w-28 shrink-0">Inspection</span>
-        <span className="text-[11px] font-medium text-foreground">Thread Plug Gauge</span>
-      </div>
-
       <div className="px-3 py-2.5 flex items-baseline gap-2">
         <span className="text-[10px] text-muted-foreground w-28 shrink-0">Source</span>
         <span className="text-[11px] text-muted-foreground">Drawing Intelligence</span>
@@ -7830,160 +6839,153 @@ function ThreadFeatureInspectorPanel({ selectedId, item }: { selectedId: string;
   );
 }
 
-function CNCFeatureTree({
-  cncFeatures,
+function MachiningFeatureTreePanel({
+  machiningFeatures,
+  v2Features,
   selectedKey,
   onSelect,
 }: {
-  cncFeatures: any;
+  machiningFeatures: any;
+  v2Features: FeatureNodeV2[];
   selectedKey?: string | null;
   onSelect?: (key: string | null) => void;
 }) {
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
-  const [expandedTypes, setExpandedTypes] = useState<Record<string, boolean>>({});
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const toggle = (k: string) => setExpanded((p) => ({ ...p, [k]: !p[k] }));
+  // A selection made elsewhere (a face clicked in 3D) opens its type and
+  // variant so the selected occurrence row is visible.
+  useEffect(() => {
+    if (!selectedKey?.startsWith('v2:occ:')) return;
+    const id = selectedKey.slice('v2:occ:'.length, selectedKey.lastIndexOf('#'));
+    const f = v2Features.find((x) => x.id === id);
+    if (!f) return;
+    const type = String(f.feature_type);
+    setExpanded((p) => ({
+      ...p,
+      [featureSelectionKey.type(type)]: true,
+      [featureSelectionKey.variant(type, f.variant ?? 'default')]: true,
+    }));
+  }, [selectedKey, v2Features]);
+  const pick = (k: string) => onSelect?.(selectedKey === k ? null : k);
 
-  const summary: Record<string, number> = cncFeatures?.feature_summary ?? {};
-  const features: any[] = cncFeatures?.features ?? [];
+  const groups = groupFeaturesByType(v2Features);
+  const total = groups.reduce((s, g) => s + g.occurrenceCount, 0);
+  // Faces no detected feature explains (cad-engine face-coverage accounting).
+  // Shown only when the engine reports it — never inferred here.
+  const unclaimed: number[] | undefined = Array.isArray(machiningFeatures?.unclaimed_face_ids)
+    ? machiningFeatures.unclaimed_face_ids.map((u: any) => (typeof u === 'number' ? u : u?.face_id)).filter((n: any) => typeof n === 'number')
+    : undefined;
 
-  const familyLabel =
-    cncFeatures?.family === 'mill_turn' ? 'Mill-Turn'
-    : cncFeatures?.family === 'turned' ? 'Turned'
-    : cncFeatures?.family === 'milled' ? 'Milled'
+  const familyTitle =
+    machiningFeatures?.family === 'mill_turn' ? 'Mill-Turn'
+    : machiningFeatures?.family === 'turned' ? 'Turned'
+    : machiningFeatures?.family === 'milled' ? 'Milled'
     : 'Machining';
 
-  function getDiameterDist(type: string): Array<{ d: string; count: number }> {
-    const byDiameter: Record<string, number> = {};
-    for (const f of features) {
-      if (f.type !== type) continue;
-      const d = f.params?.diameter_mm;
-      if (d != null) {
-        const key = `Ø${Number(d).toFixed(1)}`;
-        byDiameter[key] = (byDiameter[key] ?? 0) + 1;
-      }
-    }
-    return Object.entries(byDiameter)
-      .map(([d, count]) => ({ d, count }))
-      .sort((a, b) => parseFloat(a.d.slice(1)) - parseFloat(b.d.slice(1)));
-  }
+  const rowCls = (selected: boolean) => cn(
+    'flex items-center gap-1 w-full text-left rounded px-1 -mx-1 transition-colors',
+    selected ? 'bg-primary/10 ring-1 ring-primary/30' : 'hover:bg-muted/40',
+  );
+  const Chevron = ({ open }: { open: boolean }) => open
+    ? <ChevronDown className="h-2.5 w-2.5 text-muted-foreground shrink-0" />
+    : <ChevronRight className="h-2.5 w-2.5 text-muted-foreground shrink-0" />;
 
   return (
-    <Section title={`${familyLabel} Features`}>
-      {CNC_FEATURE_GROUPS.map(({ label, types }) => {
-        const groupCount = types.reduce((s, t) => s + (summary[t] ?? 0), 0);
-        if (groupCount === 0) return null;
-        const isOpen = !!expandedGroups[label];
-        return (
-          <div key={label} className="-mx-3 border-t first:border-t-0">
+    <Section title={`${familyTitle} Features`}>
+      {groups.length === 0 ? (
+        <p className="text-[10px] text-muted-foreground">No machining features detected.</p>
+      ) : (
+        <div className="space-y-0.5">
+          <button type="button" onClick={() => pick(featureSelectionKey.all)} className={rowCls(selectedKey === featureSelectionKey.all)}>
+            <span className="text-[10px] font-medium text-foreground flex-1">All features</span>
+            <span className="text-[10px] tabular-nums text-muted-foreground">{total}</span>
+          </button>
+          {unclaimed && (
             <button
-              onClick={() => setExpandedGroups((p) => ({ ...p, [label]: !p[label] }))}
-              className="flex items-center gap-1.5 w-full px-3 py-1 text-left hover:bg-muted/30 transition-colors"
+              type="button"
+              disabled={unclaimed.length === 0}
+              onClick={() => pick(featureSelectionKey.unclaimed)}
+              className={rowCls(selectedKey === featureSelectionKey.unclaimed)}
+              title="B-Rep faces no detected feature accounts for"
             >
-              {isOpen
-                ? <ChevronDown className="h-2.5 w-2.5 text-muted-foreground shrink-0" />
-                : <ChevronRight className="h-2.5 w-2.5 text-muted-foreground shrink-0" />}
-              <span className="text-[10px] font-medium text-foreground flex-1">{label}</span>
-              <span className="text-[10px] tabular-nums text-muted-foreground">{groupCount}</span>
+              <span className="text-[10px] text-muted-foreground flex-1">Unexplained faces</span>
+              <span className="text-[10px] tabular-nums text-muted-foreground">{unclaimed.length}</span>
             </button>
-            {isOpen && (
-              <div className="pl-7 pr-3 pb-1.5 space-y-0.5">
-                {types.map((type) => {
-                  const count = summary[type] ?? 0;
-                  if (count === 0) return null;
-                  const typeLabel = type.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
-                  const diams = getDiameterDist(type);
-                  const typeKey = `${label}:${type}`;
-                  const typeOpen = !!expandedTypes[typeKey];
-                  const typeSelected = selectedKey === type;
-                  return (
-                    <div key={type}>
-                      {diams.length > 0 ? (
-                        <button
-                          onClick={() => {
-                            setExpandedTypes((p) => ({ ...p, [typeKey]: !p[typeKey] }));
-                            onSelect?.(typeSelected ? null : type);
-                          }}
-                          className={cn(
-                            "flex items-center gap-1 w-full text-left rounded px-1 -mx-1 transition-colors",
-                            typeSelected
-                              ? "bg-primary/10 ring-1 ring-primary/30"
-                              : "hover:bg-muted/40",
+          )}
+          {groups.map((g) => {
+            const typeKey = featureSelectionKey.type(g.type);
+            const typeOpen = !!expanded[typeKey];
+            return (
+              <div key={g.type} className="-mx-3 border-t first:border-t-0 px-3">
+                <div className="flex items-center gap-1">
+                  <button type="button" onClick={() => toggle(typeKey)} className="py-1" aria-label={typeOpen ? 'Collapse' : 'Expand'}>
+                    <Chevron open={typeOpen} />
+                  </button>
+                  <button type="button" onClick={() => pick(typeKey)} className={cn(rowCls(selectedKey === typeKey), 'py-1')}>
+                    <span className="text-[10px] font-medium text-foreground flex-1">{g.type}</span>
+                    <span className="text-[10px] tabular-nums text-muted-foreground">{g.occurrenceCount}</span>
+                  </button>
+                </div>
+                {typeOpen && (
+                  <div className="pl-4 pb-1 space-y-0.5">
+                    {g.variants.map((v) => {
+                      const variantKey = featureSelectionKey.variant(g.type, v.variant);
+                      const variantOpen = !!expanded[variantKey];
+                      return (
+                        <div key={v.variant}>
+                          <div className="flex items-center gap-1">
+                            <button type="button" onClick={() => toggle(variantKey)} aria-label={variantOpen ? 'Collapse' : 'Expand'}>
+                              <Chevron open={variantOpen} />
+                            </button>
+                            <button type="button" onClick={() => pick(variantKey)} className={rowCls(selectedKey === variantKey)}>
+                              <span className="text-[10px] text-muted-foreground flex-1">{v.variant}</span>
+                              <span className="text-[10px] tabular-nums">×{v.occurrenceCount}</span>
+                            </button>
+                          </div>
+                          {variantOpen && (
+                            <div className="pl-5 space-y-0.5">
+                              {v.features.flatMap((f) => f.occurrences.map((occ, i) => {
+                                const occKey = featureSelectionKey.occurrence(f.id, i);
+                                const facts = [
+                                  f.diameter_mm != null ? `Ø${f.diameter_mm.toFixed(1)}` : null,
+                                  occ.depth_mm != null ? `depth ${occ.depth_mm.toFixed(1)}` : null,
+                                  occ.spec ?? null,
+                                ].filter(Boolean).join(' · ');
+                                return (
+                                  <button key={occKey} type="button" onClick={() => pick(occKey)} className={rowCls(selectedKey === occKey)}>
+                                    <span className="text-[9px] font-mono text-muted-foreground/80 flex-1 truncate">
+                                      #{i + 1}{facts ? ` ${facts}` : ''}
+                                    </span>
+                                    {f.canonical_operation && (
+                                      <span className="text-[9px] text-muted-foreground/60 truncate max-w-[45%]" title={f.canonical_operation}>
+                                        {f.canonical_operation}
+                                      </span>
+                                    )}
+                                  </button>
+                                );
+                              }))}
+                            </div>
                           )}
-                        >
-                          {typeOpen
-                            ? <ChevronDown className="h-2 w-2 text-muted-foreground/60 shrink-0" />
-                            : <ChevronRight className="h-2 w-2 text-muted-foreground/60 shrink-0" />}
-                          <span className={cn("text-[10px] flex-1", typeSelected ? "text-foreground font-medium" : "text-muted-foreground")}>{typeLabel}</span>
-                          <span className="text-[10px] font-medium tabular-nums">×{count}</span>
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => onSelect?.(typeSelected ? null : type)}
-                          className={cn(
-                            "flex items-baseline gap-2 pl-3 w-full text-left rounded px-1 -mx-1 transition-colors",
-                            typeSelected
-                              ? "bg-primary/10 ring-1 ring-primary/30"
-                              : "hover:bg-muted/40",
-                          )}
-                        >
-                          <span className={cn("text-[10px] flex-1", typeSelected ? "text-foreground font-medium" : "text-muted-foreground")}>{typeLabel}</span>
-                          <span className="text-[10px] font-medium tabular-nums">×{count}</span>
-                        </button>
-                      )}
-                      {typeOpen && (
-                        <div className="pl-5 pt-0.5 pb-0.5 space-y-0.5">
-                          {diams.map(({ d, count: dc }) => {
-                            const diamKey = `${type}:${d.slice(1)}`;
-                            const diamSelected = selectedKey === diamKey;
-                            return (
-                              <button
-                                key={d}
-                                onClick={() => onSelect?.(diamSelected ? null : diamKey)}
-                                className={cn(
-                                  "flex items-baseline gap-2 w-full text-left rounded px-1 -mx-1 transition-colors",
-                                  diamSelected
-                                    ? "bg-primary/10 ring-1 ring-primary/30"
-                                    : "hover:bg-muted/40",
-                                )}
-                              >
-                                <span className={cn("text-[9px] font-mono flex-1", diamSelected ? "text-foreground" : "text-muted-foreground/70")}>{d}</span>
-                                <span className="text-[9px] tabular-nums text-muted-foreground">×{dc}</span>
-                              </button>
-                            );
-                          })}
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        );
-      })}
+            );
+          })}
+        </div>
+      )}
     </Section>
   );
 }
 
 // ── PartDetailTab ─────────────────────────────────────────────────────────────
 
-function deriveComplexity(item: BOMItem): { label: string; color: string } {
-  const fg = item.featureGraph;
-  if (fg?.difficultyLevel) {
-    const map: Record<string, string> = { easy: 'Low', medium: 'Medium', hard: 'High', very_hard: 'High' };
-    const label = map[fg.difficultyLevel] ?? 'Medium';
-    return {
-      label,
-      color: label === 'Low' ? 'text-green-500' : label === 'Medium' ? 'text-yellow-500' : 'text-red-500',
-    };
-  }
-  const threads = item.drawingIntelligence?.threads?.reduce((s, t) => s + t.count, 0) ?? 0;
-  const score = (item.bendCount ?? 0) * 2 + (item.holeCount ?? 0) / 20 + threads * 5;
-  const label = score < 10 ? 'Low' : score < 30 ? 'Medium' : 'High';
-  return {
-    label,
-    color: label === 'Low' ? 'text-green-500' : label === 'Medium' ? 'text-yellow-500' : 'text-red-500',
-  };
-}
+// deriveComplexity was here: a Low/Medium/High label from the stored
+// difficultyLevel (hole + 2 x bend + pocket counts against 5/15/30) or, when
+// absent, bends x 2 + holes / 20 + threads x 5 against 10/30. Invented weights
+// and thresholds; the real drivers are listed instead.
 
 function deriveReadiness(item: BOMItem): { label: string; ready: boolean } {
   const hasCritical = (item.featureGraph?.dfmWarnings ?? []).some((w) => w.severity === 'critical');
@@ -8010,19 +7012,18 @@ function buildRiskFlags(item: BOMItem): string[] {
 }
 
 function PartDetailTab({
-  item, batchSize, factory = 'USA', selectedCNCFeatureKey, onCNCFeatureSelect,
+  item, batchSize, factory = 'USA', selectedMachiningFeatureKey, onMachiningFeatureSelect,
 }: {
   item: BOMItem;
   batchSize: number | undefined;
   factory?: string;
-  selectedCNCFeatureKey?: string | null;
-  onCNCFeatureSelect?: (key: string | null) => void;
+  selectedMachiningFeatureKey?: string | null;
+  onMachiningFeatureSelect?: (key: string | null) => void;
 }) {
   const { data: cost } = useCostSummary(item.id, batchSize, factory);
   const fg = item.featureGraph;
   const di = item.drawingIntelligence;
 
-  const complexity = deriveComplexity(item);
   const readiness = deriveReadiness(item);
   const flags = buildRiskFlags(item);
 
@@ -8030,7 +7031,7 @@ function PartDetailTab({
   const bendCount = item.bendCount ?? fg?.summary?.bendCount ?? 0;
   const threads = di?.threads ?? [];
   const threadTotal = threads.reduce((s, t) => s + t.count, 0);
-  const cncFeatures: any = (fg as any)?.cnc_features ?? null;
+  const machiningFeatures: any = (fg as any)?.machining_features ?? null;
 
   const family = item.familyClassification ?? fg?.classification?.family ?? '';
   const isIM = family === 'plastic_molded';
@@ -8122,10 +7123,9 @@ function PartDetailTab({
 
       <Section title="Manufacturing Complexity">
         <div className="flex items-center justify-between py-0.5">
-          <span className={`text-xs font-semibold ${complexity.color}`}>{complexity.label}</span>
-          {complexityDrivers.length > 0 && (
-            <span className="text-[10px] text-muted-foreground">{complexityDrivers.join(', ')}</span>
-          )}
+          <span className="text-[11px] text-muted-foreground">
+            {complexityDrivers.length > 0 ? complexityDrivers.join(', ') : '—'}
+          </span>
         </div>
       </Section>
 
@@ -8146,11 +7146,12 @@ function PartDetailTab({
         )}
       </Section>
 
-      {cncFeatures ? (
-        <CNCFeatureTree
-          cncFeatures={cncFeatures}
-          selectedKey={selectedCNCFeatureKey ?? null}
-          {...(onCNCFeatureSelect ? { onSelect: onCNCFeatureSelect } : {})}
+      {machiningFeatures ? (
+        <MachiningFeatureTreePanel
+          machiningFeatures={machiningFeatures}
+          v2Features={fg?.feature_graph_v2?.features ?? []}
+          selectedKey={selectedMachiningFeatureKey ?? null}
+          {...(onMachiningFeatureSelect ? { onSelect: onMachiningFeatureSelect } : {})}
         />
       ) : isIM ? (
         <Section title="Feature Summary">
@@ -8389,11 +7390,11 @@ function ValidationTab({ fg, item, file3dUrl }: { fg: FeatureGraph | null; item:
       if ((summary.holeCount ?? 0) > 0)   ops.push('Deburring');
       return ops;
     }
-    const cncSummary: Record<string, number> = (fg as any)?.cnc_features?.feature_summary ?? {};
+    const machiningVariants: Record<string, number> = (fg as any)?.machining_features?.variant_summary ?? {};
     const ops: string[] = [];
-    if ((cncSummary.pockets ?? 0) > 0) ops.push('Milling');
+    if ((machiningVariants['PocketV2:default'] ?? 0) > 0) ops.push('Milling');
     if ((summary.holeCount ?? 0) > 0)  ops.push('Drilling');
-    if ((cncSummary.threads ?? 0) > 0) ops.push('Tapping');
+    if ((machiningVariants['SimpleHole:threaded'] ?? 0) > 0) ops.push('Tapping');
     return ops;
   })();
   const routeSummary = featureOps.length > 0 ? featureOps.join(' → ') : null;
@@ -8401,20 +7402,12 @@ function ValidationTab({ fg, item, file3dUrl }: { fg: FeatureGraph | null; item:
 
   const checks = (fg?.validationResults ?? []) as ValidationResult[];
   const score = fg?.manufacturabilityScore;
-  const difficulty = fg?.difficultyLevel;
 
   const severityIcon = (passed: boolean, severity: string) => {
     if (passed)                  return <span className="text-emerald-400 text-sm leading-none">✓</span>;
     if (severity === 'critical') return <span className="text-red-500 text-sm leading-none">✗</span>;
     return                              <span className="text-amber-400 text-sm leading-none">!</span>;
   };
-
-  const difficultyColor = (d?: string) =>
-    d === 'easy'      ? 'text-emerald-400 bg-emerald-500/20 border-emerald-500/40' :
-    d === 'medium'    ? 'text-amber-400 bg-amber-500/20 border-amber-500/40' :
-    d === 'hard'      ? 'text-orange-400 bg-orange-500/20 border-orange-500/40' :
-    d === 'very_hard' ? 'text-red-400 bg-red-500/20 border-red-500/40' :
-                        'text-muted-foreground bg-muted/30 border-border';
 
   const handleSaveOptions = (cfg: ValidationConfig) => {
     setLiveConfig(cfg);
@@ -8520,11 +7513,6 @@ function ValidationTab({ fg, item, file3dUrl }: { fg: FeatureGraph | null; item:
                 : score >= 60 ? 'text-amber-400 bg-amber-500/20 border-amber-500/40'
                 : 'text-red-400 bg-red-500/20 border-red-500/40'}`}>
                 Score {score}/100
-              </span>
-            )}
-            {difficulty && (
-              <span className={`text-xs font-semibold px-2 py-0.5 rounded border uppercase ${difficultyColor(difficulty)}`}>
-                {difficulty.replace('_', ' ')}
               </span>
             )}
           </div>
@@ -8959,414 +7947,72 @@ function DrawingIntelligenceTab({ item }: { item: BOMItem }) {
   );
 }
 
-// ── NRE Investment constants (INR base; converted at render time via the
-// live cost-summary's currencySymbol/inrToDisplayRate — see fmtC in
-// InvestmentTab below. No per-country FX table here: the Digital Factory's
-// chosen currency and the real exchange_rates-backed conversion are the only
-// source, exactly like every other cost figure in this page.) ─────────────
-
-// Real, granular primary CNC classes — replaces the deleted 6-member
-// cnc_3ax_vmc/cnc_4ax_vmc/cnc_5ax_mc/cnc_lathe/cnc_lathe_live/cnc_mill_turn
-// set (Machining Engine Re-Architecture). Each granular class inherits its
-// coarse predecessor's figure verbatim as an explicit placeholder, same
-// convention as the backend's SETUP_COUNT/MACHINE_ENVELOPE tables.
-const INV_FIXTURE_NRE: Record<string, number> = {
-  '3_axis_mill': 25_000, '4_axis_mill': 45_000, '5_axis_mill': 85_000,
-  '2_axis_lathe': 12_000, '3_axis_lathe': 12_000,
-  '2_axis_bar_feed_lathe_with_sub_spindle': 22_000, '3_axis_bar_feed_lathe_with_sub_spindle': 22_000,
-};
-const INV_SETUP_COUNT: Record<string, number> = {
-  '3_axis_mill': 3, '4_axis_mill': 2, '5_axis_mill': 1,
-  '2_axis_lathe': 2, '3_axis_lathe': 2,
-  '2_axis_bar_feed_lathe_with_sub_spindle': 1, '3_axis_bar_feed_lathe_with_sub_spindle': 1,
-};
-const INV_TIGHT_TOL_PREMIUM   = 1.5;
-const INV_PROG_BASE: Record<string, number> = {
-  easy: 8_000, medium: 20_000, hard: 45_000, very_hard: 90_000,
-};
-const INV_PROG_PER_POCKET     = 500;
-const INV_PROG_5AX_ADDER      = 25_000;
-const INV_PROG_HOURLY_RATE    = 1_200;
-const INV_TOOL_DRILL_SET      = 1_200;
-const INV_TOOL_ENDMILL        = 3_000;
-const INV_TOOL_CHAMFER        = 2_500;
-const INV_TOOL_TAP_SET        = 800;
-const INV_TOOL_BORING_BAR     = 8_000;
-const INV_INSP_CMM_BASE       = 15_000;
-const INV_INSP_CMM_HARD       = 5_000;
-const INV_INSP_FAI_RATE       = 400;
-const INV_INSP_MIN_PER_FEAT   = 3;
-const INV_INSP_GAUGE          = 12_000;
-const INV_INSP_PROFILOMETER   = 3_000;
-
 // ── InvestmentTab ──────────────────────────────────────────────────────────────
+// One-time investment from reference data only (GET /bom-items/:id/nre,
+// services/nre.service.ts): NC programming, fixture build and CMM programming,
+// each with its source, and every item the reference cannot price listed as
+// such. The INR fixture/programming/tooling/gauge tables that used to live here
+// ("industry benchmarks") had no source and are gone.
 
 function InvestmentTab({
-  item, fg, batchSize, productionLife, factory,
+  item, batchSize, productionLife, factory,
 }: {
   item: BOMItem; fg: FeatureGraph | null;
   batchSize: number | undefined; productionLife: number | null; factory: string;
 }) {
   const { data: cost } = useCostSummary(item.id, batchSize, factory);
+  const { data: nre, isLoading, error } = useNre(item.id, batchSize, factory, productionLife);
 
-  const cncSummary: Record<string, number> = (fg as any)?.cnc_features?.feature_summary ?? {};
-  const holeGroups   = fg?.summary?.holeGroups ?? [];
-  const threads      = item.drawingIntelligence?.threads ?? [];
-  const difficulty   = fg?.difficultyLevel ?? 'medium';
-  const tightestTolMm =
-    item.tightestToleranceMm ?? item.drawingIntelligence?.tightest_tolerance_mm ?? null;
-  const surfaceRa =
-    item.surfaceFinishRa ?? item.drawingIntelligence?.surface_finish_ra ?? null;
-  const isTightTol = tightestTolMm != null && tightestTolMm <= 0.05;
-
-  // Every NRE figure below is keyed on a CNC machine class: fixture cost per
-  // setup, CAM programming bands, endmill/boring-bar tooling, CMM programming.
-  // There is no sheet-metal equivalent on file — no press-brake tooling table,
-  // no laser fixture cost, nothing.
-  //
-  // This used to end `?? 'cnc_3ax_vmc'`, so a part with no CNC line at all —
-  // every laser-cut, press-braked sheet-metal part — was costed as though it
-  // were milled on a 3-axis VMC: 25,000 fixture x 3 setups, CNC programming,
-  // endmills and boring bars it has no use for, all shown as money and
-  // amortised per unit. None of it came from this part.
-  //
-  // Now: no CNC line, no CNC investment model. The tab says so instead.
-  //
-  // FIXED (Machining Engine Re-Architecture): real granular primary classes
-  // (3_axis_mill, 2_axis_lathe, ...) don't start with 'cnc_' — that check
-  // silently matched nothing after the 6 coarse buckets were deleted, so
-  // this tab showed "no CNC operation" for every genuine CNC part. Checking
-  // membership in INV_FIXTURE_NRE (the real primary classes this NRE model
-  // actually covers) is both the fix and self-consistent — no separate
-  // hardcoded class list needed beyond the one already declared above.
-  const machineClass =
-    cost?.processLines?.find((l) => l.machineClass && l.machineClass in INV_FIXTURE_NRE)?.machineClass ?? null;
-  if (machineClass === null) {
-    return (
-      <div className="flex flex-col items-center justify-center h-40 gap-2 text-muted-foreground p-6">
-        <p className="text-xs text-center max-w-sm">
-          No NRE breakdown for this part. The investment model here is
-          CNC-specific — fixture cost per setup, CAM programming, cutting
-          tooling — and this part has no CNC operation in its route.
-        </p>
-        <p className="text-[10px] text-center max-w-sm opacity-70">
-          Sheet-metal tooling investment (press-brake tooling, punch/die sets,
-          laser fixturing) has no reference data on file yet, so nothing is
-          estimated here rather than showing a figure from another process.
-        </p>
-      </div>
-    );
-  }
-
-  const pocketCount       = cncSummary['pocket']       ?? 0;
-  const chamferCount      = cncSummary['chamfer']      ?? 0;
-  const countersinkCount  = cncSummary['countersink']  ?? 0;
-  const uniqueDrillDiams  = holeGroups.length || ((fg?.summary?.holeCount ?? 0) > 0 ? 3 : 0);
-  const uniqueThreadSizes = new Set(threads.map((t) => t.size)).size;
-
-  if (!fg) {
-    return (
-      <div className="flex flex-col items-center justify-center h-32 gap-2 text-muted-foreground p-4">
-        <AlertCircle className="h-6 w-6 opacity-30" />
-        <p className="text-xs text-center">Run Auto-Fill to see investment estimate.</p>
-      </div>
-    );
-  }
-
-  // Symbol + FX come from this Digital Factory's live cost-summary — never a
-  // per-country constant — so a location this tab has never seen before still
-  // renders correctly the moment the scenario/exchange_rates table knows it.
-  if (!cost?.currencySymbol || cost.inrToDisplayRate == null) {
+  if (isLoading || !cost) {
     return (
       <div className="flex flex-col items-center justify-center h-32 gap-2 text-muted-foreground p-4">
         <Loader2 className="h-5 w-5 animate-spin opacity-40" />
-        <p className="text-xs text-center">Loading {factory} rates…</p>
+        <p className="text-xs text-center">Loading {factory} investment…</p>
       </div>
     );
   }
-  const invSymbol = cost.currencySymbol;
-  const invInrRate = cost.inrToDisplayRate;
-  const fmtC = (inr: number, dec = 0) =>
-    `${invSymbol}${(inr * invInrRate).toLocaleString(undefined, {
-      minimumFractionDigits: dec, maximumFractionDigits: dec,
-    })}`;
-
-  // ── Fixture ──
-  const fixtureBase   = INV_FIXTURE_NRE[machineClass] ?? 25_000;
-  const fixtureSetups = INV_SETUP_COUNT[machineClass] ?? 3;
-  const fixtureTotal  = fixtureBase * fixtureSetups * (isTightTol ? INV_TIGHT_TOL_PREMIUM : 1);
-
-  // ── Programming ──
-  const progBase = (INV_PROG_BASE[difficulty] ?? INV_PROG_BASE['medium'])!;
-  const progPockets = pocketCount * INV_PROG_PER_POCKET;
-  const prog5ax = machineClass === '5_axis_mill' ? INV_PROG_5AX_ADDER : 0;
-  const progTotal = progBase + progPockets + prog5ax;
-  const progHours   = Math.round(progTotal / INV_PROG_HOURLY_RATE);
-
-  // ── Tools ──
-  const toolDrills   = uniqueDrillDiams * INV_TOOL_DRILL_SET;
-  const roughMills   = pocketCount > 0 ? Math.ceil(pocketCount / 5) : 0;
-  const finishMills  = pocketCount > 0 ? Math.ceil(pocketCount / 3) : 0;
-  const toolEndmills = (roughMills + finishMills) * INV_TOOL_ENDMILL;
-  const toolChamfer  = (chamferCount + countersinkCount) > 0 ? INV_TOOL_CHAMFER : 0;
-  const toolTaps     = uniqueThreadSizes * INV_TOOL_TAP_SET;
-  const toolBoring   = isTightTol ? INV_TOOL_BORING_BAR : 0;
-  const toolTotal    = toolDrills + toolEndmills + toolChamfer + toolTaps + toolBoring;
-
-  // ── Inspection ──
-  const cmmProg       = INV_INSP_CMM_BASE + (difficulty === 'very_hard' ? INV_INSP_CMM_HARD : 0);
-  const totalFeats    = Object.values(cncSummary).reduce((s, v) => s + v, 0) || (fg.summary?.holeCount ?? 0);
-  const faiHours      = (totalFeats * INV_INSP_MIN_PER_FEAT) / 60;
-  const faiCost       = faiHours * INV_INSP_FAI_RATE;
-  const needsGauge    = isTightTol || (surfaceRa != null && surfaceRa <= 0.8)
-    || ['H6', 'H7', 'g6', 'f7'].includes(item.toleranceGrade ?? '');
-  const criticalFeats = needsGauge
-    ? Math.max(1, uniqueThreadSizes + Math.ceil(uniqueDrillDiams / 2))
-    : 0;
-  const gaugeNRE      = criticalFeats * INV_INSP_GAUGE;
-  const profNRE       = surfaceRa != null ? INV_INSP_PROFILOMETER : 0;
-  const inspTotal     = cmmProg + faiCost + gaugeNRE + profNRE;
-
-  // ── Summary ──
-  const totalNRE         = fixtureTotal + progTotal + toolTotal + inspTotal;
-  // `null` = not computable, because either the production life or the annual
-  // volume is genuinely not on file. Deliberately NOT 0: a zero lifetime volume
-  // is a real statement (this part will never be made), and NRE amortised over
-  // it is a different claim from NRE we cannot amortise yet.
-  const lifetimeVol      = productionLife === null || item.annualVolume == null
-    ? null : item.annualVolume * productionLife;
-  const amortizedPerUnit = lifetimeVol !== null && lifetimeVol > 0 ? totalNRE / lifetimeVol : null;
-  const amortizedPct     =
-    amortizedPerUnit != null && (cost?.totalCost ?? 0) > 0
-      ? (amortizedPerUnit / cost!.totalCost) * 100
-      : null;
-
-  // Local row helpers
-  const InvRow = ({
-    label, sub, value, warn = false, indent = 0,
-  }: {
-    label: ReactNode; sub?: ReactNode;
-    value?: string; warn?: boolean; indent?: number;
-  }) => (
-    <div className={cn(
-      'flex items-baseline justify-between py-2 border-b border-border/20 last:border-0',
-      indent === 1 && 'pl-5',
-      indent === 2 && 'pl-9',
-    )}>
-      <div className="flex-1 min-w-0 pr-4">
-        <span className="text-sm text-foreground">{label}</span>
-        {warn && <span className="text-sm text-amber-500 ml-1">⚠</span>}
-        {sub && <div className="text-xs text-muted-foreground mt-0.5">{sub}</div>}
-      </div>
-      {value !== undefined && (
-        <span className="text-sm tabular-nums text-foreground shrink-0">{value}</span>
-      )}
-    </div>
-  );
-
-  const InvSection = ({ label }: { label: string }) => (
-    <div className="pt-4 pb-1">
-      <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{label}</span>
-    </div>
-  );
-
-  const InvTotal = ({ label, value, sub }: { label: string; value: string; sub?: string }) => (
-    <div className="flex items-baseline justify-between py-2.5 border-t border-border mt-1">
-      <div>
-        <span className="text-sm font-bold text-foreground">{label}</span>
-        {sub && <span className="text-xs text-muted-foreground ml-2">{sub}</span>}
-      </div>
-      <span className="text-sm font-bold tabular-nums text-foreground shrink-0">{value}</span>
-    </div>
-  );
+  if (error || !nre) {
+    return <p className="p-4 text-xs text-red-500">Could not load investment: {String((error as any)?.message ?? 'unknown error')}</p>;
+  }
+  const symbol = cost.currencySymbol ?? cost.currency ?? '';
+  const rate = cost.usdToDisplayRate ?? null;
+  const money = (usd: number | null, dec = 0) =>
+    usd == null || rate == null ? '—'
+      : `${symbol}${(usd * rate).toLocaleString(undefined, { minimumFractionDigits: dec, maximumFractionDigits: dec })}`;
 
   return (
     <div className="px-4 pb-6">
-
-      {/* Grand Total Header */}
       <div className="flex items-start justify-between pt-3 pb-2 border-b-2 border-border">
         <div>
-          <p className="text-sm font-bold text-foreground">Total NRE Investment</p>
-          <p className="text-xs text-muted-foreground mt-0.5">One-time · pre-production</p>
-        </div>
-        <div className="text-right shrink-0 ml-4">
-          <p className="text-2xl font-bold tabular-nums leading-tight text-foreground">
-            {fmtC(totalNRE)}
+          <p className="text-sm font-bold text-foreground">One-time investment (NRE)</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            From reference data only{nre.gaps > 0 ? ` · ${nre.gaps} item${nre.gaps > 1 ? 's' : ''} not priced (no source)` : ''}
           </p>
         </div>
+        <p className="text-2xl font-bold tabular-nums leading-tight text-foreground shrink-0 ml-4">{money(nre.totalUsd)}</p>
       </div>
-
-      {/* Section 1: Fixture */}
-      <InvSection label="Fixture & Work-Holding" />
-      <InvRow
-        indent={1}
-        label={`Fixture design & fab · ${machineClass.replace(/_/g, ' ').toUpperCase()}`}
-        sub={`${fixtureSetups} setup${fixtureSetups > 1 ? 's' : ''} × ${fmtC(fixtureBase)} each`}
-        value={fmtC(fixtureBase * fixtureSetups)}
-      />
-      {isTightTol && (
-        <InvRow
-          indent={1}
-          label="Tight tolerance premium (+50%)"
-          sub={`Tolerance ≤ 0.05 mm — precision datum & locating required`}
-          value={fmtC(fixtureBase * fixtureSetups * 0.5)}
-          warn
-        />
-      )}
-      <InvTotal label="Total Fixture Investment" value={fmtC(fixtureTotal)} />
-
-      {/* Section 2: Programming */}
-      <InvSection label="CNC Programming" />
-      <InvRow
-        indent={1}
-        label={`Programming base · ${difficulty.replace('_', ' ')}`}
-        sub={`~${Math.round(progBase / INV_PROG_HOURLY_RATE)} hr @ ${fmtC(INV_PROG_HOURLY_RATE)}/hr`}
-        value={fmtC(progBase)}
-        warn={difficulty === 'hard' || difficulty === 'very_hard'}
-      />
-      {pocketCount > 0 && (
-        <InvRow
-          indent={1}
-          label={`Pocket toolpath generation (${pocketCount} pockets)`}
-          sub="Rough + finish pass per pocket"
-          value={fmtC(progPockets)}
-        />
-      )}
-      {prog5ax > 0 && (
-        <InvRow
-          indent={1}
-          label="5-axis multi-axis strategy"
-          sub="Simultaneous 5-axis CAM setup and validation"
-          value={fmtC(prog5ax)}
-          warn
-        />
-      )}
-      <InvTotal
-        label="Total Programming"
-        value={fmtC(progTotal)}
-        sub={`~${progHours} programmer hours`}
-      />
-
-      {/* Section 3: Cutting Tools */}
-      <InvSection label="Cutting Tool Investment" />
-      {uniqueDrillDiams > 0 && (
-        <InvRow
-          indent={1}
-          label={`Drill sets (${uniqueDrillDiams} unique diameters)`}
-          sub="3 drills per diameter: roughing, semi-finish, finish/reserve"
-          value={fmtC(toolDrills)}
-        />
-      )}
-      {pocketCount > 0 && (
-        <InvRow
-          indent={1}
-          label={`End mills (${roughMills} roughing + ${finishMills} finishing)`}
-          sub={`${pocketCount} pockets · 1 rougher/5 pockets, 1 finisher/3 pockets`}
-          value={fmtC(toolEndmills)}
-        />
-      )}
-      {toolChamfer > 0 && (
-        <InvRow
-          indent={1}
-          label={`Chamfer mill (${chamferCount + countersinkCount} chamfers/countersinks)`}
-          value={fmtC(toolChamfer)}
-        />
-      )}
-      {uniqueThreadSizes > 0 && (
-        <InvRow
-          indent={1}
-          label={`Tap sets (${uniqueThreadSizes} thread size${uniqueThreadSizes > 1 ? 's' : ''})`}
-          sub={threads.map((t) => t.size).join(', ')}
-          value={fmtC(toolTaps)}
-        />
-      )}
-      {toolBoring > 0 && (
-        <InvRow
-          indent={1}
-          label="Boring bar / precision reamer"
-          sub="Required for hole tolerances ≤ 0.05 mm"
-          value={fmtC(toolBoring)}
-          warn
-        />
-      )}
-      <InvTotal label="Total Cutting Tools" value={fmtC(toolTotal)} />
-
-      {/* Section 4: Inspection */}
-      <InvSection label="Inspection & Gauging" />
-      <InvRow
-        indent={1}
-        label="CMM programming"
-        sub={difficulty === 'very_hard' ? 'Complex part — extended CMM program' : 'Standard CMM program'}
-        value={fmtC(cmmProg)}
-      />
-      <InvRow
-        indent={1}
-        label={`First article inspection (${totalFeats} features)`}
-        sub={`~${Math.ceil(faiHours * 60)} min @ ${fmtC(INV_INSP_FAI_RATE)}/hr`}
-        value={fmtC(faiCost)}
-      />
-      {needsGauge && (
-        <InvRow
-          indent={1}
-          label={`Custom gauges (${criticalFeats} critical feature${criticalFeats > 1 ? 's' : ''})`}
-          sub={[
-            isTightTol ? 'Tight tolerance ≤ 0.05 mm' : '',
-            surfaceRa != null && surfaceRa <= 0.8 ? `Fine Ra ${surfaceRa} μm` : '',
-          ].filter(Boolean).join(' · ')}
-          value={fmtC(gaugeNRE)}
-          warn
-        />
-      )}
-      {profNRE > 0 && (
-        <InvRow
-          indent={1}
-          label={`Surface profilometer${surfaceRa != null ? ` (Ra ${surfaceRa} μm)` : ''}`}
-          value={fmtC(profNRE)}
-        />
-      )}
-      <InvTotal label="Total Inspection" value={fmtC(inspTotal)} />
-
-      {/* NRE Summary recap */}
-      <InvSection label="NRE Summary" />
-      <InvRow label="Fixture & Work-Holding" value={fmtC(fixtureTotal)} />
-      <InvRow label="CNC Programming"        value={fmtC(progTotal)} />
-      <InvRow label="Cutting Tools"          value={fmtC(toolTotal)} />
-      <InvRow label="Inspection & Gauging"   value={fmtC(inspTotal)} />
-      <div className="flex items-baseline justify-between pt-3 mt-1 border-t-2 border-border">
-        <span className="text-base font-bold text-foreground">Total NRE Investment</span>
-        <span className="text-xl font-bold tabular-nums text-foreground">{fmtC(totalNRE)}</span>
+      {nre.items.map((i) => (
+        <div key={i.item} className="py-2 border-b border-border/20">
+          <div className="flex items-baseline justify-between">
+            <span className="text-sm text-foreground">{i.item}</span>
+            <span className={cn('text-sm tabular-nums shrink-0', i.status === 'gap' && 'text-amber-500')}>
+              {i.status === 'gap' ? 'not priced' : money(i.usd)}
+            </span>
+          </div>
+          <div className="text-xs text-muted-foreground mt-0.5">{i.detail}</div>
+          <div className="text-[10px] text-muted-foreground/70 mt-0.5">Source: {i.source}</div>
+        </div>
+      ))}
+      <div className="pt-4 pb-1">
+        <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Amortization</span>
       </div>
-
-      {/* Amortization */}
-      {lifetimeVol !== null && lifetimeVol > 0 && (
-        <>
-          <InvSection label="Amortization" />
-          <InvRow
-            label="Lifetime volume"
-            sub={`${item.annualVolume?.toLocaleString('en-IN') ?? '—'} pcs/yr × ${productionLife} yr`}
-            value={lifetimeVol.toLocaleString('en-IN') + ' pcs'}
-          />
-          {amortizedPerUnit != null && (
-            <InvRow
-              label="Amortized NRE / unit"
-              value={fmtC(amortizedPerUnit, 2)}
-            />
-          )}
-          {amortizedPct != null && (
-            <InvRow
-              label="NRE as % of part cost"
-              sub={`Part cost: ${fmtC(cost!.totalCost, 2)}`}
-              value={`${amortizedPct.toFixed(1)}%`}
-            />
-          )}
-        </>
+      <p className="text-xs text-muted-foreground">{nre.amortization.reason}</p>
+      {nre.amortization.perUnitUsd != null && (
+        <div className="flex items-baseline justify-between py-2">
+          <span className="text-sm text-foreground">NRE per unit</span>
+          <span className="text-sm tabular-nums">{money(nre.amortization.perUnitUsd, 2)}</span>
+        </div>
       )}
-
-      <p className="text-[10px] text-muted-foreground/50 pt-4 leading-relaxed">
-        NRE estimates based on industry benchmarks for {factory || 'India'} market.
-        Fixture and tooling are one-time investments; programming and CMM costs
-        recur on engineering change orders.
-      </p>
     </div>
   );
 }
@@ -9398,6 +8044,36 @@ const BLANK_STOCK_FORM_LABELS: Record<string, string> = {
   rectangular_bar: 'Rect Bar', billet: 'Billet',
   extrusion: 'Extrusion', casting: 'Casting', granules: 'Granules',
 };
+
+// Cavities per mold (injection molding): the reference mold layouts
+// (layoutNumCav) are the only choices, from the cost summary itself; unset =
+// the reference defaultNumCavities. The engine checks the choice against the
+// press (clamp, shot) and says so on the molding line when it does not fit.
+function MoldCavitiesSection({
+  im, override, onChange,
+}: {
+  im: InjectionMoldingBreakdown;
+  override: number | null;
+  onChange: (v: number | null) => void;
+}) {
+  const layouts = im.cavityLayouts ?? [];
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-2 py-0.5">
+        <span className="text-xs text-muted-foreground w-20 shrink-0">Cavities</span>
+        <select
+          className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500 cursor-pointer"
+          value={override ?? ''}
+          onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
+        >
+          <option value="">Reference default{im.defaultCavityCount != null ? ` (${im.defaultCavityCount})` : ''}</option>
+          {layouts.map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+      </div>
+      <Row label="Costed at" value={`${im.cavityCount} cavit${im.cavityCount === 1 ? 'y' : 'ies'} · ${im.cavityConstrainedBy === 'user' ? 'set here' : im.cavityConstrainedBy === 'default' ? 'reference default' : 'not verified (see molding line)'}`} />
+    </div>
+  );
+}
 
 function BlankStockSection({
   blank, currencySymbol, stockFormOverride, onStockFormChange,
@@ -9461,26 +8137,27 @@ function BlankStockSection({
 
 function AnalysisTabsPanel({
   projectId,
-  item, fg, batchSize, productionLife, factory, selectedCNCFeatureKey, onCNCFeatureSelect,
+  item, fg, batchSize, productionLife, factory, selectedMachiningFeatureKey, onMachiningFeatureSelect,
   file3dUrl, activeTab, onTabChange, treeProcessNames, vendorHotspotContext,
-  onSelectHighlight,
+  onSelectHighlight, onSecondaryHighlight,
 }: {
   projectId: string;
   item: BOMItem; fg: FeatureGraph | null;
   batchSize: number | undefined; productionLife: number | null; factory: string;
-  selectedCNCFeatureKey?: string | null;
-  onCNCFeatureSelect?: (key: string | null) => void;
+  selectedMachiningFeatureKey?: string | null;
+  onMachiningFeatureSelect?: (key: string | null) => void;
   file3dUrl?: string | null;
   activeTab: RightTabKey;
   onTabChange: (tab: RightTabKey) => void;
   treeProcessNames: string[];
   vendorHotspotContext: { layer: HeatmapLayerType; riskLevel: string } | null;
   onSelectHighlight?: (node: FeatureNodeV2 | null) => void;
+  onSecondaryHighlight?: (h: SecondaryHighlight | null) => void;
 }) {
   const tab = activeTab;
   const setTab = onTabChange;
   const cls = fg?.classification;
-  const cncSummary: Record<string, number> | null = (fg as any)?.cnc_features?.feature_summary ?? null;
+  const machiningSummary: Record<string, number> | null = (fg as any)?.machining_features?.feature_summary ?? null;
   // See the same derivation in the Investment panel above: null, not 0, when
   // volume or production life is unresolved.
   const lifetimeVol = productionLife === null || item.annualVolume == null
@@ -9519,9 +8196,9 @@ function AnalysisTabsPanel({
                     {cls.confidence != null ? `${Math.round(cls.confidence * 100)}%` : '—'}
                   </span>
                 </div>
-                {cncSummary ? (
+                {machiningSummary ? (
                   <div className="flex flex-wrap gap-1 pt-1">
-                    {Object.entries(cncSummary)
+                    {Object.entries(machiningSummary)
                       .filter(([, count]) => count > 0)
                       .map(([type, count]) => (
                         <span key={type} className="text-[10px] bg-muted px-1.5 py-0.5 rounded">
@@ -9621,8 +8298,8 @@ function AnalysisTabsPanel({
             item={item}
             batchSize={batchSize}
             factory={factory}
-            selectedCNCFeatureKey={selectedCNCFeatureKey ?? null}
-            {...(onCNCFeatureSelect ? { onCNCFeatureSelect } : {})}
+            selectedMachiningFeatureKey={selectedMachiningFeatureKey ?? null}
+            {...(onMachiningFeatureSelect ? { onMachiningFeatureSelect } : {})}
           />
         )}
 
@@ -9633,6 +8310,15 @@ function AnalysisTabsPanel({
             batchSize={batchSize}
             productionLife={productionLife}
             factory={factory}
+          />
+        )}
+
+        {tab === 'secondary' && (
+          <SecondaryProcessesPanel
+            itemId={item.id}
+            batchSize={batchSize}
+            location={factory}
+            onHighlight={(h) => onSecondaryHighlight?.(h)}
           />
         )}
 
@@ -9664,7 +8350,7 @@ function AnalysisTabsPanel({
           />
         )}
 
-        {tab !== 'part_summary' && tab !== 'cost' && tab !== 'validation' && tab !== 'sustainability' && tab !== 'detail' && tab !== 'investment' && tab !== 'copilot' && tab !== 'vendor_network' && (
+        {tab !== 'part_summary' && tab !== 'cost' && tab !== 'validation' && tab !== 'sustainability' && tab !== 'detail' && tab !== 'investment' && tab !== 'secondary' && tab !== 'copilot' && tab !== 'vendor_network' && (
           <div className="flex flex-col items-center justify-center h-32 gap-2 text-muted-foreground p-4">
             <AlertCircle className="h-6 w-6 opacity-30" />
             <p className="text-xs text-center">{RIGHT_TABS.find((t) => t.key === tab)?.label} coming in Phase 2.</p>
@@ -9686,7 +8372,7 @@ function ProcessTreePanel({
   factory: string; maximized: PanelId | null; onMaximize: (id: PanelId | null) => void;
 }) {
   const family = resolveDisplayFamily(item, fg);
-  const groupLabel = FAMILY_GROUP[family] ?? 'Manufacturing';
+  const groupLabel = FAMILY_GROUP[family] ?? 'Unclassified';
   const UNSPEC_MAT = new Set(['Unknown', 'Not specified', 'Not Specified', 'None', '']);
   const diMat = item.drawingIntelligence?.material;
   const material =
@@ -10007,10 +8693,10 @@ function GeometricCostDriversPanel({
     const v2Features = fg?.feature_graph_v2?.features;
     if (!v2Features) return undefined;
     if (selectedHoleGroup) {
-      return v2Features.find((f) => f.feature_type === 'hole' && f.diameter_mm === selectedHoleGroup.diameter_mm);
+      return v2Features.find((f) => isPlainHole(f) && f.diameter_mm === selectedHoleGroup.diameter_mm);
     }
     if (selectedBend) {
-      return v2Features.find((f) => f.feature_type === 'bend' && f.radius_mm === selectedBend.recognition.radius_mm);
+      return v2Features.find((f) => isBend(f) && f.radius_mm === selectedBend.recognition.radius_mm);
     }
     return undefined;
   }, [fg, selectedHoleGroup, selectedBend]);
@@ -10020,7 +8706,7 @@ function GeometricCostDriversPanel({
     [selectedHoleGroup, selectedBend, dfmWarnings, selectedV2Feature],
   );
 
-  const isCNCFeatureSelected = !!selectedId?.startsWith('cnc_');
+  const isMachiningFeatureSelected = !!selectedId?.startsWith('machining_');
   const isThreadFeatureSelected = !!selectedId?.startsWith('thread_di_');
 
   useEffect(() => {
@@ -10028,8 +8714,8 @@ function GeometricCostDriversPanel({
   }, [selectedHoleGroup, selectedBend]);
 
   useEffect(() => {
-    if (isCNCFeatureSelected) setTab('detail');
-  }, [isCNCFeatureSelected, selectedId]);
+    if (isMachiningFeatureSelected) setTab('detail');
+  }, [isMachiningFeatureSelected, selectedId]);
 
   useEffect(() => {
     if (isThreadFeatureSelected) setTab('detail');
@@ -10045,7 +8731,7 @@ function GeometricCostDriversPanel({
           ['geo', 'Geometry'],
           ['cost', 'Cost Drivers'],
           ['props', 'Properties'],
-          ['detail', (isFeatureSelected || isCNCFeatureSelected || isThreadFeatureSelected) ? '● Selected' : 'Selected'],
+          ['detail', (isFeatureSelected || isMachiningFeatureSelected || isThreadFeatureSelected) ? '● Selected' : 'Selected'],
           ['design', 'Design / DFM'],
         ] as [GCDTab, string][]).map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)}
@@ -10276,8 +8962,8 @@ function GeometricCostDriversPanel({
         <div className="flex-1 overflow-y-auto min-h-0">
           {isThreadFeatureSelected && selectedId ? (
             <ThreadFeatureInspectorPanel selectedId={selectedId} item={item} />
-          ) : isCNCFeatureSelected && fg && selectedId ? (
-            <CNCFeatureInspectorPanel selectedId={selectedId} fg={fg} />
+          ) : isMachiningFeatureSelected && fg && selectedId ? (
+            <MachiningFeatureInspectorPanel featureIds={selected?.v2FeatureIds ?? []} fg={fg} />
           ) : !featureMetadata && selected?.attrs?.length ? (
             <div className="p-2 space-y-0.5">
               <div className="px-2 py-1 text-xs font-medium text-foreground">{selected.label}</div>
@@ -10329,7 +9015,7 @@ export default function ManufacturingIntelligencePage() {
   const [viewerTab, setViewerTab] = useState<'3d' | '2d'>('3d');
   const [maximized, setMaximized] = useState<PanelId | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(
-    () => new Set(['root', 'grp_0', 'op_0', 'op_1', 'op_2', 'subop_0', 'subop_1', 'subop_2', 'op_threads', 'subop_threads']),
+    () => new Set(['root', 'grp_0', 'op_0', 'op_1', 'op_2', 'op_threads', 'thread_features']),
   );
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   // The batch size to REQUEST. `undefined` is the normal state and means "do not
@@ -10506,9 +9192,6 @@ export default function ManufacturingIntelligencePage() {
     // a display-only tweak.
     || (productionLife !== null && productionLife !== committedProductionLife);
 
-  // The batch size the user is currently looking at: the unapplied draft while
-  // one is pending, otherwise the value the engine actually priced against.
-  const displayBatchSize = scenarioDirty ? batchSizeDraft : effectiveBatchSize;
   // Awaitable so the single bottom "Apply" button (CostGuidePanel) can commit
   // Digital Factory/Batch Size + the staged Workflow Builder route together
   // and only THEN run its own material-grade-driven logic — there is no
@@ -10580,23 +9263,10 @@ export default function ManufacturingIntelligencePage() {
           applyMachineOverrides();
         } catch { /* errors surfaced by the mutation's own onError toast */ }
       } else {
-        const applyId = KB_TO_APPLY_ROUTE[route.id];
-        if (applyId) {
-          try {
-            await applyRoute.mutateAsync({ routeId: applyId, ...(batchSizeDraft !== null ? { batchSize: batchSizeDraft } : {}), location: factoryDraft });
-            applyMachineOverrides();
-          } catch { /* errors surfaced by the mutation's own onError toast */ }
-        } else {
-          // Real, confirmed bug (2026-09-11): a selectedManualRoute reaching
-          // here with none of dynamicCuttingRouteId/directApplyRouteId set,
-          // and an id (KB_TO_APPLY_ROUTE has no such key) that isn't a real
-          // apply target, silently did nothing — no mutation call, no error,
-          // while the Process Routing panel already showed "Manual routing"
-          // with this route's label as if it had been applied. Surfacing
-          // this closes the gap between what the UI showed and what was
-          // actually written.
-          toast.error(`"${route.label}" cannot be applied — no real route target was resolved for it. Reopen Workflow Builder and pick a route again.`);
-        }
+        // A selectedManualRoute with neither dynamicCuttingRouteId nor
+        // directApplyRouteId has no real apply target. Say so, rather than
+        // leave the Process Routing panel showing a route nothing wrote.
+        toast.error(`"${route.label}" cannot be applied — no real route target was resolved for it. Reopen Workflow Builder and pick a route again.`);
       }
     }
   };
@@ -10849,9 +9519,12 @@ export default function ManufacturingIntelligencePage() {
   const { data: materialDensityResult } = useMaterialDensity(item?.materialGrade || item?.material || undefined);
   const materialDensityGcm3 = materialDensityResult?.density_g_cm3 ?? null;
 
+  // Same query (and cache entry) the Secondary tab reads.
+  const { data: secondaryForTree } = useSecondaryProcesses(item?.id, batchSize, factory);
+
   const tree = useMemo(
-    () => (item && summary) ? buildProcessTree(item, fg, summary, factory, effectiveOverrideProcesses, effectiveCostForHeatmap, materialDensityGcm3, procRecordsForTree?.records ?? null) : null,
-    [item, fg, summary, factory, effectiveOverrideProcesses, effectiveCostForHeatmap, materialDensityGcm3, procRecordsForTree],
+    () => (item && summary) ? buildProcessTree(item, fg, summary, factory, effectiveOverrideProcesses, effectiveCostForHeatmap, materialDensityGcm3, procRecordsForTree?.records ?? null, secondaryForTree ? [...secondaryForTree.lines, ...secondaryForTree.surfaceLines, ...secondaryForTree.heatTreatmentLines, ...secondaryForTree.chemicalMillingLines] : null) : null,
+    [item, fg, summary, factory, effectiveOverrideProcesses, effectiveCostForHeatmap, materialDensityGcm3, procRecordsForTree, secondaryForTree],
   );
 
   const treeProcessNames = useMemo(() => {
@@ -10878,28 +9551,18 @@ export default function ManufacturingIntelligencePage() {
     return f?.type === 'bend' ? f : null;
   }, [selectedNodeId, fg]);
 
-  const [selectedCNCFeatureKey, setSelectedCNCFeatureKey] = useState<string | null>(null);
+  const [selectedMachiningFeatureKey, setSelectedMachiningFeatureKey] = useState<string | null>(null);
 
-  const selectedCNCV2Feature = useMemo(() => {
-    if (!selectedCNCFeatureKey || !fg) return null;
-    const cncFeats: any[] = (fg as any)?.cnc_features?.features ?? [];
-    const [type, diamStr] = selectedCNCFeatureKey.split(':');
-    const diam = diamStr ? parseFloat(diamStr) : null;
-    const matches = cncFeats.filter((f) => {
-      if (f.type !== type) return false;
-      if (diam != null) return Math.abs((f.params?.diameter_mm ?? 0) - diam) < 0.05;
-      return true;
-    });
-    if (matches.length === 0) return null;
-    return {
-      id: `cnc_${selectedCNCFeatureKey}`,
-      feature_type: type ?? 'unknown',
-      occurrences: matches.map((f) => ({
-        centroid: ((f.params?.centroid as [number, number, number]) ?? [0, 0, 0]),
-        face_ids: (f.face_ids as number[]) ?? [],
-      })),
-    };
-  }, [selectedCNCFeatureKey, fg]);
+  // Exact faces for the selected feature-tree row (type, variant, one
+  // occurrence, all, or unexplained faces) — resolved by feature_graph_v2 id.
+  const selectedMachiningV2Feature = useMemo(() => {
+    if (!selectedMachiningFeatureKey || !fg) return null;
+    const unclaimedRaw = (fg as any)?.machining_features?.unclaimed_face_ids;
+    const unclaimed: number[] | null = Array.isArray(unclaimedRaw)
+      ? unclaimedRaw.map((u: any) => (typeof u === 'number' ? u : u?.face_id)).filter((n: any) => typeof n === 'number')
+      : null;
+    return resolveFeatureSelection(selectedMachiningFeatureKey, fg.feature_graph_v2?.features ?? [], unclaimed);
+  }, [selectedMachiningFeatureKey, fg]);
 
   // Set by the Analysis panel's cost-tab "Feature breakdown" rows (Bend R1mm x2,
   // Pierces x19, Cut path...) to highlight that exact feature in the 3D viewer.
@@ -10907,17 +9570,17 @@ export default function ManufacturingIntelligencePage() {
 
   const selectedV2Feature = useMemo(() => {
     if (selectedDirectV2Feature) return selectedDirectV2Feature;
-    if (selectedCNCV2Feature) return selectedCNCV2Feature;
+    if (selectedMachiningV2Feature) return selectedMachiningV2Feature;
     const v2Features = fg?.feature_graph_v2?.features;
     if (!v2Features) return null;
     if (selectedHoleGroup) {
-      return v2Features.find((f) => f.feature_type === 'hole' && f.diameter_mm === selectedHoleGroup.diameter_mm) ?? null;
+      return v2Features.find((f) => isPlainHole(f) && f.diameter_mm === selectedHoleGroup.diameter_mm) ?? null;
     }
     if (selectedBend) {
-      return v2Features.find((f) => f.feature_type === 'bend' && f.radius_mm === selectedBend.recognition.radius_mm) ?? null;
+      return v2Features.find((f) => isBend(f) && f.radius_mm === selectedBend.recognition.radius_mm) ?? null;
     }
     return null;
-  }, [fg, selectedHoleGroup, selectedBend, selectedCNCV2Feature, selectedDirectV2Feature]);
+  }, [fg, selectedHoleGroup, selectedBend, selectedMachiningV2Feature, selectedDirectV2Feature]);
 
   const [selectedOccurrenceIndex, setSelectedOccurrenceIndex] = useState<number | null>(null);
 
@@ -10926,7 +9589,7 @@ export default function ManufacturingIntelligencePage() {
   }, [selectedV2Feature]);
 
   const faceMap = fg?.feature_graph_v2?.metadata?.face_map
-    ?? (fg as any)?.cnc_features?.face_map
+    ?? (fg as any)?.machining_features?.face_map
     ?? null;
 
   const { data: dfmScores } = useDFMScores(item?.id);
@@ -11011,6 +9674,17 @@ export default function ManufacturingIntelligencePage() {
     }
   }, [heatmapMode, heatmapLayer, dfmScores, fg, item?.sheetThicknessMm, costHeatmapWeights, toleranceHeatmapWeights, sustainabilityHeatmapWeights, isInjectionMolded, imSignals, imFeatures]);
 
+  // Click on a machined part in 3D -> select the feature occurrence that owns
+  // the picked B-Rep face (face_map), which highlights it and selects its row
+  // in the feature tree. Faces no feature owns select nothing.
+  const handleBrepFacePick = useCallback((faceId: number) => {
+    if (!(fg as any)?.machining_features) return;
+    const hit = findFeatureByFaceId(faceId, fg?.feature_graph_v2?.features ?? []);
+    if (!hit) return;
+    setSelectedDirectV2Feature(null);
+    setSelectedMachiningFeatureKey(featureSelectionKey.occurrence(hit.feature.id, hit.occurrenceIndex));
+  }, [fg]);
+
   const handleHeatmapInspect = useCallback((
     worldPos: [number, number, number],
     _triangleIndex: number,
@@ -11043,8 +9717,8 @@ export default function ManufacturingIntelligencePage() {
     const contributors = sorted.map((c) => {
       const v2 = fg?.feature_graph_v2?.features.find((f) => f.id === c.featureId);
       const label = v2
-        ? v2.feature_type === 'hole' ? `Ø${v2.diameter_mm}mm hole · occ ${c.occurrenceIndex + 1}`
-          : v2.feature_type === 'bend' ? `R${v2.radius_mm}mm bend · occ ${c.occurrenceIndex + 1}`
+        ? isPlainHole(v2) ? `Ø${v2.diameter_mm}mm hole · occ ${c.occurrenceIndex + 1}`
+          : isBend(v2) ? `R${v2.radius_mm}mm bend · occ ${c.occurrenceIndex + 1}`
           : `${v2.feature_type} · occ ${c.occurrenceIndex + 1}`
         : (c.reason ?? (c.featureId || 'Global signal'));
 
@@ -11079,7 +9753,7 @@ export default function ManufacturingIntelligencePage() {
         seenTypes.add(v2.feature_type);
 
         if (heatmapLayer === 'cost_density') {
-          if (v2.feature_type === 'hole') {
+          if (isPlainHole(v2)) {
             const occ2 = v2.occurrences[c.occurrenceIndex];
             const ldRatio = occ2?.ld_ratio ?? 0;
             if (thk === 0) {
@@ -11092,33 +9766,33 @@ export default function ManufacturingIntelligencePage() {
               if ((item?.holeCount ?? 0) > 100) recs.push({ label: 'Consider gang punch tooling to reduce per-hole cost', priority: 'medium' });
               if (v2.diameter_mm != null && v2.diameter_mm < 2 * thk) recs.push({ label: `Small hole Ø${v2.diameter_mm}mm — increase to ≥ 2× thickness if tolerance allows`, priority: 'high' });
             }
-          } else if (v2.feature_type === 'bend') {
+          } else if (isBend(v2)) {
             const pb = costHeatmapWeights.brakeCostPerBend;
             impact.push({ code: 'BEND', label: pb != null ? `Bend: $${pb.toFixed(2)}/bend (press brake)` : 'Press brake — run cost analysis for exact figure', severity: (pb ?? 0) > 10 ? 'high' : 'medium' });
             if ((item?.bendCount ?? 0) > 20) recs.push({ label: 'High bend count — review if bends can be eliminated', priority: 'medium' });
           }
         } else if (heatmapLayer === 'tolerance_risk') {
           const tol = toleranceHeatmapWeights.tightestToleranceMm;
-          if (v2.feature_type === 'hole') {
+          if (isPlainHole(v2)) {
             impact.push({ code: 'TOL', label: tol != null ? `Tightest tolerance: ±${tol}mm` : 'No drawing data — tolerance unknown', severity: (tol ?? 1) <= 0.05 ? 'critical' : (tol ?? 1) <= 0.1 ? 'high' : 'medium' });
             if (v2.diameter_mm != null && v2.diameter_mm < 4) recs.push({ label: `Ø${v2.diameter_mm}mm hole — verify with go/no-go gauge or CMM`, priority: 'high' });
             if ((tol ?? 1) <= 0.05) recs.push({ label: '±0.05mm or tighter — CMM inspection required', priority: 'high' });
-          } else if (v2.feature_type === 'bend') {
+          } else if (isBend(v2)) {
             impact.push({ code: 'BEND_TOL', label: 'Bend angle tolerance — typically ±0.5° to ±1°', severity: 'low' });
             recs.push({ label: 'Use angle gauge for critical assembly bends', priority: 'low' });
           }
         } else if (heatmapLayer === 'sustainability') {
-          if (v2.feature_type === 'hole') {
+          if (isPlainHole(v2)) {
             const cp = sustainabilityHeatmapWeights.laserCo2PerPierce;
             impact.push({ code: 'CO2_PIERCE', label: cp != null ? `Laser pierce: ${(cp * 1000).toFixed(2)} g CO₂e/hole` : 'Run cost analysis for CO₂ data', severity: 'medium' });
             if ((item?.holeCount ?? 0) > 100) recs.push({ label: 'Reduce hole count or consolidate with punching to cut process CO₂', priority: 'medium' });
-          } else if (v2.feature_type === 'bend') {
+          } else if (isBend(v2)) {
             const cb = sustainabilityHeatmapWeights.brakeCo2PerBend;
             impact.push({ code: 'CO2_BEND', label: cb != null ? `Press brake: ${(cb * 1000).toFixed(2)} g CO₂e/bend` : 'Run cost analysis for CO₂ data', severity: 'low' });
             recs.push({ label: 'Increase batch size to amortise press brake setup energy', priority: 'low' });
           }
         } else if (heatmapLayer === 'thermal') {
-          if (v2.feature_type === 'hole') {
+          if (isPlainHole(v2)) {
             const occ = v2.occurrences[c.occurrenceIndex];
             const density = occ?.local_feature_density ?? 0;
             impact.push({ code: 'THERMAL', label: density > 5 ? `Dense cluster — ${density} holes within 30mm radius` : 'Pierce heat accumulation area', severity: density > 8 ? 'high' : density > 4 ? 'medium' : 'low' });
@@ -11127,7 +9801,7 @@ export default function ManufacturingIntelligencePage() {
           }
           impact.push({ code: 'NOTE', label: 'Estimated from feature density — not FEA simulation', severity: 'low' });
         } else if (heatmapLayer === 'tool_wear') {
-          if (v2.feature_type === 'hole') {
+          if (isPlainHole(v2)) {
             const occ = v2.occurrences[c.occurrenceIndex];
             const density = occ?.local_feature_density ?? 0;
             const ldRatio = occ?.ld_ratio ?? 0;
@@ -11208,7 +9882,7 @@ export default function ManufacturingIntelligencePage() {
       LD_CRITICAL:           { label: 'Use peck drilling + high-pressure coolant; replace drill after 50 holes', priority: 'high' },
       LD_HIGH:               { label: 'Use peck drilling cycle; monitor chip evacuation', priority: 'high' },
       LD_MEDIUM:             { label: 'Standard drilling with coolant; verify chip clearance', priority: 'medium' },
-      TAPPED:                { label: 'Use spiral-flute tap with CNC rigid tapping; inspect tap every 200 parts', priority: 'medium' },
+      TAPPED:                { label: 'Use spiral-flute tap with rigid tapping; inspect tap every 200 parts', priority: 'medium' },
       SMALL_BORE:            { label: 'Reduce feed rate; use centre-drill pilot; check runout', priority: 'medium' },
     };
 
@@ -11279,7 +9953,10 @@ export default function ManufacturingIntelligencePage() {
     if (!item?.file3dPath || refreshing) return;
     setRefreshing(true);
     try {
-      await apiClient.post(`/bom-items/${itemId}/reanalyze`, {}, { timeout: 150_000 });
+      // retry: false — a re-analysis is a long, non-idempotent job; when the
+      // CAD engine is down the server now answers 503 with the reason, and
+      // retrying would only repeat the whole attempt before showing it.
+      await apiClient.post(`/bom-items/${itemId}/reanalyze`, {}, { timeout: 150_000, retry: false });
       // Also re-run 2D drawing-intelligence extraction (title block, thread
       // callouts, etc. — cad-engine/drawing_analyzer.py) when a PDF drawing
       // exists, so one "Refresh Analysis" click refreshes everything this
@@ -11381,29 +10058,7 @@ export default function ManufacturingIntelligencePage() {
       setOperationVisual(visual);
       setVizLabel(visual ? getVizLabel(node) : null);
     } else if (node.kind === 'feature') {
-      if (node.id.startsWith('cnc_')) {
-        const groupLabel = node.label.replace(/\s+×\d+$/, '');
-        const group = CNC_FEATURE_GROUPS.find((g) => g.label === groupLabel);
-        const cncFeats: any[] = (fg as any)?.cnc_features?.features ?? [];
-        if (group && cncFeats.length > 0) {
-          const matching = cncFeats.filter((f: any) => group.types.includes(f.type));
-          if (matching.length > 0) {
-            const combined: FeatureNodeV2 = {
-              id: node.id,
-              feature_type: 'hole' as FeatureCategory,
-              occurrences: matching.map((f: any) => ({
-                centroid: (f.params?.centroid as [number, number, number]) ?? [0, 0, 0],
-                face_ids: (f.face_ids as number[]) ?? [],
-              })),
-            };
-            setOperationVisual({ highlight: combined, color: '#d97706' });
-            setVizLabel(getVizLabel(node));
-            return;
-          }
-        }
-        setOperationVisual(null);
-        setVizLabel(null);
-      } else if (node.id === 'feat_im_undercut' || node.id === 'feat_im_undrafted') {
+      if (node.id === 'feat_im_undercut' || node.id === 'feat_im_undrafted') {
         // IM DFM highlighting — look up matching feature from feature_graph_v2
         const targetType = node.id === 'feat_im_undercut' ? 'im_undercut' : 'im_undrafted';
         const imFeature = v2Features.find((f) => f.feature_type === targetType);
@@ -11740,11 +10395,20 @@ export default function ManufacturingIntelligencePage() {
   const analysisProps = {
     projectId,
     item, fg, batchSize, productionLife, factory,
-    selectedCNCFeatureKey, onCNCFeatureSelect: setSelectedCNCFeatureKey,
+    selectedMachiningFeatureKey, onMachiningFeatureSelect: setSelectedMachiningFeatureKey,
     file3dUrl,
     activeTab: rightTab, onTabChange: setRightTab,
     treeProcessNames, vendorHotspotContext,
     onSelectHighlight,
+    onSecondaryHighlight: (h: SecondaryHighlight | null) => {
+      if (!h) {
+        setSelectedNodeId(null);
+        setOperationVisual(null);
+        setVizLabel(null);
+        return;
+      }
+      handleTreeSelect({ id: h.key, kind: 'feature', label: h.label, v2FeatureIds: h.featureIds, wholePart: h.wholePart });
+    },
   };
   const treeProps = { item, fg, tree, expanded: expandedNodes, selectedId: selectedNodeId, onToggle: toggleNode, onSelect: handleTreeSelect, factory, maximized, onMaximize: maximize };
   const driversProps = { tree, summary, fg, selectedId: selectedNodeId, onSelect: setSelectedNodeId, maximized, onMaximize: maximize, selectedHoleGroup, selectedBend, dfmWarnings: fg?.dfmWarnings ?? [], item };
@@ -11781,6 +10445,7 @@ export default function ManufacturingIntelligencePage() {
                       heatmapSources={heatmapSources}
                       heatmapNormalization={heatmapNorm}
                       onHeatmapInspect={handleHeatmapInspect}
+                      {...((fg as any)?.machining_features ? { onBrepFacePick: handleBrepFacePick } : {})}
                       nestQuantity={batchSize}
                       nestSheetWidthMm={costForHeatmap?.blankSpec?.sheetWidthMm}
                       nestSheetLengthMm={costForHeatmap?.blankSpec?.sheetLengthMm}
@@ -11836,7 +10501,6 @@ export default function ManufacturingIntelligencePage() {
             setProcessRouting('manual');
           }}
           cost={costForHeatmap ?? null}
-          scoringCtx={summary && item && displayBatchSize !== null ? { summary, item, batchSize: displayBatchSize, annualVolume: item.annualVolume ?? null } : null}
           factory={scenarioDirty ? factoryDraft : factory}
           itemId={item?.id}
           // REQUEST batch size, not the display one. displayBatchSize falls back
@@ -11942,6 +10606,7 @@ export default function ManufacturingIntelligencePage() {
                             heatmapSources={heatmapSources}
                             heatmapNormalization={heatmapNorm}
                             onHeatmapInspect={handleHeatmapInspect}
+                            {...((fg as any)?.machining_features ? { onBrepFacePick: handleBrepFacePick } : {})}
                             nestQuantity={batchSize}
                             nestSheetWidthMm={costForHeatmap?.blankSpec?.sheetWidthMm}
                             nestSheetLengthMm={costForHeatmap?.blankSpec?.sheetLengthMm}
@@ -12056,7 +10721,6 @@ export default function ManufacturingIntelligencePage() {
           setProcessRouting('manual');
         }}
         cost={costForHeatmap ?? null}
-        scoringCtx={summary && item && displayBatchSize !== null ? { summary, item, batchSize: displayBatchSize, annualVolume: item.annualVolume ?? null } : null}
         factory={scenarioDirty ? factoryDraft : factory}
         itemId={item?.id}
         // Same request-vs-display distinction as the other render site above.

@@ -15,7 +15,6 @@ export interface CounterboringInput {
   rate: MHRRateInput; // drill_press
   processIdentity?: { processGroup: string; processRoute: string; operation: string };
   cycleTimeSecFromCalculator?: number;
-  fallbackSetupMin: number; // opSetupMinByOp?.counterbore ?? COUNTERBORE_SETUP_MIN, per-batch
   /** Real sm_lookup_op_setup_time minutes for this operation, when a row exists. */
   operationSetupMin?: number | null;
   calculatorId?: string | null;
@@ -61,7 +60,6 @@ export function computeCounterboringCost(input: CounterboringInput): Counterbori
     process: 'Counterboring',
     machineSetupTimeHr: input.rate.setupTimeHr,
     operationSetupMin: input.operationSetupMin,
-    classDefaultMin: input.fallbackSetupMin,
     machineName: input.rate.machineName,
   });
   if (setup.warning) warnings.push(setup.warning);

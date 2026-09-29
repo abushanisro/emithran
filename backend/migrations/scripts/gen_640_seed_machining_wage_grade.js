@@ -19,14 +19,18 @@
 // source_region/source_version: 'USA' / '2026-03', matching every sibling
 // reference-data seed this session (479, 636/637, 638/639).
 //
-// Dollar-quoting for all free-text fields -- see gen_637's header for why.
+// Dollar-quoting for all free-text fields: a source note ending on its own
+// quoted phrase becomes ''' at the string boundary under standard escaping,
+// which desyncs the SQL editor's client-side statement splitting.
 //
 // Offline, file-in/file-out -- matches every other gen_*.js in this codebase.
 
 const fs = require('fs');
 const path = require('path');
 
-const WAGE_GRADE_FILE = path.join(__dirname, '../../../memory/machining/wage_grade_associations.json');
+const { readDoc } = require('./lib/memory-csv');
+
+const WAGE_GRADE_FILE = path.join(__dirname, '../../../memory/Machining/wage_grade_associations.csv');
 const OUT_SQL = path.join(__dirname, '../640_seed_machining_wage_grade.sql');
 
 const SOURCE_REGION = 'USA';
@@ -40,7 +44,7 @@ function sqlJsonb(obj) {
   return `$jsonb$${JSON.stringify(obj)}$jsonb$::jsonb`;
 }
 
-const data = JSON.parse(fs.readFileSync(WAGE_GRADE_FILE, 'utf8'));
+const data = readDoc(WAGE_GRADE_FILE, { list: 'processes', scalars: ['section', 'processCount'] });
 
 const rows = data.processes.map((p) => ({
   category: 'wage_grade',

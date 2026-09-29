@@ -3,7 +3,7 @@ import { DFMScoringService } from '../../../../modules/bom-items/services/dfm-sc
 function bendFeature(radiusMm: number, occOverrides: Record<string, any> = {}) {
   return {
     id: 'f1',
-    feature_type: 'bend',
+    feature_type: 'StraightBend', variant: 'default',
     radius_mm: radiusMm,
     occurrences: [{ ...occOverrides }],
   };
@@ -12,7 +12,7 @@ function bendFeature(radiusMm: number, occOverrides: Record<string, any> = {}) {
 function holeFeature(diameterMm: number, occOverrides: Record<string, any> = {}) {
   return {
     id: 'f1',
-    feature_type: 'hole',
+    feature_type: 'SimpleHole', variant: 'through',
     diameter_mm: diameterMm,
     occurrences: [{ ...occOverrides }],
   };
@@ -145,13 +145,13 @@ describe('DFMScoringService — missing real geometry is disclosed, never silent
   });
 
   it('flags INCOMPLETE_GEOMETRY_DATA when a hole has no real diameter_mm', () => {
-    const feature = { id: 'f1', feature_type: 'hole', diameter_mm: undefined, occurrences: [{}] };
+    const feature = { id: 'f1', feature_type: 'SimpleHole', variant: 'through', diameter_mm: undefined, occurrences: [{}] };
     const result = service.score([feature], 3);
     expect(result[0]!.occurrences[0]!.riskFactors.some((f) => f.code === 'INCOMPLETE_GEOMETRY_DATA')).toBe(true);
   });
 
   it('flags INCOMPLETE_GEOMETRY_DATA when a bend has no real radius_mm', () => {
-    const feature = { id: 'f1', feature_type: 'bend', radius_mm: undefined, occurrences: [{}] };
+    const feature = { id: 'f1', feature_type: 'StraightBend', variant: 'default', radius_mm: undefined, occurrences: [{}] };
     const result = service.score([feature], 3);
     expect(result[0]!.occurrences[0]!.riskFactors.some((f) => f.code === 'INCOMPLETE_GEOMETRY_DATA')).toBe(true);
   });

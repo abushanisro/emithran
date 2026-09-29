@@ -1,5 +1,6 @@
 'use client';
 
+import { faceIdForTriangle } from '@/lib/features/machining-feature-tree';
 import React, { Suspense, useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Grid, Center, Html } from '@react-three/drei';
@@ -121,6 +122,8 @@ interface EDrawingsViewerProps {
   heatmapNormalization?: import('@/lib/heatmap/types').HeatmapNormalization;
   /** Called when user clicks the model surface while heatmap is active */
   onHeatmapInspect?: (worldPos: [number, number, number], triangleIndex: number, riskValue: number) => void;
+  /** Called with the B-Rep face id (face_map) under a plain click on the model — requires faceMap. */
+  onBrepFacePick?: (faceId: number) => void;
   /** Override the amber group-face highlight color — used for operation-specific visualization */
   highlightColor?: string;
   /** BOM item id — required for the Nest toolbar toggle to fetch a true nest; omit to hide that button entirely. */
@@ -1391,6 +1394,7 @@ function STLModel({
   heatmapNormalization,
   heatmapRiskValuesRef,
   onHeatmapInspect,
+  onTrianglePick,
 }: {
   url: string;
   color: string;
@@ -1441,6 +1445,8 @@ function STLModel({
   heatmapRiskValuesRef?: React.RefObject<Float32Array | null> | undefined;
   /** Called when user clicks model surface while heatmap is active */
   onHeatmapInspect?: ((worldPos: [number, number, number], triangleIndex: number, riskValue: number) => void) | undefined;
+  /** Called with the picked STL triangle index on a plain (non-heatmap, non-measure) click. */
+  onTrianglePick?: ((triangleIndex: number) => void) | undefined;
 }) {
   const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(null);
   const [explodedParts, setExplodedParts] = useState<ExplodedPart[]>([]);
@@ -2562,6 +2568,12 @@ function STLModel({
               e.stopPropagation();
               const sel = classifyHit(e.intersections[0]!, e.camera, normalsRef.current, adjRef.current, measureSubMode ?? 'auto');
               onMeasureClick?.(sel);
+              return;
+            }
+            const pickHit = e.intersections[0];
+            if (onTrianglePick && pickHit?.faceIndex != null) {
+              e.stopPropagation();
+              onTrianglePick(pickHit.faceIndex);
             }
           }}
           onPointerMove={(e) => {
@@ -2792,7 +2804,7 @@ function Scene({
   selectedOccurrenceIndex,
   occurrenceFaceIndices, groupFaceIndices,
   riskGroups, selectedOccurrenceColor, groupHighlightColor,
-  heatmapActive, heatmapSources, heatmapNormalization, heatmapRiskValuesRef, onHeatmapInspect,
+  heatmapActive, heatmapSources, heatmapNormalization, heatmapRiskValuesRef, onHeatmapInspect, onTrianglePick,
 }: {
   fileUrl: string; modelColor: string; showGrid: boolean;
   viewPosition: [number, number, number]; autoFit: boolean; fitCenter: [number, number, number];
@@ -2828,6 +2840,7 @@ function Scene({
   heatmapNormalization?: HeatmapNormalization | undefined;
   heatmapRiskValuesRef?: React.RefObject<Float32Array | null> | undefined;
   onHeatmapInspect?: ((worldPos: [number, number, number], triangleIndex: number, riskValue: number) => void) | undefined;
+  onTrianglePick?: ((triangleIndex: number) => void) | undefined;
 }) {
   return (
 <>
@@ -2922,6 +2935,7 @@ function Scene({
             {...(heatmapNormalization !== undefined ? { heatmapNormalization } : {})}
             heatmapRiskValuesRef={heatmapRiskValuesRef}
             onHeatmapInspect={onHeatmapInspect}
+            onTrianglePick={onTrianglePick}
           />
         </Center>
       </Suspense>
@@ -2952,6 +2966,7 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
   heatmapSources,
   heatmapNormalization = 'absolute',
   onHeatmapInspect,
+  onBrepFacePick,
   highlightColor,
   bomItemId, nestQuantity = 1, nestSheetWidthMm, nestSheetLengthMm, nestMaterialLabel, nestGradeLabel,
   flatPatternPartName, flatPatternOutlinePointsMm, flatPatternHolesMm, flatPatternOutlineSource,
@@ -3039,6 +3054,17 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
 
 
   // face_id → FaceMapEntry lookup for O(1) triangle range access
+  // Plain click on the model -> the B-Rep face under it (face_map triangle
+  // ranges), so a host page can select the feature that owns that face.
+  const pickTriangle = useMemo(() => {
+    if (!onBrepFacePick || !faceMap?.length) return undefined;
+    const sorted = [...faceMap].sort((a, b) => a.tri_start - b.tri_start);
+    return (triangleIndex: number) => {
+      const faceId = faceIdForTriangle(sorted, triangleIndex);
+      if (faceId != null) onBrepFacePick(faceId);
+    };
+  }, [onBrepFacePick, faceMap]);
+
   const faceMapIndex = useMemo((): Map<number, FaceMapEntry> => {
     if (!faceMap?.length) return new Map();
     return new Map(faceMap.map((e) => [e.face_id, e]));
@@ -3924,6 +3950,7 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
               heatmapNormalization={heatmapNormalization}
               heatmapRiskValuesRef={heatmapRiskValuesRef}
               {...(onHeatmapInspect ? { onHeatmapInspect } : {})}
+              {...(pickTriangle ? { onTrianglePick: pickTriangle } : {})}
             />
             {measureMode !== 'IDLE' && (
               <MeasurementOverlay
@@ -3983,7 +4010,7 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
             <div className="absolute top-12 left-4 z-10 bg-black/70 backdrop-blur border border-white/20 rounded px-2.5 py-1 text-xs flex items-center gap-2 pointer-events-none">
               <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
               <span className="font-medium text-white">
-                {highlightOccurrences.feature_type === 'hole'
+                {highlightOccurrences.feature_type === 'SimpleHole'
                   ? `Ø${highlightOccurrences.diameter_mm?.toFixed(1) ?? '?'}mm`
                   : `R${highlightOccurrences.radius_mm?.toFixed(1) ?? '?'}mm bend`}
               </span>

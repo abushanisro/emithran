@@ -6,16 +6,10 @@ the "Machining is the canonical domain, not CNC" architecture mandate: any
 3D CAD/STEP upload enters the Machining feature-extraction pipeline
 (STEP/3D CAD -> MachiningFeatureRecognizer -> MachiningFeatureTree), and
 "CNC" is no longer the name of the root feature-recognition architecture.
-"CNC" remains ONLY where it already is a genuine, existing manufacturing/
-process classification required by the live DB-driven taxonomy -- the real
-"cnc_turned"/"mill_turn"/"cnc_milled" family strings this recognize()
-still accepts and returns (read throughout the backend's costing code,
-e.g. bom-items.service.ts's `family === 'cnc_milled'` checks), and the real
-wire-format key "cnc_features" the backend already reads in ~15 places
-(main.py's response, auto-fill.service.ts, bom-items.service.ts). Neither
-is part of this rename -- both are deliberately left exactly as they
-already are; renaming either would touch working, unrelated costing/
-persistence code this refactor is not scoped to touch.
+recognize() takes and returns the platform's part-family names
+(shared/part_family.py: milled / turned / mill_turn -- the same values the
+backend stores and costs on). "machining_features" remains only as the response
+wire-format key the backend reads.
 
 Converts raw OCC topology into a structured manufacturing feature tree that
 resembles eMithran's feature representation rather than a flat face inventory.
@@ -61,7 +55,7 @@ architecture plan):
                                        utilities, raw cylinder collection
                                        (hole detector's raw geometry pass)
                                        -- Sheet Metal (feature_extractor.py,
-                                       forming_spike.py) already depends on
+                                       formed_feature.py stage 1) already depends on
                                        these directly, confirmed live, not
                                        speculative.
   machining/face_classification.py  — general milled-face surface/region
@@ -87,12 +81,12 @@ imports, so every existing import path (including Sheet Metal's real
 `from machining.machining_feature_recognizer import MachiningFeature` /
 `_TAP_DRILL_RANGES` / etc.) keeps working unchanged.
 
-Covers cnc_turned and mill_turn parts (_recognize_turned):
+Covers turned and mill_turn parts (_recognize_turned):
   external_diameter, through_hole, blind_hole, cross_hole, pcd_hole_pattern,
   chamfer, groove, fillet, slot, radial_slot, pocket, counterbore,
   countersink, keyway, multi_step_hole
 
-cnc_milled (_recognize_milled) covers the same feature set as the turned
+milled (_recognize_milled) covers the same feature set as the turned
 path minus the turning-specific ones (external_diameter, pcd_hole_pattern,
 radial_slot), using generic "pocket" instead of the turned-only keyway/
 radial_slot split, plus the milled-only Phase 3-5 additions: planar_face/
@@ -120,6 +114,7 @@ from typing import Dict, List, Optional, Tuple
 # Metal's real `from machining.machining_feature_recognizer import
 # _TAP_DRILL_RANGES` / `MachiningFeature` / etc.), keeps working unchanged.
 from .feature_models import MachiningFeatureType, MachiningFeature, MachiningFeatureTree
+from shared.part_family import MILLED, TURNED_FAMILIES
 from shared.machining_geometry import (
     TAP_DRILL_RANGES as _TAP_DRILL_RANGES,
     HELICOIL_DRILL_RANGES as _HELICOIL_DRILL_RANGES,
@@ -150,13 +145,23 @@ _MIN_FILLET_RADIUS_MM = 0.5
 _STRUCTURAL_FACE_AXIS_TOL_MM = 0.05
 
 
+def _is_bore(f: MachiningFeature) -> bool:
+    """An individual axial bore (not a cross hole or an already-grouped pattern)."""
+    return f.type == "SimpleHole" and f.variant in ("through", "blind", "threaded")
+
+
+def _is_plain_bore(f: MachiningFeature) -> bool:
+    """An untapped axial bore -- the only kind that can be a counterbore/step member."""
+    return f.type == "SimpleHole" and f.variant in ("through", "blind")
+
+
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 
 class MachiningFeatureRecognizer:
     """
     Usage:
-        tree = MachiningFeatureRecognizer().recognize(occ_shape, "cnc_turned")
+        tree = MachiningFeatureRecognizer().recognize(occ_shape, "turned")
         result_dict = tree.to_dict()
     """
 
@@ -168,7 +173,7 @@ class MachiningFeatureRecognizer:
         n_torus = face_counts["torus"]
 
         logger.info(
-            f"[cnc_features] family={family} "
+            f"[machining_features] family={family} "
             f"cyl_faces={n_cyl} "
             f"planar_faces={n_planar} "
             f"cone_faces={n_cone} "
@@ -181,7 +186,7 @@ class MachiningFeatureRecognizer:
             "candidate_features": {},  # filled in by each recognizer
         }
 
-        if family in ("cnc_turned", "mill_turn"):
+        if family in TURNED_FAMILIES:
             tree = self._recognize_turned(shape, family)
         else:
             tree = self._recognize_milled(shape)
@@ -189,10 +194,36 @@ class MachiningFeatureRecognizer:
         debug["candidate_features"] = {f.type: f.params for f in tree.features[:10]}
         tree.debug = debug
 
+        # Which faces the recognized features explain -- the accuracy measure.
+        # A failure here is reported, never allowed to fail recognition.
+        try:
+            from .face_coverage import enumerate_faces, account_face_coverage
+            tree.coverage = account_face_coverage(enumerate_faces(shape), tree.features)
+            cov = tree.coverage
+            logger.info(
+                f"[machining_features] face coverage {cov['claimed_face_count']}/{cov['face_count']} "
+                f"faces, area {cov['claimed_area_fraction']}, "
+                f"multiply-claimed={len(cov['multiply_claimed_faces'])}"
+            )
+        except Exception as exc:
+            tree.warnings.append(f"Face coverage accounting failed: {exc}")
+
+        # Polygon rings (hex / square sockets and bosses), as candidates only --
+        # see detect_polygon_rings. Every face is eligible (a socket's walls
+        # are also claimed as a pocket), so nothing is claimed here.
+        try:
+            from .face_classification import detect_polygon_rings
+            tree.polygon_candidates = [
+                {k: (list(v) if isinstance(v, tuple) else v) for k, v in ring.items()}
+                for ring in detect_polygon_rings(shape, set(), part_bbox=_part_bounding_box(shape))
+            ]
+        except Exception as exc:
+            tree.warnings.append(f"Polygon ring detection failed: {exc}")
+
         n_with_ids = sum(1 for f in tree.features if f.face_ids)
         sample = tree.features[0].face_ids[:5] if tree.features else []
         logger.info(
-            f"[cnc_features] extracted {len(tree.features)} features "
+            f"[machining_features] extracted {len(tree.features)} features "
             f"types={list({f.type for f in tree.features})} "
             f"face_ids_populated={n_with_ids}/{len(tree.features)} sample={sample}"
         )
@@ -221,6 +252,25 @@ class MachiningFeatureRecognizer:
         toroids = self._collect_toroids(shape)
         prismatic = self._collect_prismatic_pockets(shape, main_axis, bbox)
 
+        # ── Teeth around the axis (gear / spline) → AxiGroove ────────────────
+        # Off-axis convex faces with N-fold rotational symmetry (axigroove.py).
+        # They are never turned diameters; unsymmetric ones are reported, not
+        # guessed into a feature.
+        offset_profile = [c for c in raw_cylinders if c["kind"] == "offset_profile"]
+        if offset_profile:
+            from .axigroove import detect_axigroove
+            teeth = detect_axigroove(shape, offset_profile, main_axis)
+            if teeth:
+                features.append(MachiningFeature(
+                    id="axigroove_0", type="AxiGroove", variant="default",
+                    params=teeth["params"], confidence=0.85, face_ids=teeth["face_ids"],
+                ))
+            else:
+                warnings.append(
+                    f"{len(offset_profile)} off-axis convex face(s) with no rotational tooth symmetry — "
+                    "not turnable about the spindle axis and not recognised as a feature."
+                )
+
         kind_counts: Dict[str, int] = {}
         for c in cylinders:
             kind_counts[c["kind"]] = kind_counts.get(c["kind"], 0) + 1
@@ -248,7 +298,8 @@ class MachiningFeatureRecognizer:
             if kind == "external_diameter":
                 features.append(MachiningFeature(
                     id=f"od_{ext_idx}",
-                    type="external_diameter",
+                    type="Ring",
+                    variant="outer_diameter",
                     params={
                         "diameter_mm": diameter_mm,
                         "length_mm": round(cyl["length"], 3),
@@ -262,7 +313,7 @@ class MachiningFeatureRecognizer:
 
             elif kind in ("through_hole", "blind_hole"):
                 fid = f"bore_{bore_idx}"
-                emit_type, tap_spec, is_helicoil = _classify_hole(
+                hole_variant, tap_spec, is_helicoil = _classify_hole(
                     diameter_mm, through=(kind == "through_hole"),
                 )
 
@@ -281,9 +332,10 @@ class MachiningFeatureRecognizer:
 
                 features.append(MachiningFeature(
                     id=fid,
-                    type=emit_type,
+                    type="SimpleHole",
+                    variant=hole_variant,
                     params=params,
-                    confidence=0.85 if emit_type == "through_hole" else (0.55 if tap_spec else 0.80),
+                    confidence=0.85 if hole_variant == "through" else (0.55 if tap_spec else 0.80),
                     face_ids=face_ids,
                 ))
                 bore_id_to_cyl[fid] = cyl
@@ -301,7 +353,8 @@ class MachiningFeatureRecognizer:
                 _annotate_hole_depth(cross_params, diameter_mm, cyl["length"])
                 features.append(MachiningFeature(
                     id=fid,
-                    type="cross_hole",
+                    type="SimpleHole",
+                    variant="cross",
                     params=cross_params,
                     confidence=0.75,
                     face_ids=face_ids,
@@ -312,7 +365,7 @@ class MachiningFeatureRecognizer:
         # ── PCD from axially-aligned bores (disc/flange/lens holder pattern) ─
         # PCD holes in a disc are parallel to the rotation axis, not cross holes.
         # They appear as through_hole/blind_hole/tapped_hole with non-zero dist_from_axis.
-        bore_features = [f for f in features if f.type in ("through_hole", "blind_hole", "tapped_hole")]
+        bore_features = [f for f in features if _is_bore(f)]
         bore_face_ids_map = {f.id: f.face_ids for f in bore_features}
         axial_pcd_groups = _detect_pcd_from_axial_bores(bore_features, bore_id_to_cyl)
         pcd_feature_idx = 0
@@ -324,14 +377,15 @@ class MachiningFeatureRecognizer:
                 ))
                 # If all holes in the group are tapped, propagate the spec + helicoil flag
                 group_features = [f for f in bore_features if f.id in group_ids]
-                tap_specs = [f.params.get("spec") for f in group_features if f.type == "tapped_hole"]
+                tap_specs = [f.params.get("spec") for f in group_features if f.variant == "threaded"]
                 if tap_specs and all(s == tap_specs[0] for s in tap_specs):
                     pcd_params = {**pcd_params, "tap_spec": tap_specs[0], "hole_type": "tapped"}
                     if any(f.params.get("helicoil_candidate") for f in group_features):
                         pcd_params["helicoil_candidate"] = True
                 features.append(MachiningFeature(
                     id=f"pcd_{pcd_feature_idx}",
-                    type="pcd_hole_pattern",
+                    type="SimpleHole",
+                    variant="pcd_pattern",
                     params=pcd_params,
                     confidence=0.85,
                     children=group_ids,
@@ -355,7 +409,8 @@ class MachiningFeatureRecognizer:
                 ))
                 features.append(MachiningFeature(
                     id=f"pcd_{pcd_feature_idx}",
-                    type="pcd_hole_pattern",
+                    type="SimpleHole",
+                    variant="pcd_pattern",
                     params={
                         "pcd_mm": round(sample.params["distance_from_axis_mm"] * 2.0, 3),
                         "hole_count": len(group),
@@ -371,10 +426,11 @@ class MachiningFeatureRecognizer:
 
         # ── Cones → chamfer or countersink ───────────────────────────────────
         for cone_idx, cone in enumerate(cones):
-            ftype, params, conf = _classify_cone(cone, cylinders)
+            edge_variant, params, conf = _classify_cone(cone, cylinders)
             features.append(MachiningFeature(
-                id=f"{ftype}_{cone_idx}",
-                type=ftype,
+                id=f"{edge_variant}_{cone_idx}",
+                type="Edge",
+                variant=edge_variant,
                 params=params,
                 confidence=conf,
                 face_ids=cone.get("face_indices", []),
@@ -384,13 +440,14 @@ class MachiningFeatureRecognizer:
         # a real 3-step hole must not ALSO be reported as two overlapping
         # 2-way counterbore pairs. See _detect_multistep_holes' own doc
         # comment (Phase 5, "Multistep Holemaking", 72 real catalog rows).
-        multistep_bores = [f for f in features if f.type in ("through_hole", "blind_hole")]
+        multistep_bores = [f for f in features if _is_plain_bore(f)]
         multistep_groups = _detect_multistep_holes(multistep_bores, bore_id_to_cyl)
         multistep_absorbed: set = set()
         for ms_idx, (member_ids, ms_params) in enumerate(multistep_groups):
             features.append(MachiningFeature(
                 id=f"mstep_{ms_idx}",
-                type="multi_step_hole",
+                type="MultiStepHole",
+                variant="stepped",
                 params=ms_params,
                 confidence=0.75,
                 children=member_ids,
@@ -402,7 +459,7 @@ class MachiningFeatureRecognizer:
 
         # ── Detect counterbores (coaxial cylinder pairs) ──────────────────────
         counterbores = _detect_counterbores(
-            [f for f in features if f.type in ("through_hole", "blind_hole")],
+            [f for f in features if _is_plain_bore(f)],
             bore_id_to_cyl,
         )
         if counterbores:
@@ -415,7 +472,8 @@ class MachiningFeatureRecognizer:
                 ))
                 features.append(MachiningFeature(
                     id=f"cbore_{cb_idx}",
-                    type="counterbore",
+                    type="MultiStepHole",
+                    variant="counterbore",
                     params=params,
                     confidence=0.78,
                     children=[outer_id, inner_id],
@@ -426,10 +484,13 @@ class MachiningFeatureRecognizer:
 
         # ── Toroids → groove / fillet ─────────────────────────────────────────
         for tor_idx, tor in enumerate(toroids):
-            ftype = "groove" if tor["is_concave"] else "fillet"
+            # Concave annular recess on a turned part is a plunged groove
+            # ("Plunging//Ring"); a convex blend is a rounded edge ("Rounding//Edge").
+            ftype, variant = ("Ring", "groove") if tor["is_concave"] else ("Edge", "round")
             features.append(MachiningFeature(
-                id=f"{ftype}_{tor_idx}",
+                id=f"{variant}_{tor_idx}",
                 type=ftype,
+                variant=variant,
                 params={
                     "major_diameter_mm": round(tor["major_radius"] * 2.0, 3),
                     "radius_mm": round(tor["minor_radius"], 3),
@@ -448,10 +509,11 @@ class MachiningFeatureRecognizer:
             result = _classify_prismatic_turned(p, main_axis)
             if result is None:
                 continue
-            ftype, params = result
+            ftype, variant, params = result
             features.append(MachiningFeature(
                 id=f"{ftype}_{p_idx}",
                 type=ftype,
+                variant=variant,
                 params=params,
                 confidence=0.70,
                 face_ids=p.get("face_indices", []),
@@ -466,7 +528,7 @@ class MachiningFeatureRecognizer:
 
         return MachiningFeatureTree(family=family, features=features, warnings=warnings)
 
-    # ── cnc_milled recognizer ─────────────────────────────────────────────────
+    # ── milled recognizer ─────────────────────────────────────────────────
 
     def _recognize_milled(self, shape) -> MachiningFeatureTree:
         """
@@ -484,7 +546,7 @@ class MachiningFeatureRecognizer:
             bbox = _part_bounding_box(shape)
         except Exception as exc:
             warnings.append(f"Bounding box failed: {exc}")
-            return MachiningFeatureTree(family="cnc_milled", features=[], warnings=warnings)
+            return MachiningFeatureTree(family=MILLED, features=[], warnings=warnings)
 
         # For milled parts the machining datum is the largest planar face.
         # Use dominant planar normal as the "Z axis" for through vs blind checks.
@@ -512,8 +574,9 @@ class MachiningFeatureRecognizer:
         bore_id_to_cyl: Dict[str, Dict] = {}
 
         for cyl in cylinders:
-            # Milled parts have no external_diameter — skip outward-facing cylinders
-            if cyl["kind"] == "external_diameter":
+            # Outward-facing (convex) cylinders are never holes — skip turned
+            # diameters and off-axis profile faces alike.
+            if cyl["kind"] in ("external_diameter", "offset_profile"):
                 continue
             diameter_mm = round(cyl["radius"] * 2.0, 3)
             cx, cy, cz = cyl["centroid"]
@@ -521,7 +584,7 @@ class MachiningFeatureRecognizer:
             fid = f"bore_{bore_idx}"
 
             kind = cyl["kind"] if cyl["kind"] in ("through_hole", "blind_hole") else "blind_hole"
-            emit_type, tap_spec, is_helicoil = _classify_hole(
+            hole_variant, tap_spec, is_helicoil = _classify_hole(
                 diameter_mm, through=(kind == "through_hole"),
             )
 
@@ -540,9 +603,10 @@ class MachiningFeatureRecognizer:
 
             features.append(MachiningFeature(
                 id=fid,
-                type=emit_type,
+                type="SimpleHole",
+                variant=hole_variant,
                 params=params,
-                confidence=0.85 if emit_type == "through_hole" else (0.55 if tap_spec else 0.80),
+                confidence=0.85 if hole_variant == "through" else (0.55 if tap_spec else 0.80),
                 face_ids=cyl.get("face_indices", []),
             ))
             bore_id_to_cyl[fid] = cyl
@@ -551,19 +615,20 @@ class MachiningFeatureRecognizer:
         # Counterbore detection with centroid distance guard. Without bore_id_to_cyl the
         # O(n²) pair check would produce thousands of false positives from non-coaxial
         # bore pairs that happen to satisfy diam_outer > diam_inner + depth_outer < depth_inner.
-        bore_features = [f for f in features if f.type in ("through_hole", "blind_hole", "tapped_hole")]
+        bore_features = [f for f in features if _is_bore(f)]
 
         # Multi-step holes (3+ coaxial bores) BEFORE counterbores — see the
         # matching comment in _recognize_turned for why the ordering matters.
         multistep_groups = _detect_multistep_holes(
-            [f for f in bore_features if f.type in ("through_hole", "blind_hole")],
+            [f for f in bore_features if _is_plain_bore(f)],
             bore_id_to_cyl,
         )
         multistep_absorbed: set = set()
         for ms_idx, (member_ids, ms_params) in enumerate(multistep_groups):
             features.append(MachiningFeature(
                 id=f"mstep_{ms_idx}",
-                type="multi_step_hole",
+                type="MultiStepHole",
+                variant="stepped",
                 params=ms_params,
                 confidence=0.75,
                 children=member_ids,
@@ -575,7 +640,7 @@ class MachiningFeatureRecognizer:
             bore_features = [f for f in bore_features if f.id not in multistep_absorbed]
 
         counterbores = _detect_counterbores(
-            [f for f in bore_features if f.type in ("through_hole", "blind_hole")],
+            [f for f in bore_features if _is_plain_bore(f)],
             bore_id_to_cyl,
         )
         if counterbores:
@@ -587,7 +652,8 @@ class MachiningFeatureRecognizer:
                 ))
                 features.append(MachiningFeature(
                     id=f"cbore_{cb_idx}",
-                    type="counterbore",
+                    type="MultiStepHole",
+                    variant="counterbore",
                     params=params,
                     confidence=0.78,
                     children=[outer_id, inner_id],
@@ -597,30 +663,35 @@ class MachiningFeatureRecognizer:
             features = [f for f in features if f.id not in absorbed]
 
         for cone_idx, cone in enumerate(cones):
-            ftype, params, conf = _classify_cone(cone, cylinders)
+            edge_variant, params, conf = _classify_cone(cone, cylinders)
             features.append(MachiningFeature(
-                id=f"{ftype}_{cone_idx}",
-                type=ftype,
+                id=f"{edge_variant}_{cone_idx}",
+                type="Edge",
+                variant=edge_variant,
                 params=params,
                 confidence=conf,
                 face_ids=cone.get("face_indices", []),
             ))
 
         for p_idx, p in enumerate(prismatic):
-            ftype, params = _classify_prismatic(p, datum_axis)
+            ftype, variant, params = _classify_prismatic(p, datum_axis)
             features.append(MachiningFeature(
                 id=f"{ftype}_{p_idx}",
                 type=ftype,
+                variant=variant,
                 params=params,
                 confidence=0.68,
                 face_ids=p.get("face_indices", []),
             ))
 
         for tor_idx, tor in enumerate(toroids):
-            ftype = "groove" if tor["is_concave"] else "fillet"
+            # Concave toroidal recess on a milled part is a milled groove
+            # ("Groove Milling//Slot"); a convex blend is a rounded edge.
+            ftype, variant = ("Slot", "groove") if tor["is_concave"] else ("Edge", "round")
             features.append(MachiningFeature(
-                id=f"{ftype}_{tor_idx}",
+                id=f"{variant}_{tor_idx}",
                 type=ftype,
+                variant=variant,
                 params={
                     "major_diameter_mm": round(tor["major_radius"] * 2.0, 3),
                     "radius_mm": round(tor["minor_radius"], 3),
@@ -646,7 +717,7 @@ class MachiningFeatureRecognizer:
         # the intended TOOLING/process, not the geometry). Confirmed live:
         # wiring it in silently reclassified an ordinary 20x15 pocket's own
         # 4 walls as "polygon". Kept as a documented, real, tested spike
-        # (same precedent as sheet_metal/features/gusset_spike.py) for a
+        # (same discipline: not wired without a disambiguating signal) for a
         # future pass that has an additional real signal (drawing-callout
         # PMI, known drive-socket size standards) to disambiguate -- not
         # wired in without one.
@@ -674,7 +745,7 @@ class MachiningFeatureRecognizer:
         for cutout_idx, cutout in enumerate(cutouts):
             features.append(MachiningFeature(
                 id=f"cutout_{cutout_idx}",
-                type="cutout",
+                type="Cutout",
                 params={
                     "side_count": cutout["side_count"],
                     "area_mm2": cutout["area_mm2"],
@@ -715,7 +786,7 @@ class MachiningFeatureRecognizer:
                 "or the part may require manual feature tagging."
             )
 
-        return MachiningFeatureTree(family="cnc_milled", features=features, warnings=warnings)
+        return MachiningFeatureTree(family=MILLED, features=features, warnings=warnings)
 
     def _dominant_planar_normal(self, shape) -> Tuple[float, float, float]:
         """
@@ -781,7 +852,7 @@ class MachiningFeatureRecognizer:
             return (0.0, 0.0, 1.0)
         dominant = max(votes, key=lambda k: votes[k])
         logger.info(
-            f"[cnc_features] dominant_axis={dominant} votes={votes[dominant]}/{sum(votes.values())}"
+            f"[machining_features] dominant_axis={dominant} votes={votes[dominant]}/{sum(votes.values())}"
         )
         return dominant
 
@@ -1051,14 +1122,13 @@ def _deduplicate_cylinders(raw: List[Dict]) -> List[Dict]:
 # (_classify_cone moved to shared/machining_geometry.py, re-exported above)
 
 
-def _classify_prismatic(pocket: Dict, main_axis: Tuple[float, float, float]) -> Tuple[MachiningFeatureType, Dict]:
+def _classify_prismatic(pocket: Dict, main_axis: Tuple[float, float, float]) -> Tuple[MachiningFeatureType, str, Dict]:
     """
-    Classify a planar floor face into slot / radial_slot / keyway / pocket.
+    Classify a planar floor face into (type, variant, params):
 
-    slot       : elongated (length/width > 3) with axis roughly perpendicular to main axis
-    radial_slot: elongated, oriented radially on a turned OD
-    keyway     : elongated parallel to main axis, shallow depth
-    pocket     : default — enclosed planar recess
+    Keyway        : elongated, floor normal parallel to the datum axis
+    Slot/straight : elongated otherwise
+    PocketV2      : default -- enclosed planar recess
     """
     dims = pocket["dims"]
     short, mid, long = dims[0], dims[1], dims[2]
@@ -1079,7 +1149,7 @@ def _classify_prismatic(pocket: Dict, main_axis: Tuple[float, float, float]) -> 
         # Check if the long dimension is parallel or perpendicular to main axis
         # Keyway: long axis parallel to main rotation axis
         # Slot / radial_slot: long axis perpendicular
-        return "keyway", {
+        return "Keyway", "default", {
             "length_mm": round(long, 3),
             "width_mm": round(mid, 3),
             "depth_mm": round(short, 3),
@@ -1087,14 +1157,14 @@ def _classify_prismatic(pocket: Dict, main_axis: Tuple[float, float, float]) -> 
         }
 
     if aspect > 2.5:
-        return "slot", {
+        return "Slot", "straight", {
             "length_mm": round(long, 3),
             "width_mm": round(mid, 3),
             "depth_mm": round(short, 3),
             "centroid": centroid,
         }
 
-    return "pocket", {
+    return "PocketV2", "default", {
         "length_mm": round(long, 3),
         "width_mm": round(mid, 3),
         "depth_mm": round(short, 3),
@@ -1105,12 +1175,12 @@ def _classify_prismatic(pocket: Dict, main_axis: Tuple[float, float, float]) -> 
 def _classify_prismatic_turned(
     pocket: Dict,
     main_axis: Tuple[float, float, float],
-) -> Optional[Tuple[MachiningFeatureType, Dict]]:
+) -> Optional[Tuple[MachiningFeatureType, str, Dict]]:
     """
     Classify a prismatic face collected from a turned part.
     Returns None for structural/transition faces (end faces, shoulders, datums).
 
-    Only keyway and slot are emitted from turned parts — generic "pocket" is not
+    Only Keyway and Slot/radial are emitted from turned parts — PocketV2 is not
     valid here because pockets on turned ODs are either keyways (parallel to axis)
     or radial slots (perpendicular). Structural faces are filtered by aspect < 2.5.
     """
@@ -1131,7 +1201,7 @@ def _classify_prismatic_turned(
 
     if dot_with_axis > 0.85:
         # Floor normal is parallel to axis → keyway running along the shaft
-        return "keyway", {
+        return "Keyway", "default", {
             "length_mm": round(long, 3),
             "width_mm": round(mid, 3),
             "depth_mm": round(short, 3),
@@ -1139,7 +1209,7 @@ def _classify_prismatic_turned(
         }
 
     # Elongated face with normal perpendicular to axis → radial slot on OD
-    return "radial_slot", {
+    return "Slot", "radial", {
         "length_mm": round(long, 3),
         "width_mm": round(mid, 3),
         "depth_mm": round(short, 3),
@@ -1270,313 +1340,226 @@ def _angles_equally_spaced(angles: List[float], tolerance_deg: float = 8.0) -> b
 # shared/machining_geometry.py, re-exported above.
 
 
-# Feature types that carry a diameter and are grouped/labelled by diameter
-# bucket. Each maps to its own real feature_type string in the output --
-# previously ALL of these (plus counterbore/countersink, which were missing
-# entirely -- see _extract_diam_depth's own doc comment) collapsed into one
-# generic "hole" string that operation-sequencer.ts's switch (which matches
-# on the exact strings "through_hole"/"blind_hole"/"tapped_hole"/
-# "counterbore"/"countersink"/"chamfer") never matched, silently routing
-# every real hole/counterbore/chamfer/countersink into its volume-only
-# default-case costing instead of real per-feature Drill/Tap/Counterbore/
-# Chamfer/Countersink cycle times.
-_DIAMETER_TYPES = {
-    "through_hole", "blind_hole", "tapped_hole", "cross_hole",
-    "counterbore", "countersink", "chamfer",
-    # Real, already-detected (MachiningFeature.face_ids populated), previously
-    # silently dropped here because _extract_diam_depth had no branch for it
-    # (fell through to (None, None), skipped by the `if diam is None`
-    # guard). Phase 0 coverage fix.
-    "external_diameter",
+# ── feature_graph_v2 synthesis ────────────────────────────────────────────────
+#
+# Every output entry's feature_type is a reference catalog feature type and
+# carries its geometric variant; occurrences are bucketed per
+# (feature_type, variant, size key). Each (type, variant) belongs to exactly
+# one geometry SHAPE, which decides which real params are read and which
+# occurrence fields are emitted. A (type, variant) missing from _SHAPE is a
+# programming error, raised loudly -- never silently dropped.
+
+_DIAMETER, _TOROID, _VOLUMETRIC, _PATTERN, _STEPPED, _REGION, _TOOTHED = (
+    "diameter", "toroid", "volumetric", "pattern", "stepped", "region", "toothed",
+)
+_SHAPE: Dict[Tuple[str, str], str] = {
+    ("SimpleHole", "through"): _DIAMETER,
+    ("SimpleHole", "blind"): _DIAMETER,
+    ("SimpleHole", "threaded"): _DIAMETER,
+    ("SimpleHole", "cross"): _DIAMETER,
+    ("SimpleHole", "pcd_pattern"): _PATTERN,
+    ("MultiStepHole", "counterbore"): _DIAMETER,
+    ("MultiStepHole", "stepped"): _STEPPED,
+    ("Edge", "countersink"): _DIAMETER,
+    ("Edge", "chamfer"): _DIAMETER,
+    ("Edge", "round"): _TOROID,
+    ("Ring", "outer_diameter"): _DIAMETER,
+    ("Ring", "groove"): _TOROID,
+    ("Slot", "groove"): _TOROID,
+    ("Slot", "straight"): _VOLUMETRIC,
+    ("Slot", "radial"): _VOLUMETRIC,
+    ("Keyway", "default"): _VOLUMETRIC,
+    ("PocketV2", "default"): _VOLUMETRIC,
+    ("Cutout", "default"): _REGION,
+    ("PlanarFace", "default"): _REGION,
+    ("CurvedWall", "default"): _REGION,
+    ("CurvedSurface", "default"): _REGION,
+    ("AxiGroove", "default"): _TOOTHED,
 }
-# Feature types classified by volumetric dims rather than a diameter.
-# "pocket" stays "pocket"; "keyway" stays "keyway" (real, distinct data --
-# a dedicated Keyway Broaching engine now consumes it, pre-filtered out of
-# what reaches build_operation_sequence the same way through_hole/blind_hole
-# occurrences are split off for Gun Drilling/Deep Bore -- see
-# deep-hole-routing.ts's splitDeepHoleOccurrences and its keyway analogue).
-# radial_slot still folds into "slot": operation-sequencer.ts has no
-# dedicated case for it yet (only "pocket"/"slot"/now "keyway"), so it is
-# still a 1:1 passthrough compromise, not a fabricated mapping.
-_POCKET_TYPES = {"pocket", "slot", "radial_slot", "keyway"}
+_TOOTH_FIELDS = ("tooth_count", "tip_diameter_mm", "root_diameter_mm", "face_width_mm")
 _KEYWAY_DIM_FIELDS = ("length_mm", "width_mm", "depth_mm")
-# Toroidal (concave=groove / convex=fillet) real features — classified by a
-# real major/minor radius pair, not a diameter+depth pair. Previously
-# silently dropped here (no branch at all); ALSO previously had no centroid
-# in their own MachiningFeature.params (see _collect_toroids' Phase 0 fix), which
-# would have caused build_machining_feature_graph_v2's `centroid_abs is None`
-# guard to drop them even with a branch added — both fixed together.
-_TOROID_TYPES = {"fillet", "groove"}
-# Phase 3 general milled-face classification regions (face_classification.py)
-# — real, connected-component face groups classified by surface type, not
-# by diameter, volume, or toroid radius. Carry area_mm2 + bbox instead.
-_FACE_REGION_TYPES = {"planar_face", "curved_wall", "curved_surface"}
 
 
-def _extract_diam_depth(ftype: str, p: dict):
-    """Real (diameter_mm, depth_mm) for one _DIAMETER_TYPES feature, or
-    (None, None) when the source data genuinely doesn't have it -- never a
-    guessed value.
+def _extract_diam_depth(ftype: str, variant: str, p: dict):
+    """Real (diameter_mm, depth_mm) for one _DIAMETER feature, or (None, None)
+    when the source data genuinely doesn't have it -- never a guessed value.
 
-    Each type's real params use a different field name for the same real
-    quantity (through_hole/blind_hole/tapped_hole/cross_hole:
-    "diameter_mm"/"depth_mm"; counterbore: "counterbore_diameter_mm"/
-    "counterbore_depth_mm" from _detect_counterbores, kept distinct from its
-    own "bore_diameter_mm" rather than conflated; countersink: only
-    "entry_diameter_mm"/"bore_diameter_mm"/"half_angle_deg" from
-    _classify_cone -- no direct depth signal from cone geometry alone, so
-    depth is derived from the real entry/bore diameter step and half-angle
-    (right-triangle: depth = radial_step / tan(half_angle)) when both are
-    present, else 0.0 so the TS-side fallback (diamMm * 2.5) applies rather
-    than fabricating a number here; chamfer: only "diameter_mm", no depth
-    concept at all -- operation-sequencer.ts's chamfer case is a fixed
-    per-count time, not diameter/depth-driven).
+    Each detector names the same quantity differently: bores use
+    diameter_mm/depth_mm; a counterbore reports its own counterbore_diameter_mm/
+    counterbore_depth_mm (kept distinct from its bore_diameter_mm); a
+    countersink has only entry/bore diameters + half-angle, so its depth is the
+    right-triangle step radial_step / tan(half_angle) when both are present,
+    else 0.0; a chamfer has no depth concept; an outer-diameter Ring's axial
+    length_mm is its real analogue of depth.
     """
-    if ftype in ("through_hole", "blind_hole", "tapped_hole", "cross_hole"):
+    if ftype == "SimpleHole":
         return p.get("diameter_mm"), (p.get("depth_mm", 0.0) or 0.0)
-    if ftype == "counterbore":
+    if ftype == "MultiStepHole" and variant == "counterbore":
         return p.get("counterbore_diameter_mm"), (p.get("counterbore_depth_mm", 0.0) or 0.0)
-    if ftype == "countersink":
+    if ftype == "Edge" and variant == "countersink":
         diam = p.get("entry_diameter_mm")
         bore_d = p.get("bore_diameter_mm")
         half_angle = p.get("half_angle_deg")
         depth = 0.0
         if diam is not None and bore_d is not None and half_angle:
-            step_r = (diam - bore_d) / 2.0
             tan_a = math.tan(math.radians(half_angle))
             if tan_a > 1e-6:
-                depth = round(step_r / tan_a, 3)
+                depth = round(((diam - bore_d) / 2.0) / tan_a, 3)
         return diam, depth
-    if ftype == "chamfer":
+    if ftype == "Edge" and variant == "chamfer":
         return p.get("diameter_mm"), 0.0
-    if ftype == "external_diameter":
-        # Real params: diameter_mm + length_mm (axial extent of the OD step,
-        # see the "external_diameter" MachiningFeature construction) — length_mm
-        # is the real analogue of "depth" here (how far along the axis this
-        # OD step runs), not a guessed value.
+    if ftype == "Ring" and variant == "outer_diameter":
         return p.get("diameter_mm"), (p.get("length_mm", 0.0) or 0.0)
     return None, None
 
 
 def build_machining_feature_graph_v2(
-    cnc_dict: dict,
+    machining_dict: dict,
     bbox_center: tuple,
     face_map_list: list,
     total_tris: int,
     stable_face_ids: Optional[Dict[int, str]] = None,
 ) -> dict:
-    """Synthesise a feature_graph_v2 payload from CNC feature data.
+    """Synthesise a feature_graph_v2 payload from the machining feature tree.
 
-    Groups diameter-bearing features (holes, counterbore, countersink,
-    chamfer) by real type + diameter bucket, and volumetric features
-    (pocket/slot) by real type, so operation-sequencer.ts's per-feature-type
-    switch actually receives the type it switches on -- see _DIAMETER_TYPES'
-    own doc comment for what this replaces.
-
-    stable_face_ids: optional real content-based face-identity map (see
-    shared/stable_face_id.py), keyed by the same OCC face ordinal used in
-    each occurrence's face_ids. When supplied, each occurrence additionally
-    carries source_face_stable_ids (same integration pattern already proven
-    for Sheet Metal in feature_extractor.py) -- purely additive, existing
-    consumers reading face_ids/centroid/etc. are unaffected.
+    Output entries carry the reference feature_type + variant the backend's
+    operation resolver dispatches on. stable_face_ids (shared/stable_face_id.py),
+    when supplied, adds source_face_stable_ids per occurrence.
     """
     from collections import defaultdict
 
     cx, cy, cz = bbox_center
     buckets: dict = defaultdict(list)
 
-    for feat in cnc_dict.get("features", []):
-        ftype = feat.get("type", "")
+    for feat in machining_dict.get("features", []):
+        ftype = feat["type"]
+        variant = feat.get("variant", "default")
+        shape = _SHAPE.get((ftype, variant))
+        if shape is None:
+            raise ValueError(f"no feature_graph_v2 shape registered for {ftype}/{variant}")
         p = feat.get("params", {})
         centroid_abs = p.get("centroid")
-        if centroid_abs is None and ftype == "pcd_hole_pattern":
-            # A PCD pattern has no single hole's centroid of its own (it's a
-            # ring of real holes) — the real part bbox_center (already
-            # computed, already passed into this function) is used as a
-            # disclosed positional fallback, not a fabricated value.
+        if centroid_abs is None and shape in (_PATTERN, _TOOTHED):
+            # A hole pattern / a ring of teeth has no single centroid of its
+            # own; the part bbox centre is the disclosed positional stand-in.
             centroid_abs = (cx, cy, cz)
         if centroid_abs is None:
             continue
+        base = {"centroid_abs": centroid_abs, "face_ids": feat.get("face_ids", [])}
 
-        if ftype in _DIAMETER_TYPES:
-            diam, depth = _extract_diam_depth(ftype, p)
+        if shape == _DIAMETER:
+            diam, depth = _extract_diam_depth(ftype, variant, p)
             if diam is None:
                 continue
-            d_bucket = round(diam / 0.1) * 0.1
-            buckets[(ftype, d_bucket)].append({
-                "centroid_abs": centroid_abs,
+            buckets[(ftype, variant, round(diam / 0.1) * 0.1)].append({
+                **base,
                 "depth_mm": depth,
-                "face_ids": feat.get("face_ids", []),
-                "tapped": ftype == "tapped_hole",
+                "tapped": variant == "threaded",
                 "spec": p.get("spec"),
                 "material_removed_mm3": round(math.pi * (diam / 2) ** 2 * depth, 2) if depth else 0.0,
             })
 
-        elif ftype in _POCKET_TYPES:
-            if ftype == "pocket":
-                feat_type_out = "pocket"
-            elif ftype == "keyway":
-                feat_type_out = "keyway"
-            else:
-                feat_type_out = "slot"
-            dims = p.get("dims") or [
-                p.get("depth_mm", 0) or 0,
-                p.get("width_mm", 0) or 0,
-                p.get("length_mm", 0) or 0,
-            ]
-            vol = round(dims[-1] * dims[-2] * dims[0], 2) if len(dims) >= 3 else 0.0
-            bucket_entry = {
-                "centroid_abs": centroid_abs,
-                "face_ids": feat.get("face_ids", []),
-                "material_removed_mm3": vol,
-            }
-            if feat_type_out == "keyway":
-                for field in _KEYWAY_DIM_FIELDS:
-                    bucket_entry[field] = p.get(field)
-            buckets[(feat_type_out, "pocket")].append(bucket_entry)
-
-        elif ftype in _TOROID_TYPES:
-            # Real major_diameter_mm/radius_mm bucket (Phase 0 coverage fix).
-            # material_removed_mm3 is honestly left at 0.0, not fabricated —
-            # a toroidal blend's real removed volume depends on its real arc
-            # sweep angle, which is not extracted here; this stays a
-            # disclosed gap for the MRR-based fallback path rather than an
-            # invented number.
-            major_d = round(p.get("major_diameter_mm", 0.0) or 0.0, 1)
-            buckets[(ftype, major_d)].append({
-                "centroid_abs": centroid_abs,
-                "radius_mm": p.get("radius_mm"),
-                "face_ids": feat.get("face_ids", []),
-                "material_removed_mm3": 0.0,
+        elif shape == _TOROID:
+            # material_removed_mm3 stays a disclosed 0.0: a toroidal blend's
+            # removed volume depends on its arc sweep, which is not extracted.
+            buckets[(ftype, variant, round(p.get("major_diameter_mm", 0.0) or 0.0, 1))].append({
+                **base, "radius_mm": p.get("radius_mm"), "material_removed_mm3": 0.0,
             })
 
-        elif ftype == "pcd_hole_pattern":
-            # A real, already-aggregated group of holes (see
-            # _detect_pcd_from_axial_bores / the cross-hole PCD grouping) --
-            # its constituent individual bores are already absorbed/removed
-            # from cnc_dict["features"] by the time this runs, so there is
-            # no real per-hole centroid to report. Represented as ONE
-            # occurrence per pattern (not fabricated per-hole entries),
-            # carrying the real hole_count so a consumer knows how many real
-            # holes it represents; face_ids is the real union of every
-            # constituent hole's faces, so clicking it highlights the real
-            # pattern (not isolatable to one hole within it, which is an
-            # honest limitation of the aggregate, not a guess).
-            diam = round(p.get("hole_diameter_mm", 0.0) or 0.0, 1)
-            buckets[(ftype, diam)].append({
-                "centroid_abs": centroid_abs,
+        elif shape == _VOLUMETRIC:
+            dims = [p.get("depth_mm", 0) or 0, p.get("width_mm", 0) or 0, p.get("length_mm", 0) or 0]
+            entry = {**base, "material_removed_mm3": round(dims[2] * dims[1] * dims[0], 2)}
+            if ftype == "Keyway":
+                for fld in _KEYWAY_DIM_FIELDS:
+                    entry[fld] = p.get(fld)
+            buckets[(ftype, variant, None)].append(entry)
+
+        elif shape == _PATTERN:
+            # One occurrence per pattern; its member holes were absorbed, so
+            # hole_count says how many real holes it stands for.
+            buckets[(ftype, variant, round(p.get("hole_diameter_mm", 0.0) or 0.0, 1))].append({
+                **base,
                 "depth_mm": p.get("depth_mm", 0.0) or 0.0,
                 "hole_count": p.get("hole_count", 1),
                 "pcd_mm": p.get("pcd_mm"),
-                "face_ids": feat.get("face_ids", []),
                 "material_removed_mm3": 0.0,
             })
 
-        elif ftype in _FACE_REGION_TYPES:
-            # Phase 3 general milled-face classification (face_classification.py).
-            # Real area_mm2, no fabricated removed-volume -- same disclosed-0.0
-            # discipline as _TOROID_TYPES above (classifying a face does not by
-            # itself reveal how much stock sat above it before machining).
-            # All real regions of the SAME type across the part become
-            # occurrences of ONE output feature entry, matching every other
-            # type's bucketing convention in this function (e.g. "pocket").
-            buckets[(ftype, "region")].append({
-                "centroid_abs": centroid_abs,
-                "area_mm2": p.get("area_mm2", 0.0) or 0.0,
-                "face_ids": feat.get("face_ids", []),
-                "material_removed_mm3": 0.0,
-            })
-
-        elif ftype == "cutout":
-            # Phase 5 (detect_cutout_rings): real wall area_mm2 + side_count.
-            # material_removed_mm3 stays a disclosed 0.0 -- the real
-            # cross-sectional footprint the cutout removed isn't separately
-            # computed here (area_mm2 is total LATERAL wall area, not
-            # footprint x depth), same honesty as _FACE_REGION_TYPES above
-            # rather than a fabricated approximation.
-            buckets[(ftype, "region")].append({
-                "centroid_abs": centroid_abs,
-                "area_mm2": p.get("area_mm2", 0.0) or 0.0,
-                "side_count": p.get("side_count", 0),
-                "face_ids": feat.get("face_ids", []),
-                "material_removed_mm3": 0.0,
-            })
-
-        elif ftype == "multi_step_hole":
-            # Phase 5 (_detect_multistep_holes): a real chain of 3+ coaxial
-            # bores. material_removed_mm3 is a real, honest sum of each
-            # step's own exposed diameter+depth as a simple cylinder --
-            # the same per-hole volume formula _DIAMETER_TYPES already uses
-            # above, applied per real step rather than fabricated.
+        elif shape == _STEPPED:
             steps = p.get("steps", [])
-            total_removed = sum(
+            removed = sum(
                 math.pi * (s.get("diameter_mm", 0.0) / 2) ** 2 * (s.get("depth_mm") or 0.0)
                 for s in steps
             )
-            buckets[(ftype, "region")].append({
-                "centroid_abs": centroid_abs,
+            buckets[(ftype, variant, None)].append({
+                **base,
                 "steps": steps,
                 "step_count": p.get("step_count", len(steps)),
-                "face_ids": feat.get("face_ids", []),
-                "material_removed_mm3": round(total_removed, 2),
+                "material_removed_mm3": round(removed, 2),
             })
 
+        elif shape == _TOOTHED:
+            # Teeth around the axis; removed volume is not derivable from the
+            # face classification -- disclosed 0.0.
+            buckets[(ftype, variant, round(p.get("tip_diameter_mm", 0.0) or 0.0, 1))].append({
+                **base, **{f: p.get(f) for f in _TOOTH_FIELDS}, "material_removed_mm3": 0.0,
+            })
+
+        else:  # _REGION
+            # area_mm2 is real (lateral wall area for a Cutout); removed volume
+            # is not derivable from a face classification -- disclosed 0.0.
+            entry = {**base, "area_mm2": p.get("area_mm2", 0.0) or 0.0, "material_removed_mm3": 0.0}
+            if ftype == "Cutout":
+                entry["side_count"] = p.get("side_count", 0)
+            buckets[(ftype, variant, None)].append(entry)
 
     features_out = []
-    for (feat_type_out, diam_or_tag), occurrences in buckets.items():
-        is_diam_type = feat_type_out in _DIAMETER_TYPES
-        # Toroids bucket by major_diameter_mm, pcd_hole_pattern by
-        # hole_diameter_mm — both real diameters worth surfacing on the
-        # entry even though they don't get the hole-family occurrence
-        # fields (depth_mm/ld_ratio/tapped/spec) below.
-        has_real_diameter = is_diam_type or feat_type_out in _TOROID_TYPES or feat_type_out == "pcd_hole_pattern"
-        diam = diam_or_tag if has_real_diameter else None
+    for (ftype, variant, diam), occurrences in buckets.items():
+        shape = _SHAPE[(ftype, variant)]
         count = len(occurrences)
         feat_id = (
-            f"{feat_type_out}_d{diam}_c{count}_cnc" if has_real_diameter
-            else f"{feat_type_out}_c{count}_cnc"
+            f"{ftype}-{variant}_d{diam}_c{count}" if diam is not None
+            else f"{ftype}-{variant}_c{count}"
         )
         occ_list = []
         for occ in occurrences:
             ax, ay, az = occ["centroid_abs"]
-            centered = [round(ax - cx, 3), round(ay - cy, 3), round(az - cz, 3)]
             depth = occ.get("depth_mm", 0.0) or 0.0
-            ld_ratio = round(depth / max(diam, 0.1), 3) if (diam and depth) else None
             occ_entry: dict = {
-                "centroid": centered,
+                "centroid": [round(ax - cx, 3), round(ay - cy, 3), round(az - cz, 3)],
                 "face_ids": occ["face_ids"],
                 "local_feature_density": count,
                 "material_removed_mm3": occ.get("material_removed_mm3", 0.0),
             }
             if stable_face_ids:
-                occ_entry["source_face_stable_ids"] = [
-                    stable_face_ids.get(fid) for fid in occ["face_ids"]
-                ]
-            if is_diam_type:
+                occ_entry["source_face_stable_ids"] = [stable_face_ids.get(f) for f in occ["face_ids"]]
+            if shape == _DIAMETER:
                 occ_entry["depth_mm"] = round(depth, 3)
-                occ_entry["ld_ratio"] = ld_ratio
-                occ_entry["tapped"] = occ.get("tapped", False)
-                occ_entry["spec"] = occ.get("spec")
-            if feat_type_out == "keyway":
-                for field in _KEYWAY_DIM_FIELDS:
-                    val = occ.get(field)
-                    occ_entry[field] = round(val, 3) if val is not None else None
-            if feat_type_out in _TOROID_TYPES:
-                occ_entry["radius_mm"] = occ.get("radius_mm")
-            if feat_type_out == "pcd_hole_pattern":
+                occ_entry["ld_ratio"] = round(depth / max(diam, 0.1), 3) if (diam and depth) else None
+                occ_entry["tapped"] = occ["tapped"]
+                occ_entry["spec"] = occ["spec"]
+            elif shape == _TOROID:
+                occ_entry["radius_mm"] = occ["radius_mm"]
+            elif shape == _PATTERN:
                 occ_entry["depth_mm"] = round(depth, 3)
-                occ_entry["hole_count"] = occ.get("hole_count", 1)
-                occ_entry["pcd_mm"] = occ.get("pcd_mm")
-            if feat_type_out in _FACE_REGION_TYPES:
-                occ_entry["area_mm2"] = occ.get("area_mm2", 0.0)
-            if feat_type_out == "cutout":
-                occ_entry["area_mm2"] = occ.get("area_mm2", 0.0)
-                occ_entry["side_count"] = occ.get("side_count", 0)
-            if feat_type_out == "multi_step_hole":
-                occ_entry["steps"] = occ.get("steps", [])
-                occ_entry["step_count"] = occ.get("step_count", 0)
+                occ_entry["hole_count"] = occ["hole_count"]
+                occ_entry["pcd_mm"] = occ["pcd_mm"]
+            elif shape == _STEPPED:
+                occ_entry["steps"] = occ["steps"]
+                occ_entry["step_count"] = occ["step_count"]
+            elif shape == _TOOTHED:
+                for fld in _TOOTH_FIELDS:
+                    occ_entry[fld] = occ.get(fld)
+            elif shape == _REGION:
+                occ_entry["area_mm2"] = occ["area_mm2"]
+                if ftype == "Cutout":
+                    occ_entry["side_count"] = occ["side_count"]
+            if ftype == "Keyway":
+                for fld in _KEYWAY_DIM_FIELDS:
+                    val = occ.get(fld)
+                    occ_entry[fld] = round(val, 3) if val is not None else None
             occ_list.append(occ_entry)
-        entry: dict = {"id": feat_id, "feature_type": feat_type_out, "occurrences": occ_list}
+        entry: dict = {"id": feat_id, "feature_type": ftype, "variant": variant, "occurrences": occ_list}
         if diam is not None:
             entry["diameter_mm"] = diam
         features_out.append(entry)
@@ -1585,9 +1568,8 @@ def build_machining_feature_graph_v2(
         "metadata": {
             "face_map": face_map_list,
             "stl_tri_total": total_tris,
-            "source": "cnc_features",
+            "source": "machining_features",
             "stable_face_ids": stable_face_ids or {},
         },
         "features": features_out,
     }
-

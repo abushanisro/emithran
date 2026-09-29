@@ -24,7 +24,7 @@ from sheet_metal.features.formed_feature import detect_formed_features, count_re
 from sheet_metal.features.lance import detect_lances, count_recognized as count_recognized_lances
 from sheet_metal.bend_relationships import compute_bend_flange_relationships
 from shared.stable_face_id import build_stable_face_id_map
-from shared.feature_contract import build_normalized_feature, FEATURE_CONTRACT_VERSION
+from sheet_metal.feature_models import sheet_metal_feature
 
 logger = logging.getLogger(__name__)
 
@@ -469,28 +469,20 @@ class SheetMetalFeatureExtractor:
                 )
                 cut_boundary_fids = self._compute_cut_boundary_face_ids(shape, panels, dominant_face)
                 if cut_boundary_fids:
-                    v2_features.append({
-                        "id": "cut_profile",
-                        "feature_type": "cut_profile",
-                        "occurrences": [{"centroid": [0, 0, 0], "face_ids": cut_boundary_fids}],
-                    })
+                    v2_features.append(sheet_metal_feature(
+                        "cut_profile", "Blank", "default",
+                        occurrences=[{"centroid": [0, 0, 0], "face_ids": cut_boundary_fids}],
+                    ))
                 # Real face_ids for the "Detected Geometry" panel's click-to-
                 # highlight (see migration/CACHE_VERSION geo_v40 notes) —
                 # extruded_flange_occurrences/thin_web_occurrences are real
                 # OCC face indices collected during detection in
                 # _count_holes_with_location, not derived/guessed here.
                 if extruded_flange_occurrences:
-                    v2_features.append({
-                        "id": "extruded_flange",
-                        "feature_type": "extruded_flange",
-                        "occurrences": extruded_flange_occurrences,
-                    })
-                if thin_web_occurrences:
-                    v2_features.append({
-                        "id": "thin_web",
-                        "feature_type": "thin_web",
-                        "occurrences": thin_web_occurrences,
-                    })
+                    v2_features.append(sheet_metal_feature(
+                        "extruded_flange", "SimpleHole", "extruded",
+                        occurrences=extruded_flange_occurrences,
+                    ))
                 # One v2 feature entry per qualifying perforated region — same
                 # absolute-mm occurrence-centroid convention as
                 # extruded_flange/thin_web above (this data is produced at the
@@ -498,17 +490,64 @@ class SheetMetalFeatureExtractor:
                 # Three.js-centering _build_feature_occurrences applies to
                 # holes/bends). Real per-hole face_ids, not derived/guessed.
                 for idx, region in enumerate(perforation_groups):
-                    v2_features.append({
-                        "id": f"perforation_{idx}_d{region['diameter_mm']}",
-                        "feature_type": "perforation",
-                        "diameter_mm": region["diameter_mm"],
-                        "pitch_x_mm": region["pitch_x_mm"],
-                        "pitch_y_mm": region["pitch_y_mm"],
-                        "pattern_rows": region["pattern_rows"],
-                        "pattern_cols": region["pattern_cols"],
-                        "region_bbox_mm": region["region_bbox_mm"],
-                        "occurrences": region["occurrences"],
-                    })
+                    v2_features.append(sheet_metal_feature(
+                        f"perforation_{idx}_d{region['diameter_mm']}", "SimpleHole", "perforated",
+                        diameter_mm=region["diameter_mm"],
+                        pitch_x_mm=region["pitch_x_mm"],
+                        pitch_y_mm=region["pitch_y_mm"],
+                        pattern_rows=region["pattern_rows"],
+                        pattern_cols=region["pattern_cols"],
+                        region_bbox_mm=region["region_bbox_mm"],
+                        occurrences=region["occurrences"],
+                    ))
+                # Confirmed formed/lanced/rolled detections only -- 'ambiguous'
+                # candidates stay in the *_candidates disclosure lists and are
+                # never presented as features. Centroids are re-centred on the
+                # bbox centre, the same convention holes and bends use.
+                bbox_c = (
+                    (bbox_minmax["xmin"] + bbox_minmax["xmax"]) / 2.0,
+                    (bbox_minmax["ymin"] + bbox_minmax["ymax"]) / 2.0,
+                    (bbox_minmax["zmin"] + bbox_minmax["zmax"]) / 2.0,
+                )
+
+                def _centred(pt):
+                    return [round(pt[0] - bbox_c[0], 2), round(pt[1] - bbox_c[1], 2), round(pt[2] - bbox_c[2], 2)]
+
+                recognized_rolled = [c for c in rolled_forms if c.get("recognition_status") == "recognized"]
+                if recognized_rolled:
+                    v2_features.append(sheet_metal_feature(
+                        "rolled_form", "Form", "rolled",
+                        occurrences=[{
+                            "centroid": _centred(c["centroid"]),
+                            "face_ids": c["face_ids"],
+                            "radius_mm": c["radius_mm"],
+                            "sweep_deg": c["sweep_deg"],
+                            "axial_length_mm": c["axial_length_mm"],
+                        } for c in recognized_rolled],
+                    ))
+                recognized_formed = [c for c in formed_features if c.get("recognition_status") == "recognized"]
+                if recognized_formed:
+                    v2_features.append(sheet_metal_feature(
+                        "formed_feature", "Form", "emboss",
+                        occurrences=[{
+                            "centroid": _centred(c["centroid_mm"]),
+                            "face_ids": c["face_ids"],
+                            "diameter_mm": c["diameter_mm"],
+                            "depth_mm": c["depth_mm"],
+                            "is_shallow": c.get("is_shallow"),
+                        } for c in recognized_formed],
+                    ))
+                recognized_lances = [c for c in lances if c.get("recognition_status") == "recognized"]
+                if recognized_lances:
+                    v2_features.append(sheet_metal_feature(
+                        "lance", "Lance", "default",
+                        occurrences=[{
+                            "centroid": _centred(c["centroid_mm"]),
+                            "face_ids": c["face_ids"],
+                            "hinge_length_mm": c["hinge_length_mm"],
+                            "flange_area_mm2": c["flange_area_mm2"],
+                        } for c in recognized_lances],
+                    ))
                 # Stable, content-based face identity -- independent of OCC's
                 # runtime enumeration order (which every face_idx above IS,
                 # per this function's own docstring: "NOT stable across STEP
@@ -522,49 +561,30 @@ class SheetMetalFeatureExtractor:
                 except Exception as e:
                     logger.warning(f"[SheetMetal] stable_face_id build failed: {e}")
 
-                # Deterministic, versioned, normalized feature contract --
-                # shared/feature_contract.py already defines the envelope
-                # (FEATURE_CONTRACT_VERSION, build_normalized_feature()) but
-                # had zero real call sites. Additive layer on top of
-                # v2_features: one normalized record per real occurrence,
-                # every field traced to a fact v2_features already computed
-                # -- this does not replace v2_features/feature_graph_v2's
-                # existing ad-hoc shape, per feature_contract.py's own
-                # docstring.
-                normalized_features: List[Dict[str, Any]] = []
-                try:
-                    for group in v2_features:
-                        f_type = group.get("feature_type", "unknown")
-                        group_id = group.get("id", f_type)
-                        for i, occ in enumerate(group.get("occurrences", []) or []):
-                            face_ids = list(occ.get("face_ids", []) or [])
-                            nf = build_normalized_feature(
-                                feature_id=f"{group_id}_{i}",
-                                feature_type=f_type,
-                                source_face_ids=face_ids,
-                                geometric_parameters={k: v for k, v in occ.items() if k != "face_ids"},
-                                recognition_method=f"sheet_metal.{f_type}",
-                                recognition_status=occ.get("recognition_status", "recognized"),
-                            )
-                            # Enrichment, not part of build_normalized_feature()'s
-                            # own tested contract shape -- cross-run identity
-                            # for consumers that want it, alongside the
-                            # ordinal source_face_ids every existing consumer
-                            # already reads.
-                            nf["source_face_stable_ids"] = [stable_face_ids.get(fid) for fid in face_ids]
-                            normalized_features.append(nf)
-                except Exception as e:
-                    logger.warning(f"[SheetMetal] normalized_features build failed: {e}")
+                # Cross-run identity per occurrence, alongside the ordinal
+                # face_ids every consumer reads (same convention as the
+                # machining feature_graph_v2).
+                for group in v2_features:
+                    for occ in group.get("occurrences", []) or []:
+                        occ["source_face_stable_ids"] = [
+                            stable_face_ids.get(fid) for fid in occ.get("face_ids", []) or []
+                        ]
 
                 feature_graph_v2 = {
                     "metadata": {
                         "face_map": face_map or [],
                         "stl_tri_total": face_map_tri_total or None,
                         "stable_face_ids": stable_face_ids,
-                        "feature_contract_version": FEATURE_CONTRACT_VERSION,
                     },
                     "features": v2_features,
-                    "normalized_features": normalized_features,
+                    # DFM conditions between features -- not manufacturing
+                    # features themselves, so never in "features" above.
+                    # thin_web: two holes whose true edge-to-edge gap is below
+                    # 1.5x sheet thickness (real face_ids for highlighting).
+                    "conditions": (
+                        [{"id": "thin_web", "condition": "thin_web", "occurrences": thin_web_occurrences}]
+                        if thin_web_occurrences else []
+                    ),
                 }
                 logger.info(
                     f"[SheetMetal] feature_graph_v2: {len(v2_features)} feature types, "
@@ -585,7 +605,7 @@ class SheetMetalFeatureExtractor:
         if feature_graph_v2 and raw_cylinders_full and sheet_thickness > 0 and bbox_minmax:
             try:
                 real_bends = [
-                    occ for f in feature_graph_v2.get("features", []) if f.get("feature_type") == "bend"
+                    occ for f in feature_graph_v2.get("features", []) if f.get("feature_type") == "StraightBend"
                     for occ in f.get("occurrences", [])
                     if occ.get("face_ids")
                 ]
@@ -681,7 +701,7 @@ class SheetMetalFeatureExtractor:
             # counts CONFIDENT detections only (the sheet's back face has its
             # own local void at the same footprint -- material worked from
             # both faces, not just removed); formed_feature_candidates
-            # additionally carries 'ambiguous' entries (forming_spike.py's
+            # additionally carries 'ambiguous' entries (formed_feature.py stage 1's
             # existing candidate set with no back-void evidence either way)
             # so a consumer can disclose them without treating them as
             # detections. Additive: no existing hole/counterbore/countersink
@@ -692,7 +712,7 @@ class SheetMetalFeatureExtractor:
             # lance_count counts CONFIDENT detections only (the base panel's
             # own boundary encloses the hinge as a genuine interior hole);
             # lance_candidates additionally carries 'ambiguous' entries
-            # (lancing_spike.py's existing candidate set with no enclosure
+            # (lance.py stage 1's existing candidate set with no enclosure
             # evidence either way) so a consumer can disclose them without
             # treating them as detections. Additive: no bend_* field above
             # is changed.
@@ -1264,19 +1284,18 @@ class SheetMetalFeatureExtractor:
             avg_ay = sum(m[6] for m in members) / len(members)
             avg_az = sum(m[7] for m in members) / len(members)
 
-            features.append({
-                "id": f"hole_d{d_mm}",
-                "feature_type": "hole",
-                "diameter_mm": d_mm,
-                "normal": [round(avg_ax, 4), round(avg_ay, 4), round(avg_az, 4)],
-                "occurrences": occurrences,  # len == physical hole count for this diameter
-                "bbox_centered": {
+            features.append(sheet_metal_feature(
+                f"hole_d{d_mm}", "SimpleHole", "through",
+                diameter_mm=d_mm,
+                normal=[round(avg_ax, 4), round(avg_ay, 4), round(avg_az, 4)],
+                occurrences=occurrences,  # len == physical hole count for this diameter
+                bbox_centered={
                     "x_min": round(min(xs) - cx, 1),
                     "x_max": round(max(xs) - cx, 1),
                     "y_min": round(min(ys) - cy, 1),
                     "y_max": round(max(ys) - cy, 1),
                 },
-            })
+            ))
 
         # ── Bends: use pre-clustered inner_faces from spatial pre-computation above ──
         #
@@ -1321,27 +1340,22 @@ class SheetMetalFeatureExtractor:
             avg_ay = sum(m[6] for (m, _) in members) / len(members)
             avg_az = sum(m[7] for (m, _) in members) / len(members)
 
-            features.append({
-                "id": f"bend_r{r_mm}",
-                "feature_type": "bend",
-                "radius_mm": r_mm,
-                "normal": [round(avg_ax, 4), round(avg_ay, 4), round(avg_az, 4)],
-                "occurrences": occurrences,  # len == physical bend count for this radius
-                "bbox_centered": {
+            features.append(sheet_metal_feature(
+                f"bend_r{r_mm}", "StraightBend", "default",
+                radius_mm=r_mm,
+                normal=[round(avg_ax, 4), round(avg_ay, 4), round(avg_az, 4)],
+                occurrences=occurrences,  # len == physical bend count for this radius
+                bbox_centered={
                     "x_min": round(min(xs) - cx, 1),
                     "x_max": round(max(xs) - cx, 1),
                     "y_min": round(min(ys) - cy, 1),
                     "y_max": round(max(ys) - cy, 1),
                 },
-            })
+            ))
 
         # Slots: add from _detect_slots_v2 result (already have centroid + face_ids)
         if slot_occurrences:
-            features.append({
-                "id": "slot_all",
-                "feature_type": "slot",
-                "occurrences": slot_occurrences,
-            })
+            features.append(sheet_metal_feature("slot_all", "ComplexHole", "slot", occurrences=slot_occurrences))
 
         return features
 
@@ -2092,7 +2106,8 @@ class SheetMetalFeatureExtractor:
             fid = f"sm_bore_{idx}"
             bore_features.append(MachiningFeature(
                 id=fid,
-                type=cyl["kind"],
+                type="SimpleHole",
+                variant="through" if cyl["kind"] == "through_hole" else "blind",
                 params={
                     "diameter_mm": round(cyl["radius"] * 2.0, 3),
                     "depth_mm": round(cyl["length"], 3),
@@ -2111,8 +2126,8 @@ class SheetMetalFeatureExtractor:
         # Countersinks: cones with a coaxial adjacent bore
         cs_diameters: List[float] = []
         for cone in cones:
-            ftype, params, _conf = _classify_cone(cone, cylinders)
-            if ftype == "countersink":
+            edge_variant, params, _conf = _classify_cone(cone, cylinders)
+            if edge_variant == "countersink":
                 cs_diameters.append(round(params["entry_diameter_mm"], 1))
 
         def _group(diams: List[float]) -> Dict[str, Any]:
@@ -2770,6 +2785,86 @@ class SheetMetalFeatureExtractor:
         props = GProp_GProps()
         brepgprop.SurfaceProperties(dominant_face, props)
         return round(props.Mass(), 1)
+
+    def formed_sheet_plane_excess(
+        self,
+        shape: Any,
+        dominant_face: Any,
+        sheet_thickness: float,
+        raw_cylinders_full: Optional[List[Tuple]] = None,
+    ) -> Optional[Dict[str, int]]:
+        """
+        How many more distinct flat sheet planes the part has than one bent
+        sheet could join: distinct_planes - (bends + 1).
+
+        A single formed sheet is one connected piece: N flat panels are joined
+        by at least N - 1 bends (a tree). So a real sheet-metal part always has
+        excess <= 0, however its bends are arranged. excess > 0 means some
+        thin walls cannot be folded out of the same sheet -- they are walls of
+        a solid body (machined, cast), not flanges of a blank.
+
+        Panels are the same antiparallel face pairs at the detected gauge
+        _identify_panels already finds (the flat-pattern and cut-length code
+        use the identical set); coplanar panels are counted once, so a CAD
+        export that splits one flat face into several patches cannot inflate
+        the count.
+
+        Bends: the higher of extract()'s two bend-FACE detectors
+        (_collect_dedup_bends, _count_bends_from_full). Either can under-count
+        on some geometry (a real bent U-channel yields 0 from
+        _collect_dedup_bends but 2 from _count_bends_from_full), and an
+        under-count would veto a genuine sheet part -- so the count is taken in
+        the direction that can only make excess smaller. _detect_sharp_bends is
+        deliberately NOT used: it reads every ~90deg solid edge as a fold (18
+        on a clean U-channel, 27-60 on machined blocks), so it cannot count.
+
+        Returns None -- unknown, never a guessed count -- when the sheet frame
+        cannot be established, or when neither detector finds any bend face:
+        with no bend faces the part's folds (if any) are sharp mitered edges
+        that cannot be told apart from machined corners, so the fold count is
+        not measurable.
+
+        """
+        from OCC.Core.BRepAdaptor import BRepAdaptor_Surface  # type: ignore
+        from OCC.Core.GeomAbs import GeomAbs_Plane  # type: ignore
+
+        if dominant_face is None or sheet_thickness <= 0:
+            return None
+        adaptor = BRepAdaptor_Surface(dominant_face)
+        if adaptor.GetType() != GeomAbs_Plane:
+            return None
+        dn = adaptor.Plane().Axis().Direction()
+        mag = math.sqrt(dn.X() ** 2 + dn.Y() ** 2 + dn.Z() ** 2) or 1.0
+        dominant_normal = (dn.X() / mag, dn.Y() / mag, dn.Z() / mag)
+
+        bend_count = len(self._collect_dedup_bends(shape, dominant_normal, sheet_thickness))
+        if raw_cylinders_full:
+            bend_count = max(
+                bend_count,
+                self._count_bends_from_full(raw_cylinders_full, sheet_thickness, dominant_normal)["count"],
+            )
+        if bend_count == 0:
+            return None
+        panels = self._identify_panels(shape, sheet_thickness)
+
+        # Coplanar = same normal (either sense) and same offset within half a
+        # gauge (the two faces of one panel are a full gauge apart).
+        offset_tol = max(0.5, sheet_thickness * 0.5)
+        planes: List[Tuple[float, float, float, float]] = []
+        for panel in panels:
+            nx, ny, nz = panel["normal"]
+            d = panel["plane_d"]
+            if not any(
+                abs(abs(nx * a + ny * b + nz * c) - 1.0) < 1e-3 and abs(abs(d) - abs(dd)) < offset_tol
+                for (a, b, c, dd) in planes
+            ):
+                planes.append((nx, ny, nz, d))
+
+        return {
+            "distinct_planes": len(planes),
+            "bends": bend_count,
+            "excess": len(planes) - (bend_count + 1),
+        }
 
     def _identify_panels(
         self,

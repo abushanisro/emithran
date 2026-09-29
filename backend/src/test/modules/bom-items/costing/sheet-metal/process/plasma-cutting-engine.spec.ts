@@ -1,5 +1,4 @@
 import { computePlasmaCutCost, type PlasmaCutInput } from '../../../../../../modules/bom-items/costing/sheet-metal/process/plasma-cutting-engine';
-import { PLASMA_CUT_SETUP_MIN } from '../../../../../../modules/bom-items/costing/shared/core/default-rates.constants';
 
 // Real Steel 6.4mm / 100W row from sm_reference_data's
 // 'nestingCutRate:1:PlasmaCut:NoGas:Steel:100:6.4'
@@ -65,16 +64,18 @@ describe('computePlasmaCutCost — setup time', () => {
     const input = baseInput({ setupMin: 4.8 });
     const result = computePlasmaCutCost(input);
 
-    expect(result.warnings.some((w) => w.includes('setup time from fallback'))).toBe(false);
+    expect(result.warnings.some((w) => w.includes('setup not costed'))).toBe(false);
   });
 
-  it('falls back to PLASMA_CUT_SETUP_MIN and discloses a warning when no real setup time is resolved', () => {
+  it('does not cost setup, and says so, when no real setup time resolved', () => {
     const input = baseInput({ setupMin: undefined });
     const result = computePlasmaCutCost(input);
     const line = result.processLines[0]!;
 
-    expect(result.warnings.some((w) => w.includes('setup time from fallback'))).toBe(true);
-    expect(line.setupCost).toBeGreaterThanOrEqual(0);
+    expect(result.warnings.some((w) => w.includes('setup not costed'))).toBe(true);
+    expect(line.setupTimeMin).toBe(0);
+    expect(line.setupTimeSource).toBe('none');
+    expect(line.setupCost).toBe(0);
   });
 });
 

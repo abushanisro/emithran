@@ -31,33 +31,34 @@ export interface CostDriver {
 /** Legacy process-slot category used by ManufacturingFeatureBase */
 export type FeatureProcessCategory = 'cut' | 'form' | 'machined';
 
-/** Standardized feature type categories for Feature Graph v2 */
+/**
+ * feature_graph_v2 feature types: the reference operation-catalog vocabulary
+ * (cad-engine/shared/reference_features.json), each paired with a `variant`
+ * (sheet_metal/feature_models.py, machining/feature_models.py), plus the two
+ * injection-molding DFM face categories.
+ */
 export type FeatureCategory =
-  | 'hole'    // vertical cylindrical through/blind hole — detected
-  | 'bend'    // sheet-metal bend (horizontal cylinder face) — detected
-  | 'slot'    // elongated internal wire loop — detected
-  | 'pocket'  // planar recessed face — detected, face_ids in follow-up
-  | 'cutout'  // internal profile cut through flat face — not yet detected
-  | 'emboss'  // raised or depressed formed area — not yet detected
-  | 'louver'  // ventilation cut-form — not yet detected
-  | 'flange'  // bent-up edge (distinct from bend) — not yet detected
-  | 'hem'     // folded-back edge — not yet detected
-  | 'bead'    // stiffening rib — not yet detected
-  | 'cut_profile' // side-wall faces along every real cut boundary (outer perimeter + any cutout, any shape) — detected
-  | 'extruded_flange' // burled/extruded hole collar (coaxial stepped-hole cluster, >=3 members) — detected, geo_v40+
-  | 'thin_web'    // pair of holes with true edge-to-edge gap < 1.5x sheet thickness — detected, geo_v40+
-  | 'im_undercut'   // injection molding undercut face (DFM)
-  | 'im_undrafted'  // injection molding undrafted face (DFM)
-  // CNC-bucketed types — from cad-engine/machining/machining_feature_recognizer.py's
-  // build_machining_feature_graph_v2 (the only producer of these on feature_graph_v2).
-  // 'pocket'/'slot' above already cover the CNC pocket/slot/keyway/radial_slot bucket.
-  | 'through_hole'
-  | 'blind_hole'
-  | 'tapped_hole'
-  | 'cross_hole'
-  | 'counterbore'
-  | 'countersink'
-  | 'chamfer';
+  // Sheet metal (sheet_metal/feature_models.py)
+  | 'SimpleHole'
+  | 'ComplexHole'
+  | 'StraightBend'
+  | 'Form'
+  | 'Lance'
+  | 'Blank'
+  // Machining (machining/feature_models.py)
+  | 'MultiStepHole'
+  | 'Edge'
+  | 'Ring'
+  | 'Slot'
+  | 'Keyway'
+  | 'PocketV2'
+  | 'Cutout'
+  | 'PlanarFace'
+  | 'CurvedWall'
+  | 'CurvedSurface'
+  // Injection molding DFM faces
+  | 'im_undercut'
+  | 'im_undrafted';
 
 export type ExtractionMethod =
   | 'occ_cylindrical_face'    // OCC topology — STEP, trusted
@@ -346,10 +347,12 @@ export interface FeatureNodeV2 {
    * Real "Operation // FeatureType" string from the canonical Machining
    * operations catalog (memory/machining/operations_full.json /
    * process_taxonomy_operations) — attached backend-side by
-   * auto-fill.service.ts's attachCanonicalOperations for CNC feature types
+   * auto-fill.service.ts's attachCanonicalOperations for machining features
    * only. Absent for Sheet Metal / Plastic Molding features.
    */
   canonical_operation?: string;
+  /** Machining features: geometric variant of feature_type (e.g. "threaded" on a SimpleHole). */
+  variant?: string;
 }
 
 export interface FeatureGraphV2 {

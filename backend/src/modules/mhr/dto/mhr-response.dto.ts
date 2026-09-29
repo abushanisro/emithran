@@ -282,6 +282,13 @@ export class MHRResponseDto {
   @ApiProperty({ nullable: true }) maxThicknessAlMm?: number;
   @ApiProperty({ nullable: true }) maxThicknessCuMm?: number;
   @ApiProperty({ nullable: true, type: [String] }) cuttableMaterials?: string[];
+  // Molding press capability and timing (migration 633; press data in specs, 832).
+  @ApiProperty({ nullable: true }) tieBarXMm?: number;
+  @ApiProperty({ nullable: true }) tieBarYMm?: number;
+  @ApiProperty({ nullable: true }) shotCapacityGrams?: number;
+  @ApiProperty({ nullable: true }) minMoldHeightMm?: number;
+  @ApiProperty({ nullable: true }) maxMoldHeightMm?: number;
+  @ApiProperty({ nullable: true }) pressCycleTimeS?: number;
   @ApiProperty({ nullable: true }) capabilityVersion?: number;
   // mhr_records.capability_source — 'imported' (verified nameplate/OEM
   // data), 'seed' (real, sourced, but not THIS unit's own verified record —
@@ -401,6 +408,12 @@ export class MHRResponseDto {
       legacyImportedMhrUsdHr: row.legacy_imported_mhr_usd_hr != null ? parseFloat(row.legacy_imported_mhr_usd_hr) : undefined,
       mhrSource: row.mhr_source ?? undefined,
       maxTonnage: row.max_tonnage != null ? parseFloat(row.max_tonnage) : undefined,
+      tieBarXMm: row.tie_bar_x_mm != null ? parseFloat(row.tie_bar_x_mm) : undefined,
+      tieBarYMm: row.tie_bar_y_mm != null ? parseFloat(row.tie_bar_y_mm) : undefined,
+      shotCapacityGrams: row.shot_capacity_grams != null ? parseFloat(row.shot_capacity_grams) : undefined,
+      minMoldHeightMm: row.min_mold_height_mm != null ? parseFloat(row.min_mold_height_mm) : undefined,
+      maxMoldHeightMm: row.max_mold_height_mm != null ? parseFloat(row.max_mold_height_mm) : undefined,
+      pressCycleTimeS: row.press_cycle_time_s != null ? parseFloat(row.press_cycle_time_s) : undefined,
       powerKw: row.power_kw != null ? parseFloat(row.power_kw) : undefined,
       maxXMm: row.max_x_mm != null ? parseFloat(row.max_x_mm) : undefined,
       maxYMm: row.max_y_mm != null ? parseFloat(row.max_y_mm) : undefined,

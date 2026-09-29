@@ -432,6 +432,59 @@ def _extract_heat_treatment(tb: dict[str, str], flat: str) -> str:
     return "None"
 
 
+# A chemical milling (chem-mill / chemical etching) callout: the drawing names
+# the process, typically as a note ("CHEM MILL PER ...", "CHEMICAL MILL AREAS
+# SHOWN", "CHEM-MILLED") or in a title-block treatment/process field. Returns
+# the matched callout text, or "None". Only the process name is detected; which
+# pockets are etched is not read from the drawing.
+_CHEM_MILL_RE = re.compile(
+    r"\b(CHEM(?:ICAL(?:LY)?)?[\s\-]*MILL(?:ED|ING)?|CHEM(?:ICAL(?:LY)?)?[\s\-]*ETCH(?:ED|ING)?)\b",
+    re.I,
+)
+
+
+def _extract_chemical_milling(tb: dict[str, str], flat: str) -> str:
+    for key in ("treatment", "process"):
+        raw = tb.get(key, "")
+        if raw and not _is_placeholder(raw) and not _is_label(raw) and _CHEM_MILL_RE.search(raw):
+            return raw.strip()
+    m = _CHEM_MILL_RE.search(flat)
+    return m.group(1).strip().upper() if m else "None"
+
+
+# Gear quality callout: new AGMA ("AGMA A8", "AGMA 2015 A6"), old AGMA
+# ("AGMA Q10") or DIN ("DIN 3962 QUALITY 7", "DIN 7"). Returned normalized as
+# "A8" / "Q10" / "DIN7", or "None". The process a quality needs comes from the
+# reference tblGearQuality, not from here.
+_GEAR_QUALITY_RE = [
+    (re.compile(r"\bAGMA(?:\s*\d{4})?[\s\-:]*(?:QUALITY\s*)?(A\d{1,2})\b", re.I), lambda m: m.group(1).upper()),
+    (re.compile(r"\bAGMA(?:\s*\d{3,4})?[\s\-:]*(?:QUALITY\s*)?(Q\d{1,2})\b", re.I), lambda m: m.group(1).upper()),
+    (re.compile(r"\bDIN(?:\s*3962)?[\s\-:]*(?:QUALITY|QUAL\.?|CLASS)?\s*(\d{1,2})\b(?!\s*[\-/]\s*\d)", re.I), lambda m: f"DIN{int(m.group(1))}"),
+]
+
+
+def _extract_gear_quality(flat: str) -> str:
+    for rx, norm in _GEAR_QUALITY_RE:
+        m = rx.search(flat)
+        if m:
+            return norm(m)
+    return "None"
+
+
+# Named gear finishing / cutting processes on the drawing ("SHAVE",
+# "GEAR SHAPING", ...), and a polygon callout ("HEX", "ROTARY BROACH",
+# "POLYGON") that lets a CAD polygon ring be treated as a polygon rather than
+# an ordinary pocket. Each returns the matched text or "None".
+_GEAR_SHAVING_RE = re.compile(r"\b(?:GEAR\s+)?SHAV(?:E|ED|ING)\b", re.I)
+_GEAR_SHAPING_RE = re.compile(r"\b(?:GEAR\s+SHAP(?:E|ED|ING)|SHAPED\s+(?:GEAR|TEETH|SPLINE)|SHAPER\s+CUT)\b", re.I)
+_POLYGON_RE = re.compile(r"\b(ROTARY[\s\-]*BROACH(?:ED|ING)?|POLYGON(?:\s+TURN(?:ED|ING))?|HEX(?:AGON(?:AL)?)?\s+(?:SOCKET|HOLE|BROACH(?:ED)?|DRIVE)|SQUARE\s+(?:SOCKET|DRIVE))\b", re.I)
+
+
+def _match_or_none(rx: "re.Pattern[str]", flat: str) -> str:
+    m = rx.search(flat)
+    return m.group(0).strip().upper() if m else "None"
+
+
 def _extract_general_tolerance(tb: dict[str, str], flat: str) -> str:
     raw = tb.get("tolerance", "")
     if raw and not _is_placeholder(raw) and re.search(r"ISO|DIN|ASME", raw, re.I):
@@ -571,7 +624,8 @@ _FALLBACK: dict[str, Any] = {
     "surface_finish_ra": 0, "surface_finish_confidence": 0.0,
     "sheet_thickness_mm": 0, "sheet_thickness_confidence": 0.0,
     "bend_count": 0,
-    "heat_treatment": "None", "coating": "None",
+    "heat_treatment": "None", "coating": "None", "chemical_milling": "None",
+    "gear_quality": "None", "gear_shaving": "None", "gear_shaping": "None", "polygon_callout": "None",
     "complexity": "medium",
     "threads": [], "gdt_callouts": [], "clearanceHoles": [],
     "general_tolerances": "",
@@ -646,6 +700,11 @@ async def analyze_drawing(body: AnalyzeDrawingRequest) -> dict[str, Any]:
         "sheet_thickness_confidence":  round(thick_conf, 2),
         "bend_count":                  _extract_bend_count(flat),
         "heat_treatment":              _extract_heat_treatment(tb, flat),
+        "chemical_milling":            _extract_chemical_milling(tb, flat),
+        "gear_quality":                _extract_gear_quality(flat),
+        "gear_shaving":                _match_or_none(_GEAR_SHAVING_RE, flat),
+        "gear_shaping":                _match_or_none(_GEAR_SHAPING_RE, flat),
+        "polygon_callout":             _match_or_none(_POLYGON_RE, flat),
         "coating":                     coating,
         "complexity":                  "medium",
         "threads":                     _extract_threads(flat),

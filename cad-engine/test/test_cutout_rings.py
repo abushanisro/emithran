@@ -27,11 +27,11 @@ from machining.machining_feature_recognizer import MachiningFeatureRecognizer
 
 
 def _recognize(shape):
-    return MachiningFeatureRecognizer().recognize(shape, "cnc_milled")
+    return MachiningFeatureRecognizer().recognize(shape, "milled")
 
 
-def _by_type(tree, ftype):
-    return [f for f in tree.features if f.type == ftype]
+def _by_type(tree, ftype, variant=None):
+    return [f for f in tree.features if f.type == ftype and (variant is None or f.variant == variant)]
 
 
 def _box_with_rect_through_cutout():
@@ -59,7 +59,7 @@ def _box_with_circular_through_hole():
 
 def test_real_rect_through_opening_is_detected_as_a_4_sided_cutout():
     tree = _recognize(_box_with_rect_through_cutout())
-    cutouts = _by_type(tree, "cutout")
+    cutouts = _by_type(tree, "Cutout")
     assert len(cutouts) == 1
     c = cutouts[0]
     assert c.params["side_count"] == 4
@@ -70,8 +70,8 @@ def test_real_rect_through_opening_is_detected_as_a_4_sided_cutout():
 
 def test_cutout_walls_are_claimed_not_double_counted_as_planar_face():
     tree = _recognize(_box_with_rect_through_cutout())
-    cutout_face_ids = set(_by_type(tree, "cutout")[0].face_ids)
-    for f in _by_type(tree, "planar_face"):
+    cutout_face_ids = set(_by_type(tree, "Cutout")[0].face_ids)
+    for f in _by_type(tree, "PlanarFace"):
         assert not (set(f.face_ids) & cutout_face_ids)
 
 
@@ -80,8 +80,8 @@ def test_real_blind_pocket_with_the_same_footprint_is_not_a_cutout():
     the SAME rectangular footprint, but blind, must be a real 'pocket', not
     a fabricated 'cutout'."""
     tree = _recognize(_box_with_blind_rect_pocket())
-    assert _by_type(tree, "cutout") == []
-    pockets = _by_type(tree, "pocket")
+    assert _by_type(tree, "Cutout") == []
+    pockets = _by_type(tree, "PocketV2")
     assert len(pockets) == 1
 
 
@@ -92,7 +92,7 @@ def test_plain_box_yields_no_false_positive_cutout():
     exclusion detect_polygon_rings uses."""
     box = BRepPrimAPI_MakeBox(60.0, 50.0, 20.0).Shape()
     tree = _recognize(box)
-    assert _by_type(tree, "cutout") == []
+    assert _by_type(tree, "Cutout") == []
 
 
 def test_real_circular_through_hole_is_not_reclassified_as_a_cutout():
@@ -100,5 +100,5 @@ def test_real_circular_through_hole_is_not_reclassified_as_a_cutout():
     detector before cutout detection runs -- it must never also appear (or
     cause a spurious ring from leftover geometry) as a cutout."""
     tree = _recognize(_box_with_circular_through_hole())
-    assert _by_type(tree, "cutout") == []
-    assert len(_by_type(tree, "through_hole")) == 1
+    assert _by_type(tree, "Cutout") == []
+    assert len(_by_type(tree, "SimpleHole", "through")) == 1

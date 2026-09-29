@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { PartSpacingRow } from '../machine/sheet-metal-nesting.engine';
 import { SupabaseService } from '../../../../../common/supabase/supabase.service';
 import type { LookupResolution, LookupQueryParam, LookupTableRow } from '../../../dto/cost-breakdown.dto';
 import { classifyLaserMaterial } from '../../shared/capability/machine-selection/physics';
@@ -192,6 +193,26 @@ export class SheetMetalLookupService {
     } catch {
       return fallback;
     }
+  }
+
+  // ── Nesting part spacing (tblPartSpacing, migration 518): every row, cached.
+  // A read error is not cached; an absent table is remembered as null.
+  private partSpacing: PartSpacingRow[] | null | undefined;
+  async getPartSpacingTable(): Promise<PartSpacingRow[] | null> {
+    if (this.partSpacing !== undefined) return this.partSpacing;
+    const { data, error } = await this.supabase.getAdminClient()
+      .from('sm_reference_data')
+      .select('raw')
+      .eq('category', 'lookup_table')
+      .like('key', 'tblPartSpacing:%');
+    if (error) return null;
+    const rows = (data ?? []).map((r: any) => ({
+      process: String(r.raw?.Process ?? ''),
+      thicknessMm: Number(r.raw?.['Thickness (mm)']),
+      spacingMm: Number(r.raw?.['Part Spacing (mm)']),
+    })).filter((r) => r.process && Number.isFinite(r.thicknessMm) && Number.isFinite(r.spacingMm));
+    this.partSpacing = rows.length ? rows : null;
+    return this.partSpacing;
   }
 
   // ── Table 5: Laser cutting params ─────────────────────────────────────────
@@ -551,7 +572,7 @@ export class SheetMetalLookupService {
 
   // ── Progressive Die Press per-machine setup time (2026-09-02, hardcoded-
   // fallback audit finding). Standard/Tandem Press's real setup_time_hr IS
-  // genuinely uniform (0.5hr/30min, matches PRESS_STROKE_SETUP_MIN) — but
+  // genuinely uniform (0.5hr/30min) — but
   // Progressive Die's varies 0.47-0.72hr (28.2-43.2min) across the 14 safe
   // (non-contaminated) real machines, correlating with press-force tier.
   // Staged from machine_library.json's "Progressive Die Press" category,

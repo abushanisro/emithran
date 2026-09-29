@@ -4,11 +4,14 @@
 //   - BOMItemsService.resolveGrossUsageForCalculator -- Gross Usage
 // Same instantiate-with-mocked-DI-and-spy-on-public-methods pattern already
 // established in bom-items.true-nest-costing.spec.ts.
+import type { SecondaryProcessService } from '../../../modules/bom-items/services/secondary-process.service';
+import type { PlasticReferenceService } from '../../../modules/bom-items/costing/plastic-molding/lookup/plastic-reference.service';
 import { BOMItemsService } from '../../../modules/bom-items/bom-items.service';
 import { resolveNetUsagePhysics } from '../../../modules/bom-items/costing/sheet-metal/raw-material/sheet-metal-net-usage.physics';
 import { type BlankOptimizerService } from '../../../modules/bom-items/costing/sheet-metal/machine/blank-optimizer.service';
 import { type SheetMetalLookupService } from '../../../modules/bom-items/costing/sheet-metal/lookup/sheet-metal-lookup.service';
 import { type MachiningLookupService } from '../../../modules/bom-items/costing/machining/lookup/machining-lookup.service';
+import { realPartSpacingTable } from './costing/sheet-metal/real-part-spacing';
 import { STANDARD_SHEETS } from '../../../modules/bom-items/costing/sheet-metal/machine/sheet-metal-nesting.engine';
 import { type CADAnalysisService } from '../../../modules/bom-items/services/cad-analysis.service';
 import { type RateResolutionService } from '../../../modules/bom-items/services/rate-resolution.service';
@@ -34,7 +37,7 @@ function buildService(computeTrueNest: jest.Mock, summary: Record<string, unknow
     {} as unknown as SupabaseService,
     {} as unknown as InspectionKnowledgeService,
     {} as unknown as BlankOptimizerService,
-    {} as unknown as SheetMetalLookupService,
+    { getPartSpacingTable: async () => realPartSpacingTable() } as unknown as SheetMetalLookupService,
     {} as unknown as MachiningLookupService,
     {} as unknown as ExchangeRateService,
     cadAnalysisService,
@@ -42,6 +45,8 @@ function buildService(computeTrueNest: jest.Mock, summary: Record<string, unknow
     {} as unknown as CalculatorCatalogService,
     {} as unknown as MaterialResolutionService,
     {} as unknown as MachineDiscoveryService,
+    {} as unknown as SecondaryProcessService,
+    {} as unknown as PlasticReferenceService,
   );
   const findOneSpy = jest.spyOn(service, 'findOne')
     .mockResolvedValue({ id: 'item-1', featureGraph: { summary } } as unknown as BOMItemResponseDto);

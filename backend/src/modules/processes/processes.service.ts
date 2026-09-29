@@ -1,5 +1,12 @@
 import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
+import {
+  flattenMachiningLookupTable,
+  machiningLookupTableNames,
+  variablesAsTable,
+  MACHINING_REFERENCE_SOURCE_VERSION,
+} from '../bom-items/costing/machining/lookup/machining-lookup-tables';
 import * as ExcelJS from 'exceljs';
+import { REFERENCE_DOMAINS, REFERENCE_GROUP_DOMAIN, type ReferenceDomain } from './reference-domains';
 import { Logger } from '../../common/logger/logger.service';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import {
@@ -80,6 +87,8 @@ export class ProcessesService {
    * could silently drift the engine's real inputs.
    */
   async getSmLookupTables(group: string, route: string, accessToken: string): Promise<any[]> {
+    const domain = REFERENCE_GROUP_DOMAIN[group];
+    if (domain) return this.getStagedReferenceTables(domain, accessToken);
     const entries = getSmLookupBridgeEntries(group, route);
     if (entries.length === 0) return [];
 
@@ -91,6 +100,43 @@ export class ProcessesService {
     );
 
     return results.filter((r): r is NonNullable<typeof r> => r != null);
+  }
+
+  /**
+   * Every staged lookup table of a reference domain (e.g. memory/SurfaceTreatment,
+   * migration 819), in the same payload shape as the bridged tables above.
+   * Read-only: staged reference data changes by a new staging migration.
+   */
+  private async getStagedReferenceTables(domain: ReferenceDomain, accessToken: string): Promise<any[]> {
+    const { table, versions } = REFERENCE_DOMAINS[domain];
+    if (!versions) return [];
+    const { data, error } = await this.supabaseService.getClient(accessToken)
+      .from(table)
+      .select('key, source_version, notes, raw')
+      .eq('category', 'lookup_table')
+      .in('source_version', versions)
+      .order('key', { ascending: true });
+    if (error) {
+      this.logger.warn(`reference lookups (${domain}): ${error.message}`, 'ProcessesService');
+      return [];
+    }
+    return (data ?? []).map((r: any, idx: number) => {
+      const rows: Record<string, unknown>[] = Array.isArray(r.raw?.rows) ? r.raw.rows : [];
+      const columns: string[] = Array.isArray(r.raw?.columns) ? r.raw.columns : rows[0] ? Object.keys(rows[0]) : [];
+      const tableId = `staged:${r.source_version}:${r.key}`;
+      return {
+        id: tableId,
+        processId: '',
+        tableName: r.key,
+        tableDescription: r.notes ?? `Staged reference table (${r.source_version})`,
+        columnDefinitions: columns.map((c) => ({ name: c, type: typeof rows[0]?.[c] === 'number' ? 'number' : 'text', label: c })),
+        displayOrder: idx,
+        isEditable: false,
+        createdAt: '',
+        updatedAt: '',
+        rows: rows.map((row, rowIdx) => ({ id: `${tableId}:${rowIdx}`, tableId, rowData: row, rowOrder: rowIdx, createdAt: '', updatedAt: '' })),
+      };
+    });
   }
 
   /**
@@ -194,6 +240,51 @@ export class ProcessesService {
     const payload = await this.buildLiveSmLookupTablePayload(client, table, table, `Live ${table} data`, 0);
     if (!payload) throw new InternalServerErrorException(`Failed to read ${table}`);
     return payload;
+  }
+
+  /**
+   * One machining reference table a machining calculator field reads
+   * (machining_reference_data, flattened — see machining-lookup-tables.ts),
+   * in the same payload shape as getSmLookupTableByName so the calculator
+   * dialog's lookup-table viewer renders it unchanged. `outputColumn` (the
+   * field's source column) is placed last, the viewer's selectable value.
+   * Only tables named by a machining calculator field are served.
+   */
+  async getMachiningLookupTableByName(table: string, outputColumn: string | undefined): Promise<any> {
+    if (!machiningLookupTableNames().includes(table)) {
+      throw new BadRequestException(`"${table}" is not a machining calculator lookup table`);
+    }
+    const db = this.supabaseService.getAdminClient();
+    let flat;
+    if (table === 'variables') {
+      const { data, error } = await db
+        .from('machining_reference_data')
+        .select('key, value, unit_type, notes')
+        .eq('category', 'variable')
+        .eq('source_version', MACHINING_REFERENCE_SOURCE_VERSION)
+        .order('key');
+      if (error) throw new InternalServerErrorException(`Failed to read machining variables: ${error.message}`);
+      flat = variablesAsTable(data ?? []);
+    } else {
+      const { data, error } = await db
+        .from('machining_reference_data')
+        .select('raw')
+        .eq('category', 'lookup_table')
+        .eq('source_version', MACHINING_REFERENCE_SOURCE_VERSION)
+        .eq('key', table)
+        .maybeSingle();
+      if (error) throw new InternalServerErrorException(`Failed to read ${table}: ${error.message}`);
+      flat = flattenMachiningLookupTable(table, data?.raw ?? null);
+    }
+    const columns = outputColumn && flat.columns.includes(outputColumn)
+      ? [...flat.columns.filter((c) => c !== outputColumn), outputColumn]
+      : flat.columns;
+    return {
+      id: `machining:${table}`,
+      tableName: `${table} (machining reference data)`,
+      columnDefinitions: columns.map((name) => ({ name, label: name })),
+      rows: flat.rows,
+    };
   }
 
   /**
@@ -1016,82 +1107,78 @@ export class ProcessesService {
    * rather than scoped to one route.
    */
   async getDomainVariables(
-    domain: 'sheet_metal' | 'injection_molding' | 'machining',
+    domain: ReferenceDomain,
     accessToken: string,
     search?: string,
     category?: string,
   ): Promise<{ domain: string; total: number; categories: string[]; variables: any[] }> {
-    const table =
-      domain === 'sheet_metal'
-        ? 'sm_reference_data'
-        : domain === 'injection_molding'
-          ? 'im_reference_data'
-          : 'machining_reference_data';
+    const { table, versions, excludeVersions } = REFERENCE_DOMAINS[domain];
     const client = this.supabaseService.getClient(accessToken);
 
-    // Explicit allow-list, not an exclude-list — sm_reference_data has grown
-    // 5 OTHER staging categories this endpoint was never meant to surface
-    // (lookup_table: 2,914 rows already served by the Process page's own
-    // per-route Lookup Tables dialog; machine: 1,757; material: 609;
-    // operation: 391; process: 24 — vs. only ~560 real variable/wage_grade
-    // rows). An exclude-list is fragile against future staging categories;
-    // this allow-list is exactly what "Variables" (constants, wage grades,
-    // rate-profile settings, tool-material properties) means for this page.
-    // Necessary because PostgREST hard-caps every response at 1000 rows
-    // server-side regardless of a larger client-requested .limit() — with
-    // no category filter, sorting by category ascending meant whichever
-    // large non-Variables category sorted first (lookup_table, then
-    // machine) silently consumed the entire capped response before ever
-    // reaching 'variable' or 'wage_grade' — confirmed live 2026-09-03:
-    // Sheet Metal's Variables view was showing raw 'machine' spec rows
-    // with no wage_grade category chip available at all.
-    const VARIABLE_CATEGORIES = ['variable', 'wage_grade', 'rate_profile', 'tool_material'];
-
-    let query = client
-      .from(table)
-      .select('id, category, source_region, source_version, key, value, unit_type, notes', { count: 'exact' })
-      .in('category', VARIABLE_CATEGORIES)
-      .order('category', { ascending: true })
-      .order('key', { ascending: true });
-
-    if (category) query = query.eq('category', category);
-    if (search) query = query.or(`key.ilike.%${search}%,notes.ilike.%${search}%`);
-
-    const { data, error } = await query.limit(2000);
-
-    if (error) {
-      this.logger.error(`Error fetching ${table}: ${error.message}`, 'ProcessesService');
-      throw new InternalServerErrorException(`Failed to fetch ${domain} variables: ${error.message}`);
+    // Every staged category of the domain except 'machine' (machines are the
+    // HR Rates page, mhr_records). Each lookup row listed is a whole table,
+    // the one row getReferenceLookup opens. sm/im_reference_data also hold
+    // lookup data exploded one row per entry (e.g. 2,079 nestingCutRate rows,
+    // read by the costing services by key prefix); those entries are not
+    // tables, so in those two tables a lookup row is listed only when it
+    // carries its rows (raw.rows, or raw itself an array). Every
+    // machining_reference_data lookup row is a whole table, some staged as a
+    // nested document ({ materials: [...] }), so none is filtered there.
+    //
+    // PostgREST caps every response at 1000 rows whatever .limit() asks for,
+    // so the rows are read in pages; the category chips come from the same
+    // full read, never from a second capped query.
+    const PAGE = 1000;
+    const rows: any[] = [];
+    for (let from = 0; ; from += PAGE) {
+      let q = client
+        .from(table)
+        .select('id, category, source_region, source_version, key, value, unit_type, notes')
+        .neq('category', 'machine');
+      if (table !== 'machining_reference_data') q = q.or('category.neq.lookup_table,raw->rows.not.is.null,raw->0.not.is.null');
+      if (versions) q = q.in('source_version', versions);
+      if (excludeVersions) q = q.not('source_version', 'in', `(${excludeVersions.map((v) => `"${v}"`).join(',')})`);
+      const { data, error } = await q.order('id', { ascending: true }).range(from, from + PAGE - 1);
+      if (error) {
+        this.logger.error(`Error fetching ${table}: ${error.message}`, 'ProcessesService');
+        throw new InternalServerErrorException(`Failed to fetch ${domain} variables: ${error.message}`);
+      }
+      rows.push(...(data ?? []));
+      if (!data || data.length < PAGE) break;
     }
 
-    const { data: categoryRows } = await client.from(table).select('category').in('category', VARIABLE_CATEGORIES).limit(10000);
-    const categories = [...new Set((categoryRows ?? []).map((r: any) => r.category))].sort();
-
-    // When the same (category, key) was sourced more than once at different
-    // times (e.g. a corrected screenshot re-capture superseding an older
-    // snapshot — sm_reference_data's 'wage_grade' category has both a
+    // When the same (category, region, key) was sourced more than once at
+    // different times (e.g. a corrected screenshot re-capture superseding an
+    // older snapshot -- sm_reference_data's 'wage_grade' category has both a
     // 2026-03 batch from migration 482 and a corrected 2026-09 batch from
     // migration 641 for the same process names), keep only the row with the
     // newest source_version so the corrected value is what's shown. Older
-    // snapshots stay in the table (lossless staging), just not surfaced
-    // here when a newer one for the same key exists.
+    // snapshots stay in the table (lossless staging). The region is part of
+    // the key: the same material name staged for USA and MEX is two rows.
     const latestByKey = new Map<string, any>();
-    for (const r of data ?? []) {
-      const dedupeKey = `${r.category}::${r.key}`;
+    for (const r of rows) {
+      const dedupeKey = `${r.category}::${r.source_region}::${r.key}`;
       const existing = latestByKey.get(dedupeKey);
       if (!existing || String(r.source_version) > String(existing.source_version)) {
         latestByKey.set(dedupeKey, r);
       }
     }
-    const deduped = [...latestByKey.values()].sort((a, b) =>
-      a.category === b.category ? String(a.key).localeCompare(String(b.key)) : String(a.category).localeCompare(String(b.category)),
-    );
+    const all = [...latestByKey.values()];
+    const categories = [...new Set(all.map((r) => r.category as string))].sort();
+
+    const needle = search?.trim().toLowerCase();
+    const listed = all
+      .filter((r) => !category || r.category === category)
+      .filter((r) => !needle || String(r.key).toLowerCase().includes(needle) || String(r.notes ?? '').toLowerCase().includes(needle))
+      .sort((a, b) =>
+        a.category === b.category ? String(a.key).localeCompare(String(b.key)) : String(a.category).localeCompare(String(b.category)),
+      );
 
     return {
       domain,
-      total: deduped.length,
+      total: listed.length,
       categories,
-      variables: deduped.map((r: any) => ({
+      variables: listed.map((r: any) => ({
         id: r.id,
         category: r.category,
         sourceRegion: r.source_region,
@@ -1102,6 +1189,33 @@ export class ProcessesService {
         notes: r.notes,
       })),
     };
+  }
+
+  /** One staged lookup table (columns + rows) of a reference domain. */
+  async getReferenceLookup(
+    domain: ReferenceDomain,
+    key: string,
+    accessToken: string,
+  ): Promise<{ key: string; sourceVersion: string; columns: string[]; rows: Record<string, unknown>[] }> {
+    const { table, versions, excludeVersions } = REFERENCE_DOMAINS[domain];
+    let q = this.supabaseService.getClient(accessToken)
+      .from(table)
+      .select('key, source_version, raw')
+      .eq('category', 'lookup_table')
+      .eq('key', key);
+    if (versions) q = q.in('source_version', versions);
+    if (excludeVersions) q = q.not('source_version', 'in', `(${excludeVersions.map((v) => `"${v}"`).join(',')})`);
+    const { data, error } = await q.order('source_version', { ascending: false }).limit(1);
+    if (error) throw new InternalServerErrorException(`Failed to read lookup ${key}: ${error.message}`);
+    const row = data?.[0] as { key: string; source_version: string; raw: any } | undefined;
+    if (!row) throw new NotFoundException(`No staged lookup table "${key}" for ${domain}`);
+    // A row array, { rows }, or a table staged as a nested document (the
+    // machining 2026-03 tables: { materials: [...] }, { sizes: [...] }, ...).
+    const flat = flattenMachiningLookupTable(row.key, row.raw);
+    const columns: string[] = Array.isArray(row.raw?.columns) && row.raw.columns.every((c: string) => flat.columns.includes(c))
+      ? [...row.raw.columns, ...flat.columns.filter((c) => !row.raw.columns.includes(c))]
+      : flat.columns;
+    return { key: row.key, sourceVersion: row.source_version, columns, rows: flat.rows };
   }
 
   // ============================================================================

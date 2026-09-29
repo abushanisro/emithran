@@ -33,7 +33,10 @@
 const fs = require('fs');
 const path = require('path');
 
-const OPS_FILE = path.join(__dirname, '../../../memory/machining/operations_full.json');
+const { readDoc, readRecords } = require('./lib/memory-csv');
+
+const OPS_FILE = path.join(__dirname, '../../../memory/Machining/operations_full__operations.csv');
+const WARNINGS_FILE = path.join(__dirname, '../../../memory/Machining/operations_full__warnings.csv');
 const OUT_SQL = path.join(__dirname, '../690_seed_machining_operations.sql');
 
 const SOURCE_REGION = 'USA';
@@ -47,7 +50,7 @@ function sqlJsonb(obj) {
   return `$jsonb$${JSON.stringify(obj)}$jsonb$::jsonb`;
 }
 
-const data = JSON.parse(fs.readFileSync(OPS_FILE, 'utf8'));
+const data = { ...readDoc(OPS_FILE, { list: 'operations', scalars: ['section', 'operationCount'] }), warnings: readRecords(WARNINGS_FILE).map((w) => w.value) };
 
 const rows = data.operations.map((r) => {
   return {

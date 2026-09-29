@@ -18,42 +18,21 @@ export class AutoFillGeometryDto {
 export class AutoFillSuggestionsDto {
   name: string;
   partNumber: string;
-  materialCategory: string;
+  materialCategory: string | null;
   materialGrade: string;
   materialId: string | null;
   density: number | null;
-  processType: string;
+  /** The CAD family's real process_taxonomy group (e.g. "Machining"), or null. */
+  processType: string | null;
+  /** Real catalog machine for machining parts (e.g. "3 Axis Mill"), else null. */
+  suggestedMachine: string | null;
   familyClassification: string | null;     // detected part family (sheet_metal, milled, etc.)
   familyConfidence: number | null;         // 0–1 confidence from CAD engine
-  makeBuy: 'make' | 'buy';
-  itemType: 'assembly' | 'sub_assembly' | 'child_part';
-}
-
-export class AutoFillCostsDto {
-  materialCostPerKg: number | null;
-  mhrRate: number | null;
-  lhrRate: number | null;
-  estimatedCycleTimeMin: number;
-  calculatorId: string | null;
-  estimatedUnitCost: number | null;
-}
-
-export class AutoFillConfidenceDto {
-  overall: number;
-  geometry: number;
-  material: number;
-  process: number;
-  cost: number;
 }
 
 export class AutoFillResponseDto {
   fileName: string;
   geometry: AutoFillGeometryDto;
   suggestions: AutoFillSuggestionsDto;
-  costs: AutoFillCostsDto;
-  confidence: AutoFillConfidenceDto;
-  cadEngineAvailable: boolean;
-  /** Human-readable reason the CAD engine was unavailable (e.g. FreeCAD not installed for SLDPRT). Absent when cadEngineAvailable is true. */
-  cadEngineError?: string;
   featureGraph: object;
 }

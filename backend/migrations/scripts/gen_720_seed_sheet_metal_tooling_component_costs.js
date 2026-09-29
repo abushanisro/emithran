@@ -1,6 +1,6 @@
 // Generator: seeds sm_lookup_tooling_component_costs (migration 720's schema)
 // from the real progressive-die / stage-tooling component cost catalog —
-// memory/sheetmetal/lookuptable/component_standard_costs.json (37 rows,
+// memory/Sheetmetal/lookuptable/component_standard_costs.csv (37 rows,
 // real per-component tooling BOM costs: {name, model, sizeMm, costUsd,
 // weightKg, machiningHours, wireEdmHours}).
 //
@@ -14,7 +14,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const SRC_FILE = path.join(__dirname, '../../../memory/sheetmetal/lookuptable/component_standard_costs.json');
+const { readDoc } = require('./lib/memory-csv');
+
+const SRC_FILE = path.join(__dirname, '../../../memory/Sheetmetal/lookuptable/component_standard_costs.csv');
 const OUT_SQL = path.join(__dirname, '../720_seed_sheet_metal_tooling_component_costs.sql');
 
 function sqlStr(v) {
@@ -25,7 +27,8 @@ function sqlNum(v) {
   return v === null || v === undefined ? 'NULL' : String(v);
 }
 
-const src = JSON.parse(fs.readFileSync(SRC_FILE, 'utf8'));
+// The CSV's name column is the row's own name (the table name is not kept).
+const src = readDoc(SRC_FILE, { list: 'rows', scalars: ['filePath', 'digitalFactory', 'rowCount'] });
 if (!Array.isArray(src.rows) || src.rows.length !== src.rowCount) {
   throw new Error(`row count mismatch: file says ${src.rowCount}, array has ${src.rows?.length}`);
 }
@@ -38,7 +41,7 @@ const sql = `-- ================================================================
 -- Migration 720: sm_lookup_tooling_component_costs
 --
 -- Real progressive-die / stage-tooling purchased-component standard costs —
--- staged verbatim from memory/sheetmetal/lookuptable/component_standard_costs.json
+-- staged verbatim from memory/Sheetmetal/lookuptable/component_standard_costs.csv
 -- (${src.rows.length} rows, source: ${src.digitalFactory}). Consumed by
 -- progressive-die-tooling-engine.ts to price the real hard-tooling BOM
 -- (pierce punches, die buttons, retainers, tapping units, guide pins, ...)

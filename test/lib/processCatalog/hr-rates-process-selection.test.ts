@@ -1,13 +1,16 @@
 import { describe, it, expect } from 'vitest';
+import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
 import {
   effectiveProcessGroupOf,
   processGroupOptionsFrom,
   categoryOptionsFrom,
   matchesProcessAndCategory,
   categoryMachineClassesOf,
-  benchmarkMatchesCategory,
   calculatorMappingsForMachineClass,
   unambiguousMapping,
+  optionsKeepingSelection,
+  selectionForMachineClass,
+  buildHrRatesIndex,
 } from '@/lib/processCatalog/hr-rates-process-selection';
 
 // A real mhr_records row: process_group is often unset and the group lives in
@@ -20,11 +23,6 @@ function row(overrides: Record<string, unknown> = {}) {
     commodityCode: 'Sheet Metal',
     ...overrides,
   };
-}
-
-// An mhr_benchmark_rates row: machine_class only, no benchmark_source_key.
-function benchmarkRow(machineClass: string) {
-  return { machineClass, benchmarkSourceKey: undefined, processGroup: 'Sheet Metal' };
 }
 
 describe('effectiveProcessGroupOf', () => {
@@ -145,25 +143,6 @@ describe('categoryMachineClassesOf', () => {
   });
 });
 
-describe('benchmarkMatchesCategory', () => {
-  // Benchmark rows have no benchmark_source_key, so resolving their category by
-  // name gives "Roll Bending 3" and matches nothing — every benchmark machine
-  // would vanish from the dropdown.
-  it('matches a benchmark row on the classes the category resolves to', () => {
-    const classes = new Set(['roll_bending_3']);
-    expect(benchmarkMatchesCategory(benchmarkRow('roll_bending_3'), classes)).toBe(true);
-    expect(benchmarkMatchesCategory(benchmarkRow('roll_bending_2'), classes)).toBe(false);
-  });
-
-  it('matches nothing when the category resolves to no class at all', () => {
-    expect(benchmarkMatchesCategory(benchmarkRow('roll_bending_3'), new Set())).toBe(false);
-  });
-
-  it('never matches a benchmark row carrying no class', () => {
-    expect(benchmarkMatchesCategory({ machineClass: undefined }, new Set(['roll_bending_3']))).toBe(false);
-  });
-});
-
 describe('calculator resolution by machine class', () => {
   const bendBrake = { machineClass: 'press_brake', operation: 'Bend Brake', lhrProcessGroup: 'Sheet Metal' };
   const progDie = { machineClass: 'press_brake', operation: 'Progressive Die Press', lhrProcessGroup: 'Sheet Metal' };
@@ -190,5 +169,78 @@ describe('calculator resolution by machine class', () => {
 
   it('resolves nothing from an empty match set', () => {
     expect(unambiguousMapping([])).toBeUndefined();
+  });
+});
+
+describe('optionsKeepingSelection', () => {
+  it('keeps the selected value listed while no loaded row carries it (rows still loading)', () => {
+    expect(optionsKeepingSelection([], 'Sheet Metal')).toEqual(['Sheet Metal']);
+  });
+
+  it('keeps a saved value the rows no longer have, in sorted position', () => {
+    expect(optionsKeepingSelection(['Machining', 'Sheet Metal'], 'Other Secondary Processes'))
+      .toEqual(['Machining', 'Other Secondary Processes', 'Sheet Metal']);
+  });
+
+  it('adds nothing when the value is already an option or nothing is selected', () => {
+    expect(optionsKeepingSelection(['Machining', 'Sheet Metal'], 'Sheet Metal')).toEqual(['Machining', 'Sheet Metal']);
+    expect(optionsKeepingSelection(['Machining'], '')).toEqual(['Machining']);
+  });
+});
+
+describe('selectionForMachineClass', () => {
+  // Real USA CMM rows (migration 806): class cmm, group Other Secondary Processes.
+  const cmm = (name: string) => row({
+    machineClass: 'cmm', processGroup: 'Other Secondary Processes', commodityCode: undefined,
+    benchmarkSourceKey: `CMM Inspection:${name}`,
+  });
+  const rows = [cmm('Axiom Too 1200'), cmm('Axiom Zenith 1000'), row()];
+
+  it('fills Process and Category for a line with no machine from its saved class', () => {
+    const cat = mhrCategoryOf(rows[0]!);
+    expect(selectionForMachineClass(rows, 'cmm', '')).toEqual({ processGroup: 'Other Secondary Processes', category: cat });
+  });
+
+  it('keeps the line Process and fills only the Category', () => {
+    expect(selectionForMachineClass(rows, 'cmm', 'Other Secondary Processes').processGroup).toBe('Other Secondary Processes');
+  });
+
+  it('names no category when the class spans several', () => {
+    const spread = [...rows, row({ machineClass: 'cmm', processGroup: 'Other Secondary Processes', commodityCode: undefined, benchmarkSourceKey: 'Inspection Bench:Granite Table' })];
+    expect(selectionForMachineClass(spread, 'cmm', '').category).toBeUndefined();
+  });
+
+  it('returns nothing for a class HR Rates has no row of', () => {
+    expect(selectionForMachineClass(rows, 'shaver', '')).toEqual({});
+  });
+});
+
+describe('buildHrRatesIndex', () => {
+  const rows = [
+    row(),
+    row({ machineClass: 'press_brake', benchmarkSourceKey: 'Bend Press Brake:Trumpf TruBend 5130' }),
+    row({ machineClass: 'cmm', processGroup: 'Other Secondary Processes', commodityCode: undefined, benchmarkSourceKey: 'CMM Inspection:Axiom Too 1200' }),
+  ];
+  const index = buildHrRatesIndex(rows);
+
+  it('answers every picker from one pass, matching the row-scan functions', () => {
+    expect(index.processGroups).toEqual(processGroupOptionsFrom(rows));
+    expect(index.categoriesOf('Sheet Metal')).toEqual(categoryOptionsFrom(rows, 'Sheet Metal'));
+    expect([...index.machineClassesOf('Sheet Metal', 'Bend Press Brake')]).toEqual(['press_brake']);
+  });
+
+  it('reads the reverse direction, class to Process and Category', () => {
+    expect(index.selectionForMachineClass('cmm', '')).toEqual({ processGroup: 'Other Secondary Processes', category: 'CMM Inspection' });
+  });
+
+  it('returns the same object for the same question, so memoized dependents do not re-run', () => {
+    expect(index.categoriesOf('Sheet Metal')).toBe(index.categoriesOf('Sheet Metal'));
+    expect(index.machineClassesOf('Sheet Metal', 'Bend Press Brake')).toBe(index.machineClassesOf('Sheet Metal', 'Bend Press Brake'));
+    expect(index.machineClassesOf('Sheet Metal', 'Unknown')).toBe(index.machineClassesOf('Machining', 'Unknown'));
+  });
+
+  it('answers empty, not undefined, for an unknown group or category', () => {
+    expect(index.categoriesOf('Unknown')).toEqual([]);
+    expect(index.machineClassesOf('Unknown', 'x').size).toBe(0);
   });
 });
