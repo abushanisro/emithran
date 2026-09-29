@@ -38,9 +38,9 @@ def _make_drilled_box(dx=40.0, dy=30.0, dz=20.0, hole_diam=6.0):
     return BRepAlgoAPI_Cut(box, drill).Shape()
 
 
-def _synthesize(shape, family="cnc_milled", with_stable_ids=True):
+def _synthesize(shape, family="milled", with_stable_ids=True):
     tree = MachiningFeatureRecognizer().recognize(shape, family=family)
-    cnc_dict = tree.to_dict()
+    machining_dict = tree.to_dict()
     bbox = _part_bounding_box(shape)
     bbox_center = (
         (bbox["xmin"] + bbox["xmax"]) / 2,
@@ -48,18 +48,18 @@ def _synthesize(shape, family="cnc_milled", with_stable_ids=True):
         (bbox["zmin"] + bbox["zmax"]) / 2,
     )
     stable_ids = build_stable_face_id_map(shape) if with_stable_ids else None
-    fgv2 = build_machining_feature_graph_v2(cnc_dict, bbox_center, [], 0, stable_face_ids=stable_ids)
-    return cnc_dict, fgv2, stable_ids
+    fgv2 = build_machining_feature_graph_v2(machining_dict, bbox_center, [], 0, stable_face_ids=stable_ids)
+    return machining_dict, fgv2, stable_ids
 
 
 def test_real_drilled_box_produces_a_through_hole_with_stable_ids():
     shape = _make_drilled_box()
-    cnc_dict, fgv2, stable_ids = _synthesize(shape)
+    machining_dict, fgv2, stable_ids = _synthesize(shape)
 
     assert stable_ids, "a real drilled box must have real faces to key stable ids on"
     assert fgv2["metadata"]["stable_face_ids"] == stable_ids
 
-    hole_entries = [f for f in fgv2["features"] if f["feature_type"] == "through_hole"]
+    hole_entries = [f for f in fgv2["features"] if (f["feature_type"], f["variant"]) == ("SimpleHole", "through")]
     assert len(hole_entries) >= 1, "real drilled box must yield a real through_hole entry"
     occ = hole_entries[0]["occurrences"][0]
 
@@ -75,8 +75,8 @@ def test_stable_ids_are_deterministic_across_repeated_synthesis():
     _, fgv2_a, _ = _synthesize(shape)
     _, fgv2_b, _ = _synthesize(shape)
 
-    hole_a = next(f for f in fgv2_a["features"] if f["feature_type"] == "through_hole")
-    hole_b = next(f for f in fgv2_b["features"] if f["feature_type"] == "through_hole")
+    hole_a = next(f for f in fgv2_a["features"] if (f["feature_type"], f["variant"]) == ("SimpleHole", "through"))
+    hole_b = next(f for f in fgv2_b["features"] if (f["feature_type"], f["variant"]) == ("SimpleHole", "through"))
     assert (
         hole_a["occurrences"][0]["source_face_stable_ids"]
         == hole_b["occurrences"][0]["source_face_stable_ids"]
@@ -91,7 +91,7 @@ def test_omitting_stable_face_ids_is_backward_compatible():
     _, fgv2, _ = _synthesize(shape, with_stable_ids=False)
 
     assert fgv2["metadata"]["stable_face_ids"] == {}
-    hole_entries = [f for f in fgv2["features"] if f["feature_type"] == "through_hole"]
+    hole_entries = [f for f in fgv2["features"] if (f["feature_type"], f["variant"]) == ("SimpleHole", "through")]
     assert len(hole_entries) >= 1
     occ = hole_entries[0]["occurrences"][0]
     assert "source_face_stable_ids" not in occ

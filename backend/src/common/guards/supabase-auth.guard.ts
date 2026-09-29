@@ -51,8 +51,14 @@ export class SupabaseAuthGuard implements CanActivate {
    */
   private async resolveAdminUserId(): Promise<string | null> {
     if (this.adminUserId !== null) return this.adminUserId;
+    // Concurrent requests share one in-flight lookup.
     this.adminUserIdLookup ??= this.supabaseService.getAdminUserId();
     this.adminUserId = await this.adminUserIdLookup;
+    // Only a resolved id is kept. A failed lookup (e.g. a transient DNS or
+    // network error reaching Supabase) returns null; keeping that promise
+    // would reject every later bypass request until the process restarted,
+    // so it is dropped and the next request looks the account up again.
+    if (this.adminUserId === null) this.adminUserIdLookup = null;
     return this.adminUserId;
   }
 

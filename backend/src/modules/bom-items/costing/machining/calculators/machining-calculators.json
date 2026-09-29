@@ -1,0 +1,1582 @@
+{
+  "_comment": "Machining calculators — the ONE definition of every machining cycle-time formula. scripts/generate-machining-calculators-migration.mjs writes these into the calculators / calculator_fields / process_calculator_mappings tables; the cost engine evaluates the stored formulas (calculator-formula-evaluator.ts) with CAD + lookup-table inputs; tests load this file as the stand-in for those rows. Edit here and regenerate — never hand-edit the migration. Every calculator's output is 'Cycle Time' in seconds. Input 'source': cad | lookup | machine | bom | drawing | engine | default (a database default with no reference source — shown as such in the trace).",
+  "lathes": [
+    "2_axis_lathe",
+    "3_axis_lathe",
+    "2_axis_bar_feed_lathe_with_sub_spindle",
+    "3_axis_bar_feed_lathe_with_sub_spindle",
+    "simultaneous_turning",
+    "machining_millturn"
+  ],
+  "mills": [
+    "3_axis_mill",
+    "4_axis_mill",
+    "5_axis_mill"
+  ],
+  "stations": {
+    "2_axis_lathe": "2 Axis Lathe",
+    "3_axis_lathe": "3 Axis Lathe",
+    "2_axis_bar_feed_lathe_with_sub_spindle": "2 Axis Bar Feed Lathe with Sub Spindle",
+    "3_axis_bar_feed_lathe_with_sub_spindle": "3 Axis Bar Feed Lathe with Sub Spindle",
+    "simultaneous_turning": "Simultaneous Turning",
+    "machining_millturn": "MillTurn",
+    "3_axis_mill": "3 Axis Mill",
+    "4_axis_mill": "4 Axis Mill",
+    "5_axis_mill": "5 Axis Mill",
+    "manual_deburr": "Manual Deburr",
+    "machining_inspection": "Inspection",
+    "special_inspection": "Special Inspection",
+    "jig_bore": "Jig Bore",
+    "jig_grind": "Jig Grind",
+    "gun_drill": "Gun Drill",
+    "deep_bore_machine": "Deep Bore Machine",
+    "cylindrical_grinder": "Cylindrical Grinder",
+    "internal_grinder": "Internal Grinder",
+    "broach": "Broach",
+    "wire_edm": "Wire EDM",
+    "reciprocating_surface_grinder": "Reciprocating Surface Grinder",
+    "hob_machine": "Hob Machine",
+    "shaver": "Shaver"
+  },
+  "calculators": [
+    {
+      "name": "Machining - Drilling",
+      "operation": "Drilling",
+      "machineClasses": "lathes+mills",
+      "description": "Drilled-hole cycle time: CAD hole diameter and depth, cutting speed and feed from tblDrilling for the material and drill construction.",
+      "fields": [
+        {
+          "name": "Hole Diameter",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Hole Depth",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Holes",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Cutting Speed",
+          "unit": "m/min",
+          "source": "lookup",
+          "table": "tblDrilling",
+          "column": "cutting_speed_m_min"
+        },
+        {
+          "name": "Feed",
+          "unit": "mm/rev",
+          "source": "lookup",
+          "table": "tblDrilling",
+          "column": "feed_mm_rev"
+        },
+        {
+          "name": "Spindle Speed",
+          "unit": "rpm",
+          "formula": "{Cutting Speed} * 1000 / (pi * {Hole Diameter})"
+        },
+        {
+          "name": "Feed Rate",
+          "unit": "mm/min",
+          "formula": "{Spindle Speed} * {Feed}"
+        },
+        {
+          "name": "Time per Hole",
+          "unit": "s",
+          "formula": "{Hole Depth} / {Feed Rate} * 60"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Time per Hole} * {Holes}"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Rough Turning",
+      "operation": "Rough Turning",
+      "machineClasses": "lathes",
+      "description": "Rough turning passes over the turned length: CAD turned diameter/length, stock bar diameter, depth of cut / speed / feed from tblGeneralTurning.",
+      "fields": [
+        {
+          "name": "Turned Diameter",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Turned Length",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Bar Diameter",
+          "unit": "mm",
+          "source": "engine"
+        },
+        {
+          "name": "Finish Depth of Cut",
+          "unit": "mm",
+          "source": "lookup",
+          "table": "tblGeneralTurning",
+          "column": "cut_depth_mm"
+        },
+        {
+          "name": "Rough Depth of Cut",
+          "unit": "mm",
+          "source": "lookup",
+          "table": "tblGeneralTurning",
+          "column": "cut_depth_mm"
+        },
+        {
+          "name": "Rough Cutting Speed",
+          "unit": "m/min",
+          "source": "lookup",
+          "table": "tblGeneralTurning",
+          "column": "cutting_speed_m_min"
+        },
+        {
+          "name": "Rough Feed",
+          "unit": "mm/rev",
+          "source": "lookup",
+          "table": "tblGeneralTurning",
+          "column": "feed_rate_mm_rev"
+        },
+        {
+          "name": "Radial Stock",
+          "unit": "mm",
+          "formula": "({Bar Diameter} - {Turned Diameter}) / 2"
+        },
+        {
+          "name": "Rough Stock",
+          "unit": "mm",
+          "formula": "max({Radial Stock} - min({Finish Depth of Cut}, {Radial Stock}), 0)"
+        },
+        {
+          "name": "Rough Passes",
+          "unit": null,
+          "formula": "round({Rough Stock} / {Rough Depth of Cut})"
+        },
+        {
+          "name": "Spindle Speed",
+          "unit": "rpm",
+          "formula": "{Rough Cutting Speed} * 1000 / (pi * {Turned Diameter})"
+        },
+        {
+          "name": "Feed Rate",
+          "unit": "mm/min",
+          "formula": "{Spindle Speed} * {Rough Feed}"
+        },
+        {
+          "name": "Time per Pass",
+          "unit": "s",
+          "formula": "{Turned Length} / {Feed Rate} * 60"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Rough Passes} * {Time per Pass}"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Finish Turning",
+      "operation": "Finish Turning",
+      "machineClasses": "lathes",
+      "description": "One finish turning pass over the turned length: CAD turned diameter/length, finish speed and feed from tblGeneralTurning.",
+      "fields": [
+        {
+          "name": "Turned Diameter",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Turned Length",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Finish Cutting Speed",
+          "unit": "m/min",
+          "source": "lookup",
+          "table": "tblGeneralTurning",
+          "column": "cutting_speed_m_min"
+        },
+        {
+          "name": "Finish Feed",
+          "unit": "mm/rev",
+          "source": "lookup",
+          "table": "tblGeneralTurning",
+          "column": "feed_rate_mm_rev"
+        },
+        {
+          "name": "Spindle Speed",
+          "unit": "rpm",
+          "formula": "{Finish Cutting Speed} * 1000 / (pi * {Turned Diameter})"
+        },
+        {
+          "name": "Feed Rate",
+          "unit": "mm/min",
+          "formula": "{Spindle Speed} * {Finish Feed}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Turned Length} / {Feed Rate} * 60"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Parting",
+      "operation": "Parting",
+      "machineClasses": "lathes",
+      "description": "Part-off plunge from the bar surface to its centre: stock bar diameter, insert speed and feed from tblVirtualPartoffInsertCutData.",
+      "fields": [
+        {
+          "name": "Bar Diameter",
+          "unit": "mm",
+          "source": "engine"
+        },
+        {
+          "name": "Cutting Speed",
+          "unit": "m/min",
+          "source": "lookup",
+          "table": "tblVirtualPartoffInsertCutData",
+          "column": "CuttingSpeedMPerMin"
+        },
+        {
+          "name": "Feed",
+          "unit": "mm/rev",
+          "source": "lookup",
+          "table": "tblVirtualPartoffInsertCutData",
+          "column": "FeedMm"
+        },
+        {
+          "name": "Cut Depth",
+          "unit": "mm",
+          "formula": "{Bar Diameter} / 2"
+        },
+        {
+          "name": "Spindle Speed",
+          "unit": "rpm",
+          "formula": "{Cutting Speed} * 1000 / (pi * {Bar Diameter})"
+        },
+        {
+          "name": "Feed Rate",
+          "unit": "mm/min",
+          "formula": "{Spindle Speed} * {Feed}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Cut Depth} / {Feed Rate} * 60"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Reaming",
+      "operation": "Reaming",
+      "machineClasses": "lathes+mills",
+      "description": "Reaming pass through the drilled hole: CAD hole diameter and depth, speed and feed from tblReaming.",
+      "fields": [
+        {
+          "name": "Hole Diameter",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Hole Depth",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Holes",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Cutting Speed",
+          "unit": "m/min",
+          "source": "lookup",
+          "table": "tblReaming",
+          "column": "CuttingSpeedMPerMin"
+        },
+        {
+          "name": "Feed",
+          "unit": "mm/rev",
+          "source": "lookup",
+          "table": "tblReaming",
+          "column": "FeedMm"
+        },
+        {
+          "name": "Spindle Speed",
+          "unit": "rpm",
+          "formula": "{Cutting Speed} * 1000 / (pi * {Hole Diameter})"
+        },
+        {
+          "name": "Feed Rate",
+          "unit": "mm/min",
+          "formula": "{Spindle Speed} * {Feed}"
+        },
+        {
+          "name": "Time per Hole",
+          "unit": "s",
+          "formula": "{Hole Depth} / {Feed Rate} * 60"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Time per Hole} * {Holes}"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Rigid Tapping",
+      "operation": "Tapping",
+      "machineClasses": "lathes+mills",
+      "description": "Rigid tapping of a threaded hole: CAD thread diameter, depth and pitch (the part, else the ISO 261 coarse pitch of its nominal size), cutting speed from tblTapping for the material and pitch. The tap feeds one pitch per revolution in and reverses out at the same feed.",
+      "fields": [
+        {
+          "name": "Thread Diameter",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Thread Depth",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Threads",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Thread Pitch",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Cutting Speed",
+          "unit": "m/min",
+          "source": "lookup",
+          "table": "tblTapping",
+          "column": "CuttingSpeedMPerMin"
+        },
+        {
+          "name": "Spindle Speed",
+          "unit": "rpm",
+          "formula": "{Cutting Speed} * 1000 / (pi * {Thread Diameter})"
+        },
+        {
+          "name": "Feed Rate",
+          "unit": "mm/min",
+          "formula": "{Spindle Speed} * {Thread Pitch}"
+        },
+        {
+          "name": "Time per Thread",
+          "unit": "s",
+          "formula": "2 * {Thread Depth} / {Feed Rate} * 60"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Time per Thread} * {Threads}"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Jig Boring",
+      "operation": "Jig Boring",
+      "machineClasses": [
+        "jig_bore"
+      ],
+      "description": "Jig boring: finish-boring physics from tblBoringV2 repeated the number of passes tblGtolProcessCapabilities gives for jig boring.",
+      "fields": [
+        {
+          "name": "Hole Diameter",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Hole Depth",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Holes",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Cutting Speed",
+          "unit": "m/min",
+          "source": "lookup",
+          "table": "tblBoringV2",
+          "column": "cutting_speed_m_min"
+        },
+        {
+          "name": "Feed",
+          "unit": "mm/rev",
+          "source": "lookup",
+          "table": "tblBoringV2",
+          "column": "feed_mm_rev"
+        },
+        {
+          "name": "Repetitions",
+          "unit": null,
+          "source": "lookup",
+          "table": "tblGtolProcessCapabilities",
+          "column": "Num Repetitions"
+        },
+        {
+          "name": "Spindle Speed",
+          "unit": "rpm",
+          "formula": "{Cutting Speed} * 1000 / (pi * {Hole Diameter})"
+        },
+        {
+          "name": "Feed Rate",
+          "unit": "mm/min",
+          "formula": "{Spindle Speed} * {Feed}"
+        },
+        {
+          "name": "Time per Pass",
+          "unit": "s",
+          "formula": "{Hole Depth} / {Feed Rate} * 60"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Time per Pass} * {Repetitions} * {Holes}"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Gun Drilling",
+      "operation": "Gun Drilling",
+      "machineClasses": [
+        "gun_drill"
+      ],
+      "description": "Deep-hole gun drilling: CAD hole diameter and depth, speed and feed from tblGunDrilling.",
+      "fields": [
+        {
+          "name": "Hole Diameter",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Hole Depth",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Holes",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Cutting Speed",
+          "unit": "m/min",
+          "source": "lookup",
+          "table": "tblGunDrilling",
+          "column": "Cutting Speed (m / min)"
+        },
+        {
+          "name": "Feed",
+          "unit": "mm/rev",
+          "source": "lookup",
+          "table": "tblGunDrilling",
+          "column": "Feed (mm / rev)"
+        },
+        {
+          "name": "Spindle Speed",
+          "unit": "rpm",
+          "formula": "{Cutting Speed} * 1000 / (pi * {Hole Diameter})"
+        },
+        {
+          "name": "Feed Rate",
+          "unit": "mm/min",
+          "formula": "{Spindle Speed} * {Feed}"
+        },
+        {
+          "name": "Time per Hole",
+          "unit": "s",
+          "formula": "{Hole Depth} / {Feed Rate} * 60"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Time per Hole} * {Holes}"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Deep Bore",
+      "operation": "Deep Bore Machine",
+      "machineClasses": [
+        "deep_bore_machine"
+      ],
+      "description": "Deep-hole boring: CAD hole diameter and depth, speed and feed from the deep bore drill lookup.",
+      "fields": [
+        {
+          "name": "Hole Diameter",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Hole Depth",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Holes",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Cutting Speed",
+          "unit": "m/min",
+          "source": "lookup",
+          "table": "deep_bore_drill_lookup",
+          "column": "cutting_speed_m_min"
+        },
+        {
+          "name": "Feed",
+          "unit": "mm/rev",
+          "source": "lookup",
+          "table": "deep_bore_drill_lookup",
+          "column": "feed_mm_rev"
+        },
+        {
+          "name": "Spindle Speed",
+          "unit": "rpm",
+          "formula": "{Cutting Speed} * 1000 / (pi * {Hole Diameter})"
+        },
+        {
+          "name": "Feed Rate",
+          "unit": "mm/min",
+          "formula": "{Spindle Speed} * {Feed}"
+        },
+        {
+          "name": "Time per Hole",
+          "unit": "s",
+          "formula": "{Hole Depth} / {Feed Rate} * 60"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Time per Hole} * {Holes}"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Cylindrical Grinding",
+      "operation": "Cylindrical Grinding",
+      "machineClasses": [
+        "cylindrical_grinder"
+      ],
+      "description": "Traverse grinding of a turned OD: CAD diameter/length, grinding allowance (variables finishGrindingDepth), wheel/work data from tblCylindricalGrinding.",
+      "grinding": true,
+      "fields": [
+        {
+          "name": "Grind Diameter",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Grind Length",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Surfaces",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Grinding Allowance",
+          "unit": "mm",
+          "source": "lookup",
+          "table": "variables",
+          "column": "value"
+        },
+        {
+          "name": "Work Speed",
+          "unit": "m/min",
+          "source": "lookup",
+          "table": "tblCylindricalGrinding",
+          "column": "work_speed_m_min"
+        },
+        {
+          "name": "Rough Infeed",
+          "unit": "mm",
+          "source": "lookup",
+          "table": "tblCylindricalGrinding",
+          "column": "rough_infeed_mm"
+        },
+        {
+          "name": "Finish Infeed",
+          "unit": "mm",
+          "source": "lookup",
+          "table": "tblCylindricalGrinding",
+          "column": "finish_infeed_mm"
+        },
+        {
+          "name": "Rough Axial Feed",
+          "unit": "mm/rev",
+          "source": "lookup",
+          "table": "tblCylindricalGrinding",
+          "column": "rough_axial_feed_rev_1"
+        },
+        {
+          "name": "Finish Axial Feed",
+          "unit": "mm/rev",
+          "source": "lookup",
+          "table": "tblCylindricalGrinding",
+          "column": "finish_axial_feed_rev_1"
+        },
+        {
+          "name": "Spindle Speed",
+          "unit": "rpm",
+          "formula": "{Work Speed} * 1000 / (pi * {Grind Diameter})"
+        },
+        {
+          "name": "Finish Stock",
+          "unit": "mm",
+          "formula": "min({Finish Infeed}, {Grinding Allowance})"
+        },
+        {
+          "name": "Rough Passes",
+          "unit": null,
+          "formula": "round(max({Grinding Allowance} - {Finish Stock}, 0) / {Rough Infeed})"
+        },
+        {
+          "name": "Rough Pass Time",
+          "unit": "s",
+          "formula": "{Grind Length} / ({Spindle Speed} * {Rough Axial Feed}) * 60"
+        },
+        {
+          "name": "Finish Pass Time",
+          "unit": "s",
+          "formula": "{Grind Length} / ({Spindle Speed} * {Finish Axial Feed}) * 60"
+        },
+        {
+          "name": "Time per Surface",
+          "unit": "s",
+          "formula": "{Rough Passes} * {Rough Pass Time} + {Finish Pass Time}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Time per Surface} * {Surfaces}"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Internal Grinding",
+      "operation": "Internal Grinding",
+      "machineClasses": [
+        "internal_grinder"
+      ],
+      "description": "Traverse grinding of a bore: CAD bore diameter/depth, grinding allowance (variables finishGrindingDepth), wheel/work data from tblInternalGrinding.",
+      "grinding": true,
+      "fields": [
+        {
+          "name": "Grind Diameter",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Grind Length",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Surfaces",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Grinding Allowance",
+          "unit": "mm",
+          "source": "lookup",
+          "table": "variables",
+          "column": "value"
+        },
+        {
+          "name": "Work Speed",
+          "unit": "m/min",
+          "source": "lookup",
+          "table": "tblInternalGrinding",
+          "column": "Work Speed (m / min)"
+        },
+        {
+          "name": "Rough Infeed",
+          "unit": "mm",
+          "source": "lookup",
+          "table": "tblInternalGrinding",
+          "column": "Rough Infeed (mm)"
+        },
+        {
+          "name": "Finish Infeed",
+          "unit": "mm",
+          "source": "lookup",
+          "table": "tblInternalGrinding",
+          "column": "Finish Infeed (mm)"
+        },
+        {
+          "name": "Rough Axial Feed",
+          "unit": "mm/rev",
+          "source": "lookup",
+          "table": "tblInternalGrinding",
+          "column": "Rough Axial Feed (rev^-1)"
+        },
+        {
+          "name": "Finish Axial Feed",
+          "unit": "mm/rev",
+          "source": "lookup",
+          "table": "tblInternalGrinding",
+          "column": "Finish Axial Feed (rev^-1)"
+        },
+        {
+          "name": "Spindle Speed",
+          "unit": "rpm",
+          "formula": "{Work Speed} * 1000 / (pi * {Grind Diameter})"
+        },
+        {
+          "name": "Finish Stock",
+          "unit": "mm",
+          "formula": "min({Finish Infeed}, {Grinding Allowance})"
+        },
+        {
+          "name": "Rough Passes",
+          "unit": null,
+          "formula": "round(max({Grinding Allowance} - {Finish Stock}, 0) / {Rough Infeed})"
+        },
+        {
+          "name": "Rough Pass Time",
+          "unit": "s",
+          "formula": "{Grind Length} / ({Spindle Speed} * {Rough Axial Feed}) * 60"
+        },
+        {
+          "name": "Finish Pass Time",
+          "unit": "s",
+          "formula": "{Grind Length} / ({Spindle Speed} * {Finish Axial Feed}) * 60"
+        },
+        {
+          "name": "Time per Surface",
+          "unit": "s",
+          "formula": "{Rough Passes} * {Rough Pass Time} + {Finish Pass Time}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Time per Surface} * {Surfaces}"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Jig Grind",
+      "operation": "Jig Grind",
+      "machineClasses": [
+        "jig_grind"
+      ],
+      "description": "Jig grinding of a hardened bore: traverse bore-grinding values (tblInternalGrinding; memory/ has no jig-grinding table) repeated the number of passes tblGtolProcessCapabilities gives for jig grinding.",
+      "fields": [
+        {
+          "name": "Grind Diameter",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Grind Length",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Surfaces",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Repetitions",
+          "unit": null,
+          "source": "lookup",
+          "table": "tblGtolProcessCapabilities",
+          "column": "Num Repetitions"
+        },
+        {
+          "name": "Grinding Allowance",
+          "unit": "mm",
+          "source": "lookup",
+          "table": "variables",
+          "column": "value"
+        },
+        {
+          "name": "Work Speed",
+          "unit": "m/min",
+          "source": "lookup",
+          "table": "tblInternalGrinding",
+          "column": "Work Speed (m / min)"
+        },
+        {
+          "name": "Rough Infeed",
+          "unit": "mm",
+          "source": "lookup",
+          "table": "tblInternalGrinding",
+          "column": "Rough Infeed (mm)"
+        },
+        {
+          "name": "Finish Infeed",
+          "unit": "mm",
+          "source": "lookup",
+          "table": "tblInternalGrinding",
+          "column": "Finish Infeed (mm)"
+        },
+        {
+          "name": "Rough Axial Feed",
+          "unit": "mm/rev",
+          "source": "lookup",
+          "table": "tblInternalGrinding",
+          "column": "Rough Axial Feed (rev^-1)"
+        },
+        {
+          "name": "Finish Axial Feed",
+          "unit": "mm/rev",
+          "source": "lookup",
+          "table": "tblInternalGrinding",
+          "column": "Finish Axial Feed (rev^-1)"
+        },
+        {
+          "name": "Spindle Speed",
+          "unit": "rpm",
+          "formula": "{Work Speed} * 1000 / (pi * {Grind Diameter})"
+        },
+        {
+          "name": "Finish Stock",
+          "unit": "mm",
+          "formula": "min({Finish Infeed}, {Grinding Allowance})"
+        },
+        {
+          "name": "Rough Passes",
+          "unit": null,
+          "formula": "round(max({Grinding Allowance} - {Finish Stock}, 0) / {Rough Infeed})"
+        },
+        {
+          "name": "Rough Pass Time",
+          "unit": "s",
+          "formula": "{Grind Length} / ({Spindle Speed} * {Rough Axial Feed}) * 60"
+        },
+        {
+          "name": "Finish Pass Time",
+          "unit": "s",
+          "formula": "{Grind Length} / ({Spindle Speed} * {Finish Axial Feed}) * 60"
+        },
+        {
+          "name": "Time per Surface",
+          "unit": "s",
+          "formula": "{Rough Passes} * {Rough Pass Time} + {Finish Pass Time}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Time per Surface} * {Repetitions} * {Surfaces}"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Surface Grinding",
+      "operation": "Surface Grinding",
+      "machineClasses": [
+        "reciprocating_surface_grinder"
+      ],
+      "description": "Traverse surface grinding of a flat face on a reciprocating grinder: CAD face length and width, grinding allowance (variables finishGrindingDepth), table speed, down-feeds and crossfeed from tblReciprocatingSurfaceGrinding (crossfeed capped at its fraction of the tblGrinding wheel width). Each pass strokes the face length once per crossfeed step across its width.",
+      "grinding": true,
+      "fields": [
+        {
+          "name": "Grind Length",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Grind Width",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Faces",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Grinding Allowance",
+          "unit": "mm",
+          "source": "lookup",
+          "table": "variables",
+          "column": "value"
+        },
+        {
+          "name": "Table Speed",
+          "unit": "m/min",
+          "source": "lookup",
+          "table": "tblReciprocatingSurfaceGrinding",
+          "column": "TableSpeedMPerMin"
+        },
+        {
+          "name": "Rough Downfeed",
+          "unit": "mm",
+          "source": "lookup",
+          "table": "tblReciprocatingSurfaceGrinding",
+          "column": "RoughDownfeedMm"
+        },
+        {
+          "name": "Finish Downfeed",
+          "unit": "mm",
+          "source": "lookup",
+          "table": "tblReciprocatingSurfaceGrinding",
+          "column": "FinishDownfeedMm"
+        },
+        {
+          "name": "Crossfeed",
+          "unit": "mm",
+          "source": "lookup",
+          "table": "tblReciprocatingSurfaceGrinding",
+          "alsoTables": [
+            "tblGrinding"
+          ],
+          "column": "AbsoluteCrossfeedMm"
+        },
+        {
+          "name": "Finish Stock",
+          "unit": "mm",
+          "formula": "min({Finish Downfeed}, {Grinding Allowance})"
+        },
+        {
+          "name": "Rough Passes",
+          "unit": null,
+          "formula": "round(max({Grinding Allowance} - {Finish Stock}, 0) / {Rough Downfeed})"
+        },
+        {
+          "name": "Strokes per Pass",
+          "unit": null,
+          "formula": "CEIL({Grind Width} / {Crossfeed})"
+        },
+        {
+          "name": "Stroke Time",
+          "unit": "s",
+          "formula": "{Grind Length} / ({Table Speed} * 1000 / 60)"
+        },
+        {
+          "name": "Time per Face",
+          "unit": "s",
+          "formula": "({Rough Passes} + 1) * {Strokes per Pass} * {Stroke Time}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Time per Face} * {Faces}"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Keyway Broaching",
+      "operation": "Keyway Broaching",
+      "machineClasses": [
+        "broach"
+      ],
+      "description": "Keyway broaching with the reference broach for the keyway width and length: a pull-type broach (single pass) when one fits, else a shim-type broach (one pass per shim plus the first). Each pass strokes the broach (teeth x pitch) plus the keyway length at the broach cutting speed; the broach is repositioned between passes (variables).",
+      "fields": [
+        {
+          "name": "Keyway Length",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Keyway Width",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Keyways",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Broach Teeth",
+          "unit": null,
+          "source": "lookup",
+          "table": "tblPullTypeKeywayBroach",
+          "column": "Teeth",
+          "alsoTables": [
+            "tblShimTypeKeywayBroach"
+          ]
+        },
+        {
+          "name": "Broach Pitch",
+          "unit": "mm",
+          "source": "lookup",
+          "table": "tblPullTypeKeywayBroach",
+          "column": "Pitch (mm)",
+          "alsoTables": [
+            "tblShimTypeKeywayBroach"
+          ]
+        },
+        {
+          "name": "Cutting Speed",
+          "unit": "m/min",
+          "source": "lookup",
+          "table": "tblPullTypeKeywayBroach",
+          "column": "Cutting Speed (m / min)",
+          "alsoTables": [
+            "tblShimTypeKeywayBroach"
+          ]
+        },
+        {
+          "name": "Passes",
+          "unit": null,
+          "source": "lookup",
+          "table": "tblPullTypeKeywayBroach",
+          "column": "Passes",
+          "alsoTables": [
+            "tblShimTypeKeywayBroach"
+          ]
+        },
+        {
+          "name": "Positioning Time",
+          "unit": "s",
+          "source": "lookup",
+          "table": "variables",
+          "column": "value"
+        },
+        {
+          "name": "Broach Length",
+          "unit": "mm",
+          "formula": "{Broach Teeth} * {Broach Pitch}"
+        },
+        {
+          "name": "Stroke Time",
+          "unit": "s",
+          "formula": "({Broach Length} + {Keyway Length}) / ({Cutting Speed} * 1000 / 60)"
+        },
+        {
+          "name": "Time per Keyway",
+          "unit": "s",
+          "formula": "{Passes} * {Stroke Time} + ({Passes} - 1) * {Positioning Time}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Time per Keyway} * {Keyways}"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Wire EDM",
+      "operation": "Wire EDM",
+      "machineClasses": [
+        "wire_edm"
+      ],
+      "description": "One roughing and one finishing wire pass over the CAD cut path, feed rates from tblWireEDMing.",
+      "fields": [
+        {
+          "name": "Cut Length",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Cuts",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Rough Feed Rate",
+          "unit": "mm/min",
+          "source": "lookup",
+          "table": "tblWireEDMing",
+          "column": "FeedRateMmPerMin"
+        },
+        {
+          "name": "Finish Feed Rate",
+          "unit": "mm/min",
+          "source": "lookup",
+          "table": "tblWireEDMing",
+          "column": "FeedRateMmPerMin"
+        },
+        {
+          "name": "Rough Pass Time",
+          "unit": "s",
+          "formula": "{Cut Length} / {Rough Feed Rate} * 60"
+        },
+        {
+          "name": "Finish Pass Time",
+          "unit": "s",
+          "formula": "{Cut Length} / {Finish Feed Rate} * 60"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "({Rough Pass Time} + {Finish Pass Time}) * {Cuts}"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Deburring",
+      "operation": "Deburring",
+      "machineClasses": [
+        "manual_deburr"
+      ],
+      "description": "Deburring every sharp edge: CAD sharp-edge length (seams and tangent edges excluded) at the tblDeburring edge speed for the material.",
+      "fields": [
+        {
+          "name": "Sharp Edge Length",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Edge Speed",
+          "unit": "mm/s",
+          "source": "lookup",
+          "table": "tblDeburring",
+          "column": "linear_speed_mm_s"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Sharp Edge Length} / {Edge Speed}"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Index Transfer",
+      "operation": "Index Transfer",
+      "machineClasses": [
+        "simultaneous_turning"
+      ],
+      "description": "Multi-spindle index cycle per part: drum index, transfer, stock feed and speed synchronisation times from the machine record.",
+      "fields": [
+        {
+          "name": "Drum Index Time",
+          "unit": "s",
+          "source": "machine"
+        },
+        {
+          "name": "Transfer Time",
+          "unit": "s",
+          "source": "machine"
+        },
+        {
+          "name": "Stock Feed Time",
+          "unit": "s",
+          "source": "machine"
+        },
+        {
+          "name": "Speed Synchronization Time",
+          "unit": "s",
+          "source": "machine"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Drum Index Time} + {Transfer Time} + {Stock Feed Time} + {Speed Synchronization Time}"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Secondary Setup",
+      "operation": "Secondary Setup (Rechuck)",
+      "machineClasses": "lathes",
+      "description": "A second chucking for features a 2-axis lathe cannot reach in one setup: workholder install-and-remove time from tblInstallingTurningWorkholders, spread over the batch.",
+      "fields": [
+        {
+          "name": "Workholder Install and Remove Time",
+          "unit": "min",
+          "source": "lookup",
+          "table": "tblInstallingTurningWorkholders",
+          "column": "Install And Remove Time (min)"
+        },
+        {
+          "name": "Batch Size",
+          "unit": null,
+          "source": "bom"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Workholder Install and Remove Time} * 60 / {Batch Size}"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Inspection",
+      "operation": "Inspection",
+      "machineClasses": [
+        "machining_inspection",
+        "special_inspection"
+      ],
+      "description": "Inspection time per part: per-piece measurement (allowances are database defaults — no reference source maps features to tblInspection analyses), spread over first-article / in-process / final sampling.",
+      "fields": [
+        {
+          "name": "Holes",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Threads",
+          "unit": null,
+          "source": "drawing"
+        },
+        {
+          "name": "Tightest Tolerance",
+          "unit": "mm",
+          "source": "drawing"
+        },
+        {
+          "name": "GDT Time",
+          "unit": "min",
+          "source": "engine"
+        },
+        {
+          "name": "Batch Size",
+          "unit": null,
+          "source": "bom"
+        },
+        {
+          "name": "First Article Pieces",
+          "unit": null,
+          "source": "engine"
+        },
+        {
+          "name": "In-process 1 in N",
+          "unit": null,
+          "source": "engine"
+        },
+        {
+          "name": "Final Check 1 in N",
+          "unit": null,
+          "source": "engine"
+        },
+        {
+          "name": "Final Check Time",
+          "unit": "min",
+          "source": "engine"
+        },
+        {
+          "name": "Positioning Time",
+          "unit": "min",
+          "source": "default",
+          "default": 5
+        },
+        {
+          "name": "Hole Sample Rate",
+          "unit": null,
+          "source": "default",
+          "default": 5
+        },
+        {
+          "name": "Max Holes Sampled",
+          "unit": null,
+          "source": "default",
+          "default": 15
+        },
+        {
+          "name": "Time per Sampled Hole",
+          "unit": "min",
+          "source": "default",
+          "default": 0.5
+        },
+        {
+          "name": "Max Threads Checked",
+          "unit": null,
+          "source": "default",
+          "default": 6
+        },
+        {
+          "name": "Time per Thread Gauge",
+          "unit": "min",
+          "source": "default",
+          "default": 0.4
+        },
+        {
+          "name": "Tight Tolerance Threshold",
+          "unit": "mm",
+          "source": "default",
+          "default": 0.05
+        },
+        {
+          "name": "Tight Tolerance CMM Time",
+          "unit": "min",
+          "source": "default",
+          "default": 8
+        },
+        {
+          "name": "Holes Sampled",
+          "unit": null,
+          "formula": "min(ceil({Holes} / {Hole Sample Rate}), {Max Holes Sampled})"
+        },
+        {
+          "name": "Threads Checked",
+          "unit": null,
+          "formula": "min({Threads}, {Max Threads Checked})"
+        },
+        {
+          "name": "Tight Tolerance Time",
+          "unit": "min",
+          "formula": "IF({Tightest Tolerance} > 0 and {Tightest Tolerance} <= {Tight Tolerance Threshold}, {Tight Tolerance CMM Time}, 0)"
+        },
+        {
+          "name": "Inspection per Piece",
+          "unit": "min",
+          "formula": "{Positioning Time} + {Holes Sampled} * {Time per Sampled Hole} + {Threads Checked} * {Time per Thread Gauge} + {Tight Tolerance Time} + {GDT Time}"
+        },
+        {
+          "name": "In-process Pieces",
+          "unit": null,
+          "formula": "floor(max({Batch Size} - {First Article Pieces}, 0) / {In-process 1 in N})"
+        },
+        {
+          "name": "Final Check Pieces",
+          "unit": null,
+          "formula": "ceil({Batch Size} / {Final Check 1 in N})"
+        },
+        {
+          "name": "Measured Minutes per Batch",
+          "unit": "min",
+          "formula": "{Inspection per Piece} * ({First Article Pieces} + {In-process Pieces}) + {Final Check Time} * {Final Check Pieces}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Measured Minutes per Batch} / {Batch Size} * 60"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Hobbing",
+      "operation": "Hobbing",
+      "machineClasses": [
+        "hob_machine"
+      ],
+      "description": "Hobbing a gear: CAD teeth, face width, module (tip diameter / (teeth + 2)) and tooth depth ((tip - root) / 2); ANSI hob diameter and starts (tblAnsiHobbing, variables defaultNumStarts); cutting speed and axial feed (tblHobbing). The hob travels the face width plus its approach (the chord of a hob of that diameter entering the tooth depth); the gear turns teeth / starts revolutions per hob revolution.",
+      "fields": [
+        {
+          "name": "Teeth",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Face Width",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Module",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Tooth Depth",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Hob Diameter",
+          "unit": "mm",
+          "source": "lookup",
+          "table": "tblAnsiHobbing",
+          "column": "hob_diameter_mm"
+        },
+        {
+          "name": "Starts",
+          "unit": null,
+          "source": "lookup",
+          "table": "variables",
+          "column": "value"
+        },
+        {
+          "name": "Cutting Speed",
+          "unit": "m/min",
+          "source": "lookup",
+          "table": "tblHobbing",
+          "column": "Cutting Speed (m / min)"
+        },
+        {
+          "name": "Axial Feed",
+          "unit": "mm/rev",
+          "source": "lookup",
+          "table": "tblHobbing",
+          "column": "Feed (mm / rev)"
+        },
+        {
+          "name": "Hob Speed",
+          "unit": "rpm",
+          "formula": "{Cutting Speed} * 1000 / (pi * {Hob Diameter})"
+        },
+        {
+          "name": "Approach",
+          "unit": "mm",
+          "formula": "sqrt({Tooth Depth} * ({Hob Diameter} - {Tooth Depth}))"
+        },
+        {
+          "name": "Axial Travel",
+          "unit": "mm",
+          "formula": "{Face Width} + {Approach}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Axial Travel} * {Teeth} / ({Hob Speed} * {Starts} * {Axial Feed}) * 60"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Shaving",
+      "operation": "Shaving",
+      "machineClasses": [
+        "shaver"
+      ],
+      "description": "Gear shaving after hobbing: CAD teeth, module and face width; strokes, cutting speed and feed per workpiece revolution from tblShaving; workpiece speed capped at variables maxShavingWorkpieceSpeed. Each stroke traverses the face width.",
+      "fields": [
+        {
+          "name": "Teeth",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Module",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Face Width",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Strokes",
+          "unit": null,
+          "source": "lookup",
+          "table": "tblShaving",
+          "column": "Strokes"
+        },
+        {
+          "name": "Cutting Speed",
+          "unit": "m/min",
+          "source": "lookup",
+          "table": "tblShaving",
+          "column": "Cutting Speed (m / min)"
+        },
+        {
+          "name": "Feed",
+          "unit": "mm/rev",
+          "source": "lookup",
+          "table": "tblShaving",
+          "column": "Feed Per Rev (mm / rev)"
+        },
+        {
+          "name": "Max Workpiece Speed",
+          "unit": "rpm",
+          "source": "lookup",
+          "table": "variables",
+          "column": "value"
+        },
+        {
+          "name": "Pitch Diameter",
+          "unit": "mm",
+          "formula": "{Module} * {Teeth}"
+        },
+        {
+          "name": "Workpiece Speed",
+          "unit": "rpm",
+          "formula": "min({Cutting Speed} * 1000 / (pi * {Pitch Diameter}), {Max Workpiece Speed})"
+        },
+        {
+          "name": "Stroke Time",
+          "unit": "s",
+          "formula": "{Face Width} / ({Feed} * {Workpiece Speed}) * 60"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Strokes} * {Stroke Time}"
+        }
+      ]
+    },
+    {
+      "name": "Machining - Rotary Broaching",
+      "operation": "Rotary Broaching",
+      "machineClasses": "lathes+mills",
+      "description": "Rotary broaching a polygon socket (drawing polygon callout + CAD polygon ring): depth from CAD; RPM and feed from tblRotaryBroaching (depth within the broach reach), feed calibrated by variables rotaryBroachFeedAdjustment. The pilot hole is priced by the Drilling calculator.",
+      "fields": [
+        {
+          "name": "Polygon Depth",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Polygons",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "RPM",
+          "unit": "rpm",
+          "source": "lookup",
+          "table": "tblRotaryBroaching",
+          "column": "RPM"
+        },
+        {
+          "name": "Feed",
+          "unit": "mm/rev",
+          "source": "lookup",
+          "table": "tblRotaryBroaching",
+          "column": "FeedMmPerRev"
+        },
+        {
+          "name": "Feed Adjustment",
+          "unit": null,
+          "source": "lookup",
+          "table": "variables",
+          "column": "value"
+        },
+        {
+          "name": "Time per Polygon",
+          "unit": "s",
+          "formula": "{Polygon Depth} / ({RPM} * {Feed} * {Feed Adjustment}) * 60"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Time per Polygon} * {Polygons}"
+        }
+      ]
+    }
+  ],
+  "retire": [
+    "CNC Drilling Calculator",
+    "Machining - Boring",
+    "Machining - Cost Drivers",
+    "Machining - Cutoff",
+    "Machining - Drilling",
+    "Machining - End Milling and Sawing",
+    "Machining - Face Milling",
+    "Machining - Facing",
+    "Machining - Inspection",
+    "Machining - Internal Boring",
+    "Machining - Knurling",
+    "Machining - Laser Cutting",
+    "Machining - Manufacturing",
+    "Machining - Plasma Cutting",
+    "Machining - Plunge Milling",
+    "Machining - Reaming",
+    "Machining - Slot Milling",
+    "Machining - Step Drilling",
+    "Machining - Threading",
+    "Machining - Turning",
+    "Thread Milling Calculator",
+    "Thread Tapping Calculator",
+    "Turning Cycle time Calculation"
+  ]
+}

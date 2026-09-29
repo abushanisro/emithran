@@ -1,13 +1,37 @@
-import { BadRequestException, Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AccessToken } from '../decorators/access-token.decorator';
+import { CurrentUser } from '../decorators/current-user.decorator';
+import { ExchangeRateService } from '../exchange-rate/exchange-rate.service';
+import { SetExchangeRateDto } from './dto/set-exchange-rate.dto';
 import { FxRateType, FxService } from './fx.service';
 
 @ApiTags('fx')
 @ApiBearerAuth()
 @Controller({ path: 'api/fx', version: '1' })
 export class FxController {
-  constructor(private readonly fxService: FxService) {}
+  constructor(
+    private readonly fxService: FxService,
+    private readonly exchangeRateService: ExchangeRateService,
+  ) {}
+
+  /** The active budget rates with their provenance — the Process page Exchange Rates panel. */
+  @Get('exchange-rates')
+  listExchangeRates(@AccessToken() accessToken: string | null) {
+    return this.exchangeRateService.listRates(accessToken);
+  }
+
+  /** Sets a new budget rate for one currency; the replaced rate is kept as history. */
+  @Put('exchange-rates/:currency')
+  async setExchangeRate(
+    @Param('currency') currency: string,
+    @Body() body: SetExchangeRateDto,
+    @CurrentUser() user: { id: string },
+    @AccessToken() accessToken: string | null,
+  ) {
+    await this.exchangeRateService.setRate(currency, body.rate, body.reason.trim(), user.id);
+    return this.exchangeRateService.listRates(accessToken);
+  }
 
   @Get('factory-currency')
   getFactoryCurrency(@Query('location') location: string) {
@@ -21,8 +45,8 @@ export class FxController {
   }
 
   @Get('currencies')
-  listCurrencies() {
-    return this.fxService.listCurrencies();
+  listCurrencies(@AccessToken() accessToken: string | null) {
+    return this.fxService.listCurrencies(accessToken);
   }
 
   @Get('rate')

@@ -4,7 +4,6 @@ import {
   rolledFormNeedsRollBender,
   routeProducesBlank,
   resolveSetupMinutes,
-  decideBenchmarkOverride,
   findRouteDataGaps,
   isRouteDataComplete,
   selectRecommendedRoute,
@@ -48,7 +47,6 @@ describe('resolveSetupMinutes', () => {
       calculatorSetupMin: 22,
       machineSetupTimeHr: 0.75,   // 45 min — real, but not part-specific
       operationSetupMin: 20,
-      classDefaultMin: 20,
     });
     expect(r.setupMin).toBe(22);
     expect(r.source).toBe('calculator');
@@ -59,7 +57,7 @@ describe('resolveSetupMinutes', () => {
     for (const v of [null, undefined, 0, Number.NaN]) {
       const r = resolveSetupMinutes({
         process: 'Press Brake', calculatorSetupMin: v as number | null,
-        machineSetupTimeHr: 0.75, classDefaultMin: 20,
+        machineSetupTimeHr: 0.75,
       });
       expect(r.setupMin).toBeCloseTo(45, 6);
       expect(r.source).toBe('machine');
@@ -71,7 +69,6 @@ describe('resolveSetupMinutes', () => {
       process: 'Laser Cutting',
       machineSetupTimeHr: 0.08,   // the real value staged for a fiber laser
       operationSetupMin: 12,
-      classDefaultMin: 15,
       machineName: 'NTC TLM-404 3300',
     });
     expect(r.setupMin).toBeCloseTo(4.8, 6);
@@ -80,8 +77,8 @@ describe('resolveSetupMinutes', () => {
   });
 
   it('lets two machines of one class carry genuinely different setup times', () => {
-    const a = resolveSetupMinutes({ process: 'Press', machineSetupTimeHr: 0.47, classDefaultMin: 30 });
-    const b = resolveSetupMinutes({ process: 'Press', machineSetupTimeHr: 0.72, classDefaultMin: 30 });
+    const a = resolveSetupMinutes({ process: 'Press', machineSetupTimeHr: 0.47 });
+    const b = resolveSetupMinutes({ process: 'Press', machineSetupTimeHr: 0.72 });
     expect(a.setupMin).toBeCloseTo(28.2, 6);
     expect(b.setupMin).toBeCloseTo(43.2, 6);
     expect(a.setupMin).not.toBeCloseTo(b.setupMin, 6);
@@ -89,23 +86,23 @@ describe('resolveSetupMinutes', () => {
 
   it('falls to the real per-operation lookup when the machine has none, and does not warn', () => {
     // A per-operation row is real sourced data, not a gap — warning here would
-    // fire on nearly every line and drown the genuine class-default gaps.
+    // fire on nearly every line and drown the genuine no-setup gaps.
     const r = resolveSetupMinutes({
-      process: 'Router Cutting', machineSetupTimeHr: null, operationSetupMin: 45, classDefaultMin: 30,
+      process: 'Router Cutting', machineSetupTimeHr: null, operationSetupMin: 45,
     });
     expect(r.setupMin).toBe(45);
     expect(r.source).toBe('operation_lookup');
     expect(r.warning).toBeUndefined();
   });
 
-  it('falls to the class default and discloses it when neither real source resolved', () => {
+  it('does not cost setup, and says so, when no real source resolved', () => {
     const r = resolveSetupMinutes({
       process: 'Plasma Cut', machineSetupTimeHr: null, operationSetupMin: null,
-      classDefaultMin: 4.8, machineName: 'CSI Series 4 - 200A',
+      machineName: 'CSI Series 4 - 200A',
     });
-    expect(r.setupMin).toBe(4.8);
-    expect(r.source).toBe('class_default');
-    expect(r.warning).toContain('setup time from fallback');
+    expect(r.setupMin).toBe(0);
+    expect(r.source).toBe('none');
+    expect(r.warning).toContain('setup not costed');
     expect(r.warning).toContain('CSI Series 4 - 200A');
   });
 
@@ -114,7 +111,7 @@ describe('resolveSetupMinutes', () => {
     // never filled — accepting it would silently zero out real setup cost.
     for (const v of [0, -1]) {
       const r = resolveSetupMinutes({
-        process: 'Turret Punching', machineSetupTimeHr: v, operationSetupMin: 20, classDefaultMin: 30,
+        process: 'Turret Punching', machineSetupTimeHr: v, operationSetupMin: 20,
       });
       expect(r.setupMin).toBe(20);
       expect(r.source).toBe('operation_lookup');
@@ -123,102 +120,10 @@ describe('resolveSetupMinutes', () => {
 
   it('ignores a non-finite machine value rather than propagating NaN into setup cost', () => {
     const r = resolveSetupMinutes({
-      process: 'Waterjet Cutting', machineSetupTimeHr: Number.NaN, operationSetupMin: null, classDefaultMin: 4.8,
+      process: 'Waterjet Cutting', machineSetupTimeHr: Number.NaN, operationSetupMin: null,
     });
-    expect(r.setupMin).toBe(4.8);
-    expect(r.source).toBe('class_default');
-  });
-});
-
-// ── decideBenchmarkOverride ───────────────────────────────────────────────────
-// This decision silently replaces the machine rate a quote is billed at, and
-// had no test before 2026-09-05. Numbers below are real values from this
-// deployment, not invented ones.
-describe('decideBenchmarkOverride', () => {
-  const thresholds = { lowFraction: 0.5, highFraction: 3.0 };
-
-  it('keeps a rate that equals the record own Direct + Indirect overhead', () => {
-    // The reported defect: "11010 (Heller-hydraulic)" real MHR 19.83/hr
-    // (direct 4.25 + indirect 15.58) was replaced by the generic 74/hr class
-    // benchmark, inflating every bend line costed on it by 3.7x.
-    const d = decideBenchmarkOverride({
-      rate: 19.83, isDbRate: true, benchmark: 74,
-      directOverheadRate: 4.25, indirectOverheadRate: 15.58, thresholds,
-    });
-    expect(d.override).toBe(false);
-  });
-
-  it('keeps the canonical rate for every class whose benchmark is a generic average', () => {
-    for (const [rate, doh, ioh, benchmark] of [
-      [19.83, 4.25, 15.58, 74],   // press_brake
-      [30.38, 14.80, 15.58, 84],  // turret_punch
-      [38.09, 22.51, 15.58, 78],  // waterjet
-    ] as const) {
-      expect(decideBenchmarkOverride({
-        rate, isDbRate: true, benchmark,
-        directOverheadRate: doh, indirectOverheadRate: ioh, thresholds,
-      }).override).toBe(false);
-    }
-  });
-
-  it('still overrides a currency mis-scale, which cannot equal the overhead sum', () => {
-    // An INR figure read as USD is ~83x out — the error this guard exists for.
-    const d = decideBenchmarkOverride({
-      rate: 1656, isDbRate: true, benchmark: 74,
-      directOverheadRate: 4.25, indirectOverheadRate: 15.58, thresholds,
-    });
-    expect(d.override).toBe(true);
-    expect(d).toHaveProperty('reason');
-  });
-
-  it('still overrides a suspiciously low rate on a row with no overhead breakdown', () => {
-    // The 13 pre-2026-07-13 seed rows have no Direct/Indirect captured, so they
-    // keep facing both ratio arms exactly as before.
-    const d = decideBenchmarkOverride({
-      rate: 9, isDbRate: true, benchmark: 74,
-      directOverheadRate: null, indirectOverheadRate: null, thresholds,
-    });
-    expect(d.override).toBe(true);
-  });
-
-  it('does not treat a zero overhead breakdown as a real canonical sum', () => {
-    // 0 + 0 means "never captured", not "this machine is free to run".
-    const d = decideBenchmarkOverride({
-      rate: 0.5, isDbRate: true, benchmark: 74,
-      directOverheadRate: 0, indirectOverheadRate: 0, thresholds,
-    });
-    expect(d.override).toBe(true);
-  });
-
-  it('uses the configured bands, not hardcoded 50%/300%', () => {
-    // Previously the guard ignored costing_settings entirely, so deploying
-    // migration 473 changed the warnings but never the rate actually billed.
-    const rate = 20, benchmark = 74;
-    expect(decideBenchmarkOverride({
-      rate, isDbRate: true, benchmark, thresholds: { lowFraction: 0.5, highFraction: 3 },
-    }).override).toBe(true);
-    expect(decideBenchmarkOverride({
-      rate, isDbRate: true, benchmark, thresholds: { lowFraction: 0.1, highFraction: 10 },
-    }).override).toBe(false);
-  });
-
-  it('never overrides a rate that did not come from a real machine record', () => {
-    expect(decideBenchmarkOverride({
-      rate: 1, isDbRate: false, benchmark: 74, thresholds,
-    }).override).toBe(false);
-  });
-
-  it('never overrides when no benchmark is on file for the class', () => {
-    expect(decideBenchmarkOverride({
-      rate: 1, isDbRate: true, benchmark: 0, thresholds,
-    }).override).toBe(false);
-  });
-
-  it('tolerates sub-cent rounding between the stored overheads and the resolved rate', () => {
-    expect(decideBenchmarkOverride({
-      rate: 19.831, isDbRate: true, benchmark: 74,
-      directOverheadRate: 4.25, indirectOverheadRate: 15.58, thresholds,
-    }).override).toBe(false);
+    expect(r.setupMin).toBe(0);
+    expect(r.source).toBe('none');
   });
 });
 
@@ -407,7 +312,7 @@ describe('selectRecommendedRoute', () => {
   it('treats an unset producesBlank as no evidence against the route', () => {
     // CNC and injection-molding routes share this ranking and have no
     // sheet-metal blanking concept at all.
-    expect(selectRecommendedRoute([route('cnc-3ax', 4.20)])?.routeId).toBe('cnc-3ax');
+    expect(selectRecommendedRoute([route('3_axis_mill', 4.20)])?.routeId).toBe('3_axis_mill');
   });
 });
 
@@ -578,9 +483,4 @@ describe('preferRealRate', () => {
     expect(preferRealRate(specific, generic)).toBe(generic);
   });
 
-  it('falls through when the specific rate is only a benchmark/default, not a real machine-specific row', () => {
-    const specific = rate({ machineClass: 'manual_deburr', source: 'default_rate' });
-    const generic = rate({ machineClass: 'deburring', source: 'mhr_database' });
-    expect(preferRealRate(specific, generic)).toBe(generic);
-  });
 });

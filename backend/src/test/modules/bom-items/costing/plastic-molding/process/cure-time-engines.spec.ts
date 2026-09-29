@@ -48,8 +48,8 @@ const noCycleTimeMachineRate = (machineClass: string): MHRRateInput => ({
 
 // Nothing passed the capability check, so selection returned no machine.
 const noMachineSelectedRate = (machineClass: string): MHRRateInput => ({
-  rate: 1200,
-  source: 'default_rate',
+  rate: 0,
+  source: 'no_db_rate',
   machineClass,
   machineName: null,
   commodityCode: null,

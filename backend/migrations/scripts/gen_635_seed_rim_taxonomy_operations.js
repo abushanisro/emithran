@@ -17,10 +17,12 @@
 const fs = require('fs');
 const path = require('path');
 
-const OPS_FILE = path.join(__dirname, '../../../memory/Injection/process/digital_factory_operations.json');
+const { readDoc } = require('./lib/memory-csv');
+
+const OPS_FILE = path.join(__dirname, '../../../memory/Plastic Modeling/process/digital_factory_operations.csv');
 const OUT_SQL = path.join(__dirname, '../635_seed_rim_taxonomy_operations.sql');
 
-const data = JSON.parse(fs.readFileSync(OPS_FILE, 'utf8'));
+const data = readDoc(OPS_FILE, { list: 'operations', scalars: ['digitalFactory'] });
 const rimOps = data.operations.filter((o) => o.process === 'Reaction Injection Molding');
 
 function sqlStr(v) {

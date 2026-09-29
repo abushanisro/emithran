@@ -4,7 +4,6 @@
 // BlankOptimizerService (blank-optimizer.service.ts) is the thin DB-fetching
 // wrapper around these functions; it owns no geometry of its own.
 
-import { CNC_STOCK_ALLOWANCE_PER_SIDE_MM } from '../../shared/core/default-rates.constants';
 
 export interface BoundingBox {
   length: number; // mm — longest dimension (feed direction)
@@ -19,7 +18,13 @@ export interface BlankResult {
   sizeLabel: string;
   billetVolMm3: number;
   utilizationPct: number | null;
+  /** Real stock_profiles bar diameter, for a round bar — the diameter the lathe actually turns down from. */
+  barDiameterMm?: number;
   requestedFormUnavailable?: { requested: StockForm; reason: string };
+  /** Billet only: the per-side machining stock allowance applied (reference
+   *  rule, costing/machining/stock-allowance.ts); null when the rule's
+   *  variables are not staged, so no allowance was added. */
+  stockAllowancePerSideMm?: number | null;
 }
 
 export interface StockProfile {
@@ -33,6 +38,7 @@ export interface ScoredCandidate {
   sizeLabel: string;
   billetVolMm3: number;
   utilizationPct: number | null;
+  barDiameterMm?: number;
   score: number;
 }
 
@@ -66,6 +72,7 @@ export function roundBarCandidates(
       form: "round_bar",
       sizeLabel: `Ø${p.size_a_mm} round bar`,
       billetVolMm3: vol,
+      barDiameterMm: p.size_a_mm,
       utilizationPct: util !== null ? Math.min(100, util) : null,
       score: scoreCandidate(vol, partVolMm3),
     });
@@ -123,16 +130,15 @@ export function rectangularBarCandidates(
   return out;
 }
 
-export function billetFallback(bbox: BoundingBox, partVolMm3: number): BlankResult {
-  // Real per-side machining stock allowance (CNC_STOCK_ALLOWANCE_PER_SIDE_MM,
-  // default-rates.constants.ts) applied on both sides of each dimension —
-  // was a separately-hardcoded literal `6` here, duplicating the same
-  // constant used elsewhere in this module (selectBestAutoCandidate below)
-  // and in cost-machining-engine.ts, all meant to be the same real number. No real
-  // stock-allowance-by-material/machine/process table exists in the
-  // reference corpus (checked directly) -- this stays a single, disclosed,
-  // class-level constant until one is sourced, not a fabricated table.
-  const allow = CNC_STOCK_ALLOWANCE_PER_SIDE_MM * 2;
+export function billetFallback(
+  bbox: BoundingBox,
+  partVolMm3: number,
+  // Per-side allowance from the reference rule (stock-allowance.ts), resolved
+  // by the caller; null = rule not staged, so none is added (and the caller
+  // discloses it) rather than a coded number standing in.
+  allowancePerSideMm: number | null,
+): BlankResult {
+  const allow = 2 * (allowancePerSideMm ?? 0);
   const vol = (bbox.length + allow) * (bbox.width + allow) * (bbox.height + allow);
   const util = vol > 0 && partVolMm3 > 0 ? (partVolMm3 / vol) * 100 : null;
   return {
@@ -140,6 +146,7 @@ export function billetFallback(bbox: BoundingBox, partVolMm3: number): BlankResu
     sizeLabel: `${(bbox.length + allow).toFixed(0)}×${(bbox.width + allow).toFixed(0)}×${(bbox.height + allow).toFixed(0)} billet`,
     billetVolMm3: vol,
     utilizationPct: util !== null ? Math.min(100, util) : null,
+    stockAllowancePerSideMm: allowancePerSideMm,
   };
 }
 
@@ -149,11 +156,11 @@ export function billetFallback(bbox: BoundingBox, partVolMm3: number): BlankResu
 // form). Returns null when no real candidate beats the billet — caller
 // falls back to billetFallback().
 export function selectBestAutoCandidate(
-  candidates: ScoredCandidate[], bbox: BoundingBox,
+  candidates: ScoredCandidate[], bbox: BoundingBox, allowancePerSideMm: number | null,
 ): ScoredCandidate | null {
   if (candidates.length === 0) return null;
   const sorted = [...candidates].sort((a, b) => b.score - a.score);
-  const bboxAllow = CNC_STOCK_ALLOWANCE_PER_SIDE_MM * 2;
+  const bboxAllow = 2 * (allowancePerSideMm ?? 0);
   const bboxFallbackVol = (bbox.length + bboxAllow) * (bbox.width + bboxAllow) * (bbox.height + bboxAllow);
   return sorted.find((c) => c.billetVolMm3 < bboxFallbackVol) ?? null;
 }
@@ -175,8 +182,9 @@ export function selectForcedFormCandidate(
   minDiam: number,
   W: number,
   H: number,
+  allowancePerSideMm: number | null,
 ): BlankResult {
-  if (forcedForm === 'billet') return billetFallback(bbox, partVolMm3);
+  if (forcedForm === 'billet') return billetFallback(bbox, partVolMm3, allowancePerSideMm);
 
   const candidates =
     forcedForm === 'round_bar' ? roundBarCandidates(profiles, minDiam, barLen, partVolMm3) :
@@ -184,7 +192,7 @@ export function selectForcedFormCandidate(
     rectangularBarCandidates(profiles, W, H, barLen, partVolMm3);
 
   if (candidates.length === 0) {
-    const fallback = billetFallback(bbox, partVolMm3);
+    const fallback = billetFallback(bbox, partVolMm3, allowancePerSideMm);
     fallback.requestedFormUnavailable = {
       requested: forcedForm,
       reason: `No real ${forcedForm.replace('_', ' ')} stock size in the reference catalog is large enough for this part.`,
@@ -194,5 +202,8 @@ export function selectForcedFormCandidate(
 
   // Smallest real fitting size — least waste among the sizes actually stocked.
   const best = [...candidates].sort((a, b) => a.billetVolMm3 - b.billetVolMm3)[0]!;
-  return { form: best.form, sizeLabel: best.sizeLabel, billetVolMm3: best.billetVolMm3, utilizationPct: best.utilizationPct };
+  return {
+    form: best.form, sizeLabel: best.sizeLabel, billetVolMm3: best.billetVolMm3, utilizationPct: best.utilizationPct,
+    ...(best.barDiameterMm != null ? { barDiameterMm: best.barDiameterMm } : {}),
+  };
 }

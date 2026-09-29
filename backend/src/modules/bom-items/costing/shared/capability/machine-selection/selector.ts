@@ -35,6 +35,8 @@ import {
   type CapabilityCheck,
   type MachineCandidate,
   type MachineRecommendation,
+  type MachineScoreBreakdown,
+  type MachineSelectionDecision,
   type MachineSelectionResult,
 } from '../../../../dto/machine-selection.dto';
 import { getCachedMachinePool, setCachedMachinePool } from './pool-cache';
@@ -277,6 +279,10 @@ export function classifyMachineRecord(row: RawMachineRow): MachineClass | null {
 
 // ── Capability hydration: DB → seed registry → class defaults ─────────────────
 
+const MOLDING_PRESS_CLASSES: ReadonlySet<string> = new Set([
+  'injection_molding', 'structural_foam_molding', 'reaction_injection_molding', 'compression_molding',
+]);
+
 function hydrateCapability(row: RawMachineRow, cls: MachineClass): {
   capability: MachineCapability;
   source: 'imported' | 'seed' | 'default_class';
@@ -307,6 +313,11 @@ function hydrateCapability(row: RawMachineRow, cls: MachineClass): {
   if (hasDbCapability) {
     return { capability: db, source: (row.capability_source as 'imported' | 'seed') ?? 'imported' };
   }
+
+  // Molding presses: capability only from their own staged record (migration
+  // 633). No capability is guessed from a machine name or class default; an
+  // empty record surfaces as missing machine data.
+  if (MOLDING_PRESS_CLASSES.has(cls)) return { capability: db, source: 'default_class' };
 
   const seed = lookupSeedCapability(row.machine_name);
   if (seed) return { capability: { ...EMPTY_CAPABILITY, ...seed }, source: 'seed' };
@@ -392,6 +403,7 @@ export async function fetchMachinePool(
       machineId: raw.id,
       machineName: raw.machine_name,
       commodityCode: raw.commodity_code,
+      processGroup: raw.process_group || raw.commodity_code || null,
       machineClass: cls,
       hourlyRate: rate,
       // 85 here is a ranking-only placeholder, not a claimed real utilization
@@ -607,7 +619,10 @@ export function isCapable(
       return true;
     }
     case 'injection_molding': {
-      if (cap.maxTonnage != null && cap.maxTonnage < req.clampTonnageRequired * TONNAGE_MARGIN) return false;
+      // Reference clamp force already carries clampForceSafetyFactor: no TONNAGE_MARGIN on top.
+      if (req.clampTonnageRequired == null) return false;
+      // No tonnage on file = not shown capable (never passed unchecked).
+      if (cap.maxTonnage == null || cap.maxTonnage < req.clampTonnageRequired) return false;
       // Tie-bar spacing: additive formula, allow 90° rotation
       if (cap.tieBarXMm != null && cap.tieBarYMm != null && req.partLengthMm > 0 && req.partWidthMm > 0) {
         const reqL = req.partLengthMm + IM_TIEBAR_ADDEND_MM;
@@ -740,7 +755,7 @@ export function fitScore(candidate: MachineCandidate, req: MachineRequirement): 
       break;
     }
     case 'injection_molding': {
-      const t = ratio(req.clampTonnageRequired * TONNAGE_MARGIN, cap.maxTonnage);
+      const t = req.clampTonnageRequired == null ? null : ratio(req.clampTonnageRequired, cap.maxTonnage);
       if (t != null) parts.push(t);
       break;
     }
@@ -872,8 +887,10 @@ function buildReasons(
       if (cap.maxLengthMm != null) reasons.push(`Length ${r0(req.lengthMm)} mm ≤ ${r0(cap.maxLengthMm)} mm between centres`);
       break;
     case 'injection_molding':
-      reasons.push(`Requires ${r0(req.clampTonnageRequired * TONNAGE_MARGIN)} t clamp force (incl. 15% margin)` +
-        (cap.maxTonnage != null ? ` ≤ ${r0(cap.maxTonnage)} t machine capacity` : ''));
+      reasons.push(req.clampTonnageRequired == null
+        ? (req.clampNotDerivableReason ?? 'Clamp force not derivable.')
+        : `Requires ${r0(req.clampTonnageRequired)} t clamp force (reference model, incl. clampForceSafetyFactor)` +
+          (cap.maxTonnage != null ? ` ≤ ${r0(cap.maxTonnage)} t machine capacity` : ''));
       if (req.shotWeightG != null && req.shotWeightG > 0) {
         // Informational until mhr_records carries shot capacity (barrel size) —
         // the gate switches on the day that column exists.
@@ -982,28 +999,29 @@ const PROFILES: Record<'balanced' | 'cheapest' | 'fastest', ProfileWeights> = {
   fastest:  { fit: 0.2, util: 0.5, cost: 0.2, avail: 0.1 },
 };
 
-function makeDefaultCandidate(_location: string, cls: MachineClass, fallbackRate = 0): MachineCandidate {
+// The "no machine" result: what selectMachine returns when this location has no
+// real, capable machine of the class. It is an explicit absence, not a stand-in
+// machine — no rate (0 → 'no_db_rate', not costed), no capability, no
+// utilization. Nothing here may be read as a property of a real machine.
+function makeNoMachineCandidate(cls: MachineClass): MachineCandidate {
   return {
     machineId: null,
     machineName: null,
     commodityCode: null,
+    processGroup: null,
     machineClass: cls,
-    // fallbackRate is the real location benchmark rate when the caller has one on
-    // file for this class; 0 only when truly nothing is known (no machine, no
-    // benchmark) — that 0 is what triggers 'no_db_rate' in the cost engine, so it
-    // must stay a genuine zero rather than a value standing in for "unknown".
-    hourlyRate: fallbackRate,
-    utilizationPct: 75, // ranking-only placeholder — no real machine/data exists for this synthetic candidate
+    hourlyRate: 0,
+    utilizationPct: 0,
     utilizationKnown: false,
     scheduledLoadPct: null,
     availabilityStatus: 'available',
     nextAvailableAt: null,
     maintenanceWindowStart: null,
     maintenanceWindowEnd: null,
-    capability: { ...EMPTY_CAPABILITY, ...MACHINE_CLASS_DEFAULTS[cls] },
+    capability: { ...EMPTY_CAPABILITY },
     capabilitySource: 'default_class',
     capabilityVersion: null,
-    operators: null, // no real machine — cost engine falls back to its own generic default
+    operators: null,
     laborRateUsdHr: null,
     pressCycleTimeS: null,
     handlingConstS: null,
@@ -1029,11 +1047,6 @@ export interface SelectMachineInput {
   requirement: MachineRequirement;
   overrideMachineId?: string | null; // user override — short-circuits scoring
   now?: Date;
-  // Location benchmark rate (mhr_benchmark_rates) for this machineClass, if the
-  // caller has one — used ONLY when no capable machine exists in the DB pool, so
-  // the "no machine on file" fallback prices at a real benchmark rate instead of
-  // a hardcoded $0 that then gets displayed/labeled as if it were priced.
-  fallbackRate?: number;
 }
 
 export function selectMachine(input: SelectMachineInput): MachineSelectionResult {
@@ -1046,29 +1059,20 @@ export function selectMachine(input: SelectMachineInput): MachineSelectionResult
     : undefined;
   const eligible = classPool.filter((c) => isCapable(c, requirement, laserOpts));
 
-  // No capable machine — fall through to the location benchmark rate when one is
-  // on file; otherwise the cost is genuinely $0, and the reason must say so rather
-  // than claim a "class default rate" that doesn't exist.
+  // No capable machine. Reported as an absence — never priced from anywhere else.
   if (eligible.length === 0 && !input.overrideMachineId) {
-    const fallbackRate = input.fallbackRate ?? 0;
-    const fallback = makeDefaultCandidate(location, machineClass, fallbackRate);
-    const noneOfClass = classPool.length === 0;
-    const reason = fallbackRate > 0
-      ? (noneOfClass
-        ? 'No machine of this class in DB — using location benchmark rate'
-        : 'No capable machine in DB — using location benchmark rate')
-      : (noneOfClass
-        ? 'No machine of this class in DB and no benchmark rate on file — cost is $0; add an MHR record'
-        : 'No capable machine in DB and no benchmark rate on file — cost is $0; add an MHR record');
+    const reason = classPool.length === 0
+      ? `No machine of this class in HR Rates for ${location} — not costed; add it to memory/ and seed it`
+      : `No machine of this class in HR Rates for ${location} can do this part — not costed`;
     const rec: MachineRecommendation = {
-      candidate: fallback,
-      score: 0.4,
+      candidate: makeNoMachineCandidate(machineClass),
+      score: 0,
       reasons: [reason],
     };
     return {
       balanced: rec, cheapest: rec, fastest: rec,
       alternatives: [],
-      confidence: 40,
+      confidence: 0,
       requirement,
       allowOverride: true,
       overridden: false,
@@ -1184,6 +1188,36 @@ export function selectMachine(input: SelectMachineInput): MachineSelectionResult
     availabilityWarning = `Heavily booked (${Math.round(picked.scheduledLoadPct!)}% scheduled load)`;
   }
 
+  const W = PROFILES.balanced;
+  const composite = (s: (typeof scored)[number]) => s.fit * W.fit + s.util * W.util + s.cost * W.cost + s.avail * W.avail;
+  const r3 = (v: number) => Math.round(v * 1000) / 1000;
+  const ranking: MachineScoreBreakdown[] = balancedRanked.map((s) => ({
+    machineId: s.candidate.machineId,
+    machineName: s.candidate.machineName,
+    hourlyRate: s.candidate.hourlyRate,
+    fit: r3(s.fit), util: r3(s.util), cost: r3(s.cost), avail: r3(s.avail),
+    score: r3(composite(s)),
+  }));
+  const rejected = classPool
+    .filter((c) => !eligible.includes(c))
+    .map((c) => ({ machineId: c.machineId, machineName: c.machineName, reasons: buildReasons(c, requirement, laserOpts) }));
+  let decision: MachineSelectionDecision;
+  if (overridden) {
+    decision = { winnerId: balancedRec.candidate.machineId, runnerUpId: null, decidingFactor: 'override' };
+  } else if (balancedRanked.length < 2) {
+    decision = { winnerId: balancedRec.candidate.machineId, runnerUpId: null, decidingFactor: 'only_capable' };
+  } else {
+    const [a, b] = balancedRanked as [(typeof scored)[number], (typeof scored)[number]];
+    const deltas = (['fit', 'util', 'cost', 'avail'] as const)
+      .map((k) => ({ k, d: (a[k] - b[k]) * W[k] }))
+      .sort((x, y) => y.d - x.d);
+    decision = {
+      winnerId: a.candidate.machineId,
+      runnerUpId: b.candidate.machineId,
+      decidingFactor: deltas[0]!.d > 1e-9 ? deltas[0]!.k : 'tie_rate',
+    };
+  }
+
   return {
     balanced: balancedRec,
     cheapest: cheapestRec,
@@ -1194,5 +1228,9 @@ export function selectMachine(input: SelectMachineInput): MachineSelectionResult
     allowOverride: true,
     overridden,
     availabilityWarning,
+    ranking,
+    rejected,
+    profileWeights: PROFILES,
+    decision,
   };
 }

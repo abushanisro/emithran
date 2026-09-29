@@ -1,29 +1,31 @@
 // Pure function — no DB, no async. All inputs must be pre-resolved by the caller.
 
-// Real per-process nesting part-to-part spacing (mm), by thickness — see
-// sm_reference_data category='lookup_table', key prefix 'tblPartSpacing'
-// (migration 518, closeout Plan Phase 3). Only the 3 machine classes this
-// app actually has a registered cutting engine for are covered — Oxyfuel/
-// Plasma have no cost engine here regardless of this data (see
-// manufacturing-process-registry.ts).
-//   fiber_laser: spacing == thickness, 1:1, capped at 50mm (every real data
-//     point from 0.5mm to 50mm is exactly spacing=thickness; the source's
-//     own 999mm row still reads 50mm, confirming the cap rather than
-//     linear growth beyond it).
-//   turret_punch / waterjet: FLAT spacing regardless of thickness (6.35mm /
-//     5.08mm respectively, i.e. 1/4" and 0.2" — real tool/nozzle
-//     clearances, not thickness-scaled).
-export function resolveProcessPartSpacingMm(machineClass: string, thicknessMm: number): number {
-  switch (machineClass) {
-    case 'fiber_laser':
-      return Math.min(thicknessMm, 50);
-    case 'turret_punch':
-      return 6.35;
-    case 'waterjet':
-      return 5.08;
-    default:
-      return Math.min(thicknessMm, 50); // no real data for this machine class -- laser's real curve is the closest disclosed default (see computePartAllowanceMm's own doc comment for why)
-  }
+// Nesting part-to-part spacing (mm) by process and thickness, from the staged
+// tblPartSpacing table (sm_reference_data lookup_table 'tblPartSpacing:*',
+// migration 518; memory/Sheetmetal/lookuptable/..._tblPartSpacing.csv).
+// Six processes: Fiber Laser and Laser Cut (1x thickness, capped at 50),
+// Oxyfuel Cut (3x, capped at 225), Plasma Cut (2x, capped at 100), Turret
+// Press (flat 6.35) and Waterjet Cut (flat 5.08). The caller loads the rows.
+//
+// Each row's thickness is the upper bound of its bracket (the 999 row is the
+// catch-all), so a thickness takes the first row at or above it: never a
+// spacing tighter than the table gives for that thickness.
+export interface PartSpacingRow {
+  process: string;
+  thicknessMm: number;
+  spacingMm: number;
+}
+
+/** null = the table has no row for this process (or no rows at all). */
+export function resolvePartSpacingMm(
+  rows: readonly PartSpacingRow[] | null | undefined,
+  process: string,
+  thicknessMm: number,
+): number | null {
+  const own = (rows ?? []).filter((r) => r.process === process).sort((a, b) => a.thicknessMm - b.thicknessMm);
+  if (own.length === 0) return null;
+  const row = own.find((r) => r.thicknessMm >= thicknessMm) ?? own[own.length - 1]!;
+  return row.spacingMm;
 }
 
 // Standard stock sheet sizes (width × length mm), ascending by area. Shared
@@ -41,22 +43,19 @@ export const STANDARD_SHEETS: ReadonlyArray<[number, number]> = [
 
 export const EDGE_ALLOWANCE_MM = 2; // minimum clearance from sheet edge
 
-// Part-to-part nesting allowance for Gross/Net Usage -- these calculators
-// compute material utilisation BEFORE any cutting process is chosen (a part
-// could still end up laser-cut, waterjet-cut, or turret-punched), so there
-// is no real per-process identity to key spacing on here the way
-// resolveProcessPartSpacingMm above can for an already-resolved cutting
-// engine. Per an explicit product decision (2026-08-21, closeout Plan
-// Phase 3), this now assumes laser cutting -- this app's dominant/default
-// cutting method -- as a disclosed default rather than the previous
-// generic shear-strength-based formula (itself a real, back-calculated
-// "punch/draw cushion" spec value, but for a DIFFERENT physical process
-// than what nesting spacing actually needs). If Gross/Net Usage ever gains
-// a real "planned cutting process" input, this should key off
-// resolveProcessPartSpacingMm(that process, thicknessMm) instead of always
-// assuming laser.
-export function computePartAllowanceMm(thicknessMm: number, hasImpressions = false): number {
-  return resolveProcessPartSpacingMm('fiber_laser', thicknessMm) + (hasImpressions ? 10 : 0);
+// Gross/Net Usage computes material utilisation BEFORE a cutting process is
+// chosen, so it nests at the spacing of the default cutting process, Fiber
+// Laser (product decision 2026-08-21, closeout Plan Phase 3). Its spacing now
+// comes from tblPartSpacing like every other process; a route-specific nest
+// (Oxyfuel 3x, Plasma 2x, ...) needs material usage computed per route.
+export const GROSS_USAGE_SPACING_PROCESS = 'Fiber Laser';
+
+/** Part allowance for Gross/Net Usage, or null when tblPartSpacing has no row. */
+export function computePartAllowanceMm(
+  spacingRows: readonly PartSpacingRow[] | null | undefined,
+  thicknessMm: number,
+): number | null {
+  return resolvePartSpacingMm(spacingRows, GROSS_USAGE_SPACING_PROCESS, thicknessMm);
 }
 
 export interface TrueNestCostingCache {
@@ -182,13 +181,14 @@ export interface NestingInput {
   scrapPricePerKg?: number;      // recovery value (default 0)
   edgeAllowanceMm?: number;      // default 2
   scrapRecoveryPct?: number;     // fraction recovered (default 0.90)
-  hasImpressions?: boolean;      // true for stamping (adds 10mm extra)
   // Real order/batch quantity being costed. Drives sheetsRequired/plannedParts/
   // excessPositions/actualBatchGrossMaterialKg only -- never guessed, and never
   // fed back into grossWeightPerPartKg (the theoretical per-position yield the
   // rest of the costing pipeline already prices material on). Omit or <= 0 to
   // skip batch-consumption computation entirely (all four outputs undefined).
   quantityRequired?: number;
+  /** Part-to-part allowance (mm), from computePartAllowanceMm. */
+  partAllowanceMm: number;
 }
 
 export interface NestingResult {
@@ -277,11 +277,9 @@ export function computeNesting(input: NestingInput): NestingResult {
     scrapPricePerKg = 0,
     edgeAllowanceMm = EDGE_ALLOWANCE_MM,
     scrapRecoveryPct = 0.90,
-    hasImpressions = false,
     quantityRequired,
+    partAllowanceMm,
   } = input;
-
-  const partAllowanceMm = computePartAllowanceMm(thicknessMm, hasImpressions);
 
   const usablePartL = flatPatternLengthMm + partAllowanceMm;
   const usablePartW = flatPatternWidthMm + partAllowanceMm;

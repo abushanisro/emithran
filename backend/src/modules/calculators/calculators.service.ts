@@ -98,9 +98,12 @@ export class CalculatorsServiceV2 {
       throw new Error(error.message);
     }
 
+    // Retired calculators (calculators.retired_at, migration 804) stay in the
+    // table so a saved reference still opens, but are never offered again.
+    const active = (data || []).filter((c: any) => !c.retired_at);
     return {
-      calculators: data || [],
-      total: count || 0,
+      calculators: active,
+      total: Math.max((count || 0) - ((data || []).length - active.length), 0),
       page,
       limit,
     };

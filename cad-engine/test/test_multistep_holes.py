@@ -37,8 +37,8 @@ def _recognize(shape, family):
     return MachiningFeatureRecognizer().recognize(shape, family)
 
 
-def _by_type(tree, ftype):
-    return [f for f in tree.features if f.type == ftype]
+def _by_type(tree, ftype, variant=None):
+    return [f for f in tree.features if f.type == ftype and (variant is None or f.variant == variant)]
 
 
 def _make_3step_tool(cx, cy, cz):
@@ -74,8 +74,8 @@ def _shaft_with_ordinary_counterbore():
 
 
 def test_real_3step_hole_on_turned_part_yields_one_real_multistep_feature():
-    tree = _recognize(_shaft_with_3step_hole(), "cnc_turned")
-    holes = _by_type(tree, "multi_step_hole")
+    tree = _recognize(_shaft_with_3step_hole(), "turned")
+    holes = _by_type(tree, "MultiStepHole", "stepped")
     assert len(holes) == 1
     h = holes[0]
     assert h.params["step_count"] == 3
@@ -84,32 +84,32 @@ def test_real_3step_hole_on_turned_part_yields_one_real_multistep_feature():
     assert len(h.face_ids) == 3
 
     # Real constituent bores must be absorbed, not double-counted.
-    assert _by_type(tree, "through_hole") == []
-    assert _by_type(tree, "blind_hole") == []
-    assert _by_type(tree, "counterbore") == []
+    assert _by_type(tree, "SimpleHole", "through") == []
+    assert _by_type(tree, "SimpleHole", "blind") == []
+    assert _by_type(tree, "MultiStepHole", "counterbore") == []
 
 
 def test_real_3step_hole_on_milled_part_yields_one_real_multistep_feature():
-    tree = _recognize(_box_with_3step_hole(), "cnc_milled")
-    holes = _by_type(tree, "multi_step_hole")
+    tree = _recognize(_box_with_3step_hole(), "milled")
+    holes = _by_type(tree, "MultiStepHole", "stepped")
     assert len(holes) == 1
     h = holes[0]
     diams = [s["diameter_mm"] for s in h.params["steps"]]
     assert diams == [16.0, 10.0, 6.0]
     assert len(h.face_ids) == 3
-    assert _by_type(tree, "through_hole") == []
-    assert _by_type(tree, "blind_hole") == []
+    assert _by_type(tree, "SimpleHole", "through") == []
+    assert _by_type(tree, "SimpleHole", "blind") == []
 
 
 def test_real_2step_hole_stays_a_counterbore_not_a_multistep_hole():
-    tree = _recognize(_shaft_with_ordinary_counterbore(), "cnc_turned")
-    assert len(_by_type(tree, "counterbore")) == 1
-    assert _by_type(tree, "multi_step_hole") == []
+    tree = _recognize(_shaft_with_ordinary_counterbore(), "turned")
+    assert len(_by_type(tree, "MultiStepHole", "counterbore")) == 1
+    assert _by_type(tree, "MultiStepHole", "stepped") == []
 
 
 def test_real_multistep_hole_survives_synthesis_with_real_removed_volume():
     shape = _shaft_with_3step_hole()
-    tree = _recognize(shape, "cnc_turned")
+    tree = _recognize(shape, "turned")
     bbox = _part_bounding_box(shape)
     bbox_center = (
         (bbox["xmin"] + bbox["xmax"]) / 2,
@@ -118,7 +118,7 @@ def test_real_multistep_hole_survives_synthesis_with_real_removed_volume():
     )
     fgv2 = build_machining_feature_graph_v2(tree.to_dict(), bbox_center, [], 0)
 
-    entries = [f for f in fgv2["features"] if f["feature_type"] == "multi_step_hole"]
+    entries = [f for f in fgv2["features"] if (f["feature_type"], f["variant"]) == ("MultiStepHole", "stepped")]
     assert len(entries) == 1
     occ = entries[0]["occurrences"][0]
     assert occ["step_count"] == 3

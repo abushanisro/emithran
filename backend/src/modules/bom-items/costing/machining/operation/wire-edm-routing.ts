@@ -47,7 +47,7 @@ export interface WireEdmOccurrenceLike {
 
 export interface WireEdmFeatureLike {
   feature_type?: string;
-  type?: string;
+  variant?: string;
   occurrences?: WireEdmOccurrenceLike[];
   [key: string]: unknown;
 }
@@ -84,8 +84,10 @@ export function splitWireEdmOccurrences(
 
   for (const raw of fgv2Features) {
     const f = raw as WireEdmFeatureLike;
-    const ft = (f.feature_type ?? f.type ?? '').toString().toLowerCase();
-    if (ft !== 'slot') {
+    // Elongated slots only (straight/radial); a Slot/groove is a toroidal
+    // recess with no cut-path length and is never a Wire EDM candidate.
+    const isElongatedSlot = f.feature_type === 'Slot' && (f.variant === 'straight' || f.variant === 'radial');
+    if (!isElongatedSlot) {
       filteredFeatures.push(raw);
       continue;
     }

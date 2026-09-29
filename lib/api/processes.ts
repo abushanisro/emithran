@@ -166,6 +166,14 @@ export const processesApi = {
   // popup's "eye" button (any lookup-backed input) to show the real table a
   // value came from. Same shape as a ReferenceTable (columnDefinitions/rows)
   // so callers reuse the identical viewer UI, not a second rendering path.
+  // A machining reference table a machining calculator field reads
+  // (machining_reference_data, flattened server-side). outputColumn = the
+  // field's source column, returned last (the viewer's selectable value).
+  getMachiningLookupTableByName: async (table: string, outputColumn?: string): Promise<ReferenceTable> => {
+    const q = outputColumn ? `?outputColumn=${encodeURIComponent(outputColumn)}` : '';
+    return apiClient.get<ReferenceTable>(`/processes/machining-lookup-tables/by-name/${encodeURIComponent(table)}${q}`);
+  },
+
   getSmLookupTableByName: async (table: string): Promise<ReferenceTable> => {
     return apiClient.get<ReferenceTable>(`/processes/sm-lookup-tables/by-name/${encodeURIComponent(table)}`);
   },

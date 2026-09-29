@@ -147,6 +147,13 @@ export type MHRRecord = {
   maxThicknessAlMm?: number;
   maxThicknessCuMm?: number;
   cuttableMaterials?: string[];
+  // Molding press capability and timing (migration 633; further press data in specs, 832).
+  tieBarXMm?: number;
+  tieBarYMm?: number;
+  shotCapacityGrams?: number;
+  minMoldHeightMm?: number;
+  maxMoldHeightMm?: number;
+  pressCycleTimeS?: number;
   capabilityVersion?: number;
   // 'imported' = verified nameplate/OEM record; 'seed' = real, sourced, but
   // NOT this specific unit's own verified reading (e.g. a documented

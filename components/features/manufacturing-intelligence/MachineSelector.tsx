@@ -7,6 +7,7 @@
  * POST /bom-items/:id/machine-override.
  */
 
+import { useState } from 'react';
 import { useMachineOverride } from '@/lib/api/hooks/useBOMItems';
 import { cn } from '@/lib/utils';
 import type {
@@ -14,6 +15,93 @@ import type {
   MachineCandidate,
   MachineSelectionResult,
 } from '@/lib/api/hooks/useBOMItems';
+
+const FACTOR_LABEL = { fit: 'Fit', util: 'Load', cost: 'Cost', avail: 'Avail' } as const;
+
+/**
+ * Why the selector picked this machine, straight from the backend's scoring:
+ * the runner-up it beat and the factor that decided it, every capable
+ * machine's component scores with the profile weights they were combined
+ * with, and the machines rejected because they cannot hold the part.
+ */
+function SelectionWhy({ selection, fmtRate }: { selection: MachineSelectionResult; fmtRate: (r: number) => string }) {
+  const [open, setOpen] = useState(false);
+  const { ranking, decision, profileWeights, rejected } = selection;
+  if (!ranking?.length || !decision) return null;
+  const winner = ranking.find((r) => r.machineId === decision.winnerId) ?? ranking[0]!;
+  const runner = ranking.find((r) => r.machineId === decision.runnerUpId);
+  const name = (r: { machineName: string | null }) => r.machineName ?? 'Class default';
+
+  let sentence: string | null = null;
+  if (decision.decidingFactor === 'only_capable') {
+    sentence = 'Only machine of this class that passes the capability check for this part.';
+  } else if (runner) {
+    const vs = `over ${name(runner)}`;
+    switch (decision.decidingFactor) {
+      case 'cost': sentence = `Picked ${vs}: lower rate ${fmtRate(winner.hourlyRate)} vs ${fmtRate(runner.hourlyRate)} (fit ${winner.fit} vs ${runner.fit}, load ${winner.util} vs ${runner.util}).`; break;
+      case 'fit': sentence = `Picked ${vs}: tighter capability fit ${winner.fit} vs ${runner.fit} — the part uses more of this machine's envelope.`; break;
+      case 'util': sentence = `Picked ${vs}: load closer to the 75% target (score ${winner.util} vs ${runner.util}).`; break;
+      case 'avail': sentence = `Picked ${vs}: better availability (${winner.avail} vs ${runner.avail}).`; break;
+      case 'tie_rate': sentence = `Identical scores to ${name(runner)}; the lower rate breaks the tie.`; break;
+      default: sentence = null;
+    }
+  }
+  const w = profileWeights?.balanced;
+
+  return (
+    <div className="space-y-1">
+      {sentence && (
+        <p className="text-[10px] text-muted-foreground leading-snug">
+          <span className="font-semibold">Selected:</span> {sentence}
+        </p>
+      )}
+      <button type="button" onClick={() => setOpen((v) => !v)} className="text-[10px] text-muted-foreground hover:text-foreground">
+        {open ? 'Hide scores' : `Show scores (${ranking.length} capable${rejected?.length ? `, ${rejected.length} rejected` : ''})`}
+      </button>
+      {open && (
+        <div className="rounded border border-border/40 p-1.5 space-y-1">
+          {w && (
+            <div className="text-[9px] text-muted-foreground/70">
+              Balanced weights: fit {w.fit * 100}% · load {w.util * 100}% · cost {w.cost * 100}%{w.avail ? ` · availability ${w.avail * 100}%` : ''}
+            </div>
+          )}
+          <table className="w-full text-[10px] tabular-nums">
+            <thead>
+              <tr className="text-muted-foreground">
+                <th className="text-left font-normal">Machine</th>
+                {(Object.keys(FACTOR_LABEL) as Array<keyof typeof FACTOR_LABEL>).map((k) => (
+                  <th key={k} className="text-right font-normal">{FACTOR_LABEL[k]}</th>
+                ))}
+                <th className="text-right font-normal">Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ranking.map((r) => (
+                <tr key={r.machineId ?? r.machineName ?? 'x'} className={r.machineId === winner.machineId ? 'text-foreground' : 'text-muted-foreground'}>
+                  <td className="text-left truncate max-w-[140px]" title={`${name(r)} · ${fmtRate(r.hourlyRate)}`}>{name(r)}</td>
+                  <td className="text-right">{r.fit}</td>
+                  <td className="text-right">{r.util}</td>
+                  <td className="text-right">{r.cost}</td>
+                  <td className="text-right">{r.avail}</td>
+                  <td className="text-right font-medium">{r.score}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {rejected && rejected.length > 0 && (
+            <div className="space-y-0.5 pt-1 border-t border-border/30">
+              {rejected.map((r) => (
+                <p key={r.machineId ?? r.machineName ?? 'r'} className="text-[10px] text-red-500/80 leading-snug">
+                  ✗ {name(r)} — cannot hold this part: {r.reasons.join('; ')}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function confidenceColor(confidence: number): string {
   if (confidence >= 80) return 'text-emerald-500';
@@ -112,6 +200,7 @@ export function MachineSelector({
         machineId: currentMachine?.mhrId ?? null,
         machineName: currentMachine?.machineName ?? null,
         commodityCode: null,
+        processGroup: null,
         machineClass: liveRecommended.machineClass,
         hourlyRate: Number(currentMachine?.machineRate ?? 0) * conversionRate,
         utilizationPct: 0,
@@ -227,6 +316,7 @@ export function MachineSelector({
           <span className="font-semibold">Why:</span> {explanation.reasons.join('; ')}
         </p>
       )}
+      {!differsFromLive && !selection.overridden && <SelectionWhy selection={selection} fmtRate={fmtRate} />}
       {differsFromLive && !savedExplanation && (
         <p className="text-[10px] text-muted-foreground/60 italic">
           Manually selected — differs from the current algorithm recommendation

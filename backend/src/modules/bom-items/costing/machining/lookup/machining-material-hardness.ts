@@ -34,22 +34,18 @@ import type { MaterialClass } from '../process/cost-machining-engine';
 // repo (titanium's 2 real rawmetalusa.json entries both have
 // HardnessSystem=null; no P20/H13/D2/M2 tool-steel entry exists at all;
 // plastics use an incompatible hardness scale entirely) — a genuine,
-// disclosed gap, not fabricated. Sentinel values (999 / 0) are chosen to
-// sit outside every real lookup table's hardness range on purpose: nearest-
-// match against a real dataset then resolves to that dataset's real
-// hardest/softest row — titanium and tool steel conservatively get the
-// hardest real row on file (slowest, safest speed assumption), plastic
-// gets the softest (fastest, matching how easily plastics actually
-// machine) — without needing special-case code, and without ever
-// inventing a number that isn't real data.
+// disclosed gap. They carry no hardness (NaN), and the matchers below only
+// match a finite value inside a table's own tabulated range, so these classes
+// resolve to null (reported missing by the caller) instead of borrowing the
+// hardest or softest steel row.
 export const MACHINING_MATERIAL_HARDNESS_HB: Record<MaterialClass, number> = {
   aluminum: 60,
   mild_steel: 125,
   stainless: 275,
   copper_alloy: 100,
-  titanium: 999,
-  tool_steel: 999,
-  plastic: 0,
+  titanium: Number.NaN,
+  tool_steel: Number.NaN,
+  plastic: Number.NaN,
 };
 
 function rowHardness(row: any): number | null {
@@ -57,7 +53,30 @@ function rowHardness(row: any): number | null {
   return typeof h === 'number' && Number.isFinite(h) ? h : null;
 }
 
+// Every matcher below snaps only WITHIN the table's own tabulated range:
+// nearest row to a value between the table's lowest and highest entry is the
+// table's own granularity; a value outside that range would be extrapolation
+// the source never gives, so it returns null and the caller reports the gap.
+function withinRange(values: number[], target: number): boolean {
+  if (values.length === 0 || !Number.isFinite(target)) return false;
+  return target >= Math.min(...values) && target <= Math.max(...values);
+}
+
+function tableHardnesses(rows: unknown[]): number[] {
+  return rows.map(rowHardness).filter((h): h is number => h != null);
+}
+
 export function nearestByHardness<T>(rows: T[], targetHb: number): T | null {
+  if (!withinRange(tableHardnesses(rows), targetHb)) return null;
+  return nearestHardnessRow(rows, targetHb);
+}
+
+// Nearest row by hardness with no range check — only called once the caller
+// has bounded the target against the WHOLE table (see
+// nearestByDiameterThenHardness: a material's rows can sit on a different
+// diameter grid, so bounding within one diameter's rows would wrongly reject
+// a hardness the table does cover).
+function nearestHardnessRow<T>(rows: T[], targetHb: number): T | null {
   let best: T | null = null;
   let bestDist = Infinity;
   for (const r of rows) {
@@ -89,9 +108,12 @@ export function nearestByDiameterThenHardness<T>(rows: T[], diameterMm: number, 
   const withDiam = rows.filter((r) => rowDiameter(r) != null);
   if (withDiam.length === 0) return null;
   const diameters = [...new Set(withDiam.map((r) => rowDiameter(r)!))].sort((a, b) => a - b);
+  // Both axes bounded against the whole table's own range.
+  if (!withinRange(diameters, diameterMm)) return null;
+  if (!withinRange(tableHardnesses(withDiam), targetHb)) return null;
   const nearestDiam = diameters.reduce((best, d) => (Math.abs(d - diameterMm) < Math.abs(best - diameterMm) ? d : best), diameters[0]);
   const atDiam = withDiam.filter((r) => rowDiameter(r) === nearestDiam);
-  return nearestByHardness(atDiam, targetHb);
+  return nearestHardnessRow(atDiam, targetHb);
 }
 
 // Some real tables (deep_bore_drill_lookup.json/deep_bore_trepan_lookup.json,
@@ -112,6 +134,7 @@ export function nearestByDiameterKey(
     .map((key) => ({ key, num: Number(key) }))
     .filter((e) => Number.isFinite(e.num));
   if (entries.length === 0) return null;
+  if (!withinRange(entries.map((e) => e.num), diameterMm)) return null;
   const nearest = entries.reduce(
     (best, e) => (Math.abs(e.num - diameterMm) < Math.abs(best.num - diameterMm) ? e : best),
     entries[0]!,

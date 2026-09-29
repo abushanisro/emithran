@@ -15,7 +15,7 @@ feature is checked, proving 3D-highlight data is actually produced.
 Known, disclosed gap surfaced while building this file (not fixed here --
 see the machining feature-extraction plan for the full writeup): a
 perpendicular-to-axis floor face (the real shape of a genuine "slot" on a
-milled part or "radial_slot" on a turned part) never reaches
+milled part or Slot/radial on a turned part) never reaches
 _collect_prismatic_pockets' classification step at all -- that collector's
 own axis-alignment prefilter (dot_with_axis > 0.85) only ever admits
 axis-PARALLEL floor faces, so 'slot' (milled) and 'radial_slot' (turned) are
@@ -41,11 +41,9 @@ from machining.feature_models import MachiningFeatureTree, MachiningFeature
 
 
 def test_recognize_returns_machining_feature_tree_of_machining_features():
-    """Renamed 2026-09-19: a 3D upload's recognize() call must produce the
-    real MachiningFeatureTree/MachiningFeature types directly (not merely an
-    object that happens to duck-type against them via the deprecated
-    CNCFeatureTree/CNCFeature aliases in machining.cnc_feature_recognizer)."""
-    tree = MachiningFeatureRecognizer().recognize(_shaft_with_tapped_hole(), "cnc_turned")
+    """A 3D upload's recognize() call must produce MachiningFeatureTree /
+    MachiningFeature instances directly."""
+    tree = MachiningFeatureRecognizer().recognize(_shaft_with_tapped_hole(), "turned")
     assert isinstance(tree, MachiningFeatureTree)
     assert tree.features, "a real fixture with a tapped hole must yield at least one feature"
     for f in tree.features:
@@ -62,8 +60,8 @@ def _recognize(shape, family):
     return MachiningFeatureRecognizer().recognize(shape, family)
 
 
-def _by_type(tree, ftype):
-    return [f for f in tree.features if f.type == ftype]
+def _by_type(tree, ftype, variant=None):
+    return [f for f in tree.features if f.type == ftype and (variant is None or f.variant == variant)]
 
 
 # ── Turned-path fixtures ──────────────────────────────────────────────────
@@ -165,8 +163,8 @@ def _flange_with_pcd_bolt_holes(n=4, pcd_radius=20.0, hole_r=2.5):
 
 
 def test_stepped_shaft_yields_two_real_external_diameters():
-    tree = _recognize(_stepped_shaft_with_holes(), "cnc_turned")
-    ods = _by_type(tree, "external_diameter")
+    tree = _recognize(_stepped_shaft_with_holes(), "turned")
+    ods = _by_type(tree, "Ring", "outer_diameter")
     diams = sorted(round(f.params["diameter_mm"]) for f in ods)
     assert diams == [25, 40]
     for f in ods:
@@ -174,8 +172,8 @@ def test_stepped_shaft_yields_two_real_external_diameters():
 
 
 def test_stepped_shaft_yields_real_blind_hole_not_tapped():
-    tree = _recognize(_stepped_shaft_with_holes(), "cnc_turned")
-    blinds = _by_type(tree, "blind_hole")
+    tree = _recognize(_stepped_shaft_with_holes(), "turned")
+    blinds = _by_type(tree, "SimpleHole", "blind")
     assert len(blinds) == 1
     f = blinds[0]
     assert f.params["diameter_mm"] == 6.0
@@ -185,8 +183,8 @@ def test_stepped_shaft_yields_real_blind_hole_not_tapped():
 
 
 def test_stepped_shaft_yields_real_cross_hole():
-    tree = _recognize(_stepped_shaft_with_holes(), "cnc_turned")
-    crosses = _by_type(tree, "cross_hole")
+    tree = _recognize(_stepped_shaft_with_holes(), "turned")
+    crosses = _by_type(tree, "SimpleHole", "cross")
     assert len(crosses) >= 1, "real radial through-hole must be detected"
     for f in crosses:
         assert f.params["diameter_mm"] == 5.0
@@ -194,20 +192,20 @@ def test_stepped_shaft_yields_real_cross_hole():
 
 
 def test_sleeve_yields_real_through_hole():
-    tree = _recognize(_sleeve_through_bore(), "cnc_turned")
-    throughs = _by_type(tree, "through_hole")
+    tree = _recognize(_sleeve_through_bore(), "turned")
+    throughs = _by_type(tree, "SimpleHole", "through")
     assert len(throughs) == 1
     f = throughs[0]
     assert f.params["diameter_mm"] == 20.0
     assert f.params["depth_mm"] == 50.0
     assert f.face_ids
-    ods = _by_type(tree, "external_diameter")
+    ods = _by_type(tree, "Ring", "outer_diameter")
     assert len(ods) == 1 and ods[0].params["diameter_mm"] == 30.0
 
 
 def test_real_tap_drill_diameter_yields_tapped_hole_with_correct_spec():
-    tree = _recognize(_shaft_with_tapped_hole(), "cnc_turned")
-    tapped = _by_type(tree, "tapped_hole")
+    tree = _recognize(_shaft_with_tapped_hole(), "turned")
+    tapped = _by_type(tree, "SimpleHole", "threaded")
     assert len(tapped) == 1
     f = tapped[0]
     assert f.params["diameter_mm"] == 5.0
@@ -216,8 +214,8 @@ def test_real_tap_drill_diameter_yields_tapped_hole_with_correct_spec():
 
 
 def test_real_coaxial_stepped_bore_yields_counterbore_with_correct_dims():
-    tree = _recognize(_shaft_with_counterbore(), "cnc_turned")
-    cbores = _by_type(tree, "counterbore")
+    tree = _recognize(_shaft_with_counterbore(), "turned")
+    cbores = _by_type(tree, "MultiStepHole", "counterbore")
     assert len(cbores) == 1
     f = cbores[0]
     assert f.params["counterbore_diameter_mm"] == 16.0
@@ -230,8 +228,8 @@ def test_real_cone_over_coaxial_bore_yields_countersink_plus_its_own_bore():
     """A countersink is genuinely two real operations (conical entry +
     straight bore) -- both must survive as distinct, correctly-typed
     features, not merged or dropped."""
-    tree = _recognize(_shaft_with_countersink(), "cnc_turned")
-    csinks = _by_type(tree, "countersink")
+    tree = _recognize(_shaft_with_countersink(), "turned")
+    csinks = _by_type(tree, "Edge", "countersink")
     assert len(csinks) == 1
     cs = csinks[0]
     assert cs.params["entry_diameter_mm"] == 16.0
@@ -239,24 +237,24 @@ def test_real_cone_over_coaxial_bore_yields_countersink_plus_its_own_bore():
     assert cs.params["half_angle_deg"] == 45.0
     assert cs.face_ids
 
-    blinds = _by_type(tree, "blind_hole")
+    blinds = _by_type(tree, "SimpleHole", "blind")
     assert len(blinds) == 1
     assert blinds[0].params["diameter_mm"] == 8.0
 
 
 def test_real_isolated_cone_with_no_coaxial_bore_yields_chamfer_not_countersink():
-    tree = _recognize(_shaft_with_chamfer(), "cnc_turned")
-    chamfers = _by_type(tree, "chamfer")
+    tree = _recognize(_shaft_with_chamfer(), "turned")
+    chamfers = _by_type(tree, "Edge", "chamfer")
     assert len(chamfers) == 1
     f = chamfers[0]
     assert f.params["half_angle_deg"] == 45.0
     assert f.face_ids
-    assert _by_type(tree, "countersink") == []
+    assert _by_type(tree, "Edge", "countersink") == []
 
 
 def test_real_pcd_bolt_pattern_is_grouped_into_one_pattern_feature():
-    tree = _recognize(_flange_with_pcd_bolt_holes(n=4, pcd_radius=20.0, hole_r=2.5), "cnc_turned")
-    patterns = _by_type(tree, "pcd_hole_pattern")
+    tree = _recognize(_flange_with_pcd_bolt_holes(n=4, pcd_radius=20.0, hole_r=2.5), "turned")
+    patterns = _by_type(tree, "SimpleHole", "pcd_pattern")
     assert len(patterns) == 1
     p = patterns[0]
     assert p.params["hole_count"] == 4
@@ -265,8 +263,8 @@ def test_real_pcd_bolt_pattern_is_grouped_into_one_pattern_feature():
     # 4 real constituent holes' faces, unioned
     assert len(p.face_ids) >= 4
     # Individual bores must be absorbed, not double-counted as separate holes
-    assert _by_type(tree, "tapped_hole") == []
-    assert _by_type(tree, "blind_hole") == []
+    assert _by_type(tree, "SimpleHole", "threaded") == []
+    assert _by_type(tree, "SimpleHole", "blind") == []
 
 
 # ── Milled-path fixtures + tests ──────────────────────────────────────────
@@ -289,8 +287,8 @@ def _box_with_bounded_recess():
 
 
 def test_real_recessed_pocket_is_detected_and_boundary_faces_are_not():
-    tree = _recognize(_box_with_pocket(), "cnc_milled")
-    pockets = _by_type(tree, "pocket")
+    tree = _recognize(_box_with_pocket(), "milled")
+    pockets = _by_type(tree, "PocketV2")
     assert len(pockets) == 1
     p = pockets[0]
     assert sorted([p.params["length_mm"], p.params["width_mm"]]) == [15.0, 20.0]
@@ -299,8 +297,8 @@ def test_real_recessed_pocket_is_detected_and_boundary_faces_are_not():
 
 
 def test_real_elongated_bounded_recess_is_detected_as_keyway():
-    tree = _recognize(_box_with_bounded_recess(), "cnc_milled")
-    keyways = _by_type(tree, "keyway")
+    tree = _recognize(_box_with_bounded_recess(), "milled")
+    keyways = _by_type(tree, "Keyway")
     assert len(keyways) >= 1, "a real elongated bounded recess must be detected"
     for f in keyways:
         assert f.params["length_mm"] == 30.0

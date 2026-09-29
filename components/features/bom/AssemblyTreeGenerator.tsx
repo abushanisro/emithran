@@ -86,7 +86,8 @@ const PROCESSING_STEPS: string[] = [
 ];
 
 const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024;
-const ACCEPTED_EXTENSIONS = ['.step', '.stp', '.iges', '.igs', '.stl', '.sldprt'];
+// The only 3D formats the CAD engine can analyse (see backend StepConverterService).
+const ACCEPTED_EXTENSIONS = ['.step', '.stp'];
 
 const PIPELINE_STAGES: PipelineStage[] = [
   { title: 'STEP Parse & Geometry',       desc: 'STEP file → OpenCascade → volume, surface area, holes, walls' },
@@ -314,7 +315,6 @@ export function AssemblyTreeGenerator({
     accept: {
       'application/octet-stream': ACCEPTED_EXTENSIONS,
       'application/step':         ['.step', '.stp'],
-      'application/x-sldprt':    ['.sldprt'],
     },
     maxSize: MAX_FILE_SIZE_BYTES,
     multiple: true,
@@ -405,13 +405,13 @@ export function AssemblyTreeGenerator({
         />
         <div className="text-center">
           <p className="text-sm font-medium text-foreground">
-            {isDragActive ? 'Release to start CAD processing' : 'Drop STEP / STL files here'}
+            {isDragActive ? 'Release to start CAD processing' : 'Drop STEP files here'}
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">
             or <span className="text-primary underline underline-offset-2">browse</span> to choose files
           </p>
         </div>
-        <p className="text-[11px] text-muted-foreground/60">.step · .stp · .stl · .iges · .igs · .sldprt</p>
+        <p className="text-[11px] text-muted-foreground/60">.step · .stp</p>
       </div>
 
       {/* Items & Parts */}

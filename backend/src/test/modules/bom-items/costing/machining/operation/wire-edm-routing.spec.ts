@@ -11,7 +11,7 @@ import { splitWireEdmOccurrences, isRealHeatTreatmentCallout } from '../../../..
 // conventionally bored).
 
 function slotFeature(occurrences: Array<{ length_mm?: number | null }>) {
-  return { feature_type: 'slot', occurrences };
+  return { feature_type: 'Slot', variant: 'straight', occurrences };
 }
 
 describe('isRealHeatTreatmentCallout', () => {
@@ -45,8 +45,8 @@ describe('splitWireEdmOccurrences', () => {
   });
 
   it('leaves non-slot features (pocket, keyway, through_hole) completely untouched even with a real callout', () => {
-    const pocket = { feature_type: 'pocket', occurrences: [{ length_mm: 40 }] };
-    const keyway = { feature_type: 'keyway', occurrences: [{ length_mm: 40, width_mm: 6, depth_mm: 4 }] };
+    const pocket = { feature_type: 'PocketV2', variant: 'default', occurrences: [{ length_mm: 40 }] };
+    const keyway = { feature_type: 'Keyway', variant: 'default', occurrences: [{ length_mm: 40, width_mm: 6, depth_mm: 4 }] };
     const result = splitWireEdmOccurrences([pocket, keyway], 'Harden to Rc60');
     expect(result.filteredFeatures).toEqual([pocket, keyway]);
     expect(result.wireEdmCandidates).toEqual([]);
@@ -69,13 +69,13 @@ describe('splitWireEdmOccurrences', () => {
     const feature = slotFeature([{ length_mm: null }, { length_mm: 0 }]);
     const result = splitWireEdmOccurrences([feature], 'Harden to Rc60');
     expect(result.wireEdmCandidates).toEqual([]);
-    expect(result.filteredFeatures).toEqual([{ feature_type: 'slot', occurrences: [{ length_mm: null }, { length_mm: 0 }] }]);
+    expect(result.filteredFeatures).toEqual([{ feature_type: 'Slot', variant: 'straight', occurrences: [{ length_mm: null }, { length_mm: 0 }] }]);
   });
 
   it('splits a feature with BOTH resolvable and unresolvable occurrences correctly', () => {
     const feature = slotFeature([{ length_mm: 40 }, { length_mm: null }]);
     const result = splitWireEdmOccurrences([feature], 'Harden to Rc60');
     expect(result.wireEdmCandidates).toEqual([{ lengthMm: 40, count: 1 }]);
-    expect(result.filteredFeatures).toEqual([{ feature_type: 'slot', occurrences: [{ length_mm: null }] }]);
+    expect(result.filteredFeatures).toEqual([{ feature_type: 'Slot', variant: 'straight', occurrences: [{ length_mm: null }] }]);
   });
 });

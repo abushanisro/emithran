@@ -4,6 +4,16 @@ import {
   sortedDimensions, scoreCandidate,
   type StockProfile, type BoundingBox,
 } from '../../../../../../modules/bom-items/costing/sheet-metal/machine/blank-stock-candidates';
+import { resolveStockAllowanceRule, stockAllowancePerSideMm } from '../../../../../../modules/bom-items/costing/machining/stock-allowance';
+
+// The reference stock-allowance rule, built from the real memory/Stock Maching
+// variables.csv values (percentStockAllowance 5, minStockAllowance 0.79375,
+// maxStockAllowance 3.175) through the same resolver production uses.
+const STOCK_RULE = resolveStockAllowanceRule([
+  { key: 'percentStockAllowance', value: '5' },
+  { key: 'minStockAllowance', value: '0.79375' },
+  { key: 'maxStockAllowance', value: '3.175' },
+]).rule!;
 
 // Pure functions, zero Supabase/DB dependency — no mocking needed or used,
 // per this project's standing rule against mocked-Supabase spec files.
@@ -96,21 +106,22 @@ describe('rectangularBarCandidates', () => {
 
 describe('selectBestAutoCandidate', () => {
   const bbox: BoundingBox = { length: 100, width: 30, height: 30 };
+  const allowance = stockAllowancePerSideMm(STOCK_RULE, bbox); // 5% of 30 = 1.5 mm/side
 
   it('returns null when there are no candidates', () => {
-    expect(selectBestAutoCandidate([], bbox)).toBeNull();
+    expect(selectBestAutoCandidate([], bbox, allowance)).toBeNull();
   });
   it('never returns a candidate as large as or larger than the plain bbox billet', () => {
-    const bboxVol = (100 + 6) * (30 + 6) * (30 + 6);
+    const bboxVol = (100 + 2 * allowance) * (30 + 2 * allowance) * (30 + 2 * allowance);
     const oversized = [{ form: 'round_bar', sizeLabel: 'huge', billetVolMm3: bboxVol * 2, utilizationPct: 10, score: 999 }];
-    expect(selectBestAutoCandidate(oversized, bbox)).toBeNull();
+    expect(selectBestAutoCandidate(oversized, bbox, allowance)).toBeNull();
   });
   it('picks the highest-scoring candidate that IS smaller than the bbox billet', () => {
     const candidates = [
       { form: 'round_bar', sizeLabel: 'loose', billetVolMm3: 50000, utilizationPct: 20, score: 0.3 },
       { form: 'round_bar', sizeLabel: 'tight', billetVolMm3: 40000, utilizationPct: 80, score: 0.9 },
     ];
-    expect(selectBestAutoCandidate(candidates, bbox)!.sizeLabel).toBe('tight');
+    expect(selectBestAutoCandidate(candidates, bbox, allowance)!.sizeLabel).toBe('tight');
   });
 });
 
@@ -121,7 +132,7 @@ describe('selectForcedFormCandidate — explicit "Stock Form" override', () => {
   const bbox: BoundingBox = { length: 100, width: 20, height: 20 };
 
   it('billet override always returns the plain bbox billet, skipping stock_profiles entirely', () => {
-    const result = selectForcedFormCandidate('billet', [], bbox, 1000, 105, 20.6, 20, 20);
+    const result = selectForcedFormCandidate('billet', [], bbox, 1000, 105, 20.6, 20, 20, stockAllowancePerSideMm(STOCK_RULE, bbox));
     expect(result.form).toBe('billet');
     expect(result.requestedFormUnavailable).toBeUndefined();
   });
@@ -131,7 +142,7 @@ describe('selectForcedFormCandidate — explicit "Stock Form" override', () => {
     // bigger than the bbox billet — that guard only protects auto-selection.
     const hugeBbox: BoundingBox = { length: 10, width: 5, height: 5 };
     const result = selectForcedFormCandidate(
-      'round_bar', ROUND_BAR_PROFILES, hugeBbox, 100, 15, 5.15, 5, 5,
+      'round_bar', ROUND_BAR_PROFILES, hugeBbox, 100, 15, 5.15, 5, 5, stockAllowancePerSideMm(STOCK_RULE, hugeBbox),
     );
     expect(result.form).toBe('round_bar');
     expect(result.requestedFormUnavailable).toBeUndefined();
@@ -139,7 +150,7 @@ describe('selectForcedFormCandidate — explicit "Stock Form" override', () => {
 
   it('picks the smallest real fitting size for the requested form, not just the first', () => {
     const result = selectForcedFormCandidate(
-      'round_bar', ROUND_BAR_PROFILES, bbox, 1000, 105, 20.6, 20, 20,
+      'round_bar', ROUND_BAR_PROFILES, bbox, 1000, 105, 20.6, 20, 20, stockAllowancePerSideMm(STOCK_RULE, bbox),
     );
     expect(result.sizeLabel).toBe('Ø25 round bar'); // 20mm excluded by minDiam, 25mm is smallest that fits
   });
@@ -148,7 +159,7 @@ describe('selectForcedFormCandidate — explicit "Stock Form" override', () => {
     const tinyProfiles: StockProfile[] = [{ form: 'round_bar', size_a_mm: 6, size_b_mm: null }];
     const bigBbox: BoundingBox = { length: 500, width: 200, height: 200 };
     const result = selectForcedFormCandidate(
-      'round_bar', tinyProfiles, bigBbox, 1e7, 505, 206, 200, 200,
+      'round_bar', tinyProfiles, bigBbox, 1e7, 505, 206, 200, 200, stockAllowancePerSideMm(STOCK_RULE, bigBbox),
     );
     expect(result.form).toBe('billet');
     expect(result.requestedFormUnavailable).toEqual({
@@ -159,7 +170,7 @@ describe('selectForcedFormCandidate — explicit "Stock Form" override', () => {
 
   it('honors an explicit hex_bar request using the real DIN934 data', () => {
     const result = selectForcedFormCandidate(
-      'hex_bar', HEX_BAR_PROFILES, bbox, 1000, 105, 20.6, 20, 20,
+      'hex_bar', HEX_BAR_PROFILES, bbox, 1000, 105, 20.6, 20, 20, stockAllowancePerSideMm(STOCK_RULE, bbox),
     );
     expect(result.form).toBe('hex_bar');
     expect(result.sizeLabel).toBe('22 A/F hex bar');
@@ -167,8 +178,17 @@ describe('selectForcedFormCandidate — explicit "Stock Form" override', () => {
 });
 
 describe('billetFallback', () => {
-  it('adds the 6mm total stock allowance (3mm/side) to every axis', () => {
-    const result = billetFallback({ length: 100, width: 50, height: 20 }, 1);
-    expect(result.sizeLabel).toBe('106×56×26 billet');
+  it('adds the reference per-side stock allowance to every axis', () => {
+    // Max cross-section 50 mm -> 5% = 2.5 mm/side (inside 0.79375..3.175).
+    const bbox = { length: 100, width: 50, height: 20 };
+    const result = billetFallback(bbox, 1, stockAllowancePerSideMm(STOCK_RULE, bbox));
+    expect(result.sizeLabel).toBe('105×55×25 billet');
+    expect(result.stockAllowancePerSideMm).toBeCloseTo(2.5, 6);
+  });
+
+  it('adds no allowance, and records that, when the rule is not staged', () => {
+    const result = billetFallback({ length: 100, width: 50, height: 20 }, 1, null);
+    expect(result.sizeLabel).toBe('100×50×20 billet');
+    expect(result.stockAllowancePerSideMm).toBeNull();
   });
 });

@@ -1,32 +1,38 @@
-import { computeNesting, resolveNestingDimensions, isTrueNestCostingCacheValid, trueNestInputFingerprint, computeMassBasedUtilizationPct, resolveProcessPartSpacingMm, computePartAllowanceMm } from '../../../../../../modules/bom-items/costing/sheet-metal/machine/sheet-metal-nesting.engine';
+import { computeNesting, resolveNestingDimensions, isTrueNestCostingCacheValid, trueNestInputFingerprint, computeMassBasedUtilizationPct, resolvePartSpacingMm, computePartAllowanceMm } from '../../../../../../modules/bom-items/costing/sheet-metal/machine/sheet-metal-nesting.engine';
+import { realPartSpacingTable } from '../real-part-spacing';
 
-describe('resolveProcessPartSpacingMm — real per-process nesting spacing (closeout Plan Phase 3)', () => {
-  it('matches thickness 1:1 for fiber_laser, up to the 50mm cap', () => {
-    expect(resolveProcessPartSpacingMm('fiber_laser', 5)).toBe(5);
-    expect(resolveProcessPartSpacingMm('fiber_laser', 50)).toBe(50);
-    expect(resolveProcessPartSpacingMm('fiber_laser', 999)).toBe(50);
+const SPACING = realPartSpacingTable();
+
+describe('resolvePartSpacingMm — tblPartSpacing by process and thickness', () => {
+  it('reads each process from the table: laser 1x, oxyfuel 3x, plasma 2x, turret and waterjet flat', () => {
+    expect(resolvePartSpacingMm(SPACING, 'Fiber Laser', 5)).toBe(5);
+    expect(resolvePartSpacingMm(SPACING, 'Oxyfuel Cut', 10)).toBe(30);
+    expect(resolvePartSpacingMm(SPACING, 'Plasma Cut', 10)).toBe(20);
+    expect(resolvePartSpacingMm(SPACING, 'Turret Press', 3)).toBe(6.35);
+    expect(resolvePartSpacingMm(SPACING, 'Waterjet Cut', 3)).toBe(5.08);
   });
 
-  it('is a flat spacing for turret_punch and waterjet, independent of thickness', () => {
-    expect(resolveProcessPartSpacingMm('turret_punch', 1)).toBe(6.35);
-    expect(resolveProcessPartSpacingMm('turret_punch', 10)).toBe(6.35);
-    expect(resolveProcessPartSpacingMm('waterjet', 1)).toBe(5.08);
-    expect(resolveProcessPartSpacingMm('waterjet', 10)).toBe(5.08);
+  it('takes the first row at or above the thickness (row thickness is the bracket upper bound)', () => {
+    expect(resolvePartSpacingMm(SPACING, 'Fiber Laser', 1.5)).toBe(2);
+    expect(resolvePartSpacingMm(SPACING, 'Fiber Laser', 75)).toBe(50);     // the 999 catch-all row
+    expect(resolvePartSpacingMm(SPACING, 'Plasma Cut', 35)).toBe(70);
+    expect(resolvePartSpacingMm(SPACING, 'Plasma Cut', 75)).toBe(100);     // its 999 catch-all row
   });
 
-  it('falls back to the laser curve for any unrecognized machine class (disclosed default, not a guess)', () => {
-    expect(resolveProcessPartSpacingMm('press_brake', 5)).toBe(5);
+  it('returns null for a process the table does not list, and for no table', () => {
+    expect(resolvePartSpacingMm(SPACING, 'Press Brake', 5)).toBeNull();
+    expect(resolvePartSpacingMm(null, 'Fiber Laser', 5)).toBeNull();
   });
 });
 
-describe('computePartAllowanceMm — Gross/Net Usage default (assumes laser cutting, closeout Plan Phase 3)', () => {
-  it('uses the real laser spacing curve as its base', () => {
-    expect(computePartAllowanceMm(5)).toBe(5);
-    expect(computePartAllowanceMm(75)).toBe(50);
+describe('computePartAllowanceMm — Gross/Net Usage nests at the default cutting process (Fiber Laser)', () => {
+  it('is the Fiber Laser spacing from the table', () => {
+    expect(computePartAllowanceMm(SPACING, 5)).toBe(5);
+    expect(computePartAllowanceMm(SPACING, 75)).toBe(50);
   });
 
-  it('adds 10mm for stamping impressions on top of the base spacing', () => {
-    expect(computePartAllowanceMm(5, true)).toBe(15);
+  it('is null (a disclosed gap) when the table is not staged', () => {
+    expect(computePartAllowanceMm([], 5)).toBeNull();
   });
 });
 
@@ -83,6 +89,7 @@ describe('computeNesting — utilization formula (unchanged by the dimension-sou
     const netWeightKg = (flatPatternAreaMm2 * thicknessMm / 1e9) * densityKgM3;
 
     const result = computeNesting({
+      partAllowanceMm: computePartAllowanceMm(SPACING, thicknessMm)!,
       flatPatternLengthMm: 55.0,
       flatPatternWidthMm: 8.0,
       thicknessMm,
@@ -109,6 +116,7 @@ describe('computeNesting — utilization formula (unchanged by the dimension-sou
 
   it('produces a larger partsPerSheet when packing against the smaller folded bbox than against a larger true flat-pattern rectangle', () => {
     const common = {
+      partAllowanceMm: computePartAllowanceMm(SPACING, 0.5)!,
       thicknessMm: 0.5,
       netWeightKg: 0.001,
       densityKgM3: 2700,
@@ -133,6 +141,7 @@ describe('computeNesting — sheetsRequired / batch consumption (RTP2 MAG2 FRONT
   // partsPerSheet/utilisationPct themselves are covered by the describe
   // block above and are untouched by this change.
   const rtp2Common = {
+    partAllowanceMm: computePartAllowanceMm(SPACING, 1.6)!,
     flatPatternLengthMm: 432.17,
     flatPatternWidthMm: 352.31,
     thicknessMm: 1.6,

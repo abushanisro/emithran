@@ -263,26 +263,11 @@ export const SM_LOOKUP_BRIDGE: Record<string, Record<string, SmLookupBridgeEntry
         keyPattern: '%tolerance%,%inspect%,%sampling%,%aql%,%cmm%',
       },
     ],
-    // Real rate table is surface_treatment_rates (migrations 362/363), not an
-    // sm_lookup_* table — bridged the same way regardless of naming, since
-    // getSmLookupTables()/updateSmLookupRow() just take a table name. Not
-    // filtered by treatment_type: an admin managing this route wants to see
-    // every treatment's rate across every location in one place, the same
-    // real table resolveSurfaceTreatmentDbRate() queries.
-    'Surface Treatment': [
-      {
-        table: 'surface_treatment_rates',
-        displayName: 'Surface Treatment Rates',
-        description: 'Rate (USD/m²) and minimum lot charge (USD) by treatment type and location — migrations 362/363',
-        orderBy: 'treatment_type,location',
-      },
-      {
-        table: 'sm_reference_data',
-        displayName: 'Reference Data (Staged Import)',
-        description: 'Staged reconciliation export rows whose key mentions coating, plating, anodize, chromate, chem, or surface — read-only, not yet wired to a live calculator (migration 479+)',
-        keyPattern: '%coating%,%plating%,%anodiz%,%chromate%,%chem%,%surface%',
-      },
-    ],
+    // Surface Treatment is not bridged here: its lookup tables are the staged
+    // memory/SurfaceTreatment tables (migration 819), served by
+    // ProcessesService.getSmLookupTables through REFERENCE_GROUP_DOMAIN. The
+    // surface_treatment_rates table that used to be listed here is retired
+    // (migration 821).
     // 'Gross Usage'/'Net Usage' (machine_class='sheet_metal_gross_usage_nesting'/
     // 'sheet_metal_net_usage') both resolve their "Material Density"/"Shear
     // Strength" calculator fields (field_type='database_lookup') from

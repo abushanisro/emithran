@@ -135,7 +135,11 @@ export function eMithranTerms(args: EMithranTermsArgs): EMithranTermsResult {
 //      the sheet-metal engines never consulted it at all.
 //   2. sm_lookup_op_setup_time — real per-OPERATION setup, less specific than a
 //      named machine but still real, sourced data.
-//   3. the per-class *_SETUP_MIN constant — a disclosed, cited fallback.
+//
+// When none of the three exists, setup is NOT costed: source 'none', 0 minutes,
+// and a warning naming the missing data. There is no per-class constant
+// standing in for real setup data (user decision 2026-09-27: memory/ data
+// only, no hardcoded fallback).
 //
 // Ranking them this way is what makes a quote reflect the machine actually
 // selected: two press brakes with genuinely different real setup times used to
@@ -143,7 +147,7 @@ export function eMithranTerms(args: EMithranTermsArgs): EMithranTermsResult {
 //
 // `source` is returned, not inferred, so the line can disclose which tier it
 // used rather than presenting a class default as if it were machine-specific.
-export type SetupTimeSource = 'calculator' | 'machine' | 'operation_lookup' | 'class_default';
+export type SetupTimeSource = 'calculator' | 'machine' | 'operation_lookup' | 'none';
 
 export interface SetupTimeResolution {
   /** Real, un-amortised setup minutes for one batch. */
@@ -166,12 +170,10 @@ export function resolveSetupMinutes(args: {
   machineSetupTimeHr?: number | null;
   /** Real per-operation minutes from sm_lookup_op_setup_time, when found. */
   operationSetupMin?: number | null;
-  /** Cited per-class constant, used only when neither real source resolved. */
-  classDefaultMin: number;
   /** Machine name, for a more useful disclosure message. */
   machineName?: string | null;
 }): SetupTimeResolution {
-  const { process, calculatorSetupMin, machineSetupTimeHr, operationSetupMin, classDefaultMin, machineName } = args;
+  const { process, calculatorSetupMin, machineSetupTimeHr, operationSetupMin, machineName } = args;
 
   // A calculator result is derived from this part's own real geometry, so it
   // beats a generic machine or operation figure. Same "0 is not a real value"
@@ -197,90 +199,14 @@ export function resolveSetupMinutes(args: {
     return { setupMin: operationSetupMin, source: 'operation_lookup' };
   }
 
-  // Genuinely unsourced: no real per-machine setup_time_hr AND no real
-  // per-operation row. Keeps the established "setup time from fallback" marker
-  // phrase every engine already disclosed under, now naming both real sources
-  // that were missing so the gap is actionable.
+  // No real setup data of any kind: setup is not costed, and the warning says
+  // exactly which real sources were missing so the gap is actionable.
   return {
-    setupMin: classDefaultMin,
-    source: 'class_default',
-    warning: `${process}: setup time from fallback — no real per-machine setup_time_hr` +
-      `${machineName ? ` for ${machineName}` : ''} in mhr_records and no sm_lookup_op_setup_time row; ` +
-      `using the ${String(classDefaultMin)} min class default.`,
+    setupMin: 0,
+    source: 'none',
+    warning: `${process}: setup not costed — no calculator setup time, no real per-machine setup_time_hr` +
+      `${machineName ? ` for ${machineName}` : ''} in HR Rates, and no sm_lookup_op_setup_time row.`,
   };
-}
-
-// ── Benchmark rate-override decision ──────────────────────────────────────────
-// Whether a machine rate resolved from mhr_records should be thrown away and
-// replaced by the location's class benchmark.
-//
-// The guard exists to catch two CURRENCY MIS-SCALE import errors, both
-// order-of-magnitude (an INR figure read as USD is ~83x out). It does not exist
-// to enforce that every machine in a class costs about the same — real fleets
-// span a wide range by machine price, and mhr_benchmark_rates carries only ONE
-// industry-average row per class for most classes.
-//
-// Extracted from bom-items.service.ts so this decision is directly testable:
-// it silently changed the billed rate on real quotes and had no test of its own.
-export interface BenchmarkOverrideInput {
-  /** Resolved machine rate, local currency/hr. */
-  rate: number;
-  /** True only for a rate that came from a real mhr_records row. */
-  isDbRate: boolean;
-  /** Location+class benchmark; <= 0 means none on file. */
-  benchmark: number;
-  /** This record's own Direct/Indirect overhead, when it has a breakdown. */
-  directOverheadRate?: number | null;
-  indirectOverheadRate?: number | null;
-  /** Real, DB-configurable bands (costing_settings), not literals. */
-  thresholds: { lowFraction: number; highFraction: number };
-}
-
-export type BenchmarkOverrideDecision =
-  | { override: false }
-  | { override: true; reason: string };
-
-export function decideBenchmarkOverride(input: BenchmarkOverrideInput): BenchmarkOverrideDecision {
-  if (!input.isDbRate) return { override: false };
-  if (!(input.benchmark > 0)) return { override: false };
-  if (!Number.isFinite(input.rate)) return { override: false };
-
-  // A rate that EQUALS this record's own Direct + Indirect overhead IS the
-  // canonical Machine Hour Rate by definition (migration 581), so it cannot be
-  // one of the mis-scaled imports this guard targets. Verified live across the
-  // fleet: 355 of 355 rows with the data satisfy rate == direct + indirect
-  // exactly, so this recognises real rates rather than excusing bad ones.
-  //
-  // Scope note, so this is not over-claimed: this is hardening, not the fix for
-  // a confirmed live overcharge. resolveMHRRates DOES log override warnings for
-  // several machines, but a before/after capture of the cost-summary endpoint
-  // (2026-09-05) showed the sheet-metal lines already resolving at their real
-  // mhr_database rate, not the benchmark — so no billed rate was observed to
-  // change here. What it guarantees is that a correctly-derived canonical rate
-  // can never be discarded merely for being cheaper than the single
-  // industry-average benchmark row most classes have (mhr_benchmark_rates,
-  // migration 345), which a real fleet spanning a wide price range will trip.
-  const doh = input.directOverheadRate;
-  const ioh = input.indirectOverheadRate;
-  const hasBreakdown = typeof doh === 'number' && Number.isFinite(doh)
-    && typeof ioh === 'number' && Number.isFinite(ioh) && doh + ioh > 0;
-  if (hasBreakdown && Math.abs(input.rate - (doh + ioh)) < 0.005) {
-    return { override: false };
-  }
-
-  if (input.rate < input.benchmark * input.thresholds.lowFraction) {
-    return {
-      override: true,
-      reason: `below ${String(Math.round(input.thresholds.lowFraction * 100))}% of location benchmark — likely a cross-location currency mismatch`,
-    };
-  }
-  if (input.rate > input.benchmark * input.thresholds.highFraction) {
-    return {
-      override: true,
-      reason: `over ${String(input.thresholds.highFraction)}x the location benchmark — likely an INR rate double-converted via USD import`,
-    };
-  }
-  return { override: false };
 }
 
 // ── Route data completeness ───────────────────────────────────────────────────

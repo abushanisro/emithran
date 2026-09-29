@@ -288,8 +288,43 @@ export interface DomainVariablesResponse {
   variables: DomainVariable[];
 }
 
+/** A reference-data domain key (backend processes/reference-domains.ts; the
+ *  list itself comes from GET /processes/reference-domains). */
+export type ReferenceDomain = string;
+
+/** Every reference-data domain, from the backend manifest of memory/ folders. */
+export function useReferenceDomains() {
+  const { user, loading: authLoading } = useAuth();
+  return useQuery({
+    queryKey: ['processes', 'reference-domains'],
+    queryFn: () => apiClient.get<Array<{ key: string; label: string }>>('/processes/reference-domains'),
+    enabled: !authLoading && !!user,
+    staleTime: 1000 * 60 * 60,
+  });
+}
+
+export interface ReferenceLookupResponse {
+  key: string;
+  sourceVersion: string;
+  columns: string[];
+  rows: Record<string, unknown>[];
+}
+
+/** One staged lookup table of a reference-data domain (null key = disabled). */
+export function useReferenceLookup(domain: ReferenceDomain, key: string | null) {
+  const { user, loading: authLoading } = useAuth();
+  return useQuery({
+    queryKey: ['processes', 'reference-lookup', domain, key],
+    queryFn: () => apiClient.get<ReferenceLookupResponse>(
+      `/processes/reference-lookup?${new URLSearchParams({ domain, key: key ?? '' }).toString()}`,
+    ),
+    enabled: !authLoading && !!user && !!key,
+    staleTime: 1000 * 60 * 5,
+  });
+}
+
 export function useDomainVariables(
-  domain: 'sheet_metal' | 'injection_molding' | 'machining',
+  domain: ReferenceDomain,
   options?: { search?: string | undefined; category?: string | undefined },
 ) {
   const { user, loading: authLoading } = useAuth();

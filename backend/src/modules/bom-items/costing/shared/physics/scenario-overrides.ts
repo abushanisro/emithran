@@ -166,6 +166,18 @@ export function resolveScenarioProductionLifeYears(
   return typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? raw : null;
 }
 
+// ── Injection-molding cavities per mold ─────────────────────────────────────
+// The reference says cavities per mold default to defaultNumCavities and the
+// user may override it (variables, memory/Plastic Modeling). Any positive
+// integer is returned; the engine checks it against the reference mold
+// layouts (layoutNumCav) and reports an invalid one instead of replacing it.
+export function resolveScenarioCavityCount(
+  scenarioOverrides: Record<string, unknown> | null | undefined,
+): number | null {
+  const raw = scenarioOverrides?.['cavityCount'];
+  return typeof raw === 'number' && Number.isInteger(raw) && raw > 0 ? raw : null;
+}
+
 // ── Machining Stock Form (BlankOptimizerService's "Let eMithran Decide" override) ──
 //
 // Persisted scenario stock-form choice for CNC parts, e.g. "Round Bar" picked

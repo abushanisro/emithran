@@ -1,4 +1,4 @@
-import { PRESS_STROKE_SETUP_MIN, SHEARING_SETUP_MIN, COMPRESSION_MOLDING_SETUP_MIN, REACTION_INJECTION_MOLDING_SETUP_MIN, DEFAULT_YIELD_PCT } from '../../shared/core/default-rates.constants';
+import { DEFAULT_YIELD_PCT } from '../../shared/core/default-rates.constants';
 import type { MHRRateInput } from '../../shared/core/cost-engine';
 import type { ProcessLineCost } from '../../../dto/cost-breakdown.dto';
 import type { CuttingProcessContext, CuttingProcessResult } from '../../shared/core/manufacturing-process.types';
@@ -32,8 +32,7 @@ export interface PressStrokeInput {
   // Progressive Die Press ONLY (2026-09-02): real per-SELECTED-MACHINE
   // setup_time_hr, resolved by the caller via
   // SheetMetalLookupService.getProgressiveDieMachineSetupMin(). Standard/
-  // Tandem Press's real setup_time_hr genuinely IS uniform (0.5hr/30min,
-  // matching PRESS_STROKE_SETUP_MIN) — but Progressive Die's real per-machine
+  // Tandem Press's real setup_time_hr genuinely IS uniform (0.5hr/30min) — but Progressive Die's real per-machine
   // value varies 28.2-43.2min across the 14 safe machines (correlates with
   // press-force tier), so collapsing it to one shared constant was wrong.
   // Used only when input.setupMin (the generic per-operation
@@ -132,31 +131,11 @@ export function computePressStrokeCost(
     process: processLabel,
     machineSetupTimeHr: rate.setupTimeHr ?? progressiveDieMachineSetupHr,
     operationSetupMin: input.setupMin,
-    // Shearing's real per-machine setup_time_hr (22.8min uniformly) differs
-    // from Standard/Tandem Press's (30min) -- see each constant's own doc
-    // comment (default-rates.ts) for the cited source. Compression Molding /
-    // Reaction Injection Molding reuse this same shared formula.
-    classDefaultMin: machineClass === "shear" ? SHEARING_SETUP_MIN
-      : machineClass === "compression_molding" ? COMPRESSION_MOLDING_SETUP_MIN
-      : machineClass === "reaction_injection_molding" ? REACTION_INJECTION_MOLDING_SETUP_MIN
-      : PRESS_STROKE_SETUP_MIN,
     machineName: rate.machineName,
   });
   const setupMin = setup.setupMin;
   const setupSource = setup.source;
-  // Progressive Die keeps its own, more specific disclosure: unlike Standard/
-  // Tandem Press (a genuinely uniform 30min across all 8 real machines) its
-  // real per-machine values span 28.2-43.2min by press-force tier, so landing
-  // on the class constant there hides a real spread and says so. The shared
-  // resolver cannot know that, hence the substitution rather than an extra
-  // warning -- the generic sentence would otherwise sit beside it saying less.
-  if (setup.warning) {
-    warnings.push(
-      machineClass === "progressive_die_press" && setup.source === "class_default"
-        ? `${processLabel}: setup time from generic fallback (${PRESS_STROKE_SETUP_MIN}min) — no real per-machine setup_time_hr resolved for ${rate.machineName ?? "the selected machine"}; real values vary 28.2-43.2min by press-force tier`
-        : setup.warning,
-    );
-  }
+  if (setup.warning) warnings.push(setup.warning);
 
   const t = eMithranTerms({
     mhrPerHr: rate.rate,
@@ -186,8 +165,8 @@ export function computePressStrokeCost(
       // Standard Press / Tandem Press / Progressive Die / Shearing row was
       // saved with a setup time of 15 minutes — a number with no source at
       // all — while the quote beside it had been costed from this machine's
-      // real 30min (PRESS_STROKE_SETUP_MIN, the measured setup_time_hr shared
-      // by all 8 real press machines) or 22.8min for shearing. The record
+      // real 30min (the measured setup_time_hr shared by all 8 real press
+      // machines) or 22.8min for shearing. The record
       // disagreed with the quote it recorded, and the Cost Guide re-derives
       // setup cost from the record.
       setupTimeMin: setupMin,

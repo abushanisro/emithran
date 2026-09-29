@@ -7,14 +7,16 @@
 // process lines, r2/r3 rounding, CostSummaryDto output) so this family costs
 // like every other one from the API consumer's point of view.
 //
-// Phase 4 cycle-time engine replaces Phase 1 named-constant approximations:
-//   Cooling  → Menges thermal formula (material-specific α, Tm, Tw, Te)
-//   Fill     → flow-length model (L_flow / v_front, material-specific)
-//   Pack     → gate-freeze proxy (0.35 × t_cool, scales with material and wall)
-//   Gate     → auto-recommended from geometry + material when caller has no signal
+// Real inputs only (see cycle-time.ts, clamp-force.ts, shot-size.ts):
+//   Cycle    → material reference thermal data + the press's injection rate and
+//              dry cycle + staged reference factors
+//   Press    → reference clamp force and GPPS-equivalent shot, checked against
+//              the selected press for the reference defaultNumCavities
+//   Gate     → the part's gate signal, else the reference default runner system
+// Anything missing marks the molding line incomplete (physicsGap) with the reason.
 //
-// The gate recommendation feeds the gate_trimming routing rule: hot_tip and sub
-// gates self-de-gate, so gate_trimming is not routed for those gate types.
+// The gate feeds the gate_trimming routing rule: hot_tip and sub gates
+// self-de-gate, so gate_trimming is not routed for those gate types.
 
 import { RATES_SOURCE_LABEL } from '../../shared/core/default-rates.constants';
 import type { MHRRateInput } from '../../shared/core/cost-engine';
@@ -29,11 +31,15 @@ import type { IMProcessTree, MoldingSubtype } from './process-tree';
 import { isSiliconeGrade } from './process-tree';
 import type { InjectionMoldingSignals } from './routing-engine';
 import { computeMoldToolingCost } from './mold-tooling-engine';
+import type { MoldClass, PlasticReference } from '../plastic-reference';
+import { requiredClampForce, type ClampForceResult, type MaterialClampProperties, type RunnerSystem } from '../clamp-force';
+import { shotGppsGramsPerCavity, shotWeightKgPerPart } from '../shot-size';
 import { buildInjectionMoldingRoute } from './routing-engine';
 import {
   computeCycleTime,
-  lookupResinProps,
+  type CycleTimeResult,
   type GateType,
+  type PressTiming,
   type RealResinInputs,
 } from './cycle-time';
 
@@ -42,11 +48,8 @@ function r3(n: number): number { return Math.round(n * 1000) / 1000; }
 
 // ── Constants not replaced by Phase 4 cycle-time engine ───────────────────────
 
-const IM_DEFAULT_WALL_MM = 2.0;        // Menges cooling fallback when wall not measured
-
-// Material — exported: machine selection uses the same runner allowance to
-// compute shot weight (one number, not two drifting copies).
-export const IM_RUNNER_SCRAP_PCT = 8;  // runner/sprue material lost per shot (cold runner)
+// Runner allowance and shot rule: shot-size.ts (shared with press selection).
+export { IM_RUNNER_SCRAP_PCT } from '../shot-size';
 
 // ── Removed, uncited constants (2026-09-11) ───────────────────────────────────
 // This block used to hold 16 named-literal time constants (mold setup 60min,
@@ -99,124 +102,41 @@ const SELF_DEGATE_TYPES: ReadonlySet<GateType> = new Set(['hot_tip', 'sub']);
 // Source: SPI (Society of the Plastics Industry) mold classification standard.
 // Class 101 = highest precision/life, Class 105 = prototype only.
 //
-// lifeShotRating values confirmed against the real source table (migration
-// 682, tblSpiType.json / "Num Annual Mold Cycles") — Class101 and Class105
-// were wrong before this fix (Class101 was capped at 1,000,000 instead of
-// the real ~unlimited production-tooling rating; Class105 was 10x too low
-// at 500 instead of 5,000). Class102-104 already matched and are unchanged.
-// The real table also carries a "Use Insert" flag per class (true for
-// 101/102, false for 103-105) — whether the mold uses a replaceable
-// hardened cavity insert — a real signal not modeled anywhere in this
-// engine yet; disclosed here as a follow-up, not added in this pass.
-//
-// baseCostUsd was removed from this table (2026-09-10) — those 5 flat
-// dollar figures had no DB/migration/literature citation anywhere (unlike
-// lifeShotRating above). Mold cost is now computed from the real, itemized
-// mold-tooling BOM (mold-tooling-engine.ts) instead of a per-class constant
-// — mold class now drives only the life-rating check in recommendMoldClass.
+// Class cycle ratings come from the staged tblSpiType table
+// (PlasticReference.spiClasses, plastic-reference.ts), never from a copy
+// here. The column is labelled "Num Annual Mold Cycles", but its values are
+// LIFETIME cycles and are compared against lifetime shots: classes 101-104
+// equal the SPI AR-106 lifetime bounds exactly (>1M, 1M, 500k, 100k), and
+// every other mold-life figure in the same dataset is shots per tool
+// (tblToolLife, variables defaultToolLife).
+// Mold cost is computed from the itemized mold-tooling BOM
+// (mold-tooling-engine.ts); mold class drives only the life-rating check.
 
-export type MoldClass = 'Class101' | 'Class102' | 'Class103' | 'Class104' | 'Class105';
-
-interface MoldClassSpec {
-  lifeShotRating: number; // shots the mold is rated for
-}
-
-const SPI_MOLD_CLASSES: Record<MoldClass, MoldClassSpec> = {
-  Class101: { lifeShotRating: 9_999_999_999 },
-  Class102: { lifeShotRating:     1_000_000 },
-  Class103: { lifeShotRating:       500_000 },
-  Class104: { lifeShotRating:       100_000 },
-  Class105: { lifeShotRating:         5_000 },
-};
-
-// Ordered from cheapest to most expensive — pick first class whose rated life
-// covers the required lifetime shots.
-const MOLD_CLASS_ORDER: MoldClass[] = ['Class105', 'Class104', 'Class103', 'Class102', 'Class101'];
-
-// Multi-cavity scaling: real per-additional-cavity component-count data was
-// not found in any sourced table (see mold-tooling-engine.ts's own doc
-// comment) — this +35%-of-base-per-additional-cavity figure is retained as a
-// disclosed engineering estimate, unchanged from before the BOM-cost fix,
-// applied now to the real itemized BOM subtotal instead of a flat SPI
-// per-class constant.
-export function computeMoldCost(baseCostUsd: number, cavityCount: number): number {
-  return baseCostUsd + Math.max(0, cavityCount - 1) * baseCostUsd * 0.35;
-}
+export type { MoldClass } from '../plastic-reference';
 
 export function recommendMoldClass(
   lifetimeShots: number,
+  spiClasses: PlasticReference['spiClasses'],
   partingComplexity: number | null,
   undercutCount: number | null,
-): MoldClass {
+): { moldClass: MoldClass; cycleRating: number } {
+  // spiClasses is ordered cheapest (lowest rating) first; the last is the most durable.
   const needsBump = (partingComplexity ?? 0) > 0.6 || (undercutCount ?? 0) > 2;
-  let cls: MoldClass = 'Class101';
-  for (const c of MOLD_CLASS_ORDER) {
-    if (SPI_MOLD_CLASSES[c].lifeShotRating >= lifetimeShots) {
-      cls = c;
-      break;
-    }
-  }
-  if (needsBump) {
-    // Bump one tier toward more durable (complex tooling wears faster).
-    // MOLD_CLASS_ORDER is cheapest→most-durable so +1 index = more durable.
-    const idx = MOLD_CLASS_ORDER.indexOf(cls);
-    cls = MOLD_CLASS_ORDER[Math.min(MOLD_CLASS_ORDER.length - 1, idx + 1)] ?? cls;
-  }
-  return cls;
+  let idx = spiClasses.findIndex((c) => c.cycleRating >= lifetimeShots);
+  if (idx < 0) idx = spiClasses.length - 1;
+  // Bump one tier toward more durable (complex tooling wears faster).
+  if (needsBump) idx = Math.min(spiClasses.length - 1, idx + 1);
+  return spiClasses[idx]!;
 }
 
-// ── Cavity count recommendation ───────────────────────────────────────────────
-// Three constraints applied; take the minimum and round down to nearest power of 2.
-
-export function recommendCavityCount(opts: {
-  projectedAreaMm2: number | null;
-  annualVolume: number;           // parts/year
-  clampTonnageKN: number;         // machine clamp force
-  shotCapacityCm3: number;        // machine shot capacity
-  partVolumeMm3: number;
-  gateType: GateType;
-}): { count: number; constrainedBy: InjectionMoldingBreakdown['cavityConstrainedBy'] } {
-  const { projectedAreaMm2, annualVolume, clampTonnageKN, shotCapacityCm3, partVolumeMm3, gateType } = opts;
-
-  // 1. Clamp constraint: n_max = floor(clampTonnage_kN / (projArea_cm² × 0.35))
-  const projAreaCm2 = (projectedAreaMm2 ?? 0) / 100;
-  const nClamp = projAreaCm2 > 0
-    ? Math.floor(clampTonnageKN / (projAreaCm2 * 0.35))
-    : 999;
-
-  // 2. Shot capacity constraint: 80% utilization; runner adds 8% for cold runner, 1% for hot
-  const partVolCm3 = Math.max(partVolumeMm3, 1) / 1000;
-  const runnerFactor = SELF_DEGATE_TYPES.has(gateType) ? 1.01 : 1.08;
-  const nShot = Math.floor((shotCapacityCm3 * 0.80) / (partVolCm3 * runnerFactor));
-
-  // 3. Economic constraint: break-even at ~50k parts/cavity/year
-  const nEcon = Math.ceil(annualVolume / 50_000);
-
-  const raw = Math.min(nClamp, nShot, nEcon);
-  const clamped = Math.max(1, Math.min(raw, 16));
-
-  // Round down to nearest power of 2 (1, 2, 4, 8, 16)
-  const powers = [1, 2, 4, 8, 16] as const;
-  const count = powers.reduce((best, p) => (p <= clamped ? p : best), 1 as number);
-
-  let constrainedBy: InjectionMoldingBreakdown['cavityConstrainedBy'] = 'economic';
-  if (nClamp <= nShot && nClamp <= nEcon) constrainedBy = 'clamp';
-  else if (nShot <= nClamp && nShot <= nEcon) constrainedBy = 'shot_capacity';
-
-  return { count, constrainedBy };
-}
-
-// ── Runner volume estimation ───────────────────────────────────────────────────
-
-export function estimateRunnerVolumeCm3(
-  bboxMaxMm: number,
-  cavityCount: number,
-  gateType: GateType,
-): number {
-  if (SELF_DEGATE_TYPES.has(gateType)) return 0; // hot runner: no runner scrap
-  // SPI rule of thumb: runner diameter ~8mm, length ≈ 0.12 × bbox × cavity_layout_factor
-  return Math.round((0.12 * bboxMaxMm * Math.sqrt(cavityCount)) * 10) / 10;
-}
+// ── Cavity count ──────────────────────────────────────────────────────────────
+// Cavities per mold: the user's count (Cost Guide, scenario override
+// cavityCount) when it is a reference mold layout (layoutNumCav), else the
+// reference defaultNumCavities ("user may override via Process Setup
+// Options"). A count with no reference layout is reported, never replaced. It
+// is never derived from a volume rule of thumb. The press must hold that many
+// cavities closed (reference clamp force) and fill them (GPPS-equivalent shot);
+// if it cannot, the molding line is marked incomplete with the reason.
 
 // ── Cost confidence ────────────────────────────────────────────────────────────
 
@@ -253,14 +173,25 @@ export interface InjectionMoldingCostInput {
   // conservative defaults and records routingWarnings instead of guessing
   // silently.
   signals?: Partial<InjectionMoldingSignals>;
-  // Bounding-box dimensions for the fill-time and gate-recommendation models.
-  // When not provided, fill time falls back to the minimum (0.5 s) — no error.
+  // Bounding-box dimensions: the projected-area footprint when CAD has no
+  // projected area (press sizing and tooling).
   bboxMaxMm?: number;
   bboxMidMm?: number;
-  // Machine physical specs for cavity count recommendation.
-  // Derived from the selected machine record; defaults applied when not present.
-  clampTonnageKN?: number;
-  shotCapacityCm3?: number;
+  // Cavities per mold set by the user (Cost Guide); null = reference default.
+  cavityCountOverride?: number | null;
+  // The selected press's own process data from its HR Rates row
+  // (PlasticReferenceService.getPressRecords): injection rate and dry cycle
+  // (absent = cycle time not derivable) and its good-part yield (cost per good
+  // part = cost / yield; absent = the line is incomplete).
+  pressTiming?: PressTiming | null;
+  goodPartYield?: number | null;
+  // The selected press's real clamp tonnage (t) and shot capacity (g), from its
+  // machine record. Absent = no press: cavities are not sized and the molding
+  // line is marked incomplete (never a default press).
+  machineClampTonnes?: number | null;
+  machineShotCapacityG?: number | null;
+  // The material's reference clamp properties (raw_materials, migration 831).
+  materialClamp?: MaterialClampProperties;
   // Tooling amortization inputs — required for ToolingCostDto.
   // When not provided, tooling cost is omitted from the response (no proxy guesses).
   annualVolume?: number;
@@ -269,14 +200,20 @@ export interface InjectionMoldingCostInput {
   moldingSubtype?: MoldingSubtype;
   // Local currency symbol (₹, $, €, …) for warning messages; defaults to '$'.
   currencySymbol?: string;
-  // Real per-grade thermal properties (Phase 1 materials-data foundation,
-  // 2026-09-02), resolved by the caller from raw_materials via
-  // resolveMaterialForFamily — the SAME real row materialCostPerKg/
-  // materialDensityKgM3 above came from. Optional; the Menges cooling
-  // formula falls back to the cited generic resin-family table
-  // (RESIN_THERMAL_TABLE) field-by-field when a specific property isn't on
-  // file for this grade — never fabricated, never all-or-nothing.
+  // The material's reference thermal properties (resolveMaterialForFamily, the
+  // same raw_materials row as cost and density; melt density via migration
+  // 831). Every field is required for the cooling model; any missing leaves
+  // the cycle not derivable (cycle-time.ts), never a resin-family default.
   realResinInputs?: RealResinInputs | null;
+  // Staged Plastic reference data (plastic-reference.ts): SPI classes and the
+  // mold-tooling tables. Null = not staged: no tooling result is produced and
+  // plasticReferenceMissing names what is absent.
+  plasticReference?: PlasticReference | null;
+  plasticReferenceMissing?: string[];
+  // Quote location: toolroom rates exist in memory/ for USA only.
+  location?: string;
+  // raw_materials.material_type of the resolved grade (tblToolLife key).
+  materialType?: string | null;
 }
 
 // Auto-derive molding subtype from material grade + signals.
@@ -310,28 +247,83 @@ function makeLine(
   };
 }
 
-export function computeInjectionMoldedCostSummary(
-  input: InjectionMoldingCostInput,
-): CostSummaryDto & { processTree: IMProcessTree } {
+type EngineResult = CostSummaryDto & { processTree: IMProcessTree };
+type CavitySizing = { count: number; constrainedBy: InjectionMoldingBreakdown['cavityConstrainedBy']; unverifiedReason: string | null };
+
+/** The press-sizing facts shared by every cavity candidate. */
+function pressSizingBasis(input: InjectionMoldingCostInput) {
+  const plasticRef = input.plasticReference ?? null;
+  const isLsr = resolveSubtype(input) === 'lsr';
+  // One projected-area rule for clamp, cavities and tooling: the CAD projected
+  // area, else the bounding-box footprint when both real dimensions exist.
+  const projectedAreaMm2 = (input.signals?.projectedAreaMm2 ?? 0) > 0
+    ? input.signals!.projectedAreaMm2 as number
+    : (input.bboxMaxMm ?? 0) > 0 && (input.bboxMidMm ?? 0) > 0 ? input.bboxMaxMm! * input.bboxMidMm! : null;
+  // Gate / runner: the part's own gate signal, else the reference default
+  // runner system (defaultRunnerSystem; cold runner = edge gate, the reference
+  // defaultGatingType). LSR molds use a self-degating cold deck.
+  const callerGate = (input.signals?.gateType ?? null) as GateType | null;
+  const gate: GateType | null = isLsr ? 'sub' : callerGate
+    ?? (plasticRef ? (plasticRef.cycleModel.defaultRunner === 'hot' ? 'hot_tip' : 'edge') : null);
+  const runner: RunnerSystem = gate != null && SELF_DEGATE_TYPES.has(gate) ? 'hot' : 'cold';
+  const clampPerCavity: ClampForceResult = !plasticRef
+    ? { derivable: false, reason: `Clamp force not derivable: Plastic reference data missing (${(input.plasticReferenceMissing ?? ['not loaded']).join('; ')}).` }
+    : requiredClampForce({
+        model: plasticRef.clampModel,
+        material: input.materialClamp ?? { injectionPressureMaxMpa: null, flowLengthRatio: null, referenceMaterial: null },
+        materialLabel: input.materialGrade ?? 'this material',
+        projectedAreaMm2: projectedAreaMm2 ?? 0,
+        cavityCount: 1,
+        runner,
+      });
+  // Shot per part and its GPPS-equivalent grams (shot-size.ts).
+  const netWeightKg = r3((Math.max(input.volume, 0) / 1e9) * input.materialDensityKgM3);
+  const shotWeightKg = shotWeightKgPerPart(netWeightKg, runner);
+  const meltDensity = input.realResinInputs?.densityOfMeltKgM3 ?? null;
+  const shotGppsGPerCavity = shotGppsGramsPerCavity({ shotWeightKg, meltDensityKgM3: meltDensity, reference: plasticRef });
+  return { plasticRef, isLsr, projectedAreaMm2, callerGate, gate, runner, clampPerCavity, netWeightKg, shotWeightKg, meltDensity, shotGppsGPerCavity };
+}
+
+export function computeInjectionMoldedCostSummary(input: InjectionMoldingCostInput): EngineResult {
+  const b = pressSizingBasis(input);
+  const clampT = input.machineClampTonnes ?? null;
+  const shotG = input.machineShotCapacityG ?? null;
+  const ref = b.plasticRef;
+  const requested = input.cavityCountOverride ?? null;
+  const n = requested ?? ref?.defaultNumCavities ?? 1;
+  const unverified = (reason: string) => computeAtCavities(input, { count: n, constrainedBy: 'unverified', unverifiedReason: reason });
+
+  if (requested != null && ref && !ref.cavityLayouts.includes(requested)) {
+    return unverified(`${requested} cavities has no reference mold layout (layoutNumCav: ${ref.cavityLayouts.join(', ')}).`);
+  }
+  if (!b.clampPerCavity.derivable) return unverified(b.clampPerCavity.reason);
+  if (clampT == null || shotG == null) return unverified('No press selected with a real clamp tonnage and shot capacity: press fit is not checked.');
+  if (b.shotGppsGPerCavity == null) return unverified('Shot size not derivable: the material has no reference melt density (migration 831).');
+  if (n * b.clampPerCavity.requiredTonnes > clampT) {
+    return unverified(`The selected press (${clampT.toFixed(1)} t) cannot hold ${n} cavit${n === 1 ? 'y' : 'ies'} closed: it needs ${(n * b.clampPerCavity.requiredTonnes).toFixed(1)} t (${b.clampPerCavity.trace}).`);
+  }
+  if (n * b.shotGppsGPerCavity > shotG) {
+    return unverified(`The selected press shot size (${shotG} g GPPS) cannot fill ${n} cavit${n === 1 ? 'y' : 'ies'}: it needs ${(n * b.shotGppsGPerCavity).toFixed(1)} g GPPS-equivalent.`);
+  }
+  return computeAtCavities(input, { count: n, constrainedBy: requested != null ? 'user' : 'default', unverifiedReason: null });
+}
+
+function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizing): EngineResult {
   const {
-    volume, surfaceArea, wallThicknessNominalMm, materialGrade, materialCostPerKg,
-    materialDensityKgM3, materialSource, batchSize, family, mhrRate, deburrRate, inspectionRate,
+    volume, wallThicknessNominalMm, materialGrade, materialCostPerKg,
+    materialDensityKgM3, materialSource, batchSize, family, mhrRate,
   } = input;
-  const batch = Math.max(batchSize, 1);
+  const b = pressSizingBasis(input);
+  const { plasticRef, isLsr, projectedAreaMm2, callerGate, gate, clampPerCavity, netWeightKg, shotWeightKg, shotGppsGPerCavity } = b;
+  const cavityCount = sizing.count;
+  const cavityConstrainedBy = sizing.constrainedBy;
 
   const warnings: string[] = [];
   const processLines: ProcessLineCost[] = [];
-
-  // Resolve molding subtype first — drives cycle time model + routing.
   const moldingSubtype = resolveSubtype(input);
-  const isLsr = moldingSubtype === 'lsr';
 
-  if (!materialGrade) warnings.push('Material grade not set — default engineering-plastic rates applied');
+  if (!materialGrade) warnings.push('Material grade not set');
   if (volume <= 0)    warnings.push('Part volume is zero — shot weight and material cost may be inaccurate');
-  if (wallThicknessNominalMm <= 0) {
-    const model = isLsr ? 'LSR Arrhenius cure' : 'Menges cooling';
-    warnings.push(`Wall thickness not detected — ${model} computed from ${IM_DEFAULT_WALL_MM}mm default gauge`);
-  }
   if (isLsr) {
     warnings.push('LSR (thermoset) — Arrhenius cure model used; Menges cooling does NOT apply. Mold temperature 180°C (heated).');
   }
@@ -347,102 +339,29 @@ export function computeInjectionMoldedCostSummary(
       `Verify the material grade in the BOM item; the cost breakdown below is unreliable until corrected.`,
     );
   }
-
-  // ── Cavity count: 3-constraint recommendation ─────────────────────────────
-  // Machine defaults: 80T class (conservative) when no machine data supplied.
-  // 1 ton ≈ 10 kN; shot capacity ≈ 0.9 × tonnage (industry rule of thumb).
-  // Computed BEFORE cycle time (moved ahead of its original position, migration
-  // 663 wiring) — recommendCavityCount() has no dependency on the cycle-time
-  // result (its gateType input is the caller/default value, not the
-  // cycle-time-recommended gate), and cycleTime.fillSec needs the real
-  // cavityCount to apply the real cavities-per-mold adjustment factor below.
-  const DEFAULT_CLAMP_KN = 800;    // 80T default class
-  const DEFAULT_SHOT_CM3 = 72;     // 80T × 0.9
-  const clampKN = input.clampTonnageKN ?? DEFAULT_CLAMP_KN;
-  const shotCm3 = input.shotCapacityCm3 ?? DEFAULT_SHOT_CM3;
-
-  const { count: cavityCount, constrainedBy: cavityConstrainedBy } = recommendCavityCount({
-    projectedAreaMm2: input.signals?.projectedAreaMm2 ?? null,
-    annualVolume: input.annualVolume ?? batch,
-    clampTonnageKN: clampKN,
-    shotCapacityCm3: shotCm3,
-    partVolumeMm3: volume,
-    gateType: (input.signals?.gateType ?? 'edge') as GateType,
-  });
-
-  if (cavityCount > 1) {
-    warnings.push(`Cavity count: ${cavityCount} (constrained by ${cavityConstrainedBy}) — confirm with toolmaker`);
-  }
-  if (!input.clampTonnageKN) {
-    warnings.push('Machine clamp tonnage not supplied — cavity count estimated from 80T default class');
+  if (sizing.unverifiedReason) warnings.push(sizing.unverifiedReason);
+  if (gate != null && callerGate == null && !isLsr) {
+    warnings.push(`Gate: ${gate} (reference defaultRunnerSystem ${plasticRef!.cycleModel.defaultRunner} runner; no gate signal on the part)`);
   }
 
-  // ── Phase 4: compute cycle time via thermal + rheology models ─────────────
-  const wall = wallThicknessNominalMm > 0 ? wallThicknessNominalMm : IM_DEFAULT_WALL_MM;
-  // When bbox not provided, estimate from volume (cube root × 2 approximates longest dim).
-  // bboxMid fallback prevents the sub-gate area heuristic from triggering on area=0.
-  const bboxMax = (input.bboxMaxMm ?? 0) > 0 ? input.bboxMaxMm! : Math.cbrt(volume) * 2;
-  const bboxMid = (input.bboxMidMm ?? 0) > 0 ? input.bboxMidMm! : Math.cbrt(volume) * 1.2;
-  const callerGateType = (input.signals?.gateType ?? null) as GateType | null;
+  // ── Cycle time: material, press and reference only (cycle-time.ts) ──────────
+  const cycle: CycleTimeResult = plasticRef
+    ? computeCycleTime({
+        wallMm: wallThicknessNominalMm > 0 ? wallThicknessNominalMm : null,
+        isLsr,
+        real: input.realResinInputs,
+        model: plasticRef.cycleModel,
+        press: input.pressTiming ?? null,
+        shotMeltVolumeMm3: b.meltDensity && b.meltDensity > 0 ? (shotWeightKg * cavityCount / b.meltDensity) * 1e9 : null,
+        cavityCount,
+        // No per-part gate-count signal: the reference defaultNumberOfGatesPerCavity.
+        gatesPerCavity: plasticRef.defaultGatesPerCavity,
+      })
+    : { derivable: false, missing: [`Plastic reference data (${(input.plasticReferenceMissing ?? ['not loaded']).join('; ')})`] };
+  const cycleGapReason = cycle.derivable ? null : `Cycle time not derivable: missing ${cycle.missing.join('; ')}.`;
+  if (cycleGapReason) warnings.push(cycleGapReason);
 
-  const cycleTime = computeCycleTime({
-    wallMm: wall,
-    longestBboxMm: bboxMax,
-    bboxMidMm: bboxMid,
-    volumeMm3: volume,
-    projectedAreaMm2: input.signals?.projectedAreaMm2 ?? null,
-    grade: materialGrade,
-    gateTypeOverride: callerGateType,
-    isLsr,
-    realResinInputs: input.realResinInputs,
-    // Real fill-time adjustment factors (migration 663). No per-part
-    // gate-count signal exists yet, so gatesPerCavity keeps its default
-    // (1) — surfaced explicitly in warnings below rather than left silent.
-    cavityCount,
-  });
-  if (input.realResinInputs?.meltingTempC != null || input.realResinInputs?.moldTempC != null) {
-    warnings.push(
-      `Cooling-time inputs: using real per-grade thermal properties on file for "${materialGrade ?? 'this material'}" ` +
-      `(raw_materials) where available; generic resin-family literature defaults fill any remaining field.`,
-    );
-  }
-  if (cavityCount > 1) {
-    warnings.push(
-      `Fill time uses real cavity-count/gate-count adjustment factors (migration 663): ${cavityCount} cavities × 1 gate/cavity assumed (no gate-count signal on file).`,
-    );
-  }
-
-  // Surfacing the gate recommendation as a routing signal and (when changed from
-  // any caller-supplied value) as an explicit audit note in warnings.
-  const recommendedGate = cycleTime.gateRecommendation.gateType;
-  if (callerGateType == null) {
-    // Auto-recommendation: emit as an informational note (not a warning)
-    warnings.push(`Gate recommendation: ${recommendedGate} — ${cycleTime.gateRecommendation.reason}`);
-  } else if (callerGateType !== recommendedGate) {
-    warnings.push(
-      `Gate type overridden by caller: ${callerGateType} (recommended: ${recommendedGate} — ${cycleTime.gateRecommendation.reason})`,
-    );
-  }
-
-  // Clamp tonnage advisory — computed from projected area and material pressure
-  // factor. The machine selector already uses this for IMM selection; surface it
-  // here so the user sees the constraint in the cost breakdown warnings.
-  if ((input.signals?.projectedAreaMm2 ?? 0) > 0) {
-    // Same real-or-fallback resolution as the cooling model above — a
-    // material's Tm can never disagree with itself between the two uses in
-    // this function.
-    const resinProps = lookupResinProps(materialGrade, input.realResinInputs);
-    // Reuse physics.ts classifyResinFamily via pressure factor approximation.
-    // Phase 5 will import clampTonnageRequired directly from the machine selector.
-    const projAreaCm2 = (input.signals!.projectedAreaMm2 as number) / 100;
-    // Conservative 0.65 ton/cm² default for mixed engineering plastics.
-    const pressureFactor = resinProps.Tm > 300 ? 1.0 : resinProps.Tm > 240 ? 0.75 : 0.65;
-    const clampTon = Math.ceil(projAreaCm2 * pressureFactor);
-    warnings.push(`Estimated clamp force: ~${clampTon}T (${projAreaCm2.toFixed(0)} cm² × ${pressureFactor} tons/cm²)`);
-  }
-
-  // ── Route the part — gate type from Phase 4 feeds into routing ─────────────
-  const netWeightKg = r3((Math.max(volume, 0) / 1e9) * materialDensityKgM3);
+  // ── Route the part ─────────────────────────────────────────────────────────
   const signals: InjectionMoldingSignals = {
     materialGrade,
     projectedAreaMm2: input.signals?.projectedAreaMm2 ?? null,
@@ -457,8 +376,7 @@ export function computeInjectionMoldedCostSummary(
     insertCount: input.signals?.insertCount ?? null,
     textFeatureCount: input.signals?.textFeatureCount ?? null,
     assemblyFeatureCount: input.signals?.assemblyFeatureCount ?? null,
-    // Phase 4: always supply gate type — either the caller's or the recommendation.
-    gateType: recommendedGate,
+    gateType: gate,
     partingComplexity: input.signals?.partingComplexity ?? null,
     unscrewingCoreCount: (input.signals as any)?.unscrewingCoreCount ?? null,
     overmoldSubstrate: (input.signals as any)?.overmoldSubstrate ?? null,
@@ -467,135 +385,86 @@ export function computeInjectionMoldedCostSummary(
   warnings.push(...processTree.routingWarnings);
   const routed = new Set<string>(processTree.operations.map((o) => o.id));
 
-  // ── Material: shot weight = part + runner/sprue allowance ───────────────────
-  // Hot-runner tools have negligible runner scrap; cold-runner tools lose ~8%.
-  const runnerPct = SELF_DEGATE_TYPES.has(recommendedGate) ? 1 : IM_RUNNER_SCRAP_PCT;
-  const shotWeightKg = r3(netWeightKg * (1 + runnerPct / 100));
-  const materialCost = r2(shotWeightKg * materialCostPerKg);
+  // ── Good-part yield of the press: every good part carries the scrapped shots ──
+  const yieldFrac = input.goodPartYield != null && input.goodPartYield > 0 && input.goodPartYield <= 1 ? input.goodPartYield : null;
+  const yieldGapReason = input.machineClampTonnes != null && yieldFrac == null
+    ? 'The selected press has no good-part yield on its HR Rates record (good_part_yield): cost per good part is not derivable.'
+    : null;
+  if (yieldGapReason) warnings.push(yieldGapReason);
+  const perGood = yieldFrac ?? 1;
+
+  // ── Material: shot weight = part + runner/sprue allowance, per good part ────
+  const materialCost = r2((shotWeightKg * materialCostPerKg) / perGood);
 
   // ── Cost every routed operation, in route order ─────────────────────────────
-
   let setupMin = 0;      // batch-amortized station time (drying + mold setup)
   let moldingMin = 0;    // in-cycle machine time per part
-  let secondaryMin = 0;  // bench ops per part
-  let inspectionMin = 0;
+  const secondaryMin = 0;  // bench ops per part
+  const inspectionMin = 0;
 
   if (routed.has('lsr_compound_dosing')) {
     warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.lsr_compound_dosing, 'LSR two-component A+B metering'));
   }
-
   if (routed.has('material_drying')) {
     warnings.push(uncostedOpWarning(
       UNCOSTED_OPERATION_LABELS.material_drying,
       materialGrade ? `${materialGrade} is hygroscopic` : undefined,
     ));
   }
-
   if (routed.has('mold_setup')) {
     warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.mold_setup));
   }
 
-  // Phase 4 in-cycle steps — times from the thermal/rheology model, not
-  // constants. LSR: cooling is replaced by lsr_curing (Arrhenius); packing is
-  // absent for LSR. cavityCount amortizes machine time per part (multi-
-  // cavity: same cycle produces N parts).
-  //
-  // Combined into ONE real process line, not one line per internal phase.
-  // Root cause (2026-09-11, user-reported): the previous one-line-per-phase
-  // breakdown (Injection/Packing/Cooling/Ejection) had no catalog counterpart
-  // of its own — this domain's real, database-driven process list is exactly
-  // 4 named processes (migration 736), this one included, not a 5th-8th
-  // phase-level entry — and, all sharing one machine_class, it broke
-  // matchedEngineLine's machine_class-only lookup (stored-process-lines.ts):
-  // every row matched whichever line came first, so Packing/Holding,
-  // Cooling, and Ejection all rendered the identical duplicated machine/
-  // tonnage/cycle-time block. Each phase's own physics-derived time is still
-  // computed and summed here — nothing is discarded — it is just no longer
-  // split into separate user-facing rows. The line's label is the real
-  // catalog process name for whichever of the 2 real machine classes that
-  // share this function actually costed it (injection_molding vs
-  // structural_foam_molding — both real, both in the 4-process catalog).
+  // One molding process line (the catalog's own process, not one row per
+  // internal phase — see stored-process-lines.ts's machine_class match). Its
+  // time is the whole cycle over the cavities; a gap names what is missing.
   const MOLDING_PROCESS_LABEL: Record<string, string> = {
     injection_molding: 'Injection Molding',
     structural_foam_molding: 'Structural Foam Molding',
   };
-  const inCycleSteps: Array<{ id: string; sec: number }> = [
-    { id: 'injection',  sec: cycleTime.fillSec  },
-    { id: 'packing',    sec: cycleTime.packSec  },
-    { id: 'cooling',    sec: isLsr ? 0 : cycleTime.coolSec },
-    { id: 'lsr_curing', sec: isLsr ? cycleTime.coolSec : 0 },
-    { id: 'ejection',   sec: cycleTime.ejectSec },
-  ];
-  const inCycleSec = inCycleSteps.reduce((s, step) => s + (routed.has(step.id) ? step.sec : 0), 0);
-  if (inCycleSec > 0) {
-    const inCycleMin = (inCycleSec / cavityCount) / 60;
-    moldingMin += inCycleMin;
-    const processLabel = MOLDING_PROCESS_LABEL[mhrRate.machineClass] ?? 'Injection Molding';
-    processLines.push(makeLine(processLabel, 0, r2((inCycleMin / 60) * mhrRate.rate), inCycleMin, mhrRate));
+  const processLabel = MOLDING_PROCESS_LABEL[mhrRate.machineClass] ?? 'Injection Molding';
+  const inCycleMin = cycle.derivable ? (cycle.totalCycleSec / cavityCount / perGood) / 60 : 0;
+  moldingMin += inCycleMin;
+  const line = makeLine(processLabel, 0, r2((inCycleMin / 60) * mhrRate.rate), inCycleMin, mhrRate);
+  const gapReason = sizing.unverifiedReason ?? cycleGapReason ?? yieldGapReason;
+  if (gapReason) {
+    line.physicsGap = {
+      gapType: 'unsupported_operation', process: processLabel, machineClass: mhrRate.machineClass,
+      reason: gapReason,
+      requiredCapability: sizing.unverifiedReason ? 'Press sizing (reference clamp force + a real press)' : cycleGapReason ? 'Cycle time (material thermal data + press timing)' : 'Press good-part yield',
+    };
   }
+  if (cycle.derivable) line.calculationTrace = cycle.trace;
+  processLines.push(line);
 
-  if (routed.has('gate_trimming')) {
-    warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.gate_trimming));
-  }
-
-  if (routed.has('deflashing')) {
-    warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.deflashing));
-  }
-
+  if (routed.has('gate_trimming')) warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.gate_trimming));
+  if (routed.has('deflashing')) warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.deflashing));
   if (routed.has('side_action')) {
     warnings.push(uncostedOpWarning(
       UNCOSTED_OPERATION_LABELS.side_action,
       `${signals.undercutCount ?? '?'} undercut feature(s) — slide/lifter tooling required`,
     ));
   }
-
   if (routed.has('core_unscrewing')) {
     warnings.push(uncostedOpWarning(
       UNCOSTED_OPERATION_LABELS.core_unscrewing,
       `${(signals as any).unscrewingCoreCount ?? '?'} unscrewing core(s) — hydraulic/servo rotation required`,
     ));
   }
-
   if (routed.has('insert_loading')) {
-    warnings.push(uncostedOpWarning(
-      UNCOSTED_OPERATION_LABELS.insert_loading,
-      `${signals.insertCount ?? '?'} insert(s)`,
-    ));
+    warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.insert_loading, `${signals.insertCount ?? '?'} insert(s)`));
   }
-
-  if (routed.has('insert_inspection')) {
-    warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.insert_inspection));
-  }
-
+  if (routed.has('insert_inspection')) warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.insert_inspection));
   if (routed.has('insert_installation')) {
-    warnings.push(uncostedOpWarning(
-      UNCOSTED_OPERATION_LABELS.insert_installation,
-      `${signals.insertCount ?? '?'} insert candidate(s)`,
-    ));
+    warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.insert_installation, `${signals.insertCount ?? '?'} insert candidate(s)`));
   }
-
-  if (routed.has('secondary_cure_oven')) {
-    warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.secondary_cure_oven));
-  }
-
+  if (routed.has('secondary_cure_oven')) warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.secondary_cure_oven));
   if (routed.has('ultrasonic_welding')) {
-    warnings.push(uncostedOpWarning(
-      UNCOSTED_OPERATION_LABELS.ultrasonic_welding,
-      `${signals.assemblyFeatureCount ?? '?'} assembly/weld feature(s)`,
-    ));
+    warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.ultrasonic_welding, `${signals.assemblyFeatureCount ?? '?'} assembly/weld feature(s)`));
   }
-
-  if (routed.has('visual_inspection')) {
-    warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.visual_inspection));
-  }
-
-  if (routed.has('dimensional_inspection')) {
-    warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.dimensional_inspection));
-  }
-
-  if (routed.has('weight_check')) {
-    warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.weight_check));
-  }
+  if (routed.has('visual_inspection')) warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.visual_inspection));
+  if (routed.has('dimensional_inspection')) warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.dimensional_inspection));
+  if (routed.has('weight_check')) warnings.push(uncostedOpWarning(UNCOSTED_OPERATION_LABELS.weight_check));
 
   // ── Totals ──────────────────────────────────────────────────────────────────
   const totalProcessCost = r2(processLines.reduce((s, l) => s + l.totalCost, 0));
@@ -606,10 +475,9 @@ export function computeInjectionMoldedCostSummary(
     materialGrade, materialCostPerKg, netWeightKg, shotWeightKg, batchSize, processLines,
   );
 
-  // ── Runner volume ─────────────────────────────────────────────────────────
-  const runnerVolumeScrapCm3 = estimateRunnerVolumeCm3(bboxMax, cavityCount, recommendedGate);
-  const runnerScrapKg = r3((runnerVolumeScrapCm3 / 1000) * materialDensityKgM3);
-  const runnerSystemType: 'hot' | 'cold' = SELF_DEGATE_TYPES.has(recommendedGate) ? 'hot' : 'cold';
+  // ── Runner ─────────────────────────────────────────────────────────────────
+  const runnerScrapKg = r3(Math.max(0, shotWeightKg - netWeightKg) * cavityCount);
+  const runnerSystemType: 'hot' | 'cold' = b.runner;
 
   // ── Cost confidence ───────────────────────────────────────────────────────
   const hasSelectedMachine = mhrRate.source === 'mhr_database';
@@ -619,46 +487,74 @@ export function computeInjectionMoldedCostSummary(
     cavityConstrainedBy,
   );
 
+  const clampRequiredT = clampPerCavity.derivable ? clampPerCavity.requiredTonnes * cavityCount : null;
+  const shotRequiredG = shotGppsGPerCavity != null ? shotGppsGPerCavity * cavityCount : null;
+  const machineClampTonnes = input.machineClampTonnes ?? null;
+  const machineShotG = input.machineShotCapacityG ?? null;
+  const pct = (req: number | null, cap: number | null) => (req != null && cap != null && cap > 0 ? Math.round((req / cap) * 1000) / 10 : null);
   const imBreakdown: InjectionMoldingBreakdown = {
     moldingSubtype,
     cavityCount,
     cavityConstrainedBy,
+    cavityLayouts: plasticRef?.cavityLayouts ?? [],
+    defaultCavityCount: plasticRef?.defaultNumCavities ?? null,
     runnerSystemType,
     runnerScrapKg,
-    gateType: recommendedGate,
+    gateType: gate ?? 'unknown',
     undercutCount: signals.undercutCount ?? null,
     partingComplexity: signals.partingComplexity ?? null,
-    cycleTimeSec: r2(cycleTime.totalCycleSec),
-    cavityCycleTimeSec: r2(cycleTime.totalCycleSec / cavityCount),
+    cycleTimeSec: cycle.derivable ? r2(cycle.totalCycleSec) : 0,
+    cavityCycleTimeSec: cycle.derivable ? r2(cycle.totalCycleSec / cavityCount) : 0,
     costConfidence: confidence,
+    projectedAreaCm2: projectedAreaMm2 != null ? Math.round(projectedAreaMm2 / 10) / 10 : null,
+    flowClass: clampPerCavity.derivable ? clampPerCavity.flowClass : null,
+    cavityPressureMpa: clampPerCavity.derivable ? r2(clampPerCavity.cavityPressureMpa) : null,
+    clampTrace: clampPerCavity.derivable ? clampPerCavity.trace : clampPerCavity.reason,
+    clampRequiredT: clampRequiredT != null ? Math.round(clampRequiredT * 10) / 10 : null,
+    clampMachineT: machineClampTonnes,
+    clampUtilPct: pct(clampRequiredT, machineClampTonnes),
+    shotRequiredG: shotRequiredG != null ? Math.round(shotRequiredG * 10) / 10 : null,
+    shotMachineG: machineShotG,
+    shotUtilPct: pct(shotRequiredG, machineShotG),
   };
 
   // ── Tooling cost (separate from piece cost, omitted when inputs absent) ────
   let toolingResult: ToolingCostDto | undefined;
   const annualVol = input.annualVolume;
   const prodLife = input.productionLifeYears;
-  if (annualVol != null && prodLife != null && annualVol > 0 && prodLife > 0) {
+  if (annualVol != null && prodLife != null && annualVol > 0 && prodLife > 0 && !plasticRef) {
+    warnings.push(`Tooling cost not computed: Plastic reference data missing (${(input.plasticReferenceMissing ?? ['not loaded']).join('; ')}).`);
+  }
+  if (annualVol != null && prodLife != null && annualVol > 0 && prodLife > 0 && plasticRef) {
     const annualShotsPerCavity = annualVol / cavityCount;
     const lifetimeShots = annualShotsPerCavity * prodLife;
     // Unscrewing cores add mold complexity beyond parting line — treat as additional undercut bump.
     const effectiveUndercutCount = (signals.undercutCount ?? 0) + ((signals as any).unscrewingCoreCount ?? 0);
-    const moldClass = recommendMoldClass(lifetimeShots, signals.partingComplexity ?? null, effectiveUndercutCount);
+    const mold = recommendMoldClass(lifetimeShots, plasticRef.spiClasses, signals.partingComplexity ?? null, effectiveUndercutCount);
 
-    // Real required mold-window area (projected area x cavity count) — same
-    // bbox-product fallback cycle-time.ts already uses when CAD hasn't
-    // supplied a real projected area (see recommendGateType, cycle-time.ts:328).
-    const projectedAreaMm2 = signals.projectedAreaMm2 ?? (bboxMax * bboxMid);
-    const moldBaseAreaMm2 = Math.max(0, projectedAreaMm2) * cavityCount;
+    // Required mold-window area: the press-sizing projected area x cavities.
+    const moldBaseAreaMm2 = Math.max(0, projectedAreaMm2 ?? 0) * cavityCount;
     const moldTooling = computeMoldToolingCost({
       moldBaseAreaMm2,
       cavityCount,
       undercutCount: effectiveUndercutCount,
+      tables: plasticRef.tooling,
+      toolroomRates: input.location === 'USA' ? plasticRef.toolroomRatesUsa : null,
+      location: input.location ?? '(unknown location)',
     });
-    const moldCostUsd = r2(computeMoldCost(moldTooling.bomSubtotalUsd, cavityCount));
+    // Molds the job wears out: tblToolLife shots per tool for the material type,
+    // the reference default (its median) for a type with no row.
+    const lifeRow = plasticRef.toolLifeShotsByType.find((t) => t.materialType === input.materialType);
+    const toolLifeShots = lifeRow?.shots ?? plasticRef.defaultToolLifeShots;
+    if (!lifeRow) {
+      warnings.push(`No tblToolLife row for material type ${input.materialType ?? '(unknown)'}: mold life uses the reference default ${plasticRef.defaultToolLifeShots.toLocaleString()} shots.`);
+    }
+    const moldsRequired = Math.max(1, Math.ceil(lifetimeShots / toolLifeShots));
+    const moldCostUsd = r2((moldTooling.bomSubtotalUsd + (moldTooling.labourCostUsd ?? 0)) * moldsRequired);
     const moldCostPerPartUsd = r2(moldCostUsd / (annualVol * prodLife));
     toolingResult = {
-      moldClass,
-      moldLifeShotRating: SPI_MOLD_CLASSES[moldClass].lifeShotRating,
+      moldClass: mold.moldClass,
+      moldLifeShotRating: mold.cycleRating,
       moldCostUsd,
       moldCostPerPartUsd,
       annualVolume: annualVol,
@@ -669,6 +565,9 @@ export function computeInjectionMoldedCostSummary(
       moldEstimatedMachiningHrs: moldTooling.estimatedMachiningHrs,
       moldEstimatedAssemblyHrs: moldTooling.estimatedAssemblyHrs,
       moldEstimatedAssemblyOperators: moldTooling.estimatedAssemblyOperators,
+      moldLabourCostUsd: moldTooling.labourCostUsd == null ? null : r2(moldTooling.labourCostUsd),
+      moldToolLifeShots: toolLifeShots,
+      moldsRequired,
     };
     warnings.push(...moldTooling.warnings);
     if (moldCostPerPartUsd > materialCostPerKg * netWeightKg * 2) {

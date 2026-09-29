@@ -1,5 +1,4 @@
 import { computePressStrokeCost } from '../../../modules/bom-items/costing/sheet-metal/process/press-stroke-engine';
-import { PRESS_STROKE_SETUP_MIN, SHEARING_SETUP_MIN } from '../../../modules/bom-items/costing/shared/core/default-rates.constants';
 import { SheetMetalLookupService } from '../../../modules/bom-items/costing/sheet-metal/lookup/sheet-metal-lookup.service';
 
 // A Standard Press line showed "Setup (0.0 min) $0.00" while the selected
@@ -15,7 +14,7 @@ import { SheetMetalLookupService } from '../../../modules/bom-items/costing/shee
 //      consulted rate.setupTimeHr at all.
 //
 // Both are gone: the miss is null, and this engine uses the shared resolver
-// (calculator -> machine setup_time_hr -> operation lookup -> class default).
+// (calculator -> machine setup_time_hr -> operation lookup -> not costed, disclosed).
 
 const rate = (over: Record<string, unknown> = {}) => ({
   rate: 52.8, source: 'mhr_database' as const, machineClass: 'standard_press',
@@ -24,7 +23,7 @@ const rate = (over: Record<string, unknown> = {}) => ({
 }) as never;
 
 const input = (over: Record<string, unknown> = {}) => ({
-  batchSize: 125000, partWeightKg: 0.024, rate: rate(),
+  batchSize: 125000, partWeightKg: 0.024, pressRate: rate(),
   pressCycleTimeS: 1.8, dlrPerHr: 36.3, qairPerHr: 47, ...over,
 }) as never;
 
@@ -44,22 +43,27 @@ describe('a press line uses the machine setup time on file', () => {
     expect(r.processLines[0]!.setupTimeMin).not.toBe(0);
   });
 
-  it('falls to the cited class constant when the machine has none', () => {
-    const r = computePressStrokeCost('Std Press', 'standard_press', input({ rate: rate({ setupTimeHr: null }) })) as never as
-      { processLines: Array<{ setupTimeMin?: number }> };
-    expect(r.processLines[0]!.setupTimeMin).toBe(PRESS_STROKE_SETUP_MIN); // 30
+  it('does not cost setup, and says so, when the machine has none and no lookup row exists', () => {
+    const r = computePressStrokeCost('Std Press', 'standard_press', input({ pressRate: rate({ setupTimeHr: null }) })) as never as
+      { processLines: Array<{ setupTimeMin?: number; setupTimeSource?: string; setupCost: number }>; warnings: string[] };
+    expect(r.processLines[0]!.setupTimeMin).toBe(0);
+    expect(r.processLines[0]!.setupTimeSource).toBe('none');
+    expect(r.processLines[0]!.setupCost).toBe(0);
+    expect(r.warnings.some((w) => w.includes('setup not costed'))).toBe(true);
   });
 
-  it('uses shearing own cited constant, not the press one', () => {
+  it('does not cost shearing setup either — no class constant stands in for missing data', () => {
     const r = computePressStrokeCost(
-      'Shearing', 'shear', input({ rate: rate({ setupTimeHr: null, machineClass: 'shear' }) })) as never as
-      { processLines: Array<{ setupTimeMin?: number }> };
-    expect(r.processLines[0]!.setupTimeMin).toBe(SHEARING_SETUP_MIN); // 22.8
+      'Shearing', 'shear', input({ pressRate: rate({ setupTimeHr: null, machineClass: 'shear' }) })) as never as
+      { processLines: Array<{ setupTimeMin?: number; setupTimeSource?: string }>; warnings: string[] };
+    expect(r.processLines[0]!.setupTimeMin).toBe(0);
+    expect(r.processLines[0]!.setupTimeSource).toBe('none');
+    expect(r.warnings.some((w) => w.includes('setup not costed'))).toBe(true);
   });
 
-  it('prefers a real operation-lookup row over the class default', () => {
+  it('uses a real operation-lookup row when the machine has none', () => {
     const r = computePressStrokeCost(
-      'Std Press', 'standard_press', input({ rate: rate({ setupTimeHr: null }), setupMin: 12 })) as never as
+      'Std Press', 'standard_press', input({ pressRate: rate({ setupTimeHr: null }), setupMin: 12 })) as never as
       { processLines: Array<{ setupTimeMin?: number }> };
     expect(r.processLines[0]!.setupTimeMin).toBe(12);
   });

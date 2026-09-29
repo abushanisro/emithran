@@ -53,6 +53,26 @@ export class RawMaterialsService {
   // Full alias list. The material picker no longer needs it (search is ranked
   // server-side by findAll(), alias-aware); kept for any client that still
   // does its own alias matching.
+  /** Stock-form prices (material_stock_prices, migration 833), optionally for one location. */
+  async getStockPrices(accessToken: string, location?: string): Promise<Array<{
+    referenceMaterial: string; rawMaterialName: string | null; stockForm: string; location: string;
+    pricePerKg: number; currencyCode: string; source: string;
+  }>> {
+    let q = this.supabaseService.getClient(accessToken).from('material_stock_prices')
+      .select('reference_material, raw_material_name, stock_form, location, price_per_kg, currency_code, source')
+      .order('reference_material').order('stock_form');
+    if (location) q = q.eq('location', location);
+    const { data, error } = await q;
+    if (error) {
+      this.logger.error(`Error fetching material stock prices: ${error.message}`, 'RawMaterialsService');
+      throw new InternalServerErrorException('Material stock prices are not available (migration 833).');
+    }
+    return (data ?? []).map((r: any) => ({
+      referenceMaterial: r.reference_material, rawMaterialName: r.raw_material_name, stockForm: r.stock_form,
+      location: r.location, pricePerKg: Number(r.price_per_kg), currencyCode: r.currency_code, source: r.source,
+    }));
+  }
+
   async getAliases(accessToken?: string): Promise<Array<{ aliasNormalized: string; rawMaterialId: string }>> {
     const { data, error } = await this.supabaseService
       .getClient(accessToken)

@@ -1,16 +1,10 @@
 // Type-only import — erased at runtime, so the cost-engine <-> composer cycle
 // this creates in the module graph never exists in emitted JS.
-import type { CostEngineInput } from '../../shared/core/cost-engine';
+import type { CostEngineInput, MHRRateInput } from '../../shared/core/cost-engine';
 import type { ProcessLineCost } from '../../../dto/cost-breakdown.dto';
 import {
-  TAPPING_SETUP_MIN,
-  COUNTERBORE_SETUP_MIN,
-  COUNTERSINK_SETUP_MIN,
-  PEM_INSERTION_SETUP_MIN,
-  BURRING_SETUP_MIN,
   TIGHT_TOLERANCE_REAM_THRESHOLD_MM,
-  REAM_SETUP_MIN,
-} from '../../shared/core/default-rates.constants';
+  } from '../../shared/core/default-rates.constants';
 import { computeHoleExtrusionCost } from './hole-extrusion-engine';
 import { computeTappingCost } from './tapping-engine';
 import { computeDeburringCost } from './deburring-engine';
@@ -19,6 +13,7 @@ import { computeCountersinkingCost } from './countersinking-engine';
 import { computePemInsertionCost } from './pem-insertion-engine';
 import { computeReamingCost } from './reaming-engine';
 import { computeSurfaceTreatmentLine } from '../../shared/process/cost-surface-treatment';
+import { preferRealRate } from '../../shared/core/engine-kernel';
 
 // ── The canonical feature-driven operation composer ───────────────────────────
 //
@@ -141,21 +136,35 @@ export function composeFeatureDrivenOperations(
   const noRate = (machineClass: string) =>
     ({ rate: 0, source: 'no_db_rate' as const, machineClass, machineName: null, commodityCode: null });
 
+  // ── Only operations with a real HR Rates machine are costed ────────────────
+  // User decision (2026-09-27): machine data comes from memory/ only. Since
+  // migration 805 every mhr_records row is memory/-backed, and a rate is
+  // either that real machine ('mhr_database') or none ('no_db_rate'). An
+  // operation with no machine is left out of the sequence with a warning
+  // naming it, instead of a $0 line. It comes back by itself the moment
+  // memory/ data for that machine class and location is seeded.
+  const location = input.location ?? 'this location';
+  const costable = (operation: string, featureCount: number, rate: MHRRateInput): number => {
+    if (featureCount <= 0) return featureCount;
+    if (rate.source === 'mhr_database') return featureCount;
+    warnings.push(
+      `${operation} not costed — the part needs it (${featureCount} feature${featureCount === 1 ? '' : 's'}) ` +
+      `but HR Rates has no ${rate.machineClass} machine for ${location}. Add the machine to memory/ and seed it to cost this operation.`,
+    );
+    return 0;
+  };
+
   // ── Hole Extrusion (Burring) — before Press Brake AND Tapping ──────────────
   // Forms the extruded hole flange/collar (e.g. drawing callout "2X M3 BURLING
   // BACK CONVEX") before the hole is threaded — physically required ordering.
-  const extrudedFlangeCount = input.extrudedFlangeCount ?? 0;
-  if (extrudedFlangeCount > 0 && input.opSetupMinByOp?.burring == null) {
-    warnings.push(`Hole extrusion (burring) setup time not on file — generic default applied (${BURRING_SETUP_MIN} min)`);
-  }
   const holeFormingRate = input.mhrRates?.holeForming ?? noRate('hole_forming');
+  const extrudedFlangeCount = costable('Hole Extrusion (Burring)', input.extrudedFlangeCount ?? 0, holeFormingRate);
   const burringResult = computeHoleExtrusionCost({
     extrudedFlangeCount, batchSize,
     rate: holeFormingRate,
     processIdentity: input.processIdentityByMachineClass?.[holeFormingRate.machineClass],
     cycleTimeSecFromCalculator: input.burringCycleTimeSecFromCalculator,
     operationSetupMin: input.opSetupMinByOp?.burring ?? null,
-    fallbackSetupMin: BURRING_SETUP_MIN,
     calculatorId: input.burringCalculatorId,
     calculatorVersion: input.burringCalculatorVersion,
     physicsGap: input.burringPhysicsGap,
@@ -165,15 +174,22 @@ export function composeFeatureDrivenOperations(
   warnings.push(...burringResult.warnings);
   preForm.push(...burringResult.processLines);
 
+  // Drill Press — the real station memory/Machining lists for Drilling,
+  // Counterboring, Countersinking, Reaming and Tapping (//SimpleHole).
+  const drillPressRate = input.mhrRates?.drillPress ?? noRate('drill_press');
+
   // ── Tapping ───────────────────────────────────────────────────────────────
-  const tappingRate = input.mhrRates?.tapping ?? noRate('tapping');
+  // memory/Machining has no tapping machine category: tapping is an operation
+  // of real stations (Drill Press:Tapping//SimpleHole, and the mills/lathes).
+  // A dedicated tapping machine wins if one is ever seeded; otherwise the real
+  // Drill Press performs it.
+  const tappingRate = preferRealRate(input.mhrRates?.tapping ?? noRate('tapping'), drillPressRate);
   const tappingResult = computeTappingCost({
-    threadCount: input.threads.length, batchSize,
+    threadCount: costable('Tapping', input.threads.length, tappingRate), batchSize,
     rate: tappingRate,
     processIdentity: input.processIdentityByMachineClass?.[tappingRate.machineClass],
     cycleTimeSecFromCalculator: input.tappingCycleTimeSecFromCalculator,
     operationSetupMin: input.opSetupMinByOp?.tapping ?? null,
-    fallbackSetupMin: TAPPING_SETUP_MIN,
     calculatorId: input.tappingCalculatorId,
     calculatorVersion: input.tappingCalculatorVersion,
     physicsGap: input.tappingPhysicsGap,
@@ -203,18 +219,13 @@ export function composeFeatureDrivenOperations(
   postForm.push(...deburrResult.processLines);
 
   // ── Counterboring — only when the extractor found a counterbore hole ───────
-  const drillPressRate = input.mhrRates?.drillPress ?? noRate('drill_press');
-  const counterboreCount = input.counterboreCount ?? 0;
-  if (counterboreCount > 0 && input.opSetupMinByOp?.counterbore == null) {
-    warnings.push(`Counterboring setup time not on file — generic default applied (${COUNTERBORE_SETUP_MIN} min)`);
-  }
+  const counterboreCount = costable('Counterboring', input.counterboreCount ?? 0, drillPressRate);
   const counterboreResult = computeCounterboringCost({
     counterboreCount, batchSize,
     rate: drillPressRate,
     processIdentity: input.processIdentityByMachineClass?.[drillPressRate.machineClass],
     cycleTimeSecFromCalculator: input.counterboreCycleTimeSecFromCalculator,
     operationSetupMin: input.opSetupMinByOp?.counterbore ?? null,
-    fallbackSetupMin: COUNTERBORE_SETUP_MIN,
     calculatorId: input.counterboreCalculatorId,
     calculatorVersion: input.counterboreCalculatorVersion,
     physicsGap: input.counterborePhysicsGap,
@@ -225,17 +236,13 @@ export function composeFeatureDrivenOperations(
   postForm.push(...counterboreResult.processLines);
 
   // ── Countersinking ────────────────────────────────────────────────────────
-  const countersinkCount = input.countersinkCount ?? 0;
-  if (countersinkCount > 0 && input.opSetupMinByOp?.countersink == null) {
-    warnings.push(`Countersinking setup time not on file — generic default applied (${COUNTERSINK_SETUP_MIN} min)`);
-  }
+  const countersinkCount = costable('Countersinking', input.countersinkCount ?? 0, drillPressRate);
   const countersinkResult = computeCountersinkingCost({
     countersinkCount, batchSize,
     rate: drillPressRate,
     processIdentity: input.processIdentityByMachineClass?.[drillPressRate.machineClass],
     cycleTimeSecFromCalculator: input.countersinkCycleTimeSecFromCalculator,
     operationSetupMin: input.opSetupMinByOp?.countersink ?? null,
-    fallbackSetupMin: COUNTERSINK_SETUP_MIN,
     calculatorId: input.countersinkCalculatorId,
     calculatorVersion: input.countersinkCalculatorVersion,
     physicsGap: input.countersinkPhysicsGap,
@@ -249,18 +256,14 @@ export function composeFeatureDrivenOperations(
   // Gated on a real recognition result: the caller matched hole diameter +
   // sheet thickness against sm_lookup_pem_hardware. A diameter with no hardware
   // match is simply not a PEM hole — never a reported gap.
-  const pemCount = input.pemCount ?? 0;
-  if (pemCount > 0 && input.opSetupMinByOp?.pem_insertion == null) {
-    warnings.push(`PEM insertion setup time not on file — generic default applied (${PEM_INSERTION_SETUP_MIN} min)`);
-  }
   const pemRate = input.mhrRates?.pemPress ?? noRate('pem_press');
+  const pemCount = costable('PEM Insertion', input.pemCount ?? 0, pemRate);
   const pemResult = computePemInsertionCost({
     pemCount, batchSize,
     rate: pemRate,
     processIdentity: input.processIdentityByMachineClass?.[pemRate.machineClass],
     cycleTimeSecFromCalculator: input.pemCycleTimeSecFromCalculator,
     operationSetupMin: input.opSetupMinByOp?.pem_insertion ?? null,
-    fallbackSetupMin: PEM_INSERTION_SETUP_MIN,
     calculatorId: input.pemCalculatorId,
     calculatorVersion: input.pemCalculatorVersion,
     physicsGap: input.pemPhysicsGap,
@@ -275,12 +278,10 @@ export function composeFeatureDrivenOperations(
   // pierced hole to final tolerance when the drawing's tightest callout cannot
   // be held by piercing alone.
   const tightTolerance = input.tightestToleranceMm ?? null;
-  const allHoleCount = input.holeCount ?? 0;
-  const reamTriggered = tightTolerance != null && tightTolerance > 0
-    && tightTolerance < TIGHT_TOLERANCE_REAM_THRESHOLD_MM && allHoleCount > 0;
-  if (reamTriggered && input.opSetupMinByOp?.ream == null) {
-    warnings.push(`Reaming setup time not on file — generic default applied (${REAM_SETUP_MIN} min)`);
-  }
+  const tightToleranceHit = tightTolerance != null && tightTolerance > 0
+    && tightTolerance < TIGHT_TOLERANCE_REAM_THRESHOLD_MM;
+  const allHoleCount = tightToleranceHit ? costable('Reaming', input.holeCount ?? 0, drillPressRate) : 0;
+  const reamTriggered = tightToleranceHit && allHoleCount > 0;
   const reamResult = computeReamingCost({
     reamHoleCount: reamTriggered ? allHoleCount : 0,
     tightestToleranceMm: tightTolerance,
@@ -289,7 +290,6 @@ export function composeFeatureDrivenOperations(
     processIdentity: input.processIdentityByMachineClass?.[drillPressRate.machineClass],
     cycleTimeSecFromCalculator: input.reamCycleTimeSecFromCalculator,
     operationSetupMin: input.opSetupMinByOp?.ream ?? null,
-    fallbackSetupMin: REAM_SETUP_MIN,
     calculatorId: input.reamCalculatorId,
     calculatorVersion: input.reamCalculatorVersion,
     physicsGap: input.reamPhysicsGap,

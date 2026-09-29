@@ -68,3 +68,6 @@ logs
 *.sln
 *.sw?
 .env*
+
+# combined env file - contains secrets
+heena.env

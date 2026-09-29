@@ -29,7 +29,7 @@ export interface FeatureOccurrenceLike {
 
 export interface HoleFeatureLike {
   feature_type?: string;
-  type?: string;
+  variant?: string;
   diameter_mm?: number;
   occurrences?: FeatureOccurrenceLike[];
   [key: string]: unknown;
@@ -52,22 +52,52 @@ export interface DeepHoleSplitResult {
   deepBoreCandidates: DeepHoleCandidate[];
 }
 
-// Real, sourced thresholds — not tuned/fabricated:
-// - LD > 5: cad-engine's own documented gun-drilling/deep-boring threshold
-//   (_annotate_hole_depth in machining_feature_recognizer.py).
-// - 50mm diameter split: the real Gun Drill fleet's own max diameter
-//   (memory/machining/machine/gun_drill_usa.json: 3-50mm) vs. the real Deep
-//   Bore Machine fleet's own min diameter (deep_bore_machine_usa.json:
-//   50-600mm) — a genuinely disjoint real capability split, not a guess.
-export const DEEP_HOLE_LD_THRESHOLD = 5;
-export const GUN_DRILL_MAX_DIAMETER_MM = 50;
+// Routing limits come from memory/Machining/lookup/tblOperationSizeRanges
+// (staged by migration 748), never from code constants:
+//   Gun Drilling       LowerBound 10   "Ratio of L/D"
+//   Deep Boring        LowerBound 38.1 "Minimum diameter"
+//   Deep Boring Ratio  LowerBound 4    "Ratio of L/D"
+// Deep Boring is checked first: it is the range the reference defines for
+// large holes, and gun drills are small-diameter tooling. Holes below both
+// ranges (incl. "Deep Drilling", L/D >= 3) stay ordinary drilling on the
+// part's own machine.
+export interface DeepHoleRules {
+  gunDrillMinLd: number;
+  deepBoreMinLd: number;
+  deepBoreMinDiameterMm: number;
+}
 
-const PLAIN_HOLE_TYPES = new Set(['through_hole', 'blind_hole']);
+/** Reads the three limits from the staged tblOperationSizeRanges rows; null
+ *  (with what is missing) when any of them is absent — routing is then not
+ *  applied rather than guessed. */
+export function resolveDeepHoleRules(
+  rows: ReadonlyArray<{ OperationName?: string; LowerBound?: number; Comment?: string }> | null | undefined,
+): { rules: DeepHoleRules | null; missing: string[] } {
+  const lower = (op: string, comment: string): number | null => {
+    const r = (rows ?? []).find((x) => x.OperationName === op && x.Comment === comment);
+    const v = r ? Number(r.LowerBound) : NaN;
+    return Number.isFinite(v) && v > 0 ? v : null;
+  };
+  const gunDrillMinLd = lower('Gun Drilling', 'Ratio of L/D');
+  const deepBoreMinLd = lower('Deep Boring Ratio', 'Ratio of L/D');
+  const deepBoreMinDiameterMm = lower('Deep Boring', 'Minimum diameter');
+  const missing = [
+    gunDrillMinLd == null ? 'Gun Drilling L/D' : null,
+    deepBoreMinLd == null ? 'Deep Boring Ratio L/D' : null,
+    deepBoreMinDiameterMm == null ? 'Deep Boring minimum diameter' : null,
+  ].filter((m): m is string => m != null);
+  if (missing.length > 0) return { rules: null, missing };
+  return { rules: { gunDrillMinLd: gunDrillMinLd!, deepBoreMinLd: deepBoreMinLd!, deepBoreMinDiameterMm: deepBoreMinDiameterMm! }, missing };
+}
+
+// Plain drilled holes: reference feature SimpleHole, through or blind.
+const PLAIN_HOLE_VARIANTS = new Set(['through', 'blind']);
 
 export function splitDeepHoleOccurrences(
   fgv2Features: unknown[] | null | undefined,
+  rules: DeepHoleRules | null,
 ): DeepHoleSplitResult {
-  if (!Array.isArray(fgv2Features) || fgv2Features.length === 0) {
+  if (!rules || !Array.isArray(fgv2Features) || fgv2Features.length === 0) {
     return { filteredFeatures: fgv2Features ?? [], gunDrillCandidates: [], deepBoreCandidates: [] };
   }
 
@@ -77,7 +107,7 @@ export function splitDeepHoleOccurrences(
 
   for (const raw of fgv2Features) {
     const f = raw as HoleFeatureLike;
-    const ft = (f.feature_type ?? f.type ?? '').toString().toLowerCase();
+    const isPlainHole = f.feature_type === 'SimpleHole' && PLAIN_HOLE_VARIANTS.has(f.variant ?? '');
     const diamMm = typeof f.diameter_mm === 'number' ? f.diameter_mm : 0;
     const occurrences = Array.isArray(f.occurrences) ? f.occurrences : [];
 
@@ -86,32 +116,29 @@ export function splitDeepHoleOccurrences(
     // still happens after the fact regardless of how the pilot hole was
     // drilled, and those feature types don't carry an independent depth
     // signal this cleanly. Scoped, disclosed, not a fabricated generalization.
-    if (!PLAIN_HOLE_TYPES.has(ft) || diamMm <= 0 || occurrences.length === 0) {
+    if (!isPlainHole || diamMm <= 0 || occurrences.length === 0) {
       filteredFeatures.push(raw);
       continue;
     }
 
     const kept: FeatureOccurrenceLike[] = [];
-    let deepCount = 0;
-    let deepDepthSum = 0;
+    const gun = { count: 0, depthSum: 0 };
+    const bore = { count: 0, depthSum: 0 };
 
     for (const occ of occurrences) {
       const depthMm = typeof occ.depth_mm === 'number' ? occ.depth_mm : 0;
       const ld = depthMm > 0 ? depthMm / diamMm : 0;
-      if (ld > DEEP_HOLE_LD_THRESHOLD) {
-        deepCount += 1;
-        deepDepthSum += depthMm;
+      if (diamMm >= rules.deepBoreMinDiameterMm && ld >= rules.deepBoreMinLd) {
+        bore.count += 1; bore.depthSum += depthMm;
+      } else if (ld >= rules.gunDrillMinLd) {
+        gun.count += 1; gun.depthSum += depthMm;
       } else {
         kept.push(occ);
       }
     }
 
-    if (deepCount > 0) {
-      const avgDepthMm = deepDepthSum / deepCount;
-      const candidate: DeepHoleCandidate = { diameterMm: diamMm, depthMm: avgDepthMm, count: deepCount };
-      if (diamMm <= GUN_DRILL_MAX_DIAMETER_MM) gunDrillCandidates.push(candidate);
-      else deepBoreCandidates.push(candidate);
-    }
+    if (gun.count > 0) gunDrillCandidates.push({ diameterMm: diamMm, depthMm: gun.depthSum / gun.count, count: gun.count });
+    if (bore.count > 0) deepBoreCandidates.push({ diameterMm: diamMm, depthMm: bore.depthSum / bore.count, count: bore.count });
 
     if (kept.length > 0) {
       filteredFeatures.push({ ...f, occurrences: kept });

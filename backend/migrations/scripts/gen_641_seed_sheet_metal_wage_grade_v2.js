@@ -20,7 +20,9 @@
 // fabricated, matching the same two placeholder rows' treatment in
 // Machining's migration 640.
 //
-// Dollar-quoting for all free-text fields -- see gen_637's header for why.
+// Dollar-quoting for all free-text fields: a source note ending on its own
+// quoted phrase becomes ''' at the string boundary under standard escaping,
+// which desyncs the SQL editor's client-side statement splitting.
 
 const fs = require('fs');
 const path = require('path');

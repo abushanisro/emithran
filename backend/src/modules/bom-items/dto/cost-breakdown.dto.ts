@@ -68,6 +68,9 @@ export interface FeatureOp {
   timeSec: number;     // physics-computed cycle seconds for this group
   featureType: string; // 'drill' | 'tapping' | 'pocket' | 'laser_cut' | 'pierce' | 'bend' | …
   count: number;       // number of occurrences collapsed into this entry
+  // feature_graph_v2 ids of the exact features this entry machines. When
+  // present the UI highlights precisely these, not every feature of the type.
+  featureIds?: string[];
 }
 
 export interface CalculationTraceStep {
@@ -284,6 +287,10 @@ export interface ProcessLineCost {
   processGroup?: string;
   processRoute?: string;
   operation?: string;
+  // See MHRRateInput.hostMachineClass — the machine class this operation
+  // actually runs on when it differs from machineClass. Persisting a line
+  // resolves its Process/Category/Operation from this class's catalog rows.
+  hostMachineClass?: string;
   setupCost: number;     // INR — amortised over batchSize
   runCost: number;       // INR — pure cycle cost per piece
   totalCost: number;     // setupCost + runCost
@@ -302,7 +309,7 @@ export interface ProcessLineCost {
    * Disclosed rather than inferred so the UI never presents a class default as
    * if it were the selected machine's real setup time. See resolveSetupMinutes().
    */
-  setupTimeSource?: 'calculator' | 'machine' | 'operation_lookup' | 'class_default';
+  setupTimeSource?: 'calculator' | 'machine' | 'operation_lookup' | 'none';
   /**
    * Real per-machine operator headcount (mhr_records.operators, via the selected
    * MachineCandidate) that this line was costed with. Surfaced so apply-route can
@@ -330,7 +337,10 @@ export interface ProcessLineCost {
   // productionLifeYears. Kept distinct from 'no_db_rate' (a genuine $0 gap)
   // so appendRateWarnings never reports a real, non-zero tooling cost as
   // "no rate on file".
-  rateSource: 'mhr_database' | 'default_rate' | 'no_db_rate' | 'tier_synthetic' | 'benchmark_override' | 'tooling_amortization';
+  // 'consumable_allowance': likewise not a machine rate — a real seeded
+  // allowance (turret material handling, waterjet nozzle wear) charged as its
+  // own line with hourlyRate 0.
+  rateSource: 'mhr_database' | 'no_db_rate' | 'tooling_amortization' | 'consumable_allowance';
   machineClass: string;        // e.g. 'fiber_laser' — maps to MACHINE_REGISTRY key
   machineName: string | null;  // DB machine_name; null when source is 'default_rate'
   commodityCode: string | null; // DB commodity_code; null when source is 'default_rate'
@@ -369,6 +379,10 @@ export interface ProcessLineCost {
   // PDF export so costing/manufacturing engineering can verify the number
   // independent of this app.
   calculationTrace?: CalculationTraceStep[];
+  // Machining calculators: per input field, the machining_reference_data
+  // lookup table and the row(s) its value came from (every column/value in
+  // `row` identifies them) — the dialog's lookup-table viewer outlines them.
+  lookupMatches?: Record<string, { table: string; row: Record<string, string | number> }>;
   // Manufacturing Physics Calculator architecture: which real, registry-
   // resolved calculator (and version — see migration 428) computed this
   // line's cycle time, when resolved via resolvePhysicsQuantity. Absent for
@@ -497,14 +511,6 @@ export interface CostSummaryDto {
   // Conflating the two is exactly how a real $1.175/kg got relabeled ₹1.175/kg
   // instead of converted — see bom-items.service.ts's resolveDisplayCurrency.
   usdToDisplayRate?: number;
-  // amount_inr × inrToDisplayRate = amount in `currency`. Same idea as
-  // usdToDisplayRate above, for frontend constants/estimates that are
-  // denominated in INR regardless of factory location (e.g. the NRE/
-  // Investment tab's fixture/programming/tooling/inspection cost tables) —
-  // without this, converting an INR-based estimate required either a
-  // duplicate hardcoded FX table on the frontend or silently mislabeling the
-  // INR number under whatever symbol the factory happened to be using.
-  inrToDisplayRate?: number;
 
   // Persistent eMithran-style manual overrides applied to this response, keyed
   // by 'mat_rate' | '<process>::rate' | '<process>::cycleMin'. materialCost /
@@ -533,7 +539,13 @@ export interface CostSummaryDto {
 export interface InjectionMoldingBreakdown {
   moldingSubtype: 'standard' | 'lsr' | 'insert' | 'overmold' | 'gas_assisted' | 'two_shot' | 'unscrewing';
   cavityCount: number;
-  cavityConstrainedBy: 'clamp' | 'shot_capacity' | 'economic' | 'default';
+  // 'user': the Cost Guide cavity count; 'default': the reference defaultNumCavities;
+  // 'unverified': the press / clamp / layout check failed (the molding line carries a physicsGap).
+  cavityConstrainedBy: 'clamp' | 'shot_capacity' | 'economic' | 'default' | 'user' | 'unverified';
+  /** The reference mold layouts (layoutNumCav) a cavity count may take. */
+  cavityLayouts: number[];
+  /** The reference defaultNumCavities. */
+  defaultCavityCount: number | null;
   runnerSystemType: 'hot' | 'cold';
   runnerScrapKg: number;
   gateType: string;
@@ -543,25 +555,25 @@ export interface InjectionMoldingBreakdown {
   cavityCycleTimeSec: number;     // cycleTime / cavityCount
   costConfidence: number;         // 0.0–1.0
 
-  // Real clamp-force / shot-capacity math for THIS quote's selected machine —
-  // the same formula and per-polymer-family clamp-factor table
-  // (resolveMaterialClampFactor, machine-selector-im.ts) that
-  // evaluateIMCandidate() uses to accept/reject/score machines during route
-  // comparison, now computed here too so the single active/applied quote
-  // shows the real numbers instead of only the cruder melting-point-tiered
-  // "Estimated clamp force" warning string. All optional: null when a real
-  // projected area or a real selected-machine tonnage isn't available yet.
-  /** Real projected area used for the clamp calculation. */
+  // Clamp-force / shot sizing against the selected press, computed by the
+  // engine with the reference clamp model (clamp-force.ts). Null when the
+  // projected area, the material's reference clamp properties or the press
+  // are not on file (clampTrace then says which).
+  /** Projected area used for clamp force and tooling. */
   projectedAreaCm2?: number | null;
-  /** Per-polymer-family factor (tons/cm²) resolveMaterialClampFactor resolved for this material. */
-  materialClampFactor?: number | null;
-  /** projectedAreaCm2 × cavityCount × materialClampFactor × 1.15 safety margin. */
+  /** Reference flow class of the material (flow length ratio thresholds). */
+  flowClass?: 'easy' | 'medium' | 'hard' | null;
+  /** Cavity pressure: adjusted injection pressure x the flow class's clamp-force percentage. */
+  cavityPressureMpa?: number | null;
+  /** The clamp calculation written out, or why it could not be made. */
+  clampTrace?: string | null;
+  /** Projected area x cavities x cavity pressure x clampForceSafetyFactor, tonnes. */
   clampRequiredT?: number | null;
   /** The selected machine's own real clamp tonnage (mhr_records / seed capability). */
   clampMachineT?: number | null;
   /** clampRequiredT / clampMachineT × 100. */
   clampUtilPct?: number | null;
-  /** Real required shot weight: (part + runner weight) × cavityCount × 1.10. */
+  /** Required shot weight: shot weight per part x cavities x shotSizeSafetyFactor. */
   shotRequiredG?: number | null;
   /** The selected machine's own real shot capacity. */
   shotMachineG?: number | null;
@@ -580,11 +592,17 @@ export interface ToolingCostDto {
   moldBomSubtotalUsd?: number;
   /** Real components this mold needs but with no fixable cost/qty on file (e.g. Ejector Pin). */
   moldMissingComponents?: string[];
-  /** Real design/machining/assembly hours needed to build this mold — disclosed, never priced (no toolroom rate on file). */
+  /** Design/machining/assembly hours to build one mold; priced into moldLabourCostUsd where a toolroom rate exists. */
   moldEstimatedDesignHrs?: number;
   moldEstimatedMachiningHrs?: number;
   moldEstimatedAssemblyHrs?: number;
   moldEstimatedAssemblyOperators?: number;
+  /** Toolroom labour for one mold (hours x reference USA rates); null where no rate is on file for the location. */
+  moldLabourCostUsd?: number | null;
+  /** Shots one mold lasts (tblToolLife by material type, or the reference default). */
+  moldToolLifeShots?: number;
+  /** Molds the job wears out: ceil(lifetime shots / moldToolLifeShots). moldCostUsd covers all of them. */
+  moldsRequired?: number;
 }
 
 /**

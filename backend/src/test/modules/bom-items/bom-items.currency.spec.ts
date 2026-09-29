@@ -3,6 +3,8 @@
 // resolveDisplayCurrency and normalizeCostSummaryToCurrency (both private,
 // exercised via `as any`, matching the established pattern in
 // bom-items.usage-calculators.spec.ts / bom-items.true-nest-costing.spec.ts).
+import type { SecondaryProcessService } from '../../../modules/bom-items/services/secondary-process.service';
+import type { PlasticReferenceService } from '../../../modules/bom-items/costing/plastic-molding/lookup/plastic-reference.service';
 import { BOMItemsService } from '../../../modules/bom-items/bom-items.service';
 import { type BlankOptimizerService } from '../../../modules/bom-items/costing/sheet-metal/machine/blank-optimizer.service';
 import { type SheetMetalLookupService } from '../../../modules/bom-items/costing/sheet-metal/lookup/sheet-metal-lookup.service';
@@ -30,6 +32,8 @@ function buildService() {
     {} as unknown as CalculatorCatalogService,
     {} as unknown as MaterialResolutionService,
     {} as unknown as MachineDiscoveryService,
+    {} as unknown as SecondaryProcessService,
+    {} as unknown as PlasticReferenceService,
   );
 }
 
@@ -70,18 +74,15 @@ describe('BOMItemsService.resolveDisplayCurrency', () => {
     const service = buildService() as any;
     const rates = makeRates({ USD: 83.5 });
     const result = service.resolveDisplayCurrency(null, 'INR', rates);
-    expect(result).toEqual({ currency: 'USD', currencySymbol: '$', rate: 1 / 83.5, usdToDisplayRate: 1, inrToDisplayRate: 1 / 83.5 });
+    expect(result).toEqual({ currency: 'USD', currencySymbol: '$', rate: 1 / 83.5, usdToDisplayRate: 1 });
   });
 
   it('is a true identity (rate 1) when the local currency is already USD and there is no snapshot', () => {
     const service = buildService() as any;
     const rates = makeRates({});
     const result = service.resolveDisplayCurrency(null, 'USD', rates);
-    // inrToDisplayRate is undefined here, not a guessed 1 or thrown error —
-    // this rates snapshot has no INR->USD leg on file (convertOptional, not
-    // convertStrict — computing this purely-additive field must never make a
-    // USD-native factory's cost-summary request fail).
-    expect(result).toEqual({ currency: 'USD', currencySymbol: '$', rate: 1, usdToDisplayRate: 1, inrToDisplayRate: undefined });
+    // No exchange rate is needed at all for a USD-native factory.
+    expect(result).toEqual({ currency: 'USD', currencySymbol: '$', rate: 1, usdToDisplayRate: 1 });
   });
 
   it('uses the scenario fxSnapshot verbatim when its factoryCurrency matches — never re-derives from the live rate table', () => {
@@ -119,7 +120,7 @@ describe('BOMItemsService.resolveDisplayCurrency', () => {
     };
     // Item's Digital Factory is now India (INR) — snapshot no longer applies.
     const result = service.resolveDisplayCurrency(scenarioOverrides, 'INR', rates);
-    expect(result).toEqual({ currency: 'USD', currencySymbol: '$', rate: 1 / 83.5, usdToDisplayRate: 1, inrToDisplayRate: 1 / 83.5 });
+    expect(result).toEqual({ currency: 'USD', currencySymbol: '$', rate: 1 / 83.5, usdToDisplayRate: 1 });
   });
 
   it('resolves each factory currency independently — no shared global assumption across locations', () => {

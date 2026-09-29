@@ -1,6 +1,25 @@
 import { Injectable, Logger, ServiceUnavailableException, UnprocessableEntityException } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 
+/** One active budget rate with its provenance (see listRates). */
+export interface ExchangeRateRow {
+  currency: string;
+  name: string | null;
+  /** 1 USD = rate `currency`. */
+  rate: number;
+  effectiveDate: string;
+  /** Email of the user who last edited the rate; null while it is the reference value. */
+  editedBy: string | null;
+  editReason: string | null;
+  sourceActive: boolean | null;
+  sourceModifiedBy: string | null;
+  sourceModifiedAt: string | null;
+  updatedAt: string;
+}
+
+/** The currency every exchange_rates row is quoted from (migration 803). */
+export const ANCHOR_CURRENCY = 'USD';
+
 /**
  * Immutable view over the rates loaded for ONE request. Captured once by
  * `ExchangeRateService.getSnapshot()` at the top of a costing request and
@@ -45,7 +64,7 @@ function makeSnapshot(rates: ReadonlyMap<string, number>): RateSnapshot {
 /**
  * Loads the active budget exchange rates from the `exchange_rates` table and
  * provides cost conversion between currencies. Shared by every module that
- * prices in a non-INR currency (MHR, LHR, bom-items, process-plan-generator)
+ * converts between currencies (MHR, LHR, bom-items, process-plan-generator)
  * so there is exactly one FX source of truth in the app — the DB table an
  * admin maintains, not a hardcoded constant that drifts out of date in code.
  *
@@ -61,7 +80,9 @@ function makeSnapshot(rates: ReadonlyMap<string, number>): RateSnapshot {
  * asked for the non-throwing check (`convertOptional`, for batch/import
  * flows that report gaps per-row instead of aborting the whole batch).
  *
- * All rates are from_currency → INR. INR itself has a rate of 1.
+ * Rows are the reference exchange rate table (migration 803), quoted as
+ * "1 USD = rate CCY" (from_currency USD → to_currency CCY). USD is the
+ * anchor; every cross-rate is derived from it.
  *
  * Intended default (not yet implemented — there is currently no admin UI or
  * write endpoint for exchange_rates at all; every row today comes from a
@@ -83,7 +104,8 @@ export class ExchangeRateService {
   // In-memory cache — reloaded once per TTL window (stateless across requests).
   // This is a cross-request cache for reducing DB load, NOT a guarantee that
   // one request sees one consistent rate throughout — see getSnapshot().
-  private rateMap: Map<string, number> = new Map([['INR', 1]]);
+  // Values are "USD per 1 unit of the currency" (USD itself is 1).
+  private rateMap: Map<string, number> = new Map([[ANCHOR_CURRENCY, 1]]);
   private lastLoaded: number = 0;
   private static readonly CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -104,18 +126,20 @@ export class ExchangeRateService {
     const client = this.supabaseService.getClient(accessToken ?? undefined);
     const { data, error } = await client
       .from('exchange_rates')
-      .select('from_currency, to_currency, rate')
+      .select('to_currency, rate')
       .eq('is_active', true)
-      .eq('to_currency', 'INR');
+      .eq('from_currency', ANCHOR_CURRENCY);
 
     if (error) {
       throw new ServiceUnavailableException(`Exchange rates unavailable — failed to read exchange_rates: ${error.message}`);
     }
 
-    const nextRateMap = new Map([['INR', 1]]);
+    const nextRateMap = new Map([[ANCHOR_CURRENCY, 1]]);
     for (const row of data ?? []) {
-      if (row.from_currency && typeof row.rate === 'number' && row.rate > 0) {
-        nextRateMap.set(row.from_currency, row.rate);
+      const rate = Number(row.rate);
+      if (row.to_currency && rate > 0) {
+        // Stored as "1 USD = rate CCY"; the map holds USD per 1 CCY.
+        nextRateMap.set(row.to_currency, 1 / rate);
       }
     }
 
@@ -130,7 +154,7 @@ export class ExchangeRateService {
 
   /**
    * Units of `toCurrency` equal to 1 unit of `fromCurrency`, derived via the
-   * INR anchor (rateMap values are always "1 unit of X = rate INR").
+   * USD anchor (rateMap values are always "1 unit of X = rate USD").
    * Returns null — never a guessed default — when either currency's rate is
    * missing. Use this ONLY when the caller genuinely wants a non-throwing
    * check (e.g. a bulk import reporting per-row gaps instead of aborting the
@@ -156,12 +180,96 @@ export class ExchangeRateService {
   }
 
   /**
+   * Every currency with a rate on file (the anchor included), with its
+   * reference-table name -- backs the Currency picker. The anchor has no row
+   * of its own, so its name comes from the ISO 4217 display names the
+   * runtime ships (Intl), never a hand-kept label.
+   */
+  async listCurrencies(accessToken: string | null): Promise<Array<{ code: string; name: string }>> {
+    await this.loadRates(accessToken);
+    // Names are display-only, so they are read here and never by loadRates:
+    // costing conversions must not depend on a label column.
+    const { data, error } = await this.supabaseService
+      .getClient(accessToken ?? undefined)
+      .from('exchange_rates')
+      .select('to_currency, currency_name')
+      .eq('is_active', true)
+      .eq('from_currency', ANCHOR_CURRENCY);
+    if (error) {
+      throw new ServiceUnavailableException(`Currency names unavailable — failed to read exchange_rates: ${error.message}`);
+    }
+    const names = new Map((data ?? []).map((r) => [r.to_currency as string, r.currency_name as string | null]));
+    const isoNames = new Intl.DisplayNames(['en'], { type: 'currency' });
+    return [...this.rateMap.keys()]
+      .sort()
+      .map((code) => ({ code, name: names.get(code) ?? isoNames.of(code) ?? code }));
+  }
+
+  /**
    * Returns the current rate map as a plain object suitable for snapshotting
    * on a generation/import record (e.g. process-plan-generator stamps this
    * onto each generation for reproducibility).
    */
   snapshot(): Record<string, number> {
     return Object.fromEntries(this.rateMap);
+  }
+
+  /**
+   * The active budget rates as stored ("1 USD = rate CCY"), with where each
+   * value came from: the reference table (sourceModifiedBy/At, sourceActive)
+   * and, once edited on the Process page, who changed it, when, and why.
+   * Backs the Process page Exchange Rates panel.
+   */
+  async listRates(accessToken: string | null): Promise<ExchangeRateRow[]> {
+    const client = this.supabaseService.getClient(accessToken ?? undefined);
+    const { data, error } = await client
+      .from('exchange_rates')
+      .select('to_currency, currency_name, rate, effective_date, set_by, notes, source_active, source_modified_by, source_modified_at, updated_at')
+      .eq('is_active', true)
+      .eq('from_currency', ANCHOR_CURRENCY)
+      .order('to_currency');
+    if (error) {
+      throw new ServiceUnavailableException(`Exchange rates unavailable — failed to read exchange_rates: ${error.message}`);
+    }
+    const editorIds = [...new Set((data ?? []).map((r) => r.set_by).filter((id): id is string => !!id))];
+    const editorEmails = new Map<string, string | null>();
+    for (const id of editorIds) {
+      const { data: user } = await this.supabaseService.getAdminClient().auth.admin.getUserById(id);
+      editorEmails.set(id, user?.user?.email ?? null);
+    }
+    return (data ?? []).map((r) => ({
+      currency: r.to_currency,
+      name: r.currency_name,
+      rate: Number(r.rate),
+      effectiveDate: r.effective_date,
+      editedBy: r.set_by ? editorEmails.get(r.set_by) ?? r.set_by : null,
+      editReason: r.set_by ? r.notes : null,
+      sourceActive: r.source_active,
+      sourceModifiedBy: r.source_modified_by,
+      sourceModifiedAt: r.source_modified_at,
+      updatedAt: r.updated_at,
+    }));
+  }
+
+  /**
+   * Sets a new budget rate (1 USD = rate `currency`) through
+   * set_budget_exchange_rate() (migration 803): the replaced rate is kept as
+   * inactive history, and the new row records `userId` and `reason`. Table
+   * writes are service-role-only, so this uses the admin client; the caller
+   * is the authenticated user the controller resolved.
+   */
+  async setRate(currency: string, rate: number, reason: string, userId: string): Promise<void> {
+    const { error } = await this.supabaseService.getAdminClient().rpc('set_budget_exchange_rate', {
+      p_currency: currency,
+      p_rate: rate,
+      p_set_by: userId,
+      p_reason: reason,
+    });
+    if (error) {
+      throw new UnprocessableEntityException(`Could not update the ${currency.toUpperCase()} exchange rate: ${error.message}`);
+    }
+    // Force the next conversion to read the new rate instead of the cache.
+    this.lastLoaded = 0;
   }
 
   /**

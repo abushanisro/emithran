@@ -40,18 +40,19 @@ describe('computeRouterCost — real material-family cutting speed', () => {
     expect(result.warnings.some((w) => w.includes('no sm_lookup_router_cut entry'))).toBe(true);
   });
 
-  it('falls back to ROUTER_SETUP_MIN and discloses it when no real op setup time was resolved', () => {
+  it('does not cost setup, and says so, when no real setup time resolved', () => {
     const result = computeRouterCost(baseInput({ setupMin: undefined }));
     const line = result.processLines[0]!;
 
-    expect(line.setupCost).toBeGreaterThanOrEqual(0);
-    expect(result.warnings.some((w) => w.includes('setup time from fallback'))).toBe(true);
-    expect(line.setupTimeSource).toBe('class_default');
+    expect(line.setupTimeMin).toBe(0);
+    expect(line.setupCost).toBe(0);
+    expect(result.warnings.some((w) => w.includes('setup not costed'))).toBe(true);
+    expect(line.setupTimeSource).toBe('none');
   });
 
   it('uses a real resolved setup time without warning when provided', () => {
     const result = computeRouterCost(baseInput({ setupMin: 45 }));
-    expect(result.warnings.some((w) => w.includes('setup time from fallback'))).toBe(false);
+    expect(result.warnings.some((w) => w.includes('setup not costed'))).toBe(false);
     expect(result.processLines[0]!.setupTimeMin).toBeCloseTo(45, 5);
     expect(result.processLines[0]!.setupTimeSource).toBe('operation_lookup');
   });

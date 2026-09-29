@@ -2,7 +2,6 @@ import { planInspection, finalizeInspectionLine, type InspectionInput, type Insp
 import type { MHRRateInput } from '../../../../../../modules/bom-items/costing/shared/core/cost-engine';
 import type { InspectionRuleRow } from '../../../../../../modules/bom-items/costing/shared/physics/gdt-severity';
 import type { UnsupportedOperationGap } from '../../../../../../modules/bom-items/dto/cost-breakdown.dto';
-import { CMM_SETUP_MIN } from '../../../../../../modules/bom-items/costing/shared/core/default-rates.constants';
 
 function rate(value: number, overrides: Partial<MHRRateInput> = {}): MHRRateInput {
   return { rate: value, source: 'mhr_database', machineClass: 'cmm', machineName: 'Test CMM', commodityCode: null, ...overrides };
@@ -237,7 +236,7 @@ describe('finalizeInspectionLine — CMM setup cost (method-aware, not a blanket
     expect(line.totalCost).toBeCloseTo(line.setupCost! + line.runCost, 5);
   });
 
-  it('falls back to the disclosed CMM_SETUP_MIN class default when the real CMM has no setup_time_hr on file', () => {
+  it('does not cost CMM setup, and says so, when the real CMM has no setup_time_hr on file', () => {
     const dedicatedCmmRate = rate(1200, { machineName: 'Real CMM Machine' }); // no setupTimeHr
     const result = computeInspectionLine(baseInput({
       holes: [{ diameterMm: 5, toleranceMm: 0.02 }],
@@ -245,9 +244,10 @@ describe('finalizeInspectionLine — CMM setup cost (method-aware, not a blanket
       batchSize: 48,
     }));
     const line = result.processLines[0]!;
-    expect(line.setupTimeMin).toBe(CMM_SETUP_MIN);
-    expect(line.setupTimeSource).toBe('class_default');
-    expect(result.warnings.some((w) => w.includes('setup_time_hr'))).toBe(true);
+    expect(line.setupTimeMin).toBe(0);
+    expect(line.setupTimeSource).toBe('none');
+    expect(line.setupCost).toBe(0);
+    expect(result.warnings.some((w) => w.includes('setup not costed') && w.includes('setup_time_hr'))).toBe(true);
   });
 
   it('charges no CMM setup at all when escalated to cmm but no dedicated cmmRate is on file (genuine $0, not a guess)', () => {
@@ -256,7 +256,7 @@ describe('finalizeInspectionLine — CMM setup cost (method-aware, not a blanket
     }));
     const line = result.processLines[0]!;
     expect(line.rateSource).toBe('no_db_rate');
-    expect(line.setupCost).toBe(0); // rate.rate is 0 — resolveSetupMinutes still resolves real minutes, but cost = minutes * $0
+    expect(line.setupCost).toBe(0); // no dedicated CMM rate and no real setup time — nothing to charge
   });
 });
 

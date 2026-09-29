@@ -19,7 +19,6 @@ export interface CountersinkingInput {
   rate: MHRRateInput;
   processIdentity?: { processGroup: string; processRoute: string; operation: string };
   cycleTimeSecFromCalculator?: number;
-  fallbackSetupMin: number; // opSetupMinByOp?.countersink ?? COUNTERSINK_SETUP_MIN, per-batch
   /** Real sm_lookup_op_setup_time minutes for this operation, when a row exists. */
   operationSetupMin?: number | null;
   calculatorId?: string | null;
@@ -65,7 +64,6 @@ export function computeCountersinkingCost(input: CountersinkingInput): Countersi
     process: 'Countersinking',
     machineSetupTimeHr: input.rate.setupTimeHr,
     operationSetupMin: input.operationSetupMin,
-    classDefaultMin: input.fallbackSetupMin,
     machineName: input.rate.machineName,
   });
   if (setup.warning) warnings.push(setup.warning);

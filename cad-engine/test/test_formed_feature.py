@@ -1,13 +1,13 @@
 """
 Tests for sheet_metal.features.formed_feature -- the paired-offset-wall
-recognition test that promotes forming_spike.py's candidates past
+recognition test that promotes formed_feature.py stage 1's candidates past
 'ambiguous'. See that module's docstring for the full reasoning: a blind
 hole leaves the sheet's back face untouched; a real dimple/emboss displaces
 material on both faces, which shows up as a local void (inner wire) in the
 back face's own boundary at the same footprint.
 
 Real B-Rep throughout, no STEP file (none exists anywhere in this repo) --
-same in-memory construction convention as test_forming_spike.py and
+same in-memory construction convention as test_formed_feature.py stage 1 and
 test_rolled_form.py.
 """
 import math
@@ -88,11 +88,11 @@ def _make_plate():
 
 def test_real_paired_offset_dimple_is_recognized():
     """A genuine paired-offset-wall structure: material worked from BOTH
-    faces at the same XY. The front cavity is exactly forming_spike's own
+    faces at the same XY. The front cavity is exactly formed_feature stage 1's own
     existing shallow-blind-cavity test case; the back also has a local void
     at that footprint -- the real, topological signature this module exists
     to find."""
-    front_depth = THICKNESS * 0.7   # 1.4mm -- inside forming_spike's accepted range
+    front_depth = THICKNESS * 0.7   # 1.4mm -- inside formed_feature stage 1's accepted range
     back_depth = THICKNESS * 0.15   # 0.3mm -- well clear of the front cavity's floor
 
     shape = _make_plate()
@@ -104,7 +104,7 @@ def test_real_paired_offset_dimple_is_recognized():
     bbox = _bbox_of(shape)
 
     found = detect_formed_features(shape, dominant_face, bbox, THICKNESS)
-    assert len(found) == 1, f"expected exactly one candidate in forming_spike's accepted depth range; got {found}"
+    assert len(found) == 1, f"expected exactly one candidate in formed_feature stage 1's accepted depth range; got {found}"
     c = found[0]
     assert c["recognition_status"] == "recognized"
     assert "opposite face" in c["recognition_evidence"]
@@ -113,7 +113,7 @@ def test_real_paired_offset_dimple_is_recognized():
 
 def test_real_ordinary_blind_pocket_stays_ambiguous():
     """Same front cavity, but the back is left completely flat and
-    undisturbed -- forming_spike.py's own existing baseline case. Must stay
+    undisturbed -- formed_feature.py stage 1's own existing baseline case. Must stay
     'ambiguous', unchanged."""
     front_depth = THICKNESS * 0.7
 

@@ -62,15 +62,17 @@ describe('computePlasmaPunchCost — setup time', () => {
     const input = baseInput({ setupMin: 30 });
     const result = computePlasmaPunchCost(input);
 
-    expect(result.warnings.some((w) => w.includes('setup time from fallback'))).toBe(false);
+    expect(result.warnings.some((w) => w.includes('setup not costed'))).toBe(false);
   });
 
-  it('falls back to PLASMA_PUNCH_SETUP_MIN and discloses a warning when no real setup time is resolved', () => {
+  it('does not cost setup, and says so, when no real setup time resolved', () => {
     const input = baseInput({ setupMin: undefined });
     const result = computePlasmaPunchCost(input);
 
-    expect(result.warnings.some((w) => w.includes('setup time from fallback'))).toBe(true);
-    expect(result.processLines[0]!.setupCost).toBeGreaterThanOrEqual(0);
+    expect(result.warnings.some((w) => w.includes('setup not costed'))).toBe(true);
+    expect(result.processLines[0]!.setupTimeMin).toBe(0);
+    expect(result.processLines[0]!.setupTimeSource).toBe('none');
+    expect(result.processLines[0]!.setupCost).toBe(0);
   });
 });
 

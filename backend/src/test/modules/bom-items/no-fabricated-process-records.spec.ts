@@ -93,8 +93,8 @@ describe('the surviving write path refuses operations with missing costing data'
 // Progressive Die, and Shearing through the same shared formula — passed
 // setupMin/batchSize into eMithranTerms but never put setupMin on the process
 // line, so all four persisted a 15-minute setup while having been costed from
-// 30min (PRESS_STROKE_SETUP_MIN, the setup_time_hr every one of the 8 real
-// press machines carries) or 22.8min for shearing. The Cost Guide re-derives
+// 30min (the setup_time_hr every one of the 8 real press machines carries)
+// or 22.8min for shearing. The Cost Guide re-derives
 // setup cost from the persisted column, so the record and the quote that
 // produced it disagreed by roughly a factor of two.
 describe('an unresolved setup time is a data gap, not a substituted 15 minutes', () => {

@@ -1,92 +1,36 @@
-// IM machine selection — eMithran-style 4-constraint algorithm.
-// Constraints evaluated in order; failure at any constraint = reject.
-// 1. Clamp force:  requiredClamp = projectedAreaCm2 × cavityCount × materialClampFactor × 1.15
-// 2. Shot capacity: requiredShot = (partWeightG + runnerWeightG) × cavityCount × 1.10
+// IM press capability — the physical constraints a press must meet for a part.
+// Failure at any constraint = not capable (the reasons say which).
+// 1. Clamp force:   the reference clamp model (clamp-force.ts): projected area × cavities ×
+//                   cavity pressure (flow class of the material) × clampForceSafetyFactor
+// 2. Shot capacity: GPPS-equivalent grams per cavity × cavities (shot-size.ts) ≤ the
+//                   press shot size (rated in GPPS grams)
 // 3. Tie-bar spacing: (partLength + 45mm) ≤ tieBarX && (partWidth + 45mm) ≤ tieBarY; 90° rotation allowed
 // 4. Daylight:     minMoldHeight ≤ estimatedToolHeight ≤ maxMoldHeight (skip if no data)
 //
-// Scoring (0–1): 0.5 × clampUtil + 0.3 × shotUtil + 0.2 × costScore
-// Target: clampUtil 60–85%, shotUtil 30–80%.
-// Returns top 3 by score; always returns at least one (cheapest capable fallback).
+// Which capable press a route uses is decided by cost, not a score: the caller
+// runs the cost engine for each capable press in a tier and keeps the cheapest
+// (bom-items.service getRouteComparison).
 
 import type { MachineCandidate } from '../../../dto/machine-selection.dto';
 import { IM_TIEBAR_ADDEND_MM } from '../../shared/capability/machine-selection/physics';
-
-// ── Clamp factors ─────────────────────────────────────────────────────────────
-// Mid-point of the range from the user specification + industry data.
-// Keys must be uppercase substrings of common grade tokens.
-// Sources: SPI/PLASTICS industry guide, Rosato "Injection Molding Handbook" 3rd ed.,
-// Brydson "Plastics Materials" 7th ed., Griff "Plastics Extrusion Technology".
-// All values = mid-point of published range; safety margin of 1.15 applied at call site.
-// Order matters — most specific / longest tokens MUST come before substrings they contain.
-// Rule: if token A is a substring of token B, token B's entry must appear first.
-// Examples: PA66GF > PA66 > PA6 > PA; PP GF > PP; PBT GF > PBT; PC GF > PC.
-const IM_CLAMP_FACTORS: Array<{ tokens: string[]; factor: number }> = [
-  // ── Glass / mineral filled (FIRST — these contain their base polymer as substring) ──
-  { tokens: ['PA66GF', 'PA66 GF', 'PA 66 GF', 'PA66-GF', 'NYLON GF', 'PA GF', 'PAGF'], factor: 0.90 },
-  { tokens: ['PBT GF', 'PBTGF', 'PBT+GF', 'PBT GF30', 'PBT-GF'],                    factor: 0.80 },
-  { tokens: ['PC GF', 'PCGF', 'PC+GF', 'PC-GF30'],                                   factor: 0.80 },
-  { tokens: ['PP GF', 'PPGF', 'PP+GF', 'PP-GF'],                                      factor: 0.58 },
-  { tokens: ['GF30', 'GF15', 'GF20', 'GF40', 'GLASS FILLED', 'GLASS REINFORCED'],    factor: 0.78 },
-
-  // ── Thermoset / elastomers (unique tokens, no base-polymer overlap) ──────────
-  { tokens: ['LSR', 'LIQUID SILICONE', 'SILICONE', 'VMQ', 'MVQ', 'FVMQ', 'SILASTIC'], factor: 0.28 },
-  { tokens: ['TPU', 'TPE', 'TPV', 'SANTOPRENE', 'HYTREL', 'PEBAX'],                   factor: 0.35 },
-
-  // ── Polyolefins ───────────────────────────────────────────────────────────────
-  { tokens: ['PP', 'POLYPROPYLENE', 'HDPE', 'LDPE', 'LLDPE', 'MDPE'],                 factor: 0.40 },
-  { tokens: ['PE', 'POLYETHYLENE'],                                                     factor: 0.40 },
-
-  // ── Styrenics / commodity ─────────────────────────────────────────────────────
-  { tokens: ['ABS', 'CYCOLAC', 'TERLURAN'],                                            factor: 0.52 },
-  { tokens: ['HIPS', 'GPPS', 'SAN', 'AS RESIN'],                                      factor: 0.48 },
-  { tokens: ['PS', 'POLYSTYRENE'],                                                      factor: 0.48 },
-
-  // ── PVC variants (UPVC/FPVC before generic PVC) ───────────────────────────────
-  { tokens: ['UPVC', 'RPVC', 'RIGID PVC'],                                             factor: 0.65 },
-  { tokens: ['FPVC', 'FLEXIBLE PVC', 'SPVC', 'PVCA'],                                 factor: 0.45 },
-  { tokens: ['PVC', 'POLYVINYL'],                                                       factor: 0.60 },
-
-  // ── Engineering polymers — more specific before substrings ────────────────────
-  // PA66 before PA6 (PA66 contains "PA6"); PA6 before generic PA.
-  { tokens: ['PA66', 'PA 66', 'NYLON66', 'NYLON 66', 'ZYTEL', 'ULTRAMID A'],          factor: 0.65 },
-  { tokens: ['PA6', 'NYLON 6', 'NYLON6', 'POLYAMIDE 6', 'PA-6'],                      factor: 0.60 },
-  { tokens: ['PA', 'NYLON', 'POLYAMIDE'],                                               factor: 0.62 },
-  { tokens: ['POM', 'ACETAL', 'DELRIN', 'HOSTAFORM', 'CELCON'],                       factor: 0.62 },
-  { tokens: ['PC', 'POLYCARBONATE', 'LEXAN', 'MAKROLON', 'CALIBRE'],                  factor: 0.68 },
-  { tokens: ['PBT', 'POLYBUTYLENE TEREPHTHALATE', 'VALOX', 'CELANEX'],                factor: 0.68 },
-  { tokens: ['PET', 'POLYETHYLENE TEREPHTHALATE', 'RYNITE'],                           factor: 0.68 },
-  { tokens: ['PMMA', 'ACRYLIC', 'PLEXIGLAS', 'PERSPEX'],                              factor: 0.55 },
-  { tokens: ['PPO', 'PPE', 'NORYL'],                                                    factor: 0.60 },
-
-  // ── High-performance / specialty ──────────────────────────────────────────────
-  { tokens: ['PEI', 'ULTEM', 'POLYETHERIMIDE'],                                        factor: 0.90 },
-  { tokens: ['PEEK', 'POLYETHER ETHER KETONE', 'VICTREX'],                             factor: 0.90 },
-  { tokens: ['PPS', 'POLYPHENYLENE SULFIDE', 'RYTON', 'FORTRON'],                     factor: 0.90 },
-  { tokens: ['LCP', 'LIQUID CRYSTAL POLYMER', 'VECTRA', 'XYDAR'],                     factor: 0.95 },
-  { tokens: ['PSU', 'POLYSULFONE', 'UDEL'],                                            factor: 0.75 },
-  { tokens: ['PES', 'POLYETHERSULFONE'],                                                factor: 0.75 },
-];
-
-export function resolveMaterialClampFactor(grade: string | null): number {
-  const g = (grade ?? '').toUpperCase();
-  for (const entry of IM_CLAMP_FACTORS) {
-    if (entry.tokens.some((t) => g.includes(t))) return entry.factor;
-  }
-  return 0.65; // mid-range engineering plastic default (matches cost-engine pressure factor)
-}
+import { requiredClampForce, type MaterialClampProperties, type RunnerSystem } from '../clamp-force';
+import type { ClampModel } from '../plastic-reference';
 
 export interface IMSelectionRequirements {
-  projectedAreaMm2: number | null;      // null = unknown, skip clamp check
+  projectedAreaMm2: number | null;      // null = no clamp force derivable: the machine is not sized
   cavityCount: number;
-  partVolumeMm3: number;
-  runnerVolumeMm3: number;              // estimated; 0 = hot runner
-  materialDensityKgM3: number;
-  materialGrade: string | null;
+  /** GPPS-equivalent grams one cavity needs (shot-size.ts); null = not derivable. */
+  shotGppsGPerCavity: number | null;
+  /** The material's reference clamp properties and label (for the reason text). */
+  material: MaterialClampProperties;
+  materialLabel: string;
+  runner: RunnerSystem;
   partLengthMm: number | null;          // bbox largest dimension (tie-bar long axis)
   partWidthMm: number | null;           // bbox second dimension (tie-bar short axis)
   partHeightMm: number | null;          // bbox third dimension (min) — not used for tie-bar
   estimatedToolHeightMm: number | null; // null = skip daylight check
+  /** Staged clamp model (plastic-reference.ts). */
+  clampModel: ClampModel;
 }
 
 export interface IMCandidateEvaluation {
@@ -99,7 +43,6 @@ export interface IMCandidateEvaluation {
   shotRequiredG: number | null;
   shotMachineG: number | null;
   shotUtil: number | null;
-  score: number;                        // 0–1 composite
 }
 
 export function evaluateIMCandidate(
@@ -109,13 +52,17 @@ export function evaluateIMCandidate(
   const cap = candidate.capability;
   const blockReasons: string[] = [];
 
-  // ── 1. Clamp force ────────────────────────────────────────────────────────
-  const materialFactor = resolveMaterialClampFactor(req.materialGrade);
+  // ── 1. Clamp force (reference model; not derivable = not sized) ─────────
   let clampRequiredT: number | null = null;
   let clampUtil: number | null = null;
-  if (req.projectedAreaMm2 != null && req.projectedAreaMm2 > 0) {
-    const projAreaCm2 = req.projectedAreaMm2 / 100;
-    clampRequiredT = projAreaCm2 * req.cavityCount * materialFactor * 1.15;
+  const clamp = requiredClampForce({
+    model: req.clampModel, material: req.material, materialLabel: req.materialLabel,
+    projectedAreaMm2: req.projectedAreaMm2 ?? 0, cavityCount: req.cavityCount, runner: req.runner,
+  });
+  if (!clamp.derivable) {
+    blockReasons.push(clamp.reason);
+  } else {
+    clampRequiredT = clamp.requiredTonnes;
     const machineClampT = cap.maxTonnage;
     if (machineClampT == null || machineClampT < clampRequiredT) {
       blockReasons.push(
@@ -126,16 +73,15 @@ export function evaluateIMCandidate(
     }
   }
 
-  // ── 2. Shot capacity ──────────────────────────────────────────────────────
-  const densityGcm3 = req.materialDensityKgM3 / 1000;
-  const partVolumeCm3 = req.partVolumeMm3 / 1000;
-  const runnerVolumeCm3 = req.runnerVolumeMm3 / 1000;
-  const partWeightG = partVolumeCm3 * densityGcm3;
-  const runnerWeightG = runnerVolumeCm3 * densityGcm3;
-  const shotRequiredG = (partWeightG + runnerWeightG) * req.cavityCount * 1.10;
+  // ── 2. Shot capacity (GPPS-equivalent grams, shot-size.ts) ─────────────────
+  const shotRequiredG = req.shotGppsGPerCavity != null ? req.shotGppsGPerCavity * req.cavityCount : null;
   let shotUtil: number | null = null;
   const machineShotG = cap.shotCapacityGrams;
-  if (machineShotG != null) {
+  if (shotRequiredG == null) {
+    blockReasons.push('Shot size not derivable: the material has no reference melt density (migration 831).');
+  } else if (machineShotG == null) {
+    blockReasons.push('Shot: the press has no shot size on file.');
+  } else {
     if (machineShotG < shotRequiredG) {
       blockReasons.push(
         `Shot: need ${shotRequiredG.toFixed(0)}g, machine has ${machineShotG}g`,
@@ -181,25 +127,6 @@ export function evaluateIMCandidate(
 
   const capable = blockReasons.length === 0;
 
-  // ── Scoring ───────────────────────────────────────────────────────────────
-  // Target: clampUtil 60-85% (sweet spot 0.725), shotUtil 30-80% (sweet spot 0.55).
-  // Machines far above or below are penalised; best score at sweet spot.
-  function utilScore(util: number | null, sweetSpot: number): number {
-    if (util == null) return 0.5; // unknown = neutral
-    // Gaussian-like: peak at sweetSpot, falls toward 0 at extremes
-    const dev = Math.abs(util - sweetSpot);
-    return Math.max(0, 1 - dev * 2);
-  }
-
-  const clampScore = utilScore(clampUtil, 0.725);
-  const shotScore  = utilScore(shotUtil, 0.55);
-  const maxRate = 500; // normalise cost: rates > 500 score near 0
-  const costScore = Math.max(0, 1 - candidate.hourlyRate / maxRate);
-
-  const score = capable
-    ? 0.5 * clampScore + 0.3 * shotScore + 0.2 * costScore
-    : 0;
-
   return {
     candidate,
     capable,
@@ -207,17 +134,15 @@ export function evaluateIMCandidate(
     clampRequiredT: clampRequiredT ? Math.round(clampRequiredT) : null,
     clampMachineT: cap.maxTonnage,
     clampUtil,
-    shotRequiredG: Math.round(shotRequiredG),
+    shotRequiredG: shotRequiredG != null ? Math.round(shotRequiredG) : null,
     shotMachineG: machineShotG,
     shotUtil,
-    score,
   };
 }
 
 // ── Tier definitions ──────────────────────────────────────────────────────────
-// Three size classes used for route comparison. Each tier picks the best-scoring
-// DB machine within its tonnage range; falls back to a synthetic class record
-// (built by the caller) when no DB machine exists in that tier.
+// Three press size classes the route comparison shows side by side (a display
+// grouping of the real press pool, not a cost input).
 export const IM_TIERS = [
   { id: 'small',    label: 'Small Press',    minT: 0,   maxT: 120  },
   { id: 'medium',   label: 'Standard Press', minT: 121, maxT: 350  },
@@ -229,40 +154,23 @@ export type IMTierId = typeof IM_TIERS[number]['id'];
 export interface IMTierResult {
   tierId: IMTierId;
   tierLabel: string;
-  evaluation: IMCandidateEvaluation | null;  // null = no DB machine for this tier
-  syntheticTonnageT: number;                 // canonical tonnage to use if DB is absent
+  /** Every real press in the tier: capable ones first, then by clamp tonnage, largest first. */
+  candidates: IMCandidateEvaluation[];
 }
 
 export function selectIMmachinesByTier(
   pool: MachineCandidate[],
   req: IMSelectionRequirements,
 ): IMTierResult[] {
-  const imCandidates = pool.filter((c) => c.machineClass === 'injection_molding');
-  const evaluated = imCandidates.map((c) => evaluateIMCandidate(c, req));
-
-  return IM_TIERS.map((tier) => {
-    const inTier = evaluated
+  const evaluated = pool.filter((c) => c.machineClass === 'injection_molding').map((c) => evaluateIMCandidate(c, req));
+  return IM_TIERS.map((tier) => ({
+    tierId: tier.id,
+    tierLabel: tier.label,
+    candidates: evaluated
       .filter((e) => {
         const t = e.candidate.capability.maxTonnage;
         return t != null && t >= tier.minT && t <= tier.maxT;
       })
-      .sort((a, b) => {
-        // Capable machines first, then by score desc
-        if (a.capable !== b.capable) return a.capable ? -1 : 1;
-        return b.score - a.score;
-      });
-
-    // Canonical fallback tonnage = midpoint of tier, rounded to nearest 50T
-    const syntheticTonnageT =
-      tier.id === 'small'  ? 100  :
-      tier.id === 'medium' ? 200  : 500;
-
-    return {
-      tierId: tier.id,
-      tierLabel: tier.label,
-      evaluation: inTier[0] ?? null,
-      syntheticTonnageT,
-    };
-  });
+      .sort((a, b) => (a.capable !== b.capable ? (a.capable ? -1 : 1) : (b.candidate.capability.maxTonnage ?? 0) - (a.candidate.capability.maxTonnage ?? 0))),
+  }));
 }
-

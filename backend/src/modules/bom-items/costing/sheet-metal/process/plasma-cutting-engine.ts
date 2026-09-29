@@ -1,4 +1,4 @@
-import { PLASMA_CUT_SETUP_MIN, DEFAULT_YIELD_PCT } from '../../shared/core/default-rates.constants';
+import { DEFAULT_YIELD_PCT } from '../../shared/core/default-rates.constants';
 import type { MHRRateInput } from '../../shared/core/cost-engine';
 import type { ProcessLineCost } from '../../../dto/cost-breakdown.dto';
 import type { CuttingProcessContext, CuttingProcessResult } from '../../shared/core/manufacturing-process.types';
@@ -25,9 +25,9 @@ export interface PlasmaCutInput {
   pierceTimeSec?: number;
   // Per-batch setup time — resolved by the caller from
   // sm_lookup_op_setup_time via SheetMetalLookupService.getOpSetupTime
-  // ('plasma_cut'). Falls back to PLASMA_CUT_SETUP_MIN when no row is
-  // seeded yet, with a disclosed warning — same convention as every other
-  // cutting engine's setupMin.
+  // ('plasma_cut'). The selected machine's
+  // real per-machine setup_time_hr wins; with neither, setup is not costed
+  // (resolveSetupMinutes returns source 'none' with a warning).
   setupMin?: number;
   // eMithranTerms() inputs — see CuttingProcessContext's own doc comment for
   // sourcing.
@@ -77,7 +77,6 @@ export function computePlasmaCutCost(input: PlasmaCutInput): PlasmaCutResult {
     process: 'Plasma Cut',
     machineSetupTimeHr: rate.setupTimeHr,
     operationSetupMin: input.setupMin,
-    classDefaultMin: PLASMA_CUT_SETUP_MIN,
     machineName: rate.machineName,
   });
   const setupMin = setup.setupMin;

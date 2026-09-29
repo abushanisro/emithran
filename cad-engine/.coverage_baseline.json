@@ -1,0 +1,342 @@
+[
+  {
+    "file": "10155a.stp",
+    "family": "sheet_metal",
+    "seconds": 1.0
+  },
+  {
+    "file": "35-143-A-IF Tube_V1_0.4_Nikhil_part A.STEP",
+    "family": "sheet_metal",
+    "seconds": 1.8
+  },
+  {
+    "file": "35-143-A-IF Tube_V1_0.4_Nikhil_part B.STEP",
+    "family": "mill_turn",
+    "features": 15,
+    "feature_types": {
+      "SimpleHole:cross": 5,
+      "SimpleHole:blind": 6,
+      "Edge:chamfer": 2,
+      "Keyway:default": 2
+    },
+    "face_count": 55,
+    "claimed_face_count": 18,
+    "claimed_area_fraction": 0.3732,
+    "multiply_claimed": 0,
+    "unclaimed_by_surface": {
+      "BSplineSurface": 2,
+      "Cylinder": 12,
+      "Plane": 23
+    },
+    "unclaimed_area_by_surface": {
+      "Plane": 1560.1,
+      "Cylinder": 3964.5,
+      "BSplineSurface": 33.8
+    },
+    "warnings": [
+      "12 off-axis convex face(s) with no rotational tooth symmetry \u2014 not turnable about the spindle axis and not recognised as a feature."
+    ],
+    "seconds": 0.7
+  },
+  {
+    "file": "35-226-B-Z-Axis Lead.STEP",
+    "family": "sheet_metal",
+    "seconds": 3.3
+  },
+  {
+    "file": "474-m-059-01.stp",
+    "family": "sheet_metal",
+    "seconds": 0.3
+  },
+  {
+    "file": "60332490016.STEP",
+    "family": "sheet_metal",
+    "seconds": 2.9
+  },
+  {
+    "file": "60332520016.step",
+    "family": "sheet_metal",
+    "seconds": 0.9
+  },
+  {
+    "file": "60332530016.step",
+    "family": "sheet_metal",
+    "seconds": 1.3
+  },
+  {
+    "file": "60332550016.step",
+    "family": "sheet_metal",
+    "seconds": 4.1
+  },
+  {
+    "file": "60338350150.STEP",
+    "family": "milled",
+    "features": 666,
+    "feature_types": {
+      "SimpleHole:blind": 81,
+      "SimpleHole:threaded": 24,
+      "Edge:chamfer": 85,
+      "Edge:countersink": 4,
+      "PocketV2:default": 39,
+      "Keyway:default": 74,
+      "Slot:groove": 7,
+      "Edge:round": 2,
+      "PlanarFace:default": 308,
+      "CurvedSurface:default": 34,
+      "CurvedWall:default": 8
+    },
+    "face_count": 768,
+    "claimed_face_count": 768,
+    "claimed_area_fraction": 1.0,
+    "multiply_claimed": 0,
+    "unclaimed_by_surface": {},
+    "unclaimed_area_by_surface": {},
+    "warnings": [],
+    "seconds": 7.0
+  },
+  {
+    "file": "60338430150.STEP",
+    "family": "mill_turn",
+    "features": 93,
+    "feature_types": {
+      "SimpleHole:cross": 13,
+      "SimpleHole:blind": 3,
+      "SimpleHole:threaded": 15,
+      "SimpleHole:pcd_pattern": 2,
+      "Edge:chamfer": 36,
+      "Edge:countersink": 6,
+      "Ring:groove": 8,
+      "Edge:round": 8,
+      "Keyway:default": 2
+    },
+    "face_count": 315,
+    "claimed_face_count": 118,
+    "claimed_area_fraction": 0.1236,
+    "multiply_claimed": 0,
+    "unclaimed_by_surface": {
+      "Plane": 137,
+      "Cylinder": 60
+    },
+    "unclaimed_area_by_surface": {
+      "Plane": 3368.4,
+      "Cylinder": 177.4
+    },
+    "warnings": [
+      "60 off-axis convex face(s) with no rotational tooth symmetry \u2014 not turnable about the spindle axis and not recognised as a feature."
+    ],
+    "seconds": 1.9
+  },
+  {
+    "file": "810-000268-00_ref2.stp",
+    "family": "sheet_metal",
+    "seconds": 8.9
+  },
+  {
+    "file": "810-000270-00_ref2.stp",
+    "family": "sheet_metal",
+    "seconds": 11.4
+  },
+  {
+    "file": "810-001719-00.stp",
+    "family": "milled",
+    "features": 178,
+    "feature_types": {
+      "SimpleHole:blind": 10,
+      "SimpleHole:threaded": 10,
+      "MultiStepHole:counterbore": 1,
+      "Edge:chamfer": 4,
+      "PocketV2:default": 29,
+      "Keyway:default": 14,
+      "Edge:round": 1,
+      "PlanarFace:default": 102,
+      "CurvedWall:default": 7
+    },
+    "face_count": 187,
+    "claimed_face_count": 187,
+    "claimed_area_fraction": 1.0,
+    "multiply_claimed": 0,
+    "unclaimed_by_surface": {},
+    "unclaimed_area_by_surface": {},
+    "warnings": [],
+    "seconds": 1.2
+  },
+  {
+    "file": "810-002203-00.stp",
+    "family": "milled",
+    "features": 76,
+    "feature_types": {
+      "SimpleHole:threaded": 5,
+      "SimpleHole:blind": 3,
+      "Edge:chamfer": 17,
+      "PocketV2:default": 8,
+      "Keyway:default": 2,
+      "Edge:round": 2,
+      "CurvedWall:default": 9,
+      "CurvedSurface:default": 9,
+      "PlanarFace:default": 21
+    },
+    "face_count": 83,
+    "claimed_face_count": 83,
+    "claimed_area_fraction": 1.0,
+    "multiply_claimed": 0,
+    "unclaimed_by_surface": {},
+    "unclaimed_area_by_surface": {},
+    "warnings": [],
+    "seconds": 1.2
+  },
+  {
+    "file": "810-002204-00.stp",
+    "family": "plastic_molded",
+    "seconds": 3.9
+  },
+  {
+    "file": "830-002176-00.stp",
+    "family": "sheet_metal",
+    "seconds": 0.6
+  },
+  {
+    "file": "AM_FLAP_CLEVIS-IN-LH.stp",
+    "family": "sheet_metal",
+    "seconds": 0.7
+  },
+  {
+    "file": "AM_FLAP_CLEVIS-OUT-LH.stp",
+    "family": "sheet_metal",
+    "seconds": 0.9
+  },
+  {
+    "file": "AM_FLAP_LUG-IN-LH.stp",
+    "family": "sheet_metal",
+    "seconds": 0.3
+  },
+  {
+    "file": "AM_FLAP_LUG-OUT-LH.stp",
+    "family": "sheet_metal",
+    "seconds": 0.4
+  },
+  {
+    "file": "BATTERY ENCLOSURE_POST WELDING_MACHINING DRAWING.STEP",
+    "family": "sheet_metal",
+    "seconds": 34.5
+  },
+  {
+    "file": "BOTTOM CELL HOLDER_21-02.stp",
+    "family": "sheet_metal",
+    "seconds": 96.7
+  },
+  {
+    "file": "Base.step",
+    "family": "sheet_metal",
+    "seconds": 17.4
+  },
+  {
+    "file": "Diffuser (1).STEP",
+    "family": "sheet_metal",
+    "seconds": 0.6
+  },
+  {
+    "file": "Diffuser Cover.STEP",
+    "family": "mill_turn",
+    "features": 27,
+    "feature_types": {
+      "SimpleHole:threaded": 9,
+      "SimpleHole:blind": 2,
+      "Ring:outer_diameter": 2,
+      "Edge:chamfer": 6,
+      "Edge:countersink": 4,
+      "Edge:round": 2,
+      "Keyway:default": 2
+    },
+    "face_count": 114,
+    "claimed_face_count": 46,
+    "claimed_area_fraction": 0.7246,
+    "multiply_claimed": 0,
+    "unclaimed_by_surface": {
+      "Cylinder": 20,
+      "Torus": 5,
+      "Plane": 19,
+      "BSplineSurface": 24
+    },
+    "unclaimed_area_by_surface": {
+      "Plane": 4838.1,
+      "Torus": 131.6,
+      "Cylinder": 423.8,
+      "BSplineSurface": 40.6
+    },
+    "warnings": [
+      "20 off-axis convex face(s) with no rotational tooth symmetry \u2014 not turnable about the spindle axis and not recognised as a feature."
+    ],
+    "seconds": 7.0
+  },
+  {
+    "file": "Diffuser.STEP",
+    "family": "sheet_metal",
+    "seconds": 0.6
+  },
+  {
+    "file": "Dry eye back part.STEP",
+    "family": "sheet_metal",
+    "seconds": 14.3
+  },
+  {
+    "file": "Front Facia_ver0.2.STEP",
+    "family": "sheet_metal",
+    "seconds": 6.3
+  },
+  {
+    "file": "Front cover for LR sensor.STEP",
+    "family": "sheet_metal",
+    "seconds": 0.2
+  },
+  {
+    "file": "HCV_VCU_Cover.STEP",
+    "family": "sheet_metal",
+    "seconds": 2.5
+  },
+  {
+    "file": "HCV_VCU_Housing.STEP",
+    "family": "sheet_metal",
+    "seconds": 9.9
+  },
+  {
+    "file": "Housing 1.STEP",
+    "family": "mill_turn",
+    "features": 1384,
+    "feature_types": {
+      "SimpleHole:cross": 409,
+      "SimpleHole:blind": 70,
+      "SimpleHole:threaded": 97,
+      "SimpleHole:pcd_pattern": 4,
+      "Edge:chamfer": 368,
+      "Edge:countersink": 120,
+      "Ring:groove": 72,
+      "Edge:round": 125,
+      "Keyway:default": 119
+    },
+    "face_count": 3892,
+    "claimed_face_count": 1639,
+    "claimed_area_fraction": 0.2521,
+    "multiply_claimed": 0,
+    "unclaimed_by_surface": {
+      "Cylinder": 1080,
+      "Sphere": 88,
+      "Plane": 1010,
+      "BSplineSurface": 75
+    },
+    "unclaimed_area_by_surface": {
+      "Plane": 759903.3,
+      "Cylinder": 78649.4,
+      "Sphere": 502.2,
+      "BSplineSurface": 2176.7
+    },
+    "warnings": [
+      "1080 off-axis convex face(s) with no rotational tooth symmetry \u2014 not turnable about the spindle axis and not recognised as a feature."
+    ],
+    "seconds": 72.3
+  },
+  {
+    "file": "IF display holder.STEP",
+    "family": "sheet_metal",
+    "seconds": 0.4
+  }
+]

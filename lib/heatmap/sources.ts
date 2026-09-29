@@ -1,3 +1,4 @@
+import { isBend, isPlainHole } from '@/lib/features/feature-graph';
 import type {
   HeatmapSource,
   HeatmapLayerType,
@@ -134,7 +135,7 @@ export function buildManufacturingRiskSources(
   for (const feat of dfmScores.features) {
     const v2 = fg.feature_graph_v2?.features.find((f) => f.id === feat.featureId);
     if (!v2) continue;
-    const isHole = v2.feature_type === 'hole';
+    const isHole = isPlainHole(v2);
 
     for (const score of feat.occurrences) {
       const v2Occ = v2.occurrences[score.occurrenceIndex];
@@ -201,12 +202,12 @@ export function buildToleranceSources(fg: FeatureGraph, weights: ToleranceHeatma
     for (let i = 0; i < feat.occurrences.length; i++) {
       const occ = feat.occurrences[i];
       if (!occ?.centroid) continue;
-      if (feat.feature_type === 'hole') {
+      if (isPlainHole(feat)) {
         // Holes < 4mm diameter more likely to carry tight position/size call-outs
         const amp = feat.diameter_mm != null && feat.diameter_mm < 4
           ? Math.min(baseAmp + 0.2, 1.0) : baseAmp;
         holeSignals.push({ centroid: occ.centroid, amplitude: amp, featureId: feat.id, occurrenceIndex: i });
-      } else if (feat.feature_type === 'bend') {
+      } else if (isBend(feat)) {
         // Bends usually carry angle tolerance only — lower amplitude
         bendSignals.push({ centroid: occ.centroid, amplitude: baseAmp * 0.5, featureId: feat.id, occurrenceIndex: i, bendLen: occ.bend_length_mm ?? 50 });
       }
@@ -240,9 +241,9 @@ export function buildSustainabilitySources(fg: FeatureGraph, weights: Sustainabi
     for (let i = 0; i < feat.occurrences.length; i++) {
       const occ = feat.occurrences[i];
       if (!occ?.centroid) continue;
-      if (feat.feature_type === 'hole') {
+      if (isPlainHole(feat)) {
         holeSignals.push({ centroid: occ.centroid, amplitude: Math.min(pierceBase, 1.0), featureId: feat.id, occurrenceIndex: i });
-      } else if (feat.feature_type === 'bend') {
+      } else if (isBend(feat)) {
         const len = occ.bend_length_mm ?? 50;
         bendSignals.push({ centroid: occ.centroid, amplitude: Math.min(bendBase + Math.min(len / 200, 0.5) * 0.2, 1.0), featureId: feat.id, occurrenceIndex: i, bendLen: len });
       }
@@ -265,7 +266,7 @@ export function buildThermalSources(fg: FeatureGraph, sheetThicknessMm: number):
   const holeSignals: RawSignal[] = [];
 
   for (const feat of v2.features) {
-    if (feat.feature_type !== 'hole') continue;
+    if (!isPlainHole(feat)) continue;
     for (let i = 0; i < feat.occurrences.length; i++) {
       const occ = feat.occurrences[i];
       if (!occ?.centroid) continue;
@@ -290,7 +291,7 @@ export function buildToolWearSources(fg: FeatureGraph, sheetThicknessMm: number)
   const holeSignals: RawSignal[] = [];
 
   for (const feat of v2.features) {
-    if (feat.feature_type !== 'hole') continue;
+    if (!isPlainHole(feat)) continue;
     for (let i = 0; i < feat.occurrences.length; i++) {
       const occ = feat.occurrences[i];
       if (!occ?.centroid) continue;
@@ -348,7 +349,7 @@ export function buildCostDensitySources(
       const occ = feat.occurrences[i];
       if (!occ?.centroid) continue;
 
-      if (feat.feature_type === 'hole') {
+      if (isPlainHole(feat)) {
         let amplitude: number;
         if (isCNC) {
           const ld = occ.ld_ratio ?? 0;
@@ -362,7 +363,7 @@ export function buildCostDensitySources(
           }
         }
         holeSignals.push({ centroid: occ.centroid, amplitude: Math.min(amplitude, 1.0), featureId: feat.id, occurrenceIndex: i });
-      } else if (feat.feature_type === 'bend') {
+      } else if (isBend(feat)) {
         const len = occ.bend_length_mm ?? 50;
         // Longer bends = more handling — pure geometry ratio, no constant duplication
         const lenBonus = Math.min(len / 200, 0.5) * 0.3;

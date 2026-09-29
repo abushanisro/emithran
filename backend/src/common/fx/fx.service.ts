@@ -1,8 +1,8 @@
 import { Injectable, UnprocessableEntityException } from '@nestjs/common';
-import { ExchangeRateService } from '../exchange-rate/exchange-rate.service';
+import { ANCHOR_CURRENCY, ExchangeRateService } from '../exchange-rate/exchange-rate.service';
 import {
+  CURRENCY_SYMBOLS,
   LOCATION_INFO,
-  listCurrencies as listCurrenciesFromLocationInfo,
   listFactoryLocations,
 } from '../../modules/bom-items/costing/shared/core/default-rates.constants';
 import { FxRateCacheService } from './fx-rate-cache.service';
@@ -49,9 +49,15 @@ export class FxService {
     return listFactoryLocations();
   }
 
-  /** Every distinct scenario currency, for the Currency & Ask Price picker — never hardcoded client-side. */
-  listCurrencies(): Array<{ code: string; symbol: string; name: string }> {
-    return listCurrenciesFromLocationInfo();
+  /**
+   * Every currency in the exchange rate table (migration 803), for the
+   * Currency & Ask Price picker -- never hardcoded client-side. Names come
+   * from the table; a factory currency keeps its LOCATION_INFO display symbol
+   * (e.g. MX$), any other currency uses the ISO 4217 symbol the runtime ships.
+   */
+  async listCurrencies(accessToken: string | null): Promise<Array<{ code: string; symbol: string; name: string }>> {
+    const currencies = await this.exchangeRateService.listCurrencies(accessToken);
+    return currencies.map(({ code, name }) => ({ code, name, symbol: CURRENCY_SYMBOLS[code] ?? isoSymbol(code) }));
   }
 
   async getRate(params: {
@@ -88,31 +94,29 @@ export class FxService {
     }
 
     if (params.rateType === 'budget') {
-      // ExchangeRateService is INR-anchored (every admin-set row is
-      // from_currency → INR) but derives a true cross-rate for ANY pair via
-      // that pivot: convertStrict(base, quote) = (INR-per-base)/(INR-per-quote).
-      // See exchange-rate.service.ts's makeSnapshot and migration 178's own
-      // comment ("derives cross-rates via: from_rate / to_rate") — this is
-      // the existing, deliberate design, not a gap to route around. What it
+      // ExchangeRateService is USD-anchored (every row is the reference
+      // table's "1 USD = rate CCY", migration 803) and derives a true
+      // cross-rate for ANY pair via that anchor:
+      // convertStrict(base, quote) = (USD-per-base)/(USD-per-quote). What it
       // does NOT do is silently substitute another rate type when a currency
       // has no budget row on file — it fails, and we check per-currency here
       // so the failure names the specific missing side rather than the pair.
       const rates = await this.exchangeRateService.getSnapshot(params.accessToken);
-      const missing = [base, quote].filter((c) => c !== 'INR' && !this.exchangeRateService.hasRate(c));
+      const missing = [base, quote].filter((c) => c !== ANCHOR_CURRENCY && !this.exchangeRateService.hasRate(c));
       if (missing.length > 0) {
         throw new UnprocessableEntityException(
-          `Budget FX rate unavailable: no admin-set exchange_rates row for ${missing.join(' and ')} → INR. ` +
+          `Budget FX rate unavailable: no exchange_rates row for ${ANCHOR_CURRENCY} → ${missing.join(' and ')}. ` +
           `Add one via the exchange_rates table/admin settings, or select Reference or Custom instead.`,
         );
       }
       const rate = rates.convertStrict(base, quote);
-      const viaPivot = base !== 'INR' && quote !== 'INR';
+      const viaPivot = base !== ANCHOR_CURRENCY && quote !== ANCHOR_CURRENCY;
       return {
         rate, base, quote, rateType: 'budget',
         provider: null,
         source: viaPivot
-          ? `exchange_rates (admin-set budget rate, ${base}→INR and ${quote}→INR cross-rate)`
-          : 'exchange_rates (admin-set budget rate)',
+          ? `exchange_rates (budget rate, ${ANCHOR_CURRENCY}→${base} and ${ANCHOR_CURRENCY}→${quote} cross-rate)`
+          : 'exchange_rates (budget rate)',
         rateDate: null, retrievedAt, stale: false,
       };
     }
@@ -142,6 +146,14 @@ export class FxService {
       rateDate: cached.rateDate, retrievedAt: cached.retrievedAt, stale: cached.stale,
     };
   }
+}
+
+/** ISO 4217 narrow symbol for a currency code, from the runtime's own locale data. */
+function isoSymbol(code: string): string {
+  const part = new Intl.NumberFormat('en', { style: 'currency', currency: code, currencyDisplay: 'narrowSymbol' })
+    .formatToParts(0)
+    .find((p) => p.type === 'currency');
+  return part?.value ?? code;
 }
 
 function todayIso(): string {

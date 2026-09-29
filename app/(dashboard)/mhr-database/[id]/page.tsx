@@ -14,6 +14,7 @@ import { formatNumber } from '@/lib/utils';
 import { getCurrencyForLocation } from '@/lib/utils/currency-locale';
 import { exportSingleMHRToPDF } from '@/lib/utils/exportMHRToPDF';
 import { MHRFormDialog } from '@/components/features/mhr/MHRFormDialog';
+import { MachineCapabilityCard } from '@/components/features/mhr/MachineCapabilityCard';
 import { EditableValue } from '@/components/ui/editable-value';
 import { calculateMHR } from '@/lib/utils/mhrCalculations';
 import type { MHRInputs, MHRCalculations } from '@/lib/utils/mhrCalculations';
@@ -367,6 +368,9 @@ export default function MHRDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Capability & process data (typed columns + specs) */}
+      <MachineCapabilityCard record={record} />
 
       {/* USD-stored-as-INR warning banner */}
       {isUsdStoredAsInr && !isEditMode && (

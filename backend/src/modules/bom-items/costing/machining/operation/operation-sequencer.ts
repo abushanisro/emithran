@@ -58,40 +58,49 @@
  * section (unrelated to this routing engine) — not part of this backlog.
  */
 
-import { MILLING_MRR, computeDrillCycleSec, computeRotaryCycleSec, DRILL_DEPTH_TO_DIAMETER_RATIO } from '../process/cost-machining-engine';
+import { MILLING_MRR, computeDrillCycle, computeTapCycle, computeRotaryCycleSec, DRILL_DEPTH_TO_DIAMETER_RATIO, detectMaterialClass } from '../process/cost-machining-engine';
+import type { DrillingTable } from '../lookup/drilling-table';
+import type { MachiningCalculators } from '../calculators/machining-calculator';
 import type { MaterialClass } from '../process/cost-machining-engine';
-import { computeTapCycleSec, TAP_UNLOAD_SEC } from '../../shared/core/default-rates.constants';
 import { nearestByDiameterThenHardness, MACHINING_MATERIAL_HARDNESS_HB } from '../lookup/machining-material-hardness';
 
-// drillTimeSec/tapTimeSec below now call the same real, material-aware
-// physics cost-machining-engine.ts uses (computeDrillCycleSec/computeTapCycleSec)
+// drillOp/tapOp below call the same calculators cost-machining-engine.ts uses
+// (computeDrillCycle / computeTapCycle)
 // instead of keeping their own separate hardcoded tables — this file used
 // to carry THREE independent drilling-time models across the two files
 // (this one's diameter-only drillFeedMmPerMin, cost-machining-engine.ts's flat
 // DRILL_CYCLE_SEC buckets, and a duplicated MRR_MM3_PER_MIN admitted by its
 // own comment to need manual sync with cost-machining-engine.ts's MILLING_MRR).
 // One source of truth now for all three.
-const BLIND_TAP_FALLBACK_DEPTH_MM = 8; // see cost-machining-engine.ts's own constant of the same name for citation
 
-function drillTimeSec(
+// Real drilling time for `count` holes (CAD Ø + CAD depth + tblDrilling), or
+// the name of the missing real input — see computeDrillCycle.
+function drillOp(
   diamMm: number,
   depthMm: number,
   count: number,
   materialGrade: string | null | undefined,
-): number {
-  return computeDrillCycleSec(diamMm, materialGrade, depthMm > 0 ? depthMm : undefined) * count;
+  drillingTable: DrillingTable | null,
+  calculators: MachiningCalculators | null,
+): { timeSec: number; missing?: string } {
+  const cycle = computeDrillCycle(diamMm, materialGrade, depthMm > 0 ? depthMm : undefined, drillingTable, calculators, count);
+  return cycle.sec == null ? { timeSec: 0, missing: cycle.missing.join('; ') } : { timeSec: cycle.sec };
 }
 
-function tapTimeSec(
+// Real tapping time for `count` threads (thread size, pitch, CAD depth +
+// tblTapping), or the name of the missing real input — see computeTapCycle.
+function tapOp(
   spec: string | null | undefined,
   count: number,
-  materialGrade: string | null | undefined,
-  pitchMm?: number,
-  depthMm?: number,
-): number {
-  if (!spec) return 0;
-  const b = computeTapCycleSec(spec, count, pitchMm, depthMm, BLIND_TAP_FALLBACK_DEPTH_MM, materialGrade);
-  return b.totalSec + TAP_UNLOAD_SEC;
+  matClass: MaterialClass,
+  pitchMm: number | undefined,
+  depthMm: number | undefined,
+  tappingTable: any[] | null,
+  calculators: MachiningCalculators | null,
+): { timeSec: number; missing?: string } {
+  if (!spec) return { timeSec: 0, missing: 'a thread size' };
+  const cycle = computeTapCycle({ size: spec, count, pitchMm, depthMm: depthMm && depthMm > 0 ? depthMm : undefined }, matClass, tappingTable, calculators);
+  return cycle.sec == null ? { timeSec: 0, missing: cycle.missing.join('; ') } : { timeSec: cycle.sec };
 }
 
 // Real, material- and diameter-aware counterbore cycle time — replaces the
@@ -197,9 +206,8 @@ export interface OperationLine {
   name: string;
   timeSec: number;
   source: "feature" | "fixed";
-  // Real CAD feature_type ('through_hole'/'blind_hole'/'tapped_hole'/
-  // 'counterbore'/'countersink'/'pocket'/'slot') and diameter this specific
-  // op line was generated from, when it came from one feature_graph_v2
+  // Reference CAD feature_type ('SimpleHole'/'MultiStepHole'/'Edge'/
+  // 'PocketV2'/'Slot'/...) and diameter this specific op line was generated from, when it came from one feature_graph_v2
   // occurrence group. Carried through so the frontend can trace an operation
   // back to the exact CAD feature for 3D-viewer highlighting (same purpose
   // Sheet Metal's FeatureBreakdown already serves for bends/holes) — a
@@ -207,10 +215,17 @@ export interface OperationLine {
   // detected feature.
   cadFeatureType?: string;
   diameterMm?: number;
+  // Real number of CAD instances this line covers (holes for a PCD pattern,
+  // occurrences otherwise) — carried so the UI never infers a count from time.
+  count?: number;
+  // feature_graph_v2 ids of the detected feature(s) this op machines, so the
+  // UI highlights exactly those occurrences instead of every feature of a type.
+  featureIds?: string[];
+  // Present when this op could not be priced from real inputs (timeSec is 0
+  // for it): names the missing CAD measurement or lookup row. Never replaced
+  // by an estimated time.
+  missing?: string;
 }
-
-// Feature types that are hole-like (need drilling before tapping/counterboring)
-const HOLE_TYPES = new Set(["through_hole", "blind_hole", "tapped_hole", "counterbore", "countersink"]);
 
 // Canonical manufacturing order for sorting. Names are the real
 // operation_category strings from memory/machining/operations_full__operations.csv
@@ -281,6 +296,9 @@ export function buildOperationSequence(
   counterboreTable: any[] | null = null,
   chamferLinearSpeedMmPerSec: number | null = null,
   roundingLinearSpeedMmPerSec: number | null = null,
+  drillingTable: DrillingTable | null = null,
+  calculators: MachiningCalculators | null = null,
+  tappingTable: any[] | null = null,
 ): OperationLine[] {
   if (!Array.isArray(fgv2Features) || fgv2Features.length === 0) return [];
 
@@ -293,7 +311,11 @@ export function buildOperationSequence(
   ops.push({ name: "Facing", timeSec: 45, source: "fixed" });
 
   for (const f of fgv2Features as any[]) {
-    const ft: string = (f.feature_type ?? f.type ?? "").toLowerCase();
+    // feature_graph_v2 entries carry a reference catalog feature_type
+    // (cad-engine/shared/reference_features.json) plus its geometric variant;
+    // together they decide the real operation chain below.
+    const ft: string = f.feature_type;
+    const variant: string = f.variant ?? "default";
     const occurrences: any[] = Array.isArray(f.occurrences) ? f.occurrences : [];
     const count = occurrences.length || 1;
     const diamMm: number = f.diameter_mm ?? 0;
@@ -304,11 +326,9 @@ export function buildOperationSequence(
       0,
     );
 
-    // Real aggregate classified area (Phase 3 face_classification.py
-    // planar_face/curved_wall/curved_surface regions) — these carry no
-    // material_removed_mm3 of their own (classifying a face does not by
-    // itself reveal how much stock sat above it), so without this they
-    // would silently fall to the zero-time `default` case below.
+    // Real aggregate classified area (PlanarFace/CurvedWall/CurvedSurface/
+    // Cutout regions) -- these carry no material_removed_mm3 of their own
+    // (classifying a face does not reveal how much stock sat above it).
     const totalAreaMm2: number = occurrences.reduce(
       (s: number, o: any) => s + (o.area_mm2 ?? 0),
       0,
@@ -317,151 +337,146 @@ export function buildOperationSequence(
     // Representative depth: first occurrence, fallback 2.5×D
     const depthMm: number = occurrences[0]?.depth_mm ?? diamMm * 2.5;
 
-    // Thread spec: occurrences[0].spec (e.g. "M6×1.0"). pitch_mm is real,
-    // already-computed CAD data when present (same field
-    // resolveTapPhysicsInputs consumes elsewhere); undefined when absent
-    // lets computeTapCycleSec fall back to the standard ISO coarse-pitch
-    // series itself, same as everywhere else this physics runs.
+    // Thread spec: occurrences[0].spec (e.g. "M6×1.0"). pitch_mm is real
+    // CAD data when present; undefined lets computeTapCycleSec fall back to
+    // the standard ISO coarse-pitch series.
     const threadSpec: string | null = occurrences[0]?.spec ?? null;
     const threadPitchMm: number | undefined = occurrences[0]?.pitch_mm ?? undefined;
 
-    switch (ft) {
-      case "pocket":
-        // Real names: "Rough Milling" (also used by slot rough below — the
-        // real catalog uses one op name across FeatureTypes), "Fine Finish
-        // Milling" (no PocketV2-specific finish row exists in the real
-        // catalog; this is the real, generic finish op already used for
-        // planar/curved regions, reused here rather than fabricating a
-        // pocket-specific name).
+    const firstOpOfFeature = ops.length;
+    const instanceCount = variant === "pcd_pattern"
+      ? occurrences.reduce((s: number, o: any) => s + (o.hole_count ?? 1), 0)
+      : count;
+
+    switch (`${ft}:${variant}`) {
+      case "PocketV2:default":
+        // "Rough Milling//PocketV2" is the real catalog op; no PocketV2-specific
+        // finish row exists, so the real generic "Fine Finish Milling" is reused.
         ops.push({ name: "Rough Milling", timeSec: pocketRoughSec(totalRemovedMm3, mrr), source: "feature", cadFeatureType: ft });
         ops.push({ name: "Fine Finish Milling", timeSec: count * 30, source: "feature", cadFeatureType: ft });
         ops.push({ name: "Fine Finish Milling", timeSec: count * 25, source: "feature", cadFeatureType: ft });
         break;
 
-      case "slot":
+      case "Slot:straight":
+      case "Slot:radial":
         ops.push({ name: "Rough Milling", timeSec: pocketRoughSec(totalRemovedMm3, mrr), source: "feature", cadFeatureType: ft });
         ops.push({ name: "Slot Milling", timeSec: count * 20, source: "feature", cadFeatureType: ft });
         break;
 
-      case "through_hole":
-      case "blind_hole":
+      case "SimpleHole:through":
+      case "SimpleHole:blind":
+      case "SimpleHole:cross":
         if (diamMm > 0) {
           ops.push({ name: "Center Drilling", timeSec: count * 5, source: "feature", cadFeatureType: ft, diameterMm: diamMm });
-          ops.push({ name: "Drilling", timeSec: drillTimeSec(diamMm, depthMm, count, materialGrade), source: "feature", cadFeatureType: ft, diameterMm: diamMm });
+          ops.push({ name: "Drilling", ...drillOp(diamMm, depthMm, count, materialGrade, drillingTable, calculators), source: "feature", cadFeatureType: ft, diameterMm: diamMm });
         }
         break;
 
-      case "multi_step_hole": {
-        // Phase 5 (_detect_multistep_holes): each real occurrence carries
-        // its own real steps[] (diameter_mm/depth_mm per coaxial bore, 3+),
-        // NOT collapsed into the top-level diamMm/depthMm/count aggregates
-        // every other case above uses — a single scalar diameter can't
-        // represent a real tapered multi-step bore. One real Spot Drill per
-        // hole assembly (not per step); Drill time is the real sum of the
-        // SAME drillTimeSec physics every ordinary hole already uses,
-        // applied per real step.
+      case "SimpleHole:pcd_pattern": {
+        // One occurrence per pattern; each carries the real number of holes
+        // it stands for (hole_count), so drilling is costed per real hole.
+        const holes = occurrences.reduce((s: number, o: any) => s + (o.hole_count ?? 1), 0);
+        if (diamMm > 0 && holes > 0) {
+          ops.push({ name: "Center Drilling", timeSec: holes * 5, source: "feature", cadFeatureType: ft, diameterMm: diamMm });
+          ops.push({ name: "Drilling", ...drillOp(diamMm, depthMm, holes, materialGrade, drillingTable, calculators), source: "feature", cadFeatureType: ft, diameterMm: diamMm });
+        }
+        break;
+      }
+
+      case "MultiStepHole:stepped": {
+        // Each occurrence carries its own real steps[] (3+ coaxial bores). One
+        // spot drill per hole assembly; drill time is the same drillTimeSec
+        // physics applied per real step.
         let spotDrillSec = 0;
         let drillSec = 0;
+        const stepMissing: string[] = [];
         for (const occ of occurrences) {
           const steps: Array<{ diameter_mm: number; depth_mm: number }> = Array.isArray(occ.steps) ? occ.steps : [];
           if (steps.length === 0) continue;
           spotDrillSec += 5;
           for (const step of steps) {
-            drillSec += drillTimeSec(step.diameter_mm, step.depth_mm, 1, materialGrade);
+            const op = drillOp(step.diameter_mm, step.depth_mm, 1, materialGrade, drillingTable, calculators);
+            drillSec += op.timeSec;
+            if (op.missing) stepMissing.push(op.missing);
           }
         }
         if (spotDrillSec > 0 || drillSec > 0) {
           ops.push({ name: "Center Drilling", timeSec: spotDrillSec, source: "feature", cadFeatureType: ft });
-          ops.push({ name: "Drilling", timeSec: drillSec, source: "feature", cadFeatureType: ft });
+          ops.push({ name: "Drilling", timeSec: drillSec, source: "feature", cadFeatureType: ft, ...(stepMissing.length ? { missing: stepMissing.join('; ') } : {}) });
         }
         break;
       }
 
-      case "tapped_hole":
+      case "SimpleHole:threaded":
         if (diamMm > 0) {
           ops.push({ name: "Center Drilling", timeSec: count * 5, source: "feature", cadFeatureType: ft, diameterMm: diamMm });
-          ops.push({ name: "Drilling", timeSec: drillTimeSec(diamMm * 0.8, depthMm, count, materialGrade), source: "feature", cadFeatureType: ft, diameterMm: diamMm }); // minor diameter
+          ops.push({ name: "Drilling", ...drillOp(diamMm * 0.8, depthMm, count, materialGrade, drillingTable, calculators), source: "feature", cadFeatureType: ft, diameterMm: diamMm }); // minor diameter
           ops.push({ name: "Chamfering", timeSec: chamferTimeSec(diamMm, count, chamferLinearSpeedMmPerSec), source: "feature", cadFeatureType: ft, diameterMm: diamMm });
-          ops.push({ name: "Tapping", timeSec: tapTimeSec(threadSpec, count, materialGrade, threadPitchMm, depthMm), source: "feature", cadFeatureType: ft, diameterMm: diamMm });
+          ops.push({ name: "Tapping", ...tapOp(threadSpec, count, matClass, threadPitchMm, depthMm, tappingTable, calculators), source: "feature", cadFeatureType: ft, diameterMm: diamMm });
         }
         break;
 
-      case "counterbore":
+      case "MultiStepHole:counterbore":
         if (diamMm > 0) {
           ops.push({ name: "Center Drilling", timeSec: count * 5, source: "feature", cadFeatureType: ft, diameterMm: diamMm });
-          ops.push({ name: "Drilling", timeSec: drillTimeSec(diamMm * 0.6, depthMm, count, materialGrade), source: "feature", cadFeatureType: ft, diameterMm: diamMm }); // through bore
+          ops.push({ name: "Drilling", ...drillOp(diamMm * 0.6, depthMm, count, materialGrade, drillingTable, calculators), source: "feature", cadFeatureType: ft, diameterMm: diamMm }); // through bore
           ops.push({ name: "Counterboring", timeSec: counterboreTimeSec(diamMm, depthMm, count, matClass, counterboreTable), source: "feature", cadFeatureType: ft, diameterMm: diamMm });
         }
         break;
 
-      case "countersink":
+      case "Edge:countersink":
         if (diamMm > 0) {
           ops.push({ name: "Center Drilling", timeSec: count * 4, source: "feature", cadFeatureType: ft, diameterMm: diamMm });
-          ops.push({ name: "Drilling", timeSec: drillTimeSec(diamMm * 0.6, depthMm, count, materialGrade), source: "feature", cadFeatureType: ft, diameterMm: diamMm });
+          ops.push({ name: "Drilling", ...drillOp(diamMm * 0.6, depthMm, count, materialGrade, drillingTable, calculators), source: "feature", cadFeatureType: ft, diameterMm: diamMm });
           ops.push({ name: "Countersinking", timeSec: count * 6, source: "feature", cadFeatureType: ft, diameterMm: diamMm });
         }
         break;
 
-      case "chamfer":
+      case "Edge:chamfer":
         ops.push({ name: "Chamfering", timeSec: chamferTimeSec(diamMm, count, chamferLinearSpeedMmPerSec), source: "feature", cadFeatureType: ft, diameterMm: diamMm > 0 ? diamMm : undefined });
         break;
 
-      case "fillet":
-        // Phase 0 coverage fix (cad-engine): _collect_toroids now reaches
-        // feature_graph_v2 with a real major-diameter bucket (previously
-        // silently dropped). No real per-diameter/material rate table
-        // exists yet for toroidal edge-blend passes (unlike chamfer's
-        // tblChamfering/counterbore's tblCounterboring) — this is a
-        // disclosed flat per-occurrence estimate, same tier as
-        // counterboreTimeSec's/chamferTimeSec's own fallback constants,
-        // not a fabricated real-physics number.
-        //
-        // fillet and groove used to share one invented "Corner Round" name,
-        // but the real catalog treats them as two genuinely different real
-        // operations — filleting is edge-rounding, groove milling is
-        // material removal. Split into their own real names below, each
-        // now driven by the real tblCornerRoundingMill linear speed
-        // (roundingTimeSec) instead of the previous flat "count * 8 sec"
-        // constant, which had no real rate table behind it at all.
+      case "Edge:round":
+        // Convex toroidal blend. Driven by the real tblCornerRoundingMill
+        // linear speed (roundingTimeSec); edge-rounding, not material removal.
         ops.push({ name: "Filleting", timeSec: roundingTimeSec(diamMm, count, roundingLinearSpeedMmPerSec), source: "feature", cadFeatureType: ft, diameterMm: diamMm > 0 ? diamMm : undefined });
         break;
 
-      case "groove":
+      case "Slot:groove":
+      case "Ring:groove":
+        // Concave toroidal recess ("Groove Milling//Slot" on a mill,
+        // "Plunging//Ring" on a lathe) -- costed by the same real rounding
+        // linear speed, a disclosed stand-in until a groove table exists.
         ops.push({ name: "Groove Milling", timeSec: roundingTimeSec(diamMm, count, roundingLinearSpeedMmPerSec), source: "feature", cadFeatureType: ft, diameterMm: diamMm > 0 ? diamMm : undefined });
         break;
 
-      case "planar_face":
+      case "PlanarFace:default":
         ops.push({ name: "Fine Finish Milling", timeSec: faceRegionSec(totalAreaMm2, mrr), source: "feature", cadFeatureType: ft });
         break;
 
-      case "curved_wall":
+      case "CurvedWall:default":
+      case "CurvedSurface:default":
+        // The real catalog uses the same "Contouring" op for both feature types.
         ops.push({ name: "Contouring", timeSec: faceRegionSec(totalAreaMm2, mrr), source: "feature", cadFeatureType: ft });
         break;
 
-      case "curved_surface":
-        // Real catalog uses the SAME "Contouring" op name for both
-        // CurvedWall and CurvedSurface FeatureTypes — collapsing the former
-        // two invented names ("Contour Mill"/"Profile Mill") onto the one
-        // real shared name is correct, not a naming collision to avoid.
-        ops.push({ name: "Contouring", timeSec: faceRegionSec(totalAreaMm2, mrr), source: "feature", cadFeatureType: ft });
-        break;
-
-      case "cutout":
-        // Phase 5 (detect_cutout_rings): a non-circular through-opening --
-        // real perimeter milling pass, same real MRR-reuse model as
-        // planar_face/curved_wall/curved_surface above (totalAreaMm2 is
-        // the cutout's own real total wall area).
+      case "Cutout:default":
+        // Non-circular through-opening: real perimeter milling pass, same
+        // MRR-reuse model as the face regions (totalAreaMm2 = real wall area).
         ops.push({ name: "Perimeter Milling", timeSec: faceRegionSec(totalAreaMm2, mrr), source: "feature", cadFeatureType: ft });
         break;
 
       default:
-        // Unknown feature — contribute removed volume to roughing time if
-        // non-zero. "Bulk Milling" is the real catalog's own generic-removal
-        // op (no real "Adaptive Rough" name exists anywhere in the catalog —
-        // that was pure toolpath-strategy jargon, not a real operation).
+        // Ring:outer_diameter (turned OD -- costed by the turning engine, not
+        // here) and any feature with no milling case contribute their removed
+        // volume to "Bulk Milling", the real catalog's generic-removal op.
         if (totalRemovedMm3 > 0) {
           ops.push({ name: "Bulk Milling", timeSec: pocketRoughSec(totalRemovedMm3, mrr), source: "feature" });
         }
+    }
+    for (let i = firstOpOfFeature; i < ops.length; i++) {
+      ops[i]!.count = instanceCount;
+      if (typeof f.id === "string" && f.id) ops[i]!.featureIds = [f.id];
     }
   }
 
@@ -503,6 +518,8 @@ export function injectDrawingIntelligence(
   ops: OperationLine[],
   di: Record<string, any> | null | undefined,
   materialGrade: string | null = null,
+  tappingTable: any[] | null = null,
+  calculators: MachiningCalculators | null = null,
 ): OperationLine[] {
   if (!di) return ops;
 
@@ -529,7 +546,7 @@ export function injectDrawingIntelligence(
     const count = t.count ?? 1;
     const alreadyHas = result.some((o) => o.name === "Tapping");
     if (!alreadyHas && spec) {
-      result.push({ name: "Tapping", timeSec: tapTimeSec(spec, count, materialGrade, t.pitchMm, t.depthMm), source: "feature" });
+      result.push({ name: "Tapping", ...tapOp(spec, count, detectMaterialClass(materialGrade), t.pitchMm, t.depthMm, tappingTable, calculators), source: "feature" });
     }
   }
 

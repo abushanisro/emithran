@@ -1,5 +1,6 @@
 'use client';
 
+import { StockPricesCard } from '@/components/features/raw-materials/StockPricesCard';
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -1086,6 +1087,9 @@ export default function RawMaterialsPage() {
           </Button>
         )}
       </div>
+
+      {/* Stock-form prices by location (material_stock_prices) */}
+      <StockPricesCard />
 
       {/* ── Data Table ─────────────────────────────────────────── */}
       <Card>

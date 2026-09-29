@@ -57,7 +57,7 @@ export interface PlannedOperation {
   /** featureIds this operation applies to. Empty = part-level operation. */
   readonly featureIds: readonly string[];
   readonly sequenceIndex: number;
-  readonly processGroup: string; // 'Sheet Metal' | 'CNC Machining' | 'Plastics' | 'Quality'
+  readonly processGroup: string; // 'Sheet Metal' | 'Machining' | 'Plastic Molding' | 'Quality'
 }
 
 export interface CandidateRoute {

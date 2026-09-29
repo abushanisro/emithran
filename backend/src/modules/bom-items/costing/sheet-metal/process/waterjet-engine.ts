@@ -1,5 +1,4 @@
 import {
-  WATERJET_SETUP_MIN,
   WATERJET_ABRASIVE_KG_PER_MIN,
   WATERJET_LEAD_IN_MM,
   WATERJET_CUT_TIME_ADJUSTMENT_FACTOR,
@@ -48,8 +47,9 @@ export interface WaterjetInput {
   abrasiveKgPerMin?: number;
   // Per-batch setup time (min) — resolved by the caller from
   // sm_lookup_op_setup_time (migration 416) via
-  // SheetMetalLookupService.getOpSetupTime('waterjet'). Falls back to
-  // WATERJET_SETUP_MIN when no row is seeded yet, with a disclosed warning.
+  // SheetMetalLookupService.getOpSetupTime('waterjet'). The selected machine's
+  // real per-machine setup_time_hr wins; with neither, setup is not costed
+  // (resolveSetupMinutes returns source 'none' with a warning).
   setupMin?: number;
   // Real nozzle-wear cost/hr — see manufacturing-process-engine.ts's
   // CuttingProcessContext for sourcing (migration 531, closeout Plan
@@ -119,7 +119,6 @@ export function computeWaterjetCost(input: WaterjetInput): WaterjetResult {
     process: "Waterjet Cutting",
     machineSetupTimeHr: rate.setupTimeHr,
     operationSetupMin: input.setupMin,
-    classDefaultMin: WATERJET_SETUP_MIN,
     machineName: rate.machineName,
   });
   const setupMin = setup.setupMin;
@@ -168,7 +167,7 @@ export function computeWaterjetCost(input: WaterjetInput): WaterjetResult {
       totalCost: nozzleCost,
       cycleTimeMin: 0,
       hourlyRate: 0,
-      rateSource: "default_rate",
+      rateSource: "consumable_allowance",
       machineClass: rate.machineClass,
       machineName: null,
       commodityCode: null,

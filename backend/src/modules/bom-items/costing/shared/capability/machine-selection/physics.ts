@@ -208,7 +208,12 @@ export interface WaterjetRequirement {
 
 export interface InjectionMoldingRequirement {
   kind: 'injection_molding';
-  clampTonnageRequired: number;  // selector applies TONNAGE_MARGIN
+  // Reference clamp force for one cavity (plastic-molding/clamp-force.ts), which
+  // already includes clampForceSafetyFactor: the selector applies no further
+  // margin. null = not derivable (material has no reference clamp properties):
+  // no press is capable, and the reason says why.
+  clampTonnageRequired: number | null;
+  clampNotDerivableReason: string | null;
   projectedAreaMm2: number;
   // Full IMM sizing criteria: clamp force, shot weight, tie-bar spacing vs
   // part dims. Only clamp tonnage has capability data in mhr_records today
@@ -482,46 +487,30 @@ export function latheRequirement(input: {
 }
 
 // ── Injection molding ──────────────────────────────────────────────────────────
-// Clamp tonnage = projected area × material-specific cavity pressure factor —
-// the standard shop-floor sizing rule (eMithran/industry convention). Phase 1
-// approximates projected area with the part's bbox footprint (the true
-// projected-area-in-mold-opening-direction is a Phase 2 refinement — see the
-// injection-molding plan doc). The material clamp factor itself is resolved
-// by the caller (resolveMaterialClampFactor, machine-selector-im.ts) — see
-// injectionMoldingRequirement's own doc comment for why.
+// Clamp tonnage is the reference clamp force (plastic-molding/clamp-force.ts),
+// resolved by the caller and passed in as a number, per this file's contract
+// (it never sees a grade string or does its own material lookup). Phase 1
+// approximates projected area with the part's bbox footprint.
 
 export function injectionMoldingRequirement(input: {
   projectedAreaMm2: number;
-  // Real per-polymer-family clamp factor (tons/cm²) — resolved ONCE by the
-  // caller (resolveMaterialClampFactor, machine-selector-im.ts: a real,
-  // sourced 40+-family table cited to Rosato/Brydson/Griff/SPI) and passed in
-  // as a plain number, per this file's own header contract ("this file never
-  // sees a grade string or does its own classification/lookup"). This
-  // function used to violate that contract directly — classifying
-  // materialGrade itself via a separate, smaller, uncited 8-entry table
-  // (MATERIAL_PRESSURE_FACTOR_TON_CM2/classifyResinFamily) that gave the
-  // ACTUAL machine-selection gate a cruder, differently-sourced number than
-  // the one already computed for route comparison (evaluateIMCandidate).
-  // Real, confirmed live gap (2026-09-11).
-  materialClampFactor: number;
+  /** Reference clamp force, one cavity, tonnes (clamp-force.ts); null = not derivable. */
+  clampTonnageRequired: number | null;
+  clampNotDerivableReason: string | null;
   // Cavity count is not yet known at machine-selection time (it is itself
   // partly a function of the selected machine's clamp tonnage — see
   // recommendCavityCount, cost-injection-molding-engine.ts) — this remains a
-  // single-cavity-basis requirement, same as before. A genuinely
-  // multi-cavity part may need a larger machine than this alone selects;
-  // route comparison's im-*-tier routes resolve cavity count themselves
-  // before scoring each tier and are the more complete number for that case.
+  // single-cavity-basis requirement. Route comparison's im-*-tier routes size
+  // cavities against each tier's real press.
   shotWeightG?: number | null;
   partLengthMm?: number;
   partWidthMm?: number;
 }): InjectionMoldingRequirement {
-  const projectedAreaMm2 = Math.max(input.projectedAreaMm2, 0);
-  const projectedAreaCm2 = projectedAreaMm2 / 100; // 1 cm² = 100 mm²
-  const clampTonnageRequired = projectedAreaCm2 * input.materialClampFactor;
   return {
     kind: 'injection_molding',
-    clampTonnageRequired,
-    projectedAreaMm2,
+    clampTonnageRequired: input.clampTonnageRequired,
+    clampNotDerivableReason: input.clampNotDerivableReason,
+    projectedAreaMm2: Math.max(input.projectedAreaMm2, 0),
     shotWeightG: input.shotWeightG ?? null,
     partLengthMm: Math.max(input.partLengthMm ?? 0, 0),
     partWidthMm: Math.max(input.partWidthMm ?? 0, 0),

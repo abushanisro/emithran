@@ -7,7 +7,7 @@ feature-extraction architecture plan's layer-separation requirement.
 
 WHY THIS LIVES IN shared/, NOT machining/
 
-sheet_metal/feature_extractor.py and sheet_metal/features/forming_spike.py
+sheet_metal/feature_extractor.py and sheet_metal/features/formed_feature.py (stage 1)
 already depend directly on several of these primitives (confirmed by grep
 before this file existed): hole-classification (_TAP_DRILL_RANGES,
 classify_hole), cone classification (classify_cone), counterbore pairing
@@ -25,11 +25,7 @@ MachiningFeatureType) or anything else Machining-specific — functions here
 operate on plain dicts and duck-typed objects (attributes .id/.params/.face_ids),
 so a caller from ANY domain can use them without pulling in
 Machining-specific data structures. machining_feature_recognizer.py
-re-exports every name here unchanged, and the deprecated
-cnc_feature_recognizer.py compatibility shim re-exports them a second time,
-so `from machining.cnc_feature_recognizer import _TAP_DRILL_RANGES`
-(Sheet Metal's real existing import, pre-rename) keeps working without
-modification.
+re-exports every name here unchanged.
 """
 from __future__ import annotations
 
@@ -70,10 +66,11 @@ MAX_COAXIAL_DIST_MM = 5.0
 
 def classify_hole(diameter_mm: float, through: bool) -> Tuple[str, Optional[str], bool]:
     """
-    Returns (feature_type, thread_spec_or_None, is_helicoil).
+    Returns (SimpleHole variant, thread_spec_or_None, is_helicoil) -- variant is
+    one of "threaded" / "through" / "blind" (see machining/feature_models.VARIANTS).
 
     Heuristic: holes whose diameter falls within a known tap pre-drill range are
-    emitted as 'tapped_hole' (confidence 0.55 — geometry only, no PMI to confirm).
+    emitted as variant 'threaded' (confidence 0.55 — geometry only, no PMI to confirm).
     Applies to BOTH blind and through holes: an M4×0.7 tapped-thru hole pre-drills
     at Ø3.3 exactly like a blind one. The old blind-only gate silently dropped
     every through-tapped hole, so drawing-less parts lost all thru-thread cost.
@@ -88,11 +85,11 @@ def classify_hole(diameter_mm: float, through: bool) -> Tuple[str, Optional[str]
     """
     for lo, hi, spec in TAP_DRILL_RANGES:
         if lo <= diameter_mm <= hi:
-            return "tapped_hole", spec, False
+            return "threaded", spec, False
     for lo, hi, spec in HELICOIL_DRILL_RANGES:
         if lo <= diameter_mm <= hi:
-            return "tapped_hole", spec, True
-    return ("through_hole" if through else "blind_hole"), None, False
+            return "threaded", spec, True
+    return ("through" if through else "blind"), None, False
 
 
 def annotate_hole_depth(params: Dict, diameter_mm: float, depth_mm: float) -> None:
@@ -114,7 +111,8 @@ def annotate_hole_depth(params: Dict, diameter_mm: float, depth_mm: float) -> No
 def classify_cone(cone: Dict, cylinders: List[Dict]) -> Tuple[str, Dict, float]:
     """
     A cone is a countersink if there is a coaxial cylinder immediately below it.
-    Otherwise it is a chamfer.
+    Otherwise it is a chamfer. Returns (Edge variant "countersink"|"chamfer",
+    params, confidence).
     """
     cx, cy, cz = cone["centroid"]
     half_angle = cone["half_angle_deg"]
@@ -374,6 +372,11 @@ def part_bounding_box(shape) -> Dict:
     }
 
 
+# Two axes closer than this are the same line. Far above STEP export
+# precision (~1e-6 mm), far below any real off-axis feature.
+COAXIAL_TOLERANCE_MM = 0.01
+
+
 def collect_cylinders(
     shape,
     main_axis: Tuple[float, float, float],
@@ -381,14 +384,14 @@ def collect_cylinders(
 ) -> List[Dict]:
     """
     Collects all cylindrical faces and classifies each as:
-      external_diameter | through_hole | blind_hole | cross_hole
+      external_diameter | offset_profile | through_hole | blind_hole | cross_hole
 
     Uses face orientation (FORWARD/REVERSED) for external vs internal.
     Uses axis alignment with main_axis for axial vs cross orientation.
     Uses length vs part span for through vs blind discrimination.
 
     Real, live cross-domain primitive: Sheet Metal
-    (sheet_metal/feature_extractor.py, sheet_metal/features/forming_spike.py)
+    (sheet_metal/feature_extractor.py, sheet_metal/features/formed_feature.py (stage 1))
     reuses this exact function (previously reached as
     MachiningFeatureRecognizer._collect_cylinders, a Machining-class internal) for
     its own blind_hole classification -- see those modules' own doc
@@ -407,6 +410,12 @@ def collect_cylinders(
 
     # Part span along main axis — used for through vs blind discrimination
     part_span = axis_span(bbox, (ax, ay, az))
+    # The part's own axis passes through its bounding-box centre, not the
+    # global origin: distances and angles round the axis are measured from
+    # there, so a part modelled away from 0,0,0 classifies the same way.
+    ox = (bbox["xmin"] + bbox["xmax"]) / 2
+    oy = (bbox["ymin"] + bbox["ymax"]) / 2
+    oz = (bbox["zmin"] + bbox["zmax"]) / 2
 
     results = []
     face_idx = 0
@@ -433,7 +442,7 @@ def collect_cylinders(
             position = cx * ax + cy * ay + cz * az
 
             # Distance from centroid to main axis (arbitrary orientation)
-            dist_from_axis = point_to_axis_distance((cx, cy, cz), (ax, ay, az))
+            dist_from_axis = point_to_axis_distance((cx - ox, cy - oy, cz - oz), (ax, ay, az))
 
             # Approximate length from face bounding box
             fbox = Bnd_Box()
@@ -449,7 +458,7 @@ def collect_cylinders(
             is_reversed = face.Orientation() != TopAbs_FORWARD
 
             # Angular position of centroid around main axis (for PCD grouping)
-            angle_deg = angle_around_axis((cx, cy, cz), (ax, ay, az))
+            angle_deg = angle_around_axis((cx - ox, cy - oy, cz - oz), (ax, ay, az))
 
             if alignment >= 0.85:
                 # Axially aligned cylinder
@@ -459,8 +468,15 @@ def collect_cylinders(
                         kind = "through_hole"
                     else:
                         kind = "blind_hole"
-                else:
+                elif dist_from_axis <= COAXIAL_TOLERANCE_MM:
+                    # Convex and on the spindle axis: a turned diameter.
                     kind = "external_diameter"
+                else:
+                    # Convex, parallel to the axis but off it: a lathe cannot
+                    # turn this about the spindle. It is part of a profile
+                    # around the axis (gear/spline tooth flank, cam lobe,
+                    # boss) — see machining/axigroove.py.
+                    kind = "offset_profile"
             else:
                 kind = "cross_hole"
 

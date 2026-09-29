@@ -16,7 +16,7 @@ export interface GdtFeatureDto {
 
 export interface GdtAnalysisDto {
   bomItemId: string;
-  source: "drawing_intelligence" | "no_data";
+  source: "step_pmi" | "drawing_intelligence" | "no_data";
   features: GdtFeatureDto[];
   overallSeverity: GdtSeverity | null;
   maxCostImpactPercent: number;

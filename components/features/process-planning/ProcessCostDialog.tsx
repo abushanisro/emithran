@@ -19,16 +19,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useMHRRecords, useMHRRecord, useMHRBenchmark } from '@/lib/api/hooks/useMHR';
+import { useMHRRecords, useMHRRecord } from '@/lib/api/hooks/useMHR';
 import { resolveMhrUsdRate } from '@/lib/api/mhr';
 import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
+import { liveOperationOptions, resolveSavedOperation, type LiveOperationOption } from '@/lib/processCatalog/live-operation-options';
 import {
   effectiveProcessGroupOf,
-  processGroupOptionsFrom,
-  categoryOptionsFrom,
+  buildHrRatesIndex,
+  optionsKeepingSelection,
   matchesProcessAndCategory,
-  categoryMachineClassesOf,
-  benchmarkMatchesCategory,
   calculatorMappingsForMachineClass,
   unambiguousMapping,
 } from '@/lib/processCatalog/hr-rates-process-selection';
@@ -60,6 +59,19 @@ const SELECT_FIELD_OPTIONS: Record<string, string[]> = {
 // generic calculator execute() engine only reads plain inputs — it can't call
 // this API mid-formula — so these fields are resolved between two execute() passes.
 const SM_LOOKUP_DATA_SOURCE = 'sheet_metal_lookup';
+// Machining calculator fields whose value is a machining_reference_data row
+// (source_table / source_field name the table and column — migration 804).
+const MACHINING_LOOKUP_DATA_SOURCE = 'machining_lookup';
+
+// The engine's own inputs for the calculator that computed a machining line
+// (see the page's Cycle Time calculator button): opening the calculator from
+// that line shows exactly the values and sources the quote used.
+interface EngineCalculatorSeed {
+  calculatorId: string;
+  inputs: Record<string, number | string>;
+  provenance: Record<string, string>;
+  lookupMatches: Record<string, { table: string; row: Record<string, string | number> }>;
+}
 
 // Mirrors backend normaliseLaserMaterial (bom-items/costing/sheet-metal-lookup.service.ts)
 // — keep the keyword lists in sync. resolveSheetMetalLookup('laser_cut', ...)
@@ -234,7 +246,7 @@ interface ProcessCostDialogProps {
   // specific part's real detected geometry produced it. Each line's own
   // featureBreakdown (when present) gives finer-grained real options, e.g.
   // "Drilling Ø4.0mm ×2" instead of just "Drilling".
-  liveProcessLines?: Array<{ process: string; machineClass: string; cycleTimeMin: number; featureBreakdown?: Array<{ name: string; featureType: string; timeSec: number; count: number }> }>;
+  liveProcessLines?: Array<{ process: string; machineClass: string; cycleTimeMin: number; featureBreakdown?: Array<{ name: string; featureType: string; timeSec: number; count: number }>; machineSelection?: { balanced?: { candidate?: { machineId?: string | null } } } }>;
 }
 
 export function ProcessCostDialog({
@@ -294,9 +306,6 @@ export function ProcessCostDialog({
   const [partsPerCycle, setPartsPerCycle] = useState<number | string>('');
   const [scrap, setScrap] = useState<number | string>('');
   const [machineValue, setMachineValue] = useState<number | string>('');
-  // Manual rate fallback — used when MHR/LHR dropdown has no records
-  const [manualMhrRate, setManualMhrRate] = useState<number | ''>('');
-  const [manualLhrRate, setManualLhrRate] = useState<number | ''>('');
 
   // Track whether the engineer explicitly chose a rate — prevents auto-select from overriding a manual pick
   const [userOverrodeMHR, setUserOverrodeMHR] = useState(false);
@@ -353,6 +362,16 @@ export function ProcessCostDialog({
   // True once the engineer explicitly picks a calculator — prevents auto-select
   // from overwriting a manual choice.
   const [userOverrodeCalculator, setUserOverrodeCalculator] = useState(false);
+  const engineSeedRef = useRef<EngineCalculatorSeed | null>(null);
+  // Every machining line's calculator inputs on this part, keyed by calculator
+  // id — picking another machining calculator opens it with that line's inputs.
+  const engineSeedsRef = useRef<Record<string, EngineCalculatorSeed>>({});
+  // Machining calculator inputs the database could not resolve for this part,
+  // each with the reason (shown under the inputs instead of silent blanks).
+  const [machiningMissing, setMachiningMissing] = useState<string[]>([]);
+  // Key inputs (Hole Diameter, Bar Diameter, ...) the engineer typed; the
+  // lookup-table inputs are re-resolved from the database for them.
+  const machiningEditedRef = useRef<Set<string>>(new Set());
   const [calculatorResults, setCalculatorResults] = useState<Record<string, any> | null>(null);
   // Surfaces execute() request-level failures (network/validation errors) —
   // without this, a failed Calculate silently leaves every field showing
@@ -415,11 +434,10 @@ export function ProcessCostDialog({
   // than presenting a short list as the whole truth.
   const mhrTruncated = !!mhrData && (mhrData.total ?? 0) > mhrRecords.length;
 
-  const processGroups = useMemo(() => processGroupOptionsFrom(mhrRecords), [mhrRecords]);
-  const categories = useMemo(
-    () => categoryOptionsFrom(mhrRecords, selectedGroup),
-    [mhrRecords, selectedGroup],
-  );
+  // One index over the loaded rows; every picker below reads from it.
+  const hrRatesIndex = useMemo(() => buildHrRatesIndex(mhrRecords), [mhrRecords]);
+  const processGroups = hrRatesIndex.processGroups;
+  const categories = hrRatesIndex.categoriesOf(selectedGroup);
 
   const isLoadingCatalog = isLoadingMHR;
   const isLoadingCategories = isLoadingMHR;
@@ -436,32 +454,10 @@ export function ProcessCostDialog({
     { enabled: open },
   );
 
-  // Benchmark MHR from DB, unfiltered by class. It cannot be filtered here any
-  // more: machine_class is now read from the machine the engineer picks, which
-  // is downstream of this fetch. filteredMHR narrows these rows to the chosen
-  // Category instead — see byBmCategory, which matches them on the real classes
-  // that category resolves to, since benchmark rows carry no benchmark_source_key
-  // of their own to derive a category from.
-  const { data: benchmarkMHR } = useMHRBenchmark(undefined, undefined, { enabled: open });
   // When editing, fetch the specific saved MHR/LHR so they always appear in their lists
   const savedMHRId = editData?.mhrId || editData?.machineId || '';
   const { data: savedMHRRecord } = useMHRRecord(savedMHRId, { enabled: !!savedMHRId && open });
 
-  // Same "always appear in the list" guarantee as savedMHRRecord/savedLHRRecord
-  // above, but for a saved benchmark (★) pick. filteredMHR narrows benchmark
-  // rows to the classes the chosen Category resolves to — if the saved row's
-  // machine_class was recorded differently (or the machine has since been
-  // recategorised), that filter excludes it, so without this injection the
-  // Select renders blank despite selectedMHRId correctly holding the id (see
-  // savedBenchmarkMhrId usage in filteredMHR/LHR below). Only fetched
-  // (unfiltered, matching migration 379's stored id verbatim — already prefixed
-  // bm-mhr-/bm-lhr-) when there's actually a saved benchmark id to look for.
-  const savedBenchmarkMhrId = editData?.benchmarkMhrId ? String(editData.benchmarkMhrId) : '';
-  const { data: allBenchmarkMHR } = useMHRBenchmark(undefined, undefined, { enabled: open && !!savedBenchmarkMhrId });
-  const savedBenchmarkMHRRecord = useMemo(
-    () => (savedBenchmarkMhrId ? (allBenchmarkMHR ?? []).find((r) => String(r.id) === savedBenchmarkMhrId) ?? null : null),
-    [allBenchmarkMHR, savedBenchmarkMhrId],
-  );
   // limit:100 — the max the backend allows/clamps to (QueryCalculatorDto's
   // @Max(200), further clamped server-side to 100 by findAll's
   // `Math.min(query.limit || 10, 100)`). Without this, the backend instead
@@ -472,6 +468,8 @@ export function ProcessCostDialog({
   // by-id useCalculator fetch below — but LOOKS unselected in the UI).
   const { data: calculatorsData, isLoading: isLoadingCalculators, error: calculatorsError } = useCalculators({ limit: 100 });
   const { data: selectedCalculator } = useCalculator(selectedCalculatorId, { enabled: !!selectedCalculatorId });
+  const selectedCalculatorIdRef = useRef(selectedCalculatorId);
+  useEffect(() => { selectedCalculatorIdRef.current = selectedCalculatorId; }, [selectedCalculatorId]);
   const executeCalculator = useExecuteCalculator();
 
   // The calculated field holding the effective cycle time is NOT named the
@@ -609,20 +607,17 @@ export function ProcessCostDialog({
   // pickers behind a read-only "Saved process" panel -- traded one for the
   // other, leaving an engineer unable to see the real choices without first
   // clearing the selection.
-  const withSaved = (list: string[], saved: string): string[] =>
-    saved && !list.includes(saved) ? [...list, saved] : list;
-  const groupOptions = useMemo(() => withSaved(processGroups, selectedGroup), [processGroups, selectedGroup]);
-  const categoryOptions = useMemo(() => withSaved(categories, selectedCategory), [categories, selectedCategory]);
-  /** True when this saved value is not in the live HR Rates list — shown on the option. */
-  const notInCatalog = (list: string[], v: string) => !!v && !list.includes(v);
+  const groupOptions = useMemo(() => optionsKeepingSelection(processGroups, selectedGroup), [processGroups, selectedGroup]);
+  const categoryOptions = useMemo(() => optionsKeepingSelection(categories, selectedCategory), [categories, selectedCategory]);
+  /** True when this saved value is not in the loaded HR Rates list — shown on the option.
+   *  Never while the rows are still loading: then nothing is in the list yet. */
+  const notInCatalog = (list: readonly string[], v: string) => !isLoadingMHR && !!v && !list.includes(v);
 
 
   // ─── filteredMHR ─────────────────────────────────────────────────────────────
-  // Priority: 1) user's own mhr_records (location+group exact match)
-  //           2) user's own mhr_records (location only)
-  //           3) mhr_benchmark_rates DB table — location + category
-  //           4) mhr_benchmark_rates DB table — location only (pre-selection)
-  // Never falls back to hardcoded constants, and never widens across location.
+  // Real HR Rates machines only (mhr_records, memory/-backed since migration
+  // 805), for this location and the chosen Process + Category. No
+  // mhr_benchmark_rates rows, no hardcoded constants, never another location.
   // True once the engineer has chosen both halves of the real selection.
   const processFullySelected = !!(selectedGroup && selectedCategory);
 
@@ -654,10 +649,7 @@ export function ProcessCostDialog({
     [selectedGroup, selectedCategory],
   );
 
-  const categoryMachineClasses = useMemo(
-    () => categoryMachineClassesOf(mhrRecords as any[], selectedGroup, selectedCategory),
-    [mhrRecords, selectedGroup, selectedCategory],
-  );
+  const categoryMachineClasses = hrRatesIndex.machineClassesOf(selectedGroup, selectedCategory);
 
   // 3. Operation — NOT a browse of the generic reference catalog. Database-
   // driven from this part's own real CAD feature extraction: the live cost
@@ -667,10 +659,8 @@ export function ProcessCostDialog({
   // has 2 tapped holes -> a real "Tapping" line exists; a category with no
   // matching live line means this part's geometry genuinely does not need
   // that category's operations, not a data gap to paper over with the full
-  // catalog). Each real line's own featureBreakdown (when present) is
-  // exploded into its own option for finer real granularity, e.g. "Drilling
-  // Ø4.0mm ×2" as a distinct choice from "Drilling Ø8.0mm ×1" — both real,
-  // both already individually costed by the live engine.
+  // catalog). One option per live line, valued by the engine's own line name —
+  // the identity every writer saves (see live-operation-options.ts).
   // Real operation_category -> feature_type, from the same real
   // process_taxonomy_operations data already fetched for this dialog
   // (allMappingsData[].taxonomy.operations — migration 609/754). Used only
@@ -691,36 +681,10 @@ export function ProcessCostDialog({
     return map;
   }, [allMappingsData, categoryMachineClasses]);
 
-  const operationOptions = useMemo(() => {
-    if (!selectedCategory || categoryMachineClasses.size === 0) return [] as { value: string; label: string; cycleTimeMin: number }[];
-    const seen = new Map<string, { label: string; cycleTimeMin: number }>();
-    const withFeature = (name: string) => {
-      const featureType = catalogFeatureTypeByOperation.get(name);
-      return featureType ? `${name} // ${featureType}` : name;
-    };
-    for (const line of liveProcessLines) {
-      if (!categoryMachineClasses.has(line.machineClass)) continue;
-      if (line.featureBreakdown && line.featureBreakdown.length > 0) {
-        for (const fb of line.featureBreakdown) {
-          if (seen.has(fb.name)) continue;
-          // fb.name may carry a real diameter/count suffix ("Drilling Ø4.0mm
-          // ×2") — the catalog lookup key is the base operation name before
-          // that suffix; the displayed label keeps the full real fb.name and
-          // just appends the real feature type when a real catalog row for
-          // the base operation name has one.
-          const baseName = fb.name.split(' Ø')[0]!.split(' ×')[0]!.trim();
-          const featureType = catalogFeatureTypeByOperation.get(baseName);
-          const label = featureType ? `${fb.name} // ${featureType}` : fb.name;
-          seen.set(fb.name, { label, cycleTimeMin: fb.timeSec / 60 });
-        }
-      } else {
-        if (seen.has(line.process)) continue;
-        seen.set(line.process, { label: withFeature(line.process), cycleTimeMin: line.cycleTimeMin });
-      }
-    }
-    return Array.from(seen, ([value, v]) => ({ value, label: v.label, cycleTimeMin: v.cycleTimeMin }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-  }, [liveProcessLines, categoryMachineClasses, selectedCategory, catalogFeatureTypeByOperation]);
+  const operationOptions = useMemo(
+    () => (selectedCategory ? liveOperationOptions(liveProcessLines, categoryMachineClasses, catalogFeatureTypeByOperation) : []),
+    [liveProcessLines, categoryMachineClasses, selectedCategory, catalogFeatureTypeByOperation],
+  );
 
   // Root cause of "selected in the backend but the field shows unselected":
   // Radix Select only displays a value when it exactly matches one of its
@@ -731,13 +695,17 @@ export function ProcessCostDialog({
   // absent from today's operationOptions. The state (selectedOperation) was
   // never the problem; the OPTIONS LIST not containing a matching item was.
   // Same root cause and same fix this file already established for Group/
-  // Category via withSaved() (line 612) — applied here too, so a real saved
+  // Category via optionsKeepingSelection() — applied here too, so a real saved
   // value is always selectable and always visibly shown, never silently
   // blank.
-  const operationOptionsWithSaved = useMemo(() => {
-    if (!savedOperation || operationOptions.some((op) => op.value === savedOperation)) return operationOptions;
-    return [...operationOptions, { value: savedOperation, label: `${savedOperation} — saved, not in this part's current CAD extraction`, cycleTimeMin: 0 }];
-  }, [operationOptions, savedOperation]);
+  const savedLiveOperation = useMemo(
+    () => resolveSavedOperation(liveProcessLines, savedOperation, editData?.machineClass ?? ''),
+    [liveProcessLines, savedOperation, editData?.machineClass],
+  );
+  const operationOptionsWithSaved = useMemo((): LiveOperationOption[] => {
+    if (!savedLiveOperation || operationOptions.some((op) => op.value === savedLiveOperation)) return operationOptions;
+    return [...operationOptions, { value: savedLiveOperation, label: `${savedLiveOperation} — saved, not in this part's current CAD extraction`, detail: null, cycleTimeMin: 0 }];
+  }, [operationOptions, savedLiveOperation]);
 
   const filteredMHR = useMemo(() => {
     // No machine ever applies to a Raw Material / Packing & Delivery / General-General
@@ -745,7 +713,6 @@ export function ProcessCostDialog({
     // than let it leak through via the "nothing to validate against" branch below.
     if (isNonMachineOperation) return [];
     const base = mhrRecords as any[];
-    const bm   = benchmarkMHR ?? [];
     const locLower = location.toLowerCase();
 
     const byLoc = (arr: any[]) =>
@@ -756,17 +723,6 @@ export function ProcessCostDialog({
       return arr.filter(matchesSelection);
     };
 
-    // mhr_benchmark_rates rows have NO benchmark_source_key — only machine_class
-    // — so mhrCategoryOf would humanise the slug ("Roll Bending 3") and never
-    // match a real category name ("3 Roll Bender"), silently hiding every
-    // benchmark machine. They are matched on the real classes the chosen
-    // category actually resolves to instead: the same join by a different key,
-    // not a looser one.
-    const byBmCategory = (arr: any[]) => {
-      if (!processFullySelected) return arr;
-      return arr.filter(r => benchmarkMatchesCategory(r, categoryMachineClasses));
-    };
-
     const withSavedMachines = (list: any[]) => {
       let result = list as any[];
       if (savedMHRRecord && !result.some((r: any) => String(r.id) === String(savedMHRRecord.id))) {
@@ -775,41 +731,19 @@ export function ProcessCostDialog({
           result = [savedMHRRecord, ...result];
         }
       }
-      // Same safety net for a saved benchmark (★) pick — a benchmark row saved
-      // under a different/since-changed machine_class would otherwise have no
-      // matching <SelectItem>, leaving the Select rendered as if nothing were
-      // chosen even though selectedMHRId correctly holds its id.
-      if (savedBenchmarkMHRRecord && !result.some((r: any) => String(r.id) === String(savedBenchmarkMHRRecord.id))) {
-        result = [savedBenchmarkMHRRecord, ...result];
-      }
       return result;
     };
 
-    // 1 & 2 — user's own records, location-scoped
+    // Real HR Rates machines, location-scoped
     const dbLoc   = byLoc(base);
     const dbMatch = byCategory(dbLoc);
     const dbResult = dbMatch.length > 0 ? dbMatch : (dbLoc.length > 0 && !processFullySelected ? dbLoc : null);
     if (dbResult && dbResult.length > 0) return withSavedMachines(dbResult);
 
-    // 3 & 4 — DB benchmark table (mhr_benchmark_rates)
-    const bmLoc   = byLoc(bm);
-    const bmMatch = byBmCategory(bmLoc);
-    // Widening across category (bmLoc, pre-selection) is fine, but never across
-    // LOCATION — falling back to the raw, every-country `bm` here (as this used
-    // to) is the same "all country" leak this filter exists to prevent: an
-    // applied/selected location must always be respected, even before a Process
-    // and Category are chosen.
-    const bmResult = bmMatch.length > 0 ? bmMatch : (bmLoc.length > 0 && !processFullySelected ? bmLoc : []);
-    if (bmResult.length > 0) return withSavedMachines(bmResult);
-
-    // Deliberately NO cross-location fallback here. A Digital Factory is
-    // always set on the costed item, so "no machine for this location/category"
-    // must show as an empty dropdown (with the manual-entry escape hatch
-    // below), never silently widen to every country's machines — that silent
-    // widening is exactly how a China labour rate ended up auto-selected for
-    // an India-costed part.
+    // No real machine for this location/category: an empty list. Never widened
+    // to other locations or to benchmark rows.
     return withSavedMachines([]);
-  }, [mhrRecords, benchmarkMHR, location, selectedCategory, categoryMachineClasses, matchesSelection, savedMHRRecord, savedBenchmarkMHRRecord, processFullySelected, isNonMachineOperation]);
+  }, [mhrRecords, location, selectedCategory, matchesSelection, savedMHRRecord, processFullySelected, isNonMachineOperation]);
 
   // ─── The machine decides the class, the class decides the rest ────────────
   // machine_class is read from the SELECTED MACHINE's own row rather than from a
@@ -988,10 +922,10 @@ export function ProcessCostDialog({
   // Neither is guaranteed to be stored: `category` only exists from migration
   // 719 onward, and `process_group` is genuinely empty on plenty of real rows
   // (it was never a required column on process_cost_records). Both are read off
-  // the machine the line is ALREADY linked to instead — a fact recorded on that
-  // line, resolved by the same two functions the pickers themselves use, so the
-  // derived values are always real options rather than "saved, not in HR Rates"
-  // strays.
+  // the machine the line is ALREADY linked to, or — for a line with no machine —
+  // off its saved machine_class against the HR Rates rows
+  // (hrRatesIndex.selectionForMachineClass). Facts recorded on that line, resolved by the
+  // same rules the pickers use, so the derived values are always real options.
   //
   // This is not cosmetic. Everything downstream keys off Process: the Category
   // list, the Machine list, the Labour list and the machine-class join all
@@ -1009,26 +943,30 @@ export function ProcessCostDialog({
       return;
     }
     if (backfilledFromMachineRef.current) return;
-    if (!editData || !editDataApplied || !savedMHRRecord) return;
+    if (!editData || !editDataApplied) return;
+    if (selectedGroup && selectedCategory) { backfilledFromMachineRef.current = true; return; }
 
-    const derivedGroup = effectiveProcessGroupOf(savedMHRRecord as any);
-    const derivedCategory = mhrCategoryOf(savedMHRRecord as any);
-    let didBackfill = false;
-    if (!selectedGroup && derivedGroup !== '-') {
-      setSelectedGroup(derivedGroup);
-      didBackfill = true;
+    // The linked machine, when the line has one; otherwise the line's own saved
+    // machine_class read against the HR Rates rows (a line whose resource HR
+    // Rates does not price has no machine, but still has its class). Wait for
+    // whichever source applies to load, then fill once.
+    let derived: { processGroup?: string; category?: string };
+    if (savedMHRId) {
+      if (!savedMHRRecord) return;
+      const g = effectiveProcessGroupOf(savedMHRRecord as any);
+      const c = mhrCategoryOf(savedMHRRecord as any);
+      derived = { ...(g !== '-' ? { processGroup: g } : {}), ...(c !== '-' ? { category: c } : {}) };
+    } else {
+      if (isLoadingMHR) return;
+      derived = hrRatesIndex.selectionForMachineClass(editData.machineClass ?? '', selectedGroup);
     }
-    if (!selectedCategory && derivedCategory !== '-') {
-      setSelectedCategory(derivedCategory);
-      didBackfill = true;
-    }
-    if (didBackfill || (selectedGroup && selectedCategory)) {
-      backfilledFromMachineRef.current = true;
-    }
-  }, [open, editData, editDataApplied, savedMHRRecord, selectedGroup, selectedCategory]);
+    if (!selectedGroup && derived.processGroup) setSelectedGroup(derived.processGroup);
+    if (!selectedCategory && derived.category) setSelectedCategory(derived.category);
+    backfilledFromMachineRef.current = true;
+  }, [open, editData, editDataApplied, savedMHRId, savedMHRRecord, isLoadingMHR, hrRatesIndex, selectedGroup, selectedCategory]);
 
   // Pre-select "3. Operation" when editing an existing line, from its real
-  // saved operation string. operationOptionsWithSaved (withSaved() applied)
+  // saved operation string. operationOptionsWithSaved (saved value kept)
   // guarantees a matching item always exists once savedOperation is known,
   // so this no longer races against liveProcessLines loading — once per
   // open, so it never overwrites a deliberate in-progress change.
@@ -1036,14 +974,16 @@ export function ProcessCostDialog({
   useEffect(() => {
     if (!open) { backfilledOperationRef.current = false; return; }
     if (backfilledOperationRef.current) return;
-    if (!savedOperation || selectedOperation) return;
-    setSelectedOperation(savedOperation);
+    if (!savedLiveOperation || selectedOperation) return;
+    setSelectedOperation(savedLiveOperation);
     backfilledOperationRef.current = true;
-  }, [open, savedOperation, selectedOperation]);
+  }, [open, savedLiveOperation, selectedOperation]);
 
-  // Auto-select the top MHR match. Re-fires when the Category changes, so the
-  // machine always belongs to the category actually chosen. Clears a stale
-  // selection if it is no longer in the filtered list.
+  // Auto-select the machine the COST ENGINE selected for this category's live
+  // line (machineSelection.balanced) — never simply the first row of the list,
+  // which is an arbitrary position, not a decision. When the engine has no
+  // machine for it (or it is not in this list), nothing is pre-selected and
+  // the engineer picks explicitly.
   useEffect(() => {
     // Gated on the real selection (Process + Category) being complete, which
     // is exactly when filteredMHR is meaningful.
@@ -1059,10 +999,14 @@ export function ProcessCostDialog({
     // one class: no machine selected, so no class, so no machine ever selected.
     if (!processFullySelected || userOverrodeMHR) return;
     const currentValid = selectedMHRId && filteredMHR.some(r => String(r.id) === String(selectedMHRId));
-    if (!currentValid && filteredMHR.length > 0) {
-      setSelectedMHRId(String(filteredMHR[0].id));
+    if (currentValid) return;
+    const liveForCategory = liveProcessLines.filter((l) => categoryMachineClasses.has(l.machineClass));
+    const liveLine = liveForCategory.find((l) => l.process === selectedOperation) ?? liveForCategory[0];
+    const engineMachineId = liveLine?.machineSelection?.balanced?.candidate?.machineId;
+    if (engineMachineId && filteredMHR.some(r => String(r.id) === String(engineMachineId))) {
+      setSelectedMHRId(String(engineMachineId));
     }
-  }, [processFullySelected, filteredMHR, userOverrodeMHR, selectedMHRId]);
+  }, [processFullySelected, filteredMHR, userOverrodeMHR, selectedMHRId, liveProcessLines, categoryMachineClasses, selectedOperation]);
 
 
   // Reset the calculator override whenever the process identity changes, OR
@@ -1251,9 +1195,99 @@ export function ProcessCostDialog({
     }
   };
 
+  // Calculators mapped to a Machining operation (process_calculator_mappings,
+  // migration 804) — their inputs come from the machining engine / database.
+  const machiningCalculatorIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const m of (allMappingsData?.mappings ?? []) as any[]) {
+      if (m.processGroup === 'Machining' && m.calculatorId) ids.add(m.calculatorId);
+    }
+    return ids;
+  }, [allMappingsData]);
+
+  // Every input of a machining calculator for this part, from the database:
+  // the part's CAD measurements (or the keys the engineer typed) and each
+  // lookup-table value resolved by the SAME resolver the cost engine uses.
+  // onlyLookups: re-resolve just the lookup-table inputs for edited keys,
+  // leaving every other input (and its source) as it is.
+  const resolveMachiningInputs = async (calculatorId: string, keys: Record<string, number>, onlyLookups: boolean) => {
+    if (!bomItemData?.id) return;
+    try {
+      const d = await apiClient.post<{
+        inputs: Record<string, number>;
+        provenance: Record<string, string>;
+        lookupMatches: Record<string, { table: string; row: Record<string, string | number> }>;
+        missing: string[];
+      }>(`/bom-items/${bomItemData.id}/machining-calculator-inputs`, {
+        calculatorId,
+        keys,
+        // The Digital Factory this part is costed in: the server costs the part
+        // there and returns the inputs the engine actually used.
+        ...(defaultLocation ? { location: defaultLocation } : {}),
+      });
+      if (!d || selectedCalculatorIdRef.current !== calculatorId) return;
+      const lookupFields = new Set(
+        ((selectedCalculator as any)?.fields ?? [])
+          .filter((f: any) => f.dataSource === MACHINING_LOOKUP_DATA_SOURCE)
+          .map((f: any) => f.fieldName as string),
+      );
+      const pick = <T,>(rec: Record<string, T>) =>
+        onlyLookups ? Object.fromEntries(Object.entries(rec).filter(([f]) => lookupFields.has(f))) : rec;
+      setCalculatorInputs((prev: Record<string, any>) => ({ ...prev, ...pick(d.inputs) }));
+      setCalculatorInputProvenance((prev) => ({ ...prev, ...pick(d.provenance) }));
+      setCalculatorMatchedRowKeys((prev) => ({
+        ...prev,
+        ...Object.fromEntries(Object.entries(pick(d.lookupMatches)).map(([f, m]) => [f, m.row])),
+      }));
+      setMachiningMissing(d.missing ?? []);
+    } catch (err: any) {
+      setMachiningMissing([`Could not read this calculator's inputs from the database: ${err?.message ?? String(err)}`]);
+    }
+  };
+
+  // Engineer changed a key input of a machining calculator (e.g. Hole
+  // Diameter): re-resolve the lookup-table inputs from the database for it.
+  const onMachiningKeyEdited = (fieldName: string) => {
+    if (!selectedCalculatorId || !machiningCalculatorIds.has(selectedCalculatorId)) return;
+    const field = ((selectedCalculator as any)?.fields ?? []).find((f: any) => f.fieldName === fieldName);
+    if (!field || field.dataSource === MACHINING_LOOKUP_DATA_SOURCE) return;
+    machiningEditedRef.current.add(fieldName);
+    setCalculatorInputProvenance((prev) => ({ ...prev, [fieldName]: 'Entered in the calculator' }));
+    const current = calculatorInputsRef.current;
+    const keys = Object.fromEntries(
+      [...machiningEditedRef.current]
+        .map((f) => [f, Number(current[f])] as const)
+        .filter(([, v]) => Number.isFinite(v)),
+    );
+    void resolveMachiningInputs(selectedCalculatorId, keys, true);
+  };
+
   // Auto-populate calculator inputs from BOM data
   const autoPopulateFromBOM = async () => {
     if (!bomItemData || !selectedCalculator) return;
+
+    // A machining calculator never keeps another calculator's values, and
+    // never guesses from the bounding box: it is filled with the inputs the
+    // engine used for this part's line (CAD measurements + lookup rows, each
+    // with its source), or — when the part has no such line — resolved from
+    // the database for this part.
+    if (machiningCalculatorIds.has(selectedCalculatorId)) {
+      const seed = engineSeedRef.current?.calculatorId === selectedCalculatorId
+        ? engineSeedRef.current
+        : engineSeedsRef.current[selectedCalculatorId] ?? null;
+      machiningEditedRef.current = new Set();
+      setCalculatorInputs(seed ? { ...seed.inputs } : {});
+      setCalculatorInputProvenance(seed ? { ...seed.provenance } : {});
+      setCalculatorMatchedRowKeys(seed
+        ? Object.fromEntries(Object.entries(seed.lookupMatches).map(([f, m]) => [f, m.row]))
+        : {});
+      setMachiningMissing([]);
+      const fields: any[] = (selectedCalculator as any)?.fields ?? [];
+      const unfilled = fields.some((f) => f.fieldType !== 'calculated' && !(seed && f.fieldName in seed.inputs)
+        && (f.defaultValue == null || f.defaultValue === ''));
+      if (!seed || unfilled) await resolveMachiningInputs(selectedCalculatorId, {}, !!seed);
+      return;
+    }
 
     const bomFieldMapping: Record<string, any> = {
       // Weight mappings
@@ -1411,18 +1445,13 @@ export function ProcessCostDialog({
       'Shoulder Width': 'V-die opening = 8 × sheet thickness (same rule of thumb machine selection already uses)',
       'Shoulder Width (mm)': 'V-die opening = 8 × sheet thickness (same rule of thumb machine selection already uses)',
       'Lot Size': 'Batch Size entered above in this process cost form',
-      // Mirrors the EXACT same fallback chain effectiveMachineRate/
-      // effectiveLaborRate use (selectedMHR -> editData.machineName -> manual
-      // entry -> unlinked), so when nothing is actively selected in the
-      // Machine/Labour Type dropdowns (e.g. the saved machine isn't in the
-      // current filtered list), this note names the SAME machine the applied
-      // rate really came from, not a vague "selected machine" that doesn't
-      // match what's actually being costed.
+      // Names the same real HR Rates machine effectiveMachineRate /
+      // effectiveLaborRate read from (selected, else the saved one) — or says
+      // plainly that none is linked.
       'MHR per Hour': `Applied machine rate — ${
         selectedMHR ? selectedMHR.machineName
-        : editData?.machineName ? editData.machineName
-        : manualMhrRate ? 'Manual entry'
-        : describeUnlinkedRateProvenance()
+        : savedMHRRecord ? (savedMHRRecord as any).machineName
+        : 'no HR Rates machine linked (not costed)'
       }${
         selectedMHR?.location ? ` · ${selectedMHR.location}`
         : editData?.location ? ` · ${editData.location}`
@@ -1432,9 +1461,7 @@ export function ProcessCostDialog({
       'LHR per Hour': `Applied labour rate — ${
         machineLabour
           ? `${machineLabour.machineName ?? 'selected machine'}${machineLabour.wageGrade ? ` · wage grade ${machineLabour.wageGrade}` : ''}`
-        : editData?.laborType ? editData.laborType
-        : manualLhrRate ? 'Manual entry'
-        : describeUnlinkedRateProvenance()
+        : 'no HR Rates machine labour rate (not costed)'
       }${
         selectedMHR?.location ? ` · ${selectedMHR.location}`
         : editData?.location ? ` · ${editData.location}`
@@ -2005,6 +2032,31 @@ export function ProcessCostDialog({
     try {
       const { processesApi } = await import('@/lib/api/processes');
 
+      // Case M: a machining calculator field backed by a machining reference
+      // table (machining_reference_data). The row the engine used is outlined
+      // from the line's own lookup match; without one, rows whose value equals
+      // the field's current value are outlined instead.
+      if (field.dataSource === MACHINING_LOOKUP_DATA_SOURCE && field.sourceTable) {
+        const table = await processesApi.getMachiningLookupTableByName(field.sourceTable, field.sourceField);
+        const rows = (table.rows ?? []) as any[];
+        const recorded = calculatorMatchedRowKeys[field.fieldName] ?? null;
+        const current = Number(calculatorInputs[field.fieldName]);
+        const valueMatch = field.sourceField && Number.isFinite(current)
+          ? rows.find((r) => Math.abs(Number(r[field.sourceField]) - current) < 1e-6)
+          : null;
+        setLookupTableData({
+          fieldName: field.fieldName,
+          fieldLabel: field.displayLabel || field.fieldName,
+          tableName: table.tableName,
+          tableId: table.id,
+          column_definitions: table.columnDefinitions || [],
+          rows,
+          matchedRowKeys: recorded ?? (valueMatch && field.sourceField ? { [field.sourceField]: valueMatch[field.sourceField] } : null),
+        });
+        setShowLookupTable(true);
+        return;
+      }
+
       // Case 0: a real sm_lookup_* cost-engine table — the same live data
       // SheetMetalLookupService queries for this exact field's value (Time
       // Per Stroke, Stroke Time, Tool Loading Time, Cutting Speed, Piercing
@@ -2196,15 +2248,9 @@ export function ProcessCostDialog({
       setSavedOperation(editData.operation || '');
       setSelectedProcessCalculatorId(editData.processCalculatorId || '');
       
-      // Use the actual field names from the process data. Fall back to the
-      // benchmark id when there's no real mhr_id/lhr_id — a saved record from
-      // a benchmark (★) pick has mhr_id/lhr_id NULL by design (it's not a real
-      // mhr_records/lhr_records row), so without this the Select shows blank
-      // even though a real benchmark rate was actually chosen and applied.
-      // benchmarkMhrId/benchmarkLhrId already carry the bm-mhr-/bm-lhr-
-      // prefix (mhr.service.ts/lhr.service.ts's getBenchmarkRates()), matching
-      // filteredMHR's benchmark rows directly — no re-fetch needed.
-      const mhrId = editData.mhrId || editData.machineId || editData.benchmarkMhrId || '';
+      // The saved real HR Rates machine. A line saved against a benchmark row
+      // has no real machine: it opens with nothing selected.
+      const mhrId = editData.mhrId || editData.machineId || '';
       setSelectedMHRId(mhrId);
       
       setSetupManning(editData.setupManning || 1);
@@ -2216,17 +2262,23 @@ export function ProcessCostDialog({
       setScrap(editData.scrap || 0);
       // Never coerce an unresolved/never-set value to 0 — that's indistinguishable
       // from a genuinely saved zero rate. Keep it blank (renders the placeholder)
-      // exactly like manualMhrRate/manualLhrRate below already correctly do.
       setMachineValue(editData.machineValue ?? '');
-      setManualMhrRate(editData.machineRate || '');
-      setManualLhrRate(editData.laborRate  || '');
       setFacilityId(editData.facilityId);
       setFacilityRateId(editData.facilityRateId);
+      const seed: EngineCalculatorSeed | undefined = editData.engineCalculator;
+      engineSeedRef.current = seed ?? null;
+      engineSeedsRef.current = editData.engineCalculators ?? {};
+      if (seed?.calculatorId) {
+        setSelectedCalculatorId(seed.calculatorId);
+        setUserOverrodeCalculator(true);
+      }
       if (autoOpenCalculator) {
         setCalculatorTarget('cycleTime');
         setCalculatorOpen(true);
       }
     } else if (!editData && open) {
+      engineSeedRef.current = null;
+      engineSeedsRef.current = {};
       setEditDataApplied(false);
       // Reset for new entry - suggest next operation number but user can change it
       setOpNbr(getSuggestedOpNbr()); // Suggest next operation number but user can enter any number
@@ -2244,17 +2296,16 @@ export function ProcessCostDialog({
       setPartsPerCycle('');
       setScrap('');
       setMachineValue('');
-      setManualMhrRate('');
-      setManualLhrRate('');
       setFacilityId(undefined);
       setFacilityRateId(undefined);
       setUserOverrodeMHR(false);
     }
   }, [editData, open, autoOpenCalculator]);
 
-  // Effective rates: dropdown selection → manual input → editData stored fallback.
-  // Non-machine operations (Raw Material / Packing & Delivery / General-General) never
-  // have a real machine cost, so no stale saved/manual value is allowed to surface here.
+  // Effective rates come only from a real HR Rates machine: the selected one,
+  // else the line's saved one. No manual entry and no stale saved-rate
+  // snapshot — with no machine the rate is 0 and the field says it is not
+  // costed. Non-machine operations never carry a machine cost.
   const effectiveMachineRate = isNonMachineOperation
     ? 0
     : selectedMHR
@@ -2273,14 +2324,9 @@ export function ProcessCostDialog({
         // on older rows) is exactly what produced "MHR = $0.00/hr" for a
         // machine that actually has a valid rate on file.
         ? resolveMhrUsdRate(savedMHRRecord)
-        : (typeof manualMhrRate === 'number' && manualMhrRate > 0 ? manualMhrRate : (Number(editData?.machineRate) || 0));
-  // For benchmark records lhr is already in USD (= lhrUsdEffective). For user records
-  // lhrUsdEffective is the correct USD value; fall back to lhr when it is missing.
-  // The selected machine's own rate, else a manual entry, else whatever this
-  // line was last saved with. No labour-record tier in between any more.
-  const effectiveLaborRate = machineLabour
-    ? machineLabour.rate
-    : (typeof manualLhrRate === 'number' && manualLhrRate > 0 ? manualLhrRate : (Number(editData?.laborRate) || 0));
+        : 0;
+  // The selected machine's own labour rate, or none.
+  const effectiveLaborRate = machineLabour ? machineLabour.rate : 0;
 
   // Cost preview: calls the exact same eMithranTerms()-based engine that computes the
   // saved record server-side (POST /process-costs/calculate → ProcessCostCalculationEngine),
@@ -2358,13 +2404,6 @@ export function ProcessCostDialog({
   // system uses everywhere else — not an AI/ML step. Read the real provenance
   // marker the backend already writes (notes = 'auto_fill_from_cad' or
   // 'auto_fill_from_route:<id>') and describe it for what it actually is.
-  const describeUnlinkedRateProvenance = (): string => {
-    const notes = String(editData?.notes ?? '');
-    if (notes === 'auto_fill_from_cad' || notes.startsWith('auto_fill_from_route:')) {
-      return 'Calculated from part geometry';
-    }
-    return 'Manual rate — not linked';
-  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -2413,27 +2452,16 @@ export function ProcessCostDialog({
       operation: selectedOperation || savedOperation,
       processCalculatorId: selectedProcessCalculatorId,
       mhrId: toUUID(selectedMHRId),
-      // Benchmark (★) machine rows live in mhr_benchmark_rates, not mhr_records —
-      // their id is a plain bigint, never a UUID, so it can never be sent as mhrId
-      // (mhr_records FK). Send it separately so the backend can still resolve the
-      // real machine_name/machine_class from mhr_benchmark_rates instead of the
-      // record silently ending up "not linked to a machine".
-      // Explicit null (not undefined) when NOT a benchmark pick — mhrId/benchmarkMhrId
-      // must be mutually exclusive on the saved record. undefined gets dropped by
-      // JSON serialization, so an update switching FROM a benchmark machine TO a
-      // real one would otherwise leave the old benchmark_mhr_id stale on the row
-      // (the backend only clears/updates a field when its key is actually present).
-      benchmarkMhrId: (selectedMHR as any)?.isBenchmark ? selectedMHR?.id : null,
+      // Always explicit null: only real HR Rates machines can be selected, and
+      // null clears any benchmark id left on an older row (the backend only
+      // updates a field whose key is present).
+      benchmarkMhrId: null,
       // Explicit null, not omitted: the labour rate now always comes from the
       // selected machine's own row, so no lhr_records / lhr_benchmark_rates row
       // was chosen. Sending null clears a stale FK left by a line that was
       // originally saved through the removed labour picker (the backend only
       // updates a field whose key is actually present).
       lhrId: null,
-      // Same reasoning as benchmarkMhrId above — a benchmark (★) labour rate
-      // lives in lhr_benchmark_rates, its id is never a UUID, so it can't be
-      // sent as lhrId. Without this, the record's labor_type ends up null even
-      // though a specific, real (benchmark) labour rate was chosen.
       benchmarkLhrId: null,
       machineName: selectedMHR?.machineName || '',
       // Real hours/day for the SELECTED machine, from its own mhr_records row
@@ -2590,18 +2618,17 @@ export function ProcessCostDialog({
                             <SelectValue placeholder="Select process" />
                           </SelectTrigger>
                           <SelectContent>
+                            {groupOptions.map((group) => (
+                              <SelectItem key={group} value={group}>
+                                {group}{notInCatalog(processGroups, group) ? ' — saved, not in HR Rates' : ''}
+                              </SelectItem>
+                            ))}
                             {isLoadingMHR ? (
-                              <SelectItem key="loading" value="loading" disabled>
+                              <SelectItem key="loading" value="__loading__" disabled>
                                 Loading processes...
                               </SelectItem>
-                            ) : groupOptions.length > 0 ? (
-                              groupOptions.map((group) => (
-                                <SelectItem key={group} value={group}>
-                                  {group}{notInCatalog(processGroups, group) ? ' — saved, not in HR Rates' : ''}
-                                </SelectItem>
-                              ))
-                            ) : (
-                              <SelectItem key="no-groups" value="none" disabled>
+                            ) : groupOptions.length === 0 && (
+                              <SelectItem key="no-groups" value="__none__" disabled>
                                 No processes available
                               </SelectItem>
                             )}
@@ -2628,18 +2655,17 @@ export function ProcessCostDialog({
                             <SelectValue placeholder="Select category" />
                           </SelectTrigger>
                           <SelectContent>
+                            {categoryOptions.map((cat: string) => (
+                              <SelectItem key={cat} value={cat}>
+                                {cat}{notInCatalog(categories, cat) ? ' — saved, not in HR Rates' : ''}
+                              </SelectItem>
+                            ))}
                             {isLoadingCategories ? (
-                              <SelectItem key="loading" value="loading" disabled>
+                              <SelectItem key="loading" value="__loading__" disabled>
                                 Loading categories...
                               </SelectItem>
-                            ) : categoryOptions.length > 0 ? (
-                              categoryOptions.map((cat: string) => (
-                                <SelectItem key={cat} value={cat}>
-                                  {cat}{notInCatalog(categories, cat) ? ' — saved, not in HR Rates' : ''}
-                                </SelectItem>
-                              ))
-                            ) : (
-                              <SelectItem key="no-categories" value="none" disabled>
+                            ) : categoryOptions.length === 0 && (
+                              <SelectItem key="no-categories" value="__none__" disabled>
                                 No categories for {selectedGroup}
                               </SelectItem>
                             )}
@@ -2716,6 +2742,10 @@ export function ProcessCostDialog({
                             ))}
                           </SelectContent>
                         </Select>
+                        {(() => {
+                          const detail = operationOptionsWithSaved.find((op) => op.value === selectedOperation)?.detail;
+                          return detail ? <p className="text-xs text-muted-foreground">Features costed on this line: {detail}</p> : null;
+                        })()}
                         {selectedCategory && operationOptions.length === 0 && selectedOperation && (
                           <p className="text-xs text-amber-600 dark:text-amber-500">
                             &quot;{selectedOperation}&quot; is this line&apos;s saved operation — this part&apos;s current CAD feature
@@ -2767,14 +2797,17 @@ export function ProcessCostDialog({
                                 <SelectItem key={mhr.id} value={String(mhr.id)}>
                                   {mhr.machineName} - ${resolveMhrUsdRate(mhr).toFixed(2)}/hr
                                   {mhr.location ? ` (${mhr.location})` : ''}
-                                  {mhr.isBenchmark ? ' ★' : ''}
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
-                          {filteredMHR.some((r: any) => r.isBenchmark) && (
+                          {/* Where the applied rate comes from, stated plainly — so a
+                              reference machine literally named "Default" reads as the
+                              category's real work center, not as a system fallback. */}
+                          {selectedMHR && (
                             <p className="text-xs text-muted-foreground">
-                              ★ Benchmark rates — add custom rates in HR Rates to override
+                              Rate source: HR Rates — {mhrCategoryOf(selectedMHR as any)} · {selectedMHR.machineName}
+                              {selectedMHR.location ? ` (${selectedMHR.location})` : ''} · MHR ${resolveMhrUsdRate(selectedMHR).toFixed(2)}/hr
                             </p>
                           )}
                           {/* This machine's own record is from a different location than the
@@ -2809,32 +2842,15 @@ export function ProcessCostDialog({
                             No machine hour rate applies — this is a raw-material / logistics step, not a
                             machine operation.
                           </p>
+                        ) : processFullySelected ? (
+                          <p className="text-xs text-destructive">
+                            No machine in HR Rates for &quot;{selectedCategory}&quot;{location ? ` in ${location}` : ''} —
+                            this line is not costed. Add the machine to memory/ and seed it into HR Rates.
+                          </p>
                         ) : (
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-muted-foreground">$/hr</span>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={manualMhrRate}
-                                onChange={(e) => setManualMhrRate(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
-                                placeholder="Enter machine rate ($/hr)"
-                                className="flex-1"
-                              />
-                            </div>
-                            {processFullySelected ? (
-                              <p className="text-xs text-destructive">
-                                No machines on file for &quot;{selectedCategory}&quot;{location ? ` in ${location}` : ''} —
-                                add one in HR Rates, or enter a rate manually above. No machines from other
-                                categories are shown, to avoid pricing this against the wrong resource.
-                              </p>
-                            ) : (
-                              <p className="text-xs text-amber-600 dark:text-amber-400">
-                                No MHR records{location ? ` for ${location}` : ''}. Enter rate manually or add in HR Rates.
-                              </p>
-                            )}
-                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Choose a Process and Category to list their HR Rates machines.
+                          </p>
                         )}
                       </div>
 
@@ -2910,31 +2926,15 @@ export function ProcessCostDialog({
                             No labour rate applies — this is a raw-material / logistics step, not a machine
                             operation.
                           </p>
+                        ) : selectedMHR ? (
+                          <p className="text-xs text-amber-600 dark:text-amber-500">
+                            {selectedMHR.machineName} has no labour rate in HR Rates — labour is not costed for this
+                            line. Set it against the machine in memory/ and re-seed.
+                          </p>
                         ) : (
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-muted-foreground">$/hr</span>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={manualLhrRate}
-                                onChange={(e) => setManualLhrRate(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
-                                placeholder="Enter labour rate ($/hr)"
-                                className="flex-1"
-                              />
-                            </div>
-                            {selectedMHR ? (
-                              <p className="text-xs text-amber-600 dark:text-amber-500">
-                                {selectedMHR.machineName} has no labour rate on file in HR Rates — enter one here,
-                                or set it against the machine so every line using it picks it up.
-                              </p>
-                            ) : (
-                              <p className="text-xs text-amber-600 dark:text-amber-400">
-                                Select a machine above to use its labour rate, or enter one manually.
-                              </p>
-                            )}
-                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            The labour rate is the selected machine&apos;s own — select a machine above.
+                          </p>
                         )}
                       </div>
                     </CardContent>
@@ -3346,6 +3346,7 @@ export function ProcessCostDialog({
                                       [field.fieldName]: parseFloat(e.target.value) || 0,
                                     })
                                   }
+                                  onBlur={() => onMachiningKeyEdited(field.fieldName)}
                                   placeholder={`Enter ${field.displayLabel || field.fieldName}`}
                                   className={`flex-1 ${realValueClassName}`}
                                 />
@@ -3373,6 +3374,7 @@ export function ProcessCostDialog({
                                     [field.fieldName]: parseFloat(e.target.value) || 0,
                                   })
                                 }
+                                onBlur={() => onMachiningKeyEdited(field.fieldName)}
                                 placeholder={`Enter ${field.displayLabel || field.fieldName}`}
                                 className={realValueClassName}
                               />
@@ -3386,6 +3388,15 @@ export function ProcessCostDialog({
                           </div>
                         );
                       })}
+
+                    {machiningCalculatorIds.has(selectedCalculatorId) && machiningMissing.length > 0 && (
+                      <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                        <div className="font-medium">Not available from this part / the database:</div>
+                        <ul className="list-disc pl-4">
+                          {machiningMissing.map((m) => <li key={m}>{m}</li>)}
+                        </ul>
+                      </div>
+                    )}
 
                     {/* Machine Capability — only for calculators that price
                         laser power (Laser Cutting today). Shows the REAL,

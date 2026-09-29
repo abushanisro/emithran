@@ -413,34 +413,23 @@ export interface AutoFillGeometry {
 export interface AutoFillSuggestions {
   name: string;
   partNumber: string;
-  materialCategory: string;
+  /** From the CAD family; null when the engine did not classify the part. */
+  materialCategory: string | null;
   materialGrade: string;
   materialId: string | null;
   density: number | null;
-  processType: string;
+  /** The CAD family's process_taxonomy group (e.g. "Machining"), or null. */
+  processType: string | null;
+  /** Real catalog machine for machining parts (e.g. "3 Axis Mill"), else null. */
+  suggestedMachine: string | null;
   familyClassification: string | null;
   familyConfidence: number | null;
-  makeBuy: 'make' | 'buy';
-  itemType: 'assembly' | 'sub_assembly' | 'child_part';
-}
-
-export interface AutoFillCosts {
-  materialCostPerKg: number | null;
-  mhrRate: number | null;
-  lhrRate: number | null;
-  estimatedCycleTimeMin: number;
-  calculatorId: string | null;
-  estimatedUnitCost: number | null;
 }
 
 export interface AutoFillResponse {
   fileName: string;
   geometry: AutoFillGeometry;
   suggestions: AutoFillSuggestions;
-  costs: AutoFillCosts;
-  confidence: { overall: number; geometry: number; material: number; process: number; cost: number };
-  cadEngineAvailable: boolean;
-  cadEngineError?: string;
   featureGraph?: FeatureGraph;
 }
 
@@ -550,6 +539,8 @@ export interface MachineCandidate {
   machineId: string | null;
   machineName: string | null;
   commodityCode: string | null;
+  /** The machine's HR Rates process group (process_group, else commodity_code). */
+  processGroup: string | null;
   machineClass: string;
   hourlyRate: number;
   utilizationPct: number;
@@ -589,6 +580,27 @@ export interface MachineSelectionResult {
   allowOverride: true;
   overridden: boolean;
   availabilityWarning?: string;
+  /** Every capable machine in balanced-profile order, with its 0-1 component scores. */
+  ranking?: MachineScoreBreakdown[];
+  /** Machines of this class that failed the part's capability check. */
+  rejected?: Array<{ machineId: string | null; machineName: string | null; reasons: string[] }>;
+  profileWeights?: Record<'balanced' | 'cheapest' | 'fastest', { fit: number; util: number; cost: number; avail: number }>;
+  decision?: {
+    winnerId: string | null;
+    runnerUpId: string | null;
+    decidingFactor: 'fit' | 'util' | 'cost' | 'avail' | 'tie_rate' | 'only_capable' | 'override';
+  };
+}
+
+export interface MachineScoreBreakdown {
+  machineId: string | null;
+  machineName: string | null;
+  hourlyRate: number;
+  fit: number;
+  util: number;
+  cost: number;
+  avail: number;
+  score: number;
 }
 
 export interface FeatureOp {
@@ -596,6 +608,8 @@ export interface FeatureOp {
   timeSec: number;
   featureType: string; // 'spot_drill' | 'drill' | 'pocket_mill' | 'tapping' | 'laser_cut' | 'pierce' | 'bend'
   count: number;
+  /** feature_graph_v2 ids of the exact features this entry machines (machining). */
+  featureIds?: string[];
 }
 
 export interface CalculationTraceStep {
@@ -680,23 +694,25 @@ export interface ProcessLineCost {
   /** Real un-amortised setup minutes for one batch (backend resolveSetupMinutes). */
   setupTimeMin?: number;
   /**
-   * Which real source that setup time came from — 'machine' is the selected
-   * machine's own mhr_records.setup_time_hr, 'operation_lookup' a real
-   * sm_lookup_op_setup_time row, 'class_default' the cited per-class constant.
-   * Disclosed so the UI never shows a class default as a measured machine spec.
+   * Which real source that setup time came from — 'calculator' a DB calculator
+   * result for this part, 'machine' the selected machine's own
+   * mhr_records.setup_time_hr, 'operation_lookup' a real sm_lookup_op_setup_time
+   * row, 'none' no real setup data (setup not costed — never a constant).
    */
-  setupTimeSource?: 'machine' | 'operation_lookup' | 'class_default';
+  setupTimeSource?: 'calculator' | 'machine' | 'operation_lookup' | 'none';
   /** Real per-machine operator headcount this line was costed with. */
   operators?: number | null;
   hourlyRate: number;
-  rateSource: 'mhr_database' | 'default_rate' | 'no_db_rate' | 'tier_synthetic' | 'benchmark_override';
+  /** 'mhr_database' = a real HR Rates machine; 'no_db_rate' = no machine (not costed);
+   *  'tooling_amortization' / 'consumable_allowance' = real non-machine cost lines. */
+  rateSource: 'mhr_database' | 'no_db_rate' | 'tooling_amortization' | 'consumable_allowance';
   machineClass: string;
   machineName: string | null;
   commodityCode: string | null;
-  /** Labour hour rate from lhr_benchmark_rates (local currency/hr). Already baked into hourlyRate. */
+  /** The selected machine's own labour hour rate (local currency/hr), charged separately from hourlyRate. */
   labourRate?: number | null;
-  /** Which of resolveLHRRates' 4 passes resolved labourRate above — mirrors rateSource's provenance visibility, for the labor side. */
-  labourRateSource?: 'lhr_database' | 'lhr_benchmark' | 'lhr_cross_location' | 'no_lhr_rate' | null;
+  /** 'mhr_machine_specific' = that machine's own LHR; 'no_lhr_rate' = none on file. */
+  labourRateSource?: 'mhr_machine_specific' | 'no_lhr_rate' | null;
   machineSelection?: MachineSelectionResult;
   /** Real mhr_records id / 'bm-mhr-<id>' benchmark id for this line's resolved
    *  resource, set directly on classes (currently just Inspection) priced via
@@ -710,6 +726,8 @@ export interface ProcessLineCost {
    *  processes wired to a real DB calculator (Laser Cutting, Press Brake).
    *  Powers the "Download calculation" export. */
   calculationTrace?: CalculationTraceStep[];
+  // Machining calculators: per input field, the lookup table + row(s) its value came from.
+  lookupMatches?: Record<string, { table: string; row: Record<string, string | number> }>;
   /** Which real, registry-resolved calculator (and version) computed this
    *  line's cycle time, when resolved via the Manufacturing Physics
    *  Calculator pipeline. Absent for processes not yet migrated onto it. */
@@ -834,12 +852,6 @@ export interface CostSummaryDto {
   // (which already applies to this DTO's own embedded figures) — see the
   // backend cost-breakdown.dto.ts's doc comment for why the two differ.
   usdToDisplayRate?: number;
-  // amount_inr × inrToDisplayRate = amount in `currency` — for converting
-  // frontend constants/estimates denominated in INR regardless of factory
-  // location (e.g. the Investment/NRE tab's fixture/programming/tooling/
-  // inspection tables). Always derived from the live exchange_rates table
-  // server-side — never a hardcoded per-country FX table on the frontend.
-  inrToDisplayRate?: number;
   // Persistent eMithran-style manual overrides already applied to the figures
   // above ('mat_rate' | '<process>::rate' | '<process>::cycleMin') — read-only
   // hint for the "overridden" badge + reset control, not something to re-apply.
@@ -860,7 +872,12 @@ export interface CostSummaryDto {
 export interface InjectionMoldingBreakdown {
   moldingSubtype: 'standard' | 'lsr' | 'insert' | 'overmold' | 'gas_assisted' | 'two_shot' | 'unscrewing';
   cavityCount: number;
-  cavityConstrainedBy: 'clamp' | 'shot_capacity' | 'economic' | 'default';
+  /** 'user': set in the Cost Guide; 'default': reference defaultNumCavities; 'unverified': press / clamp / layout check failed. */
+  cavityConstrainedBy: 'clamp' | 'shot_capacity' | 'economic' | 'default' | 'user' | 'unverified';
+  /** Reference mold layouts (layoutNumCav) a cavity count may take. */
+  cavityLayouts?: number[];
+  /** Reference defaultNumCavities. */
+  defaultCavityCount?: number | null;
   runnerSystemType: 'hot' | 'cold';
   runnerScrapKg: number;
   gateType: string;
@@ -870,7 +887,11 @@ export interface InjectionMoldingBreakdown {
   cavityCycleTimeSec: number;
   costConfidence: number;
   projectedAreaCm2?: number | null;
-  materialClampFactor?: number | null;
+  /** Reference flow class of the material (clamp-force model). */
+  flowClass?: 'easy' | 'medium' | 'hard' | null;
+  cavityPressureMpa?: number | null;
+  /** The clamp calculation written out, or why it could not be made. */
+  clampTrace?: string | null;
   clampRequiredT?: number | null;
   clampMachineT?: number | null;
   clampUtilPct?: number | null;
@@ -1459,7 +1480,7 @@ export interface GdtFeatureDto {
 
 export interface GdtAnalysisDto {
   bomItemId: string;
-  source: "drawing_intelligence" | "no_data";
+  source: "step_pmi" | "drawing_intelligence" | "no_data";
   features: GdtFeatureDto[];
   overallSeverity: GdtSeverity | null;
   maxCostImpactPercent: number;

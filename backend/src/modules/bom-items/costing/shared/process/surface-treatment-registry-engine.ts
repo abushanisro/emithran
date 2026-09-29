@@ -7,9 +7,9 @@ import type { ManufacturingProcessEngine } from '../core/manufacturing-process.t
 // Thin conformance wrapper around the real, tested computeSurfaceTreatmentLine()
 // (Platform Architecture Remediation Phase 1 — "fix the pattern across all
 // three domains"). computeSurfaceTreatmentLine() is already isolated-engine-
-// shaped (pure function, pre-resolved scalars in, ProcessLineCost|null out)
-// — deliberately NOT eMithranTerms()-based, since surface treatment has no
-// real per-part machine cycle (a subcontracted-style area treatment); this
+// shaped (pure function, pre-resolved scalars in, ProcessLineCost|null out):
+// the per-part cost arrives already computed by the reference surface-
+// treatment engine (costing/surface), so it is NOT eMithranTerms()-based; this
 // wrapper only adapts its (positional args, mutated warnings array) calling
 // convention to the shared (context, {processLines, warnings}) shape every
 // other registered engine uses — no math changes.

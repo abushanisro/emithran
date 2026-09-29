@@ -1,5 +1,4 @@
 import { computeRollBendingCost, RollBendingEngine } from '../../../../../../modules/bom-items/costing/sheet-metal/process/roll-bending-engine';
-import { ROLL_BENDING_SETUP_MIN } from '../../../../../../modules/bom-items/costing/shared/core/default-rates.constants';
 import type { MHRRateInput } from '../../../../../../modules/bom-items/costing/shared/core/cost-engine';
 
 // Real staged values for "2 Roll Bender - 1400mm Roll Length x 300mm Roll
@@ -86,14 +85,17 @@ describe('computeRollBendingCost — real rolling-speed-derived cycle time', () 
     expect(result.warnings).toHaveLength(0);
   });
 
-  it('falls back to ROLL_BENDING_SETUP_MIN and discloses it when no real setup time was resolved', () => {
+  it('does not cost setup, and says so, when no real setup time resolved', () => {
     const result = computeRollBendingCost('2 Roll Bending', 'roll_bending_2', {
       rollFeedLengthMm: 2200,
       batchSize: 5,
       rollBendingRate: realRoll2Rate(),
       rollingSpeedMmPerSec: 110,
     });
-    expect(result.warnings.some((w) => w.includes('setup time from fallback'))).toBe(true);
+    expect(result.warnings.some((w) => w.includes('setup not costed'))).toBe(true);
+    expect(result.processLines[0]!.setupTimeMin).toBe(0);
+    expect(result.processLines[0]!.setupTimeSource).toBe('none');
+    expect(result.processLines[0]!.setupCost).toBe(0);
   });
 
   it('uses a real resolved setup time without warning when provided', () => {
@@ -104,7 +106,7 @@ describe('computeRollBendingCost — real rolling-speed-derived cycle time', () 
       rollingSpeedMmPerSec: 110,
       setupMin: 45,
     });
-    expect(result.warnings.some((w) => w.includes('setup time from fallback'))).toBe(false);
+    expect(result.warnings.some((w) => w.includes('setup not costed'))).toBe(false);
   });
 });
 

@@ -1,0 +1,117 @@
+{
+  "_comment": "One list of the memory/ reference folders staged into machining_reference_data under their own source_version. Read by the staging generators (backend/migrations/scripts), the backend (processes/reference-domains.ts) and, through GET /processes/reference-domains, the Process page. Add a folder here, re-run the generator; nothing else hardcodes the list.",
+  "domains": [
+    {
+      "key": "secondary_process",
+      "label": "Secondary Process",
+      "folder": "Secondary process",
+      "sourceVersion": "2026-Secondary",
+      "processGroup": "Other Secondary Processes",
+      "stagedBy": "817"
+    },
+    {
+      "key": "surface_treatment",
+      "label": "Surface Treatment",
+      "folder": "SurfaceTreatment",
+      "sourceVersion": "2026-SurfaceTrt",
+      "processGroup": "Surface Treatment",
+      "stagedBy": "819"
+    },
+    {
+      "key": "additive",
+      "label": "Additive Manufacturing",
+      "folder": "Additive Manufacturing",
+      "sourceVersion": "2026-Additive",
+      "processGroup": "Additive Manufacturing",
+      "stagedBy": "823"
+    },
+    {
+      "key": "assembly",
+      "label": "Assembly",
+      "folder": "Assembly",
+      "sourceVersion": "2026-Assembly",
+      "processGroup": "Assembly",
+      "stagedBy": "823"
+    },
+    {
+      "key": "part_assembly",
+      "label": "Part Assembly",
+      "folder": "Part Assembly",
+      "sourceVersion": "2026-PartAssembly",
+      "processGroup": "Part Assembly",
+      "stagedBy": "823"
+    },
+    {
+      "key": "composites",
+      "label": "Composites",
+      "folder": "Composites",
+      "sourceVersion": "2026-Composites",
+      "processGroup": "Composites",
+      "stagedBy": "823"
+    },
+    {
+      "key": "pcb",
+      "label": "PCB",
+      "folder": "PCBA",
+      "sourceVersion": "2026-PCB",
+      "processGroup": "PCB",
+      "stagedBy": "823"
+    },
+    {
+      "key": "forging",
+      "label": "Forging",
+      "folder": "Forging",
+      "sourceVersion": "2026-Forging",
+      "processGroup": "Forging",
+      "stagedBy": "823"
+    },
+    {
+      "key": "heat_treatment",
+      "label": "Heat Treatment",
+      "folder": "Heat treatment",
+      "sourceVersion": "2026-HeatTreat",
+      "processGroup": "Heat Treatment",
+      "stagedBy": "823"
+    },
+    {
+      "key": "hydroforming",
+      "label": "Sheet Metal - Hydroforming",
+      "folder": "Sheetmetal Hydroforming",
+      "sourceVersion": "2026-Hydroform",
+      "processGroup": "Sheet Metal - Hydroforming",
+      "stagedBy": "823"
+    },
+    {
+      "key": "two_mold_molding",
+      "label": "2 Mold Molding",
+      "folder": "2 Mold Molding",
+      "sourceVersion": "2026-2MoldMolding",
+      "processGroup": null,
+      "stagedBy": "823"
+    },
+    {
+      "key": "stock_machining",
+      "label": "Stock Machining",
+      "folder": "Stock Maching",
+      "sourceVersion": "2026-Stock-Machining",
+      "processGroup": "Stock Machining",
+      "stagedBy": "816"
+    },
+    {
+      "key": "multi_spindle",
+      "label": "Multi-Spindle Machining",
+      "folder": "Multi-Spindle Maching",
+      "sourceVersion": "2026-Multi-Spindle",
+      "processGroup": null,
+      "stagedBy": "786/787"
+    },
+    {
+      "key": "injection_molding",
+      "label": "Plastic Molding",
+      "folder": "Plastic Modeling",
+      "sourceVersion": "2026-Plastic",
+      "processGroup": "Plastic Molding",
+      "stagedBy": "823"
+    }
+  ]
+}

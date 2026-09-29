@@ -25,7 +25,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const OPS_FILE = path.join(__dirname, '../../../memory/machining/operations_full.json');
+const { readDoc } = require('./lib/memory-csv');
+
+const OPS_FILE = path.join(__dirname, '../../../memory/Machining/operations_full__operations.csv');
 const OUT_DIR = path.join(__dirname, '..');
 const MIGRATION_BASE_NUM = 754;
 const PART_SIZE_LIMIT_BYTES = 200_000;
@@ -49,7 +51,7 @@ function parseCompoundOperationString(raw) {
   return { process, operationCategory: leaf.operation, featureType: leaf.feature };
 }
 
-const opsData = JSON.parse(fs.readFileSync(OPS_FILE, 'utf8'));
+const opsData = readDoc(OPS_FILE, { list: 'operations', scalars: ['section', 'operationCount'] });
 
 const rows = opsData.operations.map((o) => {
   const { process, operationCategory, featureType } = parseCompoundOperationString(o.processName);

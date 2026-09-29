@@ -2,10 +2,20 @@
 // run manually to (re)produce the SQL from the source JSON files, then
 // inspect the diff before committing. Same discipline as
 // gen_590_seed_sheet_metal_raw_materials.js / gen_593.
+//
+// History (2026-09-29): 594 as committed was generated from a draft of the
+// source files that migrations 595-599 later corrected (China Progressive Die
+// / Waterjet rates, OMAX 80160, naming variants), and memory/ now carries
+// those corrections - so regenerating no longer reproduces the committed
+// file, and must not replace it (595-599 are already applied on top). It
+// also keyed staged rows 'undefined:<name>' (read loc.category, not
+// r.category), fixed below; migration 836 re-stages those rows.
 const fs = require('fs');
 const path = require('path');
 
-const DIR = path.join(__dirname, '..', '..', '..', 'memory', 'sheetmetal', 'machine');
+const { readRecords, groupRecords } = require('./lib/memory-csv');
+
+const DIR = path.join(__dirname, '..', '..', '..', 'memory', 'Sheetmetal', 'machine');
 const OUT = path.join(__dirname, '..', '594_seed_multilocation_machine_rates.sql');
 
 // ── Load + normalize each location file into a common shape ────────────────
@@ -17,10 +27,9 @@ const OUT = path.join(__dirname, '..', '594_seed_multilocation_machine_rates.sql
 // conversion to local currency — the source's own values, not a guess.
 
 function loadFlat(file) {
-  // india.json / mexico_delta.json / france_delta.json share this shape:
-  // { machines: [{category, name, laborRate_USD_hr, directOverheadRate, indirectOverheadRate}] }
-  const data = JSON.parse(fs.readFileSync(path.join(DIR, file), 'utf8'));
-  return data.machines.map(m => ({
+  // india_base.csv / mexico_delta.csv / france_delta.csv share these columns:
+  // category, name, laborRate_USD_hr, directOverheadRate, indirectOverheadRate
+  return readRecords(path.join(DIR, file)).map(m => ({
     category: m.category,
     name: m.name,
     direct: m.directOverheadRate,
@@ -30,10 +39,9 @@ function loadFlat(file) {
 }
 
 function loadChina() {
-  const data = JSON.parse(fs.readFileSync(path.join(DIR, 'china_location_data_full.json'), 'utf8'));
   const out = [];
-  for (const category of Object.keys(data.categories)) {
-    for (const m of data.categories[category].machines) {
+  for (const { category, machines } of groupRecords(readRecords(path.join(DIR, 'china_location_data_full.csv')), 'category', 'machines')) {
+    for (const m of machines) {
       out.push({
         category,
         name: m.name,
@@ -71,10 +79,10 @@ function resolveName(name) {
 }
 
 const LOCATIONS = [
-  { location: 'India', region: 'IND', records: loadFlat('india.json').map(r => ({ ...r, name: resolveName(r.name) })) },
+  { location: 'India', region: 'IND', records: loadFlat('india_base.csv').map(r => ({ ...r, name: resolveName(r.name) })) },
   { location: 'China', region: 'CHN', records: chinaRecords },
-  { location: 'Mexico', region: 'MEX', records: loadFlat('mexico_delta.json').map(r => ({ ...r, name: resolveName(r.name) })) },
-  { location: 'France', region: 'FRA', records: loadFlat('france_delta.json').map(r => ({ ...r, name: resolveName(r.name) })) },
+  { location: 'Mexico', region: 'MEX', records: loadFlat('mexico_delta.csv').map(r => ({ ...r, name: resolveName(r.name) })) },
+  { location: 'France', region: 'FRA', records: loadFlat('france_delta.csv').map(r => ({ ...r, name: resolveName(r.name) })) },
 ];
 
 function sqlStr(v) {
@@ -94,7 +102,7 @@ let promoteBlocks = [];
 
 for (const loc of LOCATIONS) {
   const stageRows = loc.records.map(r =>
-    `('machine', ${sqlStr(loc.region)}, '2026-08', ${sqlStr(loc.category + ':' + r.name)}, ${sqlStr(r.direct)}, 'USD/hr direct overhead', 'Sheet metal machine rate reference row (${loc.location})', ${rawJsonb(r)})`
+    `('machine', ${sqlStr(loc.region)}, '2026-08', ${sqlStr(r.category + ':' + r.name)}, ${sqlStr(r.direct)}, 'USD/hr direct overhead', 'Sheet metal machine rate reference row (${loc.location})', ${rawJsonb(r)})`
   );
   stageBlocks.push(
     `-- ── ${loc.location} (${loc.records.length} records) ──\nINSERT INTO sm_reference_data (category, source_region, source_version, key, value, unit_type, notes, raw)\nVALUES\n${stageRows.join(',\n')}\nON CONFLICT (category, source_region, source_version, key) DO NOTHING;`

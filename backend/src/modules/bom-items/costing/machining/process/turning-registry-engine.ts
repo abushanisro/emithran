@@ -23,7 +23,7 @@ export class TurningEngine implements ManufacturingProcessEngine<
   // See milling-registry-engine.ts's identical field for why this is
   // MachineClass (the shared cross-domain union), not MachineClassId.
   readonly machineClass: MachineClass;
-  readonly processFamily = 'cnc_turning';
+  readonly processFamily = 'turning';
 
   constructor(machineClass: string) {
     this.machineClass = machineClass as MachineClass;

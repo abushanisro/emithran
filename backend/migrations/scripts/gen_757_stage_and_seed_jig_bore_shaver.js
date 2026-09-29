@@ -35,7 +35,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const MACHINE_DIR = path.join(__dirname, '../../../memory/machining/machine');
+const { readDoc, MACHINING_MACHINE_FILE_SCALARS } = require('./lib/memory-csv');
+
+const MACHINE_DIR = path.join(__dirname, '../../../memory/Machining/machine');
 const OUT_STAGE_SQL = path.join(__dirname, '../757_stage_jig_bore_shaver_reference_detail.sql');
 const OUT_SEED_SQL = path.join(__dirname, '../758_seed_jig_bore_shaver_mhr_records_and_activate.sql');
 
@@ -43,8 +45,8 @@ const SOURCE_REGION = 'USA';
 const SOURCE_VERSION = '2026-03';
 
 const FILES = {
-  'jig_bore_usa.json': 'Jig Bore',
-  'shaver_usa.json': 'Shaver',
+  'jig_bore_usa.csv': 'Jig Bore',
+  'shaver_usa.csv': 'Shaver',
 };
 const MACHINE_CLASS = {
   'Jig Bore': 'jig_bore',
@@ -102,7 +104,7 @@ const CATEGORY_WAGE_GRADE = {
 let totalMachines = 0;
 for (const [file, categoryLabel] of Object.entries(FILES)) {
   const fullPath = path.join(MACHINE_DIR, file);
-  const data = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
+  const data = readDoc(fullPath, { list: 'machines', scalars: MACHINING_MACHINE_FILE_SCALARS });
   const machineClass = MACHINE_CLASS[categoryLabel];
   const categoryWageGrade = CATEGORY_WAGE_GRADE[categoryLabel];
 

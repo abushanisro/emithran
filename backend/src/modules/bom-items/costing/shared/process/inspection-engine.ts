@@ -5,7 +5,6 @@ import {
   resolveInspectionRule,
 } from '../physics/gdt-severity';
 import { resolveSetupMinutes } from '../core/engine-kernel';
-import { CMM_SETUP_MIN } from '../core/default-rates.constants';
 
 // ── Inspection — tiered (Level 1 CAD → Level 2 +drawing intelligence →
 // Level 3 +GD&T), feature-driven, never a fixed guessed cycle time.
@@ -336,8 +335,8 @@ export function finalizeInspectionLine(input: InspectionInput, plan: InspectionP
   // erasing CNC's charge to match this engine's old blanket $0.)
   // Same resolveSetupMinutes() tiering as every other setup line: real
   // per-machine mhr_records.setup_time_hr first (see resolveCmmSpecificRate's
-  // now-fixed setup_time_hr selection), then the cited CMM_SETUP_MIN class
-  // default. Divided by the real batch quantity, not amortizeDivisor — the
+  // now-fixed setup_time_hr selection); with none, CMM setup is not costed.
+  // Divided by the real batch quantity, not amortizeDivisor — the
   // CMM setup happens once per production run regardless of which/how many
   // parts within it get sampled.
   let setupMinRaw = 0;
@@ -347,7 +346,6 @@ export function finalizeInspectionLine(input: InspectionInput, plan: InspectionP
     const setupResolution = resolveSetupMinutes({
       process: 'Inspection (CMM)',
       machineSetupTimeHr: rate.setupTimeHr,
-      classDefaultMin: CMM_SETUP_MIN,
       machineName: rate.machineName,
     });
     if (setupResolution.warning) warnings.push(setupResolution.warning);

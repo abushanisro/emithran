@@ -170,6 +170,16 @@ export function getCuttingRouteIds(): string[] {
   return getEnginesForFamily('sheet_metal_cutting').map((e) => ROUTE_ID_FOR_CLASS[e.machineClass] ?? e.machineClass);
 }
 
+/**
+ * Machining routes are identified by their catalog machine class itself
+ * (e.g. '3_axis_mill', '2_axis_lathe' -- memory/machining/processes.csv), the
+ * same id getRouteComparison's milled/turned route builders emit, so apply
+ * requests validate against exactly the registered machining engines.
+ */
+export function getMachiningRouteIds(): string[] {
+  return [...getEnginesForFamily('milling'), ...getEnginesForFamily('turning')].map((e) => e.machineClass as string);
+}
+
 export function getFormingRouteIds(): string[] {
   return getEnginesForFamily('sheet_metal_forming').map((e) => ROUTE_ID_FOR_CLASS[e.machineClass] ?? e.machineClass);
 }

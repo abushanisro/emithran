@@ -16,7 +16,6 @@ function baseInput(overrides: Partial<PressBrakeInput> = {}): PressBrakeInput {
     batchSize: 10,
     rate: realRate,
     cycleTimeSecFromCalculator: 30,
-    fallbackSetupMin: 20,
     ...overrides,
   };
 }
@@ -97,27 +96,26 @@ describe('computePressBrakeCost — real setup-time tiering', () => {
       setupTimeMinFromCalculator: undefined,
       rate: { ...realRate, setupTimeHr: 0.75 },   // the real Heller value: 45 min
       operationSetupMin: 30,
-      fallbackSetupMin: 20,
     })).processLines[0]!;
     expect(line.setupTimeMin).toBeCloseTo(45, 5);
     expect(line.setupTimeSource).toBe('machine');
   });
 
-  it('falls to the real per-operation lookup before the class constant', () => {
+  it('falls to the real per-operation lookup when the machine has no setup time', () => {
     const line = computePressBrakeCost(baseInput({
-      setupTimeMinFromCalculator: undefined, operationSetupMin: 30, fallbackSetupMin: 20,
+      setupTimeMinFromCalculator: undefined, operationSetupMin: 30,
     })).processLines[0]!;
     expect(line.setupTimeMin).toBeCloseTo(30, 5);
     expect(line.setupTimeSource).toBe('operation_lookup');
   });
 
-  it('falls to the class constant last, and discloses that it did', () => {
+  it('does not cost setup when no real source resolved, and says so', () => {
     const result = computePressBrakeCost(baseInput({
-      setupTimeMinFromCalculator: undefined, operationSetupMin: null, fallbackSetupMin: 20,
+      setupTimeMinFromCalculator: undefined, operationSetupMin: null,
     }));
-    expect(result.processLines[0]!.setupTimeMin).toBeCloseTo(20, 5);
-    expect(result.processLines[0]!.setupTimeSource).toBe('class_default');
-    expect(result.warnings.some((w) => w.includes('setup time from fallback'))).toBe(true);
+    expect(result.processLines[0]!.setupTimeMin).toBe(0);
+    expect(result.processLines[0]!.setupTimeSource).toBe('none');
+    expect(result.warnings.some((w) => w.includes('setup not costed'))).toBe(true);
   });
 
   it('lets two press brakes with different real setup times cost differently', () => {

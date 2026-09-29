@@ -10,6 +10,10 @@ export interface MachineCandidate {
   machineId: string | null;      // mhr_records.id; null for class-default fallback
   machineName: string | null;
   commodityCode: string | null;
+  // The machine's own HR Rates process group: mhr_records.process_group,
+  // else its commodity_code — the same rule HR Rates and the Process picker
+  // use (effectiveProcessGroupOf). null for the no-machine candidate.
+  processGroup: string | null;
   machineClass: MachineClass;
   hourlyRate: number;
   utilizationPct: number;        // capacity_utilization_rate 0-100 — a real value when utilizationKnown, otherwise a neutral ranking assumption
@@ -104,6 +108,36 @@ export interface MachineRecommendation {
   capabilityCheck?: CapabilityCheck | null;
 }
 
+/** Component scores of one capable machine (each 0-1) and its composite on a profile. */
+export interface MachineScoreBreakdown {
+  machineId: string | null;
+  machineName: string | null;
+  hourlyRate: number;
+  /** How tightly the part fills this machine's capability envelope (1 = perfectly sized). */
+  fit: number;
+  /** Closeness of the machine's utilization to the 75% target load. */
+  util: number;
+  /** Lowest capable hourly rate / this machine's rate. */
+  cost: number;
+  /** 1 available, 0.7 heavily scheduled, 0.5 commissioning, 0 in maintenance. */
+  avail: number;
+  /** Composite on the balanced profile. */
+  score: number;
+}
+
+export interface ProfileWeightsDto { fit: number; util: number; cost: number; avail: number }
+
+/**
+ * Why the balanced pick won: the runner-up it beat and the factor whose
+ * weighted score difference decided it. 'only_capable' when no other machine
+ * passed the capability check; 'override' when a user forced the pick.
+ */
+export interface MachineSelectionDecision {
+  winnerId: string | null;
+  runnerUpId: string | null;
+  decidingFactor: 'fit' | 'util' | 'cost' | 'avail' | 'tie_rate' | 'only_capable' | 'override';
+}
+
 export interface MachineSelectionResult {
   // Balanced is the default the cost engine prices with; cheapest/fastest are
   // surfaced so a cost engineer can flip profiles per line without an API call.
@@ -116,6 +150,13 @@ export interface MachineSelectionResult {
   allowOverride: true;
   overridden: boolean;                // true when a user override forced the pick
   availabilityWarning?: string;
+  /** Every capable machine, in balanced-profile order, with its component scores. */
+  ranking?: MachineScoreBreakdown[];
+  /** Machines of this class that failed the part's capability check, with the compared values. */
+  rejected?: Array<{ machineId: string | null; machineName: string | null; reasons: string[] }>;
+  /** The profile weights the scores were combined with. */
+  profileWeights?: Record<'balanced' | 'cheapest' | 'fastest', ProfileWeightsDto>;
+  decision?: MachineSelectionDecision;
 }
 
 export class MachineOverrideDto {

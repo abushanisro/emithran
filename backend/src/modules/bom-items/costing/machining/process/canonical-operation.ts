@@ -1,63 +1,73 @@
 /**
- * Maps a CNC-detected feature (feature_graph_v2's bucketed `feature_type` —
- * see cad-engine/machining/machining_feature_recognizer.py's build_machining_feature_graph_v2,
- * which is the only function that ever produces these 10 values) to the real
- * "Operation // FeatureType" string it corresponds to in the canonical
- * reference catalog (memory/machining/operations_full.json / the DB mirror
- * process_taxonomy_operations, migration 609/691).
+ * Maps a machining feature_graph_v2 entry (reference feature_type + geometric
+ * variant, emitted by cad-engine/machining/machining_feature_recognizer.py) to
+ * the real "Operation // FeatureType" label it corresponds to in the reference
+ * operation catalog (memory/machining/operations_full__operations.csv).
  *
- * Every string below was verified present in operations_full.json for the
- * relevant route family before being added here — never fabricated. Known,
- * disclosed scoping decision: the real catalog also carries deeper 3-level
- * compound operations (e.g. "MillTurn:Multistep Holemaking//MultiStepHole:
- * Counterboring//SimpleHole" — a counterbore cut as part of one multi-step
- * hole cycle, not a standalone pass). This table maps to the real child
- * operation name in that compound ("Counterboring // SimpleHole") without
- * modeling the multi-step-cycle grouping itself — that finer fidelity is a
- * real gap, not something to fabricate a value for.
+ * Every pairing below is verified at module load against the generated
+ * catalog (reference-features.generated.ts) — a pairing the catalog does not
+ * contain throws on import instead of shipping a fabricated label.
  *
- * external_diameter, fillet, groove, pcd_hole_pattern, radial_slot are real
- * MachiningFeature types the CAD engine can detect but build_machining_feature_graph_v2
- * does not currently bucket into feature_graph_v2 (radial_slot folds into
- * "slot"; the rest never reach this payload today) — no entry is fabricated
- * for them here.
+ * Compound catalog chains are labelled by the operation the catalog attaches
+ * to the feature itself, e.g. a counterbore is the MultiStepHole of
+ * "Multistep Holemaking//MultiStepHole:Counterboring//SimpleHole".
  */
+import { isReferenceOperation } from '../../shared/reference-features.generated';
 
 export type MachiningRouteFamily = 'milling' | 'turning';
 
-const MILLING_OPERATION_BY_FEATURE_TYPE: Readonly<Record<string, string>> = {
-  through_hole: 'Drilling // SimpleHole',
-  blind_hole: 'Drilling // SimpleHole',
-  tapped_hole: 'Tapping // SimpleHole',
-  cross_hole: 'Drilling // SimpleHole',
-  counterbore: 'Counterboring // SimpleHole',
-  countersink: 'Countersinking // SimpleHole',
-  chamfer: 'Chamfering // SimpleHole',
-  pocket: 'Rough Milling // PocketV2',
-  slot: 'Slot Milling // Slot',
-  keyway: 'Rough Milling // Keyway',
+const MILLING_OPERATION_BY_FEATURE: Readonly<Record<string, string>> = {
+  'SimpleHole:through': 'Drilling',
+  'SimpleHole:blind': 'Drilling',
+  'SimpleHole:cross': 'Drilling',
+  'SimpleHole:pcd_pattern': 'Drilling',
+  'SimpleHole:threaded': 'Tapping',
+  'MultiStepHole:counterbore': 'Multistep Holemaking',
+  'MultiStepHole:stepped': 'Step Drilling',
+  'Edge:countersink': 'Countersinking',
+  'Edge:chamfer': 'Chamfering',
+  'Edge:round': 'Rounding',
+  'PocketV2:default': 'Rough Milling',
+  'Slot:straight': 'Slot Milling',
+  'Slot:radial': 'Slot Milling',
+  'Slot:groove': 'Groove Milling',
+  'Keyway:default': 'Rough Milling',
+  'Cutout:default': 'Perimeter Milling',
+  'PlanarFace:default': 'Fine Finish Milling',
+  'CurvedWall:default': 'Contouring',
+  'CurvedSurface:default': 'Contouring',
+  'Ring:outer_diameter': 'Rough Turning',
+  'Ring:groove': 'Plunging',
 };
 
-// Turning routes (2/3 Axis Lathe, bar-feed variants, MillTurn) cut chamfers
-// with a live chamfer-milling tool, not the milling-only "Chamfering"
-// operation name — verified against operations_full.json: "3 Axis Lathe" and
-// "MillTurn" both carry "Chamfer Milling // SimpleHole" and neither carries
-// "Chamfering // SimpleHole". Every other feature type resolves identically
-// across families.
-const TURNING_OPERATION_BY_FEATURE_TYPE: Readonly<Record<string, string>> = {
-  ...MILLING_OPERATION_BY_FEATURE_TYPE,
-  chamfer: 'Chamfer Milling // SimpleHole',
+// Turning routes (lathes, bar-feed variants, MillTurn) chamfer an edge with a
+// live tool: the catalog's lathe rows carry "Mill Chamfering//Edge", not the
+// milling-only "Chamfering//Edge". Every other feature resolves identically.
+const TURNING_OPERATION_BY_FEATURE: Readonly<Record<string, string>> = {
+  ...MILLING_OPERATION_BY_FEATURE,
+  'Edge:chamfer': 'Mill Chamfering',
 };
+
+for (const table of [MILLING_OPERATION_BY_FEATURE, TURNING_OPERATION_BY_FEATURE]) {
+  for (const [key, operation] of Object.entries(table)) {
+    const featureType = key.split(':')[0];
+    if (!isReferenceOperation('machining', featureType, operation)) {
+      throw new Error(`canonical-operation: "${operation} // ${featureType}" is not in the reference machining catalog`);
+    }
+  }
+}
 
 export function machiningRouteFamilyOf(cadFamily: string | null | undefined): MachiningRouteFamily {
   return cadFamily === 'turned' || cadFamily === 'mill_turn' ? 'turning' : 'milling';
 }
 
-/** Returns null (not a fallback guess) when featureType isn't one of the 10 real values above. */
+/** "Operation // FeatureType", or null when the feature has no mapped operation. */
 export function resolveCanonicalOperation(
   featureType: string,
+  variant: string | null | undefined,
   family: MachiningRouteFamily,
 ): string | null {
-  const table = family === 'turning' ? TURNING_OPERATION_BY_FEATURE_TYPE : MILLING_OPERATION_BY_FEATURE_TYPE;
-  return table[featureType] ?? null;
+  const table = family === 'turning' ? TURNING_OPERATION_BY_FEATURE : MILLING_OPERATION_BY_FEATURE;
+  const operation = table[`${featureType}:${variant ?? 'default'}`];
+  return operation ? `${operation} // ${featureType}` : null;
 }

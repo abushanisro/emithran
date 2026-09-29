@@ -1,4 +1,4 @@
-import { PLASMA_PUNCH_SETUP_MIN, DEFAULT_YIELD_PCT } from '../../shared/core/default-rates.constants';
+import { DEFAULT_YIELD_PCT } from '../../shared/core/default-rates.constants';
 import type { MHRRateInput } from '../../shared/core/cost-engine';
 import type { ProcessLineCost } from '../../../dto/cost-breakdown.dto';
 import type { CuttingProcessContext, CuttingProcessResult } from '../../shared/core/manufacturing-process.types';
@@ -67,7 +67,6 @@ export function computePlasmaPunchCost(input: PlasmaPunchInput): PlasmaPunchResu
     process: 'Plasma Punch',
     machineSetupTimeHr: rate.setupTimeHr,
     operationSetupMin: input.setupMin,
-    classDefaultMin: PLASMA_PUNCH_SETUP_MIN,
     machineName: rate.machineName,
   });
   const setupMin = setup.setupMin;

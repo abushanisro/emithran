@@ -37,6 +37,8 @@ from OCC.Core.BRep import BRep_Tool  # type: ignore
 from OCC.Core.TopLoc import TopLoc_Location  # type: ignore
 from OCC.Core.Standard import Standard_Failure  # type: ignore
 
+from shared.part_family import MILLED, PLASTIC_MOLDED, SHEET_METAL
+
 logger = logging.getLogger(__name__)
 
 # ============================================================================
@@ -156,7 +158,30 @@ class AdvancedCADMemoryOptimizer:
     """
     
     VERSION = "2.2.0"
-    CACHE_VERSION = "geo_v44"  # bumped 2026-09-17: (21) cnc_feature_recognizer.py's
+    CACHE_VERSION = "geo_v49"  # bumped 2026-09-27: (26) machining features now carry the
+    # real sharp-edge length (shared/edge_length.py), recognise gear/spline teeth as
+    # AxiGroove (machining/axigroove.py), and no longer report off-axis convex faces
+    # as turned Ring diameters; cylinder offsets are measured about the part's own
+    # axis, not the global origin -- cached machining results must be recomputed.
+    CACHE_VERSION_V48 = "geo_v48"  # bumped 2026-09-26: (25) the engine now emits the
+    # platform's part-family names (shared/part_family.py: milled / turned /
+    # plastic_molded) instead of cnc_milled / cnc_turned / injection_molded,
+    # which backend migrations 735/789 had already retired -- cached results
+    # carry the retired names and must be recomputed.
+    CACHE_VERSION_V47 = "geo_v47"  # bumped 2026-09-25: (24) sheet-metal connectivity veto
+    # (formed_sheet_plane_excess): a part with more distinct flat sheet planes
+    # than bends + 1 cannot be one bent sheet -- cached sheet_metal
+    # classifications (e.g. machined 820-001644-00) must be recomputed.
+    CACHE_VERSION_V46 = "geo_v46"  # bumped 2026-09-25: (23) sheet-metal feature_graph_v2
+    # now emits the reference catalog vocabulary too (SimpleHole/ComplexHole/
+    # StraightBend/Form/Lance/Blank + variant, sheet_metal/feature_models.py);
+    # normalized_features removed; thin_web moved to feature_graph_v2.conditions.
+    CACHE_VERSION_V45 = "geo_v45"  # bumped 2026-09-25: (22) machining features now
+    # emit the reference catalog vocabulary (SimpleHole/MultiStepHole/Edge/Ring/
+    # Slot/Keyway/PocketV2/Cutout/PlanarFace/CurvedWall/CurvedSurface + variant,
+    # see shared/reference_features.json) instead of the old snake_case types --
+    # every cached result carries the old names and must be recomputed.
+    CACHE_VERSION_V44 = "geo_v44"  # bumped 2026-09-17: (21) cnc_feature_recognizer.py's
     # build_feature_graph_v2_from_cnc() was deliberately collapsing every real,
     # already-detected "keyway" occurrence into generic "slot" output (comment at
     # _POCKET_TYPES cited operation-sequencer.ts having no dedicated keyway case) --
@@ -494,7 +519,7 @@ class AdvancedCADMemoryOptimizer:
                 1 for cyl in holes.get('raw_cylinders_full', [])
                 if len(cyl) > 0 and cyl[0] > _large_cyl_threshold
             )
-            # Wall-thickness-uniformity signal for injection_molded classification —
+            # Wall-thickness-uniformity signal for plastic_molded classification —
             # reuses the antiparallel-face-pair histogram (built for sheet-metal
             # gauge detection) purely for its area_ratio/tight_area_frac output.
             # High thin_wall_ratio = thin-wall area spread across several close
@@ -530,13 +555,13 @@ class AdvancedCADMemoryOptimizer:
             )
 
             # ── Post-classification SMF cross-check ───────────────────────────
-            # When the classifier returns cnc_milled but the fill ratio is very
+            # When the classifier returns milled but the fill ratio is very
             # low (< 15%), there is still a chance the part is sheet metal that
             # slipped through all topology gates (e.g. a deep box where flatness
             # exceeds 0.48 but bends produce a valid gauge). Run the antiparallel-
             # face-pair gauge detector; if it finds a plausible gauge that is
             # small relative to the smallest bbox dimension, override to sheet_metal.
-            if detected_family == 'cnc_milled' and volume_mm3 > 0:
+            if detected_family == MILLED and volume_mm3 > 0:
                 _pos_dims_chk = [d for d in dims_list if d > 0]
                 _bbox_vol_chk = dims_list[0] * dims_list[1] * dims_list[2] if len(dims_list) >= 3 else 0
                 _fill_ratio_chk = volume_mm3 / _bbox_vol_chk if _bbox_vol_chk > 0 else 1.0
@@ -548,7 +573,7 @@ class AdvancedCADMemoryOptimizer:
                         # a true sheet gauge is << the smallest forming dimension.
                         # Threshold: gauge < 45% of min bbox dim (e.g. 2mm gauge, 60mm depth is fine).
                         if _gauge_chk > 0 and _gauge_chk < _min_bbox_chk * 0.45:
-                            detected_family = 'sheet_metal'
+                            detected_family = SHEET_METAL
                             family_confidence = max(family_confidence, 0.72)
                             classification_reasons.append(
                                 f"smf_override: gauge={_gauge_chk:.2f}mm < "
@@ -564,7 +589,7 @@ class AdvancedCADMemoryOptimizer:
             # strictly between ~1.4× and ~3.5× the gauge means the body has
             # stepped SOLID thickness (e.g. a 6mm cover with 3mm-deep recesses)
             # — machinable or castable, but impossible to make from sheet.
-            if detected_family == 'sheet_metal' and sheet_geometry is not None:
+            if detected_family == SHEET_METAL and sheet_geometry is not None:
                 _gauge = float(sheet_geometry[0] or 0)
                 _pos_dims = [d for d in dims_list if d > 0]
                 _min_bbox = min(_pos_dims) if _pos_dims else 0.0
@@ -584,18 +609,44 @@ class AdvancedCADMemoryOptimizer:
                     except Exception:
                         pass
                     if _tight_frac_veto >= 0.90 and pocket_count >= 3:
-                        detected_family = 'injection_molded'
+                        detected_family = PLASTIC_MOLDED
                         family_confidence = min(family_confidence, 0.62)
                         classification_reasons.append(
                             _veto_note + f"; uniform wall gauge (tight_frac={_tight_frac_veto:.2f}) "
                             f"with {pocket_count} rib/boss pockets => injection molded shell"
                         )
                     else:
-                        detected_family = 'cnc_milled'
+                        detected_family = MILLED
                         family_confidence = min(family_confidence, 0.60)
                         classification_reasons.append(
                             _veto_note + "; stepped solid thickness => machined/cast plate"
                         )
+
+            # ── Sheet-metal connectivity veto ─────────────────────────────────
+            # One bent sheet joins N flat panels with at least N-1 bends, so a
+            # sheet part never has more distinct flat planes than bends + 1.
+            # More planes than that means some thin walls cannot be folded
+            # out of the same blank -- walls of a solid body, not flanges.
+            # Validated against the labeled real-part set (13 sheet-metal
+            # parts all <= 0; the machined 820-001644-00 and tph_holder, both
+            # previously misread as perforated sheet, +5 and +3).
+            if detected_family == SHEET_METAL and sheet_geometry is not None:
+                try:
+                    _excess = SheetMetalFeatureExtractor().formed_sheet_plane_excess(
+                        shape, sheet_geometry[1], float(sheet_geometry[0] or 0),
+                        holes.get('raw_cylinders_full', []),
+                    )
+                except Exception as _e:
+                    _excess = None
+                    logger.warning(f"[mfg_intel] sheet connectivity check failed: {_e}")
+                if _excess is not None and _excess["excess"] > 0:
+                    detected_family = MILLED
+                    family_confidence = min(family_confidence, 0.60)
+                    classification_reasons.append(
+                        f"Sheet-metal veto: {_excess['distinct_planes']} distinct flat sheet planes but only "
+                        f"{_excess['bends']} bends -- one bent sheet joins at most bends+1 planes, so "
+                        f"{_excess['excess']} wall plane(s) cannot come from the same blank => machined solid"
+                    )
 
             _hole_density_val = round(holes.get('count', 0) / max(total_face_count, 1), 3)
             manufacturing_intelligence = {
@@ -618,7 +669,7 @@ class AdvancedCADMemoryOptimizer:
                 },
                 'classification_reason': classification_reasons,
             }
-            if detected_family == 'sheet_metal':
+            if detected_family == SHEET_METAL:
                 extractor = SheetMetalFeatureExtractor()
                 # Pass raw_cylinders from the already-completed face iteration so
                 # SheetMetalFeatureExtractor skips a redundant full-topology scan.
@@ -632,7 +683,7 @@ class AdvancedCADMemoryOptimizer:
                     face_id_map=holes.get('face_id_map', {}),
                     adjacent_face_ids=holes.get('adjacent_face_ids', {}),
                 )
-            elif detected_family == 'injection_molded':
+            elif detected_family == PLASTIC_MOLDED:
                 im_extractor = InjectionMoldedFeatureExtractor()
                 manufacturing_intelligence['features'] = im_extractor.extract(
                     shape, dims_list,

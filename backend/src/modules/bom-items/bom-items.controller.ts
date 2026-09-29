@@ -16,6 +16,7 @@ import {
   Logger,
   Patch,
   InternalServerErrorException,
+  ServiceUnavailableException,
   UseGuards,
 } from '@nestjs/common';
 import type { Response } from 'express';
@@ -44,6 +45,9 @@ import { FileStorageService } from './services/file-storage.service';
 import { StepConverterService } from './services/step-converter.service';
 import { CADAnalysisService } from './services/cad-analysis.service';
 import { AutoFillService } from './services/auto-fill.service';
+import { SecondaryProcessService } from './services/secondary-process.service';
+import { NreService } from './services/nre.service';
+import { resolveCostingInputs } from './costing/shared/physics/costing-inputs';
 import { DFMScoringService } from './services/dfm-scoring.service';
 import { MaterialIntelligenceService, type MaterialCandidate } from './services/material-intelligence.service';
 import { SupabaseService } from '../../common/supabase/supabase.service';
@@ -51,11 +55,11 @@ import { findRouteDataGaps, formatNearestRowsDisclosure } from './costing/shared
 import { RouteResultDto } from './dto/route-comparison.dto';
 import {
   PersistedLineCurrency,
-  resolveBenchmarkLabourRate,
   resolvePersistedCostCurrencyBasis,
 } from './costing/shared/core/persisted-currency-contract';
 import { COST_ENGINE_CONTRACT_VERSION } from './costing/shared/core/persisted-process-cost';
 import axios from 'axios';
+import { MachiningCalculatorInputsRequestDto } from './dto/machining-calculator-inputs.dto';
 
 // Define User type if not available
 interface User {
@@ -69,29 +73,6 @@ interface User {
 // it describes, so its two decisions can be tested against real currency codes
 // without standing up a controller and a database.
 
-// machine_class → process_group, mirroring the fuller vocabulary already used
-// for display in manufacturing-intelligence/page.tsx's
-// deriveProcessGroupFromMachineClass, and the process_group set
-// lhr_benchmark_rates actually has coverage for (migrations 369/371/375:
-// Sheet Metal, Machining, Assembly, Post Processing, Plastic Molding,
-// Quality). Built once at module load — a single Map.get() per line instead
-// of scanning several arrays with .includes() on every call.
-const MACHINE_CLASS_TO_PROCESS_GROUP: ReadonlyMap<string, string> = new Map([
-  ...['cmm', 'inspection'].map((c) => [c, 'Quality'] as const),
-  ...['fiber_laser', 'co2_laser', 'plasma', 'waterjet', 'press_brake', 'turret_punch', 'roll_forming', 'deep_draw', 'band_saw']
-    .map((c) => [c, 'Sheet Metal'] as const),
-  // Real, granular primary CNC classes — replaces the deleted 6-member
-  // cnc_lathe/cnc_lathe_live/cnc_mill_turn/cnc_3ax_vmc/cnc_4ax_vmc/cnc_5ax_mc
-  // set (Machining Engine Re-Architecture).
-  ...['2_axis_lathe', '3_axis_lathe', '2_axis_bar_feed_lathe_with_sub_spindle', '3_axis_bar_feed_lathe_with_sub_spindle',
-      '3_axis_mill', '4_axis_mill', '5_axis_mill', 'grinding', 'drill_press', 'tapping', 'edm']
-    .map((c) => [c, 'Machining'] as const),
-  ...['welding', 'manual_assembly', 'adhesive_bonding', 'electrical_assembly'].map((c) => [c, 'Assembly'] as const),
-  ...['ndt_test', 'heat_treat_furnace', 'anodize', 'powder_coat', 'plating', 'chem_treatment', 'laser_marking', 'deburring', 'cleaning']
-    .map((c) => [c, 'Post Processing'] as const),
-  ...['injection_molding', 'thermoforming', 'blow_molding', 'extrusion', 'rotational_molding', 'rubber_molding', 'compression_molding']
-    .map((c) => [c, 'Plastic Molding'] as const),
-]);
 
 @ApiTags('BOM Items')
 @ApiBearerAuth()
@@ -105,6 +86,8 @@ export class BOMItemsController {
     private readonly stepConverterService: StepConverterService,
     private readonly cadAnalysisService: CADAnalysisService,
     private readonly autoFillService: AutoFillService,
+    private readonly secondaryProcessService: SecondaryProcessService,
+    private readonly nreService: NreService,
     private readonly dfmScoringService: DFMScoringService,
     private readonly materialIntelligenceService: MaterialIntelligenceService,
     private readonly supabaseService: SupabaseService,
@@ -131,10 +114,12 @@ export class BOMItemsController {
     if (!file) {
       throw new BadRequestException('file is required');
     }
-    const allowedExts = ['.step', '.stp', '.stl', '.iges', '.igs', '.obj', '.sldprt'];
-    const ext = path.extname(file.originalname ?? '').toLowerCase();
-    if (!allowedExts.includes(ext)) {
-      throw new BadRequestException(`Unsupported file type: ${ext || '(none)'}. Allowed: ${allowedExts.join(', ')}`);
+    if (!this.stepConverterService.isStepFile(file.originalname ?? '')) {
+      const ext = path.extname(file.originalname ?? '').toLowerCase();
+      throw new BadRequestException(
+        `Unsupported file type: ${ext || '(none)'}. The CAD engine can analyse: ` +
+        `${this.stepConverterService.getSupportedExtensions().map((e) => '.' + e).join(', ')}`,
+      );
     }
     if (!user?.id) {
       throw new BadRequestException('User authentication required');
@@ -163,10 +148,12 @@ export class BOMItemsController {
     if (!file) {
       throw new BadRequestException('file is required');
     }
-    const allowedExts = ['.step', '.stp', '.stl', '.iges', '.igs', '.obj', '.sldprt'];
-    const ext = path.extname(file.originalname ?? '').toLowerCase();
-    if (!allowedExts.includes(ext)) {
-      throw new BadRequestException(`Unsupported file type: ${ext}`);
+    if (!this.stepConverterService.isStepFile(file.originalname ?? '')) {
+      const ext = path.extname(file.originalname ?? '').toLowerCase();
+      throw new BadRequestException(
+        `Unsupported file type: ${ext || '(none)'}. The CAD engine can analyse: ` +
+        `${this.stepConverterService.getSupportedExtensions().map((e) => '.' + e).join(', ')}`,
+      );
     }
     const jobId = this.autoFillService.startAnalysis(file.buffer, file.originalname, user.id, token, location);
     return { jobId };
@@ -326,6 +313,24 @@ export class BOMItemsController {
   // (e.g. "what did DFM say when this quote was issued"), that is new
   // capability to design deliberately (a real table + rule-version stamping +
   // explicit save action), not something to bolt on by caching this endpoint.
+  // The Edit Process Cost dialog's machining calculator: every input from the
+  // database for this part (CAD keys + lookup-table rows via the same
+  // resolvers the cost engine uses) instead of blank fields.
+  @Post(':id/machining-calculator-inputs')
+  @ApiOperation({ summary: 'Resolve a machining calculator inputs for this part from CAD and the machining lookup tables' })
+  @ApiResponse({ status: 200, description: 'Inputs, their sources, lookup rows, and anything unresolved' })
+  async resolveMachiningCalculatorInputs(
+    @Param('id') id: string,
+    @Body() body: MachiningCalculatorInputsRequestDto,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+  ) {
+    const keys = Object.fromEntries(Object.entries(body.keys ?? {})
+      .map(([k, v]) => [k, Number(v)] as const)
+      .filter(([, v]) => Number.isFinite(v)));
+    return this.bomItemsService.resolveMachiningCalculatorInputs(id, body.calculatorId, keys, user.id, token, body.location, body.batchSize);
+  }
+
   @Get(':id/dfm-scores')
   @ApiOperation({ summary: 'Compute per-occurrence DFM risk scores from stored feature_graph_v2 metrics' })
   @ApiResponse({ status: 200, description: 'DFM scores returned' })
@@ -454,6 +459,10 @@ export class BOMItemsController {
 
     const fileName = analysisPath.split('/').pop() ?? 'model.stp';
     const result = await this.autoFillService.analyzeAndSuggest(fileBuffer, fileName, user.id, token, undefined, true);
+
+    // analyzeAndSuggest throws (503 engine unreachable / 422 file rejected)
+    // when the CAD engine did not analyse the file, so nothing below ever
+    // overwrites a stored analysis with non-engine geometry.
 
     const geo = result.geometry;
     const sug = result.suggestions;
@@ -895,7 +904,7 @@ export class BOMItemsController {
     // Check if it's a STEP file
     const isStepFile = this.stepConverterService.isStepFile(bomItem.file3dPath);
     if (!isStepFile) {
-      throw new BadRequestException('File is not a supported CAD file. Only .step, .stp, .iges, .igs, .sldprt files can be converted');
+      throw new BadRequestException('File is not a supported CAD file. Only .step and .stp files can be converted');
     }
 
     // Get project ID from BOM
@@ -1225,7 +1234,7 @@ export class BOMItemsController {
 
     if (!this.stepConverterService.isStepFile(stepFile.originalname)) {
       throw new BadRequestException(
-        'Invalid file type. Supported: .step, .stp, .iges, .igs, .sldprt',
+        'Invalid file type. Supported: .step, .stp',
       );
     }
 
@@ -1246,18 +1255,26 @@ export class BOMItemsController {
     formData.append('strategy', 'balanced');
     formData.append('force_reanalysis', 'false');
 
-    const cadResponse = await fetch(`${this.cadEngineUrl}/analyze/geometry`, {
-      method: 'POST',
-      body: formData,
-      headers: {
-        'Accept': 'application/json',
-        ...(this.cadEngineApiKey && { 'X-API-Key': this.cadEngineApiKey }),
-      },
-    });
+    let cadResponse: globalThis.Response;
+    try {
+      cadResponse = await fetch(`${this.cadEngineUrl}/analyze/geometry`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Accept': 'application/json',
+          ...(this.cadEngineApiKey && { 'X-API-Key': this.cadEngineApiKey }),
+        },
+      });
+    } catch (e: any) {
+      throw new ServiceUnavailableException(
+        `CAD engine is not reachable, so ${stepFile.originalname} was not processed. Start the CAD engine and try again (${e?.message ?? e}).`,
+      );
+    }
 
     if (!cadResponse.ok) {
+      const detail = await cadResponse.json().then((b: any) => b?.detail).catch(() => undefined);
       throw new BadRequestException(
-        `CAD engine failed: ${cadResponse.statusText}`,
+        `CAD engine could not analyse ${stepFile.originalname}: ${detail ?? cadResponse.statusText}`,
       );
     }
 
@@ -1386,6 +1403,49 @@ export class BOMItemsController {
       location,
       productionLifeYears ? Number(productionLifeYears) : undefined,
     );
+  }
+
+  @Get(':id/secondary-processes')
+  @ApiOperation({ summary: 'Every secondary process (inspection, NDT, cleaning, packaging) for this part: applicability, machine, cycle time and cost from the reference data and CAD facts' })
+  async getSecondaryProcesses(
+    @Param('id') id: string,
+    @Query('batchSize') batchSize: string,
+    @Query('location') location: string,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+  ) {
+    if (!location) throw new BadRequestException('location query param is required');
+    const item = await this.bomItemsService.findOne(id, user.id, token);
+    // The same canonical batch size the cost summary uses.
+    const inputs = resolveCostingInputs({
+      requested: { batchSize: batchSize ? parseInt(batchSize, 10) : undefined, location },
+      scenarioOverrides: item.scenarioOverrides,
+      item,
+    });
+    return this.secondaryProcessService.compute({
+      item,
+      location: inputs.location ?? location,
+      batchSize: inputs.batchSize,
+      accessToken: token,
+    });
+  }
+
+  @Get(':id/nre')
+  @ApiOperation({ summary: 'One-time investment (NC programming, fixture, CMM programming) from reference data, with amortization' })
+  async getNre(
+    @Param('id') id: string,
+    @Query('batchSize') batchSize: string,
+    @Query('location') location: string,
+    @Query('productionLifeYears') productionLifeYears: string,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+  ) {
+    if (!location) throw new BadRequestException('location query param is required');
+    return this.nreService.compute({
+      itemId: id, userId: user.id, accessToken: token, location,
+      batchSize: batchSize ? parseInt(batchSize, 10) : undefined,
+      productionLifeYears: productionLifeYears ? Number(productionLifeYears) : undefined,
+    });
   }
 
   @Get(':id/true-nest')
@@ -1715,7 +1775,8 @@ export class BOMItemsController {
     const db = this.supabaseService.getClient(token);
     const orderedLines: Array<{
       process: string; machineClass: string; machineName: string | null; hourlyRate: number;
-      cycleTimeMin: number; machineSelection?: { balanced?: { candidate?: { machineId?: string | null } } };
+      labourRate?: number | null;
+      cycleTimeMin: number; machineSelection?: { balanced?: { candidate?: { machineId?: string | null; processGroup?: string | null } } };
     }> = [];
     const needsManualCycleTime: string[] = [];
 
@@ -1754,6 +1815,7 @@ export class BOMItemsController {
         machineClass: step.machineClass,
         machineName: rate?.machineName ?? null,
         hourlyRate: rate?.rate ?? 0,
+        labourRate: rate?.labourRate ?? null,
         cycleTimeMin: 0,
       });
       needsManualCycleTime.push(step.process);
@@ -1789,11 +1851,10 @@ export class BOMItemsController {
   }
 
   // Real machine rate for a machine class with no geometric trigger on this
-  // part yet — used only by applyCustomRoute's catalog-operation path. Same
-  // fallback order as everywhere else in this codebase: cheapest real
-  // mhr_records row for this location > cheapest mhr_benchmark_rates row
-  // (converted from its USD storage convention to local currency) > null
-  // (honest no-rate-on-file, never a fabricated number).
+  // part yet — used only by applyCustomRoute's catalog-operation path: the
+  // cheapest real mhr_records row for this location, with that machine's own
+  // labour rate, or null when HR Rates has no machine of the class here. No
+  // benchmark or other-location substitute.
   // Returns rate in USD, via rates.toUsd() regardless of factory currency —
   // which is why applyCustomRoute declares lineCurrency 'USD' when it calls
   // writeProcessLinesAsRecords (see PersistedLineCurrency).
@@ -1809,36 +1870,28 @@ export class BOMItemsController {
     location: string,
     token: string,
     rates: RateSnapshot,
-  ): Promise<{ machineName: string | null; rate: number } | null> {
+  ): Promise<{ machineName: string | null; rate: number; labourRate: number | null } | null> {
+    const locInfo = LOCATION_INFO[location];
+    if (!locInfo) {
+      throw new BadRequestException(`Unknown Digital Factory location '${location}' — cannot resolve its machine rates.`);
+    }
     const db = this.supabaseService.getClient(token);
     const { data: ownRows } = await db
       .from('mhr_records')
-      .select('machine_name, total_machine_hour_rate')
+      .select('machine_name, total_machine_hour_rate, usd_lhr_total')
       .eq('machine_class', machineClass)
       .eq('location', location)
       .order('total_machine_hour_rate', { ascending: true })
       .limit(1);
-    if (ownRows?.length) {
-      const locInfo = LOCATION_INFO[location] ?? LOCATION_INFO['USA']!;
-      return {
-        machineName: ownRows[0].machine_name ?? null,
-        rate: rates.toUsd(Number(ownRows[0].total_machine_hour_rate ?? 0), locInfo.code),
-      };
-    }
-
-    const { data: benchRows } = await db
-      .from('mhr_benchmark_rates')
-      .select('machine_name, mhr_usd')
-      .eq('machine_class', machineClass)
-      .eq('location', location)
-      .order('mhr_usd', { ascending: true })
-      .limit(1);
-    if (benchRows?.length) {
-      // mhr_benchmark_rates.mhr_usd is already USD-native — no conversion needed.
-      return { machineName: benchRows[0].machine_name ?? null, rate: Number(benchRows[0].mhr_usd ?? 0) };
-    }
-
-    return null;
+    if (!ownRows?.length) return null;
+    // Labour is this machine's own usd_lhr_total (already USD, the currency
+    // these lines are written in). No benchmark or process-group substitute.
+    const lhrUsd = Number(ownRows[0].usd_lhr_total ?? 0);
+    return {
+      machineName: ownRows[0].machine_name ?? null,
+      rate: rates.toUsd(Number(ownRows[0].total_machine_hour_rate ?? 0), locInfo.code),
+      labourRate: lhrUsd > 0 ? lhrUsd : null,
+    };
   }
 
   // Shared by applyRoute and applyCustomRoute — writes one process_cost_records row per
@@ -1848,8 +1901,8 @@ export class BOMItemsController {
   private async writeProcessLinesAsRecords(
     id: string,
     lines: Array<{
-      process: string; machineClass: string; machineName?: string | null; hourlyRate: number;
-      cycleTimeMin: number; machineSelection?: { balanced?: { candidate?: { machineId?: string | null } } };
+      process: string; machineClass: string; hostMachineClass?: string; machineName?: string | null; hourlyRate: number;
+      cycleTimeMin: number; machineSelection?: { balanced?: { candidate?: { machineId?: string | null; processGroup?: string | null } } };
       /** Real un-amortised setup minutes the engine charged for this line — see resolveSetupMinutes(). */
       setupTimeMin?: number;
       /** Real machine crew size from mhr_records, via the selected candidate. */
@@ -1885,7 +1938,7 @@ export class BOMItemsController {
        * NULL rather than a stand-in.
        */
       labourRate?: number | null;
-      setupTimeSource?: 'calculator' | 'machine' | 'operation_lookup' | 'class_default';
+      setupTimeSource?: 'calculator' | 'machine' | 'operation_lookup' | 'none';
     }>,
     batchSize: number,
     location: string,
@@ -2007,78 +2060,65 @@ export class BOMItemsController {
     // it, and the rollup gate above rejects what the BOM aggregate cannot
     // accept. Migration 707.
 
+    // HR Rates process group of every machine a line is linked to by id only
+    // (lines without a machine-selection candidate, e.g. inspection).
+    const machineGroupById = new Map<string, string>();
+    {
+      const ids = [...new Set(lines.map((l) => l.mhrId).filter((x): x is string => typeof x === 'string' && x.length > 0))];
+      if (ids.length > 0) {
+        const { data: machines } = await db.from('mhr_records').select('id, process_group, commodity_code').in('id', ids);
+        for (const m of (machines ?? []) as Array<{ id: string; process_group: string | null; commodity_code: string | null }>) {
+          const g = m.process_group || m.commodity_code;
+          if (g) machineGroupById.set(m.id, g);
+        }
+      }
+    }
+
     const insertedOps: string[] = [];
     /** Every row, fully built, before anything existing is touched. */
     const rowsToInsert: Record<string, unknown>[] = [];
     let opNbr = 10;
 
-    // Pre-fetch benchmark labour rates for this location from the global shared table.
-    // lhr_benchmark_rates has no user_id — readable by all authenticated users without RLS workarounds.
-    // lhr_usd_effective is always stored so the rate is location-agnostic for cost comparison.
-    const { data: benchmarkRows } = await db
-      .from('lhr_benchmark_rates')
-      .select('id, lhr, lhr_usd_effective, currency, process_group')
-      .eq('location', location)
-      .order('lhr', { ascending: true });
-
-    // Build group-keyed lookup: processGroup → benchmark LHR for that group,
-    // denominated in the SAME currency as the money on the lines being
-    // persisted (currencyContext.lineCurrency).
-    //
-    // This rule used to be "if the row is not USD, take lhr_usd_effective" —
-    // i.e. always USD, because until P1b-iv-c the caller only ever persisted
-    // USD. applyRoute now persists the factory-LOCAL route, so that rule made
-    // direct_rate = <local machine rate> + <USD labour rate>: two currencies
-    // added together. Live lhr_benchmark_rates, India / Sheet Metal, shows the
-    // size of it — lhr 144.46 INR/hr against lhr_usd_effective 1.73 USD/hr.
-    //
-    // resolveBenchmarkLabourRate picks the column that IS the target currency
-    // and returns null when neither is, so an undenominatable rate stays a
-    // visible 0 gap rather than a wrong-currency number silently summed into
-    // direct_rate.
-    const lhrByGroup = new Map<string, number>();
-    for (const row of benchmarkRows ?? []) {
-      const group = row.process_group as string;
-      if (!lhrByGroup.has(group)) {
-        const rate = resolveBenchmarkLabourRate(row, currencyContext.lineCurrency);
-        if (rate != null) lhrByGroup.set(group, rate);
-      }
-    }
-    // When DB has no row for a group — or no column in the right currency —
-    // LHR is 0: visible as a gap, not a silently wrong rate.
-    const pickLHR = (group: string): { id: null; lhr: number } =>
-      ({ id: null, lhr: lhrByGroup.get(group) ?? 0 });
-
     for (const line of lines) {
-      // The real process hierarchy (Group/Route/Operation) that the manual
-      // "Edit Process Cost" dialog's picker matches against lives in
-      // process_calculator_mappings, keyed by machine_class (migrations
-      // 368/369). This used to just slugify line.process ("Waterjet Cutting"
-      // -> "waterjet_cutting") into `operation` and never set `process_route`
-      // at all -- a real, indexed column (migration 041) that stayed NULL for
-      // every route-applied line. The dialog's "Saved process" panel only
-      // renders a Route line when one is set, so every applied-route process
-      // showed an incomplete hierarchy (Group + Operation, no Route) and could
-      // never be correctly re-matched against the picker's own Group -> Route
-      // -> Operation cascade. Resolve the real triple from the same table the
-      // picker itself reads, picking the lowest display_order row for this
-      // machine_class (mirrors the frontend's own defaultCalculatorForOperation
-      // "sort by displayOrder, take first" convention) -- falling back to the
-      // slug only when a machine class genuinely has no mapping row at all.
+      // process_route (and, for a line with no machine, the process group) is
+      // read from this machine class's catalog rows in process_calculator_mappings
+      // (migrations 368/369), lowest display_order first. An operation run on
+      // another machine (hostMachineClass, e.g. rigid tapping on the lathe that
+      // turned the part) is resolved against THAT machine's rows.
+      const hierarchyClass = line.hostMachineClass ?? line.machineClass;
       const { data: hierarchyRows } = await db
         .from('process_calculator_mappings')
-        .select('process_group, process_route, operation, lhr_process_group, display_order')
-        .eq('machine_class', line.machineClass)
+        .select('process_group, process_route, display_order')
+        .eq('machine_class', hierarchyClass)
         .eq('is_active', true)
         .order('display_order', { ascending: true })
         .limit(1);
       const hierarchyRow = hierarchyRows?.[0] as
-        | { process_group: string; process_route: string; operation: string; lhr_process_group: string | null }
+        | { process_group: string; process_route: string }
         | undefined;
-      const operation    = hierarchyRow?.operation
-        ?? line.process.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-      const processGroup = hierarchyRow?.process_group
-        ?? this.deriveProcessGroupFromMachineClass(line.machineClass);
+      // The saved operation is the engine's own name for this line
+      // (line.process) — the one identity every other writer (the dialog, the
+      // custom route above, the frontend default-route path) saves and the Edit
+      // Process Cost dialog matches against. Never the class's catalog row:
+      // that identity is per machine class, so it named every line on one
+      // machine the same ("CMM Inspection" for the "Inspection" line, one
+      // label for a lathe's Rough Turning / Finish Turning / Boring), and a
+      // reopened line then matched none of this part's live operations.
+      const operation    = line.process;
+      // The Process a saved line shows is the process group of the machine it
+      // runs on, as HR Rates lists it (mhr_records.process_group, else its
+      // commodity_code), so the Edit Process Cost picker always has it as an
+      // option. The catalog row's group is used only for a line with no
+      // machine. Neither = the line cannot be placed: no guessed group.
+      const lineMhrId = line.machineSelection?.balanced?.candidate?.machineId ?? line.mhrId ?? null;
+      const processGroup = line.machineSelection?.balanced?.candidate?.processGroup
+        ?? (lineMhrId ? machineGroupById.get(lineMhrId) : undefined)
+        ?? hierarchyRow?.process_group;
+      if (!processGroup) {
+        throw new InternalServerErrorException(
+          `"${line.process}" (${hierarchyClass}) has no process group: its machine has none in HR Rates and the class has no process_calculator_mappings row.`,
+        );
+      }
       const processRoute = hierarchyRow?.process_route ?? null;
       // machine_rate is denominated in currencyContext.lineCurrency, like every
       // other money column on the row. It is line.hourlyRate verbatim — the
@@ -2093,15 +2133,11 @@ export class BOMItemsController {
       // confirmed live: a genuine 19.2s Inspection line saved as 19s, then
       // visibly disagreed with its own calculator's exact recomputation.
       const cycleTimeSec = Math.round(line.cycleTimeMin * 60 * 100) / 100;
-      // Labour-wage tier vs. routing category are different things that happen
-      // to share the same process_calculator_mappings.process_group column for
-      // most machine classes — but several classes (cmm, deburring,
-      // turret_punch, the CNC classes, injection_molding) bill a genuinely
-      // different, more specific labour tier than their ROUTING group.
-      // lhr_process_group (migration 424) is the single DB-driven source for
-      // this, shared with BOMItemsService.resolveLHRRates — same row already
-      // fetched above, no second query.
-      const lhr = pickLHR(hierarchyRow?.lhr_process_group ?? processGroup);
+      // Labour is the rate the engine costed this line with — the selected
+      // machine's own memory/ LHR (line.labourRate). No lhr_benchmark_rates or
+      // process-group substitute. labor_rate 0 is the column's own "none"
+      // (column default 0); line_labour_rate below stays NULL for it.
+      const labourRate = line.labourRate ?? 0;
 
       rowsToInsert.push({
         bom_item_id:    id,
@@ -2121,7 +2157,7 @@ export class BOMItemsController {
         // location's real rate.
         location,
         // machine_class was never persisted here despite line.machineClass
-        // being available (already used above for deriveProcessGroupFromMachineClass) —
+        // being available —
         // every route-applied row's machine_class came back NULL, so the frontend's
         // matchedEngineLine lookup (which requires proc.machineClass === l.machineClass)
         // always failed and every applied row silently lost the live MachineSelector
@@ -2151,9 +2187,9 @@ export class BOMItemsController {
           ? (line.benchmarkMhrId ?? null)
           : null,
         machine_rate:   machineRate,
-        labor_rate:     lhr.lhr,
+        labor_rate:     labourRate,
         lhr_id:         null,
-        direct_rate:    machineRate + lhr.lhr,
+        direct_rate:    machineRate + labourRate,
         // Real, per-machine values — never the literal 15 min / 1 operator this
         // wrote for every process on every machine regardless of what the cost
         // engine had actually charged. `line.setupTimeMin` is the un-amortised
@@ -2174,8 +2210,8 @@ export class BOMItemsController {
         // Press, Tandem Press, Progressive Die and Shearing — was the one
         // sheet-metal engine that never put its setup on the line, so all four
         // persisted setup_time = 15 while having been COSTED from 30min
-        // (PRESS_STROKE_SETUP_MIN, the setup_time_hr shared by all 8 real press
-        // machines) or 22.8min for shearing. The Cost Guide re-derives setup
+        // (the setup_time_hr shared by all 8 real press machines) or 22.8min
+        // for shearing. The Cost Guide re-derives setup
         // cost from this column, so it showed roughly half the setup the quote
         // had charged. Fifteen minutes came from nowhere: no machine, no
         // lookup, no published figure.
@@ -2227,12 +2263,8 @@ export class BOMItemsController {
         // historical producers, so it cannot be read as this without knowing
         // who wrote the row. engine_version is what says who wrote it.
         //
-        // line_labour_rate is the rate the ENGINE costed with, not the
-        // benchmark re-lookup in `lhr` above. The two can differ -- lhr is
-        // re-resolved here by process group, while the engine used whatever it
-        // resolved for the selected machine -- and the honest value to record
-        // against this line is the one that produced its cost. Null when the
-        // producer resolved none, never lhr.lhr as a substitute.
+        // line_labour_rate is the rate the ENGINE costed with (the selected
+        // machine's own LHR). Null when the producer resolved none.
         line_hourly_rate:  line.hourlyRate,
         line_labour_rate:  line.labourRate ?? null,
         engine_version:    COST_ENGINE_CONTRACT_VERSION,
@@ -2261,14 +2293,4 @@ export class BOMItemsController {
     return insertedOps;
   }
 
-  // The old version only recognised 4 machine classes and silently
-  // miscategorized everything else — including 'deburring' — as the
-  // 'CNC Machining' catch-all, pulling the wrong (real-CNC-machinist) labour
-  // rate onto e.g. a Hand Deburring line instead of the correct Post
-  // Processing rate. im_* is kept as a prefix check since MACHINE_CLASS_TO_
-  // PROCESS_GROUP only has exact-match entries.
-  private deriveProcessGroupFromMachineClass(machineClass: string): string {
-    if (machineClass.startsWith('im_')) return 'Plastic Molding';
-    return MACHINE_CLASS_TO_PROCESS_GROUP.get(machineClass) ?? 'CNC Machining';
-  }
 }

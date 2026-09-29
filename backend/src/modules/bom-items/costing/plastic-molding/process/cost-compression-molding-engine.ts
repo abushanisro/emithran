@@ -81,12 +81,9 @@ export function computeCompressionMoldingCost(input: CompressionMoldingCostInput
     batchSize: input.batchSize,
     partWeightKg: input.partWeightKg,
     pressRate: effectiveRate,
-    // Real per-machine setup_time_hr, converted to minutes — takes priority
-    // over PressStrokeInput's own generic-fallback branch (see
-    // press-stroke-engine.ts). Only falls back to the cited
-    // COMPRESSION_MOLDING_SETUP_MIN constant when this specific machine has
-    // no real setup_time_hr on file (should not happen: all 23 real
-    // machines in the source data have one).
+    // Real per-machine setup_time_hr, converted to minutes. With none on
+    // file, setup is not costed (all 23 real machines in the source data
+    // have one).
     setupMin: input.rate.setupTimeHr != null ? input.rate.setupTimeHr * 60 : undefined,
     processIdentity: input.processIdentity,
     dlrPerHr: input.dlrPerHr,

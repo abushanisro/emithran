@@ -1,5 +1,4 @@
 import {
-  TURRET_SETUP_MIN,
   TURRET_TOOL_CHANGE_SEC,
   DEFAULT_YIELD_PCT,
 } from '../../shared/core/default-rates.constants';
@@ -99,7 +98,6 @@ export function computeTurretPunchCost(input: TurretPunchInput): TurretPunchResu
     process: "Turret Punching",
     machineSetupTimeHr: rate.setupTimeHr,
     operationSetupMin: input.setupMin,
-    classDefaultMin: TURRET_SETUP_MIN,
     machineName: rate.machineName,
   });
   const setupMin = setup.setupMin;
@@ -149,7 +147,7 @@ export function computeTurretPunchCost(input: TurretPunchInput): TurretPunchResu
       totalCost: handlingCost,
       cycleTimeMin: 0,
       hourlyRate: 0,
-      rateSource: "default_rate",
+      rateSource: "consumable_allowance",
       machineClass: rate.machineClass,
       machineName: null,
       commodityCode: null,

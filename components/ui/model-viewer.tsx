@@ -136,6 +136,8 @@ interface ModelViewerProps {
   heatmapSources?: HeatmapSource[];
   heatmapNormalization?: HeatmapNormalization;
   onHeatmapInspect?: (worldPos: [number, number, number], triangleIndex: number, riskValue: number) => void;
+  /** B-Rep face id under a plain click (via faceMap) — forwarded to EDrawingsViewer. */
+  onBrepFacePick?: (faceId: number) => void;
   /** Override the amber group-face highlight color — used for operation-specific visualization */
   highlightColor?: string;
   /** Nest toolbar toggle (visualization only) — order quantity + the sheet already selected by the existing cost-authoritative nesting result. */
@@ -187,6 +189,7 @@ export function ModelViewer({
   heatmapSources,
   heatmapNormalization,
   onHeatmapInspect,
+  onBrepFacePick,
   highlightColor,
   nestQuantity,
   nestSheetWidthMm,
@@ -341,6 +344,7 @@ export function ModelViewer({
               {...(heatmapSources !== undefined ? { heatmapSources } : {})}
               {...(heatmapNormalization !== undefined ? { heatmapNormalization } : {})}
               {...(onHeatmapInspect ? { onHeatmapInspect } : {})}
+              {...(onBrepFacePick ? { onBrepFacePick } : {})}
               {...(highlightColor !== undefined ? { highlightColor } : {})}
               {...(bomItemId ? { bomItemId } : {})}
               {...(nestQuantity !== undefined ? { nestQuantity } : {})}
@@ -496,6 +500,7 @@ export function ModelViewer({
               {...(heatmapSources !== undefined ? { heatmapSources } : {})}
               {...(heatmapNormalization !== undefined ? { heatmapNormalization } : {})}
               {...(onHeatmapInspect ? { onHeatmapInspect } : {})}
+              {...(onBrepFacePick ? { onBrepFacePick } : {})}
               {...(highlightColor !== undefined ? { highlightColor } : {})}
               {...(bomItemId ? { bomItemId } : {})}
               {...(nestQuantity !== undefined ? { nestQuantity } : {})}

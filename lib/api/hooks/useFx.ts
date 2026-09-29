@@ -61,7 +61,48 @@ export function useCurrencies() {
     queryKey: ['fx', 'currencies'],
     queryFn: () => apiClient.get<CurrencyInfo[]>('/fx/currencies'),
     enabled: useAuthEnabledWith(true),
-    staleTime: Infinity, // derived from the same static LOCATION_INFO map
+    staleTime: 5 * 60 * 1000, // the exchange_rates table; editing a rate invalidates it
+  });
+}
+
+/** One active budget rate with its provenance — GET /fx/exchange-rates. */
+export interface ExchangeRateRow {
+  currency: string;
+  name: string | null;
+  /** 1 USD = rate `currency`. */
+  rate: number;
+  effectiveDate: string;
+  /** Email of the user who last edited the rate; null while it is the reference value. */
+  editedBy: string | null;
+  editReason: string | null;
+  sourceActive: boolean | null;
+  sourceModifiedBy: string | null;
+  sourceModifiedAt: string | null;
+  updatedAt: string;
+}
+
+/** The budget exchange rate table (1 USD = rate CCY) — backs the Process page Exchange Rates panel. */
+export function useExchangeRates(enabled = true) {
+  return useQuery({
+    queryKey: ['fx', 'exchange-rates'],
+    queryFn: () => apiClient.get<ExchangeRateRow[]>('/fx/exchange-rates'),
+    enabled: useAuthEnabledWith(enabled),
+  });
+}
+
+/**
+ * Sets a new budget rate for one currency (a reason is required; the old
+ * rate is kept as history server-side). Invalidates every FX query, since
+ * budget conversions and the currency list both read this table.
+ */
+export function useSetExchangeRate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ currency, rate, reason }: { currency: string; rate: number; reason: string }) =>
+      apiClient.put<ExchangeRateRow[]>(`/fx/exchange-rates/${encodeURIComponent(currency)}`, { rate, reason }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['fx'] });
+    },
   });
 }
 

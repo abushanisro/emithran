@@ -1,6 +1,6 @@
 // Generator: seeds sm_lookup_tooling_coating_cost (migration 721's schema)
 // from the real per-kg tooling coating cost table —
-// memory/sheetmetal/lookuptable/coating_cost_table.json (3 rows:
+// memory/Sheetmetal/lookuptable/coating_cost_table.csv (3 rows:
 // {coatingCostUsdPerKg, coatingType, toolMaterial}).
 //
 // Paired with progressive-die-tooling-engine.ts's die-block raw-steel cost,
@@ -19,7 +19,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const SRC_FILE = path.join(__dirname, '../../../memory/sheetmetal/lookuptable/coating_cost_table.json');
+const { readDoc } = require('./lib/memory-csv');
+
+const SRC_FILE = path.join(__dirname, '../../../memory/Sheetmetal/lookuptable/coating_cost_table.csv');
 const OUT_SQL = path.join(__dirname, '../721_seed_sheet_metal_tooling_coating_cost.sql');
 
 function sqlStr(v) {
@@ -30,7 +32,7 @@ function sqlNum(v) {
   return v === null || v === undefined ? 'NULL' : String(v);
 }
 
-const src = JSON.parse(fs.readFileSync(SRC_FILE, 'utf8'));
+const src = readDoc(SRC_FILE, { list: 'rows', scalars: ['name', 'filePath', 'digitalFactory', 'rowCount'] });
 if (!Array.isArray(src.rows) || src.rows.length !== src.rowCount) {
   throw new Error(`row count mismatch: file says ${src.rowCount}, array has ${src.rows?.length}`);
 }
@@ -43,7 +45,7 @@ const sql = `-- ================================================================
 -- Migration 721: sm_lookup_tooling_coating_cost
 --
 -- Real per-kg tooling coating cost — staged verbatim from
--- memory/sheetmetal/lookuptable/coating_cost_table.json (${src.rows.length} rows,
+-- memory/Sheetmetal/lookuptable/coating_cost_table.csv (${src.rows.length} rows,
 -- source: ${src.digitalFactory}). Consumed by progressive-die-tooling-engine.ts
 -- alongside the real per-kg heat-treat cost (sm_reference_data
 -- 'stdHeatTreatCostPerKgProgDie') to price die-block finishing cost from the

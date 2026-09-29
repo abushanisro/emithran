@@ -32,6 +32,7 @@ function candidate(overrides: {
     machineId: overrides.machineId ?? 'id-' + Math.random().toString(36).slice(2),
     machineName: overrides.machineName ?? 'Test Machine',
     commodityCode: null,
+    processGroup: null,
     machineClass: overrides.machineClass,
     hourlyRate: overrides.hourlyRate,
     utilizationPct: overrides.utilizationPct ?? 75,
@@ -384,32 +385,21 @@ describe('selectMachine', () => {
     expect(isCapable(realMill, req)).toBe(true);
   });
 
-  it('falls back to class default with confidence 40 when nothing is capable', () => {
+  it('reports no machine — no rate, no capability — when nothing is capable', () => {
     const tiny = candidate({
       machineClass: 'press_brake', hourlyRate: 4,
       capability: { maxTonnage: 5, maxLengthMm: 500, maxThicknessMm: 1 },
     });
-    // This is a pure unit test of selectMachine() in isolation — no DB, no
-    // bom-items.service.ts — so fallbackRate can only be an arbitrary
-    // fixture value here, NOT a real benchmark rate (that's real in
-    // production: bom-items.service.ts resolves it from the actual median
-    // of DB machine hourly rates for this class/location — see
-    // benchmarkMap at bom-items.service.ts:1533). This test's only job is
-    // to verify selectMachine correctly threads whatever fallbackRate it's
-    // given onto the synthetic default-class candidate when nothing pooled
-    // is capable — the exact number is arbitrary and asserted right below.
-    const arbitraryTestFallbackRate = 600;
     const result = selectMachine({
       pool: [tiny],
       location,
       machineClass: 'press_brake',
       requirement: pressBrakeRequirement({ bendLengthMm: 2000, thicknessMm: 6, utsMpa: 410 }),
-      fallbackRate: arbitraryTestFallbackRate,
     });
     expect(result.balanced.candidate.machineId).toBeNull();
-    expect(result.balanced.candidate.capabilitySource).toBe('default_class');
-    expect(result.confidence).toBe(40);
-    expect(result.balanced.candidate.hourlyRate).toBe(arbitraryTestFallbackRate);
+    expect(result.balanced.candidate.hourlyRate).toBe(0);
+    expect(result.balanced.candidate.capability.maxTonnage).toBeNull();
+    expect(result.confidence).toBe(0);
   });
 
   it('cheapest profile picks the lowest-rate capable machine', () => {
@@ -531,17 +521,15 @@ describe('P0.4 — turret punch / waterjet get their own real MachineRequirement
     expect(result.balanced.candidate.machineId).toBe('snug');
   });
 
-  it('D — no capable turret machine in the pool still falls back to the benchmark rate, unmodified fallback path', () => {
+  it('D — no capable turret machine in the pool reports no machine, never a substitute rate', () => {
     const tiny = candidate({ machineId: 'tiny', machineClass: 'turret_punch', hourlyRate: 30, capability: { maxTonnage: 2, maxThicknessMm: 3, maxXMm: 1250, maxYMm: 2500 } });
     const bigJob = { cutLengthMm: 2000, materialShearStrengthMpa: 400, thicknessMm: 4, bedLengthMm: 1000, bedWidthMm: 800 };
     const req = punchingRequirement(bigJob);
     expect(isCapable(tiny, req)).toBe(false); // sanity: this job genuinely exceeds tiny's 2t capacity
-    const arbitraryTestFallbackRate = 55;
-    const result = selectMachine({ pool: [tiny], location, machineClass: 'turret_punch', requirement: req, fallbackRate: arbitraryTestFallbackRate });
+    const result = selectMachine({ pool: [tiny], location, machineClass: 'turret_punch', requirement: req });
     expect(result.balanced.candidate.machineId).toBeNull();
-    expect(result.balanced.candidate.capabilitySource).toBe('default_class');
-    expect(result.confidence).toBe(40);
-    expect(result.balanced.candidate.hourlyRate).toBe(arbitraryTestFallbackRate);
+    expect(result.balanced.candidate.hourlyRate).toBe(0);
+    expect(result.confidence).toBe(0);
   });
 
   it('E — a non-seed-registry turret machine with real imported capability is judged on its own numbers, not its name', () => {
@@ -1118,5 +1106,40 @@ describe('Machine Economics — roll_bending_2/3/4 get their own real RollBendin
     expect(requirements.roll_bending_4?.kind).toBe('roll_bending');
     expect(requirements.roll_bending_2?.rollLengthMm).toBe(1200); // = max(flatLenMm, flatWidMm)
     expect(requirements.press_brake?.kind).toBe('press_brake'); // unrelated bendCount>0 path unaffected
+  });
+});
+
+// The two real Haas bar-feed lathes from the reported part (same Ø457/Ø406
+// swing class, both at 95% utilization) differ only in hourly rate — the
+// selection must say that the rate decided it, show every capable machine's
+// scores, and list the machine too small for the part as rejected.
+describe('selectMachine — why a machine was selected', () => {
+  const ds30 = candidate({ machineId: 'ds30', machineName: 'Haas DS-30 with BAR3010SS Feeder', machineClass: '2_axis_bar_feed_lathe_with_sub_spindle' as any, hourlyRate: 2841.505, utilizationPct: 95, capability: { maxDiameterMm: 457, maxLengthMm: 1524 } });
+  const ds30ss = candidate({ machineId: 'ds30ss', machineName: 'Haas DS-30SS with BAR3010SS Feeder', machineClass: '2_axis_bar_feed_lathe_with_sub_spindle' as any, hourlyRate: 2866.555, utilizationPct: 95, capability: { maxDiameterMm: 457, maxLengthMm: 1524 } });
+  const tiny = candidate({ machineId: 'tiny', machineName: 'Too small', machineClass: '2_axis_bar_feed_lathe_with_sub_spindle' as any, hourlyRate: 100, utilizationPct: 75, capability: { maxDiameterMm: 10, maxLengthMm: 1524 } });
+
+  const result = selectMachine({
+    pool: [ds30, ds30ss, tiny],
+    location: 'USA',
+    machineClass: '2_axis_bar_feed_lathe_with_sub_spindle' as any,
+    requirement: latheRequirement({ maxDiameterMm: 17.6, maxLengthMm: 3 }),
+  });
+
+  it('ranks every capable machine with its component scores', () => {
+    expect(result.ranking!.map((r) => r.machineId)).toEqual(['ds30', 'ds30ss']);
+    const [a, b] = result.ranking!;
+    expect(a!.fit).toBe(b!.fit);
+    expect(a!.util).toBe(b!.util);
+    expect(a!.cost).toBe(1);
+    expect(b!.cost).toBeCloseTo(2841.505 / 2866.555, 3);
+  });
+
+  it('says the rate decided it, against the runner-up', () => {
+    expect(result.decision).toEqual({ winnerId: 'ds30', runnerUpId: 'ds30ss', decidingFactor: 'cost' });
+    expect(result.profileWeights!.balanced).toEqual({ fit: 0.5, util: 0.3, cost: 0.2, avail: 0 });
+  });
+
+  it('lists the machine that cannot hold the part as rejected, not silently dropped', () => {
+    expect(result.rejected!.map((r) => r.machineId)).toEqual(['tiny']);
   });
 });

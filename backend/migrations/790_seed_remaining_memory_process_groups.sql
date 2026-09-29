@@ -69,13 +69,9 @@ BEGIN;
 -- Taxonomy first (its id is what mappings and mhr_records point at, so moving
 -- the row keeps every link intact). The NOT EXISTS guard keeps a re-run safe.
 --
--- LABOUR TIER IS PINNED. Applied-route costing bills labour against
--- lhr_process_group, falling back to the mapping own process_group when it is
--- NULL (migration 424). CMM Inspection is already Quality via 424, but Surface
--- Treatment has NULL, so it currently bills at the Post Processing tier. Moving
--- it to a group with no labour rate would silently change that cost, so the old
--- tier is written into lhr_process_group first (COALESCE never overrides an
--- existing value).
+-- Labour is not moved with the group: every line is billed at its own
+-- machine labour rate (memory/-backed mhr_records), so lhr_process_group is
+-- left as it is (migration 839 cleared the old Post Processing tier).
 UPDATE process_taxonomy pt
 SET process_group = 'Surface Treatment'
 WHERE pt.process_group = 'Post Processing' AND pt.process_name = 'Surface Treatment'
@@ -87,15 +83,13 @@ WHERE pt.process_group = 'Post Processing' AND pt.process_name = 'CMM Inspection
   AND NOT EXISTS (SELECT 1 FROM process_taxonomy x WHERE x.process_group = 'Other Secondary Processes' AND x.process_name = 'CMM Inspection');
 
 UPDATE process_calculator_mappings m
-SET process_group = 'Surface Treatment',
-    lhr_process_group = COALESCE(m.lhr_process_group, 'Post Processing')
+SET process_group = 'Surface Treatment'
 WHERE m.process_group = 'Post Processing' AND m.operation = 'Surface Treatment'
   AND NOT EXISTS (SELECT 1 FROM process_calculator_mappings x
                   WHERE x.process_group = 'Surface Treatment' AND x.process_route = m.process_route AND x.operation = m.operation);
 
 UPDATE process_calculator_mappings m
-SET process_group = 'Other Secondary Processes',
-    lhr_process_group = COALESCE(m.lhr_process_group, 'Post Processing')
+SET process_group = 'Other Secondary Processes'
 WHERE m.process_group = 'Post Processing' AND m.operation = 'CMM Inspection'
   AND NOT EXISTS (SELECT 1 FROM process_calculator_mappings x
                   WHERE x.process_group = 'Other Secondary Processes' AND x.process_route = m.process_route AND x.operation = m.operation);

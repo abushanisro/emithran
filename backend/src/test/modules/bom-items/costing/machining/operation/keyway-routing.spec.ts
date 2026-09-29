@@ -13,7 +13,7 @@ import { splitKeywayOccurrences } from '../../../../../../modules/bom-items/cost
 // volume-based default-case costing (the wrong physics for a broached slot).
 
 function keywayFeature(occurrences: Array<{ length_mm?: number | null; width_mm?: number | null; depth_mm?: number | null }>) {
-  return { feature_type: 'keyway', occurrences };
+  return { feature_type: 'Keyway', variant: 'default', occurrences };
 }
 
 describe('splitKeywayOccurrences', () => {
@@ -24,8 +24,8 @@ describe('splitKeywayOccurrences', () => {
   });
 
   it('leaves non-keyway features (pocket, slot, through_hole) completely untouched', () => {
-    const pocket = { feature_type: 'pocket', occurrences: [{ depth_mm: 5 }] };
-    const slot = { feature_type: 'slot', occurrences: [{ depth_mm: 3, width_mm: 6, length_mm: 25 }] };
+    const pocket = { feature_type: 'PocketV2', variant: 'default', occurrences: [{ depth_mm: 5 }] };
+    const slot = { feature_type: 'Slot', variant: 'straight', occurrences: [{ depth_mm: 3, width_mm: 6, length_mm: 25 }] };
     const result = splitKeywayOccurrences([pocket, slot]);
     expect(result.filteredFeatures).toEqual([pocket, slot]);
     expect(result.keywayCandidates).toEqual([]);
@@ -63,7 +63,7 @@ describe('splitKeywayOccurrences', () => {
     const feature = keywayFeature([{ width_mm: 6, depth_mm: 4 }]); // no length_mm
     const result = splitKeywayOccurrences([feature]);
     expect(result.keywayCandidates).toEqual([]);
-    expect(result.filteredFeatures).toEqual([{ feature_type: 'keyway', occurrences: [{ width_mm: 6, depth_mm: 4 }] }]);
+    expect(result.filteredFeatures).toEqual([{ feature_type: 'Keyway', variant: 'default', occurrences: [{ width_mm: 6, depth_mm: 4 }] }]);
   });
 
   it('splits a feature with BOTH resolvable and unresolvable occurrences correctly', () => {
@@ -74,15 +74,15 @@ describe('splitKeywayOccurrences', () => {
     const result = splitKeywayOccurrences([feature]);
     expect(result.keywayCandidates).toEqual([{ lengthMm: 40, widthMm: 6, depthMm: 4, count: 1 }]);
     expect(result.filteredFeatures).toEqual([
-      { feature_type: 'keyway', occurrences: [{ width_mm: 6, depth_mm: 4 }] },
+      { feature_type: 'Keyway', variant: 'default', occurrences: [{ width_mm: 6, depth_mm: 4 }] },
     ]);
   });
 
-  it('handles multiple independent features in one pass, preserving unrelated ones and matching on feature_type case-insensitively', () => {
+  it('handles multiple independent features in one pass, preserving unrelated ones', () => {
     const keyway = keywayFeature([{ length_mm: 40, width_mm: 6, depth_mm: 4 }]);
-    const pocket = { feature_type: 'pocket', occurrences: [{ depth_mm: 5 }] };
-    const upperKeyway = { feature_type: 'KEYWAY', occurrences: [{ length_mm: 20, width_mm: 4, depth_mm: 3 }] };
-    const result = splitKeywayOccurrences([keyway, pocket, upperKeyway]);
+    const pocket = { feature_type: 'PocketV2', variant: 'default', occurrences: [{ depth_mm: 5 }] };
+    const secondKeyway = keywayFeature([{ length_mm: 20, width_mm: 4, depth_mm: 3 }]);
+    const result = splitKeywayOccurrences([keyway, pocket, secondKeyway]);
     expect(result.filteredFeatures).toEqual([pocket]);
     expect(result.keywayCandidates).toEqual([
       { lengthMm: 40, widthMm: 6, depthMm: 4, count: 1 },
@@ -90,9 +90,10 @@ describe('splitKeywayOccurrences', () => {
     ]);
   });
 
-  it('falls back to `type` when `feature_type` is absent', () => {
-    const feature = { type: 'keyway', occurrences: [{ length_mm: 40, width_mm: 6, depth_mm: 4 }] };
-    const result = splitKeywayOccurrences([feature]);
-    expect(result.keywayCandidates).toEqual([{ lengthMm: 40, widthMm: 6, depthMm: 4, count: 1 }]);
+  it('matches only the exact reference feature type "Keyway" — no case-folding of off-vocabulary strings', () => {
+    const offVocabulary = { feature_type: 'KEYWAY', occurrences: [{ length_mm: 20, width_mm: 4, depth_mm: 3 }] };
+    const result = splitKeywayOccurrences([offVocabulary]);
+    expect(result.keywayCandidates).toEqual([]);
+    expect(result.filteredFeatures).toEqual([offVocabulary]);
   });
 });

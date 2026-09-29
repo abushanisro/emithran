@@ -66,7 +66,7 @@ export interface CuttingProcessLineInput {
    */
   setupTimeMin?: number;
   /** Which tier resolveSetupMinutes() used — disclosed, never inferred downstream. */
-  setupTimeSource?: 'calculator' | 'machine' | 'operation_lookup' | 'class_default';
+  setupTimeSource?: 'calculator' | 'machine' | 'operation_lookup' | 'none';
   /** Extra fields specific to the calling engine (physicsGap, calculatorId, etc.) — merged in as-is. */
   extra?: Partial<ProcessLineCost>;
 }

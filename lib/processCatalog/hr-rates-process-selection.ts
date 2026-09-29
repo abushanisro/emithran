@@ -14,9 +14,7 @@ import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
 // machine silently missing from a list, or one from an unrelated process
 // silently present in it.
 
-/** The fields these rules read. Real mhr_records rows carry all of them;
- *  mhr_benchmark_rates rows carry only machineClass, which is why they are
- *  matched by class (see benchmarkMatchesCategory) rather than by category. */
+/** The fields these rules read — real mhr_records rows carry all of them. */
 export interface MachineRowForSelection {
   machineClass?: string | undefined;
   benchmarkSourceKey?: string | undefined;
@@ -45,8 +43,18 @@ export function effectiveProcessGroupOf(row: MachineRowForSelection): string {
  *  /mhr/process-groups endpoint, which queries only the real process_group
  *  column and therefore misses every commodity-code-only group. */
 export function processGroupOptionsFrom(rows: readonly MachineRowForSelection[]): string[] {
-  const groups = rows.map(effectiveProcessGroupOf).filter((g) => g !== '-');
-  return [...new Set(groups)].sort();
+  return [...buildHrRatesIndex(rows).processGroups];
+}
+
+/** A picker's options with its current value kept in them.
+ *
+ *  A Select renders blank when its value matches none of its items, and the
+ *  options above come from the loaded rows: while they load, or when a search,
+ *  location or retired machine leaves no row for the chosen value, the choice
+ *  vanishes from the control although it is still in effect. Keeping it listed
+ *  keeps it visible. */
+export function optionsKeepingSelection(options: readonly string[], selected: string): string[] {
+  return selected && !options.includes(selected) ? [...options, selected].sort() : [...options];
 }
 
 /** Real distinct machine categories within one process group, for a Category
@@ -59,12 +67,7 @@ export function categoryOptionsFrom(
   rows: readonly MachineRowForSelection[],
   processGroup: string,
 ): string[] {
-  if (!processGroup) return [];
-  const cats = rows
-    .filter((r) => effectiveProcessGroupOf(r) === processGroup)
-    .map((r) => mhrCategoryOf(r))
-    .filter((c) => c !== '-');
-  return [...new Set(cats)].sort();
+  return [...buildHrRatesIndex(rows).categoriesOf(processGroup)];
 }
 
 /**
@@ -102,31 +105,25 @@ export function categoryMachineClassesOf(
   processGroup: string,
   category: string,
 ): Set<string> {
-  const set = new Set<string>();
-  if (!category) return set;
-  for (const r of rows) {
-    if (matchesProcessAndCategory(r, processGroup, category) && r.machineClass) {
-      set.add(r.machineClass);
-    }
-  }
-  return set;
+  return new Set(buildHrRatesIndex(rows).machineClassesOf(processGroup, category));
 }
 
 /**
- * Does this mhr_benchmark_rates row belong to the chosen Category?
+ * The Process and Category a saved line's machine_class is in, for a line with
+ * no linked machine to read them off (e.g. an inspection line whose resource
+ * HR Rates does not price).
  *
- * Benchmark rows carry machine_class but NO benchmark_source_key, so
- * `mhrCategoryOf` would humanise the slug ("Roll Bending 3") and never match a
- * real category name ("3 Roll Bender") — silently hiding every benchmark
- * machine. They are matched on the real classes the category resolves to
- * instead: the same join by a different key, not a looser one.
+ * The reverse of categoryMachineClassesOf: the rows of that class, within the
+ * line's Process when it has one. Each field is returned only when those rows
+ * agree on a single value — a class spread over several categories names none
+ * of them, and the engineer picks.
  */
-export function benchmarkMatchesCategory(
-  row: MachineRowForSelection,
-  categoryClasses: ReadonlySet<string>,
-): boolean {
-  if (categoryClasses.size === 0) return false;
-  return !!row.machineClass && categoryClasses.has(row.machineClass);
+export function selectionForMachineClass(
+  rows: readonly MachineRowForSelection[],
+  machineClass: string,
+  processGroup: string,
+): { processGroup?: string; category?: string } {
+  return buildHrRatesIndex(rows).selectionForMachineClass(machineClass, processGroup);
 }
 
 /**
@@ -154,4 +151,88 @@ export function calculatorMappingsForMachineClass<T extends { machineClass?: str
  */
 export function unambiguousMapping<T>(mappingsForClass: readonly T[]): T | undefined {
   return mappingsForClass.length === 1 ? mappingsForClass[0] : undefined;
+}
+
+// ─── The index ──────────────────────────────────────────────────────────────
+//
+// Every question above is answered from one structure built in a single pass
+// over the rows, instead of re-filtering every row per question. Each row's
+// group and category are resolved once; after that every picker lookup is a
+// Map read. It is held in both directions because the pickers ask both ways:
+// Process -> Category -> machine classes (the cascade), and machine class ->
+// Process -> Category (opening a saved line with no machine).
+//
+// Build it once per loaded row set (useMemo on the rows) and read every picker
+// from it, so all of them come from the same snapshot of HR Rates.
+
+export interface HrRatesIndex {
+  /** Process groups, sorted. */
+  readonly processGroups: readonly string[];
+  /** Categories within a process group, sorted; empty for an unknown group. */
+  categoriesOf(processGroup: string): readonly string[];
+  /** The machine classes a Process + Category resolves to. */
+  machineClassesOf(processGroup: string, category: string): ReadonlySet<string>;
+  /** See the selectionForMachineClass wrapper above. */
+  selectionForMachineClass(machineClass: string, processGroup: string): { processGroup?: string; category?: string };
+}
+
+const NO_CLASSES: ReadonlySet<string> = new Set();
+
+type Nested = Map<string, Map<string, Set<string>>>;
+
+function addNested(map: Nested, a: string, b: string, c: string): void {
+  let inner = map.get(a);
+  if (!inner) map.set(a, (inner = new Map()));
+  let leaf = inner.get(b);
+  if (!leaf) inner.set(b, (leaf = new Set()));
+  leaf.add(c);
+}
+
+/** The single member of a set, or undefined when it has none or several. */
+function only<T>(values: Iterable<T>): T | undefined {
+  let found: T | undefined;
+  let count = 0;
+  for (const v of values) {
+    if (++count > 1) return undefined;
+    found = v;
+  }
+  return found;
+}
+
+export function buildHrRatesIndex(rows: readonly MachineRowForSelection[]): HrRatesIndex {
+  // group -> category -> machine classes
+  const byGroup: Nested = new Map();
+  // machine class -> group -> categories
+  const byClass: Nested = new Map();
+
+  for (const row of rows) {
+    const group = effectiveProcessGroupOf(row);
+    if (group === '-') continue;
+    const category = mhrCategoryOf(row);
+    if (!byGroup.has(group)) byGroup.set(group, new Map());
+    if (category === '-') continue;
+    if (!byGroup.get(group)!.has(category)) byGroup.get(group)!.set(category, new Set());
+    if (row.machineClass) {
+      addNested(byGroup, group, category, row.machineClass);
+      addNested(byClass, row.machineClass, group, category);
+    }
+  }
+
+  const processGroups = [...byGroup.keys()].sort();
+  const sortedCategories = new Map<string, readonly string[]>();
+  for (const [group, categories] of byGroup) sortedCategories.set(group, [...categories.keys()].sort());
+
+  return {
+    processGroups,
+    categoriesOf: (processGroup) => sortedCategories.get(processGroup) ?? [],
+    machineClassesOf: (processGroup, category) => byGroup.get(processGroup)?.get(category) ?? NO_CLASSES,
+    selectionForMachineClass(machineClass, processGroup) {
+      const groups = machineClass ? byClass.get(machineClass) : undefined;
+      if (!groups) return {};
+      const group = processGroup || only(groups.keys());
+      if (!group) return {};
+      const category = only(groups.get(group) ?? []);
+      return { processGroup: group, ...(category ? { category } : {}) };
+    },
+  };
 }

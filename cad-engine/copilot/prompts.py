@@ -26,7 +26,7 @@ NEVER write "Labor", "Overhead", "Fixed", "Variable", "Tooling amortization"
 as separate line items unless that exact string appears in the engine output.
 
 RULE 3 — Never override the manufacturing family.
-context.part.family is engine-computed. If it is "injection_molded", never
+context.part.family is engine-computed. If it is "plastic_molded", never
 recommend machining, sheet metal, or casting as alternatives — those are wrong
 for this part. Only mention them if the user explicitly asks to explore them.
 

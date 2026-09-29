@@ -42,19 +42,19 @@
 
 UPDATE mhr_records
 SET benchmark_source_key = 'Injection Molding:' || machine_name
-WHERE benchmark_source_key IS NULL AND machine_class = 'injection_molding';
+WHERE nullif(trim(benchmark_source_key), '') IS NULL AND machine_class = 'injection_molding';
 
 UPDATE mhr_records
 SET benchmark_source_key = 'Compression Molding:' || machine_name
-WHERE benchmark_source_key IS NULL AND machine_class = 'compression_molding';
+WHERE nullif(trim(benchmark_source_key), '') IS NULL AND machine_class = 'compression_molding';
 
 UPDATE mhr_records
 SET benchmark_source_key = 'Reaction Injection Molding:' || machine_name
-WHERE benchmark_source_key IS NULL AND machine_class = 'reaction_injection_molding';
+WHERE nullif(trim(benchmark_source_key), '') IS NULL AND machine_class = 'reaction_injection_molding';
 
 UPDATE mhr_records
 SET benchmark_source_key = 'Structural Foam Molding:' || machine_name
-WHERE benchmark_source_key IS NULL AND machine_class = 'structural_foam_molding';
+WHERE nullif(trim(benchmark_source_key), '') IS NULL AND machine_class = 'structural_foam_molding';
 
 -- Verification (run manually after):
 -- SELECT machine_class, count(*) AS rows, count(DISTINCT benchmark_source_key) AS distinct_keys

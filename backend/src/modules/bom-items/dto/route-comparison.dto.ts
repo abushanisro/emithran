@@ -34,13 +34,13 @@ export interface RouteCapability {
  * the same way.
  */
 export interface RouteInjectionMoldingDetail {
-  /** Required clamp force for this part (projected area × cavities × material factor × 1.15 margin), metric tons-force. */
+  /** Required clamp force (reference clamp model: projected area × cavities × cavity pressure × clampForceSafetyFactor), metric tons-force. */
   clampRequiredT: number | null;
   /** The evaluated machine's real clamp rating (DB machine) or the tier's synthetic fallback tonnage. */
   clampMachineT: number | null;
   /** clampRequiredT / clampMachineT as a 0-100 percentage. null when projected area is unknown. */
   clampUtilPct: number | null;
-  /** Required shot weight for this part (part + runner) × cavities × 1.10 margin, grams. */
+  /** Required shot size, GPPS-equivalent grams (shot-size.ts) × cavities, incl. shotSizeSafetyFactor. */
   shotRequiredG: number | null;
   /** The evaluated machine's real shot capacity, grams. null when the machine has no shot-capacity figure on file. */
   shotMachineG: number | null;
@@ -48,7 +48,7 @@ export interface RouteInjectionMoldingDetail {
   shotUtilPct: number | null;
   /** Real cavity count this route was costed at (recommendCavityCount, constrained by clamp/shot/economics). */
   cavityCount: number;
-  /** Real gate-type recommendation (recommendGateType) driving cycle time / trimming for this route. */
+  /** Gate type: the part's gate signal, else the reference default runner system (drives trimming routing). */
   gateType: string;
   /** Whether this DB machine's clamp/shot data came from imported reference data or a class-tier synthetic fallback. */
   machineDataSource: 'imported' | 'synthetic';

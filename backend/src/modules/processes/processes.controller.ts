@@ -38,6 +38,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
 import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
 import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
+import { REFERENCE_DOMAINS, isReferenceDomain, referenceDomainList } from './reference-domains';
 
 @ApiTags('Processes')
 @ApiBearerAuth()
@@ -76,15 +77,35 @@ export class ProcessesController {
   @ApiOperation({ summary: 'Get domain reference-data variables (sm_reference_data / im_reference_data / machining_reference_data)' })
   @ApiResponse({ status: 200, description: 'Domain variables retrieved successfully' })
   async getDomainVariables(
-    @Query('domain') domain: 'sheet_metal' | 'injection_molding' | 'machining',
+    @Query('domain') domain: string,
     @AccessToken() token: string,
     @Query('search') search?: string,
     @Query('category') category?: string,
   ) {
-    if (domain !== 'sheet_metal' && domain !== 'injection_molding' && domain !== 'machining') {
-      throw new BadRequestException("domain must be 'sheet_metal', 'injection_molding', or 'machining'");
+    if (!isReferenceDomain(domain)) {
+      throw new BadRequestException(`domain must be one of: ${Object.keys(REFERENCE_DOMAINS).join(', ')}`);
     }
     return this.processesService.getDomainVariables(domain, token, search, category);
+  }
+
+  @Get('reference-domains')
+  @ApiOperation({ summary: 'Every reference-data domain (memory/ folder) the Process page can list' })
+  getReferenceDomains() {
+    return referenceDomainList();
+  }
+
+  @Get('reference-lookup')
+  @ApiOperation({ summary: 'One staged reference lookup table (columns + rows) of a reference-data domain' })
+  async getReferenceLookup(
+    @Query('domain') domain: string,
+    @Query('key') key: string,
+    @AccessToken() token: string,
+  ) {
+    if (!isReferenceDomain(domain)) {
+      throw new BadRequestException(`domain must be one of: ${Object.keys(REFERENCE_DOMAINS).join(', ')}`);
+    }
+    if (!key) throw new BadRequestException('key is required');
+    return this.processesService.getReferenceLookup(domain, key, token);
   }
 
   @Get('calculator-mappings')
@@ -177,6 +198,17 @@ export class ProcessesController {
     @AccessToken() token: string,
   ) {
     return this.processesService.getSmLookupTableByName(table, token);
+  }
+
+  @Get('machining-lookup-tables/by-name/:table')
+  @ApiOperation({ summary: 'Get one machining reference table a machining calculator field reads, flattened — for the calculator dialog lookup-table viewer' })
+  @ApiResponse({ status: 200, description: 'Machining lookup table retrieved successfully' })
+  @ApiResponse({ status: 400, description: 'Not a machining calculator lookup table' })
+  async getMachiningLookupTableByName(
+    @Param('table') table: string,
+    @Query('outputColumn') outputColumn?: string,
+  ) {
+    return this.processesService.getMachiningLookupTableByName(table, outputColumn);
   }
 
   @Put('sm-lookup-tables/rows/:table/:id')

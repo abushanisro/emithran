@@ -1,16 +1,3 @@
-// Corrected 2026-09-10: was 15 with no citation. All 65 real
-// machine_library.json laser-cutting rows report the identical real
-// setup_time_hr=0.08 (4.8min) uniformly — "Fiber Laser Cutting Machine" (26),
-// "Laser Cutting Machine" (24, the real co2_laser fleet), and "3D Laser
-// Cutting Machine" (15) — same disclosed-fallback convention as
-// WATERJET_SETUP_MIN/OXYFUEL_SETUP_MIN below. Used only when a specific
-// machine's own mhr_records.setup_time_hr is absent (resolveSetupMinutes()
-// prefers that real per-machine value first — see laser-cutting-engine.ts).
-export const LASER_SETUP_MIN = 4.8;      // minutes per batch — real, cited above
-export const PRESS_BRAKE_SETUP_MIN = 20;
-export const TAPPING_SETUP_MIN = 10;
-export const CMM_SETUP_MIN = 15;         // per batch — program recall + fixture + datum alignment
-
 // eMithranTerms()'s (engine-kernel.ts) default yield fraction when no
 // per-part/per-material yield has been resolved — a single named constant so
 // every caller (cost-engine.ts's 9 inline blocks, and every registered
@@ -320,6 +307,11 @@ const DEFAULT_THREAD_PITCH_MM: Record<number, number> = {
   3: 0.5, 4: 0.7, 5: 0.8, 6: 1.0, 8: 1.25, 10: 1.5, 12: 1.75, 16: 2.0, 20: 2.5, 24: 3.0,
 };
 
+/** ISO 261 coarse pitch of a metric nominal diameter, or null off the series. */
+export function isoCoarsePitchMm(nominalDiameterMm: number): number | null {
+  return Number.isInteger(nominalDiameterMm) ? DEFAULT_THREAD_PITCH_MM[nominalDiameterMm] ?? null : null;
+}
+
 // The two values used when even the standard series cannot answer. Named, so
 // they read as assumptions at every use site instead of as bare literals, and
 // so resolveTapPhysicsInputs can flag when it fell back to them.
@@ -587,143 +579,21 @@ export function computeDeburrCycleSec(
   return (cutLengthMm / 1000) * secPerMetre + pierceCount * secPerPierce;
 }
 
-// Counterbore/countersink/PEM/ream: fallback constants used ONLY when the
-// corresponding sm_lookup_* table (migration 381) has no row for the diameter —
-// same "last-resort safety net" convention as sheet-metal-lookup.service.ts.
-export const COUNTERBORE_SETUP_MIN = 5;
-export const COUNTERSINK_SETUP_MIN = 5;
-export const PEM_INSERTION_SETUP_MIN = 5;
-// Hole extrusion (burring): die/tool-change setup, same class as counterbore/
-// countersink/PEM above. Cycle time itself comes from sm_lookup_manual_stroke
-// (via estimateBurlTonnage + getManualStrokeTime), not a fallback constant here.
-export const BURRING_SETUP_MIN = 5;
 // Reaming replaces a laser-pierced hole's finish with a drilled+reamed one when
 // tolerance can't be held by piercing alone — same threshold CNC already uses
 // in operation-sequencer.ts::injectDrawingIntelligence for the CMM trigger.
 export const TIGHT_TOLERANCE_REAM_THRESHOLD_MM = 0.05;
-export const REAM_SETUP_MIN = 8;
 
-// Real, cited total radial stock left on a turned OD specifically for a
-// finish grinding pass to remove (memory/machining/variables.json's real
-// "finishGrindingDepth" variable, unit Length/mm) — not a fabricated
-// allowance. Used by Cylindrical Grinding's real infeed-pass-count model
-// (see computeCylindricalGrindingCycleSec).
-export const FINISH_GRINDING_DEPTH_MM = 0.1;
+// Finishing-process capability thresholds (finish grinding depth, the
+// grinding Ra trigger, the jig boring / jig grinding tolerance and their
+// pass counts) are read from the staged reference data, never held here:
+// machining/capability-rules.ts (variables + tblGtolProcessCapabilities).
 
-// Real, sourced trigger threshold — memory/machining/lookup/
-// tblGtolProcessCapabilities.json (1284 real rows) gives real
-// "Best Achievable" surface roughness (Ra, µm) per real process:
-// Turning best-case Ra 0.4, Milling Fine best-case Ra 0.4. Neither can go
-// finer than 0.4µm even at their best — a drawing calling for anything
-// tighter genuinely cannot be met by turning/milling alone and needs real
-// grinding. Not tuned/guessed: this IS the real ceiling in the reference data.
-export const TURNING_MILLING_BEST_ACHIEVABLE_RA_UM = 0.4;
-
-// Gun Drilling / Deep Bore Machine setup — real, disclosed class default,
-// used only when the selected machine has no real mhr_records.setup_time_hr
-// (resolveSetupMinutes' 'machine' tier). Every real machine in both fleets
-// (memory/machining/machine/gun_drill_usa.json, 8 machines;
-// deep_bore_machine_usa.json, 6 machines) reports the identical real
-// setup_time_hr=0.5 (30min) — a uniform, cited value, not a guess.
-export const DEEP_HOLE_SETUP_MIN = 30;
-
-// Cylindrical Grinding setup — same real, disclosed class-default pattern.
-// All 6 real machines (memory/machining/machine/cylindrical_grinder_machines_usa.json)
-// report the identical real setup_time_hr=0.5 (30min) — cited, not a guess
-// (coincides numerically with DEEP_HOLE_SETUP_MIN, but kept as its own named
-// constant since it's a real, independently-sourced value for a different
-// real machine fleet, not the same fact reused).
-export const CYLINDRICAL_GRINDING_SETUP_MIN = 30;
-
-// Jig Boring — real, sourced tiering ABOVE Reaming, not a guessed number.
-// memory/machining/lookup/tblGtolProcessCapabilities.json (1284 real rows)
-// gives Jig Boring's own real positionTolerance capability (Capability
-// System 'literal', already in mm — not an IT grade needing conversion):
-// Best Achievable 0.005mm, Worst Achievable 0.026mm. tblBoringV2's own
-// real "Finish Boring" rows never go tighter than hole_tolerance_mm=0.05
-// (confirmed directly — 0.05/0.06/0.08/0.13 are the only real values on
-// file), corroborating that anything tighter than 0.05mm (the existing
-// TIGHT_TOLERANCE_REAM_THRESHOLD_MM) genuinely needs a different real
-// process — this adds the missing, tighter real tier: 0.026mm or below
-// needs a real dedicated jig borer, not just reaming.
-export const JIG_BORE_POSITION_TOLERANCE_MM = 0.026;
-// Real, cited repeat-pass count — tblGtolProcessCapabilities' own Jig
-// Boring row reports "Num Repetitions: 3" (vs. 1 for ordinary Boring/
-// Reaming) — jig boring achieves its real tighter tolerance via real
-// repeat finishing passes, not a faster/slower cut. Applied as a real
-// multiplier on the same real Finish Boring cutting physics
-// (tblBoringV2), not a separate fabricated formula.
-export const JIG_BORE_NUM_REPETITIONS = 3;
-// Real, disclosed class default — all 4 real Jig Bore machines
-// (memory/machining/machine/jig_bore_usa.json) report the identical real
-// setup_time_hr=1.0 (60min).
-export const JIG_BORE_SETUP_MIN = 60;
-
-// Jig Grind — a real, DISTINCT process from Jig Boring in
-// tblGtolProcessCapabilities.json, not a duplicate: shares Jig Boring's
-// exact real positionTolerance ceiling (literal, Worst Achievable 0.026mm —
-// same JIG_BORE_POSITION_TOLERANCE_MM), so a position-tolerance-only trigger
-// can't distinguish the two. Its own real Num Repetitions is 4 (vs Jig
-// Boring's 3) and its own real roughness range (Best 0.2286µm/Worst
-// 0.825µm) is achievable on a HARDENED bore, unlike single-point boring —
-// standard machining practice: a bore this tight in a part that has been
-// through-hardened/case-hardened must be finish-GROUND to size (grinding
-// wheels cut hardened steel; boring tools chip/wear on it), while the same
-// tolerance on an as-received (soft) part is bored. The real, disclosed
-// trigger this uses: the SAME real 0.026mm ceiling as Jig Boring, split by
-// whether the part's own real drawing-extracted heatTreatment callout
-// (bom_items.heat_treatment, populated by drawing extraction — see
-// resolveHeatTreatmentCallout's own doc comment) names an actual heat-treat
-// process, not a fabricated threshold. No dedicated Jig Grinding cutting-
-// physics table exists in the reference corpus (checked directly) — reuses
-// tblCylindricalGrinding's real wheel-speed/infeed data, same disclosed-
-// reuse judgment call as Internal Grinding.
-export const JIG_GRIND_NUM_REPETITIONS = 4;
-// Real, disclosed class default — all 4 real Jig Grind machines
-// (memory/machining/machine/jig_grind_usa.json, e.g. "Hauser S3-DR") report
-// the identical real setup_time_hr=1.0 (60min).
-export const JIG_GRIND_SETUP_MIN = 60;
-
-// Internal Grinding (ID/bore grinding) — real, staged machine fleet
-// (memory/machining/machine/internal_grinder_usa.json, 10 machines,
-// migrations 737/738/753) and the same real Ra<0.4µm trigger as
-// Cylindrical Grinding, but NO dedicated internal-grinding cutting-physics
-// table exists anywhere in the reference corpus (checked directly).
-// Reuses tblCylindricalGrinding's real wheel-speed/infeed data — a
-// disclosed simplification (external OD grinding physics applied to an
-// internal bore), same category of real-data-reuse judgment call as Jig
-// Boring reusing Finish Boring's physics, not a fabricated formula. All 10
-// real machines report the identical real setup_time_hr=0.5 (30min).
-export const INTERNAL_GRINDING_SETUP_MIN = 30;
-
-// Keyway Broaching — real, staged machine fleet (memory/machining/machine/
-// broach_machines_usa.json, 4 machines: Pioneer VT1040/H1560, Nachi
-// NUV-20-23, Cell-Mate; migrations 737/738/753 already activate this
-// machine_class). All 4 real machines report the identical real
-// setup_time_hr=0.01 (0.6min) — a genuinely fast value for this class (a
-// broach's own pull/push stroke is what takes real time; workholding is
-// typically a quick self-centering fixture) — cited, not a guess.
-export const KEYWAY_BROACHING_SETUP_MIN = 0.6;
 // Real per-stroke approach/overtravel allowance: no dedicated field for
 // this exists in tblBroaching (a material cutting-speed/feed table, not a
 // machine-geometry table), so the real keyway length alone drives stroke
 // time — a disclosed simplification (approach/overtravel isn't modeled),
 // not a fabricated allowance.
-
-// Wire EDM — real, staged machine fleet (memory/machining/machine/
-// wire_edm_work_center_data.json, 6 machines: Fanuc 0id/1id, Makino DUO43,
-// Mitsubishi BA24/FA-50V/MD+PRO II). All 6 real machines report the
-// identical real setup_time_hr=0.5 (30min). Real, disclosed trigger: same
-// heat-treat-callout signal as Jig Grind (isRealHeatTreatmentCallout,
-// wire-edm-routing.ts), applied to a real "slot" feature instead of a
-// round bore — a hardened slot cannot be conventionally milled any more
-// than a hardened bore can be conventionally bored, and wire EDM (electrical
-// erosion, immune to material hardness) is the real substitute process.
-// Real per-material cutting physics (tblWireEDMing) gives real Roughing +
-// Finishing FeedRateMmPerMin, applied to the real cut-path length as one
-// rough pass + one finish pass — same 2-pass linear-physics shape as
-// Keyway Broaching above, not a fabricated formula.
-export const WIRE_EDM_SETUP_MIN = 30;
 
 // Real HSS reaming surface speed by material family — reaming is a distinct
 // finishing operation from drilling/tapping (lower speed, precision-focused,
@@ -768,49 +638,30 @@ export function resolveReamPhysicsInputs(diameterMm: number, materialGrade: stri
   return { surfaceSpeedMMin, feedMmPerRev, materialFamily };
 }
 
-// ── Surface treatment types ────────────────────────────────────────────────────
-// Rates come from the `surface_treatment_rates` DB table (migration 362).
-// This interface describes a resolved DB row converted to local currency.
+// ── Surface treatment ─────────────────────────────────────────────────────────
+// The drawing callout is matched to a reference process from
+// memory/SurfaceTreatment and costed by the surface-treatment engine
+// (costing/surface/surface-treatment-engine.ts, via SecondaryProcessService).
+// The old surface_treatment_rates table (migration 362) and the regex
+// classifier that keyed into it (anodize_type_ii, zinc_plate, a __default__
+// catch-all for any plat/paint/coat text) are no longer read.
 
 export interface SurfaceTreatmentDbRate {
+  /** Reference machine class, e.g. surface_zinc_plating. */
   treatmentType: string;
+  /** Reference process name, e.g. Zinc Plating. */
   label: string;
-  ratePerM2Local: number;
-  minLotChargeLocal: number;
-  // Populated by BomItemsService.enrichSurfaceTreatmentRate() — the real
-  // "Post Processing - Surface Treatment" calculator's resolved Total Cost
-  // (area×rate vs. amortized min-lot, whichever is higher) for THIS part's
-  // real surface area and batch size, via resolvePhysicsQuantity. Absent
-  // (undefined) only when surface area wasn't known yet at resolution time
-  // (computeSurfaceTreatmentLine's own "area unknown" guard already warns
-  // and skips the line in that case) — never a fabricated fallback number.
+  machineName: string | null;
+  /** Per-part cost in the location currency; absent when the engine could not
+   *  cost the process (see gap). */
   totalCostFromCalculatorLocal?: number;
+  cycleTimeMin?: number;
+  hourlyRateLocal?: number;
   calculatorId?: string | null;
   calculatorVersion?: number | null;
   gap?: import('../../../dto/cost-breakdown.dto').PhysicsGap | null;
   confidence?: import('../../../dto/cost-breakdown.dto').ConfidenceLevel;
   resolutionStatus?: import('../../../dto/cost-breakdown.dto').ResolutionStatus;
-}
-
-// Maps a drawing/coating callout ("Type III Hardcoat Black Anodize") to a rate
-// key. Returns null for empty/none callouts AND for unrecognized text — the
-// engine warns on unrecognized callouts instead of pricing them wrong.
-export function classifySurfaceTreatment(callout: string | null | undefined): string | null {
-  if (!callout) return null;
-  const c = callout.trim();
-  if (!c || /^(none|n\/a|na|nil|no|-|as.?required)$/i.test(c)) return null;
-  if (/type\s*(iii|3)|hard\s*coat|hardcoat|hard\s*anodi/i.test(c)) return 'anodize_type_iii';
-  if (/anodi/i.test(c)) return 'anodize_type_ii';
-  if (/zinc|galvani/i.test(c)) return 'zinc_plate';
-  if (/powder/i.test(c)) return 'powder_coat';
-  if (/passivat/i.test(c)) return 'passivate';
-  // Chromate/chemical conversion coating (e.g. MIL-DTL-5541, trade names
-  // Alodine/Iridite) — checked BEFORE the generic catch-all below, since
-  // "chrom" alone would otherwise match that bucket's broader regex and lose
-  // this treatment's own real, region-specific rate (see migration 490).
-  if (/chemical\s*conversion|chem\s*film|chromate\s*conversion|\balodine\b|\biridite\b/i.test(c)) return 'chem_conversion_coating';
-  if (/plat|paint|coat|phosphat|black\s*oxide|blacken|nickel|chrom|e-?coat|trivalent/i.test(c)) return '__default__';
-  return null;
 }
 
 // ── Inspection resource classification (CMM vs manual-inspection vs other) ────
@@ -850,15 +701,6 @@ export function classifyInspectionResource(
   return 'OTHER';
 }
 
-// ── Turret Punch (corrected 2026-09-02 — see audit notes below) ───────────────
-// TURRET_SETUP_MIN and TURRET_TOOL_CHANGE_SEC below were previously 45min/30s
-// with no citation — both were simply wrong: all 21 real machine_library.json
-// "Turret Press (Punch Press)" machines report setup_time_hr=0.5 (30min) and
-// tool_change_time_s=1.5s uniformly (the fallback was 20x the real tool-change
-// value). Corrected to the real, cited values — used only as the fallback of
-// last resort behind SheetMetalLookupService.getTurretPunchMachineParams()'s
-// real per-machine resolution (see that method's own doc comment).
-export const TURRET_SETUP_MIN = 30;         // per batch — real, cited above
 export const TURRET_TOOL_CHANGE_SEC = 1.5;  // per unique hole diameter — real, cited above
 
 // REMOVED (2026-09-02): TURRET_HITS_PER_MIN and TURRET_NIBBLE_MM_PER_MIN used
@@ -876,19 +718,6 @@ export const TURRET_TOOL_CHANGE_SEC = 1.5;  // per unique hole diameter — real
 // has no real substitute and now costs an honest $0 with a disclosed warning
 // — see computeTurretPunchCost's own comment.
 
-// ── Waterjet ──────────────────────────────────────────────────────────────────
-// Abrasive prices come from the `consumable_prices` DB table (migration 362).
-// Cutting speed and pierce time are NOT here — they come from the real,
-// material+thickness-specific sm_lookup_waterjet_cut table (migration 398) via
-// SheetMetalLookupService.getWaterjetParams(), resolved in bom-items.service.ts
-// and passed into computeWaterjetCost() (waterjet-engine.ts). A hardcoded,
-// material-blind speed/pierce-time table used to live here and silently
-// diverged from that real data — removed rather than kept as a "fallback".
-// Corrected 2026-09-02: was 30 with no citation. All 27 real
-// machine_library.json "Waterjet Cutting Machine" rows report
-// setup_time_hr=0.08 (4.8min) uniformly — used only as the fallback of last
-// resort behind sm_lookup_op_setup_time's real per-op setup time.
-export const WATERJET_SETUP_MIN = 4.8;       // per batch — real, cited above
 // Generic fallback of last resort, behind getWaterjetAbrasiveRateForMachine's
 // real per-machine abrasive_flow_rate_kg_min (0.34-0.46 across the 27 real
 // machines) — this constant is only reached when no per-machine row
@@ -896,16 +725,6 @@ export const WATERJET_SETUP_MIN = 4.8;       // per batch — real, cited above
 // already correctly gated behind the real resolver, unlike the constants
 // above.
 export const WATERJET_ABRASIVE_KG_PER_MIN = 0.5; // kg/min of active cutting
-
-// OxyFuel Cut (2026-09-01). Feed rate / pierce time are NOT here — real,
-// material+thickness-specific data comes from sm_reference_data's staged
-// 'nestingCutRate:*:OxyFuelCut:*' rows (migration 492) via
-// SheetMetalLookupService.getOxyfuelParams(). Setup time: all 18 real
-// Oxyfuel machines in machine_library.json report the identical real
-// setup_time_hr=0.08 (4.8min) — used only when sm_lookup_op_setup_time has
-// no row yet for 'oxyfuel_cut', same disclosed-fallback convention as
-// WATERJET_SETUP_MIN above.
-export const OXYFUEL_SETUP_MIN = 4.8; // per batch
 
 // Every contour the head cuts needs a ramp-up run before it reaches full
 // pressure/speed and a mirrored ramp-down on exit — this distance is real
@@ -926,46 +745,6 @@ export const WATERJET_LEAD_IN_MM = 5;
 // alternatives, so both apply together here too.
 export const WATERJET_CUT_TIME_ADJUSTMENT_FACTOR = 1.4;
 
-// ── 2-Axis Router (Track B Phase 2) ────────────────────────────────────────────
-// Cutting speed is NOT here — it comes from the real, material-family-specific
-// sm_lookup_router_cut table (tblRouterUtilities.json) via
-// SheetMetalLookupService.getRouterParams(), resolved in bom-items.service.ts
-// and passed into computeRouterCost() (router-engine.ts). Setup time below is
-// a real, cited default: machine_library.json's "2-Axis Router" category
-// records setup_time_hr=0.5 (30min) consistently across all 10 real machines
-// in that category — used only when sm_lookup_op_setup_time has no row yet
-// for 'router_2axis' (same disclosed-fallback convention as WATERJET_SETUP_MIN).
-export const ROUTER_SETUP_MIN = 30; // per batch
-
-// Standard Press / Tandem Press (Track B Phase 2, migration 608) — used only
-// when sm_lookup_op_setup_time has no row yet for these classes. Real,
-// cited default: all 8 real Standard/Tandem Press machines' own
-// setup_time_hr (migration 585/597 staging) is 0.5hr (30min) — same
-// disclosed-fallback convention as ROUTER_SETUP_MIN above.
-export const PRESS_STROKE_SETUP_MIN = 30; // per batch
-
-// Shearing (2026-09-01) — used only when sm_lookup_op_setup_time has no row
-// yet for 'shear'. Real, cited default: all 10 real machine_library.json
-// "Shearing Machine" rows carry the identical setup_time_hr=0.38 (22.8min) —
-// same disclosed-fallback convention as PRESS_STROKE_SETUP_MIN above.
-export const SHEARING_SETUP_MIN = 22.8; // per batch
-
-// Compression Molding (2026-09-02, Injection Molding domain) — used only
-// when a compression_molding rate has no per-machine setup_time_hr staged
-// (should not happen today: all 23 real machines in
-// memory/Injection/machine/compression_molding_machines.json carry a real
-// setupTimeHr, median 1.0hr/60min). Real, cited median default, kept as a
-// disclosed fallback for defensive completeness only.
-export const COMPRESSION_MOLDING_SETUP_MIN = 60; // per batch
-
-// Reaction Injection Molding (2026-09-02, Injection Molding domain) — used
-// only when a reaction_injection_molding rate has no per-machine
-// setup_time_hr staged (should not happen today: both real machines in
-// memory/Injection/machine/reaction_injection_molding_machines.json carry
-// the identical real setupTimeHr=2hr/120min). Real, cited value, kept as a
-// disclosed fallback for defensive completeness only.
-export const REACTION_INJECTION_MOLDING_SETUP_MIN = 120; // per batch
-
 // A guillotine/power shear cuts one full straight line per stroke — it
 // cannot follow a contour. "Shear:Shear//Blank" is the ONLY feature type
 // this process appears under in process_operations.json (391 raw compound
@@ -982,64 +761,14 @@ export const REACTION_INJECTION_MOLDING_SETUP_MIN = 120; // per batch
 // Progressive-Die Press already use.
 export const SHEARING_CUTS_PER_BLANK = 2;
 
-// Laser Punch (2026-09-01) — used only when sm_reference_data has no real
-// 'laserPunchMachine:<name>' row for the selected machine yet. Real, cited
-// default: all 26 real machine_library.json "Laser Punch / Punch Press"
-// rows carry the identical setup_time_hr=0.5 (30min) — same disclosed-
-// fallback convention as TURRET_SETUP_MIN/ROUTER_SETUP_MIN above.
-export const LASER_PUNCH_SETUP_MIN = 30; // per batch
-
-// Plasma Cut (2026-09-01) — used only when sm_reference_data has no real
-// 'nestingCutRate:*:PlasmaCut:*' row for this machine/material/thickness yet.
-// Real, cited default: all 13 real machine_library.json "Plasma Cutting
-// Machine" rows carry the identical setup_time_hr=0.08 (4.8min) — same
-// disclosed-fallback convention as OXYFUEL_SETUP_MIN above.
-export const PLASMA_CUT_SETUP_MIN = 4.8; // per batch
-
-// Plasma Punch (2026-09-01) — used only when sm_reference_data has no real
-// 'nestingCutRate:*:PlasmaPunch:*' row yet. Real, cited default: 11 of 12
-// real machine_library.json "Plasma Punch" rows carry setup_time_hr=0.5
-// (30min); one outlier (0.3hr) does not change the dominant value used here
-// — same disclosed-fallback convention as every other setup-min constant.
-export const PLASMA_PUNCH_SETUP_MIN = 30; // per batch
-
-// 2/3/4 Roll Bending (2026-09-01) — used only when sm_reference_data has no
-// real 'rollBenderMachine:<name>' row for the selected machine yet. Real,
-// cited default: all 48 real machine_library.json "2/3/4 Roll Bender" rows
-// carry the identical setup_time_hr=0.5 (30min) — same disclosed-fallback
-// convention as every other setup-min constant.
-export const ROLL_BENDING_SETUP_MIN = 30; // per batch
-
-// Cut To Length Line (2026-09-10) — used only when the selected machine's own
-// mhr_records.setup_time_hr is absent. Real, cited default: all 8 real
-// machine_library.json "Cut To Length Line (CTL)" rows carry the identical
-// setup_time_hr=0.14 (8.4min) — same disclosed-fallback convention as every
-// other setup-min constant above.
-export const CUT_TO_LENGTH_SETUP_MIN = 8.4; // per batch
-
 export const RATES_SOURCE_LABEL = 'Location benchmark rates v2 (2026)';
 
 // Every costing endpoint must default to the SAME location. A summary priced in
 // India next to a route comparison priced in USA is a 20× silent error.
 export const DEFAULT_COSTING_LOCATION = 'India';
 
-// CNC billet stock allowance per side (mm): saw-cut kerf + facing/skim clean-up.
-// Applied to each bounding-box dimension (2 × per-side) when sizing milled billets.
-// This is the SINGLE canonical source for this value -- blank-stock-
-// candidates.ts (billetFallback, selectBestAutoCandidate) and
-// bom-items.service.ts (buildCNCMilledAlternativeCandidate) all import this
-// constant directly, rather than each hardcoding their own copy of the same
-// number (a real, confirmed duplication found live 2026-09-18). No real
-// stock-allowance-by-material/machine/process/bar-feeder-presence table
-// exists anywhere in the reference corpus (checked directly against
-// memory/machining/) -- disclosed as a single class-level constant, not
-// fabricated per-machine data, until one is sourced. Real per-machine bar-
-// feeder capability data DOES exist (memory/machining/machine/
-// machiningusa.json's real limits.maxBarFeedingDiaMm/minBarFeedingDiaMm,
-// staged by migration 692) but is a real bar-diameter CAPABILITY range, not
-// a stock-allowance-in-mm value -- using it to size this allowance would be
-// inventing a number the data doesn't actually give.
-export const CNC_STOCK_ALLOWANCE_PER_SIDE_MM = 3;
+// Machining billet stock allowance: the reference rule in
+// costing/machining/stock-allowance.ts (memory/Stock Maching variables).
 
 // ── Machine Registry ──────────────────────────────────────────────────────────
 // Maps each cost-engine process to the exact commodity codes that belong to it.
@@ -1228,12 +957,11 @@ export const MACHINE_REGISTRY = {
   progressive_die_press: { commodityCodes: [],                                                                                       processGroupKeywords: ['Sheet Metal', 'Sheet metal', 'Bending', 'Forming'],                                                                   machineClassKeywords: ['Progressive Die Press'] },
   tapping:        { commodityCodes: ['SM-TAP-CNC'],                                                                                  processGroupKeywords: ['Tapping', 'Sheet Metal', 'Sheet metal', 'Machining'],                                                               machineClassKeywords: ['Tapping', 'Tap', 'CNC Tap'] },
   // SM-DEBURR = India deburring bench code; Deslag = sheet metal slag removal op.
-  // 'Post Processing' is the process DB group that contains Deburring/Finishing routes.
   // Rotary/Wide Belt keywords added migration 425 alongside real Rotary Deburring
   // Machine / Wide Belt Deburring Machine benchmark rows — genuine deburring
   // equipment, unlike the ultrasonic CLEANING tank that migration 425 moved OUT
   // of this class (see the new 'cleaning' entry below).
-  deburring:      { commodityCodes: ['BENCH-DEBURR', 'SM-DEBURR'],                                                                   processGroupKeywords: ['Deburr', 'Finishing', 'Vibratory', 'Tumbling', 'Deslag', 'Post Processing'],                                        machineClassKeywords: ['Deburring', 'Bench', 'Deburr', 'Vibratory', 'Tumbl', 'Vibro', 'Finishing Cell', 'Deslag', 'Rotary', 'Wide Belt', 'Belt Deburr'] },
+  deburring:      { commodityCodes: ['BENCH-DEBURR', 'SM-DEBURR'],                                                                   processGroupKeywords: ['Deburr', 'Finishing', 'Vibratory', 'Tumbling', 'Deslag'],                                        machineClassKeywords: ['Deburring', 'Bench', 'Deburr', 'Vibratory', 'Tumbl', 'Vibro', 'Finishing Cell', 'Deslag', 'Rotary', 'Wide Belt', 'Belt Deburr'] },
   // Real, Machining-specific deburr resource (migration 737/738/753 —
   // 'Manual Deburr:Default Manual Deburr', a real staged mhr_records row,
   // $14.14/hr USA total) — distinct from the generic 'deburring' class
@@ -1254,34 +982,41 @@ export const MACHINE_REGISTRY = {
   // count) is new — see cost-machining-engine.ts's Jig Boring line.
   jig_bore:       { commodityCodes: [],                                                                                              processGroupKeywords: ['Drilling', 'Boring', 'Machining'],                                                                                 machineClassKeywords: ['Jig Bore'] },
   // Real Jig Grind fleet (migrations 737/738/753, 4 machines, default
-  // "Hauser S3-DR") — see JIG_GRIND_NUM_REPETITIONS' doc comment for the
+  // "Hauser S3-DR") — see machining/capability-rules.ts for the
   // real distinguishing trigger vs. Jig Boring and the disclosed physics-
   // reuse choice.
   jig_grind:      { commodityCodes: [],                                                                                              processGroupKeywords: ['Grinding', 'Drilling', 'Boring', 'Machining'],                                                                      machineClassKeywords: ['Jig Grind'] },
   // Real Internal Grinder fleet (migrations 737/738/753, 10 machines, e.g.
-  // "Danobat Overbeck IC/iD") — see INTERNAL_GRINDING_SETUP_MIN's doc
-  // comment for the real setup time and the disclosed physics-reuse choice.
+  // "Danobat Overbeck IC/iD"). Bore grinding from tblInternalGrinding.
   internal_grinder: { commodityCodes: [],                                                                                           processGroupKeywords: ['Grinding', 'Finishing', 'Machining'],                                                                              machineClassKeywords: ['Internal Grind'] },
+  // Real Reciprocating Surface Grinder fleet (migrations 737/738) — flat-face
+  // traverse grinding from tblReciprocatingSurfaceGrinding.
+  reciprocating_surface_grinder: { commodityCodes: [],                                                                                           processGroupKeywords: ['Grinding', 'Finishing', 'Machining'],                                                                              machineClassKeywords: ['Reciprocating Surface Grind'] },
   // Real Broach fleet (migrations 737/738/753, 4 machines: Pioneer VT1040/
   // H1560, Nachi NUV-20-23, Cell-Mate) — genuinely LINEAR stroke-based
   // physics (max_cutting_speed_m_per_min/max_stroke_length_mm), not rotary
-  // like every other class above. See KEYWAY_BROACHING_SETUP_MIN's doc
-  // comment and cost-machining-engine.ts's Keyway Broaching line
+  // like every other class above. See cost-machining-engine.ts's Keyway
+  // Broaching line
   // (computeKeywayBroachingLine) for the real cutting physics.
   broach:         { commodityCodes: [],                                                                                              processGroupKeywords: ['Broaching', 'Machining'],                                                                                            machineClassKeywords: ['Broach'] },
   // Real Wire EDM fleet (migrations 737/738/753, 6 machines, e.g. "Fanuc
-  // 0id") — see WIRE_EDM_SETUP_MIN's doc comment for the real hardened-
-  // slot trigger and disclosed physics.
+  // 0id") — see wire-edm-routing.ts for the real hardened-slot trigger and
+  // disclosed physics.
+  // Real Hob Machine fleet (mhr_records machine_class 'hob_machine', 4 machines)
+  // — cuts gear/spline teeth (catalog "Hob Machine:Setup:Hobbing//AxiGroove").
+  hob_machine:    { commodityCodes: [], processGroupKeywords: ['Hobbing', 'Machining'], machineClassKeywords: ['Hob'] },
+  // Real Shaver fleet (migration 758, 2 machines) — gear shaving after hobbing
+  // when tblGearQuality says the gear must be shaved or the drawing calls for it.
+  shaver:         { commodityCodes: [], processGroupKeywords: ['Shaving', 'Machining'], machineClassKeywords: ['Shaver'] },
   wire_edm:       { commodityCodes: [],                                                                                              processGroupKeywords: ['EDM', 'Machining'],                                                                                                  machineClassKeywords: ['Wire EDM'] },
   // Genuine cleaning/degreasing equipment (ultrasonic cleaning tanks, vapor
   // degreasers) — NOT deburring (removes contaminants/residue, not burrs/
   // material). Was folded into 'deburring' by an incorrect keyword rule in
   // migration 371; migration 425 splits it out into its own real class,
   // matching the source spreadsheet's own "Process Group: Cleaning" tag.
-  cleaning:       { commodityCodes: [],                                                                                              processGroupKeywords: ['Cleaning', 'Post Processing'],                                                                                       machineClassKeywords: ['Ultrasonic', 'Cleaning', 'Clean', 'Degreas'] },
+  cleaning:       { commodityCodes: [],                                                                                              processGroupKeywords: ['Cleaning'],                                                                                       machineClassKeywords: ['Ultrasonic', 'Cleaning', 'Clean', 'Degreas'] },
   // SM-CMM-SM = India CMM (Small) commodity code.
-  // 'Post Processing' is the process DB group that contains CMM/Inspection routes.
-  cmm:            { commodityCodes: ['QA-CMM', 'SM-CMM-SM'],                                                                         processGroupKeywords: ['Inspection', 'Quality', 'Post Processing'],                                                                         machineClassKeywords: ['CMM', 'Coordinate', 'Video Measuring', 'Vision Measuring', 'Inspection'] },
+  cmm:            { commodityCodes: ['QA-CMM', 'SM-CMM-SM'],                                                                         processGroupKeywords: ['Inspection', 'Quality'],                                                                         machineClassKeywords: ['CMM', 'Coordinate', 'Video Measuring', 'Vision Measuring', 'Inspection'] },
   // 'Machining' / 'Drilling' route — shared by Reaming (existing, migration 368),
   // Counterboring/Countersinking (migration 381). Secondary hole ops, not primary cutting.
   drill_press:    { commodityCodes: ['SM-DRILL', 'CNC-DRILL'],                                                                       processGroupKeywords: ['Drilling', 'Machining'],                                                                                            machineClassKeywords: ['Drill Press', 'Drilling', 'Bench Drill'] },
@@ -1421,14 +1156,15 @@ export const MACHINE_REGISTRY = {
   // Real, DB-backed class (Platform Architecture Remediation Phase 1) —
   // computeSurfaceTreatmentLine() (cost-surface-treatment.ts) already used
   // this exact literal for every ProcessLineCost it emits; it was never
-  // registered here, so the closed MachineClass union didn't cover it. Rates
-  // come from surface_treatment_rates (migration 362), not mhr_records, so
-  // there is no real per-machine fleet to match by commodityCode/keyword —
+  // registered here, so the closed MachineClass union didn't cover it. The
+  // costed line itself carries the reference class (surface_<process>,
+  // migration 820) chosen by the surface-treatment engine, so there is no
+  // fleet to match by commodityCode/keyword for this umbrella class —
   // this entry exists only so the class itself is a real, typed member of
   // the vocabulary (satisfies the SurfaceTreatmentEngine registry wrapper's
   // `readonly machineClass: MachineClass`), never resolved via this table's
   // keyword-matching path.
-  surface_treatment: { commodityCodes: [] as string[], processGroupKeywords: ['Surface Treatment', 'Post Processing'], machineClassKeywords: [] as string[] },
+  surface_treatment: { commodityCodes: [] as string[], processGroupKeywords: ['Surface Treatment'], machineClassKeywords: [] as string[] },
 } as const satisfies Record<string, MachineRegistryEntry>;
 
 export type MachineClass = keyof typeof MACHINE_REGISTRY;
@@ -1468,108 +1204,7 @@ export const CURRENCY_SYMBOLS: Readonly<Record<string, string>> = Object.fromEnt
   Object.values(LOCATION_INFO).map((info) => [info.code, info.symbol]),
 );
 
-// ISO 4217 display names for every currency LOCATION_INFO actually resolves
-// to — this is the ONLY place a currency's full name is spelled out. The
-// frontend's Currency & Ask Price widget fetches this (via GET /api/fx/
-// currencies) instead of keeping its own hardcoded label list, so adding a
-// Digital Factory location in a new currency here is the only edit needed.
-const ISO_CURRENCY_NAMES: Readonly<Record<string, string>> = {
-  INR: 'Indian Rupee', USD: 'US Dollar', EUR: 'Euro', GBP: 'British Pound',
-  CNY: 'Chinese Yuan', MXN: 'Mexican Peso',
-};
-
-export const CURRENCY_NAMES: Readonly<Record<string, string>> = Object.fromEntries(
-  Object.keys(CURRENCY_SYMBOLS).map((code) => [code, ISO_CURRENCY_NAMES[code] ?? code]),
-);
-
 /** Every Digital Factory location the app knows about, with its native currency — backs GET /api/fx/factories. */
 export function listFactoryLocations(): Array<{ location: string; code: string; symbol: string }> {
   return Object.entries(LOCATION_INFO).map(([location, info]) => ({ location, code: info.code, symbol: info.symbol }));
-}
-
-/** Every distinct scenario currency a Digital Factory location resolves to — backs GET /api/fx/currencies. */
-export function listCurrencies(): Array<{ code: string; symbol: string; name: string }> {
-  return Object.keys(CURRENCY_SYMBOLS).map((code) => ({
-    code, symbol: CURRENCY_SYMBOLS[code], name: CURRENCY_NAMES[code],
-  }));
-}
-
-// ── Rate plausibility guard ────────────────────────────────────────────────────
-// A DB machine/labour rate far outside the location benchmark band almost
-// always means a broken import (currency not converted, overhead-only rate,
-// benchmark-sheet noise) — the class of bug migration 327 backfilled for MHR,
-// and migration 348 for LHR. The DB stays authoritative (we never silently
-// clamp a rate the user entered), but the deviation must be VISIBLE on the
-// cost summary so bad data cannot silently reach a quote.
-//
-// The fractions themselves are business/costing POLICY, not an algorithmic
-// constant — they belong in the database (`costing_settings`, migration 473:
-// 'rate_warn_low_fraction'/'rate_warn_high_fraction'), read once per request
-// by the caller (mirroring how sga_pct/profit_pct are already loaded in
-// cost-aggregation.service.ts/location-comparison.service.ts) and passed in
-// here. These two functions contain only the generic comparison — no DB
-// access, no hardcoded policy — and DEFAULT_RATE_WARN_THRESHOLDS below is
-// strictly the last-resort fallback for when that table is ever empty
-// (same "fallback + disclosed warning" convention as SGA/profit).
-export interface RateWarnThresholds {
-  lowFraction: number;   // below this fraction of benchmark → suspicious (e.g. 0.5 = 50%)
-  highFraction: number;  // above this multiple of benchmark → suspicious (e.g. 3.0 = 300%)
-}
-
-export const DEFAULT_RATE_WARN_THRESHOLDS: RateWarnThresholds = { lowFraction: 0.5, highFraction: 3.0 };
-
-// benchmark: resolved from mhr_benchmark_rates (Pass 4 in resolveMHRRates).
-// Returns null when no benchmark is available so the guard degrades gracefully.
-export function benchmarkRateWarning(
-  machineClass: string,
-  location: string,
-  rate: number,
-  machineName: string | null,
-  benchmark: number | undefined,
-  thresholds: RateWarnThresholds = DEFAULT_RATE_WARN_THRESHOLDS,
-): string | null {
-  if (benchmark == null || benchmark <= 0 || rate <= 0) return null;
-
-  const symbol = LOCATION_INFO[location]?.symbol ?? '';
-  const name = machineName ?? machineClass.replace(/_/g, ' ');
-  if (rate < benchmark * thresholds.lowFraction) {
-    const pct = Math.round((1 - rate / benchmark) * 100);
-    return `${name} rate ${symbol}${rate}/hr is ${pct}% below the ${location} ${machineClass.replace(/_/g, ' ')} benchmark (${symbol}${benchmark}/hr) — verify the MHR record before quoting`;
-  }
-  if (rate > benchmark * thresholds.highFraction) {
-    return `${name} rate ${symbol}${rate}/hr is over ${thresholds.highFraction}× the ${location} ${machineClass.replace(/_/g, ' ')} benchmark (${symbol}${benchmark}/hr) — verify the MHR record before quoting`;
-  }
-  return null;
-}
-
-// Same plausibility guard as benchmarkRateWarning above, for LABOUR rates —
-// no equivalent existed until now, which is exactly how a stale lhr_records
-// import artifact (migration 348: a USD-denominated import multiplying an
-// already-INR India rate by ~83.5 again) reached a live quote as a real
-// ₹12,062/hr labour rate with no warning at all, while the analogous
-// machine-rate case has been caught since migration 327.
-//
-// processGroup: the resolved lhr_process_group (or process_group fallback)
-// this rate was billed under — used only for the warning text, not lookup.
-// benchmark: resolved from lhr_benchmark_rates for the SAME location+group
-// this rate was actually billed under (see resolveLHRRates). Returns null
-// when no benchmark is available so the guard degrades gracefully.
-export function lhrRateWarning(
-  processGroup: string,
-  location: string,
-  rate: number,
-  benchmark: number | undefined,
-  thresholds: RateWarnThresholds = DEFAULT_RATE_WARN_THRESHOLDS,
-): string | null {
-  if (benchmark == null || benchmark <= 0 || rate <= 0) return null;
-
-  const symbol = LOCATION_INFO[location]?.symbol ?? '';
-  if (rate < benchmark * thresholds.lowFraction) {
-    const pct = Math.round((1 - rate / benchmark) * 100);
-    return `${processGroup} labour rate ${symbol}${rate}/hr is ${pct}% below the ${location} ${processGroup} benchmark (${symbol}${benchmark}/hr) — verify the LHR record before quoting`;
-  }
-  if (rate > benchmark * thresholds.highFraction) {
-    return `${processGroup} labour rate ${symbol}${rate}/hr is over ${thresholds.highFraction}× the ${location} ${processGroup} benchmark (${symbol}${benchmark}/hr) — verify the LHR record before quoting`;
-  }
-  return null;
 }

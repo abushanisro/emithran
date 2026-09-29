@@ -38,6 +38,7 @@ from shared.config import AppConfig
 from shared.services import StepReader, ShapeMesher, StlWriter, ConversionService
 from shared.validators import FileValidator
 from shared.memory_optimizer import AdvancedCADMemoryOptimizer
+from shared.part_family import MACHINING_FAMILIES
 from shared.exceptions import (
     CADEngineException,
     FileValidationError,
@@ -618,31 +619,38 @@ async def analyze_geometry_advanced(
             # MachiningFeatureTree (renamed 2026-09-19 from
             # CNCFeatureRecognizer per the "Machining is the canonical
             # domain, not CNC" architecture mandate). The response key
-            # "cnc_features" and the "cnc_turned"/"mill_turn"/"cnc_milled"
+            # "machining_features" and the shared/part_family.py machining family
             # family strings below are real, existing manufacturing/process
             # classifications already read throughout the backend's
             # DB-driven costing/taxonomy code -- deliberately left
             # unchanged by this rename, not part of it.
-            cnc_features_result = None
+            machining_features_result = None
             try:
                 mfg_intel = (
                     optimization_result.geometry_features.manufacturing_features
                     .get("manufacturing_intelligence", {})
                 )
                 detected_family = mfg_intel.get("detected_family", "")
-                if detected_family in ("cnc_turned", "mill_turn", "cnc_milled"):
+                if detected_family in MACHINING_FAMILIES:
                     from machining.machining_feature_recognizer import MachiningFeatureRecognizer  # type: ignore
-                    cnc_features_result = MachiningFeatureRecognizer().recognize(shape, detected_family).to_dict()
+                    machining_features_result = MachiningFeatureRecognizer().recognize(shape, detected_family).to_dict()
+                    # Real sharp-edge length (deburring path) measured from the
+                    # B-Rep — replaces the backend estimating it from surface area.
+                    try:
+                        from shared.edge_length import sharp_edge_length  # type: ignore
+                        machining_features_result["edges"] = sharp_edge_length(shape)
+                    except Exception as _edge_exc:
+                        logger.warning(f"[machining_features] edge length failed: {_edge_exc}")
                     # Embed face_map so the frontend can resolve face_ids → STL triangle ranges.
                     # For sheet_metal this lives in feature_graph_v2.metadata.face_map; for Machining
                     # we carry it here since the SheetMetalFeatureExtractor is never called.
                     _holes = optimization_result.geometry_features.manufacturing_features.get('holes', {})
                     _face_map = _holes.get('face_map', [])
                     if _face_map:
-                        cnc_features_result['face_map'] = _face_map
+                        machining_features_result['face_map'] = _face_map
                     logger.info(
-                        f"[cnc_features] family={detected_family} "
-                        f"features={len(cnc_features_result.get('features', []))} "
+                        f"[machining_features] family={detected_family} "
+                        f"features={len(machining_features_result.get('features', []))} "
                         f"face_map_entries={len(_face_map)}"
                     )
                     try:
@@ -661,20 +669,20 @@ async def analyze_geometry_advanced(
                         try:
                             _stable_face_ids = build_stable_face_id_map(shape)
                         except Exception as _sfid_exc:
-                            logger.warning(f"[cnc_fgv2] stable_face_id build failed: {_sfid_exc}")
+                            logger.warning(f"[machining_fgv2] stable_face_id build failed: {_sfid_exc}")
                             _stable_face_ids = {}
-                        cnc_features_result["feature_graph_v2"] = build_machining_feature_graph_v2(
-                            cnc_features_result, (_bcx, _bcy, _bcz), _face_map, _total_tris,
+                        machining_features_result["feature_graph_v2"] = build_machining_feature_graph_v2(
+                            machining_features_result, (_bcx, _bcy, _bcz), _face_map, _total_tris,
                             stable_face_ids=_stable_face_ids,
                         )
                         logger.info(
-                            f"[cnc_fgv2] synthesised "
-                            f"{len(cnc_features_result['feature_graph_v2']['features'])} features"
+                            f"[machining_fgv2] synthesised "
+                            f"{len(machining_features_result['feature_graph_v2']['features'])} features"
                         )
                     except Exception as _fgv2_exc:
-                        logger.warning(f"[cnc_fgv2] synthesis failed: {_fgv2_exc}")
+                        logger.warning(f"[machining_fgv2] synthesis failed: {_fgv2_exc}")
             except Exception as _cnc_exc:
-                logger.warning(f"[cnc_features] extraction failed: {_cnc_exc}")
+                logger.warning(f"[machining_features] extraction failed: {_cnc_exc}")
 
             response = {
                 "success": True,
@@ -717,8 +725,13 @@ async def analyze_geometry_advanced(
                 }
             }
 
-            if cnc_features_result is not None:
-                response["cnc_features"] = cnc_features_result
+            if machining_features_result is not None:
+                response["machining_features"] = machining_features_result
+
+            # Semantic GD&T carried in the STEP model itself (AP242 PMI) — the
+            # one 3D-model source of GD&T; all families. See shared/step_pmi.py.
+            from shared.step_pmi import read_step_gdt  # type: ignore
+            response["pmi"] = read_step_gdt(step_path)
 
             # Component feature analysis (eMithran-style decomposition).
             # GCD adjacency walk is the bottleneck (30–70 s for complex sheet metal).

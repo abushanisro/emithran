@@ -68,6 +68,7 @@ function baseInput(overrides: Partial<CostEngineInput> = {}): CostEngineInput {
       tapping: rate(900, 'tapping'),
       drillPress: rate(600, 'drill_press'),
       pemPress: rate(500, 'pem_press'),
+      holeForming: rate(500, 'hole_forming'),
       inspection: rate(450, 'cmm'),
     },
     ...overrides,
@@ -185,7 +186,7 @@ describe('computeCostSummary — feature-driven secondary hole operations', () =
     expect(inspectionLines[0]!.totalCost).toBeGreaterThan(0);
   });
 
-  it('emits a no_db_rate warning when a new process line has no MHR rate on file', () => {
+  it('does not cost an operation whose machine has no HR Rates row, and names it in a warning', () => {
     const result = computeCostSummary(baseInput({
       counterboreCount: 2, counterboreCycleTimeSecFromCalculator: 20,
       mhrRates: {
@@ -196,10 +197,8 @@ describe('computeCostSummary — feature-driven secondary hole operations', () =
         drillPress: { rate: 0, source: 'no_db_rate', machineClass: 'drill_press', machineName: null, commodityCode: null },
       },
     }));
-    const line = result.processLines.find((l) => l.process === 'Counterboring')!;
-    expect(line.hourlyRate).toBe(0);
-    expect(line.rateSource).toBe('no_db_rate');
-    expect(result.warnings.some((w) => w.includes('drill press MHR rate'))).toBe(true);
+    expect(result.processLines.find((l) => l.process === 'Counterboring')).toBeUndefined();
+    expect(result.warnings.some((w) => w.startsWith('Counterboring not costed') && w.includes('drill_press'))).toBe(true);
   });
 });
 
@@ -701,7 +700,7 @@ describe('applyPersistedRouteToSummary — P0.2 applied-route authority', () => 
     const record = appliedRecord({ machine_class: 'waterjet', mhr_id: null });
     const result = applyPersistedRouteToSummary(preApply, [record], getProcessLabelForClass());
     const line = result.processLines.find((l) => l.process === 'Waterjet Cutting')!;
-    expect(line.rateSource).toBe('default_rate'); // honest, since mhr_id is absent -- never fabricated as 'mhr_database'
+    expect(line.rateSource).toBe('no_db_rate'); // no mhr_id: not traceable to an HR Rates machine -- never 'mhr_database'
     expect(line.totalCost).toBe(record.total_cost_per_part);
   });
 });

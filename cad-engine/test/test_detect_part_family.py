@@ -99,7 +99,7 @@ def test_disc_flange_is_cnc_turned():
         rotational_face_ratio=0.40,
         total_face_count=20,
     )
-    assert family == "cnc_turned"
+    assert family == "turned"
 
 
 def test_disc_flange_with_secondary_features_is_mill_turn():
@@ -120,7 +120,7 @@ def test_elongated_rod_is_cnc_turned():
     family, confidence, reasons = detect_part_family(
         bbox_dims=[25.0, 30.0, 100.0], hole_count=0, secondary_features_count=0,
     )
-    assert family == "cnc_turned"
+    assert family == "turned"
 
 
 def test_thin_shell_with_draft_is_injection_molded():
@@ -139,7 +139,7 @@ def test_thin_shell_with_draft_is_injection_molded():
         thin_wall_ratio=0.50,
         draft_face_ratio=0.40,
     )
-    assert family == "injection_molded"
+    assert family == "plastic_molded"
 
 
 def test_thin_shell_with_ribs_no_draft_signal_is_injection_molded():
@@ -158,21 +158,21 @@ def test_thin_shell_with_ribs_no_draft_signal_is_injection_molded():
         thin_wall_ratio=0.50,
         draft_face_ratio=0.0,
     )
-    assert family == "injection_molded"
+    assert family == "plastic_molded"
 
 
 def test_no_strong_signal_falls_back_to_cnc_milled():
     family, confidence, reasons = detect_part_family(
         bbox_dims=[50.0, 60.0, 70.0], hole_count=1, secondary_features_count=0,
     )
-    assert family == "cnc_milled"
+    assert family == "milled"
 
 
 def test_insufficient_bbox_data_defaults_to_cnc_milled():
     family, confidence, reasons = detect_part_family(
         bbox_dims=[0.0, 50.0], hole_count=0, secondary_features_count=0,
     )
-    assert family == "cnc_milled"
+    assert family == "milled"
     assert confidence == 0.50
 
 
@@ -199,7 +199,7 @@ def test_thin_flat_shell_with_strong_draft_signal_is_injection_molded():
         thin_wall_ratio=0.55,
         draft_face_ratio=0.45,
     )
-    assert family == "injection_molded", (
+    assert family == "plastic_molded", (
         "A thin flat shell with strong drafted-wall evidence must not be forced "
         "to sheet_metal by flatness alone"
     )
@@ -259,7 +259,7 @@ def test_dense_large_cylinder_block_is_not_sheet_metal():
     )
     # No rotational or IM evidence supplied (see cyl_axis_alignment/thin_wall_ratio
     # above) — falls through to the honest catch-all, not a fabricated guess.
-    assert family == "cnc_milled"
+    assert family == "milled"
 
 
 def test_large_cylinder_ratio_veto_does_not_regress_motor_bracket():

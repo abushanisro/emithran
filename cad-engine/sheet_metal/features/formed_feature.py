@@ -1,70 +1,199 @@
 """
-Formed-feature (dimple/emboss) RECOGNITION — the positive test forming_spike.py
-was missing.
+Formed-feature (dimple/emboss) detection: candidate discovery + a positive
+topological test. Emitted as feature_graph_v2 "Form"/"emboss" when recognized.
 
-WHY THIS EXISTS
+STAGE 1 -- CANDIDATE DISCOVERY (detect_candidate_formed_features)
 
-forming_spike.py's own honest finding: a genuine formed dimple and an ordinary
-shallow blind hole (e.g. an undersized tapped-hole pilot bore) produce the
-IDENTICAL cylinder-candidate shape (kind='blind_hole', a thickness-relative
-depth) -- nothing in that candidate's own data distinguishes "material
-displaced" from "material removed". That module names the missing signal
-explicitly: "confirmation of a genuine paired offset-wall structure".
+Reuses machining/machining_feature_recognizer.py's proven _collect_cylinders()
+blind_hole classification and narrows "every blind cylindrical cavity" to
+plausible formed-feature candidates with a thickness-relative depth filter,
+edge margin and known-hole proximity exclusion. Two honest limits of this
+stage alone:
+  - It cannot distinguish a genuine formed dimple from an ordinary shallow
+    blind hole (e.g. an undersized tapped-hole pilot bore): both are "a blind
+    cylindrical cavity at a thickness-relative depth". Every candidate it
+    returns is therefore recognition_status='ambiguous'.
+  - A 'blind_hole'-classified cylinder cannot be deeper than the local
+    material without becoming a through-hole, so only SHALLOW same-layer
+    cavities (0.2-0.9x thickness) are reachable. A deep paired-offset
+    dimple/boss does not present as a blind cylinder at all and is out of
+    reach of this technique. Cones (louvers) are not covered either.
 
-THE SIGNAL, AND WHY IT IS REAL TOPOLOGY, NOT A GUESSED THRESHOLD
+STAGE 2 -- THE POSITIVE TEST (detect_formed_features)
 
-A blind hole (material REMOVED) leaves the sheet's OPPOSITE face completely
-untouched: the panel's back planar face is one single, uninterrupted surface
-at that XY location. A genuine dimple/emboss (material DISPLACED by a punch)
-moves material on BOTH faces at once: the back face is no longer flat there
-either -- a physically separate face (the back side of the same displaced
-patch) occupies that footprint, which shows up in the B-Rep as an INNER WIRE
-(a hole) in the back panel's own face boundary, at the same XY position as the
-front cavity.
-
-So the question this module answers is purely topological: does the sheet's
-BACK planar face (the one antiparallel to `dominant_face`, ~sheet_thickness
-away -- the exact pairing _identify_panels already performs, just scoped here
-to the one face we need instead of the whole panel list it discards the
-pairing to build) have its own local void at the candidate's footprint? If
-yes, the material there was worked from both sides -- a real, confident
-'recognized' detection. If no, the back is flat and undisturbed -- a real
-'ambiguous' (stays exactly as forming_spike.py already reports it).
-
-WHAT THIS DELIBERATELY DOES NOT DO
-
-It does not extend forming_spike.py's own candidate scope (cylindrical blind
-cavities, depth 0.2-0.9x thickness). A genuinely DEEP formed feature (depth >
-1x thickness, the more common real dimple/boss) is architecturally out of
-reach of the same reason forming_spike.py already gave: `_collect_cylinders`
-only classifies a face as 'blind_hole' up to the through-hole boundary, and a
-deep paired-offset structure does not present as a simple cylindrical blind
-cavity at all. This module promotes candidates WITHIN that existing scope from
-'ambiguous' to 'recognized' when the back-void evidence is present; it does
-not claim to solve formed-feature detection generally.
-
-It does not attempt cones, elongated beads, or louvers -- same scope
-limitation forming_spike.py already disclosed (cylindrical candidates only).
+A blind hole (material REMOVED) leaves the sheet's OPPOSITE face untouched. A
+genuine dimple/emboss (material DISPLACED by a punch) moves material on BOTH
+faces: the back planar face (antiparallel to `dominant_face`, ~sheet_thickness
+away -- the same pairing _identify_panels performs) has its own local void, an
+INNER WIRE in its face boundary, at the candidate's XY footprint. Present ->
+'recognized'. Absent -> stays 'ambiguous'. Purely topological, no guessed
+threshold.
 
 SOURCED CLASSIFICATION, NOT A RECOGNITION GATE
 
-Once a candidate is confidently 'recognized' by the topological test above,
-its depth is classified against real reference-data multipliers (licensed
-source, staged at memory/sheetmetal/sheet_metal_variables.json -- NOT
-fabricated, and NOT used to decide recognition, only to describe an
-already-confirmed feature):
-  - shallowEmbossDepthMultiplier = 1   -> `is_shallow` at depth <= 1x thickness
-  - deepDimpleMultiplier          = 4   -> `exceeds_typical_dimple_depth` at
-    depth > 4x thickness (always False today: forming_spike.py's own depth
-    ceiling of 0.9x thickness is already far inside this bound, so the field
-    is honest but currently inert -- kept for when the deep case above is
-    ever built, not deleted as dead code).
+A recognized candidate's depth is described against real reference-data
+multipliers (memory/sheetmetal/sheet_metal_variables.json), never used to
+decide recognition:
+  - shallowEmbossDepthMultiplier = 1 -> `is_shallow` at depth <= 1x thickness
+  - deepDimpleMultiplier         = 4 -> `exceeds_typical_dimple_depth` at
+    depth > 4x thickness (inert today: stage 1 tops out at 0.9x thickness).
 """
 
 import math
 from typing import Any, Dict, List, Optional, Tuple
 
-from sheet_metal.features.forming_spike import detect_candidate_formed_features
+# ── Stage 1: candidate discovery ─────────────────────────────────────────────
+
+# NOT sourced from sm_reference_data directly (that data classifies an
+# ALREADY-FOUND feature as shallow/deep -- see this module's own docstring
+# and the perforation.py precedent for the same distinction).
+#
+# IMPORTANT PHYSICAL CONSTRAINT (corrected after an initial, wrong 6x-
+# thickness upper bound): a "blind_hole"-classified cylinder, by
+# construction, is a SINGLE cylindrical bore surface cut straight into one
+# face of the local material -- it cannot be deeper than the local material
+# thickness itself without breaking through to the other side (at which
+# point _collect_cylinders' own length/part_span > 0.90 rule reclassifies
+# it as 'through_hole'). A genuine FORMED dimple/boss, by contrast, is
+# usually a PAIRED offset-wall structure (inner + outer surface, material
+# displaced not removed) and can legitimately be deeper than the sheet
+# thickness -- but that shape does NOT present as a simple 'blind_hole' to
+# _collect_cylinders at all, so this spike's technique cannot reach it
+# regardless of the depth bound chosen. The bounds below therefore only
+# admit SHALLOW, same-layer blind cavities -- seemingly a narrower target
+# than "dimples" in general (see this module's docstring for the resulting
+# honest conclusion).
+MIN_DEPTH_THICKNESS_MULTIPLE = 0.2
+MAX_DEPTH_THICKNESS_MULTIPLE = 0.9  # matches _collect_cylinders' own through/blind boundary
+
+# NOT sourced. Candidate radius bounds -- reuses the SAME real range
+# _count_holes_with_location's hole filter already uses (0.3-150mm), since
+# a formed feature's footprint is physically the same order of magnitude as
+# a hole's.
+MIN_RADIUS_MM = 0.3
+MAX_RADIUS_MM = 150.0
+
+# NOT sourced. A v1, bounding-box-relative approximation for "not touching
+# the panel's own outer edge" -- real wire-distance would be more precise
+# (see _edge_clearance elsewhere in this codebase) but is not needed to
+# answer this spike's feasibility question. Expressed relative to the
+# candidate's own diameter (a feature within 1x its own radius of the part
+# boundary is likely an edge notch/flange remnant, not a local formed
+# feature).
+EDGE_MARGIN_RADIUS_MULTIPLE = 2.0
+
+# NOT sourced. A candidate within this many multiples of ITS OWN diameter
+# from an already-known real hole centroid is treated as that hole's own
+# counterbore/countersink/chamfer remnant, not an independent formed
+# feature -- same spirit as extruded_flange_count's existing coarse
+# counterbore/countersink correction (also not per-instance-matched).
+HOLE_PROXIMITY_DIAMETER_MULTIPLE = 3.0
+
+
+def _classify_candidates(
+    cylinders: List[Dict[str, Any]],
+    sheet_thickness: float,
+    bbox_minmax: Dict[str, float],
+    known_hole_centroids_mm: Optional[List[Tuple[float, float, float]]] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Pure filtering core (no OCC access) -- takes the SAME dict shape
+    machining/machining_feature_recognizer._collect_cylinders already returns
+    (radius, length, kind, centroid, face_indices, ...) and narrows it to
+    the candidate set described in this module's docstring.
+
+    Every returned candidate has recognition_status='ambiguous' -- see
+    module docstring for why 'recognized' is never used here.
+    """
+    if sheet_thickness <= 0:
+        return []
+    known_hole_centroids_mm = known_hole_centroids_mm or []
+
+    xmin, xmax = bbox_minmax.get("xmin", 0.0), bbox_minmax.get("xmax", 0.0)
+    ymin, ymax = bbox_minmax.get("ymin", 0.0), bbox_minmax.get("ymax", 0.0)
+
+    candidates: List[Dict[str, Any]] = []
+    for cyl in cylinders:
+        if cyl.get("kind") != "blind_hole":
+            continue
+        radius = cyl.get("radius", 0.0)
+        depth = cyl.get("length", 0.0)
+        if not (MIN_RADIUS_MM <= radius <= MAX_RADIUS_MM):
+            continue
+        if not (sheet_thickness * MIN_DEPTH_THICKNESS_MULTIPLE <= depth <= sheet_thickness * MAX_DEPTH_THICKNESS_MULTIPLE):
+            continue
+
+        cx, cy, cz = cyl.get("centroid", (0.0, 0.0, 0.0))
+
+        edge_margin = radius * EDGE_MARGIN_RADIUS_MULTIPLE
+        if (cx - xmin) < edge_margin or (xmax - cx) < edge_margin:
+            continue
+        if (cy - ymin) < edge_margin or (ymax - cy) < edge_margin:
+            continue
+
+        hole_proximity = radius * 2.0 * HOLE_PROXIMITY_DIAMETER_MULTIPLE
+        too_close_to_known_hole = False
+        for hx, hy, hz in known_hole_centroids_mm:
+            d = math.sqrt((cx - hx) ** 2 + (cy - hy) ** 2 + (cz - hz) ** 2)
+            if d <= hole_proximity:
+                too_close_to_known_hole = True
+                break
+        if too_close_to_known_hole:
+            continue
+
+        candidates.append({
+            "feature_type": "candidate_formed_feature",
+            "geometry_type": "cylindrical_blind_cavity",
+            "diameter_mm": round(radius * 2.0, 2),
+            "depth_mm": round(depth, 2),
+            "depth_to_thickness_ratio": round(depth / sheet_thickness, 2),
+            "centroid_mm": [round(cx, 2), round(cy, 2), round(cz, 2)],
+            "face_ids": list(cyl.get("face_indices", [])),
+            "recognition_status": "ambiguous",
+        })
+
+    return candidates
+
+
+def detect_candidate_formed_features(
+    shape: Any,
+    dominant_face: Any,
+    bbox_minmax: Dict[str, float],
+    sheet_thickness: float,
+    known_hole_centroids_mm: Optional[List[Tuple[float, float, float]]] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Real-OCC entry point. Reuses MachiningFeatureRecognizer._collect_cylinders
+    (the exact same call sheet_metal/feature_extractor.py's
+    _detect_counterbore_countersink already makes) to get real blind-cavity
+    geometry, then applies _classify_candidates' filtering. See module
+    docstring for the honest scope/limitation this spike established.
+    """
+    from machining.machining_feature_recognizer import MachiningFeatureRecognizer  # type: ignore
+    from OCC.Core.BRepAdaptor import BRepAdaptor_Surface  # type: ignore
+    from OCC.Core.GeomAbs import GeomAbs_Plane  # type: ignore
+
+    if dominant_face is None:
+        return []
+    adaptor = BRepAdaptor_Surface(dominant_face)
+    if adaptor.GetType() != GeomAbs_Plane:
+        return []
+    n = adaptor.Plane().Axis().Direction()
+    nx, ny, nz = float(n.X()), float(n.Y()), float(n.Z())
+    mag = math.sqrt(nx * nx + ny * ny + nz * nz) or 1.0
+    main_axis = (nx / mag, ny / mag, nz / mag)
+
+    recognizer = MachiningFeatureRecognizer()
+    bbox = {
+        "xmin": bbox_minmax.get("xmin", 0.0), "xmax": bbox_minmax.get("xmax", 0.0),
+        "ymin": bbox_minmax.get("ymin", 0.0), "ymax": bbox_minmax.get("ymax", 0.0),
+        "zmin": bbox_minmax.get("zmin", 0.0), "zmax": bbox_minmax.get("zmax", 0.0),
+    }
+    cylinders = recognizer._collect_cylinders(shape, main_axis, bbox)
+    return _classify_candidates(cylinders, sheet_thickness, bbox_minmax, known_hole_centroids_mm)
+
+
+# ── Stage 2: positive topological test ───────────────────────────────────────
 
 # Sourced from memory/sheetmetal/sheet_metal_variables.json (real licensed
 # reference data). Classification labels only -- see module docstring.
@@ -200,12 +329,12 @@ def detect_formed_features(
     known_hole_centroids_mm: Optional[List[Tuple[float, float, float]]] = None,
 ) -> List[Dict[str, Any]]:
     """
-    Real-OCC entry point. Reuses forming_spike.py's candidate discovery
+    Real-OCC entry point. Reuses stage 1's candidate discovery
     unchanged, then promotes a candidate to 'recognized' when the sheet's
     back face has its own local void at that candidate's footprint -- see
     module docstring for why that is real topological evidence, not a guess.
 
-    A candidate stays 'ambiguous' (exactly forming_spike.py's existing,
+    A candidate stays 'ambiguous' (exactly stage 1's existing,
     honest result) when no back face can be found, or when the back face is
     flat and undisturbed at that location.
     """
