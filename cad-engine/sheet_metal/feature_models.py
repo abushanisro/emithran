@@ -20,14 +20,19 @@ VARIANTS: Mapping[str, FrozenSet[str]] = {
     # through: a plain round through-hole. extruded: a hole with a formed
     # collar ("Extruding//SimpleHole", hole-flanging). perforated: a hole that
     # belongs to a detected repeated-pattern region ("Perforating").
-    "SimpleHole": frozenset({"through", "extruded", "perforated"}),
+    # countersunk: a cone coaxial with the hole at its mouth
+    # ("Countersinking//SimpleHole"); the hole itself stays a through entry.
+    "SimpleHole": frozenset({"through", "extruded", "perforated", "countersunk"}),
     # slot: an elongated non-circular internal cut-out.
     "ComplexHole": frozenset({"slot"}),
     "StraightBend": frozenset({"default"}),
     # rolled: one continuous curvature sweeping past what a press brake can
     # wrap in one hit ("3 Roll Bending//Form"). emboss: a formed dimple/emboss
     # worked from both faces ("Embossing//Form").
-    "Form": frozenset({"rolled", "emboss"}),
+    # drawn: a shell drawn over a punch (deep draw / fluid cell hydroforming,
+    # "Deep Draw Forming//Form"), recognised by double-curved faces with an
+    # offset twin one thickness away (sheet_metal/features/drawn_shell.py).
+    "Form": frozenset({"rolled", "emboss", "drawn"}),
     "Lance": frozenset({"default"}),
     # The cut boundary of the blank: outer perimeter plus every internal
     # cut-out wall ("Laser Cutting//Blank").

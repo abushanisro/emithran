@@ -16,6 +16,8 @@ import { MaterialResolutionService } from './services/material-resolution.servic
 import { MachineDiscoveryService } from './services/machine-discovery.service';
 import { BlankOptimizerService } from './costing/sheet-metal/machine/blank-optimizer.service';
 import { SheetMetalLookupService } from './costing/sheet-metal/lookup/sheet-metal-lookup.service';
+import { SheetMetalCatalogOperationsService } from './costing/sheet-metal/operation/catalog-operations.service';
+import { HydroformingReferenceService } from './costing/hydroforming/hydroforming-reference.service';
 import { MachiningLookupService } from './costing/machining/lookup/machining-lookup.service';
 import { SecondaryProcessService } from './services/secondary-process.service';
 import { PlasticReferenceService } from './costing/plastic-molding/lookup/plastic-reference.service';
@@ -29,7 +31,7 @@ import { ExchangeRateModule } from '../../common/exchange-rate/exchange-rate.mod
 @Module({
   imports: [SupabaseModule, LoggerModule, ConfigModule, ManufacturingKnowledgeModule, ManufacturingRulesModule, ExchangeRateModule],
   controllers: [BOMItemsController],
-  providers: [BOMItemsService, FileStorageService, StepConverterService, BomItemCostService, CADAnalysisService, AutoFillService, SheetMetalFeatureExtractorService, DFMScoringService, MaterialIntelligenceService, BlankOptimizerService, SheetMetalLookupService, MachiningLookupService, RateResolutionService, CalculatorCatalogService, MaterialResolutionService, MachineDiscoveryService, SecondaryProcessService, NreService, PlasticReferenceService],
+  providers: [BOMItemsService, FileStorageService, StepConverterService, BomItemCostService, CADAnalysisService, AutoFillService, SheetMetalFeatureExtractorService, DFMScoringService, MaterialIntelligenceService, BlankOptimizerService, SheetMetalLookupService, MachiningLookupService, RateResolutionService, CalculatorCatalogService, MaterialResolutionService, MachineDiscoveryService, SecondaryProcessService, NreService, PlasticReferenceService, SheetMetalCatalogOperationsService, HydroformingReferenceService],
   exports: [BOMItemsService, BomItemCostService, CADAnalysisService, AutoFillService, SheetMetalLookupService, MachiningLookupService],
 })
 export class BOMItemsModule {}

@@ -888,10 +888,17 @@ class MachiningFeatureRecognizer:
                 half_angle_deg = abs(math.degrees(cone.SemiAngle()))
                 loc = cone.Location()
                 ref_radius = cone.RefRadius()
+                # RefRadius is the radius at the cone's reference plane, which
+                # can lie at either end of the face (or off it). The face's own
+                # radii are r(v) = RefRadius + v * sin(SemiAngle) over its V range.
+                sin_a = math.sin(cone.SemiAngle())
+                radii = [ref_radius + v * sin_a for v in (surf.FirstVParameter(), surf.LastVParameter())]
                 is_reversed = face.Orientation() != TopAbs_FORWARD
                 results.append({
                     "half_angle_deg": half_angle_deg,
                     "ref_radius": ref_radius,
+                    "min_radius": min(radii),
+                    "max_radius": max(radii),
                     "centroid": (loc.X(), loc.Y(), loc.Z()),
                     "is_reversed": is_reversed,
                     "face_indices": [face_idx],  # OCC face ordinal — matches face_map in memory_optimizer

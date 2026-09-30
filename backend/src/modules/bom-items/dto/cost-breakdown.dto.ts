@@ -1,5 +1,6 @@
 import type { LhrRateSource } from '../costing/shared/core/cost-engine';
 import type { CostingInputs } from '../costing/shared/physics/costing-inputs';
+import type { CatalogOperation } from '../costing/sheet-metal/operation/catalog-operation-resolver';
 
 /**
  * The costing inputs this response was actually computed at, together with where
@@ -291,6 +292,10 @@ export interface ProcessLineCost {
   // actually runs on when it differs from machineClass. Persisting a line
   // resolves its Process/Category/Operation from this class's catalog rows.
   hostMachineClass?: string;
+  // Sheet metal: the reference-catalog operations this step performs on the
+  // part's own CAD features ("Punching // SimpleHole ×14"), from
+  // catalog-operation-resolver.ts. Display and trace only — costing is unchanged.
+  catalogOperations?: CatalogOperation[];
   setupCost: number;     // INR — amortised over batchSize
   runCost: number;       // INR — pure cycle cost per piece
   totalCost: number;     // setupCost + runCost

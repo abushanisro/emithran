@@ -158,7 +158,12 @@ class AdvancedCADMemoryOptimizer:
     """
     
     VERSION = "2.2.0"
-    CACHE_VERSION = "geo_v49"  # bumped 2026-09-27: (26) machining features now carry the
+    CACHE_VERSION = "geo_v50"  # bumped 2026-09-30: (27) sheet metal emits SimpleHole/countersunk
+    # (shared classify_cone now measures the cone face's real widest radius -- RefRadius
+    # could be the narrow end and read every real countersink as a chamfer) and
+    # Form/drawn (sheet_metal/features/drawn_shell.py); a drawn shell's curved faces
+    # are no longer counted as bends, holes or rolled forms; machining trees carry
+    # polygon_candidates. Previous (geo_v49), 2026-09-27: (26) machining features now carry the
     # real sharp-edge length (shared/edge_length.py), recognise gear/spline teeth as
     # AxiGroove (machining/axigroove.py), and no longer report off-axis convex faces
     # as turned Ring diameters; cylinder offsets are measured about the part's own

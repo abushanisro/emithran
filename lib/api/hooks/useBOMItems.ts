@@ -603,6 +603,20 @@ export interface MachineScoreBreakdown {
   score: number;
 }
 
+/** One CAD feature matched to the catalog operation(s) a process step performs on it. */
+export interface CatalogOperation {
+  /** One name when resolved; the candidates when undecided; empty when infeasible. */
+  operations: string[];
+  featureType: string;
+  variant: string;
+  diameterMm: number | null;
+  count: number;
+  featureIds: string[];
+  status: 'resolved' | 'undecided' | 'infeasible';
+  children: Array<{ operation: string; featureType: string }>;
+  reason?: string;
+}
+
 export interface FeatureOp {
   name: string;        // e.g. "Spot Drill ×8", "Pocket Mill ×2", "Cut path 0.85m"
   timeSec: number;
@@ -721,6 +735,9 @@ export interface ProcessLineCost {
   mhrId?: string | null;
   benchmarkMhrId?: string | null;
   featureBreakdown?: FeatureOp[];
+  /** Sheet metal: the reference-catalog operations this step performs on the
+   *  part's own CAD features (backend catalog-operation-resolver.ts). */
+  catalogOperations?: CatalogOperation[];
   /** Full end-to-end audit trail (real inputs + provenance, then calculated
    *  fields + real DB formula string, in evaluation order) — present only for
    *  processes wired to a real DB calculator (Laser Cutting, Press Brake).
