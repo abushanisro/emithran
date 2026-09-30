@@ -958,7 +958,14 @@ function buildProcessTree(
       featureNodes.push(...gdtCalloutNodes(`gdt_${opIdx}`, matchedCostLine.gdtCallouts).map((n) => ({ ...n, factory, machine })));
     }
 
-    if (isSheetMetal && isCutting) {
+    // isCutting/isBending below are the pre-catalog-operations legacy display —
+    // grouped-by-diameter holes, grouped-by-radius bends, all real CAD data,
+    // never fabricated, but a SECOND representation of the same features the
+    // catalog-operations block above already rendered once real catalog data
+    // is there. Gated to fire only when that block found nothing, so a step
+    // never shows both "Bending // StraightBend ×17" AND a legacy "R0.8 × 17"
+    // for the exact same 17 bends — one database-driven answer, not two.
+    if (isSheetMetal && isCutting && featureNodes.length === 0) {
       const flatFeat = (fg?.features ?? []).find((f) => f.type === 'flat_pattern') ?? null;
       const holeFeats = (fg?.features ?? []).filter((f) => f.type === 'hole');
 
@@ -1053,7 +1060,7 @@ function buildProcessTree(
         featureNodes.push(...holeNodes);
       }
 
-    } else if (isSheetMetal && isBending && summary.bendCount > 0) {
+    } else if (isSheetMetal && isBending && summary.bendCount > 0 && featureNodes.length === 0) {
       const bendFeats = (fg?.features ?? []).filter((f) => f.type === 'bend');
       if (bendFeats.length > 0) {
         bendFeats.forEach((f) => featureNodes.push(featureToTreeNode(f, factory, machine, cost, rec.process)));
