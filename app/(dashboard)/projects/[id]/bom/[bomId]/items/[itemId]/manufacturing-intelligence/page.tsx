@@ -53,6 +53,7 @@ import { useMHRRecords, useMHRRecord } from '@/lib/api/hooks/useMHR';
 import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
 import { groupFeaturesByType, featureSelectionKey, resolveFeatureSelection, findFeatureByFaceId } from '@/lib/features/machining-feature-tree';
 import { sheetMetalOperationNodes, type OperationTreeNode } from '@/lib/features/sheet-metal-operation-nodes';
+import { gdtCalloutNodes } from '@/lib/features/gdt-callout-nodes';
 import { effectiveProcessGroupOf } from '@/lib/processCatalog/hr-rates-process-selection';
 import { useFactoryCurrency, useFactories, useCurrencies, useFxRate, useRefreshFxRate, useFxRateOnDemand, type FxRateType } from '@/lib/api/hooks/useFx';
 import { useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculatorMappings';
@@ -945,6 +946,16 @@ function buildProcessTree(
       const withMachine = (n: OperationTreeNode): ProcessTreeNode =>
         ({ ...n, factory, machine, ...(n.children ? { children: n.children.map(withMachine) } : {}) });
       featureNodes.push(...sheetMetalOperationNodes(`catop_${opIdx}`, matchedCostLine.catalogOperations).map(withMachine));
+    }
+
+    // GD&T callouts this line covers (Inspection; family-agnostic — the
+    // backend resolver serves both sheet-metal and machining parts alike).
+    // Click-to-highlight the toleranced face uses the same v2FeatureIds
+    // mechanism as every other node; a callout with no real face link (no
+    // AP242 link on this part, or a drawing-sourced callout, which never has
+    // one) renders the same way, just without a highlight on click.
+    if (matchedCostLine?.gdtCallouts?.length) {
+      featureNodes.push(...gdtCalloutNodes(`gdt_${opIdx}`, matchedCostLine.gdtCallouts).map((n) => ({ ...n, factory, machine })));
     }
 
     if (isSheetMetal && isCutting) {

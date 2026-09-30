@@ -4250,7 +4250,10 @@ export class BOMItemsService {
       : Array.from({ length: bendCount }, () => ({}));
     const smDrawingIntel = (item.drawingIntelligence ?? null) as Record<string, any> | null;
     // GD&T: STEP-model PMI, else drawing callouts (resolveGdtCallouts).
-    const smGdtCallouts = resolveGdtCallouts(fg, item.drawingIntelligence).map((c) => ({ type: c.type, toleranceMm: c.toleranceMm }));
+    // Full GdtCallout[] (not just type/toleranceMm): the engine's own
+    // escalation math reads only those two fields, but the emitted line
+    // needs datum/source/faceIds too, for the Manufacturing Process tree.
+    const smGdtCallouts = resolveGdtCallouts(fg, item.drawingIntelligence);
     const smCmmRate = await this.resolveCmmSpecificRate(accessToken, location, rates, materialWarnings);
     const smGenericInspectionRate = await this.resolveGenericInspectionRate(accessToken, location, rates, materialWarnings);
 
@@ -6106,7 +6109,7 @@ export class BOMItemsService {
       const rcBendLengths = (summary.bendLengths ?? []) as number[];
       const rcBendRadii = (summary.bendRadii ?? []) as number[];
       const rcDrawingIntel = (item.drawingIntelligence ?? null) as Record<string, any> | null;
-      const rcGdtCallouts = resolveGdtCallouts(fg, item.drawingIntelligence).map((c) => ({ type: c.type, toleranceMm: c.toleranceMm }));
+      const rcGdtCallouts = resolveGdtCallouts(fg, item.drawingIntelligence);
       const rcCmmRate = await this.resolveCmmSpecificRate(accessToken, location, rates, comparisonWarnings);
       const rcGenericInspectionRate = await this.resolveGenericInspectionRate(accessToken, location, rates, comparisonWarnings);
       const rcInspectionInput: InspectionInput = {

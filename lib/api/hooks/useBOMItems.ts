@@ -603,6 +603,17 @@ export interface MachineScoreBreakdown {
   score: number;
 }
 
+/** One real GD&T callout this part carries — backend costing/shared/physics/gdt-callouts.ts. */
+export interface GdtCallout {
+  type: string;
+  toleranceMm: number;
+  datum: string;
+  confidence: number | null;
+  source: 'step_pmi' | 'drawing';
+  /** Real, stable face id(s) (step_pmi source only) — empty when no 3D link exists. */
+  faceIds: string[];
+}
+
 /** One CAD feature matched to the catalog operation(s) a process step performs on it. */
 export interface CatalogOperation {
   /** One name when resolved; the candidates when undecided; empty when infeasible. */
@@ -738,6 +749,8 @@ export interface ProcessLineCost {
   /** Sheet metal: the reference-catalog operations this step performs on the
    *  part's own CAD features (backend catalog-operation-resolver.ts). */
   catalogOperations?: CatalogOperation[];
+  /** GD&T callouts this line (Inspection) covers — see GdtCallout above. */
+  gdtCallouts?: GdtCallout[];
   /** Full end-to-end audit trail (real inputs + provenance, then calculated
    *  fields + real DB formula string, in evaluation order) — present only for
    *  processes wired to a real DB calculator (Laser Cutting, Press Brake).
