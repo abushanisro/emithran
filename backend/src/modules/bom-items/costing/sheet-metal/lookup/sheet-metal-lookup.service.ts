@@ -608,6 +608,24 @@ export class SheetMetalLookupService {
   // such sourced threshold anywhere in the real reference data — none is
   // fabricated for them; callers must treat those two as the ONLY gated
   // classes.
+  // Numeric sheet-metal variables (sm_reference_data category 'variable',
+  // migration 479), by key. A key absent or non-numeric is absent from the
+  // map: the caller decides what an unknown value means, never a default here.
+  async getNumericVariables(keys: readonly string[]): Promise<Map<string, number>> {
+    const { data, error } = await this.supabase.getAdminClient()
+      .from('sm_reference_data')
+      .select('key, value')
+      .eq('category', 'variable')
+      .in('key', [...keys]);
+    const result = new Map<string, number>();
+    if (error) return result;
+    for (const r of data ?? []) {
+      const v = Number(r.value);
+      if (Number.isFinite(v)) result.set(r.key as string, v);
+    }
+    return result;
+  }
+
   async getToolingAnnualVolumeThresholds(): Promise<{ progressiveDie: number | null; stageTooling: number | null }> {
     const db = this.supabase.getAdminClient();
     const { data, error } = await db

@@ -309,8 +309,9 @@ describe('MHRService.removeAll', () => {
 // string "Inspection" as machine_class — a value the rate resolvers'
 // `.eq('machine_class', 'cmm')` filter can never match.
 function makeCategoriesSupabase(rows: any[]) {
-  const limitMock = jest.fn().mockResolvedValue({ data: rows, error: null });
-  const selectMock = jest.fn().mockReturnValue({ limit: limitMock });
+  // Serves `.order().range(from, to)` like PostgREST: the requested slice.
+  const range = (from: number, to: number) => Promise.resolve({ data: rows.slice(from, to + 1), error: null });
+  const selectMock = jest.fn().mockReturnValue({ order: () => ({ range }) });
   const fromMock = jest.fn().mockReturnValue({ select: selectMock });
   return {
     service: { getClient: jest.fn().mockReturnValue({ from: fromMock }) } as unknown as SupabaseService,

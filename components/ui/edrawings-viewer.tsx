@@ -6,6 +6,8 @@ import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Grid, Center, Html } from '@react-three/drei';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import * as THREE from 'three';
+import { fitCameraToBox } from '@/lib/geometry/camera-fit';
+import { freshWorldBoundsOf } from '@/lib/geometry/scene-bounds';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -415,6 +417,52 @@ function computeProjectedFaces(geometry: THREE.BufferGeometry, view: string): nu
   return indices;
 }
 
+/**
+ * Points the camera at the loaded model's real bounding box — see the
+ * `userData.isPrimaryModel` tag on STLModel's <mesh> for what "real" means.
+ *
+ * TWO confirmed root causes of "viewer sometimes renders blank, only fixed
+ * by clicking a feature":
+ *
+ * 1. This used to find its target by traversing EVERY THREE.Mesh in the
+ *    scene and guessing which one was "the real model" from its size
+ *    (`radius < 5` → assumed a helper/gizmo, skip it). That guess was
+ *    exactly as likely to skip a genuinely small-but-valid part as a real
+ *    helper. Fixed by removing the guess: this only ever measures objects
+ *    the mesh itself tags.
+ *
+ * 2. THE PRIMARY CAUSE, confirmed against a real reported part (830-002176,
+ *    a STEP→STL export whose native coordinates sit ~6321mm from origin —
+ *    routine for a part exported in its parent assembly's placement, not
+ *    re-centered at 0,0,0): <Center> (drei) re-centers the model by setting
+ *    a position on its wrapping group, from a useLayoutEffect that runs
+ *    during React's commit — entirely outside R3F's frame loop. This
+ *    component's own useFrame runs BEFORE that frame's gl.render() call,
+ *    and `Box3.expandByObject` only refreshes the OBJECT's own local
+ *    matrix (`updateWorldMatrix(false, false)` — updateParents: false), not
+ *    its ancestors'. So the very first poll after the model mounts can read
+ *    the mesh's matrixWorld through <Center>'s STALE, pre-centering parent
+ *    transform: for a part already near the origin the error is invisible,
+ *    but for a part like this one it computes a "center" ~6321mm away from
+ *    where the model actually ends up once <Center>'s translation lands —
+ *    and because a successful measurement latches `fitted.current = true`
+ *    forever, the camera never gets a second chance to correct it. The
+ *    model is not blank, it is just pointed at empty space 6+ metres from
+ *    where the camera is looking. FeatureZoomEffect (fired by clicking a
+ *    feature) sets the camera from feature_graph_v2 centroids, which are
+ *    already expressed in <Center>'s POST-centering frame — a totally
+ *    independent, correct camera move — which is why that click looked
+ *    like it "brought the model back". Fixed by measuring through
+ *    lib/geometry/scene-bounds.ts's freshWorldBoundsOf, which forces a
+ *    synchronous matrix-world update before reading anything, so this always
+ *    sees <Center>'s current position no matter which side of gl.render() it
+ *    runs on — see that module's own doc comment for the general three.js
+ *    issue this is (not specific to this codebase or to <Center>).
+ *
+ * Also no longer a one-shot latch on failure: retries with a bounded
+ * fallback instead of polling forever, so a slow-to-mount tag can't leave
+ * the view stuck either.
+ */
 function CameraFitter({
   onFit,
   resetKey,
@@ -424,45 +472,51 @@ function CameraFitter({
 }) {
   const { scene, camera, controls } = useThree();
   const fitted = useRef(false);
+  // Bounded retry, same 5s budget class as this file's own load-timeout
+  // pattern (see the STL/STEP loadingTimeout) — never poll silently forever.
+  const deadlineRef = useRef<number>(0);
 
   useEffect(() => {
     fitted.current = false;
+    deadlineRef.current = performance.now() + 5000;
   }, [resetKey]);
 
-  // Poll every frame until geometry is in the scene (STL loads async).
   useFrame(() => {
     if (fitted.current) return;
 
-    const box = new THREE.Box3();
-    scene.traverse((obj) => {
-      if (obj instanceof THREE.Mesh) box.expandByObject(obj);
-    });
+    // freshWorldBoundsOf forces every matrixWorld in the graph current before
+    // measuring, including <Center>'s own re-centering translation — see its
+    // own doc comment (and scene-bounds.test.ts) for why that's required and
+    // not just Box3.expandByObject called directly (cause #2 above).
+    const box = freshWorldBoundsOf(scene, (obj) => !!obj.userData?.isPrimaryModel);
 
-    if (box.isEmpty()) return; // not loaded yet
-
-    const center = new THREE.Vector3();
-    box.getCenter(center);
-    const size = box.getSize(new THREE.Vector3());
-
-    // Use bounding-sphere radius so every dimension fits, regardless of aspect ratio.
-    const radius = Math.sqrt(size.x ** 2 + size.y ** 2 + size.z ** 2) / 2;
-
-    // Skip tiny helper objects (measurement points, axes markers) — wait for the real mesh.
-    if (radius < 5) return;
+    // Not mounted yet (STL still loading, or its own load failed and it never
+    // will be) — keep waiting, up to the deadline below.
+    if (box.isEmpty()) {
+      if (performance.now() < deadlineRef.current) return;
+      // Deadline passed with nothing to fit: nothing more will arrive from
+      // this resetKey. Leave the camera where it is rather than spin forever
+      // — STLModel's own loading/error overlay is the correct place for the
+      // user-facing message here.
+      fitted.current = true;
+      return;
+    }
 
     const perspCam = camera as THREE.PerspectiveCamera;
-    const fov = perspCam.fov * (Math.PI / 180);
-    // 1.9× gives comfortable padding without pushing past the clipping plane.
-    const distance = (radius / Math.tan(fov / 2)) * 1.9;
+    const fit = fitCameraToBox(
+      { min: [box.min.x, box.min.y, box.min.z], max: [box.max.x, box.max.y, box.max.z] },
+      perspCam.fov,
+    );
+    if (!fit) return; // box.isEmpty() already guarded above; kept in sync with the pure fn's own check
+
+    const center = new THREE.Vector3(...fit.center);
 
     // Expand clipping planes to fit this specific model's scale before moving the camera.
-    perspCam.near = Math.max(0.01, distance * 0.001);
-    perspCam.far = distance * 20;
+    perspCam.near = fit.near;
+    perspCam.far = fit.far;
     perspCam.updateProjectionMatrix();
 
-    // Isometric-ish angle (x=1, y=0.7, z=1 normalised) offset from center.
-    const dir = new THREE.Vector3(1, 0.7, 1).normalize();
-    camera.position.copy(center).addScaledVector(dir, distance);
+    camera.position.set(...fit.position);
     camera.lookAt(center);
 
     if (controls && 'target' in controls) {
@@ -471,7 +525,7 @@ function CameraFitter({
     }
 
     fitted.current = true;
-    onFit(distance, center);
+    onFit(fit.distance, center);
   });
 
   return null;
@@ -2551,6 +2605,16 @@ function STLModel({
           geometry={geometry}
           castShadow
           receiveShadow
+          // Explicit identity tag for CameraFitter (see its own doc comment): the
+          // ONE object the "fit to model" camera logic measures. Root-cause fix
+          // for the "viewer sometimes renders blank" bug — CameraFitter used to
+          // guess which objects were "the real model" from a global scene.traverse
+          // by size (skip anything with bounding radius < 5, to dodge helper/
+          // gizmo objects), which just as easily skipped a genuinely small-but-
+          // valid part and left the camera stuck at its default position forever
+          // (no retry, no fallback). Tagging the actual content mesh removes the
+          // ambiguity outright instead of guessing.
+          userData={{ isPrimaryModel: true }}
           visible={!isExploded || explodedParts.length === 0}
           onClick={(e) => {
             // Heatmap inspector — fires when heatmap is active (takes priority over measurement)
@@ -2904,7 +2968,14 @@ function Scene({
       />
 
       <Suspense fallback={null}>
-        <Center>
+        {/* cacheKey: drei's own documented hook for "re-measure now" — Center
+            otherwise centers exactly once, on its first mount, and never
+            again for the life of this component (its layout effect doesn't
+            depend on children/geometry at all). Not yet reachable today
+            (STLModel only ever calls setGeometry once per mount), but tying
+            it to fileUrl removes the trap for whichever future geometry-swap
+            feature (LOD, retry-without-remount, ...) hits it next. */}
+        <Center cacheKey={fileUrl}>
           <STLModel
             url={fileUrl} color={modelColor} sectionPlane={sectionPlane}
             isTransparent={isTransparent} isWireframe={isWireframe}

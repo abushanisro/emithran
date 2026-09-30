@@ -116,7 +116,9 @@ def classify_cone(cone: Dict, cylinders: List[Dict]) -> Tuple[str, Dict, float]:
     """
     cx, cy, cz = cone["centroid"]
     half_angle = cone["half_angle_deg"]
-    ref_r = cone["ref_radius"]
+    # The face's real widest radius (its entry), when the collector measured
+    # it; RefRadius alone can be the narrow end (see _collect_cones).
+    ref_r = cone.get("max_radius", cone["ref_radius"])
 
     # Check for coaxial adjacent cylinder (within 5 mm centroid proximity)
     for cyl in cylinders:

@@ -5,6 +5,8 @@
 // bom-items.usage-calculators.spec.ts / bom-items.true-nest-costing.spec.ts).
 import type { SecondaryProcessService } from '../../../modules/bom-items/services/secondary-process.service';
 import type { PlasticReferenceService } from '../../../modules/bom-items/costing/plastic-molding/lookup/plastic-reference.service';
+import type { SheetMetalCatalogOperationsService } from '../../../modules/bom-items/costing/sheet-metal/operation/catalog-operations.service';
+import type { HydroformingReferenceService } from '../../../modules/bom-items/costing/hydroforming/hydroforming-reference.service';
 import { BOMItemsService } from '../../../modules/bom-items/bom-items.service';
 import { type BlankOptimizerService } from '../../../modules/bom-items/costing/sheet-metal/machine/blank-optimizer.service';
 import { type SheetMetalLookupService } from '../../../modules/bom-items/costing/sheet-metal/lookup/sheet-metal-lookup.service';
@@ -34,6 +36,8 @@ function buildService() {
     {} as unknown as MachineDiscoveryService,
     {} as unknown as SecondaryProcessService,
     {} as unknown as PlasticReferenceService,
+    {} as unknown as SheetMetalCatalogOperationsService,
+    {} as unknown as HydroformingReferenceService,
   );
 }
 

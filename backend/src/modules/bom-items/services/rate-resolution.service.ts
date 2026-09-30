@@ -44,6 +44,16 @@ export const MHR_RATE_MACHINE_CLASSES: readonly MachineClass[] = [
   'machining_inspection', 'special_inspection',
 ];
 
+/** The catalog identity of a machine class: its process_calculator_mappings row
+ *  and, through canonical_process_id, its process_taxonomy process. */
+export interface ProcessIdentity {
+  processGroup: string;
+  processRoute: string;
+  operation: string;
+  lhrProcessGroup: string | null;
+  canonicalProcessId: string | null;
+}
+
 @Injectable()
 export class RateResolutionService {
   private readonly logger = new Logger(RateResolutionService.name);
@@ -352,7 +362,7 @@ export class RateResolutionService {
     accessToken: string,
     machineClasses?: string[],
     family?: string,
-  ): Promise<Record<string, { processGroup: string; processRoute: string; operation: string; lhrProcessGroup: string | null }>> {
+  ): Promise<Record<string, ProcessIdentity>> {
     const classes = machineClasses ? [...new Set(machineClasses.filter(Boolean))] : null;
     if (classes && classes.length === 0) return {};
 
@@ -370,15 +380,16 @@ export class RateResolutionService {
         row.machine_class != null && (!classFilter || classFilter.has(row.machine_class)),
       );
 
-      const toIdentity = (row: any) => ({
+      const toIdentity = (row: any): ProcessIdentity => ({
         processGroup: row.process_group,
         processRoute: row.process_route,
         operation: row.operation,
         lhrProcessGroup: row.lhr_process_group ?? null,
+        canonicalProcessId: row.canonical_process_id ?? null,
       });
 
       const targetClasses = classes ?? [...new Set((data as any[]).map((r) => r.machine_class as string))];
-      const result: Record<string, { processGroup: string; processRoute: string; operation: string; lhrProcessGroup: string | null }> = {};
+      const result: Record<string, ProcessIdentity> = {};
       for (const cls of targetClasses) {
         const rows = (data as any[]).filter((r) => r.machine_class === cls); // already display_order-sorted
         if (rows.length === 0) continue;

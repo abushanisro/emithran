@@ -525,6 +525,22 @@ export function rollBendingGeometryCapability(
  * genuinely need both operations, and this states the half the route is missing
  * instead of guessing which one the engineer wants.
  */
+/**
+ * A drawn shell (a cup or box drawn over a punch -- CAD Form/drawn, recognised
+ * from double-curved faces with an offset twin one thickness away) cannot be
+ * made by cutting a blank and bending it, nor by a press/roll route that has no
+ * drawing operation. Such a route stays costed and visible, but is not
+ * feasible for this part; the hydroforming route is the one that draws it.
+ * Returns the reason, or null when the part has no drawn shell.
+ */
+export function drawnShellNeedsDrawing(drawnShell: { depthMm: number; openingWidthMm: number } | null): string | null {
+  if (!drawnShell) return null;
+  return (
+    `This part is a drawn shell (${drawnShell.depthMm} mm deep, ${drawnShell.openingWidthMm} mm wide opening) `
+    + `— it cannot be produced by cutting a blank and bending it. This route does not include a drawing operation.`
+  );
+}
+
 export function rolledFormNeedsRollBender(
   processFamily: 'cutting' | 'forming',
   machineClass: string,

@@ -1,3 +1,4 @@
+import { readAllRows } from '../../common/supabase/read-all-rows';
 import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException, ConflictException } from '@nestjs/common';
 import { Logger } from '../../common/logger/logger.service';
 import { SupabaseService } from '../../common/supabase/supabase.service';
@@ -201,18 +202,20 @@ export class LHRService {
   async findAll(search: string | undefined, userId?: string, accessToken?: string) {
     this.logger.log('Fetching all LHR records', 'LHRService');
 
-    let queryBuilder = this.supabaseService
-      .getClient(accessToken)
-      .from('lhr_records')
-      .select('*', { count: 'exact' })
-      .order('labour_code', { ascending: true })
-      .limit(20000); // Override Supabase's default 1000-row cap
-
-    if (search) {
-      queryBuilder = queryBuilder.or(`labour_code.ilike.%${search}%,labour_type.ilike.%${search}%,description.ilike.%${search}%`);
-    }
-
-    const { data, error, count } = await queryBuilder;
+    // Every row, in pages: .limit() cannot lift the server's 1000-row cap.
+    const { data, error, count } = await readAllRows((from, to) => {
+      let q = this.supabaseService
+        .getClient(accessToken)
+        .from('lhr_records')
+        .select('*', { count: 'exact' })
+        .order('labour_code', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to);
+      if (search) {
+        q = q.or(`labour_code.ilike.%${search}%,labour_type.ilike.%${search}%,description.ilike.%${search}%`);
+      }
+      return q;
+    });
 
     if (error) {
       this.logger.error(`Error fetching LHR records: ${error.message}`, 'LHRService');
@@ -727,11 +730,12 @@ export class LHRService {
     const client = this.supabaseService.getClient(accessToken);
 
     // Pre-dedup: fetch existing labour codes for this user and filter them out
-    const { data: existing } = await client
+    const { data: existing } = await readAllRows((from, to) => client
       .from('lhr_records')
       .select('labour_code')
       .eq('user_id', userId)
-      .limit(20000);
+      .order('id')
+      .range(from, to));
     const existingCodes = new Set((existing ?? []).map((r: any) => r.labour_code as string));
 
     const newRows = rows.filter(r => !existingCodes.has(r.labour_code as string));

@@ -10,6 +10,7 @@
 //
 // No Euclidean distance anywhere — all fit ratios are normalized and dimensionless.
 
+import { readAllRows, type RowPage } from '../../../../../../common/supabase/read-all-rows';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   MACHINE_REGISTRY,
@@ -381,8 +382,12 @@ export async function fetchMachinePool(
   const cached = getCachedMachinePool(location);
   if (cached) return cached;
 
+  // Every machine at the location, read in pages: one request is capped at
+  // 1000 rows, which dropped every machine past the first 1000 (all USA
+  // injection presses) and left their processes with no machine to select.
   const query = (columns: string) =>
-    client.from('mhr_records').select(columns).eq('location', location).limit(2000);
+    readAllRows<Record<string, unknown>>((from, to) =>
+      client.from('mhr_records').select(columns).eq('location', location).order('id').range(from, to) as unknown as PromiseLike<RowPage<Record<string, unknown>>>);
 
   let { data, error } = await query(`${BASE_COLUMNS}, ${CAPABILITY_COLUMNS}`);
   if (error && /column|schema cache/i.test(error.message)) {

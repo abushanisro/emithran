@@ -19,6 +19,7 @@ from collections import defaultdict
 from typing import Dict, List, Optional, Tuple, Any
 
 from sheet_metal.features.perforation import detect_perforation_patterns
+from sheet_metal.features.drawn_shell import detect_drawn_shell, is_drawn_cylinder
 from sheet_metal.features.rolled_form import detect_rolled_forms, count_recognized as count_recognized_rolled_forms
 from sheet_metal.features.formed_feature import detect_formed_features, count_recognized as count_recognized_formed_features
 from sheet_metal.features.lance import detect_lances, count_recognized as count_recognized_lances
@@ -145,6 +146,21 @@ class SheetMetalFeatureExtractor:
             except Exception as e:
                 logger.warning(f"[SheetMetal] dominant normal extraction failed: {e}")
 
+        # Drawn shell (deep draw / fluid cell): double-curved faces with an
+        # offset twin one thickness away. Its curved faces -- a cup wall, a
+        # box's corner and bottom radii -- are not bends, holes or rolled
+        # forms, so they are taken out of the shared cylinder list every one
+        # of those detectors reads, and out of the bend set below. See
+        # sheet_metal/features/drawn_shell.py.
+        drawn_shell: Optional[Dict[str, Any]] = None
+        try:
+            drawn_shell = detect_drawn_shell(shape, sheet_thickness, dominant_normal)
+        except Exception as e:
+            logger.warning(f"[SheetMetal] drawn-shell detection failed: {e}")
+        if drawn_shell and raw_cylinders_full:
+            drawn_face_ids = set(drawn_shell["face_ids"])
+            raw_cylinders_full = [c for c in raw_cylinders_full if not (len(c) > 8 and c[8] in drawn_face_ids)]
+
         # Lance (partial-cut, material-remains-attached, displaced flap)
         # recognition -- promotes a candidate lance to a confident detection
         # when the base panel's own boundary encloses the hinge as a genuine
@@ -217,7 +233,10 @@ class SheetMetalFeatureExtractor:
             # length/angle -- needed for per-bend press-brake tonnage instead of
             # the flat-pattern's overall-dimension proxy.
             if dominant_normal is not None:
-                dedup_bends_for_count = self._collect_dedup_bends(shape, dominant_normal, sheet_thickness)
+                dedup_bends_for_count = [
+                    b for b in self._collect_dedup_bends(shape, dominant_normal, sheet_thickness)
+                    if not is_drawn_cylinder(drawn_shell, b["dir"], b["axis_point"], b["radius"], sheet_thickness)
+                ]
             if dedup_bends_for_count:
                 radii_rounded = [round(b["radius"], 1) for b in dedup_bends_for_count]
                 bends = {
@@ -227,8 +246,11 @@ class SheetMetalFeatureExtractor:
                 }
                 bend_lengths_mm = [round(b["axial_length"], 1) for b in dedup_bends_for_count]
                 bend_angles_deg = [round(math.degrees(b["angle_rad"]), 1) for b in dedup_bends_for_count]
-            elif raw_cylinders_full:
-                # Full tuples carry axial patch length → profile-radius filtering possible
+            elif raw_cylinders_full is not None:
+                # Full tuples carry axial patch length → profile-radius filtering possible.
+                # `is not None`, not truthiness: an empty list is real data (no
+                # bend cylinder -- e.g. every curved face belongs to a drawn
+                # shell), and must not fall through to the face-id-less list below.
                 bends = self._count_bends_from_full(raw_cylinders_full, sheet_thickness, dominant_normal)
             else:
                 bends = self._count_bends_from_list(raw_cylinders, sheet_thickness)
@@ -239,7 +261,9 @@ class SheetMetalFeatureExtractor:
         # confirmed sheet (thickness detected) — the part may be a "dumb solid"
         # STEP import (mitered fold lines, no bend relief). Detect folds from
         # face-normal dihedral angles instead of bend-radius cylinders.
-        if bends["count"] == 0 and sheet_thickness > 0:
+        # Not for a drawn shell: its walls meet through its own drawn radii,
+        # which is exactly the curvature this fallback assumes is absent.
+        if bends["count"] == 0 and sheet_thickness > 0 and not drawn_shell:
             try:
                 sharp = self._detect_sharp_bends(shape, bbox_dims, sheet_thickness)
                 if sharp["count"] > 0:
@@ -457,10 +481,13 @@ class SheetMetalFeatureExtractor:
 
         # Feature Graph v2: per-instance occurrence data with exact face_ids for highlighting
         feature_graph_v2: Optional[Dict[str, Any]] = None
-        if raw_cylinders_full and bbox_minmax:
+        # Built whenever the part has real topology: a part with no hole or
+        # bend cylinder (a drawn shell, all of whose curved faces belong to the
+        # drawn region) still has its blank, drawn form, lances ...
+        if bbox_minmax:
             try:
                 v2_features = self._build_feature_occurrences(
-                    raw_cylinders_full, bbox_minmax, sheet_thickness,
+                    raw_cylinders_full or [], bbox_minmax, sheet_thickness,
                     slot_occurrences=slots.get('occurrences', []),
                     adjacent_face_ids=adjacent_face_ids,
                     dominant_face=dominant_face,
@@ -547,6 +574,30 @@ class SheetMetalFeatureExtractor:
                             "hinge_length_mm": c["hinge_length_mm"],
                             "flange_area_mm2": c["flange_area_mm2"],
                         } for c in recognized_lances],
+                    ))
+                if drawn_shell:
+                    v2_features.append(sheet_metal_feature(
+                        "drawn_shell", "Form", "drawn",
+                        occurrences=[{
+                            "centroid": _centred(drawn_shell["centroid_mm"]),
+                            "face_ids": drawn_shell["face_ids"],
+                            "depth_mm": drawn_shell["depth_mm"],
+                            "opening_width_mm": drawn_shell["opening_width_mm"],
+                            "depth_to_width": drawn_shell["depth_to_width"],
+                            "developed_area_mm2": drawn_shell["developed_area_mm2"],
+                        }],
+                    ))
+                # Countersunk holes: the cone at a hole mouth, detected above by
+                # the machining cone rule. The hole itself stays in its through
+                # group -- it is still made first, then countersunk.
+                if countersinks.get("occurrences"):
+                    v2_features.append(sheet_metal_feature(
+                        "countersink", "SimpleHole", "countersunk",
+                        occurrences=[{
+                            "centroid": _centred(o["centroid"]),
+                            "face_ids": o["face_ids"],
+                            "entry_diameter_mm": o["entry_diameter_mm"],
+                        } for o in countersinks["occurrences"]],
                     ))
                 # Stable, content-based face identity -- independent of OCC's
                 # runtime enumeration order (which every face_idx above IS,
@@ -695,6 +746,12 @@ class SheetMetalFeatureExtractor:
             # disclose them without treating them as detections. Additive: every
             # bend_* field above is unchanged.
             "rolled_form_count": rolled_form_count,
+            # Drawn shell facts (None when the part is not drawn): depth, opening
+            # width, their ratio and the developed blank area.
+            "drawn_shell": (
+                {k: drawn_shell[k] for k in ("depth_mm", "opening_width_mm", "depth_to_width", "developed_area_mm2", "draw_axis")}
+                if drawn_shell else None
+            ),
             "rolled_form_candidates": rolled_forms,
             # Real formed-feature (dimple/emboss) recognition -- see
             # sheet_metal/features/formed_feature.py. formed_feature_count
@@ -2076,6 +2133,8 @@ class SheetMetalFeatureExtractor:
 
         Returns (counterbores, countersinks), each {"count": int, "groups": [...]}
         where groups are [{diameter_mm, count}] — same shape as hole_groups.
+        countersinks also carries "occurrences": one per cone, with its real
+        cone face ids, absolute centroid and entry diameter.
         """
         from machining.machining_feature_recognizer import MachiningFeatureRecognizer, MachiningFeature, _detect_counterbores, _classify_cone
         from OCC.Core.BRepAdaptor import BRepAdaptor_Surface  # type: ignore
@@ -2125,10 +2184,16 @@ class SheetMetalFeatureExtractor:
 
         # Countersinks: cones with a coaxial adjacent bore
         cs_diameters: List[float] = []
+        cs_occurrences: List[Dict[str, Any]] = []
         for cone in cones:
             edge_variant, params, _conf = _classify_cone(cone, cylinders)
             if edge_variant == "countersink":
                 cs_diameters.append(round(params["entry_diameter_mm"], 1))
+                cs_occurrences.append({
+                    "centroid": list(cone.get("centroid", (0.0, 0.0, 0.0))),
+                    "face_ids": cone.get("face_indices", []),
+                    "entry_diameter_mm": round(params["entry_diameter_mm"], 1),
+                })
 
         def _group(diams: List[float]) -> Dict[str, Any]:
             from collections import Counter
@@ -2139,7 +2204,7 @@ class SheetMetalFeatureExtractor:
             )
             return {"count": len(diams), "groups": groups}
 
-        return _group(cb_diameters), _group(cs_diameters)
+        return _group(cb_diameters), {**_group(cs_diameters), "occurrences": cs_occurrences}
 
     # ── Cut length, flat area, slots (accept pre-found dominant face) ─────────
 

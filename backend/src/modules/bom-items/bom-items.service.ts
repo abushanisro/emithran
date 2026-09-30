@@ -1,3 +1,8 @@
+import { HydroformingReferenceService } from './costing/hydroforming/hydroforming-reference.service';
+import { computeHydroforming } from './costing/hydroforming/hydroforming-engine';
+import { buildHydroformRoute, drawnShellFromFeatures } from './costing/hydroforming/hydroforming-route';
+import { SheetMetalCatalogOperationsService } from './costing/sheet-metal/operation/catalog-operations.service';
+import type { SheetMetalFeature } from './costing/sheet-metal/operation/catalog-operation-resolver';
 import { Injectable, Logger, NotFoundException, InternalServerErrorException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { CreateBOMItemDto, UpdateBOMItemDto } from './dto/bom-items.dto';
@@ -101,7 +106,8 @@ import {
   punchingRequirement, waterjetRequirement, shearRequirement, plasmaCutRequirement, laserPunchRequirement,
   pressFormingRequirement, rollBendingRequirement,
 } from './costing/shared/capability/machine-selection/physics';
-import { findRouteDataGaps, selectRecommendedRoute, shouldAddSeparatePressBrakeLine, rollBendingGeometryCapability, rolledFormNeedsRollBender, routeProducesBlank, preferRealRate } from './costing/shared/core/engine-kernel';
+import { findRouteDataGaps, selectRecommendedRoute, shouldAddSeparatePressBrakeLine, rollBendingGeometryCapability, rolledFormNeedsRollBender,
+  drawnShellNeedsDrawing, routeProducesBlank, preferRealRate } from './costing/shared/core/engine-kernel';
 import { computeProgressiveDieToolingCost, progressiveDieToolingDataGap, buildProgressiveDieToolingLine } from './costing/sheet-metal/process/progressive-die-tooling-engine';
 import { composeFeatureDrivenOperations, composeOperationSequence } from './costing/sheet-metal/operation/feature-driven-operations';
 import {
@@ -187,6 +193,8 @@ export class BOMItemsService {
     private readonly machineDiscoveryService: MachineDiscoveryService,
     private readonly secondaryProcessService: SecondaryProcessService,
     private readonly plasticReferenceService: PlasticReferenceService,
+    private readonly smCatalogOperations: SheetMetalCatalogOperationsService,
+    private readonly hydroformingReference: HydroformingReferenceService,
   ) { }
 
   /**
@@ -4425,6 +4433,14 @@ export class BOMItemsService {
       smResult.geometryProvenance = { bendSource: geo.bendSource, blankAreaSource: geo.blankAreaSource };
     }
     this.attachMachineSelections(smResult.processLines, mhrRates);
+    smResult.warnings.push(...await this.smCatalogOperations.attach({
+      lines: smResult.processLines,
+      features: (fg?.feature_graph_v2?.features ?? []) as SheetMetalFeature[],
+      threads,
+      thicknessMm: sheetThicknessMm,
+      family,
+      accessToken,
+    }));
     // Attach eMithran-style feature breakdowns to laser + press brake + deburr lines
     {
       const bendRadii = (fg?.summary?.bendRadii ?? []) as number[];
@@ -5252,9 +5268,19 @@ export class BOMItemsService {
         : `Below the ${limit}/yr minimum annual volume for ${entry.label} to be economical — this part's annual volume is ${vol}/yr.`;
     };
 
-    const attachToRoutes = (dto: Omit<RouteComparisonDto, 'recommendedRouteId'>): RouteComparisonResponseDto => {
+    const attachToRoutes = async (dto: Omit<RouteComparisonDto, 'recommendedRouteId'>): Promise<RouteComparisonResponseDto> => {
       for (const route of dto.routes) {
         this.attachMachineSelections(route.processLines, mhrRates);
+        if (family === 'sheet_metal') {
+          dto.comparisonWarnings.push(...await this.smCatalogOperations.attach({
+            lines: route.processLines,
+            features: (fg?.feature_graph_v2?.features ?? []) as SheetMetalFeature[],
+            threads,
+            thicknessMm: sheetThicknessMm,
+            family,
+            accessToken,
+          }));
+        }
         // Inherited tapping runs on THIS route's primary machine — surface that
         // machine on the Tapping line, not the "class default (tapping)" panel.
         if (mhrRates.tapping.source !== 'mhr_database') {
@@ -6264,6 +6290,11 @@ export class BOMItemsService {
     // catalog row existing — is what makes a cutting method real.
 
     // ── Assemble RouteResultDto ────────────────────────────────────────────────
+    // A drawn shell (CAD Form/drawn): cutting/bending routes cannot make it,
+    // and the hydroforming route is added below. See drawnShellNeedsDrawing.
+    const rcDrawnShell = drawnShellFromFeatures(fg?.feature_graph_v2?.features);
+    const rcDrawnShellReason = drawnShellNeedsDrawing(rcDrawnShell);
+
     const assembleRoute = (
       routeId: RouteId,
       routeLabel: string,
@@ -6384,7 +6415,7 @@ export class BOMItemsService {
         toolingVolumeNote: buildToolingVolumeNote(machineClass),
         processLines: allLines,
         materialCost, abrasiveCost, totalProcessCost,
-        isFeasible: capability.overallCapable && rollGeom.capable,
+        isFeasible: capability.overallCapable && rollGeom.capable && !rcDrawnShellReason,
         producesBlank,
         dataComplete: dataGaps.length === 0,
         dataGaps,
@@ -6409,6 +6440,7 @@ export class BOMItemsService {
           // The other half of the rolled-form signal: a press brake cannot make
           // the curvature this part actually has. See rolledFormNeedsRollBender.
           ...(rolledFormWarning ? [rolledFormWarning] : []),
+          ...(rcDrawnShellReason ? [rcDrawnShellReason] : []),
           // Real, itemized hard-tooling cost + its disclosed scope limits —
           // see progressive-die-tooling-engine.ts's own warnings.
           ...(progDieToolingResult?.warnings ?? []),
@@ -6554,6 +6586,31 @@ export class BOMItemsService {
         isFormingRoute ? 'forming' : 'cutting',
         engine.machineClass,
       ));
+    }
+
+    // ── Hydroforming (Offline Blank + Hydroform press) for a drawn shell ─────
+    if (rcDrawnShell) {
+      const [{ reference: hfReference, missing: hfMissing }, hfPresses] = await Promise.all([
+        this.hydroformingReference.getReference(accessToken),
+        this.hydroformingReference.getPresses(accessToken, location),
+      ]);
+      const { dlrPerHr: _routeLabour, ...hfCostContext } = rcEMithranCtx;
+      const hf = computeHydroforming({
+        shell: rcDrawnShell,
+        thicknessMm: sheetThicknessMm,
+        densityKgM3: materialDensityKgM3,
+        utsMpa: utsMpa ?? null,
+        shearStrengthMpa: rcShearStrengthMpa ?? null,
+        batchSize,
+        reference: hfReference,
+        hydroformPresses: hfPresses.hydroform,
+        blankPresses: hfPresses.blank,
+        costContext: hfCostContext,
+      });
+      if (hfMissing.length > 0) {
+        hf.warnings.push(`Hydroforming reference data not staged: ${hfMissing.join(', ')} (migration 823).`);
+      }
+      routes.push(buildHydroformRoute({ result: hf, materialCost, ratesSource: RATES_SOURCE_LABEL }));
     }
 
     // ── Badges — only assigned among capable, fully-costed routes ─────────────

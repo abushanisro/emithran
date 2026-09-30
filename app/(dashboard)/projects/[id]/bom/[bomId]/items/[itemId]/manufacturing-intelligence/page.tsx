@@ -52,6 +52,7 @@ import { useBOMItem, useAnalysisVersion, useDFMScores, useMaterialIntelligence, 
 import { useMHRRecords, useMHRRecord } from '@/lib/api/hooks/useMHR';
 import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
 import { groupFeaturesByType, featureSelectionKey, resolveFeatureSelection, findFeatureByFaceId } from '@/lib/features/machining-feature-tree';
+import { sheetMetalOperationNodes, type OperationTreeNode } from '@/lib/features/sheet-metal-operation-nodes';
 import { effectiveProcessGroupOf } from '@/lib/processCatalog/hr-rates-process-selection';
 import { useFactoryCurrency, useFactories, useCurrencies, useFxRate, useRefreshFxRate, useFxRateOnDemand, type FxRateType } from '@/lib/api/hooks/useFx';
 import { useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculatorMappings';
@@ -937,6 +938,14 @@ function buildProcessTree(
     const machine = storedMachineByProcess.get(rec.process) ?? matchedCostLine?.machineName ?? '—';
     const breakdown = matchedCostLine?.featureBreakdown ?? [];
     const featureNodes: ProcessTreeNode[] = [];
+
+    // Sheet metal: the catalog operations this step performs on the part's own
+    // CAD features ("Punching // SimpleHole Ø4.0 ×14"), resolved by the backend.
+    if (isSheetMetal && matchedCostLine?.catalogOperations?.length) {
+      const withMachine = (n: OperationTreeNode): ProcessTreeNode =>
+        ({ ...n, factory, machine, ...(n.children ? { children: n.children.map(withMachine) } : {}) });
+      featureNodes.push(...sheetMetalOperationNodes(`catop_${opIdx}`, matchedCostLine.catalogOperations).map(withMachine));
+    }
 
     if (isSheetMetal && isCutting) {
       const flatFeat = (fg?.features ?? []).find((f) => f.type === 'flat_pattern') ?? null;

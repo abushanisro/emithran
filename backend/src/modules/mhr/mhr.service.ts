@@ -1,3 +1,4 @@
+import { readAllRows } from '../../common/supabase/read-all-rows';
 import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { Logger } from '../../common/logger/logger.service';
 import { SupabaseService } from '../../common/supabase/supabase.service';
@@ -229,15 +230,10 @@ export class MHRService {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    // PostgREST returns at most 1000 rows per request (Supabase max-rows),
-    // whatever range is asked for. One request for `limit` rows therefore
-    // silently returned only the newest 1000: with 1734 USA machines the HR
-    // Rates table and the Process picker lost every older machine (all of
-    // Sheet Metal, Machining and Plastic Molding). The range is read in pages
-    // of PAGE rows instead, ordered by created_at then id so pages never
-    // overlap or skip rows that share a created_at (seeded machines do).
-    const PAGE = 1000;
-    const buildQuery = (rangeFrom: number, rangeTo: number) => {
+    // Read through readAllRows: one request is capped at 1000 rows whatever
+    // range is asked for (see POSTGREST_MAX_ROWS). Ordered by created_at then
+    // id so pages never overlap or skip rows that share a created_at.
+    const { data, error, count } = await readAllRows((rangeFrom, rangeTo) => {
       let q = this.supabaseService
         .getClient(accessToken)
         .from('mhr_records')
@@ -252,18 +248,7 @@ export class MHRService {
       if (query.processGroup) q = q.eq('process_group', query.processGroup);
       if (query.machineClass) q = q.eq('machine_class', query.machineClass);
       return q;
-    };
-
-    const data: any[] = [];
-    let count: number | null = null;
-    let error: { message: string } | null = null;
-    for (let start = from; start <= to; start += PAGE) {
-      const res = await buildQuery(start, Math.min(start + PAGE - 1, to));
-      if (res.error) { error = res.error; break; }
-      if (count == null) count = res.count ?? null;
-      data.push(...(res.data ?? []));
-      if (!res.data || res.data.length < Math.min(PAGE, to - start + 1)) break;
-    }
+    }, { from, to });
 
     if (error) {
       this.logger.error(`Error fetching MHR records: ${error.message}`, 'MHRService');
@@ -1656,11 +1641,12 @@ export class MHRService {
     // Dedup by composite (machine_name, location, machine_class)
     // machine_class is needed for Combined format where same machine name exists at same location across process sequences
     const client = this.supabaseService.getAdminClient();
-    const { data: existing } = await client
+    const { data: existing } = await readAllRows((from, to) => client
       .from('mhr_records')
       .select('machine_name, location, machine_class')
       .eq('user_id', userId)
-      .limit(20000);
+      .order('id')
+      .range(from, to));
     const dedupKey = (r: any) =>
       `${String(r.machine_name ?? '').toLowerCase()}::${String(r.location ?? '').toLowerCase()}::${String(r.machine_class ?? '').toLowerCase()}`;
     const existingKeys = new Set((existing ?? []).map(dedupKey));
@@ -1895,11 +1881,12 @@ export class MHRService {
     accessToken: string,
     processGroup?: string,
   ): Promise<Array<{ category: string; machineClass: string | null }>> {
-    const { data, error } = await this.supabaseService
+    const { data, error } = await readAllRows((from, to) => this.supabaseService
       .getClient(accessToken)
       .from('mhr_records')
       .select('benchmark_source_key, machine_class, process_group, commodity_code')
-      .limit(20000);
+      .order('id')
+      .range(from, to));
 
     if (error) {
       this.logger.error(`Error fetching distinct categories: ${error.message}`, 'MHRService');
@@ -1949,12 +1936,13 @@ export class MHRService {
    * though 141 real machines already exist for it in mhr_records.
    */
   async getDistinctProcessGroups(accessToken: string): Promise<string[]> {
-    const { data, error } = await this.supabaseService
+    const { data, error } = await readAllRows((from, to) => this.supabaseService
       .getClient(accessToken)
       .from('mhr_records')
       .select('process_group')
       .not('process_group', 'is', null)
-      .limit(20000);
+      .order('id')
+      .range(from, to));
 
     if (error) {
       this.logger.error(`Error fetching distinct process groups: ${error.message}`, 'MHRService');
@@ -1965,12 +1953,13 @@ export class MHRService {
   }
 
   async getDistinctManufacturerCountries(accessToken: string): Promise<string[]> {
-    const { data, error } = await this.supabaseService
+    const { data, error } = await readAllRows((from, to) => this.supabaseService
       .getClient(accessToken)
       .from('mhr_records')
       .select('manufacturer_country')
       .not('manufacturer_country', 'is', null)
-      .limit(20000);
+      .order('id')
+      .range(from, to));
 
     if (error) {
       this.logger.error(`Error fetching distinct manufacturer countries: ${error.message}`, 'MHRService');
@@ -1989,12 +1978,13 @@ export class MHRService {
   // let a user overwrite a real value with a fabricated one by picking the
   // only options offered.
   async getDistinctWageGrades(accessToken: string): Promise<string[]> {
-    const { data, error } = await this.supabaseService
+    const { data, error } = await readAllRows((from, to) => this.supabaseService
       .getClient(accessToken)
       .from('mhr_records')
       .select('wage_grade')
       .not('wage_grade', 'is', null)
-      .limit(20000);
+      .order('id')
+      .range(from, to));
 
     if (error) {
       this.logger.error(`Error fetching distinct wage grades: ${error.message}`, 'MHRService');
@@ -2011,12 +2001,13 @@ export class MHRService {
   // behavior) silently excluded every global location/currency from the filter
   // dropdown, even though findAll's own table happily returns those same rows.
   async getDistinctCurrencies(accessToken: string): Promise<string[]> {
-    const { data, error } = await this.supabaseService
+    const { data, error } = await readAllRows((from, to) => this.supabaseService
       .getClient(accessToken)
       .from('mhr_records')
       .select('currency')
       .not('currency', 'is', null)
-      .limit(20000);
+      .order('id')
+      .range(from, to));
 
     if (error) {
       this.logger.error(`Error fetching distinct currencies: ${error.message}`, 'MHRService');
@@ -2027,12 +2018,13 @@ export class MHRService {
   }
 
   async getDistinctLocations(accessToken: string): Promise<string[]> {
-    const { data, error } = await this.supabaseService
+    const { data, error } = await readAllRows((from, to) => this.supabaseService
       .getClient(accessToken)
       .from('mhr_records')
       .select('location')
       .not('location', 'is', null)
-      .limit(20000);
+      .order('id')
+      .range(from, to));
 
     if (error) {
       this.logger.error(`Error fetching distinct locations: ${error.message}`, 'MHRService');
