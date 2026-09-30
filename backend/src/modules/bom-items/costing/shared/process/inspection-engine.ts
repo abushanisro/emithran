@@ -1,5 +1,6 @@
 import type { MHRRateInput } from '../core/cost-engine';
 import type { ProcessLineCost, FeatureOp, PhysicsGap, ConfidenceLevel } from '../../../dto/cost-breakdown.dto';
+import type { GdtCallout } from '../physics/gdt-callouts';
 import {
   type InspectionMethod, type InspectionRuleRow,
   resolveInspectionRule,
@@ -34,8 +35,8 @@ import { resolveSetupMinutes } from '../core/engine-kernel';
 // per-feature GD&T linkage exists yet) — HoleInspectionCandidate/
 // BendInspectionCandidate carry those fields as optional so this engine is
 // ready for that data without an interface change, but never invents it.
-// gdtCallouts is real today but always [] (the drawing parser's GD&T
-// extraction, Module 3, isn't built yet) — Level 3 is reachable code, not a
+// gdtCallouts is real and populated (resolveGdtCallouts, gdt-callouts.ts,
+// both the STEP-model and drawing sources) — Level 3 is reachable code, not a
 // hardcoded escalation that fires regardless.
 
 export interface HoleInspectionCandidate {
@@ -70,7 +71,10 @@ export interface InspectionInput {
   threads: Array<{ size: string; count: number }>;
   generalTolerances: string | null;
   toleranceConfidence: number;
-  gdtCallouts: Array<{ type: string; toleranceMm: number }>;
+  // Escalation math (below) reads only .type/.toleranceMm; the full GdtCallout
+  // (datum/source/faceIds) is carried straight through unread here — see
+  // finalizeInspectionLine, which attaches it to the emitted line for the UI.
+  gdtCallouts: GdtCallout[];
   inspectionRules: InspectionRuleRow[];
   operationDefaults: InspectionOperationDefaultRow[];
   inspectionStrategy: InspectionStrategy;
@@ -376,6 +380,11 @@ export function finalizeInspectionLine(input: InspectionInput, plan: InspectionP
     mhrId: rate.mhrRecordId ?? null,
     benchmarkMhrId: rate.benchmarkMhrId ?? null,
     featureBreakdown: plan.featureBreakdown,
+    // The real GD&T callouts this inspection covers, for the Manufacturing
+    // Process tree (a node per callout, clickable-highlight for the ones
+    // with a real faceIds link — see gdt-callouts.ts). Omitted, not [],
+    // when there genuinely are none, matching every other optional field here.
+    ...(input.gdtCallouts.length > 0 ? { gdtCallouts: input.gdtCallouts } : {}),
     ...(resolved.calculatorId ? { calculatorId: resolved.calculatorId } : {}),
     ...(resolved.calculatorVersion != null ? { calculatorVersion: resolved.calculatorVersion } : {}),
     ...(resolved.gap ? { physicsGap: resolved.gap } : {}),

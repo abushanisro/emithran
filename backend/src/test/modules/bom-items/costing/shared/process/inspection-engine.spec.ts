@@ -151,10 +151,21 @@ describe('computeInspectionLine — Level 3 (GD&T, dormant until real extraction
 
   it('escalates to cmm via resolveInspectionRule when a real GD&T callout exists', () => {
     const result = computeInspectionLine(baseInput({
-      gdtCallouts: [{ type: 'position', toleranceMm: 0.03 }],
+      gdtCallouts: [{ type: 'position', toleranceMm: 0.03, datum: '', confidence: null, source: 'drawing', faceIds: [] }],
       inspectionRules: rules,
     }));
     expect(result.inspectionMethod).toBe('cmm');
+  });
+
+  it('attaches the real gdtCallouts to the emitted line, faceIds and all, for the Manufacturing Process tree', () => {
+    const callout = { type: 'flatness', toleranceMm: 0.05, datum: 'A', confidence: null, source: 'step_pmi' as const, faceIds: ['a1b2c3d4e5f6a7b8'] };
+    const result = computeInspectionLine(baseInput({ gdtCallouts: [callout], inspectionRules: rules }));
+    expect(result.processLines[0]!.gdtCallouts).toEqual([callout]);
+  });
+
+  it('omits gdtCallouts entirely when there are none — never an empty array pretending to be real data', () => {
+    const result = computeInspectionLine(baseInput({ gdtCallouts: [], inspectionRules: rules }));
+    expect(result.processLines[0]!.gdtCallouts).toBeUndefined();
   });
 
   it('folds a tight per-hole tolerance into the same escalation (replaces the old standalone CMM block)', () => {
