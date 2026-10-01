@@ -51,7 +51,6 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { createBOMItem, updateBOMItem, analyzeForAutoFill, type AutoFillResponse } from '@/lib/api/hooks/useBOMItems';
-import { useRawMaterialFilterOptions } from '@/lib/api/hooks/useRawMaterials';
 import type { DrawingAnalysisResult } from '@/lib/api/vave';
 import { BOMItemType, ITEM_TYPE_LABELS } from '@/lib/types/bom.types';
 import { apiClient } from '@/lib/api/client';
@@ -310,10 +309,6 @@ export function BOMItemDialog({
   const [materialOpen, setMaterialOpen] = useState(false);
   const [materialSearch, setMaterialSearch] = useState('');
   const [debouncedMaterialSearch, setDebouncedMaterialSearch] = useState('');
-  // Real material_group values from raw_materials (useRawMaterialFilterOptions
-  // -> GET /raw-materials/filter-options), never a hand-typed option list —
-  // whatever categories actually exist in the database is what shows here.
-  const [materialCategory, setMaterialCategory] = useState<string>('');
   const [activeResult, setActiveResult] = useState<AutoFillResponse | null>(null);
 
   // Debounce material name search
@@ -354,13 +349,11 @@ export function BOMItemDialog({
     return failureCount < 2;
   };
 
-  // Query A — unique material names. Deliberately NOT filtered by
-  // materialCategory: the category selector is a real, sourced fact once a
-  // material is chosen, but it is only a starting guess before that (an
-  // auto-classified injection-molded part previously defaulted to
-  // FERROUS_NON_FERROUS and made every real plastic grade unsearchable no
-  // matter what was typed — a confirmed live bug, 2026-09-10). Search now
-  // always queries the full raw_materials database regardless of category.
+  // Query A — unique material names, across the full raw_materials database.
+  // No category filter: a prior category selector here (removed) once
+  // defaulted an auto-classified injection-molded part to FERROUS_NON_FERROUS
+  // and made every real plastic grade unsearchable no matter what was typed
+  // — a confirmed live bug, 2026-09-10.
   const { data: rawMaterialsData, isLoading: isLoadingMaterials } = useQuery<RawMaterialsResponse>({
     queryKey: ['raw-materials-names', debouncedMaterialSearch],
     queryFn: async (): Promise<RawMaterialsResponse> => {
@@ -379,11 +372,6 @@ export function BOMItemDialog({
     retry: materialQueryRetry,
     retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
-
-  // Real, DB-driven Material Category options (distinct raw_materials.material_group
-  // values) — never a hardcoded list of categories typed into this component.
-  const { data: materialFilterOptions } = useRawMaterialFilterOptions();
-  const materialCategoryOptions = materialFilterOptions?.materialGroups ?? [];
 
   // Unique material NAME options (for the Material dropdown)
   const materialNameOptions = useMemo((): string[] => {
@@ -685,20 +673,7 @@ export function BOMItemDialog({
     });
     setAutoFilledFields(filled);
     setActiveResult(r);
-
-    // Auto-set material category from CAD family classification — matched
-    // against the real DB category list, never a hardcoded enum code that
-    // can drift out of sync with what the dropdown actually offers.
-    if (r.suggestions.familyClassification) {
-      const fc = r.suggestions.familyClassification;
-      const wantPlastic = /plastic|rubber/i.test(fc);
-      const wantFerrous = /ferrous|metal|steel|alumin|copper|titan|cast/i.test(fc);
-      const match = materialCategoryOptions.find((g) =>
-        wantPlastic ? /plastic|rubber/i.test(g) : wantFerrous ? /ferrous/i.test(g) : false,
-      );
-      if (match) setMaterialCategory(match);
-    }
-  }, [setMaterialCategory, materialCategoryOptions]);
+  }, []);
 
   const updatePendingFileStatus = useCallback((id: string, status: PendingFile['status'], error?: string) => {
     setPendingFiles(prev => prev.map(pf =>
@@ -1023,17 +998,6 @@ export function BOMItemDialog({
           return { ...prev, ...patch };
         });
 
-        // Auto-set material category from the extracted material name —
-        // matched against the real DB category list (see the CAD-classification
-        // auto-set above for why this is never a hardcoded enum code).
-        if (filled.has('material') && result.material) {
-          const isPlastic = /plastic|rubber|abs|nylon|pom|pp\b|pe\b|pvc|ptfe|pc\b|pa\b|pet\b|pbt|peek|pei|pps|polyprop|polyeth|polysty|polycaRB|epoxy|silicone|urethane|polyurethane/i.test(result.material);
-          const match = materialCategoryOptions.find((g) =>
-            isPlastic ? /plastic|rubber/i.test(g) : /ferrous/i.test(g),
-          );
-          if (match) setMaterialCategory(match);
-        }
-
         // Function forms execute after the setFormData updater has populated `filled`
         setAutoFilledFields(prev => {
           const s = new Set(prev);
@@ -1098,13 +1062,18 @@ export function BOMItemDialog({
     const controller = new AbortController();
     const recalculate = async () => {
       try {
-        const result = await apiClient.get<{ density_g_cm3: number | null }>(
+        // apiClient already unwraps the backend's {success, data, metadata}
+        // envelope, and the backend's global TransformInterceptor rewrites
+        // every response key to camelCase — so the real shape here is
+        // densityGCm3, never density_g_cm3. Reading the snake_case name
+        // silently read `undefined` forever and never computed a weight.
+        const result = await apiClient.get<{ densityGCm3: number | null }>(
           `/bom-items/material-density?grade=${encodeURIComponent(densityKey)}`,
         );
         // Reject implausible densities — real engineering materials are > 0.5 g/cm³
-        if (!result?.density_g_cm3 || result.density_g_cm3 < 0.5) return;
+        if (!result?.densityGCm3 || result.densityGCm3 < 0.5) return;
         if (controller.signal.aborted) return;
-        const computed = parseFloat(((formData.volume / 1e6) * result.density_g_cm3).toFixed(4));
+        const computed = parseFloat(((formData.volume / 1e6) * result.densityGCm3).toFixed(4));
         setFormData(prev => ({ ...prev, weight: computed }));
         setAutoFilledFields(prev => { const s = new Set(prev); s.add('weight'); return s; });
         setFieldLineage(prev => ({
@@ -1586,34 +1555,9 @@ export function BOMItemDialog({
               />
             </div>
 
-            {/* Material Category + Material — side by side */}
-            <div className="grid grid-cols-2 gap-4">
-
-              {/* Material Category */}
-              <div className="grid gap-2">
-                <Label>Material Category</Label>
-                <Select
-                  value={materialCategory}
-                  onValueChange={(v) => {
-                    setMaterialCategory(v as typeof materialCategory);
-                    setFormData({ ...formData, material: '' });
-                    setMaterialSearch('');
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select category..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {materialCategoryOptions.map((group) => (
-                      <SelectItem key={group} value={group}>{group}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Material */}
-              <div className="grid gap-2">
-                <Label htmlFor="material" className="flex items-center">Material <AutoBadge field="material" /></Label>
+            {/* Material */}
+            <div className="grid gap-2">
+              <Label htmlFor="material" className="flex items-center">Material <AutoBadge field="material" /></Label>
                 <Popover open={materialOpen} onOpenChange={setMaterialOpen}>
                   <PopoverTrigger asChild>
                     <div className="relative">
@@ -1697,8 +1641,6 @@ export function BOMItemDialog({
                     </Command>
                   </PopoverContent>
                 </Popover>
-              </div>
-
             </div>
 
             {/* 2D Drawing + Make/Buy — side by side */}

@@ -9616,7 +9616,7 @@ export default function ManufacturingIntelligencePage() {
   // default that was applied to every molded part's mass estimate
   // regardless of actual material (bug found 2026-09-03).
   const { data: materialDensityResult } = useMaterialDensity(item?.materialGrade || item?.material || undefined);
-  const materialDensityGcm3 = materialDensityResult?.density_g_cm3 ?? null;
+  const materialDensityGcm3 = materialDensityResult?.densityGCm3 ?? null;
 
   // Same query (and cache entry) the Secondary tab reads.
   const { data: secondaryForTree } = useSecondaryProcesses(item?.id, batchSize, factory);
