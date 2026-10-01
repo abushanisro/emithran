@@ -103,10 +103,14 @@ export interface MaterialCandidate {
   processCompatibility: Array<{ process: string; suitability: string }>;
 }
 
+// The backend's global TransformInterceptor rewrites every response key to
+// camelCase (and apiClient already unwraps the {success, data, metadata}
+// envelope) — this must match the REAL wire shape, never the controller's
+// own snake_case return-type annotation, which is pre-transform.
 export interface MaterialDensityResult {
-  density_g_cm3: number | null;
-  material_name: string | null;
-  material_grade: string | null;
+  densityGCm3: number | null;
+  materialName: string | null;
+  materialGrade: string | null;
 }
 
 // Real material_density_lookup / raw_materials density, keyed by the part's
