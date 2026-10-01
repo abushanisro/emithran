@@ -387,32 +387,35 @@ export function BOMItemDialog({
       .sort();
   }, [rawMaterialsData]);
 
-  // What the dropdown actually renders: narrowed against what has been typed
-  // RIGHT NOW, and capped.
-  //
-  // It used to render every name the query returned -- limit: 1000 -- with
-  // Command's own filtering switched off (shouldFilter={false}), so the only
-  // thing that ever narrowed the list was the 500ms-debounced server
-  // round-trip. Each keystroke therefore re-rendered up to a thousand mounted
-  // rows and held them for at least half a second before a narrower result
-  // arrived. That is what made the field lag and feel like it was dropping
-  // characters.
-  //
-  // The debounced query still does the real search across the whole table --
-  // this does not replace it, and a match past the cap is still reachable by
-  // typing more of it. This only stops the UI mounting rows the engineer has
-  // already typed past.
-  const MATERIAL_OPTIONS_RENDER_CAP = 100;
+  // Every real match, never capped/truncated — a capped list ("+N more, keep
+  // typing to narrow") hides real database materials from an engineer
+  // scrolling the list instead of typing a name they don't know yet.
   const materialOptionMatches = useMemo((): string[] => {
     const q = materialSearch.trim().toLowerCase();
     if (!q) return materialNameOptions;
     return materialNameOptions.filter((n) => n.toLowerCase().includes(q));
   }, [materialNameOptions, materialSearch]);
 
-  const visibleMaterialOptions = useMemo(
-    () => materialOptionMatches.slice(0, MATERIAL_OPTIONS_RENDER_CAP),
-    [materialOptionMatches],
-  );
+  // Virtualized rendering (windowing): only the rows actually scrolled into
+  // view are ever mounted, so the list can be arbitrarily long (the full
+  // raw_materials table, hundreds+ of rows) without the cost that made this
+  // field lag and drop keystrokes before -- rendering up to a thousand
+  // mounted DOM rows on every keystroke with Command's own filtering off
+  // (shouldFilter={false}; the real search is the debounced server query
+  // above). Fixed row height keeps the math exact and simple.
+  const MATERIAL_ROW_HEIGHT_PX = 36;
+  const MATERIAL_LIST_HEIGHT_PX = 240;
+  const MATERIAL_ROW_OVERSCAN = 6;
+  const [materialListScrollTop, setMaterialListScrollTop] = useState(0);
+  // A narrower search can leave the old scroll offset pointing past the new,
+  // shorter list -- reset to the top whenever the match set changes.
+  useEffect(() => { setMaterialListScrollTop(0); }, [materialOptionMatches]);
+  const materialVisibleRange = useMemo(() => {
+    const start = Math.max(0, Math.floor(materialListScrollTop / MATERIAL_ROW_HEIGHT_PX) - MATERIAL_ROW_OVERSCAN);
+    const count = Math.ceil(MATERIAL_LIST_HEIGHT_PX / MATERIAL_ROW_HEIGHT_PX) + MATERIAL_ROW_OVERSCAN * 2;
+    const end = Math.min(materialOptionMatches.length, start + count);
+    return { start, end };
+  }, [materialListScrollTop, materialOptionMatches.length]);
 
   const [loading, setLoading] = useState(false);
   const [autoParentId, setAutoParentId] = useState<string | null>(null);
@@ -1587,7 +1590,11 @@ export function BOMItemDialog({
                     onCloseAutoFocus={(e) => e.preventDefault()}
                   >
                     <Command shouldFilter={false}>
-                      <CommandList className="max-h-[280px] overflow-y-auto" onWheel={(e) => e.stopPropagation()}>
+                      <CommandList
+                        className="max-h-[280px] overflow-y-auto"
+                        onWheel={(e) => e.stopPropagation()}
+                        onScroll={(e) => setMaterialListScrollTop(e.currentTarget.scrollTop)}
+                      >
                         <CommandGroup>
                           {/* Custom value row */}
                           {materialSearch && !materialOptionMatches.some(n => n.toLowerCase() === materialSearch.toLowerCase()) && (
@@ -1602,28 +1609,34 @@ export function BOMItemDialog({
                               <span>Use <span className="font-medium">&quot;{materialSearch}&quot;</span> as custom material</span>
                             </div>
                           )}
-                          {/* DB material names */}
-                          {visibleMaterialOptions.map((name: string) => (
+                          {/* DB material names — virtualized: the wrapper reserves the
+                              full scroll height for every real match, but only the rows
+                              in (or near) view are actually mounted. */}
+                          {materialOptionMatches.length > 0 && (
                             <div
-                              key={name}
-                              onClick={() => {
-                                setFormData({ ...formData, material: name === formData.material ? '' : name, materialGrade: '' });
-                                setMaterialOpen(false);
-                              }}
-                              className={`flex cursor-pointer items-center px-3 py-2 text-sm ${
-                                formData.material === name
-                                  ? 'bg-primary text-primary-foreground font-medium'
-                                  : 'text-popover-foreground hover:bg-secondary'
-                              }`}
+                              style={{ position: 'relative', height: materialOptionMatches.length * MATERIAL_ROW_HEIGHT_PX }}
                             >
-                              <Check className={`mr-2 h-4 w-4 shrink-0 ${formData.material === name ? 'opacity-100' : 'opacity-0'}`} />
-                              <span className="font-medium">{name}</span>
-                            </div>
-                          ))}
-                          {/* Honest about the cap rather than silently truncating. */}
-                          {materialOptionMatches.length > visibleMaterialOptions.length && (
-                            <div className="px-3 py-2 text-xs text-muted-foreground text-center border-t border-border">
-                              +{materialOptionMatches.length - visibleMaterialOptions.length} more — keep typing to narrow
+                              {materialOptionMatches.slice(materialVisibleRange.start, materialVisibleRange.end).map((name, i) => {
+                                const index = materialVisibleRange.start + i;
+                                return (
+                                  <div
+                                    key={name}
+                                    onClick={() => {
+                                      setFormData({ ...formData, material: name === formData.material ? '' : name, materialGrade: '' });
+                                      setMaterialOpen(false);
+                                    }}
+                                    style={{ position: 'absolute', top: index * MATERIAL_ROW_HEIGHT_PX, left: 0, right: 0, height: MATERIAL_ROW_HEIGHT_PX }}
+                                    className={`flex cursor-pointer items-center px-3 text-sm ${
+                                      formData.material === name
+                                        ? 'bg-primary text-primary-foreground font-medium'
+                                        : 'text-popover-foreground hover:bg-secondary'
+                                    }`}
+                                  >
+                                    <Check className={`mr-2 h-4 w-4 shrink-0 ${formData.material === name ? 'opacity-100' : 'opacity-0'}`} />
+                                    <span className="font-medium truncate">{name}</span>
+                                  </div>
+                                );
+                              })}
                             </div>
                           )}
                           {!isLoadingMaterials && materialOptionMatches.length === 0 && materialSearch && (
