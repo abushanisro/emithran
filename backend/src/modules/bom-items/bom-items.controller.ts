@@ -26,6 +26,7 @@ import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express
 import { memoryStorage } from 'multer';
 import * as path from 'path';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
+import { expandSearchTermSpellingVariants } from '../raw-materials/material-search-spelling';
 import { BOMItemsService } from './bom-items.service';
 import { CreateBOMItemDto, UpdateBOMItemDto, QueryBOMItemsDto, BOMItemType } from './dto/bom-items.dto';
 import { BOMItemResponseDto, BOMItemListResponseDto } from './dto/bom-item-response.dto';
@@ -204,12 +205,25 @@ export class BOMItemsController {
       const { createClient } = await import('@supabase/supabase-js');
       const client = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
       const g = grade.trim();
+      // Same real AmE/BrE spelling variants the Material search already
+      // reconciles (material-search-spelling.ts, root-caused 2026-09-18) —
+      // a drawing extracting "ALUMINIUM" must resolve to the same real
+      // "Aluminum"-spelled rows the search box already finds, not silently
+      // fail density lookup and leave Weight blank for the exact same
+      // material a different endpoint can already find.
+      const variants = expandSearchTermSpellingVariants(g);
+      const orClause = (columns: string[], wildcard: boolean) =>
+        variants.flatMap((v) => {
+          const safe = v.replace(/"/g, '\\"');
+          const pattern = wildcard ? `%${safe}%` : safe;
+          return columns.map((col) => `${col}.ilike."${pattern}"`);
+        }).join(',');
 
-      // 1. Exact match in curated lookup table
+      // 1. Exact match in curated lookup table (any real spelling variant)
       let { data } = await client
         .from('material_density_lookup')
         .select('material_name, material_grade, density_g_cm3')
-        .ilike('material_grade', g)
+        .or(orClause(['material_grade'], false))
         .limit(1)
         .maybeSingle();
 
@@ -218,7 +232,7 @@ export class BOMItemsController {
         ({ data } = await client
           .from('material_density_lookup')
           .select('material_name, material_grade, density_g_cm3')
-          .or(`material_grade.ilike.%${g}%,material_name.ilike.%${g}%`)
+          .or(orClause(['material_grade', 'material_name'], true))
           .limit(1)
           .maybeSingle());
       }
@@ -228,7 +242,7 @@ export class BOMItemsController {
         const rm = await client
           .from('raw_materials')
           .select('material, material_grade, density')
-          .or(`material_grade.ilike.%${g}%,material.ilike.%${g}%`)
+          .or(orClause(['material_grade', 'material'], true))
           .not('density', 'is', null)
           .limit(1)
           .maybeSingle();
