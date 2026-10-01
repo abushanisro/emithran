@@ -86,32 +86,6 @@ export class RawMaterialsController {
     return this.rawMaterialsService.getStockPrices(token, location);
   }
 
-  @Get('categories')
-  @ApiOperation({ summary: 'Get available material categories' })
-  @ApiResponse({ status: 200, description: 'Material categories retrieved successfully' })
-  async getMaterialCategories() {
-    // Return categories in the format expected by the frontend
-    return {
-      success: true,
-      categories: [
-        {
-          id: 'plastic',
-          category_name: 'Plastic & Rubber',
-          category_code: 'PLASTIC',
-          color_code: '#4CAF50',
-          description: 'Polymeric materials including thermoplastics and thermosets'
-        },
-        {
-          id: 'ferrous',
-          category_name: 'Ferrous & Non-Ferrous',
-          category_code: 'FERROUS',
-          color_code: '#FF5722',
-          description: 'Iron-based and non-iron metals and alloys'
-        }
-      ]
-    };
-  }
-
   @Get('statistics')
   @ApiOperation({ summary: 'Get material category statistics' })
   @ApiResponse({ status: 200, description: 'Category statistics retrieved successfully' })

@@ -631,12 +631,6 @@ export class RawMaterialsService {
     return this.ferrousContainer.importFerrousDataFromExcel(excelData, userId, accessToken, organizationId);
   }
 
-  async getMaterialCategories(): Promise<{ categories: typeof MATERIAL_CATEGORY_LABELS }> {
-    return {
-      categories: MATERIAL_CATEGORY_LABELS,
-    };
-  }
-
   async getEnhancedMaterials(
     query: {
       page: number;

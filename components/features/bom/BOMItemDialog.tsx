@@ -51,6 +51,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { createBOMItem, updateBOMItem, analyzeForAutoFill, type AutoFillResponse } from '@/lib/api/hooks/useBOMItems';
+import { useRawMaterialFilterOptions } from '@/lib/api/hooks/useRawMaterials';
 import type { DrawingAnalysisResult } from '@/lib/api/vave';
 import { BOMItemType, ITEM_TYPE_LABELS } from '@/lib/types/bom.types';
 import { apiClient } from '@/lib/api/client';
@@ -309,7 +310,10 @@ export function BOMItemDialog({
   const [materialOpen, setMaterialOpen] = useState(false);
   const [materialSearch, setMaterialSearch] = useState('');
   const [debouncedMaterialSearch, setDebouncedMaterialSearch] = useState('');
-  const [materialCategory, setMaterialCategory] = useState<'PLASTIC_RUBBER' | 'FERROUS_NON_FERROUS' | ''>('');
+  // Real material_group values from raw_materials (useRawMaterialFilterOptions
+  // -> GET /raw-materials/filter-options), never a hand-typed option list —
+  // whatever categories actually exist in the database is what shows here.
+  const [materialCategory, setMaterialCategory] = useState<string>('');
   const [activeResult, setActiveResult] = useState<AutoFillResponse | null>(null);
 
   // Debounce material name search
@@ -375,6 +379,11 @@ export function BOMItemDialog({
     retry: materialQueryRetry,
     retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
+
+  // Real, DB-driven Material Category options (distinct raw_materials.material_group
+  // values) — never a hardcoded list of categories typed into this component.
+  const { data: materialFilterOptions } = useRawMaterialFilterOptions();
+  const materialCategoryOptions = materialFilterOptions?.materialGroups ?? [];
 
   // Unique material NAME options (for the Material dropdown)
   const materialNameOptions = useMemo((): string[] => {
@@ -677,13 +686,19 @@ export function BOMItemDialog({
     setAutoFilledFields(filled);
     setActiveResult(r);
 
-    // Auto-set material category from CAD family classification
+    // Auto-set material category from CAD family classification — matched
+    // against the real DB category list, never a hardcoded enum code that
+    // can drift out of sync with what the dropdown actually offers.
     if (r.suggestions.familyClassification) {
       const fc = r.suggestions.familyClassification;
-      if (/plastic|rubber/i.test(fc)) setMaterialCategory('PLASTIC_RUBBER');
-      else if (/ferrous|metal|steel|alumin|copper|titan|cast/i.test(fc)) setMaterialCategory('FERROUS_NON_FERROUS');
+      const wantPlastic = /plastic|rubber/i.test(fc);
+      const wantFerrous = /ferrous|metal|steel|alumin|copper|titan|cast/i.test(fc);
+      const match = materialCategoryOptions.find((g) =>
+        wantPlastic ? /plastic|rubber/i.test(g) : wantFerrous ? /ferrous/i.test(g) : false,
+      );
+      if (match) setMaterialCategory(match);
     }
-  }, [setMaterialCategory]);
+  }, [setMaterialCategory, materialCategoryOptions]);
 
   const updatePendingFileStatus = useCallback((id: string, status: PendingFile['status'], error?: string) => {
     setPendingFiles(prev => prev.map(pf =>
@@ -1008,10 +1023,15 @@ export function BOMItemDialog({
           return { ...prev, ...patch };
         });
 
-        // Auto-set material category from the extracted material name
+        // Auto-set material category from the extracted material name —
+        // matched against the real DB category list (see the CAD-classification
+        // auto-set above for why this is never a hardcoded enum code).
         if (filled.has('material') && result.material) {
           const isPlastic = /plastic|rubber|abs|nylon|pom|pp\b|pe\b|pvc|ptfe|pc\b|pa\b|pet\b|pbt|peek|pei|pps|polyprop|polyeth|polysty|polycaRB|epoxy|silicone|urethane|polyurethane/i.test(result.material);
-          setMaterialCategory(isPlastic ? 'PLASTIC_RUBBER' : 'FERROUS_NON_FERROUS');
+          const match = materialCategoryOptions.find((g) =>
+            isPlastic ? /plastic|rubber/i.test(g) : /ferrous/i.test(g),
+          );
+          if (match) setMaterialCategory(match);
         }
 
         // Function forms execute after the setFormData updater has populated `filled`
@@ -1584,8 +1604,9 @@ export function BOMItemDialog({
                     <SelectValue placeholder="Select category..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="PLASTIC_RUBBER">Plastic &amp; Rubber</SelectItem>
-                    <SelectItem value="FERROUS_NON_FERROUS">Ferrous &amp; Non-Ferrous</SelectItem>
+                    {materialCategoryOptions.map((group) => (
+                      <SelectItem key={group} value={group}>{group}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
