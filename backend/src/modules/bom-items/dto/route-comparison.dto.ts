@@ -1,6 +1,7 @@
 import type { ProcessLineCost, ResolvedCostingInputsDto, RouteResultSustainability } from "./cost-breakdown.dto";
 import type { CapabilityReasonCode } from '../costing/shared/capability/machine-capability';
 import type { RouteDataGap } from '../costing/shared/core/engine-kernel';
+import type { FactMismatch } from '../costing/shared/physics/drawing-cad-consistency';
 
 // Was a closed string-literal union of exactly the route ids known at the
 // time (3 sheet-metal-cutting + CNC/injection-molding families). Widened to
@@ -157,6 +158,9 @@ export interface RouteComparisonDto {
   materialSource: "db" | "default";
   routes: RouteResultDto[];
   comparisonWarnings: string[];
+  // Does the 2D drawing describe the same part as the 3D CAD model? Part-level,
+  // same as CostSummaryDto's own field — see drawing-cad-consistency.ts.
+  drawingCadConsistency?: FactMismatch[];
   currency: string;       // ISO 4217 code of the CURRENT display currency, e.g. 'USD'
   currencySymbol: string; // display symbol for `currency`, e.g. '$'
   toUsdRate?: number;     // amount_local × toUsdRate = amount in `currency` — see normalizeRouteComparisonToCurrency

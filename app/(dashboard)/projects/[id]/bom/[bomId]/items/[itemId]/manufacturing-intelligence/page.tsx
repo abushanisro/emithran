@@ -54,6 +54,7 @@ import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
 import { groupFeaturesByType, featureSelectionKey, resolveFeatureSelection, findFeatureByFaceId } from '@/lib/features/machining-feature-tree';
 import { sheetMetalOperationNodes, type OperationTreeNode } from '@/lib/features/sheet-metal-operation-nodes';
 import { gdtCalloutNodes } from '@/lib/features/gdt-callout-nodes';
+import { drawingCadConsistencyNodes } from '@/lib/features/drawing-cad-consistency-nodes';
 import { effectiveProcessGroupOf } from '@/lib/processCatalog/hr-rates-process-selection';
 import { useFactoryCurrency, useFactories, useCurrencies, useFxRate, useRefreshFxRate, useFxRateOnDemand, type FxRateType } from '@/lib/api/hooks/useFx';
 import { useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculatorMappings';
@@ -7380,11 +7381,32 @@ function BlankDevOptionsDialog({
 
 // ── ValidationTab ─────────────────────────────────────────────────────────────
 
-function ValidationTab({ fg, item, file3dUrl }: { fg: FeatureGraph | null; item: BOMItem; file3dUrl?: string | null }) {
+function ValidationTab({
+  fg, item, file3dUrl, batchSize, factory = 'USA', onSelectHighlight,
+}: {
+  fg: FeatureGraph | null;
+  item: BOMItem;
+  file3dUrl?: string | null;
+  batchSize?: number | undefined;
+  factory?: string | undefined;
+  onSelectHighlight?: ((node: FeatureNodeV2 | null) => void) | undefined;
+}) {
   const [optionsOpen, setOptionsOpen]     = useState(false);
   const [tolerancesOpen, setTolerancesOpen] = useState(false);
   const [machiningOpen, setMachiningOpen]   = useState(false);
   const updateBOMItem = useUpdateBOMItem();
+  // Real part-level 2D-drawing-vs-3D-CAD fact agreement — see
+  // drawing-cad-consistency-nodes.ts. Same cost-summary call every other tab
+  // already makes for this item; React Query dedupes it, not a second fetch.
+  const { data: dccCost } = useCostSummary(item.id, batchSize, factory);
+  const dccNodes = drawingCadConsistencyNodes(dccCost?.drawingCadConsistency ?? []);
+  const v2FeaturesForDcc = fg?.feature_graph_v2?.features ?? [];
+  const resolveDccHighlight = (ids: string[] | undefined): FeatureNodeV2 | null => {
+    if (!ids?.length) return null;
+    const idSet = new Set(ids);
+    const matched = v2FeaturesForDcc.filter((f) => idSet.has(f.id));
+    return matched.length ? mergeFeaturesToHL(`dcc_${ids.join('_')}`, matched) : null;
+  };
 
   const isSheetMetal = (item.sheetThicknessMm ?? 0) > 0;
 
@@ -7684,6 +7706,55 @@ function ValidationTab({ fg, item, file3dUrl }: { fg: FeatureGraph | null; item:
             </div>
           )}
         </div>
+
+        {/* Drawing ↔ CAD Consistency — does the 2D drawing describe the same
+            part as the 3D model? Never a DFM/manufacturing tolerance — see
+            drawing-cad-consistency-nodes.ts's own doc comment. */}
+        {dccNodes.length > 0 && (
+          <div className="px-3 py-2">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Drawing ↔ CAD Consistency ({dccNodes.filter((n) => n.status === 'mismatch').length})
+              </span>
+            </div>
+            <div className="divide-y divide-border/30 border border-border/40 rounded text-[11px]">
+              {dccNodes.map((n) => {
+                const highlight = resolveDccHighlight(n.v2FeatureIds);
+                const icon = n.status === 'match'
+                  ? <span className="text-emerald-400 text-sm leading-none">✓</span>
+                  : n.status === 'mismatch'
+                    ? (n.severity === 'critical'
+                        ? <span className="text-red-500 text-sm leading-none">✗</span>
+                        : <span className="text-amber-400 text-sm leading-none">!</span>)
+                    : <span className="text-muted-foreground text-sm leading-none">•</span>;
+                return (
+                  <button
+                    key={n.id}
+                    type="button"
+                    disabled={!highlight}
+                    onClick={() => highlight && onSelectHighlight?.(highlight)}
+                    title={highlight ? 'Click to highlight in the 3D view' : undefined}
+                    className="w-full px-2 py-1.5 flex items-start gap-2 text-left transition-colors disabled:cursor-default enabled:hover:bg-violet-500/5"
+                  >
+                    <span className="shrink-0 mt-0.5 w-3">{icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline gap-1.5 flex-wrap">
+                        <span className="font-medium text-foreground">{n.label}</span>
+                        <span className="text-muted-foreground font-mono">{n.drawingValue} vs {n.cadValue}</span>
+                      </div>
+                      {n.status === 'mismatch' && (
+                        <p className={`mt-0.5 leading-snug ${n.severity === 'critical' ? 'text-red-400/80' : 'text-amber-400/80'}`}>
+                          {n.message}
+                        </p>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
       </div>
     </>
@@ -8312,7 +8383,8 @@ function AnalysisTabsPanel({
         )}
 
         {tab === 'validation' && item && (
-          <ValidationTab fg={fg} item={item} file3dUrl={file3dUrl ?? null} />
+          <ValidationTab fg={fg} item={item} file3dUrl={file3dUrl ?? null}
+            batchSize={batchSize} factory={factory} onSelectHighlight={onSelectHighlight} />
         )}
 
 

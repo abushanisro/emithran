@@ -614,6 +614,27 @@ export interface GdtCallout {
   faceIds: string[];
 }
 
+/**
+ * Does the part's 2D drawing describe the SAME object as its 3D CAD model?
+ * Backend costing/shared/physics/drawing-cad-consistency.ts — a data-integrity
+ * check (did the right files get uploaded, did OCR misread a number), never a
+ * manufacturing/DFM tolerance check.
+ */
+export type MismatchStatus = 'match' | 'mismatch' | 'drawing_only' | 'cad_only';
+export type MismatchSeverity = 'critical' | 'warning' | 'info';
+
+export interface FactMismatch {
+  fact: string;
+  label: string;
+  drawingValue: string;
+  cadValue: string;
+  status: MismatchStatus;
+  severity: MismatchSeverity;
+  message: string;
+  /** CAD features to highlight on click — only when the fact has real ones. */
+  v2FeatureIds?: string[];
+}
+
 /** One CAD feature matched to the catalog operation(s) a process step performs on it. */
 export interface CatalogOperation {
   /** One name when resolved; the candidates when undecided; empty when infeasible. */
@@ -845,6 +866,8 @@ export interface CostSummaryDto {
   costStatus?: CostStatus;
   /** Process names with an unresolved physicsGap, when costStatus is 'incomplete'. */
   incompleteProcesses?: string[];
+  /** Part-level 2D-drawing-vs-3D-CAD fact agreement — see FactMismatch above. */
+  drawingCadConsistency?: FactMismatch[];
   materialCost: number;
   materialGrade: string;
   grossWeightKg: number;
@@ -1307,6 +1330,8 @@ export interface RouteComparisonDto {
   materialSource: "db" | "default";
   routes: RouteResultDto[];
   comparisonWarnings: string[];
+  /** Part-level 2D-drawing-vs-3D-CAD fact agreement — see FactMismatch above. */
+  drawingCadConsistency?: FactMismatch[];
   currency: string;
   currencySymbol: string;
   toUsdRate?: number;
