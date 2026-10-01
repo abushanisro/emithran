@@ -35,6 +35,7 @@ import { requiredMilledClassFromToolAxes } from './costing/machining/setup-axis-
 import { PlasticReferenceService } from './costing/plastic-molding/lookup/plastic-reference.service';
 import { SecondaryProcessService } from './services/secondary-process.service';
 import { resolveGdtCallouts } from './costing/shared/physics/gdt-callouts';
+import { detectDrawingCadMismatches, type FactMismatch } from './costing/shared/physics/drawing-cad-consistency';
 import type { MachiningCalculators } from './costing/machining/calculators/machining-calculator';
 import { loadMachiningCalculatorSpec } from './costing/machining/calculators/machining-calculator-spec';
 import type { KeywayBroachReference } from './costing/machining/calculators/machining-lookup-seeds';
@@ -2189,6 +2190,7 @@ export class BOMItemsService {
   }): {
     bendCount: number;
     bendSource: 'cad' | 'drawing' | 'estimated';
+    drawingBendCount: number;
     flatPatternAreaMm2: number;
     blankAreaSource: 'cad' | 'reconstructed';
     warnings: string[];
@@ -2196,6 +2198,13 @@ export class BOMItemsService {
     const warnings: string[] = [];
 
     // ── Bend count: CAD geometry vs drawing intelligence ──────────────────────
+    // Which count COSTING uses: the drawing's, whenever it is higher (a bend
+    // the drawing calls out and CAD missed should still be priced). Whether
+    // the two sources AGREE is a separate question — see
+    // detectDrawingCadMismatches, which the caller feeds drawingBendCount and
+    // geoBendCount into and which now covers every disagreement (including
+    // the CAD=0 case this function used to warn about by itself — retired
+    // here, not duplicated, so a real mismatch is never reported twice).
     const drawingBendCount =
       Math.max(0, Math.round(Number((args.item.drawingIntelligence as any)?.bend_count ?? 0))) || 0;
     let bendCount = args.geoBendCount;
@@ -2203,11 +2212,6 @@ export class BOMItemsService {
     if (drawingBendCount > bendCount) {
       bendCount = drawingBendCount;
       bendSource = 'drawing';
-      if (args.geoBendCount === 0) {
-        warnings.push(
-          `Bend count (${drawingBendCount}) taken from the 2D drawing — CAD geometry reported 0 bends`,
-        );
-      }
     }
     // Route-aware guard: the recommended route bends the part but neither CAD nor
     // drawing supplied a count — price 1 bend with a warning instead of pricing 0.
@@ -2241,7 +2245,7 @@ export class BOMItemsService {
       );
     }
 
-    return { bendCount, bendSource, flatPatternAreaMm2, blankAreaSource, warnings };
+    return { bendCount, bendSource, drawingBendCount, flatPatternAreaMm2, blankAreaSource, warnings };
   }
 
   // ── eMithran-style feature-level breakdown helpers ─────────────────────────────
@@ -2964,6 +2968,12 @@ export class BOMItemsService {
     const bendCount = geo?.bendCount ?? geoBendCount;
     const flatPatternAreaMm2 = geo?.flatPatternAreaMm2 ?? measuredFlatAreaMm2;
 
+    // Does the 2D drawing describe the same part as the 3D CAD model? See
+    // buildDrawingCadConsistency's own doc comment.
+    const drawingCadConsistency = this.buildDrawingCadConsistency({
+      item, fg, family, geoBendCount, drawingBendCount: geo?.drawingBendCount ?? null,
+    });
+
     const locInfo = LOCATION_INFO[location] ?? LOCATION_INFO['Other'];
     // One FX snapshot for this whole request — every conversion below (material,
     // each process line, at the final normalizeCostSummaryToCurrency call) uses
@@ -2977,6 +2987,9 @@ export class BOMItemsService {
 
     const materialWarnings: string[] = [];
     if (familyResolution.warning) materialWarnings.push(familyResolution.warning);
+    // Every real disagreement, in every branch's own warnings — the real
+    // numbers, never a vague "mismatch" with nothing to act on.
+    materialWarnings.push(...drawingCadConsistency.filter((m) => m.status === 'mismatch').map((m) => m.message));
     const {
       materialCostPerKg, materialDensityKgM3, materialSource, utsMpa, shearStrengthMpa,
       meltingTempC, moldTempC, ejectionTempC, specificHeatMeltJgC, thermalConductivityMeltWMK, densityOfMeltKgM3, materialType, clampProperties,
@@ -3379,6 +3392,7 @@ export class BOMItemsService {
       }
       cncResult.warnings.push(...materialWarnings, ...unpricedOpWarnings);
       if (family === 'milled' && !requiredClass) cncResult.warnings.push(axisRequirement.reason);
+      cncResult.drawingCadConsistency = drawingCadConsistency;
       this.attachMachineSelections(cncResult.processLines, mhrRates);
       // Attach eMithran-style feature-level breakdown to the primary milling
       // process line. Was string-matching on the displayed process NAME
@@ -3562,6 +3576,7 @@ export class BOMItemsService {
       };
       const imResult = { ...computeInjectionMoldedCostSummary(imInput), ...currencyMeta };
       imResult.warnings.push(...materialWarnings);
+      imResult.drawingCadConsistency = drawingCadConsistency;
 
       // Clamp / shot sizing against the selected press is computed by the engine
       // (reference clamp model, clamp-force.ts) and returned on injectionMolding.
@@ -4431,6 +4446,7 @@ export class BOMItemsService {
       ...currencyMeta,
     };
     smResult.warnings.push(...materialWarnings);
+    smResult.drawingCadConsistency = drawingCadConsistency;
     if (geo) {
       smResult.warnings.push(...geo.warnings);
       smResult.geometryProvenance = { bendSource: geo.bendSource, blankAreaSource: geo.blankAreaSource };
@@ -4848,6 +4864,13 @@ export class BOMItemsService {
       ...(Number(t.pitch) > 0 ? { pitchMm: Number(t.pitch) } : {}),
     })) as Array<{ size: string; count: number; pitchMm?: number }>;
 
+    // Does the 2D drawing describe the same part as the 3D CAD model? Same
+    // resolver as getCostSummary — the summary ≡ route invariant extends to
+    // this too, not just the costed numbers.
+    const drawingCadConsistency = this.buildDrawingCadConsistency({
+      item, fg, family, geoBendCount, drawingBendCount: geo?.drawingBendCount ?? null,
+    });
+
     // Flat pattern dimensions — from bom_items.max_length / max_width (set by CAD pipeline).
     // Access both camelCase and snake_case to handle FIELD_MAPPING variations safely.
     const flatPatternLengthMm = ((item as any).maxLength ?? (item as any).max_length ?? null) as number | null;
@@ -4863,6 +4886,7 @@ export class BOMItemsService {
     if (!grade) comparisonWarnings.push('Material grade not set — default mild steel rates applied');
     if (geo) comparisonWarnings.push(...geo.warnings);
     if (familyResolutionRC.warning) comparisonWarnings.push(familyResolutionRC.warning);
+    comparisonWarnings.push(...drawingCadConsistency.filter((m) => m.status === 'mismatch').map((m) => m.message));
 
     // ── Material cost — same resolver as getCostSummary, by construction ──────
     const locInfo = LOCATION_INFO[location] ?? LOCATION_INFO['Other'];
@@ -5784,6 +5808,7 @@ export class BOMItemsService {
         materialGrade: grade ?? '', grossWeightKg: imGrossKg, materialCostPerKg, materialSource,
         currency: locInfo.code, currencySymbol: locInfo.symbol,
         routes: imRoutes, comparisonWarnings,
+        drawingCadConsistency,
       });
     }
 
@@ -6677,6 +6702,7 @@ export class BOMItemsService {
       materialSource,
       routes,
       comparisonWarnings,
+      drawingCadConsistency,
       currency: locInfo.code,
       currencySymbol: locInfo.symbol,
     });
@@ -7413,6 +7439,80 @@ export class BOMItemsService {
     return [...groups.values()];
   }
 
+  /**
+   * Does this part's 2D drawing describe the same object as its 3D CAD model?
+   * One call, shared by getCostSummary and getRouteComparison (same inputs
+   * invariant those two endpoints already keep elsewhere in this file) — see
+   * detectDrawingCadMismatches' own doc comment for what this is and, just as
+   * importantly, what it deliberately is NOT (a manufacturing tolerance check).
+   *
+   * Each fact is gated to the family it's actually meaningful for: bend count
+   * and sheet thickness are a sheet-metal concept; thread count's CAD side
+   * only exists for machining (sheet-metal "threaded" features are
+   * synthesized FROM the drawing itself — comparing them would be circular,
+   * see cadTappedHoles). Overall dimensions apply to every family.
+   */
+  private buildDrawingCadConsistency(args: {
+    item: BOMItemResponseDto;
+    fg: any;
+    family: string;
+    geoBendCount: number;
+    drawingBendCount: number | null; // null when not sheet metal (resolveSheetGeometryInputs not run)
+  }): FactMismatch[] {
+    const di = (args.item.drawingIntelligence ?? null) as Record<string, any> | null;
+    const isSheetMetal = args.family === 'sheet_metal';
+    const isMachining = args.family === 'milled' || args.family === 'turned' || args.family === 'mill_turn';
+
+    const drawingThreads = (di?.threads ?? []) as Array<{ count?: unknown }>;
+    const drawingThreadCount = drawingThreads.length > 0
+      ? drawingThreads.reduce((s, t) => s + (Number(t.count) || 1), 0)
+      : null;
+    const cadTapped = isMachining ? this.cadTappedHoles(args.fg) : null;
+
+    const bendFeatureIds = isSheetMetal
+      ? ((args.fg?.feature_graph_v2?.features ?? []) as Array<{ id: string; feature_type: string }>)
+          .filter((f) => f.feature_type === 'StraightBend').map((f) => f.id)
+      : undefined;
+
+    const dm = di?.dimensions_mm;
+    const drawingDims: [number, number, number] | null =
+      Number(dm?.L) > 0 && Number(dm?.W) > 0 && Number(dm?.H) > 0
+        ? [Number(dm.L), Number(dm.W), Number(dm.H)] : null;
+    const cadDims: [number, number, number] | null =
+      Number(args.item.maxLength) > 0 && Number(args.item.maxWidth) > 0 && Number(args.item.maxHeight) > 0
+        ? [Number(args.item.maxLength), Number(args.item.maxWidth), Number(args.item.maxHeight)] : null;
+
+    return detectDrawingCadMismatches(
+      {
+        bendCount: isSheetMetal ? args.drawingBendCount : null,
+        sheetThicknessMm: isSheetMetal && Number(di?.sheet_thickness_mm) > 0 ? Number(di?.sheet_thickness_mm) : null,
+        threadCount: drawingThreadCount,
+        dimensionsMm: drawingDims,
+      },
+      {
+        bendCount: isSheetMetal ? args.geoBendCount : null,
+        sheetThicknessMm: isSheetMetal ? resolveEffectiveSheetThicknessMm(args.item.scenarioOverrides, args.fg?.summary?.sheetThicknessMm, args.item.sheetThicknessMm ?? 0) || null : null,
+        threadCount: cadTapped ? cadTapped.count : null,
+        dimensionsMm: cadDims,
+        bendFeatureIds,
+        threadFeatureIds: cadTapped?.featureIds,
+      },
+    );
+  }
+
+  // CAD-detected tapped holes, for the drawing-vs-CAD thread-count comparison
+  // ONLY (detectDrawingCadMismatches) — never for costing/tapping itself,
+  // which stays resolveThreads' own drawing-wins-outright rule unchanged.
+  // Machining only: a sheet-metal part's "SimpleHole/tapped" entries are
+  // themselves synthesized FROM the drawing's thread callouts
+  // (catalog-operations.service.ts) — comparing those to themselves would be
+  // circular, so sheet metal always passes { count: null } here.
+  private cadTappedHoles(fg: any): { count: number; featureIds: string[] } {
+    const cncFeatures = (fg?.machining_features?.features ?? []) as Array<{ id: string; type: string; variant: string }>;
+    const tapped = cncFeatures.filter((f) => f.type === 'SimpleHole' && f.variant === 'threaded');
+    return { count: tapped.length, featureIds: tapped.map((f) => f.id) };
+  }
+
   private resolveThreads(
     drawingThreads: Array<{ size: string; count: number; pitchMm?: number }>,
     fg: any,
@@ -7781,13 +7881,16 @@ export class BOMItemsService {
     }
 
     const billetWeightKg = (routes[0]?.materialCost ?? 0) / Math.max(materialCostPerKg, 1);
+    const drawingCadConsistency = this.buildDrawingCadConsistency({
+      item, fg, family: 'milled', geoBendCount: 0, drawingBendCount: null,
+    });
     return {
       bomItemId: id, batchSize,
       materialCost: routes[0]?.materialCost ?? 0,
       materialGrade: grade ?? 'Unknown',
       grossWeightKg: Math.round(billetWeightKg * 1000) / 1000,
       materialCostPerKg, materialSource,
-      routes, comparisonWarnings,
+      routes, comparisonWarnings, drawingCadConsistency,
       currency: locInfo.code,
       currencySymbol: locInfo.symbol,
     };
@@ -8018,13 +8121,16 @@ export class BOMItemsService {
     }
 
     const barWeightKg = (routes[0]?.materialCost ?? 0) / Math.max(materialCostPerKg, 1);
+    const drawingCadConsistency = this.buildDrawingCadConsistency({
+      item, fg, family: 'turned', geoBendCount: 0, drawingBendCount: null,
+    });
     return {
       bomItemId: id, batchSize,
       materialCost: routes[0]?.materialCost ?? 0,
       materialGrade: grade ?? 'Unknown',
       grossWeightKg: Math.round(barWeightKg * 1000) / 1000,
       materialCostPerKg, materialSource,
-      routes, comparisonWarnings,
+      routes, comparisonWarnings, drawingCadConsistency,
       currency: locInfo.code,
       currencySymbol: locInfo.symbol,
     };

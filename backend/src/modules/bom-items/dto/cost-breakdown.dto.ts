@@ -2,6 +2,7 @@ import type { LhrRateSource } from '../costing/shared/core/cost-engine';
 import type { CostingInputs } from '../costing/shared/physics/costing-inputs';
 import type { CatalogOperation } from '../costing/sheet-metal/operation/catalog-operation-resolver';
 import type { GdtCallout } from '../costing/shared/physics/gdt-callouts';
+import type { FactMismatch } from '../costing/shared/physics/drawing-cad-consistency';
 
 /**
  * The costing inputs this response was actually computed at, together with where
@@ -451,6 +452,11 @@ export interface CostSummaryDto {
   // Process names with an unresolved physicsGap, when costStatus is
   // 'incomplete' — a quick list for the UI without re-scanning processLines.
   incompleteProcesses?: string[];
+
+  // Does the 2D drawing describe the same part as the 3D CAD model? A
+  // part-level fact (not per process line) — see
+  // costing/shared/physics/drawing-cad-consistency.ts.
+  drawingCadConsistency?: FactMismatch[];
 
   // Material
   materialCost: number;
