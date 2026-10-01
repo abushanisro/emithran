@@ -354,7 +354,7 @@ export function BOMItemDialog({
   // defaulted an auto-classified injection-molded part to FERROUS_NON_FERROUS
   // and made every real plastic grade unsearchable no matter what was typed
   // — a confirmed live bug, 2026-09-10.
-  const { data: rawMaterialsData, isLoading: isLoadingMaterials } = useQuery<RawMaterialsResponse>({
+  const { data: rawMaterialsData, isLoading: isLoadingMaterials, isFetching: isFetchingMaterials } = useQuery<RawMaterialsResponse>({
     queryKey: ['raw-materials-names', debouncedMaterialSearch],
     queryFn: async (): Promise<RawMaterialsResponse> => {
       const endpoint = '/raw-materials/enhanced';
@@ -373,7 +373,10 @@ export function BOMItemDialog({
     retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 
-  // Unique material NAME options (for the Material dropdown)
+  // Unique material NAME options (for the Material dropdown), in the SERVER's
+  // own real relevance order (findAll/getEnhancedMaterials ranks exact ->
+  // designation -> alias matches via orderByRelevance) — never re-sorted
+  // alphabetically, which would throw that real ranking away.
   const materialNameOptions = useMemo((): string[] => {
     if (!rawMaterialsData?.items) return [];
     const seen = new Set<string>();
@@ -383,18 +386,29 @@ export function BOMItemDialog({
         if (!name || seen.has(name)) return false;
         seen.add(name);
         return true;
-      })
-      .sort();
+      });
   }, [rawMaterialsData]);
 
-  // Every real match, never capped/truncated — a capped list ("+N more, keep
-  // typing to narrow") hides real database materials from an engineer
-  // scrolling the list instead of typing a name they don't know yet.
-  const materialOptionMatches = useMemo((): string[] => {
-    const q = materialSearch.trim().toLowerCase();
-    if (!q) return materialNameOptions;
-    return materialNameOptions.filter((n) => n.toLowerCase().includes(q));
-  }, [materialNameOptions, materialSearch]);
+  // The server's result set for the (debounced) search term IS the match
+  // set — the server already does real alias- and spelling-variant-aware
+  // matching (material-search-spelling.ts: "aluminum"/"aluminium" etc, see
+  // buildMaterialSearchOrClause). A SECOND, plain-substring re-filter here
+  // against the raw keystroke text used to silently discard every one of
+  // those real matches the moment the live text diverged from a dumb ILIKE
+  // check (e.g. "ALUMINIUM" vs the DB's real "Aluminum"-spelled rows) —
+  // live-reproduced 2026-10-01, confirmed via a direct call to
+  // /raw-materials/enhanced?search=ALUMINIUM, which already returns the real
+  // rows; the UI was the only thing throwing them away. Industry practice
+  // for a re-query (server-driven) typeahead is explicit on this: once each
+  // keystroke re-queries the server, the response IS the result set and all
+  // filtering happens server-side — never re-filtered client-side on top.
+  const materialOptionMatches = materialNameOptions;
+  // True while the visible list may not reflect the latest keystroke yet
+  // (debounce still pending, or the debounced query is in flight) — gates
+  // the "No matches" / "Use as custom" messaging so neither ever fires
+  // against a stale or incomplete result.
+  const isMaterialSearchPending =
+    materialSearch.trim() !== debouncedMaterialSearch.trim() || isFetchingMaterials;
 
   // Virtualized rendering (windowing): only the rows actually scrolled into
   // view are ever mounted, so the list can be arbitrarily long (the full
@@ -1596,8 +1610,10 @@ export function BOMItemDialog({
                         onScroll={(e) => setMaterialListScrollTop(e.currentTarget.scrollTop)}
                       >
                         <CommandGroup>
-                          {/* Custom value row */}
-                          {materialSearch && !materialOptionMatches.some(n => n.toLowerCase() === materialSearch.toLowerCase()) && (
+                          {/* Custom value row — withheld while the server search for the
+                              latest keystroke is still pending, so this never flashes
+                              against a result set that hasn't caught up yet. */}
+                          {materialSearch && !isMaterialSearchPending && !materialOptionMatches.some(n => n.toLowerCase() === materialSearch.toLowerCase()) && (
                             <div
                               onClick={() => {
                                 setFormData({ ...formData, material: materialSearch, materialGrade: '' });
@@ -1639,13 +1655,13 @@ export function BOMItemDialog({
                               })}
                             </div>
                           )}
-                          {!isLoadingMaterials && materialOptionMatches.length === 0 && materialSearch && (
+                          {!isMaterialSearchPending && materialOptionMatches.length === 0 && materialSearch && (
                             <div className="px-3 py-4 text-sm text-muted-foreground text-center">
                               No matches in database — custom value will be saved.
                             </div>
                           )}
                         </CommandGroup>
-                        {isLoadingMaterials && (
+                        {(isLoadingMaterials || isMaterialSearchPending) && (
                           <div className="flex items-center justify-center gap-2 py-2 border-t border-border text-xs text-muted-foreground">
                             <Loader2 className="h-3 w-3 animate-spin" />Searching…
                           </div>
