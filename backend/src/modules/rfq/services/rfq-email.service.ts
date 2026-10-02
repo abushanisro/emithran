@@ -148,7 +148,7 @@ export class RfqEmailService {
   }
 
   private async fetchBomItemDetails(bomItemIds: string[], accessToken?: string): Promise<BomItemDetails[]> {
-    const { data, error } = await this.supabaseService.getClient(accessToken)
+    const { data, error } = await this.supabaseService.getUserClient(accessToken)
       .from('bom_items')
       .select(`
         id,
@@ -190,7 +190,7 @@ export class RfqEmailService {
   }
 
   private async fetchVendorDetails(vendorIds: string[], accessToken?: string): Promise<VendorDetails[]> {
-    const { data, error } = await this.supabaseService.getClient(accessToken)
+    const { data, error } = await this.supabaseService.getUserClient(accessToken)
       .from('vendors')
       .select(`
         id,
@@ -500,7 +500,7 @@ ${templateData.companyName}
     errorMessage?: string
   ): Promise<void> {
     try {
-      await this.supabaseService.client
+      await this.supabaseService.getUserClient()
         .from('rfq_email_logs')
         .insert({
           rfq_id: rfqId,

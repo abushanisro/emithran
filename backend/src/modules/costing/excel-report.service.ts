@@ -111,7 +111,7 @@ export class ExcelReportService {
 
   private async fetchItemHeaderFields(bomItemId: string, accessToken?: string): Promise<BomItemHeaderFields> {
     const { data, error } = await this.supabaseService
-      .getClient(accessToken)
+      .getUserClient(accessToken)
       .from('bom_items')
       .select(
         'part_number, name, description, material, material_grade, quantity, annual_volume, weight, ' +

@@ -46,7 +46,7 @@ export class PackagingLogisticsCostService {
       const to = from + limit - 1;
 
 let queryBuilder = this.supabaseService
-        .getClient(accessToken)
+        .getUserClient(accessToken)
         .from('packaging_logistics_cost_records')
         .select('*', { count: 'exact' })
         .order('created_at', { ascending: false })
@@ -99,7 +99,7 @@ let queryBuilder = this.supabaseService
     this.logger.log(`Fetching packaging/logistics cost: ${id}`, 'PackagingLogisticsCostService');
 
     const { data, error } = await this.supabaseService
-      .getClient(accessToken)
+      .getUserClient(accessToken)
       .from('packaging_logistics_cost_records')
       .select('*')
       .eq('id', id)
@@ -154,7 +154,7 @@ let queryBuilder = this.supabaseService
       };
 
       const { data, error } = await this.supabaseService
-        .getClient(accessToken)
+        .getUserClient(accessToken)
         .from('packaging_logistics_cost_records')
         .insert(record)
         .select()
@@ -203,7 +203,7 @@ let queryBuilder = this.supabaseService
     if (dto.isActive !== undefined) updateData.is_active = dto.isActive;
 
     const { data, error } = await this.supabaseService
-      .getClient(accessToken)
+      .getUserClient(accessToken)
       .from('packaging_logistics_cost_records')
       .update(updateData)
       .eq('id', id)
@@ -228,7 +228,7 @@ let queryBuilder = this.supabaseService
     await this.findOne(id, userId, accessToken);
 
     const { error } = await this.supabaseService
-      .getClient(accessToken)
+      .getUserClient(accessToken)
       .from('packaging_logistics_cost_records')
       .delete()
       .eq('id', id);
@@ -251,7 +251,7 @@ let queryBuilder = this.supabaseService
   ): Promise<number> {
     this.logger.log(`Calculating total packaging/logistics cost for BOM item: ${bomItemId}`, 'PackagingLogisticsCostService');
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.supabaseService.getUserClient(accessToken);
 
     // Get all active packaging/logistics costs for this BOM item
     const { data: costs, error } = await client
@@ -282,7 +282,7 @@ let queryBuilder = this.supabaseService
     if (bomItemIds.length === 0) return {};
 
     const { data, error } = await this.supabaseService
-      .getClient(accessToken)
+      .getUserClient(accessToken)
       .from('packaging_logistics_cost_records')
       .select('bom_item_id, total_cost')
       .in('bom_item_id', bomItemIds)
@@ -310,7 +310,7 @@ let queryBuilder = this.supabaseService
     accessToken?: string,
   ): Promise<Array<{ rateType: string; rateUsdPerKg: number }>> {
     const { data, error } = await this.supabaseService
-      .getClient(accessToken)
+      .getUserClient(accessToken)
       .from('freight_rate_benchmarks')
       .select('rate_type, rate_usd_per_kg')
       .order('rate_type');

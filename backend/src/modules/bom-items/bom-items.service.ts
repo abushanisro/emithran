@@ -235,7 +235,7 @@ export class BOMItemsService {
   ): Promise<BOMItemListResponseDto> {
     this.logger.log('Fetching BOM items', 'BOMItemsService');
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.supabaseService.getUserClient(accessToken);
 
     let query = client
       .from('bom_items')
@@ -306,7 +306,7 @@ export class BOMItemsService {
   ): Promise<BOMItemResponseDto> {
     this.logger.log(`Fetching BOM item with ID: ${id}`, 'BOMItemsService');
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.supabaseService.getUserClient(accessToken);
 
     const { data, error } = await client
       .from('bom_items')
@@ -338,7 +338,7 @@ export class BOMItemsService {
       'BOMItemsService',
     );
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.supabaseService.getUserClient(accessToken);
 
     // Transform camelCase DTO to snake_case database columns
     const dbData = this.transformDtoToDb(createBOMItemDto);
@@ -371,7 +371,7 @@ export class BOMItemsService {
   ): Promise<BOMItemResponseDto> {
     this.logger.log(`Updating BOM item with ID: ${id}`, 'BOMItemsService');
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.supabaseService.getUserClient(accessToken);
 
     // Transform camelCase DTO to snake_case database columns
     const dbData = this.transformDtoToDb(updateBOMItemDto);
@@ -449,7 +449,7 @@ export class BOMItemsService {
   ): Promise<{ ok: boolean }> {
     this.logger.log(`Updating thumbnail for BOM item: ${id}`, 'BOMItemsService');
     const { error } = await this.supabaseService
-      .getClient(accessToken)
+      .getUserClient(accessToken)
       .from('bom_items')
       .update({ thumbnail_url: thumbnailUrl, updated_at: new Date().toISOString() })
       .eq('id', id);
@@ -483,7 +483,7 @@ export class BOMItemsService {
     patch: Record<string, unknown>,
     accessToken?: string,
   ): Promise<BOMItemResponseDto> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.supabaseService.getUserClient(accessToken);
 
     const { data: row, error } = await client
       .rpc('merge_scenario_overrides', { p_id: id, p_patch: patch })
@@ -514,7 +514,7 @@ export class BOMItemsService {
   ): Promise<{ updated: number }> {
     this.logger.log(`Updating sort order for ${items.length} BOM items`, 'BOMItemsService');
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.supabaseService.getUserClient(accessToken);
     
     // Use batch update with single query instead of N+1 pattern
     try {
@@ -554,7 +554,7 @@ export class BOMItemsService {
 
     if (fileType === '2d' && bomItem.file2dPath) {
       const { data } = await this.supabaseService
-        .getClient(accessToken)
+        .getUserClient(accessToken)
         .storage
         .from('bom-files')
         .createSignedUrl(bomItem.file2dPath, 3600);
@@ -563,7 +563,7 @@ export class BOMItemsService {
 
     if (fileType === '3d' && bomItem.file3dPath) {
       const { data } = await this.supabaseService
-        .getClient(accessToken)
+        .getUserClient(accessToken)
         .storage
         .from('bom-files')
         .createSignedUrl(bomItem.file3dPath, 3600);
@@ -581,7 +581,7 @@ export class BOMItemsService {
   ): Promise<void> {
     this.logger.log(`Removing BOM item with ID: ${id}`, 'BOMItemsService');
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.supabaseService.getUserClient(accessToken);
 
     try {
       // Use cascade delete to automatically clean up all references
@@ -650,7 +650,7 @@ export class BOMItemsService {
     userId?: string,
     accessToken?: string,
   ): Promise<void> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.supabaseService.getUserClient(accessToken);
 
     // First, check if the item exists
     const { data: existingItem, error: fetchError } = await client
@@ -711,7 +711,7 @@ export class BOMItemsService {
   ): Promise<void> {
     this.logger.log(`Performing manual cascade delete for BOM item: ${id}`, 'BOMItemsService');
     
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.supabaseService.getUserClient(accessToken);
     
     try {
       // Get item info first
@@ -738,7 +738,7 @@ export class BOMItemsService {
         .eq('bom_item_id', id);
       
       // Also try with admin client to see if RLS is the issue
-      const adminClient = this.supabaseService.getAdminClient ? this.supabaseService.getAdminClient() : null;
+      const adminClient = this.supabaseService.getPrivilegedClient('bom-item cascade delete: production_lot_materials rows RLS hides from the caller, bounded to a BOM item already verified visible to the caller');
       let adminProdMaterials = null;
       
       if (adminClient) {
@@ -932,7 +932,7 @@ export class BOMItemsService {
   ): Promise<string> {
     this.logger.log(`Getting BOM ID for item: ${itemId}`, 'BOMItemsService');
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.supabaseService.getUserClient(accessToken);
 
     const { data, error } = await client
       .from('bom_items')
@@ -959,7 +959,7 @@ export class BOMItemsService {
   ): Promise<{ canDelete: boolean; blockers: string[]; itemName: string }> {
     this.logger.log(`Checking delete dependencies for BOM item: ${id}`, 'BOMItemsService');
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.supabaseService.getUserClient(accessToken);
     const blockers: string[] = [];
     
     // Get item info
@@ -1017,7 +1017,7 @@ export class BOMItemsService {
     userId?: string,
     accessToken?: string,
   ): Promise<string> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.supabaseService.getUserClient(accessToken);
 
     const { data, error } = await client
       .from('boms')
@@ -3690,7 +3690,7 @@ export class BOMItemsService {
     // expose cost_india.
     let smScrapPricePerKg = 0;
     try {
-      const adminDb = this.supabaseService.getAdminClient();
+      const adminDb = this.supabaseService.getUserClient();
       const g = (grade ?? '').trim();
       let rmRow: any[] | null = null;
       if (g) {
@@ -5035,7 +5035,7 @@ export class BOMItemsService {
     // expose cost_india).
     let rcScrapPricePerKg = 0;
     try {
-      const adminDb = this.supabaseService.getAdminClient();
+      const adminDb = this.supabaseService.getUserClient();
       const g = (grade ?? '').trim();
       let rmRow: any[] | null = null;
       if (g) {
@@ -8659,7 +8659,7 @@ export class BOMItemsService {
   // must never affect the cost calculation the gap is attached to.
   private async recordLookupCoverageGap(gap: PhysicsGap): Promise<void> {
     try {
-      const db = this.supabaseService.getAdminClient();
+      const db = this.supabaseService.getPrivilegedClient('system-telemetry: lookup_coverage_gaps upsert, fire-and-forget, no user context');
       const tableName = gap.gapType === 'missing_lookup' ? gap.lookupResolution.table : null;
       const missingInputs = gap.gapType === 'missing_lookup'
         ? Object.fromEntries(gap.lookupResolution.queryParams.map((p) => [p.column, p.value]))

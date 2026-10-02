@@ -19,7 +19,7 @@ function makeChain(result: { data: any; error: any }) {
 
 function makeService(fromMock: jest.Mock) {
   const supabaseService = {
-    getClient: jest.fn().mockReturnValue({ from: fromMock }),
+    getUserClient: jest.fn().mockReturnValue({ from: fromMock }),
   } as unknown as SupabaseService;
 
   return new OrchestratorService(

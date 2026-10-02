@@ -31,7 +31,7 @@ function makeExchangeRateService(rows: ReferenceRow[] = REFERENCE): ExchangeRate
     eq: () => query,
     then: (resolve: (v: { data: ReferenceRow[]; error: null }) => unknown) => resolve({ data: rows, error: null }),
   };
-  const supabaseService = { getClient: () => ({ from: () => query }) } as any;
+  const supabaseService = { getUserClient: () => ({ from: () => query }) } as any;
   return new ExchangeRateService(supabaseService);
 }
 

@@ -66,7 +66,7 @@ export class LocationComparisonService {
     token: string,
   ): Promise<LocationComparisonDto> {
     const db      = this.supabaseService.getClient(token);
-    const adminDb = this.supabaseService.getAdminClient();
+    const adminDb = this.supabaseService.getPrivilegedClient('reference-data: costing_settings and rate benchmarks, global');
     const serviceWarnings: string[] = [];
 
     // 0. Load exchange rates (one snapshot for this whole comparison — every
@@ -134,8 +134,9 @@ export class LocationComparisonService {
       );
     }
 
-    // 3. Batch-fetch MHR rates for all locations from mhr_records (admin bypasses per-user RLS)
-    const mhrQuery = adminDb
+    // 3. Batch-fetch MHR rates for all locations from mhr_records through the
+    // caller's RLS client: own-org rows plus global rows, never another org's custom rates.
+    const mhrQuery = db
       .from('mhr_records')
       .select('location, process_group, fully_burdened_local_per_hr, total_machine_hour_rate, manual_mhr_value')
       .in('location', [...ALL_LOCATIONS]);

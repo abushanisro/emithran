@@ -13,7 +13,7 @@ export class SubtaskService {
     UuidValidator.validateUuid(createDto.productionProcessId, 'Production Process ID');
     UuidValidator.validateUuid(userId, 'User ID');
 
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     try {
       // Verify the production process exists and user has access
@@ -77,7 +77,7 @@ export class SubtaskService {
   async getSubtaskById(subtaskId: string, userId: string): Promise<SubtaskResponseDto> {
     UuidValidator.validateUuid(subtaskId, 'Subtask ID');
 
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     const { data, error } = await supabase
       .from('process_subtasks')
@@ -115,7 +115,7 @@ export class SubtaskService {
   async getSubtasksByProcess(processId: string, userId: string): Promise<SubtaskResponseDto[]> {
     UuidValidator.validateUuid(processId, 'Process ID');
 
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Verify process access first
     const { data: processData } = await supabase
@@ -160,7 +160,7 @@ export class SubtaskService {
   async updateSubtask(subtaskId: string, updateDto: UpdateSubtaskDto, userId: string): Promise<SubtaskResponseDto> {
     UuidValidator.validateUuid(subtaskId, 'Subtask ID');
 
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Verify access
     const existing = await this.getSubtaskById(subtaskId, userId);
@@ -201,7 +201,7 @@ export class SubtaskService {
     // Verify access first
     await this.getSubtaskById(subtaskId, userId);
 
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     const { error } = await supabase
       .from('process_subtasks')

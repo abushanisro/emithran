@@ -365,7 +365,7 @@ export class ToolingCostService {
     if (bomItemIds.length === 0) return {};
 
     const { data, error } = await this.supabaseService
-      .getClient(accessToken)
+      .getUserClient(accessToken)
       .from('tooling_cost_records')
       .select('bom_item_id, total_cost')
       .in('bom_item_id', bomItemIds)

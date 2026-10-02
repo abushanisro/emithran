@@ -35,7 +35,7 @@ export class OrganizationContextGuard implements CanActivate {
     }
 
     const { data, error } = await this.supabaseService
-      .getAdminClient()
+      .getPrivilegedClient('auth: resolve organization membership before an org context exists')
       .from('organization_members')
       .select('organization_id')
       .eq('user_id', userId)

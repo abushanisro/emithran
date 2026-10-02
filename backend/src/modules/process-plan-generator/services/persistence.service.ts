@@ -48,7 +48,7 @@ export class PersistenceService {
     accessToken: string | null,
     organizationId?: string,
   ): Promise<ApplyResultDto> {
-    const client = this.supabaseService.getClient(accessToken ?? undefined);
+    const client = this.supabaseService.getUserClient(accessToken ?? undefined);
 
     // ── Load the generation ────────────────────────────────────────────────
     const { data: gen, error: genErr } = await client
@@ -366,7 +366,7 @@ export class PersistenceService {
     userId: string,
     accessToken: string | null,
   ): Promise<void> {
-    const client = this.supabaseService.getClient(accessToken ?? undefined);
+    const client = this.supabaseService.getUserClient(accessToken ?? undefined);
 
     const { data: gen, error: genErr } = await client
       .from('process_plan_generations')
@@ -408,7 +408,7 @@ export class PersistenceService {
     accessToken: string | null,
     organizationId?: string,
   ): Promise<{ id: string }> {
-    const client = this.supabaseService.getClient(accessToken ?? undefined);
+    const client = this.supabaseService.getUserClient(accessToken ?? undefined);
 
     // RLS scopes visibility to the caller's organization — no manual check needed.
     const { data: gen, error: genErr } = await client

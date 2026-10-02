@@ -46,7 +46,7 @@ export class ProcuredPartsCostService {
       const to = from + limit - 1;
 
       let queryBuilder = this.supabaseService
-        .getClient(accessToken)
+        .getUserClient(accessToken)
         .from('procured_parts_cost_records')
         .select('*', { count: 'exact' })
         .order('created_at', { ascending: false })
@@ -101,7 +101,7 @@ export class ProcuredPartsCostService {
     this.logger.log(`Fetching procured part cost: ${id}`, 'ProcuredPartsCostService');
 
     const { data, error } = await this.supabaseService
-      .getClient(accessToken)
+      .getUserClient(accessToken)
       .from('procured_parts_cost_records')
       .select('*')
       .eq('id', id)
@@ -161,7 +161,7 @@ export class ProcuredPartsCostService {
       };
 
       const { data, error } = await this.supabaseService
-        .getClient(accessToken)
+        .getUserClient(accessToken)
         .from('procured_parts_cost_records')
         .insert(record)
         .select()
@@ -225,7 +225,7 @@ export class ProcuredPartsCostService {
     if (dto.isActive !== undefined) updateData.is_active = dto.isActive;
 
     const { data, error } = await this.supabaseService
-      .getClient(accessToken)
+      .getUserClient(accessToken)
       .from('procured_parts_cost_records')
       .update(updateData)
       .eq('id', id)
@@ -250,7 +250,7 @@ export class ProcuredPartsCostService {
     await this.findOne(id, userId, accessToken);
 
     const { error } = await this.supabaseService
-      .getClient(accessToken)
+      .getUserClient(accessToken)
       .from('procured_parts_cost_records')
       .delete()
       .eq('id', id);
@@ -273,7 +273,7 @@ export class ProcuredPartsCostService {
   ): Promise<number> {
     this.logger.log(`Calculating total procured parts cost for BOM item: ${bomItemId}`, 'ProcuredPartsCostService');
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.supabaseService.getUserClient(accessToken);
 
     // Get all active procured parts costs for this BOM item
     const { data: costs, error } = await client
@@ -304,7 +304,7 @@ export class ProcuredPartsCostService {
     if (bomItemIds.length === 0) return {};
 
     const { data, error } = await this.supabaseService
-      .getClient(accessToken)
+      .getUserClient(accessToken)
       .from('procured_parts_cost_records')
       .select('bom_item_id, total_cost')
       .in('bom_item_id', bomItemIds)

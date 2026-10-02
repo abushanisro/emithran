@@ -175,7 +175,7 @@ export class ManufacturingRulesService {
     validation: unknown;
   }): Promise<void> {
     try {
-      const db = this.supabase.getClient();
+      const db = this.supabase.getUserClient();
       await db.from("machining_rule_results").insert({
         bom_item_id: data.bomItemId,
         generation_id: data.generationId ?? null,

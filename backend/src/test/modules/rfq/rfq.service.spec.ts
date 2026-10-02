@@ -2,7 +2,7 @@
 // RFQ module previously ran entirely through the service-role client
 // (this.supabaseService.client, RLS bypassed) with manual user_id filtering
 // as the ONLY enforcement. These tests prove the fix: create()/findOne()
-// now use the RLS-scoped getClient(accessToken) instead of the admin
+// now use the RLS-scoped getUserClient(accessToken) instead of the admin
 // client, and create() writes organization_id so RLS can actually enforce
 // the org boundary.
 import { RfqService } from '../../../modules/rfq/rfq.service';
@@ -35,8 +35,8 @@ describe('RfqService.create', () => {
     const adminFromMock = jest.fn().mockReturnValue(rfqNumberChain);
 
     const supabaseService = {
-      getClient: jest.fn().mockReturnValue({ from: rlsFromMock }),
-      client: { from: adminFromMock },
+      getUserClient: jest.fn().mockReturnValue({ from: rlsFromMock }),
+      getPrivilegedClient: jest.fn().mockReturnValue({ from: adminFromMock }),
     } as unknown as SupabaseService;
 
     const service = new RfqService(
@@ -52,7 +52,7 @@ describe('RfqService.create', () => {
       'org-789',
     );
 
-    expect(supabaseService.getClient).toHaveBeenCalledWith('token-abc');
+    expect(supabaseService.getUserClient).toHaveBeenCalledWith('token-abc');
     expect(rfqInsertChain.insert).toHaveBeenCalledWith(
       expect.objectContaining({ user_id: 'user-456', organization_id: 'org-789' }),
     );
@@ -67,7 +67,7 @@ describe('RfqService.findOne', () => {
     const chain = makeChain({ data: { id: 'rfq-1', user_id: 'user-456' }, error: null });
     const fromMock = jest.fn().mockReturnValue(chain);
     const supabaseService = {
-      getClient: jest.fn().mockReturnValue({ from: fromMock }),
+      getUserClient: jest.fn().mockReturnValue({ from: fromMock }),
     } as unknown as SupabaseService;
 
     const service = new RfqService(
@@ -78,7 +78,7 @@ describe('RfqService.findOne', () => {
 
     await service.findOne('rfq-1', 'user-456', 'token-abc');
 
-    expect(supabaseService.getClient).toHaveBeenCalledWith('token-abc');
+    expect(supabaseService.getUserClient).toHaveBeenCalledWith('token-abc');
     expect(chain.eq).not.toHaveBeenCalledWith('user_id', expect.anything());
   });
 });

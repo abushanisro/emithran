@@ -123,7 +123,7 @@ export class ExchangeRateService {
       return;
     }
 
-    const client = this.supabaseService.getClient(accessToken ?? undefined);
+    const client = this.supabaseService.getUserClient(accessToken ?? undefined);
     const { data, error } = await client
       .from('exchange_rates')
       .select('to_currency, rate')
@@ -190,7 +190,7 @@ export class ExchangeRateService {
     // Names are display-only, so they are read here and never by loadRates:
     // costing conversions must not depend on a label column.
     const { data, error } = await this.supabaseService
-      .getClient(accessToken ?? undefined)
+      .getUserClient(accessToken ?? undefined)
       .from('exchange_rates')
       .select('to_currency, currency_name')
       .eq('is_active', true)
@@ -221,7 +221,7 @@ export class ExchangeRateService {
    * Backs the Process page Exchange Rates panel.
    */
   async listRates(accessToken: string | null): Promise<ExchangeRateRow[]> {
-    const client = this.supabaseService.getClient(accessToken ?? undefined);
+    const client = this.supabaseService.getUserClient(accessToken ?? undefined);
     const { data, error } = await client
       .from('exchange_rates')
       .select('to_currency, currency_name, rate, effective_date, set_by, notes, source_active, source_modified_by, source_modified_at, updated_at')
@@ -234,7 +234,7 @@ export class ExchangeRateService {
     const editorIds = [...new Set((data ?? []).map((r) => r.set_by).filter((id): id is string => !!id))];
     const editorEmails = new Map<string, string | null>();
     for (const id of editorIds) {
-      const { data: user } = await this.supabaseService.getAdminClient().auth.admin.getUserById(id);
+      const { data: user } = await this.supabaseService.getPrivilegedClient('auth-admin: resolve rate editor email for audit display').auth.admin.getUserById(id);
       editorEmails.set(id, user?.user?.email ?? null);
     }
     return (data ?? []).map((r) => ({
@@ -259,7 +259,7 @@ export class ExchangeRateService {
    * is the authenticated user the controller resolved.
    */
   async setRate(currency: string, rate: number, reason: string, userId: string): Promise<void> {
-    const { error } = await this.supabaseService.getAdminClient().rpc('set_budget_exchange_rate', {
+    const { error } = await this.supabaseService.getPrivilegedClient('system-write: exchange_rates writes are service-role-only (migration 803), caller authenticated by controller').rpc('set_budget_exchange_rate', {
       p_currency: currency,
       p_rate: rate,
       p_set_by: userId,

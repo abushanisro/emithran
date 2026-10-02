@@ -75,6 +75,9 @@ jobs:
       - name: Type-check
         run: npm run typecheck
 
+      - name: RLS boundary and secret check
+        run: npm run check:rls
+
       - name: Production build
         run: npm run build
 

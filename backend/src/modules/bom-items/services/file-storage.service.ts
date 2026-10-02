@@ -1,6 +1,6 @@
 import { Injectable, Logger, BadRequestException, InternalServerErrorException } from '@nestjs/common';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { ConfigService } from '@nestjs/config';
+import { SupabaseClient } from '@supabase/supabase-js';
+import { SupabaseService } from '../../../common/supabase/supabase.service';
 import * as crypto from 'crypto';
 import { gzip } from 'zlib';
 import { promisify } from 'util';
@@ -53,20 +53,11 @@ export class FileStorageService {
   private readonly ALLOWED_3D_EXTENSIONS = ['.stp', '.step', '.stl', '.obj', '.iges', '.igs'];
   private readonly ALLOWED_2D_EXTENSIONS = ['.pdf', '.dwg', '.dxf', '.png', '.jpg', '.jpeg'];
 
-  constructor(private configService: ConfigService) {
-    // Backend uses server-side environment variables (not NEXT_PUBLIC_ prefix)
-    const supabaseUrl = this.configService.get<string>('SUPABASE_URL');
-    const supabaseKey = this.configService.get<string>('SUPABASE_SERVICE_KEY');
-
-    this.logger.log(`Initializing Supabase client with URL: ${supabaseUrl ? 'SET' : 'MISSING'}, Key: ${supabaseKey ? 'SET' : 'MISSING'}`);
-
-    if (!supabaseUrl || !supabaseKey) {
-      throw new InternalServerErrorException(
-        'Missing required Supabase environment variables: SUPABASE_URL and SUPABASE_SERVICE_KEY must be set'
-      );
-    }
-
-    this.supabase = createClient(supabaseUrl, supabaseKey);
+  constructor(private readonly supabaseService: SupabaseService) {
+    // Storage-bucket operations on CAD/drawing files run as the service role by
+    // design (bucket access is not RLS-scoped per row); obtained through the one
+    // audited privileged entrypoint rather than a client built here.
+    this.supabase = this.supabaseService.getPrivilegedClient('storage: CAD and drawing file bucket operations');
     this.logger.log(`Supabase client initialized successfully for bucket: ${this.BUCKET_NAME}`);
   }
 

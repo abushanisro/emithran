@@ -64,7 +64,7 @@ export class ProductionMaterialTrackingService {
   // ============================================================================
 
   async initializeProductionLotMaterials(lotId: string, userId: string): Promise<any[]> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Get production lot with selected BOM items
     const { data: lotData } = await supabase
@@ -142,7 +142,7 @@ export class ProductionMaterialTrackingService {
   }
 
   async getProductionLotMaterials(lotId: string, userId: string): Promise<any[]> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // First check if there are specific BOM items selected for this lot
     const { data: selectedBomItems } = await supabase
@@ -212,7 +212,7 @@ export class ProductionMaterialTrackingService {
     updates: MaterialStatusUpdate,
     userId: string,
   ): Promise<any> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Verify user has access
     const { data: material } = await supabase
@@ -249,7 +249,7 @@ export class ProductionMaterialTrackingService {
   }
 
   async getMaterialTrackingHistory(materialId: string, userId: string): Promise<MaterialTrackingHistoryEntry[]> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     const { data: history, error } = await supabase
       .from('material_tracking_history')
@@ -269,7 +269,7 @@ export class ProductionMaterialTrackingService {
   // ============================================================================
 
   async getProductionMonitoringData(lotId: string, userId: string): Promise<any> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Verify access
     await this.verifyLotAccess(lotId, userId);
@@ -379,7 +379,7 @@ export class ProductionMaterialTrackingService {
     metricsData: MonitoringMetrics,
     userId: string,
   ): Promise<any> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     await this.verifyLotAccess(lotId, userId);
 
@@ -417,7 +417,7 @@ export class ProductionMaterialTrackingService {
   // ============================================================================
 
   async getProductionAlerts(lotId: string, userId: string): Promise<ProductionAlert[]> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     await this.verifyLotAccess(lotId, userId);
 
@@ -448,7 +448,7 @@ export class ProductionMaterialTrackingService {
     },
     userId: string,
   ): Promise<any> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     await this.verifyLotAccess(lotId, userId);
 
@@ -476,7 +476,7 @@ export class ProductionMaterialTrackingService {
   }
 
   async resolveAlert(alertId: string, resolutionNotes: string, userId: string): Promise<any> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     const { data: alert, error } = await supabase
       .from('production_material_alerts')
@@ -507,7 +507,7 @@ export class ProductionMaterialTrackingService {
       return;
     }
 
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     const { data } = await supabase
       .from('production_lots')
@@ -530,7 +530,7 @@ export class ProductionMaterialTrackingService {
   }
 
   private async calculateProcessMaterialReadiness(lotId: string, processId: string): Promise<number> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Get materials required for this process (simplified - all materials for now)
     const { data: materials } = await supabase
@@ -547,7 +547,7 @@ export class ProductionMaterialTrackingService {
   }
 
   private async getProcessRequiredMaterials(lotId: string, processId: string): Promise<string[]> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Simplified - return all material part numbers for this lot
     const { data: materials } = await supabase
@@ -567,7 +567,7 @@ export class ProductionMaterialTrackingService {
   }
 
   private async calculateOverallMetrics(lotId: string): Promise<any> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Get recent production metrics
     const { data: metrics } = await supabase
@@ -600,7 +600,7 @@ export class ProductionMaterialTrackingService {
   }
 
   private async getMaterialSummary(lotId: string): Promise<any> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     const { data: materials } = await supabase
       .from('production_lot_materials')
@@ -619,7 +619,7 @@ export class ProductionMaterialTrackingService {
   }
 
   private async getAffectedProcesses(lotId: string, bomItemId: string): Promise<string[]> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
     
     // Get processes for this lot
     const { data: processes } = await supabase
@@ -632,7 +632,7 @@ export class ProductionMaterialTrackingService {
   }
 
   private async getMaterialAlerts(materialId: string): Promise<any[]> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     const { data: alerts } = await supabase
       .from('production_material_alerts')
@@ -644,7 +644,7 @@ export class ProductionMaterialTrackingService {
   }
 
   private async getProductionLotDetails(lotId: string, userId: string): Promise<any> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     const { data: lot } = await supabase
       .from('production_lots')
@@ -665,7 +665,7 @@ export class ProductionMaterialTrackingService {
   }
 
   private async getProductionProcesses(lotId: string, userId: string): Promise<any[]> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     await this.verifyLotAccess(lotId, userId);
 
@@ -679,7 +679,7 @@ export class ProductionMaterialTrackingService {
   }
 
   private async getProductionMetrics(lotId: string, userId: string): Promise<any> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     await this.verifyLotAccess(lotId, userId);
 

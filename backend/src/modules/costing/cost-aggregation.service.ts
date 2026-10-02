@@ -97,8 +97,8 @@ export class CostAggregationService {
 
   async computeBomItemCost(bomItemId: string, accessToken?: string): Promise<BomItemCostDto> {
     this.logger.log(`Computing aggregated cost for BOM item: ${bomItemId}`, 'CostAggregationService');
-    const client  = this.supabaseService.getClient(accessToken);
-    const adminDb = this.supabaseService.getAdminClient();
+    const client  = this.supabaseService.getUserClient(accessToken);
+    const adminDb = this.supabaseService.getPrivilegedClient('reference-data: costing_settings, global sga_pct/profit_pct');
 
     // Load SGA and profit from costing_settings (no hardcoded percentages)
     const { data: settingsRows } = await adminDb.from('costing_settings').select('key, value');

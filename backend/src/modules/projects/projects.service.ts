@@ -25,7 +25,7 @@ export class ProjectsService {
     try {
       this.logger.log(`Fetching projects for user: ${userId}`);
       
-      const client = this.supabase.getClient(accessToken);
+      const client = this.supabase.getUserClient(accessToken);
       const options = {
         page: query.page || 1,
         limit: query.limit || 10,
@@ -102,7 +102,7 @@ export class ProjectsService {
     try {
       this.logger.log(`Fetching project: ${id} for user: ${userId}`);
       
-      const client = this.supabase.getClient(accessToken);
+      const client = this.supabase.getUserClient(accessToken);
       const project = await this.projectsRepository.findById(client, id);
       const dto = ProjectResponseDto.fromDatabase(project);
       const stats = (await this.computeProjectsAggregates(client, [id])).get(id);
@@ -135,7 +135,7 @@ export class ProjectsService {
     try {
       this.logger.log(`Creating project for user: ${userId}`);
 
-      const client = this.supabase.getClient(accessToken);
+      const client = this.supabase.getUserClient(accessToken);
 
       // Check if project name already exists
       const nameExists = await this.projectsRepository.isNameExists(client, createProjectDto.name);
@@ -205,7 +205,7 @@ export class ProjectsService {
     try {
       this.logger.log(`Updating project: ${id} for user: ${userId}`);
 
-      const client = this.supabase.getClient(accessToken);
+      const client = this.supabase.getUserClient(accessToken);
 
       // Check if updating name and it conflicts with existing project
       if (updateProjectDto.name) {
@@ -285,7 +285,7 @@ export class ProjectsService {
     try {
       this.logger.log(`Deleting project: ${id} for user: ${userId}`);
 
-      const client = this.supabase.getClient(accessToken);
+      const client = this.supabase.getUserClient(accessToken);
       await this.projectsRepository.delete(client, id);
 
       return { message: 'Project and all associated data have been permanently deleted.' };
@@ -316,7 +316,7 @@ export class ProjectsService {
     try {
       this.logger.log(`Fetching cost analysis for project: ${id} for user: ${userId}`);
 
-      const client = this.supabase.getClient(accessToken);
+      const client = this.supabase.getUserClient(accessToken);
       const project = await this.projectsRepository.findById(client, id);
 
       // Get BOM data for the project
@@ -492,7 +492,7 @@ export class ProjectsService {
     try {
       this.logger.log(`Fetching team members for project: ${id} for user: ${userId}`);
 
-      const client = this.supabase.getClient(accessToken);
+      const client = this.supabase.getUserClient(accessToken);
       
       // Verify project exists and user has access
       await this.projectsRepository.findById(client, id);
@@ -605,7 +605,7 @@ export class ProjectsService {
     try {
       this.logger.log(`Adding team member to project: ${id} for user: ${userId}`);
 
-      const client = this.supabase.getClient(accessToken);
+      const client = this.supabase.getUserClient(accessToken);
       
       // Verify project exists and user has access
       await this.projectsRepository.findById(client, id);
@@ -758,7 +758,7 @@ export class ProjectsService {
     try {
       this.logger.log(`Updating team member ${memberId} for project: ${id} for user: ${userId}`);
 
-      const client = this.supabase.getClient(accessToken);
+      const client = this.supabase.getUserClient(accessToken);
       
       // Verify project exists and user has access
       await this.projectsRepository.findById(client, id);
@@ -840,7 +840,7 @@ export class ProjectsService {
     try {
       this.logger.log(`Removing team member ${memberId} from project: ${id} for user: ${userId}`);
 
-      const client = this.supabase.getClient(accessToken);
+      const client = this.supabase.getUserClient(accessToken);
       
       // Verify project exists and user has access
       await this.projectsRepository.findById(client, id);

@@ -22,7 +22,7 @@ export class PlasticRubberContainerService {
     this.logger.log('Fetching plastic & rubber materials', 'PlasticRubberContainerService');
 
     let queryBuilder = this.supabaseService
-      .getClient(accessToken)
+      .getUserClient(accessToken)
       .from('raw_materials')
       .select('*', { count: 'exact' })
       .or('material_group.ilike.%plastic%,material_group.ilike.%rubber%,material_group.ilike.%polymer%,material_group.ilike.%elastomer%');

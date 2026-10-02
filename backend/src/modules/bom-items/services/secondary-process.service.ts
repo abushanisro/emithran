@@ -72,7 +72,7 @@ export class SecondaryProcessService {
     const cached = this.references.get(version);
     if (cached) return cached;
     const { data, error } = await this.supabase
-      .getAdminClient()
+      .getPrivilegedClient('reference-data: machining_reference_data, public-read')
       .from('machining_reference_data')
       .select('category, key, value, raw')
       .eq('source_version', version)
@@ -99,7 +99,7 @@ export class SecondaryProcessService {
     if (cached) return cached;
     const keys = [...CHEMICAL_MILLING_VARIABLES, ...CHEMICAL_MILLING_TABLES, ...CHEMICAL_MILLING_PROCESSES.map((p) => p.process)];
     const { data, error } = await this.supabase
-      .getAdminClient()
+      .getPrivilegedClient('reference-data: machining_reference_data, public-read')
       .from('machining_reference_data')
       .select('category, key, value, raw')
       .eq('source_version', CHEMICAL_MILLING_SOURCE_VERSION)

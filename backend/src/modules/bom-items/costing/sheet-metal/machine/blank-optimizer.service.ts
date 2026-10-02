@@ -99,7 +99,7 @@ export class BlankOptimizerService {
   private async loadStockAllowanceRule(): Promise<{ rule: StockAllowanceRule | null; missing: string[] }> {
     if (this.allowanceRule) return this.allowanceRule;
     const { data, error } = await this.supabase
-      .getAdminClient()
+      .getPrivilegedClient('reference-data: machining_reference_data and stock_profiles, global shared')
       .from('machining_reference_data')
       .select('key, value')
       .eq('category', 'variable')

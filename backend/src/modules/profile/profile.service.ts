@@ -26,7 +26,7 @@ export class ProfileService {
       data = created;
     }
 
-    const adminClient = this.supabase.getAdminClient();
+    const adminClient = this.supabase.getPrivilegedClient('auth-admin: read or sync the caller own auth user (email, display name)');
     const { data: authData } = await adminClient.auth.admin.getUserById(userId);
 
     return this.mapProfile(data, authData?.user?.email);
@@ -53,13 +53,13 @@ export class ProfileService {
 
     // Keep Supabase auth user_metadata in sync so the sidebar shows the correct name
     if (dto.displayName !== undefined) {
-      const adminClient = this.supabase.getAdminClient();
+      const adminClient = this.supabase.getPrivilegedClient('auth-admin: read or sync the caller own auth user (email, display name)');
       await adminClient.auth.admin.updateUserById(userId, {
         user_metadata: { full_name: dto.displayName },
       });
     }
 
-    const adminClient = this.supabase.getAdminClient();
+    const adminClient = this.supabase.getPrivilegedClient('auth-admin: read or sync the caller own auth user (email, display name)');
     const { data: authData } = await adminClient.auth.admin.getUserById(userId);
 
     return this.mapProfile(data, authData?.user?.email);

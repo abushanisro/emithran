@@ -70,7 +70,7 @@ export class RetrievalService {
     // uses the exact same rates, even if the shared cache reloads meanwhile.
     const rates = await this.fx.getSnapshot(accessToken);
 
-    const client = this.supabaseService.getClient(accessToken ?? undefined);
+    const client = this.supabaseService.getUserClient(accessToken ?? undefined);
 
     // ── Load BOM item ──────────────────────────────────────────────────────
     const { data: bomRow, error: bomErr } = await client

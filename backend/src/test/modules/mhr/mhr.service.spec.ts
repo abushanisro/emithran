@@ -284,7 +284,7 @@ describe('MHRService.removeAll', () => {
     const adminClient = { from: fromMock };
 
     const supabaseService = {
-      getAdminClient: jest.fn().mockReturnValue(adminClient),
+      getUserClient: jest.fn().mockReturnValue(adminClient),
     } as unknown as SupabaseService;
 
     const service = new MHRService(

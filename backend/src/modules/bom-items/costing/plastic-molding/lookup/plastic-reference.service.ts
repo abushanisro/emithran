@@ -34,7 +34,7 @@ export class PlasticReferenceService {
 
   async getReference(): Promise<{ reference: PlasticReference | null; missing: string[] }> {
     if (this.cached) return this.cached;
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: machining_reference_data, public-read');
     const [vars, lookups, gpps] = await Promise.all([
       db.from('machining_reference_data').select('key, value')
         .eq('category', 'variable').eq('source_version', PLASTIC_REFERENCE_SOURCE_VERSION)

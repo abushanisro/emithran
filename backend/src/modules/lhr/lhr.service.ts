@@ -132,7 +132,7 @@ export class LHRService {
     }
 
     const { data: benchmarkRows } = await this.supabaseService
-      .getAdminClient()
+      .getPrivilegedClient('reference-data: lhr_benchmark_rates, global shared')
       .from('lhr_benchmark_rates')
       .select('lhr_usd_effective')
       .eq('location', location)
@@ -149,7 +149,7 @@ export class LHRService {
 
   async getBenchmarkRates(location?: string) {
     let query = this.supabaseService
-      .getAdminClient()
+      .getPrivilegedClient('reference-data: lhr_benchmark_rates, global shared')
       .from('lhr_benchmark_rates')
       .select('id, labour_code, labour_type, description, location, process_group, lhr, currency, lhr_usd_effective')
       .order('location', { ascending: true })
@@ -205,7 +205,7 @@ export class LHRService {
     // Every row, in pages: .limit() cannot lift the server's 1000-row cap.
     const { data, error, count } = await readAllRows((from, to) => {
       let q = this.supabaseService
-        .getClient(accessToken)
+        .getUserClient(accessToken)
         .from('lhr_records')
         .select('*', { count: 'exact' })
         .order('labour_code', { ascending: true })
@@ -373,7 +373,7 @@ export class LHRService {
     // by SupabaseAuthGuard, so only authenticated users can reach this method. Scoped to
     // userId so this can't delete other users' records (was previously unscoped — bug fix).
     const { data, error } = await this.supabaseService
-      .getAdminClient()
+      .getPrivilegedClient('lhr bulk delete scoped by user_id: OPEN lhr_records has no RLS policies in repo migrations, verify then move to getUserClient')
       .from('lhr_records')
       .delete()
       .eq('user_id', userId)

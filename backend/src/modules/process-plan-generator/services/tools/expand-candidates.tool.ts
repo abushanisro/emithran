@@ -41,7 +41,7 @@ export class ExpandCandidatesTool {
     if (!safeQuery) {
       return { added: [], kind: args.kind, nextStartId: 0 };
     }
-    const client = this.supabaseService.getClient(args.accessToken ?? undefined);
+    const client = this.supabaseService.getUserClient(args.accessToken ?? undefined);
 
     switch (args.kind) {
       case 'rawMaterial': return this.expandMaterials(client, safeQuery, args);

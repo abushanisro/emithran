@@ -169,7 +169,7 @@ export class MHRService {
    */
   async getBenchmarkRates(location?: string, processGroup?: string, machineClass?: string) {
     let query = this.supabaseService
-      .getAdminClient()
+      .getPrivilegedClient('reference-data: mhr_benchmark_rates, global shared, no user_id')
       .from('mhr_benchmark_rates')
       .select('id, machine_name, process_group, machine_class, location, mhr_usd, machine_ref')
       .order('location', { ascending: true })
@@ -235,7 +235,7 @@ export class MHRService {
     // id so pages never overlap or skip rows that share a created_at.
     const { data, error, count } = await readAllRows((rangeFrom, rangeTo) => {
       let q = this.supabaseService
-        .getClient(accessToken)
+        .getUserClient(accessToken)
         .from('mhr_records')
         .select('*', { count: 'exact' })
         .order('created_at', { ascending: false })
@@ -1640,7 +1640,7 @@ export class MHRService {
 
     // Dedup by composite (machine_name, location, machine_class)
     // machine_class is needed for Combined format where same machine name exists at same location across process sequences
-    const client = this.supabaseService.getAdminClient();
+    const client = this.supabaseService.getUserClient();
     const { data: existing } = await readAllRows((from, to) => client
       .from('mhr_records')
       .select('machine_name, location, machine_class')
@@ -1747,7 +1747,7 @@ export class MHRService {
     this.logger.log(`Deleting all MHR records for user ${userId}`, 'MHRService');
 
     const { data, error } = await this.supabaseService
-      .getAdminClient()
+      .getUserClient()
       .from('mhr_records')
       .delete()
       .eq('user_id', userId)

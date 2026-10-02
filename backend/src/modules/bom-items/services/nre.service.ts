@@ -64,7 +64,7 @@ export class NreService {
   ) {}
 
   private async machiningVariables(keys: string[]): Promise<Map<string, string>> {
-    const { data } = await this.supabase.getAdminClient()
+    const { data } = await this.supabase.getPrivilegedClient('reference-data: machining_reference_data, public-read')
       .from('machining_reference_data')
       .select('key, value')
       .eq('category', 'variable')
@@ -79,7 +79,7 @@ export class NreService {
     const { data: m } = await db.from('mhr_records').select('benchmark_source_key').eq('id', mhrId).maybeSingle();
     const key = (m as any)?.benchmark_source_key as string | undefined;
     if (!key) return null;
-    const { data } = await this.supabase.getAdminClient()
+    const { data } = await this.supabase.getPrivilegedClient('reference-data: machining_reference_data, public-read')
       .from('machining_reference_data')
       .select('raw')
       .eq('category', 'machine')

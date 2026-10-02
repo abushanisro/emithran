@@ -53,7 +53,7 @@ export class RawMaterialCostService {
     const to = from + limit - 1;
 
     let queryBuilder = this.supabaseService
-      .getClient(accessToken)
+      .getUserClient(accessToken)
       .from('raw_material_cost_records')
       .select('*', { count: 'exact' })
       .order('created_at', { ascending: false })
@@ -101,7 +101,7 @@ export class RawMaterialCostService {
     const materialMap = new Map<string, string>();
     if (missingIds.length > 0) {
       const { data: mats } = await this.supabaseService
-        .getClient(accessToken)
+        .getUserClient(accessToken)
         .from('raw_materials')
         .select('id, material')
         .in('id', missingIds);
@@ -524,7 +524,7 @@ export class RawMaterialCostService {
   ): Promise<number> {
     this.logger.log(`Calculating total raw material cost for BOM item: ${bomItemId}`, 'RawMaterialCostService');
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.supabaseService.getUserClient(accessToken);
 
     // Get all active raw material costs for this BOM item — compute from source fields
     // Formula: gross_usage × unit_cost × (1 + overhead/100)
@@ -556,7 +556,7 @@ export class RawMaterialCostService {
     if (bomItemIds.length === 0) return {};
 
     const { data, error } = await this.supabaseService
-      .getClient(accessToken)
+      .getUserClient(accessToken)
       .from('raw_material_cost_records')
       .select('bom_item_id, gross_usage, unit_cost, overhead')
       .in('bom_item_id', bomItemIds)

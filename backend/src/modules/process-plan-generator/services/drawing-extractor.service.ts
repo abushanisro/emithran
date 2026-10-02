@@ -98,7 +98,7 @@ export class DrawingExtractorService {
   // No rasterisation — we send the PDF bytes directly to Claude.
 
   private async fetchPdfBase64(storagePath: string, accessToken: string | null): Promise<string | null> {
-    const client = this.supabaseService.getClient(accessToken ?? undefined);
+    const client = this.supabaseService.getUserClient(accessToken ?? undefined);
     const { data, error } = await client
       .storage
       .from(STORAGE_BUCKET)
@@ -331,7 +331,7 @@ Rules:
   // ── Cache ───────────────────────────────────────────────────────────────
 
   private async cacheOnBomItem(bomItemId: string, brief: DrawingBrief, accessToken: string | null): Promise<void> {
-    const client = this.supabaseService.getClient(accessToken ?? undefined);
+    const client = this.supabaseService.getUserClient(accessToken ?? undefined);
     const { error } = await client
       .from('bom_items')
       .update({ drawing_extraction: brief })

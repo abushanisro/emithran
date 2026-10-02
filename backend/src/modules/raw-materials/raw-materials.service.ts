@@ -75,7 +75,7 @@ export class RawMaterialsService {
 
   async getAliases(accessToken?: string): Promise<Array<{ aliasNormalized: string; rawMaterialId: string }>> {
     const { data, error } = await this.supabaseService
-      .getClient(accessToken)
+      .getUserClient(accessToken)
       .from('material_aliases')
       .select('alias_normalized, raw_material_id');
     if (error) {
@@ -94,7 +94,7 @@ export class RawMaterialsService {
     const normalized = searchTerm.toUpperCase().replace(/[\s-]/g, '');
     if (!normalized) return null;
     const { data } = await this.supabaseService
-      .getClient(accessToken)
+      .getUserClient(accessToken)
       .from('material_aliases')
       .select('raw_material_id')
       .eq('alias_normalized', normalized)
@@ -106,7 +106,7 @@ export class RawMaterialsService {
     this.logger.log('Fetching all raw materials', 'RawMaterialsService');
 
     let queryBuilder = this.supabaseService
-      .getClient(accessToken)
+      .getUserClient(accessToken)
       .from('raw_materials')
       .select('*', { count: 'exact' });
 
@@ -185,7 +185,7 @@ export class RawMaterialsService {
     this.logger.log('Fetching filter options', 'RawMaterialsService');
 
     const { data, error } = await this.supabaseService
-      .getClient(accessToken)
+      .getUserClient(accessToken)
       .from('raw_materials')
       .select('material_group, material, material_grade, shape');
 
@@ -659,7 +659,7 @@ export class RawMaterialsService {
     this.logger.log('Using raw_materials table for enhanced materials', 'RawMaterialsService');
     
     let queryBuilder = this.supabaseService
-      .getClient(accessToken)
+      .getUserClient(accessToken)
       .from('raw_materials')
       .select('*', { count: 'exact' });
 

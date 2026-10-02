@@ -21,7 +21,7 @@ export class ProductionProcessService {
     UuidValidator.validateUuid(id, 'Process ID');
     UuidValidator.validateUuid(userId, 'User ID');
 
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     const { data, error } = await supabase
       .from('production_processes')
@@ -56,7 +56,7 @@ export class ProductionProcessService {
   async deleteProductionProcess(id: string, userId: string): Promise<void> {
     UuidValidator.validateUuid(id, 'Process ID');
 
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Verify ownership
     const { data: existing } = await supabase
@@ -84,7 +84,7 @@ export class ProductionProcessService {
   async getProcessesByLot(lotId: string, userId: string): Promise<ProductionProcessResponseDto[]> {
     UuidValidator.validateUuid(lotId, 'Lot ID');
 
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Verify the production lot exists and user has access
     const { data: lotData, error: lotError } = await supabase
@@ -154,7 +154,7 @@ export class ProductionProcessService {
   ): Promise<VendorAssignmentResponseDto> {
     UuidValidator.validateUuid(processId, 'Process ID');
 
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Verify process ownership and get production lot ID
     const { data: process } = await supabase
@@ -199,7 +199,7 @@ export class ProductionProcessService {
   async getProcessVendorAssignments(processId: string, userId: string): Promise<VendorAssignmentResponseDto[]> {
     UuidValidator.validateUuid(processId, 'Process ID');
 
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Get production lot ID from process
     const { data: process } = await supabase
@@ -236,7 +236,7 @@ export class ProductionProcessService {
   ): Promise<VendorAssignmentResponseDto> {
     UuidValidator.validateUuid(assignmentId, 'Assignment ID');
 
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Verify ownership through production lot
     const { data: existing } = await supabase

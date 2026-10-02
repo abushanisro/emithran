@@ -25,7 +25,7 @@ export class SupabaseHealthIndicator extends HealthIndicator {
    */
   async checkDatabase(key: string): Promise<HealthIndicatorResult> {
     try {
-      const client = this.supabaseService.getAdminClient();
+      const client = this.supabaseService.getPrivilegedClient('health-check: connectivity probe, no user context');
 
       // Check if key tables exist by querying them
       // Using core tables that always exist in the system

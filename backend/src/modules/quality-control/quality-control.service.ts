@@ -17,7 +17,7 @@ export class QualityControlService {
   ): Promise<any> {
     try {
       // Get all inspections for the project
-      let query = this.supabase.client
+      let query = this.supabase.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
         .from('quality_inspections')
         .select(`
           *,
@@ -84,7 +84,7 @@ export class QualityControlService {
       const completionRate = totalInspections > 0 ? ((completedInspections / totalInspections) * 100).toFixed(1) : '0';
 
       // Get non-conformances
-      const { data: nonConformances, error: nonConformancesError } = await this.supabase.client
+      const { data: nonConformances, error: nonConformancesError } = await this.supabase.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
         .from('quality_non_conformances')
         .select('*, quality_inspections!inspection_id(project_id)')
         .eq('quality_inspections.project_id', projectId);
@@ -153,7 +153,7 @@ export class QualityControlService {
       const metrics = await this.getQualityMetrics(projectId, userId);
       
       // Get detailed inspection data
-      const { data: inspections, error: inspectionsError } = await this.supabase.client
+      const { data: inspections, error: inspectionsError } = await this.supabase.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
         .from('quality_inspections')
         .select(`
           *,
@@ -175,7 +175,7 @@ export class QualityControlService {
       }
 
       // Get non-conformances with details
-      const { data: nonConformances, error: nonConformancesError } = await this.supabase.client
+      const { data: nonConformances, error: nonConformancesError } = await this.supabase.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
         .from('quality_non_conformances')
         .select(`
           *,
@@ -223,7 +223,7 @@ export class QualityControlService {
       const metrics = await this.getQualityMetrics(projectId, userId);
       
       // Get recent activities
-      const { data: recentInspections, error: inspectionsError } = await this.supabase.client
+      const { data: recentInspections, error: inspectionsError } = await this.supabase.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
         .from('quality_inspections')
         .select('*')
         .eq('project_id', projectId)
@@ -235,7 +235,7 @@ export class QualityControlService {
         // Continue with empty inspections data
       }
 
-      const { data: recentNonConformances, error: nonConformancesError } = await this.supabase.client
+      const { data: recentNonConformances, error: nonConformancesError } = await this.supabase.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
         .from('quality_non_conformances')
         .select(`
           *,

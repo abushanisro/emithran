@@ -48,7 +48,7 @@ export class CycleTimeLibraryService implements OnModuleInit {
 
   private async load(): Promise<void> {
     // RLS on process_cycle_time_library is FOR SELECT USING (true) — safe with admin client.
-    const client = this.supabase.getClient();
+    const client = this.supabase.getPrivilegedClient('reference-data: process_cycle_time_library');
     const { data, error } = await client
       .from('process_cycle_time_library')
       .select(
