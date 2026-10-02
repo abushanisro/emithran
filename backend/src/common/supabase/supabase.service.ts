@@ -1,6 +1,7 @@
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { currentRequestAuth } from '../request-context/request-auth-context';
 
 @Injectable()
 export class SupabaseService {
@@ -41,14 +42,16 @@ export class SupabaseService {
    * @param accessToken - User's Supabase access token
    * @returns Authenticated Supabase client
    */
-  getClient(accessToken?: string): SupabaseClient {
+  getClient(accessToken: string): SupabaseClient {
     if (!this.adminClient) {
       throw new Error('Supabase admin client not initialized');
     }
 
-    // If no access token provided, return admin client for server operations
-    if (!accessToken) {
-      return this.adminClient;
+    // Never fall back to the service-role client: a lost or missing token must
+    // fail closed, not silently bypass RLS. Server-side work that genuinely has
+    // no user context uses getPrivilegedClient(reason) instead.
+    if (typeof accessToken !== 'string' || accessToken.trim() === '') {
+      throw new UnauthorizedException('Access token is required for a user-scoped database client');
     }
 
     // Create user-authenticated client with proper token
@@ -210,18 +213,95 @@ export class SupabaseService {
     }
   }
 
-  getAdminClient(): SupabaseClient {
+  /**
+   * RLS-enforced client for the CURRENT authenticated request, taking the token
+   * from the request-scoped auth context (RequestAuthInterceptor). Throws when
+   * there is no authenticated request in scope (public route, background job,
+   * lost async context) instead of degrading to the service-role client.
+   */
+  getUserClient(explicitAccessToken?: string | null): SupabaseClient {
+    if (typeof explicitAccessToken === 'string' && explicitAccessToken.trim() !== '') {
+      return this.getClient(explicitAccessToken);
+    }
+    const auth = currentRequestAuth();
+    if (!auth) {
+      throw new UnauthorizedException(
+        'No authenticated request in scope. Use getPrivilegedClient(reason) only for work that genuinely has no user context.',
+      );
+    }
+    return this.getClient(auth.accessToken);
+  }
+
+  /**
+   * The ONLY sanctioned way to get the service-role client (bypasses RLS).
+   * `reason` is mandatory and logged at debug level so every privileged access
+   * is searchable and reviewable, e.g. 'reference-data: sm_reference_data'.
+   */
+  getPrivilegedClient(reason: string): SupabaseClient {
+    if (!reason || !reason.trim()) {
+      throw new Error('getPrivilegedClient requires a non-empty reason');
+    }
     if (!this.adminClient) {
       throw new Error('Supabase not configured');
     }
+    this.logger.debug(`privileged client: ${reason}`);
     return this.adminClient;
   }
 
-  get client(): SupabaseClient {
-    if (!this.adminClient) {
-      throw new Error('Supabase not configured');
+  /** email -> cached real session token, so the dev bypass mints at most once per token lifetime. */
+  private mintedTokens = new Map<string, { token: string; expiresAtMs: number }>();
+  private mintInFlight = new Map<string, Promise<string | null>>();
+
+  /**
+   * Development auth bypass only: a genuine user access token for `email`, so the
+   * bypass user goes through RLS exactly like a production user instead of being
+   * handed the service-role client. Magic-link token hash is minted with the admin
+   * API and redeemed through the anon client; nothing is sent by email.
+   */
+  async mintUserAccessToken(email: string): Promise<string | null> {
+    const cached = this.mintedTokens.get(email);
+    // Refresh a minute before expiry.
+    if (cached && cached.expiresAtMs - 60_000 > Date.now()) return cached.token;
+
+    let pending = this.mintInFlight.get(email);
+    if (!pending) {
+      pending = this.doMintUserAccessToken(email).finally(() => this.mintInFlight.delete(email));
+      this.mintInFlight.set(email, pending);
     }
-    return this.adminClient;
+    return pending;
+  }
+
+  private async doMintUserAccessToken(email: string): Promise<string | null> {
+    try {
+      const admin = this.getPrivilegedClient('dev-bypass: mint a real session for ADMIN_FALLBACK_EMAIL');
+      const { data: link, error: linkErr } = await admin.auth.admin.generateLink({
+        type: 'magiclink',
+        email,
+      });
+      const tokenHash = link?.properties?.hashed_token;
+      if (linkErr || !tokenHash) {
+        this.logger.warn(`Could not mint a dev-bypass session: ${linkErr?.message ?? 'no token hash returned'}`);
+        return null;
+      }
+      const anon = createClient(this.supabaseUrl, this.supabaseAnonKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+      const { data: session, error: verifyErr } = await anon.auth.verifyOtp({
+        type: 'magiclink',
+        token_hash: tokenHash,
+      });
+      const accessToken = session?.session?.access_token;
+      if (verifyErr || !accessToken) {
+        this.logger.warn(`Could not redeem the dev-bypass session: ${verifyErr?.message ?? 'no session returned'}`);
+        return null;
+      }
+      const expiresAtMs = (session.session!.expires_at ?? 0) * 1000;
+      this.mintedTokens.set(email, { token: accessToken, expiresAtMs });
+      return accessToken;
+    } catch (error: any) {
+      this.logger.warn(`Dev-bypass session mint failed: ${error?.cause?.code ?? error?.message ?? 'unknown'}`);
+      return null;
+    }
   }
 
   /**

@@ -18,7 +18,7 @@ export class CommentService {
    */
   async createComment(createDto: CreateCommentDto, userId: string): Promise<CommentResponseDto> {
     try {
-      const supabase = this.supabaseService.getClient();
+      const supabase = this.supabaseService.getUserClient();
 
       // Verify the remark exists
       const { data: remarkExists } = await supabase
@@ -70,7 +70,7 @@ export class CommentService {
    */
   async getCommentsByRemark(remarkId: string, filters: CommentFilterDto = {}): Promise<CommentResponseDto[]> {
     try {
-      const supabase = this.supabaseService.getClient();
+      const supabase = this.supabaseService.getUserClient();
       
       let query = supabase
         .from('remark_comments')
@@ -109,7 +109,7 @@ export class CommentService {
     userId: string
   ): Promise<CommentResponseDto> {
     try {
-      const supabase = this.supabaseService.getClient();
+      const supabase = this.supabaseService.getUserClient();
 
       // Check if comment exists and user owns it
       const { data: existingComment } = await supabase
@@ -155,7 +155,7 @@ export class CommentService {
    */
   async deleteComment(commentId: string, userId: string): Promise<void> {
     try {
-      const supabase = this.supabaseService.getClient();
+      const supabase = this.supabaseService.getUserClient();
 
       // Get the comment to check ownership and get remark_id
       const { data: comment } = await supabase
@@ -203,7 +203,7 @@ export class CommentService {
    * Get comments count for a remark
    */
   private async getCommentsCount(remarkId: string): Promise<number> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
     
     const { count, error } = await supabase
       .from('remark_comments')

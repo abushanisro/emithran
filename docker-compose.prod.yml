@@ -45,7 +45,7 @@ services:
       args:
         NEXT_PUBLIC_API_GATEWAY_URL: http://localhost:4000
         NEXT_PUBLIC_SUPABASE_URL: https://iuvtsvjpmovfymvnmqys.supabase.co
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml1dnRzdmpwbW92Znltdm5tcXlzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzUxMjk2NjIsImV4cCI6MjA1MDcwNTY2Mn0.sb_publishable_9Lijw5z0vmAL6vNJaxcWuA_Z3V4O_F5
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:?set NEXT_PUBLIC_SUPABASE_ANON_KEY in the deploy environment}
         NEXT_PUBLIC_CAD_ENGINE_URL: http://localhost:5000
     container_name: mithran-frontend-prod
     environment:
@@ -70,7 +70,7 @@ services:
       NODE_ENV: production
       PORT: 4000
       SUPABASE_URL: https://iuvtsvjpmovfymvnmqys.supabase.co
-      SUPABASE_SERVICE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml1dnRzdmpwbW92Znltdm5tcXlzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczNTEyOTY2MiwiZXhwIjoyMDUwNzA1NjYyfQ.sb_publishable_9Lijw5z0vmAL6vNJaxcWuA_Z3V4O_F5
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY:?set SUPABASE_SERVICE_KEY in the deploy environment}
       JWT_SECRET: production_jwt_secret_key_here
       CORS_ORIGIN: http://localhost:3000
       CAD_ENGINE_URL: http://cad-engine:5000

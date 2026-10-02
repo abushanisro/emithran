@@ -185,7 +185,7 @@ export class SheetMetalLookupService {
   ): Promise<'EXACT_MATCH' | 'INTERPOLATE' | 'RANGE' | 'FORMULA'> {
     if (this.policyCache.has(tableName)) return this.policyCache.get(tableName)!;
     try {
-      const db = this.supabase.getAdminClient();
+      const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
       const { data } = await db.from('lookup_table_policy').select('policy').eq('table_name', tableName).maybeSingle();
       const policy = (data?.policy as any) ?? fallback;
       this.policyCache.set(tableName, policy);
@@ -200,7 +200,7 @@ export class SheetMetalLookupService {
   private partSpacing: PartSpacingRow[] | null | undefined;
   async getPartSpacingTable(): Promise<PartSpacingRow[] | null> {
     if (this.partSpacing !== undefined) return this.partSpacing;
-    const { data, error } = await this.supabase.getAdminClient()
+    const { data, error } = await this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared')
       .from('sm_reference_data')
       .select('raw')
       .eq('category', 'lookup_table')
@@ -228,7 +228,7 @@ export class SheetMetalLookupService {
     technology: 'fiber' | 'co2',
   ): Promise<LaserCutParams> {
     const material = normaliseLaserMaterial(grade);
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
 
     // First: try exact thickness + nearest available power for this material
     const { data, error } = await db
@@ -294,7 +294,7 @@ export class SheetMetalLookupService {
     thicknessMm: number,
   ): Promise<WaterjetCutParams> {
     const material = normaliseLaserMaterial(grade);
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
 
     const { data, error } = await db
       .from('sm_lookup_waterjet_cut')
@@ -346,7 +346,7 @@ export class SheetMetalLookupService {
     // caller also depends on staying exactly as-is.
     const oxyfuelMaterial = material === 'Stainless Steel' ? 'Stainless Steel' : 'Steel';
 
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
       .from('sm_reference_data')
       .select('raw')
@@ -384,7 +384,7 @@ export class SheetMetalLookupService {
     const noData: LaserPunchMachineParams = { punchRateCyclesPerMin: 0, nibbleMmPerMin: 0, toolChangeSec: 0, dataFound: false };
     if (!machineName) return noData;
 
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
       .from('sm_reference_data')
       .select('raw')
@@ -428,7 +428,7 @@ export class SheetMetalLookupService {
     const noData: TurretPunchMachineParams = { nibbleMmPerMin: 0, toolChangeSec: 0, dataFound: false };
     if (!machineName) return noData;
 
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
       .from('sm_reference_data')
       .select('raw')
@@ -470,7 +470,7 @@ export class SheetMetalLookupService {
   // OxyFuel uses — same remap, not normaliseLaserMaterial's output directly.
   private async getPlasmaMachinePowerWatts(sourceKeyPrefix: 'plasmaCutMachine' | 'plasmaPunchMachine', machineName: string | null | undefined): Promise<number | null> {
     if (!machineName) return null;
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
       .from('sm_reference_data')
       .select('raw')
@@ -492,7 +492,7 @@ export class SheetMetalLookupService {
     const material = normaliseLaserMaterial(grade);
     const plasmaMaterial = material === 'Stainless Steel' ? 'Stainless Steel' : 'Steel';
 
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
       .from('sm_reference_data')
       .select('raw')
@@ -550,7 +550,7 @@ export class SheetMetalLookupService {
     const noData: RollBendingMachineParams = { rollingSpeedMmPerSec: 0, prebendTimeSec: 0, dataFound: false };
     if (!machineName) return noData;
 
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
       .from('sm_reference_data')
       .select('raw')
@@ -581,7 +581,7 @@ export class SheetMetalLookupService {
   // exclusion as their press_cycle_time_s backfill, migration 608/2026-09-01).
   async getProgressiveDieMachineSetupMin(machineName: string | null | undefined): Promise<number | null> {
     if (!machineName) return null;
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
       .from('sm_reference_data')
       .select('raw')
@@ -612,7 +612,7 @@ export class SheetMetalLookupService {
   // migration 479), by key. A key absent or non-numeric is absent from the
   // map: the caller decides what an unknown value means, never a default here.
   async getNumericVariables(keys: readonly string[]): Promise<Map<string, number>> {
-    const { data, error } = await this.supabase.getAdminClient()
+    const { data, error } = await this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared')
       .from('sm_reference_data')
       .select('key, value')
       .eq('category', 'variable')
@@ -627,7 +627,7 @@ export class SheetMetalLookupService {
   }
 
   async getToolingAnnualVolumeThresholds(): Promise<{ progressiveDie: number | null; stageTooling: number | null }> {
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
       .from('sm_reference_data')
       .select('key, value')
@@ -687,7 +687,7 @@ export class SheetMetalLookupService {
       'orDesignPercent', 'orAssemblyPercent', 'orDebugPercent', 'orReworkPercent',
       'assyHrsCompProgDie',
     ];
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
       .from('sm_reference_data')
       .select('key, value')
@@ -749,7 +749,7 @@ export class SheetMetalLookupService {
     componentName: string; model: string | null; sizeMm: number | null;
     costUsd: number; weightKg: number | null;
   }>> {
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
       .from('sm_lookup_tooling_component_costs')
       .select('component_name, model, size_mm, cost_usd, weight_kg');
@@ -771,7 +771,7 @@ export class SheetMetalLookupService {
    * pair's rate.
    */
   async getToolingCoatingCostPerKg(toolMaterial: string, coatingType: string): Promise<number | null> {
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
       .from('sm_lookup_tooling_coating_cost')
       .select('coating_cost_usd_per_kg')
@@ -795,7 +795,7 @@ export class SheetMetalLookupService {
     const familyKey = ROUTER_FAMILY_KEY[classifyLaserMaterial(grade ?? null)];
     if (!familyKey) return noData;
 
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
       .from('sm_lookup_router_cut')
       .select('cutting_speed_m_per_min')
@@ -814,7 +814,7 @@ export class SheetMetalLookupService {
 
   // ── Table 2: Handling time (min) for given weight kg ───────────────────────
   async getHandlingTime(weightKg: number): Promise<{ minutes: number; dataFound: boolean }> {
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
       .from('sm_lookup_handling_time')
       .select('weight_max_kg, handling_min')
@@ -840,7 +840,7 @@ export class SheetMetalLookupService {
   // ── Table 3A/B: Tool setup time (min) ─────────────────────────────────────
   // type='press' → keyValue = tonnage; type='brake' → keyValue = tool length mm
   async getToolSetupTime(type: 'press' | 'brake', keyValue: number): Promise<{ minutes: number; dataFound: boolean }> {
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
       .from('sm_lookup_tool_setup')
       .select('key_value, loading_time_min')
@@ -900,7 +900,7 @@ export class SheetMetalLookupService {
       { column: 'tonnage', value: tonnage, unit: 'T' },
       { column: 'complexity', value: complexity },
     ];
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
       .from('sm_lookup_manual_stroke')
       .select('thickness_mm, tonnage, complexity, stroke_time_sec')
@@ -1075,7 +1075,7 @@ export class SheetMetalLookupService {
     const empty = { secondsPerBend: null, dataFound: false };
     if (!machineName?.trim()) return empty;
 
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
       .from('sm_reference_data')
       .select('raw')
@@ -1141,7 +1141,7 @@ export class SheetMetalLookupService {
   async getSamplingRate(lotSize: number): Promise<{ rate: number; dataFound: boolean }> {
     if (lotSize <= 0) return { rate: 0, dataFound: false };
 
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
       .from('sm_lookup_sampling_plan')
       .select('batch_size_from, batch_size_to, sample_qty_l2')
@@ -1161,7 +1161,7 @@ export class SheetMetalLookupService {
   // inspection cost with zero DB backing (see migration <N>_sm_lookup_
   // inspection_time.sql). Mirrors getSamplingRate's structure exactly.
   async getInspectionTime(complexity: 'simple' | 'inter' | 'complex'): Promise<{ minutes: number; dataFound: boolean }> {
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
       .from('sm_lookup_inspection_time')
       .select('inspection_min')
@@ -1184,7 +1184,7 @@ export class SheetMetalLookupService {
   // avoids N round trips the way getCounterboreCycleTimes already does for
   // its own bulk lookup.
   async getOpSetupTimes(): Promise<{ minutes: Map<string, number>; dataFound: Set<string> }> {
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
       .from('sm_lookup_op_setup_time')
       .select('operation, setup_min');
@@ -1230,7 +1230,7 @@ export class SheetMetalLookupService {
   // full array straight through to computeInspectionLine, which does its own
   // feature+method lookup and disclosed fallback.
   async getInspectionOperationDefaults(): Promise<import('../../shared/process/inspection-engine').InspectionOperationDefaultRow[]> {
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
       .from('inspection_operation_defaults')
       .select('feature, method, cycle_time_sec, sampling_default, equipment');
@@ -1249,7 +1249,7 @@ export class SheetMetalLookupService {
   async getTurretPunchParams(thicknessMm: number): Promise<{
     hitsPerMin: number; nibbleMmPerMin: number; toolChangeSec: number; dataFound: boolean;
   }> {
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
       .from('sm_lookup_turret_punch')
       .select('thickness_mm, hits_per_min, nibble_mm_per_min, tool_change_sec')
@@ -1289,7 +1289,7 @@ export class SheetMetalLookupService {
     const empty = { hitsPerMin: null, toolChangeSec: null, dataFound: false };
     if (!machineName?.trim()) return empty;
 
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
       .from('sm_reference_data')
       .select('raw')
@@ -1319,7 +1319,7 @@ export class SheetMetalLookupService {
   // See migration 415 — replaces WATERJET_ABRASIVE_KG_PER_MIN, which used to
   // live directly in default-rates.ts.
   async getWaterjetAbrasiveRate(pumpTier = '50hp_60kpsi'): Promise<{ kgPerMin: number; dataFound: boolean }> {
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
       .from('sm_lookup_waterjet_abrasive_rate')
       .select('abrasive_kg_per_min')
@@ -1349,7 +1349,7 @@ export class SheetMetalLookupService {
     const empty = { kgPerMin: 0, dataFound: false };
     if (!machineName?.trim()) return empty;
 
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
       .from('sm_reference_data')
       .select('raw')
@@ -1411,7 +1411,7 @@ export class SheetMetalLookupService {
     if (!machineName?.trim()) return empty;
     if (!(developedLengthMm > 0) || !(thicknessMm > 0) || !(targetDiameterMm > 0)) return empty;
 
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
       .from('sm_reference_data')
       .select('raw')
@@ -1480,7 +1480,7 @@ export class SheetMetalLookupService {
   // the bracket array, unlike every other resolveBracket() caller which
   // works off a compile-time table.
   async getHandlingAllowanceUsd(machineClass: string, partWeightKg: number): Promise<{ allowanceUsd: number; dataFound: boolean }> {
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
       .from('sm_handling_allowance_rates')
       .select('weight_kg_max, allowance_usd')
@@ -1501,7 +1501,7 @@ export class SheetMetalLookupService {
   // until a per-shop nozzle-grade setting exists; disclosed via dataFound,
   // never silently substituted for a genuinely missing table.
   async getWaterjetNozzleCostPerHr(nozzleGrade = 'Mid-Life Composite Carbide'): Promise<{ costPerHr: number; dataFound: boolean }> {
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
       .from('sm_waterjet_nozzle_rates')
       .select('cost_usd, life_hours')
@@ -1522,7 +1522,7 @@ export class SheetMetalLookupService {
   // see migration 413's comment), so this resolves a single honest default
   // row rather than a fabricated material-keyed curve.
   async getDeburrRate(materialFamily = '__default__'): Promise<{ secPerMetre: number; secPerPierce: number; dataFound: boolean }> {
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
       .from('sm_lookup_deburr_rate')
       .select('sec_per_metre, sec_per_pierce')
@@ -1543,7 +1543,7 @@ export class SheetMetalLookupService {
     const result = new Map<number, { seconds: number; dataFound: boolean }>();
     if (diametersMm.length === 0) return result;
 
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
       .from('sm_lookup_counterbore')
       .select('diameter_mm, cycle_time_sec')
@@ -1566,7 +1566,7 @@ export class SheetMetalLookupService {
     const result = new Map<number, { seconds: number; dataFound: boolean }>();
     if (diametersMm.length === 0) return result;
 
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
       .from('sm_lookup_countersink')
       .select('diameter_mm, cycle_time_sec')
@@ -1595,7 +1595,7 @@ export class SheetMetalLookupService {
     const result = new Map<number, { partSpec: string; insertionCycleSec: number } | null>();
     if (holeDiametersMm.length === 0) return result;
 
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
       .from('sm_lookup_pem_hardware')
       .select('hole_diameter_mm, sheet_thickness_mm, pem_part_spec, insertion_cycle_sec');

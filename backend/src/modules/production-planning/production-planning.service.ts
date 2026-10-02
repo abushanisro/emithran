@@ -46,7 +46,7 @@ export class ProductionPlanningService {
     createDto: CreateProductionLotDto,
     userId: string,
   ): Promise<ProductionLotResponseDto> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Verify user owns the BOM
     const { data: bomCheck } = await supabase
@@ -256,7 +256,7 @@ export class ProductionPlanningService {
     userId: string,
     filters: { status?: string; bomId?: string; priority?: string; projectId?: string },
   ): Promise<ProductionLotResponseDto[]> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Try to fetch with relationships first
     let data, error;
@@ -380,7 +380,7 @@ export class ProductionPlanningService {
     UuidValidator.validateUuid(id, 'Production lot ID');
     UuidValidator.validateUuid(userId, 'User ID');
 
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Industry Best Practice: Use explicit queries instead of complex nested relationships
     // Step 1: Get production lot basic data
@@ -494,7 +494,7 @@ export class ProductionPlanningService {
     UuidValidator.validateUuid(id, 'Production lot ID');
     UuidValidator.validateUuid(userId, 'User ID');
 
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // First get the production lot basic info
     const { data: lot, error: lotError } = await supabase
@@ -641,7 +641,7 @@ export class ProductionPlanningService {
     UuidValidator.validateUuid(lotId, 'Production lot ID');
     UuidValidator.validateUuid(userId, 'User ID');
 
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // First verify the production lot exists and user has access
     const { data: lot, error: lotError } = await supabase
@@ -726,7 +726,7 @@ export class ProductionPlanningService {
     updateDto: UpdateProductionLotDto,
     userId: string,
   ): Promise<ProductionLotResponseDto> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Get existing lot to check current status for validation
     const { data: existingLot } = await supabase
@@ -775,7 +775,7 @@ export class ProductionPlanningService {
   }
 
   async deleteProductionLot(id: string, userId: string): Promise<void> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Verify ownership through BOM
     const { data: existingLot } = await supabase
@@ -858,7 +858,7 @@ export class ProductionPlanningService {
     createDto: CreateLotVendorAssignmentDto,
     userId: string,
   ): Promise<any> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Verify lot ownership
     await this.verifyLotOwnership(createDto.productionLotId, userId);
@@ -905,7 +905,7 @@ export class ProductionPlanningService {
     bulkDto: BulkVendorAssignmentDto,
     userId: string,
   ): Promise<any[]> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Verify lot ownership
     await this.verifyLotOwnership(bulkDto.productionLotId, userId);
@@ -936,7 +936,7 @@ export class ProductionPlanningService {
   }
 
   async getVendorAssignments(lotId: string, userId: string): Promise<any[]> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Verify lot ownership
     await this.verifyLotOwnership(lotId, userId);
@@ -959,7 +959,7 @@ export class ProductionPlanningService {
     updateDto: UpdateLotVendorAssignmentDto,
     userId: string,
   ): Promise<any> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Verify ownership
     const { data: assignment } = await supabase
@@ -1012,7 +1012,7 @@ export class ProductionPlanningService {
   }
 
   async deleteVendorAssignment(id: string, userId: string): Promise<void> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Verify ownership
     const { data: assignment } = await supabase
@@ -1042,7 +1042,7 @@ export class ProductionPlanningService {
     createDto: CreateProductionProcessDto,
     userId: string,
   ): Promise<any> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Verify lot ownership
     await this.verifyLotOwnership(createDto.production_lot_id, userId);
@@ -1089,7 +1089,7 @@ export class ProductionPlanningService {
     userId: string,
     filters: { status?: string },
   ): Promise<any[]> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Verify lot ownership
     await this.verifyLotOwnership(lotId, userId);
@@ -1137,7 +1137,7 @@ export class ProductionPlanningService {
     updateDto: UpdateProductionProcessDto,
     userId: string,
   ): Promise<any> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // TODO: Re-enable ownership verification once auth system is stable
     // const { data: process } = await supabase
@@ -1193,7 +1193,7 @@ export class ProductionPlanningService {
     id: string,
     userId: string,
   ): Promise<void> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Simple delete without ownership verification for now
     const { error } = await supabase
@@ -1211,7 +1211,7 @@ export class ProductionPlanningService {
   // ============================================================================
 
   async createProcessSubtask(createDto: CreateProcessSubtaskDto, userId: string): Promise<any> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Verify process ownership
     await this.verifyProcessOwnership(createDto.productionProcessId, userId);
@@ -1279,7 +1279,7 @@ export class ProductionPlanningService {
   }
 
   async getProcessSubtasks(processId: string, userId: string): Promise<any[]> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Verify process ownership
     await this.verifyProcessOwnership(processId, userId);
@@ -1302,7 +1302,7 @@ export class ProductionPlanningService {
     updateDto: UpdateProcessSubtaskDto,
     userId: string,
   ): Promise<any> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Verify ownership
     const { data: subtask } = await supabase
@@ -1343,7 +1343,7 @@ export class ProductionPlanningService {
   }
 
   async deleteProcessSubtask(id: string, userId: string): Promise<void> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Verify ownership
     const { data: subtask } = await supabase
@@ -1376,7 +1376,7 @@ export class ProductionPlanningService {
     createDto: CreateDailyProductionEntryDto,
     userId: string,
   ): Promise<DailyProductionEntryResponseDto> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Verify lot ownership
     await this.verifyLotOwnership(createDto.productionLotId, userId);
@@ -1426,7 +1426,7 @@ export class ProductionPlanningService {
     userId: string,
     filters: { startDate?: string; endDate?: string; entryType?: string },
   ): Promise<DailyProductionEntryResponseDto[]> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Verify lot ownership
     await this.verifyLotOwnership(lotId, userId);
@@ -1465,7 +1465,7 @@ export class ProductionPlanningService {
     updateDto: UpdateDailyProductionEntryDto,
     userId: string,
   ): Promise<DailyProductionEntryResponseDto> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Verify ownership
     const { data: entry } = await supabase
@@ -1520,7 +1520,7 @@ export class ProductionPlanningService {
   // ============================================================================
 
   async getProductionSummary(lotId: string, userId: string): Promise<ProductionSummaryDto> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Verify lot ownership
     await this.verifyLotOwnership(lotId, userId);
@@ -1590,7 +1590,7 @@ export class ProductionPlanningService {
     userId: string,
     filters: { startDate?: string; endDate?: string },
   ): Promise<any> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Get lots with basic stats
     let query = supabase
@@ -1653,7 +1653,7 @@ export class ProductionPlanningService {
   }
 
   async getGanttData(lotId: string, userId: string): Promise<any> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Verify lot ownership
     await this.verifyLotOwnership(lotId, userId);
@@ -1700,7 +1700,7 @@ export class ProductionPlanningService {
   // ============================================================================
 
   private async verifyLotOwnership(lotId: string, userId: string): Promise<void> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     const { data } = await supabase
       .from('production_lots')
@@ -1715,7 +1715,7 @@ export class ProductionPlanningService {
   }
 
   private async verifyProcessOwnership(processId: string, userId: string): Promise<void> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Step 1: Get the production process
     const { data: process, error: processError } = await supabase
@@ -1768,7 +1768,7 @@ export class ProductionPlanningService {
   }
 
   private async calculateEstimatedLotCost(bomId: string, quantity: number): Promise<number> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Get BOM items total cost
     const { data: bomCost } = await supabase
@@ -1785,7 +1785,7 @@ export class ProductionPlanningService {
     // Once the migration is applied, you can uncomment the code below
 
     try {
-      const supabase = this.supabaseService.getClient();
+      const supabase = this.supabaseService.getUserClient();
 
       // Try a simple query first to check if the relationship works
       const { data, error } = await supabase
@@ -1830,7 +1830,7 @@ export class ProductionPlanningService {
   }
 
   private async getLotVendorAssignments(lotId: string): Promise<any[]> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     const { data, error } = await supabase
       .from('lot_vendor_assignments')
@@ -1944,7 +1944,7 @@ export class ProductionPlanningService {
   }
 
   async getSubtasksDirectByLot(lotId: string, userId: string): Promise<any[]> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Verify lot ownership
     await this.verifyLotOwnership(lotId, userId);
@@ -2077,7 +2077,7 @@ export class ProductionPlanningService {
     plannedStartDate: string, 
     plannedEndDate: string
   ): Promise<void> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Define the 4 standard processes with correct names
     const standardProcesses = [
@@ -2154,7 +2154,7 @@ export class ProductionPlanningService {
   }
 
   async getDefaultProcessTemplates(userId: string): Promise<ProcessTemplate[]> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Try to get user's custom templates first
     const { data: userTemplates, error: userError } = await supabase
@@ -2219,7 +2219,7 @@ export class ProductionPlanningService {
     description?: string;
     category?: string;
   }): Promise<ProcessTemplate> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     const { data, error } = await supabase
       .from('process_templates')
@@ -2272,7 +2272,7 @@ export class ProductionPlanningService {
    * Auto-update lot status based on progress
    */
   async updateLotStatusByProgress(lotId: string, userId: string): Promise<void> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Get current lot status and processes
     const { data: lot } = await supabase
@@ -2316,7 +2316,7 @@ export class ProductionPlanningService {
    * Clean up production lot materials to only include selected BOM items
    */
   async cleanupProductionLotMaterials(lotId: string, userId: string): Promise<void> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Get the selected BOM items for this lot
     const { data: selectedBomItems } = await supabase

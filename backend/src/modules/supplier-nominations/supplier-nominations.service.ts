@@ -1296,7 +1296,7 @@ export class SupplierNominationsService {
     recommendation: string;
     approvalDate?: string;
   }>> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.supabaseService.getUserClient(accessToken);
 
     try {
       // Build query to find approved vendors for this BOM part using the new relationship structure

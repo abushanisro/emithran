@@ -22,7 +22,7 @@ export class FerrousContainerService {
     this.logger.log('Fetching ferrous materials', 'FerrousContainerService');
 
     let queryBuilder = this.supabaseService
-      .getClient(accessToken)
+      .getUserClient(accessToken)
       .from('raw_materials')
       .select('*', { count: 'exact' })
       .or('material_group.ilike.%ferrous%,material_group.ilike.%steel%,material_group.ilike.%iron%,material_group.ilike.%metal%');

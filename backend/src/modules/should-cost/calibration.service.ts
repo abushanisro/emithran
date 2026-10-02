@@ -35,7 +35,7 @@ export class CalibrationService {
 
   // Admin client — bypasses RLS for rate updates
   private get admin() {
-    return this.supabaseService.getClient();
+    return this.supabaseService.getPrivilegedClient('system-job: should-cost calibration updates global correction rates');
   }
 
   /**

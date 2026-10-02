@@ -31,7 +31,7 @@ export class DeliveryService {
       // Only exclude items that are in non-delivered/non-cancelled orders
       let usedItemIds: string[] = [];
       try {
-        const { data: usedItems, error: usedError } = await this.supabase.client
+        const { data: usedItems, error: usedError } = await this.supabase.getPrivilegedClient('delivery: OPEN RISK no tenancy column or RLS policies on delivery_* tables, isolation migration pending')
           .from('delivery_items')
           .select(`
             quality_approved_item_id,
@@ -62,7 +62,7 @@ export class DeliveryService {
       }
 
       // Now get available quality approved items for the project
-      let query = this.supabase.client
+      let query = this.supabase.getPrivilegedClient('delivery: OPEN RISK no tenancy column or RLS policies on delivery_* tables, isolation migration pending')
         .from('quality_approved_items')
         .select(`
           id,
@@ -164,7 +164,7 @@ export class DeliveryService {
       const orderNumber = `DO-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
       // ── Step 2: Insert the delivery order row ──────────────────────────────
-      const { data: createdOrder, error: orderError } = await this.supabase.client
+      const { data: createdOrder, error: orderError } = await this.supabase.getPrivilegedClient('delivery: OPEN RISK no tenancy column or RLS policies on delivery_* tables, isolation migration pending')
         .from('delivery_orders')
         .insert({
           order_number: orderNumber,
@@ -237,14 +237,14 @@ export class DeliveryService {
         unit_value_inr: item.unitValueInr || null,
       }));
 
-      const { error: itemsError } = await this.supabase.client
+      const { error: itemsError } = await this.supabase.getPrivilegedClient('delivery: OPEN RISK no tenancy column or RLS policies on delivery_* tables, isolation migration pending')
         .from('delivery_items')
         .insert(itemRows);
 
       if (itemsError) {
         // Compensating delete – keep the DB clean if items insert fails
         this.logger.error(`Error inserting delivery items, rolling back order: ${itemsError.message}`, itemsError);
-        await this.supabase.client.from('delivery_orders').delete().eq('id', createdOrder.id);
+        await this.supabase.getPrivilegedClient('delivery: OPEN RISK no tenancy column or RLS policies on delivery_* tables, isolation migration pending').from('delivery_orders').delete().eq('id', createdOrder.id);
         throw new BadRequestException(itemsError.message || 'Failed to create delivery items');
       }
 
@@ -271,7 +271,7 @@ export class DeliveryService {
     try {
       this.logger.debug(`Fetching delivery order ${id} for user ${userId}`);
 
-      const { data: deliveryOrder, error: orderError } = await this.supabase.client
+      const { data: deliveryOrder, error: orderError } = await this.supabase.getPrivilegedClient('delivery: OPEN RISK no tenancy column or RLS policies on delivery_* tables, isolation migration pending')
         .from('delivery_orders')
         .select(`
           *,
@@ -310,7 +310,7 @@ export class DeliveryService {
       }
 
       // Get delivery items with comprehensive details
-      const { data: deliveryItems, error: itemsError } = await this.supabase.client
+      const { data: deliveryItems, error: itemsError } = await this.supabase.getPrivilegedClient('delivery: OPEN RISK no tenancy column or RLS policies on delivery_* tables, isolation migration pending')
         .from('delivery_items')
         .select(`
           *,
@@ -339,7 +339,7 @@ export class DeliveryService {
       }
 
       // Get tracking events
-      const { data: trackingEvents, error: trackingError } = await this.supabase.client
+      const { data: trackingEvents, error: trackingError } = await this.supabase.getPrivilegedClient('delivery: OPEN RISK no tenancy column or RLS policies on delivery_* tables, isolation migration pending')
         .from('delivery_tracking')
         .select('*')
         .eq('delivery_order_id', id)
@@ -376,7 +376,7 @@ export class DeliveryService {
       this.logger.debug(`Fetching delivery orders with filters: ${JSON.stringify(queryDto)}`);
 
       // Build query with filters and related data - specify exact relationships
-      let query = this.supabase.client
+      let query = this.supabase.getPrivilegedClient('delivery: OPEN RISK no tenancy column or RLS policies on delivery_* tables, isolation migration pending')
         .from('delivery_orders')
         .select(`
           *,
@@ -494,7 +494,7 @@ export class DeliveryService {
         })));
       } else {
         // Try a simple query to see if ANY delivery orders exist
-        const { data: allOrders, error: allError } = await this.supabase.client
+        const { data: allOrders, error: allError } = await this.supabase.getPrivilegedClient('delivery: OPEN RISK no tenancy column or RLS policies on delivery_* tables, isolation migration pending')
           .from('delivery_orders')
           .select('id, order_number, project_id, status, created_at')
           .limit(5);
@@ -562,7 +562,7 @@ export class DeliveryService {
       }
 
       // Update the order
-      const { data: updatedOrder, error: updateError } = await this.supabase.client
+      const { data: updatedOrder, error: updateError } = await this.supabase.getPrivilegedClient('delivery: OPEN RISK no tenancy column or RLS policies on delivery_* tables, isolation migration pending')
         .from('delivery_orders')
         .update(updateData)
         .eq('id', id)
@@ -602,7 +602,7 @@ export class DeliveryService {
       // Verify order exists and user has access
       await this.getDeliveryOrderById(trackingDto.deliveryOrderId, userId);
 
-      const { error: insertError } = await this.supabase.client
+      const { error: insertError } = await this.supabase.getPrivilegedClient('delivery: OPEN RISK no tenancy column or RLS policies on delivery_* tables, isolation migration pending')
         .from('delivery_tracking')
         .insert({
           delivery_order_id: trackingDto.deliveryOrderId,
@@ -655,7 +655,7 @@ export class DeliveryService {
       }
 
       // Delete delivery items first (foreign key constraint)
-      const { error: itemsDeleteError } = await this.supabase.client
+      const { error: itemsDeleteError } = await this.supabase.getPrivilegedClient('delivery: OPEN RISK no tenancy column or RLS policies on delivery_* tables, isolation migration pending')
         .from('delivery_items')
         .delete()
         .eq('delivery_order_id', id);
@@ -666,7 +666,7 @@ export class DeliveryService {
       }
 
       // Delete the delivery order
-      const { error: orderDeleteError } = await this.supabase.client
+      const { error: orderDeleteError } = await this.supabase.getPrivilegedClient('delivery: OPEN RISK no tenancy column or RLS policies on delivery_* tables, isolation migration pending')
         .from('delivery_orders')
         .delete()
         .eq('id', id);
@@ -696,7 +696,7 @@ export class DeliveryService {
       this.logger.debug(`Fetching delivery metrics - Project: ${projectId}, Date range: ${startDate} to ${endDate}`);
 
       // Use the materialized view for better performance
-      const { data: qualityMetrics, error: qualityError } = await this.supabase.client
+      const { data: qualityMetrics, error: qualityError } = await this.supabase.getPrivilegedClient('delivery: OPEN RISK no tenancy column or RLS policies on delivery_* tables, isolation migration pending')
         .from('delivery_quality_metrics')
         .select('*')
         .eq(projectId ? 'project_id' : 'true', projectId || true);
@@ -706,7 +706,7 @@ export class DeliveryService {
       }
 
       // Get delivery performance metrics
-      let deliveryQuery = this.supabase.client
+      let deliveryQuery = this.supabase.getPrivilegedClient('delivery: OPEN RISK no tenancy column or RLS policies on delivery_* tables, isolation migration pending')
         .from('delivery_orders')
         .select('status, created_at, total_delivery_cost_inr, requested_delivery_date, actual_delivery_date, carrier_id');
 
@@ -777,7 +777,7 @@ export class DeliveryService {
     try {
       this.logger.debug(`Creating delivery address for project ${addressDto.projectId}`);
 
-      const { data: address, error } = await this.supabase.client
+      const { data: address, error } = await this.supabase.getPrivilegedClient('delivery: OPEN RISK no tenancy column or RLS policies on delivery_* tables, isolation migration pending')
         .from('delivery_addresses')
         .insert({
           project_id: addressDto.projectId,
@@ -828,7 +828,7 @@ export class DeliveryService {
    */
   async getDeliveryAddresses(projectId: string, userId: string): Promise<any[]> {
     try {
-      const { data: addresses, error } = await this.supabase.client
+      const { data: addresses, error } = await this.supabase.getPrivilegedClient('delivery: OPEN RISK no tenancy column or RLS policies on delivery_* tables, isolation migration pending')
         .from('delivery_addresses')
         .select('*')
         .eq('project_id', projectId)
@@ -861,7 +861,7 @@ export class DeliveryService {
       this.logger.log(`Deleting delivery address ${addressId} by user ${userId}`);
 
       // First check it exists
-      const { data: existing, error: fetchError } = await this.supabase.client
+      const { data: existing, error: fetchError } = await this.supabase.getPrivilegedClient('delivery: OPEN RISK no tenancy column or RLS policies on delivery_* tables, isolation migration pending')
         .from('delivery_addresses')
         .select('id')
         .eq('id', addressId)
@@ -871,7 +871,7 @@ export class DeliveryService {
         throw new NotFoundException(`Delivery address ${addressId} not found`);
       }
 
-      const { error } = await this.supabase.client
+      const { error } = await this.supabase.getPrivilegedClient('delivery: OPEN RISK no tenancy column or RLS policies on delivery_* tables, isolation migration pending')
         .from('delivery_addresses')
         .delete()
         .eq('id', addressId);
@@ -903,7 +903,7 @@ export class DeliveryService {
    */
   async getCarriers(): Promise<any[]> {
     try {
-      const { data: carriers, error } = await this.supabase.client
+      const { data: carriers, error } = await this.supabase.getPrivilegedClient('delivery: OPEN RISK no tenancy column or RLS policies on delivery_* tables, isolation migration pending')
         .from('carriers')
         .select('id, name, code, contact_email, contact_phone, service_areas, capabilities, performance_metrics')
         .eq('active', true)
@@ -1197,7 +1197,7 @@ export class DeliveryService {
       updateData.actual_delivery_date = eventTimestamp;
     }
 
-    const { error } = await this.supabase.client
+    const { error } = await this.supabase.getPrivilegedClient('delivery: OPEN RISK no tenancy column or RLS policies on delivery_* tables, isolation migration pending')
       .from('delivery_orders')
       .update(updateData)
       .eq('id', orderId);

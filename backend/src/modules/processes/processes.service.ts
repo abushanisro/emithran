@@ -254,7 +254,7 @@ export class ProcessesService {
     if (!machiningLookupTableNames().includes(table)) {
       throw new BadRequestException(`"${table}" is not a machining calculator lookup table`);
     }
-    const db = this.supabaseService.getAdminClient();
+    const db = this.supabaseService.getPrivilegedClient('reference-data: machining_reference_data, public-read');
     let flat;
     if (table === 'variables') {
       const { data, error } = await db
@@ -362,7 +362,7 @@ export class ProcessesService {
     const to = from + limit - 1;
 
     let queryBuilder = this.supabaseService
-      .getClient(accessToken)
+      .getUserClient(accessToken)
       .from('processes')
       .select('*', { count: 'exact' })
       .order('created_at', { ascending: false })

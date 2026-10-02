@@ -159,7 +159,7 @@ export class LaserCuttingCalculator implements IOperationCalculator {
     thicknessMm: number,
     targetPowerKw: number,
   ): Promise<{ speedMmMin: number; pierceSec: number; actualPowerKw: number }> {
-    const db = this.supabase.getClient();
+    const db = this.supabase.getPrivilegedClient("reference-data: laser_cutting_parameters");
 
     // Find closest matching thickness (DB has discrete steps: 1,2,3,4,5,6,8,10,12,16,20)
     const closestThickness = this.closestValue(

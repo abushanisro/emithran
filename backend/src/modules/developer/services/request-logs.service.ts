@@ -18,7 +18,7 @@ export class RequestLogsService {
   async write(payload: WriteLogPayload): Promise<void> {
     try {
       // Use admin client to bypass RLS for write path
-      const client = this.supabase.getClient();
+      const client = this.supabase.getUserClient();
       await client.from('api_request_logs').insert({
         user_id: payload.userId,
         method: payload.method,

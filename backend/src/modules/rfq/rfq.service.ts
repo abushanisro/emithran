@@ -36,7 +36,7 @@ export class RfqService {
     await this.validateVendors(vendorIds, accessToken);
 
 
-    const { data, error } = await this.supabaseService.getClient(accessToken)
+    const { data, error } = await this.supabaseService.getUserClient(accessToken)
       .from('rfq_records')
       .insert({
         user_id: userId,
@@ -94,7 +94,7 @@ export class RfqService {
   }
 
   async findByUser(userId: string, projectId?: string, accessToken?: string): Promise<RfqSummary[]> {
-    let query = this.supabaseService.getClient(accessToken)
+    let query = this.supabaseService.getUserClient(accessToken)
       .from('rfq_records')
       .select(`
         id,
@@ -129,7 +129,7 @@ export class RfqService {
   }
 
   async findOne(id: string, userId: string, accessToken?: string): Promise<RfqRecord> {
-    const { data, error } = await this.supabaseService.getClient(accessToken)
+    const { data, error } = await this.supabaseService.getUserClient(accessToken)
       .from('rfq_records')
       .select('*')
       .eq('id', id)
@@ -191,7 +191,7 @@ export class RfqService {
     }
 
     // Use the database function to mark as sent
-    const { error } = await this.supabaseService.getClient(accessToken)
+    const { error } = await this.supabaseService.getUserClient(accessToken)
       .rpc('send_rfq', { p_rfq_id: id, p_user_id: userId });
 
     if (error) {
@@ -232,7 +232,7 @@ export class RfqService {
     // Validate ownership first
     await this.findOne(id, userId, accessToken);
 
-    const { error } = await this.supabaseService.getClient(accessToken)
+    const { error } = await this.supabaseService.getUserClient(accessToken)
       .rpc('close_rfq', { p_rfq_id: id, p_user_id: userId });
 
     if (error) {
@@ -265,7 +265,7 @@ export class RfqService {
     // an RLS-scoped count would only see the caller's own org's rows,
     // letting two different orgs generate the same number in the same month
     // and collide on insert.
-    const { count, error } = await this.supabaseService.client
+    const { count, error } = await this.supabaseService.getPrivilegedClient('rfq-number: rfq_number is UNIQUE across all orgs, a count must see every org')
       .from('rfq_records')
       .select('*', { count: 'exact', head: true })
       .like('rfq_number', `${prefix}%`);
@@ -282,7 +282,7 @@ export class RfqService {
   private async validateBomItems(bomItemIds: string[], accessToken?: string): Promise<void> {
     // RLS-scoped (not admin client): also validates the caller's org actually
     // has access to these bom_items, not merely that the ids exist somewhere.
-    const { count, error } = await this.supabaseService.getClient(accessToken)
+    const { count, error } = await this.supabaseService.getUserClient(accessToken)
       .from('bom_items')
       .select('*', { count: 'exact', head: true })
       .in('id', bomItemIds);
@@ -307,7 +307,7 @@ export class RfqService {
   }
 
   private async validateVendors(vendorIds: string[], accessToken?: string): Promise<void> {
-    const { count, error } = await this.supabaseService.getClient(accessToken)
+    const { count, error } = await this.supabaseService.getUserClient(accessToken)
       .from('vendors')
       .select('*', { count: 'exact', head: true })
       .in('id', vendorIds);

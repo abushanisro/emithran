@@ -68,7 +68,7 @@ export class OrchestratorService {
 
   async generate(args: GenerateArgs): Promise<GenerationResponse> {
     const { bomItemId, userId, accessToken, organizationId } = args;
-    const client = this.supabaseService.getClient(accessToken ?? undefined);
+    const client = this.supabaseService.getUserClient(accessToken ?? undefined);
     const stream = this.streamKey(bomItemId, userId);
 
     // ── Stage 1 — retrieval + scope gate ──────────────────────────────────
@@ -357,13 +357,13 @@ export class OrchestratorService {
   }
 
   async getGeneration(id: string, userId: string, accessToken: string | null): Promise<GenerationResponse | null> {
-    const client = this.supabaseService.getClient(accessToken ?? undefined);
+    const client = this.supabaseService.getUserClient(accessToken ?? undefined);
     const row = await this.loadById(client, id).catch(() => null);
     return row ? this.rowToResponse(row) : null;
   }
 
   async getLatestDraft(bomItemId: string, userId: string, accessToken: string | null): Promise<GenerationResponse | null> {
-    const client = this.supabaseService.getClient(accessToken ?? undefined);
+    const client = this.supabaseService.getUserClient(accessToken ?? undefined);
     // No manual user_id filter — RLS scopes this to the caller's organization.
     const { data, error } = await client
       .from('process_plan_generations')
@@ -378,7 +378,7 @@ export class OrchestratorService {
   }
 
   async discard(id: string, userId: string, accessToken: string | null): Promise<void> {
-    const client = this.supabaseService.getClient(accessToken ?? undefined);
+    const client = this.supabaseService.getUserClient(accessToken ?? undefined);
     // No manual ownership check — RLS scopes visibility to the caller's organization.
     const { data: row, error } = await client
       .from('process_plan_generations')

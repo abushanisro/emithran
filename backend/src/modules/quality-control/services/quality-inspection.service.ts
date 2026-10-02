@@ -44,7 +44,7 @@ export class QualityInspectionService {
         updated_at: new Date().toISOString(),
       };
 
-      const { data, error } = await this.supabase.client
+      const { data, error } = await this.supabase.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
         .from('quality_inspections')
         .insert(inspectionData)
         .select('*')
@@ -83,7 +83,7 @@ export class QualityInspectionService {
     } = {},
   ): Promise<QualityInspectionResponseDto[]> {
     try {
-      let query = this.supabase.client
+      let query = this.supabase.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
         .from('quality_inspections')
         .select('*')
         .order('created_at', { ascending: false });
@@ -127,7 +127,7 @@ export class QualityInspectionService {
     userId: string,
   ): Promise<QualityInspectionResponseDto> {
     try {
-      const { data, error } = await this.supabase.client
+      const { data, error } = await this.supabase.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
         .from('quality_inspections')
         .select('*')
         .eq('id', id)
@@ -171,7 +171,7 @@ export class QualityInspectionService {
 
       this.logger.log(`Final updateData for Supabase:`, JSON.stringify(updateData));
 
-      const { data, error } = await this.supabase.client
+      const { data, error } = await this.supabase.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
         .from('quality_inspections')
         .update(updateData)
         .eq('id', id)
@@ -192,7 +192,7 @@ export class QualityInspectionService {
 
   async deleteInspection(id: string, userId: string): Promise<void> {
     try {
-      const { error } = await this.supabase.client
+      const { error } = await this.supabase.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
         .from('quality_inspections')
         .delete()
         .eq('id', id);
@@ -237,7 +237,7 @@ export class QualityInspectionService {
   ): Promise<QualityInspectionResponseDto> {
     try {
       // First, get the inspection details to access selected items
-      const { data: inspection, error: inspectionError } = await this.supabase.client
+      const { data: inspection, error: inspectionError } = await this.supabase.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
         .from('quality_inspections')
         .select('*')
         .eq('id', id)
@@ -258,7 +258,7 @@ export class QualityInspectionService {
 
       this.logger.log(`Approving inspection ${id} with update data:`, JSON.stringify(updateData));
 
-      const { data: updatedInspection, error: updateError } = await this.supabase.client
+      const { data: updatedInspection, error: updateError } = await this.supabase.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
         .from('quality_inspections')
         .update(updateData)
         .eq('id', id)
@@ -300,7 +300,7 @@ export class QualityInspectionService {
         this.logger.log(`About to create ${qualityApprovedItems.length} quality approved items:`, JSON.stringify(qualityApprovedItems, null, 2));
 
         // Insert quality approved items
-        const { data: insertedItems, error: approvedItemsError } = await this.supabase.client
+        const { data: insertedItems, error: approvedItemsError } = await this.supabase.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
           .from('quality_approved_items')
           .insert(qualityApprovedItems)
           .select('*');
@@ -338,7 +338,7 @@ export class QualityInspectionService {
       notes: rejectionData.correctiveAction,
     };
 
-    const { data, error } = await this.supabase.client
+    const { data, error } = await this.supabase.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
       .from('quality_inspections')
       .update(updateData)
       .eq('id', id)
@@ -356,7 +356,7 @@ export class QualityInspectionService {
     id: string,
     userId: string,
   ): Promise<QualityInspectionResponseDto> {
-    const { data: inspection, error: fetchError } = await this.supabase.client
+    const { data: inspection, error: fetchError } = await this.supabase.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
       .from('quality_inspections')
       .select('status')
       .eq('id', id)
@@ -372,7 +372,7 @@ export class QualityInspectionService {
 
     // If undoing approval, delete the quality_approved_items that were created for this inspection
     if (inspection.status === InspectionStatus.APPROVED) {
-      const { error: deleteError } = await this.supabase.client
+      const { error: deleteError } = await this.supabase.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
         .from('quality_approved_items')
         .delete()
         .eq('inspection_id', id);
@@ -382,7 +382,7 @@ export class QualityInspectionService {
       }
     }
 
-    const { data, error } = await this.supabase.client
+    const { data, error } = await this.supabase.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
       .from('quality_inspections')
       .update({
         status: InspectionStatus.COMPLETED,
@@ -422,7 +422,7 @@ export class QualityInspectionService {
         submitted_at: new Date().toISOString(),
       };
 
-      const { data, error } = await this.supabase.client
+      const { data, error } = await this.supabase.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
         .from('quality_inspection_results')
         .upsert(resultData, { onConflict: 'inspection_id' })
         .select('*')
@@ -449,7 +449,7 @@ export class QualityInspectionService {
     inspectionId: string,
     userId: string,
   ): Promise<any> {
-    const { data, error } = await this.supabase.client
+    const { data, error } = await this.supabase.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
       .from('quality_inspection_results')
       .select('*')
       .eq('inspection_id', inspectionId)
@@ -474,7 +474,7 @@ export class QualityInspectionService {
       created_at: new Date().toISOString(),
     };
 
-    const { data, error } = await this.supabase.client
+    const { data, error } = await this.supabase.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
       .from('quality_non_conformances')
       .insert(ncData)
       .select('*')
@@ -495,7 +495,7 @@ export class QualityInspectionService {
       severity?: string;
     } = {},
   ): Promise<any[]> {
-    let query = this.supabase.client
+    let query = this.supabase.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
       .from('quality_non_conformances')
       .select(`
         *,
@@ -599,7 +599,7 @@ export class QualityInspectionService {
       };
 
       // Upsert the detailed report
-      const { data, error } = await this.supabase.getClient()
+      const { data, error } = await this.supabase.getUserClient()
         .from('detailed_inspection_reports')
         .upsert(reportData, { 
           onConflict: 'inspection_id',
@@ -633,7 +633,7 @@ export class QualityInspectionService {
         throw new NotFoundException('Inspection not found');
       }
 
-      const { data, error } = await this.supabase.getClient()
+      const { data, error } = await this.supabase.getUserClient()
         .from('detailed_inspection_reports')
         .select('*')
         .eq('inspection_id', inspectionId)
@@ -667,7 +667,7 @@ export class QualityInspectionService {
         throw new NotFoundException('Inspection not found');
       }
 
-      const { error } = await this.supabase.getClient()
+      const { error } = await this.supabase.getUserClient()
         .from('detailed_inspection_reports')
         .delete()
         .eq('inspection_id', inspectionId);

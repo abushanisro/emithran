@@ -33,7 +33,7 @@ export class ParameterResolver {
   constructor(private readonly supabase: SupabaseService) {}
 
   async resolve(query: ParameterQuery): Promise<MachiningParams> {
-    const db = this.supabase.getClient();
+    const db = this.supabase.getPrivilegedClient("reference-data: machining_parameters");
     const {
       operation,
       isoGroup,

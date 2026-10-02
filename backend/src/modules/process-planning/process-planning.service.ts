@@ -13,7 +13,7 @@ export class ProcessPlanningService {
    */
   async getSpecificationsByBomItem(bomItemId: string, userId: string): Promise<ProcessPlanningSpecResponseDto | null> {
     try {
-      const client = this.supabaseService.getClient();
+      const client = this.supabaseService.getUserClient();
 
       const { data, error } = await client
         .from('process_planning_with_bom_details')
@@ -44,7 +44,7 @@ export class ProcessPlanningService {
    */
   async getSpecificationsByProject(projectId: string, userId: string): Promise<ProcessPlanningSpecResponseDto[]> {
     try {
-      const client = this.supabaseService.getClient();
+      const client = this.supabaseService.getUserClient();
 
       const { data, error } = await client
         .from('process_planning_with_bom_details')
@@ -71,7 +71,7 @@ export class ProcessPlanningService {
    */
   async upsertSpecifications(dto: CreateProcessPlanningSpecDto, userId: string): Promise<ProcessPlanningSpecResponseDto> {
     try {
-      const client = this.supabaseService.getClient();
+      const client = this.supabaseService.getUserClient();
 
       const { data, error } = await client
         .from('process_planning_specifications')
@@ -113,7 +113,7 @@ export class ProcessPlanningService {
    */
   async createSpecifications(dto: CreateProcessPlanningSpecDto, userId: string): Promise<ProcessPlanningSpecResponseDto> {
     try {
-      const client = this.supabaseService.getClient();
+      const client = this.supabaseService.getUserClient();
 
       // Check if specifications already exist for this BOM item
       const { data: existing } = await client
@@ -168,7 +168,7 @@ export class ProcessPlanningService {
    */
   async updateSpecifications(bomItemId: string, dto: UpdateProcessPlanningSpecDto, userId: string): Promise<ProcessPlanningSpecResponseDto> {
     try {
-      const client = this.supabaseService.getClient();
+      const client = this.supabaseService.getUserClient();
 
       const { data, error } = await client
         .from('process_planning_specifications')
@@ -212,7 +212,7 @@ export class ProcessPlanningService {
    */
   async deleteSpecifications(bomItemId: string, userId: string): Promise<void> {
     try {
-      const client = this.supabaseService.getClient();
+      const client = this.supabaseService.getUserClient();
 
       const { error } = await client
         .from('process_planning_specifications')

@@ -202,8 +202,7 @@ export class BOMItemsController {
       return { density_g_cm3: null, material_name: null, material_grade: null };
     }
     try {
-      const { createClient } = await import('@supabase/supabase-js');
-      const client = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
+      const client = this.supabaseService.getPrivilegedClient('reference-data: material_density_lookup, global shared');
       const g = grade.trim();
       // Same real AmE/BrE spelling variants the Material search already
       // reconciles (material-search-spelling.ts, root-caused 2026-09-18) —
@@ -239,7 +238,8 @@ export class BOMItemsController {
 
       // 3. Fallback to raw_materials (user's own data, density in g/cm³)
       if (!data) {
-        const rm = await client
+        // raw_materials is org-scoped: read it as the caller, never with the service role.
+        const rm = await this.supabaseService.getUserClient(token)
           .from('raw_materials')
           .select('material, material_grade, density')
           .or(orClause(['material_grade', 'material'], true))

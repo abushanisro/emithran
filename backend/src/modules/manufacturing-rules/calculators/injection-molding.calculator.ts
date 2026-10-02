@@ -157,7 +157,7 @@ export class InjectionMoldingCalculator implements IOperationCalculator {
     moldTemp: number;
     cavityPressure: number;
   }> {
-    const db = this.supabase.getClient();
+    const db = this.supabase.getPrivilegedClient("reference-data: injection_molding_materials");
     const { data } = await db
       .from("injection_molding_materials")
       .select("thermal_diffusivity_mm2_s, melt_temp_c, ejection_temp_c, recommended_mold_temp_c, cavity_pressure_mpa")

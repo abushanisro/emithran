@@ -54,7 +54,7 @@ export class ProcessCostService {
     const to = from + limit - 1;
 
     let queryBuilder = this.supabaseService
-      .getClient(accessToken)
+      .getUserClient(accessToken)
       .from('process_cost_records')
       .select('*', { count: 'exact' })
       .order('created_at', { ascending: false })
@@ -103,7 +103,7 @@ export class ProcessCostService {
     if (missingIds.length > 0) {
       // Note: machine_type column is optional — only select guaranteed columns
       const { data: procs } = await this.supabaseService
-        .getClient(accessToken)
+        .getUserClient(accessToken)
         .from('processes')
         .select('id, process_name, process_category')
         .in('id', missingIds);
@@ -252,7 +252,7 @@ export class ProcessCostService {
       // benchmark lookup can't fail due to RLS having no policy for a table
       // that was never meant to be user-scoped in the first place.
       const { data, error } = await this.supabaseService
-        .getAdminClient()
+        .getPrivilegedClient('reference-data: mhr/lhr benchmark rates, global shared')
         .from('mhr_benchmark_rates')
         .select('machine_name, machine_class')
         .eq('id', rawId)
@@ -339,7 +339,7 @@ export class ProcessCostService {
       // reason; do the same here so this lookup can't fail due to RLS having
       // no policy for a table that was never meant to be user-scoped.
       const { data, error } = await this.supabaseService
-        .getAdminClient()
+        .getPrivilegedClient('reference-data: mhr/lhr benchmark rates, global shared')
         .from('lhr_benchmark_rates')
         .select('labour_type')
         .eq('id', rawId)
@@ -944,7 +944,7 @@ export class ProcessCostService {
   ): Promise<number> {
     this.logger.log(`Calculating total process cost for BOM item: ${bomItemId}`, 'ProcessCostService');
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.supabaseService.getUserClient(accessToken);
 
     // Prefer the stored total_cost_per_part — every creation path (manual create/update,
     // process-plan-generator apply) now computes and persists it via the shared
@@ -987,7 +987,7 @@ export class ProcessCostService {
     // shared engine already computed it, recompute from source fields only as a
     // fallback for older rows saved before that engine existed.
     const { data, error } = await this.supabaseService
-      .getClient(accessToken)
+      .getUserClient(accessToken)
       .from('process_cost_records')
       .select(`bom_item_id, ${PERSISTED_PROCESS_COST_COLUMNS}`)
       .in('bom_item_id', bomItemIds)

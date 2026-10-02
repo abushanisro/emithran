@@ -16,7 +16,7 @@ export class ProductionEntryService {
     createDto: CreateProductionEntryDto,
     userId: string
   ): Promise<ProductionEntryResponseDto> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Check if entry already exists for this lot, process, date, and shift
     const { data: existing } = await supabase
@@ -65,7 +65,7 @@ export class ProductionEntryService {
   }
 
   async getProductionEntries(queryDto: ProductionEntriesQueryDto): Promise<ProductionEntryResponseDto[]> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
     
     let query = supabase
       .from('production_entries')
@@ -107,7 +107,7 @@ export class ProductionEntryService {
   }
 
   async getProductionEntryById(id: string): Promise<ProductionEntryResponseDto> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
     
     const { data, error } = await supabase
       .from('production_entries')
@@ -126,7 +126,7 @@ export class ProductionEntryService {
     id: string,
     updateDto: UpdateProductionEntryDto
   ): Promise<ProductionEntryResponseDto> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Check if entry exists
     const existing = await this.getProductionEntryById(id);
@@ -181,7 +181,7 @@ export class ProductionEntryService {
   }
 
   async deleteProductionEntry(id: string): Promise<void> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Check if entry exists
     await this.getProductionEntryById(id);
@@ -197,7 +197,7 @@ export class ProductionEntryService {
   }
 
   async getWeeklySummary(lotId: string): Promise<WeeklySummaryDto[]> {
-    const supabase = this.supabaseService.getClient();
+    const supabase = this.supabaseService.getUserClient();
 
     // Get production entries for the lot and group them manually
     const { data, error } = await supabase

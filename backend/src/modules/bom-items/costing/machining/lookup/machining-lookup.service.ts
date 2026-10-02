@@ -122,7 +122,7 @@ export class MachiningLookupService {
 
   private async loadTable(key: string): Promise<any[] | null> {
     if (this.tableCache.has(key)) return this.tableCache.get(key) as any[] | null;
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: machining lookup tables, global shared');
     const { data, error } = await db
       .from('machining_reference_data')
       .select('raw')
@@ -151,7 +151,7 @@ export class MachiningLookupService {
   // key is ever fetched through both loaders).
   private async loadObjectTable(key: string): Promise<any | null> {
     if (this.tableCache.has(key)) return this.tableCache.get(key);
-    const db = this.supabase.getAdminClient();
+    const db = this.supabase.getPrivilegedClient('reference-data: machining lookup tables, global shared');
     const { data, error } = await db
       .from('machining_reference_data')
       .select('raw')
@@ -182,7 +182,7 @@ export class MachiningLookupService {
   async getSetupAxisRule(): Promise<{ rule: SetupAxisRule | null; missing: string[] }> {
     if (this.setupAxisRule) return this.setupAxisRule;
     const { data, error } = await this.supabase
-      .getAdminClient()
+      .getPrivilegedClient('reference-data: machining lookup tables, global shared')
       .from('machining_reference_data')
       .select('key, value')
       .eq('category', 'variable')
@@ -200,7 +200,7 @@ export class MachiningLookupService {
   async getCapabilityRules(): Promise<{ rules: MachiningCapabilityRules | null; missing: string[] }> {
     if (this.capabilityRules) return this.capabilityRules;
     const { data, error } = await this.supabase
-      .getAdminClient()
+      .getPrivilegedClient('reference-data: machining lookup tables, global shared')
       .from('machining_reference_data')
       .select('key, value')
       .eq('category', 'variable')
@@ -286,7 +286,7 @@ export class MachiningLookupService {
     const [hobRows, ansiRows] = await Promise.all([this.loadTable('tblHobbing'), this.loadTable('tblAnsiHobbing')]);
     if (!hobRows?.length && !ansiRows?.length) return null;
     const { data } = await this.supabase
-      .getAdminClient()
+      .getPrivilegedClient('reference-data: machining lookup tables, global shared')
       .from('machining_reference_data')
       .select('value')
       .eq('category', 'variable')
@@ -303,7 +303,7 @@ export class MachiningLookupService {
   async getGearReference(): Promise<{ qualityRows: GearQualityRow[]; defaultQuality: string | null; shaving: { rows: any[]; maxWorkpieceRpm: number | null } }> {
     const [quality, shavingRows] = await Promise.all([this.loadObjectTable('tblGearQuality'), this.loadTable('tblShaving')]);
     const { data } = await this.supabase
-      .getAdminClient()
+      .getPrivilegedClient('reference-data: machining lookup tables, global shared')
       .from('machining_reference_data')
       .select('key, value')
       .eq('category', 'variable')
@@ -325,7 +325,7 @@ export class MachiningLookupService {
     if (!rows?.length) return null;
     const keys = ['rotaryBroachFeedAdjustment', 'pilotRotaryBroachHoleDiamPercentIncreaseHex', 'pilotRotaryBroachHoleDiamPercentIncreaseSquare', 'pilotRotaryBroachHoleLengthPercentIncrease'];
     const { data } = await this.supabase
-      .getAdminClient()
+      .getPrivilegedClient('reference-data: machining lookup tables, global shared')
       .from('machining_reference_data')
       .select('key, value')
       .eq('category', 'variable')
@@ -550,7 +550,7 @@ export class MachiningLookupService {
     ]);
     if (!pullRows?.length && !shimRows?.length) return null;
     const { data } = await this.supabase
-      .getAdminClient()
+      .getPrivilegedClient('reference-data: machining lookup tables, global shared')
       .from('machining_reference_data')
       .select('key, value')
       .eq('category', 'variable')

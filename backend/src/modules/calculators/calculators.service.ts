@@ -513,7 +513,7 @@ export class CalculatorsServiceV2 {
    *   roll_bending   → params: { machine_name, developed_length_mm, thickness_mm, target_diameter_mm }
    */
   async resolveSheetMetalLookup(tableName: string, params: Record<string, any>) {
-    const client = this.supabaseService.getAdminClient();
+    const client = this.supabaseService.getPrivilegedClient('reference-data: sm_lookup_stroke_rate, global shared');
 
     switch (tableName) {
       case 'stroke_rate': {

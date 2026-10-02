@@ -51,7 +51,7 @@ export class ChildPartCostService {
     const to = from + limit - 1;
 
     let queryBuilder = this.supabaseService
-      .getClient(accessToken)
+      .getUserClient(accessToken)
       .from('child_part_cost_records')
       .select('*', { count: 'exact' })
       .order('created_at', { ascending: false })

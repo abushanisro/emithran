@@ -117,7 +117,7 @@ export class SupabaseAuthGuard implements CanActivate {
         throw new UnauthorizedException('Authentication required');
       }
       request.user = await this.getAdminFallbackUser();
-      request.accessToken = null;
+      request.accessToken = await this.getBypassAccessToken();
       return true;
     }
 
@@ -135,8 +135,17 @@ export class SupabaseAuthGuard implements CanActivate {
           : new UnauthorizedException('Invalid or expired token');
       }
       request.user = await this.getAdminFallbackUser();
-      request.accessToken = null;
+      request.accessToken = await this.getBypassAccessToken();
       return true;
     }
+  }
+
+  /**
+   * A real session token for the bypass account, so bypass requests are subject to
+   * RLS like any user. Null only if minting fails, in which case any user-scoped
+   * DB access fails closed rather than falling back to the service-role client.
+   */
+  private async getBypassAccessToken(): Promise<string | null> {
+    return this.supabaseService.mintUserAccessToken(this.adminUserEmail);
   }
 }

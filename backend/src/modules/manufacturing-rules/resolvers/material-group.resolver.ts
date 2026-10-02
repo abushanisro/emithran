@@ -52,7 +52,7 @@ export class MaterialGroupResolver {
   constructor(private readonly supabase: SupabaseService) {}
 
   async resolve(materialGrade: string): Promise<MaterialGroupRecord> {
-    const db = this.supabase.getClient();
+    const db = this.supabase.getPrivilegedClient("reference-data: machining_material_groups");
     const grade = materialGrade.trim();
 
     // 1. Exact match on primary material_grade (case-insensitive)

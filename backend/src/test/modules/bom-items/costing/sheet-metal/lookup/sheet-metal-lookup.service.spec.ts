@@ -20,7 +20,7 @@ function fakeSupabaseService(rows: typeof MANUAL_STROKE_ROWS_80T_SIMPLE) {
     maybeSingle: async () => ({ data: null, error: null }),
     then: (resolve: (v: { data: unknown }) => void) => resolve({ data: rows }),
   };
-  return { getAdminClient: () => builder } as any;
+  return { getPrivilegedClient: () => builder } as any;
 }
 
 describe('SheetMetalLookupService.getManualStrokeTime', () => {
@@ -72,7 +72,7 @@ function fakeMachineReferenceData(rows: Array<{ raw: Record<string, unknown> }>)
     eq: (_col: string, _val: unknown) => builder,
     then: (resolve: (v: { data: unknown; error: null }) => void) => resolve({ data: rows, error: null }),
   };
-  return { getAdminClient: () => builder } as any;
+  return { getPrivilegedClient: () => builder } as any;
 }
 
 describe('SheetMetalLookupService.getWaterjetAbrasiveRateForMachine', () => {
@@ -270,7 +270,7 @@ function fakeVariableRows(rows: Array<{ key: string; value: string }>) {
     in: (_col: string, _vals: unknown[]) => builder,
     then: (resolve: (v: { data: unknown; error: null }) => void) => resolve({ data: rows, error: null }),
   };
-  return { getAdminClient: () => builder } as any;
+  return { getPrivilegedClient: () => builder } as any;
 }
 
 describe('SheetMetalLookupService.getToolingAnnualVolumeThresholds', () => {
@@ -401,7 +401,7 @@ describe('SheetMetalLookupService.getToolingComponentCosts', () => {
       select: (_cols: string) => builder,
       then: (resolve: (v: { data: unknown; error: null }) => void) => resolve({ data: rows, error: null }),
     };
-    return { getAdminClient: () => builder } as any;
+    return { getPrivilegedClient: () => builder } as any;
   }
 
   it('maps real rows through, including the null model of a single-variant component', async () => {
@@ -432,7 +432,7 @@ describe('SheetMetalLookupService.getToolingCoatingCostPerKg', () => {
       eq: (_col: string, _val: unknown) => builder,
       maybeSingle: () => Promise.resolve({ data: row, error: null }),
     };
-    return { getAdminClient: () => builder } as any;
+    return { getPrivilegedClient: () => builder } as any;
   }
 
   it('resolves the real rate for an exact (toolMaterial, coatingType) pair', async () => {

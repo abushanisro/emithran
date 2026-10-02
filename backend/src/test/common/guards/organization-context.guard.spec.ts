@@ -13,7 +13,7 @@ function makeSupabaseService(rows: Array<{ organization_id: string }>, error: an
   const eqUserId = jest.fn().mockReturnValue({ eq: eqStatus });
   const select = jest.fn().mockReturnValue({ eq: eqUserId });
   const from = jest.fn().mockReturnValue({ select });
-  return { getAdminClient: jest.fn().mockReturnValue({ from }) } as unknown as SupabaseService;
+  return { getPrivilegedClient: jest.fn().mockReturnValue({ from }) } as unknown as SupabaseService;
 }
 
 describe('OrganizationContextGuard', () => {

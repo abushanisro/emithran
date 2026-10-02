@@ -17,7 +17,7 @@ describe('LHRService.removeAll', () => {
     const adminClient = { from: fromMock };
 
     const supabaseService = {
-      getAdminClient: jest.fn().mockReturnValue(adminClient),
+      getPrivilegedClient: jest.fn().mockReturnValue(adminClient),
     } as unknown as SupabaseService;
 
     const service = new LHRService(
@@ -62,7 +62,7 @@ describe('LHRService.getEffectiveRate', () => {
 
     const supabaseService = {
       getClient: jest.fn().mockReturnValue({ from: jest.fn().mockReturnValue(shopQuery) }),
-      getAdminClient: jest.fn().mockReturnValue({ from: jest.fn().mockReturnValue(benchmarkQuery) }),
+      getPrivilegedClient: jest.fn().mockReturnValue({ from: jest.fn().mockReturnValue(benchmarkQuery) }),
     } as unknown as SupabaseService;
 
     return new LHRService(

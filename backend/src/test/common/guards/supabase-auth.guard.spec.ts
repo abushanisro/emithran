@@ -26,6 +26,7 @@ function makeSupabaseService(opts: {
     verifyToken: opts.verifyToken ?? jest.fn().mockRejectedValue(new Error('invalid token')),
     getAdminFallbackEmail: jest.fn().mockReturnValue(adminFallbackEmail),
     getAdminUserId: jest.fn().mockResolvedValue(adminUserId),
+    mintUserAccessToken: jest.fn().mockResolvedValue('minted-jwt'),
   } as unknown as SupabaseService;
 }
 

@@ -57,7 +57,7 @@ function makeSupabaseStub(script: {
 
   return {
     getClient: () => { clientCalls.push('getClient'); return { from }; },
-    getAdminClient: () => { clientCalls.push('getAdminClient'); return { from }; },
+    getPrivilegedClient: () => { clientCalls.push('getPrivilegedClient'); return { from }; },
     calls,
     insertPayload: () => calls.find((c) => c.method === 'insert')?.args?.[0],
     updatePayload: () => calls.find((c) => c.method === 'update')?.args?.[0],
@@ -70,7 +70,7 @@ function makeSupabaseStub(script: {
     // not just that the lookup happened to return the right data.
     benchmarkEqIdArg: () => calls.find((c) => c.table === 'mhr_benchmark_rates' && c.method === 'eq')?.args?.[1],
     benchmarkLhrEqIdArg: () => calls.find((c) => c.table === 'lhr_benchmark_rates' && c.method === 'eq')?.args?.[1],
-    usedAdminClientForBenchmarkLookup: () => clientCalls.includes('getAdminClient'),
+    usedAdminClientForBenchmarkLookup: () => clientCalls.includes('getPrivilegedClient'),
   };
 }
 
