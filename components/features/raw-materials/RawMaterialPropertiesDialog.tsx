@@ -31,6 +31,14 @@ function StockPricesSection({ materialId }: { materialId: string }) {
   const [price, setPrice] = useState<string>('');
 
   const current = (prices ?? []).filter((p) => p.location === STOCK_LOCATION);
+  const selected = current.find((p) => p.stockForm === form);
+
+  // Choosing a form shows its current price and fills the box with it.
+  const chooseForm = (value: string) => {
+    setForm(value);
+    const existing = current.find((p) => p.stockForm === value);
+    setPrice(existing ? existing.pricePerKg.toFixed(3) : '');
+  };
 
   const onSave = () => {
     const value = Number(price);
@@ -73,7 +81,7 @@ function StockPricesSection({ materialId }: { materialId: string }) {
       <div className="flex items-end gap-2">
         <div className="flex-1 space-y-1">
           <span className="text-xs text-muted-foreground">Stock form</span>
-          <Select value={form} onValueChange={setForm}>
+          <Select value={form} onValueChange={chooseForm}>
             <SelectTrigger className="h-8 text-xs">
               <SelectValue placeholder="Choose a form" />
             </SelectTrigger>
@@ -85,7 +93,9 @@ function StockPricesSection({ materialId }: { materialId: string }) {
           </Select>
         </div>
         <div className="w-32 space-y-1">
-          <span className="text-xs text-muted-foreground">USD per kg</span>
+          <span className="text-xs text-muted-foreground">
+            {form ? (selected ? `Current: $${selected.pricePerKg.toFixed(3)}/kg` : 'No price yet') : 'USD per kg'}
+          </span>
           <Input
             className="h-8 text-xs"
             inputMode="decimal"
