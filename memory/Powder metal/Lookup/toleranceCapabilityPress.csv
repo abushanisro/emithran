@@ -1,0 +1,5 @@
+From Length (mm),To Length (mm),Best Tolerance Hydraulic (mm),Best Tolerance Mechanical (mm)
+0.00,12.70,0.02,0.02
+12.70,50.80,0.02,0.03
+50.80,152.40,0.03,0.03
+152.40,"25,400,000.00",0.03,0.07

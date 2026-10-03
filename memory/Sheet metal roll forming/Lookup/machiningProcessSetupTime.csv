@@ -1,0 +1,7 @@
+﻿Process,Setup Time (min)
+cncMachiningLarge,60.00
+cncMachiningSmall,10.00
+dieSetupTime,32.00
+grinding,5.00
+QDCSetupTimeSaved,9.20
+wireEdm,10.00

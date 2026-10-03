@@ -1,0 +1,2 @@
+Density (kg / m^3),Eject Temp (°C),Mold Preheat Temp (°C),Name,Num Shots Per Tool,Binder Heat Of Fusion (J / kg),Binder Melting Temp (°C),Binder Specific Heat (J / kg * K)
+2800.00,35.00,70.00,Default,250000.00,990000.00,82.00,700.00

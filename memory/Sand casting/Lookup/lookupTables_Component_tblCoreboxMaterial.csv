@@ -1,0 +1,4 @@
+Corebox Cost Intercept (USD),Corebox Cost Percent,Corebox Length Allowance (mm),Corebox Refurb Life,Corebox Refurbs Per Tool,Learning Rate,One Cavity Cost (USD),Type
+920.00,10.00,50.00,5000.00,5.00,-0.70,920.00,Mahogany
+2300.00,20.00,50.00,1000000.00,15.00,-0.70,2300.00,Cast Iron
+3610.00,20.00,50.00,1000000.00,15.00,-0.70,3610.00,Plastic

@@ -1,0 +1,6 @@
+Name,Application,Target Density (g/L),Binder,Binder Weight (kg),Refractory1,Refractory1 Weight (kg),Refractory2,Refractory2 Weight (kg)
+Alumino Silicate Option 1,Secondary,1900.00,Colloidal Silica Based,19.05,Aluminosilicate 200 Mesh,49.74,,
+Ferrous Option 1,Primary,2170.00,Colloidal Silica Based,19.68,Fused Silica 200 Mesh,31.16,Zircon 200 Mesh,31.16
+Ferrous Option 2,Primary,3010.00,Colloidal Silica Based,19.93,Zircon 200 Mesh,93.76,,
+Fused Silica Option 1,Secondary,1680.00,Colloidal Silica Based,19.05,Fused Silica 120 Mesh,41.44,,
+Non-Ferrous Option 1,Primary,1710.00,Colloidal Silica Based,21.31,Fused Silica 200 Mesh,43.27,,

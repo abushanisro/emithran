@@ -1,0 +1,6 @@
+Sand Type,Bench Life Min (min),Bench Life Max (min),Stripping Time Min (min),Stripping Time Max (min)
+Acid cure,5.00,10.00,15.00,20.00
+Alkyd,10.00,12.00,45.00,60.00
+Ester cure,4.00,12.00,10.00,30.00
+Furan,7.00,8.00,30.00,40.00
+Pepset,2.00,3.00,5.00,7.00

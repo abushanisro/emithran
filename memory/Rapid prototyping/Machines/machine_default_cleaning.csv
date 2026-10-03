@@ -1,0 +1,29 @@
+Field,Value
+Digital Factory,aPriori USA
+Sector,World Average
+Name,Default Cleaning
+Labor Rate (USD / hr),30.49
+Direct Overhead Rate (USD / hr),0.15
+Indirect Overhead Rate (USD / hr),14.48
+Overhead Multiplier,1.00
+Number of Operators,1.00
+Labor Time Standard,1.00
+Wage Grade Name,
+Work Center Labor Rate Factor,1.00
+Setup Time (hr),0.00
+Is Preferred,true
+Avg Utilization,1.00
+Good Part Yield,1.00
+Machine Price (USD),0.00
+Machine Length (mm),1520.00
+Machine Width (mm),1520.00
+Footprint Allowance Factor,2.00
+Machine Power (kW),1.00
+Installation Factor (%),20.00
+Machine Uptime (%),80.00
+Annual Maintenance Factor (%),5.00
+Machine Life (yr),15
+Salvage Value Factor (%),0.00
+Supplies Cost (USD / yr),0.00
+Machine Manufacturer Location,USA
+Data Source,aPriori Baseline

@@ -1,0 +1,33 @@
+Material Type,Min External Radii (mm),Min Internal Radii (mm),Process Name
+Aluminum,0.30000,3.00000,Sand Casting
+Aluminum,0.50000,0.25000,High Pressure Die Casting
+Aluminum,6.00000,2.00000,Gravity Die Casting
+Aluminum Bronze,0.30000,3.00000,Sand Casting
+Aluminum Bronze,1.00000,0.50000,High Pressure Die Casting
+Aluminum Bronze,9.00000,3.00000,Gravity Die Casting
+Brass,0.23000,2.30000,Sand Casting
+Brass,1.00000,0.50000,High Pressure Die Casting
+Brass,9.00000,3.00000,Gravity Die Casting
+Bronze,0.23000,2.30000,Sand Casting
+Bronze,1.00000,0.50000,High Pressure Die Casting
+Bronze,9.00000,3.00000,Gravity Die Casting
+Copper,0.23000,2.30000,Sand Casting
+Copper,1.00000,0.50000,High Pressure Die Casting
+Copper,9.00000,3.00000,Gravity Die Casting
+Lead,1.00000,0.50000,High Pressure Die Casting
+Lead,9.00000,3.00000,Gravity Die Casting
+Magnesium,0.30000,3.00000,Sand Casting
+Magnesium,0.50000,0.25000,High Pressure Die Casting
+Magnesium,6.00000,2.00000,Gravity Die Casting
+Manganese Bronze,0.23000,2.30000,Sand Casting
+Manganese Bronze,1.00000,0.50000,High Pressure Die Casting
+Manganese Bronze,9.00000,3.00000,Gravity Die Casting
+Silicon Brass,0.23000,2.30000,Sand Casting
+Silicon Brass,1.00000,0.50000,High Pressure Die Casting
+Silicon Brass,9.00000,3.00000,Gravity Die Casting
+Zinc,0.30000,0.15000,High Pressure Die Casting
+Zinc,0.30000,3.00000,Sand Casting
+Zinc,3.00000,3.00000,Gravity Die Casting
+Zinc-Aluminum,3.00000,3.00000,Sand Casting
+Zinc-Aluminum,1.00000,0.50000,High Pressure Die Casting
+Zinc-Aluminum,9.00000,3.00000,Gravity Die Casting

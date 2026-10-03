@@ -1,0 +1,33 @@
+Material Type,Min Draft Angle (deg),Process Name
+Aluminum,0.25,High Pressure Die Casting
+Aluminum,0.50,Gravity Die Casting
+Aluminum,0.50,Sand Casting
+Aluminum Bronze,0.25,High Pressure Die Casting
+Aluminum Bronze,0.50,Gravity Die Casting
+Aluminum Bronze,0.50,Sand Casting
+Brass,0.50,Gravity Die Casting
+Brass,0.50,Sand Casting
+Brass,0.70,High Pressure Die Casting
+Bronze,0.50,Gravity Die Casting
+Bronze,0.50,Sand Casting
+Bronze,0.70,High Pressure Die Casting
+Copper,0.50,Gravity Die Casting
+Copper,0.50,Sand Casting
+Copper,0.70,High Pressure Die Casting
+Lead,0.25,High Pressure Die Casting
+Lead,0.50,Gravity Die Casting
+Magnesium,0.50,Gravity Die Casting
+Magnesium,0.50,Sand Casting
+Magnesium,0.60,High Pressure Die Casting
+Manganese Bronze,0.50,Gravity Die Casting
+Manganese Bronze,0.50,Sand Casting
+Manganese Bronze,0.70,High Pressure Die Casting
+Silicon Brass,0.50,Gravity Die Casting
+Silicon Brass,0.50,Sand Casting
+Silicon Brass,0.70,High Pressure Die Casting
+Zinc,0.50,High Pressure Die Casting
+Zinc,0.50,Gravity Die Casting
+Zinc,0.50,Sand Casting
+Zinc-Aluminum,0.25,High Pressure Die Casting
+Zinc-Aluminum,0.50,Gravity Die Casting
+Zinc-Aluminum,0.50,Sand Casting

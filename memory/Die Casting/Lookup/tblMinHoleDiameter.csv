@@ -1,0 +1,33 @@
+Material Type,Min Hole Diameter (mm),Process Name
+Aluminum,2.40,High Pressure Die Casting
+Aluminum,4.00,Gravity Die Casting
+Aluminum,4.80,Sand Casting
+Aluminum Bronze,2.40,High Pressure Die Casting
+Aluminum Bronze,4.80,Gravity Die Casting
+Aluminum Bronze,4.00,Sand Casting
+Brass,4.80,Gravity Die Casting
+Brass,4.00,High Pressure Die Casting
+Brass,4.80,Sand Casting
+Bronze,4.00,Gravity Die Casting
+Bronze,4.80,High Pressure Die Casting
+Bronze,4.00,Sand Casting
+Copper,4.80,Gravity Die Casting
+Copper,4.00,High Pressure Die Casting
+Copper,4.80,Sand Casting
+Lead,2.40,High Pressure Die Casting
+Lead,4.80,Gravity Die Casting
+Magnesium,2.40,High Pressure Die Casting
+Magnesium,4.80,Gravity Die Casting
+Magnesium,4.00,Sand Casting
+Manganese Bronze,4.80,Gravity Die Casting
+Manganese Bronze,4.00,High Pressure Die Casting
+Manganese Bronze,4.80,Sand Casting
+Silicon Brass,4.80,Gravity Die Casting
+Silicon Brass,4.80,High Pressure Die Casting
+Silicon Brass,4.00,Sand Casting
+Zinc,0.80,High Pressure Die Casting
+Zinc,4.00,Gravity Die Casting
+Zinc,4.80,Sand Casting
+Zinc-Aluminum,0.80,High Pressure Die Casting
+Zinc-Aluminum,4.80,Gravity Die Casting
+Zinc-Aluminum,4.00,Sand Casting

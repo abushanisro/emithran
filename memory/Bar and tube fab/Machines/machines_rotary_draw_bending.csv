@@ -1,0 +1,13 @@
+Name,Machine Type Info,Labor Rate (USD / hr),Direct Overhead Rate (USD / hr),Indirect Overhead Rate (USD / hr),Overhead Multiplier,Number of Operators,Labor Time Standard,Wage Grade Name,Work Center Labor Rate Factor,Setup Time (hr),Load+Unload Time (s),Unload Time (s),Mandrel Bend Time (s),Non Mandrel Bend Time (s),Clock Angle Rotate Time (s),Axial Feed Rate (mm / s),Max Bend Angle (deg),Base Programming Time (min),Is Preferred
+Pines Model 1,hydraulic,36.97,5.24,15.15,0.00,1.00,1.30,,1.00,0.50,5.00,3.00,12.00,8.00,2.00,100.00,190.00,25.00,false
+Pines Model 1 1/4,hydraulic,36.97,5.73,15.63,0.00,1.00,1.30,,1.00,0.50,5.00,3.00,12.00,8.00,2.00,100.00,190.00,25.00,false
+Pines Model 2,hydraulic,36.97,6.34,15.63,0.00,1.00,1.30,,1.00,0.50,5.00,3.00,12.00,8.00,2.00,100.00,190.00,25.00,false
+Pines Model 3,hydraulic,36.97,3.91,17.44,0.00,1.00,1.30,,1.00,0.50,5.00,3.00,12.00,8.00,2.00,100.00,190.00,25.00,false
+Pines Model 3/4,hydraulic,36.97,6.34,15.15,0.00,1.00,1.30,,1.00,0.50,5.00,3.00,12.00,8.00,2.00,100.00,190.00,25.00,false
+Pines Model 4,hydraulic,36.97,11.79,17.44,0.00,1.00,1.30,,1.00,0.50,5.00,3.00,12.00,8.00,2.00,100.00,190.00,25.00,false
+Pines Model 6,hydraulic,36.97,25.73,15.66,0.00,1.00,1.30,,1.00,0.50,5.00,3.00,12.00,8.00,2.00,100.00,190.00,25.00,false
+Pines Model 8,hydraulic,36.97,28.76,15.66,0.00,1.00,1.30,,1.00,0.50,5.00,3.00,12.00,8.00,2.00,100.00,190.00,25.00,false
+Rotary Draw Bender - 150mm Max Tube Diameter,hydraulic,36.97,13.61,15.99,0.00,1.00,1.30,,1.00,0.50,5.00,3.00,12.00,8.00,2.00,100.00,190.00,25.00,true
+Rotary Draw Bender - 250mm Max Tube Diameter,hydraulic,36.97,28.76,16.67,0.00,1.00,1.30,,1.00,0.50,5.00,3.00,12.00,8.00,2.00,100.00,190.00,25.00,true
+Rotary Draw Bender - 75mm Max Tube Diameter,hydraulic,36.97,5.43,15.18,0.00,1.00,1.30,,1.00,0.50,5.00,3.00,12.00,8.00,2.00,100.00,190.00,25.00,true
+Silfax SE 32 LR,hydraulic,36.97,15.13,15.83,0.00,1.00,1.30,,1.00,0.50,5.00,3.00,12.00,8.00,2.00,300.00,180.00,25.00,false

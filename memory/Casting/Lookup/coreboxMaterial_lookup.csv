@@ -1,0 +1,11 @@
+﻿Name,coreboxMaterial
+File Path,lookupTables/Component/coreboxMaterial.csv
+Lookup Key,type
+Lookup Type Name,Component//coreboxMaterial
+Stored Type Name,Component//coreboxMaterial
+Table Class Name,com.fbc.datamodel.costmodel.casting.CoreboxMaterial
+
+Corebox Cost Intercept (USD),Corebox Cost Percent,Corebox Length Allowance (mm),Corebox Refurb Life,Corebox Refurbs Per Tool,Learning Rate,One Cavity Cost (USD),Type
+920.00,10.00,50.00,"5,000.00",5.00,-0.70,920.00,Mahogany
+"2,300.00",20.00,50.00,"1,000,000.00",15.00,-0.70,"2,300.00",Cast Iron
+"3,610.00",20.00,50.00,"1,000,000.00",15.00,-0.70,"3,610.00",Plastic

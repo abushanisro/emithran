@@ -1,0 +1,35 @@
+﻿Material Type,Min External Radii (mm),Min Internal Radii (mm),Process Name
+ABS,0.38100,0.12700,Insert Injection Molding
+ABS,1.52400,1.52400,Insert Structural Foam Molding
+Acetal,0.38100,0.12700,Insert Injection Molding
+Acetal,1.52400,1.52400,Insert Structural Foam Molding
+Acrylic,0.38100,0.12700,Insert Injection Molding
+Acrylic,1.52400,1.52400,Insert Structural Foam Molding
+Nylon,0.38100,0.12700,Insert Injection Molding
+Nylon,0.76200,1.58750,Insert Reaction Injection Molding
+Nylon,1.52400,1.52400,Insert Structural Foam Molding
+PBT,0.38100,0.12700,Insert Injection Molding
+PBT,1.52400,1.52400,Insert Structural Foam Molding
+PET,0.38100,0.12700,Insert Injection Molding
+PET,1.52400,1.52400,Insert Structural Foam Molding
+Polycarbonate,0.38100,0.12700,Insert Injection Molding
+Polycarbonate,1.52400,1.52400,Insert Structural Foam Molding
+Polypropylene,0.38100,0.12700,Insert Injection Molding
+Polypropylene,1.52400,1.52400,Insert Structural Foam Molding
+Polystyrene,0.38100,0.12700,Insert Injection Molding
+Polystyrene,1.52400,1.52400,Insert Structural Foam Molding
+Polyurethane,0.76200,1.58750,Insert Reaction Injection Molding
+PPS,0.38100,0.12700,Insert Injection Molding
+PPS,1.52400,1.52400,Insert Structural Foam Molding
+TPA,0.38100,0.12700,Insert Injection Molding
+TPA,1.52400,1.52400,Insert Structural Foam Molding
+TPE,0.38100,0.12700,Insert Injection Molding
+TPE,1.52400,1.52400,Insert Structural Foam Molding
+TPO,0.38100,0.12700,Insert Injection Molding
+TPO,1.52400,1.52400,Insert Structural Foam Molding
+TPS,0.38100,0.12700,Insert Injection Molding
+TPS,1.52400,1.52400,Insert Structural Foam Molding
+TPU,0.38100,0.12700,Insert Injection Molding
+TPU,1.52400,1.52400,Insert Structural Foam Molding
+TPV,0.38100,0.12700,Insert Injection Molding
+TPV,1.52400,1.52400,Insert Structural Foam Molding

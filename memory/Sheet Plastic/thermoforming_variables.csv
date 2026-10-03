@@ -1,0 +1,139 @@
+﻿Variable Name,String Value,Unit Type Name,Notes
+actionBaseDimLarge,38.0,Length,Large side action base dimension.
+actionBaseDimMedium,31.0,Length,Medium side action base dimension.
+actionBaseDimSmall,19.0,Length,Small side action base dimension.
+actionLengthToHeightThreshold,1.5,,Ratio of action length to height which must be exceeded to use lighter length for length calculation.
+airTemp,20,Temperature,The ambient temperature of the environment that sheets are processed in. Used to calculate cooling time.
+applyPressureTime,3,Time,The time to apply pressure if pressure forming is used to create the part.
+baffleSpacing,76.2,Length,Linear spacing of baffle holes in water plate.
+buildCorePullLengthAdder,6.35,Length,Adder applied to core pull length when determining if core pull length factored by actionLengthToHeightThreshold is greater than core pull height.
+burnsPerLargeCorePull,1,,Number of burns required to EDM a large core pull.
+burnsPerMediumCorePull,1,,Number of burns required to EDM a medium core pull.
+burnsPerSmallCorePull,1,,Number of burns required to EDM a small core pull.
+capHeadScrewLongMoldBaseSpacing,152.4,Length,Spacing of the long socket cap head screws around the mold base perimeter used to assemble the mold plate to the water plate.
+capHeadScrewLongPressureBoxSpacing,304.8,Length,Spacing of the long socket cap head screws around the perimeter of the base of the pressure box used to assemble the pressure box side walls to the base.
+capHeadScrewShortSidewall,8,,Number of short socket cap head screws required to assemble the sidewalls of the pressure box together. Used to calculate Thermoforming tooling costs.
+cavityFinishThermoforming,SPI C3 - Normal Matte,,Default finish applied to cavity surface for Thermoforming. Available options are contained in the 'Detailed Finish Name' column of the SPIFinishes table.
+cavityTextureThermoforming,None,,The default textured mold cavity finish requirement for Thermoforming. A tooling cost driver. Value must match the 'Texture Name' of an entry in the look-up table 'cavityTextures'.
+clampFrameClearanceMargin,12.7,Length,
+clampFrameMargin,38.1,Length,
+clampingTime,2,Time,The time required to clamp the sheet in the thermoforming machine's clamp frame.
+cmmComplexityFactor,1.0,,Scaling factor used to manipulate CMM complexity of mold tool.
+corePullBundleFaceLengthThresholdMedium,215.9,Length,Threshold for medium core bundle face length. A core bundle with face length less than this is classified as medium. A core bundle with face length greater than this is classified as large.
+corePullBundleFaceLengthThresholdSmall,76.2,Length,Threshold for small core bundle face length. A core bundle with face length less than this is classified as small.
+corePullHeightAdder,38.1,Length,Default core pull height adder.
+corePullLengthAdderLarge,50.0,Length,Large core pull length adder.
+corePullLengthAdderMedium,38.1,Length,Medium core pull length adder.
+corePullLengthAdderSmall,25.4,Length,Small core pull length adder.
+corePullMovementRate,100,Velocity,Average movement speed of a core pull as it extends/retracts from/into the tool to make undercuts and release the part from the tool.
+corePullVolumeLarge,28677354,Volume,Volume of a standard large core pull.
+corePullVolumeMedium,13109647,Volume,Volume of a standard medium core pull.
+corePullVolumeSmall,1229032,Volume,Volume of a standard small core pull.
+corePullWidthAdder,25.4,Length,Default core pull width adder.
+cutterPathComplexityFactorComplex,0.18,,Complexity factor applied to the base mold tool CNC time to increase this for complex molds. Complex mold are defined when parting line complexity is NON FLAT.
+cutterPathComplexityFactorSimple,0.1,,Complexity factor applied to the base mold tool CNC time to increase this for simple molds. Simple mold are defined when parting line complexity is FLAT.
+cycleTimeAdjustmentFactor,1,,Factor used to globally increase or decrease cycle time evaluations per process.
+defaultToolLife,260000,,The default number of shots per tool which is used to determine tool life. This is the median value of the available data relating to tool life by part material type.
+defaultUtilizationMethod,COMPUTED,,"Eligible values: ""COMPUTED"" & ""MACHINE_DEFAULT"""
+densityCopper,8400,kg/m^3,Density of cooper used for EDM electrodes.
+densityGraphite,3514,kg/m^3,Density of graphite used for EDM electrodes.
+designCorePullSurfacesTimeBase,3,hr,Minimum time required to design the surfaces of the core pull surfaces.
+designEdmElectrodeActionsTimeBase,0.5,,Time required to design electrodes for facing core pull actions. Time is per core pull action.
+designEdmElectrodePocketsTimeBase,0.5,,Time required to design electrodes for core pull pockets. Time is per core pull pocket.
+designMoldSurfacesTimeBase,5,hr,Minimum time required to design the surfaces of the mold tool.
+designPlugSurfacesTimeBase,1,hr,Minimum time required to design the surfaces of the plug tool.
+disableInvestmentAmortization,false,,"User override to disable amortization of all fixed costs to the individual part or assembly. By default, fixed costs are calculated per part for tooling, fixtures, and programming."
+edmElectrodeActionVolumeBurn,0.01,,Percentage of electrode volume used for burning core pull action faces.
+edmElectrodePocketVolumeBurn,0.01,,Percentage of electrode volume used for burning core pull pocket faces.
+edmElectrodesPercentMachined,0.2,,The fractional percentage of the total volume of EDM electrodes that is CNC machined.
+electrodeBundledPockets,5,,Number of electrodes which are bundled when pockets are being created by EDM.
+electrodeMaterial,Carbon,,Default EDM electrode material. Available options are 'Carbon' or 'Copper'.
+enableScrapMaterialCredit,false,,Set to 'true' to enable Material Cost reduction due to sale of scrap mass of part.
+enableScrapPartCredit,false,,Set to 'true' to enable Material Cost reduction due to sale of scrapped parts as a result of Good Part Yield.
+fanAirSpeed,10,m/s,The average air speed generated by cooling fans. Used to calculate cooling time.
+finishAreaPercentage,50,,Percentage of the part's surface area on the tool facing side that is finished. This is used to determine the default value for the finishAreaPercentage PSO.
+finishingLCStep,10000,,"Adjusts the learning curve for function finishingRateAdjustedByLC used to adjust the finishingRate. Measured in sq mm, the smaller this value, the less amount of surface area needs to be worked to get faster at finishing."
+gearQualityDefaultAgmaNewStd,A8,,"A2, A3, A4, ... A11, A12"
+gearQualityDefaultAgmaOldStd,Q8,,"Q15, Q14, Q13, ... Q6, Q5"
+gearQualityDefaultDinStd,9,,"2, 3, 4, ... 11, 12"
+genericValidation,true,,'true' if the generic validation view should be used for parts costed in this process group in this Digital Factory
+includeHeatTreat,false,,Determines the default behaviour whether heat treatment is included in the mold tool manufacturing process.
+includeStressRelief,false,,Determines the default behaviour whether stress relief is included in the mold tool manufacturing process.
+laborRateAdjustmentFactor,1,,Factor used to globally increase or decrease labor rate per process.
+maxActionLength,500,Length,The maximum allowed length of a tooling action. The length is measured along the direction that is orthogonal to both setup axis and draw direction.
+maxCoreDepthPitch,25.4,Length,The maximum allowed distance between adjacent GCD front positions to bundle on the same tooling action.
+maxGCDPitch,50.8,Length,The maximum allowed distance between GCDs in the same tooling action. The distance is measured along the direction that is orthogonal to both setup axis and draw direction.
+maxGcdDistanceFromPartEdge,25.4,Length,The maximum allowed distance from a GCD to the part edge to bundle on a tooling action.
+maxMoldPlateCapHeadDrillDepth,25.4,Length,Maximum drill depth for the tapped holes required for assembly of the socket cap head screws to the mold plate.
+maxPlugThreadedAttachmentDepth,38.1,Length,Maximum length of threaded end section of the plug ram required to attach and assemble the plug.
+maxPressureBoxCapHeadCounterBoreDepth,14.0,Length,Maximum counter bore depth of the holes on the pressure box base and side walls required for assembly of the socket cap head screws to the pressure box.
+maxPressureBoxCapHeadDrillDepth,25.4,Length,Maximum drill depth for the tapped holes required for assembly of socket cap head screws to the pressure box.
+maxWaterPlateCapHeadCounterBoreDepth,20.0,Length,Maximum counter bore depth of the holes on the water plate required for assembly of the socket cap head screws to the mold plate.
+minMoldPlateThickness,50.8,Length,Minimum thickness of the base of the mold plate. Used to calculate Thermoforming tooling costs.
+minPressureBoxHeadRoom,12.7,Length,Minimum height of the head room air gap allowance between the base of the pressure box and the highest point of the mold plate. Used to calculate Thermoforming tooling costs.
+minPressureBoxSidewallThickness,12.7,Length,Minimum thickness of the side walls of the pressure box if required. Used to calculate Thermoforming tooling costs.
+minPressureBoxThickness,25.4,Length,Minimum thickness of the base of the pressure box if required. Used to calculate Thermoforming tooling costs.
+minWaterPlateThickness,76.2,Length,Minimum thickness of the water plate. Used to calculate Thermoforming tooling costs.
+miscMoldWeightAdder,0.1,,Percentage of calculated mold weight added for additional miscellaneous components. Used to calculate Thermoforming tooling costs.
+moldPlating,None,,Default mold plating. Available options are listed in tblToolCoating. Used to calculate Thermoforming tooling costs.
+moldSurfaceCountThresholdAverage,2500,,Threshold of number of surfaces on the part which define the part as average complexity. Used to calculate Thermoforming tooling costs.
+moldSurfaceCountThresholdSimple,500,,Threshold of number of surfaces on the part which define the part as simple complexity. Used to calculate Thermoforming tooling costs.
+moldType,POSITIVE,,The default mold type used to form the part. Options are 'POSITIVE' or 'NEGATIVE'.
+numTryOutBase,2,,Default number of mold tool try-outs. Used to calculate Thermoforming tooling costs.
+overheadRateAdjustmentFactor,1,,Factor used to globally increase or decrease overhead rate per process.
+partSpacingMultiplierPositiveTool,1,,Multiplier used to determine the minimum spacing between parts when using a positive tool.
+partSpacingNegativeTool,25.4,Length,The minimum part spacing required when using a negative tool.
+partSpacingPositiveTool,10.16,Length,The minimum part spacing required when using a positive tool.
+partingLineComplexityMultiplierFlat,0.013,,Scaling factor used to adjust design surface base hours for FLAT parting lines.
+partingLineComplexityMultiplierNonFlat,0.026,,Scaling factor used to adjust design surface base hours for NON FLAT parting lines.
+plugAssistToolingRequired,false,,Determines the default behavior when determining whether plug-assist tooling is required to form the part.
+plugMovementRate,100,Velocity,The rate at which the plug-assist tooling moves towards and away from the sheet.
+plugRamDiameter,25.4,Length,Default diameter of the ram used to raise and lower the plug tool if required.
+plugSizeFactor,0.75,,Factor applied to the total part volume to determine the volume of the plug tool if required. Used to calculate Thermoforming tooling costs.
+pneumaticCylindersPerSet,5,,Number of pneumatic cylinders that can be supplied by the number of pneumatic manifolds per set. Used to calculate Thermoforming tooling costs.
+pneumaticHoseFittingsPerHose,2,,Number of pneumatic line hose fittings required per hose. Used to calculate Thermoforming tooling costs.
+pneumaticHoseUnitLengthMultiplier,0.5,,Multiplier used to determine the minimum length of an individual pneumatic line hose where hose unit length is measured in meters.
+pneumaticHosesPerCylinder,2,,Number of pneumatic line hoses required per pneumatic cylinder. Used to calculate Thermoforming tooling costs.
+pneumaticManifoldsPerCylinderSet,2,,Number of pneumatic manifolds that can supply the number of pneumatic cylinders per set. Used to calculate Thermoforming tooling costs.
+pocketElectrodeAdder,50.8,Length,Adder applied to core pull height for pocket electrodes.
+pressureFeedDiameter,12.0,Length,Default diameter of the pressure feed hole through the base of the pressure box. Used to calculate Thermoforming tooling costs.
+pressureFormingRequired,false,,Default option for using pressure forming. Options are 'true' or 'false'.
+textureAreaPercentage,50,,Percentage of part's surface area on the tool facing side that is textured. This is used to determine the default value for the textureAreaPercentage PSO.
+thicknessSnap,0.05,Length,The mm error between the required sheet thickness dimension and the closest actual stock size.
+timePerTryoutBase,12,hr,Minimum time required for a single tool try-out. Used to calculate Thermoforming tooling costs.
+toolBlastingRate,500,Time/m^2,Time in seconds to bead blast 1 square meter of tool. Used to calculate tool texturing time.
+toolChemicalEtchingRate,3000,Time/mm,Time in seconds to etch 1 millimeter of texture depth. Used to calculate tool texturing time.
+toolCleaningRate,2150,Time/m^2,Time in seconds to hand clean 1 square meter of tool. Used to calculate tool texturing time.
+toolDryingTime,1500,Time,Time in seconds to dry tool after cleaning. One-size fits all. Not area based. Used to calculate tool texturing time.
+toolMaskingRate,5285,Time/m^2,Time in seconds to mask 1 square meter of tool. Used to calculate tool texturing time.
+toolMovementRate,100,Velocity,The rate at which the tool moves towards and away from the sheet.
+toolPhotoMaskUVExposureTime,1200,Time,Time in seconds to develop photomask. One-size fits all. Not area based. Used to calculate tool texturing time.
+toolRunOffMargin,38.1,Length,
+unClampingTime,2,Time,The time required to unclamp the sheet from the thermoforming machine's clamp frame.
+usePreferredMachines,true,,"If true, the model will first try to select a preferred machine. If false, the system chooses either the default machine or from the entire non-preferred set of machines."
+utilizationStepAngle,45,Angle,
+vacuumChannelAllowanceFactor,4,,Factor applied to the vacuum channel depth to determine the thickness allowance for the mold and water plate. Used to calculate Thermoforming tooling costs.
+vacuumChannelDepth,5.08,Length,Default vacuum channel depth. Used to calculate Thermoforming tooling costs.
+vacuumFeedDiameter,38.1,Length,Diameter of the vacuum feed hole in the water plate. Used to calculate Thermoforming tooling costs.
+vacuumHoleHighTolDiameter,1.5,Length,Diameter of the high tolerance vacuum holes on the mold plate in contact with the tool facing side of the part. Used to calculate Thermoforming tooling costs.
+vacuumHoleHighTolFactor,0.2,,Factor applied to the total vacuum hole depth that determines the ratio of high tolerance depth to low tolerance depth. Used to calculate Thermoforming tooling costs.
+vacuumHoleLowTolDiameter,5,Length,Diameter of the low tolerance vacuum holes on the back of the mold plate used to feed the high tolerance vacuum holes. Used to calculate Thermoforming tooling costs.
+vacuumHoleSpacing,38.1,Length,Spacing of the vacuum holes along the part's projected perimeter. Used to calculate Thermoforming tooling costs.
+vacuumHoseFittingsPerHose,2,,Number of vacuum line hose fittings required per hose. Used to calculate Thermoforming tooling costs.
+vacuumHoseUnitLengthMultiplier,0.5,,Multiplier used to determine the minimum length of an individual vacuum line hose where hose unit length is measured in meters.
+vacuumHosesPerToolBase,1,,Minimum number of vacuum line hoses required per tool. Used to calculate Thermoforming tooling costs.
+verticalBandSawMaxHumanFeedRate,30,Velocity,Maximum feed rate for a person to operate a vertical band saw. Used to calculate cycle time for the Vertical Band Saw process.
+waterHoseFittingsPerHose,2,,Number of water line hose fittings required per hose. Used to calculate Thermoforming tooling costs.
+waterHoseUnitLengthMultiplier,0.5,,Multiplier used to determine the minimum length of an individual water line hose where hose unit length is measured in meters.
+waterHosesPerManifold,4,,Number of water line hoses required per water line manifold. Used to calculate Thermoforming tooling costs.
+waterHosesPerToolBase,2,,Minimum number of water line hoses required per tool. Used to calculate Thermoforming tooling costs.
+waterLineCounterBoringTime,45,Time,The time required to counter bore a water line channel. Used to calculate Thermoforming tooling costs.
+waterLineDiameter,8,Length,Default water line diameter. Used to calculate Thermoforming tooling costs.
+waterLineDiameterAllowanceFactor,4,,Factor applied to the water line diameter to determine the thickness allowance for the water plate. Used to calculate Thermoforming tooling costs.
+waterLineSpacing,76.2,Length,Linear spacing of water lines in the water plate. Used to calculate Thermoforming tooling costs.
+waterLineTappingTime,45,Time,The time required to tap a water line channel. Used to calculate Thermoforming tooling costs.
+waterManifoldSpacingThresholdMedium,1612900,Area,Threshold of mold tool area which determines that the mold tool is considered medium.
+waterManifoldSpacingThresholdSmall,338709,Area,Threshold of mold tool area which determines that the mold tool is considered small.
+waterManifoldsTotalLarge,4,,Total number of water manifolds on the mold tool if the mold tool area is considered to be larger than waterManifoldSpacingThresholdMedium.
+waterManifoldsTotalMedium,2,,Total number of water manifolds on the mold tool if the mold tool area is considered to be smaller than waterManifoldSpacingThresholdMedium yet larger than waterManifoldSpacingThresholdSmall.
+waterManifoldsTotalSmall,0,,Total number of water manifolds on the mold tool if the mold tool area is considered to be smaller than waterManifoldSpacingThresholdSmall.

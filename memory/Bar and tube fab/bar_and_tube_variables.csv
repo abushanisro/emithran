@@ -1,0 +1,51 @@
+Variable Name,String Value,Unit Type Name,Notes
+allowPerimeterMachiningPlusTouchUpOnCutouts,true,,Allows for Perimeter Machining on Cutouts which have Sharp Corners (If some other criteria is met)
+averageFlowStressAluminum,40,MPa,The average Flow Stress for 6000 Aluminum for extrusion.
+averageStrainRateAluminum,50,,The average Strain Rate for 6000 Aluminum for extrusion.
+bandSawKerf,3,,Width of the saw cut. In most cases the kerf is wider than the saw blade. Used to calculate the number of parts per stock.
+circSawKerf,3,,Width of the saw cut. In most cases the kerf is wider than the saw blade. Used to calculate the number of parts per stock.
+cycleTimeAdjustmentFactor,1,,Factor used to globally increase or decrease cycle time evaluations per process.
+defaultMaximumTongueRatio,14,,The default maximum achievable tongue ratio for extrusions.
+defaultRoomTemp,23,Temperature,The default room temperature.
+defaultUnitSystem,US,,Default Unit System. US or metric. Currently only impacts some Generic Extrusion functionality
+defaultUtilizationMethod,COMPUTED,,"Eligible values: ""COMPUTED"" & ""MACHINE_DEFAULT"""
+disableInvestmentAmortization,false,,User override to disable amortization of all fixed costs to the individual part or assembly. By default fixed costs are calculated per part for tooling fixtures and programming.
+enableScrapMaterialCredit,false,,Set to 'true' to enable Material Cost reduction due to sale of scrap mass of part.
+enableScrapPartCredit,false,,Set to 'true' to enable Material Cost reduction due to sale of scrapped parts as a result of Good Part Yield.
+failNotSupportedGcds,true,,If true Not Supported GCDs will fail to cost; if false Not Supported GCDs will cost successfully as a No Cost Feature.
+finishMaterialAllowance,0.25,Length,The depth of cut that is applied to features when finishing operations are included. Used to calculate volume removed by machining.
+gearQualityDefaultAgmaNewStd,A8,,"A2, A3, A4, ... A11, A12"
+gearQualityDefaultAgmaOldStd,Q8,,"Q15, Q14, Q13, ... Q6, Q5"
+gearQualityDefaultDinStd,9,,"2, 3, 4, ... 11, 12"
+genericValidation,true,,'true' if the generic validation view should be used for parts costed in this process group in this Digital Factory
+laborRateAdjustmentFactor,1,,Factor used to globally increase or decrease cycle time evaluations per process.
+manualMarkingTime,30,Time,Default standard time to mark the cut location and cut perimeter for manual cutting operations.
+maxBendBrakeRadius,42,Length,Maximum bend radius that can be done in a single step bend
+maxPartsPerBundleBandSaw,18,,Maximum number of parts allowed in a bundle of parts cut by a Band Saw.
+maxPartsPerBundleCircSaw,18,,Maximum number of parts allowed in a bundle of parts cut by a Circular Saw.
+maxPartsPerBundleRecipSaw,18,,Maximum number of parts allowed in a bundle of parts cut by a Reciprocating Saw.
+maxPossibleNestedPartsOnDie,12,,The maximum possible number of nested parts on a die
+maxSawableCutoutAngle,45,Angle,The max Angle of a Cutout relative to the Direction of extrusion which can be sawed
+maxStandardNestedPartsOnDie,6,,The maximum standard number of nested parts on a die
+min2RollBendingDiameterRatio,1.15,,Ratio which determines smallest achievable roll diameter as a function of the top roll diameter of machine
+minBendRadiusRatio,0.5,,Factor to determine whether the bend radius is less than the recommended bend radius.
+minLegLength,75,,Minimum leg length. Used to determine the trim allowance.
+minimumAcceptableRamSpeed,1,Velocity,The minimum acceptable ram speed limit for determining part nesting and machine selection.
+overheadRateAdjustmentFactor,1,,Factor used to globally increase or decrease cycle time evaluations per process.
+oxyFuelCutKerf,.4,,Width of the OxyFuel torch. Used to calculate the number of parts per stock.
+parisExponentAluminum,0.125,,The Paris Exponent value for 6000 Aluminim at 500 Celsius
+profileBendExtrusionsOnlyRoutingPreference,true,,If true the model will evaluate Profile Bend processes for Generic Extrusion stock forms only.
+recipSawKerf,3,,Width of the saw cut. In most cases the kerf is wider than the saw blade. Used to calculate the number of parts per stock.
+referenceTensileStrength,306.8,Pressure,Tensile strength at which single pass will switch to multipass for roll bending machine
+rollThicknessRatio,0.9,,Ratio of part thickness as a function of machine capacity at which an additional pass should be added for rolling
+rollingSpeedAdjustmentFactor,0.5,,Adjustment ratio of speed when yield stress approaches 90% of the ultimate tensile stress
+standardSheetLength,2438.4,,Default standard sheet length if no stock is available for computed utilization.
+standardSheetWidth,1219.2,,Default standard sheet width if no stock is available for computed utilization.
+standardStockLength,6096,,Default length of stock. Used to set the standard length of machine stock.
+stockSelectPrecision,0.1,,Tolerance for selecting the correct material stock for the part.
+stockSelectPrecisionForStructuralChannels,1,,Tolerance for selecting the correct material stock for the part; used only for structural channels.
+supportsDTC,true,,'true' or 'false' - only set to 'true' if this Digital Factory's cost model has been upgraded or configured to support aPriori's Design-to-Cost functionality.
+supportsDTCPanelOutput,true,,'true' if CMV has DTC Advice Rules panel output information for UI macro to utilize
+thickCutToleranceFactor,1.43,,Factor in determining the thickness factor and thus the best tolerance for the part.
+thinToThickCutThreshold,6.35,,Factor in determining the thickness factor and thus the best tolerance for the part.
+usePreferredMachines,true,,"If true the model will first try to select a preferred machine. If false, the system chooses either the default machine or from the entire non-preferred set of machines.system"

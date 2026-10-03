@@ -1,0 +1,110 @@
+Name,Source Name,Description,Cut Code,Material Type,Unit Cost (USD / kg),Cost Units,Base Cost Per Unit (USD),Eject Deflection Temp (C),Melting Temp (C),Mold Temp (C),Can IM_SFM,Can RIM,Can CM,Material Form,Can Regrind,Density (kg/m^3),Density of Melt (kg/m^3),Specific Heat (J/g*C),Thermal Conductivity (Watts/m*C),Injection Pressure Max (MPa),Injection Pressure Min (MPa),Flow Length Ratio,Hardness,Hardness System
+"PET, Injection","Generic PET, Injection",,51.31,PET,2.336,Cost per KG,2.34,70,255,50,true,false,false,PELLET,true,1400,1190,2.050,0.210,103.00,2.76,350,30.00,Brinell
+Polypropylene Ext. Fiber,Generic Polypropylene Ext. Fiber,,51.31,Polypropylene,2.479,Cost per KG,2.48,88,218,30,true,false,false,PELLET,true,889,756,1.900,0.220,103.00,2.76,300,30.00,Brinell
+Polystyrene G-P Crystal,Generic Polystyrene G-P Crystal,,51.21,Polystyrene,2.515,Cost per KG,2.52,88,218,38,true,false,false,PELLET,true,1028,874,1.850,0.100,130.00,30.00,290,30.00,Brinell
+Polystyrene Hi Heat,Generic Polystyrene Hi Heat,,51.21,Polystyrene,2.660,Cost per KG,2.66,88,218,38,true,false,false,PELLET,true,1043,887,1.850,0.130,130.00,30.00,290,30.00,Brinell
+"Polyurethane, Polymeric MDI","Generic Polyurethane, Polymeric MDI",,52.13,Polyurethane,2.668,Cost per KG,2.67,85,240,75,false,true,false,PELLET,,1150,978,1.800,0.250,1.00,0.30,-,30.00,Brinell
+"PET, Bottle (rcar)","Generic PET, Bottle (rcar)",,51.31,PET,2.710,Cost per KG,2.71,52,232,27,true,false,false,PELLET,true,1346,1144,1.200,0.199,103.00,2.76,350,30.00,Brinell
+PETG Copol,Generic PETG Copol,,51.31,PET,2.756,Cost per KG,2.76,52,232,27,true,false,false,PELLET,true,1263,1074,1.100,0.200,103.00,68.90,90,30.00,Brinell
+Polystyrene Super Hi Impact,Generic Polystyrene Super Hi Impact,,51.21,Polystyrene,2.776,Cost per KG,2.78,96,220,40,true,false,false,PELLET,true,1030,935,2.280,0.160,130.00,30.00,290,30.00,Brinell
+"Polyurethane, 80/20 TDI","Generic Polyurethane, 80/20 TDI",,52.13,Polyurethane,2.789,Cost per KG,2.79,85,240,75,false,true,false,PELLET,,1250,1063,1.800,0.250,1.00,0.30,-,30.00,Brinell
+Polypropylene G-P H,Generic Polypropylene G-P H,,51.31,Polypropylene,2.875,Cost per KG,2.88,100,250,60,true,false,false,PELLET,true,910,775,1.700,0.130,103.00,2.76,300,30.00,Brinell
+Polystyrene HIPS,Generic Polystyrene HIPS,,51.21,Polystyrene,2.891,Cost per KG,2.89,96,220,40,true,false,false,PELLET,true,1050,936,2.280,0.160,130.00,30.00,290,30.00,Brinell
+Polystyrene,Generic Polystyrene,,51.21,Polystyrene,3.007,Cost per KG,3.01,96,230,40,true,false,false,PELLET,true,1050,893,2.300,0.155,130.00,30.00,290,30.00,Brinell
+Polypropylene Med Impact Copol,Generic Polypropylene Med Impact Copol,,51.31,Polypropylene,3.148,Cost per KG,3.15,88,218,38,true,false,false,PELLET,true,898,763,1.800,0.160,103.00,2.76,300,30.00,Brinell
+Polypropylene Profiles,Generic Polypropylene Profiles,,51.31,Polypropylene,3.148,Cost per KG,3.15,88,218,38,true,false,false,PELLET,true,877,745,1.800,0.160,103.00,2.76,300,30.00,Brinell
+PET 30% Glass,Generic PET 30% Glass,,42.13,PET,3.153,Cost per KG,3.15,170,250,70,true,false,false,PELLET,true,1580,1360,1.500,0.290,103.00,2.76,350,30.00,Brinell
+TPO,Generic TPO,,51.21,TPO,3.292,Cost per KG,3.29,95,202,39,true,false,false,PELLET,true,1000,776,1.700,0.200,120.00,0.07,325,30.00,Brinell
+Polypropylene Random Copol,Generic Polypropylene Random Copol,,51.31,Polypropylene,3.371,Cost per KG,3.37,96,250,60,true,false,false,PELLET,true,910,775,1.700,0.130,103.00,2.76,300,30.00,Brinell
+PET 55% Glass,Generic PET 55% Glass,,42.13,PET,3.480,Cost per KG,3.48,250,255,70,true,false,false,PELLET,true,1780,1510,1.850,0.210,103.00,2.76,350,30.00,Brinell
+Polyphenylene Sulfide,Generic Polyphenylene Sulfide,,51.32,PPS,3.500,Cost per KG,3.50,160,320,140,true,false,false,PELLET,true,1350,1150,1.830,0.260,110.00,35.00,185,30.00,Brinell
+PET 30% Glass Flame Ret,Generic PET 30% Glass Flame Ret,,42.13,PET,3.550,Cost per KG,3.55,170,250,70,true,false,false,PELLET,true,1670,1420,1.720,0.240,103.00,2.76,350,30.00,Brinell
+Polypropylene Hi impact Copol,Generic Polypropylene Hi impact Copol,,51.31,Polypropylene,3.817,Cost per KG,3.82,88,250,60,true,false,false,PELLET,true,900,765,1.700,0.130,103.00,2.76,300,30.00,Brinell
+"ABS, Fittings","Generic ABS, Fittings",,51.31,ABS,3.822,Cost per KG,3.82,82,260,54,true,false,false,PELLET,true,1022,869,2.050,0.170,150.00,4.00,175,30.00,Brinell
+Polystyrene FR,Generic Polystyrene FR,,51.21,Polystyrene,3.874,Cost per KG,3.87,96,220,45,true,false,false,PELLET,true,1150,978,1.850,0.130,130.00,30.00,290,30.00,Brinell
+"Acetal, Copolymer","Generic Acetal, Copolymer",,51.21,Acetal,3.883,Cost per KG,3.88,165,205,90,true,false,false,PELLET,true,1410,1200,2.210,0.155,120.00,40.00,190,30.00,Brinell
+ABS,Generic ABS,,51.31,ABS,3.982,Cost per KG,3.98,85,240,70,true,false,false,PELLET,true,1040,885,1.800,0.127,150.00,4.00,175,30.00,Brinell
+Polyphenylene Sulfide GF30,Generic Polyphenylene Sulfide GF30,,41.21,PPS,4.000,Cost per KG,4.00,255,340,140,true,false,false,PELLET,true,1570,1335,1.665,0.250,110.00,35.00,185,30.00,Brinell
+"ABS, Hi Heat","Generic ABS, Hi Heat",,51.31,ABS,4.101,Cost per KG,4.10,82,260,54,true,false,false,PELLET,true,1041,885,2.050,0.156,150.00,4.00,175,30.00,Brinell
+TPS,Generic TPS,,51.21,TPS,4.115,Cost per KG,4.12,45,193,39,true,false,false,PELLET,true,1060,904,1.570,0.193,124.00,1.38,150,30.00,Brinell
+"Nylon, Type 6 Min Filled","Generic Nylon, Type 6 Min Filled",,51.32,Nylon,4.152,Cost per KG,4.15,185,280,90,true,true,false,PELLET,true,1260,1071,2.000,0.740,150.00,55.00,250,30.00,Brinell
+"Polycarbonate, CD","Generic Polycarbonate, CD",,51.21,Polycarbonate,4.412,Cost per KG,4.41,127,302,91,true,false,false,PELLET,true,1200,1020,2.100,0.214,150.00,70.00,95,30.00,Brinell
+"Acetal, Copolymer 25% Glass","Generic Acetal, Copolymer 25% Glass",,51.21,Acetal,4.422,Cost per KG,4.42,165,210,100,true,false,false,PELLET,true,1540,1309,1.500,0.230,120.00,40.00,190,30.00,Brinell
+Polycarbonate,Generic Polycarbonate,,51.21,Polycarbonate,4.549,Cost per KG,4.55,130,290,80,true,false,false,PELLET,true,1200,1020,2.100,0.214,150.00,70.00,95,30.00,Brinell
+"Nylon, Type 6","Generic Nylon, Type 6",,51.32,Nylon,4.718,Cost per KG,4.72,175,270,90,true,true,false,PELLET,true,1130,970,2.700,0.160,150.00,55.00,250,30.00,Brinell
+"ABS, PC-ABS","Generic ABS, PC-ABS",,51.31,ABS,4.738,Cost per KG,4.74,85,240,70,true,false,false,PELLET,true,1070,910,1.800,0.131,130.00,50.00,145,30.00,Brinell
+"Nylon, Type 6 30% Glass","Generic Nylon, Type 6 30% Glass",,41.21,Nylon,4.867,Cost per KG,4.87,220,260,80,true,true,false,PELLET,true,1360,1200,2.280,0.260,150.00,55.00,250,30.00,Brinell
+"ABS, Hi Impact","Generic ABS, Hi Impact",,51.31,ABS,4.897,Cost per KG,4.90,82,260,54,true,false,false,PELLET,true,1038,882,2.050,0.165,150.00,4.00,175,30.00,Brinell
+"ABS, X-Hi Impact","Generic ABS, X-Hi Impact",,51.31,ABS,4.897,Cost per KG,4.90,82,260,54,true,false,false,PELLET,true,1047,890,2.050,0.165,150.00,4.00,175,30.00,Brinell
+"ABS, Flame Ret","Generic ABS, Flame Ret",,51.31,ABS,4.977,Cost per KG,4.98,82,260,54,true,false,false,PELLET,true,1292,1098,2.050,0.183,150.00,4.00,175,30.00,Brinell
+"Acetal, Homopol 20% Glass","Generic Acetal, Homopol 20% Glass",,51.21,Acetal,4.997,Cost per KG,5.00,160,216,93,true,false,false,PELLET,true,1557,1325,1.500,0.220,120.00,40.00,190,30.00,Brinell
+Polybutylene Terephthalate,Generic Polybutylene Terephthalate,,51.31,PBT,5.001,Cost per KG,5.00,170,225,60,true,false,false,PELLET,true,1300,1110,2.050,0.200,150.00,70.00,220,30.00,Brinell
+"ABS, 30% Glass","Generic ABS, 30% Glass",,51.31,ABS,5.096,Cost per KG,5.10,95,240,70,true,false,false,PELLET,true,1280,1090,1.640,0.144,150.00,4.00,175,30.00,Brinell
+"Acetal, Homopol","Generic Acetal, Homopol",,51.21,Acetal,5.164,Cost per KG,5.16,160,216,93,true,false,false,PELLET,true,1410,1200,1.465,0.230,120.00,40.00,190,30.00,Brinell
+"ABS, 10% Glass","Generic ABS, 10% Glass",,51.31,ABS,5.256,Cost per KG,5.26,95,240,70,true,false,false,PELLET,true,1160,985,1.640,0.144,150.00,4.00,175,30.00,Brinell
+"Acrylic, PMMA","Generic Acrylic, PMMA",,51.32,Acrylic,5.375,Cost per KG,5.38,90,248,68,true,false,false,PELLET,true,1190,1060,2.440,0.181,111.00,50.00,150,30.00,Brinell
+Polybutylene Terephthalate GF30,Generic Polybutylene Terephthalate GF30,,41.21,PBT,5.622,Cost per KG,5.62,190,224,60,true,false,false,PELLET,true,1440,1225,1.730,0.280,150.00,70.00,220,30.00,Brinell
+TPV,Generic TPV,,51.21,TPV,5.839,Cost per KG,5.84,75,245,35,true,false,false,PELLET,true,1130,962,1.890,0.190,124.00,83.00,150,30.00,Brinell
+"Polycarbonate, FR","Generic Polycarbonate, FR",,51.21,Polycarbonate,5.959,Cost per KG,5.96,130,290,80,true,false,false,PELLET,true,1200,1020,2.100,0.214,152.00,70.00,95,30.00,Brinell
+"Nylon, Type 66 30% Glass","Generic Nylon, Type 66 30% Glass",,41.21,Nylon,6.138,Cost per KG,6.14,210,260,80,true,false,false,PELLET,true,1370,1200,2.290,0.210,150.00,55.00,265,30.00,Brinell
+"ABS, Plating","Generic ABS, Plating",,51.31,ABS,6.211,Cost per KG,6.21,82,260,54,true,false,false,PELLET,true,1019,866,2.050,0.170,150.00,4.00,175,30.00,Brinell
+Polycarbonate 30% Glass,Generic Polycarbonate 30% Glass,,42.12,Polycarbonate,6.298,Cost per KG,6.30,140,300,110,true,false,false,PELLET,true,1420,1210,1.680,0.283,138.00,70.00,95,30.00,Brinell
+"ABS, Transparent","Generic ABS, Transparent",,51.31,ABS,6.410,Cost per KG,6.41,82,260,54,true,false,false,PELLET,true,1085,922,2.050,0.170,150.00,4.00,175,30.00,Brinell
+Polyphenylene Sulfide GF40,Generic Polyphenylene Sulfide GF40,,41.21,PPS,6.500,Cost per KG,6.50,270,340,140,true,false,false,PELLET,true,1660,1410,1.500,0.250,110.00,35.00,185,30.00,Brinell
+"Nylon, Type 66 Min Filled","Generic Nylon, Type 66 Min Filled",,51.32,Nylon,6.609,Cost per KG,6.61,225,280,90,true,false,false,PELLET,true,1210,1030,2.500,0.350,150.00,55.00,265,30.00,Brinell
+"Nylon, Type 66","Generic Nylon, Type 66",,51.32,Nylon,7.184,Cost per KG,7.18,190,260,80,true,false,false,PELLET,true,1140,970,2.790,0.160,150.00,55.00,265,30.00,Brinell
+Polybutylene Terephthalate GF40,Generic Polybutylene Terephthalate GF40,,41.21,PBT,7.534,Cost per KG,7.53,200,224,60,true,false,false,PELLET,true,1530,1300,1.470,0.360,150.00,70.00,220,30.00,Brinell
+Polycarbonate 20% Glass,Generic Polycarbonate 20% Glass,,42.12,Polycarbonate,7.935,Cost per KG,7.93,140,300,110,true,false,false,PELLET,true,1340,1140,1.820,0.255,138.00,70.00,95,30.00,Brinell
+"Nylon, Type 46","Generic Nylon, Type 46",,51.32,Nylon,8.728,Cost per KG,8.73,129,291,91,true,false,false,PELLET,true,1180,978,2.800,0.252,150.00,10.00,280,30.00,Brinell
+"Nylon, Type 6/10","Generic Nylon, Type 6/10",,51.32,Nylon,8.870,Cost per KG,8.87,180,291,91,true,true,false,PELLET,true,1080,918,1.900,0.250,130.00,55.00,235,30.00,Brinell
+TPE,Generic TPE,,51.21,TPE,8.916,Cost per KG,8.92,81,216,36,true,false,false,PELLET,true,1190,1000,1.700,0.200,140.00,40.00,150,30.00,Brinell
+"Nylon, Transparent Amorphous","Generic Nylon, Transparent Amorphous",,51.32,Nylon,9.011,Cost per KG,9.01,129,291,91,true,false,false,PELLET,true,1154,981,1.700,0.240,85.00,68.90,235,30.00,Brinell
+"Nylon, Type 612 40% Glass","Generic Nylon, Type 612 40% Glass",,41.11,Nylon,9.295,Cost per KG,9.29,210,290,100,true,false,false,PELLET,true,1420,1207,2.000,0.280,124.00,55.00,235,30.00,Brinell
+"Nylon, Type 612 30% Glass","Generic Nylon, Type 612 30% Glass",,41.11,Nylon,9.344,Cost per KG,9.34,210,290,100,true,false,false,PELLET,true,1320,1122,2.130,0.260,124.00,55.00,235,30.00,Brinell
+TPU,Generic TPU,,51.21,TPU,9.602,Cost per KG,9.60,60,215,35,true,false,false,PELLET,true,1210,930,1.500,0.180,100.00,4.96,325,30.00,Brinell
+"Nylon, Type 12 50% Glass","Generic Nylon, Type 12 50% Glass",,41.11,Nylon,9.636,Cost per KG,9.64,155,280,80,true,false,false,PELLET,true,1470,1280,2.000,0.280,130.00,30.00,255,30.00,Brinell
+"Nylon, Type 12","Generic Nylon, Type 12",,51.32,Nylon,9.766,Cost per KG,9.77,175,230,80,true,false,false,PELLET,true,1010,860,3.000,0.200,130.00,30.00,255,30.00,Brinell
+"Nylon, Type 12 30% Glass","Generic Nylon, Type 12 30% Glass",,41.11,Nylon,10.220,Cost per KG,10.22,155,260,80,true,false,false,PELLET,true,1220,1050,2.200,0.260,130.00,30.00,255,30.00,Brinell
+"Nylon, Type 69","Generic Nylon, Type 69",,51.32,Nylon,11.207,Cost per KG,11.21,129,291,91,true,false,false,PELLET,true,1074,913,1.700,0.210,150.00,10.00,240,30.00,Brinell
+"Nylon, Type 612","Generic Nylon, Type 612",,51.32,Nylon,11.842,Cost per KG,11.84,135,220,80,true,false,false,PELLET,true,1060,900,2.750,0.180,124.00,55.00,235,30.00,Brinell
+"Nylon, Type 11","Generic Nylon, Type 11",,51.32,Nylon,12.455,Cost per KG,12.46,129,230,30,true,false,false,PELLET,true,1020,867,1.700,0.350,130.00,30.00,255,30.00,Brinell
+"Nylon, Type 11 30% Glass","Generic Nylon, Type 11 30% Glass",,41.11,Nylon,12.848,Cost per KG,12.85,129,280,60,true,false,false,PELLET,true,1250,1065,1.700,0.300,130.00,30.00,255,30.00,Brinell
+"Nylon, Type 11 40% Glass","Generic Nylon, Type 11 40% Glass",,41.11,Nylon,13.335,Cost per KG,13.34,129,291,91,true,false,false,PELLET,true,1412,1200,1.700,0.300,130.00,30.00,255,30.00,Brinell
+TPA,Generic TPA,,51.21,TPA,15.088,Cost per KG,15.09,99,260,30,true,false,false,PELLET,true,1020,830,2.700,0.200,138.00,0.07,150,30.00,Brinell
+"Unsaturated Polyester, GF10-FR","Generic Unsaturated Polyester, GF10-FR",BMC - Unsaturated Polyester - 10% Glass Fiber - Fire Resistant,60.00,Thermoset,2.038,Cost per KG,2.04,,,150,false,false,true,BMC,,1875,,,,,,-,147.00,Brinell
+"Unsaturated Polyester, GF10-FRLS","Generic Unsaturated Polyester, GF10-FRLS",BMC - Unsaturated Polyester - 10% Glass Fiber - Fire Resistant Low Shrink,60.00,Thermoset,1.910,Cost per KG,1.91,,,150,false,false,true,BMC,,1775,,,,,,-,147.00,Brinell
+"Unsaturated Polyester, GF12-FR","Generic Unsaturated Polyester, GF12-FR",BMC - Unsaturated Polyester - 12% Glass Fiber - Fire Resistant,60.00,Thermoset,1.972,Cost per KG,1.97,,,150,false,false,true,BMC,,1775,,,,,,-,147.00,Brinell
+"Unsaturated Polyester, GF15-FR","Generic Unsaturated Polyester, GF15-FR",BMC - Unsaturated Polyester - 15% Glass Fiber - Fire Resistant,60.00,Thermoset,1.741,Cost per KG,1.74,,,150,false,false,true,BMC,,1875,,,,,,-,147.00,Brinell
+"Unsaturated Polyester, GF15-FRLS","Generic Unsaturated Polyester, GF15-FRLS",BMC - Unsaturated Polyester - 15% Glass Fiber - Fire Resistant Low Shrink,60.00,Thermoset,2.495,Cost per KG,2.50,,,150,false,false,true,BMC,,1775,,,,,,-,147.00,Brinell
+"Unsaturated Polyester, GF15-LS","Generic Unsaturated Polyester, GF15-LS",BMC - Unsaturated Polyester - 15% Glass Fiber - General Purpose Low Shrink,60.00,Thermoset,1.925,Cost per KG,1.93,,,152,false,false,true,BMC,,1850,,,,,,-,147.00,Brinell
+"Unsaturated Polyester, GF15-SR","Generic Unsaturated Polyester, GF15-SR",BMC - Unsaturated Polyester - 15% Glass Fiber - Scratch Resistant,60.00,Thermoset,1.884,Cost per KG,1.88,,,148,false,false,true,BMC,,1800,,,,,,-,147.00,Brinell
+"Unsaturated Polyester, GF18-FR","Generic Unsaturated Polyester, GF18-FR",BMC - Unsaturated Polyester - 18% Glass Fiber - Fire Resistant,60.00,Thermoset,2.028,Cost per KG,2.03,,,152,false,false,true,BMC,,1700,,,,,,-,147.00,Brinell
+"Unsaturated Polyester, GF20-FR","Generic Unsaturated Polyester, GF20-FR",BMC - Unsaturated Polyester - 20% Glass Fiber - Fire Resistant,60.00,Thermoset,1.925,Cost per KG,1.93,,,150,false,false,true,BMC,,1775,,,,,,-,147.00,Brinell
+"Unsaturated Polyester, GF20-FRLS","Generic Unsaturated Polyester, GF20-FRLS",BMC - Unsaturated Polyester - 20% Glass Fiber - Fire Resistant Low Shrink,60.00,Thermoset,1.796,Cost per KG,1.80,,,150,false,false,true,BMC,,1775,,,,,,-,147.00,Brinell
+"Unsaturated Polyester, GF20-LS","Generic Unsaturated Polyester, GF20-LS",BMC - Unsaturated Polyester - 20% Glass Fiber - General Purpose Low Shrink,60.00,Thermoset,1.670,Cost per KG,1.67,,,145,false,false,true,BMC,,1670,,,,,,-,147.00,Brinell
+"Unsaturated Polyester, GF22-FR","Generic Unsaturated Polyester, GF22-FR",BMC - Unsaturated Polyester - 22% Glass Fiber - Fire Resistant,60.00,Thermoset,1.923,Cost per KG,1.92,,,150,false,false,true,BMC,,1875,,,,,,-,147.00,Brinell
+"Unsaturated Polyester, GF24-GP","Generic Unsaturated Polyester, GF24-GP",BMC - Unsaturated Polyester - 24% Glass Fiber - General Purpose,60.00,Thermoset,1.806,Cost per KG,1.81,,,150,false,false,true,BMC,,1910,,,,,,-,147.00,Brinell
+"Unsaturated Polyester, GF25-FR","Generic Unsaturated Polyester, GF25-FR",BMC - Unsaturated Polyester - 25% Glass Fiber - Fire Resistant,60.00,Thermoset,2.221,Cost per KG,2.22,,,150,false,false,true,BMC,,1875,,,,,,-,147.00,Brinell
+"Unsaturated Polyester, GF25-GA","Generic Unsaturated Polyester, GF25-GA",BMC - Unsaturated Polyester - 25% Glass Fiber - Good Adhesion,60.00,Thermoset,1.781,Cost per KG,1.78,,,163,false,false,true,BMC,,1900,,,,,,-,147.00,Brinell
+"Unsaturated Polyester, GF8-CA","Generic Unsaturated Polyester, GF8-CA",BMC - Unsaturated Polyester - 8% Glass Fiber - Coating Applications,60.00,Thermoset,1.957,Cost per KG,1.96,,,152,false,false,true,BMC,,1910,,,,,,-,147.00,Brinell
+"Epoxy, CF50","Generic Epoxy, CF50",SMC - Epoxy - 50% Carbon Fiber - 12k,60.00,Thermoset,35.210,Cost per KG,35.21,,,145,false,false,true,SMC,,1450,,,,,,-,147.00,Brinell
+"Epoxy, CF60","Generic Epoxy, CF60",SMC - Epoxy - 60% Carbon Fiber - 3k,60.00,Thermoset,42.380,Cost per KG,42.38,,,145,false,false,true,SMC,,1510,,,,,,-,147.00,Brinell
+"Unsaturated Polyester, GF25-GP","Generic Unsaturated Polyester, GF25-GP",SMC - Unsaturated Polyester - 25% Glass Fiber - General Purpose Low Profile,60.00,Thermoset,2.360,Cost per KG,2.36,,,160,false,false,true,SMC,,1800,,,,,,-,147.00,Brinell
+"Unsaturated Polyester, GF25-LS","Generic Unsaturated Polyester, GF25-LS",SMC - Unsaturated Polyester - 25% Glass Fiber - General Purpose Low Shrink,60.00,Thermoset,2.250,Cost per KG,2.25,,,160,false,false,true,SMC,,1750,,,,,,-,147.00,Brinell
+"Unsaturated Polyester, GF27-LPA","Generic Unsaturated Polyester, GF27-LPA",SMC - Unsaturated Polyester - 27% Glass Fiber - Low Profile Class A,60.00,Thermoset,2.950,Cost per KG,2.95,,,160,false,false,true,SMC,,1700,,,,,,-,147.00,Brinell
+"Unsaturated Polyester, GF28-GP","Generic Unsaturated Polyester, GF28-GP",SMC - Unsaturated Polyester - 28% Glass Fiber - General Purpose,60.00,Thermoset,1.870,Cost per KG,1.87,,,160,false,false,true,SMC,,1800,,,,,,-,147.00,Brinell
+"Unsaturated Polyester, GF28-LD","Generic Unsaturated Polyester, GF28-LD",SMC - Unsaturated Polyester - 28% Glass Fiber - General Purpose Low Density,60.00,Thermoset,2.420,Cost per KG,2.42,,,150,false,false,true,SMC,,1200,,,,,,-,147.00,Brinell
+"Unsaturated Polyester, GF30-LP","Generic Unsaturated Polyester, GF30-LP",SMC - Unsaturated Polyester - 30% Glass Fiber - General Purpose Low Profile,60.00,Thermoset,2.360,Cost per KG,2.36,,,160,false,false,true,SMC,,1800,,,,,,-,147.00,Brinell
+"Unsaturated Polyester, GF30-LS","Generic Unsaturated Polyester, GF30-LS",SMC - Unsaturated Polyester - 30% Glass Fiber - General Purpose Low Shrink,60.00,Thermoset,2.250,Cost per KG,2.25,,,160,false,false,true,SMC,,1750,,,,,,-,147.00,Brinell
+"Unsaturated Polyester, GF30-LPA","Generic Unsaturated Polyester, GF30-LPA",SMC - Unsaturated Polyester - 30% Glass Fiber - Low Profile Class A,60.00,Thermoset,2.950,Cost per KG,2.95,,,150,false,false,true,SMC,,1900,,,,,,-,147.00,Brinell
+"Unsaturated Polyester, GF33-GP","Generic Unsaturated Polyester, GF33-GP",SMC - Unsaturated Polyester - 33% Glass Fiber - General Purpose,60.00,Thermoset,1.900,Cost per KG,1.90,,,160,false,false,true,SMC,,1800,,,,,,-,147.00,Brinell
+"Unsaturated Polyester, GF35-LD","Generic Unsaturated Polyester, GF35-LD",SMC - Unsaturated Polyester - 35% Glass Fiber - General Purpose Low Density,60.00,Thermoset,2.450,Cost per KG,2.45,,,150,false,false,true,SMC,,1200,,,,,,-,147.00,Brinell
+"Unsaturated Polyester, GF38-LPA","Generic Unsaturated Polyester, GF38-LPA",SMC - Unsaturated Polyester - 38% Glass Fiber - Low Profile Class A,60.00,Thermoset,3.000,Cost per KG,3.00,,,155,false,false,true,SMC,,1300,,,,,,-,147.00,Brinell
+"Unsaturated Polyester, GF45-GP","Generic Unsaturated Polyester, GF45-GP",SMC - Unsaturated Polyester - 45% Glass Fiber - General Purpose,60.00,Thermoset,2.700,Cost per KG,2.70,,,160,false,false,true,SMC,,1860,,,,,,-,147.00,Brinell
+"Unsaturated Polyester, CF50","Generic Unsaturated Polyester, CF50",SMC - Unsaturated Polyester - 50% Carbon Fiber,60.00,Thermoset,27.477,Cost per KG,27.48,,,142,false,false,true,SMC,,1500,,,,,,-,116.00,Brinell
+"Unsaturated Polyester, CF53","Generic Unsaturated Polyester, CF53",SMC - Unsaturated Polyester - 53% Carbon Fiber,60.00,Thermoset,28.811,Cost per KG,28.81,,,142,false,false,true,SMC,,1480,,,,,,-,116.00,Brinell
+"Unsaturated Polyester, CF55","Generic Unsaturated Polyester, CF55",SMC - Unsaturated Polyester - 55% Carbon Fiber,60.00,Thermoset,29.700,Cost per KG,29.70,,,142,false,false,true,SMC,,1480,,,,,,-,116.00,Brinell
+"Unsaturated Polyester, GFCF55","Generic Unsaturated Polyester, GFCF55",SMC - Unsaturated Polyester - 55% Glass Fiber Carbon Fiber Mix,60.00,Thermoset,15.400,Cost per KG,15.40,,,160,false,false,true,SMC,,1800,,,,,,-,116.00,Brinell
+"Unsaturated Polyester, GF63-GP","Generic Unsaturated Polyester, GF63-GP",SMC - Unsaturated Polyester - 63% Glass Fiber - General Purpose,60.00,Thermoset,2.800,Cost per KG,2.80,,,160,false,false,true,SMC,,1860,,,,,,-,147.00,Brinell
+"Vinyl Ester, CF50","Generic Vinyl Ester, CF50",SMC - Vinyl Ester - 50% Carbon Fiber - 3k,60.00,Thermoset,31.798,Cost per KG,31.80,,,140,false,false,true,SMC,,1430,,,,,,-,147.00,Brinell
+"Vinyl Ester, CF60","Generic Vinyl Ester, CF60",SMC - Vinyl Ester - 60% Carbon Fiber - 3k,60.00,Thermoset,36.374,Cost per KG,36.37,,,155,false,false,true,SMC,,1400,,,,,,-,147.00,Brinell

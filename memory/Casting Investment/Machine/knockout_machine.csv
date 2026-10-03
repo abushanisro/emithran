@@ -1,0 +1,32 @@
+Field,Value
+Sector,World Average
+Name,Pacific Kiln KOM-24
+Labor Rate (USD / hr),39.64
+Direct Overhead Rate (USD / hr),2.95
+Indirect Overhead Rate (USD / hr),14.17
+Total Overhead Rate (USD / hr),17.12
+Overhead Multiplier,0.00
+Number of Operators,1.00
+Labor Time Standard,1.00
+Wage Grade Name,
+Work Center Labor Rate Factor,1.00
+Setup Time (hr),0.00
+Useable Length (mm),609.60
+Useable Width (mm),609.60
+Useable Height (mm),609.60
+Is Preferred,false
+Avg Utilization,1.00
+Good Part Yield,1.00
+Machine Price (USD),"45,000.00"
+Machine Length (mm),"1,016.00"
+Machine Width (mm),965.20
+Footprint Allowance Factor,1.00
+Machine Power (kW),1.50
+Installation Factor (%),20.00
+Machine Uptime (%),80.00
+Annual Maintenance Factor (%),5.00
+Machine Life (yr),10
+Salvage Value Factor (%),0.00
+Supplies Cost (USD / yr),0.00
+Machine Manufacturer Location,USA
+Data Source,aPriori Baseline

@@ -1,0 +1,29 @@
+Field,Value
+Sector,World Average
+Name,Burr King 960-400
+Labor Rate (USD / hr),30.49
+Direct Overhead Rate (USD / hr),0.41
+Indirect Overhead Rate (USD / hr),14.10
+Total Overhead Rate (USD / hr),14.51
+Overhead Multiplier,0.00
+Number of Operators,1.00
+Labor Time Standard,1.00
+Wage Grade Name,
+Work Center Labor Rate Factor,1.00
+Setup Time (hr),0.00
+Is Preferred,false
+Avg Utilization,1.00
+Good Part Yield,1.00
+Machine Price (USD),"4,000.00"
+Machine Length (mm),406.40
+Machine Width (mm),550.00
+Footprint Allowance Factor,1.00
+Machine Power (kW),1.11
+Installation Factor (%),20.00
+Machine Uptime (%),80.00
+Annual Maintenance Factor (%),5.00
+Machine Life (yr),10
+Salvage Value Factor (%),0.00
+Supplies Cost (USD / yr),0.00
+Machine Manufacturer Location,USA
+Data Source,aPriori Baseline

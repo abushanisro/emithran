@@ -1,0 +1,27 @@
+Cavities Length Wise,Cavities Width Wise,Coefficient Runner Region Width,Number of Cavities,Layout Balance
+1.00,1.00,1.00,1,natural
+1.00,2.00,1.00,2,natural
+1.00,4.00,1.00,4,artificial
+1.00,8.00,2.00,8,artificial
+2.00,1.00,1.00,2,natural
+2.00,2.00,1.00,4,natural
+2.00,4.00,1.00,8,natural
+2.00,8.00,2.00,16,artificial
+2.00,16.00,3.00,32,artificial
+2.00,32.00,4.00,64,artificial
+4.00,1.00,1.00,4,artificial
+4.00,2.00,1.00,8,natural
+4.00,4.00,1.00,16,natural
+4.00,8.00,1.00,32,natural
+4.00,16.00,3.00,64,artificial
+4.00,32.00,4.00,128,artificial
+8.00,1.00,2.00,8,artificial
+8.00,2.00,2.00,16,artificial
+8.00,4.00,1.00,32,natural
+8.00,8.00,1.00,64,natural
+8.00,16.00,1.00,128,natural
+16.00,2.00,3.00,32,artificial
+16.00,4.00,3.00,64,artificial
+16.00,8.00,1.00,128,natural
+32.00,2.00,4.00,64,artificial
+32.00,4.00,4.00,128,artificial

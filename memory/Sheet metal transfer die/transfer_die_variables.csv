@@ -1,0 +1,131 @@
+﻿Variable Name,String Value,Unit Type Name,Notes,Applies To
+aerialCamAngleLowerThreshold,15,Angle,Angle lower threshold for Aerial Cam Trimming of edgeSegments and Aerial Cam Piercing of holes. Note for angles beyond Standard Cam region and 180 degrees Aerial Cams are assumed.,Transfer Die (component/cam - inferred)
+aerialCamAngleUpperThreshold,75,Angle,Angle upper threshold for Aerial Cam Trimming of edgeSegments and Aerial Cam Piercing of holes. Note for angles beyond Standard Cam region and 180 degrees Aerial Cams are assumed.,Transfer Die (component/cam - inferred)
+assyHrsCompTransferDie,1.1,,Dial for modifying the tooling assembly hours in Transfer Die.,Transfer Die
+bottomParallelHeight,101.6,Length,Height of lower parallels in Transfer Die. Used to calculate minimum required shut height.,Transfer Die
+bottomParallelSpacing,254,Length,Distance between bottom parallels.,Transfer Die (component/cam - inferred)
+bottomParallelsAdder,3,,Adds 3 bottom parallels to take the place of what used to be wide parallels.,Transfer Die (component/cam - inferred)
+bottomPlateHeight,12.7,Length,Thickness of the bottom plate in transfer die.,Transfer Die
+bottomPlateWidthAllowance,304.8,Length,amount added to each side of the die shoe width to determine the bottom plate width.,Transfer Die (component/cam - inferred)
+bottomWideParallelsQty,3,,total number of wide bottom parallels.,Transfer Die (component/cam - inferred)
+bpCbores,0,,Quantity of counterbores per bottom parallel.,Transfer Die (component/cam - inferred)
+bpCncHrs,0,,Constant for total time required for programmed machining for bottom parallels. Used to calculate the labor time of all die components.,Transfer Die (component/cam - inferred)
+bpDowels,4,,Quantity of dowels per bottom parallel.,Transfer Die (component/cam - inferred)
+bpGrindingHrs,0,hr,Total time required for grinding operator labor per bottom parallel. Used to calculate the labor time of all die components.,Transfer Die (component/cam - inferred)
+bpHoleDepth,50.8,Length,"Depth of holes in bottom parallels that are drilled, tapped, reamed.",Transfer Die (component/cam - inferred)
+bpMillingHrsPerBp,.75,hr,Total time required for milling operator labor allocated to each bottom parallel.,Transfer Die (component/cam - inferred)
+bpMillingHrsPerBpTransferDie,.33,hr,Total time required for milling operator labor to mill (2) bolt-down slots in a wide parallel.,Transfer Die
+bpNTappedPerBp,5,,The quantity of tapped holes per narrow bottom parallel in transfer die.,Transfer Die
+bpTappedPerBp,2,,Quantity of tapped holes per bottom parallel.,Transfer Die (component/cam - inferred)
+bpTappedPerBumper,2,,Quantity of tapped holes per bumper.,Transfer Die (component/cam - inferred)
+bpWTappedPerBp,7,,The quantity of tapped holes per wide bottom parallel in transfer die.,Transfer Die
+bpWidth,127,,Width of bottom parallel.,Transfer Die (component/cam - inferred)
+bplCboresPerBottomParallel,3,,The number of counterbored holes in the bottom plate for each bottom parallel.,Transfer Die (component/cam - inferred)
+bplDowelsPerWideBp,2,,The quantity of bottom plate dowel holes per wide bottom parallel.,Transfer Die (component/cam - inferred)
+bplPressLocatorHoles,2,,The number of press locator holes in the bottom plate for transfer die.,Transfer Die
+bumperBumpersPerStage,4,,Constant for quantity of bumpers per stage. Used to calculate the quantity of bumpers.,Transfer Die (component/cam - inferred)
+camApproachAngleThreshold,45,Angle,Threshold for determining if a CAM unit is considered parallel or perpendicular to the part strip flow direction. CAM's whose action vector is less than this value are typically considered to be parallel to the part strip flow direction.,Transfer Die (component/cam - inferred)
+camClearanceLength,6.35,Length,Average clearance between cam punch and workpiece.,Transfer Die (component/cam - inferred)
+camHoleDiameterThreshold,15,Length,"Diameter threshold used to determine the distance test that is used for deciding whether 2 holes intersect. If the hole's diameter is below this threshold then one test is used, if the hole's diameter is at or above this threshold then a different test is used.",Transfer Die (component/cam - inferred)
+compCoatingCost,1,,Dial for calibrating tooling Coating Cost in Transfer Die.,Transfer Die
+compHeatTreatCost,2,,Dial for calibrating tooling Heat Treat Cost in Transfer Die.,Transfer Die
+defaultDirectTrimAngleThreshold,30,Angle,Default angle for determining between Direct Trimming and Cam Action Trimming for Transfer Die.,Transfer Die
+defaultIncrementAmount,5,Angle,Default increment amount used for determining the optimum true-part nesting in Transfer Die. Valid values are from 1 to 360 degrees.,Transfer Die
+defaultStandardCamWorkTravel,60,Length,Default work travel distance of standard cam unit. Distance cam unit can travel over part to complete operation without interference.,Transfer Die (component/cam - inferred)
+dieBlockLengthAllowance,127,Length,Reverted to transfer die margin.,Transfer Die
+dieBlockWidthAllowance,101.6,Length,Reverted to transfer die margin.,Transfer Die
+dieShoeThicknessThresholdHigh,146,Length,Upper threshold for blank size used for determining die shoe thickness in Transfer Die.,Transfer Die
+dieShoeThicknessThresholdLow,108,Length,Lower threshold for blank size used for determining die shoe thickness in Transfer Die.,Transfer Die
+drawRatioThreshold,.3,,Transfer Die Forms with a form area to part box area ratio greater than this value are feasible for a Draw operation.,Transfer Die
+dsetLengthAllowance,50.8,,Reverted to transfer die margin,Transfer Die
+dsetWidthAllowance,254,,Reverted to transfer die margin,Transfer Die
+holeAxisThreshold,15,,All holes have a setupAxis that is codirectional with all other holes on the same cam unit in Transfer Die. Codirectional means the angle between their setupAxis can only vary by the number of degrees specified here.,Transfer Die
+interDieSpacing,25,Length,Default spacing between adjacent die sets. Used to calculate transfer pitch.,Transfer Die
+largeCamSizeThreshold,380,Length,Size threshold determining the difference between a small cam unit and a large cam unit.,Transfer Die (component/cam - inferred)
+maxAllowedIntersectionDistance,7000,Length,Specifies a distance limit for creating INTERSECTS relations between camBundle and other artifacts (including other camBundles). If the distance to intersection > plant.maxAllowedIntersectionDistance then the INTERSECTS relation will not be created,Transfer Die (component/cam - inferred)
+maxBundleGap,254,Length,Max horizontal distance between GCDs that can be bundled.,Transfer Die (component/cam - inferred)
+maxBundleWidth,500,Length,Max allowed width of Cam Bundle.,Transfer Die (component/cam - inferred)
+maxClearanceDifference,10,,Default maximum clearance difference affecting camBundling in Transfer Die.,Transfer Die
+maxComplexHolePosTolerance,2,,Default maximum position tolerance affecting camBundling in Transfer Die.,Transfer Die
+maxEdgeSegmentPosTolerance,2,,Default maximum position tolerance affecting camBundling in Transfer Die.,Transfer Die
+maxLancePosTolerance,2,,Default maximum position tolerance affecting camBundling in Transfer Die.,Transfer Die
+maxRamDirectionTangentAngleDegrees,30,,Default maximum tangent angle affecting camBundling in Transfer Die.,Transfer Die
+maxRamDirectionTangentAngleDegreesBending,8,Angle,Default maximum tangent angle affecting camBundling of Bends in Transfer Die.,Transfer Die
+maxRamDirectionTangentAngleDegreesLancing,15,Angle,Default maximum tangent angle affecting camBundling of Lance gcd's in Transfer Die.,Transfer Die
+maxRamDirectionTangentAngleDegreesPiercing,15,Angle,Default maximum tangent angle affecting camBundling of Pierced Holes in Transfer Die.,Transfer Die
+maxRamDirectionTangentAngleDegreesTrimming,30,Angle,Default maximum tangent angle affecting camBundling of Trimmed Edges in Transfer Die.,Transfer Die
+maxScrapSizeThreshold,457.2,Length,Maximum scrap size threshold for Transfer Die.,Transfer Die
+maxSimpleHolePosTolerance,2,,Default maximum position tolerance affecting camBundling in Transfer Die.,Transfer Die
+maxTrimStagesTransferDie,4,,Determines the number of trimming operations where the size of the blank or trim is managed for conveying purposes for a transfer die.,Transfer Die
+minBendAngleDegrees,90,,Default minimum bend angle affecting camBundling in Transfer Die.,Transfer Die
+minBurnoutHoleDiameter,50.8,Length,"The minimum diameter hole that can be flame cut (burnout) in a Transfer Die shoe, etc.",Transfer Die
+minCamIntersectDistance1,40,Length,One of several distance thresholds used to determine if a cam pierced hole intersects with a direct pierced hole. If the projected cam pierced hole intersects with the projected direct pierced hole within this distance then the cam pierced hole is considered to have intersected with the direct pierced hole.,Transfer Die (component/cam - inferred)
+minCamIntersectDistance2,25,Length,One of several distance thresholds used to determine if a cam pierced hole intersects with a direct pierced hole. If the projected cam pierced hole intersects with the projected direct pierced hole within this distance plus the cam hole's diameter then the cam pierced hole is considered to have intersected with the direct pierced hole.,Transfer Die (component/cam - inferred)
+minDirectIntersectDistance,40,Length,Distance threshold used to determine if a direct pierced hole intersects with a cam pierced hole. If the projected direct pierced hole intersects with the projected cam pierced hole within this distance then the direct pierced hole is considered to have intersected with the cam pierced hole.,Transfer Die (component/cam - inferred)
+minHoleSpacingMultiplier,2,,Multiplier for determining whether 2 adjacent pierced holes can be pierced simultaneously in Transfer Die. If the holes are at least [ blank.thickness * minHoleSpacingMultiplier] apart then they can be pierced simultaneously.,Transfer Die
+minNumQualityLoops,2,,The default minimum number of Quality Loops used during Transfer Die tryout in the event that the blank's thickness and material type isn't found in the lookup table.,Transfer Die
+minSpaceWithinBundle,2,Length,Controls smallest distance between bundled artifacts so as to not produce too narrow cuts.,Transfer Die (component/cam - inferred)
+multipleTrimsTransferDie,true,,"Controls whether the blank is cut out in one Full Blanking operation or multiple Trimming operations. Valid values = true, false.",Transfer Die
+narrowParallelsWidth,38.1,Length,Unit width of the bottom parallels placed between the end parallels.,Transfer Die (component/cam - inferred)
+numSideMillingPasses,2,,Typical number of milling passes used for side milling in Transfer Die.,Transfer Die
+numberFifty,50,,Supports a constant in Transfer Die. This plant variable is no longer used from version 19.2.1 onwards.,Transfer Die
+numberFive,5,,Supports a constant in Transfer Die.,Transfer Die
+numberFour,4,,Supports a constant in Transfer Die.,Transfer Die
+numberFourty,40,,Supports a constant in Transfer Die. This plant variable is no longer used from version 19.2.1 onwards.,Transfer Die
+numberOne,1,,Supports a constant in Transfer Die.,Transfer Die
+numberOnePntFive,1.5,,Supports a constant in Transfer Die.,Transfer Die
+numberOnePntThreeEight,1.38,,Supports a constant in Transfer Die.,Transfer Die
+numberOnePntTwoFive,1.25,,Supports a constant in Transfer Die.,Transfer Die
+numberPntFive,.5,,Supports a constant in Transfer Die.,Transfer Die
+numberPntFiveFive,.55,,Supports a constant in Transfer Die.,Transfer Die
+numberPntThreeThree,.33,,Supports a constant in Transfer Die.,Transfer Die
+numberPntTwoFive,.25,,Supports a constant in Transfer Die.,Transfer Die
+numberPntZeroNine,.09,,Supports a constant in Transfer Die.,Transfer Die
+numberSixty,60,,Supports a constant in Transfer Die. This plant variable is no longer used from version 19.2.1 onwards.,Transfer Die
+numberTen,10,,Supports a constant in Transfer Die.,Transfer Die
+numberThirty,30,,Supports a constant in Transfer Die. This plant variable is no longer used from version 19.2.1 onwards.,Transfer Die
+numberThirtyFive,35,,Supports a constant in Transfer Die. This plant variable is no longer used from version 19.2.1 onwards.,Transfer Die
+numberThree,3,,Supports a constant in Transfer Die.,Transfer Die
+numberTwelve,12,,Supports a constant in Transfer Die.,Transfer Die
+numberTwenty,20,,Supports a constant in Transfer Die. This plant variable is no longer used from version 19.2.1 onwards.,Transfer Die
+numberTwentyFive,25,,Supports a constant in Transfer Die.,Transfer Die
+numberTwentyFivePntTwoFive,25.25,,Supports a constant in Transfer Die.,Transfer Die
+numberTwo,2,,Supports a constant in Transfer Die.,Transfer Die
+numberTwoPntSevenFive,2.75,,Supports a constant in Transfer Die.,Transfer Die
+numberTwoPntTwo,2.2,,Supports a constant in Transfer Die.,Transfer Die
+numberTwoPntTwoFive,2.25,,Supports a constant in Transfer Die.,Transfer Die
+parallelCboresPerTopParallel,4,,Default quantity of parallel counterbores per top parallel.,Transfer Die (component/cam - inferred)
+parallelCboresPerTransplate,4,,Default quantity of parallel counterbores per transplate.,Transfer Die (component/cam - inferred)
+parallelHolesPerHour,7,,Quantity of holes per hour drilled into parallels.,Transfer Die (component/cam - inferred)
+parallelLength,152.4,,Length of standard parallel.,Transfer Die (component/cam - inferred)
+parallelTapsPerTopParallel,2,,Default quantity of parallel taps per top parallel.,Transfer Die (component/cam - inferred)
+parallelTapsPerTransplate,4,,Default quantity of parallel taps per transplate.,Transfer Die (component/cam - inferred)
+parallelThickness,38.1,,Thickness of standard parallel.,Transfer Die (component/cam - inferred)
+parallelsWidth,38.1,Length,Unit width of the bottom parallels placed between the end parallels.,Transfer Die (component/cam - inferred)
+partHeightAllowance,12.7,Length,Standard height of post component in Transfer Die. Used to calculated minimum required shut height.,Transfer Die
+percentTuning,.03,,Multiplier used to calculate percent profit on Transfer Die tooling.,Transfer Die
+piercePunchRetainerCustomLengthThreshold,152.4,Length,Threshold value below which a fixed minimum number of screws will be used in a Custom Punch Retainer in Transfer Die.,Transfer Die
+punchExtensionLength,50.8,Length,Default extension length for a Cam punch in Transfer Die.,Transfer Die
+punchLengthStep,76.2,Length,Step increment for adding incremental screws to a Custom Punch Retainer in Transfer Die. (add another screw each time the Retainer length increases by this amount).,Transfer Die
+scoreBendsTransferDie,true,,Used to determine if a bend in a transfer die is scored.,Transfer Die
+stdHeatTreatCostPerKgTransferDie,.23,CostPerMass,Typical cost per mass for standard oven based heat treating (hardening) of tooling components.,Transfer Die
+toolingComponentSizeThreshold,152.4,Length,Used as a size threshold to determine the number of holes in various Transfer Die tooling components.,Transfer Die
+topParallelHeightUpperLimit,1500,Length,Upper limit of top parallel height. Used to cap top parallel height avoiding unrealistic tooling costs.,Transfer Die (component/cam - inferred)
+topParallelWidth,111.252,,Width of top parallel.,Transfer Die (component/cam - inferred)
+topParallelsAdder,3,,Adds 3 top parallels to take the place of what used to be wide parallels.,Transfer Die (component/cam - inferred)
+topWideParallelsQty,3,,total number of wide top parallels.,Transfer Die (component/cam - inferred)
+tpCbores,0,,Quantity of counterbores per top parallel.,Transfer Die (component/cam - inferred)
+tpCboresPerTp,4,,Quantity of counterbores required per top plate.,Transfer Die (component/cam - inferred)
+tpCboresPerTransPlate,4,,Quantity of counterbores required per trans plate.,Transfer Die (component/cam - inferred)
+tpCncHrs,0,,Number of CNC hours required per top parallel.,Transfer Die (component/cam - inferred)
+tpDowels,0,,Quantity of dowels required per top parallel.,Transfer Die (component/cam - inferred)
+tpGrindingHrs,0,hr,Total time required for grinding operator labor per top parallel. Used to calculate the labor time of all die components.,Transfer Die (component/cam - inferred)
+tpMillingHrs,0,,Total time required for milling operator labor per top parallel. Used to calculate the labor time of all die components.,Transfer Die (component/cam - inferred)
+tpNTappedPerTp,0,,The quantity of tapped holes per narrow top parallel in transfer die.,Transfer Die
+tpTappedPerTp,2,,Quantity of tapped holes per top parallel.,Transfer Die (component/cam - inferred)
+tpTappedPerTransPlate,4,,Quantity of tapped holes per trans plate.,Transfer Die (component/cam - inferred)
+tpWTappedPerTp,0,,The quantity of tapped holes per wide top parallel in transfer die.,Transfer Die
+transferDiePartClearance,25.4,Length,"Clearance added above and below the part to allow for part transfer (1"")",Transfer Die
+transferDieToolingComponentStdCostMult,1,,Dial for modifying all tooling component standard costs in Transfer Die.,Transfer Die
+transferPitchSwerWidthThreshold,1,,"Percentage threshold for difference between the blank SWER and the blank SER. If the difference is less than or equal to this amount, then the blank SER will be used for calculating transfer pitch, otherwise blank SWER will be used.",Transfer Die
+wideParallelsWidth,76.2,Length,unit width of the bottom parallels placed at each end of the die set.,Transfer Die (component/cam - inferred)

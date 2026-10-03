@@ -1,0 +1,163 @@
+﻿Process,Gtol Category,Capability System,Best Achievable,Worst Achievable,Num Repetitions
+3D Laser,angularity,IT,10,16,1.00
+3D Laser,bendAngleTolerance,IT,10,16,1.00
+3D Laser,circularity,IT,10,16,1.00
+3D Laser,concentricity,IT,10,16,1.00
+3D Laser,cylindricity,IT,10,16,1.00
+3D Laser,diamTolerance,IT,10,16,1.00
+3D Laser,flatness,IT,10,16,1.00
+3D Laser,parallelism,IT,10,16,1.00
+3D Laser,perpendicularity,IT,10,16,1.00
+3D Laser,positionTolerance,IT,10,16,1.00
+3D Laser,profileOfSurface,IT,10,16,1.00
+3D Laser,runout,IT,10,16,1.00
+3D Laser,straightness,IT,10,16,1.00
+3D Laser,symmetry,IT,10,16,1.00
+3D Laser,tolerance,IT,10,16,1.00
+3D Laser,totalRunout,IT,10,16,1.00
+3D Laser,roughness,literal,0.2,6.3,1.00
+3D Laser,roughnessRz,literal,0.9,28.35,1.00
+Assembly,angularity,IT,5,7,1.00
+Assembly,bendAngleTolerance,IT,5,7,1.00
+Assembly,circularity,IT,5,7,1.00
+Assembly,concentricity,IT,5,7,1.00
+Assembly,cylindricity,IT,5,7,1.00
+Assembly,diamTolerance,IT,5,7,1.00
+Assembly,flatness,IT,5,7,1.00
+Assembly,parallelism,IT,5,7,1.00
+Assembly,perpendicularity,IT,5,7,1.00
+Assembly,positionTolerance,IT,5,7,1.00
+Assembly,profileOfSurface,IT,5,7,1.00
+Assembly,runout,IT,5,7,1.00
+Assembly,straightness,IT,5,7,1.00
+Assembly,symmetry,IT,5,7,1.00
+Assembly,tolerance,IT,5,7,1.00
+Assembly,totalRunout,IT,5,7,1.00
+Assembly,roughness,literal,0.4,7,1.00
+Assembly,roughnessRz,literal,1.8,31.5,1.00
+Bar & Tube Fab,angularity,IT,12,16,1.00
+Bar & Tube Fab,bendAngleTolerance,IT,12,16,1.00
+Bar & Tube Fab,circularity,IT,12,16,1.00
+Bar & Tube Fab,concentricity,IT,12,16,1.00
+Bar & Tube Fab,cylindricity,IT,12,16,1.00
+Bar & Tube Fab,diamTolerance,IT,12,16,1.00
+Bar & Tube Fab,flatness,IT,12,16,1.00
+Bar & Tube Fab,parallelism,IT,12,16,1.00
+Bar & Tube Fab,perpendicularity,IT,12,16,1.00
+Bar & Tube Fab,positionTolerance,IT,12,16,1.00
+Bar & Tube Fab,profileOfSurface,IT,12,16,1.00
+Bar & Tube Fab,runout,IT,12,16,1.00
+Bar & Tube Fab,straightness,IT,12,16,1.00
+Bar & Tube Fab,symmetry,IT,12,16,1.00
+Bar & Tube Fab,tolerance,IT,12,16,1.00
+Bar & Tube Fab,totalRunout,IT,12,16,1.00
+Bar & Tube Fab,roughness,literal,0.375,3.2,1.00
+Bar & Tube Fab,roughnessRz,literal,1.6875,14.4,1.00
+Bend Brake,angularity,IT,14,16,1.00
+Bend Brake,bendAngleTolerance,IT,14,16,1.00
+Bend Brake,circularity,IT,14,16,1.00
+Bend Brake,concentricity,IT,14,16,1.00
+Bend Brake,cylindricity,IT,14,16,1.00
+Bend Brake,diamTolerance,IT,14,16,1.00
+Bend Brake,flatness,IT,14,16,1.00
+Bend Brake,parallelism,IT,14,16,1.00
+Bend Brake,perpendicularity,IT,14,16,1.00
+Bend Brake,positionTolerance,IT,14,16,1.00
+Bend Brake,profileOfSurface,IT,14,16,1.00
+Bend Brake,runout,IT,14,16,1.00
+Bend Brake,straightness,IT,14,16,1.00
+Bend Brake,symmetry,IT,14,16,1.00
+Bend Brake,tolerance,IT,14,16,1.00
+Bend Brake,totalRunout,IT,14,16,1.00
+Bend Brake,roughness,literal,0.375,1.8,1.00
+Bend Brake,roughnessRz,literal,1.6875,8.1,1.00
+Blow Molding,angularity,IT,12,16,1.00
+Blow Molding,bendAngleTolerance,IT,12,16,1.00
+Blow Molding,circularity,IT,12,16,1.00
+Blow Molding,concentricity,IT,12,16,1.00
+Blow Molding,cylindricity,IT,12,16,1.00
+Blow Molding,diamTolerance,IT,12,16,1.00
+Blow Molding,flatness,IT,12,16,1.00
+Blow Molding,parallelism,IT,12,16,1.00
+Blow Molding,perpendicularity,IT,12,16,1.00
+Blow Molding,positionTolerance,IT,12,16,1.00
+Blow Molding,profileOfSurface,IT,12,16,1.00
+Blow Molding,runout,IT,12,16,1.00
+Blow Molding,straightness,IT,12,16,1.00
+Blow Molding,symmetry,IT,12,16,1.00
+Blow Molding,tolerance,IT,12,16,1.00
+Blow Molding,totalRunout,IT,12,16,1.00
+Blow Molding,roughness,literal,0.2,1.6,1.00
+Blow Molding,roughnessRz,literal,0.9,7.2,1.00
+Boring,angularity,IT,6,13,1.00
+Boring,bendAngleTolerance,IT,6,13,1.00
+Boring,circularity,IT,6,13,1.00
+Boring,concentricity,IT,6,13,1.00
+Boring,cylindricity,IT,6,13,1.00
+Boring,diamTolerance,IT,6,13,1.00
+Boring,flatness,IT,6,13,1.00
+Boring,parallelism,IT,6,13,1.00
+Boring,perpendicularity,IT,6,13,1.00
+Boring,positionTolerance,IT,5,11,1.00
+Boring,profileOfSurface,IT,6,13,1.00
+Boring,runout,IT,6,13,1.00
+Boring,straightness,IT,6,13,1.00
+Boring,symmetry,IT,6,13,1.00
+Boring,tolerance,IT,5,11,1.00
+Boring,totalRunout,IT,6,13,1.00
+Boring,roughness,literal,0.4,6.3,1.00
+Boring,roughnessRz,literal,1.8,28.35,1.00
+Broaching,angularity,IT,5,10,1.00
+Broaching,bendAngleTolerance,IT,5,10,1.00
+Broaching,circularity,IT,5,10,1.00
+Broaching,concentricity,IT,5,10,1.00
+Broaching,cylindricity,IT,5,10,1.00
+Broaching,diamTolerance,IT,5,10,1.00
+Broaching,flatness,IT,5,10,1.00
+Broaching,parallelism,IT,5,10,1.00
+Broaching,perpendicularity,IT,5,10,1.00
+Broaching,positionTolerance,IT,5,10,1.00
+Broaching,profileOfSurface,IT,5,10,1.00
+Broaching,runout,IT,5,10,1.00
+Broaching,straightness,IT,5,10,1.00
+Broaching,symmetry,IT,5,10,1.00
+Broaching,tolerance,IT,5,10,1.00
+Broaching,totalRunout,IT,5,10,1.00
+Broaching,roughness,literal,0.8,3.2,1.00
+Broaching,roughnessRz,literal,3.6,14.4,1.00
+Casting,angularity,IT,12,17,1.00
+Casting,bendAngleTolerance,IT,12,17,1.00
+Casting,circularity,IT,12,17,1.00
+Casting,concentricity,IT,12,17,1.00
+Casting,cylindricity,IT,12,17,1.00
+Casting,diamTolerance,IT,12,17,1.00
+Casting,flatness,IT,12,17,1.00
+Casting,parallelism,IT,12,17,1.00
+Casting,perpendicularity,IT,12,17,1.00
+Casting,positionTolerance,IT,12,17,1.00
+Casting,profileOfSurface,IT,12,17,1.00
+Casting,runout,IT,12,17,1.00
+Casting,straightness,IT,12,17,1.00
+Casting,symmetry,IT,12,17,1.00
+Casting,tolerance,IT,12,17,1.00
+Casting,totalRunout,IT,12,17,1.00
+Casting,roughness,literal,25,25,1.00
+Casting,roughnessRz,literal,54,112.5,1.00
+"Cold Rolling, Drawing",angularity,IT,10,15,1.00
+"Cold Rolling, Drawing",bendAngleTolerance,IT,10,15,1.00
+"Cold Rolling, Drawing",circularity,IT,10,15,1.00
+"Cold Rolling, Drawing",concentricity,IT,10,15,1.00
+"Cold Rolling, Drawing",cylindricity,IT,10,15,1.00
+"Cold Rolling, Drawing",diamTolerance,IT,10,15,1.00
+"Cold Rolling, Drawing",flatness,IT,10,15,1.00
+"Cold Rolling, Drawing",parallelism,IT,10,15,1.00
+"Cold Rolling, Drawing",perpendicularity,IT,10,15,1.00
+"Cold Rolling, Drawing",positionTolerance,IT,10,15,1.00
+"Cold Rolling, Drawing",profileOfSurface,IT,10,15,1.00
+"Cold Rolling, Drawing",runout,IT,10,15,1.00
+"Cold Rolling, Drawing",straightness,IT,10,15,1.00
+"Cold Rolling, Drawing",symmetry,IT,10,15,1.00
+"Cold Rolling, Drawing",tolerance,IT,10,15,1.00
+"Cold Rolling, Drawing",totalRunout,IT,10,15,1.00
+"Cold Rolling, Drawing",roughness,literal,0.8,3.2,1.00
+"Cold Rolling, Drawing",roughnessRz,literal,3.6,14.4,1.00

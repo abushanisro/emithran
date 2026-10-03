@@ -1,0 +1,31 @@
+﻿Process Name
+3 Station Rotary Thermoforming:As Formed//CoreBundle
+3 Station Rotary Thermoforming:As Formed//CurvedSurface
+3 Station Rotary Thermoforming:As Formed//CurvedWall
+3 Station Rotary Thermoforming:As Formed//PlanarFace
+3 Station Rotary Thermoforming:As Formed//Void
+3 Station Rotary Thermoforming:Core Pull//CoreBundle
+4 Station Rotary Thermoforming:As Formed//CoreBundle
+4 Station Rotary Thermoforming:As Formed//CurvedSurface
+4 Station Rotary Thermoforming:As Formed//CurvedWall
+4 Station Rotary Thermoforming:As Formed//PlanarFace
+4 Station Rotary Thermoforming:As Formed//Void
+4 Station Rotary Thermoforming:Core Pull//CoreBundle
+No Cost Feature:No Cost Feature//ComplexHole
+No Cost Feature:No Cost Feature//CoreBundle
+No Cost Feature:No Cost Feature//MultiStepHole
+No Cost Feature:No Cost Feature//Perimeter
+No Cost Feature:No Cost Feature//SimpleHole
+No Cost Feature:No Cost Feature//Void
+Shuttle Station Thermoforming:As Formed//CoreBundle
+Shuttle Station Thermoforming:As Formed//CurvedSurface
+Shuttle Station Thermoforming:As Formed//CurvedWall
+Shuttle Station Thermoforming:As Formed//PlanarFace
+Shuttle Station Thermoforming:As Formed//Void
+Shuttle Station Thermoforming:Core Pull//CoreBundle
+Single Station Thermoforming:As Formed//CoreBundle
+Single Station Thermoforming:As Formed//CurvedSurface
+Single Station Thermoforming:As Formed//CurvedWall
+Single Station Thermoforming:As Formed//PlanarFace
+Single Station Thermoforming:As Formed//Void
+Single Station Thermoforming:Core Pull//CoreBundle

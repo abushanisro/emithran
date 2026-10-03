@@ -1,0 +1,35 @@
+﻿Material Type,Maximum Wall Thickness (mm),Minimum Wall Thickness (mm),Process Name
+ABS,3.55600,1.14300,Insert Injection Molding
+ABS,15.00000,2.03200,Insert Structural Foam Molding
+Acetal,3.04800,0.76200,Insert Injection Molding
+Acetal,15.00000,2.03200,Insert Structural Foam Molding
+Acrylic,12.70000,0.63500,Insert Injection Molding
+Acrylic,15.00000,2.03200,Insert Structural Foam Molding
+Nylon,2.92100,0.76200,Insert Injection Molding
+Nylon,15.00000,2.03200,Insert Structural Foam Molding
+Nylon,50.80000,1.52400,Insert Reaction Injection Molding
+PBT,3.17500,0.76200,Insert Injection Molding
+PBT,15.00000,2.03200,Insert Structural Foam Molding
+PET,3.17500,0.76200,Insert Injection Molding
+PET,15.00000,2.03200,Insert Structural Foam Molding
+Polycarbonate,3.81000,1.01600,Insert Injection Molding
+Polycarbonate,15.00000,2.03200,Insert Structural Foam Molding
+Polypropylene,3.81000,0.63500,Insert Injection Molding
+Polypropylene,15.00000,2.03200,Insert Structural Foam Molding
+Polystyrene,3.81000,0.88900,Insert Injection Molding
+Polystyrene,15.00000,2.03200,Insert Structural Foam Molding
+Polyurethane,50.80000,1.52400,Insert Reaction Injection Molding
+PPS,4.57200,0.50800,Insert Injection Molding
+PPS,15.00000,2.03200,Insert Structural Foam Molding
+TPA,3.81000,0.71000,Insert Injection Molding
+TPA,15.00000,2.03200,Insert Structural Foam Molding
+TPE,3.81000,0.71000,Insert Injection Molding
+TPE,15.00000,2.03200,Insert Structural Foam Molding
+TPO,3.81000,0.71000,Insert Injection Molding
+TPO,15.00000,2.03200,Insert Structural Foam Molding
+TPS,3.81000,0.71000,Insert Injection Molding
+TPS,15.00000,2.03200,Insert Structural Foam Molding
+TPU,3.81000,0.71000,Insert Injection Molding
+TPU,15.00000,2.03200,Insert Structural Foam Molding
+TPV,3.81000,0.71000,Insert Injection Molding
+TPV,15.00000,2.03200,Insert Structural Foam Molding

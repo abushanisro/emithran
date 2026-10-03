@@ -1,0 +1,6 @@
+Spi Type,Num Annual Mold Cycles,Use Insert
+101,9999999999.00,true
+102,1000000.00,true
+103,500000.00,false
+104,100000.00,false
+105,500.00,false

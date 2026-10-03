@@ -1,0 +1,9 @@
+﻿Name,toleranceCapabilitySandCasting
+File Path,lookupTables/Component/toleranceCapabilitySandCasting.csv
+
+Best Tolerance (mm),From Length (mm),To Length (mm)
+0.272,0.00,50.80
+0.348,50.80,101.60
+0.451,101.60,203.20
+0.592,203.20,406.40
+19.147,406.40,"100,000.00"

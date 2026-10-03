@@ -1,0 +1,17 @@
+﻿Name,Number of Setups,Setup Time (hr)
+Coordinate Measuring,1.00,0.25
+Core Pull Machining,1.00,0.50
+Core Pull Pocket Machining,1.00,1.00
+Edge Chamfer General Machining,1.00,0.50
+EDM Electrode CNC Machining,1.00,0.25
+General Hole Boring,1.00,0.25
+General Hole Drilling,1.00,0.25
+General Hole Tapping,1.00,0.25
+Mold Plate CNC Machining,1.00,2.00
+Mold Plate General Machining,2.00,0.75
+Plug CNC Machining,1.00,0.50
+Plug General Machining,1.00,0.25
+Vacuum Line High Tolerance Machining,1.00,1.00
+Vacuum Line Low Tolerance Machining,1.00,0.50
+Water Line Drilling,1.00,1.25
+Water Plate General Machining,2.00,0.50

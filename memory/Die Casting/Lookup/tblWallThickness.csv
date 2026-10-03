@@ -1,0 +1,33 @@
+Material Type,Maximum Wall Thickness (mm),Minimum Wall Thickness (mm),Process Name
+Aluminum,38.10000,0.50000,High Pressure Die Casting
+Aluminum,50.50000,2.00000,Gravity Die Casting
+Aluminum,1016.00000,3.00000,Sand Casting
+Aluminum Bronze,38.10000,1.00000,High Pressure Die Casting
+Aluminum Bronze,50.50000,3.00000,Gravity Die Casting
+Aluminum Bronze,1016.00000,3.00000,Sand Casting
+Brass,38.10000,1.00000,High Pressure Die Casting
+Brass,50.50000,3.00000,Gravity Die Casting
+Brass,1016.00000,2.30000,Sand Casting
+Bronze,38.10000,1.00000,High Pressure Die Casting
+Bronze,50.50000,3.00000,Gravity Die Casting
+Bronze,1016.00000,2.30000,Sand Casting
+Copper,38.10000,1.00000,High Pressure Die Casting
+Copper,50.50000,3.00000,Gravity Die Casting
+Copper,1016.00000,2.30000,Sand Casting
+Lead,38.10000,1.00000,High Pressure Die Casting
+Lead,50.50000,3.00000,Gravity Die Casting
+Magnesium,38.10000,0.50000,High Pressure Die Casting
+Magnesium,50.50000,2.00000,Gravity Die Casting
+Magnesium,1016.00000,3.00000,Sand Casting
+Manganese Bronze,38.10000,1.00000,High Pressure Die Casting
+Manganese Bronze,50.50000,3.00000,Gravity Die Casting
+Manganese Bronze,1016.00000,2.30000,Sand Casting
+Silicon Brass,38.10000,1.00000,High Pressure Die Casting
+Silicon Brass,50.50000,3.00000,Gravity Die Casting
+Silicon Brass,1016.00000,2.30000,Sand Casting
+Zinc,38.10000,0.30000,High Pressure Die Casting
+Zinc,50.50000,3.00000,Gravity Die Casting
+Zinc,1016.00000,3.00000,Sand Casting
+Zinc-Aluminum,38.10000,1.00000,High Pressure Die Casting
+Zinc-Aluminum,50.50000,3.00000,Gravity Die Casting
+Zinc-Aluminum,1016.00000,3.00000,Sand Casting

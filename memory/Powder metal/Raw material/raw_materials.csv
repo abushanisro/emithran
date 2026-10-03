@@ -1,0 +1,8 @@
+Name,Source Name,Description,Cut Code,Material Type,Unit Cost (USD / kg),Cost Units,Base Cost Per Unit (USD),Green Density (kg / m^3),Apparent Density (kg / m^3),Graphite Percent Content,Max Green Density (kg / m^3),Min Green Density (kg / m^3),Milling Speed (m / min),Turning Speed (m / min),Data Source,Compaction Curve Coef A,Compaction Curve Coef B,Compaction Curve Coef C
+F-0005 Sponge,Generic F-0005 Sponge,Sponge Iron + Graphite,1.1,Steel,1.805,Cost per KG,1.805,6840.00,2600.00,0.60,7050.00,6440.00,0.00,0.00,aPriori Baseline,974.98,-12557.00,40828.60
+FLC-4605,Generic FLC-4605,Low Alloy Steel+ 2% 8081 Cu + graphite,2.1,Steel,2.873,Cost per KG,2.873,6920.00,2920.00,0.60,7100.00,6490.00,0.00,0.00,aPriori Baseline,782.73,-10101.00,32992.00
+F-0005,Generic F-0005,Iron + Graphite,2.1,Steel,1.621,Cost per KG,1.621,7020.00,2950.00,0.60,7200.00,6710.00,0.00,0.00,aPriori Baseline,1575.30,-21148.00,71379.00
+FC-0205,Generic FC-0205,Iron + 2% 8081 Cu + graphite,2.1,Steel,1.823,Cost per KG,1.823,7020.00,2900.00,0.60,7200.00,6710.00,0.00,0.00,aPriori Baseline,1575.30,-21148.00,71379.00
+FN-0205,Generic FN-0205,Iron + 2% Ni + graphite,2.1,Steel,2.221,Cost per KG,2.221,7020.00,2920.00,0.60,7200.00,6710.00,0.00,0.00,aPriori Baseline,1575.30,-21148.00,71379.00
+FLN2-4405,Generic FLN2-4405,Prealloyed Steel+ 2% Ni + graphite,2.1,Steel,2.846,Cost per KG,2.846,7040.00,2930.00,0.60,7160.00,6750.00,0.00,0.00,aPriori Baseline,1631.90,-22015.00,74657.00
+FD-0405,Generic FD-0405,Alloy Steel + graphite,2.1,Steel,3.808,Cost per KG,3.808,7040.00,2930.00,0.60,7230.00,6770.00,0.00,0.00,aPriori Baseline,1964.70,-26615.00,90548.00

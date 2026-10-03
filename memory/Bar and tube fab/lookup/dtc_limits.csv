@@ -1,0 +1,2 @@
+Process,Name,Limit,Notes
+Bent Part,Num Unique Bends,3.00,Compared against the number of unique bends. Used to flag when too many unique bends are on the part.

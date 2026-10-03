@@ -1,0 +1,16 @@
+﻿Material Type,Maximum Wall Thickness (mm),Minimum Wall Thickness (mm),Process Name
+Aluminum,1016.00000,3.00000,Sand Casting
+Aluminum Bronze,1016.00000,3.00000,Sand Casting
+Brass,1016.00000,2.30000,Sand Casting
+Bronze,1016.00000,2.30000,Sand Casting
+Copper,1016.00000,2.30000,Sand Casting
+Ductile Iron,1016.00000,3.00000,Sand Casting
+Gray Iron,1016.00000,3.00000,Sand Casting
+Magnesium,1016.00000,3.00000,Sand Casting
+Malleable Cast Iron,1016.00000,3.00000,Sand Casting
+Manganese Bronze,1016.00000,2.30000,Sand Casting
+Silicon Brass,1016.00000,2.30000,Sand Casting
+Stainless Steel,1016.00000,3.00000,Sand Casting
+Steel,1016.00000,3.00000,Sand Casting
+Zinc,1016.00000,3.00000,Sand Casting
+Zinc-Aluminum,1016.00000,3.00000,Sand Casting

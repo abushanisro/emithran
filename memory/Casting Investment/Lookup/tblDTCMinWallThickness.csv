@@ -1,0 +1,19 @@
+Material Type,Max Wall Thickness (mm),Min Wall Thickness (mm),Min Hole Wall Thickness Multiplier
+Aluminum,50.80,0.75,0.20
+Aluminum Bronze,50.80,0.75,0.20
+Brass,50.80,0.75,0.20
+Bronze,50.80,0.75,0.20
+Copper,50.80,0.75,0.20
+Ductile Iron,50.80,1.50,0.20
+Gray Iron,50.80,1.50,0.20
+Heat Resistant Super Alloys,50.80,0.50,0.20
+Lead,50.80,1.50,0.20
+Magnesium,50.80,0.75,0.20
+Malleable Cast Iron,50.80,1.50,0.20
+Manganese Bronze,50.80,0.75,0.20
+Silicon Brass,50.80,0.75,0.20
+Stainless Steel,50.80,1.50,0.20
+Steel,50.80,1.50,0.20
+Titanium,50.80,1.50,0.20
+Zinc,50.80,0.75,0.20
+Zinc-Aluminum,50.80,0.75,0.20

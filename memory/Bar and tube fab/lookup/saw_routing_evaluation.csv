@@ -1,0 +1,14 @@
+Stock Form,Band Saw,Circular Saw,Reciprocating Saw
+ANGLE_BAR,true,false,false
+CHANNEL_BAR,true,false,false
+GENERIC_EXTRUSION,false,false,true
+HEX_BAR,true,false,false
+I_BEAM,true,false,false
+PLATE,true,false,false
+RECTANGULAR_BAR,true,false,false
+RECTANGULAR_TUBE,true,false,false
+ROUND_BAR,true,false,false
+ROUND_TUBE,true,false,false
+SQUARE_BAR,true,false,false
+SQUARE_TUBE,true,false,false
+T_BEAM,true,false,false

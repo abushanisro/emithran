@@ -1,0 +1,5 @@
+﻿Name,tblMetalAdditives
+File Path,lookupTables/Component/tblMetalAdditives.csv
+
+Name,Rate (USD / kg)
+Default,0.22

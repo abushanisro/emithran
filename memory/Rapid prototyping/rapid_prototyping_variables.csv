@@ -1,0 +1,91 @@
+Variable Name,String Value,Unit Type Name,Notes
+cleaningBaseTime,300,Time,Base time to clean part
+cleaningComplexHoleBase,45,Time,Base time to clean complex hole
+cleaningComplexVoidBase,45,Time,Base time to clean complex void
+cleaningDepthLargeLimit,20,Length,Defines upper limit of hole depth
+cleaningDepthLargeMultiplier,2,,Multiplier for large hole depth
+cleaningDepthMediumMultiplier,1,,Multiplier for medium hole depth
+cleaningDepthSmallLimit,10,Length,Defines lower limit of hole depth
+cleaningDepthSmallMultiplier,0.5,,Multiplier for small hole depth
+cleaningLargeComplexLimit,30,Length,Defines upper limit for complex hole size
+cleaningLargeComplexMultiplier,0.5,,Multiplier for large complex hole
+cleaningLargeComplexVoidDepthLimit,20,Length,Defines upper limit for complex void depth
+cleaningLargeComplexVoidDepthMultiplier,2,,Multiplier for large complex void depth
+cleaningLargeComplexVoidLimit,5000,Volume,Defines upper limit for complex void size
+cleaningLargeComplexVoidMultiplier,0.5,,Multiplier for large complex void
+cleaningLargeHoleLimit,30,Length,Defines upper limit for simple hole size
+cleaningLargeHoleMultiplier,0.5,,Multiplier for large hole
+cleaningLargeMultiLimit,30,Length,Defines upper limit for multistep hole
+cleaningLargeMultiMultiplier,0.5,,Multiplier for large multistep hole size
+cleaningLargeRingDepthLimit,20,Length,Defines upper limit for ringed void depth
+cleaningLargeRingDepthMultiplier,2,,Multiplier for large ringed void depth
+cleaningLargeRingHoleLimit,30,Length,Defines upper limit for ringed hole size
+cleaningLargeRingHoleMultiplier,0.5,,Multiplier for large ringed hole size
+cleaningLargeRingLimit,5000,Volume,Defines upper limit for ringed void size
+cleaningLargeRingMultiplier,0.5,,Multiplier for large ringed void size
+cleaningLargeVoidDepthLimit,20,Length,Defines upper limit for void depth
+cleaningLargeVoidDepthMultiplier,2,,Multiplier for large void depth
+cleaningLargeVoidLimit,5000,Volume,Defines upper limit for void size
+cleaningLargeVoidMultiplier,0.5,,Multiplier for large void size
+cleaningMediumComplexMultiplier,1,,Multiplier for medium complex hole size
+cleaningMediumComplexVoidDepthMultiplier,1,,Multiplier for medium complex void depth
+cleaningMediumComplexVoidMultiplier,1,,Multiplier for medium complex void size
+cleaningMediumHoleMultiplier,1,,Multiplier for medium simple hole size
+cleaningMediumMultiMultiplier,1,,Multiplier for medium multistep hole size
+cleaningMediumRingDepthMultiplier,1,,Multiplier for medium ringed void depth
+cleaningMediumRingHoleMultiplier,1,,Multiplier for medium ringed hole size
+cleaningMediumRingMultiplier,1,,Multiplier for medium ringed void size
+cleaningMediumVoidDepthMultiplier,1,,Multiplier for medium void depth
+cleaningMediumVoidMultiplier,1,,Multiplier for medium void size
+cleaningMultiHoleBase,60,Time,Base time to clean multistep hole
+cleaningRingBase,30,Time,Base time to clean ringed void
+cleaningRingedHoleBase,60,Time,Base time to clean ringed hole
+cleaningSimpleHoleBase,30,Time,Base time to clean simple hole
+cleaningSimpleVoidBase,30,Time,Base time to clean simple void
+cleaningSmallComplexLimit,10,Length,Defines lower limit for complex hole
+cleaningSmallComplexMultiplier,2,,Multiplier for small complex hole
+cleaningSmallComplexVoidDepthLimit,10,Length,Defines lower limit for complex void depth
+cleaningSmallComplexVoidDepthMultiplier,0.5,,Multiplier for small complex void depth
+cleaningSmallComplexVoidLimit,1000,Volume,Defines lower limit for complex void size
+cleaningSmallComplexVoidMultiplier,2,,Multiplier for small complex void size
+cleaningSmallHoleLimit,10,Length,Defines lower limit for simple hole size
+cleaningSmallHoleMultiplier,2,,Multiplier for small simple hole size
+cleaningSmallMultiLimit,10,Length,Defines lower limit for multistep hole size
+cleaningSmallMultiMultiplier,2,,Multiplier for small multistep hole size
+cleaningSmallRingDepthLimit,10,Length,Defines lower limit for ringed void depth
+cleaningSmallRingDepthMultiplier,0.5,,Multiplier for small ringed void depth
+cleaningSmallRingHoleLimit,10,Length,Defines lower limit for ringed hole size
+cleaningSmallRingHoleMultiplier,2,,Multiplier for small ringed hole size
+cleaningSmallRingLimit,1000,Volume,Defines lower limit for ringed void size
+cleaningSmallRingMultiplier,2,,Multiplier for small ringed void size
+cleaningSmallVoidDepthLimit,10,Length,Defines lower limit for simple void depth
+cleaningSmallVoidDepthMultiplier,0.5,,Multiplier for small simple void depth
+cleaningSmallVoidLimit,1000,Volume,Defines limit for simple void size
+cleaningSmallVoidMultiplier,2,,Multiplier for small simple void size
+curingMaxCureTime,1800,Time,Maximum time for part curing
+cycleTimeAdjustmentFactor,1,,Factor used to globally increase or decrease cycle time evaluations per process.
+defaultUtilizationMethod,COMPUTED,,"Eligible values ""COMPUTED"" & ""MACHINE_DEFAULT"""
+disableInvestmentAmortization,false,,"User override to disable amortization of all fixed costs to the individual part or assembly. By default, fixed costs are calculated per part for tooling, fixtures, and programming."
+gearQualityDefaultAgmaNewStd,A8,,"A2, A3, A4, ... A11, A12"
+gearQualityDefaultAgmaOldStd,Q8,,"Q15, Q14, Q13, ... Q6, Q5"
+gearQualityDefaultDinStd,9,,"2, 3, 4, ... 11, 12"
+laborRateAdjustmentFactor,1,,Factor used to globally increase or decrease labor rate evaluations per process.
+nestingAllowance,0.75,Length,Default distance between parts in nesting applied to each side of part
+overheadRateAdjustmentFactor,1,,Factor used to globally increase or decrease overhead rate evaluations per process.
+printingDefaultMaterialCost,225,CostPerMass,Default material cost for 3D Printing
+printingDefaultMaterialDensity,1185,Density,Default material density for 3D Printing
+printingPreprocessingTime,300,Time,Default preprocessing time for 3D Printing
+printingSupportMaterialCost,250,CostPerMass,Default support cost for 3D Printing
+printingSupportMaterialDensity,1050,Density,Default support density for 3D Printing
+slaDefaultMaterialCost,175,CostPerMass,Default material cost for Stereolithography
+slaDefaultMaterialDensity,1100,Density,Default material density for Stereolithography
+slaHighLayerResolution,0.05,Length,High Resolution layer thickness for Stereolithography
+slaPreprocessingTime,300,Time,Default preprocessing time for Stereolithography
+slaStandardLayerResolution,0.1,Length,Standard Resolution layer thickness for Stereolithography
+slaSupportLayerThickness,0.1,Length,Default support thickness for Stereolithography
+slaSupportVolumeFraction,0.05,,Default support volume fraction for Stereolithography
+slsDefaultMaterialCost,125,CostPerMass,Default material cost for Selective Laser Sintering
+slsDefaultMaterialDensity,960,Density,Default material density for Selective Laser Sintering
+slsLayerThickness,0.1,Length,Default layer thickness for Selective Laser Sintering
+slsPreprocessingTime,300,Time,Default preprocessing time for Selective Laser Sintering
+slsRecoveryPercentage,0.85,,The default amount of damaged material that is recoverable for Selective Laser Sintering

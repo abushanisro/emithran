@@ -1,0 +1,6 @@
+Mass (kg),Number of Gates,Tree Assembly Time Per Gate (s),Band Saw Time Per Gate (s),Abrasive Wheel Cut Time Per Gate (s),Belt Sand Time Per Gate (s),Abrasive Disc Grinding Time Per Gate (s),Finishing Percentage Surface Area (%),Finishing Visual Check Time (s)
+0.34,1.00,5.00,10.00,10.00,30.00,30.00,70.00,15.00
+0.68,1.00,30.00,10.00,10.00,30.00,30.00,70.00,30.00
+1.36,1.00,300.00,10.00,10.00,30.00,30.00,70.00,45.00
+6.80,4.00,300.00,20.00,20.00,45.00,45.00,50.00,60.00
+13.60,8.00,300.00,40.00,40.00,60.00,60.00,25.00,120.00

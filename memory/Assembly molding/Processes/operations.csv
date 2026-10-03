@@ -1,0 +1,21 @@
+﻿Process Name
+Insert Injection Molding:As Molded//ComboVoid
+Insert Injection Molding:As Molded//CurvedSurface
+Insert Injection Molding:As Molded//CurvedWall
+Insert Injection Molding:As Molded//MultiStepHole
+Insert Injection Molding:As Molded//PlanarFace
+Insert Injection Molding:As Molded//Rib
+Insert Injection Molding:As Molded//SharpEdge
+Insert Injection Molding:As Molded//SimpleHole
+Insert Injection Molding:As Molded//Void
+Insert Injection Molding:HoleUnscrewMandrel//SimpleHole
+Insert Injection Molding:Lifters//LifterBundle
+Insert Injection Molding:MstepUnscrewMandrel//MultiStepHole
+Insert Injection Molding:Slides//SlideBundle
+Insert Pick and Place:As Molded//AssemblyComponentGcd
+Insert Pick and Place:Insert Lifters//LifterBundle
+Insert Pick and Place:Insert Slides//SlideBundle
+Insert Pick and Place:Manual Load//AssemblyComponentGcd
+Insert Pick and Place:Robotic Load//AssemblyComponentGcd
+No Cost Feature:No Cost Feature//MultiStepHole
+No Cost Feature:No Cost Feature//SimpleHole

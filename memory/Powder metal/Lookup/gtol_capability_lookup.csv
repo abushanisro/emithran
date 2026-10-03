@@ -1,0 +1,59 @@
+Process,Gtol Category,Capability System,Best Achievable,Worst Achievable,Num Repetitions
+2 Axis Router,angularity,IT,9,14,1.00
+2 Axis Router,bendAngleTolerance,IT,9,14,1.00
+2 Axis Router,circularity,IT,9,14,1.00
+2 Axis Router,concentricity,IT,9,14,1.00
+2 Axis Router,cylindricity,IT,9,14,1.00
+2 Axis Router,diamTolerance,IT,9,14,1.00
+2 Axis Router,flatness,IT,9,14,1.00
+2 Axis Router,parallelism,IT,9,14,1.00
+2 Axis Router,perpendicularity,IT,9,14,1.00
+2 Axis Router,positionTolerance,IT,9,14,1.00
+2 Axis Router,profileOfSurface,IT,9,14,1.00
+2 Axis Router,roughness,literal,0.8,3.2,1.00
+2 Axis Router,roughnessRz,literal,3.6,14.4,1.00
+2 Axis Router,runout,IT,9,14,1.00
+2 Axis Router,straightness,IT,9,14,1.00
+2 Axis Router,symmetry,IT,9,14,1.00
+2 Axis Router,tolerance,IT,9,14,1.00
+2 Axis Router,totalRunout,IT,9,14,1.00
+3D Laser,angularity,IT,10,16,1.00
+3D Laser,bendAngleTolerance,IT,10,16,1.00
+3D Laser,circularity,IT,10,16,1.00
+3D Laser,concentricity,IT,10,16,1.00
+3D Laser,cylindricity,IT,10,16,1.00
+3D Laser,diamTolerance,IT,10,16,1.00
+3D Laser,flatness,IT,10,16,1.00
+3D Laser,parallelism,IT,10,16,1.00
+3D Laser,perpendicularity,IT,10,16,1.00
+3D Laser,positionTolerance,IT,10,16,1.00
+3D Laser,profileOfSurface,IT,10,16,1.00
+3D Laser,roughness,literal,0.2,6.3,1.00
+3D Laser,roughnessRz,literal,0.9,28.35,1.00
+3D Laser,runout,IT,10,16,1.00
+3D Laser,straightness,IT,10,16,1.00
+3D Laser,symmetry,IT,10,16,1.00
+3D Laser,tolerance,IT,10,16,1.00
+3D Laser,totalRunout,IT,10,16,1.00
+Assembly,angularity,IT,5,7,1.00
+Assembly,bendAngleTolerance,IT,5,7,1.00
+Assembly,circularity,IT,5,7,1.00
+Assembly,concentricity,IT,5,7,1.00
+Assembly,cylindricity,IT,5,7,1.00
+Assembly,diamTolerance,IT,5,7,1.00
+Assembly,flatness,IT,5,7,1.00
+Assembly,parallelism,IT,5,7,1.00
+Assembly,perpendicularity,IT,5,7,1.00
+Assembly,positionTolerance,IT,5,7,1.00
+Assembly,profileOfSurface,IT,5,7,1.00
+Assembly,roughness,literal,0.4,7,1.00
+Assembly,roughnessRz,literal,1.8,31.5,1.00
+Assembly,runout,IT,5,7,1.00
+Assembly,straightness,IT,5,7,1.00
+Assembly,symmetry,IT,5,7,1.00
+Assembly,tolerance,IT,5,7,1.00
+Assembly,totalRunout,IT,5,7,1.00
+Bar & Tube Fab,angularity,IT,12,16,1.00
+Bar & Tube Fab,bendAngleTolerance,IT,12,16,1.00
+Bar & Tube Fab,circularity,IT,12,16,1.00
+Bar & Tube Fab,concentricity,IT,12,16,1.00

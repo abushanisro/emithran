@@ -1,0 +1,220 @@
+﻿Variable Name,String Value,Unit Type Name,Notes
+aPlateCupCavityRatio,1,,The fractional percentage of the cavity height that is within the cavity plate for a cup shaped part. Valid inputs range from 0 to 1.
+aPlateFlatCavityRatio,0.5,,The fractional percentage of the cavity height that is within the cavity plate for a flat part. Valid inputs range from 0 to 1.
+aPlateMinThickness,85.725,Length,Minimum distance from the shallowest point of the cavity to the back of the cavity plate.
+bPlateMinThickness,85.725,Length,Minimum distance from the deepest point of the cavity to the back of the core plate.
+bottomClampPlateThickness,28.575,Length,
+burnsPerLargeLifter,2,,Default burns per large lifter.
+burnsPerLargeSlide,2,,Default burns per large slide.
+burnsPerMediumLifter,2,,Default burns per medium lifter.
+burnsPerMediumSlide,2,,Default burns per medium slide.
+burnsPerSmallLifter,2,,Default burns per small lifter.
+burnsPerSmallSlide,2,,Default burns per small slide.
+cDimension,63.5,Length,
+cavityPlateDepthBorder,152.4,Length,"make 6"" also, same as core border"
+clampForceSafetyFactor,1.1,,multiplier of clamp pressure required to insure that the machine is capable of applying the necessary mold pressure (10% safety factor)
+cmmInspectionAdder,5,,Adder used for calculating required CMM hours for inspecting Slides and Lifters.
+cmmInspectionMultiplier,1.52,,Multiplier used for calculating required CMM hours for inspecting Slides and Lifters.
+coarseTextureCostperSqM,15500,,"Per square meter, from $10 per mold area square inch to texture the surface"
+colorantCost,0.75,CostPerMass,Cost of colorant per unit mass. The colorant cost is multiplied by the rough mass of the part to determine the total colorant cost.
+conventionalRunnerMaxPressureReductionFactor,0.15,,Maximum material injection pressure reduction factor for standard cold runners. Used to calculate 'adjustedInjectionPressure'. Starting point value is 0.15 signifying a 15% reduction from the selected material's maximum injection pressure. Value must be less than 1.
+corePlateDepthBorder,152.4,Length,"6"" depth border"
+costPerHydraulicEjector,4200,Currency,
+costPerPorcerax,4800,Currency,
+costPerSVGHotDrop,6000,Currency,
+costPerStandardHotDrop,3750,Currency,
+costPerUnscrewingMechanism,4200,Currency,
+cupRatioThresholdMultiplier,1,,"Threshold at which the part is deemed as cup shaped. Multiplies the part nominal wall thickness and is compared to the maximum tool reach. If this variable is set to 0, all parts will be considered cup shaped."
+cycleRatePerSlide,100,Velocity,The rate at which the hydraulic slide can move.
+cycleTimeAdjustmentFactor,1,,Factor used to globally increase or decrease cycle time evaluations per process.
+defaultCavityFinish,SPI Finish - Grade B,,"Default finish applied to cavity surface. Available options are 'As-Machined', 'SPI Finish - Grade C', 'SPI Finish - Grade B', 'SPI Finish - Grade A'."
+defaultCustomMultiplier,0.6,,"Coefficient, in case of 'Standard Mold Base'"
+defaultEjectorPinSpacing,7903.21,Area,Default spacing for ejector pins.
+defaultEnableOverhangingClampingPlates,false,,"If true, oversized clamping plates sizes will be selected from table tblStandardMoldBaseSizes. If false, the clamping plates will be flush with the rest of the mold plates, and so actual width and length dimensions will be selected from the table."
+defaultEnablePlasticFormingRegionInserts,true,,Default setting for whether or not to use inserts in the Plastic Forming Region of the mold base ('true' or 'false'). This value is referenced only if plant.defaultInsertMethod = SPECIFY.
+defaultGatingType,Edge,,Specify if the Gate is placed at the edge or on the centre of the mold for a cold runner system. Select from 'Edge' and 'Center'.
+defaultHotDropType,Standard,,Default hot drop type. Available options are 'Standard' or 'SVG'.
+defaultInboundWaterlineMultiplier,1.25,,Default Multiplier of the Waterline Diameter for calculation of the Inbound Allowance of the Plastic Forming Region.
+defaultInjectionPressure,130,Pressure,Default injection pressure for materials where injection pressure is not defined. Uses the value from ABS.
+defaultInsertMethod,SPECIFY,,'LOOKUP' versus 'SPECIFY'. Default setting for whether the decision to use inserts in the Plastic Forming Region of the mold base is dynamically retrieved from a lookup table or is statically set to the value of plant variable plant.defaultEnablePlasticFormingRegionInserts.
+defaultInsertRetentionCost,0,Currency,The default insert retention cost. The insert retention cost is an additional tooling cost for insert component retention.
+defaultManualLoadTime,8,Time,Default value for manual insert loading time.
+defaultMoldTemperatureIncrease,0,Temperature,This value is added on to the mold temperature variable that is used in the cooling time equation. It allows for local differences in mold temperatures that can occur in the event of limited access for cooling channels
+defaultNumCavities,1,,Default value for the number of cavities in one mold. User may override via Process Setup Options.
+defaultNumHotDrops,0,,
+defaultNumMoldToolsPerTable,2,,Default number of lower mold tools on rotary or shuttle table when using a vertically orientated machine.
+defaultNumTryOuts,3,,
+defaultOutboundWaterlineMultiplier,1,,Default Multiplier of the Waterline Diameter for calculation of the Outbound Allowance of the Plastic Forming Region.
+defaultRegrindAllowance,0.25,,Default allowable percentage of runners and scrap allowed with virgin material.
+defaultRoboticLoadTime,6,Time,Default value for robotic insert loading time.
+defaultRunnerAttachmentSide,Long,,Default side of the attachment of the runner to the cavity. Choose from 'Long' side of the cavity and 'Short' side of the cavity
+defaultToolLife,260000,,The default number of shots per tool which is used to determine tool life. This is the median value of the available data relating to tool life by part material type.
+defaultUtilizationMethod,COMPUTED,,"Eligible values: ""COMPUTED"" & ""MACHINE_DEFAULT"""
+defaultWaterLineDiameter,8,Length,Default water line diameter used for calculation of the plastic forming region.
+densityAL,2710,kg/m^3,
+densityCarbonSteel,7820,kg/m^3,
+densityCopper,8400,kg/m^3,Density of Copper electrodes
+densityEpoxy,1500,kg/m^3,
+densityGraphite,3514,kg/m^3,Density of graphite electrodes
+densityH13,7880,kg/m^3,
+densityP20,7860,kg/m^3,
+densityPolystyreneForShotSize,1040,Density,Industry standard density of General Purpose Polystyrene (GPPS) used to define shot size in grams
+densitySS,8030,kg/m^3,
+disableInvestmentAmortization,false,,"User override to disable amortization of all fixed costs to the individual part or assembly. By default, fixed costs are calculated per part for tooling, fixtures, and programming."
+drawDirectionOrthogonalEpsilon,5,,Bundling parameters - angular difference in setup axes of features sharing a bundle
+drawDirectionOrthogonalEpsilonForLifters,10,Angle,Default value supporting Slide and Lifter bundling
+drawDirectionOrthogonalEpsilonForSlides,30,Angle,Default value supporting Slide and Lifter bundling
+dryCycleStrokeFactor,0.7,,Euromap 6 details the dry cycle time measurement. Within this standard there is a reference to the stroke being 70% of the maximum of the tie bar values.
+ejectMethod,Manual,,"Specifies the default part eject method for the Insert Injection Molding process. Possible values: Manual, Robotic, Gravity"
+ejectorBoxRailsDefaultHeight,152.4,Length,Default ejector rail height.
+ejectorBoxRailsDefaultNumber,2,,Default number of ejector rails.
+ejectorBoxRailsDefaultWidth,76.2,Length,Default ejector rail width.
+ejectorDistanceFactor,3,,The coefficient used in finding a multiple of the part height to find the distace that the ejector pins should move
+ejectorGuidePinsBushingsCost,30,Currency,
+ejectorPinsCost,5,Currency,
+ejectorPlateCorePlateWidthReduction,152.4,Length,
+ejectorPlateSupportPillarDiameter,76.2,Length,Support pillar diameter for ejector plate.
+ejectorPlateTotalDefaultThickness,44.45,Length,Default total thickness of ejector plates. Includes top and bottom plates.
+gasCost,0.0022,CostPerMass,Default cost per total mass of part for direct injection of gas. Only applicable for Structural Foam Molding. User may override via Process Setup Options.
+gearQualityDefaultAgmaNewStd,A8,,"A2, A3, A4, ... A11, A12"
+gearQualityDefaultAgmaOldStd,Q8,,"Q15, Q14, Q13, ... Q6, Q5"
+gearQualityDefaultDinStd,9,,"2, 3, 4, ... 11, 12"
+gravityDropTime,1.25,Time,The time for the part to drop from the tool by gravity.
+handlingMultiplier,1.15,,Manual load time multiplier for insert handling difficulties
+highAspectRatioThreshold,0.50,,Parts with an aspect ratio equal to or above this threshold incur additional complexity during part ejection. Used to calculate nominal wall thickness. Default value is 0.50.
+hotRunnerMaxPressureReductionFactor,0.30,,Maximum material injection pressure reduction factor for hot runners. Used to calculate 'adjustedInjectionPressure'. Starting point value is 0.30 signifying a 30% reduction from the selected material's maximum injection pressure. Value must be less than 1.
+injectionRateMultiplier,.25,,Multiplier used to downgrade the machine injection rate.
+insertInjectionMoldingMachineOrientation,No Preference,,"Default orientation of the insert injection molding machine. Choose from 'Vertical', 'Horizontal' or 'No Preference'."
+insertionMultiplier,1.2,,Manual load time multiplier for insert insertion difficulties
+laborRateAdjustmentFactor,1,,Factor used to globally increase or decrease labor rate evaluations per process.
+largeCalcRibInsertElectrodeSize,117.1875,in^3,Size of large electrode rib insert
+largeGrillInsertDefaultHeight,50.8,Length,Large grill insert height.
+largeInsertArea,36,,"6"" x 6"" area (volume = 6 x6 x core plate height)"
+largeLifterVolume,1500,,volume of large slides - cubic inch
+largeOverrideLengthAdder,300,Length,Length adder for mold base due to the inclusion of large slides.
+largeSlideVolume,2000,,volume of large slides - cubic inch
+largeStandardRibInsertElectrodeSize,117.1875,in^3,Size of standard electrode in cubic inches
+leaderPinsShoulderBushingsCost,45,Currency,
+lifterBaseLength,15,Length,Default value for cost engine function parameter for slide and lifter bundling in Injection Molding
+lifterHeightAddendum,5,Length,Default value for cost engine function parameter for slide and lifter bundling in Injection Molding
+lifterInclineAngleDegrees,15,Angle,Default value for cost engine function parameter for slide and lifter bundling in Injection Molding
+limitSwitchesCost,50,Currency,
+loadManualOrRobotic,Manual,,"Specifies the default insert loading method for the Pick and Place process. Possible values: Manual, 3-Axis, 6-Axis."
+locatingRingsCost,85,Currency,
+lowThicknessDevThreshold,0.30,Length,"Parts with an average thickness deviation, 'avgThicknessDev', equal to or below this threshold value are considered to have relatively uniform wall thickness. Used to calculate nominal wall thickness. Default value is 0.30."
+lowerLimitSmallLifters,4,,Default limit on number of lifters allowed on parts with a projected perimeter less than maxLimitSmallLiftersThreshold.
+lowerLimitSmallSlides,2,,Default limit on number of slides allowed on parts with cavity width less than maxLimitSmallSlidesThreshold.
+machinabilityMultiplierAluminum,0.5,,Unitless machinability multiplier for Aluminum
+machinabilityMultiplierCarbonSteel,0.75,,Unitless machinability multiplier for Carbon Steel
+machinabilityMultiplierEpoxy,0.55,,Unitless machinability multiplier for Epoxy
+machinabilityMultiplierH13ToolSteel,1.15,,Unitless machinability multiplier for H13 Tool Steel
+machinabilityMultiplierP20ToolSteel,1,,Unitless machinability multiplier for P20 Tool Steel
+machinabilityMultiplierStainlessSteel,1.25,,Unitless machinability multiplier for Stainless Steel
+machineTonnageThresholdSmallMolds,700,,Machine Tonnage Threshold for Small Molds.
+manifoldPlateThickness,94.1,Length,"Manifold plate thickness. Includes Riser Pads, Spacer Ring and Manifold. Used to calculate the total hot drop thickness."
+manualGrabTime,8,Time,The time to manually remove the part from the tool.
+maxLimitSmallLiftersLengthThreshold,800,Length,Threshold used to determine the max number of lifters. Number of slides determined by lowerLimitSmallLifters and upperLimitSmallLifters.
+maxLimitSmallSlidesLengthThreshold,200,Length,Threshold used to determine the max number of slides. number of slides determined by lowerLimitSmallSlides and upperLimitSmallSlides.
+maxRunnerDia,12.7,Length,Maximal Runner Diameter
+medThicknessDevThreshold,0.50,,"Parts with an average thickness deviation, 'avgThicknessDev', above this threshold are considered to have relatively non-uniform wall thickness. Used to calculate nominal wall thickness. Default value is 0.50."
+mediumCalcRibInsertElectrodeSize,31.6875,in^3,Size of medium electrode rib insert
+mediumGrillInsertDefaultHeight,50.8,Length,Medium grill insert height.
+mediumInsertArea,9,,"3"" x 3"" area (volume = 3 x 3 x core plate height)"
+mediumLifterBundleWidthThreshold,127,Length,width threshold between a medium and large lifter bundle (based on 5 inches).
+mediumLifterVolume,500,,volume of medium slides - cubic inch
+mediumOverrideLengthAdder,200,Length,Length adder for mold base due to the inclusion of medium slides.
+mediumSlideBundleWidthThreshold,304.8,Length,width threshold between a medium and large slide bundle (based on 12 inches).
+mediumSlideVolume,1100,,volume of medium slides - cubic inch
+mediumStandardRibInsertElectrodeSize,31.6875,in^3,Size of medium electrode in cubic inches
+mediumVoidVolumeThreshold,5080,Length,
+minInjectionPressure,27.57903,Pressure,Min adjusted injection pressure is 4000 PSI.
+minPercentClampWallThickness,20,,minPercentClampWallThickness
+minRunnerDia,2.032,Length,Minimal Runner Diameter
+minimumLifterClearance,64.77,Length,Bundling parameters - lifter clearance
+minimumSlideClearance,196.75,Length,Bundling parameters - slide clearance
+minimumTempControlAllowance,12.7,Length,Minimum additional height added to the part height to allow for Cavity Temperature Control Allowance.
+moldBaseEjectorBoxMultiplierAluminum,0.7,,Unitless mold base material multiplier for Aluminum
+moldBaseEjectorBoxMultiplierCarbonSteel,0.8,,Unitless mold base material multiplier for Carbon Steel
+moldBaseEjectorBoxMultiplierH13ToolSteel,1.15,,Unitless mold base material multiplier for H13 Tool Steel
+moldBaseEjectorBoxMultiplierP20ToolSteel,1,,Unitless mold base material multiplier for P20 Tool Steel
+moldBaseEjectorBoxMultiplierStainlessSteel,1.2,,Unitless mold base material multiplier for Stainless Steel
+moldBaseMaterialMultiplierAluminum,0.5,,Unitless mold base material multiplier for Aluminum
+moldBaseMaterialMultiplierCarbonSteel,0.85,,Unitless mold base material multiplier for Carbon Steel
+moldBaseMaterialMultiplierEpoxy,0.35,,Unitless mold base material multiplier for Epoxy
+moldBaseMaterialMultiplierH13ToolSteel,1.2,,Unitless mold base material multiplier for H13 Tool Steel
+moldBaseMaterialMultiplierP20ToolSteel,1,,Unitless mold base material multiplier for P20 Tool Steel
+moldBaseMaterialMultiplierStainlessSteel,1.3,,Unitless mold base material multiplier for Stainless Steel
+moldBaseNonRecurringCostRatio,0.65,,The ratio of non-recurring mold base cost to total mold base cost when using pocketed cavity set construction. Used to calculate standard mold base cost when plastic forming region inserts are used.
+multipleHydraulicEjectorThreshold,1290320,Area,Threshold area for requiring multiple hydraulic ejectors.
+nitridePlatingCostperLb,1.50,,cost per lb to nitride plate the mold; used as the base cost with multipliers for other plating processes
+nominalHeightFactor,3,,This factor is used to determine the tool's open travel distance in the presence of parts with nominal part height values. In this case the height of the part should be considered in determining the opening distance of the tool.
+nominalWallThicknessFactor,1,,"A factor applied when calculating nominal wall thickness, default set to 1."
+nozzlePlateThickness,47.625,Length,Nozzle plate thickness. Used to calculate the total hot drop thickness.
+numElectrodesPerPocket,4,,"Unitless, number of electrodes per pocket, one per pocket corner"
+numLargeInsertsBurns,2,,"Unitless, number of large inserts burns"
+numMediumInsertsBurns,2,,"Unitless, number of medium inserts burns"
+numSleevePinsBurns,2,,Default number of sleeve pins burns.
+numSmallInsertsBurns,2,,"Unitless, number of small inserts burns"
+numSpeakerGrillBurns,3,,Default number of speaker drill burns.
+overheadRateAdjustmentFactor,1,,Factor used to globally increase or decrease overhead time evaluations per process.
+plasticFormingRegionInsertSetupTime,2,hr,Time required to setup tool material on CNC machine for machining of plastic forming region insert.
+pocketedInsertAssemblyHours,0.05,hr,Time required to assemble plastic forming region insert into retainer plate.
+qtyPocketElectrodesPerLifter,2,,Default number of pocket electrodes per lifter.
+qtyPocketElectrodesPerSlide,2,,Default number of pocket electrodes per slide.
+quickHoseDisconnectsCost,3,Currency,
+ratioFeedingDiameterToMaxThickness,1.25,,Ratio of cavity feeding diameter to maximum part thickness. Used to calculate the cavity feed diameter based on max part thickness.
+recommendedShotSizeLimitLower,0,,Lower recommended percentage limit for barrel capacity
+recommendedShotSizeLimitUpper,0.75,,Upper recommended percentage limit for barrel capacity
+regionMultiplier,1,,Multiplier used to scale the overall mold cost based on the region in which the part is manufactured.
+retractClearance,3.175,Length,Retract Clearance for calculating Slide Allowance (static value)
+returnPinsShoulderBushingsCost,35,Currency,
+robotClearanceFactor,1,,This factor is used to determine the tool's open travel distance in the presence of robotic ejection. Clearance is required to allow the head of the robot to access the part.
+robotGrabTime,6,Time,The time for a robot to remove the part from the tool.
+runnerRetentionTab,4.7625,Length,Overlapping Runner for Central Gating Runner System
+scrapTimeInMinutes_IM,15,min,Initial setup time for Injection Molding where parts are assumed to be scrap.
+shotSizeSafetyFactor,1.02,,Multiplier of required shot size to account for material left in chamber etc.
+singleHydraulicEjectorThreshold,419354,Area,Threshold area for requiring the use of single hydraulic ejector.
+sideLocksCost,160,Currency,
+sleevePinAspectRatioLimit,8,,
+sleevePinLimitDia,4,,
+sleevePinsCost,65,Currency,
+slideClearanceMultiCavity,12.7,Length,Default slide clearance allowance for multi cavity mold.
+slideClearanceSingleCavity,5,Length,Default slide clearance allowance for single cavity mold.
+smallCalcRibInsertElectrodeSize,4.6875,in^3,Size of small electrode rib insert
+smallGrillInsertDefaultHeight,50.8,Length,Small grill insert height.
+smallHeightPartFactor,1.1,,This factor is used to determine the tool's open travel distance in the presence of parts with small part height values. In this case the length of the part should be considered in determining the opening distance of the tool.
+smallInsertArea,1,,"1"" x 1"" area (volume = 1 x 1 x core plate height)"
+smallLifterBundleWidthThreshold,76.2,Length,width threshold between a small and medium lifter bundle (based on 3 inches).
+smallLifterVolume,75,,volume of small slides - cubic inch
+smallOverrideLengthAdder,100,Length,Length adder for mold base due to the inclusion of small slides.
+smallPartMaxBoxLength,356,Length,Max Box Length of a Small Part
+smallPartMaxBoxWidth,305,Length,Max Box Width of a Small Part
+smallSlideBundleWidthThreshold,76.2,Length,width threshold between a small and medium slide bundle (based on 3 inches).
+smallSlideVolume,75,,volume of small slides - cubic inch
+smallStandardRibInsertElectrodeSize,4.6875,in^3,
+smallVoidVolumeThreshold,762,Length,
+socketHeadCapScrewsLongCost,10,Currency,
+socketHeadCapScrewsShortCost,1.5,Currency,
+sprueBushingCost,70,Currency,
+sprueClearanceDia,38.1,Length,Diameter of the Sprue. Used for calculation of the Runner region for molds with a Runnersystem/cold runner or with more than one cavity.
+sprueDia,25.4,Length,Standard Sprue Diameter
+stopPinsCost,2,Currency,
+supportPillarCoveragePercentage,10,,Percentage ejector plate area covered with support pillar
+supportPillarsCost,45,Currency,
+supportPlateThickness,47.625,Length,
+supportsDTC,true,,'true' or 'false' - only set to 'true' if this Digital Factory's cost model has been upgraded or configured to support aPriori's Design-to-Cost functionality.
+threePlateAdderMultiplier,0.9,,Multiplier used to ensure that the thickness of the third plate is always 90% of either the A plate or the B Plate (whichever has the smallest thickness)
+timePerTryoutBase,12,hr,basic hrs per tryout for <500T (x2 for bigger) - 3 tryouts tye
+topClampPlateThickness,28.575,Length,
+transitionAllowableThicknessVarianceFactor,0.33,,"This is a factor which dictates the allowable thickness variance between any two points when analysing drastic thickness violations e.g. 0.25 means that between two points, the thickness at the second point is allowed to deviate by up to 0.25 the thickness at the first point."
+transitionThicknessCheckLengthFactor,0.05,,This is a factor of the part length that determines the distance when checking for the variance of the part thickness between two points. e.g. if the part length is 250mm and the factor is 0.1 then a thickness variance check will be evaluated every 25mm.
+upperLimitSmallLifters,8,,Default limit on number of lifters allowed on parts with a projected perimeter greater than maxLimitSmallLiftersThreshold.
+upperLimitSmallSlides,4,,Default limit on number of slides allowed on parts with cavity width greater than maxLimitSmallSlidesThreshold.
+useMetricOrImperialValues,Metric,,Select the default System for choosing A Standard Mold Base Size from the lookup table tblStandardMoldBaseSizes. Choose from 'Metric' in mm and 'Imperial' in inches.
+usePreferredMachines,true,,"If true the model will first try to select a preferred machine. If false, the system chooses either the default machine or from the entire non-preferred set of machines."
+verticalTableConfiguration,No Table,,"Default value for the table configuration of vertical machines. Choose from 'No Table', 'Rotary' or 'Shuttle'."
+waterBafflesCost,8,Currency,
+waterHosesCost,1.25,Currency,
+waterManifoldFittingsCost,2.5,Currency,
+waterManifoldsCost,55,Currency,
+widthOfCoolingChannel,11.1125,Length,

@@ -1,0 +1,122 @@
+﻿Process Name
+Core Refractory Coat:Core Refractory Coating//ComboVoid
+Core Refractory Coat:Core Refractory Coating//MultiStopHole
+Core Refractory Coat:Core Refractory Coating//Ring
+Core Refractory Coat:Core Refractory Coating//RingedHole
+Core Refractory Coat:Core Refractory Coating//SimpleHole
+Core Refractory Coat:Core Refractory Coating//Void
+Coremaking:As Cast//CurvedSurface
+Coremaking:As Cast//CurvedWall
+Coremaking:As Cast//Edge
+Coremaking:As Cast//PlanarFace
+Coremaking:SandCore//ComboVoid
+Coremaking:SandCore//ComboVoid:As Cast//MultiStepHole
+Coremaking:SandCore//ComboVoid:As Cast//MultiStepHole:As Cast//SimpleHole
+Coremaking:SandCore//ComboVoid:As Cast//Ring
+Coremaking:SandCore//ComboVoid:As Cast//Ring:As Cast//CurvedSurface
+Coremaking:SandCore//ComboVoid:As Cast//Ring:As Cast//CurvedWall
+Coremaking:SandCore//ComboVoid:As Cast//Ring:As Cast//PlanarFace
+Coremaking:SandCore//ComboVoid:As Cast//SimpleHole
+Coremaking:SandCore//MultiStepHole
+Coremaking:SandCore//MultiStepHole:As Cast//SimpleHole
+Coremaking:SandCore//Ring
+Coremaking:SandCore//RingedHole
+Coremaking:SandCore//RingedHole:As Cast//Ring
+Coremaking:SandCore//RingedHole:As Cast//SimpleHole
+Coremaking:SandCore//SimpleHole
+Coremaking:SandCore//Void
+Gravity Die Casting:As Cast//ComboVoid
+Gravity Die Casting:As Cast//CurvedSurface
+Gravity Die Casting:As Cast//CurvedWall
+Gravity Die Casting:As Cast//Edge
+Gravity Die Casting:As Cast//MultiStepHole
+Gravity Die Casting:As Cast//PlanarFace
+Gravity Die Casting:As Cast//Ring
+Gravity Die Casting:As Cast//SharpEdge
+Gravity Die Casting:As Cast//SimpleHole
+Gravity Die Casting:As Cast//Void
+Gravity Die Casting:No Side Pull//ComboVoid
+Gravity Die Casting:No Side Pull//ComboVoids:As Cast//MultiStepHole
+Gravity Die Casting:No Side Pull//ComboVoids:As Cast//MultiStepHole:As Cast//SimpleHole
+Gravity Die Casting:No Side Pull//ComboVoids:As Cast//Ring
+Gravity Die Casting:No Side Pull//ComboVoids:As Cast//Ring:As Cast//CurvedSurface
+Gravity Die Casting:No Side Pull//ComboVoids:As Cast//Ring:As Cast//CurvedWall
+Gravity Die Casting:No Side Pull//ComboVoids:As Cast//Ring:As Cast//PlanarFace
+Gravity Die Casting:No Side Pull//ComboVoids:As Cast//SimpleHole
+Gravity Die Casting:No Side Pull//MultiStepHole
+Gravity Die Casting:No Side Pull//MultiStepHole:As Cast//SimpleHole
+Gravity Die Casting:No Side Pull//Ring
+Gravity Die Casting:No Side Pull//RingedHole
+Gravity Die Casting:No Side Pull//RingedHole:As Cast//Ring
+Gravity Die Casting:No Side Pull//RingedHole:As Cast//SimpleHole
+Gravity Die Casting:No Side Pull//SimpleHole
+Gravity Die Casting:No Side Pull//Void
+Gravity Die Casting:Slides//SlideBundle
+High Pressure Die Casting:As Cast//ComboVoid
+High Pressure Die Casting:As Cast//CurvedSurface
+High Pressure Die Casting:As Cast//CurvedWall
+High Pressure Die Casting:As Cast//Edge
+High Pressure Die Casting:As Cast//MultiStepHole
+High Pressure Die Casting:As Cast//PlanarFace
+High Pressure Die Casting:As Cast//Ring
+High Pressure Die Casting:As Cast//SharpEdge
+High Pressure Die Casting:As Cast//SimpleHole
+High Pressure Die Casting:As Cast//Void
+High Pressure Die Casting:Insert Coring//ComboVoid
+High Pressure Die Casting:Insert Coring//ComboVoid:As Cast//MultiStepHole
+High Pressure Die Casting:Insert Coring//ComboVoid:As Cast//MultiStepHole:As Cast//SimpleHole
+High Pressure Die Casting:Insert Coring//ComboVoid:As Cast//Ring
+High Pressure Die Casting:Insert Coring//ComboVoid:As Cast//SimpleHole
+High Pressure Die Casting:Insert Coring//MultiStepHole
+High Pressure Die Casting:Insert Coring//MultiStepHole:As Cast//SimpleHole
+High Pressure Die Casting:Insert Coring//RingedHole
+High Pressure Die Casting:Insert Coring//RingedHole:As Cast//Ring
+High Pressure Die Casting:Insert Coring//RingedHole:As Cast//SimpleHole
+High Pressure Die Casting:Insert Coring//SimpleHole
+High Pressure Die Casting:Insert Coring//Void
+High Pressure Die Casting:No Coring//ComboVoid
+High Pressure Die Casting:No Coring//ComboVoid:As Cast//MultiStepHole
+High Pressure Die Casting:No Coring//ComboVoid:As Cast//MultiStepHole:As Cast//SimpleHole
+High Pressure Die Casting:No Coring//ComboVoid:As Cast//Ring
+High Pressure Die Casting:No Coring//ComboVoid:As Cast//SimpleHole
+High Pressure Die Casting:No Coring//MultiStepHole
+High Pressure Die Casting:No Coring//MultiStepHole:As Cast//SimpleHole
+High Pressure Die Casting:No Coring//Ring
+High Pressure Die Casting:No Coring//RingedHole
+High Pressure Die Casting:No Coring//RingedHole:As Cast//Ring
+High Pressure Die Casting:No Coring//RingedHole:As Cast//SimpleHole
+High Pressure Die Casting:No Coring//SimpleHole
+High Pressure Die Casting:No Coring//Void
+High Pressure Die Casting:Slides//SlideBundle
+High Pressure Die Casting:Unscrewing//MultiStepHole
+High Pressure Die Casting:Unscrewing//MultiStepHole:As Cast//SimpleHole
+High Pressure Die Casting:Unscrewing//RingedHole
+High Pressure Die Casting:Unscrewing//RingedHole:As Cast//Ring
+High Pressure Die Casting:Unscrewing//RingedHole:As Cast//SimpleHole
+High Pressure Die Casting:Unscrewing//SimpleHole
+No Cost Feature:No Cost Feature//ComboVoid
+No Cost Feature:No Cost Feature//CurvedSurface
+No Cost Feature:No Cost Feature//CurvedWall
+No Cost Feature:No Cost Feature//MultiStepHole
+No Cost Feature:No Cost Feature//NotSupported
+No Cost Feature:No Cost Feature//PlanarFace
+No Cost Feature:No Cost Feature//Ring
+No Cost Feature:No Cost Feature//RingedHole
+No Cost Feature:No Cost Feature//SimpleHole
+No Cost Feature:No Cost Feature//Void
+Refractory Coat Air Dry:Refractory Coat Air Drying//ComboVoid
+Refractory Coat Air Dry:Refractory Coat Air Drying//MultiStepHole
+Refractory Coat Air Dry:Refractory Coat Air Drying//Ring
+Refractory Coat Air Dry:Refractory Coat Air Drying//RingedHole
+Refractory Coat Air Dry:Refractory Coat Air Drying//SimpleHole
+Refractory Coat Air Dry:Refractory Coat Air Drying//Void
+Refractory Coat Oven Dry:Refractory Coat Oven Drying//ComboVoid
+Refractory Coat Oven Dry:Refractory Coat Oven Drying//MultiStepHole
+Refractory Coat Oven Dry:Refractory Coat Oven Drying//Ring
+Refractory Coat Oven Dry:Refractory Coat Oven Drying//RingedHole
+Refractory Coat Oven Dry:Refractory Coat Oven Drying//SimpleHole
+Refractory Coat Oven Dry:Refractory Coat Oven Drying//Void
+Trim:Trimming//MultiStepHole
+Trim:Trimming//SimpleHole
+Trim:Trimming//SimpleHole:As Trimmed//Edge
+Trim:Trimming//Void

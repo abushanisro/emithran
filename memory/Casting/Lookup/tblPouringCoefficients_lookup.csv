@@ -1,0 +1,13 @@
+﻿Name,tblPouringCoefficients
+File Path,lookupTables/Component/tblPouringCoefficients.csv
+
+Material Name,Min Dim,Max Dim,Coefficient,Dimension,Dimension Unit
+Aluminum,0.00,0.25,0.68,thickness,in
+Aluminum,0.25,0.44,0.80,thickness,in
+Aluminum,0.44,"9,999.00",1.43,thickness,in
+Ductile Iron,0.00,0.25,1.40,thickness,in
+Ductile Iron,0.25,0.75,1.80,thickness,in
+Ductile Iron,0.75,3.00,2.00,thickness,in
+Ductile Iron,3.00,"9,999.00",2.20,thickness,in
+Steel,0.00,100.00,1.20,weight,lb
+Steel,100.00,"100,000.00",0.40,weight,lb

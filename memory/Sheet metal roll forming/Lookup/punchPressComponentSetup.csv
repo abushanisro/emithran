@@ -1,0 +1,16 @@
+﻿Description,Number Of Setups
+bottomParallel,2.00
+bottomParallelGrinding,2.00
+bottomPlate,1.00
+bottomPlateGrinding,2.00
+cutoffInsert,1.00
+cutoffInsertGrinding,2.00
+cutoffInsertWireEdm,1.00
+cutoffPunchInsertHolder,2.00
+cutoffPunchInsertHolderGrinding,1.00
+dieShoeLower,1.00
+dieShoeUpper,1.00
+stopBlock,2.00
+stopBlockPad,1.00
+topParallel,2.00
+topParallelGrinding,2.00

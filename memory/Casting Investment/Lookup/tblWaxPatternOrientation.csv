@@ -1,0 +1,7 @@
+Name,Description
+horizHt,Pattern height aligned with tree width and pattern width aligned with tree height
+horizLen1,Pattern length aligned with tree width and pattern width aligned with tree height
+horizLen2,Pattern length aligned with tree width and pattern height aligned with tree height
+horizWid,Pattern width aligned with tree width and pattern height aligned with tree height
+vertHt,Pattern height aligned with tree height and pattern length aligned with tree width
+vertWid,Pattern width aligned with tree height and pattern length aligned with tree width

@@ -1,0 +1,13 @@
+﻿Measurement System,Tolerance Name,Lower Bound,Upper Bound,Maximum Line Speed (mm / s)
+Encoder Closed Loop,"Tolerance +/-0.254mm (+/-0.010"")",-0.25400,0.25400,381.00
+Encoder Closed Loop,"Tolerance +/-0.381mm (+/-0.015"")",-0.38100,0.38100,698.50
+Encoder Closed Loop,"Tolerance +/-0.508mm (+/-0.020"")",-0.50800,0.50800,812.80
+Encoder Closed Loop,"Tolerance +/-0.762mm (+/-0.030"")",-0.76200,0.76200,952.50
+Encoder Closed Loop,"Tolerance +/-1.524mm (+/-0.060"")",-1.52400,1.52400,1333.50
+Encoder Closed Loop,"Tolerance +/-2.362mm (+/-0.093"")",-2.36220,2.36220,1587.50
+Encoder Open Loop,"Tolerance +/-0.254mm (+/-0.010"")",-0.25400,0.25400,152.40
+Encoder Open Loop,"Tolerance +/-0.381mm (+/-0.015"")",-0.38100,0.38100,381.00
+Encoder Open Loop,"Tolerance +/-0.508mm (+/-0.020"")",-0.50800,0.50800,508.00
+Encoder Open Loop,"Tolerance +/-0.762mm (+/-0.030"")",-0.76200,0.76200,660.40
+Encoder Open Loop,"Tolerance +/-1.524mm (+/-0.060"")",-1.52400,1.52400,762.00
+Encoder Open Loop,"Tolerance +/-2.362mm (+/-0.093"")",-2.36220,2.36220,1016.00

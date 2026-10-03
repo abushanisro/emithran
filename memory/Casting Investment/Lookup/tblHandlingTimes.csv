@@ -1,0 +1,10 @@
+Equipment,Handling Time (s),Max Weight (kg),Num Operators
+crane,1800.00,2000.00,2.00
+crane,2700.00,9999999.00,2.00
+forklift,540.00,300.00,1.00
+forklift,900.00,500.00,1.00
+none,1.00,0.25,1.00
+none,2.00,1.00,1.00
+none,10.00,5.00,1.00
+none,30.00,15.00,1.00
+none,45.00,20.00,1.00

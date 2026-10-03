@@ -1,0 +1,8 @@
+Name,Manufacturer,Labor Rate (USD / hr),Direct Overhead Rate (USD / hr),Indirect Overhead Rate (USD / hr),Overhead Multiplier,Number of Operators,Labor Time Standard,Wage Grade Name,Work Center Labor Rate Factor,Setup Time (hr),Can Use V-Flash Material,Bed Height (mm),Bed Length (mm),Bed Width (mm),Layer Speed,Layer Thickness,Power (Watts),Scanning Speed,Is Preferred,Avg Utilization,Good Part Yield,Machine Price (USD),Machine Length (mm),Machine Width (mm),Footprint Allowance Factor,Machine Power (kW),Installation Factor (%),Machine Uptime (%),Annual Maintenance Factor (%),Machine Life (yr),Salvage Value Factor (%),Supplies Cost (USD / yr),Machine Manufacturer Location
+V-Flash,3D Systems,30.49,0.57,14.24,0,0,1,,1,0,true,171,228,203,0.02,0.1,600,171.0,false,1,1,9900,660,690,4,0.6,20,80,5,15,0,0,USA
+ProJet HD3000,3D Systems,30.49,3.62,14.39,0,0,1,,1,0,false,185,298,203,0.05,0.03,1800,185.0,false,1,1,69547,740,1220,4,1.8,20,80,5,15,0,0,USA
+ProJet CP3000,3D Systems,30.49,3.14,14.39,0,0,1,,1,0,false,185,298,203,0.04,0.05,1800,185.0,false,1,1,59598,740,1220,4,1.8,20,80,5,15,0,0,USA
+ProJet 5000,3D Systems,30.49,7.37,14.56,0,0,1,,1,0,false,300,550,393,0.04,0.05,1200,196.5,false,1,1,149144,1530,910,4,1.2,20,80,5,15,0,0,USA
+Eden500V,Objet,30.49,7.21,14.53,0,0,1,,1,0,false,200,490,390,0.33,0.01,1500,76.2,false,1,1,145000,1320,990,4,1.5,20,80,5,15,0,0,USA
+Eden350,Objet,30.49,5.77,14.53,0,0,1,,1,0,false,200,340,340,0.33,0.01,1500,76.2,false,1,1,115000,1320,990,4,1.5,20,80,5,15,0,0,USA
+Eden250,Objet,30.49,3.12,14.3,0,0,1,,1,0,false,200,260,260,0.33,0.01,1500,76.2,false,1,1,60000,870,730,4,1.5,20,80,5,15,0,0,USA

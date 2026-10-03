@@ -1,0 +1,411 @@
+﻿Variable Name,String Value,Unit Type Name,Notes,Category
+CNCHrsSpeakerGrillLarge,8,hr,Time required to machine individual large speaker grills.,General
+CNCHrsSpeakerGrillMedium,6,hr,Time required to machine individual medium speaker grills.,General
+CNCHrsSpeakerGrillSmall,4,hr,Time required to machine individual small speaker grills.,General
+CNCSetupTimeCavity,2,hr,Total time to setup for machining cavity plate.,General
+CNCSetupTimeCore,2,hr,Total time to setup for machining core plate.,General
+ePlateCupCavityRatio,1,,The fractional percentage of the cavity height that is within the cavity plate for a cup shaped part. Valid inputs range from 0 to 1.,General
+ePlateFlatCavityRatio,0.5,,The fractional percentage of the cavity height that is within the cavity plate for a flat part. Valid inputs range from 0 to 1.,General
+ePlateMinThickness,85.725,Length,Minimum distance from the shallowest point of the cavity to the back of the cavity plate.,General
+actionBaseDimLarge,38,Length,Large action base dimension.,General
+actionBaseDimMedium,31,Length,Medium action base dimension.,General
+actionBaseDimSmall,19,Length,Small action base dimension.,General
+actionLengthToHeightThreshold,1.5,,Ratio of action length to height which must be exceeded to use lighter length for length calculation.,General
+assemblyOperators,2,,Number of operators required for custom mold tool assembly.,Assembly
+assemblyTimeHrsActions,2,hr,Time required to assemble slide or lifter actions into the molding machine. Time is per action.,Assembly
+assemblyTimeHrsDateRecycleInsertsLogosPartNumbers,2,hr,Time required to assemble date recycle logos or part numbers inserts into the molding machine. Time is per insert.,Assembly
+assemblyTimeHrsEjectorGuidePinsAndBushings,2,hr,Time required to assemble ejector guide pins and bushings into the molding machine. Time is per ejector pin and bushing.,Assembly
+assemblyTimeHrsEjectorPins,0.25,hr,Time required to assemble ejector pins into the molding machine. Time is per ejector pin.,Assembly
+assemblyTimeHrsElectricalConsOrSwitches,1.5,hr,Time required to assemble electrical connections or switches into the molding machine. Time is per electrical connection or switch.,Assembly
+assemblyTimeHrsGuidePin,0.25,hr,Time required to assemble guide pins into the molding machine. Time is per guide.,Assembly
+assemblyTimeHrsHotRunner,2,hr,Time required to assemble hot runner system into the molding machine. Time is per hot drop.,Assembly
+assemblyTimeHrsHydraulicCylinder,5,hr,Time required to assemble hydraulic cylinder into the molding machine. Time is per hydraulic cylinder.,Assembly
+assemblyTimeHrsHydraulicSlides,2,hr,Time required to assemble hydraulic slides into the molding machine. Time is per hydraulic slide.,Assembly
+assemblyTimeHrsLeaderPinsAndShoulderBushings,1,hr,Time required to assemble leader pins and shoulder bushings into the molding machine. Time is per leader pin and shoulder bushing.,Assembly
+assemblyTimeHrsLimitSwitch,1,hr,Time required to assemble limit switches into the molding machine. Time is per switch.,Assembly
+assemblyTimeHrsLocatingRings,0.3,hr,Time required to assemble locating rings into the molding machine. Time is per locating ring.,Assembly
+assemblyTimeHrsQuickDisconnectsForHoses,0.02,hr,Time required to assemble quick disconnects for hoses into the molding machine. Time is per quick disconnect.,Assembly
+assemblyTimeHrsReturnPinsAndShoulderBushings,1,hr,Time required to assemble return pins and shoulder bushings into the molding machine. Time is per return pin and shoulder bushing.,Assembly
+assemblyTimeHrsSideLocks,0.5,hr,Time required to assemble side locks into the molding machine. Time is per side lock.,Assembly
+assemblyTimeHrsSleevePin,0.4,hr,Time required to assemble sleeve pins into the molding machine. Time is per sleeve pin.,Assembly
+assemblyTimeHrsSocketHeadScrewsLong,0.01,hr,Time required to assemble long socket head screws into the molding machine. Time is per screw.,Assembly
+assemblyTimeHrsSocketHeadScrewsShort,0.01,hr,Time required to assemble short socket head screws into the molding machine. Time is per screw.,Assembly
+assemblyTimeHrsSprueBushing,1,hr,Time required to assemble sprue bushing into the molding machine. Time is per sprue bushing.,Assembly
+assemblyTimeHrsStopPins,0.5,hr,Time required to assemble stop pins into the molding machine. Time is per stop pin.,Assembly
+assemblyTimeHrsSupportPillar,0.08,hr,Time required to assemble support pillars into the molding machine. Time is per support pillar.,Assembly
+assemblyTimeHrsThirdPlate,2,hr,Time required to assemble the third plat if required into the molding machine.,Assembly
+assemblyTimeHrsWaterBaffles,0.15,hr,Time required to assemble water baffles into the molding machine. Time is per water baffle.,Assembly
+assemblyTimeHrsWaterFittingsAndConnectors,0.02,hr,Time required to assemble water fittings and connectors into the molding machine. Time is per water fitting.,Assembly
+assemblyTimeHrsWaterHoses,0.02,hr,Time required to assemble water hoses into the molding machine. Time is per water hose.,Assembly
+assemblyTimeHrsWaterManifoldFittings,0.02,hr,Time required to assemble water manifold fittings into the molding machine. Time is per water manifold fitting.,Assembly
+assemblyTimeHrsWaterManifolds,0.02,hr,Time required to assemble water manifolds into the molding machine. Time is per water manifold.,Assembly
+bPlateMinThickness,85.725,Length,Minimum distance from the deepest point of the cavity to the back of the core plate.,General
+baffleFeedRate,25.4,Length/min,The rate at which baffle holes are bored.,General
+baffleSpacing,76.2,Length,Linear spacing of baffle holes in cavity and core plate.,General
+baffleTapSetup,4,hr,Total time to setup for baffle tapping.,General
+baffleTappingTimeHrs,0.75,hr,Time taken to tap baffles. Time for individual baffle.,General
+boreMillSetup,2,hr,Total time to setup for bore milling.,General
+bottomClampPlateThickness,28.575,Length,Default thickness of bottom clamp plate.,General
+buildLifterLengthAdder,6.35,Length,Adder applied to lifter length when determining if lifter length factored by actionLengthToHeightThreshold is greater than lifter height.,General
+buildSlideLengthAdder,6.35,Length,Adder applied to slide length when determining if slide length factored by actionLengthToHeightThreshold is greater than slide height.,General
+burnsPerLargeLifter,2,,Number of burns required to EDM a large lifter.,General
+burnsPerLargeSlide,2,,Number of burns required to EDM a large slide.,General
+burnsPerMediumLifter,2,,Number of burns required to EDM a medium lifter.,General
+burnsPerMediumSlide,2,,Number of burns required to EDM a medium slide.,General
+burnsPerSmallLifter,2,,Number of burns required to EDM a small lifter.,General
+burnsPerSmallSlide,2,,Number of burns required to EDM a small slide.,General
+cDimension,63.5,Length,Default height of c plate.,General
+cavityCorePlateDrillSetup,0.5,hr,Total time to setup for drilling cavity and core plate.,General
+cavityCorePlateHoleDrillTime,1.6,min,Time to drill individual hole in cavity or core plate for mounting. Time per hole per plate.,General
+cboreSetup,1.5,hr,Time to setup for counterboring individual cavity and core plates.,General
+cboreTime,0.75,min,Time to counter bore water lines in core and cavity plate. Time is per hole.,General
+clampForceSafetyFactor,1.1,,A multiplier of clamp pressure required to ensure that the machine is capable of applying the necessary mold pressure (10% safety factor).,General
+clampPlateDrillSetup,1,hr,Time to setup for drilling individual plates. Time is per plate.,General
+clampPlateHoleSpacingLength,203.2,Length,Linear spacing of clamp plate mounting holes in lengthwise direction.,General
+clampPlateHoleSpacingWidth,152.4,Length,Linear spacing of clamp plate mounting holes in widthwise direction.,General
+clampPlateHolesMin,8,,Minimum number of holes in clamp plate.,General
+clampPlatesFeed,0.344444444,hr/m^2,Areal removal rate for surface machining of clamp plates. Used to face all 6 faces of plate.,General
+clampPlatesSetup,1,hr,Time to set up individual clamp plate of machining.,General
+cmmBaseHrs,10,hr,Minimum time to coordinate measure tool. To obtain total CMM time this time is increased by tool complexity and additional time for slides and lifters.,General
+cmmComplexityFactor,1.54,,Scaling factor used to manipulate CMM complexity of mold tool.,General
+cmmInspectionAdder,5,,Adder used for calculating required CMM hours for inspecting Slides and Lifters.,General
+cmmInspectionMultiplier,1.52,,Multiplier used for calculating required CMM hours for inspecting Slides and Lifters.,General
+coarseTextureCostperSqM,15500,Currency/m^2,Total cost of Sequential Valve Gating hot drop system.,General
+colorantCost,0.75,CostPerMass,Cost of colorant per unit mass. The colorant cost is multiplied by the rough mass of the part to determine the total colorant cost.,General
+conventionalRunnerMaxPressureReductionFactor,0.15,,Maximum material injection pressure reduction factor for standard cold runners. Used to calculate 'adjustedInjectionPressure'. Starting point value is 0.15 signifying a 15% reduction from the selected machine's maximum injection pressure. Value must be less than 1.,General
+coolTimeRatioFactor,0.8,,Ratio of cooling time to total molding cycle time per part. Used to estimate the required number of cavities to meet annual production volume.,General
+coolingChannelHeightAllowance,4,,Allowance added to mold base to allow for clearance of cooling channel. This multiplies the width of a cooling channel.,General
+coreCavityFeed,3.1,hr/m^2,Areal removal rate for surface machining of cavity and core plates. Used to face all 6 faces of plate.,General
+coreCavitySetupPerPlate,1,hr,Time to setup plates for general machining of plates. This involves facing all 6 surfaces of each plate.,General
+corePlatePinDrillSetup,1,hr,Total time to setup for drilling ejector and sleeve pin holes.,General
+corePlatePinDrillSpeed,25.4,Length/min,The rate at which core plate pin holes are drilled.,General
+corePlatePinReamSetup,1,hr,Total time to setup for reaming ejector and sleeve pin holes.,General
+corePlatePinReamSpeed,19.05,Length/min,The rate at which core plate pin holes are reamed.,General
+corePlateReamDepth,25.4,Length,Depth of core plate ejector pin and sleeve pins holes which require reaming.,General
+costPerHydraulicEjector,4200,Currency,Cost of an individual hydraulic ejector.,General
+costPerPorcerax,4800,Currency,Cost of an individual Porcerax insert.,General
+costPerSVGHotDrop,6000,Currency,Cost of an individual Porcerax insert.,General
+costPerStandardHotDrop,3750,Currency,Total cost of standard hot drop system.,General
+costPerUnscrewingMechanism,4200,Currency,Cost of an individual unscrewing mechanism.,General
+cupRatioThresholdMultiplier,1,,"Threshold at which the part is deemed as cup shaped. Multiplies the part nominal wall thickness and is compared to the maximum tool reach. If this variable is set to 0, all parts will be considered cup shaped.",General
+cutterPathComplexityFactorComplex,0.18,,Complexity factor applied to the base mold tool CNC time to increase this for complex molds. Complex mold are defined when parting line complexity is NON FLAT.,General
+cutterPathComplexityFactorSimple,0.1,,Complexity factor applied to the base mold tool CNC time to increase this for simple molds. Simple mold are defined when parting line complexity is FLAT.,General
+cutterPathHrsPerGrill,0.5,hr,Electrode cutter path time per grill. Time is per plate.,General
+cutterPathHrsPerInsert,10,hr,CNC cutter path time per rib insert.,General
+cutterPathHrsPerLifter,10,hr,CNC cutter path time per lifter.,General
+cutterPathHrsPerSlide,10,hr,CNC cutter path time per slide.,General
+cycleTimeAdjustmentFactor,1,,Factor used to globally increase or decrease cycle time evaluations per process.,General
+defaultAdditionalStations,Let aPriori Decide,,Determines the default behaviour defining the number of additional stations during Multi-Shot Molding. Additional stations lie outside the molding area and are used for loading or unloading molded components or inserts. Additional stations add tooling costs for core mold tools and can affect parallel operations cycle time.,General
+defaultBurnsPerRib,2,,Number of EDM burns per rib insert.,General
+defaultCavityFinish,SPI Finish - Grade B,,"Default finish applied to cavity surface. Available options are 'As-Machined', 'SPI Finish - Grade C', 'SPI Finish - Grade B', 'SPI Finish - Grade A'.",General
+defaultCavityTexture,None,,"Default texture applied to mold cavity surface. Available options are 'None', 'Fine-Shallow', 'Moderate-Medium', 'Coarse-Deep'.",General
+defaultCustomMultiplier,0.6,,"Coefficient, in case of 'Standard Mold Base'",General
+defaultEjectMethod,Robotic,,"Specifies the default part eject method for the Multi-Shot Molding process. Possible values: 'Manual', 'Gravity', 'Robotic'.",General
+defaultEjectorPinSpacing,7903.21,Area,Default spacing for ejector pin coverage.,General
+defaultElectrodeMaterial,Carbon,,Default EDM electrode material. Available options are 'Carbon' or 'Graphite'.,General
+defaultEnableOverhangingClampingPlates,false,,Determines the default behaviour whether overhanging clamped plates are included in the mold tool stack.,General
+defaultEnablePlasticFormingRegionInserts,true,,Default setting for whether to use inserts in the Plastic Forming Region of the mold base ('true' or 'false'). This value is referenced only if plant.defaultInsertMethod = SPECIFY.,General
+defaultFactorBoundaryAllowance,2,,A multiplier used to assign the correct amount of boundary temperature control allowances if the number of cavities widthwise is greater than 1.,General
+defaultGatingType,Edge,,Specify if the Gate is placed at the edge or at the centre of the mold for a cold runner system. Select from 'Edge' and 'Center'.,General
+defaultGrillThickness,6.35,Length,Default grill thickness,General
+defaultHoleDrillingTime,0.5,min,"Default time to drill holes in clamp plate, ejector box rails and ejector plate. Time is per hole.",General
+defaultHotDropType,Standard,,Default hot drop type. Available options are 'Standard' or 'SVG'.,General
+defaultInboundWaterlineMultiplier,1.25,,Default Multiplier of the Waterline Diameter for calculation the Inbound Allowance of the Plastic Forming Region.,General
+defaultIncludeHeatTreat,false,,Determines the default behaviour whether heat treatment is included in the mold tool manufacturing process.,General
+defaultIncludeStressRelief,false,,Determines the default behaviour whether stress relief is included in the mold tool manufacturing process.,General
+defaultInjectionPressure,180,Pressure,Default injection pressure for materials where injection pressure is not defined.,General
+defaultInsertMethod,SPECIFY,,'LOOKUP' versus 'SPECIFY'. Default setting for whether the decision to use inserts in the Plastic Forming Region of the mold base is dynamically retrieved from a lookup table or is statically set to the value of plant variable plant.defaultEnablePlasticFormingRegionInserts.,General
+defaultInsertRetentionCost,0,Currency,The default insert retention cost. The insert retention cost is an additional tooling cost for insert component retention.,General
+defaultMachineMoldEfficiencyMSM,0.95,,Default value of PSO used to set the machine efficiency of multi-shot molding machines. Valid values are 0.01 to 1.,General
+defaultManualLoadTime,8,Time,Default value for manual insert loading time.,General
+defaultMiscMoldWeightAdder,0.1,,Percentage of calculated mold weight added for additional miscellaneous components.,General
+defaultMoldBaseConfiguration,Let aPriori Decide,,"Defines the mold base configuration for rotary platens. Available options are Let ePriori Decide, Separate, Combined or Rotating Stack. Separate implies that each stage is injected into individual mold blanks. Combined implies that each stage is injected into the same mold blank. Rotating Stack implies that back to back mold bases rotate about a vertical axis.",General
+defaultMoldPlating,None,,Default mold plating. Available options are in listed in tblToolCoating,General
+defaultMoldTemperatureIncrease,0,Temperature,This value is added on to the mold temperature variable that is used in the cooling time equation. It allows for local differences in mold temperatures that can occur in the event of limited access for cooling channels.,General
+defaultMultiShotMoldingMachineOrientation,No Preference,,"Default orientation of the multi-shot injection molding machine. Choose from 'Vertical', 'Horizontal' or 'No Preference'.",General
+defaultNumCavities,1,,Default value for the number of cavities in one mold. User may override via Process Setup Options.,General
+defaultNumHotDrops,0,,Default number of hot drops.,General
+defaultNumMultiShotTryOuts,5,,Default number of mold tool try-outs for multi-shot molding tools.,General
+defaultNumberOfPlates,2,,"Default setting for number of plates in the mold. Select from '2' for 2-Plate Molding, sprues and runners attached to part, or '3' for 3-Plate Molding where a stripper plate separates the sprues and runners from the part upon mold opening.",General
+defaultOutboundWaterlineMultiplier,1,,Default Multiplier of the Waterline Diameter for calculation the Outbound Allowance of the Plastic Forming Region.,General
+defaultRegrindAllowance,0.2,,Default allowable percentage of runners and scrap allowed with virgin material.,General
+defaultRoboticLoadTime,6,Time,Default value for robotic insert loading time.,General
+defaultRunnerAttachmentSide,Long,,Default side of the attachment of the runner to the cavity. Choose from 'Long' side of the cavity and 'Short' side of the cavity.,General
+defaultToolLife,260000,,The default number of shots per tool which is used to determine tool life. This is the median value of the available data relating to tool life by part material type.,General
+defaultWaterLineDiameter,8,Length,Default water line diameter used for calculation of the plastic forming region.,General
+densityCopper,8400,kg/m^3,Density of cooper used for EDM electrodes.,General
+densityGraphite,3514,kg/m^3,Density of graphite used for EDM electrodes.,General
+densityPolystyreneForShotSize,1040,Density,Industry standard density of General Purpose Polystyrene (GPPS) used to define shot size in grams.,General
+designHrsElectrodeActionsGrillInserts,1,hr,Time required to design electrodes for grill insert. Time is per grill insert.,General
+designHrsElectrodeActionsRibInserts,0.5,hr,Time required to design electrodes for rib insert. Time is per rib insert.,General
+designHrsElectrodePocketsLifters,0.5,hr,Time required to design electrodes for lifter pockets. Time is per lifter pocket.,General
+designHrsElectrodePocketsRibInserts,0.125,hr,Time required to design electrodes for rib insert pockets. Time is per rib insert pocket.,General
+designHrsGrillInsertLarge,80,hr,Time required to design large grill insert. Time is per grill.,General
+designHrsGrillInsertMedium,40,hr,Time required to design medium grill insert. Time is per grill.,General
+designHrsGrillInsertSmall,20,hr,Time required to design small grill insert. Time is per grill.,General
+designHrsRibInsertLarge,10,hr,Time required to design large rib insert. Time is per rib.,General
+designHrsRibInsertMedium,5,hr,Time required to design medium rib insert. Time is per rib.,General
+designHrsRibInsertSmall,3,hr,Time required to design small rib insert. Time is per rib.,General
+designHrsSurfaceTimeBase,5,hr,Minimum time required to design the surface of the mold tool.,General
+designHrsSurfaceTimeLifters,3,hr,Time required to design mold tool surface for lifters. Time is per lifter.,General
+designHrsSurfaceTimeRibInserts,2,hr,Time required to design mold tool surface for rib inserts. Time is per rib insert.,General
+designHrsSurfaceTimeSlides,4,hr,Time required to design mold tool surface for slides. Time is per slide.,General
+designHrsSurfaceTimeSpeakerGrills,30,hr,Time required to design mold tool surface for grills. Time is per speaker grill.,General
+designHrsSurfaceTimeVents,0.125,hr,Time required to design mold tool surface for vents. Time is per vent.,General
+disableInvestmentAmortization,false,,"User override to disable amortization of all fixed costs to the individual part or assembly. By default, fixed costs are calculated per part for tooling, fixtures, and programming.",General
+drillHrsSpeakerGrill,1,hr,Time required to drill holes required for speak grill. Time is per speaker grill.,General
+dryCycleStrokeFactor,0.7,,Euromap 6 details the dry cycle time measurement. This standard references the dry cycle stroke as 70% of the maximum of the tie bar values.,General
+edgeChamferFeed,0.078740,hr/m,Linear rate of edge chamfer machining.,General
+edgeChamferSetupTimePerPlate,1,hr,Time to setup for chamfering tool plates plate. Time is per plate,General
+edmCutterPathHrsPerInsert,0.5,hr,Electrode cutter path time per rib insert.,General
+edmCutterPathHrsPerLifter,0.5,hr,Electrode cutter path time per lifter.,General
+edmCutterPathHrsPerSlide,0.5,hr,Electrode cutter path time per slide.,General
+edmElectrodeBurnRate,0.244095,hr/cm^3,Volumetric removal rate EDM burning.,General
+edmElectrodeVolumeBurn,0.05,,Percentage of electrode volume used for burning.,General
+edmFinishingPasses,2,,Number of EDM finishing passes.,General
+edmHours_wire,0,hr,Total wire EDM hours. Default set as zero.,General
+edmPocketsBurnTimeHrs,1,hr,Time required to EDM pocket for a slide or lifter.,General
+edmRoughingPasses,1,,Number of EDM roughing passes.,General
+ejBoxRailHoleSpacing,203.2,Length,Linear spacing of ejector box rails.,General
+ejBoxRailHolesMin,4,,Minimum number of holes in ejector box rails.,General
+ejBoxRailsDrillSetup,1,hr,Total time to setup for drilling of ejector box rails.,General
+ejBoxRailsFeed,0.344444444,hr/m^2,Areal removal rate for surface machining of ejector box rails. Used to face all 6 faces of plate.,General
+ejBoxRailsSetup,1,hr,Total time to setup for general machining of ejector box rails.,General
+ejBoxThickness,76.2,Length,Default ejector box height.,General
+ejBoxWidth,152.4,Length,Default ejector box width.,General
+ejPlatesFeed,0.344444444,hr/m^2,Areal removal rate for surface machining of ejector plate. Used to face all 6 faces of plate.,General
+ejPlatesSetup,1,hr,Total time to setup for general machining of ejector plates.,General
+ejPlatesThickness,44.45,Length,Default ejector plate thickness. This is the thickness of one plate.,General
+ejPlatesWidthReduction,152.4,Length,The difference in width between the tool cavity/core plates and the ejector plates. Used to calculate ejector plate width,General
+ejectorBoxRailsDefaultHeight,152.4,Length,Default ejector box rails height.,General
+ejectorBoxRailsDefaultNumber,2,,Number of ejector box rails used to mold tool.,General
+ejectorBoxRailsDefaultWidth,76.2,Length,Default ejector box rails width.,General
+ejectorDistanceFactor,3,,A coefficient used as the multiplier of the part height to determine the distance the ejector pins should move.,General
+ejectorGuidePinsAndBushings,6,,Total number of ejector guide pins and bushings in mold tool.,General
+ejectorGuidePinsBushingsCost,30,Currency,Cost of an individual ejector guide pins bushing.,General
+ejectorPinsCost,5,Currency,Cost of an individual ejector pin.,General
+ejectorPlatePinDrillSetup,1,hr,Total time to setup for drilling of ejector pin and sleeve pin holes in ejector box rails.,General
+ejectorPlatePinDrillTimeHrs,0.5,hr,Time drill ejector pin and sleeve pin holes. Time is per hole,General
+ejectorPlateSupportPillarDiameter,76.2,Length,Diameter of ejector plate support pillars.,General
+ejectorPlatesDrillSetup,1,hr,Total time to setup for drilling and counter boring holes in ejector plate.,General
+ejectorPlatesHoleSpacingLength,203.2,Length,Linear spacing of ejector plate mounting holes in lengthwise direction.,General
+ejectorPlatesHoleSpacingWidth,152.4,Length,Linear spacing of ejector plate mounting holes in widthwise direction.,General
+ejectorPlatesHolesMin,8,,Minimum number of holes in ejector plate.,General
+electrodeBundledPockets,5,,Number of electrodes which are bundled when pockets are being created by EDM.,General
+electrodeGrillPercentMachined,0.8,,The percentage of an individual grill electrode that is machined.,General
+electrodeMachiningRate,0.000183,hr/cm^3,Volumetric removal rate for electrode machining.,General
+electrodePocketsPercentMachined,0.2,,The percentage of an individual pocket electrode that is machined.,General
+electrodeRibsPercentMachined,1,,The percentage of an individual rib electrode that is machined.,General
+electrodeSetupTimeHrs,0.25,hr,Total time to setup for CNC machining of electrodes.,General
+electrodeSizeRibsLarge,65548.25,Volume,Volume of electrodes used to create large rib inserts.,General
+electrodeSizeRibsMedium,65548.25,Volume,Volume of electrodes used to create medium rib inserts.,General
+electrodeSizeRibsSmall,65548.25,Volume,Volume of electrodes used to create small rib inserts.,General
+finishWireEdmFeed,762,Length^2/Length,EDM area feed rate for finishing.,General
+gearQualityDefaultAgmaNewStd,A8,,"A2, A3, A4, ... A11, A12",General
+gearQualityDefaultAgmaOldStd,Q8,,"Q15, Q14, Q13, ... Q6, Q5",General
+gearQualityDefaultDinStd,9,,"2, 3, 4, ... 11, 12",General
+gravityDropTime,1.25,Time,The time for the part to drop from the tool by gravity.,General
+grillMachiningRate,0.000183,hr/cm^3,Volumetric removal rate for grill machining.,General
+grillsMaxLimitLarge,1,,Maximum limit of large grills permitted in the mold tool.,General
+grillsMaxLimitMedium,1,,Maximum limit of medium grills permitted in the mold tool.,General
+grillsMaxLimitSmall,1,,Maximum limit of small grills permitted in the mold tool.,General
+guidePinBoringSetup,0.5,hr,Total time to setup for boring guide pin holes.,General
+guidePinCount,6,,Total number of guide pins on mold base.,General
+guidePinDrillFeedRate,25.4,Length/min,The rate at which guide pin holes are drilled.,General
+guidePinDrillSetup,2,hr,Total time to setup for drilling guide pin holes.,General
+guidePinsTotal,4,,Total number of guide pins in mold tool.,General
+gunDrillFeedRate,25.4,Length/min,The rate at which holes are gun drilled.,General
+gunDrillSetup,1,hr,Total time to setup for gun drilling horizontal channels in core and cavity tools.,General
+gunDrillSpacing,76.2,Length,Linear spacing of water channel holes in cavity and core plate .,General
+gunTapSetup,1.5,hr,Total time to setup for tapping water channels holes in core and cavity tools.,General
+gunTapTime,0.75,min,Time to tap water line gun drilled holes in cavity and core plates. Time is per hole.,General
+handlingMultiplier,1.15,,Manual load time multiplier for insert handling difficulties,General
+highAspectRatioThreshold,0.50,,Parts with an aspect ratio equal to or above this threshold incur additional complexity during part ejection. Used to calculate nominal wall thickness. Default value is 0.50.,General
+hotDropDrillSetup,1,hr,Total time to setup for drilling holes for hot drops.,General
+hotDropDrillingTimeHrsPerDrop,1,hr,Total time to drill hot drops.,General
+hotDropMachiningHrs,2,hr,Total time to machine hot drops.,General
+hotDropSetup,1,hr,Total time to setup for machining hot drops.,General
+hotRunnerMaxPressureReductionFactor,0.30,,Maximum material injection pressure reduction factor for hot runners. Used to calculate 'adjustedInjectionPressure'. Starting point value is 0.30 signifying a 30% reduction from the selected material's maximum injection pressure. Value must be less than 1.,General
+injectionRateMultiplier,0.25,,Multiplier used to downgrade the mold injection rate.,General
+insertElectrodeDepthAllowance,57.15,Length,Allowance added to insert depth in addition to half the mold base core height.,General
+insertElectrodeLengthAllowance,12.7,Length,Length allowance of electrodes used for EDM of inserts,General
+insertElectrodeWidthAllowance,12.7,Length,Width allowance of electrodes used for EDM of inserts,General
+insertMachiningRate,0.000488,hr/cm^3,Volumetric removal rate for insert machining.,General
+insertPocketMachiningRate,0.00152,hr/cm^3,Volumetric removal rate for insert pocket machining.,General
+insertPocketSetupTimeHrs,1,hr,Time to setup for CNC machining of insert pockets. Time is per insert pocket,General
+insertSetupTimeHrs,0.5,hr,Time to setup for CNC machining of insert. Time is per insert,General
+insertionMultiplier,1.2,,Manual load time multiplier for insert insertion difficulties,General
+largeCalcRibInsertElectrodeSize,1920363.281,Volume,Volume of raw material required for custom large rib insert electrodes.,General
+largeGrillInsertDefaultHeight,50.8,Length,Default large grill height adder.,General
+largeInsertArea,836127.36,Area,Area used to calculate volume of large rib inserts.,General
+largeLifterVolume,24580650,Volume,Volume of large lifters,General
+largeOverrideLengthAdder,300,Length,Adder applied to slide length end when large slides exist on a mold tool side.,General
+largeSlideVolume,32774200,Volume,Volume of Large slides.,General
+largeStandardRibInsertElectrodeSize,1920363.281,Volume,Volume of raw material required for standard large rib insert electrodes.,General
+leaderPinsAndShoulderBushings,6,,Total number of leader pins and shoulder bushings in mold tool.,General
+leaderPinsShoulderBushingsCost,45,Currency,Cost of an individual leader pins shoulder bushing.,General
+lifterBundleFaceLengthThresholdMedium,304.8,Length,Threshold for medium lifter bundle face length. A lifter bundle with face length less than this is classified as medium. A lifter bundle with face length greater than this is classified as large.,General
+lifterBundleFaceLengthThresholdSmall,76.2,Length,Threshold for small lifter bundle face length. A lifter bundle with face length less than this is classified as small.,General
+lifterHeightAdderDefault,38.1,Length,Default lifter height adder.,General
+lifterLengthAdderLarge,50.8,Length,Large lifter length adder.,General
+lifterLengthAdderMedium,38.1,Length,Medium lifter length adder.,General
+lifterLengthAdderSmall,25.4,Length,Small lifter length adder.,General
+lifterMachiningRate,0.000480,hr/cm^3,Volumetric removal rate for lifter machining.,General
+lifterPocketMachiningRate,0.00152,hr/cm^3,Volumetric removal rate for lifter pocket machining.,General
+lifterPocketSetupTimeHrs,1,hr,Time to setup for CNC machining of lifter pockets. Time is per lifter pocket.,General
+lifterSetupTimeHrs,1.5,hr,Time to setup for CNC machining of lifters. Time is per lifter.,General
+lifterWidthAdderDefault,25.4,Length,Default lifter width adder.,General
+limitSwitchesCost,50,Currency,Cost of an individual limit switch.,General
+limitSwitchesTotal,2,,Total number of limit switches in mold tool.,General
+loadManualOrRobotic,6-Axis,,"Specifies the default insert loading method for the Pick and Place process. Possible values: Manual, 3-Axis, 6-Axis.",General
+locatingRings,1,,Total number of locating rings used in the mold tool.,General
+locatingRingsCost,85,Currency,Cost of an individual locating ring.,General
+lowThicknessDevThreshold,0.30,Length,"Parts with an average thickness deviation, 'avgThicknessDev', equal to or below this threshold value are considered to have relatively uniform wall thickness. Used to calculate nominal wall thickness. Default value is 0.30.",General
+lowerLimitSmallLifters,4,,Number of small lifters permitted on mold tool if cavity is determined to be below maxLimitSmallLiftersLengthThreshold.,General
+lowerLimitSmallSlides,2,,Number of small slides permitted on mold tool if cavity is determined to be below maxLimitSmallSlidesLengthThreshold.,General
+machineTonnageThresholdSmallMolds,4982.01,kN,Threshold required press force which determines which determines that a small mold is being used.,General
+manifoldPlateThickness,94.1,Length,"Manifold plate thickness. Includes Riser Pads, Spacer Ring and Manifold. Used to calculate the total hot drop thickness.",General
+manualGrabTime,8,Time,The time to manually remove the part from the tool.,General
+maxLimitRibs,4,,Maximum limit of rib inserts permitted on the mold tool.,General
+maxLimitSmallLiftersLengthThreshold,800,Length,Threshold for cavity with which determines that the lowerLimitSmallLifters should be used.,General
+maxLimitSmallSlidesLengthThreshold,200,Length,Threshold for cavity with which determines that the lowerLimitSmallSlides should be used.,General
+maxRunnerDia,12.7,Length,Maximal Runner Diameter,General
+medThicknessDevThreshold,0.50,Length,"Parts with an average thickness deviation, 'avgThicknessDev', above this threshold are considered to have relatively non-uniform wall thickness. Used to calculate nominal wall thickness. Default value is 0.50.",General
+mediumCalcRibInsertElectrodeSize,519266.2313,Volume,Volume of raw material required for custom medium rib insert electrodes.,General
+mediumGrillInsertDefaultHeight,50.8,Length,Default height for medium grill inserts.,General
+mediumInsertArea,5806.44,Area,Default area for medium inserts.,General
+mediumLifterVolume,8194000,Volume,Volume of medium lifters.,General
+mediumOverrideLengthAdder,200,Length,Adder applied to slide length end when medium slides exist on a mold tool side.,General
+mediumSlideVolume,18026000,Volume,Volume of medium slides.,General
+mediumStandardRibInsertElectrodeSize,519266.2313,Volume,Volume of raw material required for standard medium rib insert electrodes.,General
+minInjectionPressure,27.57903,Pressure,"Minimum adjusted injection pressure, default is equivalent to 4000 PSI.",General
+minLimitRibs,2,,Minimal limit of rib inserts permitted on the mold tool.,General
+minPercentClampWallThickness,20,,The minimum percentage of the part nominal wall thickness specified for the clamping force calculation.,General
+minRotaryStackSeparation,0,Length,Minimum separation distance between back to back core plates in rotating stack mold base configuration.,General
+minRunnerDia,2.032,Length,Minimal Runner Diameter,General
+minimumTempControlAllowance,12.7,Length,Minimum additional height added to the part height to allow for Cavity Temperature Control Allowance.,General
+moldBaseNonRecurringCostRatio,0.65,,The ratio of non-recurring mold base cost to total mold base cost when using pocketed cavity set construction. Used to calculate standard mold base cost when plastic forming region inserts are used.,General
+moldSurfaceCountThresholdAverage,2500,,Threshold of number of surfaces on the part which define the part as average complexity.,General
+moldSurfaceCountThresholdSimple,500,,Threshold of number of surfaces on the part which define the part as simple complexity.,General
+moldToolRoughingRate,0.000244,hr/cm^3,Volumetric removal rate for mold tool rough machining.,General
+multipleHydraulicEjectorThreshold,1290320,Area,Mold tool area threshold at which multiple hydraulic ejectors are required to actuate the ejector plate.,General
+nominalHeightFactor,3,,A factor used to determine the tool's open travel distance in the presence of parts with nominal part height values.,General
+nominalWallThicknessFactor,1,,"A factor applied when calculating nominal wall thickness, default set to 1.",General
+nozzlePlateThickness,47.625,Length,Nozzle plate thickness. Used to calculate the total hot drop thickness.,General
+numElectrodesPerPocket,4,,Number of electrodes required per pocket for ribs and grills.,General
+numLargeInsertsBurns,2,,Number of burns required to EDM a large rib insert.,General
+numMediumInsertsBurns,2,,Number of burns required to EDM a medium rib insert.,General
+numSleevePinsBurns,2,,Number of burns required to EDM a sleeve pin.,General
+numSmallInsertsBurns,2,,Number of burns required to EDM a small rib.,General
+numSpeakerGrillBurns,3,,Number of burns required to EDM a speaker.,General
+overheadRateAdjustmentFactor,1,,Factor used to globally increase or decrease overhead time evaluations per process.,General
+partingLineComplexityMultiplierFlat,0.013,,Scaling factor used to adjust design surface base hours for FLAT parting lines.,General
+partingLineComplexityMultiplierNonFlat,0.026,,Scaling factor used to adjust design surface base hours for NON FLAT parting lines.,General
+plasticFormingRegionInsertSetupTime,2,hr,Time required to setup tool material on CNC machine for machining of plastic forming region insert.,General
+pocketElectrodeAdder,50.8,Length,Added applied to lifter height for pocket electrodes.,General
+pocketFeed,1.52559E-05,hr/cm^3,Volumetric removal rate for pocket machining.,General
+pocketSetup,0.5,hr,Time to setup for CNC machining of action pockets. Time is per action pocket.,General
+pocketedInsertAssemblyHours,0.05,hr,Time required to assemble plastic forming region insert into retainer plate.,General
+quickDisconnectsForHosesSpacing,76.2,Length,Linear spacing for quick disconnect hoses.,General
+quickHoseDisconnectsCost,3,Currency,Cost of an individual quick hose disconnect.,General
+ratioFeedingDiameterToMaxThickness,1.25,,Ratio of cavity feeding diameter to maximum part thickness. Used to calculate the cavity feed diameter based on max part thickness.,General
+recommendedShotSizeLimitLower,0.1,,Lower recommended percentage limit for injector barrel capacity.,General
+recommendedShotSizeLimitUpper,0.75,,Upper recommended percentage limit for injector barrel capacity.,General
+retractClearance,3.175,Length,Retract Clearance for calculating slide allowance.,General
+returnPinsAndShoulderBushings,6,,Total number of return pins and shoulder bushings in mold tool.,General
+returnPinsShoulderBushingsCost,35,Currency,Cost of an individual return pins shoulder bushing.,General
+ribInsertCountDial,0.75,,Rib insert dial. Controls the number of rib inserts that are assumed,General
+ribMachiningRate,0.000976,hr/cm^3,Volumetric removal rate for rib machining.,General
+robotClearanceFactor,1,,A factor used to determine the tool's open travel distance in the presence of robotic ejection allowing clearance for the head of the robot to access the part. This factor is added to the nominal height factor or small height part factor for the robotic ejection method.,General
+robotGrabTime,6,Time,The time for a robot to remove the part from the tool.,General
+roughWireEdmFeed,558.8,Length^2/Length,EDM area feed rate for roughing.,General
+runOffFinishBoarderAllowance,50.8,Length,Run off boarder allowance around part for finishing.,General
+runnerRetentionTab,4.7625,Length,Overlapping Runner for Central Gating Runner System,General
+scrapTimeInMinutes_MSM,15,min,Initial setup time for Multi-Shot Molding where parts are assumed to be scrap.,General
+shotSizeSafetyFactor,1.02,,Multiplier of required shot size to account for material left in chamber etc.,General
+sideLocksCost,160,Currency,Cost of an individual side lock.,General
+sideLocksTotal,2,,Total number of side lock on mold tool.,General
+singleHydraulicEjectorThreshold,419354,Area,Mold tool area threshold at which a single hydraulic ejector is required to actuate the ejector plate.,General
+sleevePinVolume,46838.616,Volume,Assumed volume of sleeve pins.,General
+sleevePinsCost,65,Currency,Cost of an individual sleeve pin.,General
+slideBundleFaceLengthThresholdMedium,127,Length,Threshold used to determine if a slide is medium based on its face length. Slides will be determined to be medium if less than or equal to this threshold but greater than slideBundleFaceLengthThresholdSmall. Slides will be determined to be large if greater than this threshold.,General
+slideBundleFaceLengthThresholdSmall,76.2,Length,Threshold used to determine if a slide is small based on its face length. Slides will be determined to be small if less than or equal to this threshold.,General
+slideClearanceMultiCavity,12.7,Length,Slide clearance applied to each slide on the mold tool for multi cavity mold tool.,General
+slideClearanceSingleCavity,5,Length,Slide clearance applied to each slide on the mold tool for single cavity mold tool.,General
+slideCycleRate,100,Velocity,The rate at which the hydraulic slide can move.,General
+slideHeightAdder,25.4,Length,Adder applied to slide height.,General
+slideLengthAdderLarge,50.8,Length,Adder applied to slide length for large slides. Used when determining if slide length plus adder is greater than actionLengthToHeightThreshold times slide height.,General
+slideLengthAdderMedium,38.1,Length,Adder applied to slide length for medium slides. Used when determining if slide length plus adder is greater than actionLengthToHeightThreshold times slide height.,General
+slideLengthAdderSmall,25.4,Length,Adder applied to slide length for small slides. Used when determining if slide length plus adder is greater than actionLengthToHeightThreshold times slide height.,General
+slideMachiningRate,0.000488,hr/cm^3,Volumetric material removal rate for slide machining.,General
+slidePocketMachiningRate,0.00152,hr/cm^3,Volumetric material removal rate for slide pocket machining.,General
+slidePocketSetupTimeHrs,1,hr,Slide pocket setup time per slide.,General
+slideSetupTimeHrs,1,hr,Slide setup Time per slide.,General
+slideWidthAdder,38.1,Length,Adder applied to slide width. Used when determining if slide width plus adder is greater than slide height.,General
+smallCalcRibInsertElectrodeSize,76814.53125,Volume,Volume of raw material required for custom small rib insert electrodes.,General
+smallGrillInsertDefaultHeight,50.8,Length,Default height for small grill inserts.,General
+smallHeightPartFactor,1.1,,A factor used to determine the tool's open travel distance in the presence of parts with small part height values.,General
+smallInsertArea,645.16,Area,Default area for small inserts.,General
+smallLifterVolume,1229032.5,Volume,Default volume of small lifter bundles.,General
+smallOverrideLengthAdder,100,Length,Adder applied to slide length end when small slides exist on a mold tool side.,General
+smallPartActionAllowanceHeight,12.7,Length,Height allowance added to height width when molded part is considered small. Molded parts are considered small when required machine press force is less than machineTonnageThresholdSmallMolds.,General
+smallPartActionAllowanceLength,25.4,Length,Length allowance added to lifter length when molded part is considered small. Molded parts are considered small when required machine press force is less than machineTonnageThresholdSmallMolds.,General
+smallPartActionAllowanceWidth,25.4,Length,Width allowance added to lifter width when molded part is considered small. Molded parts are considered small when required machine press force is less than machineTonnageThresholdSmallMolds.,General
+smallPartMaxBoxLength,356,Length,Max Box Length of a Small Part,General
+smallPartMaxBoxWidth,305,Length,Max Box Width of a Small Part,General
+smallSlideVolume,1229032.5,Volume,Default volume of small slide bundles.,General
+smallStandardRibInsertElectrodeSize,76814.53125,Volume,Default electrode volume for small rib inserts.,General
+socketHeadCapScrewsLongCost,10,Currency,Cost of an individual long head cap screw.,General
+socketHeadCapScrewsShortCost,1.5,Currency,Cost of an individual short head cap screw.,General
+speakerGrillBurnDepth,76.2,Length,Speaker grill burn depth.,General
+spotPartingLineSetup,2,hr,Total time for setup to spot parting line shutoff.,General
+spottingHrsPerSlide,12,hr,Spotting time per slide bundle.,General
+spottingHrsPartingLineAverage,35.650071,hr/m^2,Spotting rate for parting line shutoff where mold tool surface count is above moldSurfaceCountThresholdSimple and the parting line is deemed Flat.,General
+spottingHrsPartingLineComplex,49.600099,hr/m^2,Spotting rate for parting line shutoff where the parting line is deemed Complex.,General
+spottingHrsPartingLineSimple,23.250047,hr/m^2,Spotting rate for parting line shutoff where mold tool surface count is below moldSurfaceCountThresholdSimple and the parting line is deemed Flat.,General
+spottingHrsPerInsertLarge,4,hr,Spotting hours per Large insert.,General
+spottingHrsPerInsertMedium,3,hr,Spotting hours per medium insert.,General
+spottingHrsPerInsertSmall,2,hr,Spotting hours per small insert.,General
+spottingHrsPerLifter,3,hr,Spotting hours per lifter bundle.,General
+sprueBushingCost,70,Currency,Cost of an individual sprue bushing.,General
+sprueClearanceDia,38.1,Length,"Diameter of the Sprue. Used for calculation of the Runner region for molds with a runner system, cold runner or with more than one cavity.",General
+sprueDia,25.4,Length,Standard Sprue Diameter,General
+standardSlideLengthAdderMultiplierHigh,2,,Multiplier used to increase slide height for mold base allowance if slide height is greater than stdSlideLengthAdderThreshold.,General
+standardSlideLengthAdderMultiplierLow,1.5,,Multiplier used to increase slide height for mold base allowance if slide height is less than or equal to stdSlideLengthAdderThreshold.,General
+stdSlideLengthAdderThreshold,152.4,Length,Threshold which determines if a slides height requires a low or high adder multiplier.,General
+stopPinsCost,2,Currency,Cost of an individual stop pin.,General
+supportPillarCoveragePercentage,10,,Total percentage of ejector plate area which is covered by support pillars.,General
+supportPillarDrillTimeHrsPerPillar,0.1,hr,Total drilling time per support pillar.,General
+supportPillarsCost,45,Currency,Cost of an individual support pillar.,General
+supportPillarsSetupPerPillar,0.1,hr,Setup time per support pillar.,General
+supportPlateThickness,47.625,Length,Default thickness of mold tool support plate,General
+textureMultiplierCoarseDeep,1,,Multiplier used to factor coarseTextureCostperSqM to determine mold tool texturing cost for Coarse-Deep texture. Mold texture is defined by PSO cavityTexture.,General
+textureMultiplierFineShallow,0.5,,Multiplier used to factor coarseTextureCostperSqM to determine mold tool texturing cost for Fine-Shallow texture. Mold texture is defined by PSO cavityTexture.,General
+textureMultiplierModerateMedium,0.9,,Multiplier used to factor coarseTextureCostperSqM to determine mold tool texturing cost for Moderate-Medium texture. Mold texture is defined by PSO cavityTexture.,General
+thirdPlateThicknessRatio,0.5,,Ratio of third plate thickness to core plate.,General
+threePlateAdderMultiplier,0.9,,Multiplier used to ensure that the thickness of the third plate is always 90% of the A plate or the B Plate (whichever has the smallest thickness),General
+timePerTryoutBase,12,hr,Minimum time required for a single tool try-out.,General
+topClampPlateThickness,28.575,Length,Total thickness of the top clamp plate.,General
+tryoutPressForceThreshold,4982.01,kN,Threshold of machine press force which would require additional try-out time per try-out.,General
+upperLimitSmallLifters,8,,Maximum limit of small lifters permitted on the mold tool.,General
+upperLimitSmallSlides,4,,Maximum limit of small slides permitted on the mold tool.,General
+usePreferredMachines,true,,"If true, the model will first try to select a preferred machine. If false, the system chooses either the default machine or from the entire non-preferred set of machines.",General
+useMetricOrImperialValues,Metric,,Select the default System for choosing A Standard Mold Base Size from the lookup table tblStandardMoldBaseSizes. Choose from 'Metric' in mm and 'Imperial' in inches.,General
+ventMachiningTimePerVent,0.25,hr,Total time to machine an individual tool vent.,General
+ventSetup,1,hr,Time to setup all vent inserts in the mold tool.,General
+ventSpacing,76.2,Length,Linear spacing between vents.,General
+voidUndercutDiaFallback,0.01,Length,Used to determine the virtual diameter of void undercuts if either exposedArea or numOpenings are extracted as zero.,General
+waterBafflesCost,8,Currency,Cost of an individual water baffle.,General
+waterChannelSpacing,76.2,Length,Linear spacing between water channels.,General
+waterFittingSpacing,76.2,Length,Linear spacing between water fittings.,General
+waterHosesCost,1.25,Currency,Cost of an individual water hose.,General
+waterHosesSpacing,76.2,Length,Linear spacing between water hoses.,General
+waterManifoldFittingsCost,2.5,Currency,Cost of an individual water manifold fitting.,General
+waterManifoldFittingsSpacing,76.2,Length,Linear spacing between water manifold fittings.,General
+waterManifoldSpacingThresholdMedium,1612900,Area,Threshold of mold tool area which determines that the mold tool is considered Medium.,General
+waterManifoldSpacingThresholdSmall,338709,Area,Threshold of mold tool area which determines that the mold tool is considered small.,General
+waterManifoldsCost,55,Currency,Cost of an individual water manifold.,General
+waterManifoldsTotalLarge,4,,Total number of water manifolds on the mold tool if the mold tool area is considered to be larger than waterManifoldSpacingThresholdMedium.,General
+waterManifoldsTotalMedium,2,,Total number of water manifolds on the mold tool if the mold tool area is considered to be larger than waterManifoldSpacingThresholdSmall yet smaller than waterManifoldSpacingThresholdMedium.,General
+waterManifoldsTotalSmall,0,,Total number of water manifolds on the mold tool if the mold tool area is considered to be smaller than waterManifoldSpacingThresholdSmall.,General
+widthOfCoolingChannel,11.1125,Length,Width of the cooling channels used to cool the mold tool.,General

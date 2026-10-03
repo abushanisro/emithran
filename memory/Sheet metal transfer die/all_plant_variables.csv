@@ -1,0 +1,388 @@
+﻿Variable Name,String Value,Unit Type Name,Notes,Applies To
+absMergeInSuperformDistanceMultiplier,25.4,,Multiplier used in SuperForm Merge analysis to calculate firstDistanceLimit.,General / Shared
+addIdleAfterCamBendEnabled,Yes,,Default condition for adding Idle Stations after Cam Bending in Prog Die. Acceptable values are 'Yes' and 'No'.,Prog Die
+addIdleAfterCamFormEnabled,Yes,,Default condition for adding Idle Stations after Cam Forming in Prog Die. Acceptable values are 'Yes' and 'No'.,Prog Die
+addIdleAfterCamPierceEnabled,Yes,,Default condition for adding Idle Stations after Cam Piercing in Prog Die. Acceptable values are 'Yes' and 'No'.,Prog Die
+addIdleAfterCamTrimEnabled,Yes,,Default condition for adding Idle Stations after Cam Trimming in Prog Die. Acceptable values are 'Yes' and 'No'.,Prog Die
+addIdleAfterTrimmingEnabled,Yes,,Default condition for adding Idle Stations after Trimming in Prog Die. Acceptable values are 'Yes' and 'No'.,Prog Die
+addIdleBeforeAfterTappingEnabled,Before and After,,"Default condition for adding Idle Stations before or after Tapping in Prog Die. Acceptable values are 'Before', 'After', 'Before and After', 'None'.",Prog Die
+addIdleBeforeCutoffEnabled,Yes,,Default value for adding a idle station before cutoff. Acceptable values are 'Yes' and 'No',General / Shared
+aerialCamAngleLowerThreshold,15,Angle,Angle lower threshold for Aerial Cam Trimming of edgeSegments and Aerial Cam Piercing of holes. Note for angles beyond Standard Cam region and 180 degrees Aerial Cams are assumed.,Transfer Die (component/cam - inferred)
+aerialCamAngleUpperThreshold,75,Angle,Angle upper threshold for Aerial Cam Trimming of edgeSegments and Aerial Cam Piercing of holes. Note for angles beyond Standard Cam region and 180 degrees Aerial Cams are assumed.,Transfer Die (component/cam - inferred)
+anotherPointDepthMultiplier,10,,Multiplier used in Depth and Distance in Compatability Analysis.,General / Shared
+anotherPointDistanceMultiplier,100,,Multiplier used in Depth and Distance in Compatability Analysis.,General / Shared
+assyHrsCompProgDie,1.1,,Dial for modifying the tooling assembly hours in Prog Die.,Prog Die
+assyHrsCompTransferDie,1.1,,Dial for modifying the tooling assembly hours in Transfer Die.,Transfer Die
+bendFlapSizeRestrikeThreshold,75,Length,Straight Bends or Forms of sub-type = CURVED_BEND with a flap size greater than or equal to this value will be assigned to a restrike operation.,General / Shared
+bendFlapSizeThreshold,127,,Used to determine the bend flap condition.,General / Shared
+bendLengthThresholdMultiplier,.4,,Multiplier for calculating a dynamic threshold for bend skirt length that is a percentage of part height. Below this threshold a CURVED_BEND or straightBend will be considered a vertical flange.,General / Shared
+bigEnoughArtifactPerimeter,127,,Used in Distance in Precedence Analysis to determine isArtifactBigEnough(op).,General / Shared
+bigHoleDistanceMultiplier,12.7,,Used in Depth and Distance in Compatability Analysis to determine bigHolesTooCloseToBeCompatible.,General / Shared
+bigHoleSizeThreshold,127,,Used in Depth and Distance in Compatability Analysis to determine isBigHole(op).,General / Shared
+blankCuttingMethod,OFFLINE,,Enable for determining the type of blank cutting. Options are OFFLINE and INLINE.,General / Shared
+bottomParallelHeight,101.6,Length,Height of lower parallels in Transfer Die. Used to calculate minimum required shut height.,Transfer Die
+bottomParallelSpacing,254,Length,Distance between bottom parallels.,Transfer Die (component/cam - inferred)
+bottomParallelsAdder,3,,Adds 3 bottom parallels to take the place of what used to be wide parallels.,Transfer Die (component/cam - inferred)
+bottomPlateHeight,12.7,Length,Thickness of the bottom plate in transfer die.,Transfer Die
+bottomPlateWidthAllowance,304.8,Length,amount added to each side of the die shoe width to determine the bottom plate width.,Transfer Die (component/cam - inferred)
+bottomWideParallelsQty,3,,total number of wide bottom parallels.,Transfer Die (component/cam - inferred)
+bpCbores,0,,Quantity of counterbores per bottom parallel.,Transfer Die (component/cam - inferred)
+bpCncHrs,0,,Constant for total time required for programmed machining for bottom parallels. Used to calculate the labor time of all die components.,Transfer Die (component/cam - inferred)
+bpDowels,4,,Quantity of dowels per bottom parallel.,Transfer Die (component/cam - inferred)
+bpGrindingHrs,0,hr,Total time required for grinding operator labor per bottom parallel. Used to calculate the labor time of all die components.,Transfer Die (component/cam - inferred)
+bpHoleDepth,50.8,Length,"Depth of holes in bottom parallels that are drilled, tapped, reamed.",Transfer Die (component/cam - inferred)
+bpMillingHrsPerBp,.75,hr,Total time required for milling operator labor allocated to each bottom parallel.,Transfer Die (component/cam - inferred)
+bpMillingHrsPerBpProgDie,0.33,hr,Total time required for milling operator labor to mill (2) bolt-down slots in a wide parallel.,Prog Die
+bpMillingHrsPerBpTransferDie,.33,hr,Total time required for milling operator labor to mill (2) bolt-down slots in a wide parallel.,Transfer Die
+bpNTappedPerBp,5,,The quantity of tapped holes per narrow bottom parallel in transfer die.,Transfer Die
+bpTappedPerBp,2,,Quantity of tapped holes per bottom parallel.,Transfer Die (component/cam - inferred)
+bpTappedPerBumper,2,,Quantity of tapped holes per bumper.,Transfer Die (component/cam - inferred)
+bpWTappedPerBp,7,,The quantity of tapped holes per wide bottom parallel in transfer die.,Transfer Die
+bpWidth,127,,Width of bottom parallel.,Transfer Die (component/cam - inferred)
+bplCboresPerBottomParallel,3,,The number of counterbored holes in the bottom plate for each bottom parallel.,Transfer Die (component/cam - inferred)
+bplDowelsPerWideBp,2,,The quantity of bottom plate dowel holes per wide bottom parallel.,Transfer Die (component/cam - inferred)
+bplPressLocatorHoles,2,,The number of press locator holes in the bottom plate for transfer die.,Transfer Die
+bridgeRestrikingMultiplier,1,,Multiplier used to calculate the minimum bridge depth.,General / Shared
+bumperBumpersPerStage,4,,Constant for quantity of bumpers per stage. Used to calculate the quantity of bumpers.,Transfer Die (component/cam - inferred)
+camApproachAngleThreshold,45,Angle,Threshold for determining if a CAM unit is considered parallel or perpendicular to the part strip flow direction. CAM's whose action vector is less than this value are typically considered to be parallel to the part strip flow direction.,Transfer Die (component/cam - inferred)
+camClearanceLength,6.35,Length,Average clearance between cam punch and workpiece.,Transfer Die (component/cam - inferred)
+camHoleDiameterThreshold,15,Length,"Diameter threshold used to determine the distance test that is used for deciding whether 2 holes intersect. If the hole's diameter is below this threshold then one test is used, if the hole's diameter is at or above this threshold then a different test is used.",Transfer Die (component/cam - inferred)
+closeForPrecedenceMultiplier,3,,Used in Distance in Precedence Analysis to determine artifactTooClose.,General / Shared
+cncProgHrsPerMillingHr,0.25,,Quantity of CNC programming hours per milling hour. Used to determine the Quantity of programming hours needed for each generic press process.,General / Shared
+compCoatingCost,1,,Dial for calibrating tooling Coating Cost in Transfer Die.,Transfer Die
+compDieFtoB,1,,Dial for calibrating dieFtoB value.,General / Shared
+compHeatTreatCost,2,,Dial for calibrating tooling Heat Treat Cost in Transfer Die.,Transfer Die
+complexHoleTrimLengthThreshold,457.2,Length,Threshold used for determining whether or not a complexHole is to be trimmed or pierced.,General / Shared
+cuMmPerCuM,1000000000,,Unit conversion.,General / Shared
+customCutMultiplier,1,,Multiplier used to compute material cost in generic press processes.,General / Shared
+cycleTimeAdjustmentFactor,1,,Factor used to globally increase or decrease cycle time evaluations per process.,General / Shared
+dbCboresPerDieBlock,8,,Quantity of counterbores per die block used to calculate the CNC labor hours per die block.,General / Shared
+dbCncHrsPerPocket,0.5,,Number of CNC hours per milled pocket for a die block.,General / Shared
+dbCncSetupHrs,0.75,,Number of CNC setup hours for a die block.,General / Shared
+dbDowelsPerDieBlock,3,,Quantity of dowels per die block.,General / Shared
+dbDrillingHrsPerDieBlock,0,,Total time required for drilling operator labor for die block. Used to calculate the labor time of all die components.,General / Shared
+dbGrindingHrsPerDieBlock,3,,Total time required for grinding operator labor per die block. Used to calculate the labor time of all die components.,General / Shared
+dbMilledPocketsPerDieBlock,5,,Quantity of milled pockets per die block.,General / Shared
+dbMillingHrs,1.5,,Total time required for milling operator labor for each die block. Used to calculate the labor time of all die components.,General / Shared
+dbTappedPerDieBlock,2,,Quantity of tapped holes per die block.,General / Shared
+dbWireEdmSetupHrs,1,,Number of setup hours required for a wire EDM process. Used to calculate the labor time of all die components.,General / Shared
+deepDimpleMultiplier,4,,Used in Dimple Analysis to determine the maximum dimple depth.,General / Shared
+deepDrawRatioThreshold,1,,Threshold used to determine if the form is deep drawn.,General / Shared
+defaultAddendumWidth,0,Length,Default addendum width to add to a blank.,General / Shared
+defaultBlankPitchThreshold,10,Length,"Threshold used to determine if there is an idle station following a trimming station. If blank pitch is less than this number, an idle station will be added.",General / Shared
+defaultBlankPitchThresholdProgDie,80,Length,Default value for Blank Pitch threshold after which an IDLE station will be inserted following the last TRIMMING station in Progressive Die.,Prog Die
+defaultDieSpacing,101.6,Length,Default distance from main surface to inside of upper die shoe.,General / Shared
+defaultDieStationsPerDieSet,1,,Default number of Die Stations to be allocated per Die Set.,General / Shared
+defaultDirectTrimAngleThreshold,30,Angle,Default angle for determining between Direct Trimming and Cam Action Trimming for Transfer Die.,Transfer Die
+defaultEdgeMarginMultiplier,1.5,,Default setting of a multiplier used for calculating the edge margin applied in the stock width calculation.,General / Shared
+defaultEdgeMarginMultiplierProgDie,1.5,,Default setting of a multiplier used for calculating the edge margin applied in the stock width calculation in Prog Die routing.,Prog Die
+defaultEdgeMarginWidthMultiplier,1.5,,Default multiplier used for calculating stock size edgeMargin width as a function of blank thickness.,General / Shared
+defaultEnableCoiningSetting,No,,"Default condition for enabling COINING operations for SimpleHole GCDs. Valid values are: 'No', 'Yes'.",General / Shared
+defaultEnableIdleStations,No,,"Default condition for whether or not to auto-include IDLE stations when all other inclusion criteria suggests include. If this variable is set to ""Yes"" then IDLE stations will be inserted according to the criteria in idleStationCount.csl. If this variable is set to ""No"", then IDLE stations will NOT be inserted regardless of the criteria.",General / Shared
+defaultEnableInDieTapping,No,,"Default condition for enabling in-die TAPPING operations for SimpleHole GCDs. Valid values are: 'No', 'Yes'.",General / Shared
+defaultEnableInDieTappingProgDie,No,,"Default condition for enabling in-die TAPPING operations for SimpleHole GCDs. Valid values are: 'No', 'Yes'.",Prog Die
+defaultEnableScoringSetting,No,,"Default condition for enabling SCORING operations for Bend GCDs. Valid values are: 'No', 'Yes'.",General / Shared
+defaultEnableShavingSetting,No,,"Default condition for enabling SHAVING operations for SimpleHole GCDs. Valid values are: 'No', 'Yes'.",General / Shared
+defaultFrenchStopSize,3,Length,,General / Shared
+defaultIdleStationMaterialCost,300,Currency,Default material cost for an IDLE station.,General / Shared
+defaultIncrementAmount,5,Angle,Default increment amount used for determining the optimum true-part nesting in Transfer Die. Valid values are from 1 to 360 degrees.,Transfer Die
+defaultIncrementAmountProgDie,5,Angle,Default increment amount used for determining the optimum true-part nesting in Progressive Die. Valid values are from 1 to 360 degrees.,Prog Die
+defaultPartSpacing,25.4,Length,Default distance from the part's lowest extremity from the main surface to the inside of the lower die shoe.,General / Shared
+defaultPartSpacingMultiplier,1.5,,Default setting of a multiplier used for calculating the spacing between adjacent nested parts.,General / Shared
+defaultPositionToleranceEdgeSegment,3,Length,Default tolerance applied to EdgeSegment GCD's in the event that no tolerance was available for extraction from the CAD model for the GCD.,General / Shared
+defaultPositionToleranceHole,1.5,Length,Default tolerance range applied to SimpleHole and ComplexHole GCD's in the event that no tolerance was available for extraction from the CAD model for the GCD.,General / Shared
+defaultPositionToleranceLance,1.5,Length,Default tolerance applied to EdgeSegment GCD's in the event that no tolerance was available for extraction from the CAD model for the GCD.,General / Shared
+defaultStampAssemblyQty,3,,Default quantity of stamp-anvil assemblies per die set.,General / Shared
+defaultStampAssemblyQtyProgDie,3,,Default quantity of stamp-anvil assemblies in the Prog Die routing.,Prog Die
+defaultStandardCamWorkTravel,60,Length,Default work travel distance of standard cam unit. Distance cam unit can travel over part to complete operation without interference.,Transfer Die (component/cam - inferred)
+defaultToolLife,3000000,,The default number of parts per tool which is used to determine tool life. This is the median value of the available data relating to tool life by part material type.,General / Shared
+defaultToolingCoatingType,Nitride,,Default type of coating applied to coated tooling components.,General / Shared
+defaultToolingCoatingTypeUpdated,Nitrided Steel,,Updated Default type of coating applied to coated tooling components for 19.2. Alternative coatings can be referenced from tblToolCoating.,General / Shared
+defaultUtilizationMethod,TRUE_PART,,"Eligible values: ""COMPUTED"" (rectangular), ""TRUE_PART"" & ""MACHINE_DEFAULT""",General / Shared
+deformationThreshold,70,,"Used for the assignment of Side Action Forming operations. If the sum of a part's Form gcd's comprise a greater percentage of the part's surface than this threshold, then the part is considered to be ""highly deformed"".",General / Shared
+depthToMatlThicknessRestrikeThreshold,1000,,Threshold used for determining when to RESTRIKE a Form GCD with respect to depth-to-material-thickness of Form.,General / Shared
+dialAllLabor,0.907518,,,General / Shared
+dialAllMaterial,.907518,,Constant used to determine the material cost for processes.,General / Shared
+dialAllMaterialProgDie,1,,Constant used to determine the material cost for Progressive Die processes.,Prog Die
+dialAssemblyLabor,1,,,General / Shared
+dialCncLabor,1,,,General / Shared
+dialCncProgLabor,1,,,General / Shared
+dialCompFactor,1,,Intensity of compression.,General / Shared
+dialCompThreshold,10,,Quantity of components below which compression is turned off.,General / Shared
+dialDebugLabor,1,,,General / Shared
+dialDesignLabor,1,,,General / Shared
+dialDrillingLabor,1,,,General / Shared
+dialFormingPunches,1.5,,,General / Shared
+dialGrindingLabor,1,,,General / Shared
+dialLatheLabor,1,,,General / Shared
+dialMillingLabor,1,,,General / Shared
+dialReworkLabor,1,,,General / Shared
+dialSawingLabor,1,,,General / Shared
+dialWireEdmLabor,1,,,General / Shared
+dieAllowanceGap,25.4,Length,Gap height added to die height. Used to calculate minimum shut height.,General / Shared
+dieBlockLengthAllowance,127,Length,Reverted to transfer die margin.,Transfer Die
+dieBlockThickness,25.4,Length,"Default die thickness for a die block. Determines the thickness of die blocks, punch pads, strippers, forming inserts, and stripper inserts.",General / Shared
+dieBlockWidthAllowance,101.6,Length,Reverted to transfer die margin.,Transfer Die
+dieSetCbores,128,,,General / Shared
+dieSetDowels,37,,,General / Shared
+dieSetSprings,63,,,General / Shared
+dieSetTapped,139,,,General / Shared
+dieShoeThickness,59.944,Length,Default die holder thickness for a die set.,General / Shared
+dieShoeThicknessThresholdHigh,146,Length,Upper threshold for blank size used for determining die shoe thickness in Transfer Die.,Transfer Die
+dieShoeThicknessThresholdLow,108,Length,Lower threshold for blank size used for determining die shoe thickness in Transfer Die.,Transfer Die
+dimpleDepthMultiplierThreshold,0.5,,Used to determine the maximum dimple depth for stage tooling.,General / Shared
+dimplePerimeterMultiplierThreshold,5,,Used to determine the maximum dimple perimeter for stage tooling.,General / Shared
+disableInvestmentAmortization,false,,"User override to disable amortization of all fixed costs to the individual part or assembly. By default, fixed costs are calculated per part for tooling, fixtures, and programming.",General / Shared
+drawRate,50,Velocity,Rate at which a deep draw is drawn. Used to calcualte the computed draw time.,General / Shared
+drawRatioThreshold,.3,,Transfer Die Forms with a form area to part box area ratio greater than this value are feasible for a Draw operation.,Transfer Die
+dsCboresPerBumper,2,,Quantity of counterbores per bumper for a die set.,General / Shared
+dsCboresPerInsert,3,,Quantity of counterbores per insert for a die set.,General / Shared
+dsCboresPerParallel,2,,Quantity of counterbores per parallel for a die set.,General / Shared
+dsCncHrsPerPocket,0.5,,Number of CNC hours per milled pocket for a die set.,General / Shared
+dsCncSetupPerDs,1,,Number of CNC setup hours for a die set.,General / Shared
+dsDowels,7,,Quantity of dowels per die set.,General / Shared
+dsMilledPockets,5,,Quantity of milled pockets per die set.,General / Shared
+dsSpringsPerInsert,3,,Quantity of springs per insert in a die set.,General / Shared
+dsSpringsPerPad,6,,Quantity of springs per pad in a die set.,General / Shared
+dsTappedPerDieBlock,8,,Quantity of tapped holes per die block for a die set.,General / Shared
+dsetLengthAllowance,50.8,,Reverted to transfer die margin,Transfer Die
+dsetWidthAllowance,254,,Reverted to transfer die margin,Transfer Die
+dutyRate,0,Currency,Rate for calculating duty on tooling.,General / Shared
+edgeTrimmingPositionToleranceThreshold,2,Length,Position tolerance threshold for determining whether or not Trimming is necessary for blank edges.,General / Shared
+enableCoiningFlangedHoles,Yes,,Default setting for performing the coining operation on flanged holes that are tapped in Prog Die routing. Acceptable values are 'Yes' and 'No'.,Prog Die
+enableMultiStationTrimming,false,,"Default setting for whether Direct Trimming and Cam Trimming will be distributed over 2 die stations if the trimmed scrap length exceeds threshold length. Valid values are ""true"" and ""false"".",General / Shared
+enableMultiStationTrimmingProgDie,false,,"Default setting for whether Direct Trimming and Cam Trimming will be distributed over 2 die stations if the trimmed scrap length exceeds threshold length. Valid values = ""true"" and ""false"". Applies to Progressive Die process.",Prog Die
+enableRestrikingStraightCurvedBends,No,,Default setting for performing the restriking operation on Straight Bends and Curved Bends in the Prog Die routing. Acceptable values are 'Yes' and 'No'.,Prog Die
+enableScrapMaterialCredit,false,,Set to 'true' to enable Material Cost reduction due to sale of scrap mass of part.,General / Shared
+enableScrapPartCredit,false,,Set to 'true' to enable Material Cost reduction due to sale of scrapped parts as a result of Good Part Yield.,General / Shared
+enableShavingFlangedHoles,Yes,,Default setting for performing the shaving operation on flanged holes that are tapped in Prog Die routing. Acceptable values are 'Yes' and 'No'.,Prog Die
+enableStandalonePiloting,No,,Default setting for combining Piloting with Edge Trimming and Full Blanking on a die station in Prog Die routing. Acceptable values are 'Yes' and 'No',Prog Die
+flameHeatTreatCostPerKgProgDie,.06,CostPerMass,Typical cost per mass for torch based heat treating (hardening) of tooling components.,Prog Die
+flangeAngleThreshold,6,Angle,Threshold used for determining if a StraightBend or form/CURVED_BEND is a flange.,General / Shared
+flangeLengthPercentage,.5,,"Multiplier used to determine whether or not a flange is considered long. The part length multiplied by this plant variable sets the threshold for ""long"". The primary form of parts with ""long"" flanges is assigned to a Drawing operation.",General / Shared
+formAreaThreshold,15,,"Used for the assignment of Side Action Forming operations. If the ratio of a given EMBOSS gcd's area to the total part surface area is less than this threshold, then the gcd is feasible for Side Action Forming.",General / Shared
+formBasedScoringMultiplierThreshold,5,,,General / Shared
+formDepthPercentage,.15,,"Multiplier used to determine whether or not a form is considered shallow. The form width multiplied by this plant variable sets the threshold for ""shallow"". The primary form of parts with a ""shallow"" primary form is NOT assigned to a Drawing operation but is instead assigned to a Crash Forming operation.",General / Shared
+gearQualityDefaultAgmaNewStd,A8,,"A2, A3, A4, ... A11, A12",General / Shared
+gearQualityDefaultAgmaOldStd,Q8,,"Q15, Q14, Q13, ... Q6, Q5",General / Shared
+gearQualityDefaultDinStd,9,,"2, 3, 4, ... 11, 12",General / Shared
+genericValidation,true,,'true' if the generic validation view should be used for parts costed in this process group in this Digital Factory,General / Shared
+grindingRate,45720,mm^2/hr,Rate at which a surface can be ground. (mm^2/hour),General / Shared
+hardwareFactor,0.3,,Hardware cost as a fraction of die set material cost.,General / Shared
+hemLengthThreshold,203,,Threshold used in Scoring Analysis to determine longHemCondition(op),General / Shared
+highCncProgramHours,1,,This time in hours required to write a CNC program of large size and complexity.,General / Shared
+highStrengthMaterialMachiningMultiplierPercentage,10,,Percentage multiplier for affecting tooling machining hours if high strength material is used for the piece part.,General / Shared
+highStrengthMaterialTryoutMultiplierPercentage,10,,Percentage multiplier for affecting tooling tryout hours if high strength material is used for the piece part.,General / Shared
+highStrengthMatlDerateePercent,10,,Percentage by which the draw reduction percentage is further derated if the part material tensile strength is above the threshold.,General / Shared
+highStrengthMatlThreshold,344.74,MPa,Threshold for part material tensile strength at which the draw reduction percentage is further reduced.,General / Shared
+highStrengthMatlToolingCoatingType,DuplexVariantic,,Default type of coating applied to coated tooling components for high strength piece part material.,General / Shared
+highStrengthMatlToolingCoatingTypeProgDie,DuplexVariantic,,Default type of coating applied to coated tooling components for high strength piece part material for Prog Die process.,Prog Die
+holeAxisThreshold,15,,All holes have a setupAxis that is codirectional with all other holes on the same cam unit in Transfer Die. Codirectional means the angle between their setupAxis can only vary by the number of degrees specified here.,Transfer Die
+holeBasedScoringMultiplierThreshold,3,,Threshold used in Scoring Analysis to determine scoreHoleTooClose,General / Shared
+holePiercingPositionToleranceThreshold,2,Length,Position tolerance range threshold for determining whether or not Piercing can precede Embossing for holes and forms that do not intersect.,General / Shared
+holesAfterForms,true,,"Default setting for determining whether holes are pierced before or after forming. Valid values are: true, false.",General / Shared
+insCboresPerInsert,3,,,General / Shared
+insCncHrsPerPocket,0.5,,,General / Shared
+insCncSetup,0.5,,,General / Shared
+insDowelsPerInsert,0,,,General / Shared
+insDrillingHrs,0,,,General / Shared
+insGrindingHrs,1.5,,,General / Shared
+insGuidePins,0,,,General / Shared
+insMilledPocketsPerInsert,0,,,General / Shared
+insMillingHrs,0.5,,,General / Shared
+insPerfs,0,,,General / Shared
+insSpringPinsPerInsert,3,,,General / Shared
+insTappedPerInsert,2,,,General / Shared
+insWireEdmHrsPerDowel,1,,,General / Shared
+insfCbores,3,,Quantity of counterbores per forming insert to calculate the CNC labor hours per forming insert.,General / Shared
+insfCncHrsPerInsert,0.5,,Number of CNC hours per forming insert.,General / Shared
+insfDowels,0,,Quantity of dowels per forming insert.,General / Shared
+insfDrillingHrs,0,,Total time required for drilling operator labor per forming insert. Used to calculate the labor time of all die components.,General / Shared
+insfGrindingHrs,3,,Total time required for grinding operator labor per forming insert. Used to calculate the labor time of all die components.,General / Shared
+insfMillingHrs,1,,Total time required for milling operator labor per forming insert. Used to calculate the labor time of all die components.,General / Shared
+insfTapped,0,,Quantity of tapped holes per forming insert.,General / Shared
+insfWireEdmSetup,0.5,,Number of setup hours required for a wire EDM process. Used to calculate the labor time of all die components.,General / Shared
+inssCbores,3,,Quantity of counterbores per stripper insert.,General / Shared
+inssCncSetup,0.5,,Constant for total time required for programmed machining for stripper inserts. Used to calculate the labor time of all die components.,General / Shared
+inssDrillingHrs,0,,Total time required for drilling operator labor per stripper insert. Used to calculate the labor time of all die components.,General / Shared
+inssGrindingHrs,1.5,,Total time required for grinding operator labor per stripper insert. Used to calculate the labor time of all die components.,General / Shared
+inssMillingHrs,0.75,,Total time required for milling operator labor per stripper insert. Used to calculate the labor time of all die components.,General / Shared
+inssSpringPins,2,,Quantity of spring pins required for stripper insert.,General / Shared
+inssTapped,0,,Quantity of tapped holes per stripper insert.,General / Shared
+interDieSpacing,25,Length,Default spacing between adjacent die sets. Used to calculate transfer pitch.,Transfer Die
+laborRateAdjustmentFactor,1,,Factor used to globally increase or decrease labor rate evaluations per process.,General / Shared
+largeCamSizeThreshold,380,Length,Size threshold determining the difference between a small cam unit and a large cam unit.,Transfer Die (component/cam - inferred)
+latheHrsPerSpring,0.25,,Total time required for turning operator labor per spring. Used to calculate the number of lathe hours required for die shoes and punch holders.,General / Shared
+lowCncProgramHours,.25,,This time in hours required to write a CNC program of small size and complexity.,General / Shared
+matlYieldStrengthRestrikeThreshold,344.74,Pressure,Threshold used for determining when to RESTRIKE a Form GCD with respect to material yield strength.,General / Shared
+maxAllowedIntersectionDistance,7000,Length,Specifies a distance limit for creating INTERSECTS relations between camBundle and other artifacts (including other camBundles). If the distance to intersection > plant.maxAllowedIntersectionDistance then the INTERSECTS relation will not be created,Transfer Die (component/cam - inferred)
+maxBundleGap,254,Length,Max horizontal distance between GCDs that can be bundled.,Transfer Die (component/cam - inferred)
+maxBundleWidth,500,Length,Max allowed width of Cam Bundle.,Transfer Die (component/cam - inferred)
+maxClearanceDifference,10,,Default maximum clearance difference affecting camBundling in Transfer Die.,Transfer Die
+maxComplexHolePosTolerance,2,,Default maximum position tolerance affecting camBundling in Transfer Die.,Transfer Die
+maxDies,20,,Holds arrays for this many dies.,General / Shared
+maxEdgeSegmentPosTolerance,2,,Default maximum position tolerance affecting camBundling in Transfer Die.,Transfer Die
+maxLancePosTolerance,2,,Default maximum position tolerance affecting camBundling in Transfer Die.,Transfer Die
+maxNumberDeepDraws,3,,Maximum number of deep draws per deep form,General / Shared
+maxNumberDraws,3,,Maximum number of draws per form,General / Shared
+maxOneStepBendAngleDegrees,5,,,General / Shared
+maxRamDirectionTangentAngleDegrees,30,,Default maximum tangent angle affecting camBundling in Transfer Die.,Transfer Die
+maxRamDirectionTangentAngleDegreesBending,8,Angle,Default maximum tangent angle affecting camBundling of Bends in Transfer Die.,Transfer Die
+maxRamDirectionTangentAngleDegreesLancing,15,Angle,Default maximum tangent angle affecting camBundling of Lance gcd's in Transfer Die.,Transfer Die
+maxRamDirectionTangentAngleDegreesPiercing,15,Angle,Default maximum tangent angle affecting camBundling of Pierced Holes in Transfer Die.,Transfer Die
+maxRamDirectionTangentAngleDegreesTrimming,30,Angle,Default maximum tangent angle affecting camBundling of Trimmed Edges in Transfer Die.,Transfer Die
+maxScrapSizeThreshold,457.2,Length,Maximum scrap size threshold for Transfer Die.,Transfer Die
+maxSimpleHolePosTolerance,2,,Default maximum position tolerance affecting camBundling in Transfer Die.,Transfer Die
+maxTappedHolesPerUnit,4,,Maximum number of holes that can be tapped with a single in-die tapping unit.,General / Shared
+maxThicknessProgressiveDie,6,,Maximum material thickness for use in a progressive die.,Prog Die
+maxTrimStagesProgDie,4,,Determines the number of trimming operations where the size of the blank or trim is managed for conveying purposes for a progressive die.,Prog Die
+maxTrimStagesTransferDie,4,,Determines the number of trimming operations where the size of the blank or trim is managed for conveying purposes for a transfer die.,Transfer Die
+maximumStripWidth,1828.8,Length,Maximum width of coil stock used for strip nesting.,General / Shared
+maximumStripWidthProgDie,1828.8,Length,Maximum width of coil stock used for strip nesting in Prog Die routing.,Prog Die
+mediumCncProgramHours,.5,,This time in hours required to write a CNC program of medium size and complexity.,General / Shared
+mergeInMultibendAngle,45,,Factor used to determine whether two bends can be merged into a double bend.,General / Shared
+mergeInMultibendDistance,4,,Factor used to determine whether two bends can be merged into a double bend.,General / Shared
+mergeInMultibendMinRatio,0.4,,Factor used to determine whether two bends can be merged into a double bend.,General / Shared
+millingPerInsert,0.5,,Total time required for milling operator labor per insert. Used to calculate the labor time of all die components.,General / Shared
+millingTimePerDieBlock,1.5,,Total time required for milling operator labor per die block. Used to calculate the labor time of all die components.,General / Shared
+minBendAngleDegrees,90,,Default minimum bend angle affecting camBundling in Transfer Die.,Transfer Die
+minBurnoutHoleDiameter,50.8,Length,"The minimum diameter hole that can be flame cut (burnout) in a Transfer Die shoe, etc.",Transfer Die
+minCamIntersectDistance1,40,Length,One of several distance thresholds used to determine if a cam pierced hole intersects with a direct pierced hole. If the projected cam pierced hole intersects with the projected direct pierced hole within this distance then the cam pierced hole is considered to have intersected with the direct pierced hole.,Transfer Die (component/cam - inferred)
+minCamIntersectDistance2,25,Length,One of several distance thresholds used to determine if a cam pierced hole intersects with a direct pierced hole. If the projected cam pierced hole intersects with the projected direct pierced hole within this distance plus the cam hole's diameter then the cam pierced hole is considered to have intersected with the direct pierced hole.,Transfer Die (component/cam - inferred)
+minDirectIntersectDistance,40,Length,Distance threshold used to determine if a direct pierced hole intersects with a cam pierced hole. If the projected direct pierced hole intersects with the projected cam pierced hole within this distance then the direct pierced hole is considered to have intersected with the cam pierced hole.,Transfer Die (component/cam - inferred)
+minFormSurfaceToleranceRestrikeThreshold,.5,Length,Threshold used for determining when to RESTRIKE a Form GCD with respect to minimum surface tolerance of Form.,General / Shared
+minHoleSpacingMultiplier,2,,Multiplier for determining whether 2 adjacent pierced holes can be pierced simultaneously in Transfer Die. If the holes are at least [ blank.thickness * minHoleSpacingMultiplier] apart then they can be pierced simultaneously.,Transfer Die
+minNumQualityLoops,2,,The default minimum number of Quality Loops used during Transfer Die tryout in the event that the blank's thickness and material type isn't found in the lookup table.,Transfer Die
+minOpenAngleEdgeTrimming,3,Angle,Minimum tangent angle from vertical which an edge segment must be in order to be considered for direct trimming.,General / Shared
+minRadiusOfCurvatureRestrikeThresholdMultiplier,10,,Multiplier used to calculate the threshold used to determine when to RESTRIKE a Form GCD with respect to minimum curvature of surface.,General / Shared
+minSimpleHoleDiameterThreshold,5,,Constant used in Scoring Analysis to determine the minimum complex hole perimeter threshold.,General / Shared
+minSpaceWithinBundle,2,Length,Controls smallest distance between bundled artifacts so as to not produce too narrow cuts.,Transfer Die (component/cam - inferred)
+minimumPartHeightPlusAllowance,30.8,Length,Minimum height (mm) that must be met or exceeded by adding post height and part height. Used to calculate minimum shut height.,General / Shared
+minimumTapSpacingDistance,30.48,Length,Minimum spacing between tapped holes for them to be tapped on the same die station.,General / Shared
+mmPerIn,25.4,,Unit conversion.,General / Shared
+multipleTrimsProgDie,TRUE,,"Controls whether the blank is cut out in one Full Blanking operation or multiple Trimming operations. Valid values = true, false.",Prog Die
+multipleTrimsTransferDie,true,,"Controls whether the blank is cut out in one Full Blanking operation or multiple Trimming operations. Valid values = true, false.",Transfer Die
+narrowParallelsWidth,38.1,Length,Unit width of the bottom parallels placed between the end parallels.,Transfer Die (component/cam - inferred)
+nonEmbossDistanceMultiplier,6,,Constant used to determine the multiplied standard thickness for stage tooling.,General / Shared
+numEdgeTrimsPerPart,1,,The typical number of edge trim cuts per part. All remaining trim cuts are non-edge.,General / Shared
+numShearPlanes,1,,Sets the default number of shear planes used. Affects the total shear force required. Set to greater than 1 for cluster punching.,General / Shared
+numSideMillingPasses,2,,Typical number of milling passes used for side milling in Transfer Die.,Transfer Die
+numberFifty,50,,Supports a constant in Transfer Die. This plant variable is no longer used from version 19.2.1 onwards.,Transfer Die
+numberFive,5,,Supports a constant in Transfer Die.,Transfer Die
+numberFour,4,,Supports a constant in Transfer Die.,Transfer Die
+numberFourty,40,,Supports a constant in Transfer Die. This plant variable is no longer used from version 19.2.1 onwards.,Transfer Die
+numberOne,1,,Supports a constant in Transfer Die.,Transfer Die
+numberOnePntFive,1.5,,Supports a constant in Transfer Die.,Transfer Die
+numberOnePntThreeEight,1.38,,Supports a constant in Transfer Die.,Transfer Die
+numberOnePntTwoFive,1.25,,Supports a constant in Transfer Die.,Transfer Die
+numberPntFive,.5,,Supports a constant in Transfer Die.,Transfer Die
+numberPntFiveFive,.55,,Supports a constant in Transfer Die.,Transfer Die
+numberPntThreeThree,.33,,Supports a constant in Transfer Die.,Transfer Die
+numberPntTwoFive,.25,,Supports a constant in Transfer Die.,Transfer Die
+numberPntZeroNine,.09,,Supports a constant in Transfer Die.,Transfer Die
+numberSixty,60,,Supports a constant in Transfer Die. This plant variable is no longer used from version 19.2.1 onwards.,Transfer Die
+numberTen,10,,Supports a constant in Transfer Die.,Transfer Die
+numberThirty,30,,Supports a constant in Transfer Die. This plant variable is no longer used from version 19.2.1 onwards.,Transfer Die
+numberThirtyFive,35,,Supports a constant in Transfer Die. This plant variable is no longer used from version 19.2.1 onwards.,Transfer Die
+numberThree,3,,Supports a constant in Transfer Die.,Transfer Die
+numberTwelve,12,,Supports a constant in Transfer Die.,Transfer Die
+numberTwenty,20,,Supports a constant in Transfer Die. This plant variable is no longer used from version 19.2.1 onwards.,Transfer Die
+numberTwentyFive,25,,Supports a constant in Transfer Die.,Transfer Die
+numberTwentyFivePntTwoFive,25.25,,Supports a constant in Transfer Die.,Transfer Die
+numberTwo,2,,Supports a constant in Transfer Die.,Transfer Die
+numberTwoPntSevenFive,2.75,,Supports a constant in Transfer Die.,Transfer Die
+numberTwoPntTwo,2.2,,Supports a constant in Transfer Die.,Transfer Die
+numberTwoPntTwoFive,2.25,,Supports a constant in Transfer Die.,Transfer Die
+overheadRateAdjustmentFactor,1,,Factor used to globally increase or decrease overhead rate evaluations per process.,General / Shared
+parallelCboresPerTopParallel,4,,Default quantity of parallel counterbores per top parallel.,Transfer Die (component/cam - inferred)
+parallelCboresPerTransplate,4,,Default quantity of parallel counterbores per transplate.,Transfer Die (component/cam - inferred)
+parallelHolesPerHour,7,,Quantity of holes per hour drilled into parallels.,Transfer Die (component/cam - inferred)
+parallelLength,152.4,,Length of standard parallel.,Transfer Die (component/cam - inferred)
+parallelTapsPerTopParallel,2,,Default quantity of parallel taps per top parallel.,Transfer Die (component/cam - inferred)
+parallelTapsPerTransplate,4,,Default quantity of parallel taps per transplate.,Transfer Die (component/cam - inferred)
+parallelThickness,38.1,,Thickness of standard parallel.,Transfer Die (component/cam - inferred)
+parallelsWidth,38.1,Length,Unit width of the bottom parallels placed between the end parallels.,Transfer Die (component/cam - inferred)
+partHeightAllowance,12.7,Length,Standard height of post component in Transfer Die. Used to calculated minimum required shut height.,Transfer Die
+percentProfit,.1,,Multiplier used to calculate percent profit on tooling.,General / Shared
+percentSGandA,.1,,Multiplier used to calculate percent SG&A on tooling.,General / Shared
+percentTuning,.03,,Multiplier used to calculate percent profit on Transfer Die tooling.,Transfer Die
+piercePunchRetainerCustomLengthThreshold,152.4,Length,Threshold value below which a fixed minimum number of screws will be used in a Custom Punch Retainer in Transfer Die.,Transfer Die
+pilotPinSizingThreshold,4,Length,"Threshold to determine pilot pin diameter (mm). If material thickness is greater than this value, a large pilot pin will be used, otherwise a small pilot pin will be used.",General / Shared
+pilotsPilotsPerDie,2,,Quantity of pilots per die component.,General / Shared
+positionToleranceThresholdLance,2,Length,Position tolerance threshold used to determine whether Lance needs to be crated before or after forming/bending.,General / Shared
+postHeightMultiplier,2,,"Multiplier for calculating die height from post height. Default value is 2, meaning twice the post height must be allowed between die shoes.",General / Shared
+pressTableLengthMargin,25.4,Length,length margin ensuring that press table length is greater than die length,General / Shared
+pressTableWidthMargin,25.4,Length,width margin ensuring that press table width is greater than die width,General / Shared
+progDieAnnualVolumeLimit,15000,,"Annual volume limit for a progressive die operation. Below this value, a progressive die operation is not economically feasible.",Prog Die
+progDiePartClearance,25.4,Length,"Clearance added above and below the part to allow for part transfer (1"")",Prog Die
+punchAllowance,6.35,,Allowance on punch thickness.,General / Shared
+punchExtensionLength,50.8,Length,Default extension length for a Cam punch in Transfer Die.,Transfer Die
+punchFormingPunchFactor,1.5,,Factor to scale up the area of a forming punch.,General / Shared
+punchHolderThickness,59.944,,Default punch holder thickness for a die set.,General / Shared
+punchHoleThreshold,25.4,,Minimum hole diameter for piercing.,General / Shared
+punchLengthStep,76.2,Length,Step increment for adding incremental screws to a Custom Punch Retainer in Transfer Die. (add another screw each time the Retainer length increases by this amount).,Transfer Die
+punchThickness,57.15,,Thickness of a punch. Applicable for the thickness of piercing and forming punches.,General / Shared
+punchWiperWidth,76.2,,Width of wiper die.,General / Shared
+rateBoring,1524,mm/hr,Rate at which a hole can be bored.,General / Shared
+rateCnc,762,,Rate at which items can be CNC'ed.,General / Shared
+rateDrilling,9144,mm/hr,Rate at which a hole can be drilled.,General / Shared
+rateFacing,18288,mm^2/hr,Rate at which a face can be turned on a lathe. (mm^2/hour),General / Shared
+rateMillingSide,114300,mm/hr,Rate at which a surface can be side milled.,General / Shared
+ratePrecisionMachining,152.4,,Rate at which items can be precision machined.,General / Shared
+rateReaming,3048,mm/hr,Rate at which a hole can be reamed.,General / Shared
+rateTapping,2286,mm/hr,Rate at which a hole can be tapped.,General / Shared
+rateWireEdm,3870.96,mm/hr,Rate at which items can be wire EDM'ed.,General / Shared
+relMergeInSuperformDistanceMultiplier,0.2,,Used in SuperForm Merge analysis to determine anotherDistanceLimit.,General / Shared
+scoreBendsProgDie,No,,Default setting for scoring bends in Prog Die routing. Acceptable values are 'Yes' and 'No'.,Prog Die
+scoreBendsTransferDie,true,,Used to determine if a bend in a transfer die is scored.,Transfer Die
+shallowEmbossDepthMultiplier,1,,Multiplier used in Depth and Distance in Compatability Analsis to determine whether an item is deep or shallow.,General / Shared
+shallowEmbossDistanceMultiplier,25.4,,Multiplier used in Depth and Distance in Compatability Analsis to determine whether an item is too close for shallow embossing.,General / Shared
+shortBendMultiplierThreshold,3,,Threshold used in Scoring Analysis to determine shortBendCondition(op),General / Shared
+sideActionAxisTolerance,15,,A tolerance on the setupAxis of FORM gcd's when being compared to the MAIN SURFACE normal direction. Used to determine if FORM gcd's require Side Action Forming to create.,General / Shared
+smallBendLengthMultiplierThreshold,5,,,General / Shared
+smallHoleThreshold,2.54,,Diameter at which ejector-based perforators are needed.,General / Shared
+smallHoleThreshold2,3.18,,Diameter at which ejector-based perforators are needed.,General / Shared
+springDiameter,25.4,,Standard diameter of a spring.,General / Shared
+springLength,88.9,,Standard length of a spring.,General / Shared
+springPinsPerForm,3,,Quantity of spring pins required per form.,General / Shared
+springQty,10,,Quantity of springs required. Used to calculate the quantity of all die components.,General / Shared
+sqmmPerSqin,645.16,,Number of square millimeters in one square inch. Unit conversion.,General / Shared
+stampingHeightThreshold,101.6,Length,used to determine the post-blanking adapter height.,General / Shared
+standardDownLimit,3.17,,Used in Depth and Distance in Compatability Analysis to determine whether items are too close to be compatible.,General / Shared
+standardSheetLength,2438.4,Length,Default standard sheet length if no stock is available for computed utilization.,General / Shared
+standardSheetWidth,1219.2,Length,Default standard sheet width if no stock is available for computed utilization.,General / Shared
+standardTappingUnitTravel,76.2,Length,"Standard travel for an in-die tapping unit (3""). For die travel above this value, extra cost is associated with adding a longer ""barbershop pole"" which drives the tapping spindle.",General / Shared
+standardUpLimit,9.53,,Used in Depth and Distance in Compatability Analysis to determine whether items are too close to be compatible.,General / Shared
+stdHeatTreatCostPerKgProgDie,0.23,CostPerMass,Typical cost per mass for standard oven based heat treating (hardening) of tooling components.,Prog Die
+stdHeatTreatCostPerKgTransferDie,.23,CostPerMass,Typical cost per mass for standard oven based heat treating (hardening) of tooling components.,Transfer Die
+steelDensity,7861.092938,,Density of steel.,General / Shared
+stockLifterCoilWidthIncrementalLength,304.8,Length,For every add'l increment of this value beyond stockLifterCoilWidthThreshold include another additional stock lifter bar.,General / Shared
+stockLifterCoilWidthThreshold,381,Length,Threshold coil width beyond which additional stock lifter bars are needed.,General / Shared
+tappedHolesPerForm,2,,Quantity of tapped holes per form.,General / Shared
+thresholdForGuidepins,0.4,,Thickness threshold above which guide pins must be used.,General / Shared
+toolingComponentSizeThreshold,152.4,Length,Used as a size threshold to determine the number of holes in various Transfer Die tooling components.,Transfer Die
+topParallelHeightUpperLimit,1500,Length,Upper limit of top parallel height. Used to cap top parallel height avoiding unrealistic tooling costs.,Transfer Die (component/cam - inferred)
+topParallelWidth,111.252,,Width of top parallel.,Transfer Die (component/cam - inferred)
+topParallelsAdder,3,,Adds 3 top parallels to take the place of what used to be wide parallels.,Transfer Die (component/cam - inferred)
+topWideParallelsQty,3,,total number of wide top parallels.,Transfer Die (component/cam - inferred)
+tpCbores,0,,Quantity of counterbores per top parallel.,Transfer Die (component/cam - inferred)
+tpCboresPerTp,4,,Quantity of counterbores required per top plate.,Transfer Die (component/cam - inferred)
+tpCboresPerTransPlate,4,,Quantity of counterbores required per trans plate.,Transfer Die (component/cam - inferred)
+tpCncHrs,0,,Number of CNC hours required per top parallel.,Transfer Die (component/cam - inferred)
+tpDowels,0,,Quantity of dowels required per top parallel.,Transfer Die (component/cam - inferred)
+tpGrindingHrs,0,hr,Total time required for grinding operator labor per top parallel. Used to calculate the labor time of all die components.,Transfer Die (component/cam - inferred)
+tpMillingHrs,0,,Total time required for milling operator labor per top parallel. Used to calculate the labor time of all die components.,Transfer Die (component/cam - inferred)
+tpNTappedPerTp,0,,The quantity of tapped holes per narrow top parallel in transfer die.,Transfer Die
+tpTappedPerTp,2,,Quantity of tapped holes per top parallel.,Transfer Die (component/cam - inferred)
+tpTappedPerTransPlate,4,,Quantity of tapped holes per trans plate.,Transfer Die (component/cam - inferred)
+tpWTappedPerTp,0,,The quantity of tapped holes per wide top parallel in transfer die.,Transfer Die
+transferDiePartClearance,25.4,Length,"Clearance added above and below the part to allow for part transfer (1"")",Transfer Die
+transferDieToolingComponentStdCostMult,1,,Dial for modifying all tooling component standard costs in Transfer Die.,Transfer Die
+transferPitchSwerWidthThreshold,1,,"Percentage threshold for difference between the blank SWER and the blank SER. If the difference is less than or equal to this amount, then the blank SER will be used for calculating transfer pitch, otherwise blank SWER will be used.",Transfer Die
+typicalThickness,1,,"Standard thickness used in Dimple Analysis, Scoring Analysis, and Depth and Distance in Compatability Analysis for Stage Tooling.",General / Shared
+usePreferredMachines,true,,"If true the model will first try to select a preferred machine. If false, the system chooses either the default machine or from the entire non-preferred set of machines.",General / Shared
+verticalTrimLengthThreshold,25.4,Length,Length threshold for Direct Trimming an edgeSegment that would otherwise be Cam Trimmed. If an edgeSegment is oriented such that it would ordinarily be Cam Trimmed and its length is at or below this threshold then it may be Direct Trimmed instead of Cam Trimmed.,General / Shared
+wideParallelsWidth,76.2,Length,unit width of the bottom parallels placed at each end of the die set.,Transfer Die (component/cam - inferred)
+widthToDepthRestrikeThreshold,.5,,Threshold used for determining when to RESTRIKE a Form GCD with respect to width-to-depth ratio of Form.,General / Shared
+worstPeninsularRatio2Threshold,0.04,,Used to determine the peninsular condition.,General / Shared
+worstPeninsularRatioThreshold,0.5,,Threshold used to determine the peninsular condition.,General / Shared

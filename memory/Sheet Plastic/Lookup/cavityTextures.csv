@@ -1,0 +1,26 @@
+﻿Texture Name,Standard,Pattern,Texture Depth (mm),Min Draft Angle (deg),SPI Prefinish
+Mold-Tech-A-11000 10.2µm (402µin) depth,Mold-Tech A,MT-11000,0.01016,1.00,SPI B2
+Mold-Tech-A-11010 25.4µm (1000µin) depth,Mold-Tech A,MT-11010,0.0254,1.50,SPI C2
+Mold-Tech-A-11020 38.1µm (1500µin) depth,Mold-Tech A,MT-11020,0.0381,2.50,SPI C2
+Mold-Tech-A-11030 50.8µm (2000µin) depth,Mold-Tech A,MT-11030,0.0508,3.00,SPI C2
+Mold-Tech-A-11040 76.2µm (3000µin) depth,Mold-Tech A,MT-11040,0.0762,4.50,SPI C3
+Mold-Tech-A-11050 114.3µm (4500µin) depth,Mold-Tech A,MT-11050,0.1143,6.50,SPI C3
+Mold-Tech-B-11200 76.2µm (3000µin) depth,Mold-Tech B,MT-11200,0.0762,4.50,SPI C3
+Mold-Tech-B-11205 63.5µm (2500µin) depth,Mold-Tech B,MT-11205,0.0635,4.00,SPI C2
+Mold-Tech-B-11210 88.9µm (3500µin) depth,Mold-Tech B,MT-11210,0.0889,5.50,SPI C3
+Mold-Tech-B-11215 114.3µm (4500µin) depth,Mold-Tech B,MT-11215,0.1143,6.50,SPI C3
+Mold-Tech-B-11220 127µm (5000µin) depth,Mold-Tech B,MT-11220,0.127,7.50,SPI C3
+Mold-Tech-B-11225 114.3µm (4500µin) depth,Mold-Tech B,MT-11225,0.1143,6.50,SPI C3
+Mold-Tech-C-11300 63.5µm (2500µin) depth,Mold-Tech C,MT-11300,0.0635,3.50,SPI C2
+Mold-Tech-C-11305 127µm (5000µin) depth,Mold-Tech C,MT-11305,0.127,7.50,SPI C3
+Mold-Tech-C-11310 127µm (5000µin) depth,Mold-Tech C,MT-11310,0.127,7.50,SPI C3
+Mold-Tech-C-11315 25.4µm (1000µin) depth,Mold-Tech C,MT-11315,0.0254,1.50,SPI C2
+Mold-Tech-C-11320 63.5µm (2500µin) depth,Mold-Tech C,MT-11320,0.0635,4.00,SPI C2
+Mold-Tech-C-11325 76.2µm (3000µin) depth,Mold-Tech C,MT-11325,0.0762,4.50,SPI C3
+Mold-Tech-D-11400 50.8µm (2000µin) depth,Mold-Tech D,MT-11400,0.0508,3.00,SPI C2
+Mold-Tech-D-11405 63.5µm (2500µin) depth,Mold-Tech D,MT-11405,0.0635,4.00,SPI C2
+Mold-Tech-D-11410 88.9µm (3500µin) depth,Mold-Tech D,MT-11410,0.0889,5.50,SPI C3
+Mold-Tech-D-11415 50.8µm (2000µin) depth,Mold-Tech D,MT-11415,0.0508,3.00,SPI C2
+Mold-Tech-D-11420 63.5µm (2500µin) depth,Mold-Tech D,MT-11420,0.0635,4.00,SPI C2
+Mold-Tech-D-11425 88.9µm (3500µin) depth,Mold-Tech D,MT-11425,0.0889,5.50,SPI C3
+None,No Texture,None,0.00,0.00,None

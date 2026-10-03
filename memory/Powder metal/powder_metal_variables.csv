@@ -1,0 +1,29 @@
+Variable Name,String Value,Unit Type Name,Notes
+coreRodHeight,304.8,Length,Length of core rod members
+cycleTimeAdjustmentFactor,1,,Factor used to globally incrase or decrease cycle time evalutions per process.
+defaultMachiningRate,60,,Dollar per hour rate for tooling machining
+defaultUtilization,.90,,Default process material utilization
+defaultUtilizationMethod,COMPUTED,,"Eligible values: ""COMPUTED"", ""MACHINE_DEFAULT"" & ""OVERRIDE"""
+disableInvestmentAmortization,false,,"User override to disable amortization of all fixed costs to the individual part or assembly. By default, fixed costs are calculat..."
+finishAllowance,.635,Length,
+furniturePlateDensity,1960,kg/m^3,Density of ceramic plates used for flatness on sintering belt
+furniturePlateThickness,5,Length,Thickness of the ceramic plates used for fixturing within the sintering furnace
+furniturePlatesStandby,.15,,Ratio of required furniture plates for sintering needed for backup.
+gearQualityDefaultAgmaNewStd,A8,,"A2, A3, A4, ... A11, A12"
+gearQualityDefaultAgmaOldStd,Q8,,"Q15, Q14, Q13, ... Q6, Q5"
+gearQualityDefaultDinStd,9,,"2, 3, 4, ... 11, 12"
+genericValidation,true,,'true' if the generic validation view should be used for parts costed in this process group in this Digital Factory
+holeDiaToDepthRatio,.15,,The ratio between the diameter of a hole to the depth of the hole
+laborRateAdjustmentFactor,1,,Factor used to globally increase or decrease labor rate evalutions per process.
+maxBeltLoad,100,kg/m,Defines the maximum belt load per square meter
+minPressableHoleDiameter,1.5,Length,
+numUpperPunches,1,,Model assumes one upper punch only
+overheadRateAdjustmentFactor,1,,Factor used to globally increase or decrease overhead rate evalutions per process.
+partOffsetToBeltEdge,6.35,Length,The distance from the edge of the furnace belt to closest part
+pressForceSaftyFactor,.9,,Utilization factor for pressing force
+punchDieEngagement,19.05,Length,Punch engagement with die
+punchFootingHeight,12.7,Length,Height of bottom footing used to clamp the punch to the backing plate
+regionMultiplier,1,,
+soakTime,20,min,Defines the time a given part is AT temperature in a furnace
+spaceBetweenParts,1.5875,Length,Distance between parts in the sintering furnace
+toolLifeNumberOfParts,550000,,The number of parts that can be produced from each tool before the tooling needs refurbishing or replacing.

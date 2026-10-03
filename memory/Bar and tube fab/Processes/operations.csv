@@ -1,0 +1,112 @@
+Process Name
+As Supplied
+Band Saw:As Sawed//PlanarFace
+Band Saw:Band Sawing//Cutout
+BarBendBrake
+Circular Saw:As Sawed//PlanarFace
+Circular Saw:Circular Sawing//Cutout
+ComplexHoleLaserCutting
+ComplexHoleLaserCuttingSurface
+ComplexHolePunching
+ComplexHolePunchingSurface
+CompressionBending
+EndBandSawing
+EndBandSawing:As Supplied//CurvedSurface
+EndBandSawing:As Supplied//CurvedWall
+EndBandSawing:As Supplied//PlanarFace
+EndCircularSawing
+EndCircularSawing:As Supplied//CurvedSurface
+EndCircularSawing:As Supplied//CurvedWall
+EndCircularSawing:As Supplied//PlanarFace
+EndFlanging
+EndFlaring
+EndFlattening
+EndForming
+EndKnurling
+EndLaserCutting
+EndLaserCutting:As Supplied//CurvedSurface
+EndLaserCutting:As Supplied//CurvedWall
+EndLaserCutting:As Supplied//PlanarFace
+EndLaserCuttingSurface
+EndNotching
+EndReciprocatingSawing
+EndReciprocatingSawing:As Supplied//CurvedSurface
+EndReciprocatingSawing:As Supplied//CurvedWall
+EndReciprocatingSawing:As Supplied//PlanarFace
+EndSawingSurface
+EndSlotting
+Expansion:Expansion//Form
+Extrusion:As Extruded//CurvedSurface
+Extrusion:As Extruded//CurvedWall
+Extrusion:As Extruded//PlanarFace
+Material Stock:As Supplied//Ring
+Material Stock:As Supplied//SimpleHole
+Material Stock:AsSupplied//Form
+MultiStepHoleLaserCutting
+MultiStepHolePunching
+No Cost Feature:No Cost Feature//ComplexHole
+No Cost Feature:No Cost Feature//Cutout
+No Cost Feature:No Cost Feature//End
+No Cost Feature:No Cost Feature//Form
+No Cost Feature:No Cost Feature//MultiStepHole
+No Cost Feature:No Cost Feature//NotSupported
+No Cost Feature:No Cost Feature//SimpleHole
+Oxyfuel Torch Cut:Oxyfuel Torch Cutting//ComplexHole
+Oxyfuel Torch Cut:Oxyfuel Torch Cutting//End
+Oxyfuel Torch Cut:Oxyfuel Torch Cutting//End:EndOxyfuelCuttingSurface//CurvedSurface
+Oxyfuel Torch Cut:Oxyfuel Torch Cutting//End:EndOxyfuelCuttingSurface//CurvedWall
+Oxyfuel Torch Cut:Oxyfuel Torch Cutting//End:EndOxyfuelCuttingSurface//PlanarFace
+Oxyfuel Torch Cut:Oxyfuel Torch Cutting//SimpleHole
+Plasma CNC Cut:Plasma CNC Cutting//ComplexHole
+Plasma CNC Cut:Plasma CNC Cutting//End
+Plasma CNC Cut:Plasma CNC Cutting//End:EndPlasmaCuttingSurface//CurvedSurface
+Plasma CNC Cut:Plasma CNC Cutting//End:EndPlasmaCuttingSurface//CurvedWall
+Plasma CNC Cut:Plasma CNC Cutting//End:EndPlasmaCuttingSurface//PlanarFace
+Plasma CNC Cut:Plasma CNC Cutting//SimpleHole
+Plasma Torch Cut:Plasma Torch Cutting//ComplexHole
+Plasma Torch Cut:Plasma Torch Cutting//End
+Plasma Torch Cut:Plasma Torch Cutting//End:EndPlasmaCuttingSurface//CurvedSurface
+Plasma Torch Cut:Plasma Torch Cutting//End:EndPlasmaCuttingSurface//CurvedWall
+Plasma Torch Cut:Plasma Torch Cutting//End:EndPlasmaCuttingSurface//PlanarFace
+Plasma Torch Cut:Plasma Torch Cutting//SimpleHole
+Profile 3 Roll Bend:Profile 3 Roll Bending//Bend
+Profile CNC Bend:Profile 3 Roll Bending//Bend
+Profile CNC Bend:Rotary Draw Bending//Bend
+Punching:As Punched//CurvedWall
+Punching:As Punched//PlanarFace
+Punching:Punching//Cutout
+Reciprocating Saw:As Sawed//PlanarFace
+Reciprocating Saw:Reciprocating Sawing//Cutout
+Reduction:Reduction//Form
+RotaryDrawBending
+Shear:Shearing//End
+Shear:Shearing//End:Shearing//CurvedSurface
+Shear:Shearing//End:Shearing//CurvedWall
+Shear:Shearing//End:Shearing//PlanarFace
+Sheet Laser Cut:ComplexHoleSheetLaserCut//ComplexHole
+Sheet Laser Cut:EndLaserCutting//End
+Sheet Laser Cut:EndLaserCutting//End:As Supplied//CurvedSurface
+Sheet Laser Cut:EndLaserCutting//End:As Supplied//CurvedWall
+Sheet Laser Cut:EndLaserCutting//End:As Supplied//PlanarFace
+Sheet Laser Cut:EndLaserCutting//End:EndLaserCuttingSurface//CurvedWall
+Sheet Laser Cut:EndLaserCutting//End:EndLaserCuttingSurface//PlanarFace
+Sheet OxyFuel Cut:ComplexHoleSheetLaserCut//ComplexHole
+Sheet OxyFuel Cut:EndOxyFuelCutting//End
+Sheet OxyFuel Cut:EndOxyFuelCutting//End:As Supplied//CurvedSurface
+Sheet OxyFuel Cut:EndOxyFuelCutting//End:As Supplied//CurvedWall
+Sheet OxyFuel Cut:EndOxyFuelCutting//End:As Supplied//PlanarFace
+Sheet OxyFuel Cut:EndOxyFuelCutting//End:EndOxyFuelCuttingSurface//CurvedWall
+Sheet OxyFuel Cut:EndOxyFuelCutting//End:EndOxyFuelCuttingSurface//PlanarFace
+Sheet Plasma Cut:ComplexHoleSheetLaserCut//ComplexHole
+Sheet Plasma Cut:EndPlasmaCutting//End
+Sheet Plasma Cut:EndPlasmaCutting//End:As Supplied//CurvedSurface
+Sheet Plasma Cut:EndPlasmaCutting//End:As Supplied//CurvedWall
+Sheet Plasma Cut:EndPlasmaCutting//End:As Supplied//PlanarFace
+Sheet Plasma Cut:EndPlasmaCutting//End:EndPlasmaCuttingSurface//CurvedWall
+Sheet Plasma Cut:EndPlasmaCutting//End:EndPlasmaCuttingSurface//PlanarFace
+Sheet Stock:As Supplied//CurvedSurface
+Sheet Stock:As Supplied//CurvedWall
+Sheet Stock:As Supplied//PlanarFace
+Sheet Stock:AsSupplied//Form
+SimpleHoleLaserCutting
+SimpleHolePunching

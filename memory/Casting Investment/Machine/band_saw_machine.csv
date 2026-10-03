@@ -1,0 +1,31 @@
+Field,Value
+Sector,World Average
+Name,BLIN HDS-J200
+Labor Rate (USD / hr),30.49
+Direct Overhead Rate (USD / hr),19.10
+Indirect Overhead Rate (USD / hr),26.16
+Total Overhead Rate (USD / hr),45.26
+Overhead Multiplier,0.00
+Number of Operators,1.00
+Labor Time Standard,1.00
+Wage Grade Name,
+Work Center Labor Rate Factor,1.00
+Setup Time (hr),0.17
+Max Stock Height (mm),"2,000.00"
+Max Stock Width (mm),"2,000.00"
+Is Preferred,false
+Avg Utilization,0.00
+Good Part Yield,1.00
+Machine Price (USD),"250,000.00"
+Machine Length (mm),"9,500.00"
+Machine Width (mm),"2,500.00"
+Footprint Allowance Factor,6.00
+Machine Power (kW),26.50
+Installation Factor (%),25.00
+Machine Uptime (%),00.00
+Annual Maintenance Factor (%),5.00
+Machine Life (yr),10
+Salvage Value Factor (%),0.00
+Supplies Cost (USD / yr),0.00
+Machine Manufacturer Location,China
+Data Source,aPriori Baseline

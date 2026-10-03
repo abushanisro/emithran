@@ -1,0 +1,71 @@
+Process Name,Load Time (s),Manipulation Time (s),Unload Time (s),Weight (kg)
+2 Roll Bending,8.00,0.00,8.00,1.00
+2 Roll Bending,16.00,0.00,16.00,5.00
+2 Roll Bending,30.00,0.00,30.00,10.00
+2 Roll Bending,38.00,0.00,38.00,27.00
+2 Roll Bending,50.00,0.00,50.00,999999999.00
+3 Roll Bending,8.00,0.00,8.00,1.00
+3 Roll Bending,16.00,0.00,16.00,5.00
+3 Roll Bending,30.00,0.00,30.00,10.00
+3 Roll Bending,38.00,0.00,38.00,27.00
+3 Roll Bending,50.00,0.00,50.00,999999999.00
+4 Roll Bending,8.00,0.00,8.00,1.00
+4 Roll Bending,16.00,0.00,16.00,5.00
+4 Roll Bending,30.00,0.00,30.00,10.00
+4 Roll Bending,38.00,0.00,38.00,27.00
+4 Roll Bending,50.00,0.00,50.00,999999999.00
+Band Saw,5.00,0.00,5.00,1.00
+Band Saw,20.00,0.00,10.00,5.00
+Band Saw,25.00,0.00,15.00,10.00
+Band Saw,30.00,0.00,19.00,27.00
+Band Saw,60.00,0.00,30.00,999999999.00
+Bar Bend Brake,4.00,4.00,4.00,1.00
+Bar Bend Brake,8.00,8.00,8.00,5.00
+Bar Bend Brake,15.00,15.00,15.00,10.00
+Bar Bend Brake,19.00,19.00,19.00,27.00
+Bar Bend Brake,25.00,25.00,25.00,999999999.00
+Circular Saw,15.00,0.00,5.00,1.00
+Circular Saw,20.00,0.00,10.00,5.00
+Circular Saw,25.00,0.00,15.00,10.00
+Circular Saw,30.00,0.00,19.00,27.00
+Circular Saw,60.00,0.00,30.00,999999999.00
+Compression Bending,6.00,4.00,4.00,1.00
+Compression Bending,8.00,8.00,8.00,5.00
+Compression Bending,16.00,15.00,15.00,10.00
+Compression Bending,20.00,19.00,19.00,27.00
+Compression Bending,23.00,25.00,25.00,999999999.00
+Profile 3 Roll Bend,8.00,0.00,8.00,1.00
+Profile 3 Roll Bend,16.00,0.00,16.00,5.00
+Profile 3 Roll Bend,30.00,0.00,30.00,10.00
+Profile 3 Roll Bend,38.00,0.00,38.00,27.00
+Profile 3 Roll Bend,50.00,0.00,50.00,999999999.00
+Profile CNC Bend,8.00,0.00,8.00,1.00
+Profile CNC Bend,16.00,0.00,16.00,5.00
+Profile CNC Bend,30.00,0.00,30.00,10.00
+Profile CNC Bend,38.00,0.00,38.00,27.00
+Profile CNC Bend,50.00,0.00,50.00,999999999.00
+Punching,4.00,0.00,4.00,1.00
+Punching,8.00,0.00,8.00,5.00
+Punching,15.00,0.00,15.00,10.00
+Punching,19.00,0.00,19.00,27.00
+Punching,25.00,0.00,25.00,999999999.00
+Reciprocating Saw,15.00,0.00,5.00,1.00
+Reciprocating Saw,20.00,0.00,10.00,5.00
+Reciprocating Saw,25.00,0.00,15.00,10.00
+Reciprocating Saw,30.00,0.00,19.00,27.00
+Reciprocating Saw,60.00,0.00,30.00,999999999.00
+Rotary Draw Bending,8.00,0.00,4.00,1.00
+Rotary Draw Bending,10.00,0.00,8.00,5.00
+Rotary Draw Bending,18.00,0.00,15.00,10.00
+Rotary Draw Bending,22.00,0.00,19.00,27.00
+Rotary Draw Bending,25.00,0.00,25.00,999999999.00
+Shear,15.00,0.00,5.00,1.00
+Shear,20.00,0.00,10.00,5.00
+Shear,25.00,0.00,15.00,10.00
+Shear,30.00,0.00,19.00,27.00
+Shear,60.00,0.00,30.00,999999999.00
+Tube Laser,4.00,0.00,4.00,1.00
+Tube Laser,8.00,0.00,8.00,5.00
+Tube Laser,15.00,0.00,15.00,10.00
+Tube Laser,19.00,0.00,19.00,27.00
+Tube Laser,25.00,0.00,25.00,999999999.00

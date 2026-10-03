@@ -1,0 +1,101 @@
+﻿Section,Variable Name,String Value,Unit Type Name,Notes
+Inherited,avgPermMoldGoodPartYield,0.95,,Percentage of good parts out of total parts for melting.
+Inherited,cavityCeiling,.1,,Maximum additional percentage material yield for cavity consideration.
+Inherited,cavityPlateDepthBorder,152.4,Length,"Used to allow 6"" border distance on the depth of the cavity plate."
+Inherited,coolTimeConstantPM,20,Time,Factor used to calculate the cooling time for permanent molding.
+Inherited,coreDiameterPlay,1.5875,,"Factor used to calculate the normal stock core length, diameter, and number of sticks per hour."
+Inherited,coreLoadTimePM,10,Time,Time required to load a single core into the mold. Used to determine the total cycle time for permanent molding.
+Inherited,coreboxCalcMode,Opportunistic,,Calculation mode for the number of corebox cavities: 'Opportunistic' or 'Single Cavity.'
+Inherited,coreboxLengthAllowance,19,Length,Corebox allowance for walls.
+Inherited,coreboxToolingCalc,Parametric,,Tooling calculation choice for corebox: 'Parametric' or 'Fixed Cost'.
+Inherited,cycleTimeAdjustmentFactor,1,,Factor used to globally increase or decrease cycle time evaluations per process.
+Inherited,defaultLadleTransportTime,1,min,Plant default for amount of time required to transport ladle from furnace to pour site.
+Inherited,defaultNumCavities,1,,Default value for the number of cavities in one mold. User may override via Process Setup Options.
+Inherited,defaultNumCavitiesPM,1,,Default number of cavities for a permanent molding cycle.
+Inherited,defaultPMcycleTime,600,Time,Default permanent molding cycle time. Used to calculate the number of cavities in 'Annual Volume' mode.
+Inherited,defaultRemeltAllowancePM,1,,Default percentage of runners and scrap allowed with virgin material for Permanent Molding.
+Inherited,defaultRemeltAllowanceSandCasting,1,,Default percentage of runners and scrap allowed with virgin material for Sand Casting.
+Inherited,defaultSandAdditiveCores,None,,
+Inherited,defaultSandAdditiveMoldmaking,None,,
+Inherited,defaultSandManualFloor,chemBond,,Plant default for sand: 'chemBond' or 'greenSand' used in Manual Floor coremaking.
+Inherited,defaultSandManualPit,chemBond,,Plant default for sand: 'chemBond' or 'greenSand' used in Manual Pit coremaking.
+Inherited,defaultSandManualStandard,greenSand,,Plant default for sand: 'chemBond' or 'greenSand' used in Manual Standard coremaking.
+Inherited,defaultUtilizationMethod,COMPUTED,,"Eligible values: ""COMPUTED"" & ""MACHINE_DEFAULT"""
+Inherited,depthBorderPM,75,,"Used to allow 3"" distance from the bottom of the cavity to the bottom of the mold."
+Inherited,disableInvestmentAmortization,false,,"User override to disable amortization of all fixed costs to the individual part or assembly. By default, fixed costs are calculated per part for tooling, fixtures, and programming."
+Inherited,edgeBorderPM,75,,"Used to allow 3"" border distance around the edge of the mold."
+Inherited,fillTimeConstantPM,15,,Time required for molten metal to flow into each cavity of a permanent mold.
+Inherited,finishAllowance,5,Length,"Factor used to calculate the volume of finished faced surfaces, finished curved surfaces, and surfaces finished by side milling."
+Inherited,furnaceTapRate,121,Mass/Time,Average rate at which molten metal can be tapped from furnace.
+Inherited,gearQualityDefaultAgmaNewStd,A8,,"A2, A3, A4, ... A11, A12"
+Inherited,gearQualityDefaultAgmaOldStd,Q8,,"Q15, Q14, Q13, ... Q6, Q5"
+Inherited,gearQualityDefaultDinStd,9,,"2, 3, 4, ... 11, 12"
+Inherited,highCastingModulus,0.667,,Ratio of surface area to volume for cast parts to be considered high complexity.
+Inherited,highComplexityAdjustment,1.1,,Adjustment factor to account for high complexity parts.
+Inherited,highComplexityFactor,1.5,,Factor to take into account the complexity of the casting. Parts with more than 2000 features are considered high complexity.
+Inherited,highEndMultiplier,.9,,Highest multiplier for chunkiness.
+Inherited,highEndThickness,300,,High end threshold for thickness used to calculate chunkiness factor in material yield.
+Inherited,laborRateAdjustmentFactor,1,,Factor used to globally increase or decrease labor rate evaluations per process.
+Inherited,ladleFillTimePM,10,Time,Time required to ladel molten metal into machine crucible(s). Used to calculate the total cycle time.
+Inherited,ladlePourRatePM,145000,Volume/Time,Rate at which molten metal can be poured into machine crucible(s). Used to calculate the total cycle time.
+Inherited,largePartThreshold,1000,Mass,Threshold at which a part is considered too large to support multiple cavities or parts per mold.
+Inherited,lengthCorePrint,10,Length,Length of enclosing core box account for core prints.
+Inherited,lowCastingModulus,0.167,,Ratio of surface area to volume for cast parts to be considered low complexity.
+Inherited,lowComplexityAdjustment,0.9,,Adjustment factor to account for low complexity parts.
+Inherited,lowComplexityFactor,0.5,,Factor to take into acount the complexity of the casting. Parts with less than 1000 features are considered low complexity.
+Inherited,lowEndMultiplier,.75,,Lowest multiplier for chunkiness.
+Inherited,lowEndThickness,9.5,,Low end threshold for thickness used to calculate chunkiness factor in material yield.
+Inherited,manualMoldScrapIron,4,,Baseline percentage of scrap for manual molding of cast iron parts.
+Inherited,manualMoldScrapNonFerrous,4.75,,Baseline percentage of scrap for manual molding of non-ferrous parts.
+Inherited,manualMoldScrapSteel,4.5,,Baseline percentage of scrap for manual molding of steel parts.
+Inherited,materialYieldAluminum,55,,Basline percentage material yield for Aluminum.
+Inherited,materialYieldAluminumNB,65,,Basline percentage material yield for Aluminum with ChemBond / NoBake.
+Inherited,materialYieldCopper,50,,Basline percentage material yield for Copper.
+Inherited,materialYieldCopperNB,60,,Basline percentage material yield for Copper with ChemBond / NoBake.
+Inherited,materialYieldDuctile,40,,Basline percentage material yield for Ductile Iron.
+Inherited,materialYieldDuctileNB,70,,Basline percentage material yield for Ductile Iron with ChemBond / NoBake.
+Inherited,materialYieldGray,60,,Basline percentage material yield for Gray Cast Iron.
+Inherited,materialYieldGrayNB,75,,Basline percentage material yield for Gray Cast Iron with ChemBond / NoBake.
+Inherited,materialYieldLPDieCasting,.85,,Baseline percentage material yield for Low Pressure Die Casting.
+Inherited,materialYieldPermMold,0.70,,Baseline percentage material yield for permanent mold.
+Inherited,materialYieldSteel,50,,Basline percentage material yield for Steel.
+Inherited,materialYieldSteelNB,60,,Basline percentage material yield for Steel with ChemBond / NoBake.
+Inherited,materialYieldZinc,60,,Basline percentage material yield for Zinc and Lead.
+Inherited,materialYieldZincNB,70,,Basline percentage material yield for Zinc and Lead with ChemBond / NoBake.
+Inherited,maxComplexityMultiplierScrap,2,,Multiplier for maximum value of complexity in determing scrap. Simple parts have a multiplier of 1.
+Inherited,maxComplexityScrap,300,,Maximum number of cores and surfaces with multipliers for scrap calculation.
+Inherited,mcMoldScrapIron,1,,Baseline percentage of scrap for machine molding of cast iron parts.
+Inherited,mcMoldScrapNonFerrous,1.75,,Baseline percentage of scrap for machine molding of non-ferrous parts.
+Inherited,mcMoldScrapSteel,1.5,,Baseline percentage of scrap for machine molding of steel parts.
+Inherited,mediumComplexityFactor,1,,Factor to take into acount the complexity of the casting. Parts with between 1000 and 2000 features are considered medium complexity.
+Inherited,minCastableDraft,2,Angle,Threshold below which the draft angle is not castable.
+Inherited,minCastableHoleDia,6.4,Length,"Threshold controlling the coreability of small voids and holes. When the size of the hole or void falls below this value, the GCD is not considered coreable."
+Inherited,minCastableRadius,3,Length,Minimum radius that can be cast.
+Inherited,minCastableRingLength,14.3,Length,Smallest Ring length that can be cast. Shorter than this must be machined.
+Inherited,minDieCastableHoleDia,6.4,Length,"Threshold controlling the coreability of small voids and holes in die casting. When the size of the hole or void falls below this value, the GCD is not considered coreable"
+Inherited,minPermanentMoldHoleDia,6.4,Length,"Threshold controlling the coreability of small voids and holes in permanent mold. When the size of the hole or void falls below this value, the GCD is not considered coreable"
+Inherited,minSandCastableHoleDia,6.4,Length,"Threshold controlling the coreability of small voids and holes in sand casting. When the size of the hole or void falls below this value, the GCD is not considered coreable"
+Inherited,modulusConstant,1.75,,Exponential constant for use in Chvorinov's rule to calculate Cool Time for sand cast parts.
+Inherited,moldFillRatePM,120000,FlowRate,Rate at which molten metal can fill a cavity of a permanent mold.
+Inherited,numCavitiesMaterialYieldAdd,.01,,Additional material yield percentage per cavity.
+Inherited,numCoreCoefficient,12,,Yield based on the effect of the number of cores.
+Inherited,numSurfaceCoefficient,1,,Yield based on the effect of the number of surfaces.
+Inherited,optimumModulus,0.333,,Optimum ratio of surface area to volume for cast parts.
+Inherited,overheadRateAdjustmentFactor,1,,Factor used to globally increase or decrease overhead rate evaluations per process.
+Inherited,partPatternAllowance,25.4,,Added for alternate method to include extra meterial allowance around the entire part.
+Inherited,roughnessCapability,12,,Obsolete.
+Inherited,sandCureTimeManualFloor,30,min,Average cure time for standard chem bond sand used in Manual Floor Moldmaking.
+Inherited,sandCureTimeManualPit,45,min,Average cure time for standard chem bond sand used in Manual Pit Moldmaking.
+Inherited,sandCureTimeManualStd,10,min,Average cure time for standard chem bond sand used in Manual Std Moldmaking.
+Inherited,sandMoldDensity,1600,Mass/m^3,Density of standard chem bond sand. Used to calculate Cool Time for sand cast parts.
+Inherited,sandMoldSpecificHeat,1170,J/(Mass*K),Specific Heat of standard chem bond sand. Used to calculate Cool Time for sand cast parts.
+Inherited,sandMoldTemp,293.15,K,"Initial temperature of a sand mold, assumed to be room temperature. Used to calculate Cool Time for sand cast parts."
+Inherited,sandMoldThermalConductivity,0.52,Watts/(m*K),Thermal Conductivity of standard chem bond sand. Used to calculate Cool Time for sand cast parts.
+Inherited,sandSlingingRate,300,Mass/min,Rate at which sand can be discharged into a mold. Used to calculate Mold Rate for manual molded parts.
+Inherited,shakeoutTimeMax,1800,Time,Obsolete.
+Inherited,shellThickness,10,Length,
+Inherited,singleCoreAssemblyTime,60,Time,Time required to glue one individual core to another individual core or core assembly.
+Inherited,strainerCoreCost,1,Currency,Cost of one strainer core per mold pour.
+Inherited,visualInspectTimeStandard,5,min/m^2,Average time per surface area to visually inspect a part.
+New,regionConvFactor,1,,
+New,toolShopRegionMultiplier,1,,

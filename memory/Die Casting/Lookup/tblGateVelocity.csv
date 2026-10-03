@@ -1,0 +1,34 @@
+Material Type,Part Surface Quality,Gate Velocity (m / s)
+Aluminum,1.00,20.00
+Aluminum,3.00,40.00
+Aluminum,5.00,60.00
+Aluminum Bronze,1.00,20.00
+Aluminum Bronze,3.00,40.00
+Aluminum Bronze,5.00,60.00
+Brass,1.00,20.00
+Brass,3.00,35.00
+Brass,5.00,50.00
+Bronze,1.00,20.00
+Bronze,3.00,35.00
+Bronze,5.00,50.00
+Copper,1.00,20.00
+Copper,3.00,35.00
+Copper,5.00,50.00
+Lead,1.00,20.00
+Lead,3.00,35.00
+Lead,5.00,50.00
+Magnesium,1.00,40.00
+Magnesium,3.00,50.00
+Magnesium,5.00,60.00
+Manganese Bronze,1.00,40.00
+Manganese Bronze,3.00,50.00
+Manganese Bronze,5.00,60.00
+Silicon Brass,1.00,20.00
+Silicon Brass,3.00,35.00
+Silicon Brass,5.00,50.00
+Zinc,1.00,30.00
+Zinc,3.00,40.00
+Zinc,5.00,50.00
+Zinc-Aluminum,1.00,30.00
+Zinc-Aluminum,3.00,40.00
+Zinc-Aluminum,5.00,50.00

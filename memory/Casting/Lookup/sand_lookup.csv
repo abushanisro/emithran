@@ -1,0 +1,16 @@
+﻿Name,sand
+File Path,lookupTables/Component/sand.csv
+Lookup Key,name
+Lookup Type Name,Component//sand
+Stored Type Name,Component//sand
+Table Class Name,com.fbc.datamodel.costmodel.casting.Sand
+
+Name,Description,Density (kg / m^3),Disposal Cost (USD / kg),New Cost (USD / kg),Recycle Cost (USD / kg)
+airSetSand,Air Set Sand,"1,600.00",0.0000,0.3300,0.0264
+co2Sand,CO2 Sand,"1,600.00",0.0000,0.1101,0.0000
+greenSand,Green Sand,"1,600.00",0.0000,0.0165,0.0013
+hotBoxSand,Hot Box Sand,"1,600.00",0.0000,0.6608,0.0013
+isocureSand,Isocure Sand,"1,600.00",0.0000,0.2203,0.0000
+noBakeSand,No Bake Sand,"1,600.00",0.0000,0.3300,0.0264
+oilSand,Oil Sand,"1,600.00",0.0000,0.2643,0.0000
+shellSand,Shell Sand,"1,600.00",0.0000,0.1762,0.0000

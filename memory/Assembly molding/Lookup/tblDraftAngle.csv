@@ -1,0 +1,35 @@
+﻿Material Type,Min Draft Angle (deg),Process Name
+ABS,0.25,Insert Injection Molding
+ABS,0.50,Insert Structural Foam Molding
+Acetal,0.25,Insert Injection Molding
+Acetal,0.50,Insert Structural Foam Molding
+Acrylic,0.25,Insert Injection Molding
+Acrylic,0.50,Insert Structural Foam Molding
+Nylon,0.25,Insert Injection Molding
+Nylon,0.50,Insert Structural Foam Molding
+Nylon,0.25,Insert Reaction Injection Molding
+PBT,0.25,Insert Injection Molding
+PBT,0.50,Insert Structural Foam Molding
+PET,0.25,Insert Injection Molding
+PET,0.50,Insert Structural Foam Molding
+Polycarbonate,0.25,Insert Injection Molding
+Polycarbonate,0.50,Insert Structural Foam Molding
+Polypropylene,0.25,Insert Injection Molding
+Polypropylene,0.50,Insert Structural Foam Molding
+Polystyrene,0.25,Insert Injection Molding
+Polystyrene,0.50,Insert Structural Foam Molding
+Polyurethane,0.25,Insert Reaction Injection Molding
+PPS,0.25,Insert Injection Molding
+PPS,0.50,Insert Structural Foam Molding
+TPA,0.25,Insert Injection Molding
+TPA,0.50,Insert Structural Foam Molding
+TPE,0.25,Insert Injection Molding
+TPE,0.50,Insert Structural Foam Molding
+TPO,1.00,Insert Injection Molding
+TPO,1.00,Insert Structural Foam Molding
+TPS,0.25,Insert Injection Molding
+TPS,0.50,Insert Structural Foam Molding
+TPU,1.00,Insert Injection Molding
+TPU,0.50,Insert Structural Foam Molding
+TPV,0.25,Insert Injection Molding
+TPV,0.50,Insert Structural Foam Molding

@@ -1,0 +1,42 @@
+Rule Name,Threshold Name,Process Name,Material Type,Custom Field,Custom Value,Rule Type,Threshold Type,Critical,Major,Minor,Units,Notes
+ExcessiveFeatureElongation,Excessive Feature Elongation,,Aluminum,Cut Code,30.11,>,Percentage,,15,,,"Wrought or wrought and coldworked, non-aging. Flagged when feature elongation exceeds material % elongation."
+ExcessiveFeatureElongation,Excessive Feature Elongation,,Brass,Cut Code,33.3,>,Percentage,,50,,,Bronze and non-leaded copper including electrolytic copper. Flagged when feature elongation exceeds material % elongation.
+ExcessiveFeatureElongation,Excessive Feature Elongation,,Copper,Cut Code,33.3,>,Percentage,,50,,,Bronze and non-leaded copper including electrolytic copper. Flagged when feature elongation exceeds material % elongation.
+ExcessiveFeatureElongation,Excessive Feature Elongation,,Galvanized Steel,Cut Code,1.1,>,Percentage,,30,,,"Unalloyed, C = 0.10 - 0.25%. Flagged when feature elongation exceeds material % elongation."
+ExcessiveFeatureElongation,Excessive Feature Elongation,,Heat Resistant Super Alloys,Cut Code,20.21,>,Percentage,,40,,,"Nickel base, annealed or solution treated. Flagged when feature elongation exceeds material % elongation."
+ExcessiveFeatureElongation,Excessive Feature Elongation,,Heat Resistant Super Alloys,Cut Code,20.22,>,Percentage,,40,,,"Nickel base, aged or solution treated and aged. Flagged when feature elongation exceeds material % elongation."
+ExcessiveFeatureElongation,Excessive Feature Elongation,,Heat Resistant Super Alloys,Cut Code,20.23,>,Percentage,,40,,,"Nickel base, cold drawn. Flagged when feature elongation exceeds material % elongation."
+ExcessiveFeatureElongation,Excessive Feature Elongation,,Heat Resistant Super Alloys,Cut Code,20.31,>,Percentage,,40,,,"Cobalt base, annealed or solution treated. Flagged when feature elongation exceeds material % elongation."
+ExcessiveFeatureElongation,Excessive Feature Elongation,,Stainless Steel,Cut Code,5.11,>,Percentage,,30,,,"Bars/forged: Ferritic/martensitic, non-hardened. Flagged when feature elongation exceeds material % elongation."
+ExcessiveFeatureElongation,Excessive Feature Elongation,,Stainless Steel,Cut Code,5.12,>,Percentage,,30,,,"Bars/forged: Ferritic/martensitic, PH-hardened. Flagged when feature elongation exceeds material % elongation."
+ExcessiveFeatureElongation,Excessive Feature Elongation,,Stainless Steel,Cut Code,5.2,>,Percentage,,40,,,Bars/forged: Austenitic. Flagged when feature elongation exceeds material % elongation.
+ExcessiveFeatureElongation,Excessive Feature Elongation,,Stainless Steel,Cut Code,5.21,>,Percentage,,40,,,"Bars/forged: Austenitic, non-hardened. Flagged when feature elongation exceeds material % elongation."
+ExcessiveFeatureElongation,Excessive Feature Elongation,,Stainless Steel,Cut Code,5.52,>,Percentage,,40,,,"Bars/forged: Austenitic-ferritic (Duplex), weldable < 0,05%C. Flagged when feature elongation exceeds material % elongation."
+ExcessiveFeatureElongation,Excessive Feature Elongation,,Steel,Cut Code,1.1,>,Percentage,,30,,,"Unalloyed, C = 0.10 - 0.25%. Flagged when feature elongation exceeds material % elongation."
+ExcessiveFeatureElongation,Excessive Feature Elongation,,Steel,Cut Code,1.2,>,Percentage,,25,,,"Unalloyed, C = 0.25 - 0.55%. Flagged when feature elongation exceeds material % elongation."
+ExcessiveFeatureElongation,Excessive Feature Elongation,,Steel,Cut Code,1.4,>,Percentage,,15,,,"Unalloyed, high carbon & carbon tool steel. Flagged when feature elongation exceeds material % elongation."
+ExcessiveFeatureElongation,Excessive Feature Elongation,,Steel,Cut Code,2.1,>,Percentage,,15,,,"Low-alloyed, non-hardened. Flagged when feature elongation exceeds material % elongation."
+ExcessiveFeatureElongation,Excessive Feature Elongation,,Steel,Cut Code,2.2,>,Percentage,,15,,,"Low-alloyed, hardened and tempered. Flagged when feature elongation exceeds material % elongation."
+ExcessiveFeatureElongation,Excessive Feature Elongation,,Titanium,Cut Code,23.21,>,Percentage,,15,,,"Titanium alloys, a, near a and a + b alloys, annealed. Flagged when feature elongation exceeds material % elongation."
+InsufficientBendToBendDistance,Insufficient Bend To Bend Distance,,,,,<,Factor,,2,,,Flagged when the distance between two bends is less than the stock width multiplied by the factor.
+InsufficientCenterlineRadius,Insufficient Centerline Radius,Compression Bending,,,,<,Factor,,4,,,Flagged when the centerline radius of the bend is less than the bend width multiplied by the factor for the given process.
+InsufficientCenterlineRadius,Insufficient Centerline Radius,Profile 3 Roll Bend,,,,<,Factor,,5,,,Flagged when the centerline radius of the bend is less than the bend width multiplied by the factor for the given process.
+InsufficientCenterlineRadius,Insufficient Centerline Radius,Profile CNC Bend,,Operation Name,Profile 3 Roll Bending,<,Factor,,5,,,Flagged when the centerline radius of the bend is less than the bend width multiplied by the factor for the given operation.
+InsufficientCenterlineRadius,Insufficient Centerline Radius,Profile CNC Bend,,Operation Name,Rotary Draw Bending,<,Factor,,2,,,Flagged when the centerline radius of the bend is less than the bend width multiplied by the factor for the given operation.
+InsufficientCenterlineRadius,Insufficient Centerline Radius,Rotary Draw Bending,,,,<,Factor,,2,,,Flagged when the centerline radius of the bend is less than the bend width multiplied by the factor for the given process.
+TightToleranceCircularity,Tolerance - circularity,,,,,,Boolean,,TRUE,,,Flagged when circularity tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceConcentricity,Tolerance - concentricity,,,,,,Boolean,,TRUE,,,Flagged when concentricity tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceCoordinate,Tolerance - tolerance,,,,,,Boolean,,TRUE,,,Flagged when coordinate tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceCylindricity,Tolerance - cylindricity,,,,,,Boolean,,TRUE,,,Flagged when cylindricity tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceDiametric,Tolerance - diamTolerance,,,,,,Boolean,,TRUE,,,Flagged when diametric tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceFlatness,Tolerance - flatness,,,,,,Boolean,,TRUE,,,Flagged when flatness tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceParallelism,Tolerance - parallelism,,,,,,Boolean,,TRUE,,,Flagged when parallelism tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightTolerancePerpendicularity,Tolerance - perpendicularity,,,,,,Boolean,,TRUE,,,Flagged when perpendicularity tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightTolerancePositionTolerance,Tolerance - positionTolerance,,,,,,Boolean,,TRUE,,,Flagged when position tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceProfileOfSurface,Tolerance - profileOfSurface,,,,,,Boolean,,TRUE,,,Flagged when profile of surface tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceRoughnessRa,Tolerance - roughness,,,,,,Boolean,,TRUE,,,Flagged when roughness Ra tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceRoughnessRz,Tolerance - roughnessRz,,,,,,Boolean,,TRUE,,,Flagged when roughness Rz tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceRunout,Tolerance - runout,,,,,,Boolean,,TRUE,,,Flagged when runout tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceStraightness,Tolerance - straightness,,,,,,Boolean,,TRUE,,,Flagged when straightness tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceSymmetry,Tolerance - symmetry,,,,,,Boolean,,TRUE,,,Flagged when symmetry tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceTotalRunout,Tolerance - totalRunout,,,,,,Boolean,,TRUE,,,Flagged when total runout tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities

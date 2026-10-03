@@ -1,0 +1,16 @@
+﻿Name,Rate,Units
+Chamfering General Machining,12.70,m/hr
+Coordinate Measuring,0.10,m2/hr
+Core Pull Machining,34153.00,mm3/min
+Core Pull Pocket Machining,10965.00,mm3/min
+EDM Electrode Burn,68.28,mm3/min
+EDM Electrode CNC Machining,91075.00,mm3/min
+General Hole Boring,57.15,mm/min
+General Hole Drilling,57.15,mm/min
+General Hole Tapping,25.40,mm/min
+Mold Base General Machining,0.32,m2/hr
+Mold Plate Roughing,68306.00,mm3/min
+Plug Roughing,68306.00,mm3/min
+Vacuum Line High Tolerance Machining,109.65,mm/min
+Vacuum Line Low Tolerance Machining,10965.00,mm3/min
+Water Line Drilling,25.40,mm/min

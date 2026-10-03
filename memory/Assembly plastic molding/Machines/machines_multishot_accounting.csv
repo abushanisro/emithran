@@ -1,0 +1,79 @@
+Name,Labor Rate (USD / hr),Direct Overhead Rate (USD / hr),Indirect Overhead Rate (USD / hr),Overhead Multiplier,Number of Operators,Labor Time Standard,Wage Grade Name,Work Center Labor Rate Factor
+Horizontal Injection Molder | 700kN | 2K | 18g,45.81,10.14,15.03,0.00,0.50,1.00,,1.00
+Horizontal Injection Molder | 700kN | 2K | 18g | 2 Station,45.81,10.14,15.03,0.00,0.50,1.00,,1.00
+"Horizontal Injection Molder | 1,000kN | 2K | 100g",45.81,11.28,15.03,0.00,0.50,1.00,,1.00
+"Horizontal Injection Molder | 1,000kN | 2K | 100g | 2 Station",45.81,11.28,15.03,0.00,0.50,1.00,,1.00
+"Horizontal Injection Molder | 2,000kN | 2K | 350g",45.81,23.46,16.22,0.00,0.50,1.00,,1.00
+"Horizontal Injection Molder | 2,000kN | 2K | 350g | 2 Station",45.81,23.46,16.22,0.00,0.50,1.00,,1.00
+Horizontal Injection Molder | 400kN | 2K | 60g | 2 Station | Rotary Stack,45.81,19.38,14.92,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 800kN | 2K | 18g | 3 Station | 1200mm,45.81,22.99,15.36,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 800kN | 2K | 18g | 4 Station | 1200mm,45.81,22.99,15.36,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 800kN | 2K | 49g | 3 Station | 1200mm,45.81,24.40,15.36,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 800kN | 2K | 49g | 4 Station | 1200mm,45.81,24.40,15.36,0.00,0.50,1.00,,1.00
+"Horizontal Injection Molder | 3,500kN | 2K | 750g",45.81,33.30,17.88,0.00,0.50,1.00,,1.00
+"Horizontal Injection Molder | 3,500kN | 2K | 750g | 2 Station",45.81,33.30,17.88,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 800kN | 2K | 127g | 3 Station | 1200mm,45.81,27.96,15.36,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 800kN | 2K | 127g | 4 Station | 1200mm,45.81,27.96,15.36,0.00,0.50,1.00,,1.00
+Horizontal Injection Molder | 600kN | 2K | 150g | 2 Station | Rotary Stack,45.81,27.43,15.01,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 1600kN | 2K | 54g | 3 Station | 1500mm,45.81,34.54,15.65,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 1600kN | 2K | 54g | 4 Station | 1500mm,45.81,34.54,15.65,0.00,0.50,1.00,,1.00
+Horizontal Injection Molder | 850kN | 2K | 267g | 2 Station | Rotary Stack,45.81,37.70,15.44,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 1600kN | 2K | 141g | 3 Station | 1500mm,45.81,38.96,15.65,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 1600kN | 2K | 141g | 4 Station | 1500mm,45.81,38.96,15.65,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 2000kN | 2K | 54g | 3 Station | 2000mm,45.81,39.12,15.93,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 2000kN | 2K | 54g | 4 Station | 2000mm,45.81,39.12,15.93,0.00,0.50,1.00,,1.00
+"Horizontal Injection Molder | 5,000kN | 2K | 1kg",45.81,50.29,20.02,0.00,0.50,1.00,,1.00
+"Horizontal Injection Molder | 5,000kN | 2K | 1kg | 2 Station",45.81,50.29,20.02,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 1600kN | 2K | 232g | 3 Station | 1500mm,45.81,43.11,15.65,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 1600kN | 2K | 232g | 4 Station | 1500mm,45.81,43.11,15.65,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 2000kN | 2K | 141g | 3 Station | 2000mm,45.81,43.54,15.93,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 2000kN | 2K | 141g | 4 Station | 2000mm,45.81,43.54,15.93,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 2000kN | 2K | 291g | 3 Station | 2000mm,45.81,53.22,15.93,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 2000kN | 2K | 291g | 4 Station | 2000mm,45.81,53.22,15.93,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 3200kN | 2K | 54g | 3 Station | 1800mm,45.81,55.31,16.39,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 3200kN | 2K | 54g | 4 Station | 1800mm,45.81,55.31,16.39,0.00,0.50,1.00,,1.00
+Horizontal Injection Molder | 2900kN | 2K | 40g | 4 Station | Rotary Stack,45.81,59.96,17.81,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 2000kN | 2K | 434g | 3 Station | 2000mm,45.81,59.75,15.93,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 2000kN | 2K | 434g | 4 Station | 2000mm,45.81,59.75,15.93,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 3200kN | 2K | 141g | 3 Station | 1800mm,45.81,59.96,16.39,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 3200kN | 2K | 141g | 4 Station | 1800mm,45.81,59.96,16.39,0.00,0.50,1.00,,1.00
+"Horizontal Injection Molder | 7,500kN | 2K | 2kg",45.81,74.19,24.77,0.00,0.50,1.00,,1.00
+"Horizontal Injection Molder | 7,500kN | 2K | 2kg | 2 Station",45.81,74.19,24.77,0.00,0.50,1.00,,1.00
+Horizontal Injection Molder | 1550kN | 2K | 577g | 2 Station | Rotary Stack,45.81,63.11,16.59,0.00,0.50,1.00,,1.00
+Horizontal Injection Molder | 2900kN | 2K | 434g | 4 Station | Rotary Stack,45.81,85.44,17.81,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 3200kN | 2K | 510g | 3 Station | 1800mm,45.81,79.34,16.39,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 3200kN | 2K | 510g | 4 Station | 1800mm,45.81,79.34,16.39,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 3200kN | 2K | 723g | 3 Station | 1800mm,45.81,91.75,16.39,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 3200kN | 2K | 723g | 4 Station | 1800mm,45.81,91.75,16.39,0.00,0.50,1.00,,1.00
+"Horizontal Injection Molder | 10,000kN | 2K | 3kg",45.81,114.31,30.11,0.00,0.50,1.00,,1.00
+"Horizontal Injection Molder | 10,000kN | 2K | 3kg | 2 Station",45.81,114.31,30.11,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 3200kN | 2K | 1286g | 3 Station | 1800mm,45.81,117.46,16.39,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 3200kN | 2K | 1286g | 4 Station | 1800mm,45.81,117.46,16.39,0.00,0.50,1.00,,1.00
+Horizontal Injection Molder | 2900kN | 2K | 1860g | 4 Station | Rotary Stack,45.81,156.18,17.81,0.00,0.50,1.00,,1.00
+"Horizontal Injection Molder | 30,000kN | 2K | 8kg",45.81,202.35,37.58,0.00,0.50,1.00,,1.00
+"Horizontal Injection Molder | 30,000kN | 2K | 8kg | 2 Station",45.81,202.35,37.58,0.00,0.50,1.00,,1.00
+"Horizontal Injection Molder | 50,000kN | 2K | 50kg",45.81,355.49,43.75,0.00,0.50,1.00,,1.00
+"Horizontal Injection Molder | 50,000kN | 2K | 50kg | 2 Station",45.81,355.49,43.75,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 800kN | 3K | 18g | 4 Station | 1200mm,45.81,30.87,15.36,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 800kN | 3K | 49g | 4 Station | 1200mm,45.81,32.99,15.36,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 800kN | 3K | 127g | 4 Station | 1200mm,45.81,38.33,15.36,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 1600kN | 3K | 54g | 4 Station | 1500mm,45.81,44.98,15.65,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 2000kN | 3K | 54g | 4 Station | 2000mm,45.81,50.25,15.93,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 2000kN | 3K | 54g | 5 Station | 2000mm,45.81,50.25,15.93,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 1600kN | 3K | 141g | 4 Station | 1500mm,45.81,51.61,15.65,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 2000kN | 3K | 141g | 4 Station | 2000mm,45.81,56.88,15.93,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 2000kN | 3K | 141g | 5 Station | 2000mm,45.81,56.88,15.93,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 1600kN | 3K | 232g | 4 Station | 1500mm,45.81,57.85,15.65,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 3200kN | 3K | 54g | 4 Station | 1800mm,45.81,69.70,16.39,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 2000kN | 3K | 291g | 4 Station | 2000mm,45.81,71.40,15.93,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 2000kN | 3K | 291g | 5 Station | 2000mm,45.81,71.40,15.93,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 3200kN | 3K | 141g | 4 Station | 1800mm,45.81,76.70,16.39,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 2000kN | 3K | 434g | 4 Station | 2000mm,45.81,81.20,15.93,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 2000kN | 3K | 434g | 5 Station | 2000mm,45.81,81.20,15.93,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 3200kN | 3K | 510g | 4 Station | 1800mm,45.81,105.78,16.39,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 3200kN | 3K | 723g | 4 Station | 1800mm,45.81,124.39,16.39,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 3200kN | 3K | 1286g | 4 Station | 1800mm,45.81,162.96,16.39,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 2000kN | 4K | 54g | 5 Station | 2000mm,45.81,58.98,15.93,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 2000kN | 4K | 141g | 5 Station | 2000mm,45.81,67.82,15.93,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 2000kN | 4K | 291g | 5 Station | 2000mm,45.81,81.52,15.93,0.00,0.50,1.00,,1.00
+Vertical Injection Molder | 2000kN | 4K | 434g | 5 Station | 2000mm,45.81,100.24,15.93,0.00,0.50,1.00,,1.00

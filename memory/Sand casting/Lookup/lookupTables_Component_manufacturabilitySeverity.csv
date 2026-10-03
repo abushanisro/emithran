@@ -1,0 +1,71 @@
+﻿Rule Name,Threshold Name,Process Name,Material Type,Custom Field,Custom Value,Rule Type,Threshold Type,Critical,Major,Minor,Units,Notes
+ClosedVoid,Closed Void,,,,,Boolean,Boolean,TRUE,,,,Flagged when a void or combo void has no openings to the exterior of the part.
+HighBlindHoleLengthToDiameterRatio,High Blind Hole Length To Diameter Ratio,,,,,>,Ratio,1.5,,,,Flagged when a blind hole length-to-diameter ratio exceeds the recommended maximum.
+HighThroughHoleLengthToDiameterRatio,High Through Hole Length To Diameter Ratio,,,,,>,Ratio,2,,,,Flagged when a through hole length-to-diameter ratio exceeds the recommended maximum.
+InaccessibleFeature,Inaccessible Feature,,,,,Boolean,Boolean,TRUE,,,,Flagged when casting an inaccessible feature may prevent the mold pattern being removed from the mold.
+InsufficientDraftAngle,Min Draft Angle,,,,,<,Angle,0.01,0.5,,degrees,Flagged when the draft angle exceeds the permitted draft angle.
+InsufficientExternalRadius,Insufficient External Radius,,Aluminum,,,<,Length,,0.3,,mm,Flagged when the external edge radius is below the recommended minimum for this material type.
+InsufficientExternalRadius,Insufficient External Radius,,Aluminum Bronze,,,<,Length,,0.3,,mm,
+InsufficientExternalRadius,Insufficient External Radius,,Brass,,,<,Length,,0.23,,mm,
+InsufficientExternalRadius,Insufficient External Radius,,Bronze,,,<,Length,,0.23,,mm,
+InsufficientExternalRadius,Insufficient External Radius,,Copper,,,<,Length,,0.23,,mm,
+InsufficientExternalRadius,Insufficient External Radius,,Ductile Iron,,,<,Length,,0.3,,mm,
+InsufficientExternalRadius,Insufficient External Radius,,Gray Iron,,,<,Length,,0.3,,mm,
+InsufficientExternalRadius,Insufficient External Radius,,Magnesium,,,<,Length,,0.3,,mm,
+InsufficientExternalRadius,Insufficient External Radius,,Malleable Cast Iron,,,<,Length,,0.3,,mm,
+InsufficientExternalRadius,Insufficient External Radius,,Manganese Bronze,,,<,Length,,0.23,,mm,
+InsufficientExternalRadius,Insufficient External Radius,,Silicon Brass,,,<,Length,,0.23,,mm,
+InsufficientExternalRadius,Insufficient External Radius,,Stainless Steel,,,<,Length,,0.3,,mm,
+InsufficientExternalRadius,Insufficient External Radius,,Steel,,,<,Length,,0.3,,mm,
+InsufficientExternalRadius,Insufficient External Radius,,Zinc,,,<,Length,,0.3,,mm,
+InsufficientExternalRadius,Insufficient External Radius,,Zinc-Aluminum,,,<,Length,,0.3,,mm,
+InsufficientHoleDiameter,Insufficient Hole Diameter,,,,,<,Length,4.8,,,mm,Flagged when the diameter of a hole is below the recommended minimum value. Note: The geometry extraction used to determine hole manufacturability is not sensitive to the Process Name entry. Maintain alignment between the process model data and geometry extraction by ...
+InsufficientInternalRadius,Insufficient Internal Radius,,Aluminum,,,<,Length,,3,,mm,Flagged when the internal edge radius is below the recommended minimum for this material type.
+InsufficientInternalRadius,Insufficient Internal Radius,,Aluminum Bronze,,,<,Length,,3,,mm,
+InsufficientInternalRadius,Insufficient Internal Radius,,Brass,,,<,Length,,2.3,,mm,
+InsufficientInternalRadius,Insufficient Internal Radius,,Bronze,,,<,Length,,2.3,,mm,
+InsufficientInternalRadius,Insufficient Internal Radius,,Copper,,,<,Length,,2.3,,mm,
+InsufficientInternalRadius,Insufficient Internal Radius,,Ductile Iron,,,<,Length,,3,,mm,
+InsufficientInternalRadius,Insufficient Internal Radius,,Gray Iron,,,<,Length,,3,,mm,
+InsufficientInternalRadius,Insufficient Internal Radius,,Magnesium,,,<,Length,,3,,mm,
+InsufficientInternalRadius,Insufficient Internal Radius,,Malleable Cast Iron,,,<,Length,,3,,mm,
+InsufficientInternalRadius,Insufficient Internal Radius,,Manganese Bronze,,,<,Length,,2.3,,mm,
+InsufficientInternalRadius,Insufficient Internal Radius,,Silicon Brass,,,<,Length,,2.3,,mm,
+InsufficientInternalRadius,Insufficient Internal Radius,,Stainless Steel,,,<,Length,,3,,mm,
+InsufficientInternalRadius,Insufficient Internal Radius,,Steel,,,<,Length,,3,,mm,
+InsufficientInternalRadius,Insufficient Internal Radius,,Zinc,,,<,Length,,3,,mm,
+InsufficientInternalRadius,Insufficient Internal Radius,,Zinc-Aluminum,,,<,Length,,3,,mm,
+ThickSection,Max Wall Thickness,,,,,>,Length,,1016,127,mm,
+ThinSection,Min Wall Thickness,,Aluminum,,,<,Length,,3,,mm,Geometry extraction uses the Thin Section rule data to determine hole manufacturability but it is not sensitive to the Process Name entry. Maintain alignment between the process model data and geometry extraction by not using the Process Name column for this rule.
+ThinSection,Min Wall Thickness,,Aluminum Bronze,,,<,Length,,3,,mm,
+ThinSection,Min Wall Thickness,,Brass,,,<,Length,,2.3,,mm,
+ThinSection,Min Wall Thickness,,Bronze,,,<,Length,,2.3,,mm,
+ThinSection,Min Wall Thickness,,Copper,,,<,Length,,2.3,,mm,
+ThinSection,Min Wall Thickness,,Ductile Iron,,,<,Length,,3,,mm,
+ThinSection,Min Wall Thickness,,Gray Iron,,,<,Length,,3,,mm,
+ThinSection,Min Wall Thickness,,Magnesium,,,<,Length,,3,,mm,
+ThinSection,Min Wall Thickness,,Malleable Cast Iron,,,<,Length,,3,,mm,
+ThinSection,Min Wall Thickness,,Manganese Bronze,,,<,Length,,2.3,,mm,
+ThinSection,Min Wall Thickness,,Silicon Brass,,,<,Length,,2.3,,mm,
+ThinSection,Min Wall Thickness,,Stainless Steel,,,<,Length,,3,,mm,
+ThinSection,Min Wall Thickness,,Steel,,,<,Length,,3,,mm,
+ThinSection,Min Wall Thickness,,Zinc,,,<,Length,,3,,mm,
+ThinSection,Min Wall Thickness,,Zinc-Aluminum,,,<,Length,,3,,mm,
+ThinWallAroundHole,Thin Wall Around Hole,,,,,Boolean,Boolean,TRUE,,,,Flagged when the wall thickness between adjacent holes is below the recommended minimum section thickness for the material.
+ThreadedFeature,Threaded Feature,,,,,Boolean,Boolean,TRUE,,,,Flagged when the GCD has a threaded feature requiring a machining operation.
+TightToleranceCircularity,Tolerance - circularity,,,,,Boolean,Boolean,,TRUE,,,Flagged when circularity tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceConcentricity,Tolerance - concentricity,,,,,Boolean,Boolean,,TRUE,,,Flagged when concentricity tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceCoordinate,Tolerance - tolerance,,,,,Boolean,Boolean,,TRUE,,,Flagged when coordinate tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceCylindricity,Tolerance - cylindricity,,,,,Boolean,Boolean,,TRUE,,,Flagged when cylindricity tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceDiametric,Tolerance - diamTolerance,,,,,Boolean,Boolean,,TRUE,,,Flagged when diametric tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceFlatness,Tolerance - flatness,,,,,Boolean,Boolean,,TRUE,,,Flagged when flatness tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceParallelism,Tolerance - parallelism,,,,,Boolean,Boolean,,TRUE,,,Flagged when parallelism tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightTolerancePerpendicularity,Tolerance - perpendicularity,,,,,Boolean,Boolean,,TRUE,,,Flagged when perpendicularity tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightTolerancePositionTolerance,Tolerance - positionTolerance,,,,,Boolean,Boolean,,TRUE,,,Flagged when position tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceProfileOfSurface,Tolerance - profileOfSurface,,,,,Boolean,Boolean,,TRUE,,,Flagged when profile of surface tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceRoughnessRa,Tolerance - roughness,,,,,Boolean,Boolean,,TRUE,,,Flagged when roughness Ra tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceRoughnessRz,Tolerance - roughnessRz,,,,,Boolean,Boolean,,TRUE,,,Flagged when roughness Rz tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceRunout,Tolerance - runout,,,,,Boolean,Boolean,,TRUE,,,Flagged when runout tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceStraightness,Tolerance - straightness,,,,,Boolean,Boolean,,TRUE,,,Flagged when straightness tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceSymmetry,Tolerance - symmetry,,,,,Boolean,Boolean,,TRUE,,,Flagged when symmetry tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities
+TightToleranceTotalRunout,Tolerance - totalRunout,,,,,Boolean,Boolean,,TRUE,,,Flagged when total runout tolerance exceeds the capability of the process as defined in tblGtolProcessCapabilities

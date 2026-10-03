@@ -1,0 +1,22 @@
+Advice Rule Name,Enabled
+ExcessiveFeatureElongation,true
+ExcessiveTubeBendingDifficultyFactor,true
+ExcessiveUniqueBendRadii,true
+InsufficientBendToBendDistance,true
+InsufficientCenterlineRadius,true
+TightToleranceCircularity,true
+TightToleranceConcentricity,true
+TightToleranceCoordinate,true
+TightToleranceCylindricity,true
+TightToleranceDiametric,true
+TightToleranceFlatness,true
+TightToleranceParallelism,true
+TightTolerancePerpendicularity,true
+TightTolerancePositionTolerance,true
+TightToleranceProfileOfSurface,true
+TightToleranceRoughnessRa,true
+TightToleranceRoughnessRz,true
+TightToleranceRunout,true
+TightToleranceStraightness,true
+TightToleranceSymmetry,true
+TightToleranceTotalRunout,true

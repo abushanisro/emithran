@@ -1,0 +1,29 @@
+Field,Value
+Sector,World Average
+Name,VATECH RS300250
+Labor Rate (USD / hr),57.19
+Direct Overhead Rate (USD / hr),1.51
+Indirect Overhead Rate (USD / hr),15.01
+Total Overhead Rate (USD / hr),16.52
+Overhead Multiplier,0.00
+Number of Operators,1.00
+Labor Time Standard,1.00
+Wage Grade Name,
+Work Center Labor Rate Factor,1.00
+Setup Time (hr),0.00
+Is Preferred,false
+Avg Utilization,1.00
+Good Part Yield,1.00
+Machine Price (USD),"20,000.00"
+Machine Length (mm),"3,350.00"
+Machine Width (mm),"3,250.00"
+Footprint Allowance Factor,1.00
+Machine Power (kW),2.00
+Installation Factor (%),20.00
+Machine Uptime (%),80.00
+Annual Maintenance Factor (%),5.00
+Machine Life (yr),10
+Salvage Value Factor (%),0.00
+Supplies Cost (USD / yr),0.00
+Machine Manufacturer Location,UK
+Data Source,aPriori Baseline

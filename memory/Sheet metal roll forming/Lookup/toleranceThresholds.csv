@@ -1,0 +1,10 @@
+﻿Tolerance Type,Tolerance Name,Lower Bound,Upper Bound,Line Speed Multiplier,Number of Finishing Passes
+Cross Section,"High Tolerance +/-0.050mm (+/-0.002"")",-0.05080,0.05080,1.00,3.00
+Cross Section,"Medium Tolerance +/-0.254mm (+/-0.010"")",-0.25400,0.25400,1.00,2.00
+Cross Section,"Standard Tolerance +/- 0.762mm (+/-0.030"")",-0.76200,0.76200,1.00,1.00
+Inline Punching,"High Tolerance +/-0.127mm (+/-0.005"")",-0.12700,0.12700,1.00,0.00
+Inline Punching,"Medium Tolerance +/-0.381mm (+/-0.015"")",-0.38100,0.38100,1.00,0.00
+Inline Punching,"Standard Tolerance +/- 0.762mm (+/-0.030"")",-0.76200,0.76200,1.00,0.00
+Mid Punching,"Achievable Tolerance +/-0.381mm (+/-0.015"")",-0.38100,0.38100,1.00,0.00
+Post Punching,"Achievable Tolerance +/-0.127mm (+/-0.005"")",-0.12700,0.12700,1.00,0.00
+Pre Punching,"Achievable Tolerance +/- 0.762mm (+/-0.030"")",-0.76200,0.76200,1.00,0.00

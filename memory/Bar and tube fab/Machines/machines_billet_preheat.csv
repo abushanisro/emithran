@@ -1,0 +1,15 @@
+Name,Description,Diameter (mm),Labor Rate (USD / hr),Setup Time (hr),Is Preferred,Avg Utilization,Good Part Yield,Machine Price (USD),Machine Length (mm),Machine Width (mm),Footprint Allowance Factor,Machine Power (kW),Installation Factor (%),Machine Uptime (%),Annual Maintenance Factor (%),Machine Life (yr),Salvage Value Factor (%),Supplies Cost (USD / yr),Machine Manufacturer Location
+"Foshan Wangeshi 3.5""","3.5 in. Diameter, 20000 mm Length, 18.5kW",88.90,25.12,0.50,false,0.00,1.00,75000.00,20000.00,4200.00,1.00,18.50,20.00,80.00,5.00,10.00,0.00,0.00,China
+"Foshan Chanjeou Tech 4""","4 in. Diameter, 22500 mm Length, 20kW",101.60,25.12,0.50,false,0.00,1.00,100000.00,22500.00,4200.00,1.00,20.00,20.00,80.00,5.00,10.00,0.00,0.00,China
+"Foshan Chanjeou Tech 6""","6 in. Diameter, 25000 mm Length, 39.5kW",152.40,25.12,0.50,false,0.00,1.00,125000.00,25000.00,4200.00,1.00,39.50,20.00,80.00,5.00,10.00,0.00,0.00,China
+"Foshan Wangeshi 6""","6 in. Diameter, 25000 mm Length, 39.5kW",152.40,25.12,0.50,false,0.00,1.00,125000.00,25000.00,4200.00,1.00,39.50,20.00,80.00,5.00,10.00,0.00,0.00,China
+"Foshan Chanjeou Tech 9""","9 in. Diameter, 27000 mm Length, 35.5kW",228.60,25.12,0.50,false,0.00,1.00,250000.00,27000.00,4200.00,1.00,35.50,20.00,80.00,5.00,10.00,0.00,0.00,China
+"Foshan Wangeshi 9""","9 in. Diameter, 27000 mm Length, 39.5kW",228.60,25.12,0.50,false,0.00,1.00,250000.00,27000.00,4200.00,1.00,39.50,20.00,80.00,5.00,10.00,0.00,0.00,China
+"Granco Clarke 9""","9 in. Diameter, 27000 mm Length, 39.5kW",228.60,25.12,0.50,false,0.00,1.00,250000.00,27000.00,4200.00,1.00,39.50,20.00,80.00,5.00,10.00,0.00,0.00,USA
+"Foshan Chanjeou Tech 12""","12 in. Diameter, 31500 mm Length, 40.5kW",304.80,25.12,0.50,false,0.00,1.00,325000.00,31500.00,4500.00,1.00,40.50,20.00,80.00,5.00,10.00,0.00,0.00,China
+"Foshan Wangeshi 12""","12 in. Diameter, 31500 mm Length, 40.5kW",304.80,25.12,0.50,false,0.00,1.00,325000.00,31500.00,4500.00,1.00,40.50,20.00,80.00,5.00,10.00,0.00,0.00,China
+Virtual Billet Preheat,"30000 mm Length, 35kW",,25.12,0.50,true,0.00,1.00,350000.00,30000.00,4250.00,1.00,35.00,20.00,80.00,5.00,10.00,0.00,0.00,USA
+"Omav 8""","8 in. Diameter, 25000 mm Length, 39.5kW",203.20,25.12,0.50,false,0.00,1.00,350000.00,25000.00,4200.00,1.00,39.50,20.00,80.00,5.00,10.00,0.00,0.00,Spain
+"Foshan Chanjeou Tech 16""","16 in. Diameter, 35000 mm Length, 47kW",406.40,25.12,0.50,false,0.00,1.00,500000.00,35000.00,4500.00,1.00,47.00,20.00,80.00,5.00,10.00,0.00,0.00,China
+"Foshan Wangeshi 16""","16 in. Diameter, 35000 mm Length, 48.5kW",406.40,25.12,0.50,false,0.00,1.00,500000.00,35000.00,4500.00,1.00,48.50,20.00,80.00,5.00,10.00,0.00,0.00,China
+"Omav 10""","10 in. Diameter, 29000 mm Length, 40kW",254.00,25.12,0.50,false,0.00,1.00,550000.00,29000.00,4500.00,1.00,40.00,20.00,80.00,5.00,10.00,0.00,0.00,Spain

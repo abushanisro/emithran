@@ -1,0 +1,522 @@
+﻿Variable Name,String Value,Unit Type Name,Notes
+additionalRunnerThickness,1.5,Length,Additional thickness on maximum part thickness to account for runner area.
+addlStockGuideQtyCbores,2,,
+allBottomParallelsGrindSetup,1,,All bottom parallels should be setup for grinding in the same time.
+allTopParallelsGrindSetup,1,,All top parallels should be setup for grinding in the same time.
+ambientTemp,21,Temperature,Ambient temperature in the workcenter.
+avgPermMoldGoodPartYield,0.95,,Percentage of good parts out of total parts for melting.
+baffleDesignTime,2,hr,Time for design a single baffle.
+baffleTapSetup,4,hr,Setup time for tapping of waterlines.
+bafflesStep,3,in,Distance between closest baffles.
+baseAssyTime,4,hr,
+blankAdapterGrindingNumSetupsPerPart,2,,
+blankAdapterLengthAdder,50.8,Length,Amount of stock added to each side of blank adapter length.
+blankAdapterNumSetupsPerPart,2,,
+blankAdapterQty,1,,Quantity of blank adapter.
+blankAdapterQtyCbores,8,,Quantity of counterbored holes in a blank adapter.
+blankAdapterQtyDowels,2,,Quantity of dowels required per blank adapter.
+blankAdapterQtyJackScrews,2,,Quantity of screw jacks required per blank adapter.
+blankAdapterWidthAdder,50.8,Length,Amount of stock added to each side of blank adapter width.
+boreMillSetup,2,hr,Boring mill setup time for vertical waterlines (baffles).
+boreMillSpeed,1,in/min,Speed of boring mill for vertical waterlines (baffles).
+bottomEjectorPlateThickness,1,in,Thickness of bottom ejector plate of the mold.
+bottomParallelGrindingNumSetupsPerPart,2,,
+bottomParallelGrindingTimePerPart,0,hr,Total time required for grinding operator labor per bottom parallel.
+bottomParallelHeight,101.6,Length,Height of lower parallels.
+bottomParallelNumSetupsPerPart,2,,
+bottomParallelsAdder,3,,Number of additional bottom parallels to take the place of what used to be wide parallels.
+bottomParallelsMillingTime,0.66,hr,Total time required for milling operator labor to mill (2) bolt-down slots in a parallel.
+bottomParallelsQtyDowels,4,,Quantity of dowels required per bottom parallel.
+bottomPlateGrindingNumSetupsPerPart,2,,
+bottomPlateHeight,12.7,Length,Thickness of the bottom plate.
+bottomPlateMillingTime,0.66,hr,Time required for milling operator labor to mill (2) bolt-down slots in a bottom plate.
+bottomPlateNumSetupsPerPart,1,,
+bottomPlateQty,1,,Quantity of bottom plates.
+bottomPlateWidthAllowance,304.8,Length,Amount added to each side of the die shoe width to determine the bottom plate width.
+bpHoleDepth,50.8,Length,"Depth of holes in bottom parallels that are drilled, tapped, reamed."
+bplPressLocatorHoles,2,,The number of press locator holes in the bottom plate.
+burnEDMRate,5,,Percentage of electrode volume that after burning.
+cavCNCsetup,2,hr,
+cavityCeiling,.1,,Maximum additional percentage material yield for cavity consideration.
+cavityCorePlateDrillSetup,0.5,hr,Setup time for core (cavity) plates drilling and tapping for mounting.
+cavityPlateDepthBorder,152.4,Length,"Used to allow 6"" border distance on the depth of the cavity plate."
+cboreSetup,1.5,hr,Setup time for counterboring of cavity and core water lines.
+cboreTime,0.75,min,Counterboring time of the machine.
+chamberCleaningPartDistance,100,Length,
+chamberEfficiencyFactor,0.5,,
+clampForceSafetyFactor,1.5,,Multiplier of clamp pressure required to insure that the machine is capable of applying the necessary mold pressure (50% safety factor)
+clampPlateDrillSetup,1,hr,Setup time for machining of clamp plates (drilling and counterboring).
+clampPlateThickness,2,in,Thickness of clamp plate of mold.
+clampPlatesFeed,4500,in^2/hr,Feed for machining of clamp plates.
+clampPlatesSetup,2,hr,Setup time for machining of clamp plates.
+cncMachLargeSetupTime,60,min,Time required for the large component CNC machining setup.
+cncMachSmallSetupTime,10,min,Time required for the small component CNC machining setup.
+coarseTextureCostperSqM,15500,Currency/m^2,"Per square meter, from $10 per mold area square inch to texture the surface"
+compCoatingCost,1,,Dial for calibrating tooling Coating Cost.
+compHeatTreatCost,2,,Dial for calibrating tooling Heat Treat Cost.
+coolSystAssTimePerTool,0.02,hr,"Time for assembly a single tool of cooling system (fittings, connectors, manifolds, hoses, quick disconnectors)."
+coolTimeConstantGravityDieCasting,20,Time,Factor used to calculate the cooling time for Gravity Die Casting.
+coreCNCsetup,4,hr,
+coreCavityFeed,500,in^2/hr,Feed for general machining of core and cavity plates.
+coreCavitySetup,2,hr,Setup time for machining of core and cavity plates.
+coreDiameterPlay,1.5875,,"Factor used to calculate the normal stock core length, diameter, and number of sticks per hour."
+coreLoadTimeGravityDieCasting,10,Time,Time required to load a single core into the mold. Used to determine the total cycle time for Gravity Die Casting.
+corePinCost,6.2,Currency,Cost of single core pin.
+corePinsAssTimePerTool,0.4,hr,Time for assembly a single core pin.
+corePlatePinDrillSetup,1,hr,Setup time for drilling holes for ejector and sleeve pins in the core plate.
+corePlatePinDrillSpeed,1,in/min,Speed of drilling holes for ejector and sleeve pins in the core plate.
+corePlatePinReamHeight,1,in,Height of reaming holes for ejector and sleeve pins in the core plate.
+corePlatePinReamSetup,1,hr,Setup time to ream holes for ejector and sleeve pins in the core plate.
+corePlatePinReamSpeed,0.75,in/min,Speed of reaming holes for ejector and sleeve pins in the core plate.
+coreboxCalcMode,Opportunistic,,Calculation mode for the number of corebox cavities: 'Opportunistic' or 'Single Cavity.'
+coreboxLengthAllowance,19,Length,Corebox allowance for walls.
+coreboxToolingCalc,Parametric,,Tooling calculation choice for corebox: 'Parametric' or 'Fixed Cost'.
+costPerHydraulicEjector,4200,Currency,Cost of a single tool for hydraulic ejection.
+costPerUnscrewingMechanism,4200,Currency,Cost of a single unscrewing mechanism.
+customPiercePunchDesignTimePerPart,2,hr,Time for design of single custom pierce punch of the tool.
+cycleTimeAdjustmentFactor,1,,Factor used to globally increase or decrease cycle time evaluations per process.
+defaultAddendumWidth,0,Length,Default addendum with to add to a Die Shoe.
+defaultAirDryAndCoolTime,60,min,The default time for the air to dry and cool the core or mold.
+defaultCleaningCycleTime,4,min,The set cycle time for Shot Blasting.
+defaultCoreRefractoryCoatingInclusion,true,,The default setting on the core refractory coating pso for each core which determines the inclusion status.
+defaultCoreRefractoryCoatingMethod,Spraying,,The default method for applying the refractory coating to cores.
+defaultCoreRefractoryCoatingNumOperators,1,,Default number of operators to apply the refractory coat to each core.
+defaultCustomMultiplier,0.6,,"Coefficient, in case of 'Standard Mold Base'"
+defaultLadleTransportTime,1,min,Plant default for amount of time required to transport ladle from furnace to pour site.
+defaultMoldConstruction,Standard Mold Base,,'Standard Mold Base' versus 'Custom Mold Base' as the default for the Digital Factory
+defaultNumCavities,1,,Default value for the number of cavities in one mold. User may override via Process Setup Options.
+defaultNumCavitiesGravityDieCasting,1,,Default number of cavities for a gravity die casting cycle.
+defaultNumCoreRefractoryCoatingApplications,1,,The default number of refractory coatings on cores.
+defaultNumHotDrops,0,,Default number of hot drops per cavity.
+defaultNumTryOuts,3,,Number of tryouts.
+defaultNumberOfTrimmedParts,1,,"The default number of parts that will be trimmed in trim process, which is used to determine tool life."
+defaultOvenDryAndCoolTime,19,min,The default time for the oven to dry and cool the core or mold.
+defaultPMcycleTime,600,Time,Default permanent molding cycle time. Used to calculate the number of cavities in 'Annual Volume' mode.
+defaultPartSpacing,25.4,Length,Default distance from the part's lowest extremity from the main surface to the inside of the lower die shoe.
+defaultRefractoryAirDryNumberLaborers,1,,The default number of laborers required to load and unload cores for refractory air drying.
+defaultRefractoryBaseLiquid,Water-Based,,"The default refractory base liquid that is used in the ""Refractory Base Liquid"" PSO on Refractory Coat Cores and Refractory Coat Mold nodes. Options are 'Water-Based' or 'Solvent-Based'."
+defaultRefractoryCoatOvenSpaceAvailableFactor,0.8,,"The default factor applied to the machine bed for the oven drying machines. This represents the lesser actual volume or area available for cores due to any racking space, nesting requirements and space required to allow circulation of hot air."
+defaultRefractoryCoatingAirDryPreparationTime,0.25,hr,The default time to setup the air dry area before processing any cores.
+defaultRefractoryCoatingCorePreparationTime,0.25,hr,The default time to mix and prepare the slurry for refractory coating cores.
+defaultRefractoryCoatingOvenDryPreparationTime,0.25,hr,The default time to setup the oven before processing any molds or cores.
+defaultRefractoryOvenDryNumberLaborers,1,,The default number of laborers required to load and unload cores into the refractory coat drying oven.
+defaultRemeltAllowancePM,1,,Default percentage of runners and scrap allowed with virgin material for Permanent Molding.
+defaultRemeltAllowanceSandCasting,1,,Default percentage of runners and scrap allowed with virgin material for Sand Casting.
+defaultSandAdditiveCores,None,,
+defaultSandAdditiveMoldmaking,None,,
+defaultSandManualFloor,chemBond,,Plant default for sand: 'chemBond' or 'greenSand' used in Manual Floor coremaking.
+defaultSandManualPit,chemBond,,Plant default for sand: 'chemBond' or 'greenSand' used in Manual Pit coremaking.
+defaultSandManualStandard,greenSand,,Plant default for sand: 'chemBond' or 'greenSand' used in Manual Standard coremaking.
+defaultToolLife,162500,,The default number of shots per tool which is used to determine tool life. This is the median value of the available data relating to tool life by part material type.
+defaultUtilizationMethod,COMPUTED,,"Eligible values: ""COMPUTED"" & ""MACHINE_DEFAULT"""
+density4140,7850,kg/m^3,
+densityAL,2710,kg/m^3,
+densityCopper,8400,kg/m^3,Density of copper electrodes.
+densityGraphite,3514,kg/m^3,Density of graphite electrodes.
+densityH13,7880,kg/m^3,
+densityP20,7860,kg/m^3,
+depthBorderPM,75,,"Used to allow 3"" distance from the bottom of the cavity to the bottom of the mold."
+designFactor,1,,Percent of machining time that needs to be spent for mold base design.
+designPreparationTime,10,hr,Preparation time for design of mechanical parts of the tool.
+dialAllMaterial,.907518,,Constant used to determine the material cost.
+dieAllowanceGap,25.4,Length,Gap height added to die height.
+dieBaseDesignTime,5,hr,Time for base design of mechanical parts of the tool.
+dieBlockAdapterAssyTimePerPart,0.5,hr,
+dieBlockAdapterGrindingNumSetupsPerPart,2,,
+dieBlockAdapterNumSetupsPerPart,1,,
+dieBlockAssyTimePerPart,0.25,hr,
+dieBlockGrindingNumSetupsPerPart,2,,
+dieBlockNumJackScrews,2,,
+dieBlockNumSetupsPerPart,2,,
+dieBlockQty,1,,Quantity of die blocks.
+dieBlockQtyCboresLong,6,,quantity of counter bores if die length > threshold.
+dieBlockQtyCboresShort,4,,quantity of counter bores if die length < threshold.
+dieBlockQtyDowels,2,,Quantity of dowels required per die block.
+dieBlockQtyJackScrews,2,,
+dieBlockWireEdmNumSetupsPerPart,1,,
+dieShoeLengthMedium,3810,Length,Conditional value characterizes medium sizes die shoes.
+dieShoeLengthSmall,2286,Length,Conditional value characterizes small sizes die shoes.
+dieShoeLowerLargeAssyTime,60,hr,
+dieShoeLowerMediumAssyTime,40,hr,
+dieShoeLowerNumSetupsPerPart,1,,
+dieShoeLowerQty,1,,Quantity of lower die shoes.
+dieShoeLowerSmallAssyTime,30,hr,
+dieShoeUpperLargeAssyTime,50,hr,
+dieShoeUpperMediumAssyTime,35,hr,
+dieShoeUpperNumSetupsPerPart,1,,
+dieShoeUpperQty,1,,Quantity of upper die shoes.
+dieShoeUpperSmallAssyTime,20,hr,
+dieShoeWidthThresholdLower,1524,Length,Lower size threshold for a die shoe.
+dieShoeWidthThresholdUpper,3048,Length,Upper size threshold for a die shoe.
+disableInvestmentAmortization,false,,"User override to disable amortization of all fixed costs to the individual part or assembly. By default, fixed costs are calculated per part for tooling, fixtures, and programming."
+doubleCoreInspectionFactor,2,,Factor used to increase Visual Inspection time if the part has two or more cores.
+dowelPinCost,1.65,Currency,Cost of single dowel pin.
+dowelPinsAssTimePerTool,0.01,hr,Time for assembly a single dowel pin.
+drawDirectionOrthogonalEpsilonForLifters,10,Angle,Maximum angular deviation of Lifter setup axis from plane orthogonal to Draw Direction.
+drawDirectionOrthogonalEpsilonForSlides,30,Angle,Maximum angular deviation of Slide setup axis from plane orthogonal to Draw Direction.
+drillTimePerClampPlateHole,0.5,min,Time to drill and counterbore a single hole in clamp plate.
+drillTimePerEjBoxRailHole,0.5,min,Time to drill and counterbore a single hole in ejector box rails.
+drillTimePerEjPlateHole,0.5,min,Time to drill and counterbore a single hole in ejector plate.
+drillTimePerEjPlatePinHole,0.5,min,"Time to drill, counterbore and ream a single hole for ejector plate pins (ejector or sleeve pin)."
+drillTimePerHole,1.6,min,Time for drilling and tapping a single hole for mounting.
+drillTimePerSupportPillarHole,0.1,hr,Time for drilling and tapping a single hole in support pillar.
+dryCycleStrokeFactor,0.7,,Euromap 6 details the dry cycle time measurement. Within this standard there is a reference to the stroke being 70% of the maximum of the tie bar values.
+dutyRate,0,Currency/Mass,Rate for calculating duty on tooling.
+edgeBorderPM,75,,"Used to allow 3"" border distance around the edge of the mold."
+edgeChamferFeed,500,in/hr,Machining feed of edge chamfering for core and cavity plates.
+edgeChamferSetup,1,hr,Setup time for core and cavity plates machining (chamfering all edges).
+ejBoxRailsDrillSetup,1,hr,Setup time for drilling and counterboring of ejector box rails.
+ejBoxRailsFeed,4500,in^2/hr,Feed of ejector box rails machining.
+ejBoxRailsSetup,2,hr,Setup time for machining of ejector box rails.
+ejPinsAssTimePerTool,0.25,hr,Time for assembly a single ejector pin.
+ejPlatesFeed,4500,in^2/hr,
+ejPlatesSetup,2,hr,Setup time for the machining of ejector plates surfaces.
+ejectTimeGDC,1.57,,Factor used to estimate eject time from it's correlation with lube time in Gravity Die Casting. Used to calculate the number of cavities required to meet annual volume.
+ejectTimeHPDC,2.45,,Factor used to estimate eject time in from it's correlation with lube time in High Pressure Die Cating. Used to calculate the number of cavities required to meet annual volume.
+ejectionBarDiameter,1.5,in,Diameter of ejection bar.
+ejectorBoxRailsHeight,6,in,Height of ejector box rails.
+ejectorBoxRailsWidth,3,in,Width of ejector box rails.
+ejectorDistanceFactor,3,,The coefficient used in finding a multiple of the part height to find the distace that the ejector pins should move.
+ejectorGuidePinsBushingsCost,32.4,Currency,Cost of a single ejector guide pin and bushing.
+ejectorPinsCost,9.4,Currency,Cost of a single ejector pin in the core plate.
+ejectorPlatePinDrillSetup,1,hr,
+ejectorPlatesDrillSetup,1,hr,
+elecSwitchesAssTimePerTool,1.5,hr,Time for assembly a single electrical switch.
+extraHighComplexityAdjustment,1.3,,Adjustment factor to account for extra high complexity parts.
+extraHighModulusRatio,10,,Factor used to increase Design Complexity Factor if the part has a extra high complexity.
+failNotSupportedGcds,true,,"If true Not Supported GCDs will fail to cost, if false Not Supported GCDs will cost successfully as a No Cost Feature."
+fillTimeConstantGravityDieCasting,15,Time,Time required for molten metal to flow into each cavity of a Gravity Die Casting.
+finishAllowance,0.25,Length,"Factor used to calculate the volume of finished faced surfaces, finished curved surfaces, and surfaces finished by side milling."
+firstQualityLoopStampingTime,12,hr,
+freightAdjustmentFactor,1.1,,Adjustment factor to account additional components the mold.
+furnaceCapacitySafetyFactor,1.5,,Safety factor for furnace capacity check during machine selection.
+furnaceTapRate,121,Mass/Time,Average rate at which molten metal can be tapped from furnace.
+gearQualityDefaultAgmaNewStd,A8,,"A2, A3, A4, ... A11, A12"
+gearQualityDefaultAgmaOldStd,Q8,,"Q14, Q13, ... Q6, Q5"
+gearQualityDefaultDinStd,9,,"2, 3, 4, ... 11, 12"
+genericValidation,true,,'true' if the generic validation view should be used for parts costed in this process group in this Digital Factory
+gravityDropTime,1.25,Time,The time for a part to drop from the tool by gravity.
+gravityEject,Gravity,,"Default value for the ""ejectMethod"" PSO is that the part removal is by gravity. The other user option is that the part removal can be robotic."
+grindSpeed,381,Length/Time,
+grindStepOverAmount,0.025,in,
+grindingRate,45720,Area/hr,Rate at which a surface can be ground.
+grindingSetupTimePerUnit,5,min,Time required for grinding setup of one unit.
+guidePinAssyQtyCbores,4,,Quantity of counterbored holes in a guide pin assembly.
+guidePinAssyQtyDowels,2,,Quantity of dowels required per assembly guide pin.
+guidePinBoringSetup,0.5,hr,Setup time of boring holes for guide pins.
+guidePinBoringSpeed,1,in/min,Speed of boring holes for guide pins.
+guidePinDrillSetup,2,hr,Setup time for machining of guide pins (vertical drilling).
+guidePinDrillingSpeed,1,in/min,Speed of drilling holes for guide pins.
+guidePinsAssTimePerTool,2,hr,Time for assembly a single guide pins.
+gunDrillSetup,1,hr,Setup time for gun drilling in the core and cavity (horizontal waterline channels).
+gunTapSetup,1.5,hr,Setup time for tapping.
+gunTapTime,0.75,min,Standard time for tapping.
+highCncProgramTime,1,hr,This time required to write a CNC program of large size and complexity.
+highComplexityAdjustment,1.2,,Adjustment factor to account for high complexity parts.
+highComplexityFactor,1.5,,Factor to take into account the complexity of the casting. Parts with more than 2000 features are considered high complexity.
+highEndMultiplier,.9,,Highest multiplier for chunkiness.
+highEndThickness,300,,High end threshold for thickness used to calculate chunkiness factor in material yield.
+highModulusRatio,4,,Factor used to increase Design Complexity Factor if the part has a high complexity.
+highStrengthMatlToolingCoatingType,DuplexVariantic,,Default type of coating applied to coated tooling components for high strength piece part material.
+hydrCylAssTimePerTool,5,hr,Time for assembly a single hydraulic cylinder.
+hydrSlideAssTimePerTool,2,hr,Time for assembly a single slide for hydraulic cylinder.
+ingateAreaToRunnerArea,1.4,,Ratio of cross sectional are of ingate to cross sectional area of runner for High Pressure Die Casting.
+ingateAspectRatio,4,,Ratio of width to height used to calculate ingate dimensions.
+ingateGap,152.4,Length,Average distance between ingates in the mold.
+ingateLengthToPartLength,0.1,,Ratio of part length to ingate length used to calculate ingate length.
+ingateMultiplier,5,,
+insertCoreLoadTime,3,Time,Time required to load a single core into the mold.
+laborRateAdjustmentFactor,1,,Factor used to globally increase or decrease labor rate evaluations per process.
+ladleFillTime,3,Time,Time required to ladle molten metal into entry chamber.
+ladleFillTimeGravityDieCasting,10,Time,Time required to ladle molten metal into machine crucible(s). Used to calculate the total cycle time.
+ladlePourRateGravityDieCasting,145000,Volume/Time,Rate at which molten metal can be poured into machine crucible(s). Used to calculate the total cycle time.
+ladleRate,125000,Volume/Time,Rate at which molten metal can be poured into entry chamber.
+largePartThreshold,1000,Mass,Threshold at which a part is considered too large to support multiple cavities or parts per mold.
+largeSlideDesignTime,30,hr,Time for design a single large slide.
+largeSlideVolume,2000,in^3,volume of large slides - cubic inch
+leadStockGuideQtyCbores,2,,
+leaderPinsAndShoulderBushings,6,,Number of leader pins and shoulder bushings.
+leaderPinsAssTimePerTool,1,hr,Time for assembly a single leader pin.
+leaderPinsShoulderBushingsCost,42.7,Currency,Cost of a single leader pin and shoulder bushing.
+lengthCorePrint,10,Length,Length of enclosing core box account for core prints.
+lengthwiseMountHolesStep,8,in,Lengthwise distance between closest mounting holes in clamping plates.
+lifterBaseLength,15,Length,Additional lifter base thickness.
+lifterHeightAddendum,5,Length,Lifter height addendum to GCD height.
+lifterInclineAngle,15,Angle,Incline of lifter back side.
+limitSwitch,2,,Number of limit switches.
+limitSwitchAssTimePerTool,1,hr,Time for assembly a single limit switch.
+limitSwitchesCost,50,Currency,
+locatRingsAssTimePerTool,0.3,hr,Time for assembly a single locating ring.
+locatingRings,1,,Number of locating rings.
+locatingRingsCost,54.7,Currency,Cost of single locating ring.
+lowCncProgramTime,0.25,hr,This time required to write a CNC program of small size and complexity.
+lowComplexityAdjustment,0.9,,Adjustment factor to account for low complexity parts.
+lowComplexityFactor,0.5,,Factor to take into account the complexity of the casting. Parts with less than 1000 features are considered low complexity.
+lowEndMultiplier,.75,,Lowest multiplier for chunkiness.
+lowEndThickness,9.5,,Low end threshold for thickness used to calculate chunkiness factor in material yield.
+lubeTimeCoefficient,0.0000511,,Coefficient value in regression equation when calculating lubeTime from lubeArea
+lubeTimeConstant,2.72,,Intercept value in regression equation when calculating lubeTime from lubeArea
+machTimePerVent,0.25,hr,Machining time for single vent.
+machinabilityMultiplier4140ToolSteel,1,,Unitless machinability multiplier for 4140 Tool Steel
+machinabilityMultiplierAluminum,0.5,,Unitless machinability multiplier for Aluminum
+machinabilityMultiplierH13ToolSteel,1.15,,Unitless machinability multiplier for H13 Tool Steel
+machinabilityMultiplierP20ToolSteel,1,,Unitless machinability multiplier for P20 Tool Steel
+manualMoldScrapIron,4,,Baseline percentage of scrap for manual molding of cast iron parts.
+manualMoldScrapNonFerrous,4.75,,Baseline percentage scrap for manual molding of non-ferrous parts.
+manualMoldScrapSteel,4.5,,Baseline percentage of scrap for manual molding of steel parts.
+materialYieldAluminum,55,,Basline percentage material yield for Aluminum.
+materialYieldAluminumNB,65,,Basline percentage material yield for Aluminum with ChemBond / NoBake.
+materialYieldCopper,50,,Basline percentage material yield for Copper.
+materialYieldCopperNB,60,,Basline percentage material yield for Copper with ChemBond / NoBake.
+materialYieldDuctile,40,,Basline percentage material yield for Ductile Iron.
+materialYieldDuctileNB,70,,Basline percentage material yield for Ductile Iron with ChemBond / NoBake.
+materialYieldGravityDieCasting,70,,Basline percentage material yield for Gravity Die Casting.
+materialYieldGray,60,,Basline percentage material yield for Gray Cast Iron.
+materialYieldGrayNB,75,,Basline percentage material yield for Gray Cast Iron with ChemBond / NoBake.
+materialYieldSteel,50,,Basline percentage material yield for Steel.
+materialYieldSteelNB,60,,Basline percentage material yield for Steel with ChemBond / NoBake.
+materialYieldZinc,60,,Basline percentage material yield for Zinc and Lead.
+materialYieldZincNB,70,,Basline percentage material yield for Zinc and Lead with ChemBond / NoBake.
+maxActionLength,500,Length,Briefs maximum allowed action length. The length is measured along direction orthogonal to both setup axis and draw direction.
+maxComplexityMultiplierScrap,2,,Multiplier for maximum value of complexity in determining scrap. Simple parts have a multiplier of 1.
+maxComplexityScrap,300,,Maximum number of cores and surfaces with multipliers for scrap calculation.
+maxCorePullStrokeLength,152.4,Length,Max allowed core pull stroke length.
+maxGCDPitch,50.8,Length,Briefs maximum allowed distance between GCDs in the same action. The distance is measured along direction orthogonal to both setup axis and draw direction.
+maxGcdDistanceFromPartEdge,25.4,Length,Maximum allowed distance from GCD to part edge along setup axis to bundle on Slide.
+maxLifterDepthPitch,12.7,Length,Maximum allowed distance between adjacent GCD front positions to bundle on Lifter.
+maxPierceDieCostWithMaterial,17000,Currency,Threshold above which the material based calculation of the trimming die cost is not valid.
+maxPierceDieCostWithOutMaterial,11000,Currency,Threshold above which the non- material based calculation of the trimming die cost is not valid.
+maxSlideDepthPitch,25.4,Length,Maximum allowed distance between adjacent GCD front positions to bundle on Slide.
+mcMoldScrapIron,1,,Baseline percentage of scrap for machine molding of cast iron parts.
+mcMoldScrapNonFerrous,1.75,,Baseline percentage of scrap for machine molding of non-ferrous parts.
+mcMoldScrapSteel,1.5,,Baseline percentage of scrap for machine molding of steel parts.
+mediumCncProgramTime,0.5,hr,This time required to write a CNC program of medium size and complexity.
+mediumComplexityAdjustment,1.1,,Adjustment factor to account for medium complexity parts.
+mediumComplexityFactor,1,,Factor to take into account the complexity of the casting. Parts with between 1000 and 2000 features are considered medium complexity.
+mediumLifterBundleWidthThreshold,127,Length,width threshold between a medium and large lifter bundle (based on 5 inches).
+mediumModulusRatio,2.5,,Factor used to increase Design Complexity Factor if the part has a medium complexity.
+mediumSlideBundleWidthThreshold,304.8,Length,Width threshold between a medium and large slide bundle (based on 12 inches).
+mediumSlideDesignTime,10,hr,Time for design a single medium slide.
+mediumSlideVolume,1100,in^3,volume of medium slides - cubic inch
+minBaffleDesignTime,2,hr,Minimum required time for baffles design.
+minBurnoutHoleDiameter,50.8,Length,The minimum diameter hole that can be flame cut (burnout).
+minCastableDraft,2,Angle,Threshold below which the draft angle is not castable.
+minCastableHoleDia,6.4,Length,"Threshold controlling the coreability of small voids and holes. When the size of the hole or void falls below this value, the GCD is not considered coreable."
+minCastableRadius,3,Length,Minimum radius that can be cast.
+minCastableRingLength,14.3,Length,Smallest Ring length that can be cast. Shorter than this must be machined.
+minCastableVoidWidth,2,Length,Smallest Void width that can be cast.
+minGrindTimePerPass,0.5,Time,
+minNumClampPlateHoles,8,,Minimum number of holes to drill and counterbore in clamp plates.
+minNumEjBoxRailsHoles,4,,Minimum number of holes to drill and counterbore in ejector box rails.
+minNumEjectorPlateHoles,8,,Minimum number of holes to drill and counterbore in ejector plates.
+minNumQualityLoops,2,,The default minimum number of quality loops used during tryout.
+minPierceDieCostWithMaterial,4000,Currency,Threshold below which the material based calculation of the trimming die cost is not valid.
+minPierceDieCostWithOutMaterial,1000,Currency,Threshold below which the non- material based calculation of the trimming die cost is not valid.
+minSandCastableHoleDia,6.4,Length,"Threshold controlling the coreability of small voids and holes in sand casting. When the size of the hole or void falls below this value, the GCD is not considered coreable"
+minSlugThickness,12.7,Length,Minimum slug thickness of a trimmed simple hole.
+minTrimHoleDiameter,25.4,Length,Minimum diameter hole that can be trimmed.
+minWaterChannelDesignTime,2,hr,Minimum required time for water channels design.
+minimumPartHeightPlusAllowance,50.8,Length,Minimum height that must be met or exceeded by adding post height and part height.
+minimumSlideClearance,196.75,Length,Minimum required GCD clearance to bundle on Slide.
+miscDieBlockNumTapped,0,,
+miscPiercePunchBackingPlateCustomNumTapped,0,,
+miscPiercePunchCustomNumTapped,0,,
+miscPiercePunchRetainerCustomNumTapped,0,,
+modifyAndAdjustDesignTime,12,hr,Time for modification and adjustment during design of mechanical parts of the tool.
+modulusConstant,1.75,,Exponential constant for use in Chvorinov's rule to calculate Cool Time for sand cast parts.
+moldFillRateGravityDieCasting,120000,FlowRate,Rate at which molten metal can fill a cavity of a Gravity Die Casting.
+moldMin,8,in,Minimal mold base size. Should be the same with tool shop variable Mold Min.
+moldToleranceAdjustmentFactor,0.45,,
+multiCoreInspectionFactor,0.1,,Adder used to increase Visual Inspection time if the part has two or more cores.
+nominalHeightFactor,3,,This factor is used to determine the tool's open travel distance in the presence of parts with nominal part height values. In this case the height of the part should be considered in determining the opening distance of the tool.
+numAssOperators,2,,Number of operators tending to assembly of mold tools.
+numCavitiesMaterialYieldAdd,.01,,Additional material yield percentage per cavity.
+numClampPlates,2,,Number of clamp plates (top and bottom) of mold.
+numCoreAndCavityPlates,2,,Coefficient that needs to consider core and cavity plates.
+numCoreCoefficient,12,,Yield based on the effect of the number of cores.
+numEjectionBars,4,,Number of ejection bars.
+numEjectorBoxRails,2,,Number of ejector box rails.
+numEjectorPlates,2,,Number of ejector plates (ejector plate and ejector back plate).
+numGuidePins,6,,Number of guide pins.
+numRowsMountHoles,2,,Numner of rows for mounting holes.
+numRowsWaterChCavHoles,4,,Numner of rows of waterline channels in cavity plate.
+numRowsWaterChCoreHoles,2,,Numner of rows of waterline channels in core plate.
+numSideMillingPasses,2,,Typical number of milling passes used for side milling.
+numSleevePinBurns,2,,Number of sleeve pin electrodes for raw material (carbon) sizing.
+numSurfaceCoefficient,1,,Yield based on the effect of the number of surfaces.
+numTappedHolesPerBottomParallel,7,,The quantity of tapped holes per bottom parallel.
+numTappedHolesPerTopParallel,0,,The quantity of tapped holes per top parallel.
+optimumComplexityAdjustment,1,,Adjustment factor for optimum cylinder (cylinder with diameter equal to height).
+overheadRateAdjustmentFactor,1,,Factor used to globally increase or decrease overhead rate evaluations per process.
+parallelSpacing,254,Length,Distance between parallels.
+parallelsWidth,38.1,Length,Unit width of the parallels placed between the end parallels.
+partHeightAllowance,12.7,Length,Height allowance added on to part height when calculating die height.
+partPatternAllowance,25.4,,Added for alternate method to include extra meterial allowance around the entire part.
+partSurfaceQuality,3,,"Index from tblPercentSolids for default value of setup.partSurfaceQuality ('Some porosity, some knit lines')"
+partingLineBaseDesignTime,5,hr,Time for base design of parting line surface.
+partingLineDesignTimePerSlide,4,hr,Time for parting line surface design that depends on the single slide (any size).
+partingLineDesignTimePerVent,0.125,hr,Time for parting line surface design that depends on the single vent.
+percentProfit,0.1,,Multiplier used to calculate percent profit on tooling.
+percentSGandA,0.1,,Multiplier used to calculate percent SG&A on tooling.
+percentTuning,0.03,,Multiplier used to calculate percent tuning on tooling.
+piercePunchBackingPlateCustomGrindingNumSetupsPerPart,2,,
+piercePunchBackingPlateCustomHeight,6,Length,
+piercePunchBackingPlateCustomLengthAdder,25.4,,
+piercePunchBackingPlateCustomNumJackScrews,0,,
+piercePunchBackingPlateCustomNumSetupsPerPart,1,,
+piercePunchBackingPlateCustomQtyDowels,2,,
+piercePunchBackingPlateCustomWidthAdder,25.4,,
+piercePunchCustomAssyTimePerPart,1.25,hr,
+piercePunchCustomGrindingNumSetupsPerPart,2,,
+piercePunchCustomHeight,101.6,Length,
+piercePunchCustomLengthAdder,12.7,Length,
+piercePunchCustomNumJackScrews,1,,
+piercePunchCustomNumSetupsPerPart,2,,
+piercePunchCustomQtyCbores,2,,
+piercePunchCustomQtyDowels,0,,
+piercePunchCustomWidthAdder,12.7,Length,
+piercePunchCustomWireEdmNumSetupsPerPart,1,,
+piercePunchRetainerCustomGrindingNumSetupsPerPart,2,,
+piercePunchRetainerCustomHeight,38.1,Length,
+piercePunchRetainerCustomLengthAdder,25.4,Length,Amount of stock added to each side of custom pierce punch retainer length.
+piercePunchRetainerCustomLengthThreshold,152.4,Length,Threshold value below which a fixed minimum number of screws will be used in a Custom Punch Retainer in Transfer Die.
+piercePunchRetainerCustomNumJackScrews,2,,
+piercePunchRetainerCustomNumSetupsPerPart,2,,
+piercePunchRetainerCustomQtyCboresMin,2,,Minimal number of counterbored holes in a custom pierce punch retainer.
+piercePunchRetainerCustomQtyDowels,2,,Quantity of dowels required per custom pierce punche retainer.
+piercePunchRetainerCustomWidthAdder,25.4,Length,Amount of stock added to each side of custom pierce punch retainer width.
+piercePunchRetainerCustomWireEdmNumSetupsPerPart,1,,
+piercePunchRetainerStandardQtyCbores,2,,Quantity of counterbored holes in a standard pierce punch retainer.
+piercePunchRetainerStandardQtyDowels,1,,Quantity of dowels required per standard pierce punche retainer.
+piercePunchStandardAssyTimePerPart,1.25,hr,
+pitchStopQtyCbores,2,,
+pocketFeed,4000,in^3/hr,Feed for machining pockets for slides.
+pocketSetup,0.5,hr,Setup time for machining of pockets for slides.
+postHeightMultiplier,2,,"Multiplier for calculating die height from post height. Default value is 2, meaning twice the post height must be allowed between die shoes."
+pressForceBase,500,,"Basic clamping force, after which time per tryout needs to be double counted. Units of measuring ton-force."
+projAreaPerEjectorPin,12.25,in^2,Projected area from the mold parting line that can be ejected by a single ejector pin.
+projPerimExtraBorder,2,in,Extra border around parting line perimeter for CNC finish machining.
+punchLengthStep,76.2,Length,Step increment for adding incremental screws to a Custom Punch Retainer in Transfer Die. (add another screw each time the Retainer length increases by this amount).
+qtyCboresPerBottomParallel,8,,Quantity of counterbored holes in a bottom parallel.
+qtyCboresPerBottomPlate,3,,The number of counterbored holes in the bottom plate for each bottom parallel.
+qtyCboresPerTopParallel,0,,Quantity of counterbores per top parallel.
+qtyDowelsPerBottomPlate,2,,The quantity of bottom plate dowel holes for each bottom parallel.
+qualityLoopInspectTime,2,hr,
+qualityLoopPressDemountTime,1,hr,
+qualityLoopSetupTime,2,hr,
+quickHoseDisconnectsCost,3,Currency,Cost of a single quick coupling for hoses.
+rateBoring,1524,Length/hr,Rate at which a hole can be bored.
+rateCnc,762,Length/hr,Rate at which items can be CNC'ed.
+rateDrilling,9144,Length/hr,Rate at which a hole can be drilled.
+rateMillingSide,114300,Length/hr,Rate at which a surface can be side milled.
+rateReaming,3048,Length/hr,Rate at which a hole can be reamed.
+rateTapping,2286,Length/hr,Rate at which a hole can be tapped.
+rateWireEdm,3870.96,Length/hr,Rate at which items can be wire EDM'ed.
+regionConvFactor,1,,Ratio of the cost of melting one kilogram of this metal to melting one kilogram of Ductile Iron.
+remainingQualityLoopStampingTime,2,hr,
+returnPinsAndShoulderBushings,6,,Number of return pins with shoulder bushings.
+returnPinsAssTimePerTool,1,hr,Time for assembly a single return pin.
+returnPinsShoulderBushingsCost,31.45,Currency,Cost of a single return pin with shoulder bushing.
+robotClearanceFactor,1,,This factor is used to determine the tool's open travel distance in the presence of robotic ejection. Clearance is required to allow the head of the robot to access the part.
+robotGrabTime,2.5,Time,The time for a robot to remove the part from the tool.
+roughFinishMachFactor,2,,Factor that consider roughing and finishing machining of tooling components.
+roughingCNCRate,0.004,hr/in^3,Rough machining time per volume.
+runOffHeight,2,in,Parting line height for CNC finish machining.
+runnerAspectRatio,2,,Ratio of width to height used to calculate runner dimensions.
+runnerMultiplier,2,,
+sandCureTimeManualFloor,30,min,Average cure time for standard chem bond sand used in Manual Floor Moldmaking.
+sandCureTimeManualPit,45,min,Average cure time for standard chem bond sand used in Manual Pit Moldmaking.
+sandCureTimeManualStd,10,min,Average cure time for standard chem bond sand used in Manual Std Moldmaking.
+sandMoldDensity,1600,Mass/m^3,Density of standard chem bond sand. Used to calculate Cool Time for sand cast parts.
+sandMoldSpecificHeat,1170,J/(Mass*K),Specific Heat of standard chem bond sand. Used to calculate Cool Time for sand cast parts.
+sandMoldTemp,293.15,K,"Initial temperature of a sand mold, assumed to be room temperature. Used to calculate Cool Time for sand cast parts."
+sandMoldThermalConductivity,0.52,Watts/(m*K),Thermal Conductivity of standard chem bond sand. Used to calculate Cool Time for sand cast parts.
+sandSlingingRate,300,Mass/min,Rate at which sand can be discharged into a mold. Used to calculate Mold Rate for manual molded parts.
+shellThickness,10,Length,
+sideLocks,2,,Number of side locks.
+sideLocksAssTimePerTool,0.5,hr,Time for assembly a single side lock.
+sideLocksCost,160,Currency,
+singleCoreAssemblyTime,60,Time,Time required to glue one individual core to another individual core or core assembly.
+singleCoreInspectionFactor,1.5,,Factor used to increase Visual Inspection time if the part has a single core.
+sleevePinsAssTimePerTool,0.4,hr,Time for assembly a single sleeve pin.
+sleevePinsEDMHeight,3,in,Sleeve pin electrode height.
+sleevePinsEDMLength,1,in,Sleeve pin electrode length.
+sleevePinsEDMRate,4,hr/in^3,Time per volume for sleeve pin electrodes burning.
+sleevePinsEDMWidth,1,in,Sleeve pin electrode width.
+slideAssTimePerTool,2,hr,Time for assembly a single slide.
+slideCNCMachRate,0.008,hr/in^3,Time per volume for CNC machining of slides.
+slideCutterPathTimePerTool,10,hr,Time for design a single slide cutter path.
+slideCycleRate,100,Velocity,The rate at which the hydraulic slide can move.
+slideEDMcutterPathTimePerTool,0.5,hr,
+slideInspectSetup,10,hr,Setup time for tool inspection.
+slideInspectTimePerTool,1.54,hr,Time for inspection a single slide.
+slidePocketSetup,1,hr,Setup time for CNC machining of slide pockets.
+slideSetup,1,hr,Setup time for single slide CNC machining.
+slidesCNCRate,0.025,hr/in^3,Time per volume for CNC machining of slide pockets.
+smallLifterBundleWidthThreshold,76.2,Length,width threshold between a small and medium lifter bundle (based on 3 inches).
+smallSlideBundleWidthThreshold,76.2,Length,Width threshold between a small and medium slide bundle (based on 3 inches).
+smallSlideDesignTime,5,hr,Time for design a single small slide.
+smallSlideVolume,75,in^3,volume of small slides - cubic inch
+sockHeadScrewsAssTimePerTool,0.01,hr,Time for assembly a single socket head screw.
+socketHeadCapScrewsLongCost,10,Currency,Cost of a single long screw with socket head cap.
+socketHeadCapScrewsShortCost,1.5,Currency,Cost of a single short screw with socket head cap.
+solidificationConstantHPDC,.034,Time/Length,Empirically derived constant related to the thermal conductivity of the die steel.
+spotPartingLineSetup,2,hr,Setup time for spotting of parting line area.
+spotSlidesTimePerTool,6,hr,Spotting time for a single slide.
+spottingTimePerArea,0.0468,Time/Area,
+sprBushSpreadAssTimePerTool,1,hr,Time for assembly a single sprue bushing or spreader.
+sprueAllowance,125,Length,Extra distance added to gripping length and width to account for sprue.
+sprueBushingCost,393.8,Currency,
+sprueMultiplier,1,,
+sprueSpreaderCost,381,Currency,
+sprueWellHeightToRunner,2,,Ratio of height of sprue well to height of runner.
+sprueWellRadiusToWellBase,2,,Ratio of radius of sprue well to radius at the base of the sprue.
+stampingHeightThreshold,101.6,Length,Used to determine the post-blanking adapter height.
+stdDieBlockHeight,76.2,Length,Standard height of die block.
+stdHeatTreatCostPerMass,0.23,CostPerMass,Typical cost per mass for standard oven based heat treating (hardening) of tooling components.
+stdPiercePunchDesignTimePerPart,1.5,hr,Time for design of single standard pierce punch of the tool.
+steelDensity,7861.092938,kg/m^3,Density of steel.
+stepOverAmount,0.025,in,
+stopPinsAssTimePerTool,0.5,hr,Time for assembly a single stop pin.
+stopPinsCost,1,Currency,Cost of a single stop pin.
+strainerCoreCost,1,Currency,Cost of one strainer core per mold pour.
+supPillarsAssTimePerTool,0.08,hr,Time for assembly a single support pillar.
+supportPillarDiameter,3,in,Diameter of support pillar.
+supportPillarLength,6,in,Length of support pillar.
+supportPillarsCost,22,Currency,
+supportPillarsSetup,0.1,hr,Setup time for drilling and tapping holes in support pillars.
+supportsDTC,true,,'true' or 'false' - only set to 'true' if this Digital Factory's cost model has been upgraded or configured to support aPriori's Design-to-Cost functionality.
+supportsDTCPanelOutput,true,,True if CMV has DTC Advice Rules panel output information for UI macro to utilize
+tablePlateAssTimePerTool,2,hr,Time for assembly a single table plate.
+timePerTryoutBase,12,hr,Basic time per tryout.
+toolShopRegionMultiplier,1,,Multiplier used to scale the overall mold cost based on the region in which the part is manufactured.
+toolSizeFactor,0.4,,Machining hours percent that reflects the tool size.
+toolingComponentSizeThreshold,152.4,Length,Used as a size threshold to determine the number of holes in various tooling components.
+toolingPressSetupTime,1.5,hr,
+toolingStdCostMultiplier,1,,Dial for modifying all tooling component standard costs.
+topEjectorPlateThickness,0.75,in,Thickness of top ejector plate of the mold.
+topParallelGrindingNumSetupsPerPart,2,,
+topParallelNumSetupsPerPart,2,,
+topParallelQtyDowels,0,,Quantity of dowels required per top parallel.
+topParallelsAdder,3,,Number of additional top parallels to take the place of what used to be wide parallels.
+topParallelsMillingTime,0.66,hr,Total time required for milling operator labor to mill (2) bolt-down slots in a parallel.
+transitionAllowableThicknessVarianceFactor,0.25,,"This is a factor which dictates the allowable thickness variance between any two points when analysing drastic thickness violations e.g. 0.25 means that between two points, the thickness of the second point is allowed to deviate by up to 0.25 the thickness of the first point."
+transitionThicknessCheckLengthFactor,0.05,,This is a factor of the part length that determines the distance when checking for the variance of the part thickness between two points. e.g. if the part length is 250mm and the factor is 0.1 then a thickness variance check will be evaluated every 25mm.
+trimDiaToDepthRatio,0.5,,Ratio of hole diameter to hole depth below which a multi step hole cannot be pierced.
+usePreferredMachines,true,,"If true the model will first try to select a preferred machine. If false, the system chooses either the default machine or from the entire non-preferred set of machines."
+ventSetup,1,hr,Setup time for machining of vents.
+ventsStep,3,in,Distance between closest vents.
+visualInspectTimeStandard,5,min/m^2,Average time per surface area to visually inspect a part.
+voxelCount,100000,,An approximation of the number of voxels in the part bounding box. Used for specifying the accuracy around GCD's when determining identically sized cores.
+voxelSizeSafetyFactor,2,,A scaling factor applied to the extracted voxel size. Used for specifying the accuracy around GCD's when determining identically sized cores.
+waterBafflesAssTimePerTool,0.15,hr,Time for assembly a single mold water baffle of cooling system.
+waterBafflesCost,8,Currency,Cost of a single mold baffle.
+waterChannelDesignTime,2,hr,Time for design a single water channel.
+waterChannelsStep,3,in,Distance between closest water channels.
+waterHosesCost,1.25,Currency,Cost of a single water hose.
+waterManifoldFittingsCost,2.5,Currency,Cost of a single water manifold fitting.
+waterManifoldsCost,55,Currency,Cost of a single water manifold.
+waterlineDrillSpeed,1,in/min,Speed of drilling holes for waterlines channels.
+waterlineTapTimePerBaffle,0.75,min,
+widthwiseMountHolesStep,6,in,Widthwise distance between closest mounting holes in clamping plates.
+wireEdmSetupTimePerUnit,10,min,Time required for wire EDM machining setup of one unit.

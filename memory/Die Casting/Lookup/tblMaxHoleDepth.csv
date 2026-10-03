@@ -1,0 +1,238 @@
+﻿Hole Diameter (mm),Hole Max Depth (mm),Material Type,Process Name
+2.40,5.97,Aluminum,High Pressure Die Casting
+2.40,5.97,Aluminum Bronze,High Pressure Die Casting
+2.40,5.97,Magnesium,High Pressure Die Casting
+2.40,7.10,Lead,High Pressure Die Casting
+2.40,7.10,Zinc,High Pressure Die Casting
+2.40,7.10,Zinc-Aluminum,High Pressure Die Casting
+3.18,7.94,Aluminum,High Pressure Die Casting
+3.18,7.94,Aluminum Bronze,High Pressure Die Casting
+3.18,7.94,Magnesium,High Pressure Die Casting
+3.18,9.53,Lead,High Pressure Die Casting
+3.18,9.53,Zinc,High Pressure Die Casting
+3.18,9.53,Zinc-Aluminum,High Pressure Die Casting
+3.97,12.70,Aluminum,High Pressure Die Casting
+3.97,12.70,Aluminum Bronze,High Pressure Die Casting
+3.97,12.70,Magnesium,High Pressure Die Casting
+3.97,14.29,Lead,High Pressure Die Casting
+3.97,14.29,Zinc,High Pressure Die Casting
+3.97,14.29,Zinc-Aluminum,High Pressure Die Casting
+4.80,7.14,Aluminum,Sand Casting
+4.80,7.14,Aluminum Bronze,Sand Casting
+4.80,7.14,Brass,Sand Casting
+4.80,7.14,Bronze,Sand Casting
+4.80,7.14,Copper,Sand Casting
+4.80,7.14,Magnesium,Sand Casting
+4.80,7.14,Manganese Bronze,Sand Casting
+4.80,7.14,Silicon Brass,Sand Casting
+4.80,7.14,Zinc,Sand Casting
+4.80,7.14,Zinc-Aluminum,Sand Casting
+4.80,9.14,Brass,High Pressure Die Casting
+4.80,9.14,Bronze,High Pressure Die Casting
+4.80,9.14,Copper,High Pressure Die Casting
+4.80,9.14,Manganese Bronze,High Pressure Die Casting
+4.80,9.14,Silicon Brass,High Pressure Die Casting
+4.80,9.53,Aluminum,Gravity Die Casting
+4.80,9.53,Aluminum Bronze,Gravity Die Casting
+4.80,9.53,Brass,Gravity Die Casting
+4.80,9.53,Bronze,Gravity Die Casting
+4.80,9.53,Copper,Gravity Die Casting
+4.80,9.53,Lead,Gravity Die Casting
+4.80,9.53,Magnesium,Gravity Die Casting
+4.80,9.53,Manganese Bronze,Gravity Die Casting
+4.80,9.53,Silicon Brass,Gravity Die Casting
+4.80,9.53,Zinc,Gravity Die Casting
+4.80,9.53,Zinc-Aluminum,Gravity Die Casting
+4.80,15.88,Aluminum,High Pressure Die Casting
+4.80,15.88,Aluminum Bronze,High Pressure Die Casting
+4.80,15.88,Magnesium,High Pressure Die Casting
+4.80,19.05,Lead,High Pressure Die Casting
+4.80,19.05,Zinc,High Pressure Die Casting
+4.80,19.05,Zinc-Aluminum,High Pressure Die Casting
+6.35,9.53,Aluminum,Sand Casting
+6.35,9.53,Aluminum Bronze,Sand Casting
+6.35,9.53,Brass,Sand Casting
+6.35,9.53,Bronze,Sand Casting
+6.35,9.53,Copper,Sand Casting
+6.35,9.53,Magnesium,Sand Casting
+6.35,9.53,Manganese Bronze,Sand Casting
+6.35,9.53,Silicon Brass,Sand Casting
+6.35,9.53,Zinc,Sand Casting
+6.35,9.53,Zinc-Aluminum,Sand Casting
+6.35,12.70,Aluminum,Gravity Die Casting
+6.35,12.70,Aluminum Bronze,Gravity Die Casting
+6.35,12.70,Brass,Gravity Die Casting
+6.35,12.70,Brass,High Pressure Die Casting
+6.35,12.70,Bronze,Gravity Die Casting
+6.35,12.70,Bronze,High Pressure Die Casting
+6.35,12.70,Copper,Gravity Die Casting
+6.35,12.70,Copper,High Pressure Die Casting
+6.35,12.70,Lead,Gravity Die Casting
+6.35,12.70,Magnesium,Gravity Die Casting
+6.35,12.70,Manganese Bronze,Gravity Die Casting
+6.35,12.70,Manganese Bronze,High Pressure Die Casting
+6.35,12.70,Silicon Brass,Gravity Die Casting
+6.35,12.70,Silicon Brass,High Pressure Die Casting
+6.35,12.70,Zinc,Gravity Die Casting
+6.35,12.70,Zinc-Aluminum,Gravity Die Casting
+6.35,25.40,Aluminum,High Pressure Die Casting
+6.35,25.40,Aluminum Bronze,High Pressure Die Casting
+6.35,25.40,Lead,High Pressure Die Casting
+6.35,25.40,Magnesium,High Pressure Die Casting
+6.35,25.40,Zinc,High Pressure Die Casting
+6.35,25.40,Zinc-Aluminum,High Pressure Die Casting
+9.53,14.29,Aluminum,Sand Casting
+9.53,14.29,Aluminum Bronze,Sand Casting
+9.53,14.29,Brass,Sand Casting
+9.53,14.29,Bronze,Sand Casting
+9.53,14.29,Copper,Sand Casting
+9.53,14.29,Magnesium,Sand Casting
+9.53,14.29,Manganese Bronze,Sand Casting
+9.53,14.29,Silicon Brass,Sand Casting
+9.53,14.29,Zinc,Sand Casting
+9.53,14.29,Zinc-Aluminum,Sand Casting
+9.53,25.40,Brass,High Pressure Die Casting
+9.53,25.40,Bronze,High Pressure Die Casting
+9.53,25.40,Copper,High Pressure Die Casting
+9.53,25.40,Manganese Bronze,High Pressure Die Casting
+9.53,25.40,Silicon Brass,High Pressure Die Casting
+9.53,38.10,Aluminum,Gravity Die Casting
+9.53,38.10,Aluminum,High Pressure Die Casting
+9.53,38.10,Aluminum Bronze,Gravity Die Casting
+9.53,38.10,Aluminum Bronze,High Pressure Die Casting
+9.53,38.10,Brass,Gravity Die Casting
+9.53,38.10,Bronze,Gravity Die Casting
+9.53,38.10,Copper,Gravity Die Casting
+9.53,38.10,Lead,Gravity Die Casting
+9.53,38.10,Lead,High Pressure Die Casting
+9.53,38.10,Magnesium,Gravity Die Casting
+9.53,38.10,Manganese Bronze,Gravity Die Casting
+9.53,38.10,Silicon Brass,Gravity Die Casting
+9.53,38.10,Zinc,Gravity Die Casting
+9.53,38.10,Zinc,High Pressure Die Casting
+9.53,38.10,Zinc-Aluminum,Gravity Die Casting
+9.53,38.10,Zinc-Aluminum,High Pressure Die Casting
+12.70,19.05,Aluminum,Sand Casting
+12.70,19.05,Aluminum Bronze,Sand Casting
+12.70,19.05,Brass,Sand Casting
+12.70,19.05,Bronze,Sand Casting
+12.70,19.05,Copper,Sand Casting
+12.70,19.05,Magnesium,Sand Casting
+12.70,19.05,Manganese Bronze,Sand Casting
+12.70,19.05,Silicon Brass,Sand Casting
+12.70,19.05,Zinc,Sand Casting
+12.70,19.05,Zinc-Aluminum,Sand Casting
+12.70,31.75,Brass,High Pressure Die Casting
+12.70,31.75,Bronze,High Pressure Die Casting
+12.70,31.75,Copper,High Pressure Die Casting
+12.70,31.75,Manganese Bronze,High Pressure Die Casting
+12.70,31.75,Silicon Brass,High Pressure Die Casting
+12.70,50.80,Aluminum,Gravity Die Casting
+12.70,50.80,Aluminum,High Pressure Die Casting
+12.70,50.80,Aluminum Bronze,Gravity Die Casting
+12.70,50.80,Aluminum Bronze,High Pressure Die Casting
+12.70,50.80,Brass,Gravity Die Casting
+12.70,50.80,Bronze,Gravity Die Casting
+12.70,50.80,Copper,Gravity Die Casting
+12.70,50.80,Lead,Gravity Die Casting
+12.70,50.80,Lead,High Pressure Die Casting
+12.70,50.80,Magnesium,Gravity Die Casting
+12.70,50.80,Manganese Bronze,Gravity Die Casting
+12.70,50.80,Silicon Brass,Gravity Die Casting
+12.70,50.80,Zinc,Gravity Die Casting
+12.70,50.80,Zinc,High Pressure Die Casting
+12.70,50.80,Zinc-Aluminum,Gravity Die Casting
+12.70,50.80,Zinc-Aluminum,High Pressure Die Casting
+15.88,23.81,Aluminum,Sand Casting
+15.88,23.81,Aluminum Bronze,Sand Casting
+15.88,23.81,Brass,Sand Casting
+15.88,23.81,Bronze,Sand Casting
+15.88,23.81,Copper,Sand Casting
+15.88,23.81,Magnesium,Sand Casting
+15.88,23.81,Manganese Bronze,Sand Casting
+15.88,23.81,Silicon Brass,Sand Casting
+15.88,23.81,Zinc,Sand Casting
+15.88,23.81,Zinc-Aluminum,Sand Casting
+15.88,50.80,Brass,High Pressure Die Casting
+15.88,50.80,Bronze,High Pressure Die Casting
+15.88,50.80,Copper,High Pressure Die Casting
+15.88,50.80,Manganese Bronze,High Pressure Die Casting
+15.88,50.80,Silicon Brass,High Pressure Die Casting
+15.88,79.38,Aluminum,High Pressure Die Casting
+15.88,79.38,Aluminum Bronze,High Pressure Die Casting
+15.88,79.38,Lead,High Pressure Die Casting
+15.88,79.38,Magnesium,High Pressure Die Casting
+15.88,79.38,Zinc,High Pressure Die Casting
+15.88,79.38,Zinc-Aluminum,High Pressure Die Casting
+15.88,95.25,Aluminum,Gravity Die Casting
+15.88,95.25,Aluminum Bronze,Gravity Die Casting
+15.88,95.25,Brass,Gravity Die Casting
+15.88,95.25,Bronze,Gravity Die Casting
+15.88,95.25,Copper,Gravity Die Casting
+15.88,95.25,Lead,Gravity Die Casting
+15.88,95.25,Magnesium,Gravity Die Casting
+15.88,95.25,Manganese Bronze,Gravity Die Casting
+15.88,95.25,Silicon Brass,Gravity Die Casting
+15.88,95.25,Zinc,Gravity Die Casting
+15.88,95.25,Zinc-Aluminum,Gravity Die Casting
+19.05,28.58,Aluminum,Sand Casting
+19.05,28.58,Aluminum Bronze,Sand Casting
+19.05,28.58,Brass,Sand Casting
+19.05,28.58,Bronze,Sand Casting
+19.05,28.58,Copper,Sand Casting
+19.05,28.58,Magnesium,Sand Casting
+19.05,28.58,Manganese Bronze,Sand Casting
+19.05,28.58,Silicon Brass,Sand Casting
+19.05,28.58,Zinc,Sand Casting
+19.05,28.58,Zinc-Aluminum,Sand Casting
+19.05,63.50,Brass,High Pressure Die Casting
+19.05,63.50,Bronze,High Pressure Die Casting
+19.05,63.50,Copper,High Pressure Die Casting
+19.05,63.50,Manganese Bronze,High Pressure Die Casting
+19.05,63.50,Silicon Brass,High Pressure Die Casting
+19.05,114.30,Aluminum,Gravity Die Casting
+19.05,114.30,Aluminum,High Pressure Die Casting
+19.05,114.30,Aluminum Bronze,Gravity Die Casting
+19.05,114.30,Aluminum Bronze,High Pressure Die Casting
+19.05,114.30,Brass,Gravity Die Casting
+19.05,114.30,Bronze,Gravity Die Casting
+19.05,114.30,Copper,Gravity Die Casting
+19.05,114.30,Lead,Gravity Die Casting
+19.05,114.30,Lead,High Pressure Die Casting
+19.05,114.30,Magnesium,Gravity Die Casting
+19.05,114.30,Magnesium,High Pressure Die Casting
+19.05,114.30,Manganese Bronze,Gravity Die Casting
+19.05,114.30,Silicon Brass,Gravity Die Casting
+19.05,114.30,Zinc,Gravity Die Casting
+19.05,114.30,Zinc,High Pressure Die Casting
+19.05,114.30,Zinc-Aluminum,Gravity Die Casting
+19.05,114.30,Zinc-Aluminum,High Pressure Die Casting
+25.40,38.10,Aluminum,Sand Casting
+25.40,38.10,Aluminum Bronze,Sand Casting
+25.40,38.10,Brass,Sand Casting
+25.40,38.10,Bronze,Sand Casting
+25.40,38.10,Copper,Sand Casting
+25.40,38.10,Magnesium,Sand Casting
+25.40,38.10,Manganese Bronze,Sand Casting
+25.40,38.10,Silicon Brass,Sand Casting
+25.40,38.10,Zinc,Sand Casting
+25.40,38.10,Zinc-Aluminum,Sand Casting
+25.40,127.00,Brass,High Pressure Die Casting
+25.40,127.00,Bronze,High Pressure Die Casting
+25.40,127.00,Copper,High Pressure Die Casting
+25.40,127.00,Manganese Bronze,High Pressure Die Casting
+25.40,127.00,Silicon Brass,High Pressure Die Casting
+25.40,152.40,Aluminum,Gravity Die Casting
+25.40,152.40,Aluminum,High Pressure Die Casting
+25.40,152.40,Aluminum Bronze,Gravity Die Casting
+25.40,152.40,Aluminum Bronze,High Pressure Die Casting
+25.40,152.40,Brass,Gravity Die Casting
+25.40,152.40,Bronze,Gravity Die Casting
+25.40,152.40,Copper,Gravity Die Casting
+25.40,152.40,Lead,Gravity Die Casting
+25.40,152.40,Magnesium,Gravity Die Casting
+25.40,152.40,Manganese Bronze,Gravity Die Casting
+25.40,152.40,Silicon Brass,Gravity Die Casting
+25.40,152.40,Zinc,Gravity Die Casting
+25.40,152.40,Zinc-Aluminum,Gravity Die Casting
+25.40,152.40,Zinc-Aluminum,High Pressure Die Casting

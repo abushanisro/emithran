@@ -1,0 +1,13 @@
+﻿Name,tblSandAdditives
+File Path,lookupTables/Component/tblSandAdditives.csv
+
+Name,Usage Percent (%),Rate (USD / kg)
+Bentonite,4.00,0.22
+Cereal,2.00,0.38
+Furan,1.00,3.00
+Iron Oxide,4.00,0.72
+Kaolinite,1.70,0.20
+None,0.00,0.00
+Phenolic Resin,1.50,2.50
+Silica Flour,2.00,0.16
+Sodium Silicate,3.50,0.57

@@ -1,0 +1,51 @@
+Name,Source Name,Process,Description,Manufacturer,Cut Code,Material Type Name,Cost Per KG (USD / kg),Cost Units,Base Cost Per Unit (USD),Density (kg / m^3),Milling Speed (m / min)
+"Polyamide 12, Al-Filled","Generic Polyamide 12, Al-Filled",SLS,"Grey, Highly Machinable",EOS,1.5,Polyamide,52,Cost per KG,52,1360,0
+"Polyamide 12, Glass-Filled","Generic Polyamide 12, Glass-Filled",SLS,"White, High Stiffness, Durable",EOS,1.5,Polyamide,61,Cost per KG,61,1220,0
+A6 Metal,Generic A6 Metal,SLS,Tooling Steel for Injection Molding or Die Casting,3D Systems,1.5,LaserForm,78.6,Cost per KG,78.6,7800,0
+"Polyamide 12, Black","Generic Polyamide 12, Black",SLS,Heat Stabilized,EOS,1.5,Polyamide,83,Cost per KG,83,980,0
+"Polyamide 12, Flame Ret.","Generic Polyamide 12, Flame Ret.",SLS,"White, Flame Retardant",EOS,1.5,Polyamide,83,Cost per KG,83,1060,0
+Polystyrene,Generic Polystyrene,SLS,"Grey, Investment Casting",EOS,1.5,Polystyrene,95,Cost per KG,95,770,0
+Polyamide 12,Generic Polyamide 12,SLS,"White, Chemical Resistant, Food Approved",EOS,1.5,Polyamide,97,Cost per KG,97,930,0
+Default,Generic Default,"Default (Add $50 for SLA, Add $100 for 3DP)","Virtual Material (Add 140 kg/m^3 for SLA, Add 225 kg/m^3 for 3DP)",,1.5,Default,125,Cost per KG,125,960,0
+Polyamide 11,Generic Polyamide 11,SLS,"White, General Purpose",EOS,1.5,Polyamide,125,Cost per KG,125,960,0
+PS Plastic,Generic PS Plastic,SLS,"Red, Investment Casting",3D Systems,1.5,CastForm,131,Cost per KG,131,460,0
+"Polyamide 12, Carbon-Filled","Generic Polyamide 12, Carbon-Filled",SLS,"Black, Electrically Conductive",EOS,1.5,Polyamide,139,Cost per KG,139,1040,0
+EX Plastic,Generic EX Plastic,SLS,"Black or White, Tear Resistant",3D Systems,1.5,DuraForm,141,Cost per KG,141,1010,0
+GF Plastic,Generic GF Plastic,SLS,"Black, Glass-Filled Nylon",3D Systems,1.5,DuraForm,141,Cost per KG,141,1490,0
+PA Plastic,Generic PA Plastic,SLS,"White, Nylon",3D Systems,1.5,DuraForm,141,Cost per KG,141,1000,0
+accuGen,Generic accuGen,SLA,"Clear Amber, General Purpose",3D Systems,1.5,Accura,175,Cost per KG,175,1100,0
+Accura 10,Generic Accura 10,SLA,"Clear Amber, Rigid",3D Systems,1.5,Accura,194,Cost per KG,194,1210,0
+Flex Plastic,Generic Flex Plastic,SLS,"Many Colors, Watertight, Highly Flexible",3D Systems,1.5,DuraForm,219,Cost per KG,219,440,0
+720 Transparent,Generic 720 Transparent,3D Printing,"Rigid, General Purpose",Objet,1.5,Vero,225,Cost per KG,225,1185,0
+Accura 25,Generic Accura 25,SLA,"White, Flexible",3D Systems,1.5,Accura,234,Cost per KG,234,1190,0
+Accura 40,Generic Accura 40,SLA,"Clear Amber, Nylon 6/6-Like",3D Systems,1.5,Accura,234,Cost per KG,234,1190,0
+Accura 50,Generic Accura 50,SLA,"Opaque White, ABS-Like",3D Systems,1.5,Accura,234,Cost per KG,234,1210,0
+Accura 55,Generic Accura 55,SLA,"White, ABS-Like",3D Systems,1.5,Accura,234,Cost per KG,234,1200,0
+Accura 60,Generic Accura 60,SLA,"Clear, Polycarbonate-Like",3D Systems,1.5,Accura,234,Cost per KG,234,1210,0
+Xtreme,Generic Xtreme,SLA,"Grey, Impact Resistant",3D Systems,1.5,Accura,234,Cost per KG,234,1190,0
+CeraMax,Generic CeraMax,SLA,"Opaque White, Plastic-Ceramic Composite",3D Systems,1.5,Accura,235,Cost per KG,235,1620,0
+PEAK,Generic PEAK,SLA,"Amber, High Temperature Resistant, High Stiffness",3D Systems,1.5,Accura,235,Cost per KG,235,1360,0
+e-Stone,Generic e-Stone,SLA,"Peach, Dental Applications",3D Systems,1.5,Accura,235,Cost per KG,235,1190,0
+Accura 48HTR,Generic Accura 48HTR,SLA,"Clear Amber, Automotive Testing",3D Systems,1.5,Accura,239,Cost per KG,239,1230,0
+10122 Colorless,Generic 10122 Colorless,SLA,"Rigid, ABS-Like",Somos,1.5,WaterClear,240,Cost per KG,240,1130,0
+12120 Orange-Red,Generic 12120 Orange-Red,SLA,"Strong, High Temperature Tolerant",Somos,1.5,ProtoTherm,240,Cost per KG,240,1150,0
+18120 Translucent,Generic 18120 Translucent,SLA,"General Purpose, ABS-Like",Somos,1.5,ProtoGen,240,Cost per KG,240,1160,0
+18420 White,Generic 18420 White,SLA,"General Purpose, ABS-Like",Somos,1.5,ProtoGen,240,Cost per KG,240,1160,0
+18920 Grey,Generic 18920 Grey,SLA,"General Purpose, ABS-Like",Somos,1.5,ProtoGen,240,Cost per KG,240,1160,0
+SR 200,Generic SR 200,3D Printing,"Rigid, Durable, General Purpose",3D Systems,1.5,VisiJet Plastic,243,Cost per KG,243,1020,0
+830 White,Generic 830 White,3D Printing,Rigid,Objet,1.5,Vero,250,Cost per KG,250,1175,0
+840 Blue,Generic 840 Blue,3D Printing,Rigid,Objet,1.5,Vero,250,Cost per KG,250,1185,0
+850 Grey,Generic 850 Grey,3D Printing,Rigid,Objet,1.5,Vero,250,Cost per KG,250,1175,0
+870 Black,Generic 870 Black,3D Printing,Rigid,Objet,1.5,Vero,250,Cost per KG,250,1175,0
+MX,Generic MX,3D Printing,"Clear Amber, Acrylic",3D Systems,1.5,VisiJet Plastic,250,Cost per KG,250,1020,0
+EX 200,Generic EX 200,3D Printing,"Opaque White, Acrylic",3D Systems,1.5,VisiJet Plastic,256,Cost per KG,256,1020,0
+950 Grey,Generic 950 Grey,3D Printing,"Flexible, Rubber-Like",Objet,1.5,Tango,275,Cost per KG,275,1165,0
+970 Black,Generic 970 Black,3D Printing,"Flexible, Rubber-Like",Objet,1.5,Tango,275,Cost per KG,275,1125,0
+Bluestone,Generic Bluestone,SLA,"Opaque Blue, High Stiffness",3D Systems,1.5,Accura,289,Cost per KG,289,1780,0
+980 Black Plus,Generic 980 Black Plus,3D Printing,"Flexible, Wear Resistant",Objet,1.5,Tango,300,Cost per KG,300,1125,0
+CP 200,Generic CP 200,3D Printing,"Light Blue, Investment Casting",3D Systems,1.5,VisiJet Wax,345,Cost per KG,345,810,0
+DP 200,Generic DP 200,3D Printing,"Dark Green, Acrylic",3D Systems,1.5,VisiJet Plastic,345,Cost per KG,345,1020,0
+V-Flash,Generic V-Flash,3D Printing,for V-Flash Printer,3D Systems,1.5,V-Flash,472,Cost per KG,472,1110,0
+HR 200,Generic HR 200,3D Printing,"Dark Blue, Acrylic",3D Systems,1.5,VisiJet Plastic,489,Cost per KG,489,1020,0
+"Polyetheretherketone, PEEK","Generic Polyetheretherketone, PEEK",SLS,"Wear Resistant, Chemical Resistant",EOS,1.5,Polyaryletherketone,525,Cost per KG,525,1310,0
+CPX 200,Generic CPX 200,3D Printing,"Dark Blue, Investment Casting",3D Systems,1.5,VisiJet Wax,641,Cost per KG,641,810,0

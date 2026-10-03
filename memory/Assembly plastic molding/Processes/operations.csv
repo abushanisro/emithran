@@ -1,0 +1,27 @@
+Process Name
+Multi-Shot Molding:As Molded//ComboVoid
+Multi-Shot Molding:As Molded//MultiStepHole
+Multi-Shot Molding:As Molded//SimpleHole
+Multi-Shot Molding:As Molded//Void
+Multi-Shot Molding:HoleUnscrewMandrel//SimpleHole
+Multi-Shot Molding:MstepUnscrewMandrel//MultiStepHole
+Multi-Shot Molding:Multi-Shot Mold
+Multi-Shot Molding:Multi-Shot Mold:Multi-Shot//Stage
+Multi-Shot Molding:Multi-Shot Mold:Multi-Shot//Stage:As Molded//AssemblyComponentGcd
+Multi-Shot Molding:Multi-Shot Mold:Multi-Shot//Stage:As Molded//CurvedSurface
+Multi-Shot Molding:Multi-Shot Mold:Multi-Shot//Stage:As Molded//CurvedWall
+Multi-Shot Molding:Multi-Shot Mold:Multi-Shot//Stage:As Molded//PlanarFace
+Multi-Shot Molding:Multi-Shot Mold:Multi-Shot//Stage:As Molded//Rib
+Multi-Shot Molding:Multi-Shot Mold:Multi-Shot//Stage:As Molded//SharpEdge
+Multi-Shot Molding:Multi-Shot Mold:Multi-Shot//Stage:Lifters//LifterBundle
+Multi-Shot Molding:Multi-Shot Mold:Multi-Shot//Stage:Lifters//LifterBundle:As Molded//AssemblyComponentGcd
+Multi-Shot Molding:Multi-Shot Mold:Multi-Shot//Stage:Slides//SlideBundle
+Multi-Shot Molding:Multi-Shot Mold:Multi-Shot//Stage:Slides//SlideBundle:As Molded//AssemblyComponentGcd
+No Cost Feature:No Cost Feature//Stage
+No Cost Feature:No Cost Feature//Stage:No Cost Feature//MultiStepHole
+No Cost Feature:No Cost Feature//Stage:No Cost Feature//SimpleHole
+Pick and Place:Manual Load//AssemblyComponentGcd
+Pick and Place:Pick and Place//Stage
+Pick and Place:Pick and Place//Stage:Pick and Place Lifters//LifterBundle
+Pick and Place:Pick and Place//Stage:Pick and Place Slides//SlideBundle
+Pick and Place:Robotic Load//AssemblyComponentGcd

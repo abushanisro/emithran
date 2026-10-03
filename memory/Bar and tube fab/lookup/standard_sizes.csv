@@ -1,0 +1,27 @@
+Variable,Size (mm),Unit,Note
+bolsterDiameterAdjustmentFactor,50.00,metric,"Close to 2"""
+bolsterDiameterAdjustmentFactor,50.80,US,"2"""
+diameterThresholdForHighTrim,500.00,metric,"Close to 20"""
+diameterThresholdForHighTrim,508.00,US,"20"""
+diameterThresholdForLowTrim,250.00,metric,"Close to 10"""
+diameterThresholdForLowTrim,254.00,US,"10"""
+dieDiameterAdjustmentFactor,35.00,metric,"Close to 1.5"""
+dieDiameterAdjustmentFactor,38.10,US,"1.5"""
+dieODClearanceForNesting,5.00,metric,"Close to 1/4"""
+dieODClearanceForNesting,6.35,US,"1/4"""
+extrusionBilletLength,5.00,metric,5 mm
+extrusionBilletLength,6.35,US,"1/4"""
+extrusionToolDiameter,10.00,metric,10 mm
+extrusionToolDiameter,12.70,US,"1/2"""
+extrusionToolLength,5.00,metric,5 mm
+extrusionToolLength,6.35,US,"1/4"""
+highTrimLength,1200.00,metric,Close to 4'
+highTrimLength,1219.20,US,4'
+lowTrimLength,600.00,metric,Close to 2'
+lowTrimLength,609.60,US,2'
+mediumTrimLength,900.00,metric,Close to 3'
+mediumTrimLength,914.40,US,3'
+tool_minBolsterDiameter,365.00,metric,"Close to 14.5"""
+tool_minBolsterDiameter,368.30,US,"14.5"""
+weldScrapLength,9.53,US,"3/8"""
+weldScrapLength,10.00,metric,"Close to 3/8"""

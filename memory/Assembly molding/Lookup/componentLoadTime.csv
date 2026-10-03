@@ -1,0 +1,15 @@
+﻿Load Time (s),Weight (kg),Load Method
+0.00,0.00,Manual
+0.00,0.00,Robotic
+6.00,0.50,Robotic
+8.00,0.20,Manual
+13.00,1.00,Robotic
+15.00,1.00,Manual
+16.00,5.00,Robotic
+18.00,5.00,Manual
+22.00,20.00,Robotic
+24.00,20.00,Manual
+30.00,27.00,Robotic
+32.00,27.00,Manual
+85.00,999999999.00,Robotic
+87.00,999999999.00,Manual
