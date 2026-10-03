@@ -69,13 +69,14 @@ export default function RawMaterialsPage() {
     setSearch,
     setMaterialGroup,
     setSorting,
+    setPagination,
     clearFilters,
   } = useMaterialFilters({
     initialFilters: {
       sortBy: 'material',
       sortOrder: 'asc',
       page: 1,
-      limit: 500
+      limit: 100
     },
     autoSyncCurrency: true
   });
@@ -183,6 +184,8 @@ export default function RawMaterialsPage() {
 
   const rawMaterials = rawMaterialsData?.items || [];
   const totalCount = rawMaterialsData?.total || 0;
+  const currentPage = filters.page ?? 1;
+  const pageSize = filters.limit ?? 100;
 
   // No group-based filtering — one page, every material shown together.
   const filteredMaterials = rawMaterials;
@@ -1163,6 +1166,24 @@ export default function RawMaterialsPage() {
             )}
           </TableBody>
         </Table>
+
+        {/* Pager: every material is reachable, not just the first page. */}
+        {totalCount > 0 && (
+          <div className="flex items-center justify-between gap-2 px-3 py-2 border-t text-xs text-muted-foreground">
+            <span>
+              {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, totalCount)} of {totalCount}
+            </span>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="sm" className="h-7 px-2 text-xs"
+                disabled={currentPage <= 1}
+                onClick={() => setPagination(currentPage - 1)}>Previous</Button>
+              <span className="px-2">Page {currentPage} of {Math.max(1, Math.ceil(totalCount / pageSize))}</span>
+              <Button variant="outline" size="sm" className="h-7 px-2 text-xs"
+                disabled={currentPage * pageSize >= totalCount}
+                onClick={() => setPagination(currentPage + 1)}>Next</Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Edit Material Dialog */}
