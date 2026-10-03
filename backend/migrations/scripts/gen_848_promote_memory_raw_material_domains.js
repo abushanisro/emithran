@@ -147,7 +147,13 @@ ${coreVals.join(',\n')}
   const insertWhere = d.policy === 'suffix'
     ? 'WHERE NOT EXISTS (SELECT 1 FROM raw_materials rm WHERE rm.material = s.material_name)'
     : 'WHERE NOT EXISTS (SELECT 1 FROM raw_materials rm WHERE rm.material = s.material_name)';
-  const selectCols = coreKeys.map((c) => (c === 'material' ? 's.material_name' : `s.${c}`)).join(', ');
+  // A column that is NULL in every row of one VALUES list is typed as text, so
+  // each numeric target is cast explicitly, never left to inference.
+  const NUMERIC_CORE = new Set(['cut_code', 'cost', 'cost_usa', 'base_cost_per_unit_usd', 'density_kg_m3', 'density', 'hardness']);
+  const selectCols = coreKeys.map((c) => {
+    if (c === 'material') return 's.material_name';
+    return NUMERIC_CORE.has(c) ? `CAST(s.${c} AS NUMERIC)` : `s.${c}`;
+  }).join(', ');
 
   const core_sql = `-- ── ${d.group}: core columns (${core.length} materials, policy ${d.policy})
 WITH ${srcCte}
@@ -170,7 +176,7 @@ props(source_name, property_key, value_num, value_text, unit) AS (VALUES
 ${chunk.join(',\n')}
 )
 INSERT INTO raw_material_properties (raw_material_id, property_key, value_num, value_text, unit, source_version)
-SELECT t.id, p.property_key, p.value_num, p.value_text, p.unit, '${d.sourceVersion}'
+SELECT t.id, p.property_key, CAST(p.value_num AS NUMERIC), CAST(p.value_text AS TEXT), CAST(p.unit AS TEXT), '${d.sourceVersion}'
 FROM props p
 JOIN src s ON s.material = p.source_name
 JOIN LATERAL (
