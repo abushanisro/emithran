@@ -1,17 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  useRawMaterialProperties,
-  useRawMaterialStockPrices,
-  useSaveRawMaterialStockPrice,
-  useStockForms,
-} from '@/lib/api/hooks/useRawMaterials';
+import { useRawMaterialProperties, useRawMaterialStockPrices } from '@/lib/api/hooks/useRawMaterials';
 
 // "specific_heat_rt_j_kg_k" -> "Specific heat rt j kg k". The key is the
 // normalized source header; the unit column carries the real unit.
@@ -24,34 +14,8 @@ function labelOf(key: string): string {
 const STOCK_LOCATION = 'USA';
 
 function StockPricesSection({ materialId }: { materialId: string }) {
-  const { data: forms } = useStockForms();
   const { data: prices, isLoading } = useRawMaterialStockPrices(materialId);
-  const save = useSaveRawMaterialStockPrice(materialId);
-  const [form, setForm] = useState<string>('');
-  const [price, setPrice] = useState<string>('');
-
   const current = (prices ?? []).filter((p) => p.location === STOCK_LOCATION);
-  const selected = current.find((p) => p.stockForm === form);
-
-  // Choosing a form shows its current price and fills the box with it.
-  const chooseForm = (value: string) => {
-    setForm(value);
-    const existing = current.find((p) => p.stockForm === value);
-    setPrice(existing ? existing.pricePerKg.toFixed(3) : '');
-  };
-
-  const onSave = () => {
-    const value = Number(price);
-    if (!form) { toast.error('Choose a stock form'); return; }
-    if (!Number.isFinite(value) || value <= 0) { toast.error('Enter a price above zero'); return; }
-    save.mutate(
-      { stockForm: form, location: STOCK_LOCATION, pricePerKg: value },
-      {
-        onSuccess: () => { toast.success('Stock price saved'); setPrice(''); },
-        onError: () => toast.error('Could not save the stock price'),
-      },
-    );
-  };
 
   return (
     <div className="mt-5 space-y-3">
@@ -78,36 +42,6 @@ function StockPricesSection({ materialId }: { materialId: string }) {
           </tbody>
         </table>
       )}
-      <div className="flex items-end gap-2">
-        <div className="flex-1 space-y-1">
-          <span className="text-xs text-muted-foreground">Stock form</span>
-          <Select value={form} onValueChange={chooseForm}>
-            <SelectTrigger className="h-8 text-xs">
-              <SelectValue placeholder="Choose a form" />
-            </SelectTrigger>
-            <SelectContent>
-              {(forms?.forms ?? []).map((f) => (
-                <SelectItem key={f} value={f} className="text-xs">{labelOf(f)}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="w-32 space-y-1">
-          <span className="text-xs text-muted-foreground">
-            {form ? (selected ? `Current: $${selected.pricePerKg.toFixed(3)}/kg` : 'No price yet') : 'USD per kg'}
-          </span>
-          <Input
-            className="h-8 text-xs"
-            inputMode="decimal"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            placeholder="0.000"
-          />
-        </div>
-        <Button size="sm" className="h-8 text-xs" onClick={onSave} disabled={save.isPending}>
-          {save.isPending ? 'Saving…' : 'Save'}
-        </Button>
-      </div>
     </div>
   );
 }
@@ -129,7 +63,6 @@ export function RawMaterialPropertiesDialog({
           <DialogTitle>{materialName ?? 'Material'} — properties</DialogTitle>
           <DialogDescription>Every property on file for this material, with its unit and source.</DialogDescription>
         </DialogHeader>
-        {materialId && <StockPricesSection materialId={materialId} />}
         {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
         {error && <p className="text-sm text-red-500">Could not load properties.</p>}
         {data && data.length === 0 && <p className="text-sm text-muted-foreground">No properties on file.</p>}
@@ -155,6 +88,7 @@ export function RawMaterialPropertiesDialog({
             </tbody>
           </table>
         )}
+        {materialId && <StockPricesSection materialId={materialId} />}
       </DialogContent>
     </Dialog>
   );
