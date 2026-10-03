@@ -14,13 +14,11 @@ import { useMaterialStockPrices } from '@/lib/api/hooks/useRawMaterials';
 
 const labelOf = (form: string) => form.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
 
-export function StockPricesCard() {
+// location follows the page's cost region; null when that region has no stock data.
+export function StockPricesCard({ location }: { location: string | null }) {
   const { data, isLoading, error } = useMaterialStockPrices();
   const [open, setOpen] = useState(false);
-  const locations = useMemo(() => [...new Set((data ?? []).map((r) => r.location))].sort(), [data]);
-  const [location, setLocation] = useState<string | null>(null);
-  // The app's quote location default is USA (useCostSummary); show it first when present.
-  const loc = location ?? (locations.includes('USA') ? 'USA' : locations[0]) ?? null;
+  const loc = location;
 
   const { forms, byMaterial, unmatched } = useMemo(() => {
     const rows = (data ?? []).filter((r) => r.location === loc);
@@ -43,21 +41,11 @@ export function StockPricesCard() {
         {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         <span className="text-sm font-semibold">Stock prices by form</span>
         <span className="text-xs text-muted-foreground">
-          {byMaterial.size} materials · {loc}{unmatched > 0 ? ` · ${unmatched} not linked to a raw material (not used in costing)` : ''}
+          {loc ? `${byMaterial.size} materials · ${loc}` : 'No stock prices for this cost region'}{unmatched > 0 ? ` · ${unmatched} not linked to a raw material (not used in costing)` : ''}
         </span>
       </button>
-      {open && (
+      {open && loc && (
         <div className="mt-3 space-y-2">
-          {locations.length > 1 && (
-            <div className="flex gap-1">
-              {locations.map((l) => (
-                <button key={l} type="button" onClick={() => setLocation(l)}
-                  className={`rounded px-2 py-0.5 text-xs border ${l === loc ? 'bg-primary text-primary-foreground' : 'bg-background'}`}>
-                  {l}
-                </button>
-              ))}
-            </div>
-          )}
           <p className="text-xs text-muted-foreground">
             Machining prices a milled billet on plate and a turned part on round bar at the quote location, converted at the day&apos;s FX rate.
           </p>

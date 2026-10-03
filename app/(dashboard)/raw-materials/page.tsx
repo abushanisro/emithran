@@ -88,7 +88,7 @@ export default function RawMaterialsPage() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [editingMaterial, setEditingMaterial] = useState<RawMaterial | null>(null);
-  const [costRegion, setCostRegion] = useState<'india' | 'usa' | 'china' | 'mexico' | 'france' | 'germany' | 'w_europe' | 'e_europe'>('usa');
+  const [costRegion, setCostRegion] = useState<'usa' | 'china' | 'mexico' | 'france' | 'germany' | 'w_europe' | 'e_europe'>('usa');
   const [newMaterial, setNewMaterial] = useState({
     materialGroup: '',
     material: '',
@@ -128,7 +128,6 @@ export default function RawMaterialsPage() {
   const CONFIRM_DELETE_TEXT = 'delete';
 
   const COST_REGION_LABELS: Record<string, string> = {
-    india:    'India',
     usa:      'USA',
     china:    'China',
     mexico:   'Mexico',
@@ -141,7 +140,6 @@ export default function RawMaterialsPage() {
   // Helper functions for display
   const renderCostDisplay = (material: RawMaterial) => {
     const costMap: Record<string, number | undefined> = {
-      india:    material.costIndia,
       usa:      material.costUsa,
       china:    material.costChina,
       mexico:   material.costMexico,
@@ -1078,7 +1076,7 @@ export default function RawMaterialsPage() {
       </div>
 
       {/* Stock-form prices by location (material_stock_prices) */}
-      <StockPricesCard />
+      <StockPricesCard location={costRegion === 'usa' ? 'USA' : null} />
 
       {/* ── Data Table ─────────────────────────────────────────── */}
       <Card>
