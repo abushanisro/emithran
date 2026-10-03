@@ -141,6 +141,14 @@ export class RawMaterialsService {
     const sortOrder = query.sortOrder || 'asc';
     queryBuilder = queryBuilder.order(sortBy, { ascending: sortOrder === 'asc' });
 
+    // Pages are cut here, not left to the database default (1000 rows), so every
+    // page is reachable. A browse pages in the database; a search is ranked over
+    // its whole match set first, then paged in memory.
+    const page = Math.max(1, query.page ?? 1);
+    const limit = Math.min(1000, Math.max(1, query.limit ?? 100));
+    const offset = (page - 1) * limit;
+    queryBuilder = query.search ? queryBuilder.limit(1000) : queryBuilder.range(offset, offset + limit - 1);
+
     const { data, error, count } = await queryBuilder;
 
     if (error) {
@@ -168,7 +176,7 @@ export class RawMaterialsService {
         matchReason: reason,
         matchIsBest: isBest,
       }));
-      return { items, total: count || 0 };
+      return { items: items.slice(offset, offset + limit), total: count || 0 };
     }
 
     const items = rows.map(row => RawMaterialResponseDto.fromDatabase(row));

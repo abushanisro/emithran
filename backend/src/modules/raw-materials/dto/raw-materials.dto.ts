@@ -277,6 +277,21 @@ export class CreateRawMaterialDto {
 export class UpdateRawMaterialDto extends PartialType(CreateRawMaterialDto) {}
 
 export class QueryRawMaterialsDto {
+  @ApiPropertyOptional({ default: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  page?: number;
+
+  @ApiPropertyOptional({ default: 100, maximum: 1000 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  @Max(1000)
+  limit?: number;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
