@@ -10,6 +10,18 @@
 --   Additive Manufacturing     96 materials,   480 properties, policy suffix
 --   Composites                 23 materials,   319 properties, policy suffix
 --   PCB                        13 materials,   112 properties, policy suffix
+--   Casting Investment        157 materials,   785 properties, policy suffix
+--   Die Casting                68 materials,  1304 properties, policy suffix
+--   Casting                    95 materials,  2455 properties, policy suffix
+--   Powder Metal                7 materials,    70 properties, policy suffix
+--   Rapid Prototyping          50 materials,   149 properties, policy suffix
+--   Roto & Blow Molding        72 materials,   785 properties, policy suffix
+--   Sheet Plastic              13 materials,   130 properties, policy suffix
+--   Sheet Metal Roll Forming  102 materials,  1418 properties, policy suffix
+--   Sheet Metal Stretch Forming   49 materials,   882 properties, policy suffix
+--   Sheet Metal Transfer Die  102 materials,  1418 properties, policy suffix
+--   Bar and Tube Fabrication   93 materials,  4782 properties, policy suffix
+--   Assembly Plastic Molding  109 materials,  1228 properties, policy suffix
 --
 -- Core fields -> raw_materials columns. Every other source column -> one row of
 -- raw_material_properties. Name rule: 'suffix' stores a colliding name as
