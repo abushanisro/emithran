@@ -12,7 +12,7 @@
 // and the material search both read these):
 //   material            <- Source Name   ("Generic Aluminum Bronze")
 //   material_grade      <- Name          ("Aluminum Bronze")
-//   material_specification <- Description
+//   (Description has no column on raw_materials; it stays in the lossless 846 landing)
 //   material_type       <- Material Type
 //   density_kg_m3       <- Density (kg / m^3)
 //   density             <- Density / 1000  (g/cm3, the unit the density lookup reads)
@@ -44,7 +44,7 @@ const values = rows.map((r) => {
   const densityKg = r['Density (kg / m^3)'];
   const density = typeof densityKg === 'number' ? Math.round((densityKg / 1000) * 1000) / 1000 : null;
   const cost = typeof r['Unit Cost (USD / kg)'] === 'number' ? r['Unit Cost (USD / kg)'] : null;
-  return `  (${sqlStr(material)}, ${sqlStr(r['Name'])}, ${sqlStr(r['Description'])}, ${sqlStr(r['Material Type'])}, ${sqlStr(GROUP)}, ` +
+  return `  (${sqlStr(material)}, ${sqlStr(r['Name'])}, ${sqlStr(r['Material Type'])}, ${sqlStr(GROUP)}, ` +
     `${sqlNum(densityKg)}, ${sqlNum(density)}, ${sqlNum(r['Hardness'])}, ${sqlStr(r['Hardness System'])}, ` +
     `${sqlNum(cost)}, ${sqlNum(cost)}, 'USD')`;
 });
@@ -67,14 +67,14 @@ const sql = `-- ================================================================
 -- ============================================================================
 
 INSERT INTO raw_materials (
-  material, material_grade, material_specification, material_type, material_group,
+  material, material_grade, material_type, material_group,
   density_kg_m3, density, hardness, hardness_system, cost, cost_usa, currency
 )
-SELECT v.material, v.material_grade, v.material_specification, v.material_type, v.material_group,
+SELECT v.material, v.material_grade, v.material_type, v.material_group,
        v.density_kg_m3, v.density, v.hardness, v.hardness_system, v.cost, v.cost_usa, v.currency
 FROM (VALUES
 ${values.join(',\n')}
-) AS v(material, material_grade, material_specification, material_type, material_group,
+) AS v(material, material_grade, material_type, material_group,
        density_kg_m3, density, hardness, hardness_system, cost, cost_usa, currency)
 WHERE NOT EXISTS (
   SELECT 1 FROM raw_materials rm WHERE rm.material = v.material
