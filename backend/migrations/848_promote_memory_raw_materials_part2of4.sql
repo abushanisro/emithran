@@ -1636,7 +1636,7 @@ props(source_name, property_key, value_num, value_text, unit) AS (VALUES
   ($str$Generic Vinyl Ester, CF60$str$, $str$processing_parameters_cure_time_min$str$, 35, NULL, NULL)
 )
 INSERT INTO raw_material_properties (raw_material_id, property_key, value_num, value_text, unit, source_version)
-SELECT t.id, p.property_key, p.value_num, p.value_text, p.unit, '2026-Plastic'
+SELECT t.id, p.property_key, CAST(p.value_num AS NUMERIC), CAST(p.value_text AS TEXT), CAST(p.unit AS TEXT), '2026-Plastic'
 FROM props p
 JOIN src s ON s.material = p.source_name
 JOIN LATERAL (

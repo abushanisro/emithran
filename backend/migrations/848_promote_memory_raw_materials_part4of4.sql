@@ -587,7 +587,7 @@ props(source_name, property_key, value_num, value_text, unit) AS (VALUES
   ($str$Generic e-Stone$str$, $str$recycle_percentage$str$, 0, NULL, NULL)
 )
 INSERT INTO raw_material_properties (raw_material_id, property_key, value_num, value_text, unit, source_version)
-SELECT t.id, p.property_key, p.value_num, p.value_text, p.unit, '2026-Additive'
+SELECT t.id, p.property_key, CAST(p.value_num AS NUMERIC), CAST(p.value_text AS TEXT), CAST(p.unit AS TEXT), '2026-Additive'
 FROM props p
 JOIN src s ON s.material = p.source_name
 JOIN LATERAL (
@@ -630,7 +630,7 @@ WITH src AS (
   ) AS v(material, material_grade, material_type, material_group, cut_code, cost, cost_usa, cost_units, base_cost_per_unit_usd, currency, density_kg_m3, density, hardness, hardness_system, description, data_source, usa_name)
 )
 INSERT INTO raw_materials (material, material_grade, material_type, material_group, cut_code, cost, cost_usa, cost_units, base_cost_per_unit_usd, currency, density_kg_m3, density, hardness, hardness_system, description, data_source, usa_name)
-SELECT s.material_name, s.material_grade, s.material_type, s.material_group, s.cut_code, s.cost, s.cost_usa, s.cost_units, s.base_cost_per_unit_usd, s.currency, s.density_kg_m3, s.density, s.hardness, s.hardness_system, s.description, s.data_source, s.usa_name
+SELECT s.material_name, s.material_grade, s.material_type, s.material_group, CAST(s.cut_code AS NUMERIC), CAST(s.cost AS NUMERIC), CAST(s.cost_usa AS NUMERIC), s.cost_units, CAST(s.base_cost_per_unit_usd AS NUMERIC), s.currency, CAST(s.density_kg_m3 AS NUMERIC), CAST(s.density AS NUMERIC), CAST(s.hardness AS NUMERIC), s.hardness_system, s.description, s.data_source, s.usa_name
 FROM src s
 WHERE NOT EXISTS (SELECT 1 FROM raw_materials rm WHERE rm.material = s.material_name);
 
@@ -987,7 +987,7 @@ props(source_name, property_key, value_num, value_text, unit) AS (VALUES
   ($str$Generic Glass - Woven Prepreg - Plain Weave 3K$str$, $str$cured_thickness$str$, 0.19, NULL, $str$mm$str$)
 )
 INSERT INTO raw_material_properties (raw_material_id, property_key, value_num, value_text, unit, source_version)
-SELECT t.id, p.property_key, p.value_num, p.value_text, p.unit, '2026-Composites'
+SELECT t.id, p.property_key, CAST(p.value_num AS NUMERIC), CAST(p.value_text AS TEXT), CAST(p.unit AS TEXT), '2026-Composites'
 FROM props p
 JOIN src s ON s.material = p.source_name
 JOIN LATERAL (
@@ -1020,7 +1020,7 @@ WITH src AS (
   ) AS v(material, material_grade, material_type, material_group, cut_code, cost, cost_usa, cost_units, base_cost_per_unit_usd, currency, density_kg_m3, density, hardness, hardness_system, description, data_source, usa_name)
 )
 INSERT INTO raw_materials (material, material_grade, material_type, material_group, cut_code, cost, cost_usa, cost_units, base_cost_per_unit_usd, currency, density_kg_m3, density, hardness, hardness_system, description, data_source, usa_name)
-SELECT s.material_name, s.material_grade, s.material_type, s.material_group, s.cut_code, s.cost, s.cost_usa, s.cost_units, s.base_cost_per_unit_usd, s.currency, s.density_kg_m3, s.density, s.hardness, s.hardness_system, s.description, s.data_source, s.usa_name
+SELECT s.material_name, s.material_grade, s.material_type, s.material_group, CAST(s.cut_code AS NUMERIC), CAST(s.cost AS NUMERIC), CAST(s.cost_usa AS NUMERIC), s.cost_units, CAST(s.base_cost_per_unit_usd AS NUMERIC), s.currency, CAST(s.density_kg_m3 AS NUMERIC), CAST(s.density AS NUMERIC), CAST(s.hardness AS NUMERIC), s.hardness_system, s.description, s.data_source, s.usa_name
 FROM src s
 WHERE NOT EXISTS (SELECT 1 FROM raw_materials rm WHERE rm.material = s.material_name);
 
@@ -1160,7 +1160,7 @@ props(source_name, property_key, value_num, value_text, unit) AS (VALUES
   ($str$Generic Panel$str$, $str$milling_speed$str$, 0, NULL, $str$m / min$str$)
 )
 INSERT INTO raw_material_properties (raw_material_id, property_key, value_num, value_text, unit, source_version)
-SELECT t.id, p.property_key, p.value_num, p.value_text, p.unit, '2026-PCB'
+SELECT t.id, p.property_key, CAST(p.value_num AS NUMERIC), CAST(p.value_text AS TEXT), CAST(p.unit AS TEXT), '2026-PCB'
 FROM props p
 JOIN src s ON s.material = p.source_name
 JOIN LATERAL (
