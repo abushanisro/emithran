@@ -19,7 +19,8 @@ export function StockPricesCard() {
   const [open, setOpen] = useState(false);
   const locations = useMemo(() => [...new Set((data ?? []).map((r) => r.location))].sort(), [data]);
   const [location, setLocation] = useState<string | null>(null);
-  const loc = location ?? locations[0] ?? null;
+  // The app's quote location default is USA (useCostSummary); show it first when present.
+  const loc = location ?? (locations.includes('USA') ? 'USA' : locations[0]) ?? null;
 
   const { forms, byMaterial, unmatched } = useMemo(() => {
     const rows = (data ?? []).filter((r) => r.location === loc);
