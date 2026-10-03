@@ -1,12 +1,12 @@
 -- ============================================================================
--- Migration 849: remove the memory/ raw materials staged as JSON
+-- Migration 856: remove the memory/ raw materials staged as JSON
 -- ============================================================================
--- Migration 848 moved these materials into raw_materials and raw_material_properties.
+-- Migration 855 moved these materials into raw_materials and raw_material_properties.
 -- This deletes only the old JSON rows: category 'material' under the source
 -- versions of the domains 848 promoted. Lookups, variables, processes, operations
 -- and wage grades are not touched.
 --
--- Run after every part of 848. Idempotent: a second run deletes nothing.
+-- Run after every part of 855. Idempotent: a second run deletes nothing.
 -- ============================================================================
 
 DELETE FROM machining_reference_data

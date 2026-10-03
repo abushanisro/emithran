@@ -48,12 +48,12 @@ describe('memory reference domains', () => {
     }
   });
 
-  it('migration 846 stages the Sand Casting folder under its own source version', () => {
+  it('migration 853 stages the Sand Casting folder under its own source version', () => {
     const dir = path.join(REPO, 'backend/migrations');
-    const parts = fs.readdirSync(dir).filter((f) => /^846_stage_memory_domains/.test(f));
+    const parts = fs.readdirSync(dir).filter((f) => /^853_stage_memory_domains/.test(f));
     expect(parts.length).toBeGreaterThan(0);
     const sql = parts.map((f) => fs.readFileSync(path.join(dir, f), 'utf-8')).join(' ');
-    for (const d of MEMORY_DOMAINS.filter((x) => x.stagedBy === '846')) {
+    for (const d of MEMORY_DOMAINS.filter((x) => x.stagedBy === '853')) {
       expect(sql).toContain(`'USA', $str$${d.sourceVersion}$str$`);
     }
   });
