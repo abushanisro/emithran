@@ -119,6 +119,7 @@ export function RawMaterialPropertiesDialog({
           <DialogTitle>{materialName ?? 'Material'} — properties</DialogTitle>
           <DialogDescription>Every property on file for this material, with its unit and source.</DialogDescription>
         </DialogHeader>
+        {materialId && <StockPricesSection materialId={materialId} />}
         {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
         {error && <p className="text-sm text-red-500">Could not load properties.</p>}
         {data && data.length === 0 && <p className="text-sm text-muted-foreground">No properties on file.</p>}
@@ -144,7 +145,6 @@ export function RawMaterialPropertiesDialog({
             </tbody>
           </table>
         )}
-        {materialId && <StockPricesSection materialId={materialId} />}
       </DialogContent>
     </Dialog>
   );
