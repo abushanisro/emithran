@@ -175,12 +175,15 @@ for (const d of MANIFEST.domains.filter((x) => x.stagedBy === STAGED_BY)) {
         const k = col(r, 'Process Name', 'processName');
         if (k) add('process', String(k), col(r, 'Default Machine', 'defaultMachine'), null, col(r, 'Notes', 'notes'), r);
       }
-    } else if (materialTable) {
+    } else if (materialTable && !d.materialsTable) {
       for (const r of t.rows) {
         const k = col(r, 'Name', 'name');
         if (k) add('material', String(k), col(r, 'Material Type', 'materialType'), null, `Staged from ${src}`, r);
       }
     }
+    // A domain whose manifest entry names materialsTable keeps its materials in
+    // that real table (its own promotion migration), never as JSON rows here.
+    if (materialTable && d.materialsTable) notes.push(`${rel}: materials go to ${d.materialsTable} (not staged here)`);
   }
 
   summary.push(`--   ${d.label.padEnd(28)} ${d.sourceVersion.padEnd(19)} ${Object.entries(counts).map(([k, v]) => `${k} ${v}`).join(', ')}`);
