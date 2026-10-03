@@ -128,6 +128,14 @@
       "sourceVersion": "2026-Casting",
       "processGroup": "Casting",
       "stagedBy": "849"
+    },
+    {
+      "key": "sand_casting",
+      "label": "Sand Casting",
+      "folder": "Sand casting",
+      "sourceVersion": "2026-SandCasting",
+      "processGroup": "Sand Casting",
+      "stagedBy": "850"
     }
   ]
 }
