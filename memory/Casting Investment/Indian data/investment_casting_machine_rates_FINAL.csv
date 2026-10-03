@@ -1,0 +1,92 @@
+Machine Name,Labor Rate (USD/hr),Direct Overhead (USD/hr),Indirect Overhead (USD/hr),Total Overhead (USD/hr),Sector (as captured),Process Category (inferred)
+BLIN HDS-J200,1.65,15.42,5.01,20.43,World Average,Finishing/Deflash
+Burr King 960-400,1.65,0.33,0.87,1.20,World Average,Finishing/Deflash
+Default Bench,2.25,0.00,0.86,0.86,World Average,Generic/Bench
+Diamond America TF200,2.25,2.96,0.89,3.85,World Average,Cut-off/Grinding
+Diamond America TF400,2.25,5.24,0.89,6.13,World Average,Cut-off/Grinding
+Starkey Model 851,2.25,4.19,0.89,5.08,World Average,Cut-off/Grinding
+Verdes 050,2.25,2.75,0.89,3.64,World Average,Cut-off/Grinding
+L&L Kiln EL2427 - Box,2.14,2.56,0.90,3.46,World Average,Kiln - Dewax/Burnout
+L&L Kiln EL2448 - Box,2.14,3.91,0.90,4.81,World Average,Kiln - Dewax/Burnout
+L&L Kiln EL3048 - Box,2.14,5.04,0.92,5.96,World Average,Kiln - Dewax/Burnout
+Olympic Kiln FL31E - Shuttle Kiln,2.14,3.82,1.02,4.84,World Average,Kiln - Dewax/Burnout
+Olympic Kiln FL42E - Shuttle Kiln,2.14,5.83,1.03,6.86,World Average,Kiln - Dewax/Burnout
+Olympic Kiln FL53E - Shuttle Kiln,2.14,6.39,0.99,7.38,World Average,Kiln - Dewax/Burnout
+Olympic Kiln FL27E - Box,2.14,3.26,0.93,4.19,World Average,Kiln - Dewax/Burnout
+Olympic Kiln FL12E - Box,2.14,1.99,0.90,2.89,World Average,Kiln - Dewax/Burnout
+Olympic Kiln FL20E - Box,2.14,2.83,0.90,3.73,World Average,Kiln - Dewax/Burnout
+Vcella 100,2.14,2.31,0.89,3.20,World Average,Kiln - Dewax/Burnout
+Vcella 150,2.14,3.50,0.91,4.41,World Average,Kiln - Dewax/Burnout
+Vcella 200,2.14,3.96,0.91,4.87,World Average,Kiln - Dewax/Burnout
+Vcella 60,2.14,1.63,0.88,2.51,World Average,Kiln - Dewax/Burnout
+Cleveland CTM-100 4 Post Ceramic Injection,2.25,12.76,1.10,13.86,World Average,Wax Injection
+Cleveland CTM-15 C Frame Ceramic Injection,2.25,4.00,0.92,4.92,World Average,Wax Injection
+Cleveland CTM-25 4 Post Ceramic Injection,2.25,5.22,0.96,6.18,World Average,Wax Injection
+Cleveland CTM-50 4 Post Ceramic Injection,2.25,7.73,1.02,8.75,World Average,Wax Injection
+MODTECH 100T 4 Pillar Ceramic Injection,2.25,11.29,1.29,12.58,World Average,Wax Injection
+MODTECH 35T C Frame Ceramic Injection,2.25,5.22,0.97,6.19,World Average,Wax Injection
+MODTECH 50T 4 Pillar Ceramic Injection,2.25,6.09,1.09,7.18,World Average,Wax Injection
+Magnus ALX30H52 - 2200lbs,2.14,7.93,0.90,8.83,World Average,Wax Injection Press
+Magnus ALXH7652 - 2200lbs,2.14,17.33,0.95,18.28,World Average,Wax Injection Press
+Magnus MAL2222 - 520lbs,2.14,3.88,0.88,4.76,World Average,Wax Injection Press
+Magnus ML24X1 - 250lbs,2.14,3.34,0.88,4.22,World Average,Wax Injection Press
+Magnus ML5R - 200lbs,2.14,1.37,0.87,2.24,World Average,Wax Injection Press
+Etch Cell - 1.8m x 1.0m x 1.2m Tank,2.75,14.48,1.19,15.67,World Average,Surface Prep/Etch
+Etch Cell - 3.6m x 2.1m x 2.4m Tank,2.75,51.77,2.18,53.95,World Average,Surface Prep/Etch
+Default Machine (variant A),2.14,0.00,0.86,0.86,World Average,Generic/Machine
+Default Machine (variant B),2.14,0.62,0.86,1.48,World Average,Generic/Machine
+Flash Fire Furnace (5ft x 4ft x 5ft),2.14,87.00,0.95,87.95,World Average,Dewax - Flash Fire Furnace
+Pacific Kiln PBF-60 (Flash Fire group),2.14,83.27,0.95,84.22,World Average,Dewax - Flash Fire Furnace
+Pacific Kiln PBF-80 (Flash Fire group),2.14,84.98,0.95,85.93,World Average,Dewax - Flash Fire Furnace
+Pacific Kiln KOM-24,2.14,2.37,0.89,3.26,World Average,Kiln - Dewax/Burnout
+Consarc PC-100-Vertical,2.25,146.64,2.49,149.13,World Average,Induction Melting
+Consarc PC-200-Vertical,2.25,189.49,2.73,192.22,World Average,Induction Melting
+Consarc PC-50-Vertical,2.25,116.17,2.08,118.25,World Average,Induction Melting
+Inductotherm Dura-Line 110lbs,2.25,36.81,0.88,37.69,World Average,Induction Melting
+Inductotherm Dura-Line 220lbs,2.25,50.18,0.88,51.06,World Average,Induction Melting
+Inductotherm Dura-Line 330lbs,2.25,63.55,0.88,64.43,World Average,Induction Melting
+Inductotherm Dura-Line 550lbs,2.25,89.31,0.91,90.22,World Average,Induction Melting
+Inductotherm Dura-Line 55lbs,2.25,29.45,0.88,30.33,World Average,Induction Melting
+Inductotherm Dura-Line 770lbs,2.25,90.28,0.93,91.21,World Average,Induction Melting
+Burnout Furnace (5ft x 4ft x 5ft),2.14,84.29,0.95,85.24,World Average,Dewax - Burnout Furnace
+Pacific Kiln PBF-60 (Burnout group),2.14,81.30,0.95,82.25,World Average,Dewax - Burnout Furnace
+Pacific Kiln PBF-80 (Burnout group),2.14,82.67,0.95,83.62,World Average,Dewax - Burnout Furnace
+Pacific Kiln PBF-60 (Preheat group),2.14,42.59,0.95,43.54,World Average,Preheat Furnace
+Pacific Kiln PBF-80 (Preheat group),2.14,43.96,0.95,44.91,World Average,Preheat Furnace
+Preheat Furnace (5ft x 4ft x 5ft),2.14,45.57,0.95,46.52,World Average,Preheat Furnace
+VATECH RS300250,2.99,1.22,1.18,2.40,World Average,Robotic Shell Building
+MODTECH 600mm,2.99,0.24,0.89,1.13,World Average,Shell Building/Slurry Dip
+MODTECH 750mm,2.99,0.30,0.89,1.19,World Average,Shell Building/Slurry Dip
+MODTECH 900mm,2.99,0.38,0.91,1.29,World Average,Shell Building/Slurry Dip
+Pacific Kiln SM 36" Deluxe Slurry,2.99,0.41,0.90,1.31,World Average,Shell Building/Slurry Dip
+Pacific Kiln SM 42" Deluxe Slurry,2.99,0.82,0.92,1.74,World Average,Shell Building/Slurry Dip
+Pacific Kiln SM 48" Deluxe Slurry,2.99,1.50,0.93,2.43,World Average,Shell Building/Slurry Dip
+Pacific Kiln SM 60" Deluxe Slurry,2.99,3.48,0.96,4.44,World Average,Shell Building/Slurry Dip
+Shellomatic 48",2.99,0.78,0.92,1.70,World Average,Shell Building/Slurry Dip
+Shellomatic 60" - H,2.99,2.80,0.96,3.76,World Average,Shell Building/Slurry Dip
+Shellomatic 67",2.99,3.46,1.00,4.46,World Average,Shell Building/Slurry Dip
+Shellomatic 75" - H,2.99,4.88,1.02,5.90,World Average,Shell Building/Slurry Dip
+VA Tech HD Slurry 43.3" ST110110,2.99,0.88,0.92,1.80,World Average,Shell Building/Slurry Dip
+VA Tech HD Slurry 47.2" ST120120,2.99,1.29,0.93,2.22,World Average,Shell Building/Slurry Dip
+VA Tech HD Slurry 55.1" ST140130,2.99,2.13,0.95,3.08,World Average,Shell Building/Slurry Dip
+VA Tech HD Slurry 63" ST160130,2.99,3.18,0.96,4.14,World Average,Shell Building/Slurry Dip
+Kawasaki MX420L,0.00,5.38,0.88,6.26,World Average,Robot - Shell Building/Dip
+Kawasaki MX500N,0.00,7.18,0.88,8.06,World Average,Robot - Shell Building/Dip
+Kawasaki MX700N,0.00,8.51,0.89,9.40,World Average,Robot - Shell Building/Dip
+Kawasaki ZX165,0.00,3.05,0.88,3.93,World Average,Robot - Shell Building/Dip
+Kawasaki ZX300S,0.00,3.71,0.88,4.59,World Average,Robot - Shell Building/Dip
+Wax Injection 100 Ton,2.25,19.22,1.05,20.27,World Average,Wax Injection
+Wax Injection 15 Ton,2.25,7.11,0.91,8.02,World Average,Wax Injection
+Wax Injection 25 Ton,2.25,8.46,0.94,9.39,World Average,Wax Injection
+Wax Injection 35 Ton,2.25,9.92,0.95,10.86,World Average,Wax Injection
+Wax Injection 50 Ton,2.25,12.08,0.96,13.04,World Average,Wax Injection
+Magnus ALX30H52 - 2200lbs (group 2),2.14,2.56,0.90,3.46,World Average,Wax Injection Press
+Magnus ALXH7652 - 2200lbs (group 2),2.14,4.00,0.95,4.95,World Average,Wax Injection Press
+Magnus MAL2222 - 520lbs (group 2),2.14,1.76,0.88,2.64,World Average,Wax Injection Press
+Magnus ML24X1 - 250lbs (group 2),2.14,1.36,0.88,2.24,World Average,Wax Injection Press
+Magnus ML5R - 200lbs (group 2),2.14,0.47,0.87,1.34,World Average,Wax Injection Press
+MK A-100,2.14,20.20,1.03,21.23,World Average,Dewax - Steam Autoclave
+MK A-120,2.14,28.66,1.09,29.74,World Average,Dewax - Steam Autoclave
+MK A-150,2.14,38.30,1.15,39.45,World Average,Dewax - Steam Autoclave
+MK A-180,2.14,45.94,1.23,47.18,World Average,Dewax - Steam Autoclave
+Steam Autoclave (2m x 2m),2.14,57.60,1.42,59.02,World Average,Dewax - Steam Autoclave

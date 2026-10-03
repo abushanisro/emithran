@@ -1,0 +1,467 @@
+source_image,sector,process_group,machine_name,machine_type,labor_rate_usd_per_hr,direct_overhead_rate_usd_per_hr,indirect_overhead_rate_usd_per_hr,review_note
+B1-1,World Average,Shot Blast,Goff 1-1/2 Cu Ft,tumble,2.14,2.02,0.95,
+B1-1,World Average,Shot Blast,Goff 12 Cu Ft S,tumble,2.14,4.28,1.12,
+B1-1,World Average,Shot Blast,Goff 2-1/2 Cu Ft,tumble,2.14,2.11,0.97,
+B1-1,World Average,Shot Blast,Goff 24 Cu Ft,tumble,2.14,6.70,1.21,CONFLICT: value differs from image 17
+B1-1,World Average,Shot Blast,Goff 3 Cu Ft,tumble,2.14,2.32,1.00,
+B1-1,World Average,Shot Blast,Goff 6 Cu Ft S,tumble,2.14,3.28,1.06,CONFLICT: value differs from image 17
+B1-1,World Average,Shot Blast,Goff 72 D,table,2.14,9.50,1.15,CONFLICT: value differs from image 17
+B1-1,World Average,Shot Blast,Goff 72 S,table,2.14,9.21,1.36,
+B1-1,World Average,Shot Blast,Goff 72 SWING,table,2.14,11.35,2.25,CONFLICT: value differs from image 17
+B1-1,World Average,Shot Blast,Goff 96 XT,table,2.14,15.63,1.52,
+B1-1,World Average,Shot Blast,Manual Hand Blast,hand,2.14,0.30,1.18,
+B1-17,World Average,Shot Blast,Goff 1-1/2 Cu Ft,tumble,2.14,2.02,0.95,
+B1-17,World Average,Shot Blast,Goff 12 Cu Ft S,tumble,2.14,4.28,1.12,
+B1-17,World Average,Shot Blast,Goff 2-1/2 Cu Ft,tumble,2.14,2.11,0.97,
+B1-17,World Average,Shot Blast,Goff 24 Cu Ft,tumble,2.14,6.70,1.46,CONFLICT: value differs from image 1
+B1-17,World Average,Shot Blast,Goff 3 Cu Ft,tumble,2.14,2.32,1.00,
+B1-17,World Average,Shot Blast,Goff 6 Cu Ft S,tumble,2.14,3.28,1.10,CONFLICT: value differs from image 1
+B1-17,World Average,Shot Blast,Goff 72 D,table,2.14,9.50,1.65,CONFLICT: value differs from image 1
+B1-17,World Average,Shot Blast,Goff 72 S,table,2.14,9.21,1.36,
+B1-17,World Average,Shot Blast,Goff 72 SWING,table,2.14,12.91,2.25,CONFLICT: value differs from image 1
+B1-17,World Average,Shot Blast,Goff 96 XT,table,2.14,15.63,1.52,
+B1-17,World Average,Shot Blast,Manual Hand Blast,hand,2.14,0.30,1.18,
+B1-2,World Average,Core - CO2 Cured,Beardsley & Piper CB-15-CC,,2.25,11.05,1.51,
+B1-2,World Average,Core - CO2 Cured,Beardsley & Piper CB-184-CC,,2.25,12.26,1.51,
+B1-2,World Average,Core - CO2 Cured,Beardsley & Piper CB-254-CC,,2.25,12.26,1.51,
+B1-2,World Average,Core - CO2 Cured,Beardsley & Piper CB-30-CC,,2.25,11.05,1.51,
+B1-2,World Average,Core - CO2 Cured,Beardsley & Piper CB-40-CC,,2.25,11.05,1.51,
+B1-2,World Average,Core - CO2 Cured,DISACORE 10 MP,,2.25,7.33,1.20,
+B1-2,World Average,Core - CO2 Cured,DISACORE 120 MP,,2.25,12.26,1.82,
+B1-2,World Average,Core - CO2 Cured,DISACORE 20 MP,,2.25,11.00,1.37,
+B1-2,World Average,Core - CO2 Cured,DISACORE 20 TP,,2.25,12.21,1.61,
+B1-2,World Average,Core - CO2 Cured,DISACORE 200 MP,,2.25,13.48,1.95,
+B1-2,World Average,Core - CO2 Cured,DISACORE 250 LP,,2.25,20.76,2.61,
+B1-2,World Average,Core - CO2 Cured,DISACORE 300-25L,,2.25,13.48,1.27,
+B1-2,World Average,Core - CO2 Cured,DISACORE 300-40L,,2.25,13.48,1.27,
+B1-2,World Average,Core - CO2 Cured,DISACORE 40 MP,,2.25,13.48,1.49,
+B1-2,World Average,Core - CO2 Cured,DISACORE 40 TP,,2.25,8.52,1.64,
+B1-2,World Average,Core - CO2 Cured,DISACORE 60 TP,,2.25,8.52,1.49,
+B1-2,World Average,Core - CO2 Cured,DISACORE 80 MP,,2.25,17.20,1.49,
+B1-2,World Average,Core - CO2 Cured,DISACORE 80 TP,,2.25,17.20,1.93,
+B1-2,World Average,Core - CO2 Cured,Laempe LL20,,2.25,13.62,2.03,
+B1-2,World Average,Core - CO2 Cured,Redford CB-12-SA,,2.25,13.48,1.47,
+B1-2,World Average,Core - CO2 Cured,Redford CB-16-SA,,2.25,13.48,1.47,
+B1-2,World Average,Core - CO2 Cured,Redford CB-22-SA,,2.25,13.48,1.47,
+B1-2,World Average,Core - CO2 Cured,Redford CB-26-SA,,2.25,13.48,1.47,
+B1-2,World Average,Core - CO2 Cured,Redford HC-22-UL,,2.25,13.48,1.47,
+B1-2,World Average,Core - CO2 Cured,Redford HCB-22,,2.25,13.48,1.47,
+B1-2,World Average,Core - CO2 Cured,Redford HCB-22-UL,,2.25,13.48,1.47,
+B1-2,World Average,Core - CO2 Cured,Redford HCB-26-UL,,2.25,13.48,1.47,
+B1-2,World Average,Core - CO2 Cured,Redford HCB-36-UL,,2.25,13.48,1.47,
+B1-2,World Average,Core - CO2 Cured,customCO2Cured,,2.25,36.66,5.52,
+B1-3,World Average,Cooling,defaultCooling,,2.14,0.00,0.87,
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,"Buhler Carat 105, compact",,2.25,81.01,3.85,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,"Buhler Carat 200, compact",,2.25,122.04,5.42,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,"Buhler Carat 400, compact",,2.25,204.05,8.38,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,Buhler Ecoline 34,,2.25,35.00,2.12,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,Buhler Ecoline 53,,2.25,48.36,2.60,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,Buhler Ecoline 66,,2.25,59.91,3.02,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,Buhler Ecoline 84,,2.25,35.89,2.08,VERIFY: process group unconfirmed (die-casting machine names); low-res source; direct rate lower than Ecoline 66 - re-check
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,"Buhler Evolution 26, compact",,2.25,35.97,2.16,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,Buhler Evolution 280 Lean,,2.25,145.74,6.25,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,Buhler Evolution 320 Lean,,2.25,166.39,7.02,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,"Buhler Evolution 66, compact",,2.25,59.52,3.05,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,"Buhler Evolution 90, compact",,2.25,67.91,3.34,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,Frech DAW 20 S DCRC,,2.25,12.18,1.25,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,Frech DAW 200 S DCRC,,2.25,15.11,1.88,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,Frech DAW 50 S DCRC,,2.25,12.68,1.35,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,Idra HC 130,,2.25,14.00,1.54,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,Idra HC 200,,2.25,14.00,1.59,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,Idra HC 50,,2.25,12.49,1.40,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,Idra HC 90,,2.25,12.49,1.39,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,Idra OL 1000 R,,2.25,24.99,3.04,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,Idra OL 2000R,,2.25,28.65,4.42,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,Idra OL 4000 R,,2.25,33.56,6.94,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,PROFIT P100/16Z,,2.25,13.50,1.51,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,PROFIT P1200/19Z,,2.25,13.37,1.67,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,PROFIT P125/17Z,,2.25,13.89,1.56,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,PROFIT P150/18Z,,2.25,13.99,1.56,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,PROFIT P25/10Z,,2.25,12.83,1.33,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,PROFIT P250/20Z,,2.25,14.86,1.59,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,PROFIT P350/23Z,,2.25,14.86,2.15,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,PROFIT P50/13Z,,2.25,13.06,1.44,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,PROFIT P80/14Z,,2.25,13.50,1.46,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,QUANTUM QDC100,,2.25,13.52,1.60,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,QUANTUM QDC130,,2.25,15.60,1.64,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,QUANTUM QDC160,,2.25,16.82,1.70,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,QUANTUM QDC200,,2.25,18.55,1.79,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,QUANTUM QDC280,,2.25,18.79,1.95,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,QUANTUM QDC30,,2.25,13.06,1.38,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,QUANTUM QDC400,,2.25,20.51,2.44,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,QUANTUM QDC50,,2.25,12.32,1.46,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,QUANTUM QDC88,,2.25,14.39,1.48,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,QUANTUM QDCC100,,2.25,13.50,1.33,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,QUANTUM QDCC1250,,2.25,23.85,3.96,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,QUANTUM QDCC160,,2.25,12.78,1.70,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,QUANTUM QDCC1600,,2.25,25.71,4.03,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,QUANTUM QDCC2000,,2.25,29.38,6.77,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,QUANTUM QDCC280,,2.25,26.59,1.65,VERIFY: process group unconfirmed (die-casting machine names); low-res source; direct rate higher than QDCC400 - re-check
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,QUANTUM QDCC400,,2.25,16.13,1.82,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,QUANTUM QDCC630,,2.25,20.42,2.18,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-4,World Average,UNCONFIRMED - Die Casting Machines,QUANTUM QDCC800,,2.25,21.63,2.46,VERIFY: process group unconfirmed (die-casting machine names); low-res source
+B1-5|B1-19,World Average,Grinding / Fettling,Hand Grind,,2.14,0.29,0.90,
+B1-5|B1-19,World Average,Grinding / Fettling,Small Snag Wheel,,2.14,0.30,0.90,
+B1-5|B1-19,World Average,Grinding / Fettling,Snag Wheel,,2.14,0.59,0.90,
+B1-5|B1-19,World Average,Grinding / Fettling,Snag With Hoist,,2.14,0.74,0.90,
+B1-6,World Average,Green Sand Molding - Horizontal,"Beardsley & Piper 2016-G2 (16""x20"")",,2.25,69.82,6.11,
+B1-6,World Average,Green Sand Molding - Horizontal,"DisaMatic 130 (20""x24"")",,2.25,91.03,6.11,
+B1-6,World Average,Green Sand Molding - Horizontal,"Hunter HMP10-G (14""x19"")",,2.25,54.98,6.11,
+B1-6,World Average,Green Sand Molding - Horizontal,"Hunter HMP10-H (14""x19"")",,2.25,69.82,6.11,
+B1-6,World Average,Green Sand Molding - Horizontal,"Hunter HMP20-G (20""x24"")",,2.25,95.27,8.52,
+B1-6,World Average,Green Sand Molding - Horizontal,"Hunter HMP20-H (20""x24"")",,2.25,124.96,8.52,
+B1-6,World Average,Green Sand Molding - Horizontal,"Hunter HMP32-G (30""x32"")",,2.25,125.33,9.74,
+B1-6,World Average,Green Sand Molding - Horizontal,"Hunter HMP32-H (30""x32"")",,2.25,171.46,9.74,
+B1-6,World Average,Green Sand Molding - Horizontal,"Hunter XL 1419 (14""x19"")",,2.25,64.94,6.11,
+B1-6,World Average,Green Sand Molding - Horizontal,"Hunter XL 2024 D (20""x24"")",,2.25,101.63,8.52,
+B1-6,World Average,Green Sand Molding - Horizontal,"Hunter XL 2024 S (20""x24"")",,2.25,101.63,8.52,
+B1-6,World Average,Green Sand Molding - Horizontal,"Hunter XL 2430 D (24""x30"")",,2.25,117.54,9.11,
+B1-6,World Average,Green Sand Molding - Horizontal,"Hunter XL 2430 S (24""x30"")",,2.25,132.39,9.11,
+B1-6,World Average,Green Sand Molding - Horizontal,"Hunter XL 3032 (30""x32"")",,2.25,137.17,9.74,
+B1-6,World Average,Green Sand Molding - Horizontal,"Roberts Sinto FBM-1 (14""x19"")",,2.25,30.52,6.11,
+B1-6,World Average,Green Sand Molding - Horizontal,"Roberts Sinto FBM-IIIT (20""x26"")",,2.25,98.24,8.52,
+B1-6,World Average,Green Sand Molding - Horizontal,"Roberts Sinto FBM-IIIT-Hun (20""x24"")",,2.25,91.03,8.52,
+B1-6,World Average,Green Sand Molding - Horizontal,"Roberts Sinto FBO-II-A (14""x19"")",,2.25,46.49,6.11,
+B1-6,World Average,Green Sand Molding - Horizontal,"Roberts Sinto FBO-II-A (16""x20"")",,2.25,59.22,6.11,
+B1-6,World Average,Green Sand Molding - Horizontal,"Roberts Sinto FBO-III (20""x24"")",,2.25,69.82,8.52,
+B1-7,World Average,Core - Hot Box,Beardsley & Piper CB-15-CC,,2.25,11.05,1.51,
+B1-7,World Average,Core - Hot Box,Beardsley & Piper CB-184-CC,,2.25,12.26,1.51,
+B1-7,World Average,Core - Hot Box,Beardsley & Piper CB-254-CC,,2.25,12.26,1.51,
+B1-7,World Average,Core - Hot Box,Beardsley & Piper CB-30-CC,,2.25,11.05,1.51,
+B1-7,World Average,Core - Hot Box,Beardsley & Piper CB-40-CC,,2.25,11.05,1.51,
+B1-7,World Average,Core - Hot Box,DISACORE 10 MP,,2.25,7.33,1.20,
+B1-7,World Average,Core - Hot Box,DISACORE 120 MP,,2.25,12.26,1.82,
+B1-7,World Average,Core - Hot Box,DISACORE 20 MP,,2.25,11.00,1.37,
+B1-7,World Average,Core - Hot Box,DISACORE 20 TP,,2.25,12.21,1.61,
+B1-7,World Average,Core - Hot Box,DISACORE 200 MP,,2.25,13.48,1.95,
+B1-7,World Average,Core - Hot Box,DISACORE 250 LP,,2.25,20.76,2.61,
+B1-7,World Average,Core - Hot Box,DISACORE 40 MP,,2.25,13.48,1.49,
+B1-7,World Average,Core - Hot Box,DISACORE 40 TP,,2.25,8.52,1.64,"VERIFY: direct rate blurred in source; read as 8.52 (matches images 9,15,16,18)"
+B1-7,World Average,Core - Hot Box,DISACORE 60 TP,,2.25,8.52,1.49,
+B1-7,World Average,Core - Hot Box,DISACORE 80 MP,,2.25,17.20,1.49,
+B1-7,World Average,Core - Hot Box,DISACORE 80 TP,,2.25,17.20,1.93,
+B1-7,World Average,Core - Hot Box,Laempe LL20,,2.25,13.62,2.03,
+B1-7,World Average,Core - Hot Box,Redford HC-22-UL,,2.25,13.48,1.47,
+B1-7,World Average,Core - Hot Box,Redford HP-43A,,2.25,15.80,1.95,
+B1-7,World Average,Core - Hot Box,Redford HP-43B,,2.25,15.80,1.95,
+B1-7,World Average,Core - Hot Box,Redford HS-12-RA,,2.25,15.80,1.95,
+B1-7,World Average,Core - Hot Box,Redford HS-16-RA,,2.25,15.80,1.95,
+B1-7,World Average,Core - Hot Box,Redford HS-22-RA,,2.25,15.80,1.95,
+B1-7,World Average,Core - Hot Box,customHotBox,,2.25,36.66,5.52,
+B1-8,World Average,Inspection,defaultInspection,,2.25,0.00,0.88,
+B1-9,World Average,Core - Isocure (Cold Box),Beardsley & Piper CB-15-CC,,2.25,11.05,1.51,
+B1-9,World Average,Core - Isocure (Cold Box),Beardsley & Piper CB-184-CC,,2.25,12.26,1.51,
+B1-9,World Average,Core - Isocure (Cold Box),Beardsley & Piper CB-254-CC,,2.25,12.26,1.51,
+B1-9,World Average,Core - Isocure (Cold Box),Beardsley & Piper CB-30-CC,,2.25,11.05,1.51,
+B1-9,World Average,Core - Isocure (Cold Box),Beardsley & Piper CB-40-CC,,2.25,11.05,1.51,
+B1-9,World Average,Core - Isocure (Cold Box),DISACORE 10 MP,,2.25,7.33,1.20,
+B1-9,World Average,Core - Isocure (Cold Box),DISACORE 120 MP,,2.25,12.26,1.82,
+B1-9,World Average,Core - Isocure (Cold Box),DISACORE 20 MP,,2.25,11.00,1.37,
+B1-9,World Average,Core - Isocure (Cold Box),DISACORE 20 TP,,2.25,12.21,1.61,
+B1-9,World Average,Core - Isocure (Cold Box),DISACORE 200 MP,,2.25,13.48,1.95,
+B1-9,World Average,Core - Isocure (Cold Box),DISACORE 250 LP,,2.25,20.76,2.61,
+B1-9,World Average,Core - Isocure (Cold Box),DISACORE 40 MP,,2.25,13.48,1.49,
+B1-9,World Average,Core - Isocure (Cold Box),DISACORE 40 TP,,2.25,8.52,1.64,
+B1-9,World Average,Core - Isocure (Cold Box),DISACORE 60 TP,,2.25,8.52,1.49,
+B1-9,World Average,Core - Isocure (Cold Box),DISACORE 80 MP,,2.25,17.20,1.49,
+B1-9,World Average,Core - Isocure (Cold Box),DISACORE 80 TP,,2.25,17.20,1.93,
+B1-9,World Average,Core - Isocure (Cold Box),Laempe LL20,,2.25,13.62,2.03,
+B1-9,World Average,Core - Isocure (Cold Box),Redford CB-12-SA,,2.25,13.37,2.49,
+B1-9,World Average,Core - Isocure (Cold Box),Redford CB-16-SA,,2.25,13.37,2.49,
+B1-9,World Average,Core - Isocure (Cold Box),Redford CB-22-SA,,2.25,13.37,2.49,
+B1-9,World Average,Core - Isocure (Cold Box),Redford CB-26-SA,,2.25,13.37,2.49,
+B1-9,World Average,Core - Isocure (Cold Box),Redford HC-22-UL,,2.25,13.48,1.47,
+B1-9,World Average,Core - Isocure (Cold Box),Redford HCB-22,,2.25,13.48,1.47,
+B1-9,World Average,Core - Isocure (Cold Box),Redford HCB-22-UL,,2.25,13.48,1.47,
+B1-9,World Average,Core - Isocure (Cold Box),Redford HCB-26-UL,,2.25,13.48,1.47,
+B1-9,World Average,Core - Isocure (Cold Box),Redford HCB-36-UL,,2.25,13.48,1.47,
+B1-9,World Average,Core - Isocure (Cold Box),customIsocure,,2.25,36.66,5.52,
+B1-10,World Average,Molding Flask,Custom Flask (158x158x79in),,3.57,40.35,6.53,
+B1-10,World Average,Molding Flask,Standard Flask (100X100X24in),,3.57,9.68,6.53,
+B1-10,World Average,Molding Flask,Standard Flask (100X100X36in),,3.57,11.75,6.53,
+B1-10,World Average,Molding Flask,Standard Flask (125X125X24in),,3.57,12.14,6.53,
+B1-10,World Average,Molding Flask,Standard Flask (125X125X36in),,3.57,15.44,6.53,
+B1-10,World Average,Molding Flask,Standard Flask (150X150X24in),,3.57,15.18,6.53,
+B1-10,World Average,Molding Flask,Standard Flask (150X150X36in),,3.57,19.90,6.53,
+B1-10,World Average,Molding Flask,Standard Flask (24x24x12in),,3.57,3.69,2.76,
+B1-10,World Average,Molding Flask,Standard Flask (24x48x12in),,3.57,3.82,2.76,
+B1-10,World Average,Molding Flask,Standard Flask (28x28x12in),,3.57,3.75,2.76,
+B1-10,World Average,Molding Flask,Standard Flask (30x30x18in),,3.57,4.14,2.76,
+B1-10,World Average,Molding Flask,Standard Flask (30x42x18in),,3.57,5.22,2.76,
+B1-10,World Average,Molding Flask,Standard Flask (32x32x18in),,3.57,5.24,2.76,
+B1-10,World Average,Molding Flask,Standard Flask (36x48x24in),,3.57,5.43,2.76,
+B1-10,World Average,Molding Flask,Standard Flask (48x60x24in),,3.57,5.26,2.76,Direct rate lower than 36x48x24in - re-check
+B1-10,World Average,Molding Flask,Standard Flask (60x72x24in),,3.57,6.44,2.76,
+B1-10,World Average,Molding Flask,Standard Flask (80X80X24in),,3.57,8.07,4.37,
+B1-10,World Average,Molding Flask,Standard Flask (80X80X36in),,3.57,9.42,4.37,
+B1-10,World Average,Molding Flask,Standard Flask (90X90X24in),,3.57,8.84,4.37,"VERIFY: name blurred, may read 90X80X24in"
+B1-10,World Average,Molding Flask,Standard Flask (90X90X36in),,3.57,10.52,4.37,
+B1-11,World Average,Pit Molding,Custom Pit (158x158x79in),,3.57,49.21,24.29,
+B1-11,World Average,Pit Molding,Standard Pit (150x158x118in),,3.57,11.17,5.31,
+B1-11,World Average,Pit Molding,Standard Pit (394x197x98in),,3.57,17.57,9.48,
+B1-11,World Average,Pit Molding,Standard Pit (480x180x132in),,3.57,21.97,10.87,
+B1-11,World Average,Pit Molding,Standard Pit (660x168x180in),,3.57,31.74,13.64,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-212 Ram-Jolt Squeeze Molding Line (12x12x12in),,2.25,2.60,1.41,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-212 Ram-Jolt Squeeze Molding Line (12x12x4in),,2.25,2.60,1.41,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-212 Ram-Jolt Squeeze Molding Line (12x12x8in),,2.25,2.60,1.41,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-212 Ram-Jolt Squeeze Molding Line (12x14x12in),,2.25,2.60,1.41,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-212 Ram-Jolt Squeeze Molding Line (12x14x4in),,2.25,2.60,1.41,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-212 Ram-Jolt Squeeze Molding Line (12x14x8in),,2.25,2.60,1.41,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-212 Ram-Jolt Squeeze Molding Line (12x18x12in),,2.25,2.60,1.41,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-212 Ram-Jolt Squeeze Molding Line (12x18x4in),,2.25,2.60,1.41,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-212 Ram-Jolt Squeeze Molding Line (12x18x8in),,2.25,2.60,1.41,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-212 Ram-Jolt Squeeze Molding Line (14x14x12in),,2.25,2.60,1.41,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-212 Ram-Jolt Squeeze Molding Line (14x14x4in),,2.25,2.60,1.41,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-212 Ram-Jolt Squeeze Molding Line (14x14x8in),,2.25,2.60,1.41,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-212 Ram-Jolt Squeeze Molding Line (14x16x12in),,2.25,2.60,1.41,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-212 Ram-Jolt Squeeze Molding Line (14x16x4in),,2.25,2.60,1.41,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-212 Ram-Jolt Squeeze Molding Line (14x16x8in),,2.25,2.60,1.41,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-212 Ram-Jolt Squeeze Molding Line (14x18x12in),,2.25,2.60,1.41,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-212 Ram-Jolt Squeeze Molding Line (14x18x4in),,2.25,2.60,1.41,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-212 Ram-Jolt Squeeze Molding Line (14x18x8in),,2.25,2.60,1.41,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-212 Ram-Jolt Squeeze Molding Line (16x16x12in),,2.25,2.60,1.41,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-212 Ram-Jolt Squeeze Molding Line (16x16x4in),,2.25,2.60,1.41,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-212 Ram-Jolt Squeeze Molding Line (16x16x8in),,2.25,2.60,1.41,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-212 Ram-Jolt Squeeze Molding Line (16x18x12in),,2.25,2.60,1.41,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-212 Ram-Jolt Squeeze Molding Line (16x18x4in),,2.25,2.60,1.41,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-212 Ram-Jolt Squeeze Molding Line (16x18x8in),,2.25,2.60,1.41,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-212 Ram-Jolt Squeeze Molding Line (18x18x12in),,2.25,2.60,1.41,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-212 Ram-Jolt Squeeze Molding Line (18x18x4in),,2.25,2.60,1.41,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-212 Ram-Jolt Squeeze Molding Line (18x18x8in),,2.25,2.60,1.41,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-214 Ram-Jolt Squeeze Molding Line (12x20x12in),,2.25,3.64,1.47,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-214 Ram-Jolt Squeeze Molding Line (12x20x4in),,2.25,3.64,1.47,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-214 Ram-Jolt Squeeze Molding Line (12x20x8in),,2.25,3.64,1.47,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-214 Ram-Jolt Squeeze Molding Line (12x22x12in),,2.25,3.64,1.47,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-214 Ram-Jolt Squeeze Molding Line (12x22x4in),,2.25,3.64,1.47,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-214 Ram-Jolt Squeeze Molding Line (12x22x8in),,2.25,3.64,1.47,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-214 Ram-Jolt Squeeze Molding Line (14x20x12in),,2.25,3.64,1.47,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-214 Ram-Jolt Squeeze Molding Line (14x20x4in),,2.25,3.64,1.47,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-214 Ram-Jolt Squeeze Molding Line (14x20x8in),,2.25,3.64,1.47,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-214 Ram-Jolt Squeeze Molding Line (14x22x12in),,2.25,3.64,1.47,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-214 Ram-Jolt Squeeze Molding Line (14x22x4in),,2.25,3.64,1.47,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-214 Ram-Jolt Squeeze Molding Line (14x22x8in),,2.25,3.64,1.47,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-214 Ram-Jolt Squeeze Molding Line (18x21x12in),,2.25,3.64,1.47,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-214 Ram-Jolt Squeeze Molding Line (18x21x4in),,2.25,3.64,1.47,"VERIFY: name blurred, may read 10x21x4in"
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-214 Ram-Jolt Squeeze Molding Line (18x21x8in),,2.25,3.64,1.47,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-3161 Rota-Lift Molding Line (12x24x12in),,2.25,4.81,1.75,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-3161 Rota-Lift Molding Line (12x24x4in),,2.25,4.81,1.75,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-3161 Rota-Lift Molding Line (12x24x8in),,2.25,4.81,1.75,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-3161 Rota-Lift Molding Line (20x20x12in),,2.25,4.81,1.75,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-3161 Rota-Lift Molding Line (20x20x4in),,2.25,4.81,1.75,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-3161 Rota-Lift Molding Line (20x20x8in),,2.25,4.81,1.75,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-3161 Rota-Lift Molding Line (20x22x12in),,2.25,4.81,1.75,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-3161 Rota-Lift Molding Line (20x22x4in),,2.25,4.81,1.75,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-3161 Rota-Lift Molding Line (20x22x8in),,2.25,4.81,1.75,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-3161 Rota-Lift Molding Line (20x24x12in),,2.25,4.81,1.75,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-3161 Rota-Lift Molding Line (20x24x4in),,2.25,4.81,1.75,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-3161 Rota-Lift Molding Line (20x24x8in),,2.25,4.81,1.75,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-3161 Rota-Lift Molding Line (20x30x12in),,2.25,4.81,1.75,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-3161 Rota-Lift Molding Line (20x30x4in),,2.25,4.81,1.75,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-3161 Rota-Lift Molding Line (20x30x8in),,2.25,4.81,1.75,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-3191 Rota-Lift Molding Line (12x28x12in),,2.25,6.28,2.07,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-3191 Rota-Lift Molding Line (12x28x4in),,2.25,6.28,2.07,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-3191 Rota-Lift Molding Line (12x28x8in),,2.25,6.28,2.07,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-3191 Rota-Lift Molding Line (22x22x12in),,2.25,6.28,2.07,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-3191 Rota-Lift Molding Line (22x22x4in),,2.25,6.28,2.07,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-3191 Rota-Lift Molding Line (22x22x8in),,2.25,6.28,2.07,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-3191 Rota-Lift Molding Line (22x24x12in),,2.25,6.28,2.07,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-3191 Rota-Lift Molding Line (22x24x4in),,2.25,6.28,2.07,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-3191 Rota-Lift Molding Line (22x24x8in),,2.25,6.28,2.07,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-3191 Rota-Lift Molding Line (24x24x12in),,2.25,6.28,2.07,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-3191 Rota-Lift Molding Line (24x24x4in),,2.25,6.28,2.07,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-3191 Rota-Lift Molding Line (24x24x8in),,2.25,6.28,2.07,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-722 Rota-Lift Molding Line (14x38x12in),,2.25,12.59,2.13,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-722 Rota-Lift Molding Line (14x38x4in),,2.25,12.59,2.13,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-722 Rota-Lift Molding Line (14x38x8in),,2.25,12.59,2.13,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-722 Rota-Lift Molding Line (16x33x12in),,2.25,12.59,2.13,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-722 Rota-Lift Molding Line (16x33x4in),,2.25,12.59,2.13,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-722 Rota-Lift Molding Line (16x33x8in),,2.25,12.59,2.13,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-722 Rota-Lift Molding Line (28x28x12in),,2.25,12.59,2.13,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-722 Rota-Lift Molding Line (28x28x4in),,2.25,12.59,2.13,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-722 Rota-Lift Molding Line (28x28x8in),,2.25,12.59,2.13,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-722 Rota-Lift Molding Line (30x30x12in),,2.25,12.59,2.13,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-722 Rota-Lift Molding Line (30x30x18in),,2.25,12.59,2.13,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-722 Rota-Lift Molding Line (30x30x4in),,2.25,12.59,2.13,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-722 Rota-Lift Molding Line (30x30x8in),,2.25,12.59,2.13,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-722 Rota-Lift Molding Line (30x42x12in),,2.25,12.59,2.13,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-722 Rota-Lift Molding Line (30x42x18in),,2.25,12.59,2.13,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-722 Rota-Lift Molding Line (30x42x4in),,2.25,12.59,2.13,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-722 Rota-Lift Molding Line (30x42x8in),,2.25,12.59,2.13,"VERIFY: name blurred, may read 24x42x8in"
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-730 Rota-Lift Molding Line (24x48x12in),,2.25,23.16,2.49,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-730 Rota-Lift Molding Line (24x48x4in),,2.25,23.16,2.49,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-730 Rota-Lift Molding Line (24x48x8in),,2.25,23.16,2.49,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-730 Rota-Lift Molding Line (32x32x12in),,2.25,23.16,2.49,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-730 Rota-Lift Molding Line (32x32x18in),,2.25,23.16,2.49,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-730 Rota-Lift Molding Line (32x32x4in),,2.25,23.16,2.49,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-730 Rota-Lift Molding Line (32x32x8in),,2.25,23.16,2.49,
+B1-12|B1-13,World Average,Molding Line - Jolt Squeeze / Rota-Lift,EMI-730 Rota-Lift Molding Line (36x48x24in),,2.25,23.16,2.49,INCOMPLETE: last visible row; list continues below screenshot
+B1-14,World Average,Melting,Crucible,,2.25,0.00,0.00,CONFLICT: B2-1 shows non-zero rates for this machine; 0.00 likely a different VPE/sector or melt costed per kg
+B1-14,World Average,Melting,Cupola,,2.25,0.00,0.00,CONFLICT: B2-1 shows non-zero rates for this machine; 0.00 likely a different VPE/sector or melt costed per kg
+B1-14,World Average,Melting,Induction - DI,,2.25,0.00,0.00,CONFLICT: B2-1 shows non-zero rates for this machine; 0.00 likely a different VPE/sector or melt costed per kg
+B1-14,World Average,Melting,Induction - GI,,2.25,0.00,0.00,CONFLICT: B2-1 shows non-zero rates for this machine; 0.00 likely a different VPE/sector or melt costed per kg
+B1-15,World Average,Core - No Bake,Beardsley & Piper ABC-25,,2.25,15.80,2.49,
+B1-15,World Average,Core - No Bake,Beardsley & Piper ABC-250,,2.25,15.80,2.49,
+B1-15,World Average,Core - No Bake,Beardsley & Piper ABC-6,,2.25,15.80,2.49,
+B1-15,World Average,Core - No Bake,Beardsley & Piper ABC-75,,2.25,15.80,2.49,
+B1-15,World Average,Core - No Bake,DISACORE 10 MP,,2.25,7.33,1.20,
+B1-15,World Average,Core - No Bake,DISACORE 120 MP,,2.25,12.26,1.82,
+B1-15,World Average,Core - No Bake,DISACORE 20 MP,,2.25,11.00,1.37,
+B1-15,World Average,Core - No Bake,DISACORE 20 TP,,2.25,12.21,1.61,
+B1-15,World Average,Core - No Bake,DISACORE 200 MP,,2.25,13.48,1.95,
+B1-15,World Average,Core - No Bake,DISACORE 250 LP,,2.25,20.76,2.61,
+B1-15,World Average,Core - No Bake,DISACORE 40 MP,,2.25,13.48,1.49,
+B1-15,World Average,Core - No Bake,DISACORE 40 TP,,2.25,8.52,1.64,
+B1-15,World Average,Core - No Bake,DISACORE 60 TP,,2.25,8.52,1.49,
+B1-15,World Average,Core - No Bake,DISACORE 80 MP,,2.25,17.20,1.49,
+B1-15,World Average,Core - No Bake,DISACORE 80 TP,,2.25,17.20,1.93,
+B1-15,World Average,Core - No Bake,Laempe LL20,,2.25,13.62,2.03,
+B1-15,World Average,Core - No Bake,Redford CB-12-SA,,2.25,13.48,1.47,
+B1-15,World Average,Core - No Bake,Redford CB-16-SA,,2.25,13.48,1.47,
+B1-15,World Average,Core - No Bake,Redford CB-22-SA,,2.25,13.48,1.47,
+B1-15,World Average,Core - No Bake,Redford CB-26-SA,,2.25,13.48,1.47,
+B1-15,World Average,Core - No Bake,Redford HC-22-UL,,2.25,13.48,1.47,
+B1-15,World Average,Core - No Bake,Redford HCB-22,,2.25,13.48,1.47,
+B1-15,World Average,Core - No Bake,Redford HCB-22-UL,,2.25,13.48,1.47,
+B1-15,World Average,Core - No Bake,Redford HCB-26-UL,,2.25,13.48,1.47,
+B1-15,World Average,Core - No Bake,Redford HCB-36-UL,,2.25,13.48,1.47,
+B1-15,World Average,Core - No Bake,customNoBake,,2.25,36.66,5.52,
+B1-16,World Average,Core - Oil Sand,Beardsley & Piper CB-15-CC,,2.25,11.05,1.51,
+B1-16,World Average,Core - Oil Sand,Beardsley & Piper CB-184-CC,,2.25,12.26,1.51,
+B1-16,World Average,Core - Oil Sand,Beardsley & Piper CB-254-CC,,2.25,12.26,1.51,
+B1-16,World Average,Core - Oil Sand,Beardsley & Piper CB-30-CC,,2.25,11.05,1.51,
+B1-16,World Average,Core - Oil Sand,Beardsley & Piper CB-40-CC,,2.25,11.05,1.51,
+B1-16,World Average,Core - Oil Sand,DISACORE 10 MP,,2.25,7.33,1.20,
+B1-16,World Average,Core - Oil Sand,DISACORE 120 MP,,2.25,12.26,1.82,
+B1-16,World Average,Core - Oil Sand,DISACORE 20 MP,,2.25,11.00,1.37,
+B1-16,World Average,Core - Oil Sand,DISACORE 20 TP,,2.25,12.21,1.61,
+B1-16,World Average,Core - Oil Sand,DISACORE 200 MP,,2.25,13.48,1.95,
+B1-16,World Average,Core - Oil Sand,DISACORE 250 LP,,2.25,20.76,2.61,
+B1-16,World Average,Core - Oil Sand,DISACORE 40 MP,,2.25,13.48,1.49,
+B1-16,World Average,Core - Oil Sand,DISACORE 40 TP,,2.25,8.52,1.64,
+B1-16,World Average,Core - Oil Sand,DISACORE 60 TP,,2.25,8.52,1.49,
+B1-16,World Average,Core - Oil Sand,DISACORE 80 MP,,2.25,17.20,1.49,
+B1-16,World Average,Core - Oil Sand,DISACORE 80 TP,,2.25,17.20,1.93,
+B1-16,World Average,Core - Oil Sand,Laempe LL20,,2.25,13.62,2.03,
+B1-16,World Average,Core - Oil Sand,Redford HC-22-UL,,2.25,13.48,1.47,
+B1-16,World Average,Core - Oil Sand,Redford HP-43A,,2.25,15.80,1.95,
+B1-16,World Average,Core - Oil Sand,Redford HP-43B,,2.25,15.80,1.95,
+B1-16,World Average,Core - Oil Sand,Redford HS-12-RA,,2.25,15.80,1.95,
+B1-16,World Average,Core - Oil Sand,Redford HS-16-RA,,2.25,15.80,1.95,
+B1-16,World Average,Core - Oil Sand,Redford HS-22-RA,,2.25,15.80,1.95,
+B1-16,World Average,Core - Oil Sand,customOilCore,,2.25,36.66,5.52,
+B1-18,World Average,UNCONFIRMED - Core Process,Beardsley & Piper CB-15-CC,,2.25,11.05,1.51,VERIFY: core process not identifiable from screenshot
+B1-18,World Average,UNCONFIRMED - Core Process,Beardsley & Piper CB-184-CC,,2.25,12.26,1.51,VERIFY: core process not identifiable from screenshot
+B1-18,World Average,UNCONFIRMED - Core Process,Beardsley & Piper CB-254-CC,,2.25,12.26,1.51,VERIFY: core process not identifiable from screenshot
+B1-18,World Average,UNCONFIRMED - Core Process,Beardsley & Piper CB-30-CC,,2.25,11.05,1.51,VERIFY: core process not identifiable from screenshot
+B1-18,World Average,UNCONFIRMED - Core Process,Beardsley & Piper CB-40-CC,,2.25,11.05,1.51,VERIFY: core process not identifiable from screenshot
+B1-18,World Average,UNCONFIRMED - Core Process,DISACORE 10 MP,,2.25,7.33,1.20,VERIFY: core process not identifiable from screenshot
+B1-18,World Average,UNCONFIRMED - Core Process,DISACORE 120 MP,,2.25,12.26,1.82,VERIFY: core process not identifiable from screenshot
+B1-18,World Average,UNCONFIRMED - Core Process,DISACORE 20 MP,,2.25,11.00,1.37,VERIFY: core process not identifiable from screenshot
+B1-18,World Average,UNCONFIRMED - Core Process,DISACORE 20 TP,,2.25,12.21,1.61,VERIFY: core process not identifiable from screenshot
+B1-18,World Average,UNCONFIRMED - Core Process,DISACORE 200 MP,,2.25,13.48,1.95,VERIFY: core process not identifiable from screenshot
+B1-18,World Average,UNCONFIRMED - Core Process,DISACORE 300-25L,,2.25,13.48,1.27,VERIFY: core process not identifiable from screenshot
+B1-18,World Average,UNCONFIRMED - Core Process,DISACORE 300-40L,,2.25,13.48,1.27,VERIFY: core process not identifiable from screenshot
+B1-18,World Average,UNCONFIRMED - Core Process,DISACORE 40 MP,,2.25,13.48,1.49,VERIFY: core process not identifiable from screenshot
+B1-18,World Average,UNCONFIRMED - Core Process,DISACORE 40 TP,,2.25,8.52,1.64,VERIFY: core process not identifiable from screenshot
+B1-18,World Average,UNCONFIRMED - Core Process,DISACORE 60 TP,,2.25,8.52,1.49,VERIFY: core process not identifiable from screenshot
+B1-18,World Average,UNCONFIRMED - Core Process,DISACORE 80 MP,,2.25,17.20,1.49,VERIFY: core process not identifiable from screenshot
+B1-18,World Average,UNCONFIRMED - Core Process,DISACORE 80 TP,,2.25,17.20,1.93,VERIFY: core process not identifiable from screenshot
+B1-18,World Average,UNCONFIRMED - Core Process,Laempe LL20,,2.25,13.62,2.03,VERIFY: core process not identifiable from screenshot
+B1-18,World Average,UNCONFIRMED - Core Process,Redford CB-12-SA,,2.25,13.48,1.47,VERIFY: core process not identifiable from screenshot
+B1-18,World Average,UNCONFIRMED - Core Process,Redford CB-16-SA,,2.25,13.48,1.47,VERIFY: core process not identifiable from screenshot
+B1-18,World Average,UNCONFIRMED - Core Process,Redford CB-22-SA,,2.25,13.48,1.47,VERIFY: core process not identifiable from screenshot
+B1-18,World Average,UNCONFIRMED - Core Process,Redford CB-26-SA,,2.25,13.48,1.47,VERIFY: core process not identifiable from screenshot
+B1-18,World Average,UNCONFIRMED - Core Process,Redford HC-22-UL,,2.25,13.48,1.47,VERIFY: core process not identifiable from screenshot
+B1-18,World Average,UNCONFIRMED - Core Process,Redford HCB-22,,2.25,13.48,1.47,VERIFY: core process not identifiable from screenshot
+B1-18,World Average,UNCONFIRMED - Core Process,Redford HCB-22-UL,,2.25,13.48,1.47,VERIFY: core process not identifiable from screenshot
+B1-18,World Average,UNCONFIRMED - Core Process,Redford HCB-26-UL,,2.25,13.48,1.47,VERIFY: core process not identifiable from screenshot
+B1-18,World Average,UNCONFIRMED - Core Process,Redford HCB-36-UL,,2.25,13.48,1.47,VERIFY: core process not identifiable from screenshot
+B1-20,World Average,Inspection,ManualInspection,,2.25,0.00,0.88,
+B2-1,World Average,Melting,Crucible,,2.25,6.25,1.93,CONFLICT: B1-14 shows 0.00/0.00 for this machine
+B2-1,World Average,Melting,Cupola,,2.25,1.55,1.93,CONFLICT: B1-14 shows 0.00/0.00 for this machine
+B2-1,World Average,Melting,Induction - DI,,2.25,5.32,1.93,CONFLICT: B1-14 shows 0.00/0.00 for this machine
+B2-1,World Average,Melting,Induction - GI,,2.25,5.32,2.23,CONFLICT: B1-14 shows 0.00/0.00 for this machine
+B2-2,World Average,UNCONFIRMED - Tilt Pour / Gravity / LPDC Machines,Hall - 2H Tilt-Pour - 24x26in,,2.25,22.51,2.70,VERIFY: permanent-mold/LPDC machine names - confirm process group
+B2-2,World Average,UNCONFIRMED - Tilt Pour / Gravity / LPDC Machines,Hall - 3HS Tilt-Pour - 36x36in,,2.25,24.13,3.30,VERIFY: permanent-mold/LPDC machine names - confirm process group
+B2-2,World Average,UNCONFIRMED - Tilt Pour / Gravity / LPDC Machines,Hall - 3HSX Tilt-Pour - 40x42in,,2.25,25.74,3.99,VERIFY: permanent-mold/LPDC machine names - confirm process group
+B2-2,World Average,UNCONFIRMED - Tilt Pour / Gravity / LPDC Machines,Hall - 3L Tilt-Pour - 34x34in,,2.25,24.13,3.30,VERIFY: permanent-mold/LPDC machine names - confirm process group
+B2-2,World Average,UNCONFIRMED - Tilt Pour / Gravity / LPDC Machines,Hall - 6H Tilt-Pour - 48x42in,,2.25,25.37,4.25,VERIFY: permanent-mold/LPDC machine names - confirm process group
+B2-2,World Average,UNCONFIRMED - Tilt Pour / Gravity / LPDC Machines,IMR BP/C 155 H,,2.25,21.00,5.60,VERIFY: permanent-mold/LPDC machine names - confirm process group
+B2-2,World Average,UNCONFIRMED - Tilt Pour / Gravity / LPDC Machines,IMR C40H,,2.25,6.98,1.96,VERIFY: permanent-mold/LPDC machine names - confirm process group
+B2-2,World Average,UNCONFIRMED - Tilt Pour / Gravity / LPDC Machines,IMR C60X,,2.25,17.95,2.71,VERIFY: permanent-mold/LPDC machine names - confirm process group
+B2-2,World Average,UNCONFIRMED - Tilt Pour / Gravity / LPDC Machines,KURTZ AK-10,,2.25,8.61,2.31,VERIFY: permanent-mold/LPDC machine names - confirm process group
+B2-2,World Average,UNCONFIRMED - Tilt Pour / Gravity / LPDC Machines,KURTZ AL 10-7 TC,,2.25,32.79,5.60,VERIFY: permanent-mold/LPDC machine names - confirm process group
+B2-2,World Average,UNCONFIRMED - Tilt Pour / Gravity / LPDC Machines,KURTZ AL 13-13 TC,,2.25,21.81,5.60,VERIFY: permanent-mold/LPDC machine names - confirm process group
+B2-2,World Average,UNCONFIRMED - Tilt Pour / Gravity / LPDC Machines,KURTZ AL 14-10 SR,,2.25,34.05,5.60,VERIFY: permanent-mold/LPDC machine names - confirm process group
+B2-2,World Average,UNCONFIRMED - Tilt Pour / Gravity / LPDC Machines,KURTZ AL 7-5 TC,,2.25,25.61,3.20,VERIFY: permanent-mold/LPDC machine names - confirm process group
+B2-2,World Average,UNCONFIRMED - Tilt Pour / Gravity / LPDC Machines,KURTZ Al 13-13 SC,,2.25,26.86,4.62,VERIFY: permanent-mold/LPDC machine names - confirm process group
+B2-2,World Average,UNCONFIRMED - Tilt Pour / Gravity / LPDC Machines,SUIN SJ680,,2.25,28.90,5.20,VERIFY: permanent-mold/LPDC machine names - confirm process group
+B2-2,World Average,UNCONFIRMED - Tilt Pour / Gravity / LPDC Machines,Zhenhuan ZLC160,,2.25,4.45,1.78,VERIFY: permanent-mold/LPDC machine names - confirm process group
+B2-3,World Average,UNCONFIRMED - Roberts-Sinto FVN (Cap.-rated),Roberts-Sinto (custom cap),,2.25,60.04,1.67,VERIFY: process group and capacity unit not shown in screenshot
+B2-3,World Average,UNCONFIRMED - Roberts-Sinto FVN (Cap.-rated),Roberts-Sinto FVN-I (Cap.: 250),,2.25,10.22,1.84,VERIFY: process group and capacity unit not shown in screenshot
+B2-3,World Average,UNCONFIRMED - Roberts-Sinto FVN (Cap.-rated),Roberts-Sinto FVN-I (Cap.: 400),,2.25,13.06,1.92,VERIFY: process group and capacity unit not shown in screenshot
+B2-3,World Average,UNCONFIRMED - Roberts-Sinto FVN (Cap.-rated),Roberts-Sinto FVN-II (Cap.: 450),,2.25,15.91,2.00,VERIFY: process group and capacity unit not shown in screenshot
+B2-3,World Average,UNCONFIRMED - Roberts-Sinto FVN (Cap.-rated),Roberts-Sinto FVN-II (Cap.: 650),,2.25,18.76,2.08,VERIFY: process group and capacity unit not shown in screenshot
+B2-3,World Average,UNCONFIRMED - Roberts-Sinto FVN (Cap.-rated),Roberts-Sinto FVN-III (Cap.: 700),,2.25,21.60,2.16,VERIFY: process group and capacity unit not shown in screenshot
+B2-3,World Average,UNCONFIRMED - Roberts-Sinto FVN (Cap.-rated),Roberts-Sinto FVN-III (Cap.: 900),,2.25,24.45,2.24,VERIFY: process group and capacity unit not shown in screenshot
+B2-3,World Average,UNCONFIRMED - Roberts-Sinto FVN (Cap.-rated),Roberts-Sinto FVN-IV (Cap.: 1000),,2.25,27.30,2.32,VERIFY: process group and capacity unit not shown in screenshot
+B2-3,World Average,UNCONFIRMED - Roberts-Sinto FVN (Cap.-rated),Roberts-Sinto FVN-IV (Cap.: 1300),,2.25,30.03,2.40,VERIFY: process group and capacity unit not shown in screenshot
+B2-4,World Average,Shakeout,defaultShakeout,,2.14,4.80,0.90,
+B2-5,World Average,Core - Shell,Beardsley & Piper SF-104A,,2.25,11.21,2.49,
+B2-5,World Average,Core - Shell,Beardsley & Piper SF-10A,,2.25,11.21,2.49,
+B2-5,World Average,Core - Shell,Beardsley & Piper SF-6CA,,2.25,11.21,2.49,
+B2-5,World Average,Core - Shell,DISACORE 10 MP,,2.25,7.33,1.20,
+B2-5,World Average,Core - Shell,DISACORE 120 MP,,2.25,12.26,1.82,
+B2-5,World Average,Core - Shell,DISACORE 20 MP,,2.25,11.00,1.37,
+B2-5,World Average,Core - Shell,DISACORE 20 TP,,2.25,12.21,1.61,
+B2-5,World Average,Core - Shell,DISACORE 200 MP,,2.25,13.48,1.95,
+B2-5,World Average,Core - Shell,DISACORE 250 LP,,2.25,20.76,2.61,
+B2-5,World Average,Core - Shell,DISACORE 40 MP,,2.25,13.48,1.49,
+B2-5,World Average,Core - Shell,DISACORE 40 TP,,2.25,8.52,1.64,VERIFY: direct rate blurred in source; read as 8.52 (matches other core lists)
+B2-5,World Average,Core - Shell,DISACORE 60 TP,,2.25,8.52,1.49,
+B2-5,World Average,Core - Shell,DISACORE 80 MP,,2.25,17.20,1.49,
+B2-5,World Average,Core - Shell,DISACORE 80 TP,,2.25,17.20,1.93,
+B2-5,World Average,Core - Shell,Laempe LL20,,2.25,13.62,2.03,
+B2-5,World Average,Core - Shell,Redford HC-22-UL,,2.25,13.48,1.47,
+B2-5,World Average,Core - Shell,Redford HP-43A,,2.25,15.80,1.95,
+B2-5,World Average,Core - Shell,Redford HP-43B,,2.25,15.80,1.95,
+B2-5,World Average,Core - Shell,Redford HS-12-RA,,2.25,15.80,1.95,
+B2-5,World Average,Core - Shell,Redford HS-16-RA,,2.25,15.80,1.95,
+B2-5,World Average,Core - Shell,Redford HS-22-RA,,2.25,15.80,1.95,
+B2-5,World Average,Core - Shell,customShell,,2.25,36.66,5.52,
+B2-6,World Average,UNCONFIRMED - Extruder,Default Extruder,,2.99,14.18,4.02,VERIFY: process group not shown in screenshot
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"DisaMatic 130-A (19""x24"")",,2.25,92.99,8.92,
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"DisaMatic 130-B (21""x26"")",,2.25,109.95,9.11,
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"DisaMatic 130-C (24""x27"")",,2.25,126.92,9.11,
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"DisaMatic 130-X (21""x30"")",,2.25,122.68,9.11,
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"DisaMatic 2013 Mk V -LP (19""x24"")",,2.25,63.30,8.92,
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"DisaMatic 2013 Mk V -X (21""x30"")",,2.25,84.50,9.11,
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"DisaMatic 2070 Mk II -A (28""x37"")",,2.25,180.92,10.66,
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"DisaMatic 2070 Mk II -B (32""x37"")",,2.25,180.92,12.14,
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"DisaMatic 2070 Mk II -C (32""x40"")",,2.25,193.64,12.14,
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"DisaMatic 2070 Mk II -S (27""x34"")",,2.25,155.47,10.46,
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"DisaMatic 2110 Mk3 (16""x16"")",,2.25,51.06,8.55,
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"DisaMatic 2110 Mk3 (20""x20"")",,2.25,69.30,8.92,
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"DisaMatic 230 Mk II -A (19""x24"")",,2.25,124.44,8.92,
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"DisaMatic 230 Mk II -B (21""x25"")",,2.25,155.47,9.11,
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"DisaMatic 230 Mk II -C (24""x27"")",,2.25,176.60,9.48,
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"DisaMatic 230 Mk II -X (21""x30"")",,2.25,176.68,9.11,
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"Loramendi VMM-4050 (20""x16"")",,2.25,60.82,8.92,
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"Loramendi VMM-5070-A (24""x19"")",,2.25,120.20,10.26,
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"Loramendi VMM-5070-B (26""x21"")",,2.25,146.98,10.46,
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"Loramendi VMM-5070-C (27""x21"")",,2.25,159.71,10.46,
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"Loramendi VMM-5070-D (30""x21"")",,2.25,168.19,11.70,
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"Loramendi VMM-5070-E (30""x24"")",,2.25,189.40,11.70,
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"Loramendi VMM-5070-F (31""x24"")",,2.25,193.64,11.70,
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"Loramendi VMM-5070-G (32""x24"")",,2.25,197.88,12.14,
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"Loramendi VMM-6080-A (32""x26"")",,2.25,180.92,12.14,Direct rate lower than VMM-5070-G - re-check
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"Loramendi VMM-6080-B (32""x28"")",,2.25,193.64,12.14,
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"Loramendi VMM-6080-C (34""x26"")",,2.25,193.64,12.14,
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"Loramendi VMM-6080-D (34""x28"")",,2.25,206.37,12.14,
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"Loramendi VMM-6080-E (37""x28"")",,2.25,227.50,13.41,
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"Loramendi VMM-7090-A (37""x31"")",,2.25,197.88,13.41,Direct rate lower than VMM-6080-E - re-check
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"Loramendi VMM-7090-B (39""x31"")",,2.25,206.37,14.27,
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"Loramendi VMM-80120-A (43""x35"")",,2.25,214.85,14.75,
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"Loramendi VMM-80120-B (43""x40"")",,2.25,236.06,14.75,
+B2-7,World Average,Green Sand Molding - Vertical Flaskless,"Loramendi VMM-80120-C (47""x43"")",,2.25,278.48,15.48,
+B2-8,World Average,Inspection,XrayMachine,,2.99,1.92,9.82,"Indirect > direct overhead - unusual, confirm in source"

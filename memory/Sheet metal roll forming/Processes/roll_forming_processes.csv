@@ -1,0 +1,13 @@
+﻿Process Name,Default Tool Shop Name,Default Machine,Notes
+Coil Flattener,,"Coe CPPS-250 12"" Stock Width",
+Coil Material Stock,,Default Coil Material Stock,
+Cut-Off Press,Default,"4 Post Hydraulic Press 150 Ton 2"" Press Stroke",
+Integrated HFI Welding,,HFI Welder 100kW,
+Integrated Laser Welding,,Laser Welder 8KW,
+Integrated Rotary Spot Welding,,Rotary Spot Welder 120kW,
+Integrated TIG Welding,,TIG Welder 10kW,
+No Cost Feature,,,
+Punch Press,Default,"4 Post Hydraulic Press 150 Ton 2"" Press Stroke",
+Roll Forming Mill,Default,"Bradbury 2.5"" Shaft Diameter 12 stand",
+Uncoiler,,BK-10D Powered Double Mandrel,
+User-Defined Process,,,

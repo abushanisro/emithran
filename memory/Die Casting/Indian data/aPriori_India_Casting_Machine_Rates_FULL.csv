@@ -1,0 +1,99 @@
+﻿Machine Group,Machine Name,Labor Rate (USD/hr),Direct Overhead Rate (USD/hr),Indirect Overhead Rate (USD/hr)
+High Pressure Die Casting,"Buhler Carat 105, compact",2.14,81.01,3.85
+High Pressure Die Casting,"Buhler Carat 200, compact",2.14,122.04,5.42
+High Pressure Die Casting,"Buhler Carat 400, compact",2.14,204.05,8.38
+High Pressure Die Casting,Buhler Ecoline 34,2.14,35.00,2.12
+High Pressure Die Casting,Buhler Ecoline 53,2.14,48.36,2.60
+High Pressure Die Casting,Buhler Ecoline 66,2.14,59.91,3.02
+High Pressure Die Casting,Buhler Ecoline 84,2.14,35.89,2.09
+High Pressure Die Casting,"Buhler Evolution 26, compact",2.14,35.97,2.16
+High Pressure Die Casting,Buhler Evolution 280 Lean,2.14,145.74,6.25
+High Pressure Die Casting,Buhler Evolution 320 Lean,2.14,166.39,7.02
+High Pressure Die Casting,"Buhler Evolution 66, compact",2.14,59.52,3.05
+High Pressure Die Casting,"Buhler Evolution 90, compact",2.14,67.91,3.34
+High Pressure Die Casting,Frech DAW 20 S DCRC,2.14,12.18,1.25
+High Pressure Die Casting,Frech DAW 200 S DCRC,2.14,15.11,1.88
+High Pressure Die Casting,Frech DAW 50 S DCRC,2.14,12.60,1.35
+High Pressure Die Casting,"High Pressure Machine - 1,000kN Clamp Force",2.14,13.51,1.49
+High Pressure Die Casting,"High Pressure Machine - 1,500kN Clamp Force",2.14,14.61,1.70
+High Pressure Die Casting,"High Pressure Machine - 10,000kN Clamp Force",2.14,49.87,3.22
+High Pressure Die Casting,"High Pressure Machine - 2,000kN Clamp Force",2.14,18.62,1.82
+High Pressure Die Casting,"High Pressure Machine - 20,000kN Clamp Force",2.14,80.85,5.97
+High Pressure Die Casting,"High Pressure Machine - 4,000kN Clamp Force",2.14,27.98,2.28
+High Pressure Die Casting,"High Pressure Machine - 40,000kN Clamp Force",2.14,131.23,7.67
+High Pressure Die Casting,High Pressure Machine - 500kN Clamp Force,2.14,12.41,1.36
+High Pressure Die Casting,"High Pressure Machine - 6,000kN Clamp Force",2.14,45.46,2.70
+High Pressure Die Casting,Idra HC 130,2.14,14.00,1.54
+High Pressure Die Casting,Idra HC 200,2.14,14.00,1.59
+High Pressure Die Casting,Idra HC 50,2.14,12.49,1.40
+High Pressure Die Casting,Idra HC 90,2.14,12.49,1.39
+High Pressure Die Casting,Idra OL 1000 R,2.14,24.99,3.04
+High Pressure Die Casting,Idra OL 2000R,2.14,28.65,4.42
+High Pressure Die Casting,Idra OL 4000 R,2.14,33.56,6.94
+High Pressure Die Casting,PROFIT P100/16Z,2.14,13.50,1.51
+High Pressure Die Casting,PROFIT P1200/18Z,2.14,13.37,1.67
+High Pressure Die Casting,PROFIT P125/17Z,2.14,13.99,1.56
+High Pressure Die Casting,PROFIT P150/18Z,2.14,13.99,1.56
+High Pressure Die Casting,PROFIT P25/10Z,2.14,12.83,1.33
+High Pressure Die Casting,PROFIT P250/20Z,2.14,14.86,1.60
+High Pressure Die Casting,PROFIT P350/23Z,2.14,14.86,2.15
+High Pressure Die Casting,PROFIT P50/13Z,2.14,13.06,1.44
+High Pressure Die Casting,PROFIT P80/14Z,2.14,13.50,1.46
+High Pressure Die Casting,QUANTUM QDC100,2.14,13.52,1.59
+High Pressure Die Casting,QUANTUM QDC130,2.14,15.60,1.64
+High Pressure Die Casting,QUANTUM QDC160,2.14,16.82,1.70
+High Pressure Die Casting,QUANTUM QDC200,2.14,18.55,1.79
+High Pressure Die Casting,QUANTUM QDC280,2.14,18.79,1.95
+High Pressure Die Casting,QUANTUM QDC30,2.14,13.06,1.38
+High Pressure Die Casting,QUANTUM QDC400,2.14,20.51,2.44
+High Pressure Die Casting,QUANTUM QDC50,2.14,12.32,1.46
+High Pressure Die Casting,QUANTUM QDC88,2.14,14.39,1.48
+High Pressure Die Casting,QUANTUM QDCC100,2.14,13.50,1.33
+High Pressure Die Casting,QUANTUM QDCC1250,2.14,23.85,3.96
+High Pressure Die Casting,QUANTUM QDCC160,2.14,12.78,1.70
+High Pressure Die Casting,QUANTUM QDCC1600,2.14,25.71,4.03
+High Pressure Die Casting,QUANTUM QDCC2000,2.14,29.38,6.77
+High Pressure Die Casting,QUANTUM QDCC280,2.14,26.59,1.65
+High Pressure Die Casting,QUANTUM QDCC400,2.14,16.13,1.82
+High Pressure Die Casting,QUANTUM QDCC630,2.14,20.42,2.18
+High Pressure Die Casting,QUANTUM QDCC800,2.14,21.63,2.46
+High Pressure Die Casting,Toshiba DC250R - M/EM,2.14,15.88,1.79
+High Pressure Die Casting,Toshiba DC350R - M/EM,2.14,20.26,2.05
+High Pressure Die Casting,Toshiba DC500R - M/EM,2.14,26.50,2.08
+High Pressure Die Casting,Toshiba DC650R - M/EM,2.14,30.89,2.29
+High Pressure Die Casting,Toshiba DC800R - M/EM,2.14,40.64,2.89
+Gravity / Tilt-Pour / Low-Pressure Die Casting,"Gravity Die Machine - 1,000mm x 1,200mm x 1,200mm (LxWxH) Max Mold Base",2.14,20.73,2.68
+Gravity / Tilt-Pour / Low-Pressure Die Casting,"Gravity Die Machine - 1,300mm x 1,500mm x 1,800mm (LxWxH) Max Mold Base",2.14,25.66,4.22
+Gravity / Tilt-Pour / Low-Pressure Die Casting,Gravity Die Machine - 500mm x 500mm x 450mm (LxWxH) Max Mold Base,2.14,12.80,2.00
+Gravity / Tilt-Pour / Low-Pressure Die Casting,Gravity Die Machine - 800mm x 800mm x 900mm (LxWxH) Max Mold Base,2.14,18.28,2.43
+Gravity / Tilt-Pour / Low-Pressure Die Casting,Hall - 2H Tilt-Pour - 24x26in,2.14,22.51,2.70
+Gravity / Tilt-Pour / Low-Pressure Die Casting,Hall - 3HS Tilt-Pour - 36x36in,2.14,24.13,3.30
+Gravity / Tilt-Pour / Low-Pressure Die Casting,Hall - 3HSX Tilt-Pour - 40x42in,2.14,25.74,3.99
+Gravity / Tilt-Pour / Low-Pressure Die Casting,Hall - 3L Tilt-Pour - 34x34in,2.14,24.13,3.30
+Gravity / Tilt-Pour / Low-Pressure Die Casting,Hall - 6H Tilt-Pour - 48x42in,2.14,25.37,4.25
+Gravity / Tilt-Pour / Low-Pressure Die Casting,IMR BP/C 155 H,2.14,17.76,4.22
+Gravity / Tilt-Pour / Low-Pressure Die Casting,IMR C40H,2.14,6.98,1.96
+Gravity / Tilt-Pour / Low-Pressure Die Casting,IMR C60X,2.14,17.95,2.71
+Gravity / Tilt-Pour / Low-Pressure Die Casting,KURTZ AK-10,2.14,8.61,2.31
+Gravity / Tilt-Pour / Low-Pressure Die Casting,KURTZ AL 10-7 TC,2.14,27.44,4.22
+Gravity / Tilt-Pour / Low-Pressure Die Casting,KURTZ AL 13-13 TC,2.14,17.44,4.22
+Gravity / Tilt-Pour / Low-Pressure Die Casting,KURTZ AL 14-10 SR,2.14,28.39,4.22
+Gravity / Tilt-Pour / Low-Pressure Die Casting,KURTZ AL 7-5 TC,2.14,20.36,2.47
+Gravity / Tilt-Pour / Low-Pressure Die Casting,KURTZ AI 13-13 SC,2.14,20.70,3.48
+Gravity / Tilt-Pour / Low-Pressure Die Casting,SUIN SJ680,2.14,22.91,3.92
+Gravity / Tilt-Pour / Low-Pressure Die Casting,Zhenhuan ZLC160,2.14,4.45,1.78
+Investment Casting - Wax Injection,Wax Injection 15 Ton,2.25,7.11,0.91
+Investment Casting - Wax Injection,Wax Injection 25 Ton,2.25,8.46,0.94
+Investment Casting - Wax Injection,Wax Injection 35 Ton,2.25,9.92,0.95
+Investment Casting - Wax Injection,Wax Injection 50 Ton,2.25,12.08,0.96
+Investment Casting - Wax Injection,Wax Injection 100 Ton,2.25,19.22,1.05
+"Magnus (ALX / MAL / ML series, lbs capacity)",Magnus MLSR - 200lbs,2.14,0.47,0.87
+"Magnus (ALX / MAL / ML series, lbs capacity)",Magnus ML24 X1 - 250lbs,2.14,1.36,0.88
+"Magnus (ALX / MAL / ML series, lbs capacity)",Magnus MAL 2222 - 520lbs,2.14,1.76,0.88
+"Magnus (ALX / MAL / ML series, lbs capacity)",Magnus ALX30H52 - 2200lbs,2.14,2.56,0.90
+"Magnus (ALX / MAL / ML series, lbs capacity)",Magnus ALXH7652 - 2200lbs,2.14,4.00,0.95
+Investment Casting - Autoclave (MK A / Steam),MK A-100,2.14,20.20,1.03
+Investment Casting - Autoclave (MK A / Steam),MK A-120,2.14,28.66,1.09
+Investment Casting - Autoclave (MK A / Steam),MK A-150,2.14,38.30,1.15
+Investment Casting - Autoclave (MK A / Steam),MK A-180,2.14,45.94,1.23
+Investment Casting - Autoclave (MK A / Steam),Steam Autoclave (2m x 2m),2.14,57.60,1.42

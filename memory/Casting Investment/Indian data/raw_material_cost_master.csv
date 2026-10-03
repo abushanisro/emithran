@@ -1,0 +1,156 @@
+Material Name,Source Name,Description / Grade,Unit Cost (USD/kg),Cost Units,Base Cost Per Unit (USD),Sector (as captured)
+ASTM A27 Grade 65-35 [450-240],Generic ASTM A27 Grade 65-35 [450-240],Grade 65-35 [450-240],0.308,Cost per KG,0.31,World Average
+ASTM A148 Grade 80-40,Generic ASTM A148 Grade 80-40,Grade 80-40,0.308,Cost per KG,0.31,World Average
+ASTM A27 Grade U-60-30 [415-205],Generic ASTM A27 Grade U-60-30 [415-205],Grade U-60-30 [415-205],0.308,Cost per KG,0.31,World Average
+"Ductile Iron, ASTM A536, 120-90-02","Generic Ductile Iron, ASTM A536, 120-90-02",Grade 120-90-02,0.314,Cost per KG,0.31,World Average
+"Steel, AISI 1045, Medium-Carbon","Generic Steel, AISI 1045, Medium-Carbon",Grade 1045 (Old DIN 1.1191),0.314,Cost per KG,0.31,World Average
+ASTM Grade 30 Gray Iron,Generic ASTM Grade 30 Gray Iron,Grade 30 (Old DIN 0.6020 GG20),0.315,Cost per KG,0.31,World Average
+"Steel, ASTM A915 SC1020","Generic Steel, ASTM A915 SC1020",Grade SC1020 (A915),0.316,Cost per KG,0.32,World Average
+"Ductile Iron, ASTM A536, 60-40-18","Generic Ductile Iron, ASTM A536, 60-40-18",Grade 60-40-18,0.317,Cost per KG,0.32,World Average
+"Steel, ASTM A27 Grade 70-40 (485-275)","Generic Steel, ASTM A27 Grade 70-40 (485-275)",Grade 70-40 (A27),0.317,Cost per KG,0.32,World Average
+ASTM A352 Grade LCB,Generic ASTM A352 Grade LCB,Grade LCB,0.320,Cost per KG,0.32,World Average
+ASTM A304 1330 H,Generic ASTM A304 1330 H,Grade 1330 H,0.321,Cost per KG,0.32,World Average
+Ductile Iron ASTM A536,Generic Ductile Iron A536,,0.324,Cost per KG,0.32,World Average
+"Ductile Iron, ASTM A536, 70-50-05","Generic Ductile Iron, ASTM A536, 70-50-05",Grade 70-50-05 (Old DIN 0.7050 GGG50),0.328,Cost per KG,0.33,World Average
+ASTM Grade 35 Gray Iron,Generic ASTM Grade 35 Gray Iron,Grade 35 (Old DIN 0.6025 GG25),0.337,Cost per KG,0.34,World Average
+ASTM Grade 40 Gray Iron,Generic ASTM Grade 40 Gray Iron,Grade 40 (Old DIN 0.6030 GG30),0.337,Cost per KG,0.34,World Average
+ASTM Grade 50 Gray Iron,Generic ASTM Grade 50 Gray Iron,Grade 50 (Old DIN 0.6035 GG35),0.337,Cost per KG,0.34,World Average
+ISO JMB 300-6,Generic ISO JMB 300-6,ISO JMB 300-6,0.337,Cost per KG,0.34,World Average
+ISO JMB 350-10,Generic ISO JMB 350-10,ISO JMB 350-10,0.337,Cost per KG,0.34,World Average
+ISO JMB 450-6,Generic ISO JMB 450-6,ISO JMB 450-6,0.337,Cost per KG,0.34,World Average
+ISO JMB 500-5,Generic ISO JMB 500-5,ISO JMB 500-5,0.337,Cost per KG,0.34,World Average
+ISO JMB 550-4,Generic ISO JMB 550-4,ISO JMB 550-4,0.337,Cost per KG,0.34,World Average
+ISO JMB 600-3,Generic ISO JMB 600-3,ISO JMB 600-3,0.337,Cost per KG,0.34,World Average
+ISO JMB 650-2,Generic ISO JMB 650-2,ISO JMB 650-2,0.337,Cost per KG,0.34,World Average
+ISO JMB 700-2,Generic ISO JMB 700-2,ISO JMB 700-2,0.337,Cost per KG,0.34,World Average
+ISO JMB 800-1,Generic ISO JMB 800-1,ISO JMB 800-1,0.337,Cost per KG,0.34,World Average
+ISO JMW 350-4,Generic ISO JMW 350-4,ISO JMW 350-4,0.337,Cost per KG,0.34,World Average
+ISO JMW 360-12,Generic ISO JMW 360-12,ISO JMW 360-12,0.337,Cost per KG,0.34,World Average
+ISO JMW 400-5,Generic ISO JMW 400-5,ISO JMW 400-5,0.337,Cost per KG,0.34,World Average
+ISO JMW 450-7,Generic ISO JMW 450-7,ISO JMW 450-7,0.337,Cost per KG,0.34,World Average
+ISO JMW 550-4,Generic ISO JMW 550-4,ISO JMW 550-4,0.337,Cost per KG,0.34,World Average
+"Ductile Iron, ASTM A536, 80-60-03","Generic Ductile Iron, ASTM A536, 80-60-03",Grade 80-60-03 (Old DIN 0.7050 GGG60),0.354,Cost per KG,0.35,World Average
+"Ductile Iron, ASTM A536, 100-70-03","Generic Ductile Iron, ASTM A536, 100-70-03",Grade 100-70-03 (Old DIN 0.7050 GGG70),0.355,Cost per KG,0.35,World Average
+ISO JS 350-22/S,Generic ISO JS 350-22/S,ISO JS 350-22/S,0.363,Cost per KG,0.36,World Average
+ISO JS 450-10/S,Generic ISO JS 450-10/S,ISO JS 450-10/S,0.363,Cost per KG,0.36,World Average
+ASTM Grade 20 Gray Iron,Generic ASTM Grade 20 Gray Iron,Grade 20 (Old DIN 0.6010 GG10),0.365,Cost per KG,0.37,World Average
+ASTM Grade 25 Gray Iron,Generic ASTM Grade 25 Gray Iron,Grade 25 (Old DIN 0.6015 GG15),0.365,Cost per KG,0.37,World Average
+ISO JS 900-2/S,Generic ISO JS 900-2/S,ISO JS 900-2/S,0.368,Cost per KG,0.37,World Average
+ASTM A352 Grade LCC,Generic ASTM A352 Grade LCC,Grade LCC,0.375,Cost per KG,0.38,World Average
+ASTM A148 Grade 105-85,Generic ASTM A148 Grade 105-85,Grade 105-85,0.419,Cost per KG,0.42,World Average
+"Steel, AISI 4140, Medium-Carbon","Generic Steel, AISI 4140, Medium-Carbon",Grade 4140 (Old DIN 1.7225 GS-42CrMo4),0.420,Cost per KG,0.42,World Average
+SAE 4118,Generic SAE 4118,ASTM A217 Grade WC6,0.547,Cost per KG,0.55,World Average
+ASTM A148 Grade 115-95,Generic ASTM A148 Grade 115-95,Grade 115-95,0.619,Cost per KG,0.62,World Average
+"Steel, Cold Worked, AISI 1005","Generic Steel, Cold Worked, AISI 1005",Grade 1005,0.639,Cost per KG,0.64,World Average
+"Steel, Hot Worked, AISI 1018","Generic Steel, Hot Worked, AISI 1018",Grade 1018,0.643,Cost per KG,0.64,World Average
+"Steel, Hot Worked, AISI 1050","Generic Steel, Hot Worked, AISI 1050",Grade 1050,0.643,Cost per KG,0.64,World Average
+"Steel, Hot Worked, ASTM A572 Grade 50","Generic Steel, Hot Worked, ASTM A572 Grade 50",Grade 50,0.647,Cost per KG,0.65,World Average
+"Steel, Cold Worked, DC06","Generic Steel, Cold Worked, DC06",Grade DC06,0.649,Cost per KG,0.65,World Average
+"Steel, Cold Worked, AISI 5210","Generic Steel, Cold Worked, AISI 5210",Grade 5210,0.669,Cost per KG,0.67,World Average
+"Steel, Hot Worked, Grade S235JR","Generic Steel, Hot Worked, Grade S235JR",Grade S235JR,0.685,Cost per KG,0.69,World Average
+"Steel, Hot Worked, S900MC","Generic Steel, Hot Worked, S900MC",Grade S900MC,0.693,Cost per KG,0.69,World Average
+"Steel, Cold Worked, AISI 1018","Generic Steel, Cold Worked, AISI 1018",Grade 1018,0.733,Cost per KG,0.73,World Average
+"Steel, Cold Worked, AISI 1050","Generic Steel, Cold Worked, AISI 1050",Grade 1050,0.733,Cost per KG,0.73,World Average
+"Steel, Cold Worked, AISI 4130","Generic Steel, Cold Worked, AISI 4130",Grade 4130,0.735,Cost per KG,0.74,World Average
+"Steel, Cold Worked, AISI 8620","Generic Steel, Cold Worked, AISI 8620",Grade 8620,0.767,Cost per KG,0.77,World Average
+ASTM A217 Grade CA15,Generic ASTM A217 Grade CA15,Grade CA15,0.828,Cost per KG,0.83,World Average
+"Stainless Steel, AISI 410","Generic Stainless Steel, AISI 410",,0.896,Cost per KG,0.90,World Average
+"Tool Steel, O-1","Generic Tool Steel, O-1",UNS T90102; Cast ASTM A597 Grade CO-1,0.980,Cost per KG,0.98,World Average
+"Stainless Steel, AISI 430","Generic Stainless Steel, AISI 430",,0.994,Cost per KG,0.99,World Average
+"Stainless Steel, A240","Generic Stainless Steel, A240",Grade A240,1.026,Cost per KG,1.03,World Average
+"Stainless Steel, AISI 441","Generic Stainless Steel, AISI 441",Grade 441,1.162,Cost per KG,1.16,World Average
+Magnesium AZ91E,Generic Magnesium AZ91E,,1.171,Cost per KG,1.17,World Average
+"Stainless Steel, 416","Generic Stainless Steel, 416",AMS 5349; UNS J91161,1.181,Cost per KG,1.18,World Average
+"Tool Steel, A-2","Generic Tool Steel, A-2",UNS T90102; Cast ASTM A597 Grade CA-2,1.226,Cost per KG,1.23,World Average
+Magnesium AZ91D,Generic Magnesium AZ91D,,1.315,Cost per KG,1.31,World Average
+"Stainless Steel, 440C","Generic Stainless Steel, 440C",AMS 5352; UNS J91651,1.317,Cost per KG,1.32,World Average
+Magnesium AM60B,Generic Magnesium AM60B,,1.362,Cost per KG,1.36,World Average
+"Stainless Steel, A351 CF8","Generic Stainless Steel, A351 CF8",Grade CF8 (DIN 1.4308),1.371,Cost per KG,1.37,World Average
+ASTM A743 Grade CA-6NM,Generic ASTM A743 Grade CA-6NM,Grade CA-6NM,1.406,Cost per KG,1.41,World Average
+"Stainless Steel, 440B","Generic Stainless Steel, 440B",,1.440,Cost per KG,1.44,World Average
+"Stainless Steel, 15-5PH","Generic Stainless Steel, 15-5PH",,1.485,Cost per KG,1.48,World Average
+"Tool Steel, D-2","Generic Tool Steel, D-2",UNS T90402; Cast ASTM A597 Grade CD-2,1.583,Cost per KG,1.58,World Average
+"Stainless Steel, AISI 303","Generic Stainless Steel, AISI 303",,1.648,Cost per KG,1.65,World Average
+"Stainless Steel, AISI 304","Generic Stainless Steel, AISI 304",,1.670,Cost per KG,1.67,World Average
+Zinc - Zamak 5,Generic Zinc - Zamak 5,Grade ZA-5 (B86),1.728,Cost per KG,1.73,World Average
+"Stainless Steel, AISI 304L","Generic Stainless Steel, AISI 304L",Grade 304L,1.738,Cost per KG,1.74,World Average
+Zinc-Aluminum ZA8,Generic Zinc-Aluminum ZA8,Grade ZA-8 (B791),1.777,Cost per KG,1.78,World Average
+Zinc-Aluminum ZA12,Generic Zinc-Aluminum ZA12,Grade ZA-12 (B86),1.788,Cost per KG,1.79,World Average
+Zinc - Zamak,Generic Zinc - Zamak,,1.827,Cost per KG,1.83,World Average
+"Manganese Bronze, 863","Generic Manganese Bronze, 863","Grade C86300 (B30, B176)",1.834,Cost per KG,1.83,World Average
+"Manganese Bronze, 865","Generic Manganese Bronze, 865","Grade C86500 (B30, B176)",1.838,Cost per KG,1.84,World Average
+Lead,Generic Lead,Grade Pb98.5 (B29),1.843,Cost per KG,1.84,World Average
+Zinc-Aluminum ZA27,Generic Zinc-Aluminum ZA27,Grade ZA-27 (B791),2.004,Cost per KG,2.00,World Average
+"Aluminum, ANSI A413.0","Generic Aluminum, ANSI A413.0",Grade A413 (Old DIN 3.2583 G-AlSi12(Cu)),2.287,Cost per KG,2.29,World Average
+"Aluminum, 413.0","Generic Aluminum, 413.0",Grade 413,2.294,Cost per KG,2.29,World Average
+"Aluminum, ANSI B413.0","Generic Aluminum, ANSI B413.0",Grade B413 (Old DIN 3.2581 G-AlSi12),2.294,Cost per KG,2.29,World Average
+"Aluminum, ANSI 361.0","Generic Aluminum, ANSI 361.0",Grade 361 (Old DIN 2.2381 G-AlSi10Mg),2.308,Cost per KG,2.31,World Average
+"Aluminum, ANSI 303.0","Generic Aluminum, ANSI 303.0",Grade 303 (Old DIN 3.2382 GD-AlSi10Mg),2.322,Cost per KG,2.32,World Average
+"Aluminum, ANSI 365.0","Generic Aluminum, ANSI 365.0",Grade 365 (Old DIN 3.2373 G-AlSi9Mg),2.336,Cost per KG,2.34,World Average
+"Aluminum, ANSI 356.0","Generic Aluminum, ANSI 356.0","Grade 356 (B26, B108, B618) (Old DIN 3.2371 G-AlSi7Mg)",2.352,Cost per KG,2.35,World Average
+"Stainless Steel, 14-4PH","Generic Stainless Steel, 14-4PH",UNS J92240; AMS 5340,2.369,Cost per KG,2.37,World Average
+Silicon Brass 879,Generic Silicon Brass 879,Grade 879 (B108),2.382,Cost per KG,2.38,World Average
+"Aluminum, ANSI 357.0","Generic Aluminum, ANSI 357.0","Grade 357 (B26, B108, B618)",2.395,Cost per KG,2.40,World Average
+"Aluminum, ANSI 5019","Generic Aluminum, ANSI 5019",Grade 5019 (Old DIN 3.3261.01 G-AlMg5Si),2.458,Cost per KG,2.46,World Average
+"Aluminum, AA 7003","Generic Aluminum, AA 7003",Grade 7003,2.469,Cost per KG,2.47,World Average
+"Aluminum, AA 383.0","Generic Aluminum, AA 383.0",Grade 383,2.494,Cost per KG,2.49,World Average
+"Aluminum, ANSI 333.0","Generic Aluminum, ANSI 333.0",Grade 333 (Old DIN 2.2163 GD-AlSi9Cu3),2.494,Cost per KG,2.49,World Average
+"Aluminum, AA 380.0","Generic Aluminum, AA 380.0",Grade 380,2.494,Cost per KG,2.49,World Average
+"Aluminum, ANSI AL380.0","Generic Aluminum, ANSI AL380.0","Grade AL380 (B26, B108, B618) (Old DIN 2.2163 G-AlSi9Cu3)",2.494,Cost per KG,2.49,World Average
+"Aluminum, ANSI 5119","Generic Aluminum, ANSI 5119",Grade Aluminum 5119,2.495,Cost per KG,2.49,World Average
+"Aluminum, ANSI 220.0","Generic Aluminum, ANSI 220.0","Grade 220 (B26, B108, B618)",2.496,Cost per KG,2.50,World Average
+"Aluminum, ANSI 5083","Generic Aluminum, ANSI 5083",Grade 5083,2.498,Cost per KG,2.50,World Average
+"Aluminum, Alloy C355","Generic Aluminum, Alloy C355",Aluminum Alloy C355,2.499,Cost per KG,2.50,World Average
+"Aluminum, ANSI 7022","Generic Aluminum, ANSI 7022",Grade 7022,2.504,Cost per KG,2.50,World Average
+"Aluminum, ANSI 7020","Generic Aluminum, ANSI 7020",Grade 7020,2.511,Cost per KG,2.51,World Average
+"Aluminum, ANSI 5454","Generic Aluminum, ANSI 5454",Grade 5454,2.525,Cost per KG,2.53,World Average
+"Aluminum, ANSI 6012","Generic Aluminum, ANSI 6012",Grade 6012,2.526,Cost per KG,2.53,World Average
+"Aluminum, ANSI 112.0","Generic Aluminum, ANSI 112.0","Grade 112 (B26, B108, B618)",2.526,Cost per KG,2.53,World Average
+"Aluminum, ANSI 6082","Generic Aluminum, ANSI 6082",Grade 6082,2.531,Cost per KG,2.53,World Average
+"Aluminum, ANSI 7075","Generic Aluminum, ANSI 7075",Grade 7075,2.531,Cost per KG,2.53,World Average
+"Aluminum, ANSI 3103","Generic Aluminum, ANSI 3103",Grade 3103,2.533,Cost per KG,2.53,World Average
+"Aluminum, ANSI 3003","Generic Aluminum, ANSI 3003",,2.536,Cost per KG,2.54,World Average
+"Aluminum, ANSI 5251","Generic Aluminum, ANSI 5251",Grade 5251,2.537,Cost per KG,2.54,World Average
+"Aluminum, ANSI 5052","Generic Aluminum, ANSI 5052",,2.546,Cost per KG,2.55,World Average
+"Aluminum, AA 3105","Generic Aluminum, AA 3105",Grade 3105,2.550,Cost per KG,2.55,World Average
+"Aluminum, ANSI 6061","Generic Aluminum, ANSI 6061",,2.563,Cost per KG,2.56,World Average
+"Aluminum, ANSI 5005A","Generic Aluminum, ANSI 5005A",Grade 5005A,2.565,Cost per KG,2.57,World Average
+"Aluminum, ANSI 6060","Generic Aluminum, ANSI 6060",,2.581,Cost per KG,2.58,World Average
+"Aluminum, ANSI 319.0","Generic Aluminum, ANSI 319.0","Grade 319 (B26, B108, B618) (Old DIN 3.2151 G-AlSi6Cu4)",2.585,Cost per KG,2.59,World Average
+"Aluminum, ANSI 1050A","Generic Aluminum, ANSI 1050A",,2.590,Cost per KG,2.59,World Average
+"Stainless Steel, 310","Generic Stainless Steel, 310",UNS J94292; CK20; ASTM A351,2.595,Cost per KG,2.60,World Average
+"Aluminum, ANSI 5754","Generic Aluminum, ANSI 5754",Grade Aluminum 5754,2.628,Cost per KG,2.63,World Average
+"Aluminum, AA 1100","Generic Aluminum, AA 1100",Grade 1100,2.678,Cost per KG,2.68,World Average
+"Aluminum, ANSI 7050","Generic Aluminum, ANSI 7050",,2.678,Cost per KG,2.68,World Average
+"Aluminum, ANSI 2030","Generic Aluminum, ANSI 2030",Grade 2030,2.699,Cost per KG,2.70,World Average
+"Aluminum, ANSI 2007","Generic Aluminum, ANSI 2007",Grade 2007,2.707,Cost per KG,2.71,World Average
+"Aluminum, ANSI 2017","Generic Aluminum, ANSI 2017",,2.746,Cost per KG,2.75,World Average
+"Aluminum, ANSI 2024","Generic Aluminum, ANSI 2024",,2.776,Cost per KG,2.78,World Average
+"Aluminum, ANSI 204.0","Generic Aluminum, ANSI 204.0",Grade 204 (Old DIN 3.1841 G-AlCu4Ti),2.776,Cost per KG,2.78,World Average
+"Stainless Steel, AISI 316","Generic Stainless Steel, AISI 316",,2.821,Cost per KG,2.82,World Average
+"Aluminum, AA 2219","Generic Aluminum, AA 2219",Grade 2219,2.959,Cost per KG,2.96,World Average
+"Stainless Steel, AISI 316L","Generic Stainless Steel, AISI 316L",,3.091,Cost per KG,3.09,World Average
+"Nickel Alloy, Inconel 783","Generic Nickel Alloy, Inconel 783",Nickel Alloy UNS R30783; SAE AMS 5940,3.119,Cost per KG,3.12,World Average
+"Nickel Alloy, Inconel 713 C","Generic Nickel Alloy, Inconel 713 C",Nickel Alloy UNS N07713; AMS 5391,3.141,Cost per KG,3.14,World Average
+"Stainless Steel, 17-4PH","Generic Stainless Steel, 17-4PH",UNS J92180 / J92220; CB7Cu-1; ASTM A747,4.022,Cost per KG,4.02,World Average
+"Stainless Steel, 347","Generic Stainless Steel, 347",UNS J92710; CF8C; ASTM A351,4.169,Cost per KG,4.17,World Average
+"Cobalt Alloy, Co Alloy 25","Generic Cobalt Alloy, Co Alloy 25",UNS R30605; Haynes alloy 25; 2.4964,4.623,Cost per KG,4.62,World Average
+"Brass, UNS C36000","Generic Brass, UNS C36000",Grade CW617N,4.674,Cost per KG,4.67,World Average
+"Copper, UNS C28000","Generic Copper, UNS C28000",,4.726,Cost per KG,4.73,World Average
+"Brass, Free-Cutting 360","Generic Brass, Free-Cutting 360","Grade C85700 (B30, B176)",4.911,Cost per KG,4.91,World Average
+"Copper, UNS C11000","Generic Copper, UNS C11000",,4.919,Cost per KG,4.92,World Average
+"Brass, Yellow 270","Generic Brass, Yellow 270","Grade 270 (B30, B176)",5.896,Cost per KG,5.90,World Average
+"Bronze, Commercial 220","Generic Bronze, Commercial 220","Grade C94900 (B30, B176)",5.908,Cost per KG,5.91,World Average
+"Copper, UNS C18150","Generic Copper, UNS C18150",,6.094,Cost per KG,6.09,World Average
+"Cobalt Alloy, Co Alloy X-40","Generic Cobalt Alloy, Co Alloy X-40",UNS R30031,6.264,Cost per KG,6.26,World Average
+"Copper, UNS C62730","Generic Copper, UNS C62730",,6.264,Cost per KG,6.26,World Average
+Aluminum Bronze,Generic Aluminum Bronze,"Grade C95500 (B148, B176)",6.565,Cost per KG,6.56,World Average
+"Nickel Alloy, Inconel 718","Generic Nickel Alloy, Inconel 718",Nickel Alloy UNS N07718; AMS 5383,7.774,Cost per KG,7.77,World Average
+"Copper, UNS C51900","Generic Copper, UNS C51900",,9.221,Cost per KG,9.22,World Average
+"Nickel Alloy, Nickel Alloy In 625","Generic Nickel Alloy, Nickel Alloy In 625",Nickel Alloy IN-625,9.847,Cost per KG,9.85,World Average
+"Nickel Alloy, Nickel Alloy X","Generic Nickel Alloy, Nickel Alloy X",Nickel Alloy X,12.004,Cost per KG,12.00,World Average
+"Titanium, Ti-6Al-4V","Generic Titanium, Ti-6Al-4V","Ti-6-4; UNS R56400; ASTM Grade 5 Titanium; Ti6Al4V, Ti64, TC4",14.423,Cost per KG,14.42,World Average
+"Nickel Alloy, Nickel Alloy C276","Generic Nickel Alloy, Nickel Alloy C276",UNS N30107; CW-6M,15.246,Cost per KG,15.25,World Average
+"Cobalt Alloy, Mar M 509","Generic Cobalt Alloy, Mar M 509",Cobalt Alloy,16.456,Cost per KG,16.46,World Average
+"Titanium, Titanium Grade 2","Generic Titanium, Titanium Grade 2","ASTM Grade 2; UNS R50400; TA2, C.P.Titanium",20.980,Cost per KG,20.98,World Average
+"Cobalt Alloy, Co Alloy FSX 414","Generic Cobalt Alloy, Co Alloy FSX 414",FSX 414 Cobalt Alloy,,Cost per KG,,World Average

@@ -1,0 +1,5 @@
+﻿Name,Description,Labor Rate (USD / hr),Direct Over...,Indirect Ov...,Overhead ...,Labor Time...,Number of...,Wage Grad...,Work ...,Setup Time (hr),Is Preferred,Avg Utilization,Good ...,Machine Price (USD),Machine P...,Machine L...,Machine W...,Footprint A...,Machine Li...,Installation...,Annual Ma...,Machine U...,Salvage Val...,Suppli...,Machine Manufacturer Location
+Manual Bench Cell - 16m x 4m Footprint,16m x 4m manual bench cell,36.97,0.45,19.51,0.00,1.00,2.00,,1.00,0.50,true,0.00,1.00,0.00,3.00,"16,000.00","4,000.00",1.00,20.00,20.00,5.00,80.00,0.00,0.00,Virtual
+Manual Bench Cell - 2m x 2m Footprint,2m x 2m manual bench cell,36.97,0.15,14.42,0.00,1.00,1.00,,1.00,0.50,true,0.00,1.00,0.00,1.00,"2,000.00","2,000.00",1.00,20.00,20.00,5.00,80.00,0.00,0.00,Virtual
+Manual Bench Cell - 4m x 4m Footprint,4m x 4m manual bench cell,36.97,0.15,15.44,0.00,1.00,1.00,,1.00,0.50,true,0.00,1.00,0.00,1.00,"4,000.00","4,000.00",1.00,20.00,20.00,5.00,80.00,0.00,0.00,Virtual
+Manual Bench Cell - 8m x 4m Footprint,8m x 4m manual bench cell,36.97,0.30,16.80,0.00,1.00,1.00,,1.00,0.50,true,0.00,1.00,0.00,2.00,"8,000.00","4,000.00",1.00,20.00,20.00,5.00,80.00,0.00,0.00,Virtual

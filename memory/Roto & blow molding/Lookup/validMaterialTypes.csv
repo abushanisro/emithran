@@ -1,0 +1,12 @@
+﻿Digital Factory,Table Name,Source File Path,Material Type,Max Wall Thickness (mm),Min Wall Thickness (mm)
+aPriori USA,validMaterialTypes,lookupTables/Component/validMaterialTypes.csv,ABS,,
+aPriori USA,validMaterialTypes,lookupTables/Component/validMaterialTypes.csv,Acetal,,
+aPriori USA,validMaterialTypes,lookupTables/Component/validMaterialTypes.csv,HDPE,,
+aPriori USA,validMaterialTypes,lookupTables/Component/validMaterialTypes.csv,LDPE,,
+aPriori USA,validMaterialTypes,lookupTables/Component/validMaterialTypes.csv,Nylon,31.75,1.50
+aPriori USA,validMaterialTypes,lookupTables/Component/validMaterialTypes.csv,PET,50.80,0.50
+aPriori USA,validMaterialTypes,lookupTables/Component/validMaterialTypes.csv,Polycarbonate,12.70,1.50
+aPriori USA,validMaterialTypes,lookupTables/Component/validMaterialTypes.csv,Polyethylene,50.80,0.50
+aPriori USA,validMaterialTypes,lookupTables/Component/validMaterialTypes.csv,Polypropylene,10.16,0.75
+aPriori USA,validMaterialTypes,lookupTables/Component/validMaterialTypes.csv,Polystyrene,,
+aPriori USA,validMaterialTypes,lookupTables/Component/validMaterialTypes.csv,Silicone,,

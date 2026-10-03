@@ -1,0 +1,16 @@
+﻿Digital Factory,Table Name,Source File Path,Material Type,Num Shots Per Tool
+aPriori USA,tblToolLife,lookupTables/Component/tblToolLife.csv,ABS,144000
+aPriori USA,tblToolLife,lookupTables/Component/tblToolLife.csv,Acetal,278000
+aPriori USA,tblToolLife,lookupTables/Component/tblToolLife.csv,Acrylic,257000
+aPriori USA,tblToolLife,lookupTables/Component/tblToolLife.csv,Nylon,278000
+aPriori USA,tblToolLife,lookupTables/Component/tblToolLife.csv,PEEK,144000
+aPriori USA,tblToolLife,lookupTables/Component/tblToolLife.csv,PEI,144000
+aPriori USA,tblToolLife,lookupTables/Component/tblToolLife.csv,PES,144000
+aPriori USA,tblToolLife,lookupTables/Component/tblToolLife.csv,PET,428000
+aPriori USA,tblToolLife,lookupTables/Component/tblToolLife.csv,Polycarbonate,144000
+aPriori USA,tblToolLife,lookupTables/Component/tblToolLife.csv,Polypropylene,321000
+aPriori USA,tblToolLife,lookupTables/Component/tblToolLife.csv,Polystyrene,428000
+aPriori USA,tblToolLife,lookupTables/Component/tblToolLife.csv,PPO,144000
+aPriori USA,tblToolLife,lookupTables/Component/tblToolLife.csv,PPS,144000
+aPriori USA,tblToolLife,lookupTables/Component/tblToolLife.csv,PVC,144000
+aPriori USA,tblToolLife,lookupTables/Component/tblToolLife.csv,SAN,257000

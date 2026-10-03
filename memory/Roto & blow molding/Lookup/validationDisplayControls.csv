@@ -1,0 +1,12 @@
+﻿Digital Factory,Table Name,Source File Path,Panel Name,Display
+aPriori USA,validationDisplayControls,lookupTables/Component/validationDisplayControls.csv,Blank Size,no
+aPriori USA,validationDisplayControls,lookupTables/Component/validationDisplayControls.csv,Build Direction,no
+aPriori USA,validationDisplayControls,lookupTables/Component/validationDisplayControls.csv,Draw Direction,yes
+aPriori USA,validationDisplayControls,lookupTables/Component/validationDisplayControls.csv,Machining,no
+aPriori USA,validationDisplayControls,lookupTables/Component/validationDisplayControls.csv,Main Surface,no
+aPriori USA,validationDisplayControls,lookupTables/Component/validationDisplayControls.csv,No Cost Feature,no
+aPriori USA,validationDisplayControls,lookupTables/Component/validationDisplayControls.csv,Ram Direction,no
+aPriori USA,validationDisplayControls,lookupTables/Component/validationDisplayControls.csv,Routing,yes
+aPriori USA,validationDisplayControls,lookupTables/Component/validationDisplayControls.csv,Stock Form,no
+aPriori USA,validationDisplayControls,lookupTables/Component/validationDisplayControls.csv,Tolerances,no
+aPriori USA,validationDisplayControls,lookupTables/Component/validationDisplayControls.csv,Uncosted GCDs,yes

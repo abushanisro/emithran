@@ -1,0 +1,74 @@
+﻿Variable Name,String Value,Unit Type Name,Notes,Process Applicability
+airFlowVelocity,35,m/s,Air flow velocity through the bore.,Blow Molding
+applyLabelRate,5,Time,Default time required to manually apply one in-mold label in Rotational Molding.,Rotational Molding
+applyMoldReleaseRate,371612,,Default time required to manually apply mold release during the load/unload cycle of Rotational Molding.,Rotational Molding
+autoApplyLabelRate,1,Time,Default time required to automatically apply one in-mold label in Blow Molding.,Blow Molding
+blowMoldTailLength,5,Length,Typical length of the flash at the bottom (tail) of the part.,Blow Molding
+blowMoldVacuumFactor,.9,,Multiplier affecting the cooling time when a vacuum assisted mold is used for in-mold labels (1 = 100%),Blow Molding
+blowMoldingExtruderHeadCostComp,1,,Dial for tuning Extrusion Head tooling cost.,Blow Molding
+blowMoldingMaxMoldCost,12000,Currency,Upper limit for Blow Molding production mold cost.,Blow Molding
+blowMoldingMaxTrimToolingCost,10000,Currency,Upper limit for Blow Molding Trim-Transfer tooling xost.,Blow Molding
+blowMoldingMaxUnitMoldCost,7000,Currency,Upper limit for Blow Molding prototype mold cost.,Blow Molding
+blowMoldingMinMoldCost,1000,Currency,Lower limit for Blow Molding production mold cost.,Blow Molding
+blowMoldingMinSurfaceRoughness,1,,Process capability threshold for surface roughness in Blow Molding.,Blow Molding
+blowMoldingMinSurfaceTolerance,1,,Process capability threshold for surface tolerance in Blow Molding.,Blow Molding
+blowMoldingMinTrimToolingCost,5000,Currency,Lower limit for Blow Molding Trim-Transfer tooling xost.,Blow Molding
+blowMoldingMinUnitMoldCost,1500,Currency,Lower limit for Blow Molding prototype mold cost.,Blow Molding
+blowMoldingMoldCostComp,1,,Dial for tuning Blow Mold tooling cost.,Blow Molding
+blowMoldingTrimToolingCostComp,1,,Dial for tuning Trim-Transfer tooling cost.,Blow Molding
+blowMoldingUnitMoldCostComp,1,,Dial for tuning Unit Blow Mold tooling cost.,Blow Molding
+boreDiameter,10,Length,Diameter of the bore for air blowing into the cavity.,Blow Molding
+clampSpacing,127,,Space between adjacent mold clamps which hold a Rotational Mold closed.  Affects the number of clamps used.,Rotational Molding
+clampingRate,2,Time,Default time required to manually open or close a mold clamp in Rotational Molding.,Rotational Molding
+colorantCost,.75,CostPerMass,Default cost for colorant if added to the raw material in Rotational and Blow Molding.  Affects total material cost.,Rotational & Blow Molding
+coreInstallRate,15,Time,Default time to manually install or remove a mold core in Rotational Molding.,Rotational Molding
+cycleTimeAdjustmentFactor,1,,Factor used to globally increase or decrease cycle time evaluations per process.,General
+defaultCostPerBlowMoldLabel,.15,Currency,Default cost per in-mold label in Blow Molding.,Blow Molding
+defaultCostPerLabel,1.00,Currency,Default cost per in-mold label in Rotational Molding.,Rotational Molding
+defaultInsertCost,.12,Currency,Default cost per insert in Rotational Molding.,Rotational Molding
+defaultNumDropBoxes,0,,Default number of Drop Boxes used in Rotational Molding.,Rotational Molding
+defaultNumLabels,0,,Default number of in-mold labels used in Rotational and Blow Molding.,Rotational & Blow Molding
+defaultNumberOfSubCores,2,,The default number of sub-cores into which a larger core should be divided in order to enable the cores removal from the part.,Rotational Molding
+defaultToolLife,266000,,The default number of shots per tool which is used to determine tool life. This is the median value of the available data relating to tool life by part material type.,General
+defaultUtilizationMethod,COMPUTED,,"Eligible values: ""COMPUTED"" & ""MACHINE_DEFAULT""",General
+disableInvestmentAmortization,false,,"User override to disable amortization of all fixed costs to the individual part or assembly. By default, fixed costs are calculated per part for tooling, fixtures, and programming.",General
+distanceToObstructionThreshold,50,Length,Distance to obstruction threshold beyond which a void is considered not obstructed.,Blow Molding
+dropBoxFillRate,30,Time,Default time required to fill 1 Drop Box in Rotational Molding.,Rotational Molding
+gearQualityDefaultAgmaNewStd,A8,,"A2, A3, A4, ... A11, A12",General
+gearQualityDefaultAgmaOldStd,Q8,,"Q15, Q14, Q13, ... Q6, Q5",General
+gearQualityDefaultDinStd,9,,"2, 3, 4, ... 11, 12",General
+genericValidation,true,,'true' if the generic validation view should be used for parts costed in this process group in this Digital Factory,General
+grindProcessEnable,true,,Switch for enabling the material Grind process in Rotational Molding.,Rotational Molding
+insertInstallRate,10,Time,Default time to manually install an insert in Rotational Molding.,Rotational Molding
+laborRateAdjustmentFactor,1,,Factor used to globally increase or decrease labor rate evaluations per process.,General
+manualTrimRate,12.7,,Default rate (mm/second) for manually trimming a part feature.,Rotational & Blow Molding
+materialMeltingPressure,0.5,Pressure,Pressure on the material at the melting point that will inflate the material to form the desired shape.,Blow Molding
+materialVolumeComp,1,,Dial for tuning material flash volume.,Rotational & Blow Molding
+maxBlowHoleDiameter,63.5,Length,Upper size limit for a Blow Hole in Blow Molding.,Blow Molding
+maxBlowMoldSimpleHoleDepth,10,,Depth threshold for a non-cored blind hole in Blow Molding.  Holes deeper than this threshold will require a core.,Blow Molding
+maxCorableHoleDiameter,381,Length,Size threshold for hole coring in Rotational Molding.  Above this threshold does not require a core.,Rotational Molding
+maxNoCoreInsertDiameter,6.35,Length,Size threshold for coring an inserted hole.  Holes below this size don't require a core when inserted.,Rotational Molding
+maxRotoMoldableWallThickness,50.8,,Default process capability threshold for maximum part wall thickness in Rotational Molding.,Rotational Molding
+minAxisAngleVariance,45,Angle,The minimum difference between the blowHole axis and a possible pull direction allowing a void core to be removed from the part.,Blow Molding
+minBlowHoleDiameter,12.7,Length,Lower size limit for a Blow Hole in Blow Molding.,Blow Molding
+minNumberOfClamps,4,,Default minimum number of mold clamps employed for holding a Rotational Mold closed.,Rotational Molding
+minRotoMoldableWallThickness,.5,Length,Default process capability threshold for minimum part wall thickness in Rotational Molding.,Rotational Molding
+mirrorEnable,true,,Enable mirroring for shell type parts in Rotational Molding.,Rotational Molding
+moldFillRate,3,Time,Defalut time required to manuall fill a Rotationl Mold with raw material.,Rotational Molding
+overheadRateAdjustmentFactor,1,,Factor used to globally increase or decrease overhead rate evaluations per process.,General
+partMouthThreshold,.2,,A limit for determining whether a complexHole is a partMouth and therefore can be manufactured mouth-to-mouth (nested) with another of the same part. (eg: .2 = within 20%),Rotational Molding
+regionMultiplier,1,,Dial for adjusting tooling costs per geographic region.,General
+rotoMoldCleanRate,92903,,Default time required to manually clean a mold during the load/unload cycle of Rotational Molding.,Rotational Molding
+rotoMoldMountingMargin,127,Length,Default space between the machine mounting surface and the bottom of the mold in Rotational Molding.,Rotational Molding
+rotoMoldSpacingMargin,152.4,Length,Default spacing between adjacent molds on the machine mounting surface in Rotational Molding.,Rotational Molding
+rotoMoldStructureMargin,82.55,Length,Default space allowance per mold side for the mold flange and framework in Rotational Molding.,Rotational Molding
+rotoMoldingMaxMoldCost,150000,Currency,Upper limit for Rotatioinal Molding production mold cost.,Rotational Molding
+rotoMoldingMinMoldCost,3000,Currency,Lower limit for Rotatioinal Molding production mold cost.,Rotational Molding
+rotoMoldingMinSurfaceRoughness,1,,Process capability threshold for surface roughness in Rotational Molding.,Rotational Molding
+rotoMoldingMinSurfaceTolerance,1,,Process capability threshold for surface tolerance in Rotational Molding.,Rotational Molding
+rotoMoldingMoldCostComp,1,,Dial for tuning Rotational Mold tooling cost.,Rotational Molding
+rotoMoldingShrinkageAllowance,3,,Default material shrinkage allowance for calculating mold size from part size (UOM = %),Rotational Molding
+routerRoughnessThreshold,1,,Process capability threshold for surface roughness of a Routering operation.  (Less than this value will result in a Router operation being assigned.),General
+routerToleranceThreshold,1,,Process capability threshold for surface tolerance of a Routering operation.  (Less than this value will result in a Router operation being assigned.),General
+trimStockAllowance,.5,Length,Surface stock allowance applied for a Trim operation in Rotational Molding.  Affects stock addback which affect material utilization.,Rotational Molding
+voidDepthConstant,4,,A constant used in the calculation of depth-to-width allowance for coring voids / comboVoids in Blow Molding.,Blow Molding

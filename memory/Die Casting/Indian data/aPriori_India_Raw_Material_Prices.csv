@@ -1,0 +1,68 @@
+﻿Material Family,Material Name,Source Name,Unit Cost (USD/kg)
+Magnesium,Magnesium AZ91E,Generic Magnesium AZ91E,1.171
+Magnesium,Magnesium AZ91D,Generic Magnesium AZ91D,1.315
+Magnesium,Magnesium AM60B,Generic Magnesium AM60B,1.362
+Zinc,Zinc - Zamak 5,Generic Zinc - Zamak 5,1.728
+Zinc,Zinc-Aluminum ZA8,Generic Zinc-Aluminum ZA8,1.777
+Zinc,Zinc-Aluminum ZA12,Generic Zinc-Aluminum ZA12,1.788
+Zinc,Zinc - Zamak,Generic Zinc - Zamak,1.827
+Copper Alloy,"Manganese Bronze, 863","Generic Manganese Bronze, 863",1.834
+Copper Alloy,"Manganese Bronze, 865","Generic Manganese Bronze, 865",1.838
+Lead,Lead,Generic Lead,1.843
+Zinc,Zinc-Aluminum ZA27,Generic Zinc-Aluminum ZA27,2.004
+Aluminum,"Aluminum, ANSI A413.0","Generic Aluminum, ANSI A413.0",2.287
+Aluminum,"Aluminum, ANSI 413.0","Generic Aluminum, ANSI 413.0",2.294
+Aluminum,"Aluminum, ANSI B413.0","Generic Aluminum, ANSI B413.0",2.294
+Aluminum,"Aluminum, ANSI 361.0","Generic Aluminum, ANSI 361.0",2.308
+Aluminum,"Aluminum, ANSI 308.0","Generic Aluminum, ANSI 308.0",2.322
+Aluminum,"Aluminum, ANSI 365.0","Generic Aluminum, ANSI 365.0",2.336
+Aluminum,"Aluminum, ANSI 356.0","Generic Aluminum, ANSI 356.0",2.352
+Copper Alloy,Silicon Brass 879,Generic Silicon Brass 879,2.382
+Aluminum,"Aluminum, ANSI 357.0","Generic Aluminum, ANSI 357.0",2.395
+Aluminum,"Aluminum, ANSI 5019","Generic Aluminum, ANSI 5019",2.458
+Aluminum,"Aluminum, AA 7003","Generic Aluminum, AA 7003",2.469
+Aluminum,"Aluminum, AA 383.0","Generic Aluminum, AA 383.0",2.486
+Aluminum,"Aluminum, ANSI 333.0","Generic Aluminum, ANSI 333.0",2.494
+Aluminum,"Aluminum, AA 380.0","Generic Aluminum, AA 380.0",2.494
+Aluminum,"Aluminum, ANSI AL380.0","Generic Aluminum, ANSI AL380.0",2.494
+Aluminum,"Aluminum, ANSI 5119","Generic Aluminum, ANSI 5119",2.495
+Aluminum,"Aluminum, ANSI 220.0","Generic Aluminum, ANSI 220.0",2.498
+Aluminum,"Aluminum, ANSI 5083","Generic Aluminum, ANSI 5083",2.498
+Aluminum,"Aluminum, ANSI 7022","Generic Aluminum, ANSI 7022",2.504
+Aluminum,"Aluminum, ANSI 7020","Generic Aluminum, ANSI 7020",2.511
+Aluminum,"Aluminum, ANSI 5454","Generic Aluminum, ANSI 5454",2.525
+Aluminum,"Aluminum, ANSI 6012","Generic Aluminum, ANSI 6012",2.526
+Aluminum,"Aluminum, ANSI 112.0","Generic Aluminum, ANSI 112.0",2.526
+Aluminum,"Aluminum, ANSI 6082","Generic Aluminum, ANSI 6082",2.526
+Aluminum,"Aluminum, ANSI 7075","Generic Aluminum, ANSI 7075",2.531
+Aluminum,"Aluminum, ANSI 3103","Generic Aluminum, ANSI 3103",2.533
+Aluminum,"Aluminum, ANSI 3003","Generic Aluminum, ANSI 3003",2.536
+Aluminum,"Aluminum, ANSI 5251","Generic Aluminum, ANSI 5251",2.537
+Aluminum,"Aluminum, ANSI 5052","Generic Aluminum, ANSI 5052",2.537
+Aluminum,"Aluminum, AA 3105","Generic Aluminum, AA 3105",2.546
+Aluminum,"Aluminum, ANSI 6061","Generic Aluminum, ANSI 6061",2.550
+Aluminum,"Aluminum, ANSI 5005A","Generic Aluminum, ANSI 5005A",2.563
+Aluminum,"Aluminum, ANSI 6060","Generic Aluminum, ANSI 6060",2.565
+Aluminum,"Aluminum, ANSI 319.0","Generic Aluminum, ANSI 319.0",2.581
+Aluminum,"Aluminum, ANSI 1050A","Generic Aluminum, ANSI 1050A",2.585
+Aluminum,"Aluminum, ANSI 5754","Generic Aluminum, ANSI 5754",2.595
+Aluminum,"Aluminum, AA 1100","Generic Aluminum, AA 1100",2.596
+Aluminum,"Aluminum, ANSI 7050","Generic Aluminum, ANSI 7050",2.628
+Aluminum,"Aluminum, ANSI 2030","Generic Aluminum, ANSI 2030",2.678
+Aluminum,"Aluminum, ANSI 2007","Generic Aluminum, ANSI 2007",2.678
+Aluminum,"Aluminum, ANSI 2017","Generic Aluminum, ANSI 2017",2.699
+Aluminum,"Aluminum, ANSI 2024","Generic Aluminum, ANSI 2024",2.707
+Aluminum,"Aluminum, ANSI 204.0","Generic Aluminum, ANSI 204.0",2.746
+Aluminum,"Aluminum, AA 2219","Generic Aluminum, AA 2219",2.821
+Copper Alloy,"Brass, UNS C36000","Generic Brass, UNS C36000",4.169
+Copper Alloy,"Brass, CW617N","Generic Brass, CW617N",4.623
+Copper Alloy,"Copper, UNS C28000","Generic Copper, UNS C28000",4.674
+Copper Alloy,"Brass, Free-Cutting 360","Generic Brass, Free-Cutting 360",4.726
+Copper Alloy,"Copper, UNS C11000","Generic Copper, UNS C11000",4.911
+Copper Alloy,"Brass, Yellow 270","Generic Brass, Yellow 270",4.919
+Copper Alloy,"Copper, UNS C27200","Generic Copper, UNS C27200",4.919
+Copper Alloy,"Bronze, Commercial 220","Generic Bronze, Commercial 220",5.896
+Copper Alloy,"Copper, UNS C18150","Generic Copper, UNS C18150",5.908
+Copper Alloy,Aluminum Bronze,Generic Aluminum Bronze,6.264
+Copper Alloy,"Copper, UNS C62730","Generic Copper, UNS C62730",6.264
+Copper Alloy,"Copper, UNS C51900","Generic Copper, UNS C51900",7.774

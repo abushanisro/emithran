@@ -1,0 +1,34 @@
+﻿Variable Name,String Value,Unit Type Name,Notes
+allowableHullToCurveRatio,0.8,,Allowable ratio between Hull Overlap Length and Curve Length for stretch forming still to be feasible
+defaultApplyLubricantTime,30,Time,Time taken to apply lubricant solution to form tool.
+defaultColdStorageTime,24,hr,Time spent in cold storage.
+defaultFinalInspectionTime,5,min,Final part quality visual inspection time.
+defaultIdentingTime,45,Time,Default identing time
+defaultInterStretchInspectionTime,30,Time,Visual inspection of form formation during stretch.
+defaultLocatingHoleDrillingTime,4,min,Default location hole drilling time
+defaultManualFormFormingRate,50,mm/min,Rate at which form can be manually created.
+defaultManualFormingToolingMultiplier,0.2,,Default value used to factor the cost of stretch form block cost. Used to generate a manual forming tool cost.
+defaultNumCounterFormToolsRequired,1,,The number of parts that can be produced from each Counter Forming Tool before the tooling needs replacing.
+defaultNumFormingBlocksRequired,1,,The number of parts that can be produced from each Forming Block before the tooling needs replacing.
+defaultNumStretches,1,,Default number of stretch form cycles.
+defaultRouterJigToolingCost,4420,,Router jig tooling parametric cost. $/sqm
+defaultStretchFormToolingCost,23250,,Stretch form tooling parametric cost. $/sqm
+defaultUtilizationMethod,COMPUTED,,"Eligible values: ""COMPUTED"" (rectangular), ""TRUE_PART"" & ""MACHINE_DEFAULT"""
+disableInvestmentAmortization,false,,"User override to disable amortization of all fixed costs to the individual part or assembly. By default, fixed costs are calculated per part for tooling, fixtures, and programming."
+enableScrapMaterialCredit,false,,Set to 'true' to enable Material Cost reduction due to sale of scrap mass of part.
+enableScrapPartCredit,false,,Set to 'true' to enable Material Cost reduction due to sale of scrapped parts as a result of Good Part Yield.
+formedAreaMinimumAllowance,0.8,,Minimum ratio of Embossed form areas to part area. Used to evaluate Stretch Forming feasibility.
+gearQualityDefaultAgmaNewStd,A8,,"A2, A3, A4, ... A11, A12"
+gearQualityDefaultAgmaOldStd,Q8,,"Q15, Q14, Q13, ... Q6, Q5"
+gearQualityDefaultDinStd,9,,"2, 3, 4, ... 11, 12"
+genericValidation,true,,'true' if the generic validation view should be used for parts costed in this process group in this Digital Factory
+gripperIndividualLength,304.8,Length,Length of individual jaw gripper on jaw set.
+gripperMaxRotationAngle,15,Angle,Maximum rotation of individual jaw gripper on curved jaw set.
+manualFormingBlockNumberOfPartsLife,1,,The number of parts that can be produced from each Manual Forming Block before the tooling needs replacing.
+minimumManualCleanTime,10,Time,Minimum allowed time for manual cleaning. Used to handle cleaning times associated with small parts.
+minimumToolCleanTime,5,Time,Minimum allowed time for manual tool cleaning. Used to handle cleaning times associated with tools for small parts.
+overheadRateAdjustmentFactor,1,,Factor used to globally increase or decrease overhead rate evaluations per process.
+routerJigNumberOfPartsLife,1,,The number of parts that can be produced from each Router Jig before the tooling needs replacing.
+stretchFormAlignedMaterialAddendum,500,Length,Material addendum added to each edge in stretch direction
+stretchFormOrthogonalMaterialAddendum,50,Length,Material addendum added to each edge orthogonal to stretch direction
+usePreferedMachines,true,,"If true the model will first try to select a preferred machine. If false, the system chooses either the default machine or from the entire non-preferred set of machines."

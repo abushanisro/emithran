@@ -1,0 +1,2 @@
+﻿Digital Factory,Table Name,Source File Path,Cutting Rate (mm^2 / min),Material Type
+aPriori USA,circularSawCutting,lookupTables/Component/circularSawCutting.csv,31391.00,all
