@@ -87,12 +87,6 @@ export default function RawMaterialsPage() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [editingMaterial, setEditingMaterial] = useState<RawMaterial | null>(null);
-  const [visibleSections, setVisibleSections] = useState({
-    basic: true,
-    properties: true,
-    standards: true,
-    forming: true,
-  });
   const [costRegion, setCostRegion] = useState<'india' | 'usa' | 'china' | 'mexico' | 'france' | 'germany' | 'w_europe' | 'e_europe'>('usa');
   const [newMaterial, setNewMaterial] = useState({
     materialGroup: '',
@@ -160,11 +154,6 @@ export default function RawMaterialsPage() {
     return `$${cost.toFixed(2)}`;
   };
 
-
-  const renderShapeDisplay = (material: RawMaterial) => {
-    if (material.shape) return MATERIAL_SHAPE_LABELS[material.shape];
-    return '-';
-  };
 
   // One unified query, no group-based restriction — every material comes back
   // together (this used to force an exact materialGroup match per container,
@@ -1056,17 +1045,6 @@ export default function RawMaterialsPage() {
           </Select>
         )}
 
-        {/* Column visibility */}
-        <div className="flex gap-1">
-          {(['basic', 'properties', 'standards', 'forming'] as const).map(s => (
-            <Button key={s} variant={visibleSections[s] ? 'default' : 'outline'} size="sm"
-              className="h-9 text-xs px-2"
-              onClick={() => setVisibleSections(prev => ({ ...prev, [s]: !prev[s] }))}>
-              {s === 'basic' ? 'Info' : s === 'properties' ? 'Props' : s === 'standards' ? 'Std' : 'Form'}
-            </Button>
-          ))}
-        </div>
-
         {/* Cost region selector */}
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-muted-foreground whitespace-nowrap">Cost region:</span>
@@ -1101,343 +1079,90 @@ export default function RawMaterialsPage() {
 
       {/* ── Data Table ─────────────────────────────────────────── */}
       <Card>
-        <Table wrapperClassName="overflow-x-auto overflow-y-auto max-h-[calc(100vh-380px)]" className="relative min-w-0 w-full">
-                <TableHeader className="sticky top-0 z-30">
-                  <TableRow className="bg-card hover:bg-card border-b-2 border-border">
-                    {/* Always Visible - Sticky Basic Info */}
-                    <TableHead className="cursor-pointer h-10 px-2 text-xs sticky left-0 bg-card z-20 min-w-[72px] w-[72px] border-r-2 border-border shadow-lg" onClick={() => toggleSort('material_type')}>
-                      <div className="flex items-center font-semibold">
-                        Material
-                        <SortIcon column="material_type" />
-                      </div>
-                    </TableHead>
-                    <TableHead className="cursor-pointer h-10 px-2 text-xs sticky left-[72px] bg-card z-20 min-w-[90px] w-[90px] max-w-[90px] border-r-2 border-border shadow-lg" onClick={() => toggleSort('material')}>
-                      <div className="flex items-center font-semibold">
-                        Grade
-                        <SortIcon column="material" />
-                      </div>
-                    </TableHead>
+        <Table wrapperClassName="overflow-x-auto overflow-y-auto max-h-[calc(100vh-380px)]" className="min-w-0 w-full">
+          <TableHeader className="sticky top-0 z-30">
+            <TableRow className="bg-card hover:bg-card border-b-2 border-border">
+              <TableHead className="cursor-pointer h-10 px-2 text-xs" onClick={() => toggleSort('material_type')}>
+                <div className="flex items-center font-semibold">Material<SortIcon column="material_type" /></div>
+              </TableHead>
+              <TableHead className="cursor-pointer h-10 px-2 text-xs" onClick={() => toggleSort('material')}>
+                <div className="flex items-center font-semibold">Name<SortIcon column="material" /></div>
+              </TableHead>
+              <TableHead className="h-10 px-2 text-xs">Process group</TableHead>
+              <TableHead className="h-10 px-2 text-xs text-right">Cost</TableHead>
+              <TableHead className="h-10 px-2 text-xs text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
 
-                    {/* Conditional Basic Info Columns */}
-                    {visibleSections.basic && (
-                      <>
-                        <TableHead className="h-10 px-1 text-xs min-w-[52px] w-[52px] max-w-[52px]">State</TableHead>
-                      </>
-                    )}
-
-                    {visibleSections.properties && (
-                      <>
-                        <TableHead className="h-10 px-1 text-xs text-center border-l-4 border-indigo-400 bg-indigo-50 dark:bg-indigo-950/30 min-w-[46px] w-[46px]">
-                          <div className="leading-tight">
-                            <div className="text-indigo-700 dark:text-indigo-300 font-bold text-[9px]">PROPS</div>
-                            <div className="text-indigo-600 dark:text-indigo-400 font-semibold text-[10px]">Den.</div>
-                          </div>
-                        </TableHead>
-                        <TableHead className="h-10 px-1 text-xs text-center bg-indigo-50 dark:bg-indigo-950/20 min-w-[42px] w-[42px]">
-                          <div className="leading-tight">
-                            <div className="text-indigo-600 dark:text-indigo-400 font-semibold text-[10px]">UTS</div>
-                            <div className="text-[9px] text-muted-foreground">MPa</div>
-                          </div>
-                        </TableHead>
-                        <TableHead className="h-10 px-1 text-xs text-center bg-indigo-50 dark:bg-indigo-950/20 min-w-[42px] w-[42px]">
-                          <div className="leading-tight">
-                            <div className="text-indigo-600 dark:text-indigo-400 font-semibold text-[10px]">YTS</div>
-                            <div className="text-[9px] text-muted-foreground">MPa</div>
-                          </div>
-                        </TableHead>
-                        <TableHead className="h-10 px-1 text-xs text-center bg-indigo-50 dark:bg-indigo-950/20 min-w-[42px] w-[42px]">
-                          <div className="leading-tight">
-                            <div className="text-indigo-600 dark:text-indigo-400 font-semibold text-[10px]">Shear</div>
-                            <div className="text-[9px] text-muted-foreground">MPa</div>
-                          </div>
-                        </TableHead>
-                        <TableHead className="h-10 px-1 text-xs text-center bg-indigo-50 dark:bg-indigo-950/20 min-w-[46px] w-[46px]">
-                          <div className="leading-tight">
-                            <div className="text-indigo-600 dark:text-indigo-400 font-semibold text-[10px]">Hard.</div>
-                            <div className="text-[9px] text-muted-foreground">HB/HRC</div>
-                          </div>
-                        </TableHead>
-                      </>
-                    )}
-
-                    {visibleSections.standards && (
-                      <>
-                        <TableHead className="h-10 px-1 text-xs text-center border-l-4 border-violet-400 bg-violet-50 dark:bg-violet-950/30 min-w-[52px] w-[52px]">
-                          <div className="leading-tight">
-                            <div className="text-violet-700 dark:text-violet-300 font-bold text-[9px]">STD</div>
-                            <div className="text-violet-600 dark:text-violet-400 font-semibold text-[10px]">ASTM</div>
-                          </div>
-                        </TableHead>
-                        <TableHead className="h-10 px-1 text-xs text-center bg-violet-50 dark:bg-violet-950/20 min-w-[46px] w-[46px]">
-                          <div className="text-violet-600 dark:text-violet-400 font-semibold text-[10px]">DIN</div>
-                        </TableHead>
-                        <TableHead className="h-10 px-1 text-xs text-center bg-violet-50 dark:bg-violet-950/20 min-w-[42px] w-[42px]">
-                          <div className="text-violet-600 dark:text-violet-400 font-semibold text-[10px]">EN</div>
-                        </TableHead>
-                        <TableHead className="h-10 px-1 text-xs text-center bg-violet-50 dark:bg-violet-950/20 min-w-[42px] w-[42px]">
-                          <div className="text-violet-600 dark:text-violet-400 font-semibold text-[10px]">JIS</div>
-                        </TableHead>
-                      </>
-                    )}
-
-                    {visibleSections.forming && (
-                      <>
-                        <TableHead className="h-10 px-1 text-xs text-center border-l-4 border-amber-400 bg-amber-50 dark:bg-amber-950/30 min-w-[42px] w-[42px]" title="Strength coefficient K (MPa) in sigma = K * epsilon^n">
-                          <div className="leading-tight">
-                            <div className="text-amber-700 dark:text-amber-300 font-bold text-[9px]">FORM</div>
-                            <div className="text-amber-600 dark:text-amber-400 font-semibold text-[10px]">K</div>
-                          </div>
-                        </TableHead>
-                        <TableHead className="h-10 px-1 text-xs text-center bg-amber-50 dark:bg-amber-950/20 min-w-[36px] w-[36px]" title="Strain-hardening exponent n">
-                          <div className="text-amber-600 dark:text-amber-400 font-semibold text-[10px]">n</div>
-                        </TableHead>
-                        <TableHead className="h-10 px-1 text-xs text-center bg-amber-50 dark:bg-amber-950/20 min-w-[36px] w-[36px]" title="Lankford (normal anisotropy) coefficient R">
-                          <div className="text-amber-600 dark:text-amber-400 font-semibold text-[10px]">R</div>
-                        </TableHead>
-                        <TableHead className="h-10 px-1 text-xs text-center bg-amber-50 dark:bg-amber-950/20 min-w-[42px] w-[42px]" title="Scrap / yield-loss fraction">
-                          <div className="text-amber-600 dark:text-amber-400 font-semibold text-[10px]">Scrap%</div>
-                        </TableHead>
-                      </>
-                    )}
-
-                    {(
-                      <>
-                        <TableHead className="h-10 px-1 text-xs min-w-[46px] w-[46px]">Shape</TableHead>
-                        <TableHead className="h-10 px-1 text-xs min-w-[52px] w-[52px]">
-                          <div className="leading-tight">
-                            <div className="text-[10px]">Hard.</div>
-                            <div className="text-[9px] text-muted-foreground">HB/HRC</div>
-                          </div>
-                        </TableHead>
-                        <TableHead className="h-10 px-1 text-xs min-w-[48px] w-[48px]">Regrind</TableHead>
-                        <TableHead className="h-10 px-1 text-xs min-w-[42px] w-[42px]">Rgrd%</TableHead>
-                        <TableHead className="h-10 px-1 text-xs min-w-[50px] w-[50px]">Clamp</TableHead>
-                        <TableHead className="h-10 px-1 text-xs min-w-[50px] w-[50px]">Eject°C</TableHead>
-                        <TableHead className="h-10 px-1 text-xs min-w-[48px] w-[48px]">Melt°C</TableHead>
-                        <TableHead className="h-10 px-1 text-xs min-w-[46px] w-[46px]">Mold°C</TableHead>
-                        <TableHead className="h-10 px-1 text-xs min-w-[48px] w-[48px]">Density</TableHead>
-                        <TableHead className="h-10 px-1 text-xs min-w-[48px] w-[48px]">SpHeat</TableHead>
-                        <TableHead className="h-10 px-1 text-xs min-w-[52px] w-[52px]">ThCond.</TableHead>
-                      </>
-                    )}
-
-                    {/* Always Visible - Right Side */}
-                    <TableHead className="h-10 px-1 text-xs min-w-[62px] w-[62px] max-w-[62px] text-right">Cost</TableHead>
-                    <TableHead className="h-10 px-1 text-xs sticky right-0 bg-card z-20 min-w-[56px] w-[56px] border-l-2 border-border shadow-lg">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                
-                <TableBody>
-                  {isLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={23} className="text-center py-12 text-muted-foreground">
-                        <div className="flex flex-col items-center gap-2">
-                          <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                          <span className="text-sm">Loading materials…</span>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ) : displayMaterials.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={23} className="text-center py-12 text-muted-foreground">
-                        <div className="flex flex-col items-center gap-2">
-                          <FileSpreadsheet className="h-8 w-8 opacity-30" />
-                          <span className="text-sm">No materials found. Upload an Excel file to get started.</span>
-                          <Button size="sm" variant="outline" onClick={() => setUploadDialogOpen(true)}>
-                            <Upload className="h-3.5 w-3.5 mr-1.5" /> Import Excel
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    displayMaterials.map((material) => (
-                      <TableRow key={material.id} className="hover:bg-secondary/30 border-b border-border/50">
-                        {/* Always Visible - Sticky Basic Info */}
-                        <TableCell className="font-medium px-1 py-2 text-xs sticky left-0 bg-background z-10 min-w-[72px] w-[72px] max-w-[72px] overflow-hidden border-r border-border">
-                          <div className="truncate" title={material.materialType || material.materialGroup || ''}>
-                            <Badge
-                              variant="outline"
-                              className={`text-[9px] px-1 py-0 max-w-full truncate ${
-                                material.materialGroup?.toLowerCase().includes('plastic') ||
-                                material.materialGroup?.toLowerCase().includes('rubber')
-                                  ? 'border-blue-400 text-blue-700 bg-blue-50'
-                                  : 'border-orange-400 text-orange-700 bg-orange-50'
-                              }`}
-                            >
-                              {material.materialType || material.materialGroup}
-                            </Badge>
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-semibold px-2 py-2 text-xs sticky left-[72px] bg-background z-10 min-w-[90px] w-[90px] max-w-[90px] overflow-hidden border-r border-border">
-                          <div className="truncate text-[10px] font-semibold max-w-full" title={material.material}>
-                            {material.material}
-                          </div>
-                        </TableCell>
-
-                        {/* Conditional Basic Info Columns */}
-                        {visibleSections.basic && (
-                          <>
-                            <TableCell className="px-1 py-2 min-w-[52px] w-[52px] max-w-[52px] overflow-hidden">
-                              <div className="truncate text-[10px] max-w-full" title={material.matlState || ''}>{material.matlState || '-'}</div>
-                            </TableCell>
-                          </>
-                        )}
-
-                        {visibleSections.properties && (
-                          <>
-                            <TableCell className="px-1 py-2 text-center border-l-4 border-indigo-400/30 bg-indigo-50/20 min-w-[46px] w-[46px]">
-                              {(() => {
-                                const d = material.density ?? (material.densityKgM3 ? material.densityKgM3 / 1000 : null);
-                                return <div className="text-[10px] font-mono">{d ? d.toFixed(2) : '-'}</div>;
-                              })()}
-                            </TableCell>
-                            <TableCell className="px-1 py-2 text-center bg-indigo-50/10 min-w-[42px] w-[42px]">
-                              <div className="text-[10px] font-mono">{material.ultimateTensileStrength ? material.ultimateTensileStrength.toFixed(0) : '-'}</div>
-                            </TableCell>
-                            <TableCell className="px-1 py-2 text-center bg-indigo-50/10 min-w-[42px] w-[42px]">
-                              <div className="text-[10px] font-mono">{material.yieldTensileStrength ? material.yieldTensileStrength.toFixed(0) : '-'}</div>
-                            </TableCell>
-                            <TableCell className="px-1 py-2 text-center bg-indigo-50/10 min-w-[42px] w-[42px]">
-                              <div className="text-[10px] font-mono">{material.shearingStrength ? material.shearingStrength.toFixed(0) : '-'}</div>
-                            </TableCell>
-                            <TableCell className="px-1 py-2 text-center bg-indigo-50/10 min-w-[46px] w-[46px]">
-                              {material.hardness ? (
-                                <span className="text-[10px] font-mono" title={material.hardnessSystem || ''}>
-                                  {material.hardness.toFixed(0)}
-                                  {material.hardnessSystem ? <span className="text-[9px] text-muted-foreground ml-0.5">{material.hardnessSystem.slice(0, 3)}</span> : null}
-                                </span>
-                              ) : <span className="text-[10px]">-</span>}
-                            </TableCell>
-                          </>
-                        )}
-
-                        {visibleSections.standards && (
-                          <>
-                            <TableCell className="px-1 py-2 text-center border-l-4 border-violet-400/30 bg-violet-50/20 min-w-[52px] w-[52px]">
-                              <div className="text-[10px] truncate" title={material.astmStandard || ''}>{material.astmStandard || '-'}</div>
-                            </TableCell>
-                            <TableCell className="px-1 py-2 text-center bg-violet-50/10 min-w-[46px] w-[46px]">
-                              <div className="text-[10px] truncate" title={material.dinStandard || ''}>{material.dinStandard || '-'}</div>
-                            </TableCell>
-                            <TableCell className="px-1 py-2 text-center bg-violet-50/10 min-w-[42px] w-[42px]">
-                              <div className="text-[10px] truncate" title={material.enStandard || ''}>{material.enStandard || '-'}</div>
-                            </TableCell>
-                            <TableCell className="px-1 py-2 text-center bg-violet-50/10 min-w-[42px] w-[42px]">
-                              <div className="text-[10px] truncate" title={material.jisStandard || ''}>{material.jisStandard || '-'}</div>
-                            </TableCell>
-                          </>
-                        )}
-
-                        {visibleSections.forming && (
-                          <>
-                            <TableCell className="px-1 py-2 text-center border-l-4 border-amber-400/30 bg-amber-50/20 min-w-[42px] w-[42px]">
-                              <div className="text-[10px] font-mono">{material.strengthCoeffKMpa ? material.strengthCoeffKMpa.toFixed(1) : '-'}</div>
-                            </TableCell>
-                            <TableCell className="px-1 py-2 text-center bg-amber-50/10 min-w-[36px] w-[36px]">
-                              <div className="text-[10px] font-mono">{material.strainHardeningExponentN ? material.strainHardeningExponentN.toFixed(2) : '-'}</div>
-                            </TableCell>
-                            <TableCell className="px-1 py-2 text-center bg-amber-50/10 min-w-[36px] w-[36px]">
-                              <div className="text-[10px] font-mono">{material.lankfordCoefficientR ? material.lankfordCoefficientR.toFixed(2) : '-'}</div>
-                            </TableCell>
-                            <TableCell className="px-1 py-2 text-center bg-amber-50/10 min-w-[42px] w-[42px]">
-                              <div className="text-[10px] font-mono">{material.scrapFactor ? `${(material.scrapFactor * 100).toFixed(1)}%` : '-'}</div>
-                            </TableCell>
-                          </>
-                        )}
-
-                        {(
-                          <>
-                            <TableCell className="px-1 py-2 min-w-[46px] w-[46px]">
-                              {renderShapeDisplay(material)}
-                            </TableCell>
-                            <TableCell className="px-1 py-2 text-right min-w-[52px] w-[52px]">
-                              {material.hardness ? (
-                                <span className="text-[10px] font-mono" title={material.hardnessSystem || ''}>
-                                  {material.hardness.toFixed(0)}
-                                  {material.hardnessSystem ? <span className="text-[9px] text-muted-foreground ml-0.5">{material.hardnessSystem.slice(0, 3)}</span> : null}
-                                </span>
-                              ) : '-'}
-                            </TableCell>
-                            <TableCell className="px-1 py-2 min-w-[48px] w-[48px]">
-                              {material.regrinding === 'Yes' ? (
-                                <Badge variant="default" className="bg-green-600 text-[9px] px-1 py-0 h-4">Yes</Badge>
-                              ) : material.regrinding === 'No' ? (
-                                <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4">No</Badge>
-                              ) : (
-                                <span className="text-[10px]">-</span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right px-1 py-2 text-[10px] min-w-[42px] w-[42px]">
-                              {material.regrindingPercentage ? `${material.regrindingPercentage.toFixed(1)}%` : '-'}
-                            </TableCell>
-                            <TableCell className="text-right px-1 py-2 text-[10px] min-w-[50px] w-[50px]">
-                              {material.clampingPressureMpa?.toFixed(1) || '-'}
-                            </TableCell>
-                            <TableCell className="text-right px-1 py-2 text-[10px] min-w-[50px] w-[50px]">
-                              {material.ejectDeflectionTempC?.toFixed(0) || '-'}
-                            </TableCell>
-                            <TableCell className="text-right px-1 py-2 text-[10px] min-w-[48px] w-[48px]">
-                              {material.meltingTempC?.toFixed(0) || '-'}
-                            </TableCell>
-                            <TableCell className="text-right px-1 py-2 text-[10px] min-w-[46px] w-[46px]">
-                              {material.moldTempC?.toFixed(0) || '-'}
-                            </TableCell>
-                            <TableCell className="text-right px-1 py-2 text-[10px] min-w-[48px] w-[48px]">
-                              {(() => {
-                                const d = material.densityKgM3 ?? (material.density ? Math.round(material.density * 1000) : null);
-                                return d ? String(d) : '-';
-                              })()}
-                            </TableCell>
-                            <TableCell className="text-right px-1 py-2 text-[10px] min-w-[48px] w-[48px]">
-                              {material.specificHeatMelt?.toFixed(2) || '-'}
-                            </TableCell>
-                            <TableCell className="text-right px-1 py-2 text-[10px] min-w-[52px] w-[52px]">
-                              {material.thermalConductivityMelt?.toFixed(3) || '-'}
-                            </TableCell>
-                          </>
-                        )}
-
-                        {/* Always Visible - Right Side */}
-                        <TableCell className="text-right px-1 py-2 min-w-[62px] w-[62px] max-w-[62px]">
-                          <div className="text-[10px] font-mono font-semibold whitespace-nowrap">
-                            {renderCostDisplay(material)}
-                          </div>
-                        </TableCell>
-                        <TableCell className="px-1 py-2 text-xs sticky right-0 bg-background z-10 min-w-[56px] w-[56px] border-l border-border">
-                          <div className="flex items-center gap-0.5">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setPropertiesMaterial({ id: material.id, name: material.material })}
-                              className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                              title="Show every property"
-                            >
-                              <FileSpreadsheet className="h-2.5 w-2.5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleEditMaterial(material)}
-                              className="h-6 w-6 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                            >
-                              <Pencil className="h-2.5 w-2.5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDeleteMaterial(material.id, material.material)}
-                              disabled={deleteMutation.isPending}
-                              className="h-6 w-6 text-red-600 hover:text-red-700 hover:bg-red-50"
-                            >
-                              <Trash2 className="h-2.5 w-2.5" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+          <TableBody>
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    <span className="text-sm">Loading materials…</span>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : displayMaterials.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
+                  <div className="flex flex-col items-center gap-2">
+                    <FileSpreadsheet className="h-8 w-8 opacity-30" />
+                    <span className="text-sm">No materials found. Upload an Excel file to get started.</span>
+                    <Button size="sm" variant="outline" onClick={() => setUploadDialogOpen(true)}>
+                      <Upload className="h-3.5 w-3.5 mr-1.5" /> Import Excel
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : (
+              displayMaterials.map((material) => (
+                <TableRow key={material.id} className="hover:bg-secondary/30 border-b border-border/50">
+                  <TableCell className="px-2 py-2 text-xs">{material.materialType ?? '—'}</TableCell>
+                  <TableCell className="px-2 py-2 text-xs font-medium">{material.material}</TableCell>
+                  <TableCell className="px-2 py-2 text-xs">
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">{material.materialGroup ?? '—'}</Badge>
+                  </TableCell>
+                  <TableCell className="px-2 py-2 text-right text-xs font-mono font-semibold whitespace-nowrap">
+                    {renderCostDisplay(material)}
+                  </TableCell>
+                  <TableCell className="px-2 py-2 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => setPropertiesMaterial({ id: material.id, name: material.material })}
+                      >
+                        Properties
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEditMaterial(material)}
+                        className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        title="Edit"
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteMaterial(material.id, material.material)}
+                        disabled={deleteMutation.isPending}
+                        className="h-7 w-7 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        title="Delete"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
       </Card>
 
       {/* Edit Material Dialog */}
