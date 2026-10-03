@@ -1,7 +1,7 @@
 'use client';
 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { useRawMaterialProperties, useRawMaterialStockPrices } from '@/lib/api/hooks/useRawMaterials';
+import { useRawMaterialProperties, useRawMaterialStockPrices, useStockForms } from '@/lib/api/hooks/useRawMaterials';
 
 // "specific_heat_rt_j_kg_k" -> "Specific heat rt j kg k". The key is the
 // normalized source header; the unit column carries the real unit.
@@ -14,17 +14,16 @@ function labelOf(key: string): string {
 const STOCK_LOCATION = 'USA';
 
 function StockPricesSection({ materialId }: { materialId: string }) {
+  const { data: forms } = useStockForms();
   const { data: prices, isLoading } = useRawMaterialStockPrices(materialId);
-  const current = (prices ?? []).filter((p) => p.location === STOCK_LOCATION);
+  const byForm = new Map((prices ?? []).filter((p) => p.location === STOCK_LOCATION).map((p) => [p.stockForm, p.pricePerKg]));
 
+  // Every stock form is listed; a dash marks a form with no price on file.
   return (
     <div className="mt-5 space-y-3">
       <div className="text-sm font-semibold">Stock prices ({STOCK_LOCATION}, USD/kg)</div>
       {isLoading && <p className="text-xs text-muted-foreground">Loading…</p>}
-      {!isLoading && current.length === 0 && (
-        <p className="text-xs text-muted-foreground">No stock prices for this material yet.</p>
-      )}
-      {current.length > 0 && (
+      {!isLoading && (
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b text-left text-muted-foreground">
@@ -33,12 +32,15 @@ function StockPricesSection({ materialId }: { materialId: string }) {
             </tr>
           </thead>
           <tbody>
-            {current.map((p) => (
-              <tr key={p.stockForm} className="border-b border-border/40">
-                <td className="py-1 pr-2">{labelOf(p.stockForm)}</td>
-                <td className="py-1 pr-2 text-right font-mono">{p.pricePerKg.toFixed(3)}</td>
-              </tr>
-            ))}
+            {(forms?.forms ?? []).map((f) => {
+              const price = byForm.get(f);
+              return (
+                <tr key={f} className="border-b border-border/40">
+                  <td className="py-1 pr-2">{labelOf(f)}</td>
+                  <td className="py-1 pr-2 text-right font-mono">{price != null ? price.toFixed(3) : '—'}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       )}
