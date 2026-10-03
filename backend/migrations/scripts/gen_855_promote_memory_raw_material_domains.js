@@ -29,7 +29,7 @@ const MIG = path.join(__dirname, '..');
 const PART_BUDGET = 180000;
 
 const DOMAINS = [
-  { key: 'injection_molding', group: 'Plastic Molding', sourceVersion: '2026-Plastic', file: 'Plastic Modeling/materials_final.csv', policy: 'attach', keepJsonRows: true },
+  { key: 'injection_molding', group: 'Plastic Molding', sourceVersion: '2026-Plastic', file: 'Plastic Modeling/materials_final.csv', policy: 'attach' },
   { key: 'forging', group: 'Forging', sourceVersion: '2026-Forging', file: 'Forging/forging_materials.csv', policy: 'suffix' },
   { key: 'additive', group: 'Additive Manufacturing', sourceVersion: '2026-Additive', file: 'Additive Manufacturing/Raw materials.csv', policy: 'suffix' },
   { key: 'composites', group: 'Composites', sourceVersion: '2026-Composites', file: 'Composites/materials.csv', policy: 'suffix' },
@@ -204,9 +204,7 @@ JOIN LATERAL (
 ON CONFLICT (raw_material_id, property_key) DO NOTHING;`);
 
   parts.push(...[core_sql, ...prop_sql]);
-  // Plastic costing still reads one JSON row (GPPS, plastic-reference.service.ts),
-  // so its JSON rows stay until that reader moves to raw_material_properties.
-  if (!d.keepJsonRows) deleteSources.push(d.sourceVersion);
+  deleteSources.push(d.sourceVersion);
   summary.push(`--   ${d.group.padEnd(24)} ${String(core.length).padStart(4)} materials, ${String(props.length).padStart(5)} properties, policy ${d.policy}`);
 }
 

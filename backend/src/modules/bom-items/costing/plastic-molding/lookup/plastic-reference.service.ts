@@ -2,13 +2,20 @@ import { Injectable } from '@nestjs/common';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { SupabaseService } from '../../../../../common/supabase/supabase.service';
 import {
-  GPPS_REFERENCE_MATERIAL,
   PLASTIC_LOOKUP_KEYS,
   PLASTIC_REFERENCE_SOURCE_VERSION,
   PLASTIC_VARIABLE_KEYS,
   resolvePlasticReference,
   type PlasticReference,
 } from '../plastic-reference';
+
+/** The raw_materials row (its Source Name) of the GPPS reference material. */
+const GPPS_SOURCE_NAME = 'Generic Polystyrene';
+/** Normalized property_key (migration 855) -> the dotted header plastic-reference.ts reads. */
+const GPPS_PROPERTY_NAMES: Record<string, string> = {
+  physical_properties_density_of_melt_kg_m3: 'physicalProperties.densityOfMeltKgM3',
+  thermal_properties_melting_temp_c: 'thermalProperties.meltingTempC',
+};
 
 /** A press's own process data, from its HR Rates row (mhr_records). */
 export interface PressRecord {
@@ -42,18 +49,37 @@ export class PlasticReferenceService {
       db.from('machining_reference_data').select('key, raw')
         .eq('category', 'lookup_table').eq('source_version', PLASTIC_REFERENCE_SOURCE_VERSION)
         .in('key', [...PLASTIC_LOOKUP_KEYS]),
-      db.from('machining_reference_data').select('raw')
-        .eq('category', 'material').eq('source_version', PLASTIC_REFERENCE_SOURCE_VERSION)
-        .eq('key', GPPS_REFERENCE_MATERIAL).maybeSingle(),
+      this.loadGpps(db),
     ]);
     const error = vars.error ?? lookups.error ?? gpps.error;
     if (error) return { reference: null, missing: [`Plastic reference data (${error.message})`] };
     this.cached = resolvePlasticReference({
       variables: vars.data ?? [],
       lookups: Object.fromEntries((lookups.data ?? []).map((r: any) => [r.key, Array.isArray(r.raw?.rows) ? r.raw.rows : undefined])),
-      gppsMaterial: (gpps.data as any)?.raw ?? undefined,
+      gppsMaterial: gpps.data ?? undefined,
     });
     return this.cached;
+  }
+
+  /**
+   * The GPPS reference material, read from raw_material_properties (migration
+   * 855) and returned under the dotted header names plastic-reference.ts reads,
+   * so the resolver is unchanged by the move off the staged JSON row.
+   */
+  private async loadGpps(db: SupabaseClient): Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }> {
+    const { data, error } = await db
+      .from('raw_material_properties')
+      .select('property_key, value_num, raw_materials!inner(material)')
+      .eq('source_version', PLASTIC_REFERENCE_SOURCE_VERSION)
+      .eq('raw_materials.material', GPPS_SOURCE_NAME)
+      .in('property_key', Object.keys(GPPS_PROPERTY_NAMES));
+    if (error) return { data: null, error };
+    const row: Record<string, unknown> = {};
+    for (const r of (data ?? []) as Array<{ property_key: string; value_num: number | null }>) {
+      const name = GPPS_PROPERTY_NAMES[r.property_key];
+      if (name && r.value_num !== null) row[name] = Number(r.value_num);
+    }
+    return { data: Object.keys(row).length ? row : null, error: null };
   }
 
   /**
