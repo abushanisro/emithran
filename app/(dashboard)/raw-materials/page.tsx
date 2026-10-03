@@ -1123,7 +1123,7 @@ export default function RawMaterialsPage() {
               displayMaterials.map((material) => (
                 <TableRow key={material.id} className="hover:bg-secondary/30 border-b border-border/50">
                   <TableCell className="px-2 py-2 text-xs">{material.materialType ?? '—'}</TableCell>
-                  <TableCell className="px-2 py-2 text-xs font-medium">{material.material}</TableCell>
+                  <TableCell className="px-2 py-2 text-xs font-medium">{material.materialGrade || material.material}</TableCell>
                   <TableCell className="px-2 py-2 text-xs">
                     <Badge variant="outline" className="text-[10px] px-1.5 py-0">{material.materialGroup ?? '—'}</Badge>
                   </TableCell>
