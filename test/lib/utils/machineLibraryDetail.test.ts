@@ -145,3 +145,36 @@ describe('groupMachineLibraryDetail — edge cases', () => {
     expect(findEntry(zeroes, 'salvageValueFactorPct')!.value).toBe('0');
   });
 });
+
+describe('specsReferenceDetail (Die Casting and other memory/-seeded machines)', () => {
+  // Real specs of "Frech DAW 20 S DCRC" (migration 845), as the API returns them.
+  const DIE_CASTING_SPECS = {
+    source: 'memory/Die Casting/Machine/high_pressure_die_casting_machines.csv',
+    sector: 'World Average',
+    dryCycleTimeS: 1.8,
+    clampingForceKn: 240,
+    openingStrokeMm: 105,
+    maxMoldHeightMm: 300,
+    plungerDiameterMm: 45,
+    tieBarDistanceHorMm: 250,
+    tieBarDistanceVertMm: 250,
+    isPreferred: false,
+  };
+
+  it('shows the machine\'s own specs, its source csv as the source', async () => {
+    const { specsReferenceDetail } = await import('@/lib/utils/machineLibraryDetail');
+    const d = specsReferenceDetail(DIE_CASTING_SPECS, 'High Pressure Die Casting:Frech DAW 20 S DCRC');
+    expect(d.found).toBe(true);
+    expect(d.sourceKey).toBe('memory/Die Casting/Machine/high_pressure_die_casting_machines.csv');
+    expect(d.raw).not.toHaveProperty('source');
+    const labels = groupMachineLibraryDetail(d.raw).flatMap((g) => g.entries.map((e) => `${e.label}=${e.value}`));
+    expect(labels).toEqual(expect.arrayContaining(['Clamping Force (kN)=240', 'Plunger Diameter (mm)=45', 'Tie Bar Distance Hor (mm)=250']));
+  });
+
+  it('is not found for empty or provenance-only specs', async () => {
+    const { specsReferenceDetail } = await import('@/lib/utils/machineLibraryDetail');
+    for (const s of [undefined, null, {}, { source: 'memory/x.csv' }]) {
+      expect(specsReferenceDetail(s, 'k')).toEqual({ found: false, sourceKey: null, raw: null });
+    }
+  });
+});

@@ -71,13 +71,24 @@ const QUERY_KEYS = {
 
 // API Functions
 const processCalculatorMappingsApi = {
+  // The backend caps a page at 1000 rows (and orders by display_order), so a
+  // catalog past 1000 rows silently lost its highest-display_order rows -- the
+  // newest seeded group's last process (Die Casting's Visual Inspection,
+  // display_order 2011) never reached the Process page. A caller that names no
+  // page means "all of them": keep fetching pages until `count` is reached.
   getAll: async (params?: QueryProcessCalculatorMappingsParams) => {
-    return apiClient.get<{
-      mappings: ProcessCalculatorMapping[];
-      count: number;
-      page: number;
-      limit: number;
-    }>('/processes/calculator-mappings', { ...(params !== undefined ? { params } : {}) });
+    type Page = { mappings: ProcessCalculatorMapping[]; count: number; page: number; limit: number };
+    const fetchPage = (p?: QueryProcessCalculatorMappingsParams) =>
+      apiClient.get<Page>('/processes/calculator-mappings', { ...(p !== undefined ? { params: p } : {}) });
+    const first = await fetchPage(params);
+    if (params?.page !== undefined || !first?.mappings) return first;
+    const mappings = [...first.mappings];
+    for (let page = 2; mappings.length < first.count; page++) {
+      const next = await fetchPage({ ...params, page, limit: first.limit });
+      if (!next?.mappings?.length) break;
+      mappings.push(...next.mappings);
+    }
+    return { ...first, mappings };
   },
 
   getOne: async (id: string) => {
