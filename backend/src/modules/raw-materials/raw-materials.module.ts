@@ -4,6 +4,7 @@ import { RawMaterialsController } from './raw-materials.controller';
 import { RawMaterialsService } from './raw-materials.service';
 import { RawMaterialCostController } from './controllers/raw-material-cost.controller';
 import { RawMaterialCostService } from './services/raw-material-cost.service';
+import { MaterialStockPricesService } from './services/material-stock-prices.service';
 import { PlasticRubberContainerService } from './containers/plastic-rubber-container.service';
 import { FerrousContainerService } from './containers/ferrous-container.service';
 import { SupabaseModule } from '../../common/supabase/supabase.module';
@@ -25,6 +26,7 @@ import { ExchangeRateModule } from '../../common/exchange-rate/exchange-rate.mod
   providers: [
     RawMaterialsService, 
     RawMaterialCostService,
+    MaterialStockPricesService,
     PlasticRubberContainerService,
     FerrousContainerService,
   ],

@@ -430,3 +430,39 @@ export function useRawMaterialProperties(materialId: string | null) {
     staleTime: 1000 * 60 * 10,
   });
 }
+
+export interface MaterialStockPriceRow {
+  stockForm: string;
+  location: string;
+  pricePerKg: number;
+  currencyCode: string;
+  source: string;
+}
+
+export function useStockForms() {
+  return useQuery({
+    queryKey: ['raw-materials', 'stock-forms'],
+    queryFn: () => apiClient.get<{ forms: string[] }>('/raw-materials/stock-forms'),
+    staleTime: 1000 * 60 * 60,
+  });
+}
+
+export function useRawMaterialStockPrices(materialId: string | null) {
+  return useQuery({
+    queryKey: ['raw-materials', 'stock-prices', materialId],
+    queryFn: () => apiClient.get<MaterialStockPriceRow[]>(`/raw-materials/${materialId}/stock-prices`),
+    enabled: !!materialId,
+  });
+}
+
+export function useSaveRawMaterialStockPrice(materialId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { stockForm: string; location: string; pricePerKg: number }) =>
+      apiClient.put<MaterialStockPriceRow>(`/raw-materials/${materialId}/stock-prices`, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['raw-materials', 'stock-prices', materialId] });
+      queryClient.invalidateQueries({ queryKey: ['raw-materials', 'stock-prices'] });
+    },
+  });
+}
