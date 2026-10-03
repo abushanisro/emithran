@@ -20,7 +20,7 @@ import { toast } from 'sonner';
 import { mhrFormSchema, type MHRFormData } from '@/lib/validations/mhrValidation';
 import { getCurrencyForLocation as getCurrencyInfo } from '@/lib/utils/currency-locale';
 import { useFxRate } from '@/lib/api/hooks/useFx';
-import { groupMachineLibraryDetail } from '@/lib/utils/machineLibraryDetail';
+import { groupMachineLibraryDetail, specsReferenceDetail } from '@/lib/utils/machineLibraryDetail';
 import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
 
 interface MHRFormDialogProps {
@@ -70,7 +70,12 @@ function EconomicsSourceNote({ source, benchmarkValue }: { source?: string | und
 
 export function MHRFormDialog({ open, onOpenChange, editingId }: MHRFormDialogProps) {
   const { data: existingRecord } = useMHRRecord(editingId || '', { enabled: !!editingId });
-  const { data: referenceDetail } = useMHRReferenceDetail(editingId);
+  const { data: libraryDetail } = useMHRReferenceDetail(editingId);
+  // A machine with no machine_library-style reference row (Die Casting,
+  // Forging, ... seeded from memory/ csvs) shows its own specs instead.
+  const referenceDetail = libraryDetail?.found
+    ? libraryDetail
+    : specsReferenceDetail(existingRecord?.specs, existingRecord?.benchmarkSourceKey);
   const createMutation = useCreateMHR();
   const updateMutation = useUpdateMHR();
 

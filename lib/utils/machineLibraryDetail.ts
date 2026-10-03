@@ -163,6 +163,33 @@ function flattenRaw(raw: Record<string, any>): Record<string, any> {
   return flat;
 }
 
+// Provenance keys the memory/ machine seeds write into specs (camelCased by the
+// API): the source csv, shown as the lookup's source rather than as a field.
+const SPECS_SOURCE_KEYS = ['source', 'pressDataSource'];
+
+/**
+ * A machine's own mhr_records.specs as its reference detail — the full source
+ * row of every machine seeded from a memory/ machine csv (Die Casting,
+ * Forging, Hydroforming, ...), whose domains have no machine_library-style
+ * reference table. Mirrors the backend's specsReferenceDetail(): it is this
+ * record's own data, never a name match. found:false when specs holds nothing
+ * beyond its provenance.
+ */
+export function specsReferenceDetail(
+  specs: Record<string, any> | null | undefined,
+  fallbackSourceKey?: string | null,
+): { found: boolean; sourceKey: string | null; raw: Record<string, any> | null } {
+  if (!specs || typeof specs !== 'object' || Array.isArray(specs)) return { found: false, sourceKey: null, raw: null };
+  const raw: Record<string, any> = {};
+  let source: string | null = null;
+  for (const [k, v] of Object.entries(specs)) {
+    if (SPECS_SOURCE_KEYS.includes(k)) source ??= typeof v === 'string' ? v : null;
+    else raw[k] = v;
+  }
+  if (Object.keys(raw).length === 0) return { found: false, sourceKey: null, raw: null };
+  return { found: true, sourceKey: source ?? fallbackSourceKey ?? null, raw };
+}
+
 /**
  * `alreadyShownElsewhere` lets a caller mark camelCase fields as "already
  * shown as a real editable number elsewhere on this page" (e.g.

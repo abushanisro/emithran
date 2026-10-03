@@ -12,6 +12,7 @@ import { invalidateMachinePools } from '../bom-items/costing/shared/capability/m
 import { resolveMachineEconomics } from '../bom-items/costing/shared/capability/machine-selection/economics-resolver';
 import { ExchangeRateService, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
 import { LHRService } from '../lhr/lhr.service';
+import { specsReferenceDetail } from './specs-reference-detail';
 import * as ExcelJS from 'exceljs';
 
 /**
@@ -400,7 +401,7 @@ export class MHRService {
     const { data: row, error: rowError } = await this.supabaseService
       .getClient(accessToken)
       .from('mhr_records')
-      .select('benchmark_source_key, machine_name')
+      .select('benchmark_source_key, machine_name, specs')
       .eq('id', id)
       .maybeSingle();
     if (rowError || !row) {
@@ -460,6 +461,11 @@ export class MHRService {
         return { found: true, sourceKey: machMatches[0].key, raw: machMatches[0].raw ?? null };
       }
     }
+
+    // Domains seeded from memory/ machine csvs (Die Casting, Forging, ...) have
+    // no reference table: the machine's full source row is its own specs.
+    const fromSpecs = specsReferenceDetail(row.specs, row.benchmark_source_key);
+    if (fromSpecs.found) return fromSpecs;
 
     return empty;
   }

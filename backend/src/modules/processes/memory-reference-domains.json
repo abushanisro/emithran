@@ -112,6 +112,22 @@
       "sourceVersion": "2026-Plastic",
       "processGroup": "Plastic Molding",
       "stagedBy": "823"
+    },
+    {
+      "key": "die_casting",
+      "label": "Die Casting",
+      "folder": "Die Casting",
+      "sourceVersion": "2026-DieCasting",
+      "processGroup": "Die Casting",
+      "stagedBy": "846"
+    },
+    {
+      "key": "casting",
+      "label": "Casting",
+      "folder": "Casting",
+      "sourceVersion": "2026-Casting",
+      "processGroup": "Casting",
+      "stagedBy": "849"
     }
   ]
 }
