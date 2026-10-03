@@ -22,6 +22,7 @@ import {
   type RawMaterial,
 } from '@/lib/api/hooks/useRawMaterials';
 import { FerrousNonFerrousForm } from '@/components/features/raw-materials/FerrousNonFerrousForm';
+import { RawMaterialPropertiesDialog } from '@/components/features/raw-materials/RawMaterialPropertiesDialog';
 import { useMaterialFilters } from '@/lib/hooks/useMaterialFilters';
 import {
   CURRENCY_SYMBOLS,
@@ -81,6 +82,7 @@ export default function RawMaterialsPage() {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [propertiesMaterial, setPropertiesMaterial] = useState<{ id: string; name: string } | null>(null);
   const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -540,6 +542,12 @@ export default function RawMaterialsPage() {
           <p className="text-2xl font-bold">{totalCount}</p>
         </Card>
       </div>
+
+      <RawMaterialPropertiesDialog
+        materialId={propertiesMaterial?.id ?? null}
+        materialName={propertiesMaterial?.name ?? null}
+        onClose={() => setPropertiesMaterial(null)}
+      />
 
       {/* Upload Dialog */}
       <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
@@ -1397,6 +1405,15 @@ export default function RawMaterialsPage() {
                         </TableCell>
                         <TableCell className="px-1 py-2 text-xs sticky right-0 bg-background z-10 min-w-[56px] w-[56px] border-l border-border">
                           <div className="flex items-center gap-0.5">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setPropertiesMaterial({ id: material.id, name: material.material })}
+                              className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                              title="Show every property"
+                            >
+                              <FileSpreadsheet className="h-2.5 w-2.5" />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="icon"
