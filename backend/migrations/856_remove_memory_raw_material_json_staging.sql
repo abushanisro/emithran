@@ -11,10 +11,10 @@
 
 DELETE FROM machining_reference_data
 WHERE category = 'material'
-  AND source_version IN ('2026-Forging', '2026-Additive', '2026-Composites', '2026-PCB', '2026-CastInvest', '2026-DieCasting', '2026-Casting', '2026-PowderMetal', '2026-RapidProto', '2026-RotoBlow', '2026-SheetPlastic', '2026-RollForm', '2026-StretchForm', '2026-TransferDie', '2026-BarTube', '2026-AssyPlastic');
+  AND source_version IN ('2026-Plastic', '2026-Forging', '2026-Additive', '2026-Composites', '2026-PCB', '2026-CastInvest', '2026-DieCasting', '2026-Casting', '2026-PowderMetal', '2026-RapidProto', '2026-RotoBlow', '2026-SheetPlastic', '2026-RollForm', '2026-StretchForm', '2026-TransferDie', '2026-BarTube', '2026-AssyPlastic');
 
 NOTIFY pgrst, 'reload schema';
 
 -- Verify (expect 0):
 --   SELECT count(*) FROM machining_reference_data
---   WHERE category = 'material' AND source_version IN ('2026-Forging', '2026-Additive', '2026-Composites', '2026-PCB', '2026-CastInvest', '2026-DieCasting', '2026-Casting', '2026-PowderMetal', '2026-RapidProto', '2026-RotoBlow', '2026-SheetPlastic', '2026-RollForm', '2026-StretchForm', '2026-TransferDie', '2026-BarTube', '2026-AssyPlastic');
+--   WHERE category = 'material' AND source_version IN ('2026-Plastic', '2026-Forging', '2026-Additive', '2026-Composites', '2026-PCB', '2026-CastInvest', '2026-DieCasting', '2026-Casting', '2026-PowderMetal', '2026-RapidProto', '2026-RotoBlow', '2026-SheetPlastic', '2026-RollForm', '2026-StretchForm', '2026-TransferDie', '2026-BarTube', '2026-AssyPlastic');
