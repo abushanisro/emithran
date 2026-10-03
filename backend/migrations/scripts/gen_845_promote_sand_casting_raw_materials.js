@@ -3,13 +3,17 @@
 // memory/Sand casting/Raw Material/raw_materials.csv, as real columns of the
 // live raw_materials table (no JSON). Every CSV property has a column.
 //
+// Name rule: a material keeps its Source Name. If that name already exists under
+// another group (sheet metal, machining), the Sand Casting record is stored as
+// "<Source Name> (Sand Casting)" so both records stay, each with its own cost and
+// properties. The choice is made in SQL against the live table, so it is safe to
+// re-run.
+//
 //   1. ALTER TABLE raw_materials ADD COLUMN IF NOT EXISTS - one column per CSV
 //      property raw_materials does not have yet. Existing columns are reused.
-//   2. INSERT the materials not yet present (NOT EXISTS on material). A name
-//      already in raw_materials is skipped, never overwritten.
+//   2. INSERT the materials not yet present (NOT EXISTS on the stored name).
 //   3. UPDATE the Sand Casting rows already present, so the new columns are
 //      filled for rows an earlier run inserted before the columns existed.
-//      Only material_group = 'Sand Casting' rows are touched.
 //
 // Run: node backend/migrations/scripts/gen_845_promote_sand_casting_raw_materials.js
 
@@ -21,6 +25,7 @@ const ROOT = path.resolve(__dirname, '..', '..', '..');
 const SRC = path.join(ROOT, 'memory', 'Sand casting', 'Raw Material', 'raw_materials.csv');
 const OUT = path.join(__dirname, '..', '845_promote_sand_casting_raw_materials.sql');
 const GROUP = 'Sand Casting';
+const SUFFIX = ` (${GROUP})`;
 
 // [raw_materials column, how its value is read].
 // A string is a CSV header read as text, 'num' reads it as a number, and a
@@ -100,7 +105,23 @@ const tuples = rows.map((row) => {
 
 const newCols = cols.filter((c) => c in NEW_COLUMN_TYPES);
 const alter = newCols.map((c) => `  ADD COLUMN IF NOT EXISTS ${c} ${NEW_COLUMN_TYPES[c]}`).join(',\n');
-const updateSet = cols.filter((c) => c !== 'material').map((c) => `  ${c} = v.${c}`).join(',\n');
+const updateSet = cols.filter((c) => c !== 'material').map((c) => `  ${c} = s.${c}`).join(',\n');
+
+// The source rows, with the stored name decided in SQL: a collision with a
+// record of another group takes the suffix; everything else keeps its name.
+const srcCte = `WITH src AS (
+  SELECT v.*,
+    CASE WHEN EXISTS (
+      SELECT 1 FROM raw_materials rm
+      WHERE rm.material = v.material AND rm.material_group IS DISTINCT FROM '${GROUP}'
+    ) THEN v.material || '${SUFFIX}' ELSE v.material END AS material_name
+  FROM (VALUES
+${tuples.join(',\n')}
+  ) AS v(${cols.join(', ')})
+)`;
+
+const insertCols = cols.join(', ');
+const selectCols = cols.map((c) => (c === 'material' ? 's.material_name' : `s.${c}`)).join(', ');
 
 const sql = `-- ============================================================================
 -- Migration 845: Sand Casting raw materials as real raw_materials columns
@@ -112,11 +133,14 @@ const sql = `-- ================================================================
 -- Every CSV property is a real column, no JSON. Added columns:
 --   ${newCols.join(', ')}
 --
+-- Name rule: a material keeps its Source Name. If that name already exists under
+-- another group (sheet metal or machining), the Sand Casting record is stored as
+-- "<Source Name> (${GROUP})" so both records stay, each with its own cost and
+-- properties. Decided in SQL against the live table.
+--
 -- 1. Adds the new columns (IF NOT EXISTS; existing columns are reused).
--- 2. Inserts the materials not yet present. A name already in raw_materials
---    is SKIPPED, never overwritten.
--- 3. Fills the new columns on Sand Casting rows already present, so an earlier
---    run is brought up to date. Only material_group = '${GROUP}' is touched.
+-- 2. Inserts the materials not yet present (NOT EXISTS on the stored name).
+-- 3. Fills the new columns on the Sand Casting rows already present.
 --
 -- Idempotent: a second run changes nothing.
 -- ============================================================================
@@ -125,31 +149,28 @@ const sql = `-- ================================================================
 ALTER TABLE raw_materials
 ${alter};
 
--- ── 2. insert missing materials
-INSERT INTO raw_materials (${cols.join(', ')})
-SELECT v.${cols.join(', v.')}
-FROM (VALUES
-${tuples.join(',\n')}
-) AS v(${cols.join(', ')})
+-- ── 2. insert materials not yet present
+${srcCte}
+INSERT INTO raw_materials (${insertCols})
+SELECT ${selectCols}
+FROM src s
 WHERE NOT EXISTS (
-  SELECT 1 FROM raw_materials rm WHERE rm.material = v.material
+  SELECT 1 FROM raw_materials rm WHERE rm.material = s.material_name
 );
 
 -- ── 3. fill the new columns on Sand Casting rows already present
+${srcCte}
 UPDATE raw_materials rm
 SET
 ${updateSet}
-FROM (VALUES
-${tuples.join(',\n')}
-) AS v(${cols.join(', ')})
-WHERE rm.material = v.material AND rm.material_group = '${GROUP}';
+FROM src s
+WHERE rm.material = s.material_name AND rm.material_group = '${GROUP}';
 
 NOTIFY pgrst, 'reload schema';
 
 -- Verify (run manually after):
---   SELECT count(*) FROM raw_materials WHERE material_group = '${GROUP}';
---   Names skipped (already present in another group) are listed by
---   scripts/845_verify_skipped_names.sql.
+--   SELECT count(*) FROM raw_materials WHERE material_group = '${GROUP}';        -- expect ${rows.length}
+--   SELECT material FROM raw_materials WHERE material LIKE '% (${GROUP})';       -- the renamed collisions
 `;
 
 fs.writeFileSync(OUT, sql, 'utf8');
