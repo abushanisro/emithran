@@ -48,6 +48,16 @@ describe('memory reference domains', () => {
     }
   });
 
+  it('migration 846 stages the Sand Casting folder under its own source version', () => {
+    const dir = path.join(REPO, 'backend/migrations');
+    const parts = fs.readdirSync(dir).filter((f) => /^846_stage_memory_domains/.test(f));
+    expect(parts.length).toBeGreaterThan(0);
+    const sql = parts.map((f) => fs.readFileSync(path.join(dir, f), 'utf-8')).join(' ');
+    for (const d of MEMORY_DOMAINS.filter((x) => x.stagedBy === '846')) {
+      expect(sql).toContain(`'USA', $str$${d.sourceVersion}$str$`);
+    }
+  });
+
   it('Plastic Molding lists the complete restage, including the tables the old key scheme lost', () => {
     expect(REFERENCE_DOMAINS['injection_molding']!.versions).toEqual(['2026-Plastic']);
     const dir = path.join(REPO, 'backend/migrations');
