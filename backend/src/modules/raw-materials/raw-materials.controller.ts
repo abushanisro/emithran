@@ -189,6 +189,13 @@ export class RawMaterialsController {
     return this.rawMaterialsService.getGroupedByMaterialGroup(user.id, token);
   }
 
+  // Every property of one material (raw_material_properties, migration 855).
+  @Get(':id/properties')
+  @ApiOperation({ summary: 'Get every property of a raw material, with its unit and source' })
+  async getProperties(@Param('id') id: string, @AccessToken() token: string) {
+    return this.rawMaterialsService.getProperties(id, token);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get raw material by ID' })
   @ApiResponse({ status: 200, description: 'Raw material retrieved successfully', type: RawMaterialResponseDto })

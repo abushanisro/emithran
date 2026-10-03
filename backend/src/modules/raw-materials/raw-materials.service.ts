@@ -207,6 +207,25 @@ export class RawMaterialsService {
     };
   }
 
+  async getProperties(id: string, accessToken: string): Promise<Array<{
+    propertyKey: string; valueNum: number | null; valueText: string | null; unit: string | null; sourceVersion: string;
+  }>> {
+    const { data, error } = await this.supabaseService
+      .getUserClient(accessToken)
+      .from('raw_material_properties')
+      .select('property_key, value_num, value_text, unit, source_version')
+      .eq('raw_material_id', id)
+      .order('property_key', { ascending: true });
+    if (error) {
+      this.logger.error(`Failed to read properties for ${id}: ${error.message}`, 'RawMaterialsService');
+      throw new InternalServerErrorException(`Failed to read material properties: ${error.message}`);
+    }
+    return (data ?? []).map((r: any) => ({
+      propertyKey: r.property_key, valueNum: r.value_num === null ? null : Number(r.value_num),
+      valueText: r.value_text, unit: r.unit, sourceVersion: r.source_version,
+    }));
+  }
+
   async findOne(id: string, userId: string, accessToken: string): Promise<RawMaterialResponseDto> {
     this.logger.log(`Fetching raw material: ${id}`, 'RawMaterialsService');
 

@@ -412,3 +412,21 @@ export function useUploadRawMaterialsExcel() {
     },
   });
 }
+
+export interface RawMaterialProperty {
+  propertyKey: string;
+  valueNum: number | null;
+  valueText: string | null;
+  unit: string | null;
+  sourceVersion: string;
+}
+
+// Every property of one raw material (raw_material_properties, migration 855).
+export function useRawMaterialProperties(materialId: string | null) {
+  return useQuery({
+    queryKey: ['raw-materials', 'properties', materialId],
+    queryFn: () => apiClient.get<RawMaterialProperty[]>(`/raw-materials/${materialId}/properties`),
+    enabled: !!materialId,
+    staleTime: 1000 * 60 * 10,
+  });
+}
