@@ -21,6 +21,7 @@
 --   Sheet Metal Stretch Forming   49 materials,   882 properties, policy suffix
 --   Sheet Metal Transfer Die  102 materials,  1418 properties, policy suffix
 --   Bar and Tube Fabrication   93 materials,  4782 properties, policy suffix
+--   Ferrous & Non-Ferrous     101 materials,  1574 properties, policy attach
 --   Assembly Plastic Molding  109 materials,  1228 properties, policy suffix
 --
 -- Core fields -> raw_materials columns. Every other source column -> one row of

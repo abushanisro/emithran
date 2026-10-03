@@ -47,12 +47,15 @@ const DOMAINS = [
   { key: 'sheet_stretch_forming', group: 'Sheet Metal Stretch Forming', sourceVersion: '2026-StretchForm', file: 'Sheet metal stretch forming/Raw materials/raw_materials_metals.csv', policy: 'suffix' },
   { key: 'sheet_transfer_die', group: 'Sheet Metal Transfer Die', sourceVersion: '2026-TransferDie', file: 'Sheet metal transfer die/Raw Materials/material_master.csv', policy: 'suffix' },
   { key: 'bar_tube_fab', group: 'Bar and Tube Fabrication', sourceVersion: '2026-BarTube', file: 'Bar and tube fab/Raw material/materials.csv', policy: 'suffix' },
+  // Sheet-metal USA list: its 590 rows are already in raw_materials (migration 590),
+  // so these properties attach to them by name and no duplicate is created.
+  { key: 'sheet_metal_usa', group: 'Ferrous & Non-Ferrous', sourceVersion: '2026-SMUsa', file: 'Sheetmetal/rawmetrial/rawmetalusa.csv', policy: 'attach' },
   { key: 'assembly_plastic_molding', group: 'Assembly Plastic Molding', sourceVersion: '2026-AssyPlastic', file: 'Assembly plastic molding/Raw Materials/raw_materials_full.csv', policy: 'suffix' },
 ];
 
 // Header -> core raw_materials column. Anything not listed becomes a property.
 const CORE = {
-  'Source Name': 'material', sourceName: 'material',
+  'Source Name': 'material', sourceName: 'material', OtherID: 'material', PrimaryID: 'material_grade',
   Name: 'material_grade', name: 'material_grade',
   'Material Type': 'material_type', materialType: 'material_type',
   'Cut Code': 'cut_code', cutCode: 'cut_code',
@@ -91,7 +94,7 @@ const summary = [];
 
 for (const d of DOMAINS) {
   const { rows, columns } = readCsv(path.join(MEM, d.file));
-  const hasSource = columns.some((c) => c === 'Source Name' || c === 'sourceName');
+  const hasSource = columns.some((c) => c === 'Source Name' || c === 'sourceName' || c === 'OtherID');
   const coreCols = columns.filter((c) => c in CORE);
   const propCols = columns.filter((c) => !(c in CORE) && !SKIP.has(c));
   const val = (row, h) => {
@@ -106,7 +109,7 @@ for (const d of DOMAINS) {
   const props = [];
   const seen = new Set();
   for (const row of rows) {
-    const name = String(hasSource ? (row['Source Name'] ?? row['sourceName']) : row['Name'] ?? row['name'] ?? '').trim();
+    const name = String(hasSource ? (row['Source Name'] ?? row['sourceName'] ?? row['OtherID']) : row['Name'] ?? row['name'] ?? '').trim();
     if (!name) throw new Error(`${d.file}: row without a material name`);
     if (seen.has(name)) throw new Error(`${d.file}: duplicate material ${name}`);
     seen.add(name);
