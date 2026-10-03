@@ -8,11 +8,14 @@
 -- Every CSV property is a real column, no JSON. Added columns:
 --   usa_name, din_name, en_name, gb_name, jis_name, description, cost_units, base_cost_per_unit_usd, heat_of_fusion_j_kg, specific_heat_rt_j_kg_k, specific_heat_solidus_j_kg_k, thermal_conductivity_w_m_c, cooling_factor_s_mm, ejection_temp_c, injection_temp_c, liquidus_temp_c, solidus_temp_c, yield_loss_factor, data_source
 --
+-- Name rule: a material keeps its Source Name. If that name already exists under
+-- another group (sheet metal or machining), the Sand Casting record is stored as
+-- "<Source Name> (Sand Casting)" so both records stay, each with its own cost and
+-- properties. Decided in SQL against the live table.
+--
 -- 1. Adds the new columns (IF NOT EXISTS; existing columns are reused).
--- 2. Inserts the materials not yet present. A name already in raw_materials
---    is SKIPPED, never overwritten.
--- 3. Fills the new columns on Sand Casting rows already present, so an earlier
---    run is brought up to date. Only material_group = 'Sand Casting' is touched.
+-- 2. Inserts the materials not yet present (NOT EXISTS on the stored name).
+-- 3. Fills the new columns on the Sand Casting rows already present.
 --
 -- Idempotent: a second run changes nothing.
 -- ============================================================================
@@ -39,10 +42,14 @@ ALTER TABLE raw_materials
   ADD COLUMN IF NOT EXISTS yield_loss_factor DECIMAL(6,3),
   ADD COLUMN IF NOT EXISTS data_source TEXT;
 
--- ── 2. insert missing materials
-INSERT INTO raw_materials (material, material_grade, material_type, material_group, cut_code, usa_name, din_name, en_name, gb_name, jis_name, description, cost, cost_usa, cost_units, base_cost_per_unit_usd, currency, density_kg_m3, density, heat_of_fusion_j_kg, specific_heat_rt_j_kg_k, specific_heat_solidus_j_kg_k, thermal_conductivity_w_m_c, cooling_factor_s_mm, hardness, hardness_system, ejection_temp_c, injection_temp_c, liquidus_temp_c, solidus_temp_c, mold_temp_c, yield_loss_factor, data_source)
-SELECT v.material, v.material_grade, v.material_type, v.material_group, v.cut_code, v.usa_name, v.din_name, v.en_name, v.gb_name, v.jis_name, v.description, v.cost, v.cost_usa, v.cost_units, v.base_cost_per_unit_usd, v.currency, v.density_kg_m3, v.density, v.heat_of_fusion_j_kg, v.specific_heat_rt_j_kg_k, v.specific_heat_solidus_j_kg_k, v.thermal_conductivity_w_m_c, v.cooling_factor_s_mm, v.hardness, v.hardness_system, v.ejection_temp_c, v.injection_temp_c, v.liquidus_temp_c, v.solidus_temp_c, v.mold_temp_c, v.yield_loss_factor, v.data_source
-FROM (VALUES
+-- ── 2. insert materials not yet present
+WITH src AS (
+  SELECT v.*,
+    CASE WHEN EXISTS (
+      SELECT 1 FROM raw_materials rm
+      WHERE rm.material = v.material AND rm.material_group IS DISTINCT FROM 'Sand Casting'
+    ) THEN v.material || ' (Sand Casting)' ELSE v.material END AS material_name
+  FROM (VALUES
   ($str$Generic Aluminum Bronze$str$, $str$Aluminum Bronze$str$, $str$Aluminum Bronze$str$, $str$Sand Casting$str$, 33.3, $str$Aluminum Bronze$str$, $str$CuAl10Fe5Ni5-C-GS$str$, $str$CC333G-GS$str$, $str$ZCuAl10Fe5Ni5$str$, $str$CAC703C$str$, $str$Grade C95500 (B148, B176)$str$, 12.318, 12.318, $str$Cost per KG$str$, 12.32, $str$USD$str$, 7500, 7.5, 174450, 420, 575, 59, 0.47, 100, $str$Brinell$str$, 300, 1205, 1077, 1040, 220, 1, $str$reference export baseline$str$),
   ($str$Generic Aluminum, AA 1100$str$, $str$Aluminum, AA 1100$str$, $str$Aluminum$str$, $str$Sand Casting$str$, 30.11, $str$Aluminum, AA 1100$str$, $str$Aluminum, AA 1100$str$, $str$EN AW-1100$str$, $str$Aluminum, AA 1100$str$, $str$Aluminum, AA 1100$str$, $str$Grade 1100$str$, 5.826, 5.826, $str$Cost per KG$str$, 5.83, $str$USD$str$, 2700, 2.7, 400000, 900, 1093, 220, 0.47, 60, $str$Brinell$str$, 200, 690, 643, 570, 220, 1, $str$reference export baseline$str$),
   ($str$Generic Aluminum, AA 2219$str$, $str$Aluminum, AA 2219$str$, $str$Aluminum$str$, $str$Sand Casting$str$, 30.11, $str$Aluminum, AA 2219$str$, $str$Aluminum, AA 2219$str$, $str$EN AW-2219$str$, $str$Aluminum, AA 2219$str$, $str$Aluminum, AA 2219$str$, $str$Grade 2219$str$, 6.208, 6.208, $str$Cost per KG$str$, 6.21, $str$USD$str$, 3100, 3.1, 390000, 900, 1093, 140, 0.47, 60, $str$Brinell$str$, 200, 690, 643, 543, 220, 1, $str$reference export baseline$str$),
@@ -160,46 +167,23 @@ FROM (VALUES
   ($str$Generic Zinc-Aluminum ZA12$str$, $str$Zinc-Aluminum ZA12$str$, $str$Zinc-Aluminum$str$, $str$Sand Casting$str$, 30.12, $str$Zinc-Aluminum ZA12$str$, $str$1743-2 Z110$str$, $str$CEN EN 12844(98) ZP12$str$, $str$ZX08$str$, $str$(ZP12)$str$, $str$Grade ZA-12 (B86)$str$, 3.716, 3.716, $str$Cost per KG$str$, 3.72, $str$USD$str$, 6030, 6.03, 118000, 450, 540, 116, 0.4, 100, $str$Brinell$str$, 200, 430, 385, 357, 175, 1, $str$reference export baseline$str$),
   ($str$Generic Zinc-Aluminum ZA27$str$, $str$Zinc-Aluminum ZA27$str$, $str$Zinc-Aluminum$str$, $str$Sand Casting$str$, 30.12, $str$Zinc-Aluminum ZA27$str$, $str$1743-2 Z2720$str$, $str$CEN EN 12844(98) ZP27$str$, $str$ZX10$str$, $str$(ZP27)$str$, $str$Grade ZA-27 (B791)$str$, 4.226, 4.226, $str$Cost per KG$str$, 4.23, $str$USD$str$, 5000, 5, 128000, 525, 615, 125, 0.42, 100, $str$Brinell$str$, 200, 430, 385, 357, 215, 1, $str$reference export baseline$str$),
   ($str$Generic Zinc-Aluminum ZA8$str$, $str$Zinc-Aluminum ZA8$str$, $str$Zinc-Aluminum$str$, $str$Sand Casting$str$, 30.12, $str$Zinc-Aluminum ZA8$str$, $str$1743-2 Z810$str$, $str$CEN EN 12844(98) ZP8$str$, $str$ZX06$str$, $str$(ZP8)$str$, $str$Grade ZA-8 (B791)$str$, 3.678, 3.678, $str$Cost per KG$str$, 3.68, $str$USD$str$, 6300, 6.3, 112000, 435, 525, 115, 0.42, 100, $str$Brinell$str$, 200, 430, 385, 357, 215, 1, $str$reference export baseline$str$)
-) AS v(material, material_grade, material_type, material_group, cut_code, usa_name, din_name, en_name, gb_name, jis_name, description, cost, cost_usa, cost_units, base_cost_per_unit_usd, currency, density_kg_m3, density, heat_of_fusion_j_kg, specific_heat_rt_j_kg_k, specific_heat_solidus_j_kg_k, thermal_conductivity_w_m_c, cooling_factor_s_mm, hardness, hardness_system, ejection_temp_c, injection_temp_c, liquidus_temp_c, solidus_temp_c, mold_temp_c, yield_loss_factor, data_source)
+  ) AS v(material, material_grade, material_type, material_group, cut_code, usa_name, din_name, en_name, gb_name, jis_name, description, cost, cost_usa, cost_units, base_cost_per_unit_usd, currency, density_kg_m3, density, heat_of_fusion_j_kg, specific_heat_rt_j_kg_k, specific_heat_solidus_j_kg_k, thermal_conductivity_w_m_c, cooling_factor_s_mm, hardness, hardness_system, ejection_temp_c, injection_temp_c, liquidus_temp_c, solidus_temp_c, mold_temp_c, yield_loss_factor, data_source)
+)
+INSERT INTO raw_materials (material, material_grade, material_type, material_group, cut_code, usa_name, din_name, en_name, gb_name, jis_name, description, cost, cost_usa, cost_units, base_cost_per_unit_usd, currency, density_kg_m3, density, heat_of_fusion_j_kg, specific_heat_rt_j_kg_k, specific_heat_solidus_j_kg_k, thermal_conductivity_w_m_c, cooling_factor_s_mm, hardness, hardness_system, ejection_temp_c, injection_temp_c, liquidus_temp_c, solidus_temp_c, mold_temp_c, yield_loss_factor, data_source)
+SELECT s.material_name, s.material_grade, s.material_type, s.material_group, s.cut_code, s.usa_name, s.din_name, s.en_name, s.gb_name, s.jis_name, s.description, s.cost, s.cost_usa, s.cost_units, s.base_cost_per_unit_usd, s.currency, s.density_kg_m3, s.density, s.heat_of_fusion_j_kg, s.specific_heat_rt_j_kg_k, s.specific_heat_solidus_j_kg_k, s.thermal_conductivity_w_m_c, s.cooling_factor_s_mm, s.hardness, s.hardness_system, s.ejection_temp_c, s.injection_temp_c, s.liquidus_temp_c, s.solidus_temp_c, s.mold_temp_c, s.yield_loss_factor, s.data_source
+FROM src s
 WHERE NOT EXISTS (
-  SELECT 1 FROM raw_materials rm WHERE rm.material = v.material
+  SELECT 1 FROM raw_materials rm WHERE rm.material = s.material_name
 );
 
 -- ── 3. fill the new columns on Sand Casting rows already present
-UPDATE raw_materials rm
-SET
-  material_grade = v.material_grade,
-  material_type = v.material_type,
-  material_group = v.material_group,
-  cut_code = v.cut_code,
-  usa_name = v.usa_name,
-  din_name = v.din_name,
-  en_name = v.en_name,
-  gb_name = v.gb_name,
-  jis_name = v.jis_name,
-  description = v.description,
-  cost = v.cost,
-  cost_usa = v.cost_usa,
-  cost_units = v.cost_units,
-  base_cost_per_unit_usd = v.base_cost_per_unit_usd,
-  currency = v.currency,
-  density_kg_m3 = v.density_kg_m3,
-  density = v.density,
-  heat_of_fusion_j_kg = v.heat_of_fusion_j_kg,
-  specific_heat_rt_j_kg_k = v.specific_heat_rt_j_kg_k,
-  specific_heat_solidus_j_kg_k = v.specific_heat_solidus_j_kg_k,
-  thermal_conductivity_w_m_c = v.thermal_conductivity_w_m_c,
-  cooling_factor_s_mm = v.cooling_factor_s_mm,
-  hardness = v.hardness,
-  hardness_system = v.hardness_system,
-  ejection_temp_c = v.ejection_temp_c,
-  injection_temp_c = v.injection_temp_c,
-  liquidus_temp_c = v.liquidus_temp_c,
-  solidus_temp_c = v.solidus_temp_c,
-  mold_temp_c = v.mold_temp_c,
-  yield_loss_factor = v.yield_loss_factor,
-  data_source = v.data_source
-FROM (VALUES
+WITH src AS (
+  SELECT v.*,
+    CASE WHEN EXISTS (
+      SELECT 1 FROM raw_materials rm
+      WHERE rm.material = v.material AND rm.material_group IS DISTINCT FROM 'Sand Casting'
+    ) THEN v.material || ' (Sand Casting)' ELSE v.material END AS material_name
+  FROM (VALUES
   ($str$Generic Aluminum Bronze$str$, $str$Aluminum Bronze$str$, $str$Aluminum Bronze$str$, $str$Sand Casting$str$, 33.3, $str$Aluminum Bronze$str$, $str$CuAl10Fe5Ni5-C-GS$str$, $str$CC333G-GS$str$, $str$ZCuAl10Fe5Ni5$str$, $str$CAC703C$str$, $str$Grade C95500 (B148, B176)$str$, 12.318, 12.318, $str$Cost per KG$str$, 12.32, $str$USD$str$, 7500, 7.5, 174450, 420, 575, 59, 0.47, 100, $str$Brinell$str$, 300, 1205, 1077, 1040, 220, 1, $str$reference export baseline$str$),
   ($str$Generic Aluminum, AA 1100$str$, $str$Aluminum, AA 1100$str$, $str$Aluminum$str$, $str$Sand Casting$str$, 30.11, $str$Aluminum, AA 1100$str$, $str$Aluminum, AA 1100$str$, $str$EN AW-1100$str$, $str$Aluminum, AA 1100$str$, $str$Aluminum, AA 1100$str$, $str$Grade 1100$str$, 5.826, 5.826, $str$Cost per KG$str$, 5.83, $str$USD$str$, 2700, 2.7, 400000, 900, 1093, 220, 0.47, 60, $str$Brinell$str$, 200, 690, 643, 570, 220, 1, $str$reference export baseline$str$),
   ($str$Generic Aluminum, AA 2219$str$, $str$Aluminum, AA 2219$str$, $str$Aluminum$str$, $str$Sand Casting$str$, 30.11, $str$Aluminum, AA 2219$str$, $str$Aluminum, AA 2219$str$, $str$EN AW-2219$str$, $str$Aluminum, AA 2219$str$, $str$Aluminum, AA 2219$str$, $str$Grade 2219$str$, 6.208, 6.208, $str$Cost per KG$str$, 6.21, $str$USD$str$, 3100, 3.1, 390000, 900, 1093, 140, 0.47, 60, $str$Brinell$str$, 200, 690, 643, 543, 220, 1, $str$reference export baseline$str$),
@@ -317,12 +301,46 @@ FROM (VALUES
   ($str$Generic Zinc-Aluminum ZA12$str$, $str$Zinc-Aluminum ZA12$str$, $str$Zinc-Aluminum$str$, $str$Sand Casting$str$, 30.12, $str$Zinc-Aluminum ZA12$str$, $str$1743-2 Z110$str$, $str$CEN EN 12844(98) ZP12$str$, $str$ZX08$str$, $str$(ZP12)$str$, $str$Grade ZA-12 (B86)$str$, 3.716, 3.716, $str$Cost per KG$str$, 3.72, $str$USD$str$, 6030, 6.03, 118000, 450, 540, 116, 0.4, 100, $str$Brinell$str$, 200, 430, 385, 357, 175, 1, $str$reference export baseline$str$),
   ($str$Generic Zinc-Aluminum ZA27$str$, $str$Zinc-Aluminum ZA27$str$, $str$Zinc-Aluminum$str$, $str$Sand Casting$str$, 30.12, $str$Zinc-Aluminum ZA27$str$, $str$1743-2 Z2720$str$, $str$CEN EN 12844(98) ZP27$str$, $str$ZX10$str$, $str$(ZP27)$str$, $str$Grade ZA-27 (B791)$str$, 4.226, 4.226, $str$Cost per KG$str$, 4.23, $str$USD$str$, 5000, 5, 128000, 525, 615, 125, 0.42, 100, $str$Brinell$str$, 200, 430, 385, 357, 215, 1, $str$reference export baseline$str$),
   ($str$Generic Zinc-Aluminum ZA8$str$, $str$Zinc-Aluminum ZA8$str$, $str$Zinc-Aluminum$str$, $str$Sand Casting$str$, 30.12, $str$Zinc-Aluminum ZA8$str$, $str$1743-2 Z810$str$, $str$CEN EN 12844(98) ZP8$str$, $str$ZX06$str$, $str$(ZP8)$str$, $str$Grade ZA-8 (B791)$str$, 3.678, 3.678, $str$Cost per KG$str$, 3.68, $str$USD$str$, 6300, 6.3, 112000, 435, 525, 115, 0.42, 100, $str$Brinell$str$, 200, 430, 385, 357, 215, 1, $str$reference export baseline$str$)
-) AS v(material, material_grade, material_type, material_group, cut_code, usa_name, din_name, en_name, gb_name, jis_name, description, cost, cost_usa, cost_units, base_cost_per_unit_usd, currency, density_kg_m3, density, heat_of_fusion_j_kg, specific_heat_rt_j_kg_k, specific_heat_solidus_j_kg_k, thermal_conductivity_w_m_c, cooling_factor_s_mm, hardness, hardness_system, ejection_temp_c, injection_temp_c, liquidus_temp_c, solidus_temp_c, mold_temp_c, yield_loss_factor, data_source)
-WHERE rm.material = v.material AND rm.material_group = 'Sand Casting';
+  ) AS v(material, material_grade, material_type, material_group, cut_code, usa_name, din_name, en_name, gb_name, jis_name, description, cost, cost_usa, cost_units, base_cost_per_unit_usd, currency, density_kg_m3, density, heat_of_fusion_j_kg, specific_heat_rt_j_kg_k, specific_heat_solidus_j_kg_k, thermal_conductivity_w_m_c, cooling_factor_s_mm, hardness, hardness_system, ejection_temp_c, injection_temp_c, liquidus_temp_c, solidus_temp_c, mold_temp_c, yield_loss_factor, data_source)
+)
+UPDATE raw_materials rm
+SET
+  material_grade = s.material_grade,
+  material_type = s.material_type,
+  material_group = s.material_group,
+  cut_code = s.cut_code,
+  usa_name = s.usa_name,
+  din_name = s.din_name,
+  en_name = s.en_name,
+  gb_name = s.gb_name,
+  jis_name = s.jis_name,
+  description = s.description,
+  cost = s.cost,
+  cost_usa = s.cost_usa,
+  cost_units = s.cost_units,
+  base_cost_per_unit_usd = s.base_cost_per_unit_usd,
+  currency = s.currency,
+  density_kg_m3 = s.density_kg_m3,
+  density = s.density,
+  heat_of_fusion_j_kg = s.heat_of_fusion_j_kg,
+  specific_heat_rt_j_kg_k = s.specific_heat_rt_j_kg_k,
+  specific_heat_solidus_j_kg_k = s.specific_heat_solidus_j_kg_k,
+  thermal_conductivity_w_m_c = s.thermal_conductivity_w_m_c,
+  cooling_factor_s_mm = s.cooling_factor_s_mm,
+  hardness = s.hardness,
+  hardness_system = s.hardness_system,
+  ejection_temp_c = s.ejection_temp_c,
+  injection_temp_c = s.injection_temp_c,
+  liquidus_temp_c = s.liquidus_temp_c,
+  solidus_temp_c = s.solidus_temp_c,
+  mold_temp_c = s.mold_temp_c,
+  yield_loss_factor = s.yield_loss_factor,
+  data_source = s.data_source
+FROM src s
+WHERE rm.material = s.material_name AND rm.material_group = 'Sand Casting';
 
 NOTIFY pgrst, 'reload schema';
 
 -- Verify (run manually after):
---   SELECT count(*) FROM raw_materials WHERE material_group = 'Sand Casting';
---   Names skipped (already present in another group) are listed by
---   scripts/845_verify_skipped_names.sql.
+--   SELECT count(*) FROM raw_materials WHERE material_group = 'Sand Casting';        -- expect 117
+--   SELECT material FROM raw_materials WHERE material LIKE '% (Sand Casting)';       -- the renamed collisions
