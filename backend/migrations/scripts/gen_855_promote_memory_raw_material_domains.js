@@ -64,6 +64,9 @@ const CORE = {
   'Base Cost Per Unit (USD)': 'base_cost_per_unit_usd', 'cost.baseCostPerUnitUsd': 'base_cost_per_unit_usd',
   'Density (kg / m^3)': 'density_kg_m3', 'Density (kg/m^3)': 'density_kg_m3', 'physicalProperties.densityKgM3': 'density_kg_m3',
   'Unit Cost (USD/kg)': 'cost', 'Cost Per KG (USD / kg)': 'cost',
+  // Forging and bar-and-tube list their cost per stock form; round bar is the stock
+  // those processes start from, so it is the material's cost. Other forms stay as properties.
+  'Round Bar Unit Cost (USD / kg)': 'cost',
   'Material Type Name': 'material_type',
   Hardness: 'hardness', 'physicalProperties.hardness': 'hardness',
   'Hardness System': 'hardness_system', 'physicalProperties.hardnessSystem': 'hardness_system',
