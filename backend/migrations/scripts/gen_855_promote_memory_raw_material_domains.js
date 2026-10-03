@@ -29,11 +29,25 @@ const MIG = path.join(__dirname, '..');
 const PART_BUDGET = 180000;
 
 const DOMAINS = [
-  { key: 'injection_molding', group: 'Plastic Molding', sourceVersion: '2026-Plastic', file: 'Plastic Modeling/materials_final.csv', policy: 'attach' },
+  { key: 'injection_molding', group: 'Plastic Molding', sourceVersion: '2026-Plastic', file: 'Plastic Modeling/materials_final.csv', policy: 'attach', keepJsonRows: true },
   { key: 'forging', group: 'Forging', sourceVersion: '2026-Forging', file: 'Forging/forging_materials.csv', policy: 'suffix' },
   { key: 'additive', group: 'Additive Manufacturing', sourceVersion: '2026-Additive', file: 'Additive Manufacturing/Raw materials.csv', policy: 'suffix' },
   { key: 'composites', group: 'Composites', sourceVersion: '2026-Composites', file: 'Composites/materials.csv', policy: 'suffix' },
   { key: 'pcb', group: 'PCB', sourceVersion: '2026-PCB', file: 'PCBA/raw_materials.csv', policy: 'suffix' },
+  // Raw-material masters that were never staged, plus the Die Casting and Casting
+  // material tables that the Heena staging wrote as JSON rows.
+  { key: 'casting_investment', group: 'Casting Investment', sourceVersion: '2026-CastInvest', file: 'Casting Investment/Raw Material/raw_materials.csv', policy: 'suffix' },
+  { key: 'die_casting', group: 'Die Casting', sourceVersion: '2026-DieCasting', file: 'Die Casting/Raw Material/materials_master.csv', policy: 'suffix' },
+  { key: 'casting', group: 'Casting', sourceVersion: '2026-Casting', file: 'Casting/Raw Material/materials_FULL_raw_data_v2.csv', policy: 'suffix' },
+  { key: 'powder_metal', group: 'Powder Metal', sourceVersion: '2026-PowderMetal', file: 'Powder metal/Raw material/raw_materials.csv', policy: 'suffix' },
+  { key: 'rapid_prototyping', group: 'Rapid Prototyping', sourceVersion: '2026-RapidProto', file: 'Rapid prototyping/Raw Materials/raw_materials.csv', policy: 'suffix' },
+  { key: 'roto_blow_molding', group: 'Roto & Blow Molding', sourceVersion: '2026-RotoBlow', file: 'Roto & blow molding/Raw materials/raw_materials.csv', policy: 'suffix' },
+  { key: 'sheet_plastic', group: 'Sheet Plastic', sourceVersion: '2026-SheetPlastic', file: 'Sheet Plastic/Raw Materials/materials.csv', policy: 'suffix' },
+  { key: 'sheet_roll_forming', group: 'Sheet Metal Roll Forming', sourceVersion: '2026-RollForm', file: 'Sheet metal roll forming/Raw Materials/material_master.csv', policy: 'suffix' },
+  { key: 'sheet_stretch_forming', group: 'Sheet Metal Stretch Forming', sourceVersion: '2026-StretchForm', file: 'Sheet metal stretch forming/Raw materials/raw_materials_metals.csv', policy: 'suffix' },
+  { key: 'sheet_transfer_die', group: 'Sheet Metal Transfer Die', sourceVersion: '2026-TransferDie', file: 'Sheet metal transfer die/Raw Materials/material_master.csv', policy: 'suffix' },
+  { key: 'bar_tube_fab', group: 'Bar and Tube Fabrication', sourceVersion: '2026-BarTube', file: 'Bar and tube fab/Raw material/materials.csv', policy: 'suffix' },
+  { key: 'assembly_plastic_molding', group: 'Assembly Plastic Molding', sourceVersion: '2026-AssyPlastic', file: 'Assembly plastic molding/Raw Materials/raw_materials_full.csv', policy: 'suffix' },
 ];
 
 // Header -> core raw_materials column. Anything not listed becomes a property.
@@ -45,7 +59,9 @@ const CORE = {
   'Unit Cost (USD / kg)': 'cost', 'cost.unitCostUsdPerKg': 'cost',
   'Cost Units': 'cost_units', 'cost.costUnits': 'cost_units',
   'Base Cost Per Unit (USD)': 'base_cost_per_unit_usd', 'cost.baseCostPerUnitUsd': 'base_cost_per_unit_usd',
-  'Density (kg / m^3)': 'density_kg_m3', 'physicalProperties.densityKgM3': 'density_kg_m3',
+  'Density (kg / m^3)': 'density_kg_m3', 'Density (kg/m^3)': 'density_kg_m3', 'physicalProperties.densityKgM3': 'density_kg_m3',
+  'Unit Cost (USD/kg)': 'cost', 'Cost Per KG (USD / kg)': 'cost',
+  'Material Type Name': 'material_type',
   Hardness: 'hardness', 'physicalProperties.hardness': 'hardness',
   'Hardness System': 'hardness_system', 'physicalProperties.hardnessSystem': 'hardness_system',
   Description: 'description', description: 'description',
@@ -188,7 +204,9 @@ JOIN LATERAL (
 ON CONFLICT (raw_material_id, property_key) DO NOTHING;`);
 
   parts.push(...[core_sql, ...prop_sql]);
-  deleteSources.push(d.sourceVersion);
+  // Plastic costing still reads one JSON row (GPPS, plastic-reference.service.ts),
+  // so its JSON rows stay until that reader moves to raw_material_properties.
+  if (!d.keepJsonRows) deleteSources.push(d.sourceVersion);
   summary.push(`--   ${d.group.padEnd(24)} ${String(core.length).padStart(4)} materials, ${String(props.length).padStart(5)} properties, policy ${d.policy}`);
 }
 
