@@ -6,7 +6,7 @@
 --
 -- Domains (the materials that were staged as JSON rows in machining_reference_data):
 --   Plastic Molding           109 materials,  1517 properties, policy attach
---   Forging                   105 materials,   930 properties, policy suffix
+--   Forging                   105 materials,   825 properties, policy suffix
 --   Additive Manufacturing     96 materials,   480 properties, policy suffix
 --   Composites                 23 materials,   319 properties, policy suffix
 --   PCB                        13 materials,   112 properties, policy suffix
@@ -20,7 +20,7 @@
 --   Sheet Metal Roll Forming  102 materials,  1418 properties, policy suffix
 --   Sheet Metal Stretch Forming   49 materials,   882 properties, policy suffix
 --   Sheet Metal Transfer Die  102 materials,  1418 properties, policy suffix
---   Bar and Tube Fabrication   93 materials,  4782 properties, policy suffix
+--   Bar and Tube Fabrication   93 materials,  4689 properties, policy suffix
 --   Ferrous & Non-Ferrous     101 materials,  1574 properties, policy attach
 --   Assembly Plastic Molding  109 materials,  1228 properties, policy suffix
 --
