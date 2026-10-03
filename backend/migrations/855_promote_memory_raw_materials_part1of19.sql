@@ -43,6 +43,11 @@ CREATE TABLE IF NOT EXISTS raw_material_properties (
 );
 CREATE INDEX IF NOT EXISTS raw_material_properties_source_idx ON raw_material_properties (source_version);
 
+ALTER TABLE raw_material_properties ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS raw_material_properties_read ON raw_material_properties;
+CREATE POLICY raw_material_properties_read ON raw_material_properties
+  FOR SELECT TO authenticated USING (true);
+
 ALTER TABLE raw_materials
   ADD COLUMN IF NOT EXISTS usa_name VARCHAR(255),
   ADD COLUMN IF NOT EXISTS description TEXT,
