@@ -92,14 +92,14 @@ DECLARE
   unmatched text;
 BEGIN
   UPDATE material_stock_prices p
-  SET raw_material_name = m.material
+  SET raw_material_name = m.grade
   FROM (
-    SELECT p2.reference_material, min(r.material) AS material
+    SELECT p2.reference_material, min(r.grade) AS grade
     FROM (SELECT DISTINCT reference_material FROM material_stock_prices) p2
     JOIN raw_materials r
-      ON lower(r.material) IN (lower(p2.reference_material), lower('Generic ' || p2.reference_material))
+      ON lower(r.grade) IN (lower(p2.reference_material), lower('Generic ' || p2.reference_material))
     GROUP BY p2.reference_material
-    HAVING count(DISTINCT lower(r.material)) = 1
+    HAVING count(DISTINCT lower(r.grade)) = 1
   ) m
   WHERE p.reference_material = m.reference_material;
 

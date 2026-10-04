@@ -1,7 +1,7 @@
 import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { SupabaseService } from '../../../common/supabase/supabase.service';
 import { Logger } from '../../../common/logger/logger.service';
-import { UpsertMaterialStockPriceDto, STOCK_FORMS } from '../dto/material-stock-price.dto';
+import { STOCK_FORMS } from '../dto/material-stock-price.dto';
 
 export interface MaterialStockPrice {
   stockForm: string;
@@ -11,7 +11,7 @@ export interface MaterialStockPrice {
   source: string;
 }
 
-// A stock price belongs to the reference alloy (material_grade, falling back to the
+// A stock price belongs to the reference alloy (name, falling back to the grade
 // material name), the same key the price table and the costing lookup use. An
 // edit here is therefore the price every row of that alloy is costed with.
 @Injectable()
@@ -29,12 +29,12 @@ export class MaterialStockPricesService {
     const { data, error } = await this.supabase
       .getUserClient(accessToken)
       .from('raw_materials')
-      .select('material, material_grade')
+      .select('grade, name')
       .eq('id', materialId)
       .maybeSingle();
     if (error) throw new InternalServerErrorException(`Failed to read material: ${error.message}`);
     if (!data) throw new NotFoundException(`Raw material ${materialId} not found`);
-    return (data.material_grade || data.material) as string;
+    return (data.name || data.grade) as string;
   }
 
   async listForMaterial(materialId: string, accessToken: string): Promise<MaterialStockPrice[]> {
@@ -56,31 +56,4 @@ export class MaterialStockPricesService {
     }));
   }
 
-  async upsertForMaterial(materialId: string, input: UpsertMaterialStockPriceDto, accessToken: string): Promise<MaterialStockPrice> {
-    const reference = await this.referenceOf(materialId, accessToken);
-    // Writes need the service role: the table is read-only for signed-in users (RLS).
-    // The reason is logged so every privileged write is traceable.
-    const db = this.supabase.getPrivilegedClient(`material-stock-prices: entered price for ${reference}`);
-    const row = {
-      reference_material: reference,
-      stock_form: input.stockForm,
-      location: input.location,
-      price_per_kg: input.pricePerKg,
-      currency_code: 'USD',
-      source: 'entered in the app',
-      updated_at: new Date().toISOString(),
-    };
-    const { error } = await db
-      .from('material_stock_prices')
-      .upsert(row, { onConflict: 'reference_material,stock_form,location' });
-    if (error) throw new InternalServerErrorException(`Failed to save stock price: ${error.message}`);
-    this.logger.log(`Stock price saved: ${reference} ${input.stockForm} ${input.location} = ${input.pricePerKg}`, 'MaterialStockPricesService');
-    return {
-      stockForm: input.stockForm,
-      location: input.location,
-      pricePerKg: input.pricePerKg,
-      currencyCode: 'USD',
-      source: 'entered in the app',
-    };
-  }
 }

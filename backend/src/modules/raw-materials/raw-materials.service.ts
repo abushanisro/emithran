@@ -33,9 +33,9 @@ export function buildMaterialSearchOrClause(searchTerm: string): string {
   const clauses = variants.flatMap((v) => {
     const safe = v.replace(/"/g, '\\"');
     return [
-      `material.ilike."%${safe}%"`,
+      `grade.ilike."%${safe}%"`,
       `material_group.ilike."%${safe}%"`,
-      `material_grade.ilike."%${safe}%"`,
+      `name.ilike."%${safe}%"`,
     ];
   });
   return clauses.join(',');
@@ -114,9 +114,14 @@ export class RawMaterialsService {
     if (query.materialGroup) {
       queryBuilder = queryBuilder.eq('material_group', query.materialGroup);
     }
+    let processMaterialGroups: string[] | undefined;
+    if (query.processGroup) {
+      processMaterialGroups = await this.materialGroupsForProcess(query.processGroup, accessToken);
+      if (processMaterialGroups.length > 0) queryBuilder = queryBuilder.in('material_group', processMaterialGroups);
+    }
 
     if (query.material) {
-      queryBuilder = queryBuilder.eq('material', query.material);
+      queryBuilder = queryBuilder.eq('grade', query.material);
     }
 
 
@@ -137,7 +142,9 @@ export class RawMaterialsService {
     }
 
     // Apply sorting
-    const sortBy = query.sortBy || 'material';
+    // The list sorts by the DB column; 'material' (the Name header's key) sorts the source name, as before.
+    const SORT_COLUMN: Record<string, string> = { material: 'grade', material_grade: 'name' };
+    const sortBy = SORT_COLUMN[query.sortBy || 'material'] ?? query.sortBy ?? 'grade';
     const sortOrder = query.sortOrder || 'asc';
     queryBuilder = queryBuilder.order(sortBy, { ascending: sortOrder === 'asc' });
 
@@ -176,12 +183,56 @@ export class RawMaterialsService {
         matchReason: reason,
         matchIsBest: isBest,
       }));
-      return { items: items.slice(offset, offset + limit), total: count || 0 };
+      return {
+        items: await this.withStockCoverage(items.slice(offset, offset + limit), accessToken), total: count || 0,
+        ...(processMaterialGroups ? { processMaterialGroups } : {}),
+      };
     }
 
     const items = rows.map(row => RawMaterialResponseDto.fromDatabase(row));
 
-    return { items, total: count || 0 };
+    return {
+      items: await this.withStockCoverage(items, accessToken), total: count || 0,
+      ...(processMaterialGroups ? { processMaterialGroups } : {}),
+    };
+  }
+
+  /** Every process group <-> material group link (process_material_groups, migration 879). */
+  async processMaterialGroups(accessToken?: string): Promise<Array<{ processGroup: string; materialGroup: string }>> {
+    const { data, error } = await this.supabaseService
+      .getUserClient(accessToken)
+      .from('process_material_groups')
+      .select('process_group, material_group')
+      .order('process_group');
+    if (error) throw new InternalServerErrorException(`Failed to read process material groups: ${error.message}`);
+    return (data ?? []).map((r: { process_group: string; material_group: string }) => ({ processGroup: r.process_group, materialGroup: r.material_group }));
+  }
+
+  /** The material groups linked to a process group (process_material_groups, migration 879). */
+  private async materialGroupsForProcess(processGroup: string, accessToken?: string): Promise<string[]> {
+    const { data, error } = await this.supabaseService
+      .getUserClient(accessToken)
+      .from('process_material_groups')
+      .select('material_group')
+      .eq('process_group', processGroup);
+    if (error) throw new InternalServerErrorException(`Failed to read process material groups: ${error.message}`);
+    return (data ?? []).map((r: { material_group: string }) => r.material_group);
+  }
+
+  // Adds how many USA stock forms each listed material has priced (migration 864). The key is the
+  // one the costing uses: grade, falling back to the name.
+  private async withStockCoverage<T extends { materialGrade?: string; material: string; stockFormsPriced?: number }>(
+    items: T[],
+    accessToken?: string,
+  ): Promise<T[]> {
+    const keys = [...new Set(items.map((i) => i.materialGrade || i.material))];
+    if (keys.length === 0) return items;
+    const { data, error } = await this.supabaseService
+      .getUserClient(accessToken)
+      .rpc('material_stock_coverage', { p_keys: keys, p_location: 'USA' });
+    if (error) throw new InternalServerErrorException(`Failed to read stock coverage: ${error.message}`);
+    const counts = new Map((data ?? []).map((r: { reference_material: string; priced_forms: number }) => [r.reference_material, r.priced_forms]));
+    return items.map((i) => ({ ...i, stockFormsPriced: counts.get(i.materialGrade || i.material) ?? 0 }));
   }
 
   async getFilterOptions(userId?: string, accessToken?: string): Promise<{
@@ -195,7 +246,7 @@ export class RawMaterialsService {
     const { data, error } = await this.supabaseService
       .getUserClient(accessToken)
       .from('raw_materials')
-      .select('material_group, material, material_grade, shape');
+      .select('material_group, grade, name, shape');
 
     if (error) {
       this.logger.error(`Error fetching filter options: ${error.message}`, 'RawMaterialsService');
@@ -204,8 +255,8 @@ export class RawMaterialsService {
 
     // Extract unique values
     const materialGroups = [...new Set(data.map(m => m.material_group).filter(Boolean))].sort();
-    const materialTypes = [...new Set(data.map(m => m.material).filter(Boolean))].sort();
-    const grades = [...new Set(data.map(m => m.material_grade).filter(Boolean))].sort();
+    const materialTypes = [...new Set(data.map(m => m.grade).filter(Boolean))].sort();
+    const grades = [...new Set(data.map(m => m.name).filter(Boolean))].sort();
 
     return {
       materialGroups,
@@ -234,6 +285,7 @@ export class RawMaterialsService {
     }));
   }
 
+
   async findOne(id: string, userId: string, accessToken: string): Promise<RawMaterialResponseDto> {
     this.logger.log(`Fetching raw material: ${id}`, 'RawMaterialsService');
 
@@ -260,8 +312,8 @@ export class RawMaterialsService {
       .from('raw_materials')
       .insert({
         material_group: createRawMaterialDto.materialGroup,
-        material: createRawMaterialDto.material,
-        material_grade: createRawMaterialDto.materialGrade,
+        grade: createRawMaterialDto.material,
+        name: createRawMaterialDto.materialGrade,
         material_type: createRawMaterialDto.materialType,
         material_description: createRawMaterialDto.materialDescription,
         stock_form: createRawMaterialDto.stockForm,
@@ -329,8 +381,8 @@ export class RawMaterialsService {
 
     const records = materials.map(dto => ({
       material_group: dto.materialGroup,
-      material: dto.material,
-      material_grade: dto.materialGrade,
+      grade: dto.material,
+      name: dto.materialGrade,
       material_type: dto.materialType,
       material_description: dto.materialDescription,
       stock_form: dto.stockForm,
@@ -415,8 +467,8 @@ export class RawMaterialsService {
     };
     
     if (updateRawMaterialDto.materialGroup !== undefined) updateData.material_group = handleStringField(updateRawMaterialDto.materialGroup);
-    if (updateRawMaterialDto.material !== undefined) updateData.material = handleStringField(updateRawMaterialDto.material);
-    if (updateRawMaterialDto.materialGrade !== undefined) updateData.material_grade = handleStringField(updateRawMaterialDto.materialGrade);
+    if (updateRawMaterialDto.material !== undefined) updateData.grade = handleStringField(updateRawMaterialDto.material);
+    if (updateRawMaterialDto.materialGrade !== undefined) updateData.name = handleStringField(updateRawMaterialDto.materialGrade);
     if (updateRawMaterialDto.materialType !== undefined) updateData.material_type = handleStringField(updateRawMaterialDto.materialType);
     if (updateRawMaterialDto.materialDescription !== undefined) updateData.material_description = handleStringField(updateRawMaterialDto.materialDescription);
     if (updateRawMaterialDto.stockForm !== undefined) updateData.stock_form = handleStringField(updateRawMaterialDto.stockForm);
@@ -433,6 +485,8 @@ export class RawMaterialsService {
     if (updateRawMaterialDto.location !== undefined) updateData.location = handleStringField(updateRawMaterialDto.location);
     if (updateRawMaterialDto.cost !== undefined) updateData.cost = handleNumberField(updateRawMaterialDto.cost);
     if (updateRawMaterialDto.unitCost !== undefined) updateData.cost = handleNumberField(updateRawMaterialDto.unitCost);
+    // The table's Cost column reads cost_usa for the USA region, so an edited USA cost must land there.
+    if (updateRawMaterialDto.costUsa !== undefined) updateData.cost_usa = handleNumberField(updateRawMaterialDto.costUsa);
     if (updateRawMaterialDto.currency !== undefined) updateData.currency = updateRawMaterialDto.currency;
     
     // Update additional properties
@@ -526,9 +580,9 @@ export class RawMaterialsService {
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
       .from('raw_materials')
-      .select('material_group, material')
+      .select('material_group, grade')
       .order('material_group', { ascending: true })
-      .order('material', { ascending: true });
+      .order('grade', { ascending: true });
 
     if (error) {
       this.logger.error(`Error fetching grouped materials: ${error.message}`, 'RawMaterialsService');
@@ -542,7 +596,7 @@ export class RawMaterialsService {
         acc[group] = [];
       }
       acc[group].push({
-        material: row.material,
+        material: row.grade,
       });
       return acc;
     }, {});
@@ -725,10 +779,10 @@ export class RawMaterialsService {
     // plain browse still pages in the database.
     const offset = (query.page - 1) * query.limit;
     if (query.search) {
-      queryBuilder = queryBuilder.order('material', { ascending: true }).limit(1000);
+      queryBuilder = queryBuilder.order('grade', { ascending: true }).limit(1000);
     } else {
       queryBuilder = queryBuilder.range(offset, offset + query.limit - 1);
-      queryBuilder = queryBuilder.order('material', { ascending: true });
+      queryBuilder = queryBuilder.order('grade', { ascending: true });
     }
 
     const { data: fetched, error, count } = await queryBuilder;
@@ -754,29 +808,26 @@ export class RawMaterialsService {
     // Transform data to match enhanced format with proper null handling
     const transformedData = (data || []).map(item => {
       // Ensure we have valid material name
-      const materialName = item.material || item.material_name || 'Unknown Material';
-      const materialGrade = item.material_grade || '';
+      const materialName = item.grade || 'Unknown Material';
+      const materialGrade = item.name || '';
       const materialGroup = item.material_group || 'Unknown';
       
       return {
         id: item.id,
         materialName: materialName,
         materialGrade: materialGrade,
-        materialSpecification: item.material_specification || '',
-        manufacturer: item.manufacturer || '',
-        supplier: item.supplier || '',
         categoryName: materialGroup,
         categoryCode: materialGroup === 'Plastic & Rubber' ? 'PLASTIC' : 'FERROUS',
         colorCode: materialGroup === 'Plastic & Rubber' ? '#4CAF50' : '#FF5722',
-        costPerKg: item.cost || item.cost_per_kg || 0,
-        costPerUnit: item.cost || item.cost_per_unit || 0,
+        costPerKg: item.cost || 0,
+        costPerUnit: item.cost || 0,
         unitType: 'kg',
         densityKgM3: item.density_kg_m3 || null,
         utsMpa: item.ultimate_tensile_strength || item.uts_mpa || null,
-        ytsMpa: item.yield_tensile_strength || item.yts_mpa || null,
+        ytsMpa: item.yield_strength_mpa || null,
         shearingStrength: item.shearing_strength || null,
         elasticModulusGpa: item.elastic_modulus_gpa || null,
-        hardnessValue: item.hardness_value || null,
+        hardnessValue: item.hardness || null,
         hardnessScale: item.hardness_scale || null,
         meltingTempCelsius: item.melting_temp_c || item.melting_temp_celsius || null,
         ejectDeflectionTempCelsius: item.eject_deflection_temp_c || item.eject_deflection_temp_celsius || null,

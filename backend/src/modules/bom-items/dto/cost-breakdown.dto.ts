@@ -74,6 +74,10 @@ export interface FeatureOp {
   // feature_graph_v2 ids of the exact features this entry machines. When
   // present the UI highlights precisely these, not every feature of the type.
   featureIds?: string[];
+  // The exact occurrences (feature_graph_v2 entry id + occurrence index) this
+  // entry machines, when it is one or some occurrences of an entry rather
+  // than all of them (machining a cast part's toleranced features).
+  occurrenceRefs?: Array<{ featureId: string; occurrenceIndex: number }>;
 }
 
 export interface CalculationTraceStep {
@@ -368,6 +372,10 @@ export interface ProcessLineCost {
   // Physics-based selection result (recommendation + alternatives + profiles).
   // Attached by BOMItemsService when ENABLE_PHYSICS_MACHINE_SELECTION is on.
   machineSelection?: MachineSelectionResult;
+  // Why this line runs on its machine, for engines that choose by a fixed rule
+  // (the casting route, costing/casting/machine-choice.ts): the rule, the
+  // criteria, and every machine looked at -- chosen, capable or rejected.
+  machineChoice?: MachineChoiceDto;
   // Real mhr_records id / 'bm-mhr-<id>' benchmark id for this line's resolved
   // resource — set directly (not via machineSelection) on classes priced
   // through a flat single-resource resolver instead of the full candidate-
@@ -380,6 +388,15 @@ export interface ProcessLineCost {
   // eMithran-style per-feature operation breakdown. Present on CNC Milling (per hole/pocket/tap),
   // Laser Cutting (cut path + pierces), and Press Brake (per bend group). Absent on Setup/Deburr/Inspect.
   featureBreakdown?: FeatureOp[];
+  // Casting: the catalog operation each detected feature receives on this
+  // line ("As Cast // SimpleHole", "No Coring // SimpleHole", ...), from
+  // casting-feature-operations.ts. operation null = undetermined, with why.
+  featureOperations?: Array<{
+    operation: string | null;
+    featureType: string;
+    instances: Array<{ label: string; featureId: string | null; occurrenceIndex: number }>;
+    reason: string;
+  }>;
   // Full end-to-end audit trail for how this line's cycle time was computed:
   // every real input value (with its provenance — CAD extraction, a specific
   // sm_lookup_* DB table row, or the currently selected machine), then every
@@ -547,9 +564,158 @@ export interface CostSummaryDto {
   // Present only when family === 'plastic_molded'.
   injectionMolding?: InjectionMoldingBreakdown;
 
+  // High pressure die casting: cavities per die and the clamp / shot they set.
+  // Present only when a die-cast part reached the HPDC engine's cavity step.
+  dieCasting?: DieCastingBreakdown;
+
+  // The die-casting die, amortised over its life (die-tooling.ts). USD, like
+  // the injection-molding tooling: separate from the piece cost.
+  dieTooling?: DieToolingDto;
+
+  // Heat treatment, surface treatment and other secondary processes, shared by
+  // every family (costing/shared/secondary-operations.ts): every option with its
+  // cost, and which are selected. Selected ones are lines in processLines.
+  secondaryOperations?: SecondaryOperationsDto;
+
+  // Coreboxes for the sand cores of a gravity die casting (coremaking.ts), USD,
+  // separate from the piece cost like the die.
+  coreboxTooling?: { boxes: number; costUsd: number; perPartUsd: number | null; detail: string };
+
+  // Calculators behind values that are not process lines (die casting: Net /
+  // Gross Material Usage, Shot Volume, Clamp Force, Trim Force, Die Build, Die
+  // Cost, Die Life, Corebox), keyed by calculator key.
+  calculatorRuns?: Record<string, CalculatorRunDto>;
+
+  // Die casting: which process (HPDC / GDC) this summary prices and why, with
+  // the other process's cost for comparison (bom-items.service casting branch).
+  dieCastingProcess?: DieCastingProcessChoiceDto;
+
   // Tooling cost — always separate from pieceCostUsd.
   // Present only when family === 'plastic_molded' and annualVolume / productionLifeYears provided.
   tooling?: ToolingCostDto;
+}
+
+/**
+ * One calculator run that is not a process line of its own (material usage,
+ * shot volume, clamp force, trim force, die tooling): the calculator, its trace
+ * (inputs with their source, formulas with their values), the lookup rows its
+ * inputs came from, and its output.
+ */
+export interface CalculatorRunDto {
+  calculatorId: string | null;
+  calculatorVersion: number | null;
+  name: string;
+  output: string;
+  value: number | null;
+  trace: CalculationTraceStep[];
+  lookupMatches: Record<string, { table: string; row: Record<string, string | number> }>;
+  missing: string[];
+}
+
+export interface MachineChoiceDto {
+  /** How the machine was chosen among the capable ones. */
+  rule: string;
+  /** What a machine had to meet to be capable. */
+  criteria: string[];
+  chosen: string | null;
+  capableCount: number;
+  /** Chosen first, then capable by the rule's value, then rejected with the failed criteria. */
+  candidates: Array<{ name: string; status: 'chosen' | 'capable' | 'rejected'; perPartCost: number | null; reasons: string[] }>;
+}
+
+export interface SecondaryOptionDto {
+  process: string;
+  status: 'costed' | 'not_applicable' | 'gap';
+  /** Cost per part in the summary currency; null when not costed. */
+  costPerPart: number | null;
+  reason: string;
+  /** Named by the drawing (heat-treatment / surface-treatment callout). */
+  fromDrawing: boolean;
+  selected: boolean;
+}
+
+export interface SecondaryOperationsDto {
+  /** 'scenario': the engineer's saved choice; 'drawing': the drawing callouts (nothing saved yet). */
+  source: 'scenario' | 'drawing';
+  heat: SecondaryOptionDto[];
+  surface: SecondaryOptionDto[];
+  other: SecondaryOptionDto[];
+  dataWarnings: string[];
+}
+
+export interface DieCastingProcessOptionDto {
+  process: string;
+  /** null when feasibility could not be decided (a measurement or reference row missing). */
+  feasible: boolean | null;
+  /** Why not feasible / undecided, or what was checked. */
+  detail: string;
+  /** Piece cost (material + every line) in the summary currency; null when the casting line is not costed. */
+  pieceCost: number | null;
+  /** Die tooling per part, converted to the summary currency; null when not amortised. */
+  toolingPerPart: number | null;
+  /** What the choice compares, on the choice basis (see DieCastingProcessChoiceDto.basis). */
+  total: number | null;
+}
+
+export interface DieCastingProcessChoiceDto {
+  chosen: string;
+  /** 'user': Cost Guide; 'auto': cheapest feasible; 'none_feasible': no process is feasible (the first is shown). */
+  chosenBy: 'user' | 'auto' | 'none_feasible';
+  /** What `total` compares: piece + die tooling per part when every costed option
+   *  has an amortised die, else piece cost alone for all. */
+  basis: 'piece_and_tooling' | 'piece_only';
+  options: DieCastingProcessOptionDto[];
+}
+
+export interface DieToolingDto {
+  ok: boolean;
+  reason: string | null;
+  dieSizeMm: [number, number, number] | null;
+  /** The machine clamping force the die borders were sized for; null for a gravity die. */
+  pressForceKn: number | null;
+  complexity: 'Simple' | 'Average' | 'Complex';
+  featureCount: number;
+  steelKg: number | null;
+  steelUsd: number | null;
+  designHr: number | null;
+  machiningHr: number | null;
+  assemblyHr: number | null;
+  ejectorPins: number | null;
+  ejectorPinsUsd: number | null;
+  labourUsd: number | null;
+  markupPct: number;
+  dieCostUsd: number | null;
+  shotsPerDie: number | null;
+  diesRequired: number | null;
+  totalToolingUsd: number | null;
+  perPartUsd: number | null;
+  trace: Array<{ label: string; value: string }>;
+}
+
+export interface DieCastingBreakdown {
+  cavityCount: number;
+  // 'user': the Cost Guide cavity count; 'default': variables defaultNumCavities;
+  // 'large_part': forced to one by largePartThreshold; 'unverified': the
+  // requested count has no layout or could not be checked (the HPDC line carries a physicsGap).
+  cavityConstrainedBy: 'user' | 'default' | 'large_part' | 'unverified';
+  /** Every layoutNumCav cavity count. */
+  cavityLayouts: number[];
+  /** variables defaultNumCavities. */
+  defaultCavityCount: number;
+  /** Required clamp for every cavity (kN); null when not derivable. */
+  requiredClampKn: number | null;
+  /** Parts + overflow metal per shot (mm3); null when not derivable. */
+  shotVolumeMm3: number | null;
+  /** Metal per part (kg): the part itself, what is charged (part x Yield Loss
+   *  Factor), what is melted (the part share of the shot) and what returns to
+   *  the furnace (melted - part). Runner and biscuit are not in the shot. */
+  metal: {
+    partKg: number;
+    chargedKg: number;
+    yieldLossFactor: number | null;
+    meltedKg: number | null;
+    returnedKg: number | null;
+  };
 }
 
 export interface InjectionMoldingBreakdown {

@@ -1,0 +1,1792 @@
+{
+  "processGroup": "Die Casting",
+  "domain": "die_casting",
+  "calculators": [
+    {
+      "name": "Die Casting - Net Material Usage",
+      "key": "Net Material Usage",
+      "category": "material",
+      "output": "Net Usage",
+      "description": "Finished part metal: CAD part volume x alloy density (memory/Die Casting materials_master).",
+      "fields": [
+        {
+          "name": "Part Volume",
+          "unit": "mm3",
+          "source": "cad"
+        },
+        {
+          "name": "Density",
+          "unit": "kg/m3",
+          "source": "alloy",
+          "column": "Density (kg/m^3)"
+        },
+        {
+          "name": "Net Usage",
+          "unit": "kg",
+          "formula": "{Part Volume} / 1e9 * {Density}"
+        }
+      ]
+    },
+    {
+      "name": "Die Casting - Gross Material Usage",
+      "key": "Gross Material Usage",
+      "category": "material",
+      "output": "Gross Usage",
+      "description": "Charged metal: the part metal x the alloy Yield Loss Factor. Overflow, runner and gating metal is remelted in-house, not charged.",
+      "fields": [
+        {
+          "name": "Net Usage",
+          "unit": "kg",
+          "source": "calculator",
+          "from": "Net Material Usage"
+        },
+        {
+          "name": "Yield Loss Factor",
+          "unit": null,
+          "source": "alloy",
+          "column": "Yield Loss Factor"
+        },
+        {
+          "name": "Gross Usage",
+          "unit": "kg",
+          "formula": "{Net Usage} * {Yield Loss Factor}"
+        },
+        {
+          "name": "Scrap",
+          "unit": "%",
+          "formula": "({Gross Usage} - {Net Usage}) / {Gross Usage} * 100"
+        }
+      ]
+    },
+    {
+      "name": "Die Casting - Shot Volume",
+      "key": "Shot Volume",
+      "category": "process",
+      "output": "Shot Volume",
+      "description": "High pressure die casting shot: every cavity plus its overflow (tblOverflowDim) plus the runner feeding it (runner height = thickest wall + additionalRunnerThickness, width = runnerAspectRatio x height, one ingate per ingateGap of part length).",
+      "fields": [
+        {
+          "name": "Part Volume",
+          "unit": "mm3",
+          "source": "cad"
+        },
+        {
+          "name": "Cavities",
+          "unit": null,
+          "source": "engine"
+        },
+        {
+          "name": "Overflow Ratio",
+          "unit": null,
+          "source": "lookup",
+          "table": "tblOverflowDim",
+          "column": "Overflow Volume Ratio High",
+          "alsoColumns": [
+            "Overflow Volume Ratio Low"
+          ]
+        },
+        {
+          "name": "Wall Max",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Part Length",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Additional Runner Thickness",
+          "unit": "mm",
+          "source": "variable",
+          "column": "additionalRunnerThickness"
+        },
+        {
+          "name": "Runner Aspect Ratio",
+          "unit": null,
+          "source": "variable",
+          "column": "runnerAspectRatio"
+        },
+        {
+          "name": "Ingate Gap",
+          "unit": "mm",
+          "source": "variable",
+          "column": "ingateGap"
+        },
+        {
+          "name": "Runner Height",
+          "unit": "mm",
+          "formula": "{Wall Max} + {Additional Runner Thickness}"
+        },
+        {
+          "name": "Runner Area",
+          "unit": "mm2",
+          "formula": "{Runner Height} ^ 2 * {Runner Aspect Ratio}"
+        },
+        {
+          "name": "Ingates",
+          "unit": null,
+          "formula": "max(1, ceil({Part Length} / {Ingate Gap}))"
+        },
+        {
+          "name": "Runner Volume",
+          "unit": "mm3",
+          "formula": "{Runner Area} * {Ingates} * {Ingate Gap} * {Cavities}"
+        },
+        {
+          "name": "Shot Volume",
+          "unit": "mm3",
+          "formula": "{Part Volume} * {Cavities} * (1 + {Overflow Ratio}) + {Runner Volume}"
+        }
+      ]
+    },
+    {
+      "name": "Die Casting - Clamp Force",
+      "key": "Clamp Force",
+      "category": "process",
+      "output": "Required Clamp Force",
+      "description": "Clamp a high pressure die must hold: every cavity projected area x alloy clamping pressure x clampForceSafetyFactor.",
+      "fields": [
+        {
+          "name": "Cavities",
+          "unit": null,
+          "source": "engine"
+        },
+        {
+          "name": "Projected Area",
+          "unit": "mm2",
+          "source": "cad"
+        },
+        {
+          "name": "Clamping Pressure",
+          "unit": "MPa",
+          "source": "alloy",
+          "column": "Clamping Pressure (MPa)"
+        },
+        {
+          "name": "Clamp Force Safety Factor",
+          "unit": null,
+          "source": "variable",
+          "column": "clampForceSafetyFactor"
+        },
+        {
+          "name": "Required Clamp Force",
+          "unit": "kN",
+          "formula": "{Cavities} * {Projected Area} * {Clamping Pressure} * {Clamp Force Safety Factor} / 1000"
+        }
+      ]
+    },
+    {
+      "name": "Die Casting - High Pressure Die Casting",
+      "key": "High Pressure Die Casting",
+      "category": "process",
+      "output": "Cycle Time",
+      "description": "One shot = (machine dry cycle + ladle + lube + eject + fill + solidification) x cycleTimeAdjustmentFactor; per part = shot / cavities.",
+      "fields": [
+        {
+          "name": "Dry Cycle Time",
+          "unit": "s",
+          "source": "machine",
+          "column": "dry_cycle_time_s"
+        },
+        {
+          "name": "Cavities",
+          "unit": null,
+          "source": "engine"
+        },
+        {
+          "name": "Projected Area",
+          "unit": "mm2",
+          "source": "cad"
+        },
+        {
+          "name": "Ladle Fill Time",
+          "unit": "s",
+          "source": "variable",
+          "column": "ladleFillTime"
+        },
+        {
+          "name": "Lube Time Constant",
+          "unit": "s",
+          "source": "variable",
+          "column": "lubeTimeConstant"
+        },
+        {
+          "name": "Lube Time Coefficient",
+          "unit": "s/mm2",
+          "source": "variable",
+          "column": "lubeTimeCoefficient"
+        },
+        {
+          "name": "Eject Time Factor",
+          "unit": null,
+          "source": "variable",
+          "column": "ejectTimeHPDC"
+        },
+        {
+          "name": "Solidification Constant",
+          "unit": "s/mm",
+          "source": "variable",
+          "column": "solidificationConstantHPDC"
+        },
+        {
+          "name": "Injection Temp",
+          "unit": "C",
+          "source": "alloy",
+          "column": "Injection Temp (C)"
+        },
+        {
+          "name": "Liquidus Temp",
+          "unit": "C",
+          "source": "alloy",
+          "column": "Liquidus Temp (C)"
+        },
+        {
+          "name": "Mold Temp",
+          "unit": "C",
+          "source": "alloy",
+          "column": "Mold Temp (C)"
+        },
+        {
+          "name": "Percent Solids",
+          "unit": null,
+          "source": "lookup",
+          "table": "tblPercentSolids",
+          "column": "Percent Solids"
+        },
+        {
+          "name": "Latent Heat Constant",
+          "unit": "C",
+          "source": "lookup",
+          "table": "tblLatentHeatConstant",
+          "column": "Latent Heat Constant"
+        },
+        {
+          "name": "Wall Nominal",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Cooling Factor",
+          "unit": "s/mm",
+          "source": "alloy",
+          "column": "Cooling Factor (s/mm)"
+        },
+        {
+          "name": "Wall Max",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Cycle Time Adjustment Factor",
+          "unit": null,
+          "source": "variable",
+          "column": "cycleTimeAdjustmentFactor"
+        },
+        {
+          "name": "Lube Time",
+          "unit": "s",
+          "formula": "{Lube Time Constant} + {Lube Time Coefficient} * 2 * {Cavities} * {Projected Area}"
+        },
+        {
+          "name": "Eject Time",
+          "unit": "s",
+          "formula": "{Lube Time} * {Eject Time Factor}"
+        },
+        {
+          "name": "Fill Time",
+          "unit": "s",
+          "formula": "{Solidification Constant} * (({Injection Temp} - {Liquidus Temp} + {Percent Solids} * {Latent Heat Constant}) / ({Liquidus Temp} - {Mold Temp})) * {Wall Nominal}"
+        },
+        {
+          "name": "Solidification Time",
+          "unit": "s",
+          "formula": "{Cooling Factor} * {Wall Max}"
+        },
+        {
+          "name": "Shot Time",
+          "unit": "s",
+          "formula": "({Dry Cycle Time} + {Ladle Fill Time} + {Lube Time} + {Eject Time} + {Fill Time} + {Solidification Time}) * {Cycle Time Adjustment Factor}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Shot Time} / {Cavities}"
+        }
+      ]
+    },
+    {
+      "name": "Die Casting - Gravity Die Casting",
+      "key": "Gravity Die Casting",
+      "category": "process",
+      "output": "Cycle Time",
+      "description": "One pour = (dry cycle + ladle + lube + fill + solidification + drop + core load) x cycleTimeAdjustmentFactor / Mold Efficiency; per part = pour / cavities. Shot volume from the gravity metal yield.",
+      "fields": [
+        {
+          "name": "Dry Cycle Time",
+          "unit": "s",
+          "source": "machine",
+          "column": "dry_cycle_time_s"
+        },
+        {
+          "name": "Mold Efficiency",
+          "unit": null,
+          "source": "machine",
+          "column": "mold_efficiency"
+        },
+        {
+          "name": "Cavities",
+          "unit": null,
+          "source": "engine"
+        },
+        {
+          "name": "Projected Area",
+          "unit": "mm2",
+          "source": "cad"
+        },
+        {
+          "name": "Part Volume",
+          "unit": "mm3",
+          "source": "cad"
+        },
+        {
+          "name": "Wall Max",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Core Count",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Ladle Fill Time",
+          "unit": "s",
+          "source": "variable",
+          "column": "ladleFillTimeGravityDieCasting"
+        },
+        {
+          "name": "Lube Time Constant",
+          "unit": "s",
+          "source": "variable",
+          "column": "lubeTimeConstant"
+        },
+        {
+          "name": "Lube Time Coefficient",
+          "unit": "s/mm2",
+          "source": "variable",
+          "column": "lubeTimeCoefficient"
+        },
+        {
+          "name": "Material Yield",
+          "unit": "%",
+          "source": "variable",
+          "column": "materialYieldGravityDieCasting"
+        },
+        {
+          "name": "Cavity Yield Add",
+          "unit": null,
+          "source": "variable",
+          "column": "numCavitiesMaterialYieldAdd"
+        },
+        {
+          "name": "Cavity Ceiling",
+          "unit": null,
+          "source": "variable",
+          "column": "cavityCeiling"
+        },
+        {
+          "name": "Mold Fill Rate",
+          "unit": "mm3/s",
+          "source": "variable",
+          "column": "moldFillRateGravityDieCasting"
+        },
+        {
+          "name": "Cool Time Constant",
+          "unit": "s/mm",
+          "source": "variable",
+          "column": "coolTimeConstantGravityDieCasting"
+        },
+        {
+          "name": "Gravity Drop Time",
+          "unit": "s",
+          "source": "variable",
+          "column": "gravityDropTime"
+        },
+        {
+          "name": "Core Load Time",
+          "unit": "s",
+          "source": "variable",
+          "column": "coreLoadTimeGravityDieCasting"
+        },
+        {
+          "name": "Cycle Time Adjustment Factor",
+          "unit": null,
+          "source": "variable",
+          "column": "cycleTimeAdjustmentFactor"
+        },
+        {
+          "name": "Metal Yield",
+          "unit": null,
+          "formula": "{Material Yield} / 100 + min({Cavity Yield Add} * {Cavities}, {Cavity Ceiling})"
+        },
+        {
+          "name": "Shot Volume",
+          "unit": "mm3",
+          "formula": "{Cavities} * {Part Volume} / {Metal Yield}"
+        },
+        {
+          "name": "Lube Time",
+          "unit": "s",
+          "formula": "{Lube Time Constant} + {Lube Time Coefficient} * 2 * {Cavities} * {Projected Area}"
+        },
+        {
+          "name": "Fill Time",
+          "unit": "s",
+          "formula": "{Shot Volume} / {Mold Fill Rate}"
+        },
+        {
+          "name": "Solidification Time",
+          "unit": "s",
+          "formula": "{Cool Time Constant} * {Wall Max}"
+        },
+        {
+          "name": "Core Load",
+          "unit": "s",
+          "formula": "{Core Load Time} * {Core Count}"
+        },
+        {
+          "name": "Shot Time",
+          "unit": "s",
+          "formula": "({Dry Cycle Time} + {Ladle Fill Time} + {Lube Time} + {Fill Time} + {Solidification Time} + {Gravity Drop Time} + {Core Load}) * {Cycle Time Adjustment Factor} / {Mold Efficiency}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Shot Time} / {Cavities}"
+        }
+      ]
+    },
+    {
+      "name": "Die Casting - Melting",
+      "key": "Melting",
+      "category": "process",
+      "output": "Cost per Part",
+      "description": "Melted metal per part (the shot shared across cavities) x the ductile-iron melter Conversion Cost x regionConvFactor; the furnace must hold the batch melt x furnaceCapacitySafetyFactor.",
+      "fields": [
+        {
+          "name": "Shot Volume",
+          "unit": "mm3",
+          "source": "calculator",
+          "from": "Shot Volume"
+        },
+        {
+          "name": "Cavities",
+          "unit": null,
+          "source": "engine"
+        },
+        {
+          "name": "Density",
+          "unit": "kg/m3",
+          "source": "alloy",
+          "column": "Density (kg/m^3)"
+        },
+        {
+          "name": "Conversion Cost",
+          "unit": "per kg",
+          "source": "machine",
+          "column": "conversion_cost_usd_per_kg"
+        },
+        {
+          "name": "Region Conversion Factor",
+          "unit": null,
+          "source": "variable",
+          "column": "regionConvFactor"
+        },
+        {
+          "name": "Batch Size",
+          "unit": null,
+          "source": "bom"
+        },
+        {
+          "name": "Furnace Capacity Safety Factor",
+          "unit": null,
+          "source": "variable",
+          "column": "furnaceCapacitySafetyFactor"
+        },
+        {
+          "name": "Melted Volume",
+          "unit": "mm3",
+          "formula": "{Shot Volume} / {Cavities}"
+        },
+        {
+          "name": "Melted Weight",
+          "unit": "kg",
+          "formula": "{Melted Volume} / 1e9 * {Density}"
+        },
+        {
+          "name": "Required Furnace Capacity",
+          "unit": "m3",
+          "formula": "{Melted Volume} * {Batch Size} / 1e9 * {Furnace Capacity Safety Factor}"
+        },
+        {
+          "name": "Cost per Part",
+          "unit": "per part",
+          "formula": "{Melted Weight} * {Conversion Cost} * {Region Conversion Factor}"
+        }
+      ]
+    },
+    {
+      "name": "Die Casting - Trim",
+      "key": "Trim",
+      "category": "process",
+      "output": "Cycle Time",
+      "description": "Per part = trim press Cycle Time / defaultNumberOfTrimmedParts parts per stroke.",
+      "fields": [
+        {
+          "name": "Press Cycle Time",
+          "unit": "s",
+          "source": "machine",
+          "column": "cycle_time_s"
+        },
+        {
+          "name": "Parts per Stroke",
+          "unit": null,
+          "source": "variable",
+          "column": "defaultNumberOfTrimmedParts"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Press Cycle Time} / {Parts per Stroke}"
+        }
+      ]
+    },
+    {
+      "name": "Die Casting - Trim Force",
+      "key": "Trim Force",
+      "category": "process",
+      "output": "Trim Force",
+      "description": "Force to shear the flash off along the parting line: perimeter x flash thickness (tblGrindingDimensions) x alloy Shear Strength.",
+      "fields": [
+        {
+          "name": "Parting Line Perimeter",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Flash Thickness",
+          "unit": "mm",
+          "source": "lookup",
+          "table": "tblGrindingDimensions",
+          "column": "Parting Line Thickness (mm)"
+        },
+        {
+          "name": "Shear Strength",
+          "unit": "MPa",
+          "source": "alloy",
+          "column": "Shear Strength (MPa)"
+        },
+        {
+          "name": "Trim Force",
+          "unit": "kN",
+          "formula": "{Parting Line Perimeter} * {Flash Thickness} * {Shear Strength} / 1000"
+        }
+      ]
+    },
+    {
+      "name": "Die Casting - Finishing",
+      "key": "Finishing",
+      "category": "process",
+      "output": "Cycle Time",
+      "description": "Grind the parting-line flash (perimeter x tblGrindingDimensions thickness x height) and, on a pressure die, the ingate stubs (ingate area = runner area x ingateAreaToRunnerArea, x Ingate Height), each at the machine grinding speed x the alloy Cut Code factor.",
+      "fields": [
+        {
+          "name": "Parting Line Perimeter",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Flash Thickness",
+          "unit": "mm",
+          "source": "lookup",
+          "table": "tblGrindingDimensions",
+          "column": "Parting Line Thickness (mm)"
+        },
+        {
+          "name": "Flash Height",
+          "unit": "mm",
+          "source": "lookup",
+          "table": "tblGrindingDimensions",
+          "column": "Parting Line Height (mm)"
+        },
+        {
+          "name": "Grinding Speed Parting Line",
+          "unit": "mm3/s",
+          "source": "machine",
+          "column": "grinding_speed_parting_line_mm3_per_s"
+        },
+        {
+          "name": "Grinding Speed Gating",
+          "unit": "mm3/s",
+          "source": "machine",
+          "column": "grinding_speed_gating_mm3_per_s"
+        },
+        {
+          "name": "Material Factor",
+          "unit": null,
+          "source": "lookup",
+          "table": "tblGrindingSpeedMaterialFactor",
+          "column": "Grinding Speed Material Factor"
+        },
+        {
+          "name": "Gates Ground",
+          "unit": null,
+          "source": "engine"
+        },
+        {
+          "name": "Wall Max",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Part Length",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Additional Runner Thickness",
+          "unit": "mm",
+          "source": "variable",
+          "column": "additionalRunnerThickness"
+        },
+        {
+          "name": "Runner Aspect Ratio",
+          "unit": null,
+          "source": "variable",
+          "column": "runnerAspectRatio"
+        },
+        {
+          "name": "Ingate to Runner Area",
+          "unit": null,
+          "source": "variable",
+          "column": "ingateAreaToRunnerArea"
+        },
+        {
+          "name": "Ingate Gap",
+          "unit": "mm",
+          "source": "variable",
+          "column": "ingateGap"
+        },
+        {
+          "name": "Ingate Height",
+          "unit": "mm",
+          "source": "lookup",
+          "table": "tblGrindingDimensions",
+          "column": "Ingate Height (mm)"
+        },
+        {
+          "name": "Flash Volume",
+          "unit": "mm3",
+          "formula": "{Parting Line Perimeter} * {Flash Thickness} * {Flash Height}"
+        },
+        {
+          "name": "Ingate Area",
+          "unit": "mm2",
+          "formula": "({Wall Max} + {Additional Runner Thickness}) ^ 2 * {Runner Aspect Ratio} * {Ingate to Runner Area}"
+        },
+        {
+          "name": "Ingates",
+          "unit": null,
+          "formula": "{Gates Ground} * max(1, ceil({Part Length} / {Ingate Gap}))"
+        },
+        {
+          "name": "Gate Stub Volume",
+          "unit": "mm3",
+          "formula": "{Ingates} * {Ingate Area} * {Ingate Height}"
+        },
+        {
+          "name": "Parting Line Time",
+          "unit": "s",
+          "formula": "{Flash Volume} / ({Grinding Speed Parting Line} * {Material Factor})"
+        },
+        {
+          "name": "Gate Time",
+          "unit": "s",
+          "formula": "{Gate Stub Volume} / ({Grinding Speed Gating} * {Material Factor})"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Parting Line Time} + {Gate Time}"
+        }
+      ]
+    },
+    {
+      "name": "Die Casting - Cleaning",
+      "key": "Cleaning",
+      "category": "process",
+      "output": "Cycle Time",
+      "description": "Shot blast: parts per load = min(floor(Weight Capacity / part weight), Max Batch Size); per part = Time per Load / parts per load.",
+      "fields": [
+        {
+          "name": "Time per Load",
+          "unit": "min",
+          "source": "machine",
+          "column": "time_per_load_min"
+        },
+        {
+          "name": "Weight Capacity",
+          "unit": "kg",
+          "source": "machine",
+          "column": "weight_capacity_kg"
+        },
+        {
+          "name": "Max Batch Size",
+          "unit": null,
+          "source": "machine",
+          "column": "max_batch_size"
+        },
+        {
+          "name": "Part Weight",
+          "unit": "kg",
+          "source": "calculator",
+          "from": "Net Material Usage"
+        },
+        {
+          "name": "Parts per Load",
+          "unit": null,
+          "formula": "min(floor({Weight Capacity} / {Part Weight}), {Max Batch Size})"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Time per Load} * 60 / {Parts per Load}"
+        }
+      ]
+    },
+    {
+      "name": "Die Casting - Visual Inspection",
+      "key": "Visual Inspection",
+      "category": "process",
+      "output": "Cycle Time",
+      "description": "Part surface area x the tblVisualInspection External Inspection Rate of the first weight band at or above the part weight.",
+      "fields": [
+        {
+          "name": "Surface Area",
+          "unit": "mm2",
+          "source": "cad"
+        },
+        {
+          "name": "External Inspection Rate",
+          "unit": "min/m2",
+          "source": "lookup",
+          "table": "tblVisualInspection",
+          "column": "External Inspection Rate (min / m^2)"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Surface Area} / 1e6 * {External Inspection Rate} * 60"
+        }
+      ]
+    },
+    {
+      "name": "Die Casting - Coremaking",
+      "key": "Coremaking",
+      "category": "process",
+      "output": "Cycle Time",
+      "description": "One core per corebox blow: per part = core machine Base Cycle Time x cores.",
+      "fields": [
+        {
+          "name": "Base Cycle Time",
+          "unit": "s",
+          "source": "machine",
+          "column": "base_cycle_time_s"
+        },
+        {
+          "name": "Core Count",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Base Cycle Time} * {Core Count}"
+        }
+      ]
+    },
+    {
+      "name": "Die Casting - Core Sand",
+      "key": "Core Sand",
+      "category": "process",
+      "output": "Cost per Part",
+      "description": "Core sand used per part: core volume x sand density x sand New Cost (the Core Sand Type of the coremaker).",
+      "fields": [
+        {
+          "name": "Core Volume",
+          "unit": "mm3",
+          "source": "cad"
+        },
+        {
+          "name": "Sand Density",
+          "unit": "kg/m3",
+          "source": "lookup",
+          "table": "sand",
+          "column": "Density (kg / m^3)"
+        },
+        {
+          "name": "Sand New Cost",
+          "unit": "USD/kg",
+          "source": "lookup",
+          "table": "sand",
+          "column": "New Cost (USD / kg)"
+        },
+        {
+          "name": "USD to Local",
+          "unit": null,
+          "source": "engine"
+        },
+        {
+          "name": "Sand Weight",
+          "unit": "kg",
+          "formula": "{Core Volume} / 1e9 * {Sand Density}"
+        },
+        {
+          "name": "Cost per Part",
+          "unit": "per part",
+          "formula": "{Sand Weight} * {Sand New Cost} * {USD to Local}"
+        }
+      ]
+    },
+    {
+      "name": "Die Casting - Core Refractory Coat",
+      "key": "Core Refractory Coat",
+      "category": "process",
+      "output": "Cycle Time",
+      "description": "Core area / the tblRefractoryCoating Application Rate of the default method x defaultNumCoreRefractoryCoatingApplications.",
+      "fields": [
+        {
+          "name": "Core Area",
+          "unit": "mm2",
+          "source": "cad"
+        },
+        {
+          "name": "Application Rate",
+          "unit": "m2/min",
+          "source": "lookup",
+          "table": "tblRefractoryCoating",
+          "column": "Application Rate (m^2 / min)"
+        },
+        {
+          "name": "Coat Applications",
+          "unit": null,
+          "source": "variable",
+          "column": "defaultNumCoreRefractoryCoatingApplications"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Core Area} / 1e6 / {Application Rate} * {Coat Applications} * 60"
+        }
+      ]
+    },
+    {
+      "name": "Die Casting - Refractory Coat Air Dry",
+      "key": "Refractory Coat Air Dry",
+      "category": "process",
+      "output": "Cycle Time",
+      "description": "Loads of part core sets (by box volume, at most the batch) x defaultAirDryAndCoolTime, spread over the batch.",
+      "fields": [
+        {
+          "name": "Bed Length",
+          "unit": "mm",
+          "source": "machine",
+          "column": "bed_length_mm"
+        },
+        {
+          "name": "Bed Width",
+          "unit": "mm",
+          "source": "machine",
+          "column": "bed_width_mm"
+        },
+        {
+          "name": "Bed Height",
+          "unit": "mm",
+          "source": "machine",
+          "column": "bed_height_mm"
+        },
+        {
+          "name": "Core Set Box Volume",
+          "unit": "mm3",
+          "source": "cad"
+        },
+        {
+          "name": "Batch Size",
+          "unit": null,
+          "source": "bom"
+        },
+        {
+          "name": "Dry Time",
+          "unit": "min",
+          "source": "variable",
+          "column": "defaultAirDryAndCoolTime"
+        },
+        {
+          "name": "Parts per Load",
+          "unit": null,
+          "formula": "min(floor({Bed Length} * {Bed Width} * {Bed Height} / {Core Set Box Volume}), {Batch Size})"
+        },
+        {
+          "name": "Loads",
+          "unit": null,
+          "formula": "ceil({Batch Size} / {Parts per Load})"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Loads} * {Dry Time} * 60 / {Batch Size}"
+        }
+      ]
+    },
+    {
+      "name": "Die Casting - Refractory Coat Oven Dry",
+      "key": "Refractory Coat Oven Dry",
+      "category": "process",
+      "output": "Cycle Time",
+      "description": "Loads of part core sets (by box volume x defaultRefractoryCoatOvenSpaceAvailableFactor, at most the batch) x defaultOvenDryAndCoolTime, spread over the batch.",
+      "fields": [
+        {
+          "name": "Bed Length",
+          "unit": "mm",
+          "source": "machine",
+          "column": "bed_length_mm"
+        },
+        {
+          "name": "Bed Width",
+          "unit": "mm",
+          "source": "machine",
+          "column": "bed_width_mm"
+        },
+        {
+          "name": "Bed Height",
+          "unit": "mm",
+          "source": "machine",
+          "column": "bed_height_mm"
+        },
+        {
+          "name": "Space Available Factor",
+          "unit": null,
+          "source": "variable",
+          "column": "defaultRefractoryCoatOvenSpaceAvailableFactor"
+        },
+        {
+          "name": "Core Set Box Volume",
+          "unit": "mm3",
+          "source": "cad"
+        },
+        {
+          "name": "Batch Size",
+          "unit": null,
+          "source": "bom"
+        },
+        {
+          "name": "Dry Time",
+          "unit": "min",
+          "source": "variable",
+          "column": "defaultOvenDryAndCoolTime"
+        },
+        {
+          "name": "Parts per Load",
+          "unit": null,
+          "formula": "min(floor({Bed Length} * {Bed Width} * {Bed Height} * {Space Available Factor} / {Core Set Box Volume}), {Batch Size})"
+        },
+        {
+          "name": "Loads",
+          "unit": null,
+          "formula": "ceil({Batch Size} / {Parts per Load})"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Loads} * {Dry Time} * 60 / {Batch Size}"
+        }
+      ]
+    },
+    {
+      "name": "Die Casting - Slide",
+      "key": "Slide",
+      "category": "tooling",
+      "output": "Slide Steel Weight",
+      "description": "One slide, sized by its bundle width (small / medium / large SlideVolume and SlideDesignTime): H13 weight and the design, CNC, pocket, assembly, spotting and inspection hours.",
+      "fields": [
+        {
+          "name": "Slide Volume",
+          "unit": "in3",
+          "source": "variable",
+          "column": "smallSlideVolume",
+          "alsoColumns": [
+            "mediumSlideVolume",
+            "largeSlideVolume"
+          ]
+        },
+        {
+          "name": "Slide Design Time",
+          "unit": "hr",
+          "source": "variable",
+          "column": "smallSlideDesignTime",
+          "alsoColumns": [
+            "mediumSlideDesignTime",
+            "largeSlideDesignTime"
+          ]
+        },
+        {
+          "name": "H13 Density",
+          "unit": "kg/m3",
+          "source": "variable",
+          "column": "densityH13"
+        },
+        {
+          "name": "Cutter Path Time",
+          "unit": "hr",
+          "source": "variable",
+          "column": "slideCutterPathTimePerTool"
+        },
+        {
+          "name": "Slide CNC Rate",
+          "unit": "hr/in3",
+          "source": "variable",
+          "column": "slideCNCMachRate"
+        },
+        {
+          "name": "Slide Setup",
+          "unit": "hr",
+          "source": "variable",
+          "column": "slideSetup"
+        },
+        {
+          "name": "Pocket CNC Rate",
+          "unit": "hr/in3",
+          "source": "variable",
+          "column": "slidesCNCRate"
+        },
+        {
+          "name": "Pocket Setup",
+          "unit": "hr",
+          "source": "variable",
+          "column": "slidePocketSetup"
+        },
+        {
+          "name": "Slide Assembly Time",
+          "unit": "hr",
+          "source": "variable",
+          "column": "slideAssTimePerTool"
+        },
+        {
+          "name": "Spotting Time",
+          "unit": "hr",
+          "source": "variable",
+          "column": "spotSlidesTimePerTool"
+        },
+        {
+          "name": "Slide Inspection Time",
+          "unit": "hr",
+          "source": "variable",
+          "column": "slideInspectTimePerTool"
+        },
+        {
+          "name": "Slide Steel Weight",
+          "unit": "kg",
+          "formula": "{Slide Volume} * 25.4 ^ 3 / 1e9 * {H13 Density}"
+        },
+        {
+          "name": "Slide Design Hours",
+          "unit": "hr",
+          "formula": "{Slide Design Time} + {Cutter Path Time}"
+        },
+        {
+          "name": "Slide Machining Hours",
+          "unit": "hr",
+          "formula": "{Slide CNC Rate} * {Slide Volume} + {Slide Setup} + {Pocket CNC Rate} * {Slide Volume} + {Pocket Setup}"
+        },
+        {
+          "name": "Slide Assembly Hours",
+          "unit": "hr",
+          "formula": "{Slide Assembly Time} + {Spotting Time} + {Slide Inspection Time}"
+        }
+      ]
+    },
+    {
+      "name": "Die Casting - Die Size",
+      "key": "Die Size",
+      "category": "tooling",
+      "output": "Die Steel Weight",
+      "description": "The die block: the cavity layout plus the edge borders each side (pressure die: tblEdgeMoldBorderX/Y for the press force; gravity die: edgeBorderPM), the part depth along the pull plus the cavity and core half depth borders, in H13.",
+      "fields": [
+        {
+          "name": "Layout Length",
+          "unit": "mm",
+          "source": "engine"
+        },
+        {
+          "name": "Layout Width",
+          "unit": "mm",
+          "source": "engine"
+        },
+        {
+          "name": "Edge Border X",
+          "unit": "mm",
+          "source": "lookup",
+          "table": "tblEdgeMoldBorderX",
+          "column": "Edge Mold Border X (mm)",
+          "alsoTables": [
+            "variables"
+          ],
+          "alsoColumns": [
+            "edgeBorderPM"
+          ]
+        },
+        {
+          "name": "Edge Border Y",
+          "unit": "mm",
+          "source": "lookup",
+          "table": "tblEdgeMoldBorderY",
+          "column": "Edge Mold Border Y (mm)",
+          "alsoTables": [
+            "variables"
+          ],
+          "alsoColumns": [
+            "edgeBorderPM"
+          ]
+        },
+        {
+          "name": "Pull Extent",
+          "unit": "mm",
+          "source": "cad"
+        },
+        {
+          "name": "Cavity Half Depth Border",
+          "unit": "mm",
+          "source": "lookup",
+          "table": "tblCavityPlateDepthBorder",
+          "column": "Cavity Plate Depth Border (in)",
+          "alsoTables": [
+            "variables"
+          ],
+          "alsoColumns": [
+            "depthBorderPM"
+          ]
+        },
+        {
+          "name": "Core Half Depth Border",
+          "unit": "mm",
+          "source": "lookup",
+          "table": "tblCorePlateDepthBorder",
+          "column": "Core Plate Depth Border (in)",
+          "alsoTables": [
+            "variables"
+          ],
+          "alsoColumns": [
+            "depthBorderPM"
+          ]
+        },
+        {
+          "name": "H13 Density",
+          "unit": "kg/m3",
+          "source": "variable",
+          "column": "densityH13"
+        },
+        {
+          "name": "Die Length",
+          "unit": "mm",
+          "formula": "{Layout Length} + 2 * {Edge Border X}"
+        },
+        {
+          "name": "Die Width",
+          "unit": "mm",
+          "formula": "{Layout Width} + 2 * {Edge Border Y}"
+        },
+        {
+          "name": "Die Depth",
+          "unit": "mm",
+          "formula": "{Pull Extent} + {Cavity Half Depth Border} + {Core Half Depth Border}"
+        },
+        {
+          "name": "Die Steel Weight",
+          "unit": "kg",
+          "formula": "{Die Length} * {Die Width} * {Die Depth} / 1e9 * {H13 Density}"
+        }
+      ]
+    },
+    {
+      "name": "Die Casting - Die Build",
+      "key": "Die Build",
+      "category": "tooling",
+      "output": "Total Steel Weight",
+      "description": "The die build: design / cavity machining / cooling / assembly hours and the bought components (ejector and guide pins, sprue bushing, spreader, locating ring), slides included, and the steel to buy.",
+      "fields": [
+        {
+          "name": "Die Length",
+          "unit": "mm",
+          "source": "calculator",
+          "from": "Die Size"
+        },
+        {
+          "name": "Die Steel Weight",
+          "unit": "kg",
+          "source": "calculator",
+          "from": "Die Size"
+        },
+        {
+          "name": "Base Design Time",
+          "unit": "hr",
+          "source": "lookup",
+          "table": "tblMoldBaseDesignTime",
+          "column": "Standard Base Design Time (hr)",
+          "alsoColumns": [
+            "Custom Base Design Time (hr)"
+          ]
+        },
+        {
+          "name": "Per Slide Design Time",
+          "unit": "hr",
+          "source": "lookup",
+          "table": "tblMoldBaseDesignTime",
+          "column": "Per Slide Design Time (hr)"
+        },
+        {
+          "name": "Slides",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Parting Line Base Design Time",
+          "unit": "hr",
+          "source": "variable",
+          "column": "partingLineBaseDesignTime"
+        },
+        {
+          "name": "Parting Line Design Time per Slide",
+          "unit": "hr",
+          "source": "variable",
+          "column": "partingLineDesignTimePerSlide"
+        },
+        {
+          "name": "Hours per Square Inch",
+          "unit": "hr/in2",
+          "source": "lookup",
+          "table": "tblHrsPerSqInchSimple",
+          "column": "Hrs Per Sq Inch Simple (hr / in^2)",
+          "alsoTables": [
+            "tblHrsPerSqInchAverage",
+            "tblHrsPerSqInchComplex"
+          ],
+          "alsoColumns": [
+            "Hrs Per Sq Inch Average (hr / in^2)",
+            "Hrs Per Sq Inch Complex (hr / in^2)"
+          ]
+        },
+        {
+          "name": "Surface Area",
+          "unit": "mm2",
+          "source": "cad"
+        },
+        {
+          "name": "Cavities",
+          "unit": null,
+          "source": "engine"
+        },
+        {
+          "name": "H13 Machinability",
+          "unit": null,
+          "source": "variable",
+          "column": "machinabilityMultiplierH13ToolSteel"
+        },
+        {
+          "name": "Projected Area",
+          "unit": "mm2",
+          "source": "cad"
+        },
+        {
+          "name": "Projected Area per Ejector Pin",
+          "unit": "in2",
+          "source": "variable",
+          "column": "projAreaPerEjectorPin"
+        },
+        {
+          "name": "Ejector Pin Cost",
+          "unit": "USD",
+          "source": "variable",
+          "column": "ejectorPinsCost"
+        },
+        {
+          "name": "Ejector Pin Assembly Time",
+          "unit": "hr",
+          "source": "variable",
+          "column": "ejPinsAssTimePerTool"
+        },
+        {
+          "name": "Guide Pins",
+          "unit": null,
+          "source": "variable",
+          "column": "numGuidePins"
+        },
+        {
+          "name": "Guide Pin Cost",
+          "unit": "USD",
+          "source": "lookup",
+          "table": "componentStandardCosts",
+          "column": "Cost (USD)"
+        },
+        {
+          "name": "Guide Pin Assembly Time",
+          "unit": "hr",
+          "source": "variable",
+          "column": "guidePinsAssTimePerTool"
+        },
+        {
+          "name": "Pressure Die",
+          "unit": null,
+          "source": "engine"
+        },
+        {
+          "name": "Sprue Bushing Cost",
+          "unit": "USD",
+          "source": "variable",
+          "column": "sprueBushingCost"
+        },
+        {
+          "name": "Sprue Spreader Cost",
+          "unit": "USD",
+          "source": "variable",
+          "column": "sprueSpreaderCost"
+        },
+        {
+          "name": "Sprue Assembly Time",
+          "unit": "hr",
+          "source": "variable",
+          "column": "sprBushSpreadAssTimePerTool"
+        },
+        {
+          "name": "Locating Rings",
+          "unit": null,
+          "source": "variable",
+          "column": "locatingRings"
+        },
+        {
+          "name": "Locating Ring Cost",
+          "unit": "USD",
+          "source": "variable",
+          "column": "locatingRingsCost"
+        },
+        {
+          "name": "Locating Ring Assembly Time",
+          "unit": "hr",
+          "source": "variable",
+          "column": "locatRingsAssTimePerTool"
+        },
+        {
+          "name": "Cavity Plate Water Rows",
+          "unit": null,
+          "source": "variable",
+          "column": "numRowsWaterChCavHoles"
+        },
+        {
+          "name": "Core Plate Water Rows",
+          "unit": null,
+          "source": "variable",
+          "column": "numRowsWaterChCoreHoles"
+        },
+        {
+          "name": "Gun Drill Setup",
+          "unit": "hr",
+          "source": "variable",
+          "column": "gunDrillSetup"
+        },
+        {
+          "name": "Waterline Drill Speed",
+          "unit": "in/min",
+          "source": "variable",
+          "column": "waterlineDrillSpeed"
+        },
+        {
+          "name": "Gun Tap Setup",
+          "unit": "hr",
+          "source": "variable",
+          "column": "gunTapSetup"
+        },
+        {
+          "name": "Gun Tap Time",
+          "unit": "min",
+          "source": "variable",
+          "column": "gunTapTime"
+        },
+        {
+          "name": "Counterbore Setup",
+          "unit": "hr",
+          "source": "variable",
+          "column": "cboreSetup"
+        },
+        {
+          "name": "Counterbore Time",
+          "unit": "min",
+          "source": "variable",
+          "column": "cboreTime"
+        },
+        {
+          "name": "Water Channel Design Time",
+          "unit": "hr",
+          "source": "variable",
+          "column": "waterChannelDesignTime"
+        },
+        {
+          "name": "Min Water Channel Design Time",
+          "unit": "hr",
+          "source": "variable",
+          "column": "minWaterChannelDesignTime"
+        },
+        {
+          "name": "Slide Steel Weight",
+          "unit": "kg",
+          "source": "calculator",
+          "from": "Slide"
+        },
+        {
+          "name": "Slide Design Hours",
+          "unit": "hr",
+          "source": "calculator",
+          "from": "Slide"
+        },
+        {
+          "name": "Slide Machining Hours",
+          "unit": "hr",
+          "source": "calculator",
+          "from": "Slide"
+        },
+        {
+          "name": "Slide Assembly Hours",
+          "unit": "hr",
+          "source": "calculator",
+          "from": "Slide"
+        },
+        {
+          "name": "Slide Inspection Setup",
+          "unit": "hr",
+          "source": "variable",
+          "column": "slideInspectSetup"
+        },
+        {
+          "name": "Cooling Channels",
+          "unit": null,
+          "formula": "{Cavity Plate Water Rows} + {Core Plate Water Rows}"
+        },
+        {
+          "name": "Cooling Machining Hours",
+          "unit": "hr",
+          "formula": "{Gun Drill Setup} + {Cooling Channels} * {Die Length} / 25.4 / {Waterline Drill Speed} / 60 + {Gun Tap Setup} + {Cooling Channels} * {Gun Tap Time} / 60 + {Counterbore Setup} + {Cooling Channels} * {Counterbore Time} / 60"
+        },
+        {
+          "name": "Design Hours",
+          "unit": "hr",
+          "formula": "{Base Design Time} + {Per Slide Design Time} * {Slides} + {Parting Line Base Design Time} + {Parting Line Design Time per Slide} * {Slides} + max({Min Water Channel Design Time}, {Cooling Channels} * {Water Channel Design Time}) + {Slide Design Hours}"
+        },
+        {
+          "name": "Cavity Machining Hours",
+          "unit": "hr",
+          "formula": "{Hours per Square Inch} * {Surface Area} / 645.16 * {Cavities} * {H13 Machinability}"
+        },
+        {
+          "name": "Machining Hours",
+          "unit": "hr",
+          "formula": "{Cavity Machining Hours} + {Cooling Machining Hours} + {Slide Machining Hours}"
+        },
+        {
+          "name": "Ejector Pins",
+          "unit": null,
+          "formula": "ceil({Cavities} * {Projected Area} / 645.16 / {Projected Area per Ejector Pin})"
+        },
+        {
+          "name": "Assembly Hours",
+          "unit": "hr",
+          "formula": "{Ejector Pins} * {Ejector Pin Assembly Time} + {Guide Pins} * {Guide Pin Assembly Time} + {Pressure Die} * (2 * {Sprue Assembly Time} + {Locating Rings} * {Locating Ring Assembly Time}) + {Slide Assembly Hours} + IF({Slide Assembly Hours} > 0, {Slide Inspection Setup}, 0)"
+        },
+        {
+          "name": "Component Cost",
+          "unit": "USD",
+          "formula": "{Ejector Pins} * {Ejector Pin Cost} + {Guide Pins} * {Guide Pin Cost} + {Pressure Die} * ({Sprue Bushing Cost} + {Sprue Spreader Cost} + {Locating Rings} * {Locating Ring Cost})"
+        },
+        {
+          "name": "Total Steel Weight",
+          "unit": "kg",
+          "formula": "{Die Steel Weight} + {Slide Steel Weight}"
+        }
+      ]
+    },
+    {
+      "name": "Die Casting - Die Cost",
+      "key": "Die Cost",
+      "category": "tooling",
+      "output": "Die Cost",
+      "description": "One die: (H13 steel + heat treat + bought components + tool shop hours x the Default tool shop rates) x (1 + percentTuning + percentSGandA + percentProfit).",
+      "fields": [
+        {
+          "name": "Total Steel Weight",
+          "unit": "kg",
+          "source": "calculator",
+          "from": "Die Build"
+        },
+        {
+          "name": "Component Cost",
+          "unit": "USD",
+          "source": "calculator",
+          "from": "Die Build"
+        },
+        {
+          "name": "Design Hours",
+          "unit": "hr",
+          "source": "calculator",
+          "from": "Die Build"
+        },
+        {
+          "name": "Machining Hours",
+          "unit": "hr",
+          "source": "calculator",
+          "from": "Die Build"
+        },
+        {
+          "name": "Assembly Hours",
+          "unit": "hr",
+          "source": "calculator",
+          "from": "Die Build"
+        },
+        {
+          "name": "H13 Price",
+          "unit": "USD/kg",
+          "source": "lookup",
+          "table": "digital_factory_tool_materials_usa",
+          "column": "materialCostUsdPerKg"
+        },
+        {
+          "name": "Heat Treat Cost per kg",
+          "unit": "USD/kg",
+          "source": "variable",
+          "column": "stdHeatTreatCostPerMass"
+        },
+        {
+          "name": "Heat Treat Calibration",
+          "unit": null,
+          "source": "variable",
+          "column": "compHeatTreatCost"
+        },
+        {
+          "name": "Design Rate",
+          "unit": "USD/hr",
+          "source": "lookup",
+          "table": "digital_factory_settings_usa",
+          "column": "designRateUsdPerHr"
+        },
+        {
+          "name": "Machining Rate",
+          "unit": "USD/hr",
+          "source": "lookup",
+          "table": "digital_factory_settings_usa",
+          "column": "machiningRateUsdPerHr"
+        },
+        {
+          "name": "Assembly Rate",
+          "unit": "USD/hr",
+          "source": "lookup",
+          "table": "digital_factory_settings_usa",
+          "column": "assemblyRateUsdPerHr"
+        },
+        {
+          "name": "Tuning",
+          "unit": null,
+          "source": "variable",
+          "column": "percentTuning"
+        },
+        {
+          "name": "SG and A",
+          "unit": null,
+          "source": "variable",
+          "column": "percentSGandA"
+        },
+        {
+          "name": "Profit",
+          "unit": null,
+          "source": "variable",
+          "column": "percentProfit"
+        },
+        {
+          "name": "Steel Cost",
+          "unit": "USD",
+          "formula": "{Total Steel Weight} * {H13 Price}"
+        },
+        {
+          "name": "Heat Treat Cost",
+          "unit": "USD",
+          "formula": "{Total Steel Weight} * {Heat Treat Cost per kg} * {Heat Treat Calibration}"
+        },
+        {
+          "name": "Labour Cost",
+          "unit": "USD",
+          "formula": "{Design Hours} * {Design Rate} + {Machining Hours} * {Machining Rate} + {Assembly Hours} * {Assembly Rate}"
+        },
+        {
+          "name": "Markup",
+          "unit": null,
+          "formula": "1 + {Tuning} + {SG and A} + {Profit}"
+        },
+        {
+          "name": "Die Cost",
+          "unit": "USD",
+          "formula": "({Steel Cost} + {Heat Treat Cost} + {Component Cost} + {Labour Cost}) * {Markup}"
+        },
+        {
+          "name": "Replacement Die Cost",
+          "unit": "USD",
+          "formula": "{Die Cost} - {Design Hours} * {Design Rate} * {Markup}"
+        }
+      ]
+    },
+    {
+      "name": "Die Casting - Die Life",
+      "key": "Die Life",
+      "category": "tooling",
+      "output": "Tooling per Part",
+      "description": "Dies the production needs (lifetime shots / tblToolLife shots per die) and the tooling per part: a replacement die reuses the design.",
+      "fields": [
+        {
+          "name": "Die Cost",
+          "unit": "USD",
+          "source": "calculator",
+          "from": "Die Cost"
+        },
+        {
+          "name": "Replacement Die Cost",
+          "unit": "USD",
+          "source": "calculator",
+          "from": "Die Cost"
+        },
+        {
+          "name": "Shots per Die",
+          "unit": null,
+          "source": "lookup",
+          "table": "tblToolLife",
+          "column": "Num Shots Per Tool",
+          "alsoTables": [
+            "variables"
+          ],
+          "alsoColumns": [
+            "defaultToolLife"
+          ]
+        },
+        {
+          "name": "Annual Volume",
+          "unit": null,
+          "source": "bom"
+        },
+        {
+          "name": "Production Life",
+          "unit": "yr",
+          "source": "bom"
+        },
+        {
+          "name": "Cavities",
+          "unit": null,
+          "source": "engine"
+        },
+        {
+          "name": "Lifetime Parts",
+          "unit": null,
+          "formula": "{Annual Volume} * {Production Life}"
+        },
+        {
+          "name": "Dies Required",
+          "unit": null,
+          "formula": "max(1, ceil({Lifetime Parts} / {Cavities} / {Shots per Die}))"
+        },
+        {
+          "name": "Total Tooling",
+          "unit": "USD",
+          "formula": "{Die Cost} + ({Dies Required} - 1) * {Replacement Die Cost}"
+        },
+        {
+          "name": "Tooling per Part",
+          "unit": "USD",
+          "formula": "{Total Tooling} / {Lifetime Parts}"
+        }
+      ]
+    },
+    {
+      "name": "Die Casting - Corebox",
+      "key": "Corebox",
+      "category": "tooling",
+      "output": "Corebox per Part",
+      "description": "Coreboxes for the sand cores: each makes Refurb Life x (Refurbs Per Tool + 1) cores (coreboxMaterial), one box per core for the production, at the One Cavity Cost.",
+      "fields": [
+        {
+          "name": "Core Count",
+          "unit": null,
+          "source": "cad"
+        },
+        {
+          "name": "Refurb Life",
+          "unit": null,
+          "source": "lookup",
+          "table": "coreboxMaterial",
+          "column": "Corebox Refurb Life"
+        },
+        {
+          "name": "Refurbs per Tool",
+          "unit": null,
+          "source": "lookup",
+          "table": "coreboxMaterial",
+          "column": "Corebox Refurbs Per Tool"
+        },
+        {
+          "name": "One Cavity Cost",
+          "unit": "USD",
+          "source": "lookup",
+          "table": "coreboxMaterial",
+          "column": "One Cavity Cost (USD)"
+        },
+        {
+          "name": "Annual Volume",
+          "unit": null,
+          "source": "bom"
+        },
+        {
+          "name": "Production Life",
+          "unit": "yr",
+          "source": "bom"
+        },
+        {
+          "name": "Lifetime Parts",
+          "unit": null,
+          "formula": "{Annual Volume} * {Production Life}"
+        },
+        {
+          "name": "Cores per Box",
+          "unit": null,
+          "formula": "{Refurb Life} * ({Refurbs per Tool} + 1)"
+        },
+        {
+          "name": "Boxes",
+          "unit": null,
+          "formula": "max(1, ceil({Lifetime Parts} / {Cores per Box})) * {Core Count}"
+        },
+        {
+          "name": "Corebox Cost",
+          "unit": "USD",
+          "formula": "{Boxes} * {One Cavity Cost}"
+        },
+        {
+          "name": "Corebox per Part",
+          "unit": "USD",
+          "formula": "{Corebox Cost} / {Lifetime Parts}"
+        }
+      ]
+    }
+  ]
+}

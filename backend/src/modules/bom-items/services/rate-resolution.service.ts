@@ -40,7 +40,7 @@ export const MHR_RATE_MACHINE_CLASSES: readonly MachineClass[] = [
   '3_axis_mill', '4_axis_mill', '5_axis_mill',
   '2_axis_lathe', '3_axis_lathe', '2_axis_bar_feed_lathe_with_sub_spindle', '3_axis_bar_feed_lathe_with_sub_spindle',
   'injection_molding', 'compression_molding', 'structural_foam_molding', 'reaction_injection_molding', 'drill_press', 'pem_press', 'hole_forming',
-  'gun_drill', 'deep_bore_machine', 'manual_deburr', 'cylindrical_grinder', 'jig_bore', 'jig_grind', 'internal_grinder', 'broach', 'machining_millturn', 'wire_edm', 'hob_machine', 'simultaneous_turning',
+  'gun_drill', 'deep_bore_machine', 'manual_deburr', 'manual_bench_cell', 'cylindrical_grinder', 'jig_bore', 'jig_grind', 'internal_grinder', 'broach', 'machining_millturn', 'wire_edm', 'hob_machine', 'simultaneous_turning',
   'machining_inspection', 'special_inspection',
 ];
 
@@ -119,6 +119,8 @@ export class RateResolutionService {
     gunDrill: MHRRateInput;
     deepBoreMachine: MHRRateInput;
     manualDeburr: MHRRateInput;
+    /** Bench Operation (memory/Machining), class manual_bench_cell. */
+    manualBenchCell: MHRRateInput;
     cylindricalGrinder: MHRRateInput;
     jigBore: MHRRateInput;
     jigGrind: MHRRateInput;
@@ -285,6 +287,7 @@ export class RateResolutionService {
       gunDrill:         get('gun_drill'),
       deepBoreMachine:  get('deep_bore_machine'),
       manualDeburr:     get('manual_deburr'),
+      manualBenchCell:  get('manual_bench_cell'),
       cylindricalGrinder: get('cylindrical_grinder'),
       jigBore:          get('jig_bore'),
       jigGrind:         get('jig_grind'),

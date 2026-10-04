@@ -24,14 +24,7 @@ from OCC.Core.BRepAdaptor import BRepAdaptor_Surface  # type: ignore
 from OCC.Core.BRepGProp import brepgprop  # type: ignore
 from OCC.Core.GeomAbs import GeomAbs_Plane  # type: ignore
 from OCC.Core.GProp import GProp_GProps  # type: ignore
-from OCC.Core.TopAbs import TopAbs_EDGE, TopAbs_FACE  # type: ignore
-from OCC.Core.TopExp import TopExp_Explorer, topexp  # type: ignore
-from OCC.Core.TopoDS import topods  # type: ignore
-from OCC.Core.TopTools import (  # type: ignore
-    TopTools_IndexedDataMapOfShapeListOfShape,
-    TopTools_IndexedMapOfShape,
-    TopTools_ListIteratorOfListOfShape,
-)
+from shared.face_adjacency import build_edge_face_adjacency
 
 
 def _face_area_mm2(face: Any) -> float:
@@ -41,40 +34,10 @@ def _face_area_mm2(face: Any) -> float:
 
 
 def _build_edge_face_adjacency(shape: Any) -> Tuple[List[Any], Dict[int, set]]:
-    """
-    Real, standard OCC adjacency: for every face, which OTHER faces share an
-    edge with it. Same underlying technique memory_optimizer.py already uses
-    for hole-rim detection (TopExp.MapShapesAndAncestors, EDGE -> FACE),
-    generalized here to the whole shape rather than filtered to hole
-    cylinders only.
-    """
-    faces: List[Any] = []
-    exp = TopExp_Explorer(shape, TopAbs_FACE)
-    while exp.More():
-        faces.append(topods.Face(exp.Current()))
-        exp.Next()
-
-    edge_face_map = TopTools_IndexedDataMapOfShapeListOfShape()
-    topexp.MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, edge_face_map)
-    face_indexed = TopTools_IndexedMapOfShape()
-    for f in faces:
-        face_indexed.Add(f)
-
-    adjacency: Dict[int, set] = {i: set() for i in range(len(faces))}
-    for i in range(1, edge_face_map.Size() + 1):
-        adj_list = edge_face_map.FindFromIndex(i)
-        it = TopTools_ListIteratorOfListOfShape(adj_list)
-        touching = []
-        while it.More():
-            fi = face_indexed.FindIndex(it.Value()) - 1
-            if fi >= 0:
-                touching.append(fi)
-            it.Next()
-        for a in touching:
-            for b in touching:
-                if a != b:
-                    adjacency[a].add(b)
-    return faces, adjacency
+    """Thin wrapper over shared/face_adjacency.py (extracted 2026-10, Die
+    Casting Phase 1 prerequisite refactor) -- byte-identical behavior, kept
+    here so every existing call site in this module is unchanged."""
+    return build_edge_face_adjacency(shape)
 
 
 def compute_bend_flange_relationships(

@@ -37,7 +37,7 @@ from OCC.Core.BRep import BRep_Tool  # type: ignore
 from OCC.Core.TopLoc import TopLoc_Location  # type: ignore
 from OCC.Core.Standard import Standard_Failure  # type: ignore
 
-from shared.part_family import MILLED, PLASTIC_MOLDED, SHEET_METAL
+from shared.part_family import ALL_FAMILIES, CASTING_FAMILY_DOMAIN, MILLED, PLASTIC_MOLDED, SHEET_METAL
 
 logger = logging.getLogger(__name__)
 
@@ -294,17 +294,30 @@ class AdvancedCADMemoryOptimizer:
         strategy: str = "balanced",
         force_reanalysis: bool = False,
         user_processes: Optional[List[Any]] = None,
-        file_hash: Optional[str] = None
+        file_hash: Optional[str] = None,
+        family_hint: str = "",
     ) -> OptimizationResult:
         """
         Comprehensive geometry analysis and memory optimization
-        
+
         Args:
             shape: OpenCascade TopoDS_Shape
             file_path: Original file path for caching
             strategy: Optimization strategy (aggressive/balanced/conservative)
             force_reanalysis: Force re-analysis even if cached
-            
+            family_hint: an explicit, honestly-disclosed manual override (the
+                Create BOM Item process dropdown, for when the real geometric
+                classifier below gets a part wrong or a user wants to force a
+                specific family for testing). When it is one of the real
+                platform families (shared.part_family.ALL_FAMILIES), it
+                short-circuits detect_part_family's own result before any of
+                its sheet-metal/plastic-molded veto logic runs -- this is the
+                only path that ever reaches 'die_cast' today, since no
+                automatic geometric die-cast classifier exists yet (building
+                one is itself a routing-adjacent inference, deliberately
+                deferred). Any other/unrecognized value is ignored and the
+                real classifier chain runs unchanged.
+
         Returns:
             Complete optimization result with geometry features, DFM analysis, and memory metrics
         """
@@ -318,7 +331,7 @@ class AdvancedCADMemoryOptimizer:
             raise ValueError("analyze_and_optimize received a null/empty TopoDS_Shape -- the STEP file likely failed to parse into valid geometry")
         try:
             # Generate geometry hash for caching
-            geometry_hash = self._calculate_geometry_hash(shape, file_path, file_hash)
+            geometry_hash = self._calculate_geometry_hash(shape, file_path, file_hash, family_hint)
 
             # Check cache first (unless forced reanalysis)
             if not force_reanalysis and geometry_hash in self.optimization_cache:
@@ -349,7 +362,7 @@ class AdvancedCADMemoryOptimizer:
             
             with self._lock:
                 # Step 1: Advanced geometry analysis
-                geometry_features = self._analyze_geometry_advanced(shape)
+                geometry_features = self._analyze_geometry_advanced(shape, family_hint=family_hint)
                 
                 # Step 2: Memory optimization
                 memory_metrics = self._optimize_memory_advanced(shape, geometry_features, strategy)
@@ -396,7 +409,7 @@ class AdvancedCADMemoryOptimizer:
             logger.error(f"Optimization failed: {str(e)}", exc_info=True)
             raise
 
-    def _analyze_geometry_advanced(self, shape: TopoDS_Shape) -> GeometryFeatures:
+    def _analyze_geometry_advanced(self, shape: TopoDS_Shape, family_hint: str = "") -> GeometryFeatures:
         """
         Advanced geometry analysis — real measurements, no simulated values.
         Fixes GProp_GProps_MomentOfInertia by using gp_Ax1 (axis) not gp_Pnt.
@@ -405,33 +418,15 @@ class AdvancedCADMemoryOptimizer:
 
         from OCC.Core.gp import gp_Ax1, gp_Dir # type: ignore
 
-        volume_props = GProp_GProps()
-        surface_props = GProp_GProps()
-
-        brepgprop.VolumeProperties(shape, volume_props)
-        brepgprop.SurfaceProperties(shape, surface_props)
-
-        volume = max(volume_props.Mass(), 0.0)
-        surface_area = max(surface_props.Mass(), 0.0)
-
-        # Bounding box
-        bbox = Bnd_Box()
-        brepbndlib.Add(shape, bbox)
-        xmin, ymin, zmin, xmax, ymax, zmax = bbox.Get()
-
-        # Sort dimensions so length >= width >= height regardless of STEP axis orientation.
-        # A sheet-metal part lying on any axis will always have height = thinnest dim.
-        _extents = sorted([
-            round(xmax - xmin, 4),
-            round(ymax - ymin, 4),
-            round(zmax - zmin, 4),
-        ], reverse=True)
-        bounding_box = {
-            'length':   _extents[0],
-            'width':    _extents[1],
-            'height':   _extents[2],
-            'diagonal': round(((xmax-xmin)**2 + (ymax-ymin)**2 + (zmax-zmin)**2)**0.5, 4)
-        }
+        # Volume, surface area and the sorted bounding box: the one shared
+        # measurement (shared/solid_measures.py), also served alone by
+        # POST /measure/geometry, so both report the same numbers.
+        from shared.solid_measures import measure_solid
+        measured = measure_solid(shape)
+        volume_props = measured["volume_props"]
+        volume = measured["volume"]
+        surface_area = measured["surface_area"]
+        bounding_box = measured["bounding_box"]
 
         # Centre of gravity (safe — no crash)
         cog = volume_props.CentreOfMass()
@@ -458,7 +453,7 @@ class AdvancedCADMemoryOptimizer:
         feature_count = self._count_topological_features(shape)
         complexity_score = self._calculate_complexity_score(shape, feature_count, volume, surface_area)
         manufacturing_features = self._analyze_manufacturing_features(
-            shape, bounding_box, volume_mm3=round(float(volume), 4)
+            shape, bounding_box, volume_mm3=round(float(volume), 4), family_hint=family_hint
         )
 
         return GeometryFeatures(
@@ -471,7 +466,7 @@ class AdvancedCADMemoryOptimizer:
             manufacturing_features=manufacturing_features
         )
 
-    def _analyze_manufacturing_features(self, shape: TopoDS_Shape, bounding_box: dict, volume_mm3: float = 0.0) -> dict:
+    def _analyze_manufacturing_features(self, shape: TopoDS_Shape, bounding_box: dict, volume_mm3: float = 0.0, family_hint: str = "") -> dict:
         """Real manufacturing feature analysis using OpenCASCADE topology."""
         # Mesh the shape before any topology queries so BRep_Tool.Triangulation returns
         # face data for face_map.  Same deflection params as ShapeMesher in services.py
@@ -558,6 +553,18 @@ class AdvancedCADMemoryOptimizer:
                 # back to pocket_count when draft isn't available.
                 volume_mm3=volume_mm3,
             )
+
+            # Manual family override (see analyze_and_optimize's own docstring)
+            # -- short-circuits BEFORE any veto logic below runs, so the real
+            # sheet-metal/plastic-molded classifier chain is never consulted
+            # or regressed for a part the user explicitly flagged. Only a
+            # real platform family is honored; any other string (typo, stale
+            # client, unrecognized value) is silently ignored rather than
+            # faked into a family that doesn't exist.
+            if family_hint and family_hint in ALL_FAMILIES:
+                detected_family = family_hint
+                family_confidence = 1.0
+                classification_reasons = [f"manual family_hint={family_hint} (user override via Create BOM Item process dropdown)"]
 
             # ── Post-classification SMF cross-check ───────────────────────────
             # When the classifier returns milled but the fill ratio is very
@@ -697,6 +704,19 @@ class AdvancedCADMemoryOptimizer:
                     pocket_count=pocket_count,
                     face_map=holes.get('face_map', []),
                     face_map_tri_total=holes.get('face_map_tri_total', 0),
+                )
+            elif detected_family in CASTING_FAMILY_DOMAIN:
+                # One casting extractor for every casting process; the
+                # process's own catalog decides which feature types exist.
+                from die_casting.feature_extractor import DieCastingFeatureExtractor  # type: ignore
+                dc_extractor = DieCastingFeatureExtractor()
+                manufacturing_intelligence['features'] = dc_extractor.extract(
+                    shape, dims_list,
+                    raw_cylinders_full=holes.get('raw_cylinders_full'),
+                    bbox_minmax=bbox_minmax,
+                    face_map=holes.get('face_map', []),
+                    face_map_tri_total=holes.get('face_map_tri_total', 0),
+                    domain=CASTING_FAMILY_DOMAIN[detected_family],
                 )
             # holes= here is the coarse _detect_holes_real count (a classification
             # signal only — may include bend-radius cylinder faces; see that
@@ -1255,23 +1275,29 @@ class AdvancedCADMemoryOptimizer:
     # PRIVATE HELPER METHODS
     # ============================================================================
 
-    def _calculate_geometry_hash(self, shape: TopoDS_Shape, file_path: Optional[str] = None, file_hash: Optional[str] = None) -> str:
+    def _calculate_geometry_hash(self, shape: TopoDS_Shape, file_path: Optional[str] = None, file_hash: Optional[str] = None, family_hint: str = "") -> str:
         """Generate unique hash for geometry caching"""
         hasher = hashlib.sha256()
-        
+
         # Use content file_hash if provided, otherwise fallback to path heuristics
         if file_hash:
             hasher.update(file_hash.encode())
         elif file_path and os.path.exists(file_path):
             hasher.update(file_path.encode())
             hasher.update(str(os.path.getmtime(file_path)).encode())
-        
+
         # Add shape topology information
         feature_count = self._count_topological_features(shape)
         hasher.update(json.dumps(feature_count, sort_keys=True).encode())
 
         # Salt with extraction logic version so algorithm changes auto-invalidate
         hasher.update(self.CACHE_VERSION.encode())
+
+        # Salt with family_hint: the SAME geometry analyzed once with the Die
+        # Casting Phase 1 manual override and once without it must never share
+        # a cache entry -- they run genuinely different extraction logic
+        # (DieCastingFeatureExtractor vs. the real classifier chain).
+        hasher.update(family_hint.encode())
 
         return hasher.hexdigest()
 

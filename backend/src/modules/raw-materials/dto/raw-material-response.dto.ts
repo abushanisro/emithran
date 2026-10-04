@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class RawMaterialResponseDto {
   @ApiProperty()
@@ -12,6 +12,10 @@ export class RawMaterialResponseDto {
 
   @ApiProperty({ required: false })
   materialGrade?: string;
+  description?: string;
+
+  @ApiProperty({ required: false, description: 'List only: how many stock forms have a price in the USA' })
+  stockFormsPriced?: number;
 
   @ApiProperty({ required: false })
   materialType?: string;
@@ -199,10 +203,11 @@ export class RawMaterialResponseDto {
     return {
       id: row.id,
       materialGroup: row.material_group,
-      material: row.material,
-      materialGrade: row.material_grade,
+      material: row.grade,
+      materialGrade: row.name,
       materialType: row.material_type,
       materialDescription: row.material_description,
+      description: row.description,
       densityKgM3: row.density_kg_m3 ? parseFloat(row.density_kg_m3) : undefined,
       cost: costValue ? parseFloat(String(costValue)) : undefined,
       unitCost: costValue ? parseFloat(String(costValue)) : undefined,
@@ -264,4 +269,10 @@ export class RawMaterialListResponseDto {
 
   @ApiProperty()
   total: number;
+
+  // Set when the list was asked for one process group: the material groups it
+  // was limited to. Empty when that process group has no material group linked
+  // (the list is then the whole database, and the UI says so).
+  @ApiPropertyOptional({ type: [String] })
+  processMaterialGroups?: string[];
 }

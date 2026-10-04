@@ -454,13 +454,31 @@ function sleep(ms: number): Promise<void> {
 // HTTP request open (fragile across proxies/timeouts) by returning the same
 // Promise<AutoFillResponse> shape callers already expect, with polling hidden
 // inside.
-export async function analyzeForAutoFill(file: File): Promise<AutoFillResponse> {
-  const key = `${file.name}:${file.size}`;
+/** What a dropped model gives before its process is known (backend measure-for-autofill). */
+export interface MeasureResponse {
+  suggestions: { name: string; partNumber: string };
+  geometry: { volume: number; surfaceArea: number; boundingBox: { length: number; width: number; height: number } };
+}
+
+/** Measure a 3D model (volume, surface area, bounding box) with no process: no classification, no features. */
+export async function measureForAutoFill(file: File): Promise<MeasureResponse> {
+  const form = new FormData();
+  form.append('file', file);
+  return apiClient.uploadFiles<MeasureResponse>('/bom-items/measure-for-autofill', form);
+}
+
+export async function analyzeForAutoFill(file: File, familyHint?: string): Promise<AutoFillResponse> {
+  // familyHint is part of the dedup key: the same file re-analyzed under a
+  // different manual process override (Create BOM Item's process dropdown)
+  // must not return the stale in-flight/previous promise for the unhinted
+  // (or differently-hinted) request.
+  const key = `${file.name}:${file.size}:${familyHint ?? ''}`;
   const existing = _analyzeInFlight.get(key);
   if (existing) return existing;
 
   const form = new FormData();
   form.append('file', file);
+  if (familyHint) form.append('familyHint', familyHint);
   const promise = (async () => {
     const { jobId } = await apiClient.uploadFiles<{ jobId: string }>('/bom-items/analyze-for-autofill/start', form);
     if (!jobId) throw new Error('No job started for auto-fill analysis');
@@ -660,6 +678,8 @@ export interface FeatureOp {
   count: number;
   /** feature_graph_v2 ids of the exact features this entry machines (machining). */
   featureIds?: string[];
+  /** Exact occurrences this entry machines (feature_graph_v2 entry id + occurrence index). */
+  occurrenceRefs?: Array<{ featureId: string; occurrenceIndex: number }>;
 }
 
 export interface CalculationTraceStep {
@@ -764,6 +784,8 @@ export interface ProcessLineCost {
   /** 'mhr_machine_specific' = that machine's own LHR; 'no_lhr_rate' = none on file. */
   labourRateSource?: 'mhr_machine_specific' | 'no_lhr_rate' | null;
   machineSelection?: MachineSelectionResult;
+  /** Why this line runs on its machine (casting route engines): rule, criteria, every machine checked. */
+  machineChoice?: MachineChoiceDto;
   /** Real mhr_records id / 'bm-mhr-<id>' benchmark id for this line's resolved
    *  resource, set directly on classes (currently just Inspection) priced via
    *  a flat single-resource resolver instead of machineSelection's candidate
@@ -771,6 +793,13 @@ export interface ProcessLineCost {
   mhrId?: string | null;
   benchmarkMhrId?: string | null;
   featureBreakdown?: FeatureOp[];
+  /** Casting: the catalog operation each feature receives (operation null = undetermined). */
+  featureOperations?: Array<{
+    operation: string | null;
+    featureType: string;
+    instances: Array<{ label: string; featureId: string | null; occurrenceIndex: number }>;
+    reason: string;
+  }>;
   /** Sheet metal: the reference-catalog operations this step performs on the
    *  part's own CAD features (backend catalog-operation-resolver.ts). */
   catalogOperations?: CatalogOperation[];
@@ -917,6 +946,105 @@ export interface CostSummaryDto {
   blankSpec?: BlankSpecDto;
   /** Present only when family === 'plastic_molded' — see InjectionMoldingBreakdown. */
   injectionMolding?: InjectionMoldingBreakdown;
+  /** Present when a die-cast part reached the HPDC cavity step — see DieCastingBreakdown. */
+  dieCasting?: DieCastingBreakdown;
+  /** The die-casting die amortised over its life (USD, separate from the piece cost). */
+  dieTooling?: DieToolingDto;
+  /** Heat / surface / other secondary operations, shared by every family. See SecondaryOperationsDto. */
+  secondaryOperations?: SecondaryOperationsDto;
+  /** Coreboxes for gravity die casting sand cores (USD, separate from the piece cost). */
+  coreboxTooling?: { boxes: number; costUsd: number; perPartUsd: number | null; detail: string };
+  /** Which die-casting process (HPDC / GDC) this summary prices, with the other for comparison. */
+  dieCastingProcess?: DieCastingProcessChoiceDto;
+}
+
+/** Mirrors the backend's MachineChoiceDto (cost-breakdown.dto.ts). */
+export interface MachineChoiceDto {
+  rule: string;
+  criteria: string[];
+  chosen: string | null;
+  capableCount: number;
+  candidates: Array<{ name: string; status: 'chosen' | 'capable' | 'rejected'; perPartCost: number | null; reasons: string[] }>;
+}
+
+/** Mirrors the backend's SecondaryOptionDto (cost-breakdown.dto.ts). */
+export interface SecondaryOptionDto {
+  process: string;
+  status: 'costed' | 'not_applicable' | 'gap';
+  costPerPart: number | null;
+  reason: string;
+  fromDrawing: boolean;
+  selected: boolean;
+}
+
+/** Mirrors the backend's SecondaryOperationsDto (cost-breakdown.dto.ts). */
+export interface SecondaryOperationsDto {
+  source: 'scenario' | 'drawing';
+  heat: SecondaryOptionDto[];
+  surface: SecondaryOptionDto[];
+  other: SecondaryOptionDto[];
+  dataWarnings: string[];
+}
+
+/** Mirrors the backend's DieCastingProcessChoiceDto (cost-breakdown.dto.ts). */
+export interface DieCastingProcessChoiceDto {
+  chosen: string;
+  chosenBy: 'user' | 'auto' | 'none_feasible';
+  /** What each option total compares: piece + die per part, or piece cost alone when a die is not amortised. */
+  basis: 'piece_and_tooling' | 'piece_only';
+  options: Array<{
+    process: string;
+    feasible: boolean | null;
+    detail: string;
+    pieceCost: number | null;
+    toolingPerPart: number | null;
+    total: number | null;
+  }>;
+}
+
+/** Mirrors the backend's DieToolingDto (cost-breakdown.dto.ts). */
+export interface DieToolingDto {
+  ok: boolean;
+  reason: string | null;
+  dieSizeMm: [number, number, number] | null;
+  pressForceKn: number | null;
+  complexity: 'Simple' | 'Average' | 'Complex';
+  featureCount: number;
+  steelKg: number | null;
+  steelUsd: number | null;
+  designHr: number | null;
+  machiningHr: number | null;
+  assemblyHr: number | null;
+  ejectorPins: number | null;
+  ejectorPinsUsd: number | null;
+  labourUsd: number | null;
+  markupPct: number;
+  dieCostUsd: number | null;
+  shotsPerDie: number | null;
+  diesRequired: number | null;
+  totalToolingUsd: number | null;
+  perPartUsd: number | null;
+  trace: Array<{ label: string; value: string }>;
+}
+
+/** Mirrors the backend's DieCastingBreakdown (cost-breakdown.dto.ts). */
+export interface DieCastingBreakdown {
+  cavityCount: number;
+  /** 'user': set in the Cost Guide; 'default': defaultNumCavities; 'large_part': one cavity above largePartThreshold; 'unverified': no layout / not checkable. */
+  cavityConstrainedBy: 'user' | 'default' | 'large_part' | 'unverified';
+  /** layoutNumCav cavity counts. */
+  cavityLayouts: number[];
+  defaultCavityCount: number;
+  requiredClampKn: number | null;
+  shotVolumeMm3: number | null;
+  /** Metal per part (kg): charged = part x Yield Loss Factor; melted - part returns to the furnace. */
+  metal: {
+    partKg: number;
+    chargedKg: number;
+    yieldLossFactor: number | null;
+    meltedKg: number | null;
+    returnedKg: number | null;
+  };
 }
 
 /**

@@ -218,6 +218,11 @@ export class MachiningLookupService {
     return this.loadTable('tblOperationSizeRanges');
   }
 
+  // ── Part load / unload / reorientation by equipment, weight and size (componentLoadTime).
+  async getComponentLoadTime(): Promise<any[] | null> {
+    return this.loadTable('componentLoadTime');
+  }
+
   // ── Workholder install/remove times (tblInstallingTurningWorkholders).
   async getWorkholderTable(): Promise<any[] | null> {
     return this.loadTable('tblInstallingTurningWorkholders');

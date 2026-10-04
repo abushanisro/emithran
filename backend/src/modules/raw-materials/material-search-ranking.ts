@@ -362,8 +362,8 @@ export function rankableFromDbRow(row: Record<string, unknown>): RankableMateria
   const cost = [row.cost, row.cost_india, row.cost_usa].map(num).some((c) => c != null && c > 0);
   return {
     id: row.id as string,
-    material: (row.material as string | null) ?? null,
-    materialGrade: (row.material_grade as string | null) ?? null,
+    material: (row.grade as string | null) ?? null,
+    materialGrade: (row.name as string | null) ?? null,
     materialGroup: (row.material_group as string | null) ?? null,
     materialDescription: (row.material_description as string | null) ?? null,
     astmStandard: (row.astm_standard as string | null) ?? null,
