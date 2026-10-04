@@ -56,15 +56,17 @@ export class ExpandCandidatesTool {
   private async expandMaterials(client: any, q: string, args: any) {
     const { data, error } = await client
       .from('raw_materials')
-      .select('id, material_group, material, material_grade, density_kg_m3, cost, location, user_id')
-      .or(`material.ilike.%${q}%,material_grade.ilike.%${q}%,material_group.ilike.%${q}%`)
+      .select('id, material_group, grade, name, density_kg_m3, cost, location, user_id')
+      .or(`grade.ilike.%${q}%,name.ilike.%${q}%,material_group.ilike.%${q}%`)
       .limit(40);
     if (error) {
       this.logger.warn(`expand materials failed: ${error.message}`);
       return { added: [], kind: 'rawMaterial', nextStartId: 0 };
     }
     const seen = new Set(args.currentCandidates.rawMaterials.map((c: MaterialCandidate) => c.dbId));
-    const fresh = (data ?? []).filter((r: any) => !seen.has(r.id));
+    const fresh = (data ?? [])
+      .map((r: any) => ({ ...r, material: r.grade, material_grade: r.name }))
+      .filter((r: any) => !seen.has(r.id));
     const ranked = rankMaterials(fresh, args.family, q, args.orgLocation, 5);
     const startIdx = args.currentCandidates.rawMaterials.length + 1;
     const renumbered = ranked.map((c, i) => ({ ...c, candidateId: `rm-${startIdx + i}` }));

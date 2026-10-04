@@ -50,7 +50,9 @@ import {
   DollarSign,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { createBOMItem, updateBOMItem, analyzeForAutoFill, type AutoFillResponse } from '@/lib/api/hooks/useBOMItems';
+import { createBOMItem, updateBOMItem, analyzeForAutoFill, measureForAutoFill, type AutoFillResponse } from '@/lib/api/hooks/useBOMItems';
+import { familyToProcessGroupLabel, processGroupOptionsFrom, processGroupToFamilyHint, processesForMaterialGroups } from '@/lib/features/process-group';
+import { useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculatorMappings';
 import type { DrawingAnalysisResult } from '@/lib/api/vave';
 import { BOMItemType, ITEM_TYPE_LABELS } from '@/lib/types/bom.types';
 import { apiClient } from '@/lib/api/client';
@@ -116,7 +118,61 @@ interface PendingFile {
   status: 'pending' | 'analyzing' | 'ready' | 'error';
   result?: AutoFillResponse;
   error?: string;
+  // Manual process override — the SAME real process_group label shown in the
+  // Process field below (not a raw cad-engine family string); when set, it is
+  // mapped through processGroupToFamilyHint and re-analysis is forced to
+  // that family via cad-engine's family_hint instead of the real geometric
+  // classifier chain. Undefined = auto-detected.
+  familyOverride?: string | undefined;
 }
+
+// A chosen process group -> the cad-engine family_hint that runs its
+// extractor: processGroupToFamilyHint (lib/features/process-group.ts),
+// derived from the one shared family<->group table. A group with no CAD
+// extractor (Assembly, Forging, ...) can still be picked as the item's
+// Process; it sends no family_hint, so the real classifier chain runs.
+
+// The inverse of processGroupToFamilyHint, for displaying what the CAD
+// engine auto-detected (suggestions.familyClassification, always present
+// once any family was detected) as its real process_group label — NOT the
+// server's own suggestions.processType, which is gated on process_taxonomy's
+// roadmap_status='production' (resolveDbDrivenProcessLabel,
+// auto-fill.service.ts). Confirmed live: Machining's 43 real stations are
+// seeded roadmap_status='not_modeled' (migration 691 -- a real, disclosed
+// taxonomy-layer gap, separate from cost-cnc-engine.ts's own real, tested,
+// live-wired CNC costing), so processType is null for every milled/turned/
+// mill_turn part even though the CAD engine extracted it correctly --
+// that null was leaving this dropdown looking unset/broken for the single
+// most common family. Shared with the manufacturing-intelligence page's own
+// "Process Group" display (lib/features/process-group.ts) so the identical
+// classification never shows different text ("Milled" here vs "Machining"
+// there) in two different places.
+const familyToProcessLabel = familyToProcessGroupLabel;
+
+
+// Resolves the Process field's value when opening an EXISTING item to edit.
+// There is no persisted processType column at all (confirmed: absent from
+// both CreateBOMItemDto and UpdateBOMItemDto) — the real, persisted field is
+// familyClassification (bom_items.family_classification), which
+// bom-items.service.ts auto-derives from the saved featureGraph's own
+// classification.family on every create/update. Mapped through the same
+// FAMILY_HINT_TO_PROCESS_GROUP as a fresh analysis, so a reopened item shows
+// the same label it was created with, not a blank field.
+function resolveStoredProcessLabel(item: { familyClassification?: string } | null | undefined): string {
+  return familyToProcessLabel(item?.familyClassification) ?? '';
+}
+
+// Resolves what a dropdown should show as "currently selected" for a given
+// pending file: the manual override if one was set, else resolveProcessLabel
+// for its own result, else '' (shows the placeholder — no selectable
+// "Auto-detect" item; once a file is analyzed this always resolves to a real
+// process name, never a reset-to-auto state).
+function resolveProcessDropdownValue(pf: PendingFile): string {
+  // The process is chosen -- by the engineer, or from the material -- never
+  // taken from the CAD engine's own family guess (see handleFileDrop).
+  return pf.familyOverride ?? '';
+}
+
 
 // ─── Error Categorization ─────────────────────────────────────────────────────
 
@@ -389,6 +445,25 @@ export function BOMItemDialog({
       });
   }, [rawMaterialsData]);
 
+  // Process dropdown options — every real process_group heading from the
+  // same live process_taxonomy/process_calculator_mappings data the Process
+  // Catalog page itself reads (reused via this existing hook, which already
+  // auto-paginates past the backend's 1000-row page cap), never a hardcoded
+  // list. Not filtered to 'production'/active rows: the user wants the full
+  // catalog of primary manufacturing domains here, staged ones included.
+  //
+  // Three groups are deliberately excluded, not because they are inactive
+  // (several included groups are 100% inactive too, e.g. Die Casting, Sand
+  // Casting) but because they are cross-cutting secondary/post-processing
+  // steps common to every route regardless of which primary process was
+  // picked here, not a primary process choice themselves — they are applied
+  // separately (the real reference-data pipeline behind /secondary-processes).
+  const { data: processMappingsData } = useProcessCalculatorMappings();
+  const processGroupOptions = useMemo(
+    () => processGroupOptionsFrom(processMappingsData?.mappings),
+    [processMappingsData],
+  );
+
   // The server's result set for the (debounced) search term IS the match
   // set — the server already does real alias- and spelling-variant-aware
   // matching (material-search-spelling.ts: "aluminum"/"aluminium" etc, see
@@ -490,6 +565,19 @@ export function BOMItemDialog({
 
   const formDataRef = useRef(formData);
   formDataRef.current = formData; // keep ref in sync every render so async handlers see latest state
+
+  // Who set Process: the engineer ('user') or the chosen material ('material').
+  // A material only ever fills Process the engineer has not set themselves.
+  const [processSource, setProcessSource] = useState<'user' | 'material' | null>(null);
+  // Processes the chosen material belongs to when it is more than one: shown
+  // so the engineer picks (a sheet / bar grade serves Machining, Sheet Metal, ...).
+  const [materialProcessChoices, setMaterialProcessChoices] = useState<string[]>([]);
+  // process_material_groups (migration 879): which processes each material group serves.
+  const { data: processMaterialLinks } = useQuery<Array<{ processGroup: string; materialGroup: string }>>({
+    queryKey: ['process-material-groups'],
+    queryFn: () => apiClient.get('/raw-materials/process-material-groups'),
+    staleTime: 1000 * 60 * 30,
+  });
 
   useEffect(() => { itemRef.current = item; }, [item]);
 
@@ -642,10 +730,9 @@ export function BOMItemDialog({
       // Make/buy and item type are the engineer's decisions: nothing in the
       // CAD file states them, so they are never filled from it. (They used
       // to come from a volume-threshold rule: "assembly" above 10,000 cm3.)
-      if (!prev.processType && r.suggestions.processType) {
-        patch.processType = r.suggestions.processType;
-        filled.add('processType');
-      }
+      // Process is NOT filled from the analysis: the analysis runs only once a
+      // process is chosen (by the engineer, or from the material) and is
+      // forced to it, so the CAD engine's own family guess never decides it.
       if (!prev.holeCount && r.geometry.holeCount > 0) {
         patch.holeCount = r.geometry.holeCount;
         filled.add('holeCount');
@@ -683,9 +770,6 @@ export function BOMItemDialog({
     // so it gets no score (it used to get a fixed 0.9).
     setFieldConfidences(prev => {
       const next = { ...prev };
-      if (filled.has('processType') && r.suggestions.familyConfidence != null) {
-        next.processType = r.suggestions.familyConfidence;
-      }
       return next;
     });
     setAutoFilledFields(filled);
@@ -705,7 +789,12 @@ export function BOMItemDialog({
   const analyzeFile = useCallback(async (item: PendingFile, isFirst: boolean) => {
     updatePendingFileStatus(item.id, 'analyzing');
     try {
-      const result = await analyzeForAutoFill(item.file);
+      // familyOverride is a process_group label (what the dropdowns show) --
+      // map it to the raw family string cad-engine's family_hint actually
+      // honors. No mapping (a staged-only group like Sand Casting, or no
+      // override at all) sends no hint, so the real classifier chain runs.
+      const familyHint = processGroupToFamilyHint(item.familyOverride);
+      const result = await analyzeForAutoFill(item.file, familyHint);
       updatePendingFileResult(item.id, result);
       if (isFirst) {
         setActiveFileId(item.id);
@@ -722,6 +811,72 @@ export function BOMItemDialog({
       });
     }
   }, [updatePendingFileStatus, updatePendingFileResult, populateFormFromResult]);
+
+  // Process dropdown changed (from either its per-file control here, or the
+  // main Process field below — both call this) — re-analyze this file forced
+  // to the chosen process_group's family (or back to auto-detection) via
+  // cad-engine's family_hint. Used both when the import didn't classify the
+  // part at all and when the engineer disagrees with what it detected. Kept
+  // in sync with the main Process field so the two can never silently
+  // diverge (one saying "Die Casting", the other actually still extracting
+  // as whatever was auto-detected).
+  const handleFamilyOverrideChange = useCallback((pf: PendingFile, value: string) => {
+    // A request for this exact file is already in flight — ignore a second
+    // trigger (e.g. a double-fire from a fast double-click, or the main
+    // Process field and this file's own dropdown both reacting to the same
+    // selection) rather than stacking another /analyze-for-autofill call on
+    // top of one still running. Confirmed live: without this guard, a tight
+    // retry loop exhausted the CAD engine's own 10/min rate limit.
+    if (pf.status === 'analyzing') return;
+    // No-op if nothing actually changed (re-selecting the same value) — same
+    // reasoning, one fewer avoidable CAD engine call.
+    if (value === resolveProcessDropdownValue(pf)) return;
+    // No "Auto-detect" item exists any more -- every selectable value is a
+    // real process_group name.
+    const label = value;
+    const nextItem: PendingFile = { ...pf, familyOverride: label };
+    setPendingFiles(prev => prev.map(p => (p.id === pf.id ? nextItem : p)));
+    if (pf.id === activeFileId) {
+      setFormData(prevForm => ({ ...prevForm, processType: label ?? '' }));
+      setAutoFilledFields(prev => { const s = new Set(prev); s.delete('processType'); return s; });
+    }
+    void analyzeFile(nextItem, pf.id === activeFileId);
+  }, [analyzeFile, activeFileId]);
+
+  // One path for setting Process, whoever sets it: the active model (if any)
+  // is analysed for that process; otherwise the choice is just recorded.
+  // One Process for the dialog: every uploaded model is analysed for it.
+  const selectProcess = useCallback((value: string, source: 'user' | 'material') => {
+    setProcessSource(source);
+    setFormData(prev => ({ ...prev, processType: value }));
+    setAutoFilledFields(prev => { const s = new Set(prev); s.delete('processType'); return s; });
+    for (const pf of pendingFiles) {
+      if (!/\.(dxf|dwg)$/i.test(pf.file.name)) handleFamilyOverrideChange(pf, value);
+    }
+  }, [pendingFiles, handleFamilyOverrideChange]);
+
+  // The material groups each material name belongs to, from the same search
+  // result the Material dropdown lists (a name can sit in several groups).
+  const materialGroupsByName = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const m of rawMaterialsData?.items ?? []) {
+      const name = (m.materialName ?? m.material ?? '').trim();
+      if (!name || !m.materialGroup) continue;
+      (map.get(name) ?? map.set(name, new Set()).get(name)!).add(m.materialGroup);
+    }
+    return map;
+  }, [rawMaterialsData]);
+
+  // A chosen material decides Process when its groups serve exactly one
+  // process (a die-casting alloy -> Die Casting); several -> the engineer
+  // picks among them. Never overrides a Process the engineer set.
+  const applyMaterialProcess = useCallback((name: string) => {
+    const candidates = processesForMaterialGroups([...(materialGroupsByName.get(name) ?? [])], processMaterialLinks ?? [], processGroupOptions);
+    setMaterialProcessChoices(candidates.length > 1 ? candidates : []);
+    if (candidates.length !== 1 || processSource === 'user') return;
+    if (formDataRef.current.processType === candidates[0]) return;
+    selectProcess(candidates[0]!, 'material');
+  }, [materialGroupsByName, processMaterialLinks, processGroupOptions, processSource, selectProcess]);
 
   const handleFileDrop = useCallback(async (acceptedFiles: File[]) => {
     if (!acceptedFiles.length) return;
@@ -748,10 +903,44 @@ export function BOMItemDialog({
     if (modelFiles.length > 0) {
       if (isFirstBatch && modelFiles[0]) {
         setFormData(prev => ({ ...prev, file3d: modelFiles[0] ?? null }));
+        setActiveFileId(modelItems[0]!.id);
       }
-      await Promise.allSettled(
-        modelItems.map((item, i) => analyzeFile(item, isFirstBatch && i === 0))
-      );
+      // A model is analysed only for a known process: features differ by
+      // process (die casting cores and draft vs machining setups), and an
+      // unhinted analysis lets the CAD engine guess the family (Machining for
+      // any solid that is not sheet metal or plastic). With a process already
+      // chosen the files are analysed for it now; otherwise they wait until
+      // the engineer picks the process or a material that implies one.
+      // Measure the first model now: Name, Part Number and the physical
+      // properties do not depend on the process. (Weight follows from
+      // volume x the chosen material's density.)
+      if (isFirstBatch && modelFiles[0]) {
+        const first = modelFiles[0];
+        void measureForAutoFill(first).then((m) => {
+          const filled = new Set<string>();
+          setFormData(prev => {
+            const patch: Partial<typeof prev> = {};
+            if (!prev.name) { patch.name = m.suggestions.name; filled.add('name'); }
+            if (!prev.partNumber) { patch.partNumber = m.suggestions.partNumber; filled.add('partNumber'); }
+            if (!prev.volume && m.geometry.volume > 0) { patch.volume = m.geometry.volume; filled.add('volume'); }
+            if (!prev.surfaceArea && m.geometry.surfaceArea > 0) { patch.surfaceArea = m.geometry.surfaceArea; filled.add('surfaceArea'); }
+            if (!prev.maxLength && m.geometry.boundingBox.length > 0) { patch.maxLength = m.geometry.boundingBox.length; filled.add('maxLength'); }
+            if (!prev.maxWidth && m.geometry.boundingBox.width > 0) { patch.maxWidth = m.geometry.boundingBox.width; filled.add('maxWidth'); }
+            if (!prev.maxHeight && m.geometry.boundingBox.height > 0) { patch.maxHeight = m.geometry.boundingBox.height; filled.add('maxHeight'); }
+            return { ...prev, ...patch };
+          });
+          setFieldLineage(prev => { const next = { ...prev }; filled.forEach(f => { next[f] = { source: 'cad' }; }); return next; });
+          setAutoFilledFields(prev => new Set([...prev, ...filled]));
+        }).catch((e: any) => {
+          toast.error(`Could not measure ${first.name}`, { description: e?.message ?? 'Measurement failed', duration: 10000 });
+        });
+      }
+      const chosen = formDataRef.current.processType;
+      if (chosen) {
+        const hinted = modelItems.map((item) => ({ ...item, familyOverride: chosen }));
+        setPendingFiles(prev => prev.map(pf => hinted.find(h => h.id === pf.id) ?? pf));
+        await Promise.allSettled(hinted.map((item, i) => analyzeFile(item, isFirstBatch && i === 0)));
+      }
     }
   }, [pendingFiles.length, analyzeFile]);
 
@@ -830,7 +1019,7 @@ export function BOMItemDialog({
         cutLengthMm: (item as any).cutLengthMm || 0,
         pierceCount: (item as any).pierceCount || 0,
         flatPatternAreaMm2: (item as any).flatPatternAreaMm2 || 0,
-        processType: (item as any).processType || '',
+        processType: (item.scenarioOverrides?.['processGroup'] as string | undefined) || resolveStoredProcessLabel(item),
         materialSource: (item as any).materialSource || '',
         materialConfidence: (item as any).materialConfidence || 0,
         coating: (item as any).coating || '',
@@ -886,6 +1075,8 @@ export function BOMItemDialog({
       });
     }
     // Reset multi-file state whenever dialog opens fresh
+    setProcessSource(null);
+    setMaterialProcessChoices([]);
     setPendingFiles([]);
     setActiveFileId(null);
     setAutoFilledFields(new Set());
@@ -1195,6 +1386,13 @@ export function BOMItemDialog({
         });
       }
 
+      // The Process the user picked is the item's process group from here on
+      // (Cost Guide reads it back). There is no processType column, so it is
+      // stored in the existing scenario_overrides bag; null clears it.
+      await apiClient.patch(`/bom-items/${itemId}/scenario-overrides`, {
+        processGroup: formData.processType || null,
+      });
+
       const dxfPending = pendingFiles.find(pf => /\.(dxf|dwg)$/i.test(pf.file.name));
       if (formData.file2d || formData.file3d || dxfPending) {
         const formDataUpload = new FormData();
@@ -1342,6 +1540,10 @@ export function BOMItemDialog({
           surfaceArea: r.geometry.surfaceArea || undefined,
         };
         const newItem = await createBOMItem(payload);
+        const fileProcess = resolveProcessDropdownValue(pf);
+        if (fileProcess) {
+          await apiClient.patch(`/bom-items/${newItem.id}/scenario-overrides`, { processGroup: fileProcess });
+        }
 
         const uploadForm = new FormData();
         uploadForm.append('file3d', pf.file);
@@ -1485,14 +1687,9 @@ export function BOMItemDialog({
                         <span className="text-xs text-muted-foreground shrink-0">
                           {(pf.file.size / 1024 / 1024).toFixed(1)} MB
                         </span>
-                        {/\.(dxf|dwg)$/i.test(pf.file.name) ? (
+                        {/\.(dxf|dwg)$/i.test(pf.file.name) && (
                           <Badge variant="outline" className="text-xs shrink-0">DXF Drawing</Badge>
-                        ) : pf.result ? (
-                          /* Process family only. No material badge: nothing in the CAD
-                             file states a grade, so there is nothing here to show
-                             until the engineer picks one. */
-                          <Badge variant="secondary" className="text-xs shrink-0">{pf.result.suggestions.suggestedMachine ?? pf.result.suggestions.processType ?? 'Unclassified'}</Badge>
-                        ) : null}
+                        )}
                         {pf.status === 'error' && (
                           <span className="text-xs text-red-500 shrink-0 max-w-[100px] truncate" title={pf.error}>
                             {pf.error}
@@ -1560,16 +1757,48 @@ export function BOMItemDialog({
               </div>
             </div>
 
-            {/* Description */}
+            {/* Process + Material — side by side, Process first */}
+            <div className="grid grid-cols-2 gap-4">
+            {/* Process — auto-filled from the 3D model's CAD-detected family
+                when the import classified it; always editable so the
+                engineer can correct a wrong detection or choose manually
+                when no 3D model was uploaded or the import didn't classify
+                the part at all. The SAME options, selection, and sync as
+                the active file's own per-file dropdown above — changing
+                either one re-analyzes the active file with the matching
+                family_hint (processGroupToFamilyHint) so this label and
+                the actual CAD extraction can never silently disagree. */}
             <div className="grid gap-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                placeholder="Detailed description of the part..."
-                rows={2}
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              />
+              <Label htmlFor="processType" className="flex items-center">Process <AutoBadge field="processType" /></Label>
+              <Select
+                // Editing an existing item shows its real stored process
+                // name (populated into formData.processType by the item-load
+                // effect); no "Auto-detect" item exists any more — an empty
+                // value just shows the placeholder.
+                value={formData.processType || ''}
+                onValueChange={(value) => selectProcess(value, 'user')}
+                disabled={pendingFiles.find(pf => pf.id === activeFileId)?.status === 'analyzing'}
+              >
+                <SelectTrigger id="processType"><SelectValue placeholder="Select process…" /></SelectTrigger>
+                <SelectContent>
+                  {processGroupOptions.map((g) => (
+                    <SelectItem key={g} value={g}>{g}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!formData.processType && materialProcessChoices.length > 1 && (
+                <p className="text-xs text-muted-foreground">
+                  {formData.material} is used by {materialProcessChoices.join(', ')}: choose the process.
+                </p>
+              )}
+              {!formData.processType && pendingFiles.some(pf => pf.status === 'pending' && !/\.(dxf|dwg)$/i.test(pf.file.name)) && (
+                <p className="text-xs text-muted-foreground">
+                  The 3D model is analysed for the process: choose a material (it sets the process when it implies one) or the process.
+                </p>
+              )}
+              {processSource === 'material' && formData.processType && (
+                <p className="text-xs text-muted-foreground">Set from the material ({formData.material}).</p>
+              )}
             </div>
 
             {/* Material */}
@@ -1638,8 +1867,18 @@ export function BOMItemDialog({
                                   <div
                                     key={name}
                                     onClick={() => {
-                                      setFormData({ ...formData, material: name === formData.material ? '' : name, materialGrade: '' });
+                                      const picked = name === formData.material ? '' : name;
+                                      // A raw_materials row is a grade: it is the part's
+                                      // Material Grade, which costing, machining need and
+                                      // the item page all read. A typed custom value stays
+                                      // material only (not a verified grade).
+                                      setFormData({
+                                        ...formData, material: picked, materialGrade: picked,
+                                        ...(picked ? { materialSource: 'manual' } : {}),
+                                      });
                                       setMaterialOpen(false);
+                                      if (picked) applyMaterialProcess(picked);
+                                      else setMaterialProcessChoices([]);
                                     }}
                                     style={{ position: 'absolute', top: index * MATERIAL_ROW_HEIGHT_PX, left: 0, right: 0, height: MATERIAL_ROW_HEIGHT_PX }}
                                     className={`flex cursor-pointer items-center px-3 text-sm ${
@@ -1670,6 +1909,19 @@ export function BOMItemDialog({
                     </Command>
                   </PopoverContent>
                 </Popover>
+            </div>
+            </div>
+
+            {/* Description */}
+            <div className="grid gap-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                placeholder="Detailed description of the part..."
+                rows={2}
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              />
             </div>
 
             {/* 2D Drawing + Make/Buy — side by side */}

@@ -137,6 +137,23 @@
       "processGroup": "Sand Casting",
       "stagedBy": "853",
       "materialsTable": "raw_materials"
+    },
+    {
+      "key": "casting_investment",
+      "label": "Casting Investment",
+      "folder": "Casting Investment",
+      "sourceVersion": "2026-CastInvest",
+      "processGroup": "Casting Investment",
+      "stagedBy": "874",
+      "materialsTable": "raw_materials"
+    },
+    {
+      "key": "standards",
+      "label": "Standards",
+      "folder": "Standards",
+      "sourceVersion": "2026-Standards",
+      "processGroup": null,
+      "stagedBy": "880"
     }
   ]
 }

@@ -648,6 +648,9 @@ export class ProcessCostResponseDto {
   @ApiProperty({ description: 'Cycle time (seconds)', example: 80 })
   cycleTime: number;
 
+  @ApiProperty({ description: "'time': costed from setup and cycle time x rates; 'per_part': a per-part charge with no machine time (totalCostPerPart is the cost)", example: 'time' })
+  chargeBasis: 'time' | 'per_part';
+
   @ApiProperty({ description: 'Parts per cycle', example: 1 })
   partsPerCycle: number;
 
@@ -760,6 +763,7 @@ export class ProcessCostResponseDto {
       batchSize: parseFloat(row.batch_size) || 1,
       heads: parseFloat(row.heads) || 0,
       cycleTime: parseFloat(row.cycle_time) || 0,
+      chargeBasis: row.charge_basis === 'per_part' ? 'per_part' : 'time',
       partsPerCycle: parseFloat(row.parts_per_cycle) || 1,
       scrap: parseFloat(row.scrap) || 0,
       totalCostPerPart: parseFloat(row.total_cost_per_part) || 0,

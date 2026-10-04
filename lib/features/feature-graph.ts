@@ -34,3 +34,4 @@ export const isBend = (f: FeatureGraphEntryLike): boolean => f.feature_type === 
 
 /** The blank's cut boundary: outer perimeter plus every internal cut-out wall. */
 export const isBlankProfile = (f: FeatureGraphEntryLike): boolean => f.feature_type === 'Blank';
+

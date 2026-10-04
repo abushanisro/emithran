@@ -25,6 +25,7 @@ from sheet_metal.features.formed_feature import detect_formed_features, count_re
 from sheet_metal.features.lance import detect_lances, count_recognized as count_recognized_lances
 from sheet_metal.bend_relationships import compute_bend_flange_relationships
 from shared.stable_face_id import build_stable_face_id_map
+from shared.feature_extent import annotate_occurrence_extents
 from sheet_metal.feature_models import sheet_metal_feature
 
 logger = logging.getLogger(__name__)
@@ -620,6 +621,8 @@ class SheetMetalFeatureExtractor:
                         occ["source_face_stable_ids"] = [
                             stable_face_ids.get(fid) for fid in occ.get("face_ids", []) or []
                         ]
+                # Nominal size for ISO 286 grading of tolerances on non-hole features.
+                annotate_occurrence_extents(shape, v2_features)
 
                 feature_graph_v2 = {
                     "metadata": {

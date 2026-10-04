@@ -54,6 +54,7 @@ import { ExchangeRatesCard } from '@/components/features/process/ExchangeRatesCa
 import { useAuth } from '@/lib/providers/auth';
 import { adaptMappingsToProcessCatalogTree } from '@/lib/processCatalog/process-catalog-tree';
 import { hasOperationDetail } from '@/lib/processCatalog/operation-detail';
+import { catalogOperationTree, type CatalogOperationNode } from '@/lib/features/catalog-operation-tree';
 
 // Helper function to convert snake_case to camelCase
 const snakeToCamel = (str: string): string => {
@@ -1109,13 +1110,10 @@ export default function ProcessPage() {
                                         <div className="text-muted-foreground">aka: {op.taxonomy.aliases.join(', ')}</div>
                                       )}
                                       {op.taxonomy.operations.length > 0 && (
-                                        <div className="flex flex-wrap gap-1 pt-0.5">
-                                          {op.taxonomy.operations.map((fo, i) => (
-                                            <span key={i} className="rounded border border-border/60 bg-background px-1.5 py-0.5 text-[10px] text-foreground" title={fo.raw}>
-                                              {fo.operationCategory ?? '(bare)'}{fo.featureType ? ` // ${fo.featureType}` : ''}
-                                            </span>
-                                          ))}
-                                        </div>
+                                        // Catalog rows are paths (Operation//Feature[:Child...]);
+                                        // shown as a tree so a child operation sits under the
+                                        // feature it is done inside, once, instead of repeating.
+                                        <CatalogOperationList nodes={catalogOperationTree(op.taxonomy.operations)} />
                                       )}
                                     </div>
                                   )}
@@ -1560,5 +1558,24 @@ export default function ProcessPage() {
       </Dialog>
 
     </div >
+  );
+}
+
+function CatalogOperationList({ nodes }: { nodes: CatalogOperationNode[] }) {
+  return (
+    <ul className="space-y-0.5 pt-0.5">
+      {nodes.map((n) => (
+        <li key={`${n.operation ?? ''}//${n.featureType ?? ''}`}>
+          <span className="rounded border border-border/60 bg-background px-1.5 py-0.5 text-[10px] text-foreground">
+            {n.operation ?? '(bare)'}{n.featureType ? ` // ${n.featureType}` : ''}
+          </span>
+          {n.children.length > 0 && (
+            <div className="ml-3 mt-0.5 border-l border-border/60 pl-2">
+              <CatalogOperationList nodes={n.children} />
+            </div>
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }

@@ -133,3 +133,20 @@ describe('deriveMaterialUsage — sheet metal path is unchanged', () => {
     expect(isStockDrivenBlank(sheetBlank)).toBe(false);
   });
 });
+
+describe('deriveMaterialUsage -- die casting', () => {
+  it('records the part metal as net and the charged metal as gross, not the scrap allowance', () => {
+    // AA 3105 part, 144138 mm3 at 2720 kg/m3, charged with a 1.05 Yield Loss Factor.
+    const partKg = (144138.18 / 1e9) * 2720;
+    const r = deriveMaterialUsage({
+      blankSpec: null, isSheetMetal: false, engineGrossKg: 0.43, engineNetKg: null,
+      itemVolumeMm3: 144138.18, densityKgM3: 2720, cadWeightKg: null,
+      castingMetal: { partKg, chargedKg: partKg * 1.05 },
+    });
+    expect(r.source).toBe('casting_charge');
+    expect(r.netUsage).toBeCloseTo(partKg, 6);
+    expect(r.grossUsage).toBeCloseTo(partKg * 1.05, 6);
+    expect(r.scrapPct).toBeCloseTo((1 - 1 / 1.05) * 100, 2);
+    expect(r.scrapPct).not.toBe(FALLBACK_SCRAP_PCT);
+  });
+});

@@ -18,7 +18,8 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { RawMaterialsService } from './raw-materials.service';
 import { MaterialStockPricesService } from './services/material-stock-prices.service';
-import { UpsertMaterialStockPriceDto } from './dto/material-stock-price.dto';
+import { SaveRawMaterialEditorDto } from './dto/raw-material-editor.dto';
+import { RawMaterialEditorService } from './services/raw-material-editor.service';
 import { CreateRawMaterialDto, UpdateRawMaterialDto, QueryRawMaterialsDto } from './dto/raw-materials.dto';
 import { MaterialShape } from './constants/material-categories.constants';
 import { RawMaterialResponseDto, RawMaterialListResponseDto } from './dto/raw-material-response.dto';
@@ -37,6 +38,7 @@ export class RawMaterialsController {
   constructor(
     private readonly rawMaterialsService: RawMaterialsService,
     private readonly stockPricesService: MaterialStockPricesService,
+    private readonly editorService: RawMaterialEditorService,
   ) { }
 
   @Get('enhanced')
@@ -75,6 +77,14 @@ export class RawMaterialsController {
   @ApiResponse({ status: 200, description: 'Filter options retrieved successfully' })
   async getFilterOptions(@CurrentUser() user: User, @AccessToken() token: string) {
     return this.rawMaterialsService.getFilterOptions(user.id, token);
+  }
+
+  // Before @Get(':id'). Which processes each material group belongs to (migration
+  // 879): the Create BOM Item dialog derives the process from the chosen material.
+  @Get('process-material-groups')
+  @ApiOperation({ summary: 'Process group <-> material group links' })
+  async getProcessMaterialGroups(@AccessToken() token: string) {
+    return this.rawMaterialsService.processMaterialGroups(token);
   }
 
   // Must be declared before @Get(':id') so 'aliases' isn't swallowed as an :id param.
@@ -207,17 +217,25 @@ export class RawMaterialsController {
     return this.stockPricesService.listForMaterial(id, token);
   }
 
-  @Put(':id/stock-prices')
-  @ApiOperation({ summary: 'Add or change one stock price of a material' })
-  async upsertStockPrice(@Param('id') id: string, @Body() body: UpsertMaterialStockPriceDto, @AccessToken() token: string) {
-    return this.stockPricesService.upsertForMaterial(id, body, token);
-  }
 
   // Every property of one material (raw_material_properties, migration 855).
   @Get(':id/properties')
   @ApiOperation({ summary: 'Get every property of a raw material, with its unit and source' })
   async getProperties(@Param('id') id: string, @AccessToken() token: string) {
     return this.rawMaterialsService.getProperties(id, token);
+  }
+
+  // The edit form: one load, one save. See RawMaterialEditorService.
+  @Get(':id/editor')
+  @ApiOperation({ summary: 'Everything the edit form shows for one material, in one response' })
+  async getEditor(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string) {
+    return this.editorService.load(id, user.id, token);
+  }
+
+  @Put(':id/editor')
+  @ApiOperation({ summary: 'Save the edit form (core fields, property values, stock prices) in one transaction' })
+  async saveEditor(@Param('id') id: string, @Body() body: SaveRawMaterialEditorDto, @CurrentUser() user: User, @AccessToken() token: string) {
+    return this.editorService.save(id, body, user.id, token);
   }
 
   @Get(':id')

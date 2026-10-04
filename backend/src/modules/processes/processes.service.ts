@@ -5,6 +5,8 @@ import {
   variablesAsTable,
   MACHINING_REFERENCE_SOURCE_VERSION,
 } from '../bom-items/costing/machining/lookup/machining-lookup-tables';
+import { dieCastingLookupTableNames } from '../bom-items/costing/casting/calculators/die-casting-calculator-spec';
+import { castingMaterialsAsTable, castingTableQuery, castingVariablesAsTable, type CastingFlatTable } from '../bom-items/costing/casting/casting-lookup-tables';
 import * as ExcelJS from 'exceljs';
 import { REFERENCE_DOMAINS, REFERENCE_GROUP_DOMAIN, type ReferenceDomain } from './reference-domains';
 import { Logger } from '../../common/logger/logger.service';
@@ -250,6 +252,48 @@ export class ProcessesService {
    * field's source column) is placed last, the viewer's selectable value.
    * Only tables named by a machining calculator field are served.
    */
+  /**
+   * One reference table a calculator field of `domain` reads, in the same
+   * payload shape as getMachiningLookupTableByName. Only tables named by a
+   * calculator field of that domain are served.
+   */
+  async getReferenceLookupTableByName(domain: string, table: string, outputColumn: string | undefined): Promise<any> {
+    if (domain === 'machining') return this.getMachiningLookupTableByName(table, outputColumn);
+    if (domain !== 'die_casting') throw new BadRequestException(`"${domain}" has no reference calculators (machining, die_casting)`);
+    if (!dieCastingLookupTableNames().includes(table)) {
+      throw new BadRequestException(`"${table}" is not a die-casting calculator lookup table`);
+    }
+    const q = castingTableQuery(table);
+    const db = this.supabaseService.getPrivilegedClient('reference-data: machining_reference_data, public-read');
+    let flat: CastingFlatTable | { columns: string[]; rows: Array<Record<string, unknown>> };
+    if (q.category === 'variable') {
+      const { data, error } = await db.from('machining_reference_data').select('key, value, unit_type, notes')
+        .eq('category', 'variable').eq('source_version', q.sourceVersion).order('key');
+      if (error) throw new InternalServerErrorException(`Failed to read die-casting variables: ${error.message}`);
+      flat = castingVariablesAsTable(data ?? []);
+    } else if (q.category === 'material') {
+      const { data, error } = await db.from('machining_reference_data').select('raw')
+        .eq('category', 'material').eq('source_version', q.sourceVersion).order('key');
+      if (error) throw new InternalServerErrorException(`Failed to read die-casting alloys: ${error.message}`);
+      flat = castingMaterialsAsTable(data ?? []);
+    } else {
+      const { data, error } = await db.from('machining_reference_data').select('raw')
+        .eq('category', 'lookup_table').eq('source_version', q.sourceVersion).eq('key', q.key!).maybeSingle();
+      if (error) throw new InternalServerErrorException(`Failed to read ${table}: ${error.message}`);
+      if (!data) throw new NotFoundException(`${table} is not staged (source version ${q.sourceVersion})`);
+      flat = flattenMachiningLookupTable(table, data.raw);
+    }
+    const columns = outputColumn && flat.columns.includes(outputColumn)
+      ? [...flat.columns.filter((c) => c !== outputColumn), outputColumn]
+      : flat.columns;
+    return {
+      id: `die_casting:${table}`,
+      tableName: `${table} (die casting reference data)`,
+      columnDefinitions: columns.map((name) => ({ name, label: name })),
+      rows: flat.rows,
+    };
+  }
+
   async getMachiningLookupTableByName(table: string, outputColumn: string | undefined): Promise<any> {
     if (!machiningLookupTableNames().includes(table)) {
       throw new BadRequestException(`"${table}" is not a machining calculator lookup table`);

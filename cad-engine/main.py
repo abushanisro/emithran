@@ -537,6 +537,7 @@ async def analyze_geometry_advanced(
     strategy: str = Form("balanced"),
     force_reanalysis: bool = Form(False),
     user_processes: str = Form(""),
+    family_hint: str = Form(""),
     _auth: None = Security(require_api_key)
 ) -> Dict[str, Any]:
     """
@@ -547,6 +548,16 @@ async def analyze_geometry_advanced(
     analysis will evaluate each process against the actual part geometry and rank
     them by suitability. Format: [{"processName":"CNC Milling","processCategory":"Machining",
     "machineType":"VMC","cycleTimeMinutes":45,"setupTimeMinutes":30}, ...]
+
+    Accepts optional `family_hint` -- an explicit manual override (the
+    Create BOM Item process dropdown). Pass one of shared.part_family's real
+    platform families ("sheet_metal", "milled", "turned", "mill_turn",
+    "plastic_molded", "die_cast") to force that family's extractor instead of
+    the real geometric classifier chain -- this is the only way to reach
+    "die_cast" today, since no automatic die-cast classifier exists yet
+    (routing-adjacent inference, deliberately deferred). Any other value
+    (including the default "") is ignored and the real classifier chain
+    runs unchanged.
     """
     import json as _json
 
@@ -609,7 +620,8 @@ async def analyze_geometry_advanced(
                 strategy=strategy,
                 force_reanalysis=force_reanalysis,
                 user_processes=parsed_processes,
-                file_hash=file_hash
+                file_hash=file_hash,
+                family_hint=family_hint,
             )
 
             logger.info(f"Advanced analysis completed for {file.filename}")
@@ -675,6 +687,9 @@ async def analyze_geometry_advanced(
                             machining_features_result, (_bcx, _bcy, _bcz), _face_map, _total_tris,
                             stable_face_ids=_stable_face_ids,
                         )
+                        # Nominal size for ISO 286 grading of tolerances on non-hole features.
+                        from shared.feature_extent import annotate_occurrence_extents
+                        annotate_occurrence_extents(shape, machining_features_result["feature_graph_v2"]["features"])
                         logger.info(
                             f"[machining_fgv2] synthesised "
                             f"{len(machining_features_result['feature_graph_v2']['features'])} features"
@@ -821,6 +836,56 @@ class NestRequest(BaseModel):
     kerf_mm: float = 0.0
     edge_margin_mm: float = 2.0
     allowed_rotations_deg: Optional[list[float]] = None
+
+
+@app.post("/measure/geometry")
+@limiter.limit(f"{config.rate_limit_per_minute}/minute")
+async def measure_geometry(
+    request: Request,
+    file: UploadFile = File(...),
+    _auth: None = Security(require_api_key)
+) -> Dict[str, Any]:
+    """
+    The process-independent measurements of a solid only: volume (mm3),
+    surface area (mm2) and the sorted bounding box (mm). No family
+    classification and no feature extraction -- those need the part's process,
+    which the Create BOM Item dialog asks for first. Same reader and the same
+    measurement (shared/solid_measures.py) as /analyze/geometry.
+    """
+    from shared.solid_measures import measure_solid
+
+    file_validator: FileValidator = request.app.state.file_validator
+    step_path = None
+    try:
+        file_ext = Path(file.filename).suffix.lower()
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext, dir=config.temp_dir, mode="wb") as temp_step:
+            step_path = temp_step.name
+            temp_step.write(await file.read())
+            temp_step.flush()
+        try:
+            file_validator.validate_file(step_path, file.filename)
+        except FileValidationError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        if file_ext == '.sldprt':
+            try:
+                converted = sldprt_converter.convert(step_path, config.temp_dir)
+            except RuntimeError as e:
+                raise HTTPException(status_code=422, detail=str(e))
+            cleanup_files(step_path)
+            step_path = converted
+        try:
+            shape = StepReader().read(step_path)
+        except Exception as e:
+            raise HTTPException(status_code=422, detail=f"Failed to read STEP file: {str(e)}")
+        m = measure_solid(shape)
+        return {
+            "volume_mm3": round(float(m["volume"]), 4),
+            "surface_area_mm2": round(float(m["surface_area"]), 4),
+            "bounding_box": m["bounding_box"],
+        }
+    finally:
+        if step_path:
+            cleanup_files(step_path)
 
 
 @app.post("/nest")

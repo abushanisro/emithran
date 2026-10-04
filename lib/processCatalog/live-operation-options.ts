@@ -18,18 +18,31 @@ export interface LiveOperationLine {
   machineClass: string;
   cycleTimeMin: number;
   featureBreakdown?: ReadonlyArray<{ name: string }>;
+  /** Catalog operation per feature a forming line performs in one go (the
+   *  casting line: "As Cast" on SimpleHole x 3, ...). */
+  featureOperations?: ReadonlyArray<{ operation: string | null; featureType: string; instances: ReadonlyArray<unknown> }>;
 }
 
 export interface LiveOperationOption {
   value: string;
   label: string;
   detail: string | null;
+  /** The line's cycle time; 0 for a catalog operation of a multi-operation line
+   *  (the line's time belongs to the whole shot, not to one operation). */
   cycleTimeMin: number;
+  /** The live line this option belongs to (its engine name). */
+  lineProcess: string;
 }
 
-/** Operations of the live lines that run on one of `machineClasses`, one per line
- *  name, sorted by label. `featureTypeByOperation` adds the catalog feature type
- *  to a label ("Drilling // SimpleHole") when the catalog pairs one with it. */
+/** Operations of the live lines that run on one of `machineClasses`, sorted by
+ *  label. One per line name; `featureTypeByOperation` adds the catalog feature
+ *  type to a label ("Drilling // SimpleHole") when the catalog pairs one with it.
+ *
+ *  A line that performs several catalog operations at once (a die casting shot
+ *  forms every feature: "No Coring // SimpleHole", "As Cast // Void", ...)
+ *  offers each of those catalog operations, with its feature count, rather than
+ *  its process name (which would only repeat the Category). They share the
+ *  line's cost: the shot is one cycle, so no operation carries a time of its own. */
 export function liveOperationOptions(
   lines: readonly LiveOperationLine[],
   machineClasses: ReadonlySet<string>,
@@ -38,13 +51,23 @@ export function liveOperationOptions(
   const byValue = new Map<string, LiveOperationOption>();
   for (const line of lines) {
     if (!machineClasses.has(line.machineClass) || byValue.has(line.process)) continue;
-    const featureType = featureTypeByOperation.get(line.process);
     const features = (line.featureBreakdown ?? []).map((f) => f.name);
+    const detail = features.length > 0 ? features.join(', ') : null;
+    const catalogOps = catalogOperationsOf(line);
+    if (catalogOps.length > 0) {
+      for (const c of catalogOps) {
+        if (byValue.has(c.operation)) continue;
+        byValue.set(c.operation, { value: c.operation, label: `${c.operation} [${c.count}]`, detail, cycleTimeMin: 0, lineProcess: line.process });
+      }
+      continue;
+    }
+    const featureType = featureTypeByOperation.get(line.process);
     byValue.set(line.process, {
       value: line.process,
       label: featureType ? `${line.process} // ${featureType}` : line.process,
-      detail: features.length > 0 ? features.join(', ') : null,
+      detail,
       cycleTimeMin: line.cycleTimeMin,
+      lineProcess: line.process,
     });
   }
   return [...byValue.values()].sort((a, b) => a.label.localeCompare(b.label));
@@ -65,7 +88,23 @@ export function resolveSavedOperation(
   savedOperation: string,
   savedMachineClass: string,
 ): string {
-  if (!savedOperation || lines.some((l) => l.process === savedOperation)) return savedOperation;
+  if (!savedOperation) return savedOperation;
+  // A catalog operation of a multi-operation line is an operation as saved.
+  if (lines.some((l) => catalogOperationsOf(l).some((c) => c.operation === savedOperation))) return savedOperation;
+  // A multi-operation line's own process name is not one of its operations:
+  // nothing is pre-selected, the engineer picks the operation.
+  if (lines.some((l) => l.process === savedOperation && catalogOperationsOf(l).length > 0)) return '';
+  if (lines.some((l) => l.process === savedOperation)) return savedOperation;
   const onClass = new Set(lines.filter((l) => l.machineClass === savedMachineClass).map((l) => l.process));
   return onClass.size === 1 ? [...onClass][0]! : savedOperation;
+}
+
+/** "Op // Feature" with its instance count, for each catalog operation group of a line. */
+function catalogOperationsOf(line: LiveOperationLine): Array<{ operation: string; count: number }> {
+  const byOp = new Map<string, number>();
+  for (const f of line.featureOperations ?? []) {
+    const op = `${f.operation ?? 'Operation not determined'} // ${f.featureType}`;
+    byOp.set(op, (byOp.get(op) ?? 0) + f.instances.length);
+  }
+  return [...byOp].map(([operation, count]) => ({ operation, count }));
 }

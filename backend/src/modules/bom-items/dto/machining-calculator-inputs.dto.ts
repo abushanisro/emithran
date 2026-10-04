@@ -27,6 +27,13 @@ export class MachiningCalculatorInputsRequestDto {
   batchSize?: number;
 }
 
+export class CalculatorInputsRequestDto extends MachiningCalculatorInputsRequestDto {
+  @ApiPropertyOptional({ description: 'Which run of the calculator, when the part has several ("Slide 2"); the first otherwise' })
+  @IsOptional()
+  @IsString()
+  runKey?: string;
+}
+
 export interface MachiningCalculatorInputsDto {
   calculatorId: string;
   /** Catalog operation the calculator is mapped to ("Drilling", "Parting", ...). */

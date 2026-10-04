@@ -69,9 +69,9 @@ export class PlasticReferenceService {
   private async loadGpps(db: SupabaseClient): Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }> {
     const { data, error } = await db
       .from('raw_material_properties')
-      .select('property_key, value_num, raw_materials!inner(material)')
+      .select('property_key, value_num, raw_materials!inner(grade)')
       .eq('source_version', PLASTIC_REFERENCE_SOURCE_VERSION)
-      .eq('raw_materials.material', GPPS_SOURCE_NAME)
+      .eq('raw_materials.grade', GPPS_SOURCE_NAME)
       .in('property_key', Object.keys(GPPS_PROPERTY_NAMES));
     if (error) return { data: null, error };
     const row: Record<string, unknown> = {};

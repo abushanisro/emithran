@@ -103,9 +103,9 @@ export class RawMaterialCostService {
       const { data: mats } = await this.supabaseService
         .getUserClient(accessToken)
         .from('raw_materials')
-        .select('id, material')
+        .select('id, grade')
         .in('id', missingIds);
-      (mats || []).forEach(m => materialMap.set(String(m.id), m.material));
+      (mats || []).forEach(m => materialMap.set(String(m.id), m.grade));
     }
     const enriched = rows.map(r =>
       !r.material_name && r.material_id && materialMap.has(String(r.material_id))
@@ -151,10 +151,10 @@ export class RawMaterialCostService {
       const { data: mat } = await this.supabaseService
         .getClient(accessToken)
         .from('raw_materials')
-        .select('material')
+        .select('grade')
         .eq('id', String(row.material_id))
         .single();
-      if (mat?.material) row = { ...row, material_name: mat.material };
+      if (mat?.grade) row = { ...row, material_name: mat.grade };
     }
 
     // Recalculate to ensure fresh values
@@ -620,7 +620,7 @@ export class RawMaterialCostService {
       // e.g. "Steel," in a token would break .or() without quoting.
       const q = (t: string) => `"${t.replace(/"/g, '\\"')}"`;
       const orClause = (tokens.length > 1 ? tokens : [g])
-        .flatMap((t) => [`material_grade.ilike.%${q(t)}%`, `material.ilike.%${q(t)}%`])
+        .flatMap((t) => [`name.ilike.%${q(t)}%`, `grade.ilike.%${q(t)}%`])
         .join(',');
       const { data } = await this.supabaseService
         .getClient(accessToken)

@@ -14,6 +14,7 @@ import { Plus, Upload, Search, ArrowUpDown, Download, Trash2, AlertTriangle, Pen
 import {
   useRawMaterials,
   useRawMaterialFilterOptions,
+  useStockForms,
   useUploadRawMaterialsExcel,
   useCreateRawMaterial,
   useUpdateRawMaterial,
@@ -22,6 +23,7 @@ import {
   type RawMaterial,
 } from '@/lib/api/hooks/useRawMaterials';
 import { FerrousNonFerrousForm } from '@/components/features/raw-materials/FerrousNonFerrousForm';
+import { RawMaterialEditForm } from '@/components/features/raw-materials/RawMaterialEditForm';
 import { RawMaterialPropertiesDialog } from '@/components/features/raw-materials/RawMaterialPropertiesDialog';
 import { useMaterialFilters } from '@/lib/hooks/useMaterialFilters';
 import {
@@ -150,7 +152,9 @@ export default function RawMaterialsPage() {
       w_europe: material.costWEurope,
       e_europe: material.costEEurope,
     };
-    const cost = costMap[costRegion] ?? material.unitCost ?? material.cost;
+    // Every row shows the selected region's cost field. No fallback to the legacy cost columns,
+    // which are a different source and made the column mix values from two sources.
+    const cost = costMap[costRegion];
     if (!cost || cost === 0) return '-';
     return `$${cost.toFixed(2)}`;
   };
@@ -176,6 +180,7 @@ export default function RawMaterialsPage() {
 
   const { data: rawMaterialsData, isLoading } = useRawMaterials(getEnhancedQuery());
   const { data: filterOptions } = useRawMaterialFilterOptions();
+  const { data: stockForms } = useStockForms();
   const uploadMutation = useUploadRawMaterialsExcel();
   const createMutation = useCreateRawMaterial();
   const updateMutation = useUpdateRawMaterial();
@@ -415,7 +420,8 @@ export default function RawMaterialsPage() {
       materialType: material.materialType || '',
       materialDescription: material.materialDescription || '',
       densityKgM3: material.densityKgM3?.toString() || '',
-      unitCost: (material.unitCost || material.cost)?.toString() || '',
+      // The table's Cost column shows the USA cost, so the dialog edits that same value.
+      unitCost: (material.costUsa ?? material.unitCost ?? material.cost)?.toString() || '',
       country: material.country || '',
       currency: material.currency || 'USD',
       shape: material.shape || '',
@@ -459,20 +465,7 @@ export default function RawMaterialsPage() {
       materialGrade: editingMaterial.materialGrade || undefined,
       materialType: editingMaterial.materialType || undefined,
       materialDescription: editingMaterial.materialDescription || undefined,
-      unitCost: editingMaterial.unitCost ? parseFloat(editingMaterial.unitCost.toString()) : undefined,
-      country: editingMaterial.country || undefined,
-      shape: editingMaterial.shape || undefined,
-      
-      // Plastic-specific fields
-      regrinding: editingMaterial.regrinding || undefined,
-      regrindingPercentage: editingMaterial.regrindingPercentage ? parseFloat(editingMaterial.regrindingPercentage.toString()) : undefined,
-      clampingPressureMpa: editingMaterial.clampingPressureMpa ? parseFloat(editingMaterial.clampingPressureMpa.toString()) : undefined,
-      ejectDeflectionTempC: editingMaterial.ejectDeflectionTempC ? parseFloat(editingMaterial.ejectDeflectionTempC.toString()) : undefined,
-      meltingTempC: editingMaterial.meltingTempC ? parseFloat(editingMaterial.meltingTempC.toString()) : undefined,
-      moldTempC: editingMaterial.moldTempC ? parseFloat(editingMaterial.moldTempC.toString()) : undefined,
-      densityKgM3: editingMaterial.densityKgM3 ? parseFloat(editingMaterial.densityKgM3.toString()) : undefined,
-      specificHeatMelt: editingMaterial.specificHeatMelt ? parseFloat(editingMaterial.specificHeatMelt.toString()) : undefined,
-      thermalConductivityMelt: editingMaterial.thermalConductivityMelt ? parseFloat(editingMaterial.thermalConductivityMelt.toString()) : undefined,
+      costUsa: editingMaterial.unitCost ? parseFloat(editingMaterial.unitCost.toString()) : undefined,
     };
 
     updateMutation.mutate(
@@ -1091,7 +1084,10 @@ export default function RawMaterialsPage() {
               <TableHead className="cursor-pointer h-10 px-2 text-xs" onClick={() => toggleSort('material')}>
                 <div className="flex items-center font-semibold">Name<SortIcon column="material" /></div>
               </TableHead>
+              <TableHead className="h-10 px-2 text-xs">Source name</TableHead>
+              <TableHead className="h-10 px-2 text-xs">Grade</TableHead>
               <TableHead className="h-10 px-2 text-xs">Process group</TableHead>
+              <TableHead className="h-10 px-2 text-xs text-right">Stock prices (USA)</TableHead>
               <TableHead className="h-10 px-2 text-xs text-right">Cost</TableHead>
               <TableHead className="h-10 px-2 text-xs text-right">Actions</TableHead>
             </TableRow>
@@ -1100,7 +1096,7 @@ export default function RawMaterialsPage() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
                   <div className="flex flex-col items-center gap-2">
                     <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                     <span className="text-sm">Loading materials…</span>
@@ -1109,7 +1105,7 @@ export default function RawMaterialsPage() {
               </TableRow>
             ) : displayMaterials.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
                   <div className="flex flex-col items-center gap-2">
                     <FileSpreadsheet className="h-8 w-8 opacity-30" />
                     <span className="text-sm">No materials found. Upload an Excel file to get started.</span>
@@ -1124,8 +1120,13 @@ export default function RawMaterialsPage() {
                 <TableRow key={material.id} className="hover:bg-secondary/30 border-b border-border/50">
                   <TableCell className="px-2 py-2 text-xs">{material.materialType ?? '—'}</TableCell>
                   <TableCell className="px-2 py-2 text-xs font-medium">{material.materialGrade || material.material}</TableCell>
+                  <TableCell className="px-2 py-2 text-xs">{material.material}</TableCell>
+                  <TableCell className="px-2 py-2 text-xs">{material.description ?? '—'}</TableCell>
                   <TableCell className="px-2 py-2 text-xs">
                     <Badge variant="outline" className="text-[10px] px-1.5 py-0">{material.materialGroup ?? '—'}</Badge>
+                  </TableCell>
+                  <TableCell className="px-2 py-2 text-right text-xs font-mono whitespace-nowrap">
+                    {material.stockFormsPriced ?? 0} of {stockForms?.forms.length ?? '—'}
                   </TableCell>
                   <TableCell className="px-2 py-2 text-right text-xs font-mono font-semibold whitespace-nowrap">
                     {renderCostDisplay(material)}
@@ -1204,239 +1205,28 @@ export default function RawMaterialsPage() {
                   isEditing={true}
                 />
               ) : (
-                <div className="space-y-6">
-                  {/* Material Identification Section */}
-                  <div className="space-y-4 p-4 bg-secondary/30 rounded-lg">
-                    <h3 className="text-sm font-semibold text-foreground">Material Identification</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Material Group *</label>
-                        <Input
-                          placeholder="e.g., Plastic & Rubber"
-                          value={editingMaterial.materialGroup || ''}
-                          onChange={(e) => setEditingMaterial({ ...editingMaterial, materialGroup: e.target.value })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Material *</label>
-                        <Input
-                          placeholder="e.g., ABS, PC, PE"
-                          value={editingMaterial.material || ''}
-                          onChange={(e) => setEditingMaterial({ ...editingMaterial, material: e.target.value })}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Processing Parameters Section */}
-                  <div className="space-y-4 p-4 bg-secondary/30 rounded-lg">
-                    <h3 className="text-sm font-semibold text-foreground">Processing Parameters</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Country</label>
-                        <Select
-                          value={editingMaterial.country || ''}
-                          onValueChange={(value) => {
-                            const country = value as Country;
-                            const defaultCurrency = getCurrencyForCountry(country);
-                            setEditingMaterial({ 
-                              ...editingMaterial, 
-                              country,
-                              currency: defaultCurrency
-                            });
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select country" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {Object.entries(COUNTRY_LABELS).map(([value, label]) => (
-                              <SelectItem key={value} value={value}>
-                                {label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Shape</label>
-                        <Select
-                          value={editingMaterial.shape || ''}
-                          onValueChange={(value) => setEditingMaterial({ ...editingMaterial, shape: value as MaterialShape })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select shape" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {Object.entries(MATERIAL_SHAPE_LABELS).map(([value, label]) => (
-                              <SelectItem key={value} value={value}>
-                                {label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Regrinding</label>
-                        <Select
-                          value={editingMaterial.regrinding || ''}
-                          onValueChange={(value) => setEditingMaterial({ ...editingMaterial, regrinding: value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select Yes/No" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Yes">Yes</SelectItem>
-                            <SelectItem value="No">No</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Regrind Percentage (%)</label>
-                        <Input
-                          type="number"
-                          step="0.1"
-                          placeholder="e.g., 10.0"
-                          value={editingMaterial.regrindingPercentage?.toString() || ''}
-                          onChange={(e) => {
-                            const { regrindingPercentage: _regrindingPercentage, ...rest } = editingMaterial;
-                            setEditingMaterial(e.target.value ? { ...rest, regrindingPercentage: parseFloat(e.target.value) } : rest);
-                          }}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Clamping Pressure (MPa)</label>
-                        <Input
-                          type="number"
-                          step="0.1"
-                          placeholder="e.g., 49.4"
-                          value={editingMaterial.clampingPressureMpa?.toString() || ''}
-                          onChange={(e) => {
-                            const { clampingPressureMpa: _clampingPressureMpa, ...rest } = editingMaterial;
-                            setEditingMaterial(e.target.value ? { ...rest, clampingPressureMpa: parseFloat(e.target.value) } : rest);
-                          }}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Eject Deflection Temp (°C)</label>
-                        <Input
-                          type="number"
-                          step="1"
-                          placeholder="e.g., 85"
-                          value={editingMaterial.ejectDeflectionTempC?.toString() || ''}
-                          onChange={(e) => {
-                            const { ejectDeflectionTempC: _ejectDeflectionTempC, ...rest } = editingMaterial;
-                            setEditingMaterial(e.target.value ? { ...rest, ejectDeflectionTempC: parseFloat(e.target.value) } : rest);
-                          }}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Melting Temp (°C)</label>
-                        <Input
-                          type="number"
-                          step="1"
-                          placeholder="e.g., 240"
-                          value={editingMaterial.meltingTempC?.toString() || ''}
-                          onChange={(e) => {
-                            const { meltingTempC: _meltingTempC, ...rest } = editingMaterial;
-                            setEditingMaterial(e.target.value ? { ...rest, meltingTempC: parseFloat(e.target.value) } : rest);
-                          }}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Mold Temp (°C)</label>
-                        <Input
-                          type="number"
-                          step="1"
-                          placeholder="e.g., 70"
-                          value={editingMaterial.moldTempC?.toString() || ''}
-                          onChange={(e) => {
-                            const { moldTempC: _moldTempC, ...rest } = editingMaterial;
-                            setEditingMaterial(e.target.value ? { ...rest, moldTempC: parseFloat(e.target.value) } : rest);
-                          }}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Density (kg/m³)</label>
-                        <Input
-                          type="number"
-                          step="1"
-                          placeholder="e.g., 1040"
-                          value={editingMaterial.densityKgM3?.toString() || ''}
-                          onChange={(e) => {
-                            const { densityKgM3: _densityKgM3, ...rest } = editingMaterial;
-                            setEditingMaterial(e.target.value ? { ...rest, densityKgM3: parseFloat(e.target.value) } : rest);
-                          }}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Specific Heat (J/g·°C)</label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          placeholder="e.g., 1.8"
-                          value={editingMaterial.specificHeatMelt?.toString() || ''}
-                          onChange={(e) => {
-                            const { specificHeatMelt: _specificHeatMelt, ...rest } = editingMaterial;
-                            setEditingMaterial(e.target.value ? { ...rest, specificHeatMelt: parseFloat(e.target.value) } : rest);
-                          }}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Thermal Conductivity (W/m·°C)</label>
-                        <Input
-                          type="number"
-                          step="0.001"
-                          placeholder="e.g., 0.127"
-                          value={editingMaterial.thermalConductivityMelt?.toString() || ''}
-                          onChange={(e) => {
-                            const { thermalConductivityMelt: _thermalConductivityMelt, ...rest } = editingMaterial;
-                            setEditingMaterial(e.target.value ? { ...rest, thermalConductivityMelt: parseFloat(e.target.value) } : rest);
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Cost Information Section */}
-                  <div className="space-y-4 p-4 bg-secondary/30 rounded-lg">
-                    <h3 className="text-sm font-semibold text-foreground">Cost Information</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Unit Cost</label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          placeholder="e.g., 135.00"
-                          value={editingMaterial.unitCost?.toString() || ''}
-                          onChange={(e) => {
-                            const { unitCost: _unitCost, ...rest } = editingMaterial;
-                            setEditingMaterial(e.target.value ? { ...rest, unitCost: parseFloat(e.target.value) } : rest);
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <RawMaterialEditForm materialId={editingMaterial.id} onClose={() => setEditDialogOpen(false)} />
               )
             )}
 
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                onClick={() => setEditDialogOpen(false)}
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleUpdateMaterial}
-                disabled={updateMutation.isPending}
-                className="flex-1"
-              >
-                {updateMutation.isPending ? 'Updating...' : 'Update Material'}
-              </Button>
-            </div>
+            {editingMaterial && isFerrousMaterial(editingMaterial.materialGroup) && (
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => setEditDialogOpen(false)}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleUpdateMaterial}
+                  disabled={updateMutation.isPending}
+                  className="flex-1"
+                >
+                  {updateMutation.isPending ? 'Updating...' : 'Update Material'}
+                </Button>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

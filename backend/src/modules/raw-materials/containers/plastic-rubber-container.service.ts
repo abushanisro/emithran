@@ -76,9 +76,9 @@ export class PlasticRubberContainerService {
 
     const materialData = {
       material_group: this.ensurePlasticRubberCategory(createDto.materialGroup),
-      material: createDto.material,
+      grade: createDto.material,
       material_type: createDto.materialType,
-      material_grade: createDto.materialGrade,
+      name: createDto.materialGrade,
       material_description: createDto.materialDescription,
       shape: createDto.shape,
       stock_form: createDto.stockForm,
@@ -170,7 +170,7 @@ export class PlasticRubberContainerService {
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
       .from('raw_materials')
-      .select('material_grade, location, cost')
+      .select('name, location, cost')
       .or('material_group.ilike.%plastic%,material_group.ilike.%rubber%,material_group.ilike.%polymer%,material_group.ilike.%elastomer%');
 
     if (error) {
@@ -183,7 +183,7 @@ export class PlasticRubberContainerService {
     let costCount = 0;
 
     materials.forEach(material => {
-      const subtype = material.material_grade || 'Unknown';
+      const subtype = material.name || 'Unknown';
       bySubtype[subtype] = (bySubtype[subtype] || 0) + 1;
 
       if (material.cost) { totalCost += parseFloat(material.cost); costCount++; }
@@ -218,7 +218,7 @@ export class PlasticRubberContainerService {
 
   private applyFilters(queryBuilder: any, query: QueryRawMaterialsDto) {
     if (query.material) {
-      queryBuilder = queryBuilder.eq('material', query.material);
+      queryBuilder = queryBuilder.eq('grade', query.material);
     }
     if (query.search) {
       queryBuilder = queryBuilder.or(
@@ -229,7 +229,7 @@ export class PlasticRubberContainerService {
   }
 
   private applySorting(queryBuilder: any, query: QueryRawMaterialsDto) {
-    const sortBy = query.sortBy || 'material';
+    const sortBy = ({ material: 'grade', material_grade: 'name' } as Record<string, string>)[query.sortBy || 'material'] ?? query.sortBy ?? 'grade';
     const sortOrder = query.sortOrder || 'asc';
     return queryBuilder.order(sortBy, { ascending: sortOrder === 'asc' });
   }

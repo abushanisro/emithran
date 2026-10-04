@@ -11,6 +11,7 @@ from collections import defaultdict
 from typing import Dict, List, Optional, Tuple, Any
 
 from sheet_metal.feature_extractor import SheetMetalFeatureExtractor
+from shared.draft_angle_geometry import analyze_draft_angles
 
 logger = logging.getLogger(__name__)
 
@@ -281,247 +282,18 @@ class InjectionMoldedFeatureExtractor:
         bbox_dims: List[float],
     ) -> Dict[str, Any]:
         """
-        Measure per-face draft angles on "wall faces" — planar faces whose normal
-        is roughly perpendicular to the mold pull direction.
-
-        Pull direction = the canonical axis (x/y/z) aligned with the shortest
-        bounding-box dimension (the standard mold opening / ejection direction).
-
-        For a wall face with unit normal n and pull unit vector p:
-          draft_angle = arcsin(|dot(n, p)|)
-          (When dot = 0: face is exactly perpendicular to pull → 0° draft.
-           When dot = sin(2°) ≈ 0.035: face has 2° draft.)
-
-        Classification (industry standard for thermoplastics):
-          undrafted:   draft_angle < 0.3°   — straight-pull surface, ejection risk
-          drafted:     0.3° ≤ angle ≤ 5°    — within standard draft range
-          overdrafted: angle > 5°            — acceptable but notable for deep ribs
-          undercut:    dot(n, p) < −sin(0.3°) — face normal opposes pull direction;
-                       requires slide, lifter, or part-line re-design
-
-        parting_complexity (0–1): derived from the ratio of undrafted + undercut
-        faces to total wall faces. Feeds the routing engine's deflashing gate:
-          complexity ≥ 0.5 → deflashing routed (stepped/complex shutoff line).
-
-        Confidence is 0.65 — a V1 heuristic on a single-body assumption. Molds with
-        multiple parting surfaces or unsupported side actions may show false undrafts
-        on the action faces. Tune against real parts before raising confidence.
+        Thermoplastic draft-angle analysis — thin wrapper over the shared,
+        family-agnostic geometry in shared/draft_angle_geometry.py (extracted
+        2026-10, Die Casting Phase 1 prerequisite refactor). Passes this
+        domain's own industry-standard thresholds (0.3deg undrafted ceiling,
+        5deg draft/undercut range) exactly as before — behavior is unchanged.
+        See analyze_draft_angles's own docstring for the full algorithm.
         """
-        _FALLBACK = {
-            "undrafted_face_count": 0,
-            "drafted_face_count": 0,
-            "overdrafted_face_count": 0,
-            "undercut_face_count": 0,
-            "total_wall_face_count": 0,
-            "avg_draft_angle_deg": None,
-            "parting_complexity": None,
-            "pull_axis": None,
-            "draft_confidence": 0.0,
-        }
-        try:
-            from OCC.Core.BRepAdaptor import BRepAdaptor_Surface  # type: ignore
-            from OCC.Core.TopExp import TopExp_Explorer  # type: ignore
-            from OCC.Core.TopAbs import TopAbs_FACE  # type: ignore
-            from OCC.Core.GeomAbs import GeomAbs_Plane  # type: ignore
-            from OCC.Core.TopoDS import topods  # type: ignore
-            from OCC.Core.BRepGProp import brepgprop  # type: ignore
-            from OCC.Core.GProp import GProp_GProps  # type: ignore
-        except ImportError:
-            logger.warning("[InjectionMolded] OCC unavailable for draft analysis")
-            return _FALLBACK
-
-        # ── Pull axis: dominant planar face normal ─────────────────────────────
-        # The mold opens perpendicular to the parting surface — the largest flat
-        # face in the part. Accumulate planar face area per canonical axis; the
-        # axis with the most area is the parting-surface normal = pull direction.
-        #
-        # This is more robust than min(bbox_dims) for non-flat parts:
-        #   flat cover 150×96×6:  large top/bottom faces ⊥ Z → pull=Z ✓
-        #   deep cup 50×50×200:   large bottom face ⊥ Z (bigger than any wall) → pull=Z ✓
-        #   box shell 100×80×40:  large side faces ⊥ longest dims, bottom largest → correct
-        #
-        # Fallback to min(bbox_dims) when no clearly dominant axis is found (e.g.
-        # the shape is a pure cylinder with no planar faces).
-        axis_area = [0.0, 0.0, 0.0]
-        _pre_exp = TopExp_Explorer(shape, TopAbs_FACE)
-        while _pre_exp.More():
-            try:
-                _f = topods.Face(_pre_exp.Current())
-                _adp = BRepAdaptor_Surface(_f)
-                if _adp.GetType() == GeomAbs_Plane:
-                    _n = _adp.Plane().Axis().Direction()
-                    _comps = [abs(float(_n.X())), abs(float(_n.Y())), abs(float(_n.Z()))]
-                    _dom = max(range(3), key=lambda i: _comps[i])
-                    if _comps[_dom] >= 0.70:  # clearly aligned to one axis
-                        _gp = GProp_GProps()
-                        brepgprop.SurfaceProperties(_f, _gp)
-                        axis_area[_dom] += _gp.Mass()
-            except Exception:
-                pass
-            _pre_exp.Next()
-
-        if max(axis_area) >= 1.0:
-            pull_axis_idx = int(max(range(3), key=lambda i: axis_area[i]))
-        else:
-            pull_axis_idx = min(range(len(bbox_dims)), key=lambda i: bbox_dims[i])
-
-        pull_axis_names = ["x", "y", "z"]
-        pull: Tuple[float, float, float] = (
-            1.0 if pull_axis_idx == 0 else 0.0,
-            1.0 if pull_axis_idx == 1 else 0.0,
-            1.0 if pull_axis_idx == 2 else 0.0,
+        return analyze_draft_angles(
+            shape, bbox_dims,
+            undrafted_threshold_deg=0.3,
+            undercut_threshold_deg=5.0,
         )
-
-        # Wall faces: normal roughly ⊥ pull → |dot(n, pull)| < cos(75°) ≈ 0.259.
-        # Base/top/parting faces (normal ≈ pull) are excluded — they don't need draft.
-        WALL_FACE_COS_THRESHOLD = 0.259  # cos(75°)
-        MIN_FACE_AREA_MM2 = 10.0
-
-        # ── Undercut threshold ─────────────────────────────────────────────────
-        # A mold has TWO halves pulling in opposite directions. A face with a
-        # small NEGATIVE dot product with the chosen pull vector is NOT an undercut
-        # — it is a correctly drafted face belonging to the cavity half of the mold
-        # (e.g., side walls of a lid that taper toward the parting surface).
-        #
-        # True undercutcuts have a SIGNIFICANT back-angle: the face normal opposes
-        # pull by more than a generous draft range (5°). At <5° back-angle, the face
-        # is attributed to the opposite mold half and classified as drafted.
-        #
-        # Previous threshold was -sin(0.3°) ≈ -0.005 — this caused any cavity-half
-        # draft angle (even 0.5°) to be reported as an undercut. Now raised to
-        # -sin(5°) ≈ -0.087 so only faces with genuine back-angles flag as undercut.
-        UNDERCUT_NEG_DOT_THRESHOLD = -math.sin(math.radians(5.0))   # ≈ -0.087
-        UNDRAFTED_ABS_DOT_THRESHOLD = math.sin(math.radians(0.3))   # ≈ 0.005
-
-        undrafted_count = 0
-        drafted_count = 0
-        overdrafted_count = 0
-        undercut_count = 0
-        draft_angles: List[float] = []
-
-        # Collect wall face plane equations for reuse in rib detection:
-        # (nx, ny, nz, plane_offset, area, cx, cy, cz) — 8-tuple with centroid for heatmap placement
-        wall_face_planes: List[Tuple] = []
-
-        # DFM face groups for 3D highlighting: track face_index (global ordinal matching
-        # face_map from _detect_holes_real) and centroid per classified face.
-        undercut_dfm: List[Dict[str, Any]] = []
-        undrafted_dfm: List[Dict[str, Any]] = []
-        # All wall face classifications for heatmap source builders (not just undrafted/undercut)
-        all_draft_faces_hm: List[Dict[str, Any]] = []
-
-        face_index = 0  # counts ALL faces — matches face_map ordinal from _detect_holes_real
-        explorer = TopExp_Explorer(shape, TopAbs_FACE)
-        while explorer.More():
-            try:
-                face = topods.Face(explorer.Current())
-                current_face_index = face_index
-                face_index += 1
-
-                adaptor = BRepAdaptor_Surface(face)
-                if adaptor.GetType() != GeomAbs_Plane:
-                    explorer.Next()
-                    continue
-
-                plane = adaptor.Plane()
-                n = plane.Axis().Direction()
-                p = plane.Location()
-                nx, ny, nz = float(n.X()), float(n.Y()), float(n.Z())
-                mag = math.sqrt(nx * nx + ny * ny + nz * nz)
-                if mag < 1e-9:
-                    explorer.Next()
-                    continue
-                nx, ny, nz = nx / mag, ny / mag, nz / mag
-
-                # Signed dot product along pull
-                dot = nx * pull[0] + ny * pull[1] + nz * pull[2]
-
-                # Only wall faces (normal roughly ⊥ pull)
-                if abs(dot) > WALL_FACE_COS_THRESHOLD:
-                    explorer.Next()
-                    continue
-
-                # Skip degenerate faces
-                props = GProp_GProps()
-                brepgprop.SurfaceProperties(face, props)
-                area = props.Mass()
-                if area < MIN_FACE_AREA_MM2:
-                    explorer.Next()
-                    continue
-
-                # Centroid (CentreOfMass) for 3D highlighting
-                try:
-                    cog = props.CentreOfMass()
-                    centroid = [round(float(cog.X()), 2), round(float(cog.Y()), 2), round(float(cog.Z()), 2)]
-                except Exception:
-                    centroid = [round(float(p.X()), 2), round(float(p.Y()), 2), round(float(p.Z()), 2)]
-
-                # draft_angle = arcsin(|dot|) in degrees (always non-negative)
-                draft_deg = math.degrees(math.asin(min(1.0, abs(dot))))
-                draft_angles.append(round(draft_deg, 2))
-
-                # Collect plane equation for rib detection (offset = dot(location, normal))
-                # 8-tuple includes centroid coords for heatmap blob placement in _detect_ribs
-                offset = float(p.X()) * nx + float(p.Y()) * ny + float(p.Z()) * nz
-                wall_face_planes.append((nx, ny, nz, offset, area, centroid[0], centroid[1], centroid[2]))
-
-                # Undercut: face normal has SIGNIFICANT component opposing pull.
-                # Small negative dot = cavity-half draft (valid, not an undercut).
-                # Large negative dot (back-angle > 5°) = true undercut (needs slide/lifter).
-                if dot < UNDERCUT_NEG_DOT_THRESHOLD:
-                    undercut_count += 1
-                    undercut_dfm.append({"face_id": current_face_index, "centroid": centroid, "back_angle_deg": round(draft_deg, 2)})
-                    all_draft_faces_hm.append({"centroid": centroid, "draft_deg": round(draft_deg, 2), "classification": "undercut"})
-                elif abs(dot) < UNDRAFTED_ABS_DOT_THRESHOLD:
-                    undrafted_count += 1
-                    undrafted_dfm.append({"face_id": current_face_index, "centroid": centroid, "angle_deg": round(draft_deg, 2)})
-                    all_draft_faces_hm.append({"centroid": centroid, "draft_deg": round(draft_deg, 2), "classification": "undrafted"})
-                elif draft_deg <= 5.0:
-                    drafted_count += 1
-                    all_draft_faces_hm.append({"centroid": centroid, "draft_deg": round(draft_deg, 2), "classification": "drafted"})
-                else:
-                    overdrafted_count += 1
-                    all_draft_faces_hm.append({"centroid": centroid, "draft_deg": round(draft_deg, 2), "classification": "overdrafted"})
-            except Exception:
-                pass
-            explorer.Next()
-
-        total = undrafted_count + drafted_count + overdrafted_count + undercut_count
-        if total == 0:
-            return _FALLBACK
-
-        # parting_complexity: undercut = full concern, undrafted = half concern.
-        # Clamped to [0, 0.95]; a fully-drafted part = 0.
-        raw = (undercut_count + undrafted_count * 0.5) / total
-        parting_complexity = round(min(0.95, raw), 3)
-        avg_draft = round(sum(draft_angles) / len(draft_angles), 2) if draft_angles else None
-
-        logger.info(
-            f"[InjectionMolded] draft: pull={pull_axis_names[pull_axis_idx]} "
-            f"total_wall={total} drafted={drafted_count} undrafted={undrafted_count} "
-            f"undercut={undercut_count} parting_complexity={parting_complexity}"
-        )
-
-        return {
-            "undrafted_face_count": undrafted_count,
-            "drafted_face_count": drafted_count,
-            "overdrafted_face_count": overdrafted_count,
-            "undercut_face_count": undercut_count,
-            "total_wall_face_count": total,
-            "avg_draft_angle_deg": avg_draft,
-            "parting_complexity": parting_complexity,
-            "pull_axis": pull_axis_names[pull_axis_idx],
-            "draft_confidence": 0.65,
-            # Internal: reused by _detect_ribs to avoid a second face scan
-            "_wall_face_planes": wall_face_planes,
-            "_pull_axis_idx": pull_axis_idx,
-            # DFM face groups for 3D highlighting (face_id = global OCC ordinal matching face_map)
-            "_dfm_face_groups": {
-                "undercut": undercut_dfm,
-                "undrafted": undrafted_dfm,
-                "_all_draft_faces": all_draft_faces_hm,
-            },
-        }
 
     # ── Phase 4: rib detection ────────────────────────────────────────────────
 
