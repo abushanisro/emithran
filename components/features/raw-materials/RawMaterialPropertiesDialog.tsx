@@ -1,13 +1,51 @@
 'use client';
 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { useRawMaterialProperties } from '@/lib/api/hooks/useRawMaterials';
+import { useRawMaterialProperties, useRawMaterialStockPrices, useStockForms } from '@/lib/api/hooks/useRawMaterials';
 
 // "specific_heat_rt_j_kg_k" -> "Specific heat rt j kg k". The key is the
 // normalized source header; the unit column carries the real unit.
 function labelOf(key: string): string {
   const words = key.split('_').filter(Boolean);
   return words.map((w, i) => (i === 0 ? w.charAt(0).toUpperCase() + w.slice(1) : w)).join(' ');
+}
+
+// The stock section prices this material in the cost region the page is set to.
+const STOCK_LOCATION = 'USA';
+
+function StockPricesSection({ materialId }: { materialId: string }) {
+  const { data: forms } = useStockForms();
+  const { data: prices, isLoading } = useRawMaterialStockPrices(materialId);
+  const byForm = new Map((prices ?? []).filter((p) => p.location === STOCK_LOCATION).map((p) => [p.stockForm, p.pricePerKg]));
+
+  // Every stock form is listed; a dash marks a form with no price on file.
+  return (
+    <div className="mt-5 space-y-3">
+      <div className="text-sm font-semibold">Stock prices ({STOCK_LOCATION}, USD/kg)</div>
+      {isLoading && <p className="text-xs text-muted-foreground">Loading…</p>}
+      {!isLoading && (
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b text-left text-muted-foreground">
+              <th className="py-1 pr-2 font-medium">Stock form</th>
+              <th className="py-1 pr-2 font-medium text-right">Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(forms?.forms ?? []).map((f) => {
+              const price = byForm.get(f);
+              return (
+                <tr key={f} className="border-b border-border/40">
+                  <td className="py-1 pr-2">{labelOf(f)}</td>
+                  <td className="py-1 pr-2 text-right font-mono">{price != null ? price.toFixed(3) : '—'}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
 }
 
 export function RawMaterialPropertiesDialog({
@@ -52,6 +90,7 @@ export function RawMaterialPropertiesDialog({
             </tbody>
           </table>
         )}
+        {materialId && <StockPricesSection materialId={materialId} />}
       </DialogContent>
     </Dialog>
   );

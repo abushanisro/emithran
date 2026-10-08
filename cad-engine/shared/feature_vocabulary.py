@@ -16,7 +16,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Dict, FrozenSet, Literal
 
-Domain = Literal["sheet_metal", "machining"]
+Domain = Literal["sheet_metal", "machining", "die_casting", "sand_casting", "investment_casting"]
 
 _VOCAB_PATH = Path(__file__).with_name("reference_features.json")
 

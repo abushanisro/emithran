@@ -6,7 +6,7 @@ export type FeatureType =
 
 export type ManufacturingFamily =
   | 'sheet_metal' | 'milled' | 'turned'
-  | 'plastic_molded' | 'casting' | 'forging'
+  | 'plastic_molded' | 'casting' | 'die_cast' | 'sand_cast' | 'investment_cast' | 'forging'
   | 'extrusion' | 'weldment' | 'additive';
 
 export type CostDriverType =
@@ -56,6 +56,15 @@ export type FeatureCategory =
   | 'PlanarFace'
   | 'CurvedWall'
   | 'CurvedSurface'
+  // Die casting (die_casting/feature_models.py) — SimpleHole/MultiStepHole/
+  // Ring/PlanarFace/CurvedWall/CurvedSurface above are shared verbatim; these
+  // are die-casting-only additions
+  | 'RingedHole'
+  | 'ComboVoid'
+  | 'Void'
+  | 'SlideBundle'
+  | 'SharpEdge'
+  | 'NotSupported'
   // Injection molding DFM faces
   | 'im_undercut'
   | 'im_undrafted';
@@ -351,6 +360,13 @@ export interface FeatureNodeV2 {
    * only. Absent for Sheet Metal / Plastic Molding features.
    */
   canonical_operation?: string;
+  /**
+   * Die casting: every real operation the reference catalog pairs with this
+   * feature type (memory/Die Casting/Processes/operations.csv), attached by
+   * auto-fill.service.ts. No instance-level selection rule is sourced yet,
+   * so this is the allowed list, not a chosen operation.
+   */
+  catalog_operations?: string[];
   /** Machining features: geometric variant of feature_type (e.g. "threaded" on a SimpleHole). */
   variant?: string;
 }

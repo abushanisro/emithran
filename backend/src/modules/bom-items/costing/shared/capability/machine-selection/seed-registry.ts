@@ -314,6 +314,7 @@ export const MACHINE_CLASS_DEFAULTS: Record<MachineClass, Partial<MachineCapabil
   gun_drill:      {},
   deep_bore_machine: {},
   manual_deburr:  {},
+  manual_bench_cell: {},
   cylindrical_grinder: {},
   jig_bore:       {},
   jig_grind:      {},

@@ -18,6 +18,7 @@ import { DrawingIntelligenceDto } from '../dto/drawing-intelligence.dto';
 // future, differently-shaped parser response.
 const DRAWING_PARSER_VERSION = 'v1';
 import { machiningRouteFamilyOf, resolveCanonicalOperation } from '../costing/machining/process/canonical-operation';
+import { REFERENCE_FEATURE_OPERATIONS } from '../costing/shared/reference-features.generated';
 import { MachiningLookupService } from '../costing/machining/lookup/machining-lookup.service';
 import { requiredMilledClassFromToolAxes } from '../costing/machining/setup-axis-rule';
 import { machiningFeatureCounts } from '../costing/machining/operation/machining-feature-counts';
@@ -180,6 +181,7 @@ export class AutoFillService {
     userId: string,
     accessToken: string,
     location?: string,
+    familyHint?: string,
   ): string {
     // Sweep stale jobs on each new start — bounds Map growth without a background timer.
     const now = Date.now();
@@ -190,7 +192,7 @@ export class AutoFillService {
     const jobId = crypto.randomUUID();
     this.jobs.set(jobId, { status: 'processing', createdAt: now });
 
-    this.analyzeAndSuggest(fileBuffer, fileName, userId, accessToken, location)
+    this.analyzeAndSuggest(fileBuffer, fileName, userId, accessToken, location, false, familyHint)
       .then((result) => this.jobs.set(jobId, { status: 'ready', result, createdAt: now }))
       .catch((e: any) => {
         // Background job: nothing else ever sees this error, so log it with
@@ -213,6 +215,11 @@ export class AutoFillService {
     accessToken: string,
     location?: string,
     forceReanalysis = false,
+    // Manual, disclosed family override (Create BOM Item's process dropdown) --
+    // see cad-engine/main.py's family_hint. Passed through only when the
+    // caller explicitly set one; absent, the real geometric classifier chain
+    // runs exactly as it always has.
+    familyHint?: string,
   ): Promise<AutoFillResponseDto> {
     // 1. The CAD engine is the only source of geometry and features. When it
     // cannot analyse the file there is nothing real to return, so the request
@@ -225,7 +232,7 @@ export class AutoFillService {
     // itself from that, and Refresh Analysis wrote it over a real analysis.
     let cadResult: any;
     try {
-      cadResult = await this.callCADEngineStateless(fileBuffer, fileName, forceReanalysis);
+      cadResult = await this.callCADEngineStateless(fileBuffer, fileName, forceReanalysis, familyHint);
     } catch (e) {
       const reason = (e.response?.data?.detail as string | undefined) || e.message;
       this.logger.warn(`CAD engine could not analyse ${fileName} (${reason})`);
@@ -358,6 +365,14 @@ export class AutoFillService {
 
     const isSheetMetal = family.family === 'sheet_metal';
     const isInjectionMolded = family.family === 'plastic_molded';
+    // Casting (die / sand / investment): reached only via cad-engine's explicit
+    // family_hint (the user's chosen process). The engine reports which
+    // process catalog its features were validated against — read that, not a
+    // second family->catalog table kept here.
+    const castingDomain: string | null =
+      cadResult?.geometry_features?.manufacturing_features
+        ?.manufacturing_intelligence?.features?.casting_domain ?? null;
+    const isCasting = castingDomain != null;
 
     const cadV2: any =
       cadResult?.geometry_features?.manufacturing_features
@@ -474,6 +489,39 @@ export class AutoFillService {
           partingComplexity:    cadMI?.features?.parting_complexity ?? null,
           avgDraftAngleDeg:     cadMI?.features?.avg_draft_angle_deg ?? null,
         } : {}),
+        // Die Casting Phase 1 — promoted from DieCastingFeatureExtractor output
+        // (cadMI.features). Detection + highlighting only; process routing and
+        // costing are a later phase (see the Die Casting Phase 1 plan).
+        ...(isCasting ? {
+          castingDomain,
+          castingSetupAxis:             cadMI?.features?.primary_setup_axis ?? null,
+          castingPartingPlaneOffsetMm:  cadMI?.features?.parting_plane_offset_mm ?? null,
+          // Measured from the solid (cad-engine shared/casting_geometry.py):
+          // silhouette on the parting plane (clamp force) and local wall
+          // thickness (solidification). null = not measured, never 0.
+          castingProjectedAreaMm2:      cadMI?.features?.projected_area_mm2 ?? null,
+          // Silhouette extents on the parting plane [a, b] mm (tie-bar fit).
+          castingPartingFootprintMm:    cadMI?.features?.parting_footprint_mm ?? null,
+          castingPullExtentMm:          cadMI?.features?.pull_extent_mm ?? null,
+          // Outer boundary of the parting-plane silhouette: the parting line (mm).
+          castingPartingPerimeterMm:    cadMI?.features?.parting_perimeter_mm ?? null,
+          // Cores (shared/core_geometry.py): air no die half reaches by a straight
+          // pull, each with volume, box and area. null = not measured.
+          castingCores:                 cadMI?.features?.core_count == null ? null : (cadMI?.features?.cores ?? []),
+          castingWallNominalMm:         cadMI?.features?.wall_thickness_nominal_mm ?? null,
+          castingWallMinMm:             cadMI?.features?.wall_thickness_min_mm ?? null,
+          castingWallMaxMm:             cadMI?.features?.wall_thickness_max_mm ?? null,
+          castingSimpleHoleCount:       cadMI?.features?.simple_hole_count ?? 0,
+          castingMultiStepHoleCount:    cadMI?.features?.multi_step_hole_count ?? 0,
+          castingComboVoidCount:        cadMI?.features?.combo_void_count ?? 0,
+          castingVoidCount:             cadMI?.features?.void_count ?? 0,
+          castingSlideBundleCount:      cadMI?.features?.slide_bundle_count ?? 0,
+          castingPlanarFaceCount:       cadMI?.features?.planar_face_count ?? 0,
+          castingCurvedWallCount:       cadMI?.features?.curved_wall_count ?? 0,
+          castingCurvedSurfaceCount:    cadMI?.features?.curved_surface_count ?? 0,
+          castingSharpEdgeCount:        cadMI?.features?.sharp_edge_count ?? 0,
+          castingNotSupportedFaceCount: (cadMI?.features?.not_supported_face_ids ?? []).length,
+        } : {}),
       },
       dfmWarnings:            this.buildDFMWarnings(geo, cadResult),
       validationResults:      this.buildValidationChecks(geo, family.family, cadResult),
@@ -481,7 +529,7 @@ export class AutoFillService {
       feature_graph_version:  parseInt(process.env.FEATURE_GRAPH_VERSION ?? '4', 10),
       cad_engine_version:     process.env.CAD_ENGINE_VERSION ?? 'geo_v5',
       analyzed_at:            new Date().toISOString(),
-      ...(cadV2 ? { feature_graph_v2: this.attachCanonicalOperations(cadV2, family.family) } : {}),
+      ...(cadV2 ? { feature_graph_v2: this.attachCanonicalOperations(cadV2, family.family, castingDomain) } : {}),
       ...(machiningFeatures ? { machining_features: machiningFeatures } : {}),
       // Semantic GD&T from the STEP model itself (cad-engine shared/step_pmi.py).
       ...(cadResult?.pmi ? { pmi: cadResult.pmi } : {}),
@@ -504,8 +552,23 @@ export class AutoFillService {
    * and any feature_type not in that table are passed through unchanged — no
    * fabricated label is ever attached.
    */
-  private attachCanonicalOperations(cadV2: any, cadFamily: string | null | undefined): any {
+  private attachCanonicalOperations(cadV2: any, cadFamily: string | null | undefined, castingDomain?: string | null): any {
     if (!cadV2?.features?.length) return cadV2;
+    // Die casting: attach the real operations the catalog pairs with each
+    // feature type (memory/Die Casting/Processes/operations.csv, via the
+    // generated vocabulary). Which one applies to a given instance (As Cast
+    // vs Insert Coring vs Unscrewing, ...) has no sourced selection rule yet,
+    // so the full allowed list is attached and nothing is picked for it.
+    if (castingDomain && castingDomain in REFERENCE_FEATURE_OPERATIONS) {
+      const ops = REFERENCE_FEATURE_OPERATIONS[castingDomain as keyof typeof REFERENCE_FEATURE_OPERATIONS] as Readonly<Record<string, readonly string[]>>;
+      return {
+        ...cadV2,
+        features: cadV2.features.map((f: any) => {
+          const allowed = ops[f.feature_type];
+          return allowed ? { ...f, catalog_operations: [...allowed] } : f;
+        }),
+      };
+    }
     const family = machiningRouteFamilyOf(cadFamily);
     return {
       ...cadV2,
@@ -903,7 +966,47 @@ export class AutoFillService {
   // CAD ENGINE (STATELESS)
   // ────────────────────────────────────────────────────────────────────────────
 
-  private async callCADEngineStateless(fileBuffer: Buffer, fileName: string, forceReanalysis = false): Promise<any> {
+  /**
+   * The process-independent fields of a dropped model, before its process is
+   * known: Name and Part Number from the file name (the same rules as the full
+   * analysis) and volume, surface area and the sorted bounding box from
+   * cad-engine POST /measure/geometry (shared/solid_measures.py -- the same
+   * measurement the full analysis reports). No family classification and no
+   * feature extraction: those run once the process is chosen. Weight needs
+   * the material's density and is not returned.
+   */
+  async measureForAutoFill(fileBuffer: Buffer, fileName: string): Promise<{
+    suggestions: { name: string; partNumber: string };
+    geometry: { volume: number; surfaceArea: number; boundingBox: { length: number; width: number; height: number } };
+  }> {
+    const ext = path.extname(fileName).toLowerCase().replace('.', '') || 'step';
+    const FormData = require('form-data');
+    const form = new FormData();
+    form.append('file', fileBuffer, { filename: `model.${ext}`, contentType: 'application/octet-stream' });
+    const response = await axios.post(`${this.cadEngineUrl}/measure/geometry`, form, {
+      headers: { ...form.getHeaders(), ...(this.cadEngineApiKey && { 'X-API-Key': this.cadEngineApiKey }) },
+      // OCC's STEP transfer dominates and can take minutes on large files (see callCADEngineStateless).
+      timeout: 600_000,
+      maxContentLength: 150 * 1024 * 1024,
+    });
+    const d = response.data ?? {};
+    const bb = d.bounding_box ?? {};
+    return {
+      suggestions: { name: this.inferName(fileName), partNumber: this.generatePartNumber(fileName) },
+      geometry: {
+        volume: Number(d.volume_mm3) || 0,
+        surfaceArea: Number(d.surface_area_mm2) || 0,
+        boundingBox: { length: Number(bb.length) || 0, width: Number(bb.width) || 0, height: Number(bb.height) || 0 },
+      },
+    };
+  }
+
+  private async callCADEngineStateless(
+    fileBuffer: Buffer,
+    fileName: string,
+    forceReanalysis = false,
+    familyHint?: string,
+  ): Promise<any> {
     const ext = path.extname(fileName).toLowerCase().replace('.', '') || 'step';
     const contentTypeMap: Record<string, string> = {
       step: 'application/step',
@@ -923,6 +1026,12 @@ export class AutoFillService {
     form.append('strategy', 'balanced');
     form.append('bypass_format_check', 'true');
     form.append('force_reanalysis', String(forceReanalysis));
+    // Real, disclosed manual override only -- main.py's family_hint short-
+    // circuits detect_part_family's result. Never sent when unset, so the
+    // real geometric classifier chain is what runs by default.
+    if (familyHint) {
+      form.append('family_hint', familyHint);
+    }
 
     const response = await axios.post(
       `${this.cadEngineUrl}/analyze/geometry`,
@@ -1126,7 +1235,32 @@ export class AutoFillService {
     milled: 'Machining',
     turned: 'Machining',
     mill_turn: 'Machining',
+    // Die Casting Phase 1 (2026-10): detection + highlighting only, no cost
+    // engine yet — process_taxonomy's real "Die Casting" rows are all seeded
+    // roadmap_status='not_modeled' (migration 844), so the query below still
+    // correctly returns null until that catalog is promoted to production.
+    // Mapped here now so this needs no further backend change on that day.
+    die_cast: 'Die Casting',
+    // Same casting extractor, validated against each process's own catalog
+    // (cad-engine shared/part_family.py CASTING_FAMILY_DOMAIN).
+    sand_cast: 'Sand Casting',
+    investment_cast: 'Casting Investment',
   };
+
+  /**
+   * The cad-engine family_hint for a user-chosen process_group label — the
+   * inverse of CAD_FAMILY_TO_PROCESS_GROUP, so the forward and reverse
+   * mappings can never drift apart. Machining covers milled/turned/mill_turn;
+   * the first entry (milled) is the general one. A group with no CAD family
+   * (Sand Casting, Assembly, ...) returns undefined: there is no extractor to
+   * force, so the real classifier chain runs.
+   */
+  familyHintForProcessGroup(processGroup: string | null | undefined): string | undefined {
+    if (!processGroup) return undefined;
+    const entry = Object.entries(AutoFillService.CAD_FAMILY_TO_PROCESS_GROUP)
+      .find(([, group]) => group === processGroup);
+    return entry?.[0];
+  }
 
   /**
    * Resolves a CAD-detected family to a real, live process_taxonomy label —

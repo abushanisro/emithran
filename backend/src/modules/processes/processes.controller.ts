@@ -211,6 +211,18 @@ export class ProcessesController {
     return this.processesService.getMachiningLookupTableByName(table, outputColumn);
   }
 
+  @Get('reference-lookup-tables/:domain/by-name/:table')
+  @ApiOperation({ summary: 'Get one reference table a calculator field of a domain (machining, die_casting) reads, flattened — for the calculator dialog lookup-table viewer' })
+  @ApiResponse({ status: 200, description: 'Lookup table retrieved successfully' })
+  @ApiResponse({ status: 400, description: 'Not a calculator lookup table of that domain' })
+  async getReferenceLookupTableByName(
+    @Param('domain') domain: string,
+    @Param('table') table: string,
+    @Query('outputColumn') outputColumn?: string,
+  ) {
+    return this.processesService.getReferenceLookupTableByName(domain, table, outputColumn);
+  }
+
   @Put('sm-lookup-tables/rows/:table/:id')
   @ApiOperation({ summary: 'Update one row of a real sm_lookup_* cost-engine table (allowlisted tables/columns only)' })
   @ApiResponse({ status: 200, description: 'Row updated successfully' })

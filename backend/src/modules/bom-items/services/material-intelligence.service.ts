@@ -40,7 +40,7 @@ export class MaterialIntelligenceService {
     const { data: rows, error } = await client
       .from('raw_materials')
       .select(
-        'id, material_group, material, material_grade, density_kg_m3, density, cost, location, material_form, material_family',
+        'id, material_group, grade, name, density_kg_m3, density, cost, location, material_form, material_family',
       )
       .or(
         `material_group.ilike.%ferrous%,material_group.ilike.%non-ferrous%,material_group.ilike.%aluminium%,material_group.ilike.%aluminum%,material_form.ilike.%sheet%,material_form.ilike.%plate%,material_form.ilike.%coil%,material_form.ilike.%bar%,material_form.ilike.%rod%`,
@@ -64,7 +64,10 @@ export class MaterialIntelligenceService {
       bendCount,
       coating,
     };
-    const ranked = rankMaterials(rows as any[], safeFamily, materialHint, 'India', 5, signals);
+    const ranked = rankMaterials(
+      (rows ?? []).map((r: any) => ({ ...r, material: r.grade, material_grade: r.name })),
+      safeFamily, materialHint, 'India', 5, signals,
+    );
 
     const result: MaterialCandidate[] = [];
     for (const cand of ranked) {

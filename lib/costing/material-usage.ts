@@ -7,6 +7,9 @@ import type { BlankSpecDto } from '@/lib/api/hooks/useBOMItems';
  * - `stock_blank`: machining -- the weight of the stock the blank optimizer
  *   actually selected (stock volume x material density). The engine prices
  *   material on this same figure, so the record must agree with it.
+ * - `casting_charge`: die casting -- Net is the part metal, Gross the metal
+ *   charged (part x the alloy Yield Loss Factor), the same figures the engine
+ *   prices material on (cost summary dieCasting.metal).
  * - `scrap_allowance_fallback`: no real stock/nesting result is available yet
  *   (cost summary still loading, or material density unresolved), so Gross is
  *   estimated as Net / (1 - scrap allowance). A disclosed estimate, never
@@ -16,6 +19,7 @@ import type { BlankSpecDto } from '@/lib/api/hooks/useBOMItems';
 export type MaterialUsageSource =
   | 'sheet_nesting'
   | 'stock_blank'
+  | 'casting_charge'
   | 'scrap_allowance_fallback'
   | 'none';
 
@@ -66,6 +70,8 @@ export interface DeriveMaterialUsageInput {
   itemVolumeMm3: number | null | undefined;
   densityKgM3: number | null | undefined;
   cadWeightKg: number | null | undefined;
+  /** Die casting: the engine's per-part metal (cost summary dieCasting.metal). */
+  castingMetal?: { partKg: number; chargedKg: number } | null;
 }
 
 /**
@@ -87,6 +93,13 @@ export function deriveMaterialUsage(input: DeriveMaterialUsageInput): MaterialUs
       scrapPct: grossUsage > 0 ? r2(((grossUsage - netUsage) / grossUsage) * 100) : 0,
       source: 'sheet_nesting',
     };
+  }
+
+  const metal = input.castingMetal;
+  if (metal && metal.partKg > 0 && metal.chargedKg >= metal.partKg) {
+    const grossUsage = r6(metal.chargedKg);
+    const netUsage = r6(metal.partKg);
+    return { grossUsage, netUsage, scrapPct: r2(((grossUsage - netUsage) / grossUsage) * 100), source: 'casting_charge' };
   }
 
   if (blankSpec && isStockDrivenBlank(blankSpec)) {

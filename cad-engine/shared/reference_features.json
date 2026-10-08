@@ -8,6 +8,18 @@
     "machining": {
       "path": "memory/machining/operations_full__operations.csv",
       "sha256": "c55e538eead93fe0a0213e9fc0c7a910e748694552617463eea0517c76a00e88"
+    },
+    "die_casting": {
+      "path": "memory/Die Casting/Processes/operations.csv",
+      "sha256": "1c6a16939365418ee04fe1e00e742cf252b2c51b0e83ba5aae71e09979b1451d"
+    },
+    "sand_casting": {
+      "path": "memory/Sand casting/Processes/operations.csv",
+      "sha256": "3e535c4bf588eb96e34dc342c1cc9413c85157e539fef1c302aa0cfaedb97de0"
+    },
+    "investment_casting": {
+      "path": "memory/Casting Investment/Processes/operations.csv",
+      "sha256": "e3f364e67a863f06e639c63c48375bc13e86a13bc4bb061637c8ffbf3578b2ed"
     }
   },
   "domains": {
@@ -1594,6 +1606,1011 @@
       "source_capture_warnings": [
         "Source screenshots for '3 Axis Bar Feed Lathe with Sub Spindle' show a gap between 'Plunging//Ring' and 'Slide Machining//SlideBundle' - intermediate rows (Plunging expansions, Postdrill/Preturn Drilling, Reaming, Rotary Broaching, Rough Turning variants, Setup) were not captured in the supplied screenshots and are not included here.",
         "All rows have an empty Notes field, matching the source table (Notes column was blank throughout)."
+      ]
+    },
+    "die_casting": {
+      "row_count": 121,
+      "feature_types": {
+        "ComboVoid": {
+          "child_features": [
+            "MultiStepHole",
+            "Ring",
+            "SimpleHole"
+          ],
+          "machines": [
+            "Core Refractory Coat",
+            "Coremaking",
+            "Gravity Die Casting",
+            "High Pressure Die Casting",
+            "No Cost Feature",
+            "Refractory Coat Air Dry",
+            "Refractory Coat Oven Dry"
+          ],
+          "operations": [
+            "As Cast",
+            "Core Refractory Coating",
+            "Insert Coring",
+            "No Coring",
+            "No Cost Feature",
+            "No Side Pull",
+            "Refractory Coat Air Drying",
+            "Refractory Coat Oven Drying",
+            "SandCore"
+          ],
+          "parent_features": []
+        },
+        "CurvedSurface": {
+          "child_features": [],
+          "machines": [
+            "Coremaking",
+            "Gravity Die Casting",
+            "High Pressure Die Casting",
+            "No Cost Feature"
+          ],
+          "operations": [
+            "As Cast",
+            "No Cost Feature"
+          ],
+          "parent_features": [
+            "Ring"
+          ]
+        },
+        "CurvedWall": {
+          "child_features": [],
+          "machines": [
+            "Coremaking",
+            "Gravity Die Casting",
+            "High Pressure Die Casting",
+            "No Cost Feature"
+          ],
+          "operations": [
+            "As Cast",
+            "No Cost Feature"
+          ],
+          "parent_features": [
+            "Ring"
+          ]
+        },
+        "Edge": {
+          "child_features": [],
+          "machines": [
+            "Coremaking",
+            "Gravity Die Casting",
+            "High Pressure Die Casting",
+            "Trim"
+          ],
+          "operations": [
+            "As Cast",
+            "As Trimmed"
+          ],
+          "parent_features": [
+            "SimpleHole"
+          ]
+        },
+        "MultiStepHole": {
+          "child_features": [
+            "SimpleHole"
+          ],
+          "machines": [
+            "Core Refractory Coat",
+            "Coremaking",
+            "Gravity Die Casting",
+            "High Pressure Die Casting",
+            "No Cost Feature",
+            "Refractory Coat Air Dry",
+            "Refractory Coat Oven Dry",
+            "Trim"
+          ],
+          "operations": [
+            "As Cast",
+            "Core Refractory Coating",
+            "Insert Coring",
+            "No Coring",
+            "No Cost Feature",
+            "No Side Pull",
+            "Refractory Coat Air Drying",
+            "Refractory Coat Oven Drying",
+            "SandCore",
+            "Trimming",
+            "Unscrewing"
+          ],
+          "parent_features": [
+            "ComboVoid"
+          ]
+        },
+        "NotSupported": {
+          "child_features": [],
+          "machines": [
+            "No Cost Feature"
+          ],
+          "operations": [
+            "No Cost Feature"
+          ],
+          "parent_features": []
+        },
+        "PlanarFace": {
+          "child_features": [],
+          "machines": [
+            "Coremaking",
+            "Gravity Die Casting",
+            "High Pressure Die Casting",
+            "No Cost Feature"
+          ],
+          "operations": [
+            "As Cast",
+            "No Cost Feature"
+          ],
+          "parent_features": [
+            "Ring"
+          ]
+        },
+        "Ring": {
+          "child_features": [
+            "CurvedSurface",
+            "CurvedWall",
+            "PlanarFace"
+          ],
+          "machines": [
+            "Core Refractory Coat",
+            "Coremaking",
+            "Gravity Die Casting",
+            "High Pressure Die Casting",
+            "No Cost Feature",
+            "Refractory Coat Air Dry",
+            "Refractory Coat Oven Dry"
+          ],
+          "operations": [
+            "As Cast",
+            "Core Refractory Coating",
+            "No Coring",
+            "No Cost Feature",
+            "No Side Pull",
+            "Refractory Coat Air Drying",
+            "Refractory Coat Oven Drying",
+            "SandCore"
+          ],
+          "parent_features": [
+            "ComboVoid",
+            "RingedHole"
+          ]
+        },
+        "RingedHole": {
+          "child_features": [
+            "Ring",
+            "SimpleHole"
+          ],
+          "machines": [
+            "Core Refractory Coat",
+            "Coremaking",
+            "Gravity Die Casting",
+            "High Pressure Die Casting",
+            "No Cost Feature",
+            "Refractory Coat Air Dry",
+            "Refractory Coat Oven Dry"
+          ],
+          "operations": [
+            "Core Refractory Coating",
+            "Insert Coring",
+            "No Coring",
+            "No Cost Feature",
+            "No Side Pull",
+            "Refractory Coat Air Drying",
+            "Refractory Coat Oven Drying",
+            "SandCore",
+            "Unscrewing"
+          ],
+          "parent_features": []
+        },
+        "SharpEdge": {
+          "child_features": [],
+          "machines": [
+            "Gravity Die Casting",
+            "High Pressure Die Casting"
+          ],
+          "operations": [
+            "As Cast"
+          ],
+          "parent_features": []
+        },
+        "SimpleHole": {
+          "child_features": [
+            "Edge"
+          ],
+          "machines": [
+            "Core Refractory Coat",
+            "Coremaking",
+            "Gravity Die Casting",
+            "High Pressure Die Casting",
+            "No Cost Feature",
+            "Refractory Coat Air Dry",
+            "Refractory Coat Oven Dry",
+            "Trim"
+          ],
+          "operations": [
+            "As Cast",
+            "Core Refractory Coating",
+            "Insert Coring",
+            "No Coring",
+            "No Cost Feature",
+            "No Side Pull",
+            "Refractory Coat Air Drying",
+            "Refractory Coat Oven Drying",
+            "SandCore",
+            "Trimming",
+            "Unscrewing"
+          ],
+          "parent_features": [
+            "ComboVoid",
+            "MultiStepHole",
+            "RingedHole"
+          ]
+        },
+        "SlideBundle": {
+          "child_features": [],
+          "machines": [
+            "Gravity Die Casting",
+            "High Pressure Die Casting"
+          ],
+          "operations": [
+            "Slides"
+          ],
+          "parent_features": []
+        },
+        "Void": {
+          "child_features": [],
+          "machines": [
+            "Core Refractory Coat",
+            "Coremaking",
+            "Gravity Die Casting",
+            "High Pressure Die Casting",
+            "No Cost Feature",
+            "Refractory Coat Air Dry",
+            "Refractory Coat Oven Dry",
+            "Trim"
+          ],
+          "operations": [
+            "As Cast",
+            "Core Refractory Coating",
+            "Insert Coring",
+            "No Coring",
+            "No Cost Feature",
+            "No Side Pull",
+            "Refractory Coat Air Drying",
+            "Refractory Coat Oven Drying",
+            "SandCore",
+            "Trimming"
+          ],
+          "parent_features": []
+        }
+      },
+      "rows_without_feature": []
+    },
+    "sand_casting": {
+      "row_count": 258,
+      "feature_types": {
+        "ComboVoid": {
+          "child_features": [
+            "MultiStepHole",
+            "Ring",
+            "SimpleHole",
+            "Void"
+          ],
+          "machines": [
+            "CO2 Cured",
+            "Core Refractory Coat",
+            "Horizontal Automatic",
+            "Hot Box",
+            "Isocure Gas",
+            "Manual Coremaking",
+            "Manual Floor Moldmaking",
+            "Manual Pit Moldmaking",
+            "Manual Std Moldmaking",
+            "Mold Refractory Coat",
+            "No Bake",
+            "No Cost Feature",
+            "Oil Core",
+            "Refractory Coat Air Dry",
+            "Refractory Coat Oven Dry",
+            "Shell",
+            "Vertical Automatic"
+          ],
+          "operations": [
+            "CO2 Cured Coring:CO2 Cured",
+            "Core Refractory Coating",
+            "Hot Box Coring:Hot Box",
+            "Isocure Gas Coring:Isocure Gas",
+            "Manual Coring:Manual Core",
+            "Mold Refractory Coating",
+            "No Bake Coring:No Bake",
+            "No Cost Feature",
+            "Oil Core Coring:Oil Core",
+            "Refractory Coat Air Drying",
+            "Refractory Coat Oven Drying",
+            "Sand Casting",
+            "Shell Coring:Shell"
+          ],
+          "parent_features": []
+        },
+        "CurvedSurface": {
+          "child_features": [],
+          "machines": [
+            "CO2 Cured",
+            "Horizontal Automatic",
+            "Hot Box",
+            "Isocure Gas",
+            "Manual Coremaking",
+            "Manual Floor Moldmaking",
+            "Manual Pit Moldmaking",
+            "Manual Std Moldmaking",
+            "Mold Refractory Coat",
+            "No Bake",
+            "No Cost Feature",
+            "Oil Core",
+            "Refractory Coat Air Dry",
+            "Refractory Coat Oven Dry",
+            "Shell",
+            "Vertical Automatic"
+          ],
+          "operations": [
+            "As Cast",
+            "As Cored",
+            "Mold Refractory Coating",
+            "No Cost Feature",
+            "Refractory Coat Air Drying",
+            "Refractory Coat Oven Drying"
+          ],
+          "parent_features": [
+            "Ring",
+            "SimpleHole"
+          ]
+        },
+        "CurvedWall": {
+          "child_features": [],
+          "machines": [
+            "CO2 Cured",
+            "Horizontal Automatic",
+            "Hot Box",
+            "Isocure Gas",
+            "Manual Coremaking",
+            "Manual Floor Moldmaking",
+            "Manual Pit Moldmaking",
+            "Manual Std Moldmaking",
+            "Mold Refractory Coat",
+            "No Bake",
+            "No Cost Feature",
+            "Oil Core",
+            "Refractory Coat Air Dry",
+            "Refractory Coat Oven Dry",
+            "Shell",
+            "Vertical Automatic"
+          ],
+          "operations": [
+            "As Cast",
+            "As Cored",
+            "Mold Refractory Coating",
+            "No Cost Feature",
+            "Refractory Coat Air Drying",
+            "Refractory Coat Oven Drying"
+          ],
+          "parent_features": [
+            "Ring",
+            "SimpleHole"
+          ]
+        },
+        "Edge": {
+          "child_features": [],
+          "machines": [
+            "CO2 Cured",
+            "Horizontal Automatic",
+            "Hot Box",
+            "Isocure Gas",
+            "Manual Coremaking",
+            "Manual Floor Moldmaking",
+            "Manual Pit Moldmaking",
+            "Manual Std Moldmaking",
+            "No Bake",
+            "Oil Core",
+            "Shell",
+            "Vertical Automatic"
+          ],
+          "operations": [
+            "As Cast",
+            "As Cored"
+          ],
+          "parent_features": [
+            "SimpleHole"
+          ]
+        },
+        "MultiStepHole": {
+          "child_features": [
+            "SimpleHole"
+          ],
+          "machines": [
+            "CO2 Cured",
+            "Core Refractory Coat",
+            "Horizontal Automatic",
+            "Hot Box",
+            "Isocure Gas",
+            "Manual Coremaking",
+            "Manual Floor Moldmaking",
+            "Manual Pit Moldmaking",
+            "Manual Std Moldmaking",
+            "Mold Refractory Coat",
+            "No Bake",
+            "No Cost Feature",
+            "Oil Core",
+            "Refractory Coat Air Dry",
+            "Refractory Coat Oven Dry",
+            "Shell",
+            "Vertical Automatic"
+          ],
+          "operations": [
+            "As Cored",
+            "CO2 Cured Coring:CO2 Cured",
+            "Core Refractory Coating",
+            "Hot Box Coring:Hot Box",
+            "Isocure Gas Coring:Isocure Gas",
+            "Manual Coring:Manual Core",
+            "Mold Refractory Coating",
+            "No Bake Coring:No Bake",
+            "No Cost Feature",
+            "Oil Core Coring:Oil Core",
+            "Refractory Coat Air Drying",
+            "Refractory Coat Oven Drying",
+            "Sand Casting",
+            "Shell Coring:Shell"
+          ],
+          "parent_features": [
+            "ComboVoid"
+          ]
+        },
+        "NotSupported": {
+          "child_features": [],
+          "machines": [
+            "No Cost Feature"
+          ],
+          "operations": [
+            "No Cost Feature"
+          ],
+          "parent_features": []
+        },
+        "PlanarFace": {
+          "child_features": [],
+          "machines": [
+            "CO2 Cured",
+            "Horizontal Automatic",
+            "Hot Box",
+            "Isocure Gas",
+            "Manual Coremaking",
+            "Manual Floor Moldmaking",
+            "Manual Pit Moldmaking",
+            "Manual Std Moldmaking",
+            "Mold Refractory Coat",
+            "No Bake",
+            "No Cost Feature",
+            "Oil Core",
+            "Refractory Coat Air Dry",
+            "Refractory Coat Oven Dry",
+            "Shell",
+            "Vertical Automatic"
+          ],
+          "operations": [
+            "As Cast",
+            "As Cored",
+            "Mold Refractory Coating",
+            "No Cost Feature",
+            "Refractory Coat Air Drying",
+            "Refractory Coat Oven Drying"
+          ],
+          "parent_features": [
+            "Ring",
+            "SimpleHole"
+          ]
+        },
+        "Ring": {
+          "child_features": [
+            "CurvedSurface",
+            "CurvedWall",
+            "PlanarFace"
+          ],
+          "machines": [
+            "CO2 Cured",
+            "Horizontal Automatic",
+            "Hot Box",
+            "Isocure Gas",
+            "Manual Coremaking",
+            "Manual Floor Moldmaking",
+            "Manual Pit Moldmaking",
+            "Manual Std Moldmaking",
+            "Mold Refractory Coat",
+            "No Bake",
+            "No Cost Feature",
+            "Oil Core",
+            "Refractory Coat Air Dry",
+            "Refractory Coat Oven Dry",
+            "Shell",
+            "Vertical Automatic"
+          ],
+          "operations": [
+            "As Cored",
+            "Mold Refractory Coating",
+            "No Cost Feature",
+            "Refractory Coat Air Drying",
+            "Refractory Coat Oven Drying",
+            "Sand Casting"
+          ],
+          "parent_features": [
+            "ComboVoid",
+            "RingedHole"
+          ]
+        },
+        "RingedHole": {
+          "child_features": [
+            "Ring"
+          ],
+          "machines": [
+            "CO2 Cured",
+            "Core Refractory Coat",
+            "Horizontal Automatic",
+            "Hot Box",
+            "Isocure Gas",
+            "Manual Coremaking",
+            "Manual Floor Moldmaking",
+            "Manual Pit Moldmaking",
+            "Manual Std Moldmaking",
+            "Mold Refractory Coat",
+            "No Bake",
+            "No Cost Feature",
+            "Oil Core",
+            "Refractory Coat Air Dry",
+            "Refractory Coat Oven Dry",
+            "Shell",
+            "Vertical Automatic"
+          ],
+          "operations": [
+            "CO2 Cured Coring:CO2 Cured",
+            "Core Refractory Coating",
+            "Hot Box Coring:Hot Box",
+            "Isocure Gas Coring:Isocure Gas",
+            "Manual Coring:Manual Core",
+            "Mold Refractory Coating",
+            "No Bake Coring:No Bake",
+            "No Cost Feature",
+            "Oil Core Coring:Oil Core",
+            "Refractory Coat Air Drying",
+            "Refractory Coat Oven Drying",
+            "Sand Casting",
+            "Shell Coring:Shell"
+          ],
+          "parent_features": []
+        },
+        "SharpEdge": {
+          "child_features": [],
+          "machines": [
+            "Horizontal Automatic",
+            "Manual Floor Moldmaking",
+            "Manual Pit Moldmaking",
+            "Manual Std Moldmaking",
+            "Mold Refractory Coat",
+            "Refractory Coat Air Dry",
+            "Refractory Coat Oven Dry",
+            "Vertical Automatic"
+          ],
+          "operations": [
+            "Mold Refractory Coating",
+            "Refractory Coat Air Drying",
+            "Refractory Coat Oven Drying",
+            "Sand Casting"
+          ],
+          "parent_features": []
+        },
+        "SimpleHole": {
+          "child_features": [
+            "CurvedSurface",
+            "CurvedWall",
+            "Edge",
+            "PlanarFace"
+          ],
+          "machines": [
+            "CO2 Cured",
+            "Core Refractory Coat",
+            "Horizontal Automatic",
+            "Hot Box",
+            "Isocure Gas",
+            "Manual Coremaking",
+            "Manual Floor Moldmaking",
+            "Manual Pit Moldmaking",
+            "Manual Std Moldmaking",
+            "Mold Refractory Coat",
+            "No Bake",
+            "No Cost Feature",
+            "Oil Core",
+            "Refractory Coat Air Dry",
+            "Refractory Coat Oven Dry",
+            "Shell",
+            "Stock Core",
+            "Vertical Automatic"
+          ],
+          "operations": [
+            "As Cored",
+            "CO2 Cured Coring:CO2 Cured",
+            "Core Refractory Coating",
+            "Hot Box Coring:Hot Box",
+            "Isocure Gas Coring:Isocure Gas",
+            "Manual Coring:Manual Core",
+            "Mold Refractory Coating",
+            "No Bake Coring:No Bake",
+            "No Cost Feature",
+            "Oil Core Coring:Oil Core",
+            "Refractory Coat Air Drying",
+            "Refractory Coat Oven Drying",
+            "Sand Casting",
+            "Shell Coring:Shell",
+            "Stock Core Coring:Stock Core"
+          ],
+          "parent_features": [
+            "ComboVoid",
+            "MultiStepHole"
+          ]
+        },
+        "Void": {
+          "child_features": [],
+          "machines": [
+            "CO2 Cured",
+            "Core Refractory Coat",
+            "Horizontal Automatic",
+            "Hot Box",
+            "Isocure Gas",
+            "Manual Coremaking",
+            "Manual Floor Moldmaking",
+            "Manual Pit Moldmaking",
+            "Manual Std Moldmaking",
+            "Mold Refractory Coat",
+            "No Bake",
+            "No Cost Feature",
+            "Oil Core",
+            "Refractory Coat Air Dry",
+            "Refractory Coat Oven Dry",
+            "Shell",
+            "Vertical Automatic"
+          ],
+          "operations": [
+            "As Cored",
+            "CO2 Cured Coring:CO2 Cured",
+            "Core Refractory Coating",
+            "Hot Box Coring:Hot Box",
+            "Isocure Gas Coring:Isocure Gas",
+            "Manual Coring:Manual Core",
+            "Mold Refractory Coating",
+            "No Bake Coring:No Bake",
+            "No Cost Feature",
+            "Oil Core Coring:Oil Core",
+            "Refractory Coat Air Drying",
+            "Refractory Coat Oven Drying",
+            "Sand Casting",
+            "Shell Coring:Shell"
+          ],
+          "parent_features": [
+            "ComboVoid"
+          ]
+        }
+      },
+      "rows_without_feature": [
+        "CO2 Cured:CO2 Cured Coring",
+        "Hot Box:Hot Box Coring",
+        "Isocure Gas:Isocure Gas Coring",
+        "Manual Coremaking:Manual Coring",
+        "No Bake:No Bake Coring",
+        "Oil Core:Oil Core Coring",
+        "Shell:Shell Coring",
+        "Stock Core:Stock Core Coring"
+      ]
+    },
+    "investment_casting": {
+      "row_count": 111,
+      "feature_types": {
+        "ComboVoid": {
+          "child_features": [],
+          "machines": [
+            "Bench Operation",
+            "Ceramic Core Firing",
+            "Ceramic Core Making",
+            "Ceramic Leaching",
+            "Metal Pouring",
+            "No Cost Feature",
+            "Primary Slurry Dipping",
+            "Soluble Wax Core Making",
+            "Soluble Wax Leaching",
+            "Wax Pattern Molding"
+          ],
+          "operations": [
+            "Cast",
+            "Ceramic Core Finishing:Core Finish",
+            "Ceramic Core Resting:Core Rest",
+            "Ceramic Coring:Ceramic Core",
+            "Ceramic Leach",
+            "Core Fire",
+            "Molded",
+            "No Cost Feature",
+            "Shelled",
+            "Soluble Wax Coring:Wax Core",
+            "Wax Leach"
+          ],
+          "parent_features": []
+        },
+        "CoreBundle": {
+          "child_features": [],
+          "machines": [
+            "Bench Operation",
+            "Ceramic Core Extrusion",
+            "Ceramic Core Firing",
+            "Ceramic Core Making",
+            "Metal Pouring",
+            "No Cost Feature",
+            "Primary Slurry Dipping",
+            "Soluble Wax Core Making",
+            "Soluble Wax Leaching",
+            "Wax Pattern Molding"
+          ],
+          "operations": [
+            "Cast",
+            "Ceramic Core Finishing:Core Finish",
+            "Ceramic Core Fire",
+            "Ceramic Core Resting:Core Rest",
+            "Ceramic Coring:Ceramic Core",
+            "Extruded Ceramic Coring:Ceramic Core Extrude",
+            "Molded",
+            "No Cost Feature",
+            "Shelled",
+            "Soluble Wax Coring:Soluble Wax Core",
+            "Soluble Wax Leach"
+          ],
+          "parent_features": []
+        },
+        "CurvedSurface": {
+          "child_features": [],
+          "machines": [
+            "Ceramic Core Making",
+            "Metal Pouring",
+            "No Cost Feature",
+            "Soluble Wax Core Making"
+          ],
+          "operations": [
+            "As Cast",
+            "Ceramic Coring:As Cored",
+            "No Cost Feature",
+            "Soluble Wax Coring:As Cored"
+          ],
+          "parent_features": []
+        },
+        "CurvedWall": {
+          "child_features": [],
+          "machines": [
+            "Ceramic Core Making",
+            "Metal Pouring",
+            "No Cost Feature",
+            "Soluble Wax Core Making"
+          ],
+          "operations": [
+            "As Cast",
+            "Ceramic Coring:As Cored",
+            "No Cost Feature",
+            "Soluble Wax Coring:As Cored"
+          ],
+          "parent_features": []
+        },
+        "Edge": {
+          "child_features": [],
+          "machines": [
+            "Ceramic Core Extrusion",
+            "Ceramic Core Making",
+            "Metal Pouring",
+            "No Cost Feature",
+            "Soluble Wax Core Making"
+          ],
+          "operations": [
+            "As Cast",
+            "Ceramic Coring:As Cored",
+            "Extruded Ceramic Coring:As Cored",
+            "No Cost Feature",
+            "Soluble Wax Coring:As Cored"
+          ],
+          "parent_features": []
+        },
+        "MultiStepHole": {
+          "child_features": [],
+          "machines": [
+            "Bench Operation",
+            "Ceramic Core Firing",
+            "Ceramic Core Making",
+            "Ceramic Leaching",
+            "Metal Pouring",
+            "No Cost Feature",
+            "Primary Slurry Dipping",
+            "Soluble Wax Core Making",
+            "Soluble Wax Leaching",
+            "Wax Pattern Molding"
+          ],
+          "operations": [
+            "Cast",
+            "Ceramic Core Finishing:Core Finish",
+            "Ceramic Core Resting:Core Rest",
+            "Ceramic Coring:Ceramic Core",
+            "Ceramic Leach",
+            "Core Fire",
+            "Molded",
+            "No Cost Feature",
+            "Shelled",
+            "Soluble Wax Coring:Wax Core",
+            "Wax Leach"
+          ],
+          "parent_features": []
+        },
+        "NotSupported": {
+          "child_features": [],
+          "machines": [
+            "No Cost Feature"
+          ],
+          "operations": [
+            "No Cost Feature"
+          ],
+          "parent_features": []
+        },
+        "PlanarFace": {
+          "child_features": [],
+          "machines": [
+            "Ceramic Core Making",
+            "Metal Pouring",
+            "No Cost Feature",
+            "Soluble Wax Core Making"
+          ],
+          "operations": [
+            "As Cast",
+            "Ceramic Coring:As Cored",
+            "No Cost Feature",
+            "Soluble Wax Coring:As Cored"
+          ],
+          "parent_features": []
+        },
+        "Ring": {
+          "child_features": [],
+          "machines": [
+            "Bench Operation",
+            "Ceramic Core Firing",
+            "Ceramic Core Making",
+            "Ceramic Leaching",
+            "Metal Pouring",
+            "No Cost Feature",
+            "Primary Slurry Dipping",
+            "Soluble Wax Core Making",
+            "Soluble Wax Leaching",
+            "Wax Pattern Molding"
+          ],
+          "operations": [
+            "Cast",
+            "Ceramic Core Finishing:Core Finish",
+            "Ceramic Core Resting:Core Rest",
+            "Ceramic Coring:Ceramic Core",
+            "Ceramic Leach",
+            "Core Fire",
+            "Molded",
+            "No Cost Feature",
+            "Shelled",
+            "Soluble Wax Coring:Wax Core",
+            "Wax Leach"
+          ],
+          "parent_features": []
+        },
+        "SharpEdge": {
+          "child_features": [],
+          "machines": [
+            "Metal Pouring",
+            "No Cost Feature"
+          ],
+          "operations": [
+            "As Cast",
+            "No Cost Feature"
+          ],
+          "parent_features": []
+        },
+        "SimpleHole": {
+          "child_features": [],
+          "machines": [
+            "Bench Operation",
+            "Ceramic Core Extrusion",
+            "Ceramic Core Firing",
+            "Ceramic Core Making",
+            "Ceramic Leaching",
+            "Metal Pouring",
+            "No Cost Feature",
+            "Primary Slurry Dipping",
+            "Soluble Wax Core Making",
+            "Soluble Wax Leaching",
+            "Wax Pattern Molding"
+          ],
+          "operations": [
+            "Cast",
+            "Ceramic Core Finishing:Core Finish",
+            "Ceramic Core Resting:Core Rest",
+            "Ceramic Coring:Ceramic Core",
+            "Ceramic Leach",
+            "Core Fire",
+            "Extruded Ceramic Coring:Ceramic Core Extrude",
+            "Molded",
+            "No Cost Feature",
+            "Shelled",
+            "Soluble Wax Coring:Wax Core",
+            "Wax Leach"
+          ],
+          "parent_features": []
+        },
+        "SlideBundle": {
+          "child_features": [],
+          "machines": [
+            "Metal Pouring",
+            "No Cost Feature",
+            "Primary Slurry Dipping",
+            "Wax Pattern Molding"
+          ],
+          "operations": [
+            "Cast",
+            "Loose Piece",
+            "No Cost Feature",
+            "Shelled",
+            "Slide"
+          ],
+          "parent_features": []
+        },
+        "Void": {
+          "child_features": [],
+          "machines": [
+            "Bench Operation",
+            "Ceramic Core Firing",
+            "Ceramic Core Making",
+            "Ceramic Leaching",
+            "Metal Pouring",
+            "No Cost Feature",
+            "Primary Slurry Dipping",
+            "Soluble Wax Core Making",
+            "Soluble Wax Leaching",
+            "Wax Pattern Molding"
+          ],
+          "operations": [
+            "Cast",
+            "Ceramic Core Finishing:Core Finish",
+            "Ceramic Core Resting:Core Rest",
+            "Ceramic Coring:Ceramic Core",
+            "Ceramic Leach",
+            "Core Fire",
+            "Molded",
+            "No Cost Feature",
+            "Shelled",
+            "Soluble Wax Coring:Wax Core",
+            "Wax Leach"
+          ],
+          "parent_features": []
+        }
+      },
+      "rows_without_feature": [
+        "Bench Operation:Abrasive Disc Grinding",
+        "Bench Operation:Abrasive Wheel Cutting",
+        "Bench Operation:Ceramic Core Finishing",
+        "Bench Operation:Ceramic Core Resting",
+        "Bench Operation:Depth Inspecting",
+        "Bench Operation:Dimensional Inspecting",
+        "Bench Operation:Finishing",
+        "Bench Operation:Insulation Wrapping",
+        "Bench Operation:Mold Cleaning",
+        "Bench Operation:Part Cleaning",
+        "Bench Operation:Part Drying",
+        "Bench Operation:Pattern Finishing",
+        "Bench Operation:Pattern Sub-Assembly",
+        "Bench Operation:Tree Assembly",
+        "Bench Operation:Visual Inspecting",
+        "Bench Operation:Wax Vent Plugging",
+        "Ceramic Core Extrusion:Extruded Ceramic Coring",
+        "Ceramic Core Making:Ceramic Coring",
+        "Soluble Wax Core Making:Soluble Wax Coring"
       ]
     }
   }

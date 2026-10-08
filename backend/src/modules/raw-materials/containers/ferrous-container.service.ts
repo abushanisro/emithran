@@ -76,9 +76,9 @@ export class FerrousContainerService {
 
     const materialData = {
       material_group: this.ensureFerrousCategory(createDto.materialGroup),
-      material: createDto.material,
+      grade: createDto.material,
       material_type: createDto.materialType,
-      material_grade: createDto.materialGrade,
+      name: createDto.materialGrade,
       material_description: createDto.materialDescription,
       shape: createDto.shape,
       stock_form: createDto.stockForm,
@@ -173,7 +173,7 @@ export class FerrousContainerService {
     const { data, error } = await this.supabaseService
       .getClient(accessToken)
       .from('raw_materials')
-      .select('material, material_grade, location, density_kg_m3, cost')
+      .select('grade, name, location, density_kg_m3, cost')
       .or('material_group.ilike.%ferrous%,material_group.ilike.%steel%,material_group.ilike.%iron%,material_group.ilike.%metal%');
 
     if (error) {
@@ -186,7 +186,7 @@ export class FerrousContainerService {
     let costCount = 0;
 
     materials.forEach(material => {
-      const grade = material.material_grade || 'Unknown';
+      const grade = material.name || 'Unknown';
       byGrade[grade] = (byGrade[grade] || 0) + 1;
 
       if (material.cost) { totalCost += parseFloat(material.cost); costCount++; }
@@ -197,8 +197,8 @@ export class FerrousContainerService {
     const compositionData = materials
       .filter(m => m.density_kg_m3)
       .map(m => ({
-        material: m.material,
-        grade: m.material_grade || 'Unknown',
+        material: m.grade,
+        grade: m.name || 'Unknown',
         density: parseFloat(m.density_kg_m3),
       }));
 
@@ -257,7 +257,7 @@ export class FerrousContainerService {
 
   private applyFilters(queryBuilder: any, query: QueryRawMaterialsDto) {
     if (query.material) {
-      queryBuilder = queryBuilder.eq('material', query.material);
+      queryBuilder = queryBuilder.eq('grade', query.material);
     }
     if (query.search) {
       queryBuilder = queryBuilder.or(
@@ -268,7 +268,7 @@ export class FerrousContainerService {
   }
 
   private applySorting(queryBuilder: any, query: QueryRawMaterialsDto) {
-    const sortBy = query.sortBy || 'material';
+    const sortBy = ({ material: 'grade', material_grade: 'name' } as Record<string, string>)[query.sortBy || 'material'] ?? query.sortBy ?? 'grade';
     const sortOrder = query.sortOrder || 'asc';
     return queryBuilder.order(sortBy, { ascending: sortOrder === 'asc' });
   }

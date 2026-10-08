@@ -33,7 +33,12 @@ router = APIRouter()
 # Used both to FIND label cells AND to EXCLUDE them from being selected as values.
 
 _LABEL_KEYS: dict[str, re.Pattern] = {
-    "material":   re.compile(r"^MATER(?:IAL)?$|^MATL$|^MAT$", re.I),
+    # "MATERIAL SPECIFICATION" is a real title-block label wording (confirmed
+    # live) -- without this, the label cell's own text doesn't match here, Pass
+    # 1 finds nothing, and the flat-text fallback (path 2 below) was matching
+    # "MATERIAL" and capturing the label's own trailing word "SPECIFICATION"
+    # as if it were the value.
+    "material":   re.compile(r"^MATER(?:IAL)?(?:\s+SPEC(?:IFICATION)?)?$|^MATL$|^MAT$", re.I),
     "revision":   re.compile(r"^REV(?:ISION)?$|^ISSUE$|^REV\.$", re.I),
     "thickness":  re.compile(r"^(?:SHEET\s+)?THI?C?K(?:NESS)?$|^THK$", re.I),
     "tolerance":  re.compile(r"^(?:GENERAL\s+)?TOL(?:ERANCE)?$|^G\.TOL$", re.I),
@@ -54,7 +59,7 @@ _LABEL_KEYS: dict[str, re.Pattern] = {
 # All known labels combined — used to exclude label blocks from value candidates
 _ALL_LABEL_RE = re.compile(
     r"""^(?:
-        MATER(?:IAL)?|MATL?                          |
+        MATER(?:IAL)?(?:\s+SPEC(?:IFICATION)?)?|MATL? |
         REV(?:ISION)?|ISSUE                           |
         THI?C?K(?:NESS)?|THK                          |
         (?:GENERAL\s+)?TOL(?:ERANCE)?|G\.TOL          |
@@ -90,6 +95,7 @@ _PLACEHOLDER = re.compile(
         TBD|TBC|TBR    |
         \?+            |
         SPECIFY        |
+        SPEC(?:IFICATION)?   |
         AS\s+PER\s+\w+
     )$""",
     re.IGNORECASE | re.VERBOSE,
@@ -259,13 +265,18 @@ def _extract_material(tb: dict[str, str], flat: str) -> tuple[str, float]:
         if norm:
             return norm, 0.92
 
-    # 2) Inline "MATERIAL: ..." in flat text
+    # 2) Inline "MATERIAL: ..." in flat text. This has no coordinates to tell
+    # a label cell's own trailing word from a real value (unlike path 1
+    # above) -- confirmed live: "MATERIAL SPECIFICATION" as a title-block
+    # label (no colon, no real value following it in the flat text) matched
+    # "MATERIAL" and captured the label's own word "SPECIFICATION" as if it
+    # were the material. _is_label guards the same way path 1 already does.
     for pat in (
         r"(?:MATERIAL|MATL|MAT)[:\s\-–]+([A-Z0-9][A-Z0-9 /\.\-]{1,30})",
         r"(?:SHEET\s+)?MATERIAL[:\s\-–]+([A-Z0-9][A-Z0-9 /\.\-]{1,30})",
     ):
         raw2 = _find(pat, flat)
-        if raw2 and not _is_placeholder(raw2):
+        if raw2 and not _is_placeholder(raw2) and not _is_label(raw2):
             raw2 = re.split(r'\s{2,}|\t|\n', raw2)[0].strip()
             norm = _normalize_material(raw2)
             if norm:

@@ -402,7 +402,7 @@ export class RetrievalService {
   private async queryRawMaterials(client: any, userId: string, family: string, rates: RateSnapshot) {
     const { data, error } = await client
       .from('raw_materials')
-      .select('id, material_group, material, material_grade, density_kg_m3, cost, currency, location, user_id, material_form, material_family')
+      .select('id, material_group, grade, name, density_kg_m3, cost, currency, location, user_id, material_form, material_family')
       .or(`material_group.ilike.%ferrous%,material_group.ilike.%non-ferrous%,material_group.ilike.%plastic%,material_group.ilike.%rubber%,material_group.ilike.%metal%`)
       .limit(120);
 
@@ -421,6 +421,8 @@ export class RetrievalService {
       const localPerInr = rates.convertOptional(currency, 'INR');
       return {
         ...row,
+        material: row.grade,
+        material_grade: row.name,
         cost_original: row.cost,
         cost_original_currency: currency,
         cost: localPerInr != null ? Number(row.cost ?? 0) * localPerInr : null,
@@ -700,8 +702,8 @@ export class RetrievalService {
         .from('raw_materials')
         .select('material_family')
         .or(
-          `material_grade.ilike.%${clean}%,` +
-          `material.ilike.%${clean}%,` +
+          `name.ilike.%${clean}%,` +
+          `grade.ilike.%${clean}%,` +
           `material_group.ilike.%${clean}%`,
         )
         .not('material_family', 'is', null)
@@ -719,7 +721,7 @@ export class RetrievalService {
         const { data: kd } = await client
           .from('raw_materials')
           .select('material_family')
-          .or(`material_grade.ilike.%${kClean}%,material.ilike.%${kClean}%`)
+          .or(`name.ilike.%${kClean}%,grade.ilike.%${kClean}%`)
           .not('material_family', 'is', null)
           .limit(1)
           .maybeSingle();

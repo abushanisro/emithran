@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import type { RouteId } from './route-comparison.dto';
 import { getCuttingRouteIds, getFormingRouteIds, getMachiningRouteIds } from '../costing/shared/core/manufacturing-process-registry';
 import { LOCATION_INFO } from '../costing/shared/core/default-rates.constants';
+import { DIE_CASTING_PROCESSES, dieCastingRouteId } from '../costing/casting/die-casting-process-choice';
 
 // The locations this system holds real rate and material-cost data for, taken
 // from LOCATION_INFO itself so the validator can never drift from the table
@@ -20,6 +21,7 @@ export const VALID_ROUTE_IDS: RouteId[] = [
   ...getFormingRouteIds(),
   ...getMachiningRouteIds(),
   'injection-molding', 'im-small-50t', 'im-standard-200t', 'im-large-500t',
+  ...DIE_CASTING_PROCESSES.map(dieCastingRouteId),
 ];
 
 export class ApplyRouteDto {
