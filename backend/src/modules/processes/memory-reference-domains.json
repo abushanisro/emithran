@@ -86,7 +86,7 @@
       "label": "2 Mold Molding",
       "folder": "2 Mold Molding",
       "sourceVersion": "2026-2MoldMolding",
-      "processGroup": null,
+      "processGroup": "2 Mold Molding",
       "stagedBy": "823"
     },
     {
@@ -102,7 +102,7 @@
       "label": "Multi-Spindle Machining",
       "folder": "Multi-Spindle Maching",
       "sourceVersion": "2026-Multi-Spindle",
-      "processGroup": null,
+      "processGroup": "Multi-Spindle Machining",
       "stagedBy": "786/787"
     },
     {
@@ -136,6 +136,104 @@
       "sourceVersion": "2026-SandCasting",
       "processGroup": "Sand Casting",
       "stagedBy": "853",
+      "materialsTable": "raw_materials"
+    },
+    {
+      "key": "casting_investment",
+      "label": "Casting Investment",
+      "folder": "Casting Investment",
+      "sourceVersion": "2026-CastInvest",
+      "processGroup": "Casting Investment",
+      "stagedBy": "863",
+      "materialsTable": "raw_materials"
+    },
+    {
+      "key": "assembly_molding",
+      "label": "Assembly Molding",
+      "folder": "Assembly molding",
+      "sourceVersion": "2026-AssyMolding",
+      "processGroup": "Assembly Molding",
+      "stagedBy": "863"
+    },
+    {
+      "key": "assembly_plastic_molding",
+      "label": "Assembly Plastic Molding",
+      "folder": "Assembly plastic molding",
+      "sourceVersion": "2026-AssyPlastic",
+      "processGroup": "Assembly Plastic Molding",
+      "stagedBy": "863",
+      "materialsTable": "raw_materials"
+    },
+    {
+      "key": "bar_tube_fab",
+      "label": "Bar and Tube Fabrication",
+      "folder": "Bar and tube fab",
+      "sourceVersion": "2026-BarTube",
+      "processGroup": "Bar and Tube Fabrication",
+      "stagedBy": "863",
+      "materialsTable": "raw_materials"
+    },
+    {
+      "key": "powder_metal",
+      "label": "Powder Metal",
+      "folder": "Powder metal",
+      "sourceVersion": "2026-PowderMetal",
+      "processGroup": "Powder Metal",
+      "stagedBy": "863",
+      "materialsTable": "raw_materials"
+    },
+    {
+      "key": "rapid_prototyping",
+      "label": "Rapid Prototyping",
+      "folder": "Rapid prototyping",
+      "sourceVersion": "2026-RapidProto",
+      "processGroup": "Rapid Prototyping",
+      "stagedBy": "863",
+      "materialsTable": "raw_materials"
+    },
+    {
+      "key": "roto_blow_molding",
+      "label": "Roto & Blow Molding",
+      "folder": "Roto & blow molding",
+      "sourceVersion": "2026-RotoBlow",
+      "processGroup": "Roto & Blow Molding",
+      "stagedBy": "863",
+      "materialsTable": "raw_materials"
+    },
+    {
+      "key": "sheet_roll_forming",
+      "label": "Sheet Metal Roll Forming",
+      "folder": "Sheet metal roll forming",
+      "sourceVersion": "2026-RollForm",
+      "processGroup": "Sheet Metal Roll Forming",
+      "stagedBy": "863",
+      "materialsTable": "raw_materials"
+    },
+    {
+      "key": "sheet_stretch_forming",
+      "label": "Sheet Metal Stretch Forming",
+      "folder": "Sheet metal stretch forming",
+      "sourceVersion": "2026-StretchForm",
+      "processGroup": "Sheet Metal Stretch Forming",
+      "stagedBy": "863",
+      "materialsTable": "raw_materials"
+    },
+    {
+      "key": "sheet_transfer_die",
+      "label": "Sheet Metal Transfer Die",
+      "folder": "Sheet metal transfer die",
+      "sourceVersion": "2026-TransferDie",
+      "processGroup": "Sheet Metal Transfer Die",
+      "stagedBy": "863",
+      "materialsTable": "raw_materials"
+    },
+    {
+      "key": "sheet_plastic",
+      "label": "Sheet Plastic",
+      "folder": "Sheet Plastic",
+      "sourceVersion": "2026-SheetPlastic",
+      "processGroup": "Sheet Plastic",
+      "stagedBy": "863",
       "materialsTable": "raw_materials"
     }
   ]

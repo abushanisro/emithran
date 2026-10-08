@@ -94,10 +94,26 @@ for (const d of MANIFEST.domains.filter((x) => x.stagedBy === STAGED_BY)) {
   const out = [];
   const counts = {};
   const keysUsed = new Map();
-  const add = (category, key, value, unit, note, raw) => {
-    const k = `${category}::${key}`;
-    if (keysUsed.has(k)) throw new Error(`${d.key}: duplicate ${category} key "${key}" (${keysUsed.get(k)} and ${note})`);
+  const valuesUsed = new Map();
+  const dupNotes = [];
+  // `file` (variable / wage_grade / operation / process rows): two files of one
+  // folder may carry the same key (Sheet metal transfer die has both
+  // all_plant_variables.csv and transfer_die_variables.csv). The same value
+  // again is staged once; a different value is staged under "key@file" so
+  // neither is lost. Both are named in the header. Without `file` a repeat is
+  // a generator bug and stops the run.
+  const add = (category, key, value, unit, note, raw, file) => {
+    let k = `${category}::${key}`;
+    if (keysUsed.has(k)) {
+      if (!file) throw new Error(`${d.key}: duplicate ${category} key "${key}" (${keysUsed.get(k)} and ${note})`);
+      if (String(valuesUsed.get(k)) === String(value)) { dupNotes.push(`${category} ${key} (${file}, same value)`); return; }
+      key = `${key}@${path.basename(file, '.csv')}`;
+      k = `${category}::${key}`;
+      if (keysUsed.has(k)) throw new Error(`${d.key}: duplicate ${category} key "${key}"`);
+      dupNotes.push(`${category} ${key} (${file}, differing value: staged under this key)`);
+    }
     keysUsed.set(k, note);
+    valuesUsed.set(k, value);
     out.push(`(${sqlStr(category)}, 'USA', ${sqlStr(d.sourceVersion)}, ${sqlStr(key)}, ${sqlStr(value)}, ${sqlStr(unit)}, ${sqlStr(note)}, ${sqlJsonb(raw)})`);
     counts[category] = (counts[category] ?? 0) + 1;
   };
@@ -158,22 +174,22 @@ for (const d of MANIFEST.domains.filter((x) => x.stagedBy === STAGED_BY)) {
       if (iN < 0 || iV < 0) throw new Error(`${rel}: not a variables file`);
       txt.slice(1).forEach((r, i) => {
         if (!text(r[iN])) return;
-        add('variable', text(r[iN]), text(r[iV]), iU >= 0 ? text(r[iU]) : null, iNo >= 0 ? text(r[iNo]) : null, t.rows[i]);
+        add('variable', text(r[iN]), text(r[iV]), iU >= 0 ? text(r[iU]) : null, iNo >= 0 ? text(r[iNo]) : null, t.rows[i], rel);
       });
     } else if (/wage_grade/.test(name)) {
       for (const r of t.rows) {
         const k = col(r, 'Process Name', 'processName');
-        if (k) add('wage_grade', String(k), col(r, 'Wage Grade Name', 'wageGradeName'), null, null, r);
+        if (k) add('wage_grade', String(k), col(r, 'Wage Grade Name', 'wageGradeName'), null, null, r, rel);
       }
     } else if (/operation/.test(name)) {
       for (const r of t.rows) {
-        const k = col(r, 'Process Name', 'Process Name (raw)', 'processName');
-        if (k) add('operation', String(k), null, null, null, r);
+        const k = col(r, 'Process Name', 'Process Name (raw)', 'Process Name (Full Path)', 'processName');
+        if (k) add('operation', String(k), null, null, null, r, rel);
       }
     } else if (/process/.test(name)) {
       for (const r of t.rows) {
         const k = col(r, 'Process Name', 'processName');
-        if (k) add('process', String(k), col(r, 'Default Machine', 'defaultMachine'), null, col(r, 'Notes', 'notes'), r);
+        if (k) add('process', String(k), col(r, 'Default Machine', 'defaultMachine'), null, col(r, 'Notes', 'notes'), r, rel);
       }
     } else if (materialTable && !d.materialsTable) {
       for (const r of t.rows) {
@@ -184,6 +200,12 @@ for (const d of MANIFEST.domains.filter((x) => x.stagedBy === STAGED_BY)) {
     // A domain whose manifest entry names materialsTable keeps its materials in
     // that real table (its own promotion migration), never as JSON rows here.
     if (materialTable && d.materialsTable) notes.push(`${rel}: materials go to ${d.materialsTable} (not staged here)`);
+  }
+
+  if (dupNotes.length) {
+    const same = dupNotes.filter((n) => n.endsWith("same value)"));
+    const differing = dupNotes.filter((n) => !n.endsWith("same value)"));
+    notes.push(`${d.label}: ${same.length} key(s) repeated with the same value in a second file, staged once${differing.length ? `; differing, staged under key@file: ${differing.join("; ")}` : ""}`);
   }
 
   summary.push(`--   ${d.label.padEnd(28)} ${d.sourceVersion.padEnd(19)} ${Object.entries(counts).map(([k, v]) => `${k} ${v}`).join(', ')}`);

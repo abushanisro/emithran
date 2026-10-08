@@ -44,6 +44,7 @@ import {
 import {
   useMHRRecords,
   useMHRCurrencies,
+  useMHRProcessGroups,
   useMHRLocations,
   useDeleteMHR,
   useDeleteAllMHR,
@@ -132,25 +133,24 @@ export default function HRRatesPage() {
   const [isMhrFormOpen, setIsMhrFormOpen] = useState(false);
   const [editingMhrId, setEditingMhrId] = useState<string | null>(null);
 
-  // Load every record in one page — the table itself scrolls, so there's no
-  // pagination UI to advance a "page 2" and no limit should hide rows.
-  // Process Group is deliberately NOT sent to the server: the backend's
-  // filter does an exact `process_group = ...` match, but most pre-existing
-  // rows (everything imported before this session) never had process_group
-  // set at all — only commodity_code. The table's own display already
-  // falls back to commodityCode (see effectiveProcessGroupOf below); a
-  // server-side exact-match filter that doesn't know about that fallback
-  // silently dropped ~95% of real Sheet Metal rows. Filtering client-side
-  // with the identical fallback keeps the filter and the display honest
-  // about what "Sheet Metal" actually means for this data.
+  // Load every record of the selected process group in one page — the table
+  // itself scrolls, so there's no pagination UI and no limit should hide rows.
+  // The group filter is sent to the server: every mhr_records row now carries
+  // process_group (the commodity_code-only rows this page once had to filter
+  // client-side are gone), and loading all ~2,900 USA machines (~8 MB) just to
+  // show one group made the request slow enough to fail. "All Process Groups"
+  // still loads everything. The client-side filter below stays as a guard for
+  // any row that still lacks process_group.
   const { data: mhrData, isLoading: isMhrLoading } = useMHRRecords({
     search: mhrSearch,
     ...(mhrLocation ? { location: mhrLocation } : {}),
     ...(mhrCurrency ? { currency: mhrCurrency } : {}),
+    ...(mhrProcessGroupFilter ? { processGroup: mhrProcessGroupFilter } : {}),
     limit: 10000,
   });
   const { data: mhrCurrencies = [] } = useMHRCurrencies();
   const { data: mhrLocations = [] } = useMHRLocations();
+  const { data: mhrServerProcessGroups = [] } = useMHRProcessGroups();
 
   const filteredMhrRecords = useMemo(() => {
     const records = mhrData?.records ?? [];
@@ -158,14 +158,16 @@ export default function HRRatesPage() {
     return records.filter(r => effectiveProcessGroupOf(r) === mhrProcessGroupFilter);
   }, [mhrData?.records, mhrProcessGroupFilter]);
 
-  // Real distinct process groups AS ACTUALLY DISPLAYED (processGroup ??
-  // commodityCode) — not the /mhr/process-groups endpoint, which only queries
-  // the real process_group column and would miss every commodityCode-only
-  // group. Shared with Edit Process Cost, which derives its Process picker from
-  // the identical rule over the identical query.
+  // Every process group with machines on file (/mhr/process-groups, a light
+  // query), plus the groups of the loaded rows as displayed (processGroup ??
+  // commodityCode). The loaded rows alone are now one group's, so they can no
+  // longer list the others.
   const mhrProcessGroupOptions = useMemo(
-    () => optionsKeepingSelection(buildHrRatesIndex(mhrData?.records ?? []).processGroups, mhrProcessGroupFilter),
-    [mhrData?.records, mhrProcessGroupFilter],
+    () => optionsKeepingSelection(
+      [...new Set([...mhrServerProcessGroups, ...buildHrRatesIndex(mhrData?.records ?? []).processGroups])].sort(),
+      mhrProcessGroupFilter,
+    ),
+    [mhrServerProcessGroups, mhrData?.records, mhrProcessGroupFilter],
   );
 
   // Live ECB/Frankfurter reference rates for every distinct currency the
@@ -428,7 +430,12 @@ export default function HRRatesPage() {
               className="text-destructive hover:text-destructive"
               disabled={!mhrData?.records?.length || deleteAllMhrMutation.isPending}
               onClick={() => {
-                if (confirm(`Delete all ${mhrData?.total ?? 0} MHR records? This cannot be undone.`)) {
+                // Deletes every record, not only the loaded (filtered) ones —
+                // so the loaded count is not shown as the number deleted.
+                const scope = mhrProcessGroupFilter || mhrLocation
+                  ? 'Delete ALL MHR records in every process group and location (not only the ones shown)?'
+                  : `Delete all ${mhrData?.total ?? 0} MHR records?`;
+                if (confirm(`${scope} This cannot be undone.`)) {
                   deleteAllMhrMutation.mutate();
                 }
               }}

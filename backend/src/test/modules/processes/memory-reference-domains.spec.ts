@@ -58,6 +58,20 @@ describe('memory reference domains', () => {
     }
   });
 
+  it('migration 863 stages every remaining folder, each opening its own catalog group', () => {
+    const dir = path.join(REPO, 'backend/migrations');
+    const parts = fs.readdirSync(dir).filter((f) => /^863_stage_memory_domains/.test(f));
+    expect(parts.length).toBeGreaterThan(0);
+    const sql = parts.map((f) => fs.readFileSync(path.join(dir, f), 'utf-8')).join(' ');
+    const staged = MEMORY_DOMAINS.filter((x) => x.stagedBy === '863');
+    expect(staged.length).toBeGreaterThan(0);
+    for (const d of staged) {
+      expect(sql).toContain(`'USA', $str$${d.sourceVersion}$str$`);
+      // Migration 862 seeds the catalog group of the same name.
+      expect(REFERENCE_GROUP_DOMAIN[d.processGroup!]).toBe(d.key);
+    }
+  });
+
   it('Plastic Molding lists the complete restage, including the tables the old key scheme lost', () => {
     expect(REFERENCE_DOMAINS['injection_molding']!.versions).toEqual(['2026-Plastic']);
     const dir = path.join(REPO, 'backend/migrations');

@@ -94,7 +94,7 @@ const COLUMNS = [
 ];
 
 /**
- * @param {Array<{file:string, rel:string, category:string, machineClass:string, grade:string|null,
+ * @param {Array<{file?:string, table?:{columns:string[], rows:object[]}, rel:string, category:string, machineClass:string, grade:string|null,
  *                envelope:[string|null,string|null,string|null,string|null],
  *                categoryColumn?:string, classOf?:(c:string)=>string, gradeOf?:(c:string)=>string|null}>} files
  *   categoryColumn: a column naming each row's own category/process (e.g. the
@@ -102,13 +102,24 @@ const COLUMNS = [
  *   machine class and wage grade per row.
  * @param {string} processGroup
  */
+// mhr_records.specs of one source row: its provenance plus every column that
+// has no mhr_records column of its own (BASE), verbatim.
+function specsOf(row, specCols, rel) {
+  const specs = { source: `memory/${rel}` };
+  for (const c of specCols) specs[specKey(c)] = row[c];
+  return specs;
+}
+const specColumns = (columns, exclude) => columns.filter((c) => !(c in BASE) && c !== exclude);
+
 function buildMachineRows(files, processGroup) {
   const rows = [];
   const report = [];
   for (const f of files) {
-    const t = readCsv(f.file);
+    // `table` (readCsv's {columns, rows}) lets a caller pass a source it had to
+    // reshape first (gen_862: transposed or truncated-header exports).
+    const t = f.table ?? readCsv(f.file);
     for (const c of f.envelope) if (c && !t.columns.includes(c)) throw new Error(`${f.rel}: envelope column "${c}" missing`);
-    const specCols = t.columns.filter((c) => !(c in BASE) && c !== f.categoryColumn);
+    const specCols = specColumns(t.columns, f.categoryColumn);
     const seen = new Set();
     for (const m of t.rows) {
       const rawName = m['Name'] ?? m['Machine Name'];
@@ -129,8 +140,7 @@ function buildMachineRows(files, processGroup) {
       if (!hasRates && !f.ratesAbsentInSource) throw new Error(`${f.rel} ${name}: missing overhead rate`);
       const mhr = hasRates ? Math.round((direct + indirect) * 100) / 100 : null;
       const labour = get('labour'), price = get('price'), loc = get('mfr');
-      const specs = { source: `memory/${f.rel}` };
-      for (const c of specCols) specs[specKey(c)] = m[c];
+      const specs = specsOf(m, specCols, f.rel);
       const cap = f.envelope.map((c) => (c ? m[c] : null));
       const hasCap = cap.some((v) => typeof v === 'number' && v > 0);
       rows.push([
@@ -187,4 +197,77 @@ WHERE NOT EXISTS (
 );`;
 }
 
-module.exports = { parseCsv, readCsv, sqlStr, sqlNum, sqlJsonb, specKey, buildMachineRows, insertSql };
+// ── Source-shape normalisation (gen_862, gen_864) ───────────────────────────
+// A transposed Field,Value file is one machine; "Accounting: " style section
+// prefixes are dropped; a header the export truncated ("Direct Over...") maps
+// only when it is the prefix of exactly one known column; camelCase keys
+// (accounting.laborRateUsdPerHr) map to their export names.
+const KNOWN = [
+  'Name', 'Description', 'Labor Rate (USD / hr)', 'Direct Overhead Rate (USD / hr)', 'Indirect Overhead Rate (USD / hr)',
+  'Number of Operators', 'Labor Time Standard', 'Wage Grade Name', 'Work Center Labor Rate Factor', 'Setup Time (hr)',
+  'Avg Utilization', 'Good Part Yield', 'Machine Price (USD)', 'Machine Length (mm)', 'Machine Width (mm)',
+  'Footprint Allowance Factor', 'Machine Power (kW)', 'Installation Factor (%)', 'Machine Uptime (%)',
+  'Annual Maintenance Factor (%)', 'Machine Life (yr)', 'Salvage Value Factor (%)', 'Supplies Cost (USD / yr)',
+  'Machine Manufacturer Location', 'Overhead Multiplier', 'Is Preferred',
+];
+const CAMEL = {
+  name: 'Name', laborRateUsdPerHr: 'Labor Rate (USD / hr)', directOverheadRateUsdPerHr: 'Direct Overhead Rate (USD / hr)',
+  indirectOverheadRateUsdPerHr: 'Indirect Overhead Rate (USD / hr)', overheadMultiplier: 'Overhead Multiplier',
+  numberOfOperators: 'Number of Operators', laborTimeStandard: 'Labor Time Standard', wageGradeName: 'Wage Grade Name',
+  workCenterLaborRateFactor: 'Work Center Labor Rate Factor', setupTimeHr: 'Setup Time (hr)', isPreferred: 'Is Preferred',
+  avgUtilization: 'Avg Utilization', goodPartYield: 'Good Part Yield', machinePriceUsd: 'Machine Price (USD)',
+  machineLengthMm: 'Machine Length (mm)', machineWidthMm: 'Machine Width (mm)', footprintAllowanceFactor: 'Footprint Allowance Factor',
+  machinePowerKw: 'Machine Power (kW)', installationFactorPct: 'Installation Factor (%)', machineUptimePct: 'Machine Uptime (%)',
+  annualMaintenanceFactorPct: 'Annual Maintenance Factor (%)', machineLifeYr: 'Machine Life (yr)',
+  salvageValueFactorPct: 'Salvage Value Factor (%)', suppliesCostUsdPerYr: 'Supplies Cost (USD / yr)',
+  machineManufacturerLocation: 'Machine Manufacturer Location',
+};
+const NAME_ALIASES = new Set(['Primary ID Name', 'Primary ID / Name', 'Primary ID (Name)', 'Machine Name']);
+
+function normalizeHeader(h, renames) {
+  let c = h.trim();
+  if (/^[a-z][A-Za-z]*\.[A-Za-z]+$/.test(c)) c = CAMEL[c.split('.')[1]] ?? c; // accounting.laborRateUsdPerHr
+  else if (c in CAMEL) c = CAMEL[c];
+  c = c.replace(/^(Accounting|Time|Other|Yields|Bottom-?Up Overhead Rate Inputs|Manufacturer Information|Capabilities):\s*/i, '');
+  if (NAME_ALIASES.has(c)) c = 'Name';
+  const truncated = /^(.*?)\s*(\.\.\.|…)$/.exec(c);
+  if (truncated) {
+    const hits = KNOWN.filter((k) => k.startsWith(truncated[1]));
+    if (hits.length === 1) c = hits[0];
+  }
+  if (c !== h.trim()) renames.push(`${h.trim()} -> ${c}`);
+  return c;
+}
+
+// readCsv's {columns, rows} with the headers normalised; a transposed
+// Field,Value / Property,Value / parameter,value[,unit] file becomes a one-row
+// table (a unit column is folded into the field name the way the other
+// exports spell it: "Labor Rate" + "USD / hr" -> "Labor Rate (USD / hr)").
+function readMachineTable(file) {
+  const raw = readCsv(file);
+  const renames = [];
+  let columns = raw.columns, rows = raw.rows;
+  const [c0, c1, c2] = raw.columns;
+  const transposed = (raw.columns.length === 2 || (raw.columns.length === 3 && /^units?$/i.test(c2)))
+    && /^(field|property|parameter)$/i.test(c0) && /^value$/i.test(c1);
+  if (transposed) {
+    const fieldOf = (r) => {
+      const f = String(r[c0]).trim();
+      const u = c2 && r[c2] != null ? String(r[c2]).trim() : '';
+      return u && !/\(.*\)$/.test(f) ? `${f} (${u})` : f;
+    };
+    columns = raw.rows.map(fieldOf);
+    rows = [Object.fromEntries(raw.rows.map((r) => [fieldOf(r), r[c1]]))];
+    renames.push(`transposed ${raw.columns.join(',')} -> one machine`);
+  }
+  const map = Object.fromEntries(columns.map((c) => [c, normalizeHeader(c, renames)]));
+  const outCols = [...new Set(Object.values(map))];
+  if (outCols.length !== columns.length) throw new Error(`${file}: two headers normalise to the same column`);
+  return {
+    columns: outCols,
+    rows: rows.map((r) => Object.fromEntries(columns.map((c) => [map[c], r[c]]))),
+    renames,
+  };
+}
+
+module.exports = { parseCsv, readCsv, sqlStr, sqlNum, sqlJsonb, specKey, specsOf, specColumns, buildMachineRows, insertSql, readMachineTable };

@@ -4,7 +4,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { HttpModule } from '@nestjs/axios';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 
-import { ProjectsModule } from './modules/projects/projects.module';
+import { ProjectsModule } from './modules/projects/projects.module'; 862 
 import { VendorsModule } from './modules/vendors/vendors.module';
 import { BOMsModule } from './modules/boms/boms.module';
 import { BOMItemsModule } from './modules/bom-items/bom-items.module';
