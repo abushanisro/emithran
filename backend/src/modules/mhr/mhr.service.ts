@@ -12,7 +12,7 @@ import { invalidateMachinePools } from '../bom-items/costing/shared/capability/m
 import { resolveMachineEconomics } from '../bom-items/costing/shared/capability/machine-selection/economics-resolver';
 import { ExchangeRateService, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
 import { LHRService } from '../lhr/lhr.service';
-import { specsReferenceDetail } from './specs-reference-detail';
+import { pickRegionalReferenceRow, specsReferenceDetail } from './specs-reference-detail';
 import * as ExcelJS from 'exceljs';
 
 /**
@@ -401,7 +401,7 @@ export class MHRService {
     const { data: row, error: rowError } = await this.supabaseService
       .getClient(accessToken)
       .from('mhr_records')
-      .select('benchmark_source_key, machine_name, specs')
+      .select('benchmark_source_key, machine_name, specs, location')
       .eq('id', id)
       .maybeSingle();
     if (rowError || !row) {
@@ -411,26 +411,38 @@ export class MHRService {
     const empty: MHRReferenceDetailDto = { found: false, sourceKey: null, raw: null };
     const client = this.supabaseService.getClient(accessToken);
 
+    // One key is staged once per region (USA machine_library + 836's
+    // India/China/Mexico/France rate rows), so this reads every row of the key
+    // and picks one, rather than .maybeSingle() (which errors on several).
     if (row.benchmark_source_key) {
       const { data } = await client
         .from('sm_reference_data')
-        .select('key, raw')
+        .select('key, raw, source_region')
         .eq('category', 'machine')
-        .eq('key', row.benchmark_source_key)
-        .maybeSingle();
-      if (data) return { found: true, sourceKey: data.key, raw: data.raw ?? null };
+        .eq('key', row.benchmark_source_key);
+      const hit = pickRegionalReferenceRow(data ?? [], row.location);
+      if (hit) return { found: true, sourceKey: hit.key, raw: hit.raw ?? null };
     }
 
     if (row.machine_name?.trim()) {
       const nameLower = row.machine_name.trim().toLowerCase();
+      // ILIKE "%name%" with the name's own LIKE wildcards escaped narrows the
+      // read to a handful of rows (a source name may carry stray whitespace);
+      // the trimmed, exact comparison below still decides the match.
+      const likeExact = `%${row.machine_name.trim().replace(/[\\%_]/g, (c: string) => `\\${c}`)}%`;
 
       const { data: smData } = await client
         .from('sm_reference_data')
-        .select('key, raw')
-        .eq('category', 'machine');
+        .select('key, raw, source_region')
+        .eq('category', 'machine')
+        // Filtered in the query: these tables hold more machine rows than
+        // PostgREST returns unpaginated (1000), so an unfiltered read could
+        // drop the very row being looked up.
+        .ilike('raw->>name', likeExact);
       const smMatches = (smData ?? []).filter((r: any) => String(r.raw?.name ?? '').trim().toLowerCase() === nameLower);
-      if (smMatches.length === 1) {
-        return { found: true, sourceKey: smMatches[0].key, raw: smMatches[0].raw ?? null };
+      const smHit = pickRegionalReferenceRow(smMatches, row.location);
+      if (smHit) {
+        return { found: true, sourceKey: smHit.key, raw: smHit.raw ?? null };
       }
 
       // The Plastic Molding presses (migration 633) are keyed
@@ -440,11 +452,16 @@ export class MHRService {
       // block above.
       const { data: imData } = await client
         .from('im_reference_data')
-        .select('key, raw')
-        .eq('category', 'machine');
+        .select('key, raw, source_region')
+        .eq('category', 'machine')
+        // Filtered in the query: these tables hold more machine rows than
+        // PostgREST returns unpaginated (1000), so an unfiltered read could
+        // drop the very row being looked up.
+        .ilike('raw->>name', likeExact);
       const imMatches = (imData ?? []).filter((r: any) => String(r.raw?.name ?? '').trim().toLowerCase() === nameLower);
-      if (imMatches.length === 1) {
-        return { found: true, sourceKey: imMatches[0].key, raw: imMatches[0].raw ?? null };
+      const imHit = pickRegionalReferenceRow(imMatches, row.location);
+      if (imHit) {
+        return { found: true, sourceKey: imHit.key, raw: imHit.raw ?? null };
       }
 
       // Machining's real machine dataset (migration 692, partial — more
@@ -454,11 +471,16 @@ export class MHRService {
       // against machining_reference_data category='machine'.
       const { data: machData } = await client
         .from('machining_reference_data')
-        .select('key, raw')
-        .eq('category', 'machine');
+        .select('key, raw, source_region')
+        .eq('category', 'machine')
+        // Filtered in the query: these tables hold more machine rows than
+        // PostgREST returns unpaginated (1000), so an unfiltered read could
+        // drop the very row being looked up.
+        .ilike('raw->>name', likeExact);
       const machMatches = (machData ?? []).filter((r: any) => String(r.raw?.name ?? '').trim().toLowerCase() === nameLower);
-      if (machMatches.length === 1) {
-        return { found: true, sourceKey: machMatches[0].key, raw: machMatches[0].raw ?? null };
+      const machHit = pickRegionalReferenceRow(machMatches, row.location);
+      if (machHit) {
+        return { found: true, sourceKey: machHit.key, raw: machHit.raw ?? null };
       }
     }
 
