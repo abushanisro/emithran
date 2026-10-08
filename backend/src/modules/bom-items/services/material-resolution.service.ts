@@ -188,7 +188,7 @@ export class MaterialResolutionService {
     //
     // id/material/material_group/*_standard: identity columns the ranker
     // needs to score a candidate (materialCol above is only the COST column).
-    const selectCols = `${materialCol}, id, material, material_group, material_type, astm_standard, din_standard, en_standard, jis_standard, cost_india, cost, density, density_kg_m3, shape, material_grade, shearing_strength, ultimate_tensile_strength, shear_strength_mpa, uts_mpa, melting_temp_c, mold_temp_c, specific_heat_melt, thermal_conductivity_melt, eject_deflection_temp_c` +
+    const selectCols = `${materialCol}, id, grade, material_group, material_type, astm_standard, din_standard, en_standard, jis_standard, cost_india, cost, density, density_kg_m3, shape, name, shearing_strength, ultimate_tensile_strength, shear_strength_mpa, uts_mpa, melting_temp_c, mold_temp_c, specific_heat_melt, thermal_conductivity_melt, eject_deflection_temp_c` +
       (cureTimeColumnAvailable ? `, cure_time_min` : '') +
       (imColumnsAvailable ? `, im_injection_pressure_max_mpa, im_flow_length_ratio, im_density_of_melt_kg_m3, im_reference_material` : '');
 
@@ -234,7 +234,7 @@ export class MaterialResolutionService {
       ({ data } = await client
         .from('raw_materials')
         .select(selectCols)
-        .ilike('material', exactPattern)
+        .ilike('grade', exactPattern)
         .limit(5));
       if (data?.length) stage = 'exact';
     }
@@ -242,7 +242,7 @@ export class MaterialResolutionService {
       ({ data } = await client
         .from('raw_materials')
         .select(selectCols)
-        .ilike('material_grade', exactPattern)
+        .ilike('name', exactPattern)
         .limit(5));
       if (data?.length) stage = 'exact';
     }
@@ -268,7 +268,7 @@ export class MaterialResolutionService {
         .flatMap((t) => expandSearchTermSpellingVariants(t))
         .flatMap((v) => {
           const safe = escapeLikePattern(v).replace(/"/g, '\\"');
-          return ['material_grade', 'material', 'astm_standard', 'din_standard', 'en_standard', 'jis_standard']
+          return ['name', 'grade', 'astm_standard', 'din_standard', 'en_standard', 'jis_standard']
             .map((col) => `${col}.ilike."%${safe}%"`);
         })
         .join(',');
@@ -276,7 +276,7 @@ export class MaterialResolutionService {
         .from('raw_materials')
         .select(selectCols)
         .or(orClause)
-        .order('material', { ascending: true })
+        .order('grade', { ascending: true })
         .limit(300));
     }
 
@@ -310,8 +310,8 @@ export class MaterialResolutionService {
       return {
         // ranker identity
         id: row.id as string,
-        material: (row.material as string | null) ?? null,
-        materialGrade: (row.material_grade as string | null) ?? null,
+        material: (row.grade as string | null) ?? null,
+        materialGrade: (row.name as string | null) ?? null,
         materialGroup: (row.material_group as string | null) ?? null,
         materialType: (row.material_type as string | null) ?? null,
         astmStandard: (row.astm_standard as string | null) ?? null,
@@ -488,7 +488,10 @@ export class MaterialResolutionService {
           }
           const hasUts = best.utsMpa != null && best.utsMpa > 0 && best.shearStrengthMpa != null && best.shearStrengthMpa > 0;
           const familyUts = hasUts ? null : resolveUtsMpa(grade);
-          if (!hasUts) {
+          // UTS/shear drive press-brake and turret-punch tonnage and the sheet-metal
+          // DFM checks only; no other family reads them (a casting uses its own
+          // alloy Shear Strength, casting-reference.ts), so the gap is said there only.
+          if (!hasUts && family === 'sheet_metal') {
             warnings.push(
               familyUts != null
                 ? `Material "${grade}" found in raw_materials, but no verified UTS/shear strength — using the approved ${grade} family UTS (${familyUts} MPa) for press-brake tonnage. Shear strength has no approved-family table, so it is unavailable and turret-punch tonnage checks are skipped until verified values are added.`

@@ -72,6 +72,13 @@ export interface StoredProcessRow {
   batchSize?: number | null;
   location?: string | null;
   cycleTime?: number | null;
+  /**
+   * 'per_part': a per-part charge with no machine time (die-casting melting,
+   * a consumable allowance); totalCostPerPart is its cost, there is no time x
+   * rate to re-derive. 'time' (or absent, older rows): setup and cycle x rates.
+   */
+  chargeBasis?: 'time' | 'per_part' | null;
+  totalCostPerPart?: number | null;
   heads?: number | null;
   partsPerCycle?: number | null;
   scrap?: number | null;
@@ -242,8 +249,11 @@ export function resolveStoredProcessLines<
     const partsPerCycle = Math.max(num(row.partsPerCycle, 1), 1);
     const scrap = num(row.scrap);
 
-    const setupPerPart = ((setupMin / 60) * (machineRate + laborRate * setupManning)) / batchSize;
-    const cyclePerPart = ((cycleSec / 3600) * (machineRate + laborRate * heads)) / partsPerCycle;
+    const perPartCharge = row.chargeBasis === 'per_part';
+    const setupPerPart = perPartCharge ? 0 : ((setupMin / 60) * (machineRate + laborRate * setupManning)) / batchSize;
+    const cyclePerPart = perPartCharge
+      ? num(row.totalCostPerPart)
+      : ((cycleSec / 3600) * (machineRate + laborRate * heads)) / partsPerCycle;
 
     const persistedBatchSize = Number.isFinite(Number(row.batchSize)) && Number(row.batchSize) >= 1
       ? Math.floor(Number(row.batchSize))

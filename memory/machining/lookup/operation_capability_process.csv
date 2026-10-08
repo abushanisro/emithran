@@ -1,0 +1,36 @@
+Operation,Capability Process,Basis
+Boring,Boring,exact name
+Bulk Milling Surface,Milling,process family (user decision 2026-10-04)
+Contouring,Milling,process family (user decision 2026-10-04)
+Cylindrical Grinder,Cylindrical Grinding,process family (user decision 2026-10-04)
+Drilling,Drilling,exact name
+Fine Finish Milling,Milling Fine,process family (user decision 2026-10-04)
+Finish Boring,Boring,process family (user decision 2026-10-04)
+Finish Plunge Grinding,Surface Grinding,process family (user decision 2026-10-04)
+Finish Traverse Grinding,Surface Grinding,process family (user decision 2026-10-04)
+General Mill Finishing,Milling,process family (user decision 2026-10-04)
+Gun Drilling,Gun Drilling,exact name
+ID Finish Plunge Grinding,Cylindrical Grinding,process family (user decision 2026-10-04)
+ID Finish Traverse Grinding,Cylindrical Grinding,process family (user decision 2026-10-04)
+Internal Grinder,Cylindrical Grinding,process family (user decision 2026-10-04)
+Jig Boring,Jig Boring,exact name
+Mill Boring,Boring,process family (user decision 2026-10-04)
+Mill Contouring,Milling,process family (user decision 2026-10-04)
+Mill Facing,Milling,process family (user decision 2026-10-04)
+Multistep Holemaking,Drilling,process family (user decision 2026-10-04)
+OD Finish Plunge Grinding,Cylindrical Grinding,process family (user decision 2026-10-04)
+OD Finish Traverse Grinding,Cylindrical Grinding,process family (user decision 2026-10-04)
+Plunging,Plunging,exact name
+Polygon Turning,Polygon Turning,exact name
+Reaming,Reaming,exact name
+Reciprocating Surface Grinder,Surface Grinding,process family (user decision 2026-10-04)
+Rotary Broaching,Rotary Broaching,exact name
+Rotary Surface Grinder,Surface Grinding,process family (user decision 2026-10-04)
+Rough Boring,Boring,process family (user decision 2026-10-04)
+Rough Milling,Milling,process family (user decision 2026-10-04)
+Semi-Finish Boring,Boring,process family (user decision 2026-10-04)
+Shaping,Shaping,exact name
+Side Milling,Milling,process family (user decision 2026-10-04)
+Step Drilling,Drilling,process family (user decision 2026-10-04)
+Tapping,Tapping,exact name
+Wire EDM,Wire EDM,exact name

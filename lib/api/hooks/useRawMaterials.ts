@@ -18,6 +18,8 @@ export interface RawMaterial {
   materialGroup: string;
   material: string;
   materialGrade?: string;
+  description?: string;
+  stockFormsPriced?: number;
   materialType?: string;   // stores Excel GROUP (ABS, Acetal, etc.)
   materialDescription?: string;
   densityKgM3?: number;
@@ -94,11 +96,15 @@ export interface RawMaterial {
 export interface RawMaterialListResponse {
   items: RawMaterial[];
   total: number;
+  /** Set when asked for one processGroup: the material groups the list was limited to (empty = none linked, whole database). */
+  processMaterialGroups?: string[];
 }
 
 export interface QueryRawMaterialsParams {
   search?: string;
   materialGroup?: string;
+  /** Only the material groups linked to this process group (migration 879). */
+  processGroup?: string;
   materialCategory?: MaterialCategory;
   material?: string;
   country?: Country;
@@ -428,5 +434,70 @@ export function useRawMaterialProperties(materialId: string | null) {
     queryFn: () => apiClient.get<RawMaterialProperty[]>(`/raw-materials/${materialId}/properties`),
     enabled: !!materialId,
     staleTime: 1000 * 60 * 10,
+  });
+}
+
+export interface MaterialStockPriceRow {
+  stockForm: string;
+  location: string;
+  pricePerKg: number;
+  currencyCode: string;
+  source: string;
+}
+
+export function useStockForms() {
+  return useQuery({
+    queryKey: ['raw-materials', 'stock-forms'],
+    queryFn: () => apiClient.get<{ forms: string[] }>('/raw-materials/stock-forms'),
+    staleTime: 1000 * 60 * 60,
+  });
+}
+
+export function useRawMaterialStockPrices(materialId: string | null) {
+  return useQuery({
+    queryKey: ['raw-materials', 'stock-prices', materialId],
+    queryFn: () => apiClient.get<MaterialStockPriceRow[]>(`/raw-materials/${materialId}/stock-prices`),
+    enabled: !!materialId,
+  });
+}
+
+// The edit form's whole state, loaded in one request and saved in one request.
+export interface RawMaterialEditorData {
+  material: RawMaterial;
+  properties: RawMaterialProperty[];
+  stockPrices: MaterialStockPriceRow[];
+  stockForms: string[];
+}
+
+export interface RawMaterialEditorSave {
+  core: {
+    materialGroup: string;
+    material: string;
+    grade: string | null;
+    materialType: string | null;
+    materialDescription: string | null;
+    costUsa: number | null;
+  };
+  properties: Array<{ propertyKey: string; valueNum?: number | null; valueText?: string | null }>;
+  stockPrices: Array<{ stockForm: string; location: string; pricePerKg: number }>;
+}
+
+export function useRawMaterialEditor(materialId: string | null) {
+  return useQuery({
+    queryKey: ['raw-materials', 'editor', materialId],
+    queryFn: () => apiClient.get<RawMaterialEditorData>(`/raw-materials/${materialId}/editor`),
+    enabled: !!materialId,
+  });
+}
+
+export function useSaveRawMaterialEditor(materialId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: RawMaterialEditorSave) =>
+      apiClient.put<RawMaterialEditorData>(`/raw-materials/${materialId}/editor`, payload),
+    onSuccess: (saved) => {
+      queryClient.setQueryData(['raw-materials', 'editor', materialId], saved);
+      queryClient.invalidateQueries({ queryKey: ['raw-materials'] });
+    },
   });
 }

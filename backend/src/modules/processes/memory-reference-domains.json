@@ -144,7 +144,7 @@
       "folder": "Casting Investment",
       "sourceVersion": "2026-CastInvest",
       "processGroup": "Casting Investment",
-      "stagedBy": "863",
+      "stagedBy": "874",
       "materialsTable": "raw_materials"
     },
     {
@@ -235,6 +235,14 @@
       "processGroup": "Sheet Plastic",
       "stagedBy": "863",
       "materialsTable": "raw_materials"
+    },
+    {
+      "key": "standards",
+      "label": "Standards",
+      "folder": "Standards",
+      "sourceVersion": "2026-Standards",
+      "processGroup": null,
+      "stagedBy": "880"
     }
   ]
 }

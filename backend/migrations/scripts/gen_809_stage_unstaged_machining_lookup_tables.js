@@ -19,6 +19,8 @@
 //
 // Aborts if a key already exists in an earlier staging migration.
 // Run: node backend/migrations/scripts/gen_809_stage_unstaged_machining_lookup_tables.js
+// A later table: --migration=<N> --table=<key>:<file.csv> (repeatable) stages
+// only those tables as migration N (e.g. 882, operation_capability_process).
 
 const fs = require('fs');
 const path = require('path');
@@ -26,14 +28,15 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 const LOOKUP_DIR = path.join(ROOT, 'memory', 'Machining', 'lookup');
 const OUT_DIR = path.join(__dirname, '..');
-const MIGRATION_BASE_NUM = 809;
+const arg = (name) => process.argv.filter((a) => a.startsWith(`--${name}=`)).map((a) => a.slice(name.length + 3));
+const MIGRATION_BASE_NUM = Number(arg('migration')[0] ?? 809);
 const PART_SIZE_LIMIT_BYTES = 200_000;
 const SOURCE_REGION = 'USA';
 const SOURCE_VERSION = '2026-03';
 
 // key -> files (relative to LOOKUP_DIR). Keys match the table names the
 // reference uses; the _partial suffix is recorded as status, not in the key.
-const TABLES = [
+const DEFAULT_TABLES = [
   ['tblMilling', ['tblMilling_partial.csv']],
   ['tblTapping', ['tblTapping.csv']],
   ['tblThreadMilling', ['tblThreadMilling.csv']],
@@ -50,6 +53,9 @@ const TABLES = [
   ['tblStraightBevelGearCutting', ['tblStraightBevelGearCutting_partial.csv']],
   ['tblDovetailFinishingPassCharacteristics', ['tblDovetailFinishingPassCharacteristics.csv']],
 ];
+const TABLES = arg('table').length
+  ? arg('table').map((t) => { const [key, file] = t.split(':'); return [key, [file]]; })
+  : DEFAULT_TABLES;
 
 function parseCsv(text) {
   const rows = [];
@@ -140,7 +146,9 @@ if (cur.length) parts.push(cur);
 
 parts.forEach((partRows, i) => {
   const num = MIGRATION_BASE_NUM + i;
-  const fileName = `${num}_stage_unstaged_machining_lookup_tables_part${i + 1}of${parts.length}.sql`;
+  const fileName = MIGRATION_BASE_NUM === 809
+    ? `${num}_stage_unstaged_machining_lookup_tables_part${i + 1}of${parts.length}.sql`
+    : `${num}_stage_machining_lookup_${TABLES.map(([k]) => k).join('_')}.sql`;
   const list = partRows.map((r) => `--   ${r.key.padEnd(40)} ${String(r.rowCount).padStart(4)} rows  ${r.status.padEnd(8)} <- ${r.files.join(' + ')}`).join('\n');
   const sql = `-- ============================================================================
 -- Migration ${num}: stage memory/Machining lookup tables never staged before

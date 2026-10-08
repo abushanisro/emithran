@@ -176,6 +176,25 @@ export class NreService {
       });
     }
 
+    // ── Die casting die and coreboxes (the route's tooling, memory/Die Casting) ─
+    const die = cost.dieTooling;
+    if (die) {
+      const usd = die.totalToolingUsd ?? die.dieCostUsd;
+      items.push(die.ok && usd != null
+        ? {
+          item: 'Die casting die', status: 'costed', usd,
+          detail: `${die.diesRequired ?? 1} × ${die.complexity} die${die.dieSizeMm ? ` ${die.dieSizeMm.map((v) => Math.round(v)).join(' × ')} mm` : ''}` +
+            ` at ${die.dieCostUsd?.toFixed(2)} USD each` +
+            (die.shotsPerDie != null ? `; one die lasts ${die.shotsPerDie.toLocaleString()} shots` : ''),
+          source: 'memory/Die Casting (die tooling tables) + tool shop rates',
+        }
+        : { item: 'Die casting die', status: 'gap', usd: null, detail: die.reason ?? 'Die cost not derivable for this part.', source: 'memory/Die Casting' });
+    }
+    const boxes = cost.coreboxTooling;
+    if (boxes) {
+      items.push({ item: 'Coreboxes', status: 'costed', usd: boxes.costUsd, detail: `${boxes.boxes} corebox(es): ${boxes.detail}`, source: 'memory/Die Casting (coremaking) + tool shop rates' });
+    }
+
     items.push({
       item: 'Cutting tools, gauges',
       status: 'gap',

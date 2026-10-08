@@ -166,6 +166,13 @@ export function resolveSetupMinutes(args: {
    * that knows the part rather than just the machine or the operation.
    */
   calculatorSetupMin?: number | null;
+  /**
+   * The machine's setup hours as recorded in its own memory reference record
+   * (machining_reference_data raw time.setupTimeHr). Recorded, so 0 is a real
+   * zero (memory gives the Manual Bench Cells 0.0 hr); HR Rates setup_time_hr
+   * cannot say that, its staging wrote blank cells as 0 too.
+   */
+  referenceSetupTimeHr?: number | null;
   /** MHRRateInput.setupTimeHr — the real per-machine value, hours. */
   machineSetupTimeHr?: number | null;
   /** Real per-operation minutes from sm_lookup_op_setup_time, when found. */
@@ -173,13 +180,17 @@ export function resolveSetupMinutes(args: {
   /** Machine name, for a more useful disclosure message. */
   machineName?: string | null;
 }): SetupTimeResolution {
-  const { process, calculatorSetupMin, machineSetupTimeHr, operationSetupMin, machineName } = args;
+  const { process, calculatorSetupMin, referenceSetupTimeHr, machineSetupTimeHr, operationSetupMin, machineName } = args;
 
   // A calculator result is derived from this part's own real geometry, so it
   // beats a generic machine or operation figure. Same "0 is not a real value"
   // rule as the tiers below.
   if (typeof calculatorSetupMin === 'number' && Number.isFinite(calculatorSetupMin) && calculatorSetupMin > 0) {
     return { setupMin: calculatorSetupMin, source: 'calculator' };
+  }
+
+  if (typeof referenceSetupTimeHr === 'number' && Number.isFinite(referenceSetupTimeHr) && referenceSetupTimeHr >= 0) {
+    return { setupMin: referenceSetupTimeHr * 60, source: 'machine' };
   }
 
   // A machine with a real, positive setup_time_hr on file is the most specific
@@ -260,6 +271,10 @@ export interface RouteDataGapLine {
    * 15, which is why this is a gap and not a nullable column.
    */
   setupTimeMin?: number | null;
+  /** ProcessLineCost.rateSource; a per-part charge (isPerPartCharge) has no machine time. */
+  rateSource?: string | null;
+  /** The money the engine charged for the line, per part. */
+  totalCost?: number | null;
   physicsGap?:
     | {
         gapType: 'missing_lookup';
@@ -318,6 +333,17 @@ export function formatNearestRowsDisclosure(rows: readonly LookupTableRow[] | un
 const MIN_PERSISTABLE_CYCLE_SEC = 0.01;
 
 /**
+ * A line charged per part with no machine time: a consumable or conversion
+ * cost (rateSource 'consumable_allowance'), e.g. die-casting Melting (melted
+ * kg x the melter conversion cost per kg; memory/Die Casting has no melt rate)
+ * or waterjet nozzle wear. It has no cycle or setup time to resolve; its
+ * charge is the data, and it is persisted as charge_basis 'per_part'.
+ */
+export function isPerPartCharge(line: { rateSource?: string | null }): boolean {
+  return line.rateSource === 'consumable_allowance';
+}
+
+/**
  * Every operation in `lines` whose required costing data is missing, in line
  * order. Empty means the route is fully costed and can be both ranked and
  * applied.
@@ -335,6 +361,10 @@ export function findRouteDataGaps(lines: readonly RouteDataGapLine[]): RouteData
         nearestRows = line.physicsGap.lookupResolution?.nearestRows;
       } else {
         reason = line.physicsGap.reason;
+      }
+    } else if (isPerPartCharge(line)) {
+      if (!(line.totalCost != null && line.totalCost > 0)) {
+        reason = 'no per-part charge was resolved for this line, so it cannot be costed or persisted';
       }
     } else if (cycleTimeSec < MIN_PERSISTABLE_CYCLE_SEC) {
       // Says what is actually wrong. A cycle that rounds to 0.00 s at the

@@ -21,6 +21,7 @@ describe('liveOperationOptions', () => {
       label: 'Inspection',
       detail: 'Hole diameter ×4, Flatness ×1',
       cycleTimeMin: 0.32,
+      lineProcess: 'Inspection',
     });
   });
 
@@ -43,6 +44,24 @@ describe('liveOperationOptions', () => {
     const [op] = liveOperationOptions([roughTurning], new Set(['cnc_lathe']), new Map([['Rough Turning', 'Ring']]));
     expect(op!.value).toBe('Rough Turning');
     expect(op!.label).toBe('Rough Turning // Ring');
+  });
+
+  it('a line that performs several catalog operations offers each one, sharing the line', () => {
+    const hpdc = {
+      process: 'High Pressure Die Casting', machineClass: 'die_casting_high_pressure_die_casting', cycleTimeMin: 1.14,
+      featureBreakdown: [{ name: 'Fill' }, { name: 'Solidification' }],
+      featureOperations: [
+        { operation: 'No Coring', featureType: 'SimpleHole', instances: Array.from({ length: 17 }, () => ({})) },
+        { operation: 'As Cast', featureType: 'Void', instances: [{}, {}, {}] },
+      ],
+    };
+    const opts = liveOperationOptions([hpdc], new Set(['die_casting_high_pressure_die_casting']), new Map());
+    expect(opts.map((o) => o.value)).toEqual(['As Cast // Void', 'No Coring // SimpleHole']);
+    expect(opts.map((o) => o.label)).toEqual(['As Cast // Void [3]', 'No Coring // SimpleHole [17]']);
+    expect(opts.every((o) => o.lineProcess === 'High Pressure Die Casting' && o.cycleTimeMin === 0)).toBe(true);
+    // The line's own name is not an operation: nothing pre-selected.
+    expect(resolveSavedOperation([hpdc], 'High Pressure Die Casting', 'die_casting_high_pressure_die_casting')).toBe('');
+    expect(resolveSavedOperation([hpdc], 'As Cast // Void', 'die_casting_high_pressure_die_casting')).toBe('As Cast // Void');
   });
 });
 

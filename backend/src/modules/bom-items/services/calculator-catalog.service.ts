@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../../common/supabase/supabase.service';
 import { cachedRead } from '../costing/shared/core/request-cache';
+import { loadDieCastingCalculatorSpec } from '../costing/casting/calculators/die-casting-calculator-spec';
+import type { ReferenceCalculators } from '../costing/shared/calculators/reference-calculator';
 
 @Injectable()
 export class CalculatorCatalogService {
@@ -65,6 +67,38 @@ export class CalculatorCatalogService {
         calculators: calculators ?? [],
         fields: fields ?? [],
       };
+    });
+  }
+
+  /**
+   * The die-casting calculators (migration 893), keyed by spec key: the global,
+   * current calculator of each spec name with its fields. A calculator not in
+   * the database is absent, so the line that needs it is a named gap.
+   */
+  loadDieCastingCalculators(accessToken: string): Promise<ReferenceCalculators> {
+    return cachedRead('die-casting-calculators', async () => {
+      const spec = loadDieCastingCalculatorSpec();
+      const client = this.supabaseService.getClient(accessToken);
+      const { data: calcs } = await client
+        .from('calculators')
+        .select('id, name, version')
+        .in('name', spec.calculators.map((c) => c.name))
+        .is('user_id', null)
+        .is('retired_at', null);
+      const ids = (calcs ?? []).map((c: any) => c.id);
+      if (ids.length === 0) return {};
+      const { data: fields } = await client
+        .from('calculator_fields')
+        .select('calculator_id, field_name, display_label, field_type, unit, default_value, display_order, data_source, source_table, source_field')
+        .in('calculator_id', ids)
+        .order('display_order');
+      const out: ReferenceCalculators = {};
+      for (const c of spec.calculators) {
+        const row = (calcs ?? []).find((x: any) => x.name === c.name);
+        const fs = (fields ?? []).filter((f: any) => f.calculator_id === row?.id);
+        if (row && fs.length) out[c.key] = { calculatorId: row.id, name: row.name, version: row.version ?? 1, fields: fs };
+      }
+      return out;
     });
   }
 }

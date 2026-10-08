@@ -246,7 +246,7 @@ interface ProcessCostDialogProps {
   // specific part's real detected geometry produced it. Each line's own
   // featureBreakdown (when present) gives finer-grained real options, e.g.
   // "Drilling Ø4.0mm ×2" instead of just "Drilling".
-  liveProcessLines?: Array<{ process: string; machineClass: string; cycleTimeMin: number; featureBreakdown?: Array<{ name: string; featureType: string; timeSec: number; count: number }>; machineSelection?: { balanced?: { candidate?: { machineId?: string | null } } } }>;
+  liveProcessLines?: Array<{ process: string; machineClass: string; cycleTimeMin: number; featureBreakdown?: Array<{ name: string; featureType: string; timeSec: number; count: number }>; featureOperations?: Array<{ operation: string | null; featureType: string; instances: unknown[] }>; machineSelection?: { balanced?: { candidate?: { machineId?: string | null } } } }>;
 }
 
 export function ProcessCostDialog({
@@ -704,7 +704,7 @@ export function ProcessCostDialog({
   );
   const operationOptionsWithSaved = useMemo((): LiveOperationOption[] => {
     if (!savedLiveOperation || operationOptions.some((op) => op.value === savedLiveOperation)) return operationOptions;
-    return [...operationOptions, { value: savedLiveOperation, label: `${savedLiveOperation} — saved, not in this part's current CAD extraction`, detail: null, cycleTimeMin: 0 }];
+    return [...operationOptions, { value: savedLiveOperation, label: `${savedLiveOperation} — saved, not in this part's current CAD extraction`, detail: null, cycleTimeMin: 0, lineProcess: savedLiveOperation }];
   }, [operationOptions, savedLiveOperation]);
 
   const filteredMHR = useMemo(() => {
@@ -1001,12 +1001,13 @@ export function ProcessCostDialog({
     const currentValid = selectedMHRId && filteredMHR.some(r => String(r.id) === String(selectedMHRId));
     if (currentValid) return;
     const liveForCategory = liveProcessLines.filter((l) => categoryMachineClasses.has(l.machineClass));
-    const liveLine = liveForCategory.find((l) => l.process === selectedOperation) ?? liveForCategory[0];
+    const lineProcess = operationOptionsWithSaved.find((o) => o.value === selectedOperation)?.lineProcess ?? selectedOperation;
+    const liveLine = liveForCategory.find((l) => l.process === lineProcess) ?? liveForCategory[0];
     const engineMachineId = liveLine?.machineSelection?.balanced?.candidate?.machineId;
     if (engineMachineId && filteredMHR.some(r => String(r.id) === String(engineMachineId))) {
       setSelectedMHRId(String(engineMachineId));
     }
-  }, [processFullySelected, filteredMHR, userOverrodeMHR, selectedMHRId, liveProcessLines, categoryMachineClasses, selectedOperation]);
+  }, [processFullySelected, filteredMHR, userOverrodeMHR, selectedMHRId, liveProcessLines, categoryMachineClasses, selectedOperation, operationOptionsWithSaved]);
 
 
   // Reset the calculator override whenever the process identity changes, OR
@@ -2743,8 +2744,16 @@ export function ProcessCostDialog({
                           </SelectContent>
                         </Select>
                         {(() => {
-                          const detail = operationOptionsWithSaved.find((op) => op.value === selectedOperation)?.detail;
-                          return detail ? <p className="text-xs text-muted-foreground">Features costed on this line: {detail}</p> : null;
+                          const op = operationOptionsWithSaved.find((o) => o.value === selectedOperation);
+                          if (!op?.detail) return null;
+                          const shared = op.lineProcess !== op.value;
+                          return (
+                            <p className="text-xs text-muted-foreground">
+                              {shared
+                                ? `One ${op.lineProcess} shot performs every operation in this list; its cycle: ${op.detail}`
+                                : `Features costed on this line: ${op.detail}`}
+                            </p>
+                          );
                         })()}
                         {selectedCategory && operationOptions.length === 0 && selectedOperation && (
                           <p className="text-xs text-amber-600 dark:text-amber-500">

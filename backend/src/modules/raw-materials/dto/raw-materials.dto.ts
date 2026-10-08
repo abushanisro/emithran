@@ -302,6 +302,13 @@ export class QueryRawMaterialsDto {
   @IsString()
   materialGroup?: string;
 
+  // The part's process group: only the material groups linked to it
+  // (process_material_groups, migration 879) are listed.
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  processGroup?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

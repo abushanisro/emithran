@@ -236,3 +236,17 @@ describe('sequential input changes leave no stale carry-over', () => {
     expect(seen[3]!.setup).toBeCloseTo(seen[0]!.setup, 12);
   });
 });
+
+describe('resolveStoredProcessLines — per-part charge rows', () => {
+  it('takes a melting row cost from its saved total, with no time x rate', () => {
+    // Die-casting Melting: 0.44 kg melted x the melter conversion cost per kg.
+    const melting = row({
+      machineClass: 'casting_pm_melting', machineName: 'Induction Furnace - 0.06m^3 Capacity',
+      machineRate: 0, laborRate: 0, setupTime: 0, cycleTime: null,
+      chargeBasis: 'per_part', totalCostPerPart: 0.1873,
+    });
+    const [line] = resolveStoredProcessLines([melting], [], EFFECTIVE);
+    expect(line!.setupPerPart).toBe(0);
+    expect(line!.totalPerPart).toBeCloseTo(0.1873, 12);
+  });
+});

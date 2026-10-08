@@ -8,6 +8,7 @@ Sources (raw, untouched, source of truth):
   memory/sheetmetal/process/process_operations.csv     (391 rows)
   memory/machining/operations_full__operations.csv     (1174 rows)
   memory/machining/operations_full__warnings.csv       (disclosed capture gaps)
+  memory/Die Casting/Processes/operations.csv          (122 rows)
 
 Grammar of every row (same as memory/sheetmetal/process/build-taxonomy.mjs):
   Machine:Level[:Level...]
@@ -39,8 +40,32 @@ REPO = Path(__file__).resolve().parents[2]
 SOURCES = {
     "sheet_metal": REPO / "memory" / "sheetmetal" / "process" / "process_operations.csv",
     "machining": REPO / "memory" / "machining" / "operations_full__operations.csv",
+    "die_casting": REPO / "memory" / "Die Casting" / "Processes" / "operations.csv",
+    # Same Machine:Operation//Feature grammar and casting feature vocabulary as
+    # die casting; each process keeps its own catalog because the physics
+    # differ (sand cores undercuts, so it has no SlideBundle; investment adds
+    # CoreBundle). memory/Casting is NOT included: its catalog names
+    # operations-as-features (HoleInsertCoring, DieCastAsMStepHole, ...), a
+    # different grammar that cannot be mapped without inventing a rule.
+    "sand_casting": REPO / "memory" / "Sand casting" / "Processes" / "operations.csv",
+    "investment_casting": REPO / "memory" / "Casting Investment" / "Processes" / "operations.csv",
 }
+# Domains whose catalogs are casting catalogs (shared alias handling below).
+CASTING_DOMAINS = {"die_casting", "sand_casting", "investment_casting"}
 MACHINING_WARNINGS = REPO / "memory" / "machining" / "operations_full__warnings.csv"
+
+# Real spelling inconsistencies in memory/Die Casting/Processes/operations.csv, confirmed
+# present in the source file itself (not a parsing bug here): "ComboVoids" (plural) appears
+# only under Gravity Die Casting's "No Side Pull" group, vs. "ComboVoid" (singular) everywhere
+# else; "MultiStopHole" appears only under "Core Refractory Coat", vs. "MultiStepHole"
+# everywhere else. Canonicalized to the dominant spelling here, once, at generation time, so
+# downstream consumers (predicates, the generated TS union) match on exactly one string that
+# means the real feature -- memory/Die Casting/Processes/operations.csv itself is never edited,
+# so the generator's own sha256 provenance stamp always reflects the real upstream file.
+_DIE_CASTING_FEATURE_ALIASES = {
+    "ComboVoids": "ComboVoid",
+    "MultiStopHole": "MultiStepHole",
+}
 OUT_JSON = REPO / "cad-engine" / "shared" / "reference_features.json"
 OUT_TS = (
     REPO / "backend" / "src" / "modules" / "bom-items" / "costing" / "shared"
@@ -52,7 +77,11 @@ def _read_rows(domain: str) -> List[str]:
     path = SOURCES[domain]
     with path.open(encoding="utf-8-sig", newline="") as fh:
         reader = csv.DictReader(fh)
-        column = "raw_operation_string" if domain == "sheet_metal" else "processName"
+        column = (
+            "raw_operation_string" if domain == "sheet_metal"
+            else "processName" if domain == "machining"
+            else "Process Name"  # casting catalogs
+        )
         if column not in (reader.fieldnames or []):
             raise SystemExit(f"{path}: expected column {column!r}, found {reader.fieldnames}")
         return [row[column].strip() for row in reader if row[column].strip()]
@@ -95,6 +124,8 @@ def build_domain(domain: str) -> Dict:
             continue
         parent: Optional[str] = None
         for op, feature in chain:
+            if domain in CASTING_DOMAINS:
+                feature = _DIE_CASTING_FEATURE_ALIASES.get(feature, feature)
             e = entry(feature)
             e["operations"].add(op)
             e["machines"].add(machine)
@@ -139,28 +170,47 @@ def main() -> int:
     def ts_union(names: List[str]) -> str:
         return "\n".join(f"  | '{n}'" for n in names)
 
-    sm = sorted(domains["sheet_metal"]["feature_types"])
-    mc = sorted(domains["machining"]["feature_types"])
+    # One TS type name + domain key per domain -- new domains are added here only
+    # (DOMAIN_TS_NAMES), never by hand-writing a new emission block per domain.
+    DOMAIN_TS_NAMES = {
+        "sheet_metal": "SheetMetalFeatureType",
+        "machining": "MachiningFeatureType",
+        "die_casting": "DieCastingFeatureType",
+        "sand_casting": "SandCastingFeatureType",
+        "investment_casting": "InvestmentCastingFeatureType",
+    }
+    missing_names = [d for d in domains if d not in DOMAIN_TS_NAMES]
+    if missing_names:
+        raise SystemExit(f"DOMAIN_TS_NAMES is missing an entry for: {missing_names}")
+
     ops = {
         d: {f: v["operations"] for f, v in domains[d]["feature_types"].items()}
         for d in domains
     }
+    domain_literal = " | ".join(f"'{d}'" for d in domains)
+    type_decls = "\n\n".join(
+        f"export type {DOMAIN_TS_NAMES[d]} =\n{ts_union(sorted(domains[d]['feature_types']))};"
+        for d in domains
+    )
+    record_fields = "\n".join(
+        f"  readonly {d}: Readonly<Record<{DOMAIN_TS_NAMES[d]}, readonly string[]>>;"
+        for d in domains
+    )
     ts = (
         "// GENERATED by cad-engine/scripts/build_reference_features.py -- do not hand-edit.\n"
         "// Canonical manufacturing feature vocabulary, derived from the reference\n"
         "// operation catalogs (memory/sheetmetal/process/process_operations.csv,\n"
-        "// memory/machining/operations_full__operations.csv). The CAD engine emits\n"
+        "// memory/machining/operations_full__operations.csv,\n"
+        "// memory/Die Casting/Processes/operations.csv). The CAD engine emits\n"
         "// exactly these feature_type strings (cad-engine/shared/reference_features.json).\n\n"
-        f"export type SheetMetalFeatureType =\n{ts_union(sm)};\n\n"
-        f"export type MachiningFeatureType =\n{ts_union(mc)};\n\n"
+        f"{type_decls}\n\n"
         "/** Real operation names the reference catalog pairs with each feature type. */\n"
         "export const REFERENCE_FEATURE_OPERATIONS: {\n"
-        "  readonly sheet_metal: Readonly<Record<SheetMetalFeatureType, readonly string[]>>;\n"
-        "  readonly machining: Readonly<Record<MachiningFeatureType, readonly string[]>>;\n"
+        f"{record_fields}\n"
         f"}} = {json.dumps(ops, indent=2, ensure_ascii=False)} as const;\n\n"
         "/** True when `operation` is a real catalog pairing for `featureType` in `domain`. */\n"
         "export function isReferenceOperation(\n"
-        "  domain: 'sheet_metal' | 'machining',\n"
+        f"  domain: {domain_literal},\n"
         "  featureType: string,\n"
         "  operation: string,\n"
         "): boolean {\n"

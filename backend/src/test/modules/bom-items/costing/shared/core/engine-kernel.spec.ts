@@ -39,6 +39,13 @@ describe('shouldAddSeparatePressBrakeLine', () => {
 // engines only ever read tiers 2 and 3, so two machines of the same class with
 // genuinely different real setup times produced byte-identical setup cost.
 describe('resolveSetupMinutes', () => {
+  it('a recorded reference setup of 0 is a real zero (memory Manual Bench Cell time.setupTimeHr 0)', () => {
+    const r = resolveSetupMinutes({ process: 'Identing', referenceSetupTimeHr: 0, machineSetupTimeHr: 0, machineName: 'Manual Bench Cell - 2m x 2m Footprint' });
+    expect(r).toEqual({ setupMin: 0, source: 'machine' });
+  });
+  it('an HR Rates setup_time_hr of 0 alone is still not taken as real', () => {
+    expect(resolveSetupMinutes({ process: 'Identing', machineSetupTimeHr: 0 }).source).toBe('none');
+  });
   it('prefers a real calculator result over the machine, because only it knows the part', () => {
     // The Sheet Metal Bending calculator computes tool loading time from THIS
     // part's bends; the machine figure is generic to the machine.
@@ -149,6 +156,19 @@ describe('findRouteDataGaps', () => {
       line({ process: 'Deburring', machineClass: 'deburring', cycleTimeMin: 0.327 }),
     ])).toEqual([]);
     expect(isRouteDataComplete([line()])).toBe(true);
+  });
+
+  it('accepts a per-part charge with no machine time, and flags one with no charge', () => {
+    // Die-casting Melting: melted kg x the melter conversion cost per kg; no
+    // melt rate in memory/Die Casting, so no cycle or setup time exists.
+    const melting = line({
+      process: 'Melting', machineClass: 'casting_pm_melting', cycleTimeMin: 0, setupTimeMin: undefined,
+      rateSource: 'consumable_allowance', totalCost: 0.19,
+    });
+    expect(findRouteDataGaps([melting, line()])).toEqual([]);
+    const gaps = findRouteDataGaps([{ ...melting, totalCost: 0 }]);
+    expect(gaps).toHaveLength(1);
+    expect(gaps[0]!.reason).toContain('no per-part charge was resolved');
   });
 
   it('flags the real Tandem Press case — no press_cycle_time_s on file', () => {

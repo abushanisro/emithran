@@ -972,6 +972,11 @@ export const MACHINE_REGISTRY = {
   // process_taxonomy (same migration) but has NO real mhr_records row
   // anywhere in the staged corpus -- a genuine, disclosed gap, not wired.
   manual_deburr:  { commodityCodes: [],                                                                                              processGroupKeywords: ['Finishing', 'Deburring', 'Machining'],                                                                              machineClassKeywords: ['Manual Deburr'] },
+  // Bench Operation (memory/Machining processes.csv: default machine "Manual
+  // Bench Cell"), real mhr_records rows seeded by migration 693 (USA) and 829
+  // (India). Runs the bench steps after machining (identing, spark testing,
+  // cleaning, final inspecting).
+  manual_bench_cell: { commodityCodes: [], processGroupKeywords: ['Machining', 'Finishing'], machineClassKeywords: ['Manual Bench Cell'] },
   // Real Cylindrical Grinding fleet (migration 737/738/753, 6 machines,
   // e.g. "Flex Grind Schaudt M") — see cost-machining-engine.ts's Cylindrical
   // Grinding line for the real Ra<0.4µm trigger this feeds.

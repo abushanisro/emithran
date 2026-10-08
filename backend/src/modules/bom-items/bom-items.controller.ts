@@ -28,6 +28,7 @@ import * as path from 'path';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { expandSearchTermSpellingVariants } from '../raw-materials/material-search-spelling';
 import { BOMItemsService } from './bom-items.service';
+import { FeatureToleranceService } from './services/feature-tolerance.service';
 import { CreateBOMItemDto, UpdateBOMItemDto, QueryBOMItemsDto, BOMItemType } from './dto/bom-items.dto';
 import { BOMItemResponseDto, BOMItemListResponseDto } from './dto/bom-item-response.dto';
 import { AutoFillResponseDto } from './dto/auto-fill.dto';
@@ -52,7 +53,7 @@ import { resolveCostingInputs } from './costing/shared/physics/costing-inputs';
 import { DFMScoringService } from './services/dfm-scoring.service';
 import { MaterialIntelligenceService, type MaterialCandidate } from './services/material-intelligence.service';
 import { SupabaseService } from '../../common/supabase/supabase.service';
-import { findRouteDataGaps, formatNearestRowsDisclosure } from './costing/shared/core/engine-kernel';
+import { findRouteDataGaps, formatNearestRowsDisclosure, isPerPartCharge } from './costing/shared/core/engine-kernel';
 import { RouteResultDto } from './dto/route-comparison.dto';
 import {
   PersistedLineCurrency,
@@ -60,7 +61,7 @@ import {
 } from './costing/shared/core/persisted-currency-contract';
 import { COST_ENGINE_CONTRACT_VERSION } from './costing/shared/core/persisted-process-cost';
 import axios from 'axios';
-import { MachiningCalculatorInputsRequestDto } from './dto/machining-calculator-inputs.dto';
+import { CalculatorInputsRequestDto, MachiningCalculatorInputsRequestDto } from './dto/machining-calculator-inputs.dto';
 
 // Define User type if not available
 interface User {
@@ -93,6 +94,7 @@ export class BOMItemsController {
     private readonly materialIntelligenceService: MaterialIntelligenceService,
     private readonly supabaseService: SupabaseService,
     private readonly exchangeRateService: ExchangeRateService,
+    private readonly featureToleranceService: FeatureToleranceService,
   ) {}
 
   // ── Stateless CAD auto-fill (no DB writes) ──────────────────────────────────
@@ -111,6 +113,13 @@ export class BOMItemsController {
     @CurrentUser() user: User,
     @AccessToken() token: string,
     @Query('location') location?: string,
+    // Create BOM Item's process dropdown: a manual, disclosed family override
+    // for when auto-detection gets it wrong or doesn't run at all. Passed
+    // through unvalidated -- cad-engine's own ALL_FAMILIES check (shared/
+    // memory_optimizer.py) is the single source of truth for which values are
+    // real and silently ignores anything else, so there is nothing to
+    // duplicate or fabricate here.
+    @Body('familyHint') familyHint?: string,
   ): Promise<AutoFillResponseDto> {
     if (!file) {
       throw new BadRequestException('file is required');
@@ -125,7 +134,22 @@ export class BOMItemsController {
     if (!user?.id) {
       throw new BadRequestException('User authentication required');
     }
-    return this.autoFillService.analyzeAndSuggest(file.buffer, file.originalname, user.id, token, location);
+    return this.autoFillService.analyzeAndSuggest(file.buffer, file.originalname, user.id, token, location, false, familyHint);
+  }
+
+  // ── Measurement only (no process yet): Name, Part Number, volume, surface
+  // area and bounding box of a dropped model. Stateless, no DB write.
+  @Post('measure-for-autofill')
+  @ApiOperation({ summary: 'Measure a 3D file (volume, surface, bounding box) before its process is known' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } }))
+  async measureForAutoFill(@UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('file is required');
+    if (!this.stepConverterService.isStepFile(file.originalname ?? '')) {
+      const ext = path.extname(file.originalname ?? '').toLowerCase();
+      throw new BadRequestException(`Unsupported file type: ${ext || '(none)'}.`);
+    }
+    return this.autoFillService.measureForAutoFill(file.buffer, file.originalname);
   }
 
   // ── Background variant: for large/complex files where CAD analysis can take
@@ -145,6 +169,8 @@ export class BOMItemsController {
     @CurrentUser() user: User,
     @AccessToken() token: string,
     @Query('location') location?: string,
+    // See analyzeForAutoFill's own comment — same manual family override.
+    @Body('familyHint') familyHint?: string,
   ): Promise<{ jobId: string }> {
     if (!file) {
       throw new BadRequestException('file is required');
@@ -156,7 +182,7 @@ export class BOMItemsController {
         `${this.stepConverterService.getSupportedExtensions().map((e) => '.' + e).join(', ')}`,
       );
     }
-    const jobId = this.autoFillService.startAnalysis(file.buffer, file.originalname, user.id, token, location);
+    const jobId = this.autoFillService.startAnalysis(file.buffer, file.originalname, user.id, token, location, familyHint);
     return { jobId };
   }
 
@@ -241,8 +267,8 @@ export class BOMItemsController {
         // raw_materials is org-scoped: read it as the caller, never with the service role.
         const rm = await this.supabaseService.getUserClient(token)
           .from('raw_materials')
-          .select('material, material_grade, density')
-          .or(orClause(['material_grade', 'material'], true))
+          .select('grade, name, density')
+          .or(orClause(['name', 'grade'], true))
           .not('density', 'is', null)
           .limit(1)
           .maybeSingle();
@@ -250,7 +276,7 @@ export class BOMItemsController {
           const d = parseFloat(rm.data.density);
           // Reject implausible densities — real engineering materials are 0.5–22 g/cm³
           if (isFinite(d) && d >= 0.5 && d <= 22) {
-            return { density_g_cm3: d, material_name: rm.data.material, material_grade: rm.data.material_grade };
+            return { density_g_cm3: d, material_name: rm.data.grade, material_grade: rm.data.name };
           }
         }
       }
@@ -345,6 +371,53 @@ export class BOMItemsController {
     return this.bomItemsService.resolveMachiningCalculatorInputs(id, body.calculatorId, keys, user.id, token, body.location, body.batchSize);
   }
 
+  // Any reference calculator (Machining, Die Casting): its inputs for this
+  // part, from the cost engine's own run, with sources and lookup rows.
+  @Post(':id/calculator-inputs')
+  @ApiOperation({ summary: 'Resolve a reference calculator inputs for this part from the cost engine run' })
+  @ApiResponse({ status: 200, description: 'Inputs, their sources, lookup rows, and anything unresolved' })
+  async resolveCalculatorInputs(
+    @Param('id') id: string,
+    @Body() body: CalculatorInputsRequestDto,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+  ) {
+    const keys = Object.fromEntries(Object.entries(body.keys ?? {})
+      .map(([k, v]) => [k, Number(v)] as const)
+      .filter(([, v]) => Number.isFinite(v)));
+    return this.bomItemsService.resolveCalculatorInputs(id, body.calculatorId, keys, user.id, token, body.location, body.batchSize, body.runKey);
+  }
+
+  // ── Required tolerances per feature instance (GD&T tab, migration 881) ────
+  @Get(':id/feature-tolerances')
+  @ApiOperation({ summary: 'Every detected feature instance with its required tolerances (Manual values, then the Tolerance Policy), each with its source' })
+  async getFeatureTolerances(@Param('id') id: string, @AccessToken() token: string) {
+    return this.featureToleranceService.get(id, token);
+  }
+
+  @Put(':id/feature-tolerances/:featureKey')
+  @ApiOperation({ summary: 'Set Manual tolerances of one feature instance: { values: { category: number | null } }, null returns the category to Auto' })
+  async setFeatureTolerances(
+    @Param('id') id: string,
+    @Param('featureKey') featureKey: string,
+    @Body('values') values: Record<string, unknown>,
+    @AccessToken() token: string,
+  ) {
+    return this.featureToleranceService.setFeature(id, featureKey, values, token);
+  }
+
+  @Get(':id/machining-need')
+  @ApiOperation({ summary: 'Features the primary process leaves short of their required tolerances (or cannot form), with the machining operations able to finish each' })
+  async getMachiningNeed(@Param('id') id: string, @AccessToken() token: string) {
+    return this.featureToleranceService.getMachiningNeed(id, token);
+  }
+
+  @Put(':id/tolerance-policy')
+  @ApiOperation({ summary: 'Set the Tolerance Policy for Auto categories: assume_achieved | uniform {values} | cad {replaceBelow}' })
+  async setTolerancePolicy(@Param('id') id: string, @Body() policy: unknown, @AccessToken() token: string) {
+    return this.featureToleranceService.setPolicy(id, policy, token);
+  }
+
   @Get(':id/dfm-scores')
   @ApiOperation({ summary: 'Compute per-occurrence DFM risk scores from stored feature_graph_v2 metrics' })
   @ApiResponse({ status: 200, description: 'DFM scores returned' })
@@ -405,7 +478,7 @@ export class BOMItemsController {
     const { data } = await db
       .from('raw_materials')
       .select('uts_mpa, ultimate_tensile_strength')
-      .ilike('material_grade', g)
+      .ilike('name', g)
       .limit(1)
       .maybeSingle();
     return (data?.uts_mpa as number | null) ?? (data?.ultimate_tensile_strength as number | null) ?? null;
@@ -472,7 +545,15 @@ export class BOMItemsController {
     }
 
     const fileName = analysisPath.split('/').pop() ?? 'model.stp';
-    const result = await this.autoFillService.analyzeAndSuggest(fileBuffer, fileName, user.id, token, undefined, true);
+    // Re-analyse as the process the user chose (Create/Edit BOM Item's
+    // Process field, persisted as scenario_overrides.processGroup). Without
+    // this, every Refresh Analysis re-ran the geometric classifier alone and
+    // overwrote a Die Casting part's feature graph with machining features.
+    const chosenProcessGroup = (bomItem.scenarioOverrides as Record<string, unknown> | undefined)?.['processGroup'];
+    const familyHint = this.autoFillService.familyHintForProcessGroup(
+      typeof chosenProcessGroup === 'string' ? chosenProcessGroup : undefined,
+    );
+    const result = await this.autoFillService.analyzeAndSuggest(fileBuffer, fileName, user.id, token, undefined, true, familyHint);
 
     // analyzeAndSuggest throws (503 engine unreachable / 422 file rejected)
     // when the CAD engine did not analyse the file, so nothing below ever
@@ -1916,6 +1997,8 @@ export class BOMItemsController {
     id: string,
     lines: Array<{
       process: string; machineClass: string; hostMachineClass?: string; machineName?: string | null; hourlyRate: number;
+      /** ProcessLineCost.rateSource: a per-part charge (isPerPartCharge) is persisted with no cycle time. */
+      rateSource?: string;
       cycleTimeMin: number; machineSelection?: { balanced?: { candidate?: { machineId?: string | null; processGroup?: string | null } } };
       /** Real un-amortised setup minutes the engine charged for this line — see resolveSetupMinutes(). */
       setupTimeMin?: number;
@@ -2147,6 +2230,7 @@ export class BOMItemsController {
       // confirmed live: a genuine 19.2s Inspection line saved as 19s, then
       // visibly disagreed with its own calculator's exact recomputation.
       const cycleTimeSec = Math.round(line.cycleTimeMin * 60 * 100) / 100;
+      const perPart = isPerPartCharge(line);
       // Labour is the rate the engine costed this line with — the selected
       // machine's own memory/ LHR (line.labourRate). No lhr_benchmark_rates or
       // process-group substitute. labor_rate 0 is the column's own "none"
@@ -2229,10 +2313,13 @@ export class BOMItemsController {
         // cost from this column, so it showed roughly half the setup the quote
         // had charged. Fifteen minutes came from nowhere: no machine, no
         // lookup, no published figure.
-        setup_time:     line.setupTimeMin!,
+        // A per-part charge (melting, nozzle wear) has no machine time: no
+        // setup and no cycle, its money is total_cost_per_part (migration 890).
+        setup_time:     perPart ? 0 : line.setupTimeMin!,
         batch_size:     batchSize,
         heads:          1,
-        cycle_time:     cycleTimeSec,
+        cycle_time:     perPart ? null : cycleTimeSec,
+        charge_basis:   perPart ? 'per_part' : 'time',
         parts_per_cycle: 1,
         scrap:          0,
         // Was the literal 'USD'. Now the currency this money is actually in,

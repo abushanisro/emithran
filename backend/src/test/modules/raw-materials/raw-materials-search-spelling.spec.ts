@@ -84,17 +84,17 @@ describe('expandSearchTermSpellingVariants', () => {
 });
 
 describe('buildMaterialSearchOrClause', () => {
-  it('builds a PostgREST OR-ILIKE clause covering material/material_group/material_grade', () => {
+  it('builds a PostgREST OR-ILIKE clause covering grade/material_group/name', () => {
     const clause = buildMaterialSearchOrClause('steel');
     expect(clause).toBe(
-      'material.ilike."%steel%",material_group.ilike."%steel%",material_grade.ilike."%steel%"',
+      'grade.ilike."%steel%",material_group.ilike."%steel%",name.ilike."%steel%"',
     );
   });
 
   it('the reported live bug is fixed: "aluminium" clause also matches real "Aluminum" rows via ILIKE', () => {
     const clause = buildMaterialSearchOrClause('aluminium');
-    expect(clause).toContain('material.ilike."%aluminium%"');
-    expect(clause).toContain('material.ilike."%aluminum%"');
+    expect(clause).toContain('grade.ilike."%aluminium%"');
+    expect(clause).toContain('grade.ilike."%aluminum%"');
   });
 
   it('escapes literal double quotes so a real material name is never misread as PostgREST filter syntax', () => {
