@@ -198,6 +198,7 @@ class SheetMetalFeatureExtractor:
         cut_length_breakdown = {"outer_profile_mm": 0.0, "circular_holes_mm": 0.0, "internal_profiles_mm": 0.0}
         longest_continuous_cut_mm = 0.0
         internal_profile_count = 0
+        cut_face_ids_by_category: Dict[str, List[int]] = {}
         try:
             _cl = self._compute_cut_length(
                 shape, dominant_face, panels, raw_cylinders_full, sheet_thickness, dominant_normal,
@@ -210,6 +211,7 @@ class SheetMetalFeatureExtractor:
             }
             longest_continuous_cut_mm = round(_cl["longest_continuous_cut_mm"], 1)
             internal_profile_count = _cl.get("internal_profile_count", 0)
+            cut_face_ids_by_category = _cl.get("face_ids_by_category", {})
         except Exception as e:
             logger.warning(f"[SheetMetal] cut_length failed: {e}")
 
@@ -495,11 +497,23 @@ class SheetMetalFeatureExtractor:
                     panels=panels,
                     dominant_normal=dominant_normal,
                 )
-                cut_boundary_fids = self._compute_cut_boundary_face_ids(shape, panels, dominant_face)
-                if cut_boundary_fids:
+                # The cut path, one occurrence per category, built from the
+                # SAME edges _compute_cut_length summed (its side-wall faces
+                # and its length) — so highlighting "Cut Length" shows exactly
+                # what was measured.
+                cut_occurrences = [
+                    {
+                        "centroid": [0, 0, 0],
+                        "face_ids": cut_face_ids_by_category[cat],
+                        "cut_category": cat,
+                        "length_mm": cut_length_breakdown[f"{cat}_mm"],
+                    }
+                    for cat in ("outer_profile", "circular_holes", "internal_profiles")
+                    if cut_face_ids_by_category.get(cat)
+                ]
+                if cut_occurrences:
                     v2_features.append(sheet_metal_feature(
-                        "cut_profile", "Blank", "default",
-                        occurrences=[{"centroid": [0, 0, 0], "face_ids": cut_boundary_fids}],
+                        "cut_profile", "Blank", "default", occurrences=cut_occurrences,
                     ))
                 # Real face_ids for the "Detected Geometry" panel's click-to-
                 # highlight (see migration/CACHE_VERSION geo_v40 notes) —
@@ -624,6 +638,31 @@ class SheetMetalFeatureExtractor:
                 # Nominal size for ISO 286 grading of tolerances on non-hole features.
                 annotate_occurrence_extents(shape, v2_features)
 
+                # One source for "how long is each bend": when the clustered bend
+                # pass produced no lengths but the bend features did, the lengths the
+                # highlight shows ARE the bend lengths (same detections, same count).
+                if not bend_lengths_mm and bends["count"] > 0:
+                    occ_lengths = [
+                        o["bend_length_mm"]
+                        for f in v2_features if f.get("feature_type") == "StraightBend"
+                        for o in f.get("occurrences", []) if o.get("bend_length_mm") is not None
+                    ]
+                    if len(occ_lengths) == bends["count"]:
+                        bend_lengths_mm = [round(float(x), 1) for x in occ_lengths]
+
+                measurements: Dict[str, Any] = {}
+                try:
+                    measurements = self._build_measurements(
+                        shape, v2_features, panels, dominant_face,
+                        cut_face_ids_by_category=cut_face_ids_by_category,
+                        pierce_count=pierce_count,
+                        bend_count=bends["count"],
+                        flat_pattern_area_mm2=flat_pattern_area_mm2,
+                        flat_pattern_area_method=flat_pattern_area_method,
+                    )
+                except Exception as e:
+                    logger.warning(f"[SheetMetal] measurements failed: {e}")
+
                 feature_graph_v2 = {
                     "metadata": {
                         "face_map": face_map or [],
@@ -631,6 +670,10 @@ class SheetMetalFeatureExtractor:
                         "stable_face_ids": stable_face_ids,
                     },
                     "features": v2_features,
+                    # Measured quantities the costing inputs consume, each with
+                    # the faces it was measured on -- not manufacturing
+                    # features, so never in "features" (same rule as conditions).
+                    "measurements": measurements,
                     # DFM conditions between features -- not manufacturing
                     # features themselves, so never in "features" above.
                     # thin_web: two holes whose true edge-to-edge gap is below
@@ -1330,6 +1373,9 @@ class SheetMetalFeatureExtractor:
                     "centroid": [round(h_cx - cx, 2), round(h_cy - cy, 2), round(h_cz - cz, 2)],
                     # cylinder wall(s) + adjacent planar rim faces for visible top-down highlight
                     "face_ids": list(merged_fids) + adj_fids,
+                    # the cut wall(s) alone, without the rim faces above: what a
+                    # pierce of this hole actually cuts (see _build_measurements)
+                    "wall_face_ids": list(merged_fids),
                     "edge_clearance_mm": ec,
                     "nearest_hole_distance_mm": self._nearest_dist(h_cx, h_cy, h_cz, hole_centroids_abs),
                     "nearest_bend_distance_mm": self._nearest_dist(h_cx, h_cy, h_cz, bend_centroids_abs)
@@ -1418,6 +1464,83 @@ class SheetMetalFeatureExtractor:
             features.append(sheet_metal_feature("slot_all", "ComplexHole", "slot", occurrences=slot_occurrences))
 
         return features
+
+    def _build_measurements(
+        self,
+        shape: Any,
+        v2_features: List[Dict[str, Any]],
+        panels: Optional[List[Dict[str, Any]]],
+        dominant_face: Any,
+        *,
+        cut_face_ids_by_category: Dict[str, List[int]],
+        pierce_count: int,
+        bend_count: int,
+        flat_pattern_area_mm2: float,
+        flat_pattern_area_method: str,
+    ) -> Dict[str, Any]:
+        """
+        The faces behind each CAD-derived costing number, so an engineer can see
+        what was measured. Each entry: {value, unit, occurrences[], reconciles}.
+        Occurrences are built from the SAME detections the number comes from,
+        and `reconciles` is False when they cannot account for the number
+        (never forced to match).
+
+          pierce_count      one occurrence per pierce: each hole's cut wall, each
+                            slot, plus the one initial pierce on the outer profile
+                            (pierce_count = holes + slots + 1).
+          bend_line_length  one occurrence per bend (both cylinder faces), carrying
+                            that bend's own axial length; value is their sum.
+          flat_pattern_area one face of every panel plus every bend surface: the
+                            faces whose flattened area makes up the blank.
+        """
+        out: Dict[str, Any] = {}
+
+        pierces: List[Dict[str, Any]] = []
+        for f in v2_features:
+            if f.get("feature_type") == "SimpleHole" and f.get("variant") == "through":
+                for o in f.get("occurrences", []):
+                    pierces.append({"kind": "hole", "face_ids": o.get("wall_face_ids") or o.get("face_ids", [])})
+            elif f.get("feature_type") == "ComplexHole" and f.get("variant") == "slot":
+                for o in f.get("occurrences", []):
+                    pierces.append({"kind": "slot", "face_ids": o.get("face_ids", [])})
+        outer = list(cut_face_ids_by_category.get("outer_profile", []))
+        if outer:
+            pierces.append({"kind": "initial_pierce", "face_ids": outer})
+        out["pierce_count"] = {
+            "value": pierce_count, "unit": "count", "occurrences": pierces,
+            "reconciles": len(pierces) == pierce_count,
+        }
+
+        bend_occ: List[Dict[str, Any]] = []
+        for f in v2_features:
+            if f.get("feature_type") == "StraightBend":
+                for o in f.get("occurrences", []):
+                    if o.get("bend_length_mm") is not None:
+                        bend_occ.append({"face_ids": o.get("face_ids", []), "length_mm": o["bend_length_mm"]})
+        if bend_occ:
+            out["bend_line_length"] = {
+                "value": round(sum(o["length_mm"] for o in bend_occ), 1), "unit": "mm",
+                "occurrences": bend_occ, "reconciles": len(bend_occ) == bend_count,
+            }
+
+        from OCC.Core.TopAbs import TopAbs_FACE  # type: ignore
+        from OCC.Core.TopExp import TopExp_Explorer  # type: ignore
+        from OCC.Core.TopTools import TopTools_IndexedMapOfShape  # type: ignore
+        face_index = TopTools_IndexedMapOfShape()
+        fe = TopExp_Explorer(shape, TopAbs_FACE)
+        while fe.More():
+            face_index.Add(fe.Current())
+            fe.Next()
+        panel_faces = [p["face"] for p in (panels or [])] or ([dominant_face] if dominant_face is not None else [])
+        area_ids = sorted({face_index.FindIndex(fc) - 1 for fc in panel_faces if face_index.FindIndex(fc) > 0})
+        area_ids = sorted(set(area_ids) | {fid for o in bend_occ for fid in o["face_ids"]})
+        if area_ids and flat_pattern_area_mm2 > 0:
+            out["flat_pattern_area"] = {
+                "value": round(flat_pattern_area_mm2, 1), "unit": "mm2",
+                "method": flat_pattern_area_method,
+                "occurrences": [{"face_ids": area_ids}], "reconciles": True,
+            }
+        return out
 
     @staticmethod
     def _dedupe_coincident_cylinders(raw_cylinders_full: List[Tuple]) -> List[Tuple]:
@@ -2304,6 +2427,37 @@ class SheetMetalFeatureExtractor:
         except Exception:
             edge_face_map = None
 
+        # Face ordinals (0-based, TopExp_Explorer order — the same ids
+        # face_map / feature_graph_v2 use) of the side-wall face along each
+        # COUNTED cut edge, per category: exactly the edges summed below, so
+        # the 3D highlight shows what the cut length measured — never the
+        # excluded fold-transition edges.
+        from OCC.Core.TopTools import TopTools_IndexedMapOfShape  # type: ignore
+        face_index = TopTools_IndexedMapOfShape()
+        _fe = TopExp_Explorer(shape, TopAbs_FACE)
+        while _fe.More():
+            face_index.Add(_fe.Current())
+            _fe.Next()
+        cut_face_ids: Dict[str, set] = {"outer_profile": set(), "circular_holes": set(), "internal_profiles": set()}
+
+        def _side_wall_face_ids(edge: Any, face: Any) -> List[int]:
+            if edge_face_map is None:
+                return []
+            idx = edge_face_map.FindIndex(edge)
+            if idx <= 0:
+                return []
+            out = []
+            it = TopTools_ListIteratorOfListOfShape(edge_face_map.FindFromIndex(idx))
+            while it.More():
+                adj = topods.Face(it.Value())
+                it.Next()
+                if adj.IsSame(face):
+                    continue
+                fi = face_index.FindIndex(adj) - 1
+                if fi >= 0:
+                    out.append(fi)
+            return out
+
         def _face_normal(face: Any) -> Optional[Tuple[float, float, float]]:
             try:
                 adaptor = BRepAdaptor_Surface(face)
@@ -2358,6 +2512,7 @@ class SheetMetalFeatureExtractor:
                 wire_len = 0.0
                 wire_is_hole_like = True
                 had_edge = False
+                wire_face_ids: List[int] = []
                 ee = TopExp_Explorer(wire, TopAbs_EDGE)
                 while ee.More():
                     edge = topods.Edge(ee.Current())
@@ -2366,6 +2521,7 @@ class SheetMetalFeatureExtractor:
                         ee.Next()
                         continue  # fold transition — not a cut edge at all
                     had_edge = True
+                    wire_face_ids.extend(_side_wall_face_ids(edge, face))
                     try:
                         curve = BRepAdaptor_Curve(edge)
                         wire_len += GCPnts_AbscissaPoint.Length(curve, 1e-3)
@@ -2377,13 +2533,16 @@ class SheetMetalFeatureExtractor:
                 if had_edge:
                     if wire_idx == 0:
                         outer += wire_len
+                        cut_face_ids["outer_profile"].update(wire_face_ids)
                     elif wire_is_hole_like:
                         holes += wire_len
                         max_hole_wire = max(max_hole_wire, wire_len)
+                        cut_face_ids["circular_holes"].update(wire_face_ids)
                     else:
                         internal += wire_len
                         max_internal_wire = max(max_internal_wire, wire_len)
                         internal_wire_count += 1
+                        cut_face_ids["internal_profiles"].update(wire_face_ids)
                 wire_idx += 1
                 we.Next()
             return outer, holes, internal, max_hole_wire, max_internal_wire, internal_wire_count
@@ -2401,6 +2560,7 @@ class SheetMetalFeatureExtractor:
                 "outer_profile_mm": outer, "circular_holes_mm": holes, "internal_profiles_mm": internal,
                 "longest_continuous_cut_mm": max(outer, max_hole, max_internal),
                 "internal_profile_count": internal_count,
+                "face_ids_by_category": {k: sorted(v) for k, v in cut_face_ids.items()},
             }
 
         outer_total = 0.0
@@ -2456,6 +2616,7 @@ class SheetMetalFeatureExtractor:
             "internal_profiles_mm": internal_total,
             "longest_continuous_cut_mm": max(outer_total, max_hole_wire_overall, max_internal_wire_overall),
             "internal_profile_count": internal_profile_count_total,
+            "face_ids_by_category": {k: sorted(v) for k, v in cut_face_ids.items()},
         }
 
     def _compute_corner_angles(
@@ -2750,90 +2911,6 @@ class SheetMetalFeatureExtractor:
             current = remaining.pop(best_i)
 
         return round((total_mm / self._RAPID_TRAVERSE_MM_PER_MIN) * 60.0, 2)
-
-    def _compute_cut_boundary_face_ids(
-        self,
-        shape: Any,
-        panels: Optional[List[Dict[str, Any]]],
-        dominant_face: Any,
-    ) -> List[int]:
-        """
-        Face IDs of the side-wall faces along every real cut boundary of the
-        part — the physical edge faces a laser/punch actually cuts through,
-        as opposed to the flat top/bottom panel faces themselves. Lets the
-        viewer highlight the full cut path (every real panel's perimeter AND
-        every cutout in it) together with the pierced holes, so selecting
-        Flat Pattern shows the complete laser-cutting operation instead of
-        only the round-hole markers.
-
-        For each real panel (base + every bent-up wall/flange; falls back to
-        dominant_face alone when panel detection failed, same convention
-        _compute_cut_length uses), walks EVERY wire on that panel face — not
-        only the outer contour, but also every inner cutout wire — and finds
-        each edge's OTHER adjacent face (not the panel face itself); that
-        neighbour is the actual side wall the cut passes through.
-
-        Walking every wire (not just the outer one) matters: a cutout doesn't
-        have to be a plain round hole or a simple slot. A confirmed real part
-        has an ear-panel cutout bounded by 16 edges — alternating small R0.8
-        fillets and larger R6/R7 arcs, no dominant circular wall at all — a
-        scalloped/wavy profile the cylindrical-face hole detector can never
-        recognise as a hole (there's no single circular face to find) and
-        the slot detector doesn't match either. Walking every wire finds its
-        side walls regardless of shape, rather than requiring the shape to
-        be pre-classified first. Round holes' own wires get walked too —
-        redundant with their already-highlighted cylindrical face, but
-        harmless (same faces, added to the same highlight set).
-        """
-        panel_faces = [p["face"] for p in panels] if panels else ([dominant_face] if dominant_face is not None else [])
-        if not panel_faces:
-            return []
-
-        try:
-            from OCC.Core.TopTools import (  # type: ignore
-                TopTools_IndexedDataMapOfShapeListOfShape,
-                TopTools_ListIteratorOfListOfShape,
-                TopTools_IndexedMapOfShape,
-            )
-            from OCC.Core.TopExp import topexp, TopExp_Explorer as _WExp  # type: ignore
-            from OCC.Core.TopAbs import TopAbs_WIRE, TopAbs_EDGE, TopAbs_FACE  # type: ignore
-            from OCC.Core.TopoDS import topods as _td  # type: ignore
-
-            edge_face_map = TopTools_IndexedDataMapOfShapeListOfShape()
-            topexp.MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, edge_face_map)  # type: ignore
-
-            face_shape_indexed = TopTools_IndexedMapOfShape()
-            fe = _WExp(shape, TopAbs_FACE)
-            while fe.More():
-                face_shape_indexed.Add(fe.Current())
-                fe.Next()
-
-            boundary_fids: set = set()
-            for panel_face in panel_faces:
-                we = _WExp(panel_face, TopAbs_WIRE)
-                while we.More():
-                    wire = _td.Wire(we.Current())
-                    ee = _WExp(wire, TopAbs_EDGE)
-                    while ee.More():
-                        edge = _td.Edge(ee.Current())
-                        idx = edge_face_map.FindIndex(edge)
-                        if idx > 0:
-                            adj_list = edge_face_map.FindFromIndex(idx)
-                            it = TopTools_ListIteratorOfListOfShape(adj_list)
-                            while it.More():
-                                adj_face = _td.Face(it.Value())
-                                it.Next()
-                                if adj_face.IsSame(panel_face):
-                                    continue
-                                adj_fi = face_shape_indexed.FindIndex(adj_face) - 1  # 1-based → 0-based
-                                if adj_fi >= 0:
-                                    boundary_fids.add(adj_fi)
-                        ee.Next()
-                    we.Next()
-            return sorted(boundary_fids)
-        except Exception as e:
-            logger.warning(f"[SheetMetal] outer boundary face computation failed: {e}")
-            return []
 
     def _compute_flat_pattern_area(self, shape: Any, dominant_face: Any) -> float:
         """Area of the dominant blank face. Orientation-independent.

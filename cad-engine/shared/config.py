@@ -27,9 +27,12 @@ class AppConfig:
     linear_deflection: float
     angular_deflection: float
     
+    # Face graph (per-face attributes + edge convexity) is skipped above this many faces
+    face_graph_max_faces: int
+
     # Storage
     temp_dir: str
-    
+
     # Logging
     log_level: str
     
@@ -65,6 +68,7 @@ class AppConfig:
             rate_limit_per_minute=int(os.getenv("RATE_LIMIT_PER_MINUTE", "10")),
             linear_deflection=linear_deflection,
             angular_deflection=angular_deflection,
+            face_graph_max_faces=int(os.getenv("FACE_GRAPH_MAX_FACES", "20000")),
             temp_dir=os.getenv("TEMP_DIR", os.getenv("TMPDIR", "/tmp/cad-files")),
             log_level=os.getenv("LOG_LEVEL", "info").upper()
         )
