@@ -46,12 +46,8 @@ export type RollupInputKind =
   | 'tooling'
   | 'direct_children';
 
-export const ROLLUP_INPUT_KINDS: readonly RollupInputKind[] = [
-  'raw_material', 'packaging_logistics', 'procured_parts', 'process', 'tooling', 'direct_children',
-];
-
 /** The currency basis vocabulary shared with migrations 707 and 708. */
-export type RollupSourceBasis = 'legacy_unverified' | 'converted' | 'local';
+type RollupSourceBasis = 'legacy_unverified' | 'converted' | 'local';
 
 export interface RollupSourceAmount {
   kind: RollupInputKind;
@@ -65,9 +61,9 @@ export interface RollupSourceAmount {
   ref?: string | null;
 }
 
-export type RollupIntegrity = 'consistent' | 'unverified' | 'mixed';
+type RollupIntegrity = 'consistent' | 'unverified' | 'mixed';
 
-export interface RollupProvenance {
+interface RollupProvenance {
   reportingCurrency: string;
   /** Every rate actually applied, keyed by source currency. All from one snapshot. */
   fxRates: Record<string, number>;
@@ -90,7 +86,7 @@ export interface RollupProvenance {
   computedAt: string;
 }
 
-export interface RollupResult {
+interface RollupResult {
   trusted: boolean;
   integrity: RollupIntegrity;
   reportingCurrency: string;

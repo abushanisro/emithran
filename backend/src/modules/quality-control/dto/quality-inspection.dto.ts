@@ -2,7 +2,7 @@ import { IsString, IsOptional, IsArray, IsEnum, IsDateString, IsUUID, IsObject, 
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-export enum InspectionType {
+enum InspectionType {
   FIRST_ARTICLE = 'first-article',
   IN_PROCESS = 'in-process',
   FINAL = 'final',
@@ -27,20 +27,20 @@ export enum InspectionResult {
   NOT_TESTED = 'not-tested',
 }
 
-export enum CriticalLevel {
+enum CriticalLevel {
   CRITICAL = 'critical',
   MAJOR = 'major',
   MINOR = 'minor',
 }
 
-export enum MeasurementType {
+enum MeasurementType {
   PASS_FAIL = 'pass_fail',
   MEASUREMENT = 'measurement',
   VISUAL = 'visual',
   DOCUMENT = 'document',
 }
 
-export class InspectionChecklistItemDto {
+class InspectionChecklistItemDto {
   @ApiProperty()
   @IsString()
   id: string;
@@ -198,7 +198,7 @@ export class UpdateQualityInspectionDto {
   metadata?: Record<string, any>;
 }
 
-export class InspectionChecklistResultDto {
+class InspectionChecklistResultDto {
   @ApiProperty()
   @IsString()
   checklistItemId: string;

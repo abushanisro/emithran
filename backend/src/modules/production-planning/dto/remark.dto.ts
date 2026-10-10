@@ -2,7 +2,7 @@ import { IsUUID, IsString, IsEnum, IsOptional, IsDateString, IsInt, IsArray, Min
 import { Type, Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-export enum RemarkType {
+enum RemarkType {
   DELAY = 'DELAY',
   QUALITY = 'QUALITY',
   SUGGESTION = 'SUGGESTION',
@@ -12,14 +12,14 @@ export enum RemarkType {
   OTHER = 'OTHER',
 }
 
-export enum RemarkPriority {
+enum RemarkPriority {
   LOW = 'LOW',
   MEDIUM = 'MEDIUM',
   HIGH = 'HIGH',
   CRITICAL = 'CRITICAL',
 }
 
-export enum RemarkStatus {
+enum RemarkStatus {
   OPEN = 'OPEN',
   IN_PROGRESS = 'IN_PROGRESS',
   RESOLVED = 'RESOLVED',

@@ -18,9 +18,9 @@ import type { ReferenceCalculatorField, ReferenceCalculators } from '../../share
  *   engine      decided by the engine (cavities, layout, which gates are ground)
  *   calculator  another calculator's output (`from` = its key)
  */
-export type DieCastingFieldSource = 'cad' | 'alloy' | 'machine' | 'variable' | 'lookup' | 'bom' | 'engine' | 'calculator';
+type DieCastingFieldSource = 'cad' | 'alloy' | 'machine' | 'variable' | 'lookup' | 'bom' | 'engine' | 'calculator';
 
-export interface DieCastingSpecField {
+interface DieCastingSpecField {
   name: string;
   unit: string | null;
   source?: DieCastingFieldSource;
@@ -34,7 +34,7 @@ export interface DieCastingSpecField {
   formula?: string;
 }
 
-export interface DieCastingSpecCalculator {
+interface DieCastingSpecCalculator {
   name: string;
   key: string;
   category: 'material' | 'process' | 'tooling';

@@ -5,7 +5,7 @@ import { SupabaseService } from '../../../common/supabase/supabase.service';
 import type { RateSnapshot } from '../../../common/exchange-rate/exchange-rate.service';
 import { resolveUtsMpa, isSheetFormableMaterial } from '../costing/shared/core/default-rates.constants';
 import { isPlasticGrade } from '../costing/plastic-molding/process/process-tree';
-import { shapeRankForFamily, isDiscouragedShapeForFamily } from '../../raw-materials/constants/material-shape-ranking';
+import { isDiscouragedShapeForFamily } from '../../raw-materials/constants/material-shape-ranking';
 import type { BOMItemResponseDto } from '../dto/bom-item-response.dto';
 import {
   rankMaterialMatches,

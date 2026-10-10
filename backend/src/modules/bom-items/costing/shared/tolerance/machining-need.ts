@@ -35,13 +35,13 @@ export function resolveOperationLinks(rows: ReadonlyArray<Record<string, unknown
     .filter((l) => l.operation && l.capabilityProcess);
 }
 
-export type Formability = { formable: true; detail: string } | { formable: false; detail: string } | { formable: null; detail: string };
+type Formability = { formable: true; detail: string } | { formable: false; detail: string } | { formable: null; detail: string };
 
-export interface MachiningCandidate { operation: string; capabilityProcess: string; detail: string[] }
+interface MachiningCandidate { operation: string; capabilityProcess: string; detail: string[] }
 
-export type FeatureVerdict = 'as_primary' | 'needs_machining' | 'undecided';
+type FeatureVerdict = 'as_primary' | 'needs_machining' | 'undecided';
 
-export interface FeatureMachiningNeed {
+interface FeatureMachiningNeed {
   featureKey: string | null;
   label: string;
   featureType: string;

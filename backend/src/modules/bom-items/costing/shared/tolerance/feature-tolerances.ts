@@ -137,7 +137,7 @@ export type TolerancePolicy =
   | { mode: 'cad'; replaceBelow: { thresholdMm: number; withMm: number } | null };
 
 /** No policy stored = the first option of the policy dialog. */
-export const DEFAULT_TOLERANCE_POLICY: TolerancePolicy = { mode: 'assume_achieved' };
+const DEFAULT_TOLERANCE_POLICY: TolerancePolicy = { mode: 'assume_achieved' };
 
 const isCategory = (c: string): c is GtolCategory => (GTOL_CATEGORIES as readonly string[]).includes(c);
 const positive = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0;
@@ -177,7 +177,7 @@ export function parseTolerancePolicy(raw: unknown): { policy: TolerancePolicy | 
  * of an axis, and the capability table carries only concentricity.
  * profile_of_line has no capability row and stays unmapped (reported).
  */
-export const PMI_CATEGORY: Readonly<Record<string, GtolCategory>> = {
+const PMI_CATEGORY: Readonly<Record<string, GtolCategory>> = {
   angularity: 'angularity',
   circular_runout: 'runout',
   coaxiality: 'concentricity',
@@ -196,7 +196,7 @@ export const PMI_CATEGORY: Readonly<Record<string, GtolCategory>> = {
 
 // ── Resolution ──────────────────────────────────────────────────────────────
 
-export type RequirementSource = 'manual' | 'policy_uniform' | 'cad_model' | 'cad_model_replaced';
+type RequirementSource = 'manual' | 'policy_uniform' | 'cad_model' | 'cad_model_replaced';
 
 export interface ResolvedRequirement extends Requirement { source: RequirementSource; note?: string }
 

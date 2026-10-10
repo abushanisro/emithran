@@ -28,7 +28,7 @@ export interface SheetMetalFeature {
   occurrences: ReadonlyArray<{ face_ids?: ReadonlyArray<number> | null }>;
 }
 
-export interface PunchLimits {
+interface PunchLimits {
   /** Smallest hole Ø the machine may punch; null = not known. */
   minPunchDiameterMm: number | null;
   /** Largest single punch tool; null = not known. */

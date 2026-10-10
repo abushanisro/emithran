@@ -6,7 +6,7 @@ import Tesseract from 'tesseract.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
-export interface PDFTextItem {
+interface PDFTextItem {
   text: string;
   x: number;
   y: number;
@@ -17,7 +17,7 @@ export interface PDFTextItem {
   rotation: number;
 }
 
-export interface BalloonDetection {
+interface BalloonDetection {
   id: string;
   number: number;
   center: { x: number; y: number };
@@ -26,7 +26,7 @@ export interface BalloonDetection {
   type: 'circle' | 'rectangle' | 'diamond';
 }
 
-export interface DimensionMatch {
+interface DimensionMatch {
   balloonId: string;
   balloonNumber: number;
   dimension: {

@@ -47,7 +47,7 @@ export interface TurretPunchInput {
   scrapPricePerKg?: number;
 }
 
-export interface TurretPunchResult {
+interface TurretPunchResult {
   processLines: ProcessLineCost[];
   cuttingMin: number;
   warnings: string[];

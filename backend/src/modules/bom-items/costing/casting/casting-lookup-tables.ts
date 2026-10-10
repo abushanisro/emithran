@@ -9,7 +9,7 @@ import { TOOL_SHOP_LOOKUP_KEYS } from './die-tooling';
 import { PLASTIC_REFERENCE_SOURCE_VERSION } from '../plastic-molding/plastic-reference';
 import { CASTING_MATERIALS_TABLE, CASTING_VARIABLES_TABLE } from './calculators/die-casting-calculator-spec';
 
-export interface CastingTableQuery {
+interface CastingTableQuery {
   /** machining_reference_data category. */
   category: 'variable' | 'material' | 'lookup_table';
   sourceVersion: string;

@@ -19,14 +19,14 @@ import { IsOptionalBoolean } from '../../../common/decorators/validation.decorat
 // ENUMS
 // ============================================================================
 
-export enum LogisticsType {
+enum LogisticsType {
   PACKAGING = 'packaging',
   INBOUND = 'inbound',
   OUTBOUND = 'outbound',
   STORAGE = 'storage',
 }
 
-export enum CostBasis {
+enum CostBasis {
   PER_UNIT = 'per_unit',
   PER_BATCH = 'per_batch',
   PER_KG = 'per_kg',

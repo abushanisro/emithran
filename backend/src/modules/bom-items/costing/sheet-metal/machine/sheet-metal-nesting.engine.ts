@@ -28,20 +28,17 @@ export function resolvePartSpacingMm(
   return row.spacingMm;
 }
 
-// Standard stock sheet sizes (width × length mm), ascending by area. Shared
-// by the rectangle-grid engine below AND true-nest-costing.engine.ts's
-// true-shape candidate enumeration -- both must compare the SAME candidate
-// set, or "which sheet sizes are even considered" could silently diverge
-// between the fallback and primary costing paths.
-export const STANDARD_SHEETS: ReadonlyArray<[number, number]> = [
-  [1000, 2000],
-  [1250, 2500],
-  [1500, 3000],
-  [2000, 4000],
-  [2500, 5000],
-];
+// The stock sheet a part is nested on is no longer a fixed list here: it is
+// the selected laser's nominal sheet (machine library), else the reference
+// standard sheet (standardSheetWidth/Length) — see
+// BOMItemsService.resolveNestingSheet. The rectangle-grid and true-shape
+// paths both receive that same sheet, so they can never consider different
+// sizes.
+export interface NestingSheet { widthMm: number; lengthMm: number }
 
-export const EDGE_ALLOWANCE_MM = 2; // minimum clearance from sheet edge
+// Edge allowance (mm): the Sheet Metal Calculators' own default
+// (memory/Sheetmetal/Sheet_Metal_Calculators.md, "Edge Allowance (mm) 2").
+export const EDGE_ALLOWANCE_MM = 2;
 
 // Gross/Net Usage computes material utilisation BEFORE a cutting process is
 // chosen, so it nests at the spacing of the default cutting process, Fiber
@@ -58,7 +55,7 @@ export function computePartAllowanceMm(
   return resolvePartSpacingMm(spacingRows, GROSS_USAGE_SPACING_PROCESS, thicknessMm);
 }
 
-export interface TrueNestCostingCache {
+interface TrueNestCostingCache {
   sheetWidthMm: number;
   sheetLengthMm: number;
   kerfMm: number;
@@ -81,7 +78,7 @@ export interface TrueNestCostingCache {
  * safe because Reanalyze rebuilds featureGraph.summary as a fresh object and
  * therefore silently DESTROYED the cache — so a geometry change could never
  * reuse a stale result, but neither could an identical re-analysis reuse a
- * perfectly valid one. Since an uncached resolve walks all 5 STANDARD_SHEETS
+ * perfectly valid one. Since an uncached resolve walked every candidate sheet
  * sequentially against cad-engine's single-threaded /nest endpoint (13-30s per
  * sheet on real parts), that made every Reanalyze cost 65-150s on the next
  * cost-summary AND again on the next route-comparison, which is what timed the
@@ -151,6 +148,7 @@ export function isTrueNestCostingCacheValid(
   kerfMm: number,
   edgeMarginMm: number,
   inputFingerprint?: string,
+  sheet?: NestingSheet,
 ): cache is TrueNestCostingCache {
   if (!cache || typeof cache !== 'object') return false;
   const c = cache as Record<string, unknown>;
@@ -159,6 +157,9 @@ export function isTrueNestCostingCacheValid(
   // cache written before fingerprinting existed, or one written from different
   // geometry, is refused rather than silently reused at the old parts-per-sheet.
   if (inputFingerprint !== undefined && c.inputFingerprint !== inputFingerprint) return false;
+  // A nest on a different stock sheet (e.g. the selected laser changed) is
+  // a different result.
+  if (sheet && !(closeEnough(c.sheetWidthMm, sheet.widthMm) && closeEnough(c.sheetLengthMm, sheet.lengthMm))) return false;
   return (
     closeEnough(c.kerfMm, kerfMm) &&
     closeEnough(c.edgeMarginMm, edgeMarginMm) &&
@@ -171,7 +172,7 @@ export function isTrueNestCostingCacheValid(
   );
 }
 
-export interface NestingInput {
+interface NestingInput {
   flatPatternLengthMm: number;   // unfolded longest dimension
   flatPatternWidthMm: number;    // unfolded shorter dimension
   thicknessMm: number;
@@ -189,6 +190,8 @@ export interface NestingInput {
   quantityRequired?: number;
   /** Part-to-part allowance (mm), from computePartAllowanceMm. */
   partAllowanceMm: number;
+  /** Stock sheet(s) to nest on — see NestingSheet. */
+  sheets: readonly NestingSheet[];
 }
 
 export interface NestingResult {
@@ -214,7 +217,7 @@ export interface NestingResult {
   actualBatchGrossMaterialKg?: number; // sheetsRequired * sheetWeightKg
 }
 
-export interface NestingDimensionResolution {
+interface NestingDimensionResolution {
   lengthMm: number;
   widthMm: number;
   source: 'cad_flat_pattern_bounding_rect' | 'folded_3d_bounding_box';
@@ -279,15 +282,17 @@ export function computeNesting(input: NestingInput): NestingResult {
     scrapRecoveryPct = 0.90,
     quantityRequired,
     partAllowanceMm,
+    sheets,
   } = input;
 
   const usablePartL = flatPatternLengthMm + partAllowanceMm;
   const usablePartW = flatPatternWidthMm + partAllowanceMm;
 
   let bestParts = 0;
-  let bestSheet: [number, number] = STANDARD_SHEETS[STANDARD_SHEETS.length - 1];
+  const last = sheets[sheets.length - 1]!;
+  let bestSheet: [number, number] = [last.widthMm, last.lengthMm];
 
-  for (const [w, l] of STANDARD_SHEETS) {
+  for (const { widthMm: w, lengthMm: l } of sheets) {
     if (w < flatPatternWidthMm + 2 * edgeAllowanceMm) continue;
     if (l < flatPatternLengthMm + 2 * edgeAllowanceMm) continue;
 

@@ -62,7 +62,7 @@ export interface ProcessCostInput {
 /**
  * Detailed cost breakdown result
  */
-export interface ProcessCostResult {
+interface ProcessCostResult {
   // Input Summary
   operationNumber: number;
   currency: string;

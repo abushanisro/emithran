@@ -41,7 +41,7 @@ export interface PlasmaCutInput {
   scrapPricePerKg?: number;
 }
 
-export interface PlasmaCutResult {
+interface PlasmaCutResult {
   processLines: ProcessLineCost[];
   cuttingMin: number;
   // Always 0 — plasma cutting's real consumable is the nozzle/electrode

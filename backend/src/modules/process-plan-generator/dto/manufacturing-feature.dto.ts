@@ -71,7 +71,7 @@ export interface ManufacturingFeatureGraph {
  * Guides the AI toward the correct machine category for each mandatory op.
  * Prevents CNC lathes from being assigned to bench/manual operations.
  */
-export type MachineCategoryHint =
+type MachineCategoryHint =
   | 'cnc_lathe'          // turning center, CNC lathe
   | 'cnc_mill'           // VMC, HMC, machining center
   | 'laser_cut'          // fiber/CO2 laser cutting machine

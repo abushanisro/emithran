@@ -100,7 +100,7 @@ export class ResolverService {
         data: {
           materialId: candidate?.dbId ?? null,
           newMasterRef: newRef,
-          materialCategory: candidate?.materialGroup?.toLowerCase().includes('plastic') ? 'PLASTIC_RUBBER' : 'FERROUS_NON_FERROUS',
+          materialCategory: candidate?.materialClass ?? null,
           materialName: candidate?.material || extractProposedString(proposedMasters, newRef, 'material', ''),
           // Real, disclosed gap instead of a category conflation: a matched
           // candidate's own real `grade` column is the only thing that

@@ -8,7 +8,7 @@ import { eMithranTerms } from '../../shared/core/engine-kernel';
 
 // Extracted verbatim from cost-engine.ts's inline Deburring block (Platform
 // Architecture Remediation Phase 1 — engine registry unification, Rule 8).
-export interface DeburringInput {
+interface DeburringInput {
   cutLengthMm: number;
   rate: MHRRateInput;
   processIdentity?: { processGroup: string; processRoute: string; operation: string };
@@ -27,7 +27,7 @@ export interface DeburringInput {
   scrapPricePerKg?: number;
 }
 
-export interface DeburringResult {
+interface DeburringResult {
   processLines: ProcessLineCost[];
   cycleTimeMin: number;
   warnings: string[];
@@ -109,7 +109,7 @@ export function computeDeburringCost(input: DeburringInput): DeburringResult {
   };
 }
 
-export interface DeburringContext extends DeburringInput {}
+interface DeburringContext extends DeburringInput {}
 
 export class DeburringEngine implements ManufacturingProcessEngine<DeburringContext, DeburringResult> {
   readonly machineClass = 'deburring' as const;

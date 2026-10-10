@@ -90,7 +90,7 @@ export class QueryProcessesDto {
 // PROCESS REFERENCE TABLES DTOs
 // ============================================================================
 
-export class ColumnDefinitionDto {
+class ColumnDefinitionDto {
   @ApiProperty({ example: 'flow_path_ratio' })
   @IsString()
   name: string;

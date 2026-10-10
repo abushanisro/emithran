@@ -10,7 +10,7 @@ import type {
   ToolRequirements,
 } from "../interfaces/operation-calculator.interface";
 
-export interface TappingGeometry extends FeatureGeometry {
+interface TappingGeometry extends FeatureGeometry {
   threadSpec: string;          // 'M8×1.25', 'M12×1.75', 'UNC 3/8-16'
   pitchMm: number;             // 1.25 for M8×1.25; must be > 0
   majorDiameterMm: number;

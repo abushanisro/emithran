@@ -2,7 +2,7 @@ import { IsString, IsUUID, IsOptional, IsArray, IsNumber, IsDateString, IsIn, Va
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-export class BOMPartRequirementDto {
+class BOMPartRequirementDto {
   @ApiProperty()
   @IsUUID()
   bomItemId: string;
@@ -106,7 +106,7 @@ export class UpdateSubtaskDto {
   notes?: string;
 }
 
-export class BOMRequirementResponseDto {
+class BOMRequirementResponseDto {
   @ApiProperty()
   id: string;
 

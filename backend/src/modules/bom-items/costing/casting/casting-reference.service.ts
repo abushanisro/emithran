@@ -25,7 +25,7 @@ import { CORE_LOOKUP_KEYS, CORE_TEXT_VARIABLE_KEYS, CORE_VARIABLE_KEYS, resolveC
 import type { FinishingMachine } from './casting-finishing';
 
 /** HR Rates machine class of the High Pressure Die Casting machines (migration 845). */
-export const HPDC_MACHINE_CLASS = 'die_casting_high_pressure_die_casting';
+const HPDC_MACHINE_CLASS = 'die_casting_high_pressure_die_casting';
 /** raw_materials.material_group of the die-casting alloys (migration 855). */
 const DIE_CASTING_MATERIAL_GROUP = 'Die Casting';
 

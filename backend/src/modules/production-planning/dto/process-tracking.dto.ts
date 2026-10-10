@@ -6,7 +6,7 @@ import { Type } from 'class-transformer';
 // ENUMS
 // =====================================================
 
-export enum TrackingStatus {
+enum TrackingStatus {
   PENDING = 'PENDING',
   IN_PROGRESS = 'IN_PROGRESS',
   COMPLETED = 'COMPLETED',
@@ -33,7 +33,7 @@ export enum EntityType {
 // TIMELINE MANAGEMENT DTOs
 // =====================================================
 
-export class WeekConfigDto {
+class WeekConfigDto {
   @ApiProperty({ description: 'Week number' })
   @IsNumber()
   week: number;
@@ -108,7 +108,7 @@ export class UpdateTimelineDto {
 // PROCESS TRACKING DTOs
 // =====================================================
 
-export class TimelinePositionDto {
+class TimelinePositionDto {
   @ApiProperty({ description: 'Left position percentage' })
   @IsNumber()
   @Min(0)

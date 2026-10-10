@@ -149,7 +149,7 @@ export const RAW_MATERIAL_COST_CONSTANTS = {
  * formatINR(1234567.89) // "₹12,34,567.89"
  * formatINR(100000) // "₹1,00,000.00"
  */
-export function formatINR(amount: number, decimals: number = 2): string {
+function formatINR(amount: number, decimals: number = 2): string {
   const absoluteAmount = Math.abs(amount);
   const sign = amount < 0 ? '-' : '';
 
@@ -202,7 +202,7 @@ export function formatINR(amount: number, decimals: number = 2): string {
  * @example
  * formatPercentage(36.7) // "36.70%"
  */
-export function formatPercentage(value: number, decimals: number = 2): string {
+function formatPercentage(value: number, decimals: number = 2): string {
   return `${value.toFixed(decimals)}%`;
 }
 
@@ -217,7 +217,7 @@ export function formatPercentage(value: number, decimals: number = 2): string {
  * @example
  * formatUOM(247.28, 'KG') // "247.28 KG"
  */
-export function formatUOM(value: number, uom: string, decimals: number = 2): string {
+function formatUOM(value: number, uom: string, decimals: number = 2): string {
   return `${value.toFixed(decimals)} ${uom}`;
 }
 
@@ -230,7 +230,7 @@ export function formatUOM(value: number, uom: string, decimals: number = 2): str
  * @example
  * getUOMName('KG') // "Kilogram"
  */
-export function getUOMName(uom: string): string {
+function getUOMName(uom: string): string {
   const uoms = RAW_MATERIAL_COST_CONSTANTS.UNITS_OF_MEASURE;
   return uoms[uom as keyof typeof uoms] ?? uom;
 }

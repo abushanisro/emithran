@@ -191,13 +191,6 @@ export class CustomValidationPipe extends NestValidationPipe implements PipeTran
 }
 
 /**
- * Factory function to create a validation pipe with custom options
- */
-export function createValidationPipe(options?: ValidationPipeOptions): CustomValidationPipe {
-  return new CustomValidationPipe(options);
-}
-
-/**
  * Pre-configured validation pipes for different use cases
  */
 export const ValidationPipes = {

@@ -42,7 +42,7 @@ export interface RankableMaterial {
   hasCost?: boolean;
 }
 
-export type MaterialMatchTier =
+type MaterialMatchTier =
   | 'exact'
   | 'alias'
   | 'designation'
@@ -89,7 +89,7 @@ export function designationTokens(text: string | null | undefined): string[] {
     .filter(Boolean);
 }
 
-export function normalizeDesignation(text: string | null | undefined): string {
+function normalizeDesignation(text: string | null | undefined): string {
   return (text ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
@@ -217,7 +217,7 @@ function scoreAgainstVariant(variant: string, row: RankableMaterial): Scored | n
   return best;
 }
 
-export interface RankOptions {
+interface RankOptions {
   /** Part family (milled, sheet_metal, ...) -- prefers suitable stock forms. */
   family?: string;
   /** Row ids known to be registered aliases of the query (tier 'alias'). */
@@ -271,7 +271,7 @@ export function rankMaterialMatches<T extends RankableMaterial>(
   return ranked;
 }
 
-export interface BestPick<T extends RankableMaterial> {
+interface BestPick<T extends RankableMaterial> {
   best: RankedMaterial<T> | null;
   /** Equally-ranked candidates whose density differs materially -- why no pick was made. */
   ambiguous: RankedMaterial<T>[];
@@ -312,7 +312,7 @@ export function pickUnambiguousBest<T extends RankableMaterial>(
   return { best: top, ambiguous: [], divergentAlternatives };
 }
 
-export interface OrderedByRelevance<T> {
+interface OrderedByRelevance<T> {
   item: T;
   tier: MaterialMatchTier | 'substring';
   reason: string;

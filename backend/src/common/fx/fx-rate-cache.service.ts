@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { FrankfurterFxProvider } from './frankfurter-fx.provider';
 
-export interface CachedFxRate {
+interface CachedFxRate {
   rate: number;
   /** YYYY-MM-DD the rate is FOR. */
   rateDate: string;

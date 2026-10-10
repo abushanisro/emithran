@@ -476,3 +476,67 @@ export class MHRListResponseDto {
   @ApiProperty()
   limit: number;
 }
+
+/**
+ * One machine as the process dialog's pickers need it: enough to build the
+ * Process -> Category -> Machine lists and show each machine's rate. The full
+ * row (economics, specs, capability) is fetched only for the machine chosen.
+ */
+export class MHRPickerRowDto {
+  @ApiProperty() id: string;
+  @ApiProperty() machineName: string;
+  @ApiProperty() location: string;
+  @ApiProperty({ nullable: true }) machineClass?: string;
+  @ApiProperty({ nullable: true }) benchmarkSourceKey?: string;
+  @ApiProperty({ nullable: true }) processGroup?: string;
+  @ApiProperty({ nullable: true }) commodityCode: string | null;
+  /** The same rate the full record gives (frontend resolveMhrUsdRate). */
+  @ApiProperty() mhrUsdPerHour: number;
+
+  /** engineRateUsdPerHour: the engine's rate, for a row that stores none. */
+  static fromDatabase(row: MHRPickerDbRow, engineRateUsdPerHour?: number): MHRPickerRowDto {
+    return {
+      id: row.id,
+      machineName: row.machine_name,
+      location: row.location,
+      machineClass: row.machine_class ?? undefined,
+      benchmarkSourceKey: row.benchmark_source_key ?? undefined,
+      processGroup: row.process_group ?? undefined,
+      commodityCode: row.commodity_code,
+      mhrUsdPerHour: pickerRateUsdPerHour(row) ?? engineRateUsdPerHour ?? 0,
+    };
+  }
+}
+
+/** The mhr_records columns the picker reads. */
+export const MHR_PICKER_COLUMNS =
+  'id,machine_name,location,machine_class,benchmark_source_key,process_group,commodity_code,' +
+  'mhr_usd_per_hour,total_machine_hour_rate,manual_mhr_value,is_manual_entry';
+
+export interface MHRPickerDbRow {
+  id: string;
+  machine_name: string;
+  location: string;
+  machine_class: string | null;
+  benchmark_source_key: string | null;
+  process_group: string | null;
+  commodity_code: string | null;
+  mhr_usd_per_hour: number | string | null;
+  total_machine_hour_rate: number | string | null;
+  manual_mhr_value: number | string | null;
+  is_manual_entry: boolean | null;
+}
+
+/**
+ * The rate findAll() reports for a row without running the full engine:
+ * the stored USD rate, else the manual entry, else the stored total — the
+ * same order as findAll()'s calculations plus the frontend's resolveMhrUsdRate.
+ * A row with none of them (null) is priced by the engine (findPickerRows).
+ */
+export function pickerRateUsdPerHour(row: Pick<MHRPickerDbRow,
+  'mhr_usd_per_hour' | 'total_machine_hour_rate' | 'manual_mhr_value' | 'is_manual_entry'>): number | null {
+  if (row.mhr_usd_per_hour != null) return Number(row.mhr_usd_per_hour);
+  if (row.is_manual_entry && row.manual_mhr_value) return Number(row.manual_mhr_value);
+  const total = Number(row.total_machine_hour_rate ?? 0);
+  return total > 0 ? total : null;
+}

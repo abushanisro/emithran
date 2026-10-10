@@ -41,6 +41,7 @@ export function buildHydroformRoute(args: {
     routeLabel: result.process,
     processFamily: 'forming',
     toolingVolumeNote: null,
+    autoRoutable: false, // forming route: excluded from Auto, as before
     processLines: lines,
     materialCost,
     abrasiveCost: 0,

@@ -3,7 +3,7 @@ import { SupabaseService } from '../../../common/supabase/supabase.service';
 import { FileStorageService } from './file-storage.service';
 import axios from 'axios';
 
-export interface CADAnalysisRequest {
+interface CADAnalysisRequest {
   bomItemId: string;
   filePath: string;
   strategy?: 'aggressive' | 'balanced' | 'conservative';
@@ -1349,7 +1349,7 @@ export class CADAnalysisService {
   }
 }
 
-export interface TrueNestRequest {
+interface TrueNestRequest {
   outlinePointsMm: number[][];
   holesMm: Array<{ cxMm: number; cyMm: number; diameterMm: number }>;
   sheetWidthMm: number;
@@ -1359,7 +1359,7 @@ export interface TrueNestRequest {
   edgeMarginMm?: number;
 }
 
-export interface TrueNestCadEngineResult {
+interface TrueNestCadEngineResult {
   sheetWidthMm: number;
   sheetLengthMm: number;
   partsPerSheet: number;

@@ -140,7 +140,7 @@ export function recommendMoldClass(
 
 // ── Cost confidence ────────────────────────────────────────────────────────────
 
-export function computeCostConfidence(
+function computeCostConfidence(
   signals: Partial<InjectionMoldingSignals>,
   hasSelectedMachine: boolean,
   cavityConstrainedBy: InjectionMoldingBreakdown['cavityConstrainedBy'],

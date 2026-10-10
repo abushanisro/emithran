@@ -1,7 +1,7 @@
 import { IsString, IsNumber, IsEnum, IsOptional, IsUUID, IsDateString, Min } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
-export enum ProductionShift {
+enum ProductionShift {
   MORNING = 'MORNING',
   AFTERNOON = 'AFTERNOON',
   NIGHT = 'NIGHT'

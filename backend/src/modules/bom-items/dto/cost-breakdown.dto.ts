@@ -20,13 +20,13 @@ export interface ProcessCO2 {
   co2Kg: number;
 }
 
-export interface CO2Contributor {
+interface CO2Contributor {
   label: string;   // "Material Production" | process name
   co2Kg: number;
   pct: number;     // share of totalCo2Kg, 0–100
 }
 
-export interface ScoreBreakdown {
+interface ScoreBreakdown {
   materialEfficiency: number;  // 0–30
   carbonIntensity: number;     // 0–30
   recyclability: number;       // 0–20
@@ -64,6 +64,7 @@ export interface RouteResultSustainability {
 
 import type { CapabilityCheck, MachineSelectionResult } from './machine-selection.dto';
 import type { BlankSpecDto } from './blank-spec.dto';
+import type { CadEvidenceKey } from '../costing/shared/cad-evidence';
 
 /** One operation in a feature-level breakdown (eMithran-style sub-operations). */
 export interface FeatureOp {
@@ -99,6 +100,9 @@ export interface CalculationTraceStep {
   // valid inputs — never itself "missing lookup data"). Optional/undefined
   // for calculators not yet migrated onto resolvePhysicsQuantity.
   stepType?: 'physics' | 'lookup';
+  // 'input' steps whose value was measured on CAD faces: which measurement
+  // (see costing/shared/cad-evidence.ts), so the UI can show those faces.
+  evidence?: CadEvidenceKey;
 }
 
 // Every lookup table declares exactly one policy (lookup_table_policy,
@@ -692,7 +696,7 @@ export interface DieToolingDto {
   trace: Array<{ label: string; value: string }>;
 }
 
-export interface DieCastingBreakdown {
+interface DieCastingBreakdown {
   cavityCount: number;
   // 'user': the Cost Guide cavity count; 'default': variables defaultNumCavities;
   // 'large_part': forced to one by largePartThreshold; 'unverified': the

@@ -36,7 +36,7 @@ export interface RouterInput {
   scrapPricePerKg?: number;
 }
 
-export interface RouterResult {
+interface RouterResult {
   processLines: ProcessLineCost[];
   cuttingMin: number;
   // Always 0 — routing has no abrasive consumable. Kept only so this result

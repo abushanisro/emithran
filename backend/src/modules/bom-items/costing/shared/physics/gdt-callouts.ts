@@ -21,7 +21,7 @@
  * CAD engine never produced (always 0), and the sheet-metal readers guessed
  * `toleranceMm`/`tolerance_mm`, keys no producer ever wrote.
  */
-export type GdtCalloutSource = 'step_pmi' | 'drawing';
+type GdtCalloutSource = 'step_pmi' | 'drawing';
 
 export interface GdtCallout {
   type: string;

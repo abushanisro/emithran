@@ -25,9 +25,9 @@ import { resolveCostingInputs } from '../costing/shared/physics/costing-inputs';
 // Anything else (cutting-tool purchase, gauges) has no reference source and is
 // listed as such, never priced.
 
-export type NreStatus = 'costed' | 'gap';
+type NreStatus = 'costed' | 'gap';
 
-export interface NreItem {
+interface NreItem {
   item: string;
   status: NreStatus;
   usd: number | null;

@@ -22,7 +22,7 @@ export class MatchVendorsDto {
 
 // ── Response types ────────────────────────────────────────────────────────────
 
-export interface VendorScoreBreakdown {
+interface VendorScoreBreakdown {
   capability: number;     // 0–35
   quality: number;        // 0–20
   delivery: number;       // 0–15

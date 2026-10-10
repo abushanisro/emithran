@@ -38,7 +38,7 @@ export interface PressBrakeInput {
   scrapPricePerKg?: number;
 }
 
-export interface PressBrakeResult {
+interface PressBrakeResult {
   processLines: ProcessLineCost[];
   cycleTimeMin: number;
   warnings: string[];
@@ -131,7 +131,7 @@ export function computePressBrakeCost(input: PressBrakeInput): PressBrakeResult 
   };
 }
 
-export interface PressBrakeContext extends PressBrakeInput {}
+interface PressBrakeContext extends PressBrakeInput {}
 
 export class PressBrakeEngine implements ManufacturingProcessEngine<PressBrakeContext, PressBrakeResult> {
   readonly machineClass = 'press_brake' as const;

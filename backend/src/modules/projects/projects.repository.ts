@@ -3,7 +3,7 @@ import { BaseRepository } from '@/common/repositories/base.repository';
 import { Logger } from '@/common/logger/logger.service';
 import { SupabaseClient } from '@supabase/supabase-js';
 
-export interface ProjectEntity {
+interface ProjectEntity {
   id: string;
   name: string;
   description?: string;

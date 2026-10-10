@@ -17,7 +17,7 @@ import type { PlasticReference } from './plastic-reference';
 
 /** Runner / sprue share of the part mass per shot: cold runner 8 %, hot runner 1 % (see header). */
 export const IM_RUNNER_SCRAP_PCT = 8;
-export const IM_HOT_RUNNER_SCRAP_PCT = 1;
+const IM_HOT_RUNNER_SCRAP_PCT = 1;
 
 export function shotWeightKgPerPart(netWeightKg: number, runner: RunnerSystem): number {
   const pct = runner === 'hot' ? IM_HOT_RUNNER_SCRAP_PCT : IM_RUNNER_SCRAP_PCT;

@@ -1,11 +1,9 @@
 import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { Logger } from '../../common/logger/logger.service';
+import { readAllRows } from '../../common/supabase/read-all-rows';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { CreateRawMaterialDto, UpdateRawMaterialDto, QueryRawMaterialsDto } from './dto/raw-materials.dto';
 import { RawMaterialResponseDto, RawMaterialListResponseDto } from './dto/raw-material-response.dto';
-import { PlasticRubberContainerService } from './containers/plastic-rubber-container.service';
-import { FerrousContainerService } from './containers/ferrous-container.service';
-import { MATERIAL_CATEGORY_LABELS } from './constants/material-categories.constants';
 import { shapeRankForFamily } from './constants/material-shape-ranking';
 
 import {
@@ -46,8 +44,6 @@ export class RawMaterialsService {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly logger: Logger,
-    private readonly plasticRubberContainer: PlasticRubberContainerService,
-    private readonly ferrousContainer: FerrousContainerService,
   ) {}
 
   // Full alias list. The material picker no longer needs it (search is ranked
@@ -113,6 +109,9 @@ export class RawMaterialsService {
     // Apply filters
     if (query.materialGroup) {
       queryBuilder = queryBuilder.eq('material_group', query.materialGroup);
+    }
+    if (query.materialClass) {
+      queryBuilder = queryBuilder.eq('material_class', query.materialClass);
     }
     let processMaterialGroups: string[] | undefined;
     if (query.processGroup) {
@@ -235,18 +234,52 @@ export class RawMaterialsService {
     return items.map((i) => ({ ...i, stockFormsPriced: counts.get(i.materialGrade || i.material) ?? 0 }));
   }
 
+  /**
+   * The material class of each named material (raw_materials.material_class,
+   * migration 897), matched exactly on grade or name — the names a BOM item
+   * stores are picked from this table (migration 892). No match, or a name
+   * whose rows disagree on the class, is null: never a nearest guess.
+   */
+  async materialClassesFor(names: readonly string[], accessToken?: string): Promise<Record<string, string | null>> {
+    const wanted = [...new Set(names.map((n) => n.trim()).filter(Boolean))];
+    const out: Record<string, string | null> = Object.fromEntries(wanted.map((n) => [n, null]));
+    if (wanted.length === 0) return out;
+    const client = this.supabaseService.getUserClient(accessToken);
+    const classesOf = new Map<string, Set<string | null>>();
+    for (const column of ['grade', 'name'] as const) {
+      const { data, error } = await readAllRows<{ grade: string | null; name: string | null; material_class: string | null }>(
+        (from, to) => client.from('raw_materials').select('grade, name, material_class').in(column, wanted).order('id').range(from, to),
+      );
+      if (error) throw new InternalServerErrorException(`Failed to read material classes: ${error.message}`);
+      for (const row of data) {
+        const key = row[column];
+        if (!key) continue;
+        if (!classesOf.has(key)) classesOf.set(key, new Set());
+        classesOf.get(key)?.add(row.material_class);
+      }
+    }
+    for (const [key, classes] of classesOf) out[key] = classes.size === 1 ? [...classes][0] ?? null : null;
+    return out;
+  }
+
   async getFilterOptions(userId?: string, accessToken?: string): Promise<{
     materialGroups: string[];
+    materialClasses: string[];
     materialTypes: string[];
     countries: string[];
     grades: string[];
   }> {
     this.logger.log('Fetching filter options', 'RawMaterialsService');
 
-    const { data, error } = await this.supabaseService
-      .getUserClient(accessToken)
-      .from('raw_materials')
-      .select('material_group, grade, name, shape');
+    // Every row: one request is capped at 1000 rows and the table is larger.
+    const { data, error } = await readAllRows<{ material_group: string | null; material_class: string | null; grade: string | null; name: string | null }>(
+      (from, to) => this.supabaseService
+        .getUserClient(accessToken)
+        .from('raw_materials')
+        .select('material_group, material_class, grade, name')
+        .order('id', { ascending: true })
+        .range(from, to),
+    );
 
     if (error) {
       this.logger.error(`Error fetching filter options: ${error.message}`, 'RawMaterialsService');
@@ -254,12 +287,16 @@ export class RawMaterialsService {
     }
 
     // Extract unique values
-    const materialGroups = [...new Set(data.map(m => m.material_group).filter(Boolean))].sort();
-    const materialTypes = [...new Set(data.map(m => m.grade).filter(Boolean))].sort();
-    const grades = [...new Set(data.map(m => m.name).filter(Boolean))].sort();
+    const distinct = (values: (string | null)[]): string[] =>
+      [...new Set(values.filter((v): v is string => !!v))].sort();
+    const materialGroups = distinct(data.map(m => m.material_group));
+    const materialClasses = distinct(data.map(m => m.material_class));
+    const materialTypes = distinct(data.map(m => m.grade));
+    const grades = distinct(data.map(m => m.name));
 
     return {
       materialGroups,
+      materialClasses,
       materialTypes,
       countries: [],
       grades,
@@ -604,119 +641,11 @@ export class RawMaterialsService {
     return grouped;
   }
 
-  async getPlasticRubberMaterials(
-    query: QueryRawMaterialsDto,
-    userId?: string,
-    accessToken?: string
-  ): Promise<RawMaterialListResponseDto> {
-    this.logger.log('Fetching plastic & rubber materials via enhanced service', 'RawMaterialsService');
-    return this.plasticRubberContainer.findAllPlasticRubberMaterials(query, userId, accessToken);
-  }
-
-  async getFerrousMaterials(
-    query: QueryRawMaterialsDto,
-    userId?: string,
-    accessToken?: string
-  ): Promise<RawMaterialListResponseDto> {
-    this.logger.log('Fetching ferrous materials via enhanced service', 'RawMaterialsService');
-    return this.ferrousContainer.findAllFerrousMaterials(query, userId, accessToken);
-  }
-
-  async getPlasticRubberMaterialById(
-    id: string,
-    userId: string,
-    accessToken: string
-  ): Promise<RawMaterialResponseDto> {
-    return this.plasticRubberContainer.getPlasticRubberMaterialById(id, userId, accessToken);
-  }
-
-  async getFerrousMaterialById(
-    id: string,
-    userId: string,
-    accessToken: string
-  ): Promise<RawMaterialResponseDto> {
-    return this.ferrousContainer.getFerrousMaterialById(id, userId, accessToken);
-  }
-
-  async createPlasticRubberMaterial(
-    createDto: CreateRawMaterialDto,
-    userId: string,
-    accessToken: string,
-    organizationId: string
-  ): Promise<RawMaterialResponseDto> {
-    return this.plasticRubberContainer.createPlasticRubberMaterial(createDto, userId, accessToken, organizationId);
-  }
-
-  async createFerrousMaterial(
-    createDto: CreateRawMaterialDto,
-    userId: string,
-    accessToken: string,
-    organizationId: string
-  ): Promise<RawMaterialResponseDto> {
-    return this.ferrousContainer.createFerrousMaterial(createDto, userId, accessToken, organizationId);
-  }
-
-  async updatePlasticRubberMaterial(
-    id: string,
-    updateDto: UpdateRawMaterialDto,
-    userId: string,
-    accessToken: string
-  ): Promise<RawMaterialResponseDto> {
-    return this.plasticRubberContainer.updatePlasticRubberMaterial(id, updateDto, userId, accessToken);
-  }
-
-  async updateFerrousMaterial(
-    id: string,
-    updateDto: UpdateRawMaterialDto,
-    userId: string,
-    accessToken: string
-  ): Promise<RawMaterialResponseDto> {
-    return this.ferrousContainer.updateFerrousMaterial(id, updateDto, userId, accessToken);
-  }
-
-  async getMaterialCategoryStatistics(userId: string, accessToken: string): Promise<{
-    plasticRubber: any;
-    ferrous: any;
-    summary: {
-      totalMaterials: number;
-      categoryCounts: Record<string, number>;
-    };
-  }> {
-    this.logger.log('Fetching material category statistics', 'RawMaterialsService');
-
-    const [plasticRubberStats, ferrousStats] = await Promise.all([
-      this.plasticRubberContainer.getPlasticRubberStatistics(userId, accessToken),
-      this.ferrousContainer.getFerrousStatistics(userId, accessToken),
-    ]);
-
-    return {
-      plasticRubber: plasticRubberStats,
-      ferrous: ferrousStats,
-      summary: {
-        totalMaterials: plasticRubberStats.totalMaterials + ferrousStats.totalMaterials,
-        categoryCounts: {
-          [MATERIAL_CATEGORY_LABELS.PLASTIC_RUBBER]: plasticRubberStats.totalMaterials,
-          [MATERIAL_CATEGORY_LABELS.FERROUS_NON_FERROUS]: ferrousStats.totalMaterials,
-        },
-      },
-    };
-  }
-
-  async importFerrousDataFromExcel(
-    excelData: CreateRawMaterialDto[],
-    userId: string,
-    accessToken: string,
-    organizationId: string
-  ): Promise<{ imported: number; errors: string[] }> {
-    this.logger.log('Importing ferrous materials from Excel', 'RawMaterialsService');
-    return this.ferrousContainer.importFerrousDataFromExcel(excelData, userId, accessToken, organizationId);
-  }
-
   async getEnhancedMaterials(
     query: {
       page: number;
       limit: number;
-      category?: string;
+      materialClass?: string;
       search?: string;
       partFamily?: string;
     },
@@ -745,21 +674,9 @@ export class RawMaterialsService {
       .select('*', { count: 'exact' });
 
     // Apply filters to query
-    if (query.category && query.category !== 'all') {
-      // Map category codes to material group names
-      const categoryMapping: { [key: string]: string } = {
-        'PLASTIC': 'Plastic & Rubber',
-        'THERMO': 'Plastic & Rubber',
-        'FERROUS': 'Ferrous & Non-Ferrous',
-        'NON_FERROUS': 'Ferrous & Non-Ferrous',
-        'AL_ALLOY': 'Ferrous & Non-Ferrous',
-        'CU_ALLOY': 'Ferrous & Non-Ferrous',
-        'SS': 'Ferrous & Non-Ferrous'
-      };
-      
-      const materialGroup = categoryMapping[query.category] || query.category;
-      const groupKeyword = materialGroup.split(' ')[0];
-      queryBuilder = queryBuilder.ilike('material_group', `%${groupKeyword}%`);
+    // Ferrous / Non-Ferrous / Plastic & Rubber (raw_materials.material_class, migration 897).
+    if (query.materialClass) {
+      queryBuilder = queryBuilder.eq('material_class', query.materialClass);
     }
 
     let aliasId: string | null = null;
@@ -816,9 +733,7 @@ export class RawMaterialsService {
         id: item.id,
         materialName: materialName,
         materialGrade: materialGrade,
-        categoryName: materialGroup,
-        categoryCode: materialGroup === 'Plastic & Rubber' ? 'PLASTIC' : 'FERROUS',
-        colorCode: materialGroup === 'Plastic & Rubber' ? '#4CAF50' : '#FF5722',
+        materialClass: item.material_class ?? null,
         costPerKg: item.cost || 0,
         costPerUnit: item.cost || 0,
         unitType: 'kg',

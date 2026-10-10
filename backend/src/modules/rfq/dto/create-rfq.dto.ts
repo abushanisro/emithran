@@ -2,7 +2,7 @@ import { IsString, IsUUID, IsArray, IsOptional, IsEnum, IsDate, MinLength } from
 import { ApiProperty } from '@nestjs/swagger';
 import { Type, Transform } from 'class-transformer';
 
-export enum RfqSelectionType {
+enum RfqSelectionType {
   SINGLE = 'single',
   MULTIPLE = 'multiple',
   COMPETITIVE = 'competitive',

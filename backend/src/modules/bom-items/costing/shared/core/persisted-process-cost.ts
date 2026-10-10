@@ -48,7 +48,7 @@ export const PERSISTED_PROCESS_COST_COLUMNS =
   'machine_rate, labor_rate, setup_manning, setup_time, batch_size, heads, ' +
   'cycle_time, parts_per_cycle, scrap';
 
-export type PersistedCostSource = 'stored' | 'derived_legacy_fallback';
+type PersistedCostSource = 'stored' | 'derived_legacy_fallback';
 
 export interface PersistedProcessCostRow {
   total_cost_per_part?: number | string | null;
@@ -65,7 +65,7 @@ export interface PersistedProcessCostRow {
   scrap?: number | string | null;
 }
 
-export interface ResolvedProcessCost {
+interface ResolvedProcessCost {
   totalCostPerPart: number;
   setupCostPerPart: number;
   cycleCostPerPart: number;

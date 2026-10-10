@@ -47,12 +47,12 @@ export interface AbstractProcessLine {
   timingSource?: 'planner_physics' | 'ai_hint' | string;
 }
 
-export interface AbstractToolingLine {
+interface AbstractToolingLine {
   candidateId: string;   // 'tc-N' from tooling CandidateSet — all cost data comes from DB
   reason: string;        // ≤ 240 chars, must cite the operation and why this tool is needed
 }
 
-export interface AbstractLogisticsLine {
+interface AbstractLogisticsLine {
   costName: string;
   logisticsType: 'packaging' | 'inbound' | 'outbound' | 'storage';
   modeOfTransport: 'road' | 'rail' | 'air' | 'sea';
@@ -63,7 +63,7 @@ export interface AbstractLogisticsLine {
   reason: string;
 }
 
-export interface AbstractProcuredPartLine {
+interface AbstractProcuredPartLine {
   partName: string;
   partNumber: string;
   supplierName: string | null;
@@ -75,7 +75,7 @@ export interface AbstractProcuredPartLine {
   reason: string;
 }
 
-export interface AbstractProposedRawMaterial {
+interface AbstractProposedRawMaterial {
   kind: 'raw_material';
   proposedMasterId: string;          // 'pm-N'
   materialGroup: string;
@@ -87,7 +87,7 @@ export interface AbstractProposedRawMaterial {
   reason: string;
 }
 
-export interface AbstractProposedProcess {
+interface AbstractProposedProcess {
   kind: 'process';
   proposedMasterId: string;          // 'pm-N'
   processGroup: string;

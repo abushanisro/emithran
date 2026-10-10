@@ -2,9 +2,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 import { applyPersistedRouteToSummary } from '../../../modules/bom-items/costing/shared/core/cost-engine';
-import {
-  getRouteCoreProcessClasses, getFormingProcessClasses, getProcessLabelForClass,
-} from '../../../modules/bom-items/costing/shared/core/manufacturing-process-registry';
+import { getProcessLabelForClass } from '../../../modules/bom-items/costing/shared/core/manufacturing-process-registry';
 
 // D1. process_cost_records carries three per-line cost columns. Nothing ever
 // wrote them, and buildLineFromAppliedRecord reads them as `?? 0` — so the

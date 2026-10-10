@@ -46,7 +46,7 @@ export const MHR_RATE_MACHINE_CLASSES: readonly MachineClass[] = [
 
 /** The catalog identity of a machine class: its process_calculator_mappings row
  *  and, through canonical_process_id, its process_taxonomy process. */
-export interface ProcessIdentity {
+interface ProcessIdentity {
   processGroup: string;
   processRoute: string;
   operation: string;

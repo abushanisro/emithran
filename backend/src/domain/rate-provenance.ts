@@ -9,7 +9,7 @@
 // sources this table used to classify were removed as substitutes.
 import type { MHRRateInput, LhrRateSource } from './cost-result';
 
-export type RateProvenanceTier = 'REAL' | 'BENCHMARK' | 'ESTIMATE' | 'REFERENCE' | 'NO_RATE';
+type RateProvenanceTier = 'REAL' | 'BENCHMARK' | 'ESTIMATE' | 'REFERENCE' | 'NO_RATE';
 
 const MHR_SOURCE_TO_PROVENANCE: Record<MHRRateInput['source'], RateProvenanceTier> = {
   mhr_database: 'REAL',

@@ -1,6 +1,6 @@
 import { IsUUID, IsOptional, IsDateString, IsEnum, IsInt, IsString, IsNumber, Min } from 'class-validator';
 
-export enum EntryType {
+enum EntryType {
   DAILY = 'daily',
   WEEKLY = 'weekly',
   SHIFT = 'shift'

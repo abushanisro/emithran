@@ -26,7 +26,7 @@ import { Type } from 'class-transformer';
 import { IsOptionalBoolean } from '../../../common/decorators/validation.decorators';
 
 @ValidatorConstraint({ name: 'IsUUIDOrArrayOfUUIDs', async: false })
-export class IsUUIDOrArrayOfUUIDs implements ValidatorConstraintInterface {
+class IsUUIDOrArrayOfUUIDs implements ValidatorConstraintInterface {
   validate(value: any, args: ValidationArguments) {
     if (!value) return true; // Optional field
 

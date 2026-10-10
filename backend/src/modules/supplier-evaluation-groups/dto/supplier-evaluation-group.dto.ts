@@ -2,7 +2,7 @@ import { IsUUID, IsString, IsOptional, IsArray, ValidateNested, IsNumber, IsBool
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-export class BomItemDto {
+class BomItemDto {
   @ApiProperty()
   @IsUUID()
   id: string;
@@ -31,7 +31,7 @@ export class BomItemDto {
   quantity: number;
 }
 
-export class ProcessDto {
+class ProcessDto {
   @ApiProperty()
   @IsString()
   id: string;

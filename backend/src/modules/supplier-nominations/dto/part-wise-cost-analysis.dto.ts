@@ -123,7 +123,7 @@ export class PartWiseCostBaseDataDto {
   updatedAt?: Date;
 }
 
-export class CreatePartWiseCostAnalysisDto {
+class CreatePartWiseCostAnalysisDto {
   @ApiProperty()
   @IsUUID()
   nominationId: string;
@@ -197,7 +197,7 @@ export class CreatePartWiseCostAnalysisDto {
   leadTimeDays?: number;
 }
 
-export class CreatePartWiseCostBaseDataDto {
+class CreatePartWiseCostBaseDataDto {
   @ApiProperty()
   @IsUUID()
   nominationId: string;

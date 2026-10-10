@@ -34,9 +34,9 @@ import type { MachiningNeedResult } from './machining-need';
 const HOLE_CALCULATORS = new Set(['Drilling', 'Reaming', 'Jig Boring', 'Gun Drilling', 'Deep Bore Machine']);
 
 /** HR Rates machine per calculator; the caller supplies the classes the machining engine uses. */
-export type MachineForCalculator = (calculator: string) => MHRRateInput | undefined;
+type MachineForCalculator = (calculator: string) => MHRRateInput | undefined;
 
-export interface PricedCandidate {
+interface PricedCandidate {
   operation: string;
   calculator: string;
   machine: MHRRateInput;
@@ -46,7 +46,7 @@ export interface PricedCandidate {
   run: CalcRun;
 }
 
-export interface FeatureMachiningChoice {
+interface FeatureMachiningChoice {
   label: string;
   featureType: string;
   /** The operations run on the feature, in order: forming (if any), then the cheapest finishing. Empty when none could be priced. */
@@ -55,7 +55,7 @@ export interface FeatureMachiningChoice {
   unpriced: Array<{ operation: string; reason: string }>;
 }
 
-export interface SecondaryMachiningResult {
+interface SecondaryMachiningResult {
   /** One line per machine that machines at least one feature. */
   lines: ProcessLineCost[];
   features: FeatureMachiningChoice[];

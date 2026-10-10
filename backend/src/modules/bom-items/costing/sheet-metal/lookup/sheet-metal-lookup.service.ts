@@ -2,7 +2,8 @@ import { Injectable } from '@nestjs/common';
 import type { PartSpacingRow } from '../machine/sheet-metal-nesting.engine';
 import { SupabaseService } from '../../../../../common/supabase/supabase.service';
 import type { LookupResolution, LookupQueryParam, LookupTableRow } from '../../../dto/cost-breakdown.dto';
-import { classifyLaserMaterial } from '../../shared/capability/machine-selection/physics';
+import { classifyLaserMaterial, type LaserPowerRequirement } from '../../shared/capability/machine-selection/physics';
+import { ReferenceMemo } from '../../../../../common/cache/reference-memo';
 
 // No fallback constants in this file. Every lookup below returns
 // `dataFound: false` (with a neutral 0/empty value that is never priced —
@@ -37,7 +38,7 @@ export function normaliseLaserMaterial(grade: string | null | undefined): string
 // getManualStrokeTime shares this rounding rather than each reimplementing
 // it — this table's own resolver is the single place that knows how its
 // tonnage column is actually classed.
-export const STANDARD_PRESS_BRAKE_TONNAGE_CLASSES = [
+const STANDARD_PRESS_BRAKE_TONNAGE_CLASSES = [
   10, 20, 30, 50, 80, 100, 150, 200, 250, 300, 350, 400, 500, 800, 1000, 1500, 2000,
 ];
 
@@ -93,25 +94,25 @@ export interface LaserCutParams {
   dataFound: boolean;
 }
 
-export interface WaterjetCutParams {
+interface WaterjetCutParams {
   cuttingSpeedMmPerMin: number;
   pierceTimeMin: number;
   kerfMm: number;
   dataFound: boolean;
 }
 
-export interface RouterCutParams {
+interface RouterCutParams {
   cuttingSpeedMmPerMin: number;
   dataFound: boolean;
 }
 
-export interface OxyfuelCutParams {
+interface OxyfuelCutParams {
   feedRateLargeFeaturesMmPerMin: number;
   pierceTimeSec: number;
   dataFound: boolean;
 }
 
-export interface LaserPunchMachineParams {
+interface LaserPunchMachineParams {
   punchRateCyclesPerMin: number;
   nibbleMmPerMin: number;
   toolChangeSec: number;
@@ -136,7 +137,7 @@ export interface PlasmaPunchParams {
   dataFound: boolean;
 }
 
-export interface RollBendingMachineParams {
+interface RollBendingMachineParams {
   rollingSpeedMmPerSec: number;
   prebendTimeSec: number;
   dataFound: boolean;
@@ -166,6 +167,22 @@ const ROUTER_FAMILY_KEY: Partial<Record<ReturnType<typeof classifyLaserMaterial>
 @Injectable()
 export class SheetMetalLookupService {
   constructor(private readonly supabase: SupabaseService) {}
+
+  // sm_reference_data machine rows whose raw name equals `machineName`
+  // (case-insensitive), filtered in the database. The per-machine lookups
+  // below used to download every machine row (the whole library's JSON) and
+  // filter in JS on each call; callers still apply their own exact-name and
+  // ambiguity checks to what comes back.
+  private machineReferenceRowsNamed(machineName: string) {
+    // ILIKE wildcards (% _) and the escape character itself match literally.
+    const pattern = machineName.trim().replace(/[\\%_]/g, (c) => '\\' + c);
+    return this.supabase
+      .getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared')
+      .from('sm_reference_data')
+      .select('raw')
+      .eq('category', 'machine')
+      .ilike('raw->>name', pattern);
+  }
 
   // lookup_table_policy (migration 427) was seeded but never actually read —
   // every call site below hardcoded 'EXACT_MATCH'/'INTERPOLATE' as a TS
@@ -200,19 +217,80 @@ export class SheetMetalLookupService {
   private partSpacing: PartSpacingRow[] | null | undefined;
   async getPartSpacingTable(): Promise<PartSpacingRow[] | null> {
     if (this.partSpacing !== undefined) return this.partSpacing;
+    // tblPartSpacing is staged two ways from the same memory CSV
+    // (lookuptable/digital_factory_lookup_tables__tblPartSpacing.csv): one
+    // row per entry (migration 518, key 'tblPartSpacing:...') and one row
+    // for the whole table (migration 830, raw.rows). A database may carry
+    // either — the live dev DB has only the whole-table row — so both are read.
     const { data, error } = await this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared')
       .from('sm_reference_data')
       .select('raw')
       .eq('category', 'lookup_table')
-      .like('key', 'tblPartSpacing:%');
+      .or('key.like.tblPartSpacing:%,key.eq.digital_factory_lookup_tables__tblPartSpacing');
     if (error) return null;
-    const rows = (data ?? []).map((r: any) => ({
-      process: String(r.raw?.Process ?? ''),
-      thicknessMm: Number(r.raw?.['Thickness (mm)']),
-      spacingMm: Number(r.raw?.['Part Spacing (mm)']),
-    })).filter((r) => r.process && Number.isFinite(r.thicknessMm) && Number.isFinite(r.spacingMm));
+    const entries = (data ?? []).flatMap((r: any) => (Array.isArray(r.raw?.rows) ? r.raw.rows : [r.raw]));
+    const seen = new Set<string>();
+    const rows = entries.map((r: any) => ({
+      process: String(r?.Process ?? ''),
+      thicknessMm: Number(r?.['Thickness (mm)']),
+      spacingMm: Number(r?.['Part Spacing (mm)']),
+    })).filter((r) => r.process && Number.isFinite(r.thicknessMm) && Number.isFinite(r.spacingMm))
+      // the same entry staged both ways is one row
+      .filter((r) => { const k = `${r.process}|${r.thicknessMm}`; if (seen.has(k)) return false; seen.add(k); return true; });
     this.partSpacing = rows.length ? rows : null;
     return this.partSpacing;
+  }
+
+  // (thickness, power) rows of sm_lookup_laser_cut with a cutting speed, per
+  // material + technology. Cached in-process like the part-spacing table:
+  // global reference data, read on every cost summary. A read error is not
+  // cached.
+  private laserPowerRowsCache = new Map<string, { t: number; w: number }[]>();
+  private async laserPowerRows(material: string, technology: 'fiber' | 'co2'): Promise<{ t: number; w: number }[] | null> {
+    const key = `${technology}|${material}`;
+    const cached = this.laserPowerRowsCache.get(key);
+    if (cached) return cached;
+    const { data, error } = await this.supabase
+      .getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared')
+      .from('sm_lookup_laser_cut')
+      .select('thickness_mm, laser_power_w')
+      .eq('material', material)
+      .eq('laser_technology', technology)
+      .not('cutting_speed_m_per_min', 'is', null);
+    if (error || !data) return null;
+    const rows = data.map((r) => ({ t: Number(r.thickness_mm), w: Number(r.laser_power_w) }));
+    this.laserPowerRowsCache.set(key, rows);
+    return rows;
+  }
+
+  // Lowest laser power that can cut this material at this thickness, from
+  // sm_lookup_laser_cut: a power with no row for the material/thickness
+  // cannot cut it. The part's thickness rounds UP to the next tabulated
+  // thickness, so the requirement is never understated. Returns null when the
+  // table has no rows for this material at all (copper, titanium, ... — only
+  // the families the table actually carries are mapped, never defaulted).
+  async getMinLaserPowerRequirement(
+    grade: string | null | undefined,
+    thicknessMm: number,
+    technology: 'fiber' | 'co2',
+  ): Promise<LaserPowerRequirement | null> {
+    const family = classifyLaserMaterial(grade ?? null);
+    const material =
+      family === 'MS' ? 'Carbon Steel'
+      : family === 'SS' ? 'Stainless Steel'
+      : family === 'AL' ? 'Aluminium'
+      : family === 'CU' && normaliseLaserMaterial(grade) === 'Brass' ? 'Brass'
+      : null;
+    if (!material || !(thicknessMm > 0)) return null;
+
+    const rows = await this.laserPowerRows(material, technology);
+    if (!rows?.length) return null;
+
+    const thicker = rows.filter((r) => r.t >= thicknessMm - 1e-9).map((r) => r.t);
+    if (thicker.length === 0) return { material, tableThicknessMm: null, requiredW: null };
+    const tableThicknessMm = Math.min(...thicker);
+    const requiredW = Math.min(...rows.filter((r) => r.t === tableThicknessMm).map((r) => r.w));
+    return { material, tableThicknessMm, requiredW };
   }
 
   // ── Table 5: Laser cutting params ─────────────────────────────────────────
@@ -221,6 +299,7 @@ export class SheetMetalLookupService {
   // see migration 457. Every row seeded so far is 'fiber'; a co2-classed
   // machine (e.g. AMADA Quattro) correctly gets dataFound:false until real
   // co2-specific data is sourced, regardless of what power it reports.
+  @ReferenceMemo()
   async getLaserParams(
     grade: string | null | undefined,
     thicknessMm: number,
@@ -546,6 +625,7 @@ export class SheetMetalLookupService {
   // the key). prebendTimeSec is real per-machine data for 3/4-Roll machines
   // and genuinely absent (0) for 2-Roll machines — a real physical
   // distinction in the source data, not a gap.
+  @ReferenceMemo()
   async getRollBendingMachineParams(machineName: string | null | undefined): Promise<RollBendingMachineParams> {
     const noData: RollBendingMachineParams = { rollingSpeedMmPerSec: 0, prebendTimeSec: 0, dataFound: false };
     if (!machineName) return noData;
@@ -611,6 +691,7 @@ export class SheetMetalLookupService {
   // Numeric sheet-metal variables (sm_reference_data category 'variable',
   // migration 479), by key. A key absent or non-numeric is absent from the
   // map: the caller decides what an unknown value means, never a default here.
+  @ReferenceMemo()
   async getNumericVariables(keys: readonly string[]): Promise<Map<string, number>> {
     const { data, error } = await this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared')
       .from('sm_reference_data')
@@ -624,6 +705,86 @@ export class SheetMetalLookupService {
       if (Number.isFinite(v)) result.set(r.key as string, v);
     }
     return result;
+  }
+
+  // ── Stock sheet for nesting ─────────────────────────────────────────────────
+  // The nominal sheet a specific laser cuts from (machine library
+  // nominal_sheet_size_length_mm/width_mm, staged in sm_reference_data).
+  // Same exact-name, non-ambiguous discipline as the other per-machine lookups.
+  @ReferenceMemo()
+  async getNominalSheetForMachine(machineName: string | null | undefined): Promise<{ widthMm: number; lengthMm: number } | null> {
+    if (!machineName?.trim()) return null;
+    const { data, error } = await this.machineReferenceRowsNamed(machineName);
+    if (error || !data) return null;
+    const nameLower = machineName.trim().toLowerCase();
+    const sheets = data
+      .filter((r: any) => String(r.raw?.name ?? '').trim().toLowerCase() === nameLower)
+      .map((r: any) => ({ widthMm: Number(r.raw?.nominal_sheet_size_width_mm), lengthMm: Number(r.raw?.nominal_sheet_size_length_mm) }))
+      .filter((s) => s.widthMm > 0 && s.lengthMm > 0);
+    return sheets.length === 1 ? sheets[0]! : null;
+  }
+
+  // Every distinct nominal sheet size the machine library's fiber lasers cut
+  // from (nominal_sheet_size_*). The Nest view's candidate stock sheets.
+  // Cached in-process: global reference data.
+  private laserSheetSizesCache: { widthMm: number; lengthMm: number }[] | null = null;
+  async getLaserNominalSheetSizes(): Promise<{ widthMm: number; lengthMm: number }[]> {
+    if (this.laserSheetSizesCache) return this.laserSheetSizesCache;
+    const { data, error } = await this.supabase
+      .getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared')
+      .from('sm_reference_data')
+      .select('raw')
+      .eq('category', 'machine')
+      .eq('raw->>machine_category', 'Fiber Laser Cutting Machine');
+    if (error || !data) return [];
+    const seen = new Map<string, { widthMm: number; lengthMm: number }>();
+    for (const r of data as any[]) {
+      const widthMm = Number(r.raw?.nominal_sheet_size_width_mm);
+      const lengthMm = Number(r.raw?.nominal_sheet_size_length_mm);
+      if (widthMm > 0 && lengthMm > 0) seen.set(`${widthMm}x${lengthMm}`, { widthMm, lengthMm });
+    }
+    this.laserSheetSizesCache = [...seen.values()];
+    return this.laserSheetSizesCache;
+  }
+
+  // Each Deslag machine's own time per mm of cut (burr) edge —
+  // perimeter_allowance_s_per_mm in the machine library ("Deslag Machine").
+  // Keyed by lower-cased machine name. Cached in-process: reference data.
+  private deslagAllowanceCache: Record<string, number> | null = null;
+  async getDeslagSecPerMmByMachine(): Promise<Record<string, number>> {
+    if (this.deslagAllowanceCache) return this.deslagAllowanceCache;
+    const { data, error } = await this.supabase
+      .getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared')
+      .from('sm_reference_data')
+      .select('raw')
+      .eq('category', 'machine')
+      .eq('raw->>machine_category', 'Deslag Machine');
+    if (error || !data) return {};
+    const out: Record<string, number> = {};
+    for (const r of data as any[]) {
+      const name = String(r.raw?.name ?? '').trim().toLowerCase();
+      const sPerMm = Number(r.raw?.perimeter_allowance_s_per_mm);
+      if (name && sPerMm > 0) out[name] = sPerMm;
+    }
+    this.deslagAllowanceCache = out;
+    return out;
+  }
+
+  // Default stock sheet when no machine sheet is known: standardSheetWidth /
+  // standardSheetLength ("Default standard sheet ... if no stock is
+  // available for computed utilization", migration 479).
+  async getStandardSheet(): Promise<{ widthMm: number; lengthMm: number } | null> {
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const { data, error } = await db
+      .from('sm_reference_data')
+      .select('key, value')
+      .eq('category', 'variable')
+      .in('key', ['standardSheetWidth', 'standardSheetLength']);
+    if (error || !data) return null;
+    const byKey = new Map(data.map((r) => [r.key as string, Number(r.value)]));
+    const widthMm = byKey.get('standardSheetWidth');
+    const lengthMm = byKey.get('standardSheetLength');
+    return widthMm! > 0 && lengthMm! > 0 ? { widthMm: widthMm!, lengthMm: lengthMm! } : null;
   }
 
   async getToolingAnnualVolumeThresholds(): Promise<{ progressiveDie: number | null; stageTooling: number | null }> {
@@ -813,6 +974,7 @@ export class SheetMetalLookupService {
   }
 
   // ── Table 2: Handling time (min) for given weight kg ───────────────────────
+  @ReferenceMemo()
   async getHandlingTime(weightKg: number): Promise<{ minutes: number; dataFound: boolean }> {
     const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
@@ -839,6 +1001,7 @@ export class SheetMetalLookupService {
 
   // ── Table 3A/B: Tool setup time (min) ─────────────────────────────────────
   // type='press' → keyValue = tonnage; type='brake' → keyValue = tool length mm
+  @ReferenceMemo()
   async getToolSetupTime(type: 'press' | 'brake', keyValue: number): Promise<{ minutes: number; dataFound: boolean }> {
     const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
@@ -881,6 +1044,7 @@ export class SheetMetalLookupService {
   // the seeded thickness range (below 1mm or above 16mm) for a given
   // tonnage/complexity is still a real gap, not interpolation — rule 4 of
   // this architecture's own policy definitions.
+  @ReferenceMemo()
   async getManualStrokeTime(
     thicknessMm: number,
     tonnage: number,
@@ -1071,15 +1235,12 @@ export class SheetMetalLookupService {
   // 16 named "Bend Press Brake" machines. Same exact-name, non-ambiguous
   // matching discipline as getWaterjetAbrasiveRateForMachine/
   // getTurretPunchParamsForMachine.
+  @ReferenceMemo()
   async getBendCycleTimeForMachine(machineName: string | null | undefined): Promise<{ secondsPerBend: number | null; dataFound: boolean }> {
     const empty = { secondsPerBend: null, dataFound: false };
     if (!machineName?.trim()) return empty;
 
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
-    const { data, error } = await db
-      .from('sm_reference_data')
-      .select('raw')
-      .eq('category', 'machine');
+    const { data, error } = await this.machineReferenceRowsNamed(machineName);
     if (error || !data) return empty;
 
     const nameLower = machineName.trim().toLowerCase();
@@ -1122,22 +1283,24 @@ export class SheetMetalLookupService {
   // comment). `resolution`/`roundedFromTonnage` are passed through from the
   // generic curve unchanged (still useful audit-trail context) even when the
   // real per-machine value wins on secondsPerBend/dataFound.
+  @ReferenceMemo()
   async getManualStrokeTimeForPressBrake(
     thicknessMm: number,
     tonnage: number,
     complexity: 'simple' | 'complex',
     machineName: string | null | undefined,
-  ): ReturnType<SheetMetalLookupService['getManualStrokeTime']> {
+  ): Promise<Awaited<ReturnType<SheetMetalLookupService['getManualStrokeTime']>> & { fromMachineSpec: boolean }> {
     const [generic, real] = await Promise.all([
       this.getManualStrokeTime(thicknessMm, tonnage, complexity),
       this.getBendCycleTimeForMachine(machineName),
     ]);
-    if (!real.dataFound || real.secondsPerBend == null) return generic;
-    return { ...generic, secondsPerBend: real.secondsPerBend, dataFound: true };
+    if (!real.dataFound || real.secondsPerBend == null) return { ...generic, fromMachineSpec: false };
+    return { ...generic, secondsPerBend: real.secondsPerBend, dataFound: true, fromMachineSpec: true };
   }
 
   // ── Table 6: Sampling rate (fraction) for given lot size ──────────────────
   // Returns sample_qty_l2 / lotSize as a fraction.
+  @ReferenceMemo()
   async getSamplingRate(lotSize: number): Promise<{ rate: number; dataFound: boolean }> {
     if (lotSize <= 0) return { rate: 0, dataFound: false };
 
@@ -1160,6 +1323,7 @@ export class SheetMetalLookupService {
   // ever overrode — silently baked into every sheet-metal process line's
   // inspection cost with zero DB backing (see migration <N>_sm_lookup_
   // inspection_time.sql). Mirrors getSamplingRate's structure exactly.
+  @ReferenceMemo()
   async getInspectionTime(complexity: 'simple' | 'inter' | 'complex'): Promise<{ minutes: number; dataFound: boolean }> {
     const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
@@ -1183,6 +1347,7 @@ export class SheetMetalLookupService {
   // tapping/counterbore/countersink/pem_insertion/burring/ream), so this
   // avoids N round trips the way getCounterboreCycleTimes already does for
   // its own bulk lookup.
+  @ReferenceMemo()
   async getOpSetupTimes(): Promise<{ minutes: Map<string, number>; dataFound: Set<string> }> {
     const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
@@ -1229,6 +1394,7 @@ export class SheetMetalLookupService {
   // table, same convention as getOpSetupTimes() above — the caller passes the
   // full array straight through to computeInspectionLine, which does its own
   // feature+method lookup and disclosed fallback.
+  @ReferenceMemo()
   async getInspectionOperationDefaults(): Promise<import('../../shared/process/inspection-engine').InspectionOperationDefaultRow[]> {
     const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
@@ -1289,11 +1455,7 @@ export class SheetMetalLookupService {
     const empty = { hitsPerMin: null, toolChangeSec: null, dataFound: false };
     if (!machineName?.trim()) return empty;
 
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
-    const { data, error } = await db
-      .from('sm_reference_data')
-      .select('raw')
-      .eq('category', 'machine');
+    const { data, error } = await this.machineReferenceRowsNamed(machineName);
     if (error || !data) return empty;
 
     const nameLower = machineName.trim().toLowerCase();
@@ -1349,11 +1511,7 @@ export class SheetMetalLookupService {
     const empty = { kgPerMin: 0, dataFound: false };
     if (!machineName?.trim()) return empty;
 
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
-    const { data, error } = await db
-      .from('sm_reference_data')
-      .select('raw')
-      .eq('category', 'machine');
+    const { data, error } = await this.machineReferenceRowsNamed(machineName);
     if (error || !data) return empty;
 
     const nameLower = machineName.trim().toLowerCase();
@@ -1411,11 +1569,7 @@ export class SheetMetalLookupService {
     if (!machineName?.trim()) return empty;
     if (!(developedLengthMm > 0) || !(thicknessMm > 0) || !(targetDiameterMm > 0)) return empty;
 
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
-    const { data, error } = await db
-      .from('sm_reference_data')
-      .select('raw')
-      .eq('category', 'machine');
+    const { data, error } = await this.machineReferenceRowsNamed(machineName);
     if (error || !data) return empty;
 
     const nameLower = machineName.trim().toLowerCase();
@@ -1588,6 +1742,8 @@ export class SheetMetalLookupService {
   // Recognition-only match (nearest within tolerance) — not a geometric detector.
   // Bulk: one query for the whole (small) table, matched in memory per hole group.
   // A hole diameter with no match is just a plain through-hole, not a false PEM guess.
+  // A database failure answers with every diameter unmatched, so only an answer with at least one match is kept.
+  @ReferenceMemo({ cacheable: (v) => [...(v as Map<number, unknown>).values()].some((m) => m !== null) })
   async getPemMatches(
     holeDiametersMm: number[],
     sheetThicknessMm: number,

@@ -12,9 +12,10 @@
  * to the feature itself, e.g. a counterbore is the MultiStepHole of
  * "Multistep Holemaking//MultiStepHole:Counterboring//SimpleHole".
  */
+import { isTurnedFamily } from '../../../../../domain/part-family';
 import { isReferenceOperation } from '../../shared/reference-features.generated';
 
-export type MachiningRouteFamily = 'milling' | 'turning';
+type MachiningRouteFamily = 'milling' | 'turning';
 
 const MILLING_OPERATION_BY_FEATURE: Readonly<Record<string, string>> = {
   'SimpleHole:through': 'Drilling',
@@ -58,7 +59,7 @@ for (const table of [MILLING_OPERATION_BY_FEATURE, TURNING_OPERATION_BY_FEATURE]
 }
 
 export function machiningRouteFamilyOf(cadFamily: string | null | undefined): MachiningRouteFamily {
-  return cadFamily === 'turned' || cadFamily === 'mill_turn' ? 'turning' : 'milling';
+  return isTurnedFamily(cadFamily) ? 'turning' : 'milling';
 }
 
 /** "Operation // FeatureType", or null when the feature has no mapped operation. */

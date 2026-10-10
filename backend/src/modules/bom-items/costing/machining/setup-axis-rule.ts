@@ -22,8 +22,6 @@
 //                             lathe-spindle features, stock-derived features)
 
 import { MACHINING_REFERENCE_SOURCE_VERSION } from './lookup/machining-lookup-tables';
-
-export const SETUP_AXIS_SOURCE_VERSION = MACHINING_REFERENCE_SOURCE_VERSION;
 export const SETUP_AXIS_VARIABLE_KEYS = [
   'perpendicularCountFor3AM',
   'maxOblique4AMSetups',
@@ -36,9 +34,9 @@ export interface SetupAxisRule {
   allowedAngleDeviationDeg: number;
 }
 
-export type MilledClass = '3_axis_mill' | '4_axis_mill' | '5_axis_mill';
+type MilledClass = '3_axis_mill' | '4_axis_mill' | '5_axis_mill';
 
-export interface RequiredMilledClass {
+interface RequiredMilledClass {
   /** null = not derivable (no rule staged, or no feature carries a tool axis):
    *  no class is excluded, and `reason` says why. */
   required: MilledClass | null;

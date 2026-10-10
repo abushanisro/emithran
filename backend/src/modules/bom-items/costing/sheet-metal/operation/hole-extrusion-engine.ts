@@ -9,7 +9,7 @@ import { eMithranTerms, resolveSetupMinutes } from '../../shared/core/engine-ker
 // Extracted verbatim from cost-engine.ts's inline Hole Extrusion (Burring)
 // block (Platform Architecture Remediation Phase 1 — engine registry
 // unification, Rule 8).
-export interface HoleExtrusionInput {
+interface HoleExtrusionInput {
   extrudedFlangeCount: number;
   batchSize: number;
   rate: MHRRateInput;
@@ -31,7 +31,7 @@ export interface HoleExtrusionInput {
   scrapPricePerKg?: number;
 }
 
-export interface HoleExtrusionResult {
+interface HoleExtrusionResult {
   processLines: ProcessLineCost[];
   cycleTimeMin: number;
   warnings: string[];
@@ -116,7 +116,7 @@ export function computeHoleExtrusionCost(input: HoleExtrusionInput): HoleExtrusi
   };
 }
 
-export interface HoleExtrusionContext extends HoleExtrusionInput {}
+interface HoleExtrusionContext extends HoleExtrusionInput {}
 
 export class HoleExtrusionEngine implements ManufacturingProcessEngine<HoleExtrusionContext, HoleExtrusionResult> {
   readonly machineClass = 'hole_forming' as const;

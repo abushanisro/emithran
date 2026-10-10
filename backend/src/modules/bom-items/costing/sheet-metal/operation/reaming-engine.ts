@@ -13,7 +13,7 @@ import { eMithranTerms, resolveSetupMinutes } from '../../shared/core/engine-ker
 // extraction — this engine's gate is simply `reamHoleCount > 0`, matching
 // every other count-gated secondary op; the caller passes 0 when the
 // tolerance threshold wasn't crossed.
-export interface ReamingInput {
+interface ReamingInput {
   reamHoleCount: number; // 0 when the tight-tolerance trigger didn't fire
   tightestToleranceMm: number | null; // for the disclosure warning only
   batchSize: number;
@@ -36,7 +36,7 @@ export interface ReamingInput {
   scrapPricePerKg?: number;
 }
 
-export interface ReamingResult {
+interface ReamingResult {
   processLines: ProcessLineCost[];
   cycleTimeMin: number;
   warnings: string[];
@@ -122,7 +122,7 @@ export function computeReamingCost(input: ReamingInput): ReamingResult {
   };
 }
 
-export interface ReamingContext extends ReamingInput {}
+interface ReamingContext extends ReamingInput {}
 
 export class ReamingEngine implements ManufacturingProcessEngine<ReamingContext, ReamingResult> {
   readonly machineClass = 'drill_press' as const;

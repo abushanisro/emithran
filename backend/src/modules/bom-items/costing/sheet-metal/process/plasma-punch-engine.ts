@@ -34,7 +34,7 @@ export interface PlasmaPunchInput {
   scrapPricePerKg?: number;
 }
 
-export interface PlasmaPunchResult {
+interface PlasmaPunchResult {
   processLines: ProcessLineCost[];
   cuttingMin: number;
   // Always 0 — no abrasive/nozzle-wear rate table exists for this class yet.

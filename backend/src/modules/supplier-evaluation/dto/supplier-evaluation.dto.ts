@@ -35,7 +35,7 @@ export enum EvaluationStatus {
 /**
  * Recommendation status enum
  */
-export enum RecommendationStatus {
+enum RecommendationStatus {
   RECOMMENDED = 'recommended',
   CONDITIONAL = 'conditional',
   NOT_RECOMMENDED = 'not_recommended',

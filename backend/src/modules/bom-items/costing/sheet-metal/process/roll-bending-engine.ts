@@ -5,7 +5,7 @@ import type { CuttingProcessContext, CuttingProcessResult } from '../../shared/c
 import { noRateFallback, eMithranTerms, resolveSetupMinutes } from '../../shared/core/engine-kernel';
 import { BaseCuttingEngine, buildCuttingProcessLine } from '../../shared/core/engine-orchestrator';
 
-export interface RollBendingInput {
+interface RollBendingInput {
   // The flat pattern's real feed-length dimension (item.maxLength) — the
   // dimension fed through the rolls. NOT cut length or bend length; a
   // genuinely distinct geometry input this engine is the first to use.
@@ -33,7 +33,7 @@ export interface RollBendingInput {
   scrapPricePerKg?: number;
 }
 
-export interface RollBendingResult {
+interface RollBendingResult {
   processLines: ProcessLineCost[];
   cuttingMin: number;
   // Always 0 — roll bending has no abrasive/wear consumable modeled. Kept

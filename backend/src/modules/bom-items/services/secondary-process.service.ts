@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../../common/supabase/supabase.service';
 import { ExchangeRateService } from '../../../common/exchange-rate/exchange-rate.service';
+import { isMachiningFamily } from '../../../domain/part-family';
 import { getCurrencyForLocation } from '../../mhr/constants/mhr-calculation.constants';
 import { MaterialResolutionService } from './material-resolution.service';
 import {
@@ -12,6 +13,7 @@ import {
   type SecondaryProcessResult,
   type SecondaryReference,
 } from '../costing/secondary/secondary-process-engine';
+import { surfaceCalloutOf } from '../costing/surface/surface-callout';
 import { SURFACE_PROCESSES, SURFACE_TREATMENT_SOURCE_VERSION, computeSurfaceTreatments, matchSurfaceTreatmentCallout } from '../costing/surface/surface-treatment-engine';
 import { HEAT_TREATMENT_PROCESSES, HEAT_TREATMENT_SOURCE_VERSION, computeHeatTreatments, caseDepthFromCallout, matchHeatTreatmentCallout } from '../costing/heat/heat-treatment-engine';
 import {
@@ -194,6 +196,7 @@ export class SecondaryProcessService {
       heatTreatment?: string | null;
       featureGraph?: any;
       drawingIntelligence?: any;
+      coating?: string | null;
     };
     location: string;
     batchSize: number | null;
@@ -230,6 +233,8 @@ export class SecondaryProcessService {
       wallThicknessMm: wall,
       materialCutCode: cutCode,
       materialTypeName: materialGroup,
+      isMachined: family === 'unknown' ? null : isMachiningFamily(family),
+      surfaceCallout: surfaceCalloutOf(item),
       features: (fg?.feature_graph_v2?.features ?? []).filter((f: any) => f?.id && f?.feature_type && Array.isArray(f?.occurrences)),
       batchSize,
     };

@@ -5,7 +5,7 @@ import type { CuttingProcessContext, CuttingProcessResult } from '../../shared/c
 import { noRateFallback, eMithranTerms, resolveSetupMinutes } from '../../shared/core/engine-kernel';
 import { BaseCuttingEngine, buildCuttingProcessLine } from '../../shared/core/engine-orchestrator';
 
-export interface LaserPunchInput {
+interface LaserPunchInput {
   pierceCount: number;   // total punched holes
   holeCount: number;     // unique hole diameters -> one tool change each
   cutLengthMm: number;   // contour length to nibble
@@ -37,7 +37,7 @@ export interface LaserPunchInput {
   scrapPricePerKg?: number;
 }
 
-export interface LaserPunchResult {
+interface LaserPunchResult {
   processLines: ProcessLineCost[];
   cuttingMin: number;
   // Always 0 — laser punching has no abrasive consumable. Kept only so this

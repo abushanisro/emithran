@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { SupabaseService } from '../../../../../common/supabase/supabase.service';
+import { isTurnedFamily } from '../../../../../domain/part-family';
 import {
   type BoundingBox, type BlankResult, type StockForm, type StockProfile,
   sortedDimensions, roundBarCandidates, hexBarCandidates, rectangularBarCandidates,
@@ -37,7 +38,7 @@ export class BlankOptimizerService {
     try {
       const profiles = await this.loadStockProfiles(accessToken);
       const allowance = (await this.stockAllowanceFor(bbox)).allowancePerSideMm;
-      const turnedFamily = family === 'turned' || family === 'mill_turn';
+      const turnedFamily = isTurnedFamily(family);
       const { L, W, H } = turnedFamily && turnedAxis
         ? { L: turnedAxis.lengthMm, W: turnedAxis.diameterMm, H: turnedAxis.diameterMm }
         : sortedDimensions(bbox);

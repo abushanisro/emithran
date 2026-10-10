@@ -19,7 +19,7 @@
 
 import type { ClampModel } from './plastic-reference';
 
-export type FlowClass = 'easy' | 'medium' | 'hard';
+type FlowClass = 'easy' | 'medium' | 'hard';
 export type RunnerSystem = 'hot' | 'cold';
 
 /** The material's reference clamp properties (raw_materials, migration 831). */
@@ -44,7 +44,7 @@ export type ClampForceResult =
 /** One tonne-force in newtons (the platform's clamp tonnage unit). */
 const NEWTONS_PER_TONNE_FORCE = 9806.65;
 
-export function flowClassOf(model: ClampModel, flowLengthRatio: number): FlowClass {
+function flowClassOf(model: ClampModel, flowLengthRatio: number): FlowClass {
   if (flowLengthRatio >= model.easyFlowRatio) return 'easy';
   if (flowLengthRatio >= model.mediumFlowRatio) return 'medium';
   return 'hard';

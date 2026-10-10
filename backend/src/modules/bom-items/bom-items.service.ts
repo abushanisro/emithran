@@ -1,4 +1,5 @@
 import { HydroformingReferenceService } from './costing/hydroforming/hydroforming-reference.service';
+import { isMachiningFamily, isTurnedFamily, type MachiningFamily } from '../../domain/part-family';
 import { computeHydroforming } from './costing/hydroforming/hydroforming-engine';
 import { buildHydroformRoute, drawnShellFromFeatures } from './costing/hydroforming/hydroforming-route';
 import { SheetMetalCatalogOperationsService } from './costing/sheet-metal/operation/catalog-operations.service';
@@ -9,7 +10,7 @@ import { CreateBOMItemDto, UpdateBOMItemDto } from './dto/bom-items.dto';
 import { BOMItemResponseDto, BOMItemListResponseDto } from './dto/bom-item-response.dto';
 import type { CalculationTraceStep, PhysicsGap, UnsupportedOperationGap, ManufacturingPhysicsResult, ConfidenceLevel, ResolutionStatus, LookupResolution, ValidatedInput } from './dto/cost-breakdown.dto';
 import { computeCostSummary, computeSustainability, applyPersistedRouteToSummary, selectAppliedGeneration, detectAppliedGenerationDrift } from './costing/shared/core/cost-engine';
-import type { MHRRateInput, AppliedProcessCostRecord, LhrRateSource } from './costing/shared/core/cost-engine';
+import type { MHRRateInput, AppliedProcessCostRecord } from './costing/shared/core/cost-engine';
 import { planInspection, finalizeInspectionLine } from './costing/shared/process/inspection-engine';
 import type { InspectionInput } from './costing/shared/process/inspection-engine';
 import { evaluateCalculatorFormulas, normalizeFieldName } from '../calculators/calculator-formula-evaluator';
@@ -18,9 +19,8 @@ import { PHYSICS_REGISTRY } from '../calculators/physics-registry';
 import { SheetMetalLookupService, roundUpToStandardTonnageClass } from './costing/sheet-metal/lookup/sheet-metal-lookup.service';
 import { MachiningLookupService } from './costing/machining/lookup/machining-lookup.service';
 import type { LaserCutParams } from './costing/sheet-metal/lookup/sheet-metal-lookup.service';
-import { computeNesting, resolveNestingDimensions, EDGE_ALLOWANCE_MM, STANDARD_SHEETS, isTrueNestCostingCacheValid, trueNestInputFingerprint, computePartAllowanceMm, GROSS_USAGE_SPACING_PROCESS } from './costing/sheet-metal/machine/sheet-metal-nesting.engine';
+import { computeNesting, resolveNestingDimensions, EDGE_ALLOWANCE_MM, type NestingSheet, isTrueNestCostingCacheValid, trueNestInputFingerprint, computePartAllowanceMm, GROSS_USAGE_SPACING_PROCESS } from './costing/sheet-metal/machine/sheet-metal-nesting.engine';
 import { selectBestTrueNestCandidate } from './costing/sheet-metal/machine/true-nest-costing.engine';
-import { cachedRead } from './costing/shared/core/request-cache';
 import { resolveNetUsagePhysics } from './costing/sheet-metal/raw-material/sheet-metal-net-usage.physics';
 import type { TrueNestCandidate, TrueNestCostingSelection } from './costing/sheet-metal/machine/true-nest-costing.engine';
 import {
@@ -55,29 +55,17 @@ import { computeInjectionMoldedCostSummary, IM_RUNNER_SCRAP_PCT } from './costin
 import { computeCompressionMoldingCost } from './costing/plastic-molding/process/cost-compression-molding-engine';
 import { computeReactionInjectionMoldingCost } from './costing/plastic-molding/process/cost-reaction-injection-molding-engine';
 import type { InjectionMoldingCostInput } from './costing/plastic-molding/process/cost-injection-molding-engine';
-import { isPlasticGrade } from './costing/plastic-molding/process/process-tree';
 import {
   selectIMmachinesByTier,
   type IMSelectionRequirements,
 } from './costing/plastic-molding/machine/machine-selector-im';
 import { requiredClampForce, type MaterialClampProperties } from './costing/plastic-molding/clamp-force';
 import { shotGppsGramsPerCavity, shotWeightKgPerPart } from './costing/plastic-molding/shot-size';
-import {
-  MATERIAL_OVERHEAD_PCT, RATES_SOURCE_LABEL,
-  DEBURR_SEC_PER_METRE, DEBURR_SEC_PER_PIERCE,
-  computeTapCycleSec, resolveTapPhysicsInputs, TAP_UNLOAD_SEC, isoCoarsePitchMm,
-  resolveDrillingSpeedFeed, COUNTERSINK_SPEED_FACTOR, HOLE_OP_UNLOAD_SEC,
-  resolveReamPhysicsInputs, TIGHT_TOLERANCE_REAM_THRESHOLD_MM,
-  MACHINE_REGISTRY, LOCATION_INFO, CURRENCY_SYMBOLS,
-  DEFAULT_COSTING_LOCATION,
-  resolveUtsMpa, isSheetFormableMaterial, estimateBendTonnage,
-  estimateBurlTonnage, estimateBurlDiameterMm, type SurfaceTreatmentDbRate,
-  classifyInspectionResource, DEFAULT_YIELD_PCT,
-} from './costing/shared/core/default-rates.constants';
+import { MATERIAL_OVERHEAD_PCT, RATES_SOURCE_LABEL, computeTapCycleSec, resolveTapPhysicsInputs, TAP_UNLOAD_SEC, isoCoarsePitchMm, resolveDrillingSpeedFeed, COUNTERSINK_SPEED_FACTOR, HOLE_OP_UNLOAD_SEC, resolveReamPhysicsInputs, TIGHT_TOLERANCE_REAM_THRESHOLD_MM, MACHINE_REGISTRY, LOCATION_INFO, CURRENCY_SYMBOLS, recommendedBendTonnage, bendShoulderWidthMm, estimateBurlTonnage, estimateBurlDiameterMm, type SurfaceTreatmentDbRate, DEFAULT_YIELD_PCT } from './costing/shared/core/default-rates.constants';
 import type { MachineClass } from './costing/shared/core/default-rates.constants';
 import { checkMachineCapability } from './costing/shared/capability/machine-capability';
 import type { CapabilityCheck as MachineCapabilityCheck, PartGeometryForCapability } from './costing/shared/capability/machine-capability';
-import { getProcessLabelForClass, getEnginesForFamily, getRouteCoreProcessClasses, getFormingProcessClasses, ROUTE_ID_FOR_CLASS, ROUTE_LABEL_FOR_CLASS } from './costing/shared/core/manufacturing-process-registry';
+import { getProcessLabelForClass, getEnginesForFamily, getRouteCoreProcessClasses, ROUTE_ID_FOR_CLASS, ROUTE_LABEL_FOR_CLASS } from './costing/shared/core/manufacturing-process-registry';
 // Platform Architecture Remediation Phase 1 (engine registry unification,
 // Rule 8) — getRouteComparison()'s Press Brake/Deburring/Hole Extrusion/
 // Tapping lines now call the exact same registered engines
@@ -85,11 +73,7 @@ import { getProcessLabelForClass, getEnginesForFamily, getRouteCoreProcessClasse
 // labor/inspection-sampling/yield-loss cost (see each engine file's own doc
 // comment for the specific divergence this closes).
 import { computePressBrakeCost } from './costing/sheet-metal/process/press-brake-engine';
-import { computeDeburringCost } from './costing/sheet-metal/operation/deburring-engine';
-import { computeHoleExtrusionCost } from './costing/sheet-metal/operation/hole-extrusion-engine';
-import { computeTappingCost } from './costing/sheet-metal/operation/tapping-engine';
 import { resolveEffectiveSheetThicknessMm, resolveScenarioFxSnapshot, resolveScenarioStockForm, resolveScenarioCavityCount } from './costing/shared/physics/scenario-overrides';
-import { overlayRejectionReason, PersistedMoneyRow } from './costing/shared/core/persisted-currency-contract';
 import { resolveCostingInputs } from './costing/shared/physics/costing-inputs';
 import type { CostSummaryDto, CostSummaryResponseDto, ProcessLineCost, FeatureOp, CostStatus } from './dto/cost-breakdown.dto';
 import type { BlankSpecDto } from './dto/blank-spec.dto';
@@ -106,23 +90,18 @@ import {
   classifyLaserMaterial, laserRequirement, latheRequirement,
   pressBrakeRequirement, holeFormingRequirement, vmcRequirement, injectionMoldingRequirement,
   punchingRequirement, waterjetRequirement, shearRequirement, plasmaCutRequirement, laserPunchRequirement,
-  pressFormingRequirement, rollBendingRequirement,
+  pressFormingRequirement, rollBendingRequirement, deburrSecPerMm,
 } from './costing/shared/capability/machine-selection/physics';
 import { findRouteDataGaps, selectRecommendedRoute, shouldAddSeparatePressBrakeLine, rollBendingGeometryCapability, rolledFormNeedsRollBender,
-  drawnShellNeedsDrawing, routeProducesBlank, preferRealRate } from './costing/shared/core/engine-kernel';
+  drawnShellNeedsDrawing, routeProducesBlank, preferRealRate, hardToolingVolumeCapability, isAutoRoutable } from './costing/shared/core/engine-kernel';
 import { computeProgressiveDieToolingCost, progressiveDieToolingDataGap, buildProgressiveDieToolingLine } from './costing/sheet-metal/process/progressive-die-tooling-engine';
 import { composeFeatureDrivenOperations, composeOperationSequence } from './costing/sheet-metal/operation/feature-driven-operations';
 import {
   MATERIAL_MRR_CM3_MIN,
 } from './costing/shared/capability/machine-selection/physics';
 import type { MachineRequirement } from './costing/shared/capability/machine-selection/physics';
-import { explainCandidate, fetchMachinePool, selectMachine } from './costing/shared/capability/machine-selection/selector';
-import { EMPTY_CAPABILITY, MACHINE_CLASS_DEFAULTS } from './costing/shared/capability/machine-selection/seed-registry';
+import { explainCandidate, fetchMachinePool } from './costing/shared/capability/machine-selection/selector';
 import type { CapabilityCheck, MachineCandidate, MachineRecommendation, MachineSelectionResult } from './dto/machine-selection.dto';
-import {
-  shapeRankForFamily,
-  isDiscouragedShapeForFamily,
-} from '../raw-materials/constants/material-shape-ranking';
 import { ExchangeRateService, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
 import { CADAnalysisService } from './services/cad-analysis.service';
 import { RateResolutionService } from './services/rate-resolution.service';
@@ -138,7 +117,7 @@ import { priceSecondaryMachining } from './costing/shared/tolerance/secondary-ma
 import { selectCastingOperations, topLevelCatalogRows } from './costing/casting/casting-feature-operations';
 import { runReferenceCalculator, type ReferenceCalculators } from './costing/shared/calculators/reference-calculator';
 import { castingSeed } from './costing/casting/casting-calculator-seeds';
-import { cleaningLine, meltingLine, partingLineGrindingLine, trimLine, visualInspectionLine, type FinishingMachine } from './costing/casting/casting-finishing';
+import { cleaningLine, meltingLine, partingLineGrindingLine, trimLine, visualInspectionLine } from './costing/casting/casting-finishing';
 import { computeDieTooling, type DieToolingResult } from './costing/casting/die-tooling';
 import { readFinishingMachines } from './costing/casting/casting-reference.service';
 import { HPDC_MACHINE_CLASS_ID, HPDC_PROCESS, type HpdcResult } from './costing/casting/hpdc-engine';
@@ -154,8 +133,11 @@ import {
   type SecondaryGroup, type SecondaryResultLike, type SecondarySelection,
 } from './costing/shared/secondary-operations';
 import { matchSurfaceTreatmentCallout } from './costing/surface/surface-treatment-engine';
+import { surfaceCalloutOf } from './costing/surface/surface-callout';
 import type { CalculatorRunDto, SecondaryOperationsDto, SecondaryOptionDto } from './dto/cost-breakdown.dto';
 import type { DieCastingProcessChoiceDto, DieCastingProcessOptionDto } from './dto/cost-breakdown.dto';
+import { cadEvidenceKey } from './costing/shared/cad-evidence';
+import { realBendLengthsMm } from './costing/shared/bend-lengths';
 
 /** A quote with extra lines appended: process total, total, cycle time and completeness follow. */
 function appendLines<T extends CostSummaryDto>(dto: T, lines: ProcessLineCost[]): T {
@@ -1346,6 +1328,11 @@ export class BOMItemsService {
       // cutting engine not named here falls back to the laser requirement,
       // preserving the previous "new engine auto-included" behavior for the
       // common case.
+      // Both laser technologies' minimum-power lookups start together.
+      const laserPower = {
+        fiber: this.smLookup.getMinLaserPowerRequirement(input.grade, input.sheetThicknessMm, 'fiber'),
+        co2: this.smLookup.getMinLaserPowerRequirement(input.grade, input.sheetThicknessMm, 'co2'),
+      };
       for (const engine of getEnginesForFamily('sheet_metal_cutting')) {
         const cls = engine.machineClass as MachineClass;
         if (cls === 'turret_punch') {
@@ -1413,6 +1400,11 @@ export class BOMItemsService {
             bedLengthMm: flatLen,
             bedWidthMm: flatWid,
           });
+        } else if (cls === 'fiber_laser' || cls === 'co2_laser') {
+          // Source power from the laser cut table decides which lasers can
+          // cut this material/thickness (memory Lookup Table 5).
+          const power = await laserPower[cls === 'fiber_laser' ? 'fiber' : 'co2'];
+          requirements[cls] = power ? { ...cutReq, power } : cutReq;
         } else {
           requirements[cls] = cutReq;
         }
@@ -1459,6 +1451,28 @@ export class BOMItemsService {
         });
       }
 
+      // Burr removal: the burr sits on the cut edge, so its length is the
+      // cut length. Deslag machines and Manual Deburr each carry their own
+      // real time per mm (see DeburrRequirement).
+      if ((input.cutLengthMm ?? 0) > 0) {
+        const [deslag, manual, passes] = await Promise.all([
+          this.smLookup.getDeslagSecPerMmByMachine(),
+          this.machiningLookup.getDeburrParams(detectMaterialClass(input.grade)),
+          this.machiningLookup.getDeburrPassesPerEdge(),
+        ]);
+        requirements.deburring = {
+          kind: 'deburr',
+          burrEdgeLengthMm: input.cutLengthMm!,
+          deslagSecPerMmByMachine: deslag,
+          manualDeburr: manual.dataFound && manual.linearSpeedMmPerSec > 0 && passes != null
+            ? {
+                secPerMm: passes / manual.linearSpeedMmPerSec,
+                source: `tblDeburring ${manual.linearSpeedMmPerSec} mm/s (material code ${manual.materialCutCode ?? '?'}) × ${passes} pass`,
+              }
+            : null,
+        };
+      }
+
       if ((input.extrudedFlangeCount ?? 0) > 0) {
         requirements.hole_forming = holeFormingRequirement({
           holeDiameterMm: input.burlDiameterMm ?? 3,
@@ -1489,7 +1503,7 @@ export class BOMItemsService {
       for (const cls of millingClasses) requirements[cls] = vmcReq;
     }
 
-    if (input.family === 'turned' || input.family === 'mill_turn') {
+    if (isTurnedFamily(input.family)) {
       // The CAD turned diameter and length along the turning axis; the
       // bounding box (longest side = length) only when the part has no
       // recognised turned-diameter feature.
@@ -2545,35 +2559,22 @@ export class BOMItemsService {
   }
 
   /**
-   * Build Deburring feature breakdown from cut edge length and pierce count.
-   *
-   * Uses the exact same DEBURR_SEC_PER_METRE/DEBURR_SEC_PER_PIERCE constants
-   * that computeCostSummary already used for the dollar cost, so the
-   * displayed "why" breakdown and the cycle time driving the total always
-   * agree. Method is always vibratory finishing — the only deburr method this
-   * engine currently prices (no distinct manual/tumbling formula exists).
+   * Deburring feature breakdown: the burr edge at the selected machine's own
+   * time per mm — the same rate resolveDeburrCalc prices the line with, so the
+   * breakdown and the cycle time always agree.
    */
-  private buildDeburrFeatureBreakdown(cutLengthMm: number, pierceCount: number): FeatureOp[] {
-    const result: FeatureOp[] = [];
-    if (cutLengthMm > 0) {
-      const timeSec = (cutLengthMm / 1000) * DEBURR_SEC_PER_METRE;
-      result.push({
-        name: `Edge length ${(cutLengthMm / 1000).toFixed(2)}m (vibratory, ${DEBURR_SEC_PER_METRE} sec/m)`,
-        timeSec: Math.round(timeSec),
-        featureType: 'deburr_edge',
-        count: 1,
-      });
-    }
-    if (pierceCount > 0) {
-      const timeSec = pierceCount * DEBURR_SEC_PER_PIERCE;
-      result.push({
-        name: `Pierce cleanup ×${pierceCount}`,
-        timeSec: Math.round(timeSec),
-        featureType: 'deburr_pierce',
-        count: pierceCount,
-      });
-    }
-    return result;
+  private buildDeburrFeatureBreakdown(deburr: MHRRateInput): FeatureOp[] {
+    const req = deburr.selection?.requirement;
+    const cand = deburr.selection?.balanced?.candidate;
+    if (req?.kind !== 'deburr' || !cand) return [];
+    const rate = deburrSecPerMm(cand, req);
+    if (!rate) return [];
+    return [{
+      name: `Burr edge ${(req.burrEdgeLengthMm / 1000).toFixed(2)} m × ${rate.secPerMm.toPrecision(3)} s/mm (${cand.machineName})`,
+      timeSec: Math.round(req.burrEdgeLengthMm * rate.secPerMm),
+      featureType: 'deburr_edge',
+      count: 1,
+    }];
   }
 
   // Build PEM Insertion feature breakdown from the resolved sm_lookup_pem_hardware
@@ -2703,6 +2704,73 @@ export class BOMItemsService {
       .filter((h) => Number.isFinite(h.cxMm) && Number.isFinite(h.cyMm) && Number.isFinite(h.diameterMm));
   }
 
+  /**
+   * Deslag / deburr cycle time for the machine selected on the deburr line:
+   * burr edge length (the cut length) x that machine's own time per mm
+   * (DeburrRequirement / deburrSecPerMm — the rule the selector ranked with).
+   * No selected machine or no rate on file -> a reported gap, never a default.
+   */
+  private async resolveDeburrCalc(accessToken: string, deburr: MHRRateInput): Promise<ManufacturingPhysicsResult> {
+    const req = deburr.selection?.requirement;
+    const cand = deburr.selection?.balanced?.candidate;
+    if (req?.kind !== 'deburr' || !cand?.machineId) return this.emptyPhysicsResult(['Total Time']);
+    const rate = deburrSecPerMm(cand, req);
+    return this.resolvePhysicsQuantity(accessToken, {
+      machineClass: 'deburring',
+      process: 'Deburring',
+      targetFieldNames: ['Total Time'],
+      seedScope: {
+        'Burr Edge Length': req.burrEdgeLengthMm,
+        ...(rate ? { 'Deburr Time Per mm': rate.secPerMm } : {}),
+      },
+      seedProvenance: {
+        'Burr Edge Length': 'CAD feature extraction — cut edge length (the burr sits on the cut edge)',
+        'Deburr Time Per mm': rate?.source ?? `no deburr time rate on file for "${cand.machineName}"`,
+      },
+    });
+  }
+
+  /**
+   * The stock sheet a part is nested on (material cost + Nest view): the
+   * nominal sheet of the laser selected to cut it (machine library), else
+   * the reference standard sheet (standardSheetWidth/Length). Null only when
+   * neither is on file — a real data gap, reported by the caller.
+   */
+  async resolveNestingSheet(laserMachineName: string | null | undefined): Promise<(NestingSheet & { source: string }) | null> {
+    const machineSheet = await this.smLookup.getNominalSheetForMachine(laserMachineName);
+    if (machineSheet) return { ...machineSheet, source: `Nominal sheet of "${laserMachineName}" (machine library)` };
+    const standard = await this.smLookup.getStandardSheet();
+    return standard ? { ...standard, source: 'Standard sheet (standardSheetWidth/Length)' } : null;
+  }
+
+  /**
+   * Candidate stock sheets for the Nest view: the reference standard sheet
+   * plus every distinct nominal sheet the machine library's fiber lasers cut
+   * from — kept only when it fits the selected laser's bed (a sheet bigger
+   * than the bed cannot be cut on it). The costed sheet is always included.
+   */
+  async resolveNestCandidateSheets(
+    laser: MHRRateInput | undefined,
+    costedSheet: (NestingSheet & { source: string }) | null,
+  ): Promise<Array<NestingSheet & { source: string }>> {
+    const [standard, library] = await Promise.all([
+      this.smLookup.getStandardSheet(),
+      this.smLookup.getLaserNominalSheetSizes(),
+    ]);
+    const cap = (laser?.selection?.balanced?.candidate as any)?.capability;
+    const bedX = Number(cap?.maxXMm), bedY = Number(cap?.maxYMm);
+    const fitsBed = (s: NestingSheet) => !(bedX > 0 && bedY > 0) ||
+      (s.lengthMm <= bedX && s.widthMm <= bedY) || (s.lengthMm <= bedY && s.widthMm <= bedX);
+    const out = new Map<string, NestingSheet & { source: string }>();
+    const add = (s: NestingSheet | null, source: string) => {
+      if (s && fitsBed(s)) out.set(`${s.widthMm}x${s.lengthMm}`, { ...s, source });
+    };
+    add(standard, 'Standard sheet (standardSheetWidth/Length)');
+    for (const s of library) add(s, 'Laser nominal sheet (machine library)');
+    if (costedSheet) out.set(`${costedSheet.widthMm}x${costedSheet.lengthMm}`, costedSheet);
+    return [...out.values()];
+  }
+
   async resolveTrueShapeNestCosting(
     itemId: string,
     summary: any,
@@ -2713,6 +2781,7 @@ export class BOMItemsService {
     edgeMarginMm: number,
     userId: string,
     accessToken: string,
+    sheet: NestingSheet,
   ): Promise<{ selection: TrueNestCostingSelection; reason?: undefined } | { selection: null; reason: string }> {
     const outlinePointsMm = summary?.flatPatternOutlinePointsMm;
     if (!Array.isArray(outlinePointsMm) || outlinePointsMm.length < 3) {
@@ -2725,7 +2794,7 @@ export class BOMItemsService {
     });
 
     const cache = summary?.trueNestCostingCache;
-    if (isTrueNestCostingCacheValid(cache, kerfMm, edgeMarginMm, inputFingerprint)) {
+    if (isTrueNestCostingCacheValid(cache, kerfMm, edgeMarginMm, inputFingerprint, sheet)) {
       return {
         selection: {
           sheetWidthMm: cache.sheetWidthMm, sheetLengthMm: cache.sheetLengthMm,
@@ -2747,13 +2816,13 @@ export class BOMItemsService {
     // only share a computation that would have produced the same answer. The
     // entry is removed on settle, so a later request with changed geometry (a
     // different fingerprint) never joins a stale flight.
-    const flightKey = `${itemId}|${inputFingerprint}|${kerfMm}|${edgeMarginMm}`;
+    const flightKey = `${itemId}|${inputFingerprint}|${kerfMm}|${edgeMarginMm}|${sheet.widthMm}x${sheet.lengthMm}`;
     const inFlight = this.trueNestInFlight.get(flightKey);
     if (inFlight) return inFlight;
 
     const flight = this.computeTrueShapeNestCosting(
       itemId, summary, netWeightKg, densityKgM3, thicknessMm, kerfMm, edgeMarginMm,
-      userId, accessToken, outlinePointsMm, inputFingerprint,
+      userId, accessToken, outlinePointsMm, inputFingerprint, sheet,
     ).finally(() => this.trueNestInFlight.delete(flightKey));
     this.trueNestInFlight.set(flightKey, flight);
     return flight;
@@ -2778,6 +2847,7 @@ export class BOMItemsService {
     accessToken: string,
     outlinePointsMm: number[][],
     inputFingerprint: string,
+    sheet: NestingSheet,
   ): Promise<{ selection: TrueNestCostingSelection; reason?: undefined } | { selection: null; reason: string }> {
     const holesMm = this.toNestHoles(summary.flatPatternHolesMm);
 
@@ -2788,7 +2858,7 @@ export class BOMItemsService {
     // -- see this method's own doc comment for why that's correct here).
     const candidates: TrueNestCandidate[] = [];
     const perCandidateReasons: string[] = [];
-    for (const [w, l] of STANDARD_SHEETS) {
+    for (const { widthMm: w, lengthMm: l } of [sheet]) {
       const { result, reason } = await this.cadAnalysisService.computeTrueNest({
         outlinePointsMm, holesMm, sheetWidthMm: w, sheetLengthMm: l,
         quantity: 1, // partsPerSheet/utilization are quantity-independent -- see nesting.py
@@ -2806,7 +2876,7 @@ export class BOMItemsService {
     if (!best) {
       return {
         selection: null,
-        reason: `true-shape nest failed for every candidate standard sheet -- ${perCandidateReasons.join('; ')}`,
+        reason: `true-shape nest failed on the ${sheet.widthMm}x${sheet.lengthMm}mm sheet -- ${perCandidateReasons.join('; ')}`,
       };
     }
 
@@ -2833,7 +2903,7 @@ export class BOMItemsService {
     }, userId, accessToken);
     this.logger.log(
       `[true-nest-costing] selected ${best.sheetWidthMm}x${best.sheetLengthMm}mm: ${best.partsPerSheet} parts/sheet, ` +
-      `${best.utilisationPct}% utilization for item ${itemId} (${candidates.length}/${STANDARD_SHEETS.length} candidates viable)`,
+      `${best.utilisationPct}% utilization for item ${itemId}`,
     );
     return { selection: best };
   }
@@ -2847,6 +2917,9 @@ export class BOMItemsService {
   // labeled path -- this calculator represents the true-shape half only.
   static readonly GROSS_USAGE_GAP_REASON =
     'Unable to calculate true-shape gross usage — verified flat pattern required';
+  static readonly NO_SHEET_GAP =
+    'No stock sheet on file — the selected laser has no nominal sheet size in the machine library and ' +
+    'standardSheetWidth/standardSheetLength are missing from sm_reference_data.';
   static readonly PART_SPACING_GAP =
     `Nesting part spacing not staged: tblPartSpacing (migration 518) has no ${GROSS_USAGE_SPACING_PROCESS} row`;
 
@@ -2890,9 +2963,20 @@ export class BOMItemsService {
 
     const kerfMm = computePartAllowanceMm(await this.smLookup.getPartSpacingTable(), thicknessMm);
     if (kerfMm == null) return { _gapReason: GAP_REASON, _internalReason: BOMItemsService.PART_SPACING_GAP };
+    // The sheet: handed in by the cost engine (the selected laser's sheet);
+    // opened interactively, the sheet this part was last costed on; else the
+    // standard sheet.
+    const cached = summary?.trueNestCostingCache;
+    const sheet: NestingSheet | null =
+      Number(inputValues['Sheet Width']) > 0 && Number(inputValues['Sheet Length']) > 0
+        ? { widthMm: Number(inputValues['Sheet Width']), lengthMm: Number(inputValues['Sheet Length']) }
+        : cached?.sheetWidthMm > 0 && cached?.sheetLengthMm > 0
+          ? { widthMm: cached.sheetWidthMm, lengthMm: cached.sheetLengthMm }
+          : await this.resolveNestingSheet(null);
+    if (!sheet) return { _gapReason: GAP_REASON, _internalReason: BOMItemsService.NO_SHEET_GAP };
     const trueShape = await this.resolveTrueShapeNestCosting(
       ctx.itemId, summary, netWeightKg, densityKgM3, thicknessMm,
-      kerfMm, edgeMarginMm, ctx.userId, ctx.accessToken,
+      kerfMm, edgeMarginMm, ctx.userId, ctx.accessToken, sheet,
     );
     if (!trueShape.selection) {
       return { _gapReason: GAP_REASON, _internalReason: trueShape.reason };
@@ -3075,7 +3159,7 @@ export class BOMItemsService {
     // all cylindrical faces (OD steps, groove IDs) — not just machined holes.
     const cncFeatureSummary = machiningFeatureCounts(fg?.machining_features);
     const holeCount = (
-      cncFeatureSummary !== null && (family === 'milled' || family === 'turned' || family === 'mill_turn')
+      cncFeatureSummary !== null && isMachiningFamily(family)
         ? cncFeatureSummary.drilledHoles
         : (summary.holeCount ?? item.holeCount ?? 0)
     ) as number;
@@ -3167,7 +3251,7 @@ export class BOMItemsService {
               height: ((item as any).maxHeight ?? 0) as number,
             }),
             weightKg: (((item as any).weight ?? 0) as number),
-            bendLengthsMm: (fg?.summary?.bendLengths ?? []) as number[],
+            bendLengthsMm: realBendLengthsMm(fg),
             utsMpa,
             materialClamp: clampProperties,
             extrudedFlangeCount: fg?.summary?.extrudedFlangeCount ?? 0,
@@ -3185,7 +3269,7 @@ export class BOMItemsService {
     // Audit trail — non-blocking; costing must never wait on or fail with it
     void this.writeSelectionSnapshots(id, accessToken, mhrRates, location);
 
-    if (family === 'milled' || family === 'turned' || family === 'mill_turn') {
+    if (isMachiningFamily(family)) {
       const inspectionRules = await this.inspectionKnowledge.getInspectionRules(accessToken);
       const samplingPolicy = await this.resolveSamplingPolicy(item, accessToken);
 
@@ -3199,7 +3283,7 @@ export class BOMItemsService {
       const blankResult = await this.blankOptimizer.selectOptimalBlank(
         bbox,
         (item.volume ?? 0) as number,
-        family as 'milled' | 'turned' | 'mill_turn',
+        family as MachiningFamily,
         accessToken,
         resolveScenarioStockForm(item.scenarioOverrides),
         this.resolveTurnedGeometry(fg, bbox),
@@ -3331,7 +3415,7 @@ export class BOMItemsService {
         `[CNC cost] grade=${grade ?? 'null'} family=${family} blank=${blankResult.sizeLabel} ` +
         `util=${blankResult.utilizationPct?.toFixed(1)}% featureOps=${featureOps?.length ?? 'bbox-fallback'} ` +
         `machiningTimeSec=${featureMachiningTimeSec.toFixed(1)} threads=${JSON.stringify(threads)} ` +
-        `surface=${this.resolveSurfaceTreatment(item) ?? 'none'}`,
+        `surface=${surfaceCalloutOf(item) ?? 'none'}`,
       );
 
       // Surface treatment is a shared secondary operation (appendSecondaryOperations), not an engine line.
@@ -4296,10 +4380,10 @@ export class BOMItemsService {
     // buildPartRequirements' identical convention) when the cad-engine has
     // it; falls back to the flat-pattern's own overall dimension only when
     // it doesn't (mesh-inference-only parts). Tonnage uses the SAME
-    // estimateBendTonnage formula/real UTS that machine selection's
+    // recommendedBendTonnage formula/real UTS that machine selection's
     // pressBrakeRequirement uses — sized to this one longest bend, not
     // summed across bendCount (a brake bends one line at a time).
-    const smRealBendLengths = (fg?.summary?.bendLengths ?? []) as number[];
+    const smRealBendLengths = realBendLengthsMm(fg);
     const smBendLength = smRealBendLengths.length > 0
       ? Math.max(...smRealBendLengths)
       : (bendCount > 0 ? (((item as any).maxLength ?? 200) as number) : 200);
@@ -4308,7 +4392,7 @@ export class BOMItemsService {
     // the selected machine's real capacity over this estimate, so 0 correctly
     // falls through to "no requirement known" rather than fabricating one.
     const smRequiredTonnage = bendCount > 0
-      ? Math.ceil(estimateBendTonnage(smUtsMpa, sheetThicknessMm, smBendLength) ?? 0)
+      ? Math.ceil(recommendedBendTonnage(smUtsMpa, sheetThicknessMm, smBendLength) ?? 0)
       : 0;
     // Stroke time is a property of the MACHINE, not of this one bend's
     // minimum required force — see resolveStrokeLookupTonnage's own doc
@@ -4328,7 +4412,6 @@ export class BOMItemsService {
       smSamplingResult,
       smInspectionResult,
       smOpSetupTimesResult,
-      smDeburrRateResult,
       smInspectionOperationDefaults,
       smInspectionRules,
     ] = await Promise.all([
@@ -4356,7 +4439,6 @@ export class BOMItemsService {
       this.smLookup.getSamplingRate(batchSize),
       this.smLookup.getInspectionTime(lookupComplexity),
       this.smLookup.getOpSetupTimes(),
-      this.smLookup.getDeburrRate(),
       this.smLookup.getInspectionOperationDefaults(),
       this.inspectionKnowledge.getInspectionRules(accessToken),
     ]);
@@ -4476,7 +4558,7 @@ export class BOMItemsService {
           seedScope: {
             Thickness: sheetThicknessMm,
             'Bending Line Length': smBendLength,
-            'Shoulder Width': 8 * sheetThicknessMm,
+            'Shoulder Width': bendShoulderWidthMm(sheetThicknessMm),
             // Omitted entirely (not passed as undefined) when the real stroke-
             // time lookup found no matching row — leaves the formula unable
             // to resolve this symbol, so resolvePhysicsQuantity correctly
@@ -4492,7 +4574,9 @@ export class BOMItemsService {
           },
           seedProvenance: {
             Thickness: 'BOM sheet thickness',
-            'Bending Line Length': ((item as any).maxLength != null) ? 'CAD/BOM part geometry — max length' : 'Default (200mm, no CAD length available)',
+            'Bending Line Length': smRealBendLengths.length > 0
+              ? `CAD feature extraction — longest of ${smRealBendLengths.length} bend lines`
+              : (((item as any).maxLength != null) ? 'CAD/BOM part geometry — max length (flat-pattern proxy: no per-bend lengths in this analysis)' : 'Default (200mm, no CAD length available)'),
             'Shoulder Width': 'Approximated as 8× sheet thickness (standard V-die shoulder rule)',
             UTS: 'raw_materials — material grade Ultimate Tensile Strength (verified DB value, or an approved material-family default; omitted when neither is available)',
             'No Of Bends': 'CAD/drawing feature extraction — bend count',
@@ -4535,44 +4619,12 @@ export class BOMItemsService {
     if (!smInspectionResult.dataFound) {
       materialWarnings.push('Per-piece inspection time from fallback — seed sm_lookup_inspection_time for this complexity tier.');
     }
-    if (cutLengthMm > 0 && !smDeburrRateResult.dataFound) {
-      materialWarnings.push('Deburr cycle-time rate from fallback — seed sm_lookup_deburr_rate for accurate estimates.');
-    }
 
     const smTappingCalc = await this.resolveTappingCycleTimeSec(accessToken, threads, sheetThicknessMm, grade);
 
-    // Deburring — evaluated from the real "Sheet Metal - Deburring" DB
-    // calculator's physics-backed 'Total Time' (physics_key='deburring',
-    // dispatches to the exact same computeDeburrCycleSec() the interactive
-    // popup uses). 'Sec Per Metre'/'Sec Per Pierce' are omitted (not passed
-    // as undefined) when sm_lookup_deburr_rate had no real row — the physics
-    // function falls back to its own documented default rate in that case,
-    // same convention as every other lookup-sourced seed field.
-    const smDeburrCalc = (cutLengthMm > 0)
-      ? await this.resolvePhysicsQuantity(accessToken, {
-          machineClass: 'deburring',
-          process: 'Deburring',
-          targetFieldNames: ['Total Time'],
-          seedScope: {
-            'Length Of Cut (mm)': cutLengthMm,
-            'No Of Starts': pierceCount,
-            ...(smDeburrRateResult.dataFound ? {
-              'Sec Per Metre': smDeburrRateResult.secPerMetre,
-              'Sec Per Pierce': smDeburrRateResult.secPerPierce,
-            } : {}),
-          },
-          seedProvenance: {
-            'Length Of Cut (mm)': 'CAD feature extraction — total cut path length',
-            'No Of Starts': 'CAD feature extraction — pierce/start count',
-            'Sec Per Metre': 'sm_lookup_deburr_rate — edge deburr rate for this material/process',
-            'Sec Per Pierce': 'sm_lookup_deburr_rate — same row as Sec Per Metre',
-          },
-          lookupTableByField: {
-            'Sec Per Metre': 'sm_lookup_deburr_rate',
-            'Sec Per Pierce': 'sm_lookup_deburr_rate',
-          },
-        })
-      : this.emptyPhysicsResult(['Total Time']);
+    // Deslag / deburr — the selected machine (Deslag or Manual Deburr, ranked
+    // by cost per part) priced with its own real time per mm of burr edge.
+    const smDeburrCalc = await this.resolveDeburrCalc(accessToken, mhrRates.deburring);
     const smDeburrCycleTimeSec = smDeburrCalc.outputs['Total Time'];
 
     // ── Feature-driven secondary hole operations ──────────────────────────────
@@ -4675,7 +4727,12 @@ export class BOMItemsService {
     const smPartAllowanceMm = hasValidDimensions
       ? computePartAllowanceMm(await this.smLookup.getPartSpacingTable(), sheetThicknessMm)
       : null;
-    let smNestingResult = hasValidDimensions && smNetWeightKg > 0 && smPartAllowanceMm != null
+    // The sheet the part is nested on: the selected fiber laser's own
+    // nominal sheet, else the reference standard sheet.
+    const smNestingSheet = hasValidDimensions
+      ? await this.resolveNestingSheet(mhrRates.fiberLaser?.machineName)
+      : null;
+    let smNestingResult = hasValidDimensions && smNetWeightKg > 0 && smPartAllowanceMm != null && smNestingSheet
       ? computeNesting({
           flatPatternLengthMm: nestLMm,
           flatPatternWidthMm: nestWMm || Math.sqrt(flatPatternAreaMm2),
@@ -4686,6 +4743,7 @@ export class BOMItemsService {
           scrapPricePerKg: smScrapPricePerKg,
           quantityRequired: batchSize,
           partAllowanceMm: smPartAllowanceMm,
+          sheets: [smNestingSheet],
         })
       : undefined;
 
@@ -4704,8 +4762,11 @@ export class BOMItemsService {
     let smCalculatorConfidence: ConfidenceLevel | undefined;
     if (hasValidDimensions && smNetWeightKg > 0 && smPartAllowanceMm == null) {
       smNestingFallbackReason = BOMItemsService.PART_SPACING_GAP;
+    } else if (hasValidDimensions && smNetWeightKg > 0 && !smNestingSheet) {
+      smNestingFallbackReason = BOMItemsService.NO_SHEET_GAP;
     }
-    if (hasValidDimensions && smNetWeightKg > 0 && smPartAllowanceMm != null) {
+    if (hasValidDimensions && smNetWeightKg > 0 && smPartAllowanceMm != null && smNestingSheet) {
+      const nestingSheet = smNestingSheet;
       const partAllowanceMm = smPartAllowanceMm;
       const hasQty = typeof batchSize === 'number' && batchSize > 0;
       // Gross usage resolves through the "Sheet Metal - Gross Material Usage
@@ -4735,6 +4796,8 @@ export class BOMItemsService {
           'Net Weight Per Part': smNetWeightKg,
           'Material Density': materialDensityKgM3,
           'Edge Allowance': EDGE_ALLOWANCE_MM,
+          'Sheet Width': nestingSheet.widthMm,
+          'Sheet Length': nestingSheet.lengthMm,
           ...(hasQty ? { 'Batch Quantity': batchSize } : {}),
         },
         seedProvenance: {
@@ -4742,7 +4805,9 @@ export class BOMItemsService {
           'Shear Strength': 'raw_materials lookup',
           'Net Weight Per Part': 'Sheet Metal - Net Material Usage calculator',
           'Material Density': 'raw_materials lookup',
-          'Edge Allowance': 'Sheet-metal nesting configuration',
+          'Edge Allowance': 'Sheet Metal Calculators default (memory/Sheetmetal/Sheet_Metal_Calculators.md)',
+          'Sheet Width': nestingSheet.source,
+          'Sheet Length': nestingSheet.source,
           ...(hasQty ? { 'Batch Quantity': 'Order/batch quantity' } : {}),
         },
         itemId: item.id,
@@ -4755,7 +4820,7 @@ export class BOMItemsService {
         // calculator itself wraps, exactly as before this reroute existed.
         ? await this.resolveTrueShapeNestCosting(
             item.id, summary, smNetWeightKg, materialDensityKgM3, sheetThicknessMm,
-            partAllowanceMm, EDGE_ALLOWANCE_MM, userId, accessToken,
+            partAllowanceMm, EDGE_ALLOWANCE_MM, userId, accessToken, nestingSheet,
           )
         : trueShapeCalc.gap
           ? { selection: null as null, reason: trueShapeCalc.gap.gapType === 'unsupported_operation' ? trueShapeCalc.gap.reason : `${trueShapeCalc.gap.gapType} — see calculator ${trueShapeCalc.calculatorId}` }
@@ -5059,7 +5124,7 @@ export class BOMItemsService {
       }
       const deburrLine = smResult.processLines.find((l) => l.process === 'Deburring');
       if (deburrLine) {
-        deburrLine.featureBreakdown = this.buildDeburrFeatureBreakdown(cutLengthMm, pierceCount);
+        deburrLine.featureBreakdown = this.buildDeburrFeatureBreakdown(mhrRates.deburring);
         if (smDeburrCalc.trace.length) deburrLine.calculationTrace = smDeburrCalc.trace;
       }
       const tappingLine = smResult.processLines.find((l) => l.process === 'Tapping');
@@ -5212,10 +5277,16 @@ export class BOMItemsService {
     this.appendRateWarnings(smResult, location);
     this.applyCostOverrides(smResult, costOverrides);
     if (costOverrides.size > 0) smResult.costOverrides = Object.fromEntries(costOverrides);
+    // Stock sheets the Nest view offers (it ranks them by yield and
+    // recommends the best 3): see resolveNestCandidateSheets.
+    const smCandidateSheets = flatPatternAreaMm2 > 0 && sheetThicknessMm > 0
+      ? await this.resolveNestCandidateSheets(mhrRates.fiberLaser, smNestingSheet)
+      : [];
     if (flatPatternAreaMm2 > 0 && sheetThicknessMm > 0 && materialDensityKgM3 > 0) {
       if (smNestingResult) {
         smResult.blankSpec = {
           form:           'sheet',
+          ...(smCandidateSheets.length ? { candidateSheets: smCandidateSheets } : {}),
           sizeLabel:      `${smNestingResult.sheetWidthMm}×${smNestingResult.sheetLengthMm}×${sheetThicknessMm}mm (${smNestingResult.partsPerSheet} parts/sheet)`,
           grossWeightKg:  smNestingResult.grossWeightPerPartKg,
           netWeightKg:    smNestingResult.grossWeightPerPartKg - smNestingResult.scrapWeightPerPartKg,
@@ -5228,6 +5299,9 @@ export class BOMItemsService {
           sheetWidthMm:   smNestingResult.sheetWidthMm,
           sheetLengthMm:  smNestingResult.sheetLengthMm,
           partsPerSheet:  smNestingResult.partsPerSheet,
+          ...(smNestingSheet ? { sheetSource: smNestingSheet.source } : {}),
+          ...(smPartAllowanceMm != null ? { kerfMm: smPartAllowanceMm } : {}),
+          edgeMarginMm:   EDGE_ALLOWANCE_MM,
           // The FULL physical stock-sheet weight -- see BlankSpecDto's own
           // doc comment for why this is exposed separately from
           // grossWeightKg (which is already per-part).
@@ -5256,6 +5330,7 @@ export class BOMItemsService {
           : Math.sqrt(flatPatternAreaMm2);
         smResult.blankSpec = {
           form:           'sheet',
+          ...(smCandidateSheets.length ? { candidateSheets: smCandidateSheets } : {}),
           sizeLabel:      `${Math.round(effL)}×${Math.round(effW)}×${sheetThicknessMm}mm`,
           grossWeightKg:  smResult.grossWeightKg,
           netWeightKg:    smResult.sustainability.netWeightKg,
@@ -5381,6 +5456,7 @@ export class BOMItemsService {
         routeLabel: p,
         processFamily: 'cutting',
         toolingVolumeNote: null,
+        autoRoutable: true, // cutting-family route: always eligible, as before
         processLines: s.processLines,
         materialCost: s.materialCost,
         abrasiveCost: 0,
@@ -5467,7 +5543,7 @@ export class BOMItemsService {
    */
   private async resolveSecondaryOperations(item: any, location: string, batchSize: number, accessToken: string, conv: number) {
     const all = await this.secondaryProcessService.compute({ item, location, batchSize, accessToken });
-    const surfaceCallout = matchSurfaceTreatmentCallout(this.resolveSurfaceTreatment(item));
+    const surfaceCallout = matchSurfaceTreatmentCallout(surfaceCalloutOf(item));
     const drawing: SecondarySelection = {
       heat: all.heatTreatmentCalloutProcess ? [all.heatTreatmentCalloutProcess] : [],
       surface: surfaceCallout ? [surfaceCallout] : [],
@@ -5568,7 +5644,7 @@ export class BOMItemsService {
     // feature recognizer counts over raw cylinder count to keep summary ≡ route invariant.
     const cncFeatureSummaryRC = machiningFeatureCounts(fg?.machining_features);
     const holeCount = (
-      cncFeatureSummaryRC !== null && (family === 'milled' || family === 'turned' || family === 'mill_turn')
+      cncFeatureSummaryRC !== null && isMachiningFamily(family)
         ? cncFeatureSummaryRC.drilledHoles
         : (summary.holeCount ?? item.holeCount ?? 0)
     ) as number;
@@ -5656,9 +5732,8 @@ export class BOMItemsService {
       densityOfMeltKgM3: rcDensityOfMeltKgM3,
     };
 
-    const realMaxBendLengthMm = ((fg?.summary?.bendLengths ?? []) as number[]).length > 0
-      ? Math.max(...(fg.summary.bendLengths as number[]))
-      : null;
+    const rcRealBendLengths = realBendLengthsMm(fg);
+    const realMaxBendLengthMm = rcRealBendLengths.length > 0 ? Math.max(...rcRealBendLengths) : null;
     const capabilityGeometry: PartGeometryForCapability = {
       sheetThicknessMm,
       flatPatternLengthMm,
@@ -5696,20 +5771,6 @@ export class BOMItemsService {
     // candidate sheet genuinely fails — same last-resort role this constant
     // already plays in cost-engine.ts — never a substitute for a resolvable
     // true-shape result.
-    let grossWeightKg = netWeightKg * (1 + MATERIAL_OVERHEAD_PCT / 100);
-    const partAllowanceMm = family === 'sheet_metal' && netWeightKg > 0
-      ? computePartAllowanceMm(await this.smLookup.getPartSpacingTable(), sheetThicknessMm)
-      : null;
-    if (partAllowanceMm != null) {
-      const trueShape = await this.resolveTrueShapeNestCosting(
-        item.id, summary, netWeightKg, materialDensityKgM3, sheetThicknessMm,
-        partAllowanceMm, EDGE_ALLOWANCE_MM, userId, accessToken,
-      );
-      if (trueShape.selection) {
-        grossWeightKg = trueShape.selection.grossWeightPerPartKg;
-      }
-    }
-    const materialCost = this.r2(grossWeightKg * materialCostPerKg);
 
     // ── MHR rates ──────────────────────────────────────────────────────────────
     const physics = {
@@ -5730,7 +5791,7 @@ export class BOMItemsService {
               height: ((item as any).maxHeight ?? 0) as number,
             }),
             weightKg: (((item as any).weight ?? 0) as number),
-            bendLengthsMm: (fg?.summary?.bendLengths ?? []) as number[],
+            bendLengthsMm: realBendLengthsMm(fg),
             utsMpa,
             materialClamp: rcClampProperties,
             extrudedFlangeCount: fg?.summary?.extrudedFlangeCount ?? 0,
@@ -5744,6 +5805,26 @@ export class BOMItemsService {
         };
 
     const mhrRates = await this.resolveMHRRates(accessToken, location, physics, rates);
+
+    let grossWeightKg = netWeightKg * (1 + MATERIAL_OVERHEAD_PCT / 100);
+    const partAllowanceMm = family === 'sheet_metal' && netWeightKg > 0
+      ? computePartAllowanceMm(await this.smLookup.getPartSpacingTable(), sheetThicknessMm)
+      : null;
+    // Same sheet as getCostSummary: the selected fiber laser's nominal sheet,
+    // else the standard sheet — so this is a cache hit on the same nest.
+    const nestingSheet = partAllowanceMm != null
+      ? await this.resolveNestingSheet(mhrRates.fiberLaser?.machineName)
+      : null;
+    if (partAllowanceMm != null && nestingSheet) {
+      const trueShape = await this.resolveTrueShapeNestCosting(
+        item.id, summary, netWeightKg, materialDensityKgM3, sheetThicknessMm,
+        partAllowanceMm, EDGE_ALLOWANCE_MM, userId, accessToken, nestingSheet,
+      );
+      if (trueShape.selection) {
+        grossWeightKg = trueShape.selection.grossWeightPerPartKg;
+      }
+    }
+    const materialCost = this.r2(grossWeightKg * materialCostPerKg);
 
     // ── Shared eMithranTerms() context (Platform Architecture Remediation
     // Phase 1, engine registry unification) — resolved ONCE here, identically
@@ -6006,25 +6087,9 @@ export class BOMItemsService {
       ? ((fg?.summary as any).holeGroups as unknown[]).length
       : 0;
 
-    // Real, database-driven "is this route's hard tooling economical at this
-    // part's real annual volume" note — the only 2 sheet-metal forming
-    // classes with a sourced threshold. Compares annualVolumeRC (this part's
-    // real, already-resolved input) against the real threshold and states
-    // the actual relationship; returns null (no note, not a fabricated one)
-    // whenever either input required to make the real comparison is missing.
-    const buildToolingVolumeNote = (machineClass: string): string | null => {
-      const thresholdByClass: Record<string, { limit: number | null; label: string }> = {
-        progressive_die_press: { limit: rcToolingVolumeThresholds.progressiveDie, label: 'progressive die tooling' },
-        tandem_press: { limit: rcToolingVolumeThresholds.stageTooling, label: 'stage tooling' },
-      };
-      const entry = thresholdByClass[machineClass];
-      if (!entry || entry.limit === null || annualVolumeRC === null) return null;
-      const vol = annualVolumeRC.toLocaleString();
-      const limit = entry.limit.toLocaleString();
-      return annualVolumeRC >= entry.limit
-        ? `Economical at this volume — ${vol}/yr meets the ${limit}/yr minimum for ${entry.label} to pay off.`
-        : `Below the ${limit}/yr minimum annual volume for ${entry.label} to be economical — this part's annual volume is ${vol}/yr.`;
-    };
+    // Hard-tooling volume gate — see hardToolingVolumeCapability.
+    const toolingVolumeFor = (machineClass: string) =>
+      hardToolingVolumeCapability(machineClass, annualVolumeRC, rcToolingVolumeThresholds);
 
     const attachToRoutes = async (dto: Omit<RouteComparisonDto, 'recommendedRouteId'>): Promise<RouteComparisonResponseDto> => {
       for (const route of dto.routes) {
@@ -6096,7 +6161,7 @@ export class BOMItemsService {
         // be recommended unless it is also genuinely applyable, for any
         // current or future route id, not just these 3.
         recommendedRouteId: selectRecommendedRoute(
-          normalized.routes.filter((r) => r.processFamily === 'cutting' && VALID_ROUTE_IDS.includes(r.routeId)),
+          normalized.routes.filter((r) => r.autoRoutable && VALID_ROUTE_IDS.includes(r.routeId)),
         )?.routeId ?? null,
         resolvedInputs: costingInputs,
       };
@@ -6108,7 +6173,7 @@ export class BOMItemsService {
     const cncSurfaceTreatmentDbRate = null;
     const waterjetAbrasivePricePerKg = await this.resolveConsumablePrice(accessToken, 'garnet_abrasive', location, rates);
 
-    if (family === 'milled' || family === 'turned' || family === 'mill_turn') {
+    if (isMachiningFamily(family)) {
       // Same rules + sampling policy as getCostSummary — totals must match line for line
       const inspection = {
         rules: await this.inspectionKnowledge.getInspectionRules(accessToken),
@@ -6159,6 +6224,7 @@ export class BOMItemsService {
           routeLabel: 'Upload 3D Model for Routing',
           processFamily: 'cutting' as const,
           toolingVolumeNote: null,
+          autoRoutable: true, // cutting-family route: always eligible, as before
           processLines: [],
           materialCost: 0,
           abrasiveCost: 0,
@@ -6311,6 +6377,7 @@ export class BOMItemsService {
           routeLabel,
           processFamily: 'cutting',
           toolingVolumeNote: null,
+          autoRoutable: true, // cutting-family route: always eligible, as before
           processLines: cost.processLines, materialCost: cost.materialCost, abrasiveCost: 0,
           totalProcessCost: cost.totalProcessCost,
           isFeasible: capable,
@@ -6383,6 +6450,7 @@ export class BOMItemsService {
           : 'Compression Molding',
         processFamily: 'cutting',
         toolingVolumeNote: null,
+        autoRoutable: true, // cutting-family route: always eligible, as before
         processLines: compressionResult.processLines, materialCost: compressionMaterialCost, abrasiveCost: 0,
         totalProcessCost: this.r2(compressionResult.processLines.reduce((s, l) => s + l.totalCost, 0)),
         isFeasible: compressionCapable,
@@ -6420,6 +6488,7 @@ export class BOMItemsService {
           : 'Reaction Injection Molding',
         processFamily: 'cutting',
         toolingVolumeNote: null,
+        autoRoutable: true, // cutting-family route: always eligible, as before
         processLines: rimResult.processLines, materialCost: compressionMaterialCost, abrasiveCost: 0,
         totalProcessCost: this.r2(rimResult.processLines.reduce((s, l) => s + l.totalCost, 0)),
         isFeasible: rimCapable,
@@ -6480,6 +6549,7 @@ export class BOMItemsService {
           : 'Structural Foam Molding',
         processFamily: 'cutting',
         toolingVolumeNote: null,
+        autoRoutable: true, // cutting-family route: always eligible, as before
         processLines: structuralFoamCost.processLines, materialCost: structuralFoamCost.materialCost, abrasiveCost: 0,
         totalProcessCost: structuralFoamCost.totalProcessCost,
         isFeasible: structuralFoamCapable,
@@ -6594,13 +6664,12 @@ export class BOMItemsService {
     // via comparisonWarnings when a table has no row yet (never silent).
     // See migrations 413 (deburr), 414 (turret punch), 415 (waterjet abrasive),
     // 416 (setup times).
-    const [rcOpSetupTimes, rcTurretParams, rcRealTurretParams, rcAbrasiveRate, rcRealAbrasiveRate, rcDeburrRate, rcHandlingAllowance, rcNozzleRate] = await Promise.all([
+    const [rcOpSetupTimes, rcTurretParams, rcRealTurretParams, rcAbrasiveRate, rcRealAbrasiveRate, rcHandlingAllowance, rcNozzleRate] = await Promise.all([
       this.smLookup.getOpSetupTimes(),
       this.smLookup.getTurretPunchParams(thk),
       this.smLookup.getTurretPunchParamsForMachine(mhrRates.turret.machineName),
       this.smLookup.getWaterjetAbrasiveRate(),
       this.smLookup.getWaterjetAbrasiveRateForMachine(mhrRates.waterjet.machineName),
-      this.smLookup.getDeburrRate(),
       this.smLookup.getHandlingAllowanceUsd('turret_punch', grossWeightKg),
       this.smLookup.getWaterjetNozzleCostPerHr(),
     ]);
@@ -6632,9 +6701,6 @@ export class BOMItemsService {
     if (!effectiveAbrasiveRate.dataFound) {
       comparisonWarnings.push('Waterjet abrasive consumption rate from fallback — seed sm_lookup_waterjet_abrasive_rate, or add this machine to the machine library reference data');
     }
-    if (!rcDeburrRate.dataFound) {
-      comparisonWarnings.push('Deburr cycle-time rate from fallback — seed sm_lookup_deburr_rate');
-    }
 
     // ── Shared process lines (computed once, reused across all three routes) ───
 
@@ -6653,7 +6719,7 @@ export class BOMItemsService {
         (((item as any).complexity ?? fg?.summary?.complexity) === 'complex') ? 'complex' : 'simple';
       const rcBendLengthMm = capabilityGeometry.bendLengthMm ?? 200;
       const rcBendTonnage = Math.ceil(
-        estimateBendTonnage(utsMpa, thk, rcBendLengthMm) ?? 0,
+        recommendedBendTonnage(utsMpa, thk, rcBendLengthMm) ?? 0,
       );
       // See resolveStrokeLookupTonnage's own doc comment — stroke time
       // belongs to the selected press brake's real tonnage capacity, not
@@ -6681,7 +6747,7 @@ export class BOMItemsService {
         seedScope: {
           Thickness: thk,
           'Bending Line Length': rcBendLengthMm,
-          'Shoulder Width': 8 * thk,
+          'Shoulder Width': bendShoulderWidthMm(thk),
           ...(utsMpa != null ? { UTS: utsMpa } : {}),
           'No Of Bends': bendCount,
           ...(rcStrokeResult.dataFound ? { 'Time Per Stroke': rcStrokeResult.secondsPerBend } : {}),
@@ -6817,34 +6883,9 @@ export class BOMItemsService {
     }
 
     if (cutLengthMm > 0) {
-      // Manufacturing Physics Calculator architecture: cycle time comes from
-      // the real "Sheet Metal - Deburring" DB calculator ONLY, via the same
-      // resolvePhysicsQuantity call getCostSummary uses — so route comparison
-      // (and whatever applyRoute persists) can never silently diverge from
-      // the cost-summary tab for the identical part.
-      const rcDeburrCalc = await this.resolvePhysicsQuantity(accessToken, {
-        machineClass: 'deburring',
-        process: 'Deburring',
-        targetFieldNames: ['Total Time'],
-        seedScope: {
-          'Length Of Cut (mm)': cutLengthMm,
-          'No Of Starts': pierceCount,
-          ...(rcDeburrRate.dataFound ? {
-            'Sec Per Metre': rcDeburrRate.secPerMetre,
-            'Sec Per Pierce': rcDeburrRate.secPerPierce,
-          } : {}),
-        },
-        seedProvenance: {
-          'Length Of Cut (mm)': 'CAD feature extraction — total cut path length',
-          'No Of Starts': 'CAD feature extraction — pierce/start count',
-          'Sec Per Metre': 'sm_lookup_deburr_rate — edge deburr rate for this material/process',
-          'Sec Per Pierce': 'sm_lookup_deburr_rate — same row as Sec Per Metre',
-        },
-        lookupTableByField: {
-          'Sec Per Metre': 'sm_lookup_deburr_rate',
-          'Sec Per Pierce': 'sm_lookup_deburr_rate',
-        },
-      });
+      // Same helper as getCostSummary, so route comparison and the cost
+      // summary can never price the deburr line differently.
+      const rcDeburrCalc = await this.resolveDeburrCalc(accessToken, mhrRates.deburring);
       rcDeburrPhysics = rcDeburrCalc;
     }
 
@@ -6859,6 +6900,7 @@ export class BOMItemsService {
         this.smLookup.getSamplingRate(batchSize),
       ]);
       const rcHoleDiameters = (summary.holeDiameters ?? []) as number[];
+      // summary-only on purpose: these are paired index-for-index with rcBendRadii (same pass)
       const rcBendLengths = (summary.bendLengths ?? []) as number[];
       const rcBendRadii = (summary.bendRadii ?? []) as number[];
       const rcDrawingIntel = (item.drawingIntelligence ?? null) as Record<string, any> | null;
@@ -7164,14 +7206,16 @@ export class BOMItemsService {
       // over a smaller scope of work than the routes it is compared against.
       const producesBlank = routeProducesBlank(machineClass, blankCapableClasses);
       const rolledFormWarning = rolledFormNeedsRollBender(processFamily, machineClass, rcRolledFormCount);
+      const toolingVolume = toolingVolumeFor(machineClass);
 
       return {
         routeId, routeLabel,
         processFamily,
-        toolingVolumeNote: buildToolingVolumeNote(machineClass),
+        toolingVolumeNote: toolingVolume.note,
+        autoRoutable: isAutoRoutable(processFamily, toolingVolume),
         processLines: allLines,
         materialCost, abrasiveCost, totalProcessCost,
-        isFeasible: capability.overallCapable && rollGeom.capable && !rcDrawnShellReason,
+        isFeasible: capability.overallCapable && rollGeom.capable && !rcDrawnShellReason && toolingVolume.capable,
         producesBlank,
         dataComplete: dataGaps.length === 0,
         dataGaps,
@@ -7197,6 +7241,7 @@ export class BOMItemsService {
           // the curvature this part actually has. See rolledFormNeedsRollBender.
           ...(rolledFormWarning ? [rolledFormWarning] : []),
           ...(rcDrawnShellReason ? [rcDrawnShellReason] : []),
+          ...(toolingVolume.reason ? [toolingVolume.reason] : []),
           // Real, itemized hard-tooling cost + its disclosed scope limits —
           // see progressive-die-tooling-engine.ts's own warnings.
           ...(progDieToolingResult?.warnings ?? []),
@@ -7485,7 +7530,7 @@ export class BOMItemsService {
     const grade = item.materialGrade ?? (item as any).material ?? null;
     const { family } = this.resolveEffectiveFamily({ item, fg, grade, sheetThicknessMm });
 
-    const isCNC = family === 'milled' || family === 'turned' || family === 'mill_turn';
+    const isCNC = isMachiningFamily(family);
     const bbox  = { length: maxLength, width: maxWidth, height: maxHeight };
 
     // Phase 2: material density + MHR rates (parallel)
@@ -7507,7 +7552,7 @@ export class BOMItemsService {
     // Phase 3: blank optimizer for CNC primary routes (conditional)
     const blankResult = isCNC
       ? await this.blankOptimizer.selectOptimalBlank(
-          bbox, volume, family as 'milled' | 'turned' | 'mill_turn', accessToken,
+          bbox, volume, family as MachiningFamily, accessToken,
           resolveScenarioStockForm(item.scenarioOverrides),
           this.resolveTurnedGeometry(fg, bbox),
         )
@@ -8231,7 +8276,7 @@ export class BOMItemsService {
   }): FactMismatch[] {
     const di = (args.item.drawingIntelligence ?? null) as Record<string, any> | null;
     const isSheetMetal = args.family === 'sheet_metal';
-    const isMachining = args.family === 'milled' || args.family === 'turned' || args.family === 'mill_turn';
+    const isMachining = isMachiningFamily(args.family);
 
     const drawingThreads = (di?.threads ?? []) as Array<{ count?: unknown }>;
     const drawingThreadCount = drawingThreads.length > 0
@@ -8374,22 +8419,6 @@ export class BOMItemsService {
     const planKey = (item?.validationConfig as any)?.inspection?.qualityPlan;
     if (typeof planKey !== 'string' || !planKey.trim()) return undefined;
     return (await this.inspectionKnowledge.getQualityPlan(accessToken, planKey.trim())) ?? undefined;
-  }
-
-  // Surface treatment resolution precedence (Fix 5 — drawing intelligence injection):
-  //  1. drawingIntelligence.surface_treatment  (legacy field name)
-  //  2. drawingIntelligence.coating.value       (drawing analysis API returns {value, confidence})
-  //  3. drawingIntelligence.coating             (flat string fallback)
-  //  4. item.coating                            (manually set or auto-filled column)
-  private resolveSurfaceTreatment(item: any): string | null {
-    const di = item?.drawingIntelligence as any;
-    return (
-      (di?.surface_treatment as string | undefined) ??
-      (typeof di?.coating === 'object' ? (di.coating?.value as string | undefined) : undefined) ??
-      (typeof di?.coating === 'string' ? di.coating : undefined) ??
-      (item?.coating as string | undefined) ??
-      null
-    );
   }
 
   // Same real drawing-extracted Ra field operation-sequencer.ts's
@@ -8583,6 +8612,7 @@ export class BOMItemsService {
         routeLabel: this.humanizeMachineClass(mc),
         processFamily: 'cutting',
         toolingVolumeNote: null,
+        autoRoutable: true, // cutting-family route: always eligible, as before
         processLines: cost.processLines,
         materialCost: cost.materialCost,
         abrasiveCost: 0,
@@ -8825,6 +8855,7 @@ export class BOMItemsService {
         routeLabel: this.humanizeMachineClass(mc),
         processFamily: 'cutting',
         toolingVolumeNote: null,
+        autoRoutable: true, // cutting-family route: always eligible, as before
         processLines: cost.processLines,
         materialCost: cost.materialCost,
         abrasiveCost: 0,
@@ -9039,6 +9070,7 @@ export class BOMItemsService {
             value: hasSeed ? (seedScope[f.field_name] as any) : (typeof val === 'number' || typeof val === 'string' ? val : (val ?? f.default_value)),
             unit: f.unit ?? null,
             source: seedProvenance[f.field_name] ?? (hasSeed ? 'Provided value' : "Calculator's own default value"),
+            ...(cadEvidenceKey(f.field_name, seedProvenance[f.field_name]) ? { evidence: cadEvidenceKey(f.field_name, seedProvenance[f.field_name])! } : {}),
           });
         } else {
           if (val === undefined || (val && typeof val === 'object' && 'error' in val)) continue; // unresolved — omit, don't fabricate

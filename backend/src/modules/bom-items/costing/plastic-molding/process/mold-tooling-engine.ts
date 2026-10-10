@@ -61,7 +61,7 @@ import { componentNameKey, type MoldToolingTables } from '../plastic-reference';
 // progressive-die-tooling-engine.ts's guidePinAssy/stripperGuidePinAssy).
 const SIDE_ACTION_ONLY_COMPONENTS = new Set(['Hydraulic Cylinder', 'Side Lock'].map(componentNameKey));
 
-export interface MoldToolingInput {
+interface MoldToolingInput {
   /** Real required mold-window area (projected area x cavity count), mm^2. */
   moldBaseAreaMm2: number;
   cavityCount: number;
@@ -75,7 +75,7 @@ export interface MoldToolingInput {
   location: string;
 }
 
-export interface MoldToolingResult {
+interface MoldToolingResult {
   items: Array<{ componentName: string; qty: number; unitCostUsd: number; totalCostUsd: number }>;
   /** Sum of items — the real, priced, purchased-component BOM subtotal. */
   bomSubtotalUsd: number;

@@ -19,7 +19,7 @@ import type { DieToolingResult } from './die-tooling';
 import { computeSustainability } from '../shared/core/cost-engine';
 import { HPDC_PROCESS, type HpdcResult } from './hpdc-engine';
 
-export type CastingProcess = 'die_casting' | 'sand_casting' | 'investment_casting';
+type CastingProcess = 'die_casting' | 'sand_casting' | 'investment_casting';
 
 const PROCESS_LABEL: Record<CastingProcess, string> = {
   die_casting: 'High Pressure Die Casting',
@@ -28,7 +28,7 @@ const PROCESS_LABEL: Record<CastingProcess, string> = {
 };
 
 /** The cad-engine casting families (shared/part_family.py CASTING_FAMILY_DOMAIN). */
-export const CASTING_FAMILY_PROCESS: Readonly<Record<string, CastingProcess>> = {
+const CASTING_FAMILY_PROCESS: Readonly<Record<string, CastingProcess>> = {
   die_cast: 'die_casting',
   sand_cast: 'sand_casting',
   investment_cast: 'investment_casting',
@@ -46,7 +46,7 @@ export function castingProcessOfFamily(family: string): CastingProcess | null {
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
 
-export function unmodelledCastingLine(process: CastingProcess): ProcessLineCost {
+function unmodelledCastingLine(process: CastingProcess): ProcessLineCost {
   const label = PROCESS_LABEL[process];
   return {
     process: label,

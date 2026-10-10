@@ -66,11 +66,18 @@ describe('SheetMetalLookupService.getManualStrokeTime', () => {
 // prefers over the generic pump-tier average when the selected waterjet
 // machine happens to be one of the 281 named reference machines.
 function fakeMachineReferenceData(rows: Array<{ raw: Record<string, unknown> }>) {
+  let matched = rows;
   const builder: any = {
     from: (_table: string) => builder,
     select: (_cols: string) => builder,
     eq: (_col: string, _val: unknown) => builder,
-    then: (resolve: (v: { data: unknown; error: null }) => void) => resolve({ data: rows, error: null }),
+    // ilike('raw->>name', pattern) with no wildcards = case-insensitive name equality.
+    ilike: (_col: string, pattern: string) => {
+      const name = pattern.replace(/\\(.)/g, '$1').toLowerCase();
+      matched = rows.filter((r) => String(r.raw?.name ?? '').toLowerCase() === name);
+      return builder;
+    },
+    then: (resolve: (v: { data: unknown; error: null }) => void) => resolve({ data: matched, error: null }),
   };
   return { getPrivilegedClient: () => builder } as any;
 }
@@ -443,5 +450,42 @@ describe('SheetMetalLookupService.getToolingCoatingCostPerKg', () => {
   it('returns null, never substituting a different pair\'s rate, when this exact pair has none on file', async () => {
     const svc = new SheetMetalLookupService(fakeCoatingRow(null));
     expect(await svc.getToolingCoatingCostPerKg('S7', 'CVD')).toBeNull();
+  });
+});
+
+// tblPartSpacing is staged two ways from the same memory CSV: one row per
+// entry (migration 518) and one row for the whole table (migration 830). The
+// live dev DB has only the whole-table row (found 2026-10-08: no kerf resolved
+// for any part, so true-shape nesting fell into the part-spacing gap).
+describe('SheetMetalLookupService.getPartSpacingTable — both staging formats', () => {
+  function fakeRows(rows: Array<{ raw: Record<string, unknown> }>) {
+    const builder: any = {
+      from: () => builder, select: () => builder, eq: () => builder, or: () => builder,
+      then: (resolve: (v: { data: unknown; error: null }) => void) => resolve({ data: rows, error: null }),
+    };
+    return { getPrivilegedClient: () => builder } as any;
+  }
+  const entry = (t: number, s: number) => ({ Process: 'Fiber Laser', 'Thickness (mm)': t, 'Part Spacing (mm)': s });
+
+  it('reads the whole-table row (migration 830)', async () => {
+    const svc = new SheetMetalLookupService(fakeRows([{ raw: { table_name: 'tblPartSpacing', rows: [entry(1, 1), entry(2, 2)] } }]));
+    expect(await svc.getPartSpacingTable()).toEqual([
+      { process: 'Fiber Laser', thicknessMm: 1, spacingMm: 1 },
+      { process: 'Fiber Laser', thicknessMm: 2, spacingMm: 2 },
+    ]);
+  });
+
+  it('reads per-entry rows (migration 518)', async () => {
+    const svc = new SheetMetalLookupService(fakeRows([{ raw: entry(1, 1) }, { raw: entry(2, 2) }]));
+    expect((await svc.getPartSpacingTable())?.length).toBe(2);
+  });
+
+  it('counts an entry staged both ways once', async () => {
+    const svc = new SheetMetalLookupService(fakeRows([{ raw: entry(2, 2) }, { raw: { rows: [entry(1, 1), entry(2, 2)] } }]));
+    expect((await svc.getPartSpacingTable())?.map((r) => r.thicknessMm).sort()).toEqual([1, 2]);
+  });
+
+  it('is null (a reported gap) when neither format is on file', async () => {
+    expect(await new SheetMetalLookupService(fakeRows([])).getPartSpacingTable()).toBeNull();
   });
 });

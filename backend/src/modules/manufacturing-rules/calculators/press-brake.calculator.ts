@@ -10,7 +10,7 @@ import type {
   ToolRequirements,
 } from "../interfaces/operation-calculator.interface";
 
-export interface PressBrakeGeometry extends FeatureGeometry {
+interface PressBrakeGeometry extends FeatureGeometry {
   bendCount: number;
   materialThicknessMm: number;
   bendLengthMm: number;         // length of each bend (usually sheet width)

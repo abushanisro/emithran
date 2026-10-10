@@ -42,7 +42,7 @@ export interface RealResinInputs {
   densityOfMeltKgM3: number | null;
 }
 
-export interface ResinThermalProps {
+interface ResinThermalProps {
   alpha: number; // thermal diffusivity, mm²/s
   Tm: number;    // melt temperature, C
   Tw: number;    // mold wall temperature, C
@@ -55,7 +55,7 @@ export interface PressTiming {
   dryCycleTimeS: number | null;
 }
 
-export type ThermalResult = { props: ResinThermalProps } | { missing: string[] };
+type ThermalResult = { props: ResinThermalProps } | { missing: string[] };
 
 export function resinThermalProps(real: RealResinInputs | null | undefined, moldTemperatureIncreaseC: number): ThermalResult {
   const need: Array<[keyof RealResinInputs, string]> = [
@@ -105,17 +105,17 @@ export function computeFillTimeSec(input: {
 const PACK_TO_COOL_RATIO = 0.35;
 const PACK_MIN_SEC = 2.0;
 
-export function computePackTimeSec(coolingTimeSec: number): number {
+function computePackTimeSec(coolingTimeSec: number): number {
   return Math.max(PACK_MIN_SEC, Math.round(coolingTimeSec * PACK_TO_COOL_RATIO * 10) / 10);
 }
 
 // LSR cure (Arrhenius), literature constants: see header.
-export const LSR_DEFAULT_MOLD_TEMP_C = 180;
+const LSR_DEFAULT_MOLD_TEMP_C = 180;
 const LSR_A_FACTOR = 0.008;
 const LSR_EA_OVER_R = 3500;
 const R_KELVIN_OFFSET = 273.15;
 
-export function computeLsrCureTime(wallMm: number, moldTempC: number = LSR_DEFAULT_MOLD_TEMP_C): number {
+function computeLsrCureTime(wallMm: number, moldTempC: number = LSR_DEFAULT_MOLD_TEMP_C): number {
   const T = moldTempC + R_KELVIN_OFFSET;
   return Math.round(LSR_A_FACTOR * Math.exp(LSR_EA_OVER_R / T) * wallMm * 10) / 10;
 }

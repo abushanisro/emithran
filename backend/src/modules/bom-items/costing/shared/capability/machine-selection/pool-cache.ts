@@ -20,7 +20,7 @@ interface PoolEntry {
 
 const pools = new Map<string, PoolEntry>();
 
-export function machinePoolKey(location: string): string {
+function machinePoolKey(location: string): string {
   return location.trim().toLowerCase();
 }
 

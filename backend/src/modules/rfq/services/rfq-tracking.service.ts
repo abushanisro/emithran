@@ -6,7 +6,7 @@ import {
   RfqTrackingStatus 
 } from '../dto/rfq-tracking.dto';
 
-export interface CreateRfqTrackingData {
+interface CreateRfqTrackingData {
   rfqId: string;
   projectId?: string;
   rfqName: string;
@@ -28,7 +28,7 @@ export interface CreateRfqTrackingData {
 }
 
 
-export interface UpdateVendorResponseData {
+interface UpdateVendorResponseData {
   responded: boolean;
   quoteAmount?: number;
   leadTimeDays?: number;

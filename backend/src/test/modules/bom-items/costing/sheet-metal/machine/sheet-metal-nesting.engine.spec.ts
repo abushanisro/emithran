@@ -76,6 +76,30 @@ describe('resolveNestingDimensions', () => {
   });
 });
 
+// Reference standard sheet (standardSheetWidth/Length, migration 479).
+const STANDARD_SHEET = { widthMm: 1219.2, lengthMm: 2438.4 };
+
+describe('computeNesting — nests only on the sheet(s) it is given', () => {
+  const part = {
+    partAllowanceMm: 1.6, flatPatternLengthMm: 400, flatPatternWidthMm: 300,
+    thicknessMm: 1.6, netWeightKg: 1.2, densityKgM3: 7850, materialPricePerKg: 1,
+  };
+
+  it('uses the selected laser sheet (Salvagnini L3-30: 3048 x 1524)', () => {
+    const r = computeNesting({ ...part, sheets: [{ widthMm: 1524, lengthMm: 3048 }] });
+    expect([r.sheetWidthMm, r.sheetLengthMm]).toEqual([1524, 3048]);
+    // usable 1520 x 3044; part + allowance 401.6 x 301.6 -> best of 3x10=30 / 5x7=35
+    expect(r.partsPerSheet).toBe(35);
+  });
+
+  it('a different sheet gives a different nest (the setup follows the sheet)', () => {
+    const a = computeNesting({ ...part, sheets: [STANDARD_SHEET] });
+    const b = computeNesting({ ...part, sheets: [{ widthMm: 1524, lengthMm: 3048 }] });
+    expect(a.sheetWidthMm).toBe(1219.2);
+    expect(a.partsPerSheet).not.toBe(b.partsPerSheet);
+  });
+});
+
 describe('computeNesting — utilization formula (unchanged by the dimension-source fix)', () => {
   // D. Existing utilization formula itself is unchanged. Reproduces the real
   // part's reported numbers (part 830-002072-00): folded bbox 55.0x8.0mm,
@@ -96,6 +120,7 @@ describe('computeNesting — utilization formula (unchanged by the dimension-sou
       netWeightKg,
       densityKgM3,
       materialPricePerKg: 2.70,
+      sheets: [STANDARD_SHEET],
     });
 
     // utilisationPct = netWeightKg / (sheetWeightKg / partsPerSheet) -- same
@@ -121,6 +146,7 @@ describe('computeNesting — utilization formula (unchanged by the dimension-sou
       netWeightKg: 0.001,
       densityKgM3: 2700,
       materialPricePerKg: 2.70,
+      sheets: [STANDARD_SHEET],
     };
     const foldedResult = computeNesting({ ...common, flatPatternLengthMm: 55.0, flatPatternWidthMm: 8.0 });
     const trueFlatResult = computeNesting({ ...common, flatPatternLengthMm: 90.0, flatPatternWidthMm: 40.0 });
@@ -148,6 +174,7 @@ describe('computeNesting — sheetsRequired / batch consumption (RTP2 MAG2 FRONT
     netWeightKg: 1.2335,
     densityKgM3: 7850, // SECC
     materialPricePerKg: 1.0,
+    sheets: [{ widthMm: 2500, lengthMm: 5000 }], // the fixture's known nest sheet
   };
 
   it('sheetsRequired/plannedParts/excessPositions are undefined when quantityRequired is omitted', () => {

@@ -66,7 +66,7 @@ export interface ChildPartCostInput {
 /**
  * Detailed cost breakdown result for child parts
  */
-export interface ChildPartCostResult {
+interface ChildPartCostResult {
   // Input Summary
   partNumber: string;
   partName: string;

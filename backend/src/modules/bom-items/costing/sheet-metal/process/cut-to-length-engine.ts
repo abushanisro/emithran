@@ -51,7 +51,7 @@ export interface CutToLengthInput {
   scrapPricePerKg?: number;
 }
 
-export interface CutToLengthResult {
+interface CutToLengthResult {
   processLines: ProcessLineCost[];
   cuttingMin: number;
   abrasiveCost: number;

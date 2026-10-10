@@ -7,7 +7,7 @@ import { resolveCapabilityTable, resolveIsoTable, type CapabilityRow, type IsoTo
 
 const STANDARDS_SOURCE_VERSION: string = MANIFEST.domains.find((d) => d.key === 'standards')!.sourceVersion;
 
-export interface ToleranceReference {
+interface ToleranceReference {
   capability: CapabilityRow[];
   iso: IsoToleranceRow[];
   links: OperationLink[];

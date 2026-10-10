@@ -1,6 +1,6 @@
-export type ImplicationType = 'process' | 'inspection' | 'characteristic' | 'material';
+type ImplicationType = 'process' | 'inspection' | 'characteristic' | 'material';
 
-export type ImplicationSource =
+type ImplicationSource =
   | 'drawing_tolerance'
   | 'drawing_thread'
   | 'drawing_coating'
@@ -25,7 +25,7 @@ export interface ManufacturingImplication {
 
 // ── Thread lookup tables (ISO 965-1, class 6H) ───────────────────────────────
 
-export const TAP_DRILL_MM: Record<string, number> = {
+const TAP_DRILL_MM: Record<string, number> = {
   'M2':   1.60, 'M2.5': 2.05, 'M3':  2.50, 'M4':  3.30,
   'M5':   4.20, 'M6':   5.00, 'M8':  6.75, 'M10': 8.50,
   'M12': 10.25, 'M16': 14.00, 'M20': 17.50, 'M24': 21.00,

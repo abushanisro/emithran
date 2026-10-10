@@ -150,7 +150,7 @@ export function resolvePersistedCostCurrencyBasis(
  * ──────────────────────────────────────────────────────────────────────────── */
 
 /** The two columns an overlay decision needs from a persisted row. */
-export interface PersistedMoneyRow {
+interface PersistedMoneyRow {
   currency: string | null;
   cost_currency_basis: PersistedCostCurrencyBasis | null;
 }
@@ -187,7 +187,7 @@ export function overlayRejectionReason(
 }
 
 /** 'local' and 'converted' both assert that `currency` names the money. */
-export function isTrustedPersistedBasis(
+function isTrustedPersistedBasis(
   basis: PersistedCostCurrencyBasis | null | undefined,
 ): boolean {
   return basis === 'local' || basis === 'converted';
@@ -209,7 +209,7 @@ export function isTrustedPersistedBasis(
  * can spread the result straight into its insert payload rather than restating
  * each field and risking a mismatch.
  */
-export interface CostRecordCurrencyColumns {
+interface CostRecordCurrencyColumns {
   currency: string | null;
   cost_currency_basis: PersistedCostCurrencyBasis;
   cost_currency_local: string | null;

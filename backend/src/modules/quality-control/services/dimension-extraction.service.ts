@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-export interface ExtractedDimension {
+interface ExtractedDimension {
   id: string;
   value: string;
   unit: string;
@@ -13,7 +13,7 @@ export interface ExtractedDimension {
   confidence: number;
 }
 
-export interface ExtractionConfig {
+interface ExtractionConfig {
   morphKernel: number;
   cannyThreshold1: number;
   cannyThreshold2: number;

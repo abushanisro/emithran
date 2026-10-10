@@ -5,6 +5,7 @@
 import { BOMsService } from '../../../modules/boms/boms.service';
 import { type Logger } from '../../../common/logger/logger.service';
 import { type SupabaseService } from '../../../common/supabase/supabase.service';
+import { type ExchangeRateService } from '../../../common/exchange-rate/exchange-rate.service';
 
 describe('BOMsService.create', () => {
   it('writes organization_id alongside user_id when an organization is resolved', async () => {
@@ -27,7 +28,7 @@ describe('BOMsService.create', () => {
       getClient: jest.fn().mockReturnValue(client),
     } as unknown as SupabaseService;
 
-    const service = new BOMsService(supabaseService, { log: jest.fn(), error: jest.fn() } as unknown as Logger);
+    const service = new BOMsService(supabaseService, { log: jest.fn(), error: jest.fn() } as unknown as Logger, {} as unknown as ExchangeRateService);
 
     await service.create({ name: 'Test BOM' } as any, 'user-456', 'token', 'org-789');
 
@@ -56,7 +57,7 @@ describe('BOMsService.create', () => {
       getClient: jest.fn().mockReturnValue(client),
     } as unknown as SupabaseService;
 
-    const service = new BOMsService(supabaseService, { log: jest.fn(), error: jest.fn() } as unknown as Logger);
+    const service = new BOMsService(supabaseService, { log: jest.fn(), error: jest.fn() } as unknown as Logger, {} as unknown as ExchangeRateService);
 
     await service.create({ name: 'Test BOM' } as any, 'user-456', 'token');
 

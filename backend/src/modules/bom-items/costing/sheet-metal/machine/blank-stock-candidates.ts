@@ -33,7 +33,7 @@ export interface StockProfile {
   size_b_mm: number | null;
 }
 
-export interface ScoredCandidate {
+interface ScoredCandidate {
   form: string;
   sizeLabel: string;
   billetVolMm3: number;

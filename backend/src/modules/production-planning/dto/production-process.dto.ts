@@ -1,7 +1,7 @@
 import { IsUUID, IsString, IsOptional, IsEnum, IsInt, IsBoolean, IsArray, IsNumber, Min, Max, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
-export enum ProcessStatus {
+enum ProcessStatus {
   PENDING = 'pending',
   READY = 'ready',
   IN_PROGRESS = 'in_progress',
@@ -124,7 +124,7 @@ export class UpdateProductionProcessDto {
   remarks?: string;
 }
 
-export class BomPartRequirementDto {
+class BomPartRequirementDto {
   @IsUUID()
   bom_item_id: string;
 

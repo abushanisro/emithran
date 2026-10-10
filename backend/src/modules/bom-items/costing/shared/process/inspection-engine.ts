@@ -39,21 +39,21 @@ import { resolveSetupMinutes } from '../core/engine-kernel';
 // both the STEP-model and drawing sources) — Level 3 is reachable code, not a
 // hardcoded escalation that fires regardless.
 
-export interface HoleInspectionCandidate {
+interface HoleInspectionCandidate {
   diameterMm?: number;
   toleranceMm?: number;
   isThreaded?: boolean;
   isCritical?: boolean;
 }
 
-export interface BendInspectionCandidate {
+interface BendInspectionCandidate {
   lengthMm?: number;
   radiusMm?: number;
   angleDeg?: number; // never populated today — see class-level comment
   isCritical?: boolean;
 }
 
-export type InspectionStrategy = '100pct' | 'first_article' | 'sampling' | 'skip';
+type InspectionStrategy = '100pct' | 'first_article' | 'sampling' | 'skip';
 
 export interface InspectionOperationDefaultRow {
   feature: 'hole' | 'bend' | 'thickness' | 'dimension' | 'thread' | 'visual_base';

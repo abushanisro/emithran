@@ -119,7 +119,7 @@ export interface ToolingComponentCost {
   costUsd: number;
 }
 
-export interface ProgressiveDieToolingInput {
+interface ProgressiveDieToolingInput {
   machineClass: 'progressive_die_press' | 'tandem_press';
   /** Distinct hole-diameter groups (each needs its own punch/retainer/button). */
   holeGroupCount: number;
@@ -167,7 +167,7 @@ export interface ProgressiveDieToolingInput {
   };
 }
 
-export interface ProgressiveDieToolingResult {
+interface ProgressiveDieToolingResult {
   /** One line per real BOM component actually needed for this part. */
   items: Array<{ componentName: string; model: string | null; qty: number; unitCostUsd: number; totalCostUsd: number }>;
   /** Σ items — before markup/SG&A/profit. */

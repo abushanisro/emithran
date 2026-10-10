@@ -22,7 +22,7 @@ export type GdtReasonCode =
   | "SURFACE_VERIFICATION_REQUIRED"
   | "UNKNOWN_TYPE";
 
-export const INSPECTION_TIME_MIN: Record<InspectionMethod, number> = {
+const INSPECTION_TIME_MIN: Record<InspectionMethod, number> = {
   visual: 1,
   caliper: 2,
   height_gauge: 4,
@@ -35,7 +35,7 @@ export const SEVERITY_RANK: Record<GdtSeverity, number> = {
   high: 2,
 };
 
-export interface GdtSeverityResult {
+interface GdtSeverityResult {
   severity: GdtSeverity;
   inspectionMethod: InspectionMethod;
   inspectionTimeMin: number;

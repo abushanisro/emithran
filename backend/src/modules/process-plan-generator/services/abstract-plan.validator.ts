@@ -20,11 +20,9 @@ export type ValidationResult =
   | { ok: false; errors: string[] };
 
 const PART_FAMILIES = ['turned', 'milled', 'sheet_metal'] as const;
-const TOOLING_TYPES = ['cutting_tool', 'fixture', 'jig', 'gauge', 'die', 'mold', 'other'] as const;
 const LOGISTICS_TYPES = ['packaging', 'inbound', 'outbound', 'storage'] as const;
 const TRANSPORT_MODES = ['road', 'rail', 'air', 'sea'] as const;
 const COST_BASES = ['per_unit', 'per_batch', 'per_kg', 'per_km'] as const;
-const SKILL_LEVELS = ['Unskilled', 'Semi-Skilled', 'Skilled', 'Highly Skilled'] as const;
 
 // ─── Small primitives ────────────────────────────────────────────────────────
 

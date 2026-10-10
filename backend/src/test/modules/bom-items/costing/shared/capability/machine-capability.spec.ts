@@ -158,6 +158,27 @@ describe('checkMachineCapability — CNC milling (real per-machine table travel,
   });
 });
 
+describe('checkMachineCapability — press brake recommended force', () => {
+  // 2 mm, 1000 mm bend, UTS 410: 4 x 1000 x 410 x 1.33 / 16 / 9810 = 13.90 t; recommended 13.90 x 1.25 = 17.38 t.
+  const g = () => geometry({ sheetThicknessMm: 2, bendLengthMm: 1000, materialUtsMpa: 410 });
+
+  it('reports the recommended force (theoretical x 1.25) as the estimated tonnage', () => {
+    const result = checkMachineCapability('press_brake', null, g(), capability({ maxTonnage: 100 }));
+    expect(result.estimatedTonnage).toBeCloseTo(17.38, 2);
+  });
+
+  it('passes a machine rated exactly at the recommended force (no extra 15% on top)', () => {
+    const result = checkMachineCapability('press_brake', null, g(), capability({ maxTonnage: 17.38 }));
+    expect(result.reasonCodes).not.toContain('TONNAGE_EXCEEDED');
+  });
+
+  it('fails a machine rated just below the recommended force, naming it', () => {
+    const result = checkMachineCapability('press_brake', null, g(), capability({ maxTonnage: 17.3 }));
+    expect(result.reasonCodes).toContain('TONNAGE_EXCEEDED');
+    expect(result.reasons.some((r) => r.includes('Recommended bend force 17.38t'))).toBe(true);
+  });
+});
+
 describe('checkMachineCapability — press brake tonnage (no regression)', () => {
   it('still computes bend tonnage the same way, unaffected by the turret change', () => {
     const g = geometry({ bendLengthMm: 500, materialUtsMpa: 410 });
@@ -174,14 +195,15 @@ describe('checkMachineCapability — press brake tonnage (no regression)', () =>
 // static-registry fallback is unchanged when no real capability is passed.
 describe('checkMachineCapability — real per-machine capability (P0.1)', () => {
   it('rejects a job the real machine cannot bend, even with no commodity code — the confirmed live defect', () => {
-    // 10mm mild steel, 3000mm bend -> ~222.6t required (1.42*410*3000*10^2/(1000*80))
+    // 10mm mild steel, 3000mm bend -> recommended 260.6t (Bending calculator:
+    // 10^2*3000*410*1.33/80/9810 = 208.4t theoretical, x 1.25)
     const g = geometry({
       sheetThicknessMm: 10, bendLengthMm: 3000, materialUtsMpa: 410,
       flatPatternLengthMm: 3000, flatPatternWidthMm: 1500,
     });
     // Old behaviour for this exact input: no commodity code -> assumed capable.
     // This is the bug: the real selector already proved no machine on file
-    // could do this job (200T < 222.6t * 1.15 margin) and passed null through.
+    // could do this job (200T < 260.6t recommended) and passed null through.
     const oldResult = checkMachineCapability('press_brake', null, g);
     expect(oldResult.capable).toBe(true);
 

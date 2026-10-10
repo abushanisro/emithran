@@ -587,9 +587,18 @@ export class CalculatorsServiceV2 {
         const thickness = Number(params.thickness_mm);
         const tonnage = Number(params.tonnage);
         const complexity = String(params.complexity || 'simple').toLowerCase() === 'complex' ? 'complex' : 'simple';
-        const result = await this.sheetMetalLookup.getManualStrokeTime(thickness, tonnage, complexity);
+        // Same resolver the cost engine uses for a press brake line: the
+        // selected machine's own bend cycle time when it has one on file,
+        // else the table. Without machine_name this is the table alone.
+        const machineName = params.machine_name ? String(params.machine_name) : null;
+        const result = await this.sheetMetalLookup.getManualStrokeTimeForPressBrake(thickness, tonnage, complexity, machineName);
         if (!result.dataFound) return { value: null, resolution: result.resolution };
-        return { value: result.secondsPerBend, row: result.resolution.matchedRow, resolution: result.resolution };
+        return {
+          value: result.secondsPerBend,
+          row: result.fromMachineSpec ? null : result.resolution.matchedRow,
+          resolution: result.resolution,
+          fromMachineSpec: result.fromMachineSpec,
+        };
       }
 
       case 'laser_cut': {

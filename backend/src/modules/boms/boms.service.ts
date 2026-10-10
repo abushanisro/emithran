@@ -5,12 +5,16 @@ import { CreateBOMDto, UpdateBOMDto, QueryBOMsDto } from './dto/boms.dto';
 import { BOMResponseDto, BOMListResponseDto } from './dto/bom-response.dto';
 import { validate as isValidUUID } from 'uuid';
 import { PERSISTED_PROCESS_COST_COLUMNS, resolvePersistedProcessCost } from '../bom-items/costing/shared/core/persisted-process-cost';
+import { ROLLUP_REPORTING_CURRENCY } from '../bom-items/costing/shared/core/persisted-currency-contract';
+import { ExchangeRateService } from '../../common/exchange-rate/exchange-rate.service';
+import { computeBomTotal, type BomCostRow } from './bom-total';
 
 @Injectable()
 export class BOMsService {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly logger: Logger,
+    private readonly exchangeRates: ExchangeRateService,
   ) {}
 
   async findAll(query: QueryBOMsDto, userId: string, accessToken: string): Promise<BOMListResponseDto> {
@@ -111,13 +115,15 @@ export class BOMsService {
     });
   }
 
-  private async computeBomsCosts(accessToken: string, bomIds: string[]): Promise<Map<string, number>> {
-    const costMap = new Map<string, number>();
+  /**
+   * Each BOM's total in the reporting currency, or null when it cannot be
+   * established (see bom-total.ts): cost rows are converted from the currency
+   * they declare, never summed as if they shared one.
+   */
+  private async computeBomsCosts(accessToken: string, bomIds: string[]): Promise<Map<string, number | null>> {
+    const costMap = new Map<string, number | null>();
     if (!bomIds.length) return costMap;
-
-    for (const id of bomIds) {
-      costMap.set(id, 0);
-    }
+    for (const id of bomIds) costMap.set(id, 0);
 
     const client = this.supabaseService.getClient(accessToken);
     const { data: allItems } = await client
@@ -128,55 +134,66 @@ export class BOMsService {
     if (!allItems || allItems.length === 0) return costMap;
 
     const allItemIds = allItems.map((i: any) => i.id);
-    const recordCostMap = new Map<string, number>();
-    const tableCostMap = new Map<string, number>();
+    const rows: BomCostRow[] = [];
+    const trustedBasis = (basis: unknown) => basis === 'local' || basis === 'converted';
 
-    if (allItemIds.length > 0) {
-      const { data: rmRows } = await client
-        .from('raw_material_cost_records')
-        .select('bom_item_id, gross_usage, unit_cost, overhead')
-        .in('bom_item_id', allItemIds)
-        .eq('is_active', true);
+    const { data: rmRows } = await client
+      .from('raw_material_cost_records')
+      .select('bom_item_id, gross_usage, unit_cost, overhead, currency, cost_currency_basis')
+      .in('bom_item_id', allItemIds)
+      .eq('is_active', true);
 
-      for (const r of rmRows ?? []) {
-        const grossUsage = parseFloat(r.gross_usage) || 0;
-        const unitCost   = parseFloat(r.unit_cost)   || 0;
-        const overhead   = parseFloat(r.overhead)    || 0;
-        const cost = grossUsage * unitCost * (1 + overhead / 100);
-        recordCostMap.set(r.bom_item_id, (recordCostMap.get(r.bom_item_id) || 0) + cost);
-      }
-
-      // P1b-iv-b: prefer the cost the engine already computed and persisted.
-      // This block used to re-derive every line from the rate columns alone,
-      // which is a poorer cost model -- it cannot see labour, QA inspection
-      // sampling or yield loss. Measured live: of 55 active rows carrying a
-      // stored engine cost, 51 disagreed with the re-derivation by more than
-      // 1%, ratios 0.285x to 1.963x. resolvePersistedProcessCost falls back to
-      // this exact formula only for rows that have nothing stored, so legacy
-      // rows keep the number they had.
-      const { data: pcRows } = await client
-        .from('process_cost_records')
-        .select(`bom_item_id, ${PERSISTED_PROCESS_COST_COLUMNS}`)
-        .in('bom_item_id', allItemIds)
-        .eq('is_active', true);
-
-      for (const r of pcRows ?? []) {
-        const { totalCostPerPart } = resolvePersistedProcessCost(r);
-        recordCostMap.set(r.bom_item_id, (recordCostMap.get(r.bom_item_id) || 0) + totalCostPerPart);
-      }
-
-      const { data: bcRows } = await client
-        .from('bom_item_costs')
-        .select('bom_item_id, total_cost')
-        .in('bom_item_id', allItemIds);
-
-      for (const r of bcRows ?? []) {
-        const tc = parseFloat(r.total_cost) || 0;
-        if (tc > 0) tableCostMap.set(r.bom_item_id, tc);
-      }
+    for (const r of rmRows ?? []) {
+      const grossUsage = parseFloat(r.gross_usage) || 0;
+      const unitCost   = parseFloat(r.unit_cost)   || 0;
+      const overhead   = parseFloat(r.overhead)    || 0;
+      rows.push({
+        itemId: r.bom_item_id, kind: 'material',
+        amount: grossUsage * unitCost * (1 + overhead / 100),
+        currency: r.currency ?? null, trusted: trustedBasis(r.cost_currency_basis),
+      });
     }
 
-    // Group items by bom_id
+    // P1b-iv-b: prefer the cost the engine already computed and persisted (labour, QA
+    // sampling, yield loss), falling back to the rate-column formula only for rows that
+    // have nothing stored -- see resolvePersistedProcessCost.
+    const { data: pcRows } = await client
+      .from('process_cost_records')
+      .select(`bom_item_id, currency, cost_currency_basis, ${PERSISTED_PROCESS_COST_COLUMNS}`)
+      .in('bom_item_id', allItemIds)
+      .eq('is_active', true);
+
+    for (const r of pcRows ?? []) {
+      const { totalCostPerPart } = resolvePersistedProcessCost(r);
+      rows.push({
+        itemId: r.bom_item_id, kind: 'process', amount: totalCostPerPart,
+        currency: r.currency ?? null, trusted: trustedBasis(r.cost_currency_basis),
+      });
+    }
+
+    const { data: bcRows } = await client
+      .from('bom_item_costs')
+      .select('bom_item_id, total_cost, currency_code, currency_integrity')
+      .in('bom_item_id', allItemIds);
+
+    for (const r of bcRows ?? []) {
+      rows.push({
+        itemId: r.bom_item_id, kind: 'aggregate', amount: parseFloat(r.total_cost) || 0,
+        currency: r.currency_code ?? null, trusted: r.currency_integrity === 'consistent',
+      });
+    }
+
+    // ONE FX snapshot for every BOM in this response. If no rates are available the
+    // totals are simply unavailable (null); a cost list must not fail on that.
+    const reporting = ROLLUP_REPORTING_CURRENCY;
+    let rateToReporting: (from: string) => number | null = (from) => (from === reporting ? 1 : null);
+    try {
+      const snapshot = await this.exchangeRates.getSnapshot(accessToken);
+      rateToReporting = (from) => (from === reporting ? 1 : snapshot.convertOptional(from, reporting) ?? null);
+    } catch (e) {
+      this.logger.warn(`BOM totals: FX snapshot unavailable (${e instanceof Error ? e.message : String(e)}); non-${reporting} amounts stay unresolved`, 'BOMsService');
+    }
+
     const itemsByBom = new Map<string, any[]>();
     for (const item of allItems) {
       const arr = itemsByBom.get(item.bom_id) || [];
@@ -185,34 +202,14 @@ export class BOMsService {
     }
 
     for (const [bomId, items] of itemsByBom.entries()) {
-      const parentIds = new Set<string>();
-      for (const item of items) {
-        if (item.parent_item_id) parentIds.add(item.parent_item_id);
-      }
-
-      let leafSum = 0;
-      let rootSum = 0;
-      let allSum = 0;
-
-      for (const item of items) {
-        const qty = parseFloat(item.quantity) || 1;
-        const recCost = recordCostMap.get(item.id) || 0;
-        const tblCost = tableCostMap.get(item.id) || 0;
-        const unitCost = parseFloat(item.unit_cost) || 0;
-        const bestUnitCost = recCost > 0 ? recCost : (tblCost > 0 ? tblCost : unitCost);
-        const itemTotal = bestUnitCost * qty;
-
-        allSum += itemTotal;
-        if (!parentIds.has(item.id)) {
-          leafSum += itemTotal;
-        }
-        if (!item.parent_item_id) {
-          rootSum += itemTotal;
-        }
-      }
-
-      const bomCost = Math.max(leafSum, rootSum) > 0 ? Math.max(leafSum, rootSum) : allSum;
-      costMap.set(bomId, bomCost);
+      const ids = new Set(items.map((i: any) => i.id));
+      const result = computeBomTotal({
+        items,
+        rows: rows.filter((r) => ids.has(r.itemId)),
+        reportingCurrency: reporting,
+        rateToReporting,
+      });
+      costMap.set(bomId, result.total);
     }
 
     return costMap;

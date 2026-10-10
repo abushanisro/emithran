@@ -68,7 +68,7 @@ export const COSTING_INPUT_DEFAULTS = {
  * disclosure ("no annual volume on file") is driven by provenance instead of by
  * probing for a sentinel value.
  */
-export type CostingInputSource =
+type CostingInputSource =
   | 'request'           // explicit query parameter on this costing call
   | 'scenario_override' // persisted bom_items.scenario_overrides key
   | 'item_column'       // the bom_items row's own real column
@@ -76,7 +76,7 @@ export type CostingInputSource =
   | 'default'           // COSTING_INPUT_DEFAULTS
   | 'absent';           // no real value anywhere — the resolved value is null
 
-export interface CostingInputProvenance {
+interface CostingInputProvenance {
   batchSize: CostingInputSource;
   location: CostingInputSource;
   annualVolume: CostingInputSource;
@@ -107,7 +107,7 @@ export interface CostingInputs {
   readonly provenance: CostingInputProvenance;
 }
 
-export interface ResolveCostingInputsArgs {
+interface ResolveCostingInputsArgs {
   /** Explicit values supplied on this costing request (query params). */
   requested?: {
     batchSize?: number | null;
@@ -217,9 +217,9 @@ export function resolveCostingInputs(args: ResolveCostingInputsArgs): CostingInp
 // line. Annual volume and production life drive tooling amortisation, which is
 // not a process_cost_record, so no extra column is needed to decide staleness.
 
-export type StaleInputKey = 'batchSize' | 'location';
+type StaleInputKey = 'batchSize' | 'location';
 
-export interface PersistedCostingInputs {
+interface PersistedCostingInputs {
   batchSize?: number | null;
   location?: string | null;
 }

@@ -17,7 +17,7 @@ const MAX_TOKENS_OUT = 8192;
 const WALL_CLOCK_MS = 180_000;
 const VALIDATION_RETRIES = 1;
 
-export interface ReasoningInput {
+interface ReasoningInput {
   brief: EngineeringBrief;
   candidates: CandidateSet;
   userId: string;
@@ -26,7 +26,7 @@ export interface ReasoningInput {
   kbContext?: string; // manufacturing knowledge base context injected before user message
 }
 
-export interface ReasoningOutput {
+interface ReasoningOutput {
   plan: AbstractPlan | null;
   candidatesAfterExpansion: CandidateSet;
   toolCalls: ToolCallLogEntry[];

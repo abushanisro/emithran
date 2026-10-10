@@ -9,7 +9,7 @@ import { eMithranTerms, resolveSetupMinutes } from '../../shared/core/engine-ker
 // Extracted verbatim from cost-engine.ts's inline Counterboring block
 // (Platform Architecture Remediation Phase 1 — engine registry unification,
 // Rule 8).
-export interface CounterboringInput {
+interface CounterboringInput {
   counterboreCount: number;
   batchSize: number;
   rate: MHRRateInput; // drill_press
@@ -31,7 +31,7 @@ export interface CounterboringInput {
   scrapPricePerKg?: number;
 }
 
-export interface CounterboringResult {
+interface CounterboringResult {
   processLines: ProcessLineCost[];
   cycleTimeMin: number;
   warnings: string[];
@@ -116,7 +116,7 @@ export function computeCounterboringCost(input: CounterboringInput): Counterbori
   };
 }
 
-export interface CounterboringContext extends CounterboringInput {}
+interface CounterboringContext extends CounterboringInput {}
 
 export class CounterboringEngine implements ManufacturingProcessEngine<CounterboringContext, CounterboringResult> {
   readonly machineClass = 'drill_press' as const;

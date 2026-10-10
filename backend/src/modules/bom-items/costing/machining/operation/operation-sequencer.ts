@@ -17,7 +17,7 @@
  * ── Sheet-metal feature-driven routing backlog (see migration 381) ─────────
  * Sheet metal's Counterboring/Countersinking/PEM Insertion/Reaming/CMM Inspection/
  * Hole Extrusion (Burring) are now feature-driven (cost-engine.ts::computeCostSummary,
- * gated on SheetMetalFeatureExtractorService output). Hole extrusion (burled/
+ * gated on the CAD feature summary counts). Hole extrusion (burled/
  * extruded hole flanges, e.g. drawing callout "2X M3 BURLING BACK CONVEX") was
  * added via a real coaxial-hole-cluster detector in feature_extractors.py
  * (geo_v40+, extruded_flange_count) — previously listed below as undetectable
@@ -48,8 +48,8 @@
  *   1. Detect the feature in feature_extractors.py (or add an OCR extractor to
  *      drawing_analyzer.py for callout-based features like welds/threads).
  *   2. Emit it into manufacturing_intelligence.features (or drawing_intelligence).
- *   3. Classify it in SheetMetalFeatureExtractorService / auto-fill.service.ts's
- *      RawGeometry, following the counterboreGroups/countersinkGroups precedent.
+ *   3. Carry it through auto-fill.service.ts's RawGeometry and feature summary,
+ *      following the counterboreGroups/countersinkGroups precedent.
  *   4. Add a gated block in cost-engine.ts::computeCostSummary + a
  *      process_calculator_mappings row (+ sm_lookup_* cycle-time table if the
  *      op needs one) for the new operation.

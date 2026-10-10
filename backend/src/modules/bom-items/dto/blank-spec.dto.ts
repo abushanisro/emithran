@@ -24,6 +24,15 @@ export interface BlankSpecDto {
   sheetWidthMm?: number;
   sheetLengthMm?: number;
   partsPerSheet?: number;
+  // Where that sheet came from (the selected laser's nominal sheet, or the
+  // reference standard sheet), and the part-to-part allowance (kerf) and
+  // edge margin it was nested with — what the Nest view opens with.
+  sheetSource?: string;
+  kerfMm?: number;
+  edgeMarginMm?: number;
+  // Stock sheets the Nest view ranks and recommends from (see
+  // BOMItemsService.resolveNestCandidateSheets).
+  candidateSheets?: Array<{ widthMm: number; lengthMm: number; source: string }>;
   // The FULL physical stock-sheet weight (sheetWidthMm x sheetLengthMm x
   // thickness x density) -- a genuinely different quantity from grossWeightKg
   // above (which is already divided by partsPerSheet). Exposed explicitly so

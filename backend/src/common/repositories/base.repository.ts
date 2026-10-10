@@ -14,14 +14,14 @@ import { NotFoundException, InternalServerErrorException } from '@nestjs/common'
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Logger } from '../logger/logger.service';
 
-export interface QueryOptions {
+interface QueryOptions {
   page?: number;
   limit?: number;
   orderBy?: string;
   ascending?: boolean;
 }
 
-export interface QueryResult<T> {
+interface QueryResult<T> {
   data: T[];
   total: number;
   page: number;

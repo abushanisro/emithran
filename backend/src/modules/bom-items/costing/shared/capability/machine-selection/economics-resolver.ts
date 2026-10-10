@@ -25,10 +25,10 @@
 // actually returns today for the same "nothing on file" case — value: null,
 // never a fabricated number (root-caused 2026-08-30, in direct response to
 // "remove all fallback, i want real without fabricated, all database driven").
-export type EconomicsSource = 'shop_override' | 'imported' | 'benchmark' | 'generic_fallback' | 'no_rate' | 'lhr_shop_avg' | 'lhr_benchmark';
-export type EconomicsConfidence = 'high' | 'medium' | 'low';
+type EconomicsSource = 'shop_override' | 'imported' | 'benchmark' | 'generic_fallback' | 'no_rate' | 'lhr_shop_avg' | 'lhr_benchmark';
+type EconomicsConfidence = 'high' | 'medium' | 'low';
 
-export interface ResolvedRate {
+interface ResolvedRate {
   /** null means no real value and no benchmark exist — never a fabricated number. */
   value: number | null;
   source: EconomicsSource;
@@ -37,7 +37,7 @@ export interface ResolvedRate {
   reason: string | null;
 }
 
-export interface MachineEconomics {
+interface MachineEconomics {
   directOverheadRate: ResolvedRate;
   indirectOverheadRate: ResolvedRate;
   laborRateUsdHr: ResolvedRate;

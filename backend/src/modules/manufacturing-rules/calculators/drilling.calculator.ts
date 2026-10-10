@@ -10,7 +10,7 @@ import type {
   ToolRequirements,
 } from "../interfaces/operation-calculator.interface";
 
-export interface DrillGeometry extends FeatureGeometry {
+interface DrillGeometry extends FeatureGeometry {
   diameterMm: number;
   depthMm: number;
   holeCount: number;

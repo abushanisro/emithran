@@ -504,3 +504,92 @@ describe('preferRealRate', () => {
   });
 
 });
+
+// ── Hard-tooling volume gate (Phase 6) ──────────────────────────────────────
+// Limits = memory/Sheetmetal/sheet_metal_variables.csv:
+// progDieAnnualVolumeLimit 15000, stageToolingAnnualVolumeLimit 10000.
+import { hardToolingVolumeCapability } from '../../../../../../modules/bom-items/costing/shared/core/engine-kernel';
+
+describe('hardToolingVolumeCapability', () => {
+  const limits = { progressiveDie: 15000, stageTooling: 10000 };
+
+  it('a low-volume part is not feasible on a progressive die, with the reason', () => {
+    const r = hardToolingVolumeCapability('progressive_die_press', 5000, limits);
+    expect(r.capable).toBe(false);
+    expect(r.reason).toContain('below the 15,000/yr minimum');
+  });
+
+  it('at exactly the limit the die is economical (boundary is inclusive)', () => {
+    expect(hardToolingVolumeCapability('progressive_die_press', 15000, limits)).toMatchObject({ capable: true, reason: null });
+  });
+
+  it('just below the limit is not', () => {
+    expect(hardToolingVolumeCapability('progressive_die_press', 14999, limits).capable).toBe(false);
+  });
+
+  it('tandem press uses the stage tooling limit', () => {
+    expect(hardToolingVolumeCapability('tandem_press', 9999, limits).capable).toBe(false);
+    expect(hardToolingVolumeCapability('tandem_press', 10000, limits).capable).toBe(true);
+  });
+
+  it('tool-less routes are never gated by volume', () => {
+    for (const cls of ['fiber_laser', 'turret_punch', 'press_brake', 'standard_press']) {
+      expect(hardToolingVolumeCapability(cls, 1, limits)).toEqual({ capable: true, reason: null, note: null, volumeChecked: false });
+    }
+  });
+
+  it('unknown annual volume is disclosed, not assumed either way', () => {
+    const r = hardToolingVolumeCapability('progressive_die_press', null, limits);
+    expect(r.capable).toBe(true);
+    expect(r.note).toContain('Annual volume not set');
+  });
+
+  it('no limit on file is disclosed, never a guessed one', () => {
+    const r = hardToolingVolumeCapability('progressive_die_press', 100, { progressiveDie: null, stageTooling: null });
+    expect(r.capable).toBe(true);
+    expect(r.note).toContain('No minimum annual volume on file');
+  });
+});
+
+describe('volume gate end to end through route ranking', () => {
+  const limits = { progressiveDie: 15000, stageTooling: 10000 };
+  const route = (routeId: string, cls: string, totalCost: number, annualVolume: number): RankableRoute => ({
+    routeId,
+    totalCost,
+    cycleTimes: { totalMin: 1 },
+    capability: { overallCapable: true },
+    dataComplete: true,
+    isFeasible: hardToolingVolumeCapability(cls, annualVolume, limits).capable,
+    producesBlank: true,
+  });
+
+  it('5,000/yr: the cheaper progressive die is not recommended — the laser route is', () => {
+    const r = selectRecommendedRoute([route('prog-die', 'progressive_die_press', 0.8, 5000), route('laser', 'fiber_laser', 2.1, 5000)]);
+    expect(r?.routeId).toBe('laser');
+  });
+
+  it('50,000/yr: the progressive die is recommended when it is cheapest', () => {
+    const r = selectRecommendedRoute([route('prog-die', 'progressive_die_press', 0.8, 50000), route('laser', 'fiber_laser', 2.1, 50000)]);
+    expect(r?.routeId).toBe('prog-die');
+  });
+});
+
+import { isAutoRoutable } from '../../../../../../modules/bom-items/costing/shared/core/engine-kernel';
+
+describe('isAutoRoutable', () => {
+  const limits = { progressiveDie: 15000, stageTooling: 10000 };
+  it.each([
+    ['cutting route, any volume', 'cutting' as const, 'fiber_laser', 100, true],
+    ['progressive die at/above its minimum', 'forming' as const, 'progressive_die_press', 15000, true],
+    ['progressive die below its minimum', 'forming' as const, 'progressive_die_press', 14999, false],
+    ['tandem press above its minimum', 'forming' as const, 'tandem_press', 20000, true],
+    ['standard press (no sourced minimum, no die cost) — never auto', 'forming' as const, 'standard_press', 1_000_000, false],
+    ['roll bending — never auto', 'forming' as const, 'roll_bending_3', 1_000_000, false],
+  ])('%s', (_l, family, cls, vol, expected) => {
+    expect(isAutoRoutable(family, hardToolingVolumeCapability(cls, vol, limits))).toBe(expected);
+  });
+
+  it('hard tooling with unknown annual volume is not auto-picked', () => {
+    expect(isAutoRoutable('forming', hardToolingVolumeCapability('progressive_die_press', null, limits))).toBe(false);
+  });
+});

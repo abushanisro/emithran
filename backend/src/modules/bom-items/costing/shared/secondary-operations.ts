@@ -14,7 +14,7 @@
 import type { ProcessLineCost } from '../../dto/cost-breakdown.dto';
 
 export type SecondaryGroup = 'heat' | 'surface' | 'other';
-export const SECONDARY_GROUPS: readonly SecondaryGroup[] = ['heat', 'surface', 'other'];
+const SECONDARY_GROUPS: readonly SecondaryGroup[] = ['heat', 'surface', 'other'];
 
 /** HR Rates process group of each kind (migrations 818 / 820 / 826). */
 export const SECONDARY_GROUP_LABEL: Record<SecondaryGroup, string> = {

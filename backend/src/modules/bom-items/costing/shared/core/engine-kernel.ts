@@ -147,7 +147,7 @@ export function eMithranTerms(args: EMithranTermsArgs): EMithranTermsResult {
 //
 // `source` is returned, not inferred, so the line can disclose which tier it
 // used rather than presenting a class default as if it were machine-specific.
-export type SetupTimeSource = 'calculator' | 'machine' | 'operation_lookup' | 'none';
+type SetupTimeSource = 'calculator' | 'machine' | 'operation_lookup' | 'none';
 
 export interface SetupTimeResolution {
   /** Real, un-amortised setup minutes for one batch. */
@@ -480,6 +480,59 @@ export function selectRecommendedRoute<T extends RankableRoute>(routes: readonly
  * Derived from the registered engine classes, not maintained as prose.
  */
 const ROLL_BENDING_CLASSES = new Set(['roll_bending_2', 'roll_bending_3', 'roll_bending_4']);
+
+/**
+ * Hard tooling (a progressive die, or stage tooling on a tandem press) only pays
+ * off above a minimum annual volume. The minimum is real reference data —
+ * progDieAnnualVolumeLimit / stageToolingAnnualVolumeLimit in sm_reference_data
+ * ("below this value, a progressive die operation is not economically
+ * feasible"). Below it the route stays visible and costed but is not feasible,
+ * so it is never auto-recommended; low volume goes to tool-less routes (laser,
+ * turret, press brake). Classes with no sourced limit are never gated, and an
+ * unknown annual volume or limit is disclosed, never assumed.
+ */
+interface HardToolingVolumeLimits { progressiveDie: number | null; stageTooling: number | null }
+
+export function hardToolingVolumeCapability(
+  machineClass: string,
+  annualVolume: number | null,
+  limits: HardToolingVolumeLimits,
+): { capable: boolean; reason: string | null; note: string | null; volumeChecked: boolean } {
+  const entry = machineClass === 'progressive_die_press'
+    ? { limit: limits.progressiveDie, label: 'progressive die tooling' }
+    : machineClass === 'tandem_press'
+      ? { limit: limits.stageTooling, label: 'stage tooling' }
+      : null;
+  if (!entry) return { capable: true, reason: null, note: null, volumeChecked: false };
+  if (entry.limit === null) {
+    return { capable: true, reason: null, note: `No minimum annual volume on file for ${entry.label} — volume not checked.`, volumeChecked: false };
+  }
+  const limit = entry.limit.toLocaleString();
+  if (annualVolume === null) {
+    return { capable: true, reason: null, note: `Annual volume not set — cannot check the ${limit}/yr minimum for ${entry.label}.`, volumeChecked: false };
+  }
+  const vol = annualVolume.toLocaleString();
+  if (annualVolume >= entry.limit) {
+    return { capable: true, reason: null, note: `Economical at this volume — ${vol}/yr meets the ${limit}/yr minimum for ${entry.label}.`, volumeChecked: true };
+  }
+  const reason = `${vol}/yr is below the ${limit}/yr minimum annual volume for ${entry.label} — use a tool-less route at this volume.`;
+  return { capable: false, reason, note: reason, volumeChecked: true };
+}
+
+/**
+ * May Auto routing pick this route? Cutting routes (cut → bend → finish), and
+ * hard-tooling routes whose annual volume was actually checked against their
+ * sourced minimum and passed. Forming routes with no sourced minimum
+ * (Standard Press, Roll Bending — no die cost or volume limit on file) stay
+ * visible and manually selectable, never auto-picked. Ranking still requires
+ * a fully costed route, so an unpriced die is never auto-picked either.
+ */
+export function isAutoRoutable(
+  processFamily: 'cutting' | 'forming',
+  toolingVolume: { capable: boolean; volumeChecked: boolean },
+): boolean {
+  return processFamily === 'cutting' || (toolingVolume.volumeChecked && toolingVolume.capable);
+}
 
 /**
  * Can a roll bender produce this part's formed geometry?

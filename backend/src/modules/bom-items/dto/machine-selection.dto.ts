@@ -3,7 +3,7 @@ import type { MachineClass } from '../costing/shared/core/default-rates.constant
 import type { MachineCapability } from '../costing/shared/capability/machine-selection/seed-registry';
 import type { MachineRequirement } from '../costing/shared/capability/machine-selection/physics';
 
-export type CapabilitySource = 'imported' | 'seed' | 'default_class';
+type CapabilitySource = 'imported' | 'seed' | 'default_class';
 export type AvailabilityStatus = 'available' | 'maintenance' | 'down' | 'retired' | 'commissioning';
 
 export interface MachineCandidate {
@@ -125,7 +125,7 @@ export interface MachineScoreBreakdown {
   score: number;
 }
 
-export interface ProfileWeightsDto { fit: number; util: number; cost: number; avail: number }
+interface ProfileWeightsDto { fit: number; util: number; cost: number; avail: number }
 
 /**
  * Why the balanced pick won: the runner-up it beat and the factor whose

@@ -2,7 +2,7 @@ import { IsUUID, IsString, IsNumber, IsOptional, IsDate, IsEnum, IsArray, Valida
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-export enum QuoteStatus {
+enum QuoteStatus {
   DRAFT = 'draft',
   SUBMITTED = 'submitted',
   UNDER_REVIEW = 'under_review',
@@ -11,7 +11,7 @@ export enum QuoteStatus {
   EXPIRED = 'expired',
 }
 
-export enum SelectionStatus {
+enum SelectionStatus {
   PENDING = 'pending',
   SELECTED = 'selected',
   ALTERNATE = 'alternate',

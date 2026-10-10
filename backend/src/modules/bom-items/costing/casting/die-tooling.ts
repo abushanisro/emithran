@@ -91,7 +91,7 @@ const MM2_PER_IN2 = MM_PER_IN * MM_PER_IN;
  *  highComplexityFactor ("more than 2000 features"). */
 export const COMPLEXITY_FEATURE_THRESHOLDS = { lowBelow: 1000, highAbove: 2000 } as const;
 
-export type DieComplexity = 'Simple' | 'Average' | 'Complex';
+type DieComplexity = 'Simple' | 'Average' | 'Complex';
 
 export const DIE_TOOLING_VARIABLE_KEYS = [
   'partingLineBaseDesignTime', 'partingLineDesignTimePerSlide', 'projAreaPerEjectorPin', 'ejectorPinsCost',

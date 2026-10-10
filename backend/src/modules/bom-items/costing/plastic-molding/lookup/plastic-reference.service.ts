@@ -18,7 +18,7 @@ const GPPS_PROPERTY_NAMES: Record<string, string> = {
 };
 
 /** A press's own process data, from its HR Rates row (mhr_records). */
-export interface PressRecord {
+interface PressRecord {
   /** specs.injection_rate_mm3_per_s (migration 832): melt volume the press injects per second. */
   injectionRateMm3PerS: number | null;
   /** press_cycle_time_s (migration 633): Euromap 6 dry cycle, mold open + close. */
