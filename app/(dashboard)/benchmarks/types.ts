@@ -64,12 +64,7 @@ export interface BOMMetricEntry {
   items: EnrichedBOMItem[] | undefined;
 }
 
-export type MaterialCategory =
-  | "Ferrous"
-  | "Non-Ferrous"
-  | "Plastics"
-  | "Rubber"
-  | "Composites"
-  | "Other";
+/** A material's stored class (raw_materials.material_class), or none on file. */
+export type MaterialCategory = "Ferrous" | "Non-Ferrous" | "Plastic & Rubber" | "Unclassified";
 
 export type BenchmarkStep = "project-selection" | "bom-selection" | "comparison";

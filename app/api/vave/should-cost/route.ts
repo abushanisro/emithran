@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { VaveBomItem, ShouldCostResult } from '@/lib/api/vave';
+import { requireUserForAi } from '@/lib/server/auth';
 
 export async function POST(request: NextRequest) {
+  const auth = await requireUserForAi('vave-should-cost');
+  if (!auth.ok) return auth.response;
+
   try {
     const { part }: { part: VaveBomItem } = await request.json();
 

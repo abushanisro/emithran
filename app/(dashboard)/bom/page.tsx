@@ -374,7 +374,7 @@ function BOMManagementContent() {
                       </TableCell>
                       <TableCell className="text-right">{bom.totalItems}</TableCell>
                       <TableCell className="text-right">
-                        ${(bom.totalCost || 0).toLocaleString()}
+                        {bom.totalCost == null ? '—' : `$${bom.totalCost.toLocaleString()}`}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">

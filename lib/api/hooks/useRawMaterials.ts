@@ -6,7 +6,6 @@ import type {
   Currency,
   Country,
   MaterialShape,
-  MaterialCategory
 } from '@/lib/constants/materials';
 
 // ============================================================================
@@ -16,6 +15,8 @@ import type {
 export interface RawMaterial {
   id: string;
   materialGroup: string;
+  /** Ferrous | Non-Ferrous | Plastic & Rubber (migration 897); null = unclassified. */
+  materialClass?: string | null;
   material: string;
   materialGrade?: string;
   description?: string;
@@ -103,9 +104,10 @@ export interface RawMaterialListResponse {
 export interface QueryRawMaterialsParams {
   search?: string;
   materialGroup?: string;
+  /** Ferrous | Non-Ferrous | Plastic & Rubber (raw_materials.material_class). */
+  materialClass?: string;
   /** Only the material groups linked to this process group (migration 879). */
   processGroup?: string;
-  materialCategory?: MaterialCategory;
   material?: string;
   country?: Country;
   currency?: Currency;
@@ -158,7 +160,6 @@ export interface CreateRawMaterialData {
   scrapFactor?: number;
 }
 
-export interface UpdateRawMaterialData extends Partial<CreateRawMaterialData> {}
 
 // ============================================================================
 // QUERY HOOKS
@@ -245,13 +246,28 @@ export function useRawMaterialsGrouped() {
 }
 
 // Hook to get unique filter options for dropdowns
+/**
+ * The stored material class (Ferrous / Non-Ferrous / Plastic & Rubber) of each
+ * named material, exact match on raw_materials grade or name; null = no class
+ * on file for that name. POST /raw-materials/classes (migration 897).
+ */
+export function useMaterialClasses(names: readonly string[]) {
+  const unique = [...new Set(names.filter(Boolean))].sort();
+  return useQuery({
+    queryKey: ['raw-materials', 'classes', unique],
+    queryFn: () => apiClient.post<Record<string, string | null>>('/raw-materials/classes', { names: unique }),
+    enabled: unique.length > 0,
+    staleTime: 1000 * 60 * 5,
+  });
+}
+
 export function useRawMaterialFilterOptions() {
   return useQuery({
     queryKey: ['raw-materials', 'filter-options'],
     queryFn: async () => {
       const response = await apiClient.get<{
         materialGroups: string[];
-        materialCategories: MaterialCategory[];
+        materialClasses: string[];
         materialTypes: string[];
         countries: Country[];
         currencies: Currency[];
@@ -286,27 +302,6 @@ export function useCreateRawMaterial() {
     },
     onError: (error: any) => {
       toast.error(error?.message || 'Failed to create raw material');
-    },
-  });
-}
-
-export function useUpdateRawMaterial() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: UpdateRawMaterialData }) => {
-      const response = await apiClient.put<RawMaterial>(`/raw-materials/${id}`, data);
-      return response;
-    },
-    onSuccess: (_updatedMaterial, _variables) => {
-      // Force immediate cache invalidation to ensure fresh data
-      queryClient.invalidateQueries({ queryKey: ['raw-materials'] });
-      queryClient.invalidateQueries({ queryKey: ['raw-materials', 'filter-options'] });
-      
-      toast.success('Raw material updated successfully');
-    },
-    onError: (error: any) => {
-      toast.error(error?.message || 'Failed to update raw material');
     },
   });
 }

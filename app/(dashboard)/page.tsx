@@ -143,13 +143,14 @@ export default function DashboardPage() {
   const { data: projectsData } = useProjects({ limit: 100 });
   const { data: vendorsData } = useVendors();
   const { data: rawMaterialsData } = useRawMaterials();
-  const { data: mhrData } = useMHRRecords();
+  // Only whether any machine is on file: one row and the total, not the rows.
+  const { data: mhrData } = useMHRRecords({ limit: 1 });
   const { data: lhrData } = useLHR();
 
   const projects = projectsData?.projects || [];
   const vendors = vendorsData?.vendors || [];
   const rawMaterials = rawMaterialsData?.items || [];
-  const mhrRecords = mhrData?.records || [];
+  const mhrCount = mhrData?.total ?? 0;
   const lhrRecords = lhrData?.records ?? [];
 
   const manufacturingModules = getManufacturingModules(projects);
@@ -185,7 +186,7 @@ export default function DashboardPage() {
   const resourceScore = Math.min(30,
     (vendors.length > 0 ? 8 : 0) +
     (rawMaterials.length > 0 ? 8 : 0) +
-    (mhrRecords.length > 0 ? 7 : 0) +
+    (mhrCount > 0 ? 7 : 0) +
     (lhrRecords.length > 0 ? 7 : 0)
   );
 
@@ -200,7 +201,7 @@ export default function DashboardPage() {
   if (projects.length > 0) {
     systemEfficiency = costCoverage + resourceScore + maturityScore;
     // Ensure a floor of 10% when there is any data at all
-    if (systemEfficiency < 10 && (vendors.length + rawMaterials.length + mhrRecords.length + lhrRecords.length + totalBomItemsForEff) > 0) {
+    if (systemEfficiency < 10 && (vendors.length + rawMaterials.length + mhrCount + lhrRecords.length + totalBomItemsForEff) > 0) {
       systemEfficiency = 10;
     }
   }

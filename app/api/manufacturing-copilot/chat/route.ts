@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { requireUserForAi } from "@/lib/server/auth";
 
 const CAD_ENGINE_URL = process.env.CAD_ENGINE_URL ?? "http://localhost:5000";
 const CAD_ENGINE_API_KEY = process.env.CAD_ENGINE_API_KEY ?? "";
@@ -8,6 +9,8 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
+  const auth = await requireUserForAi("manufacturing-copilot");
+  if (!auth.ok) return auth.response;
   try {
     const body = await request.json();
 
