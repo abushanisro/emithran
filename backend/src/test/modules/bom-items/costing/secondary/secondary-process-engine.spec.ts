@@ -12,7 +12,7 @@ import {
   type SecondaryReference,
 } from '../../../../../modules/bom-items/costing/secondary/secondary-process-engine';
 
-const ROOT = path.resolve(__dirname, '../../../../../../../memory/Secondary process');
+const ROOT = path.resolve(__dirname, '../../../../../../../memory/secondary process');
 
 function parseCsv(file: string): Array<Record<string, string>> {
   const text = fs.readFileSync(path.join(ROOT, file), 'utf-8').replace(/^﻿/, '');

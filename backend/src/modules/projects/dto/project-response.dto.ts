@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { ProjectStatus } from './projects.dto';
+import { ROLLUP_REPORTING_CURRENCY } from '../../bom-items/costing/shared/core/persisted-currency-contract';
 
 /**
  * Project Response DTO
@@ -57,9 +58,12 @@ export class ProjectResponseDto {
   @ApiProperty({ example: 14, required: false, description: 'Total BOM line items across all BOMs' })
   bomItemCount?: number;
 
-  /** Sum of bom_items.unit_cost across all BOMs — the computed "should cost" for this project. */
-  @ApiProperty({ example: 4250.00, required: false, description: 'Actual cost derived from BOM item costs' })
-  actualCost?: number;
+  /** Complete snapshot-based BOM total, or null when any calculation is unresolved. */
+  @ApiProperty({ example: 4250.00, required: false, nullable: true, description: 'Actual cost from current BOM snapshots' })
+  actualCost?: number | null;
+
+  @ApiProperty({ example: 'USD', description: 'Denomination of actualCost' })
+  actualCostCurrency: string;
 
   /**
    * Transform database row to DTO
@@ -88,7 +92,8 @@ export class ProjectResponseDto {
     // Aggregate fields — set externally after enrichment, default to 0
     dto.bomCount = row.bom_count ?? 0;
     dto.bomItemCount = row.bom_item_count ?? 0;
-    dto.actualCost = row.actual_cost != null ? Number(row.actual_cost) : 0;
+    dto.actualCost = row.actual_cost != null ? Number(row.actual_cost) : null;
+    dto.actualCostCurrency = ROLLUP_REPORTING_CURRENCY;
 
     return dto;
   }
