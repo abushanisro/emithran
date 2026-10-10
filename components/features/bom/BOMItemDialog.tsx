@@ -68,7 +68,6 @@ interface RawMaterial {
   materialGrade?: string;
   material?: string;
   materialGroup?: string;
-  categoryName?: string;
   materialType?: string;
   materialDescription?: string;
   description?: string;

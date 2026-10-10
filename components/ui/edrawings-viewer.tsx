@@ -7,6 +7,7 @@ import { OrbitControls, PerspectiveCamera, Grid, Center, Html } from '@react-thr
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import * as THREE from 'three';
 import { fitCameraToBox } from '@/lib/geometry/camera-fit';
+import { BodyEdges, SetupAxisArrows } from '@/components/viewer/body-overlays';
 import { freshWorldBoundsOf } from '@/lib/geometry/scene-bounds';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -128,6 +129,8 @@ interface EDrawingsViewerProps {
   onBrepFacePick?: (faceId: number) => void;
   /** Override the amber group-face highlight color — used for operation-specific visualization */
   highlightColor?: string;
+  /** Real setup-axis directions to draw as arrows (both ends, pointing at the part). */
+  setupAxes?: Array<[number, number, number]>;
   /** BOM item id — required for the Nest toolbar toggle to fetch a true nest; omit to hide that button entirely. */
   bomItemId?: string;
   /** Order quantity for the Nest view's sheets-required figure — defaults to 1 if omitted. */
@@ -135,6 +138,11 @@ interface EDrawingsViewerProps {
   /** Initial sheet size default, seeded from the existing (rectangle-based, cost-authoritative) nesting result — the Nest view's own sheet-size picker (3 standard stock sizes + custom) starts here but the user can change it; the cost-authoritative sheet/nesting result is never affected either way. */
   nestSheetWidthMm?: number;
   nestSheetLengthMm?: number;
+  /** Kerf / edge margin / sheet origin the cost engine nested with (blankSpec). */
+  nestKerfMm?: number;
+  nestEdgeMarginMm?: number;
+  nestSheetSource?: string;
+  nestCandidateSheets?: Array<{ widthMm: number; lengthMm: number; source: string }>;
   nestMaterialLabel?: string;
   nestGradeLabel?: string;
   /** Flat Pattern toolbar toggle — the real unfolded 2D outline (cad-engine's wire-walk extraction), shown on its own before Nest places copies of it on a sheet. Omit outlinePointsMm to hide the button entirely. */
@@ -931,6 +939,9 @@ function FaceHighlight({ triangleIndices, geometry, color, opacity = 0.45 }: {
   );
 }
 
+/** Real setup-axis directions to draw as arrows (empty unless the engine proved some). */
+const SetupAxesCtx = React.createContext<Array<[number, number, number]>>([]);
+
 /** Selected-occurrence highlight: solid orange fill + BackSide glow ring from normal-expanded geometry. */
 function SelectedFaceHighlight({
   triangleIndices,
@@ -1502,6 +1513,7 @@ function STLModel({
   /** Called with the picked STL triangle index on a plain (non-heatmap, non-measure) click. */
   onTrianglePick?: ((triangleIndex: number) => void) | undefined;
 }) {
+  const setupAxes = React.useContext(SetupAxesCtx);
   const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(null);
   const [explodedParts, setExplodedParts] = useState<ExplodedPart[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -2661,8 +2673,11 @@ function STLModel({
             ref={materialRef}
             vertexColors={heatmapActive}
             color={heatmapActive ? 'white' : isDimmed ? '#1a3050' : showFeatures ? '#8899aa' : color}
-            metalness={0.2}
-            roughness={0.45}
+            metalness={0.05}
+            roughness={0.6}
+            polygonOffset
+            polygonOffsetFactor={1}
+            polygonOffsetUnits={1}
             side={THREE.DoubleSide}
             transparent={!heatmapActive && (isDimmed || isTransparent || !!showFeatures)}
             opacity={heatmapActive ? 1 : isDimmed ? 0.50 : isTransparent ? 0.3 : showFeatures ? 0.22 : 1}
@@ -2812,6 +2827,8 @@ function STLModel({
       {!heatmapActive && riskGroups.length === 0 && groupFaceIndices && groupFaceIndices.length > 0 && geometry && (
         <FaceHighlight triangleIndices={groupFaceIndices} geometry={geometry} color={groupHighlightColor ?? '#d97706'} opacity={0.65} />
       )}
+      {!heatmapActive && !isWireframe && geometry && <BodyEdges geometry={geometry} />}
+      {geometry && setupAxes.length > 0 && <SetupAxisArrows geometry={geometry} axes={setupAxes} />}
 
       {/* Selected occurrence — risk-colored fill + glow ring */}
       {occurrenceFaceIndices && occurrenceFaceIndices.length > 0 && geometry && (
@@ -3039,7 +3056,8 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
   onHeatmapInspect,
   onBrepFacePick,
   highlightColor,
-  bomItemId, nestQuantity = 1, nestSheetWidthMm, nestSheetLengthMm, nestMaterialLabel, nestGradeLabel,
+  setupAxes,
+  bomItemId, nestQuantity = 1, nestSheetWidthMm, nestSheetLengthMm, nestKerfMm, nestEdgeMarginMm, nestSheetSource, nestCandidateSheets, nestMaterialLabel, nestGradeLabel,
   flatPatternPartName, flatPatternOutlinePointsMm, flatPatternHolesMm, flatPatternOutlineSource,
   flatPatternBoundingLengthMm, flatPatternBoundingWidthMm, flatPatternCutLengthMm, flatPatternBendCount,
   flatPatternHoleCount, flatPatternPierceCount, flatPatternAreaMm2,
@@ -3048,7 +3066,7 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
   // Bumped to force a full Canvas remount (fresh WebGL context + geometry reload)
   // when a lost WebGL context fails to auto-restore — see onLost/onRestored below.
   const [canvasGeneration, setCanvasGeneration] = useState(0);
-  const [modelColor] = useState('#3d7ab5');
+  const [modelColor] = useState('#9b9bb4');
   const [showGrid, setShowGrid] = useState(false);
   const [currentView, setCurrentView] = useState<string>('home');
   const [autoFit, setAutoFit] = useState(true);
@@ -3213,6 +3231,8 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
     }
     return result;
   }, [selectedOccurrenceIndex, highlightOccurrences, faceMapIndex]);
+
+  const setupAxesValue = useMemo(() => setupAxes ?? [], [setupAxes]);
 
   // Cursor crosshair when measurement mode is active
   useEffect(() => {
@@ -3767,90 +3787,90 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
   const toggleFlatPatternView = () => setShowFlatPatternView(v => !v);
 
   return (
-    <div className="h-full w-full flex flex-col bg-[#2d2d2d]">
+    <div className="h-full w-full flex flex-col bg-[#e6f0e7]">
       {/* Top Toolbar */}
-      <div className="bg-[#3f3f3f] border-b border-[#555555] px-3 py-1.5 shrink-0 overflow-x-auto">
+      <div className="bg-[#f3f6f3] border-b border-[#c4cfc6] px-3 py-1.5 shrink-0 overflow-x-auto">
         <div className="flex items-center justify-between min-w-max">
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={toggleTransparent} title="Transparent"
-              className={`font-medium text-xs ${isTransparent ? 'bg-green-600 hover:bg-green-700 text-white border-green-700' : 'bg-[#505050] hover:bg-[#606060] text-white border-[#666666]'}`}>
+              className={`font-medium text-xs ${isTransparent ? 'bg-green-600 hover:bg-green-700 text-white border-green-700' : 'bg-white hover:bg-[#e8efe9] text-[#1f2d3a] border-[#c4cfc6]'}`}>
               <Eye className="h-3.5 w-3.5" />
             </Button>
             <Button variant="outline" size="sm" onClick={toggleWireframe} title="Wireframe"
-              className={`font-medium text-xs ${isWireframe ? 'bg-green-600 hover:bg-green-700 text-white border-green-700' : 'bg-[#505050] hover:bg-[#606060] text-white border-[#666666]'}`}>
+              className={`font-medium text-xs ${isWireframe ? 'bg-green-600 hover:bg-green-700 text-white border-green-700' : 'bg-white hover:bg-[#e8efe9] text-[#1f2d3a] border-[#c4cfc6]'}`}>
               <Square className="h-3.5 w-3.5" />
             </Button>
             <Button variant="outline" size="sm" onClick={toggleCrossSection} title="Cross Section"
-              className={`font-medium text-xs ${showCrossSection ? 'bg-green-600 hover:bg-green-700 text-white border-green-700' : 'bg-[#505050] hover:bg-[#606060] text-white border-[#666666]'}`}>
+              className={`font-medium text-xs ${showCrossSection ? 'bg-green-600 hover:bg-green-700 text-white border-green-700' : 'bg-white hover:bg-[#e8efe9] text-[#1f2d3a] border-[#c4cfc6]'}`}>
               <Slice className="h-3.5 w-3.5" />
             </Button>
             {flatPatternOutlinePointsMm && (
               <Button variant="outline" size="sm" onClick={toggleFlatPatternView} title="Flat Pattern — the real unfolded 2D outline for this part, before nesting"
-                className={`font-medium text-xs ${showFlatPatternView ? 'bg-green-600 hover:bg-green-700 text-white border-green-700' : 'bg-[#505050] hover:bg-[#606060] text-white border-[#666666]'}`}>
+                className={`font-medium text-xs ${showFlatPatternView ? 'bg-green-600 hover:bg-green-700 text-white border-green-700' : 'bg-white hover:bg-[#e8efe9] text-[#1f2d3a] border-[#c4cfc6]'}`}>
                 <Scan className="h-3.5 w-3.5" />
               </Button>
             )}
             {bomItemId && (
               <Button variant="outline" size="sm" onClick={toggleNestView} title="Nest — true (real-shape) 2D nesting on the selected sheet, visualization only"
-                className={`font-medium text-xs ${showNestView ? 'bg-green-600 hover:bg-green-700 text-white border-green-700' : 'bg-[#505050] hover:bg-[#606060] text-white border-[#666666]'}`}>
+                className={`font-medium text-xs ${showNestView ? 'bg-green-600 hover:bg-green-700 text-white border-green-700' : 'bg-white hover:bg-[#e8efe9] text-[#1f2d3a] border-[#c4cfc6]'}`}>
                 <LayoutGrid className="h-3.5 w-3.5" />
               </Button>
             )}
 
             {features.length > 0 && (
               <>
-                <Separator orientation="vertical" className="h-6 bg-[#555555]" />
+                <Separator orientation="vertical" className="h-6 bg-[#c4cfc6]" />
                 <Button variant="outline" size="sm" onClick={() => setInternalShowFeatures(v => !v)}
-                  className={`gap-1.5 font-medium text-xs ${internalShowFeatures ? 'bg-green-600 hover:bg-green-700 text-white border-green-700' : 'bg-[#505050] hover:bg-[#606060] text-white border-[#666666]'}`}>
+                  className={`gap-1.5 font-medium text-xs ${internalShowFeatures ? 'bg-green-600 hover:bg-green-700 text-white border-green-700' : 'bg-white hover:bg-[#e8efe9] text-[#1f2d3a] border-[#c4cfc6]'}`}>
                   <Target className="h-3.5 w-3.5" /> DFM Features ({features.length})
                 </Button>
               </>
             )}
 
-            <Separator orientation="vertical" className="h-6 bg-[#555555]" />
-            <Button variant="ghost" size="sm" onClick={handleResetView} className="text-white hover:bg-[#505050] gap-2">
+            <Separator orientation="vertical" className="h-6 bg-[#c4cfc6]" />
+            <Button variant="ghost" size="sm" onClick={handleResetView} className="text-[#1f2d3a] hover:bg-[#dfe8e0] gap-2">
               <Home className="h-4 w-4" /><span className="hidden md:inline">Home</span>
             </Button>
-            <Button variant="ghost" size="sm" onClick={handleFitToScreen} className="text-white hover:bg-[#505050] gap-2">
+            <Button variant="ghost" size="sm" onClick={handleFitToScreen} className="text-[#1f2d3a] hover:bg-[#dfe8e0] gap-2">
               <Maximize className="h-4 w-4" /><span className="hidden md:inline">Fit</span>
             </Button>
-            <Separator orientation="vertical" className="h-6 bg-[#555555]" />
+            <Separator orientation="vertical" className="h-6 bg-[#c4cfc6]" />
 
             <Select value={currentView} onValueChange={handleViewChange}>
-              <SelectTrigger className="w-[140px] bg-[#505050] border-[#666666] text-white">
+              <SelectTrigger className="w-[140px] bg-[#cfe0d1] border-[#c4cfc6] text-[#1f2d3a]">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-[#3f3f3f] border-[#666666]">
+              <SelectContent className="bg-[#f3f6f3] border-[#c4cfc6]">
                 {['home','front','back','top','bottom','right','left','isometric'].map(v => (
-                  <SelectItem key={v} value={v} className="text-white capitalize">{v.charAt(0).toUpperCase() + v.slice(1)}</SelectItem>
+                  <SelectItem key={v} value={v} className="text-[#1f2d3a] capitalize">{v.charAt(0).toUpperCase() + v.slice(1)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
-            <Separator orientation="vertical" className="h-6 bg-[#555555]" />
+            <Separator orientation="vertical" className="h-6 bg-[#c4cfc6]" />
             <Button variant="ghost" size="sm" onClick={() => setShowGrid(v => !v)}
-              className={`text-white hover:bg-[#505050] ${showGrid ? 'bg-[#505050]' : ''}`}>
+              className={`text-[#1f2d3a] hover:bg-[#dfe8e0] ${showGrid ? 'bg-[#cfe0d1]' : ''}`}>
               <Grid3x3 className="h-4 w-4" />
             </Button>
             <Button variant="ghost" size="sm" onClick={toggleAnimation}
-              className={`text-white hover:bg-[#505050] ${isAnimating ? 'bg-[#505050]' : ''}`}>
+              className={`text-[#1f2d3a] hover:bg-[#dfe8e0] ${isAnimating ? 'bg-[#cfe0d1]' : ''}`}>
               {isAnimating ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
             </Button>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setShowProjectedAreaHighlight(v => !v)}
-              className={`text-white hover:bg-[#505050] ${showProjectedAreaHighlight ? 'bg-[#505050]' : ''}`}
+              className={`text-[#1f2d3a] hover:bg-[#dfe8e0] ${showProjectedAreaHighlight ? 'bg-[#cfe0d1]' : ''}`}
               title="Toggle Projected Area Highlight"
             >
               <Layers className="h-4 w-4" />
             </Button>
-            <Separator orientation="vertical" className="h-6 bg-[#555555]" />
+            <Separator orientation="vertical" className="h-6 bg-[#c4cfc6]" />
             <Button
               variant="ghost"
               size="sm"
               onClick={measureMode === 'IDLE' ? startMeasure : exitMeasure}
-              className={`text-white hover:bg-[#505050] gap-1.5 text-xs font-medium ${measureMode !== 'IDLE' ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
+              className={`text-[#1f2d3a] hover:bg-[#dfe8e0] gap-1.5 text-xs font-medium ${measureMode !== 'IDLE' ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
               title="Measure tool — click two points on the model"
             >
               <Ruler className="h-3.5 w-3.5" />
@@ -3860,11 +3880,11 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
 
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={() => setShowSidebar(v => !v)}
-              className={`text-white hover:bg-[#505050] ${showSidebar ? 'bg-[#505050]' : ''}`}>
+              className={`text-[#1f2d3a] hover:bg-[#dfe8e0] ${showSidebar ? 'bg-[#cfe0d1]' : ''}`}>
               {showSidebar ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
             </Button>
-            <Separator orientation="vertical" className="h-6 bg-[#555555]" />
-            <Button variant="ghost" size="sm" className="text-white hover:bg-[#505050]" asChild>
+            <Separator orientation="vertical" className="h-6 bg-[#c4cfc6]" />
+            <Button variant="ghost" size="sm" className="text-[#1f2d3a] hover:bg-[#dfe8e0]" asChild>
               <a href={fileUrl} download><Download className="h-4 w-4" /></a>
             </Button>
           </div>
@@ -3874,7 +3894,7 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
       {/* Main Content */}
       <div className="flex-1 flex relative min-h-0 overflow-hidden">
         {/* 3D Viewport */}
-        <div ref={canvasContainerRef} className="flex-1 relative bg-gradient-to-b from-[#4a4a4a] to-[#2d2d2d]">
+        <div ref={canvasContainerRef} className="flex-1 relative bg-gradient-to-b from-[#e6f0e7] to-[#b4d2b7]">
           {bomItemId && (
             // Popup rather than an inline overlay: Nest's own sheet-size
             // picker + custom inputs need real screen space (see
@@ -3889,10 +3909,17 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
                   </DialogTitle>
                 </DialogHeader>
                 <NestView
+                  // Remount when the costed sheet / kerf / thickness changes, so
+                  // the dialog's editable copies start from the new values.
+                  key={`${nestSheetWidthMm}x${nestSheetLengthMm}|${nestKerfMm}|${nestEdgeMarginMm}|${sheetThickness}`}
                   bomItemId={bomItemId}
                   quantity={nestQuantity}
                   sheetWidthMm={nestSheetWidthMm}
                   sheetLengthMm={nestSheetLengthMm}
+                  kerfMm={nestKerfMm}
+                  edgeMarginMm={nestEdgeMarginMm}
+                  sheetSource={nestSheetSource}
+                  candidateSheets={nestCandidateSheets}
                   materialLabel={nestMaterialLabel}
                   gradeLabel={nestGradeLabel}
                   thicknessMm={sheetThickness}
@@ -3927,6 +3954,7 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
               </DialogContent>
             </Dialog>
           )}
+          <SetupAxesCtx.Provider value={setupAxesValue}>
           <FeatureOverlayCtx.Provider value={{ featureType: highlightOccurrences?.feature_type ?? '', sheetThickness: sheetThickness ?? 2 }}>
           <Canvas
             shadows
@@ -4035,6 +4063,7 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
             )}
           </Canvas>
           </FeatureOverlayCtx.Provider>
+          </SetupAxesCtx.Provider>
 
           {loading && (
             <div className="absolute inset-0 flex items-center justify-center bg-[#2d2d2d]">

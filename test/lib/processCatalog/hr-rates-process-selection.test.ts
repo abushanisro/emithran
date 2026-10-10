@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
 import {
+  identityMappings,
   effectiveProcessGroupOf,
-  processGroupOptionsFrom,
   categoryOptionsFrom,
   matchesProcessAndCategory,
   categoryMachineClassesOf,
@@ -41,21 +41,20 @@ describe('effectiveProcessGroupOf', () => {
   });
 });
 
-describe('processGroupOptionsFrom', () => {
+describe('buildHrRatesIndex process groups', () => {
   it('lists every group that really appears, via either column, and omits unknowns', () => {
-    const groups = processGroupOptionsFrom([
+    const groups = buildHrRatesIndex([
       row({ commodityCode: 'Sheet Metal' }),
       row({ processGroup: 'Machining', commodityCode: undefined }),
       row({ commodityCode: 'Sheet Metal' }),
       row({ processGroup: undefined, commodityCode: undefined }),
-    ]);
+    ]).processGroups;
     expect(groups).toEqual(['Machining', 'Sheet Metal']);
   });
 
-  // This is the bug the /mhr/process-groups endpoint has: it reads only the raw
-  // process_group column, so a commodity-code-only group is invisible to it.
+  // The displayed group falls back to commodity_code when process_group is empty.
   it('does not lose a group that only ever appears in commodity_code', () => {
-    const groups = processGroupOptionsFrom([row({ processGroup: undefined, commodityCode: 'Sheet Metal' })]);
+    const groups = buildHrRatesIndex([row({ processGroup: undefined, commodityCode: 'Sheet Metal' })]).processGroups;
     expect(groups).toEqual(['Sheet Metal']);
   });
 });
@@ -224,7 +223,7 @@ describe('buildHrRatesIndex', () => {
   const index = buildHrRatesIndex(rows);
 
   it('answers every picker from one pass, matching the row-scan functions', () => {
-    expect(index.processGroups).toEqual(processGroupOptionsFrom(rows));
+    expect(index.processGroups).toEqual(['Other Secondary Processes', 'Sheet Metal']);
     expect(index.categoriesOf('Sheet Metal')).toEqual(categoryOptionsFrom(rows, 'Sheet Metal'));
     expect([...index.machineClassesOf('Sheet Metal', 'Bend Press Brake')]).toEqual(['press_brake']);
   });
@@ -242,5 +241,19 @@ describe('buildHrRatesIndex', () => {
   it('answers empty, not undefined, for an unknown group or category', () => {
     expect(index.categoriesOf('Unknown')).toEqual([]);
     expect(index.machineClassesOf('Unknown', 'x').size).toBe(0);
+  });
+});
+
+describe('identityMappings (the route and operation a line saves as)', () => {
+  // Live catalog 2026-10-09: Black Oxide's only row is inactive (no calculator wired).
+  const blackOxide = { processRoute: 'Black Oxide', operation: 'Black Oxide', isActive: false };
+
+  it('a class whose only row has no calculator still has its route', () => {
+    expect(identityMappings([blackOxide])).toEqual([blackOxide]);
+  });
+
+  it('active rows win over deactivated duplicates', () => {
+    const laser = { processRoute: 'Laser Cutting', operation: 'Laser Cut', isActive: true };
+    expect(identityMappings([laser, { processRoute: 'Sheet Cutting', operation: 'Co2 Laser Cutting', isActive: false }])).toEqual([laser]);
   });
 });

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireUser } from '@/lib/server/auth';
+import { fetchTrustedFile, PayloadTooLargeError, readLimited, UntrustedUrlError } from '@/lib/server/safe-fetch';
 
 interface BackendDimensionEntry {
   balloonId: string;
@@ -13,6 +15,9 @@ interface BackendDimensionEntry {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireUser();
+  if (!auth.ok) return auth.response;
+
   try {
     const body = await request.json();
     const { pdfUrl } = body;
@@ -22,18 +27,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch the PDF from the provided URL (Supabase storage)
-    const pdfResponse = await fetch(pdfUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; PDF-Processor/1.0)',
+    let pdfBuffer: Buffer;
+    try {
+      const pdfResponse = await fetchTrustedFile(String(pdfUrl), { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PDF-Processor/1.0)' } });
+      if (!pdfResponse.ok) {
+        return NextResponse.json({ error: 'Failed to fetch PDF from storage' }, { status: 400 });
       }
-    });
-    
-    if (!pdfResponse.ok) {
-      return NextResponse.json({ error: 'Failed to fetch PDF from storage' }, { status: 400 });
+      pdfBuffer = await readLimited(pdfResponse, 25 * 1024 * 1024);
+    } catch (e) {
+      if (e instanceof UntrustedUrlError) return NextResponse.json({ error: 'PDF URL is not on the trusted storage host' }, { status: 400 });
+      if (e instanceof PayloadTooLargeError) return NextResponse.json({ error: 'PDF is too large' }, { status: 413 });
+      throw e;
     }
-
-    const pdfArrayBuffer = await pdfResponse.arrayBuffer();
-    const pdfBuffer = Buffer.from(pdfArrayBuffer);
     
     
     // Validate PDF buffer
@@ -49,7 +54,7 @@ export async function POST(request: NextRequest) {
       },
       body: (() => {
         const formData = new FormData();
-        formData.append('pdf', new Blob([pdfBuffer], { type: 'application/pdf' }));
+        formData.append('pdf', new Blob([new Uint8Array(pdfBuffer)], { type: 'application/pdf' }));
         return formData;
       })(),
       signal: AbortSignal.timeout(30000), // 30 second timeout

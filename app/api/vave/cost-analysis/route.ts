@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { VaveBomItem, CostAnalysisResult, QFDMatrix } from '@/lib/api/vave';
+import { requireUserForAi } from '@/lib/server/auth';
 
 export async function POST(request: NextRequest) {
+  const auth = await requireUserForAi('vave-cost-analysis');
+  if (!auth.ok) return auth.response;
+
   try {
     const { bomItems }: { bomItems: VaveBomItem[] } = await request.json();
 

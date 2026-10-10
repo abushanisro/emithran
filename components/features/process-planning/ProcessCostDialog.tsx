@@ -1,9 +1,14 @@
 'use client';
 
+import { Loader2, Calculator as CalculatorIcon, Play, Eye, EyeOff } from 'lucide-react';
+import { longestBendLineMm } from '@/lib/features/bend-line-length';
+import { cadEvidenceKeyFor } from '@/lib/features/cad-evidence-fields';
+import { checkAgainstInput, resolveFieldHighlight } from '@/lib/features/field-highlight';
+import type { CadEvidence } from './CadEvidencePanel';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -12,6 +17,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -19,10 +26,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useMHRRecords, useMHRRecord } from '@/lib/api/hooks/useMHR';
-import { resolveMhrUsdRate } from '@/lib/api/mhr';
-import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
-import { liveOperationOptions, resolveSavedOperation, type LiveOperationOption } from '@/lib/processCatalog/live-operation-options';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import type { CalculatorField } from '@/lib/api/calculators';
+import { calculatorsApi } from '@/lib/api/calculators';
+import { apiClient } from '@/lib/api/client';
+import { useCalculators, useCalculator, useExecuteCalculator } from '@/lib/api/hooks/useCalculators';
+import { useMHRPickerRows, useMHRRecord } from '@/lib/api/hooks/useMHR';
+import { keepsSavedOperation, resolveLineIdentity } from '@/lib/processCatalog/line-identity';
 import {
   effectiveProcessGroupOf,
   buildHrRatesIndex,
@@ -30,17 +40,18 @@ import {
   matchesProcessAndCategory,
   calculatorMappingsForMachineClass,
   unambiguousMapping,
+  identityMappings,
+  type MachineRowForSelection,
 } from '@/lib/processCatalog/hr-rates-process-selection';
 import { useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculatorMappings';
-import { useCalculators, useCalculator, useExecuteCalculator } from '@/lib/api/hooks/useCalculators';
 import { useCalculateProcessCost } from '@/lib/api/hooks/useProcessCosts';
+import { machineListRateUsd, resolveMhrUsdRate, type MachineListRow } from '@/lib/api/mhr';
 import { useDebounce } from '@/lib/hooks/useDebounce';
-import { Loader2, Calculator as CalculatorIcon, Play, Eye } from 'lucide-react';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { calculatorsApi } from '@/lib/api/calculators';
-import { apiClient } from '@/lib/api/client';
+import type { EngineCalculatorSeed } from '@/lib/calculators/engine-calculator-seeds';
+import { isMatchedLookupRow } from '@/lib/calculators/lookup-row-match';
+import { describeStrokeLookup, strokeComplexity as strokeComplexityOf } from '@/lib/calculators/stroke-lookup';
+import { liveOperationOptions, resolveSavedOperation, type LiveOperationOption } from '@/lib/processCatalog/live-operation-options';
+import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
 
 // Known options for calculator fields whose fieldType is 'select' — the
 // calculator engine has no generic options-storage column yet, so this is a
@@ -63,15 +74,6 @@ const SM_LOOKUP_DATA_SOURCE = 'sheet_metal_lookup';
 // (source_table / source_field name the table and column — migration 804).
 const MACHINING_LOOKUP_DATA_SOURCE = 'machining_lookup';
 
-// The engine's own inputs for the calculator that computed a machining line
-// (see the page's Cycle Time calculator button): opening the calculator from
-// that line shows exactly the values and sources the quote used.
-interface EngineCalculatorSeed {
-  calculatorId: string;
-  inputs: Record<string, number | string>;
-  provenance: Record<string, string>;
-  lookupMatches: Record<string, { table: string; row: Record<string, string | number> }>;
-}
 
 // Mirrors backend normaliseLaserMaterial (bom-items/costing/sheet-metal-lookup.service.ts)
 // — keep the keyword lists in sync. resolveSheetMetalLookup('laser_cut', ...)
@@ -115,9 +117,6 @@ function resolveAdHocLookupTableKey(fieldName: string, machineClass: string | un
   if (fieldName === 'Cutting Speed' || fieldName === 'Piercing Time Per Start') {
     return machineClass === 'waterjet' ? 'sm_lookup_waterjet_cut' : 'sm_lookup_laser_cut';
   }
-  if (fieldName === 'Sec Per Metre' || fieldName === 'Sec Per Pierce') {
-    return 'sm_lookup_deburr_rate';
-  }
   if (fieldName === 'Insertion Cycle Time') {
     return 'sm_lookup_pem_hardware';
   }
@@ -156,11 +155,6 @@ function computeAdHocMatchedRow(
     const feature = INSPECTION_FEATURE_BY_FIELD[fieldName];
     if (!feature || !Number.isFinite(num)) return null;
     return rows.find((r) => r.feature === feature && Math.abs(Number(r.cycleTimeSec) - num) < 1e-6) ?? null;
-  }
-  if (tableName === 'sm_lookup_deburr_rate') {
-    // Only one real row exists today (material_family='__default__') — see
-    // this session's own audit of this table.
-    return rows.find((r) => r.materialFamily === '__default__') ?? rows[0] ?? null;
   }
   if (tableName === 'surface_treatment_rates') {
     if (!Number.isFinite(num)) return rows.find((r) => r.location === location) ?? null;
@@ -211,9 +205,9 @@ function extractRowColumns(row: any): Record<string, any> | null {
 // capacity") instead of duplicating a different approximation.
 function parseTonnageFromMachineName(machineName: string | undefined): number | null {
   if (!machineName) return null;
-  const kn = machineName.match(/(\d+(?:\.\d+)?)\s*k\s*n\b/i);
+  const kn = /(\d+(?:\.\d+)?)\s*k\s*n\b/i.exec(machineName);
   if (kn?.[1]) return Math.round((parseFloat(kn[1]) / 9.80665) * 10) / 10;
-  const tons = machineName.match(/(\d+(?:\.\d+)?)\s*(?:tonnes?|tons?|t)\b/i);
+  const tons = /(\d+(?:\.\d+)?)\s*(?:tonnes?|tons?|t)\b/i.exec(machineName);
   if (tons?.[1]) return parseFloat(tons[1]);
   return null;
 }
@@ -246,7 +240,13 @@ interface ProcessCostDialogProps {
   // specific part's real detected geometry produced it. Each line's own
   // featureBreakdown (when present) gives finer-grained real options, e.g.
   // "Drilling Ø4.0mm ×2" instead of just "Drilling".
-  liveProcessLines?: Array<{ process: string; machineClass: string; cycleTimeMin: number; featureBreakdown?: Array<{ name: string; featureType: string; timeSec: number; count: number }>; featureOperations?: Array<{ operation: string | null; featureType: string; instances: unknown[] }>; machineSelection?: { balanced?: { candidate?: { machineId?: string | null } } } }>;
+  liveProcessLines?: { process: string; machineClass: string; cycleTimeMin: number; featureBreakdown?: { name: string; featureType: string; timeSec: number; count: number }[]; featureOperations?: { operation: string | null; featureType: string; instances: unknown[] }[]; machineSelection?: { balanced?: { candidate?: { machineId?: string | null } } } }[];
+  // Opens the CAD evidence window (the page owns the viewer) for a CAD-derived
+  // input; null closes it.
+  onShowEvidence?: (evidence: CadEvidence | null) => void;
+  // Label of the input whose CAD evidence window is open (null when none): that
+  // input's eye shows as on, every other input's as off.
+  activeEvidenceLabel?: string | null;
 }
 
 export function ProcessCostDialog({
@@ -261,8 +261,13 @@ export function ProcessCostDialog({
   conversionRate = 1,
   autoOpenCalculator,
   liveProcessLines = [],
+  onShowEvidence,
+  activeEvidenceLabel = null,
 }: ProcessCostDialogProps) {
   const [opNbr, setOpNbr] = useState<number>(0);
+  useEffect(() => {
+    if (!open) onShowEvidence?.(null);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   // Locked to the Digital Factory location — no independent state. A free
   // per-row location override (formerly a Select with "🌍 All locations" +
   // 10 hardcoded countries) let a process line's MHR resolve against India
@@ -355,7 +360,8 @@ export function ProcessCostDialog({
   // eye in the "eye" button's full table view was the actual ask here.
   // Lets the viewer highlight/scroll to it instead of the engineer having
   // to re-derive the match themselves.
-  const [calculatorMatchedRowKeys, setCalculatorMatchedRowKeys] = useState<Record<string, Record<string, any>>>({});
+  // An interpolated lookup holds the two real rows it sits between.
+  const [calculatorMatchedRowKeys, setCalculatorMatchedRowKeys] = useState<Record<string, Record<string, any> | Record<string, any>[]>>({});
   // Scrolls the "eye" viewer straight to the highlighted (currently-used)
   // row when it opens — see the matchedCurrentRowRef assignment below.
   const matchedCurrentRowRef = useRef<HTMLTableRowElement | null>(null);
@@ -405,34 +411,24 @@ export function ProcessCostDialog({
   // location IS pushed to the server: it is the real scope of a costed line (the
   // Digital Factory) and the filter that actually reduces the table.
   //
-  // Process group is deliberately NOT pushed down. The backend filter is an exact
-  // `process_group = ...` match, but that column was only ever populated by
-  // migrations 130, 646/647 and 694, each for a specific set of rows; everything
-  // imported before them carries its group in commodity_code instead. Sending it
-  // silently drops the large majority of real rows -- the same trap the HR Rates
-  // page documents at its own query. effectiveProcessGroupOf applies the real
-  // fallback client-side instead.
+  // Process group is not sent: the Process picker itself is built from every
+  // group at this location (effectiveProcessGroupOf).
   //
-  // The /mhr/process-groups and /mhr/categories endpoints are unused here for
-  // the same reason: both read the raw process_group column, so both are blind
-  // to every commodity-code-only group. Reading the rows themselves is the only
-  // derivation that matches what the machine list can actually offer.
-  const MHR_FETCH_LIMIT = 10000;
+  // The groups and categories come from these same rows, not from
+  // GET /mhr/process-groups (every group, every location): only groups with a
+  // machine at this location can be offered, and the rows say which.
+  //
+  // The rows are the slim picker shape (GET /mhr/picker, every machine at the
+  // location); the full row is fetched only for the machine chosen, below.
+  // The full list (~11 MB for one location) outran the request timeout and,
+  // fetched silently, showed as "no processes" instead of an error.
   const {
     data: mhrData,
     isLoading: isLoadingMHR,
     error: mhrError,
-  } = useMHRRecords(
-    { ...(location ? { location } : {}), limit: MHR_FETCH_LIMIT },
-    { enabled: open },
-  );
+  } = useMHRPickerRows(location || undefined, { enabled: open });
 
-  const mhrRecords = useMemo(() => mhrData?.records ?? [], [mhrData]);
-
-  // Every list below is built from this one page of rows, so if the table ever
-  // outgrows it a real machine could be missing from a dropdown. Say so rather
-  // than presenting a short list as the whole truth.
-  const mhrTruncated = !!mhrData && (mhrData.total ?? 0) > mhrRecords.length;
+  const mhrRecords = useMemo(() => mhrData ?? [], [mhrData]);
 
   // One index over the loaded rows; every picker below reads from it.
   const hrRatesIndex = useMemo(() => buildHrRatesIndex(mhrRecords), [mhrRecords]);
@@ -441,7 +437,7 @@ export function ProcessCostDialog({
 
   const isLoadingCatalog = isLoadingMHR;
   const isLoadingCategories = isLoadingMHR;
-  const catalogError = (mhrError as Error | null) ?? null;
+  const catalogError = (mhrError) ?? null;
 
   // The calculator catalog is still fetched — but only to answer ONE question
   // now: which calculator (and which lhr_process_group) belongs to the
@@ -449,9 +445,12 @@ export function ProcessCostDialog({
   // any dropdown, so it is no longer a second taxonomy; machine_class is a
   // real column on both mhr_records and process_calculator_mappings, which
   // makes it a genuine join rather than a name match.
-  const { data: allMappingsData } = useProcessCalculatorMappings(
-    { limit: 1000, isActive: true },
-    { enabled: open },
+  // Every catalog row: calculators read only the active ones (is_active =
+  // "a calculator is wired"); the line's route/operation reads identityMappings.
+  const { data: catalogData } = useProcessCalculatorMappings({ limit: 1000 }, { enabled: open });
+  const activeMappings = useMemo(
+    () => (catalogData?.mappings ?? []).filter((m) => m.isActive),
+    [catalogData],
   );
 
   // When editing, fetch the specific saved MHR/LHR so they always appear in their lists
@@ -490,7 +489,7 @@ export function ProcessCostDialog({
   const CYCLE_TIME_FIELD_NAMES = ['Total Time', 'Cycle Time'];
   const computedCycleTime = useMemo(() => {
     if (!calculatorResults || !selectedCalculator?.fields) return null;
-    const totalTimeField = selectedCalculator.fields.find((f: any) => CYCLE_TIME_FIELD_NAMES.includes(f.fieldName));
+    const totalTimeField = selectedCalculator.fields.find((f: CalculatorField) => CYCLE_TIME_FIELD_NAMES.includes(f.fieldName));
     if (!totalTimeField) return null;
     const raw = calculatorResults[totalTimeField.fieldName];
     const hasError = raw && typeof raw === 'object' && 'error' in raw;
@@ -519,18 +518,18 @@ export function ProcessCostDialog({
   // its lookup params — real dependencies of a lookup-populated field
   // (Time Per Stroke, Tool Loading Time) that formula-token parsing alone
   // can never see, since these fields carry no {…} formula themselves.
-  // 'Selected Tonnage' is listed alongside 'Total Tonnage' because
-  // handleExecuteCalculator's tonnage lookup now prefers it (the real
-  // selected machine's rated capacity) over 'Total Tonnage' (this bend's own
-  // theoretical minimum required force) — see that function's own doc
-  // comment. Omitting it here was the reason 'Selected Tonnage' never
+  // 'Selected Tonnage' is listed alongside 'Recommended Force' because
+  // handleExecuteCalculator's tonnage lookup prefers it (the real selected
+  // machine's rated capacity) over 'Recommended Force' (this bend's own
+  // required force, theoretical × 1.25) — see that function's own doc
+  // comment. Showing both lets the engineer check required ≤ selected. Omitting it here was the reason 'Selected Tonnage' never
   // rendered in this popup at all: relevantFieldNames only shows a field
   // once something resolves it as a real dependency, so with no way to see
   // or fill it in, the tonnage lookup was always forced onto the (usually
   // sub-10T, never-matches-a-real-machine) theoretical estimate.
   const SM_LOOKUP_PARAM_DEPS: Record<string, string[]> = {
-    manual_stroke: ['Thickness', 'Total Tonnage', 'Selected Tonnage', 'Complexity'],
-    tool_setup: ['Total Tonnage', 'Selected Tonnage'],
+    manual_stroke: ['Thickness', 'Recommended Force', 'Selected Tonnage', 'Complexity'],
+    tool_setup: ['Recommended Force', 'Selected Tonnage'],
   };
 
   // Same idea as SM_LOOKUP_PARAM_DEPS above, but keyed by fieldName instead
@@ -645,7 +644,7 @@ export function ProcessCostDialog({
   // and the machines shown under it cannot disagree with each other or with
   // that page.
   const matchesSelection = useCallback(
-    (r: any): boolean => matchesProcessAndCategory(r, selectedGroup, selectedCategory),
+    (r: MachineRowForSelection): boolean => matchesProcessAndCategory(r, selectedGroup, selectedCategory),
     [selectedGroup, selectedCategory],
   );
 
@@ -670,7 +669,7 @@ export function ProcessCostDialog({
   // row matches.
   const catalogFeatureTypeByOperation = useMemo(() => {
     const map = new Map<string, string>();
-    for (const m of allMappingsData?.mappings ?? []) {
+    for (const m of activeMappings) {
       if (!m.machineClass || !categoryMachineClasses.has(m.machineClass)) continue;
       for (const op of m.taxonomy?.operations ?? []) {
         if (op.operationCategory && op.featureType && !map.has(op.operationCategory)) {
@@ -679,7 +678,7 @@ export function ProcessCostDialog({
       }
     }
     return map;
-  }, [allMappingsData, categoryMachineClasses]);
+  }, [activeMappings, categoryMachineClasses]);
 
   const operationOptions = useMemo(
     () => (selectedCategory ? liveOperationOptions(liveProcessLines, categoryMachineClasses, catalogFeatureTypeByOperation) : []),
@@ -702,32 +701,28 @@ export function ProcessCostDialog({
     () => resolveSavedOperation(liveProcessLines, savedOperation, editData?.machineClass ?? ''),
     [liveProcessLines, savedOperation, editData?.machineClass],
   );
-  const operationOptionsWithSaved = useMemo((): LiveOperationOption[] => {
-    if (!savedLiveOperation || operationOptions.some((op) => op.value === savedLiveOperation)) return operationOptions;
-    return [...operationOptions, { value: savedLiveOperation, label: `${savedLiveOperation} — saved, not in this part's current CAD extraction`, detail: null, cycleTimeMin: 0, lineProcess: savedLiveOperation }];
-  }, [operationOptions, savedLiveOperation]);
 
   const filteredMHR = useMemo(() => {
     // No machine ever applies to a Raw Material / Packing & Delivery / General-General
     // line — return no machines at all, including any previously-saved one, rather
     // than let it leak through via the "nothing to validate against" branch below.
     if (isNonMachineOperation) return [];
-    const base = mhrRecords as any[];
+    const base: MachineListRow[] = mhrRecords;
     const locLower = location.toLowerCase();
 
-    const byLoc = (arr: any[]) =>
-      !location ? arr : arr.filter(r => (r.location ?? '').toLowerCase() === locLower);
+    const byLoc = (arr: MachineListRow[]) =>
+      !location ? arr : arr.filter(r => r.location.toLowerCase() === locLower);
 
-    const byCategory = (arr: any[]) => {
+    const byCategory = (arr: MachineListRow[]) => {
       if (!processFullySelected) return arr;
       return arr.filter(matchesSelection);
     };
 
-    const withSavedMachines = (list: any[]) => {
-      let result = list as any[];
-      if (savedMHRRecord && !result.some((r: any) => String(r.id) === String(savedMHRRecord.id))) {
+    const withSavedMachines = (list: MachineListRow[]): MachineListRow[] => {
+      let result = list;
+      if (savedMHRRecord && !result.some((r) => r.id === savedMHRRecord.id)) {
         // Don't inject a saved machine that isn't in the chosen category
-        if (!selectedCategory || matchesSelection(savedMHRRecord as any)) {
+        if (!selectedCategory || matchesSelection(savedMHRRecord)) {
           result = [savedMHRRecord, ...result];
         }
       }
@@ -749,9 +744,12 @@ export function ProcessCostDialog({
   // machine_class is read from the SELECTED MACHINE's own row rather than from a
   // catalog mapping, so everything downstream of the class -- the calculator
   // join and the labour rate -- resolves from the machine the engineer picked.
-  const selectedMHR = useMemo(() => {
-    return filteredMHR.find((r: any) => String(r.id) === String(selectedMHRId));
-  }, [filteredMHR, selectedMHRId]);
+  // The full row (rates, capability, specs) of the machine picked from the slim list.
+  const { data: selectedMHRRecord } = useMHRRecord(selectedMHRId, { enabled: !!selectedMHRId && open });
+  const selectedMHR = useMemo(
+    () => (filteredMHR.some((r) => r.id === selectedMHRId) ? selectedMHRRecord ?? undefined : undefined),
+    [filteredMHR, selectedMHRId, selectedMHRRecord],
+  );
 
   // The real cost-engine key. Preferred source is the machine actually chosen —
   // its own mhr_records.machine_class, which is a fact about that machine
@@ -776,16 +774,16 @@ export function ProcessCostDialog({
   // while a real rate was already being applied underneath -- the worst of both,
   // since the number being charged was invisible.
   const machineLabour = useMemo(() => {
-    const rate = Number((selectedMHR as any)?.usdLhrTotal);
+    const rate = Number((selectedMHR)?.usdLhrTotal);
     if (!selectedMHR || !(rate > 0)) return null;
-    const source = (selectedMHR as any).laborRateSource as string | undefined;
+    const source = (selectedMHR).laborRateSource as string | undefined;
     return {
       rate,
       // The real labour classification HR Rates assigns this machine (its
       // "Wage Grade" column, e.g. "4 - Metal") -- a fact on the row, not a
       // separate labour record chosen alongside it.
-      wageGrade: ((selectedMHR as any).wageGrade as string | undefined) || null,
-      machineName: (selectedMHR as any).machineName as string | undefined,
+      wageGrade: ((selectedMHR).wageGrade as string | undefined) || null,
+      machineName: (selectedMHR).machineName as string | undefined,
       // Same ★ convention as every other isBenchmark check here: marks "not
       // this shop's own confirmed value", set only when the machine's OWN rate
       // came from a benchmark/reference tier.
@@ -797,14 +795,14 @@ export function ProcessCostDialog({
   // undefined (not a default) when nothing is selected or the row has no shift
   // pattern on file — see the save payload for why a default would be a lie.
   const shiftPatternHoursPerDayFromMachine = useMemo(() => {
-    const shifts = Number((selectedMHR as any)?.shiftsPerDay);
-    const hours  = Number((selectedMHR as any)?.hoursPerShift);
+    const shifts = Number((selectedMHR)?.shiftsPerDay);
+    const hours  = Number((selectedMHR)?.hoursPerShift);
     if (!(shifts > 0) || !(hours > 0)) return undefined;
     return shifts * hours;
   }, [selectedMHR]);
 
   const selectedMachineClass = useMemo(() => {
-    const fromMachine = (selectedMHR as any)?.machineClass;
+    const fromMachine = (selectedMHR)?.machineClass;
     if (fromMachine) return String(fromMachine);
     if (categoryMachineClasses.size === 1) return [...categoryMachineClasses][0]!;
     return '';
@@ -817,14 +815,44 @@ export function ProcessCostDialog({
   // single row is only treated as authoritative when exactly one matches; the
   // ambiguous case is surfaced to the engineer rather than silently resolved.
   const calculatorMappingsForClass = useMemo(
-    () => calculatorMappingsForMachineClass((allMappingsData?.mappings ?? []) as any[], selectedMachineClass),
-    [allMappingsData, selectedMachineClass],
+    () => calculatorMappingsForMachineClass(activeMappings, selectedMachineClass),
+    [activeMappings, selectedMachineClass],
   );
 
   const selectedMapping = useMemo(
     () => unambiguousMapping(calculatorMappingsForClass),
     [calculatorMappingsForClass],
   );
+
+  // The class's catalog identity (route/operation), which may be a row with no
+  // calculator yet — see identityMappings.
+  const classCatalogRow = useMemo(
+    () => unambiguousMapping(identityMappings(calculatorMappingsForMachineClass(catalogData?.mappings ?? [], selectedMachineClass))),
+    [catalogData, selectedMachineClass],
+  );
+
+  // The saved operation is offered only while the line stays on its saved
+  // machine class — once the engineer moves it to another class (e.g. an
+  // Inspection line to a Black Oxide machine) the old operation no longer
+  // belongs to it (see lib/processCatalog/line-identity.ts).
+  const savedOperationApplies = keepsSavedOperation(editData?.machineClass, selectedMachineClass);
+  const operationOptionsWithSaved = useMemo((): LiveOperationOption[] => {
+    if (!savedOperationApplies || !savedLiveOperation || operationOptions.some((op) => op.value === savedLiveOperation)) return operationOptions;
+    return [...operationOptions, { value: savedLiveOperation, label: `${savedLiveOperation} (saved on this line)`, detail: null, cycleTimeMin: 0, lineProcess: savedLiveOperation }];
+  }, [operationOptions, savedLiveOperation, savedOperationApplies]);
+  // A selection that is no longer offered (machine class changed) is cleared.
+  useEffect(() => {
+    if (selectedOperation && !operationOptionsWithSaved.some((o) => o.value === selectedOperation)) setSelectedOperation('');
+  }, [operationOptionsWithSaved, selectedOperation]);
+  // The route + operation this line will be saved with.
+  const lineIdentity = resolveLineIdentity({
+    savedMachineClass: editData?.machineClass,
+    savedProcessRoute,
+    savedOperation,
+    selectedMachineClass,
+    selectedOperation,
+    classCatalog: classCatalogRow ? { processRoute: classCatalogRow.processRoute, operation: classCatalogRow.operation } : null,
+  });
 
 
   // ─── Calculator resolution ────────────────────────────────────────────────
@@ -842,9 +870,9 @@ export function ProcessCostDialog({
   // and LHR are scoped, instead of listing all ~45 calculators across every
   // process (Machining, Injection Molding, Sheet Metal...) mixed together.
   const calculatorIdsForGroup = useMemo(() => {
-    if (!selectedGroup || !allMappingsData?.mappings || !calculatorsData?.calculators) return null;
+    if (!selectedGroup || !catalogData || !calculatorsData?.calculators) return null;
     const ids = new Set<string>();
-    for (const mapping of allMappingsData.mappings) {
+    for (const mapping of activeMappings) {
       if (mapping.processGroup !== selectedGroup) continue;
       if (mapping.calculatorId) {
         ids.add(mapping.calculatorId);
@@ -854,7 +882,7 @@ export function ProcessCostDialog({
       }
     }
     return ids;
-  }, [selectedGroup, allMappingsData, calculatorsData]);
+  }, [selectedGroup, catalogData, activeMappings, calculatorsData]);
 
   const calculatorsForDropdown = useMemo(() => {
     const all = calculatorsData?.calculators ?? [];
@@ -953,8 +981,8 @@ export function ProcessCostDialog({
     let derived: { processGroup?: string; category?: string };
     if (savedMHRId) {
       if (!savedMHRRecord) return;
-      const g = effectiveProcessGroupOf(savedMHRRecord as any);
-      const c = mhrCategoryOf(savedMHRRecord as any);
+      const g = effectiveProcessGroupOf(savedMHRRecord);
+      const c = mhrCategoryOf(savedMHRRecord);
       derived = { ...(g !== '-' ? { processGroup: g } : {}), ...(c !== '-' ? { category: c } : {}) };
     } else {
       if (isLoadingMHR) return;
@@ -974,10 +1002,10 @@ export function ProcessCostDialog({
   useEffect(() => {
     if (!open) { backfilledOperationRef.current = false; return; }
     if (backfilledOperationRef.current) return;
-    if (!savedLiveOperation || selectedOperation) return;
+    if (!savedLiveOperation || selectedOperation || !savedOperationApplies) return;
     setSelectedOperation(savedLiveOperation);
     backfilledOperationRef.current = true;
-  }, [open, savedLiveOperation, selectedOperation]);
+  }, [open, savedLiveOperation, selectedOperation, savedOperationApplies]);
 
   // Auto-select the machine the COST ENGINE selected for this category's live
   // line (machineSelection.balanced) — never simply the first row of the list,
@@ -1081,6 +1109,30 @@ export function ProcessCostDialog({
     setCalculatorTarget(null);
   };
 
+  // Inputs that belong to the selected MACHINE rather than to the part —
+  // cleared and re-derived whenever the machine changes.
+  const MACHINE_FIELD_NAMES = ['Selected Tonnage', 'Machine Name', 'Laser Machine Power', 'Cutting Speed', 'Piercing Time Per Start'];
+  const isMachineDependentField = (fieldName: string) =>
+    MACHINE_FIELD_NAMES.includes(fieldName) ||
+    (selectedCalculator?.fields ?? []).some(
+      (f: CalculatorField) => f.fieldName === fieldName && f.dataSource === SM_LOOKUP_DATA_SOURCE && f.sourceField === 'manual_stroke',
+    );
+
+  const strokeComplexity = (inputs: Record<string, any>) =>
+    strokeComplexityOf(inputs.Complexity, bomItemData?.complexity);
+
+  // Time Per Stroke for the selected press brake, from the SAME backend
+  // resolver the cost engine uses (see describeStrokeLookup).
+  const lookupManualStroke = async (thickness: number, tonnage: number, complexity: 'simple' | 'complex') => {
+    const lookup = await calculatorsApi.sheetMetalLookup('manual_stroke', {
+      thickness_mm: thickness,
+      tonnage,
+      complexity,
+      ...(selectedMHR?.machineName ? { machine_name: selectedMHR.machineName } : {}),
+    });
+    return describeStrokeLookup(lookup, { thicknessMm: thickness, tonnage, complexity, machineName: selectedMHR?.machineName ?? null });
+  };
+
   const handleExecuteCalculator = async () => {
     if (!selectedCalculatorId) return;
     setCalculatorError(null);
@@ -1104,7 +1156,7 @@ export function ProcessCostDialog({
       // sheet_metal_lookup fields (stroke_rate, laser_cut, etc.) need different
       // resolution params and aren't handled by this pass.
       const lookupField = selectedCalculator?.fields?.find(
-        (f: any) => f.dataSource === SM_LOOKUP_DATA_SOURCE && f.sourceField === 'manual_stroke' && !calculatorInputs[f.fieldName]
+        (f: CalculatorField) => f.dataSource === SM_LOOKUP_DATA_SOURCE && f.sourceField === 'manual_stroke' && !calculatorInputs[f.fieldName]
       );
 
       // Same reasoning, for Stamping/Drawing-Forming's "Tool Loading Time":
@@ -1114,11 +1166,11 @@ export function ProcessCostDialog({
       // resolves upfront in autoPopulateFromBOM, so by the time this runs its
       // input is already filled and this correctly finds nothing to do there.
       const toolSetupField = selectedCalculator?.fields?.find(
-        (f: any) => f.dataSource === SM_LOOKUP_DATA_SOURCE && f.sourceField === 'tool_setup' && !calculatorInputs[f.fieldName]
+        (f: CalculatorField) => f.dataSource === SM_LOOKUP_DATA_SOURCE && f.sourceField === 'tool_setup' && !calculatorInputs[f.fieldName]
       );
 
       if (lookupField || toolSetupField) {
-        const thickness = parseFloat(calculatorInputs['Thickness']);
+        const thickness = parseFloat(calculatorInputs.Thickness);
         // sm_lookup_manual_stroke/tool_setup are keyed by a real MACHINE's
         // tonnage class, not by this bend's own theoretical minimum required
         // force ('Total Tonnage' — often well under 10T, which no real
@@ -1129,23 +1181,25 @@ export function ProcessCostDialog({
         // server-side; fall back to the theoretical requirement only when no
         // machine is selected.
         const selectedTonnage = Number(calculatorInputs['Selected Tonnage']);
-        const requiredTonnage = Number(result.results?.['Total Tonnage']);
+        const requiredTonnage = Number(result.results?.['Recommended Force']);
         const tonnage = selectedTonnage > 0 ? selectedTonnage : requiredTonnage;
-        const complexity = String(calculatorInputs['Complexity'] || 'Simple').toLowerCase();
-        let updatedInputs = { ...calculatorInputs };
+        const complexity = strokeComplexity(calculatorInputs);
+        const updatedInputs = { ...calculatorInputs };
         let changed = false;
 
         if (lookupField && thickness > 0 && tonnage > 0) {
-          const lookupTable = `sm_lookup_${lookupField.sourceField || 'manual_stroke'}`;
-          const lookup = await calculatorsApi.sheetMetalLookup(
-            lookupField.sourceField || 'manual_stroke',
-            { thickness_mm: thickness, tonnage, complexity },
-          );
-          if (typeof lookup?.value === 'number') {
-            updatedInputs[lookupField.fieldName] = lookup.value;
+          const lookupTable = 'sm_lookup_manual_stroke';
+          const stroke = await lookupManualStroke(thickness, tonnage, complexity);
+          if (stroke) {
+            updatedInputs[lookupField.fieldName] = stroke.value;
             changed = true;
-            const rowCols = extractRowColumns((lookup as any).row);
-            if (rowCols) setCalculatorMatchedRowKeys((prev) => ({ ...prev, [lookupField.fieldName]: rowCols }));
+            setCalculatorInputProvenance((prev) => ({ ...prev, [lookupField.fieldName]: stroke.provenance }));
+            setCalculatorMatchedRowKeys((prev) => {
+              const next = { ...prev };
+              if (stroke.matchedRows) next[lookupField.fieldName] = stroke.matchedRows;
+              else delete next[lookupField.fieldName];
+              return next;
+            });
           } else {
             // Manufacturing Physics Calculator architecture: no seeded row for
             // these real inputs — report the gap plainly (table + the exact
@@ -1200,11 +1254,11 @@ export function ProcessCostDialog({
   // migration 804) — their inputs come from the machining engine / database.
   const machiningCalculatorIds = useMemo(() => {
     const ids = new Set<string>();
-    for (const m of (allMappingsData?.mappings ?? []) as any[]) {
+    for (const m of activeMappings as any[]) {
       if (m.processGroup === 'Machining' && m.calculatorId) ids.add(m.calculatorId);
     }
     return ids;
-  }, [allMappingsData]);
+  }, [activeMappings]);
 
   // Every input of a machining calculator for this part, from the database:
   // the part's CAD measurements (or the keys the engineer typed) and each
@@ -1228,9 +1282,9 @@ export function ProcessCostDialog({
       });
       if (!d || selectedCalculatorIdRef.current !== calculatorId) return;
       const lookupFields = new Set(
-        ((selectedCalculator as any)?.fields ?? [])
-          .filter((f: any) => f.dataSource === MACHINING_LOOKUP_DATA_SOURCE)
-          .map((f: any) => f.fieldName as string),
+        (selectedCalculator?.fields ?? [])
+          .filter((f: CalculatorField) => f.dataSource === MACHINING_LOOKUP_DATA_SOURCE)
+          .map((f: CalculatorField) => f.fieldName as string),
       );
       const pick = <T,>(rec: Record<string, T>) =>
         onlyLookups ? Object.fromEntries(Object.entries(rec).filter(([f]) => lookupFields.has(f))) : rec;
@@ -1250,7 +1304,7 @@ export function ProcessCostDialog({
   // Diameter): re-resolve the lookup-table inputs from the database for it.
   const onMachiningKeyEdited = (fieldName: string) => {
     if (!selectedCalculatorId || !machiningCalculatorIds.has(selectedCalculatorId)) return;
-    const field = ((selectedCalculator as any)?.fields ?? []).find((f: any) => f.fieldName === fieldName);
+    const field = (selectedCalculator?.fields ?? []).find((f: CalculatorField) => f.fieldName === fieldName);
     if (!field || field.dataSource === MACHINING_LOOKUP_DATA_SOURCE) return;
     machiningEditedRef.current.add(fieldName);
     setCalculatorInputProvenance((prev) => ({ ...prev, [fieldName]: 'Entered in the calculator' }));
@@ -1283,13 +1337,17 @@ export function ProcessCostDialog({
         ? Object.fromEntries(Object.entries(seed.lookupMatches).map(([f, m]) => [f, m.row]))
         : {});
       setMachiningMissing([]);
-      const fields: any[] = (selectedCalculator as any)?.fields ?? [];
+      const fields: any[] = selectedCalculator?.fields ?? [];
       const unfilled = fields.some((f) => f.fieldType !== 'calculated' && !(seed && f.fieldName in seed.inputs)
         && (f.defaultValue == null || f.defaultValue === ''));
       if (!seed || unfilled) await resolveMachiningInputs(selectedCalculatorId, {}, !!seed);
       return;
     }
 
+    // The real longest bend line when the analysis has per-bend lengths; the
+    // flat-pattern dimension only as a labelled proxy when it does not.
+    const realBendLineMm = longestBendLineMm(bomItemData?.featureGraph);
+    const bendLineLengthMm = realBendLineMm ?? Math.max(bomItemData.maxLength || 0, bomItemData.maxWidth || 0);
     const bomFieldMapping: Record<string, any> = {
       // Weight mappings
       'weight': bomItemData.weight || bomItemData.unitWeight,
@@ -1339,15 +1397,13 @@ export function ProcessCostDialog({
       'No Of Bends': bomItemData.bendCount,
       'Thickness': bomItemData.sheetThicknessMm,
       'Thickness (mm)': bomItemData.sheetThicknessMm,
-      // Longest flat-pattern edge as a bend-line proxy — the SAME conservative
-      // approximation (real per-bend lengths aren't tracked in the feature
-      // graph yet) already used server-side for press-brake tonnage/capability
-      // checks (bom-items.service.ts's capabilityGeometry.bendLengthMm and its
-      // machine-selection requirement), not a new/independent guess.
-      ...(bomItemData.bendCount > 0 && (bomItemData.maxLength || bomItemData.maxWidth)
+      // Longest real bend line (flat-pattern edge only as a labelled proxy when the
+      // analysis has no per-bend lengths), the same value press-brake tonnage and
+      // machine selection use server-side.
+      ...(bomItemData.bendCount > 0 && (realBendLineMm ?? (bomItemData.maxLength || bomItemData.maxWidth))
         ? {
-            'Bending Line Length': Math.max(bomItemData.maxLength || 0, bomItemData.maxWidth || 0),
-            'Bending Line Length (mm)': Math.max(bomItemData.maxLength || 0, bomItemData.maxWidth || 0),
+            'Bending Line Length': bendLineLengthMm,
+            'Bending Line Length (mm)': bendLineLengthMm,
           }
         : {}),
       // V-die shoulder/opening width = 8 × sheet thickness — the same industry
@@ -1379,7 +1435,7 @@ export function ProcessCostDialog({
       // not re-derived or re-guessed here. Absent entirely for any other
       // process type, so this is a no-op everywhere else.
       ...(Array.isArray(editData?.featureBreakdown) ? (() => {
-        const fb = editData.featureBreakdown as Array<{ name: string; timeSec: number; featureType: string; count: number }>;
+        const fb = editData.featureBreakdown as { name: string; timeSec: number; featureType: string; count: number }[];
         const byType = (t: string) => fb.find((f) => f.featureType === t);
         const methodEntry = fb.find((f) => f.featureType === 'inspection_method');
         const hole = byType('hole');
@@ -1415,7 +1471,7 @@ export function ProcessCostDialog({
       // still reproduces the real total seconds; provenance says so explicitly
       // rather than implying a single uniform spec.
       ...(Array.isArray(editData?.featureBreakdown) ? (() => {
-        const pemRows = (editData.featureBreakdown as Array<{ name: string; timeSec: number; featureType: string; count: number }>)
+        const pemRows = (editData.featureBreakdown as { name: string; timeSec: number; featureType: string; count: number }[])
           .filter((f) => f.featureType === 'pem_insertion');
         if (pemRows.length === 0) return {};
         const totalCount = pemRows.reduce((s, r) => s + r.count, 0);
@@ -1441,8 +1497,12 @@ export function ProcessCostDialog({
       'Cutting Length': 'CAD feature extraction — total cut path length', 'Length Of Cut (mm)': 'CAD feature extraction — total cut path length', 'Length Of Cut': 'CAD feature extraction — total cut path length',
       'No Of Starts': 'CAD feature extraction — pierce/start count', 'No Of Bends': 'CAD feature extraction — bend count',
       'Thickness': 'BOM sheet thickness', 'Thickness (mm)': 'BOM sheet thickness',
-      'Bending Line Length': 'CAD/BOM part geometry — longest flat-pattern edge (bend-line proxy, same value machine selection already uses)',
-      'Bending Line Length (mm)': 'CAD/BOM part geometry — longest flat-pattern edge (bend-line proxy, same value machine selection already uses)',
+      'Bending Line Length': realBendLineMm != null
+        ? 'CAD feature extraction — longest bend line'
+        : 'CAD/BOM part geometry — longest flat-pattern edge (bend-line proxy: this analysis has no per-bend lengths)',
+      'Bending Line Length (mm)': realBendLineMm != null
+        ? 'CAD feature extraction — longest bend line'
+        : 'CAD/BOM part geometry — longest flat-pattern edge (bend-line proxy: this analysis has no per-bend lengths)',
       'Shoulder Width': 'V-die opening = 8 × sheet thickness (same rule of thumb machine selection already uses)',
       'Shoulder Width (mm)': 'V-die opening = 8 × sheet thickness (same rule of thumb machine selection already uses)',
       'Lot Size': 'Batch Size entered above in this process cost form',
@@ -1483,7 +1543,7 @@ export function ProcessCostDialog({
       'Dimension Check Time': 'Inspection Engine — Feature breakdown panel',
       ...(() => {
         const pemRows = Array.isArray(editData?.featureBreakdown)
-          ? (editData.featureBreakdown as Array<{ name: string; timeSec: number; featureType: string; count: number }>)
+          ? (editData.featureBreakdown as { name: string; timeSec: number; featureType: string; count: number }[])
               .filter((f) => f.featureType === 'pem_insertion')
           : [];
         if (pemRows.length === 0) return {};
@@ -1501,10 +1561,10 @@ export function ProcessCostDialog({
     const newProvenance: Record<string, string> = { ...calculatorInputProvenanceRef.current };
 
     selectedCalculator.fields
-      ?.filter((field: any) => field.fieldType !== 'calculated')
-      .forEach((field: any) => {
+      ?.filter((field: CalculatorField) => field.fieldType !== 'calculated')
+      .forEach((field: CalculatorField) => {
         const fieldName = field.fieldName;
-        const displayName = field.displayLabel || field.displayName;
+        const displayName = field.displayLabel;
 
         // Try to match by field name or display name
         const bomValue = bomFieldMapping[fieldName] || bomFieldMapping[displayName];
@@ -1525,6 +1585,23 @@ export function ProcessCostDialog({
         }
       });
 
+    // The cost engine's own inputs for this calculator on this part (UTS,
+    // thickness, bend length, lookup values — each with its source) win over
+    // the generic BOM mapping above: they are what the quote used. Fields that
+    // depend on the MACHINE are left out — they are re-derived below for
+    // whichever machine is selected in this dialog, so changing the machine
+    // changes them.
+    const engineSeed = engineSeedRef.current?.calculatorId === selectedCalculatorId
+      ? engineSeedRef.current
+      : engineSeedsRef.current[selectedCalculatorId] ?? null;
+    if (engineSeed) {
+      for (const [fieldName, value] of Object.entries(engineSeed.inputs)) {
+        if (isMachineDependentField(fieldName)) continue;
+        newInputs[fieldName] = value;
+        newProvenance[fieldName] = engineSeed.provenance[fieldName] ?? 'Cost engine input for this part';
+      }
+    }
+
     setCalculatorInputs(newInputs);
     setCalculatorInputProvenance(newProvenance);
 
@@ -1538,8 +1615,8 @@ export function ProcessCostDialog({
     // as blank — must count as "still needs a value" here, or it silently never gets
     // auto-filled even after a real lookup value becomes available.
     const isBlank = (v: any) => v === undefined || v === null || v === '';
-    const cuttingSpeedField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'Cutting Speed');
-    const pierceTimeField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'Piercing Time Per Start');
+    const cuttingSpeedField = selectedCalculator.fields?.find((f: CalculatorField) => f.fieldName === 'Cutting Speed');
+    const pierceTimeField = selectedCalculator.fields?.find((f: CalculatorField) => f.fieldName === 'Piercing Time Per Start');
     const needsCuttingSpeed = cuttingSpeedField && isBlank(newInputs['Cutting Speed']);
     const needsPierceTime = pierceTimeField && isBlank(newInputs['Piercing Time Per Start']);
     if (needsCuttingSpeed || needsPierceTime) {
@@ -1605,13 +1682,13 @@ export function ProcessCostDialog({
       const parseWattageField = (raw: unknown): number | null => {
         if (typeof raw === 'number' && raw > 0) return raw;
         if (typeof raw !== 'string') return null;
-        const kw = raw.match(/(\d+(?:\.\d+)?)\s*k\s*w/i);
+        const kw = /(\d+(?:\.\d+)?)\s*k\s*w/i.exec(raw);
         if (kw?.[1]) return parseFloat(kw[1]) * 1000;
-        const w = raw.match(/(\d+(?:\.\d+)?)/);
+        const w = /(\d+(?:\.\d+)?)/.exec(raw);
         return w?.[1] ? parseFloat(w[1]) : null;
       };
-      const laserPowerW = (typeof (selectedMHR as any)?.powerKw === 'number' && (selectedMHR as any).powerKw > 0)
-        ? (selectedMHR as any).powerKw * 1000
+      const laserPowerW = (typeof (selectedMHR)?.powerKw === 'number' && (selectedMHR).powerKw > 0)
+        ? (selectedMHR).powerKw * 1000
         : parseWattageField(newInputs['Laser Machine Power']);
 
       if (grade && thickness > 0 && laserPowerW) {
@@ -1680,8 +1757,8 @@ export function ProcessCostDialog({
     // same /raw-materials search endpoint the Cost Guide panel already uses —
     // and read its real ultimate_tensile_strength (backfilled Aug 2026 into
     // uts_mpa too; both columns now agree wherever populated).
-    const utsField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'UTS');
-    if (utsField && isBlank(newInputs['UTS'])) {
+    const utsField = selectedCalculator.fields?.find((f: CalculatorField) => f.fieldName === 'UTS');
+    if (utsField && isBlank(newInputs.UTS)) {
       const grade = bomItemData.materialGrade || bomItemData.material;
       if (grade) {
         try {
@@ -1691,7 +1768,7 @@ export function ProcessCostDialog({
           const match = res?.items?.[0];
           const uts = match?.utsMpa ?? match?.ultimateTensileStrength;
           if (typeof uts === 'number' && uts > 0) {
-            setCalculatorInputs((prev) => (isBlank(prev['UTS']) ? { ...prev, UTS: uts } : prev));
+            setCalculatorInputs((prev) => (isBlank(prev.UTS) ? { ...prev, UTS: uts } : prev));
             setCalculatorInputProvenance((prev) => ({
               ...prev,
               UTS: `raw_materials — "${match.material}" ultimate tensile strength`,
@@ -1708,7 +1785,7 @@ export function ProcessCostDialog({
     // fields with no resolution mechanism anywhere. Field name varies by
     // calculator ("Shear Strength" on Stamping, "Shear Strength (Mpa)" on TPP).
     const shearField = selectedCalculator.fields?.find(
-      (f: any) => f.fieldName === 'Shear Strength' || f.fieldName === 'Shear Strength (Mpa)'
+      (f: CalculatorField) => f.fieldName === 'Shear Strength' || f.fieldName === 'Shear Strength (Mpa)'
     );
     if (shearField && isBlank(newInputs[shearField.fieldName])) {
       const grade = bomItemData.materialGrade || bomItemData.material;
@@ -1730,7 +1807,7 @@ export function ProcessCostDialog({
       }
     }
 
-    const yieldField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'Yield Strength');
+    const yieldField = selectedCalculator.fields?.find((f: CalculatorField) => f.fieldName === 'Yield Strength');
     if (yieldField && isBlank(newInputs['Yield Strength'])) {
       const grade = bomItemData.materialGrade || bomItemData.material;
       if (grade) {
@@ -1758,8 +1835,8 @@ export function ProcessCostDialog({
     // data_source tag at all (pure manual entry) despite the real table
     // existing and already being bridged for the eye icon.
     if (selectedMachineClass === 'roll_forming') {
-      const lineSpeedField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'Line Speed');
-      const rollSetupField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'Setup Time');
+      const lineSpeedField = selectedCalculator.fields?.find((f: CalculatorField) => f.fieldName === 'Line Speed');
+      const rollSetupField = selectedCalculator.fields?.find((f: CalculatorField) => f.fieldName === 'Setup Time');
       if ((lineSpeedField && isBlank(newInputs['Line Speed'])) || (rollSetupField && isBlank(newInputs['Setup Time']))) {
         try {
           const lookup = await calculatorsApi.sheetMetalLookup('roll_forming', {});
@@ -1784,7 +1861,7 @@ export function ProcessCostDialog({
     // Cutting/Drawing-Forming: "Sheet Loading Time"; Stamping: "Total Coil
     // Loading Time"; TPP: "Total Sheet Loading Unloading (min)").
     const sheetLoadingField = selectedCalculator.fields?.find(
-      (f: any) => f.fieldName === 'Sheet Loading Time'
+      (f: CalculatorField) => f.fieldName === 'Sheet Loading Time'
         || f.fieldName === 'Total Coil Loading Time'
         || f.fieldName === 'Total Sheet Loading Unloading (min)'
     );
@@ -1809,7 +1886,7 @@ export function ProcessCostDialog({
     // level, so this defaults to Level I (lowest/simplest) — the safe,
     // documented default rather than guessing Medium/High, same reasoning as
     // "Simple" for Time Per Stroke's complexity default above.
-    const samplingField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'Sampling Rate');
+    const samplingField = selectedCalculator.fields?.find((f: CalculatorField) => f.fieldName === 'Sampling Rate');
     if (samplingField && isBlank(newInputs['Sampling Rate'])) {
       const lotSize = Number(newInputs['Lot Size'] || batchSize || 0);
       if (lotSize > 0) {
@@ -1839,22 +1916,22 @@ export function ProcessCostDialog({
     //   Feed per Rev — for rigid tapping, feed/rev IS the thread pitch by
     //     definition (0.5mm for M3x0.5).
     if (selectedCalculatorId === tappingCalculatorId) {
-      const thread = ((bomItemData.drawingIntelligence as any)?.threads as Array<{ size: string; pitch: number; count?: number }> | undefined)?.[0];
+      const thread = ((bomItemData.drawingIntelligence)?.threads as { size: string; pitch: number; count?: number }[] | undefined)?.[0];
       const nominalDia = thread?.size ? parseFloat(thread.size.replace(/[^0-9.]/g, '')) : null;
 
-      const tapLengthField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'Length');
-      if (tapLengthField && isBlank(newInputs['Length']) && bomItemData.sheetThicknessMm > 0) {
-        setCalculatorInputs((prev) => (isBlank(prev['Length']) ? { ...prev, Length: bomItemData.sheetThicknessMm } : prev));
+      const tapLengthField = selectedCalculator.fields?.find((f: CalculatorField) => f.fieldName === 'Length');
+      if (tapLengthField && isBlank(newInputs.Length) && bomItemData.sheetThicknessMm > 0) {
+        setCalculatorInputs((prev) => (isBlank(prev.Length) ? { ...prev, Length: bomItemData.sheetThicknessMm } : prev));
         setCalculatorInputProvenance((prev) => ({ ...prev, Length: 'BOM sheet thickness (tap engagement depth)' }));
       }
 
-      const tapDiaField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'Tap Diameter');
+      const tapDiaField = selectedCalculator.fields?.find((f: CalculatorField) => f.fieldName === 'Tap Diameter');
       if (tapDiaField && isBlank(newInputs['Tap Diameter']) && nominalDia) {
         setCalculatorInputs((prev) => (isBlank(prev['Tap Diameter']) ? { ...prev, 'Tap Diameter': nominalDia } : prev));
         setCalculatorInputProvenance((prev) => ({ ...prev, 'Tap Diameter': `Nominal major diameter of "${thread!.size}" thread (drawing callout)` }));
       }
 
-      const feedField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'Feed per Rev');
+      const feedField = selectedCalculator.fields?.find((f: CalculatorField) => f.fieldName === 'Feed per Rev');
       if (feedField && isBlank(newInputs['Feed per Rev']) && thread?.pitch) {
         setCalculatorInputs((prev) => (isBlank(prev['Feed per Rev']) ? { ...prev, 'Feed per Rev': thread.pitch } : prev));
         setCalculatorInputProvenance((prev) => ({
@@ -1873,7 +1950,7 @@ export function ProcessCostDialog({
       // file's own classifySubstrate-equivalent keyword taxonomy (see
       // page.tsx's classifySubstrate / backend's classifyMaterialFamily) —
       // keep the keyword lists in sync across all three.
-      const cuttingSpeedField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'Cutting Speed');
+      const cuttingSpeedField = selectedCalculator.fields?.find((f: CalculatorField) => f.fieldName === 'Cutting Speed');
       if (cuttingSpeedField && isBlank(newInputs['Cutting Speed'])) {
         const gradeText = (bomItemData.materialGrade || bomItemData.material || '').toString().toUpperCase();
         let materialFamily: 'aluminum' | 'stainless' | 'carbon_steel' | 'unknown' = 'unknown';
@@ -1905,12 +1982,12 @@ export function ProcessCostDialog({
 
       // No of Uses defaults to 1 (one tap) — override with the drawing's
       // actual tapped-hole count so Total Time reflects every hole, not just one.
-      const noOfUsesField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'No of Uses');
+      const noOfUsesField = selectedCalculator.fields?.find((f: CalculatorField) => f.fieldName === 'No of Uses');
       if (noOfUsesField && thread?.count && Number(newInputs['No of Uses']) === 1) {
         setCalculatorInputs((prev) => (Number(prev['No of Uses']) === 1 ? { ...prev, 'No of Uses': thread.count } : prev));
         setCalculatorInputProvenance((prev) => ({
           ...prev,
-          'No of Uses': `Thread callout count (${thread!.count} × "${thread!.size}" holes on drawing)`,
+          'No of Uses': `Thread callout count (${thread.count ?? '?'} × "${thread.size ?? '?'}" holes on drawing)`,
         }));
       }
     }
@@ -1925,7 +2002,7 @@ export function ProcessCostDialog({
     // CALCULATED result, not known until after execute() runs once, so that
     // variant is resolved in handleExecuteCalculator's post-execute chain
     // (alongside Time Per Stroke) instead of here.
-    const toolLoadingField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'Tool Loading Time');
+    const toolLoadingField = selectedCalculator.fields?.find((f: CalculatorField) => f.fieldName === 'Tool Loading Time');
     if (
       toolLoadingField && isBlank(newInputs['Tool Loading Time']) && bomItemData.bendCount > 0 &&
       selectedCalculatorId === bendingCalculatorId
@@ -1951,7 +2028,7 @@ export function ProcessCostDialog({
     // values ("Trulaser", "6000 W") that never matched the actually selected
     // machine and don't feed any formula (purely informational). Show the real
     // selected machine instead of a generic placeholder.
-    const machineNameField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'Machine Name');
+    const machineNameField = selectedCalculator.fields?.find((f: CalculatorField) => f.fieldName === 'Machine Name');
     if (machineNameField && isBlank(newInputs['Machine Name']) && selectedMHR?.machineName) {
       setCalculatorInputs((prev) => ({ ...prev, 'Machine Name': selectedMHR.machineName }));
       setCalculatorInputProvenance((prev) => ({ ...prev, 'Machine Name': 'Currently selected machine for this process (Resources & Location above)' }));
@@ -1964,7 +2041,7 @@ export function ProcessCostDialog({
     // capacity stated plainly in the machine's own name — the same fallback
     // machine-selection/selector.ts's own parseTonnageFromName already uses
     // server-side for this exact reason.
-    const selectedTonnageField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'Selected Tonnage');
+    const selectedTonnageField = selectedCalculator.fields?.find((f: CalculatorField) => f.fieldName === 'Selected Tonnage');
     if (selectedTonnageField && isBlank(newInputs['Selected Tonnage'])) {
       const tonnage = selectedMHR?.maxTonnage ?? parseTonnageFromMachineName(selectedMHR?.machineName);
       if (tonnage) {
@@ -1987,9 +2064,9 @@ export function ProcessCostDialog({
     // fix for the real cost engine's own laser-power resolution. A blank
     // field now correctly means "no verified capability on file — enter the
     // real value," never a guess dressed up as resolved data.
-    const laserMachinePowerField = selectedCalculator.fields?.find((f: any) => f.fieldName === 'Laser Machine Power');
+    const laserMachinePowerField = selectedCalculator.fields?.find((f: CalculatorField) => f.fieldName === 'Laser Machine Power');
     if (laserMachinePowerField && isBlank(newInputs['Laser Machine Power'])) {
-      const powerKw = (selectedMHR as any)?.powerKw;
+      const powerKw = (selectedMHR)?.powerKw;
       if (typeof powerKw === 'number' && powerKw > 0) {
         const powerW = powerKw * 1000;
         setCalculatorInputs((prev) => (isBlank(prev['Laser Machine Power']) ? { ...prev, 'Laser Machine Power': `${powerW} W` } : prev));
@@ -1999,12 +2076,89 @@ export function ProcessCostDialog({
         }));
       }
     }
+
+    // Time Per Stroke when the popup opens (and after a machine change), not
+    // only after Execute: it needs just the thickness and the selected
+    // machine's rated tonnage, both known here.
+    const strokeField = selectedCalculator.fields?.find(
+      (f: CalculatorField) => f.dataSource === SM_LOOKUP_DATA_SOURCE && f.sourceField === 'manual_stroke',
+    );
+    if (strokeField && isBlank(calculatorInputsRef.current[strokeField.fieldName])) {
+      const thickness = Number(newInputs.Thickness);
+      const tonnage = Number(selectedMHR?.maxTonnage ?? parseTonnageFromMachineName(selectedMHR?.machineName));
+      if (thickness > 0 && tonnage > 0) {
+        try {
+          const stroke = await lookupManualStroke(thickness, tonnage, strokeComplexity(newInputs));
+          if (stroke) {
+            setCalculatorInputs((prev) => (isBlank(prev[strokeField.fieldName]) ? { ...prev, [strokeField.fieldName]: stroke.value } : prev));
+            setCalculatorInputProvenance((prev) => ({ ...prev, [strokeField.fieldName]: stroke.provenance }));
+            if (stroke.matchedRows) setCalculatorMatchedRowKeys((prev) => ({ ...prev, [strokeField.fieldName]: stroke.matchedRows! }));
+          }
+        } catch {
+          // No match / lookup failed — Execute reports the gap.
+        }
+      }
+    }
+
+    setAutoRunPending(true);
   };
+
+  // Run the calculator once its inputs are filled, so Recommended Force
+  // (required tonnage) and Cycle Time show without pressing Execute, and
+  // update after a machine change. Read-only on the server; called through
+  // the API directly so an incomplete calculator shows no error toast — the
+  // engineer still gets the full error from Execute.
+  const [autoRunPending, setAutoRunPending] = useState(false);
+  useEffect(() => {
+    if (!autoRunPending || !selectedCalculatorId) return;
+    setAutoRunPending(false);
+    const calculatorId = selectedCalculatorId;
+    calculatorsApi.execute({ calculatorId, inputValues: calculatorInputs })
+      .then((r: any) => {
+        if (r?.success && selectedCalculatorIdRef.current === calculatorId) setCalculatorResults(r.results);
+      })
+      .catch(() => {
+        // Silent by design: an incomplete calculator just shows no results;
+        // Execute reports the full error.
+      });
+  }, [autoRunPending, calculatorInputs, selectedCalculatorId]);
+
+  // Machine changed in this dialog: drop every input that belongs to the old
+  // machine (rated tonnage, name, power, stroke time) and re-derive them for
+  // the new one, then re-run — the cycle time follows the machine.
+  // Keyed on the LOADED machine, not the picked id: the full row arrives one
+  // request after the pick, and re-deriving before it lands reads nothing.
+  const loadedMHRId = selectedMHR ? String(selectedMHR.id) : '';
+  const lastMHRIdRef = useRef(loadedMHRId);
+  useEffect(() => {
+    if (!loadedMHRId) return; // still loading the picked machine
+    const previous = lastMHRIdRef.current;
+    if (previous === loadedMHRId) return;
+    lastMHRIdRef.current = loadedMHRId;
+    if (!selectedCalculator || !bomItemData || machiningCalculatorIds.has(selectedCalculatorId)) return;
+    // The saved machine arriving on open is not a change: only fill the
+    // machine fields still blank (auto-fill never overwrites a value).
+    if (!previous) {
+      void autoPopulateFromBOM();
+      return;
+    }
+    const keep = (rec: Record<string, any>) =>
+      Object.fromEntries(Object.entries(rec).filter(([f]) => !isMachineDependentField(f)));
+    // Drop only the machine fields: functional updates, so a value filled a
+    // moment ago (e.g. UTS) is never overwritten by an older snapshot.
+    calculatorInputsRef.current = keep(calculatorInputsRef.current);
+    calculatorInputProvenanceRef.current = keep(calculatorInputProvenanceRef.current);
+    setCalculatorInputs((prev) => keep(prev));
+    setCalculatorInputProvenance((prev) => keep(prev));
+    setCalculatorMatchedRowKeys((prev) => keep(prev));
+    setCalculatorResults(null);
+    void autoPopulateFromBOM();
+  }, [loadedMHRId]);
 
   // Auto-populate when calculator or BOM data changes
   useEffect(() => {
     if (selectedCalculator && bomItemData) {
-      autoPopulateFromBOM();
+      void autoPopulateFromBOM();
     }
   }, [selectedCalculator?.id, bomItemData?.id, calculatorTarget]);
 
@@ -2012,7 +2166,7 @@ export function ProcessCostDialog({
   useEffect(() => {
     if (open && selectedCalculatorId && bomItemData) {
       // Small delay to ensure calculator data is loaded
-      setTimeout(autoPopulateFromBOM, 100);
+      setTimeout(() => { void autoPopulateFromBOM(); }, 100);
     }
   }, [open, selectedCalculatorId, bomItemData?.id]);
 
@@ -2027,8 +2181,10 @@ export function ProcessCostDialog({
   }, [showLookupTable, lookupTableData]);
 
   // Handle viewing lookup table
-  const handleViewLookupTable = async (field: any) => {
+  const handleViewLookupTable = async (field: CalculatorField) => {
     setSelectedLookupField(field);
+    // one panel slot: the evidence window yields to the reference table
+    onShowEvidence?.(null);
 
     try {
       const { processesApi } = await import('@/lib/api/processes');
@@ -2042,8 +2198,9 @@ export function ProcessCostDialog({
         const rows = (table.rows ?? []) as any[];
         const recorded = calculatorMatchedRowKeys[field.fieldName] ?? null;
         const current = Number(calculatorInputs[field.fieldName]);
-        const valueMatch = field.sourceField && Number.isFinite(current)
-          ? rows.find((r) => Math.abs(Number(r[field.sourceField]) - current) < 1e-6)
+        const sourceField = field.sourceField;
+        const valueMatch = sourceField && Number.isFinite(current)
+          ? rows.find((r) => Math.abs(Number(r[sourceField]) - current) < 1e-6)
           : null;
         setLookupTableData({
           fieldName: field.fieldName,
@@ -2067,10 +2224,11 @@ export function ProcessCostDialog({
       // 'tool_setup') — the ad-hoc resolver above returns the real, FULL
       // table name directly instead (needed for inspection_operation_defaults/
       // surface_treatment_rates, which don't follow the sm_lookup_ convention).
-      const isAdHoc = !(field.dataSource === SM_LOOKUP_DATA_SOURCE && field.sourceField);
-      const smLookupTableName = isAdHoc
-        ? resolveAdHocLookupTableKey(field.fieldName, selectedMachineClass)
-        : `sm_lookup_${field.sourceField}`;
+      const smSourceField = field.dataSource === SM_LOOKUP_DATA_SOURCE ? field.sourceField : undefined;
+      const isAdHoc = !smSourceField;
+      const smLookupTableName = smSourceField
+        ? `sm_lookup_${smSourceField}`
+        : resolveAdHocLookupTableKey(field.fieldName, selectedMachineClass);
       if (smLookupTableName) {
         const table = await processesApi.getSmLookupTableByName(smLookupTableName);
         if (table) {
@@ -2435,6 +2593,16 @@ export function ProcessCostDialog({
       setSubmitError('Please select an Operation (3) — sourced from this part\'s real CAD feature extraction');
       return;
     }
+    // Machineless legacy lines (Raw Material, Packing & Delivery, General)
+    // keep what they were saved with; every machine line takes the route and
+    // operation of its machine class (lib/processCatalog/line-identity.ts).
+    const identity = isNonMachineOperation
+      ? { ok: true as const, processRoute: savedProcessRoute, operation: selectedOperation || savedOperation }
+      : lineIdentity;
+    if (!identity.ok) {
+      setSubmitError(identity.reason);
+      return;
+    }
     setSubmitError(null);
 
     onSubmit({
@@ -2449,8 +2617,9 @@ export function ProcessCostDialog({
       // liveProcessLines) — required and used when real options exist; the
       // pre-719 saved value is preserved only when this category has none
       // (never silently blanked).
-      processRoute: savedProcessRoute,
-      operation: selectedOperation || savedOperation,
+      // Route + operation follow the machine class (see identity above).
+      processRoute: identity.processRoute,
+      operation: identity.operation,
       processCalculatorId: selectedProcessCalculatorId,
       mhrId: toUUID(selectedMHRId),
       // Always explicit null: only real HR Rates machines can be selected, and
@@ -2514,7 +2683,13 @@ export function ProcessCostDialog({
           onOpenChange(openState);
         }}
       >
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden">
+        <DialogContent
+          className="max-w-3xl max-h-[90vh] overflow-hidden"
+          // Only the X / Cancel / Save close this form: a click or focus on the
+          // calculator, the reference/evidence windows or the page must not.
+          onInteractOutside={(e) => { e.preventDefault(); }}
+          onEscapeKeyDown={(e) => { e.preventDefault(); }}
+        >
           <DialogHeader>
             <DialogTitle className="text-primary">
               {editData
@@ -2699,18 +2874,17 @@ export function ProcessCostDialog({
                             .
                           </p>
                         )}
-                        {/* A pre-719 line still carries the Route/Operation it was created
-                            with. Shown read-only, because it is real saved data that is
-                            written back unchanged — hiding it would make a re-save look
-                            like it had silently dropped something. */}
-                        {(savedProcessRoute || savedOperation) && (
-                          <p className="text-xs text-muted-foreground">
-                            Originally configured as
-                            {savedProcessRoute ? <> route <span className="font-medium">{savedProcessRoute}</span></> : null}
-                            {savedProcessRoute && savedOperation ? ' /' : null}
-                            {savedOperation ? <> operation <span className="font-medium">{savedOperation}</span></> : null}
-                            {' '}— preserved on save, not editable here.
-                          </p>
+                        {/* What this line will be saved as — follows the machine class. */}
+                        {!isNonMachineOperation && selectedMachineClass && (
+                          lineIdentity.ok ? (
+                            <p className="text-xs text-muted-foreground">
+                              Saves as route <span className="font-medium">{lineIdentity.processRoute}</span> / operation{' '}
+                              <span className="font-medium">{lineIdentity.operation}</span>
+                              {lineIdentity.source === 'catalog' ? ' (process catalog for this machine class)' : ' (saved on this line)'}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-amber-600 dark:text-amber-500">{lineIdentity.reason}</p>
+                          )
                         )}
                       </div>
 
@@ -2722,6 +2896,7 @@ export function ProcessCostDialog({
                           operations right now (it is not the currently costed route for
                           this part) — not a data gap, so no generic fallback list is
                           substituted. Required whenever real options exist. */}
+                      {operationOptionsWithSaved.length > 0 ? (
                       <div className="space-y-2">
                         <Label className="font-semibold">
                           3. Operation
@@ -2755,19 +2930,14 @@ export function ProcessCostDialog({
                             </p>
                           );
                         })()}
-                        {selectedCategory && operationOptions.length === 0 && selectedOperation && (
-                          <p className="text-xs text-amber-600 dark:text-amber-500">
-                            &quot;{selectedOperation}&quot; is this line&apos;s saved operation — this part&apos;s current CAD feature
-                            extraction does not produce it for &quot;{selectedCategory}&quot; (not the currently costed route).
-                          </p>
-                        )}
-                        {selectedCategory && operationOptionsWithSaved.length === 0 && (
-                          <p className="text-xs text-amber-600 dark:text-amber-500">
-                            This part&apos;s real CAD feature extraction produced no operations for &quot;{selectedCategory}&quot; —
-                            it is not the currently costed route for this part.
-                          </p>
-                        )}
                       </div>
+                      ) : selectedCategory ? (
+                        // No CAD-detected operations for this category: no step to
+                        // fill in — the line takes its machine class's catalog operation.
+                        <p className="text-xs text-muted-foreground">
+                          No CAD-detected operations for &quot;{selectedCategory}&quot; on this part — the operation comes from the machine class (shown above).
+                        </p>
+                      ) : null}
                         </>
                     </CardContent>
                   </Card>
@@ -2802,9 +2972,9 @@ export function ProcessCostDialog({
                               <SelectValue placeholder="Select machine" />
                             </SelectTrigger>
                             <SelectContent>
-                              {filteredMHR.map((mhr: any) => (
+                              {filteredMHR.map((mhr) => (
                                 <SelectItem key={mhr.id} value={String(mhr.id)}>
-                                  {mhr.machineName} - ${resolveMhrUsdRate(mhr).toFixed(2)}/hr
+                                  {mhr.machineName} - ${machineListRateUsd(mhr).toFixed(2)}/hr
                                   {mhr.location ? ` (${mhr.location})` : ''}
                                 </SelectItem>
                               ))}
@@ -2815,7 +2985,7 @@ export function ProcessCostDialog({
                               category's real work center, not as a system fallback. */}
                           {selectedMHR && (
                             <p className="text-xs text-muted-foreground">
-                              Rate source: HR Rates — {mhrCategoryOf(selectedMHR as any)} · {selectedMHR.machineName}
+                              Rate source: HR Rates — {mhrCategoryOf(selectedMHR)} · {selectedMHR.machineName}
                               {selectedMHR.location ? ` (${selectedMHR.location})` : ''} · MHR ${resolveMhrUsdRate(selectedMHR).toFixed(2)}/hr
                             </p>
                           )}
@@ -2836,13 +3006,6 @@ export function ProcessCostDialog({
                           {effectiveMachineRate <= 0 && (
                             <p className="text-xs text-amber-600 dark:text-amber-500">
                               ⚠ No machine rate applied — cost cannot be calculated from machine time.
-                            </p>
-                          )}
-                          {mhrTruncated && (
-                            <p className="text-xs text-amber-600 dark:text-amber-500">
-                              ⚠ Showing the first {MHR_FETCH_LIMIT} of {mhrData?.total} HR Rates machines — this
-                              list may be incomplete. Narrow it down in HR Rates, or search there for the machine
-                              you need.
                             </p>
                           )}
                           </>
@@ -3116,7 +3279,7 @@ export function ProcessCostDialog({
                 <p className="text-xs text-destructive mt-2">⚠ {submitError}</p>
               )}
               <DialogFooter className="mt-6">
-                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                <Button type="button" variant="outline" onClick={() => { onOpenChange(false); }}>
                   Cancel
                 </Button>
                 <Button
@@ -3147,7 +3310,14 @@ export function ProcessCostDialog({
         
         setCalculatorOpen(open);
       }} modal={false}>
-        <SheetContent side="right" className="w-[600px] sm:w-[700px]" style={{ overflowY: 'auto' }}>
+        <SheetContent
+          side="right"
+          className="w-[600px] sm:w-[700px]"
+          style={{ overflowY: 'auto' }}
+          // Closes only through its own X, never from an outside click/focus/Esc.
+          onInteractOutside={(e) => { e.preventDefault(); }}
+          onEscapeKeyDown={(e) => { e.preventDefault(); }}
+        >
           <SheetHeader>
             <SheetTitle>Calculator - {calculatorTarget}</SheetTitle>
             <SheetDescription>
@@ -3258,7 +3428,7 @@ export function ProcessCostDialog({
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {selectedCalculator.fields
-                      ?.filter((field: any) => field.fieldType !== 'calculated')
+                      ?.filter((field: CalculatorField) => field.fieldType !== 'calculated')
                       // MHR per Hour / LHR per Hour are already set above in this
                       // same dialog's Resources & Location section (machine +
                       // labour type + location) — showing them again here
@@ -3268,19 +3438,19 @@ export function ProcessCostDialog({
                       // autoPopulateFromBOM's bomFieldMapping) so formulas that
                       // reference {MHR per Hour}/{LHR per Hour} keep working —
                       // just not rendered as a separate input here.
-                      .filter((field: any) => field.fieldName !== 'MHR per Hour' && field.fieldName !== 'LHR per Hour')
+                      .filter((field: CalculatorField) => field.fieldName !== 'MHR per Hour' && field.fieldName !== 'LHR per Hour')
                       // Opened specifically for Cycle Time: hide inputs that don't
                       // feed it (Machine Name, Lot Size, labour counts, ...) — see
                       // relevantFieldNames' own comment. No-ops (shows everything)
                       // when that couldn't be confidently resolved.
-                      .filter((field: any) => !relevantFieldNames || relevantFieldNames.has(field.fieldName))
-                      .map((field: any) => {
+                      .filter((field: CalculatorField) => !relevantFieldNames || relevantFieldNames.has(field.fieldName))
+                      .map((field: CalculatorField) => {
                         // Only show eye button for fields that have actual lookup tables configured
                         const isLookupTableField =
                           // Only show for explicitly configured database lookup fields
                           (field.fieldType === 'database_lookup' && field.dataSource === 'processes') ||
                           // Only show for fields with sourceField starting with 'from_' (linked to reference tables)
-                          (field.sourceField && field.sourceField.startsWith('from_')) ||
+                          (field.sourceField?.startsWith('from_')) ||
                           // Real sm_lookup_* cost-engine tables — every field this session's
                           // whole Manufacturing Physics Calculator work has been wiring up
                           // (Time Per Stroke, Stroke Time, Tool Loading Time, Cutting Speed,
@@ -3295,6 +3465,18 @@ export function ProcessCostDialog({
 
 
                         const selectOptions = SELECT_FIELD_OPTIONS[field.fieldName];
+                        // The eye is offered for every input the cost engine declared as measured
+                        // on CAD faces (trace step `evidence`). Where the part's analysis did not
+                        // record those faces, clicking it opens the popup asking to re-analyse.
+                        // The cost-engine seed names it when there is one; when the dialog filled
+                        // the value itself (BOM autofill), the value's shown CAD source does.
+                        const cadEvidenceKey = onShowEvidence
+                          ? (engineSeedRef.current?.calculatorId === selectedCalculatorId
+                              ? engineSeedRef.current
+                              : engineSeedsRef.current[selectedCalculatorId] ?? null)?.evidence?.[field.fieldName]
+                            ?? cadEvidenceKeyFor(field.fieldName, calculatorInputProvenance[field.fieldName])
+                          : undefined;
+                        const cadHighlight = resolveFieldHighlight(cadEvidenceKey, bomItemData?.featureGraph?.feature_graph_v2);
 
                         // A field is "real" (not a manual guess or the calculator
                         // schema's blank placeholder) when its Why: caption names
@@ -3320,7 +3502,7 @@ export function ProcessCostDialog({
                             {field.fieldType === 'select' && selectOptions ? (
                               <Select
                                 value={calculatorInputs[field.fieldName] ?? ''}
-                                onValueChange={(v) => setCalculatorInputs({ ...calculatorInputs, [field.fieldName]: v })}
+                                onValueChange={(v) => { setCalculatorInputs({ ...calculatorInputs, [field.fieldName]: v }); }}
                               >
                                 <SelectTrigger>
                                   <SelectValue placeholder={`Choose ${field.displayLabel || field.fieldName}`} />
@@ -3336,8 +3518,7 @@ export function ProcessCostDialog({
                                 id={field.fieldName}
                                 type="text"
                                 value={calculatorInputs[field.fieldName] ?? ''}
-                                onChange={(e) =>
-                                  setCalculatorInputs({ ...calculatorInputs, [field.fieldName]: e.target.value })
+                                onChange={(e) => { setCalculatorInputs({ ...calculatorInputs, [field.fieldName]: e.target.value }); }
                                 }
                                 placeholder={`Enter ${field.displayLabel || field.fieldName}`}
                               />
@@ -3349,13 +3530,12 @@ export function ProcessCostDialog({
                                   type="number"
                                   step="0.01"
                                   value={calculatorInputs[field.fieldName] ?? ''}
-                                  onChange={(e) =>
-                                    setCalculatorInputs({
+                                  onChange={(e) => { setCalculatorInputs({
                                       ...calculatorInputs,
                                       [field.fieldName]: parseFloat(e.target.value) || 0,
-                                    })
+                                    }); }
                                   }
-                                  onBlur={() => onMachiningKeyEdited(field.fieldName)}
+                                  onBlur={() => { onMachiningKeyEdited(field.fieldName); }}
                                   placeholder={`Enter ${field.displayLabel || field.fieldName}`}
                                   className={`flex-1 ${realValueClassName}`}
                                 />
@@ -3363,7 +3543,7 @@ export function ProcessCostDialog({
                                   type="button"
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => handleViewLookupTable(field)}
+                                  onClick={() => { void handleViewLookupTable(field); }}
                                   className="px-3"
                                   title="View reference table"
                                 >
@@ -3371,29 +3551,75 @@ export function ProcessCostDialog({
                                 </Button>
                               </div>
                             ) : (
-                              // Regular input field only
-                              <Input
-                                id={field.fieldName}
-                                type="number"
-                                step="0.01"
-                                value={calculatorInputs[field.fieldName] ?? ''}
-                                onChange={(e) =>
-                                  setCalculatorInputs({
-                                    ...calculatorInputs,
-                                    [field.fieldName]: parseFloat(e.target.value) || 0,
-                                  })
-                                }
-                                onBlur={() => onMachiningKeyEdited(field.fieldName)}
-                                placeholder={`Enter ${field.displayLabel || field.fieldName}`}
-                                className={realValueClassName}
-                              />
+                              <div className="flex gap-2">
+                                <Input
+                                  id={field.fieldName}
+                                  type="number"
+                                  step="0.01"
+                                  value={calculatorInputs[field.fieldName] ?? ''}
+                                  onChange={(e) => { setCalculatorInputs({
+                                      ...calculatorInputs,
+                                      [field.fieldName]: parseFloat(e.target.value) || 0,
+                                    }); }
+                                  }
+                                  onBlur={() => { onMachiningKeyEdited(field.fieldName); }}
+                                  placeholder={`Enter ${field.displayLabel || field.fieldName}`}
+                                  className={`flex-1 ${realValueClassName}`}
+                                />
+                                {cadEvidenceKey && (() => {
+                                  const label = field.displayLabel || field.fieldName;
+                                  const isOn = activeEvidenceLabel === label;
+                                  return (
+                                    <Button
+                                      type="button"
+                                      variant={isOn ? 'default' : 'outline'}
+                                      size="sm"
+                                      aria-pressed={isOn}
+                                      onClick={() => {
+                                        if (isOn) { onShowEvidence?.(null); return; }
+                                        // one panel slot: the reference table yields to the evidence,
+                                        // and showing this input replaces any other input's highlight
+                                        setShowLookupTable(false);
+                                        setSelectedLookupField(null);
+                                        setLookupTableData(null);
+                                        onShowEvidence?.({
+                                          highlight: cadHighlight ? checkAgainstInput(cadHighlight, calculatorInputs[field.fieldName]) : null,
+                                          fieldLabel: label,
+                                        });
+                                      }}
+                                      className="px-3"
+                                      title={isOn
+                                        ? 'Hide the CAD faces'
+                                        : cadHighlight
+                                          ? 'Show the CAD faces this value was measured on'
+                                          : 'Show the CAD faces for this value (the part needs re-analysis first)'}
+                                    >
+                                      {isOn ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                                    </Button>
+                                  );
+                                })()}
+                              </div>
                             )}
+
 
                             {calculatorInputProvenance[field.fieldName] && (
                               <div className="text-xs text-muted-foreground">
                                 Why: {calculatorInputProvenance[field.fieldName]}
                               </div>
                             )}
+                            {field.fieldName === 'Selected Tonnage' && (() => {
+                              // Required (this calculator's Recommended Force) vs the machine's rating.
+                              const required = Number(calculatorResults?.['Recommended Force']);
+                              const selected = Number(calculatorInputs['Selected Tonnage']);
+                              if (!(required > 0) || !(selected > 0)) return null;
+                              const ok = required <= selected;
+                              return (
+                                <div className={`text-xs font-medium ${ok ? 'text-emerald-600' : 'text-destructive'}`}>
+                                  Required {required.toFixed(2)} T (Recommended Force) {ok ? '≤' : '>'} selected {selected.toFixed(1)} T
+                                  {ok ? ' — machine has enough capacity' : ' — machine is undersized for this bend'}
+                                </div>
+                              );
+                            })()}
                           </div>
                         );
                       })}
@@ -3412,8 +3638,8 @@ export function ProcessCostDialog({
                         verified mhr_records.power_kw this calculation used,
                         or plainly discloses why none is available, instead
                         of leaving that fact implicit in a "Why:" line. */}
-                    {selectedCalculator.fields?.some((f: any) => f.fieldName === 'Laser Machine Power') && (() => {
-                      const capabilityPowerKw = (selectedMHR as any)?.powerKw;
+                    {selectedCalculator.fields?.some((f: CalculatorField) => f.fieldName === 'Laser Machine Power') && (() => {
+                      const capabilityPowerKw = (selectedMHR)?.powerKw;
                       const hasPower = typeof capabilityPowerKw === 'number' && capabilityPowerKw > 0;
                       // 'seed' = real, sourced, but NOT this unit's own verified
                       // nameplate reading (e.g. Salvagnini L3-30, migration 459's
@@ -3422,7 +3648,7 @@ export function ProcessCostDialog({
                       // Same distinction machine-selection/selector.ts already
                       // renders server-side ("Capability from model seed data —
                       // verify against machine plate").
-                      const isEstimated = (selectedMHR as any)?.capabilitySource === 'seed';
+                      const isEstimated = (selectedMHR)?.capabilitySource === 'seed';
                       return (
                         <div className="rounded-md border border-border p-3 space-y-1 text-xs">
                           <div className="font-semibold text-sm mb-1">Machine Capability</div>
@@ -3454,7 +3680,7 @@ export function ProcessCostDialog({
                     })()}
 
                     <Button
-                      onClick={handleExecuteCalculator}
+                      onClick={() => { void handleExecuteCalculator(); }}
                       disabled={executeCalculator.isPending}
                       className="w-full"
                     >
@@ -3475,7 +3701,7 @@ export function ProcessCostDialog({
                     </CardHeader>
                     <CardContent className="space-y-3">
                       {selectedCalculator.fields
-                        ?.filter((field: any) => field.fieldType === 'calculated')
+                        ?.filter((field: CalculatorField) => field.fieldType === 'calculated')
                         // This calculator is being used only to derive a Cycle
                         // Time value for the main form (calculatorTarget ===
                         // 'cycleTime') — the cost breakdown (Machine/Labour/
@@ -3487,8 +3713,8 @@ export function ProcessCostDialog({
                         // defines (see CYCLE_TIME_FIELD_NAMES above) — the
                         // same field computedCycleTime/"Use as Cycle Time"
                         // below already keys off.
-                        .filter((field: any) => calculatorTarget !== 'cycleTime' || CYCLE_TIME_FIELD_NAMES.includes(field.fieldName))
-                        .map((field: any) => {
+                        .filter((field: CalculatorField) => calculatorTarget !== 'cycleTime' || CYCLE_TIME_FIELD_NAMES.includes(field.fieldName))
+                        .map((field: CalculatorField) => {
                           const result = calculatorResults[field.fieldName];
                           const hasError = result && typeof result === 'object' && 'error' in result;
                           const value = hasError ? undefined : (result?.value !== undefined ? result.value : result);
@@ -3499,7 +3725,7 @@ export function ProcessCostDialog({
                               className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg"
                             >
                               <div>
-                                <div className="font-medium">{field.displayName || field.fieldName}</div>
+                                <div className="font-medium">{field.displayLabel || field.fieldName}</div>
                                 {field.unit && !hasError && (
                                   <div className="text-xs text-muted-foreground">{field.unit}</div>
                                 )}
@@ -3523,7 +3749,7 @@ export function ProcessCostDialog({
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => handleCalculatorValue(value)}
+                                  onClick={() => { handleCalculatorValue(value); }}
                                   disabled={typeof value !== 'number' && typeof value !== 'string'}
                                 >
                                   Use
@@ -3557,7 +3783,7 @@ export function ProcessCostDialog({
                         </div>
                         <Button
                           size="sm"
-                          onClick={() => handleCalculatorValue(computedCycleTime.totalTimeSec)}
+                          onClick={() => { handleCalculatorValue(computedCycleTime.totalTimeSec); }}
                         >
                           Use as Cycle Time
                         </Button>
@@ -3590,28 +3816,14 @@ export function ProcessCostDialog({
       </Sheet>
 
       {/* Lookup Table Panel */}
-      {showLookupTable && lookupTableData && (() => {
-        return (
+      {showLookupTable && lookupTableData && (() => (
           <>
-            {/* Backdrop */}
-            <div 
-              className="fixed inset-0 bg-black/20 z-[59]" 
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                e.nativeEvent?.stopImmediatePropagation?.();
-                setShowLookupTable(false);
-                setSelectedLookupField(null);
-                setLookupTableData(null);
-              }}
-            />
-            
-            {/* Lookup Table */}
+            {/* Lookup Table: no backdrop, it closes only through its own X */}
             <div
               className="fixed top-0 left-0 h-screen w-[500px] bg-background border-r border-border shadow-xl z-[60] flex flex-col"
               style={{ pointerEvents: 'auto' }}
-              onClick={(e) => e.stopPropagation()}
-              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); }}
+              onMouseDown={(e) => { e.stopPropagation(); }}
             >
           <div className="flex items-center justify-between p-3 border-b border-border bg-background">
             <div>
@@ -3644,7 +3856,11 @@ export function ProcessCostDialog({
             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
             Click any row to use that value for <strong className="text-foreground mx-0.5">{lookupTableData.fieldLabel}</strong>. Highlighted column = selected value.
             {lookupTableData.matchedRowKeys && (
-              <span className="text-primary font-medium ml-1">The row outlined below is the one currently in use.</span>
+              <span className="text-primary font-medium ml-1">
+                {Array.isArray(lookupTableData.matchedRowKeys)
+                  ? 'The value in use is interpolated between the two rows outlined below.'
+                  : 'The row outlined below is the one currently in use.'}
+              </span>
             )}
           </div>
 
@@ -3655,8 +3871,8 @@ export function ProcessCostDialog({
               pointerEvents: 'auto',
               zIndex: 10000
             }}
-            onClick={(e) => e.stopPropagation()}
-            onScroll={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); }}
+            onScroll={(e) => { e.stopPropagation(); }}
           >
             <div className="w-full">
               <table className="w-full border-collapse text-sm bg-background">
@@ -3698,15 +3914,7 @@ export function ProcessCostDialog({
                     // Numeric comparison tolerates string-vs-number typing
                     // differences between the two API responses; real
                     // lookup values never differ by a meaningful amount.
-                    const matchedRowKeys = lookupTableData.matchedRowKeys;
-                    const isCurrentMatch = !!matchedRowKeys && Object.entries(matchedRowKeys).every(([key, expected]) => {
-                      const actual = row[key];
-                      if (actual === undefined) return true; // column not present on this row shape — don't fail the match over it
-                      if (typeof expected === 'number' || typeof actual === 'number') {
-                        return Math.abs(Number(actual) - Number(expected)) < 1e-6;
-                      }
-                      return String(actual) === String(expected);
-                    });
+                    const isCurrentMatch = isMatchedLookupRow(row, lookupTableData.matchedRowKeys);
                     return (
                       <tr
                         key={rowIndex}
@@ -3768,8 +3976,7 @@ export function ProcessCostDialog({
           </div>
         </div>
         </>
-        );
-      })()}
+        ))()}
     </>
   );
 }

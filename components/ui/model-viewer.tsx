@@ -140,10 +140,16 @@ interface ModelViewerProps {
   onBrepFacePick?: (faceId: number) => void;
   /** Override the amber group-face highlight color — used for operation-specific visualization */
   highlightColor?: string;
+  /** Real setup-axis directions to draw as arrows. */
+  setupAxes?: Array<[number, number, number]>;
   /** Nest toolbar toggle (visualization only) — order quantity + the sheet already selected by the existing cost-authoritative nesting result. */
   nestQuantity?: number | undefined;
   nestSheetWidthMm?: number | undefined;
   nestSheetLengthMm?: number | undefined;
+  nestKerfMm?: number | undefined;
+  nestEdgeMarginMm?: number | undefined;
+  nestSheetSource?: string | undefined;
+  nestCandidateSheets?: Array<{ widthMm: number; lengthMm: number; source: string }> | undefined;
   nestMaterialLabel?: string | undefined;
   nestGradeLabel?: string | undefined;
   /** Flat Pattern toolbar toggle (visualization only) — the real unfolded 2D outline for this part. */
@@ -191,9 +197,14 @@ export function ModelViewer({
   onHeatmapInspect,
   onBrepFacePick,
   highlightColor,
+  setupAxes,
   nestQuantity,
   nestSheetWidthMm,
   nestSheetLengthMm,
+  nestKerfMm,
+  nestEdgeMarginMm,
+  nestSheetSource,
+  nestCandidateSheets,
   nestMaterialLabel,
   nestGradeLabel,
   flatPatternPartName,
@@ -346,10 +357,15 @@ export function ModelViewer({
               {...(onHeatmapInspect ? { onHeatmapInspect } : {})}
               {...(onBrepFacePick ? { onBrepFacePick } : {})}
               {...(highlightColor !== undefined ? { highlightColor } : {})}
+              {...(setupAxes !== undefined ? { setupAxes } : {})}
               {...(bomItemId ? { bomItemId } : {})}
               {...(nestQuantity !== undefined ? { nestQuantity } : {})}
               {...(nestSheetWidthMm !== undefined ? { nestSheetWidthMm } : {})}
               {...(nestSheetLengthMm !== undefined ? { nestSheetLengthMm } : {})}
+              {...(nestKerfMm !== undefined ? { nestKerfMm } : {})}
+              {...(nestEdgeMarginMm !== undefined ? { nestEdgeMarginMm } : {})}
+              {...(nestSheetSource !== undefined ? { nestSheetSource } : {})}
+              {...(nestCandidateSheets !== undefined ? { nestCandidateSheets } : {})}
               {...(nestMaterialLabel !== undefined ? { nestMaterialLabel } : {})}
               {...(nestGradeLabel !== undefined ? { nestGradeLabel } : {})}
               {...(flatPatternPartName !== undefined ? { flatPatternPartName } : {})}
@@ -502,10 +518,15 @@ export function ModelViewer({
               {...(onHeatmapInspect ? { onHeatmapInspect } : {})}
               {...(onBrepFacePick ? { onBrepFacePick } : {})}
               {...(highlightColor !== undefined ? { highlightColor } : {})}
+              {...(setupAxes !== undefined ? { setupAxes } : {})}
               {...(bomItemId ? { bomItemId } : {})}
               {...(nestQuantity !== undefined ? { nestQuantity } : {})}
               {...(nestSheetWidthMm !== undefined ? { nestSheetWidthMm } : {})}
               {...(nestSheetLengthMm !== undefined ? { nestSheetLengthMm } : {})}
+              {...(nestKerfMm !== undefined ? { nestKerfMm } : {})}
+              {...(nestEdgeMarginMm !== undefined ? { nestEdgeMarginMm } : {})}
+              {...(nestSheetSource !== undefined ? { nestSheetSource } : {})}
+              {...(nestCandidateSheets !== undefined ? { nestCandidateSheets } : {})}
               {...(nestMaterialLabel !== undefined ? { nestMaterialLabel } : {})}
               {...(nestGradeLabel !== undefined ? { nestGradeLabel } : {})}
               {...(flatPatternPartName !== undefined ? { flatPatternPartName } : {})}

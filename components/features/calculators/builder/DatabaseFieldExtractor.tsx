@@ -25,12 +25,6 @@ type DatabaseFieldExtractorProps = {
   disabled?: boolean;
   associatedProcessId?: string;
 };
-// Material categories for better organization
-const MATERIAL_CATEGORIES = [
-  { code: 'PLASTIC_RUBBER', label: 'Plastic & Rubber', description: 'Thermoplastic and rubber-based materials' },
-  { code: 'FERROUS_NON_FERROUS', label: 'Ferrous & Non-Ferrous', description: 'All metallic materials including steel and alloys' },
-];
-
 // Define available fields for each data source
 const DATA_SOURCE_FIELDS: Record<DataSource, Array<{ field: string; label: string; description: string }>> = {
   mhr: [
@@ -105,6 +99,8 @@ const DATA_SOURCE_FIELDS: Record<DataSource, Array<{ field: string; label: strin
     { field: 'fromRunnerDia', label: 'From Runner Dia Table', description: 'Lookup from Runner Diameter Selection table' },
   ],
   manual: [],
+  // Machining lookup fields name a reference table (sourceTable), not a fixed field list.
+  machining_lookup: [],
   sheet_metal_lookup: [
     { field: 'value', label: 'Resolved Value', description: 'Primary resolved value from the lookup table' },
     { field: 'kerf', label: 'Kerf Width', description: 'Laser kerf width (Table 5 only)' },
@@ -128,7 +124,6 @@ export function DatabaseFieldExtractor({
   const [tablesLoading, setTablesLoading] = useState(false);
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const [loadedProcessId, setLoadedProcessId] = useState<string | null>(null);
-  const [selectedMaterialCategory, setSelectedMaterialCategory] = useState<string>('');
 
   // Initialize selected table from selectedField
   useEffect(() => {
@@ -140,15 +135,6 @@ export function DatabaseFieldExtractor({
       setSelectedTableId(null);
     }
   }, [selectedField, disabled]);
-
-  // Auto-set material category for raw materials if field is already configured
-  useEffect(() => {
-    if (dataSource === 'raw_materials' && selectedField && !selectedMaterialCategory && disabled) {
-      // If we have a saved field but no category selected, default to ferrous category
-      // This ensures saved fields display properly after refresh
-      setSelectedMaterialCategory('FERROUS_NON_FERROUS');
-    }
-  }, [dataSource, selectedField, selectedMaterialCategory, disabled]);
 
   // Fetch reference tables when process ID changes
   useEffect(() => {
@@ -347,37 +333,9 @@ export function DatabaseFieldExtractor({
       </div>
 
       <div className="space-y-4">
-        {/* Material Category Selection - Only show for raw_materials */}
-        {dataSource === 'raw_materials' && !disabled && (
-          <div className="space-y-2">
-            <Label className="text-xs font-medium">Material Category</Label>
-            <Select
-              value={selectedMaterialCategory}
-              onValueChange={(value) => {
-                setSelectedMaterialCategory(value);
-                setSelectedRecord(''); // Clear selected record when category changes
-              }}
-              disabled={disabled}
-            >
-              <SelectTrigger className={cn("h-9", disabled ? "bg-secondary/20" : "bg-primary/5 border-primary/10")}>
-                <SelectValue placeholder="Choose material category..." />
-              </SelectTrigger>
-              <SelectContent>
-                {MATERIAL_CATEGORIES.map((category) => (
-                  <SelectItem key={category.code} value={category.code}>
-                    <div className="flex flex-col">
-                      <span className="font-medium">{category.label}</span>
-                      <span className="text-xs text-muted-foreground">{category.description}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
-        {/* Field Selection for Raw Materials */}
-        {dataSource === 'raw_materials' && selectedMaterialCategory && (
+        {/* Field Selection for Raw Materials: a material property, read from
+            whichever material the line uses (no category step: it filtered nothing). */}
+        {dataSource === 'raw_materials' && (
           <div className="space-y-2">
             <Label className="text-xs font-medium">Select Property to Extract</Label>
             <Select
@@ -402,8 +360,8 @@ export function DatabaseFieldExtractor({
           </div>
         )}
 
-        {/* Record Selection - Only show for non raw_materials or when category not selected */}
-        {(dataSource !== 'raw_materials' || !selectedMaterialCategory) && (
+        {/* Record Selection - every source except raw_materials (a property, above) */}
+        {dataSource !== 'raw_materials' && (
           <div className="space-y-2">
             <Label className="text-xs font-medium">Select Record/Table</Label>
             <DatabaseRecordPicker

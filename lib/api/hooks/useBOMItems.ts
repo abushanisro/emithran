@@ -150,7 +150,6 @@ export interface CreateBOMItemDto {
   annualVolume?: number | undefined;
   unit?: string | undefined;
   material?: string | undefined;
-  materialCategory?: string | undefined;
   materialGrade?: string | undefined;
   makeBuy?: 'make' | 'buy' | undefined;
   unitCost?: number | undefined;
@@ -173,7 +172,6 @@ export interface UpdateBOMItemDto {
   annualVolume?: number | undefined;
   unit?: string | undefined;
   material?: string | undefined;
-  materialCategory?: string | undefined;
   materialGrade?: string | undefined;
   // Provenance of materialGrade — 'manual' means the engineer explicitly
   // confirmed it via the Material Grade picker (see bom-items.service.ts's
@@ -417,8 +415,6 @@ export interface AutoFillGeometry {
 export interface AutoFillSuggestions {
   name: string;
   partNumber: string;
-  /** From the CAD family; null when the engine did not classify the part. */
-  materialCategory: string | null;
   materialGrade: string;
   materialId: string | null;
   density: number | null;
@@ -1099,6 +1095,12 @@ export interface BlankSpecDto {
   // yield the costing engine actually prices material on).
   sheetWidthMm?: number;
   sheetLengthMm?: number;
+  // Sheet origin + the kerf / edge margin the cost engine nested with.
+  sheetSource?: string;
+  kerfMm?: number;
+  edgeMarginMm?: number;
+  // Stock sheets the Nest view ranks and recommends from.
+  candidateSheets?: Array<{ widthMm: number; lengthMm: number; source: string }>;
   partsPerSheet?: number;
   // The FULL physical stock-sheet weight -- NOT the same as grossWeightKg
   // above (already per-part). See backend blank-spec.dto.ts's own doc
@@ -1357,6 +1359,8 @@ export interface RouteResultDto {
   // threshold (progressive_die_press / tandem_press). null for every other
   // route, including when the part's own annual volume isn't set.
   toolingVolumeNote: string | null;
+  /** May Auto routing pick this route (backend isAutoRoutable). */
+  autoRoutable?: boolean;
   processLines: ProcessLineCost[];
   materialCost: number;
   abrasiveCost: number;

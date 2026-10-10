@@ -455,17 +455,8 @@ export function RawMaterialDialog({
         const { apiClient } = await import('@/lib/api/client');
         
         try {
-          // Use enhanced materials endpoint to get all material data
-          const categoryParam = field.materialCategory === 'PLASTIC_RUBBER' ? 'PLASTIC' : 
-                               field.materialCategory === 'FERROUS_NON_FERROUS' ? 'FERROUS' :
-                               'FERROUS'; // Default to ferrous
-          
-          const response = await apiClient.get('/raw-materials/enhanced', { 
-            params: { 
-              limit: 500,
-              category: categoryParam
-            } 
-          });
+          // Every material, with its real class (Ferrous / Non-Ferrous / Plastic & Rubber).
+          const response = await apiClient.get('/raw-materials/enhanced', { params: { limit: 500 } });
           
           if (response?.items) {
             // Transform raw materials data into lookup table format
@@ -487,7 +478,7 @@ export function RawMaterialDialog({
             const columns = [
               { name: 'materialName', key: 'materialName', label: 'Material Name', dataType: 'text' },
               { name: 'materialGrade', key: 'materialGrade', label: 'Grade', dataType: 'text' },
-              { name: 'categoryName', key: 'categoryName', label: 'Category', dataType: 'text' }
+              { name: 'materialClass', key: 'materialClass', label: 'Class', dataType: 'text' }
             ];
 
             // Add the specific property column being looked up
@@ -514,7 +505,7 @@ export function RawMaterialDialog({
               .map((material) => ({
                 materialName: material.materialName || '',
                 materialGrade: material.materialGrade || '',
-                categoryName: material.categoryName || '',
+                materialClass: material.materialClass ?? 'Unclassified',
                 [field.sourceProperty]: material[field.sourceProperty] || 0
               }));
 

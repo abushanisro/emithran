@@ -1,9 +1,3 @@
-export type FeatureType =
-  | 'flat_pattern' | 'bend' | 'hole' | 'slot'
-  | 'flange' | 'hem' | 'corner_relief' | 'notch'
-  | 'louver' | 'emboss' | 'dimple' | 'bead'
-  | 'hardware';
-
 export type ManufacturingFamily =
   | 'sheet_metal' | 'milled' | 'turned'
   | 'plastic_molded' | 'casting' | 'die_cast' | 'sand_cast' | 'investment_cast' | 'forging'
@@ -29,8 +23,6 @@ export interface CostDriver {
 }
 
 /** Legacy process-slot category used by ManufacturingFeatureBase */
-export type FeatureProcessCategory = 'cut' | 'form' | 'machined';
-
 /**
  * feature_graph_v2 feature types: the reference operation-catalog vocabulary
  * (cad-engine/shared/reference_features.json), each paired with a `variant`
@@ -68,88 +60,6 @@ export type FeatureCategory =
   // Injection molding DFM faces
   | 'im_undercut'
   | 'im_undrafted';
-
-export type ExtractionMethod =
-  | 'occ_cylindrical_face'    // OCC topology — STEP, trusted
-  | 'stl_curvature_analysis'  // STL mesh-based, approximate
-  | 'bbox_heuristic'          // bounding box inference
-  | 'summary_expansion';      // expanded from aggregate count (Phase 1 fallback)
-
-export interface GeometryRefs {
-  faces: number[];    // OCC face indices → Three.js viewer highlight (Phase 2)
-  edges: number[];    // OCC edge indices
-  vertices: number[]; // OCC vertex indices (Phase 2+)
-}
-
-export interface ManufacturingFeatureBase {
-  id: string;                   // stable hash-based ID: hole_d5.0_x12, bend_r3.0_x5
-  featureCategory: FeatureProcessCategory;
-  index: number;
-  faces: number[];              // backward compat alias for geometryRefs.faces
-  edges: number[];
-  geometryRefs: GeometryRefs;   // placeholder for 3D click-to-highlight
-  costDrivers: CostDriver[];
-  confidence: number;           // 0–1 per-feature extraction certainty
-  source: 'cad_engine' | 'step_topology' | 'mesh_inference';
-  extractionMethod: ExtractionMethod;
-  manufacturingIntent?: string; // routing hint: 'laser_pierce', 'press_brake', 'laser_cut'
-}
-
-export interface HoleFeature extends ManufacturingFeatureBase {
-  type: 'hole';
-  featureCategory: 'cut';
-  recognition: {
-    diameter_mm: number;
-    count: number;
-    depth_mm: number | null;               // null until Phase 2 OCC depth extraction
-    through: 'through' | 'blind' | null;   // null until Phase 2
-    // Feature-driven routing subtype — see SheetMetalFeatureExtractorService.buildHoleFeatures.
-    // Defaults to 'through' for legacy feature graphs computed before this field existed.
-    hole_type?: 'through' | 'counterbore' | 'countersink';
-  };
-}
-
-export interface BendFeature extends ManufacturingFeatureBase {
-  type: 'bend';
-  featureCategory: 'form';
-  recognition: {
-    radius_mm: number | null;       // null = unknown (STL or no OCC bend data)
-    count: number;
-    angle_deg: number | null;       // real per-radius-group average bend angle; null when cad-engine had no per-bend data
-    bend_length_mm: number | null;  // longest real bend line in this radius group (tonnage-sizing-relevant); null when no per-bend data
-  };
-}
-
-export interface FlatPatternFeature extends ManufacturingFeatureBase {
-  type: 'flat_pattern';
-  featureCategory: 'cut';
-  recognition: {
-    area_mm2: number;
-    cut_length_mm: number;
-    /** Present only when the cad-engine's panel-wire walk produced a breakdown (STEP topology path). */
-    cut_length_breakdown?: { outer_profile_mm: number; circular_holes_mm: number; internal_profiles_mm: number };
-    /** Longest single unbroken laser path — laser machines slow down on long contours. */
-    longest_continuous_cut_mm?: number;
-    /** Corners by turn angle > 60deg (deceleration-relevant); acute (< 30deg interior) is a SUBSET, not a separate bucket. */
-    sharp_corner_count?: number;
-    acute_corner_count?: number;
-    /** Holes under 2x sheet thickness in diameter — needs a reduced laser/punch feed rate. */
-    small_hole_count?: number;
-    /** Nesting metrics from the true 2D unfold solver — absent when it couldn't confidently walk this part's panel/bend graph. */
-    bounding_rect_mm2?: number;
-    material_utilization_pct?: number;
-    scrap_area_mm2?: number;
-    pierce_count: number;
-    sheet_thickness_mm: number;
-    est_laser_time_sec: number;
-    /** Non-cutting head-repositioning time between pierce points, estimated from real hole/slot pierce locations (nearest-neighbour tour) — additive on top of cutting+piercing time, not part of est_laser_time_sec. Absent when there's no dominant-face reference point to anchor the tour on. */
-    rapid_traverse_sec?: number;
-  };
-}
-
-// Discriminated union — extend in Phase 2 (SlotFeature, FlangeFeature, etc.)
-export type SheetMetalFeature = FlatPatternFeature | HoleFeature | BendFeature;
-export type ManufacturingFeature = SheetMetalFeature;
 
 export interface FamilyClassification {
   family: ManufacturingFamily;
@@ -219,13 +129,20 @@ export interface FeatureGraphSummary {
   counterboreGroups?: HoleGroup[];
   countersinkGroups?: HoleGroup[];
   bendRadii?: number[];
-  // Real, CAD-detected — computed in cad-engine/feature_extractors.py,
-  // already flowing through to FlatPatternFeature.recognition but not
-  // previously surfaced here for easy top-level access (see the "Detected"
-  // feature-checklist panel in manufacturing-intelligence/page.tsx).
+  // Real, CAD-detected — computed in cad-engine/feature_extractors.py.
   sharpCornerCount?: number;
   acuteCornerCount?: number;
   smallHoleCount?: number;
+  /** The measured cut path by category (STEP topology parts only). */
+  cutLengthBreakdownMm?: { outerProfile: number; circularHoles: number; internalProfiles: number };
+  /** Longest unbroken laser path, mm (STEP topology parts only). */
+  longestContinuousCutMm?: number;
+  /** Head travel between pierce points, s (STEP topology parts only). */
+  rapidTraverseSec?: number;
+  /** Flat-pattern nesting metrics, when the 2D unfold resolved them. */
+  flatPatternBoundingRectMm2?: number;
+  materialUtilizationPct?: number;
+  scrapAreaMm2?: number;
   // New in cad-engine geo_v38 — see memory_optimizer.py's CACHE_VERSION
   // changelog for full derivation/disclosed-limitation notes.
   extrudedFlangeCount?: number;
@@ -238,6 +155,18 @@ export interface FeatureGraphSummary {
   holeOrBossCount?: number;
   filletCount?: number;
   ribCountProxy?: number;
+  ribCount?: number;
+  wallUniformityRatio?: number | null;
+  blindFeatureCount?: number;
+  undraftedFaceCount?: number;
+  undercutFaceCount?: number;
+  partingComplexity?: number | null;
+  avgDraftAngleDeg?: number | null;
+  // Die casting (auto-fill.service.ts: primary_setup_axis / parting_plane_offset_mm)
+  castingSetupAxis?: number[] | null;
+  castingPartingPlaneOffsetMm?: number | null;
+  /** Pull axes the engine proved undercut-free; drawn as setup-axis arrows in the viewer. */
+  castingSetupAxes?: number[][];
   // Real flat-pattern outline/hole geometry (cad-engine's wire-walk
   // extractor, see feature_extractors.py's _compute_flat_pattern_outline) --
   // undefined/'unavailable' when the wire-walk/merge couldn't resolve one
@@ -253,7 +182,6 @@ export interface FeatureGraphSummary {
 export interface FeatureGraph {
   extractedAt: string;
   classification: FamilyClassification;
-  features: ManufacturingFeature[];
   processRecommendations: ProcessRecommendation[];
   summary?: FeatureGraphSummary;
   dfmWarnings?: DFMWarning[];
@@ -265,14 +193,37 @@ export interface FeatureGraph {
   analyzed_at?: string;
   /** Per-instance occurrence data — added in Feature Graph v2 */
   feature_graph_v2?: FeatureGraphV2;
+  /** Per-face attributes + edge convexity for every domain (null when the part exceeded the engine's face limit). */
+  face_graph?: FaceGraph;
   /** Per-feature spatial data for injection molding heatmap (bosses, ribs, wall samples, draft faces) */
   imHeatmapFeatures?: import('@/lib/heatmap/types').IMHeatmapFeatures;
+  /** Machining feature extraction (cad-engine machining/feature_models.py). */
+  machining_features?: MachiningFeaturesResult | null;
+  /** Part bounding box (mm), when the engine reported one. */
+  bounding_box?: { x?: number; y?: number; z?: number };
+  bboxX?: number;
+  bboxY?: number;
+  bboxZ?: number;
 }
 
-export interface FeatureSelection {
-  featureId: string;
-  faces?: number[];
-  edges?: number[];
+/** cad-engine machining feature extraction, as MachiningFeatureSet.to_dict() returns it. */
+export interface MachiningFeaturesResult {
+  family?: string;
+  features?: {
+    id: string;
+    type: string;
+    variant?: string | null;
+    params?: Record<string, unknown>;
+    confidence?: number;
+    children?: string[];
+    face_ids?: number[];
+  }[];
+  feature_summary?: Record<string, number>;
+  variant_summary?: Record<string, number>;
+  extraction_version?: string;
+  warnings?: string[];
+  unclaimed_face_ids?: number[];
+  face_map?: FaceMapEntry[];
 }
 
 // ─── Feature Graph v2 — per-instance occurrence data ─────────────────────────
@@ -298,6 +249,10 @@ export interface FeatureOccurrence {
    * Empty for items analyzed before face_map was introduced (need re-analysis).
    */
   face_ids: number[];
+  /** Sheet-metal cut path (Blank / cut_profile, geo_v51+): which part of the cut this occurrence is */
+  cut_category?: 'outer_profile' | 'circular_holes' | 'internal_profiles';
+  /** Sheet-metal cut path: the measured cut length of this category, mm (same walk as cut_length_mm) */
+  length_mm?: number;
   // Spatial DFM metrics — present for analyses after Phase 4 CAD engine update; null otherwise
   /** mm from hole wall (or bend axis centroid) to nearest outer part edge */
   edge_clearance_mm?: number | null;
@@ -379,6 +334,33 @@ export interface FeatureGraphV2 {
     stl_tri_total?: number;
   };
   features: FeatureNodeV2[];
+  /** Sheet-metal quantities with the faces they were measured on (geo_v52+). */
+  measurements?: Partial<Record<MeasurementKey, FeatureMeasurement>>;
+}
+
+/** Attributed adjacency graph: face i is the TopExp ordinal used by face_map / feature_graph_v2. */
+export interface FaceGraph {
+  face_attributes: {
+    surface_type: string;
+    area_mm2: number;
+    centroid: [number, number, number];
+    reversed: boolean;
+    normal?: [number, number, number];
+    axis?: [number, number, number];
+    radius_mm?: number;
+  }[];
+  edge_graph: { a: number; b: number; convexity: 'convex' | 'concave' | 'smooth'; dihedral_deg: number }[];
+}
+
+export type MeasurementKey = 'pierce_count' | 'bend_line_length' | 'flat_pattern_area';
+
+export interface FeatureMeasurement {
+  value: number;
+  unit: string;
+  method?: string;
+  occurrences: { kind?: string; face_ids: number[]; length_mm?: number }[];
+  /** False when the occurrences cannot account for `value` — shown, never hidden. */
+  reconciles: boolean;
 }
 
 // ─── DFM Risk Scoring ─────────────────────────────────────────────────────────

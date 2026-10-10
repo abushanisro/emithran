@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireUserForAi } from '@/lib/server/auth';
+import { fetchTrustedFile, PayloadTooLargeError, readLimited, UntrustedUrlError } from '@/lib/server/safe-fetch';
 
 const CAD_ENGINE_URL = process.env.CAD_ENGINE_URL ?? process.env.NEXT_PUBLIC_CAD_ENGINE_URL ?? 'http://localhost:5000';
 
@@ -7,6 +9,9 @@ const CAD_ENGINE_URL = process.env.CAD_ENGINE_URL ?? process.env.NEXT_PUBLIC_CAD
  * in the CAD engine's POST /drawing/analyze endpoint.
  */
 export async function POST(request: NextRequest) {
+  const auth = await requireUserForAi('vave-drawing-analysis');
+  if (!auth.ok) return auth.response;
+
   try {
     const body = await request.json();
 
@@ -16,7 +21,13 @@ export async function POST(request: NextRequest) {
 
     // If caller passed a URL instead of base64, fetch and convert here
     if (body.imageUrl && !body.imageBase64) {
-      const imgRes = await fetch(body.imageUrl as string);
+      let imgRes: Response;
+      try {
+        imgRes = await fetchTrustedFile(String(body.imageUrl));
+      } catch (e) {
+        if (e instanceof UntrustedUrlError) return NextResponse.json({ error: 'imageUrl is not on the trusted storage host' }, { status: 400 });
+        throw e;
+      }
       if (!imgRes.ok) {
         return NextResponse.json({ error: 'Failed to fetch drawing image' }, { status: 400 });
       }
@@ -26,8 +37,14 @@ export async function POST(request: NextRequest) {
         : contentType.includes('jpeg') || contentType.includes('jpg')
           ? 'image/jpeg'
           : 'image/png';
-      const buffer = await imgRes.arrayBuffer();
-      body.imageBase64 = Buffer.from(buffer).toString('base64');
+      let buffer: Buffer;
+      try {
+        buffer = await readLimited(imgRes, 15 * 1024 * 1024);
+      } catch (e) {
+        if (e instanceof PayloadTooLargeError) return NextResponse.json({ error: 'Drawing image is too large' }, { status: 413 });
+        throw e;
+      }
+      body.imageBase64 = buffer.toString('base64');
       body.mediaType = mediaType;
       delete body.imageUrl;
     }

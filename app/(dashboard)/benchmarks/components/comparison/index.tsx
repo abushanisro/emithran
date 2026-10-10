@@ -24,8 +24,6 @@ interface Props {
   processes: any[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   vendors: any[];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  rawMaterials: any[];
   onBack: () => void;
 }
 
@@ -37,7 +35,6 @@ export function ComparisonView({
   selectedProjects,
   processes,
   vendors,
-  rawMaterials,
   onBack,
 }: Props) {
   const [activeTab, setActiveTab] = useState("parts");
@@ -180,7 +177,7 @@ export function ComparisonView({
         </TabsContent>
 
         <TabsContent value="materials">
-          <MaterialsTab bomMetrics={bomMetrics} rawMaterials={rawMaterials} />
+          <MaterialsTab bomMetrics={bomMetrics} />
         </TabsContent>
 
         <TabsContent value="complexity">

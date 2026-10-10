@@ -9,6 +9,7 @@ import { FlatPatternDrawing, normalizeFlatPattern } from '@/components/ui/flat-p
 import { Input } from '@/components/ui/input';
 import { useSvgPanZoom } from '@/components/ui/use-svg-pan-zoom';
 import { useTrueNest, type TrueNestResultDto } from '@/lib/api/hooks/useBOMItems';
+import { recommendSheets, type CandidateSheet } from '@/lib/costing/sheet-recommendation';
 import { shoelaceAreaMm2, boundingBoxMm } from '@/lib/geometry/polygon2d';
 
 interface NestViewProps {
@@ -21,17 +22,11 @@ interface NestViewProps {
   materialLabel?: string | undefined;
   gradeLabel?: string | undefined;
   thicknessMm?: number | undefined;
+  /** Where the costed sheet came from (selected laser's sheet / standard sheet). */
+  sheetSource?: string | undefined;
+  /** Stock sheets to rank and recommend from (backend blankSpec.candidateSheets). */
+  candidateSheets?: CandidateSheet[] | undefined;
 }
-
-// The 3 standard stock sheet sizes from
-// memory/sheetmetal/laser_cutting_costing_params (1).md section 6b's worked
-// example -- the md's own recommendation rule is "pick whichever candidate
-// gives the lowest input weight per part" (best material yield).
-const STANDARD_SHEETS: { key: string; label: string; widthMm: number; lengthMm: number }[] = [
-  { key: 'A', label: '1219 × 2438 mm (4×8 ft)', widthMm: 1219, lengthMm: 2438 },
-  { key: 'B', label: '1524 × 3048 mm (5×10 ft)', widthMm: 1524, lengthMm: 3048 },
-  { key: 'C', label: '1219 × 3048 mm (4×10 ft)', widthMm: 1219, lengthMm: 3048 },
-];
 
 function extractErrorDetail(error: unknown): string | null {
   if (!(error instanceof Error)) return null;
@@ -56,91 +51,60 @@ function placementTransform(xMm: number, yMm: number, rotationDeg: number): stri
   return `translate(${xMm.toString()} ${yMm.toString()}) rotate(${rotationDeg.toString()})`;
 }
 
-// Kerf-adjusted rectangle yield estimate -- same formula as
-// memory/sheetmetal/laser_cutting_costing_params (1).md section 6a, used
-// ONLY to rank the 3 standard stock sizes before a real true-shape nest runs
-// for whichever one the user actually picks. Deliberately the simpler
-// bounding-rect estimate, not a true polygon nest for all 3 candidates --
-// that would triple the cad-engine load for a ranking decision the rect
-// estimate already gets right (ranking by yield is the same whether
-// measured via bounding-rect count or true polygon utilization, for a fixed
-// part/thickness/material -- see this file's presetEstimates comment).
-function estimateRectPartsPerSheet(
-  sheetWidthMm: number, sheetLengthMm: number,
-  partWidthMm: number, partLengthMm: number,
-  kerfMm: number, edgeMarginMm: number,
-): number {
-  const usableW = sheetWidthMm - 2 * edgeMarginMm;
-  const usableL = sheetLengthMm - 2 * edgeMarginMm;
-  if (usableW <= 0 || usableL <= 0) return 0;
-  const orientationA = Math.floor((usableW + kerfMm) / (partWidthMm + kerfMm)) * Math.floor((usableL + kerfMm) / (partLengthMm + kerfMm));
-  const orientationB = Math.floor((usableW + kerfMm) / (partLengthMm + kerfMm)) * Math.floor((usableL + kerfMm) / (partWidthMm + kerfMm));
-  return Math.max(orientationA, orientationB, 0);
-}
-
 export function NestView({
   bomItemId, quantity, sheetWidthMm, sheetLengthMm, kerfMm, edgeMarginMm,
-  materialLabel, gradeLabel, thicknessMm,
+  materialLabel, gradeLabel, thicknessMm, sheetSource, candidateSheets,
 }: NestViewProps) {
-  // Sheet & cutting setup is user-controlled from here down -- the incoming
-  // props are only the INITIAL defaults (whatever sheet the existing
-  // rectangle costing engine already picked), never live-updated from the
-  // parent afterward.
-  const initialPreset = STANDARD_SHEETS.find((s) => s.widthMm === sheetWidthMm && s.lengthMm === sheetLengthMm);
-  const [sheetMode, setSheetMode] = useState<string>(initialPreset?.key ?? 'custom');
-  const [customWidthStr, setCustomWidthStr] = useState(String(sheetWidthMm ?? 1250));
-  const [customLengthStr, setCustomLengthStr] = useState(String(sheetLengthMm ?? 2500));
+  // Starts from what the cost engine nested with (the selected laser's sheet,
+  // the part-spacing kerf for this thickness, the edge allowance); every
+  // value stays editable for a what-if. The parent remounts this view when
+  // those costed values change, so it never shows a stale setup.
+  const costed = {
+    width: sheetWidthMm != null ? String(sheetWidthMm) : '',
+    length: sheetLengthMm != null ? String(sheetLengthMm) : '',
+    kerf: kerfMm != null ? String(kerfMm) : '',
+    margin: edgeMarginMm != null ? String(edgeMarginMm) : '',
+  };
+  const [widthStr, setWidthStr] = useState(costed.width);
+  const [lengthStr, setLengthStr] = useState(costed.length);
   const [qtyStr, setQtyStr] = useState(String(quantity));
-  const [kerfStr, setKerfStr] = useState(String(kerfMm ?? 0));
-  const [marginStr, setMarginStr] = useState(String(edgeMarginMm ?? 2));
+  const [kerfStr, setKerfStr] = useState(costed.kerf);
+  const [marginStr, setMarginStr] = useState(costed.margin);
+  const edited = widthStr !== costed.width || lengthStr !== costed.length || kerfStr !== costed.kerf || marginStr !== costed.margin;
 
   const qty = Number(qtyStr) || 0;
   const kerf = Number(kerfStr) || 0;
   const margin = Number(marginStr) || 0;
-  const activeSheet: { widthMm: number; lengthMm: number } = sheetMode === 'custom'
-    ? { widthMm: Number(customWidthStr) || 0, lengthMm: Number(customLengthStr) || 0 }
-    : (STANDARD_SHEETS.find((s) => s.key === sheetMode) ?? { widthMm: 1219, lengthMm: 2438 });
+  const activeSheet = { widthMm: Number(widthStr) || 0, lengthMm: Number(lengthStr) || 0 };
 
   const { data, isLoading, isError, error } = useTrueNest(
     bomItemId, qty, activeSheet.widthMm, activeSheet.lengthMm, { kerfMm: kerf, edgeMarginMm: margin },
   );
 
-  // The real part outline is CAD-static (independent of sheet size), so
-  // once ANY sheet size has successfully loaded it, this bbox/area stays
-  // valid for ranking the other standard sizes too -- no extra true-nest
-  // calls needed just to populate the preset comparison below.
+  // The real part outline does not depend on the sheet, so once any nest has
+  // loaded it ranks every candidate sheet without more nest calls.
   const partGeometry = useMemo(() => {
     if (!data || data.outlinePointsMm.length < 3) return null;
     return { ...boundingBoxMm(data.outlinePointsMm), areaMm2: shoelaceAreaMm2(data.outlinePointsMm) };
   }, [data]);
-
-  const presetEstimates = useMemo(() => {
-    if (!partGeometry) return null;
-    return STANDARD_SHEETS.map((s) => {
-      const partsPerSheet = estimateRectPartsPerSheet(s.widthMm, s.lengthMm, partGeometry.widthMm, partGeometry.lengthMm, kerf, margin);
-      const utilizationPct = partsPerSheet > 0 ? (partsPerSheet * partGeometry.areaMm2) / (s.widthMm * s.lengthMm) * 100 : 0;
-      return { ...s, partsPerSheet, utilizationPct };
-    });
-  }, [partGeometry, kerf, margin]);
-
-  // Recommended = highest yield (utilization%) among the 3 standard sizes --
-  // for a fixed part/thickness/material this ranks identically to the md's
-  // own "lowest input weight per part" rule (see estimateRectPartsPerSheet's
-  // doc comment), without needing a material density lookup to compute it.
-  const recommendedKey = useMemo(() => {
-    if (!presetEstimates || presetEstimates.every((p) => p.partsPerSheet === 0)) return null;
-    return presetEstimates.reduce((best, cur) => (cur.utilizationPct > best.utilizationPct ? cur : best)).key;
-  }, [presetEstimates]);
+  const recommendations = useMemo(
+    () => recommendSheets(candidateSheets ?? [], partGeometry, kerf, margin),
+    [candidateSheets, partGeometry, kerf, margin],
+  );
+  const pickSheet = (s: CandidateSheet) => { setWidthStr(String(s.widthMm)); setLengthStr(String(s.lengthMm)); setSelected(null); };
 
   const [selected, setSelected] = useState<{ type: 'part'; index: number } | { type: 'sheet' } | null>(null);
 
   const { svgRef, effectiveViewBox, handleWheel, handleMouseDown, handleMouseMove, handleMouseUp } =
     useSvgPanZoom(data?.sheetWidthMm, data?.sheetLengthMm);
 
-  // Switching sheet/cutting setup invalidates any part/sheet selection made
+  // Changing the sheet/cutting setup invalidates any part/sheet selection made
   // under the PREVIOUS true-nest result -- placements array is a fresh
   // layout each time, so a stale `index` could point at the wrong part.
-  const changeSheetMode = (key: string) => { setSheetMode(key); setSelected(null); };
+  const resetToCosted = () => {
+    setWidthStr(costed.width); setLengthStr(costed.length);
+    setKerfStr(costed.kerf); setMarginStr(costed.margin); setSelected(null);
+  };
 
   // ── Apply this view's sheet selection to the Raw Material record ─────────
   // Self-contained: resolves the material's real density and the item's
@@ -213,50 +177,68 @@ export function NestView({
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <div className="shrink-0 border-b border-[#555555] bg-[#3a3a3a] text-white px-4 py-3 space-y-3">
-        <div>
-          <p className="text-[10px] uppercase tracking-wider text-white/50 font-semibold mb-1.5">Standard sheet sizes</p>
-          <div className="flex flex-wrap gap-2">
-            {STANDARD_SHEETS.map((s) => {
-              const est = presetEstimates?.find((p) => p.key === s.key);
-              const isRecommended = recommendedKey === s.key;
-              const isActive = sheetMode === s.key;
-              return (
-                <button
-                  key={s.key}
-                  onClick={() => { changeSheetMode(s.key); }}
-                  className={`text-left rounded border px-3 py-1.5 text-xs transition-colors ${
-                    isActive ? 'bg-blue-600 border-blue-400' : 'bg-[#4a4a4a] border-[#666666] hover:bg-[#565656]'
-                  }`}
-                >
-                  <div className="flex items-center gap-1.5 font-medium">
-                    {s.label}
-                    {isRecommended && (
-                      <span className="text-[9px] uppercase tracking-wide bg-emerald-500 text-black rounded px-1 py-0.5">Recommended</span>
-                    )}
-                  </div>
-                  <div className="text-white/60 mt-0.5">
-                    {est ? `~${est.partsPerSheet.toString()} parts/sheet · ${est.utilizationPct.toFixed(1)}% est. yield` : 'estimate pending'}
-                  </div>
-                </button>
-              );
-            })}
-            <button
-              onClick={() => { changeSheetMode('custom'); }}
-              className={`rounded border px-3 py-1.5 text-xs font-medium transition-colors ${
-                sheetMode === 'custom' ? 'bg-blue-600 border-blue-400' : 'bg-[#4a4a4a] border-[#666666] hover:bg-[#565656]'
-              }`}
-            >
-              Custom
-            </button>
-          </div>
-          <p className="text-[10px] text-white/40 mt-1.5 leading-snug">
-            Estimated parts/sheet above use a kerf-adjusted bounding-rectangle count (per laser_cutting_costing_params.md), only to rank the 3 standard sizes — the actual nest below always uses the real part silhouette.
+        <div className="flex items-start justify-between gap-3 text-xs">
+          <p className="text-white/70 leading-snug">
+            <span className="text-white font-medium">Costed setup:</span>{' '}
+            {sheetSource ? `${sheetSource} — ` : ''}
+            {!(costed.width && costed.length) && !costed.kerf
+              ? 'this part has not been nested by costing yet — pick a sheet below and enter kerf and edge margin'
+              : <>
+                  {costed.width && costed.length ? `${costed.width} × ${costed.length} mm` : 'no costed sheet'}
+                  {costed.kerf ? ` · kerf ${costed.kerf} mm (part-spacing table${thicknessMm ? `, ${thicknessMm} mm sheet` : ''})` : ' · kerf: no part-spacing row for this thickness'}
+                </>}
+            {costed.margin ? ` · edge margin ${costed.margin} mm` : ''}
           </p>
+          {edited && (
+            <Button size="sm" variant="secondary" className="h-6 text-[11px] shrink-0" onClick={resetToCosted}>
+              Reset to costed setup
+            </Button>
+          )}
         </div>
 
+        {recommendations.length > 0 && (
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-white/50 font-semibold mb-1.5">Recommended sheets</p>
+            <div className="flex flex-wrap gap-2">
+              {recommendations.map((s) => {
+                const isActive = activeSheet.widthMm === s.widthMm && activeSheet.lengthMm === s.lengthMm;
+                const isCosted = String(s.widthMm) === costed.width && String(s.lengthMm) === costed.length;
+                return (
+                  <button
+                    key={`${s.widthMm}x${s.lengthMm}`}
+                    onClick={() => { pickSheet(s); }}
+                    title={s.source}
+                    className={`text-left rounded border px-3 py-1.5 text-xs transition-colors ${
+                      isActive ? 'bg-blue-600 border-blue-400' : 'bg-[#4a4a4a] border-[#666666] hover:bg-[#565656]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-medium">
+                      {s.widthMm} × {s.lengthMm} mm
+                      {s.recommended && (
+                        <span className="text-[9px] uppercase tracking-wide bg-emerald-500 text-black rounded px-1 py-0.5">Recommended</span>
+                      )}
+                      {isCosted && (
+                        <span className="text-[9px] uppercase tracking-wide bg-sky-400 text-black rounded px-1 py-0.5">Costed</span>
+                      )}
+                    </div>
+                    <div className="text-white/60 mt-0.5">
+                      {s.partsPerSheet != null && s.utilizationPct != null
+                        ? `~${s.partsPerSheet.toString()} parts/sheet · ${s.utilizationPct.toFixed(1)}% est. yield`
+                        : 'estimate after the part outline loads'}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[10px] text-white/40 mt-1.5 leading-snug">
+              Ranked by estimated yield (lowest input weight per part, laser_cutting_costing_params §6) from the machine library's laser sheets and the standard sheet that fit the selected laser's bed. The nest below always uses the real part silhouette.
+            </p>
+          </div>
+        )}
+
         <div className="grid grid-cols-5 gap-2">
-          <LabeledInput label="Sheet width (mm)" value={customWidthStr} onChange={(v) => { setCustomWidthStr(v); setSheetMode('custom'); setSelected(null); }} />
-          <LabeledInput label="Sheet length (mm)" value={customLengthStr} onChange={(v) => { setCustomLengthStr(v); setSheetMode('custom'); setSelected(null); }} />
+          <LabeledInput label="Sheet width (mm)" value={widthStr} onChange={(v) => { setWidthStr(v); setSelected(null); }} />
+          <LabeledInput label="Sheet length (mm)" value={lengthStr} onChange={(v) => { setLengthStr(v); setSelected(null); }} />
           <LabeledInput label="Quantity" value={qtyStr} onChange={setQtyStr} />
           <LabeledInput label="Kerf (mm)" value={kerfStr} onChange={setKerfStr} />
           <LabeledInput label="Edge margin (mm)" value={marginStr} onChange={setMarginStr} />
@@ -268,6 +250,11 @@ export function NestView({
           <div className="flex flex-1 items-center justify-center text-white/70 gap-2">
             <Loader2 className="h-5 w-5 animate-spin" />
             <span className="text-sm">Computing true nest…</span>
+          </div>
+        ) : !(activeSheet.widthMm > 0 && activeSheet.lengthMm > 0) ? (
+          // No sheet means no nest was requested — not a geometry gap.
+          <div className="flex flex-1 items-center justify-center text-white/70 text-sm text-center px-6">
+            Choose a sheet above (or enter its width and length) to nest this part.
           </div>
         ) : isError || !data ? (
           <div className="flex flex-1 items-center justify-center text-white/70 text-sm text-center px-6">

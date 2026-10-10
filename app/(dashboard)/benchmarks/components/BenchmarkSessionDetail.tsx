@@ -17,7 +17,6 @@ import {
   useDeleteBenchmarkSession,
 } from '@/lib/api/hooks/useBenchmarkSessions';
 import { useProjects } from '@/lib/api/hooks/useProjects';
-import { useRawMaterials } from '@/lib/api/hooks/useRawMaterials';
 import { useVendors } from '@/lib/api/hooks/useVendors';
 import { useProcesses } from '@/lib/api/hooks/useProcesses';
 import { ProjectSelection } from './ProjectSelection';
@@ -71,8 +70,6 @@ export function BenchmarkSessionDetail({ sessionId, onBack }: Props) {
   const { data: projectsData } = useProjects();
   const allProjects = (projectsData as any)?.projects ?? [];
 
-  const { data: rawMaterialsData } = useRawMaterials();
-  const rawMaterials = (rawMaterialsData as any)?.items ?? [];
 
   const { data: vendorsData } = useVendors();
   const vendors = (vendorsData as any)?.vendors ?? [];
@@ -442,7 +439,6 @@ export function BenchmarkSessionDetail({ sessionId, onBack }: Props) {
             selectedProjects={selectedProjects}
             processes={processes}
             vendors={vendors}
-            rawMaterials={rawMaterials}
             onBack={() => setActiveTab('boms')}
           />
         </TabsContent>

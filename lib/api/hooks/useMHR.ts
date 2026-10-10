@@ -20,6 +20,7 @@ export const mhrKeys = {
   all: ['mhr'] as const,
   lists: () => [...mhrKeys.all, 'list'] as const,
   list: (query?: MHRQuery) => [...mhrKeys.lists(), query] as const,
+  picker: (location?: string) => [...mhrKeys.lists(), 'picker', location ?? ''] as const,
   details: () => [...mhrKeys.all, 'detail'] as const,
   detail: (id: string) => [...mhrKeys.details(), id] as const,
 };
@@ -46,6 +47,20 @@ export function useMHRRecords(query?: MHRQuery, options?: { enabled?: boolean })
     // "no machines for this class" result from earlier in the session.
     refetchOnMount: 'always',
     throwOnError: false, // Graceful error handling
+  });
+}
+
+/** Slim machine rows for the process dialog's pickers (see mhrApi.getPickerRows). */
+export function useMHRPickerRows(location?: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: mhrKeys.picker(location),
+    queryFn: () => mhrApi.getPickerRows(location),
+    staleTime: 1000 * 60 * 5,
+    enabled: options?.enabled !== false,
+    retry: false,
+    refetchOnWindowFocus: false,
+    // Same reason as useMHRRecords: a machine added in HR Rates must show on the next open.
+    refetchOnMount: 'always',
   });
 }
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { VaveBomItem, VaveShouldCost, CreateVaveIdea } from '@/lib/api/vave';
+import { requireUserForAi } from '@/lib/server/auth';
 
 interface IdeationRequest {
   bomItems: VaveBomItem[];
@@ -8,6 +9,9 @@ interface IdeationRequest {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireUserForAi('vave-ideation');
+  if (!auth.ok) return auth.response;
+
   try {
     const { bomItems, focusAreas, shouldCostGaps }: IdeationRequest = await request.json();
 

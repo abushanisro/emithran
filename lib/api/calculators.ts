@@ -11,7 +11,7 @@ import { apiClient } from './client';
 
 export type CalculatorType = 'single' | 'multi_step' | 'dashboard';
 export type FieldType = 'number' | 'text' | 'select' | 'database_lookup' | 'calculated' | 'multi_select' | 'const' | 'bom' | 'table_lookup';
-export type DataSource = 'lhr' | 'mhr' | 'raw_materials' | 'processes' | 'manual' | 'sheet_metal_lookup';
+export type DataSource = 'lhr' | 'mhr' | 'raw_materials' | 'processes' | 'manual' | 'sheet_metal_lookup' | 'machining_lookup';
 export type FormulaType = 'expression' | 'multi_step' | 'conditional';
 export type DisplayFormat = 'number' | 'currency' | 'percentage';
 
@@ -362,7 +362,13 @@ export const calculatorsApi = {
   },
 
   // Sheet metal parameterized lookup tables
-  sheetMetalLookup: async (tableName: string, params: Record<string, any>): Promise<{ value: number | null; kerf?: number; sampleQty?: number; setupTimeMin?: number; row?: any }> => {
+  sheetMetalLookup: async (tableName: string, params: Record<string, any>): Promise<{
+    value: number | null; kerf?: number; sampleQty?: number; setupTimeMin?: number; row?: any;
+    // manual_stroke only: the resolver's account of the rows it used, and
+    // whether the selected machine's own bend cycle time won over the table.
+    resolution?: { policy?: string; nearestRows?: { columns: Record<string, string | number> }[] };
+    fromMachineSpec?: boolean;
+  }> => {
     return apiClient.post('/calculators/sheet-metal/lookup', { tableName, params }) as Promise<any>;
   },
 
