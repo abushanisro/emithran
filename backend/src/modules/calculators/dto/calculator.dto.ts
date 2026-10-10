@@ -18,13 +18,13 @@ import { IsOptionalBoolean } from '../../../common/decorators/validation.decorat
 // ENUMS
 // ============================================================================
 
-export enum CalculatorType {
+enum CalculatorType {
   SINGLE = 'single',
   MULTI_STEP = 'multi_step',
   DASHBOARD = 'dashboard',
 }
 
-export enum CalculatorCategory {
+enum CalculatorCategory {
   COSTING = 'costing',
   MATERIAL = 'material',
   PROCESS = 'process',
@@ -33,7 +33,7 @@ export enum CalculatorCategory {
   SHEET_METAL = 'sheet_metal',
 }
 
-export enum FieldType {
+enum FieldType {
   NUMBER = 'number',
   TEXT = 'text',
   SELECT = 'select',
@@ -44,7 +44,7 @@ export enum FieldType {
   TABLE_LOOKUP = 'table_lookup',
 }
 
-export enum DataSource {
+enum DataSource {
   LHR = 'lhr',
   MHR = 'mhr',
   RAW_MATERIALS = 'raw_materials',
@@ -54,13 +54,13 @@ export enum DataSource {
   ENGINEERING_BRIEF = 'engineering_brief', // part geometry: volume_mm3, length_mm, width_mm, height_mm, hole_count, surface_area_mm2
 }
 
-export enum FormulaType {
+enum FormulaType {
   EXPRESSION = 'expression',
   MULTI_STEP = 'multi_step',
   CONDITIONAL = 'conditional',
 }
 
-export enum DisplayFormat {
+enum DisplayFormat {
   NUMBER = 'number',
   CURRENCY = 'currency',
   PERCENTAGE = 'percentage',

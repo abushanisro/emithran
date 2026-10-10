@@ -16,7 +16,7 @@ import { BOMItemsService } from '../../../modules/bom-items/bom-items.service';
 import { type BlankOptimizerService } from '../../../modules/bom-items/costing/sheet-metal/machine/blank-optimizer.service';
 import { type SheetMetalLookupService } from '../../../modules/bom-items/costing/sheet-metal/lookup/sheet-metal-lookup.service';
 import { type MachiningLookupService } from '../../../modules/bom-items/costing/machining/lookup/machining-lookup.service';
-import { STANDARD_SHEETS, trueNestInputFingerprint } from '../../../modules/bom-items/costing/sheet-metal/machine/sheet-metal-nesting.engine';
+import { trueNestInputFingerprint, type NestingSheet } from '../../../modules/bom-items/costing/sheet-metal/machine/sheet-metal-nesting.engine';
 import { type CADAnalysisService } from '../../../modules/bom-items/services/cad-analysis.service';
 import { type RateResolutionService } from '../../../modules/bom-items/services/rate-resolution.service';
 import { type MaterialResolutionService } from '../../../modules/bom-items/services/material-resolution.service';
@@ -36,8 +36,12 @@ interface TrueShapeNestCostingResult {
 
 type ResolveTrueShapeNestCosting = (
   itemId: string, summary: unknown, netWeightKg: number, densityKgM3: number, thicknessMm: number,
-  kerfMm: number, edgeMarginMm: number, userId: string, accessToken: string,
+  kerfMm: number, edgeMarginMm: number, userId: string, accessToken: string, sheet: NestingSheet,
 ) => Promise<TrueShapeNestCostingResult>;
+
+// The sheet the part is nested on (in production: the selected laser's
+// nominal sheet, else the standard sheet — BOMItemsService.resolveNestingSheet).
+const SHEET: NestingSheet = { widthMm: 1500, lengthMm: 3000 };
 
 const OUTLINE = [[0, 0], [50, 0], [50, 100], [0, 100]]; // 50x100mm rectangle -- exact shape irrelevant, just needs >=3 points
 const NET_WEIGHT_KG = 1.234;
@@ -84,48 +88,48 @@ function buildService(computeTrueNest: jest.Mock) {
     .mockResolvedValue({} as unknown as BOMItemResponseDto);
   const resolveTrueShapeNestCosting = (service as unknown as { resolveTrueShapeNestCosting: ResolveTrueShapeNestCosting })
     .resolveTrueShapeNestCosting.bind(service);
-  const call = (summary: unknown, kerfMm = 0.56, edgeMarginMm = 2) =>
-    resolveTrueShapeNestCosting('item-1', summary, NET_WEIGHT_KG, DENSITY_KG_M3, THICKNESS_MM, kerfMm, edgeMarginMm, 'user-1', 'token-1');
+  const call = (summary: unknown, kerfMm = 0.56, edgeMarginMm = 2, sheet: NestingSheet = SHEET) =>
+    resolveTrueShapeNestCosting('item-1', summary, NET_WEIGHT_KG, DENSITY_KG_M3, THICKNESS_MM, kerfMm, edgeMarginMm, 'user-1', 'token-1', sheet);
   return { findOneSpy, updateSpy, call };
 }
 
 describe('resolveTrueShapeNestCosting — deterministic true-shape costing (no rectangle pre-filter, no background warming)', () => {
-  it('evaluates EVERY viable standard sheet (not rectangle-prefiltered) and selects the lowest gross weight/part', async () => {
-    // Craft per-candidate partsPerSheet so a SMALLER sheet wins on gross
-    // weight/part despite placing fewer raw parts than a larger one --
-    // this is the exact scenario a rectangle-grid pre-filter would get
-    // wrong (it would rank by raw count, not weight/part).
-    const partsPerSheetBySize: Record<string, number> = {
-      '1000x2000': 20, // 1000*2000*1.6/1e9*7850=25.12kg / 20 = 1.256 kg/part
-      '1250x2500': 30, // 39.25kg / 30 = 1.308 kg/part
-      '1500x3000': 45, // 56.52kg / 45 = 1.256 kg/part
-      '2000x4000': 60, // 100.48kg / 60 = 1.675 kg/part -- worse despite most raw parts
-      '2500x5000': 77, // 157.0kg / 77 = 2.039 kg/part -- worse still
-    };
-    const computeTrueNest = jest.fn(({ sheetWidthMm, sheetLengthMm }: { sheetWidthMm: number; sheetLengthMm: number }) => {
-      const parts = partsPerSheetBySize[`${sheetWidthMm.toString()}x${sheetLengthMm.toString()}`];
-      return Promise.resolve({ result: { partsPerSheet: parts, utilizationPct: 999 /* must be IGNORED -- see mass-based utilization test below */ }, reason: '' });
-    });
+  it('nests on exactly the sheet it is given (the selected laser sheet) — one cad-engine call', async () => {
+    const computeTrueNest = jest.fn(() => Promise.resolve({
+      result: { partsPerSheet: 45, utilizationPct: 999 /* must be IGNORED -- recomputed from mass */ }, reason: '',
+    }));
     const { updateSpy, call } = buildService(computeTrueNest);
 
     const result = await call({ flatPatternOutlinePointsMm: OUTLINE, flatPatternHolesMm: [] });
 
-    // Every one of the 5 standard sheets must have been evaluated -- no pre-filter skipped any.
-    expect(computeTrueNest).toHaveBeenCalledTimes(STANDARD_SHEETS.length);
-
-    // 1000x2000 and 1500x3000 tie at 1.256 kg/part -- either is a correct
-    // "cheapest" answer; the real assertion is that the winner is NOT the
-    // 2500x5000 sheet a raw-parts-count ranking would have picked.
+    expect(computeTrueNest).toHaveBeenCalledTimes(1);
+    expect(computeTrueNest).toHaveBeenCalledWith(expect.objectContaining({ sheetWidthMm: 1500, sheetLengthMm: 3000, kerfMm: 0.56, edgeMarginMm: 2 }));
     if (!result.selection) throw new Error('expected a non-null selection');
-    const selection = result.selection;
-    expect(`${selection.sheetWidthMm.toString()}x${selection.sheetLengthMm.toString()}`).not.toBe('2500x5000');
-    expect(selection.grossWeightPerPartKg).toBeLessThan(1.7);
+    // 1500 x 3000 x 1.6 mm x 7850 kg/m3 = 56.52 kg / 45 parts = 1.256 kg/part
+    expect(result.selection.sheetWeightKg).toBeCloseTo(56.52, 2);
+    expect(result.selection.grossWeightPerPartKg).toBeCloseTo(1.256, 3);
+    expect(result.selection.utilisationPct).toBeLessThanOrEqual(100);
+    expect(updateSpy).toHaveBeenCalledTimes(1); // persisted before returning
+  });
 
-    // Utilization must be recomputed from real mass, never the mocked 999% passed back.
-    expect(selection.utilisationPct).toBeLessThanOrEqual(100);
+  it('does not reuse a cached nest made on a different sheet (the selected laser changed)', async () => {
+    const computeTrueNest = jest.fn(() => Promise.resolve({ result: { partsPerSheet: 20, utilizationPct: 0 }, reason: '' }));
+    const { call } = buildService(computeTrueNest);
+    const cachedOn1500x3000 = {
+      flatPatternOutlinePointsMm: OUTLINE,
+      flatPatternHolesMm: [],
+      trueNestCostingCache: {
+        sheetWidthMm: 1500, sheetLengthMm: 3000, kerfMm: 0.56, edgeMarginMm: 2,
+        partsPerSheet: 45, utilizationPct: 55.0, sheetWeightKg: 56.52, grossWeightPerPartKg: 1.256,
+        inputFingerprint: fingerprintFor({ flatPatternHolesMm: [] }),
+      },
+    };
 
-    // Result was persisted (cached) before returning.
-    expect(updateSpy).toHaveBeenCalledTimes(1);
+    const result = await call(cachedOn1500x3000, 0.56, 2, { widthMm: 1524, lengthMm: 3048 });
+
+    expect(computeTrueNest).toHaveBeenCalledWith(expect.objectContaining({ sheetWidthMm: 1524, sheetLengthMm: 3048 }));
+    expect(result.selection?.sheetWidthMm).toBe(1524);
+    expect(result.selection?.partsPerSheet).toBe(20);
   });
 
   it('is deterministic: a cache hit returns the exact same result without calling cad-engine again', async () => {
@@ -174,7 +178,7 @@ describe('resolveTrueShapeNestCosting — deterministic true-shape costing (no r
     expect(computeTrueNest).toHaveBeenCalled();
   });
 
-  it('falls back with a specific reason when every candidate genuinely fails (never fabricates a result)', async () => {
+  it('falls back with a specific reason when the part cannot be nested on the sheet (never fabricates a result)', async () => {
     const computeTrueNest = jest.fn(() => Promise.resolve({ result: null, reason: 'part does not fit this sheet at any rotation' }));
     const { updateSpy, call } = buildService(computeTrueNest);
 
@@ -182,7 +186,7 @@ describe('resolveTrueShapeNestCosting — deterministic true-shape costing (no r
 
     expect(result.selection).toBeNull();
     expect(result.reason).toContain('does not fit');
-    expect(updateSpy).not.toHaveBeenCalled(); // nothing to cache when every candidate failed
+    expect(updateSpy).not.toHaveBeenCalled(); // nothing to cache when the nest failed
   });
 
   it('returns a real, disclosed reason (never attempts cad-engine) when no real outline exists yet', async () => {
@@ -220,7 +224,7 @@ describe('RTP2 MAG2 FRONTFRAME live regression -- SECC 1.6mm, 1250x2500mm sheet,
   it('A: 1250x2500x1.6mm SECC (density 7850) physical sheet weight is ~39.25kg', async () => {
     const computeTrueNest = mockOnlyCandidateFits(1250, 2500, 19);
     const { call } = buildService(computeTrueNest);
-    const result = await call({ flatPatternOutlinePointsMm: OUTLINE, flatPatternHolesMm: [] });
+    const result = await call({ flatPatternOutlinePointsMm: OUTLINE, flatPatternHolesMm: [] }, 0.56, 2, { widthMm: 1250, lengthMm: 2500 });
     if (!result.selection) throw new Error('expected a non-null selection');
     expect(result.selection.sheetWeightKg).toBeCloseTo(39.25, 1);
   });
@@ -228,7 +232,7 @@ describe('RTP2 MAG2 FRONTFRAME live regression -- SECC 1.6mm, 1250x2500mm sheet,
   it('B+C: 19 parts/sheet gives ~2.0658 kg gross/part and ~59.7% mass-based utilization', async () => {
     const computeTrueNest = mockOnlyCandidateFits(1250, 2500, 19);
     const { call } = buildService(computeTrueNest);
-    const result = await call({ flatPatternOutlinePointsMm: OUTLINE, flatPatternHolesMm: [] });
+    const result = await call({ flatPatternOutlinePointsMm: OUTLINE, flatPatternHolesMm: [] }, 0.56, 2, { widthMm: 1250, lengthMm: 2500 });
     if (!result.selection) throw new Error('expected a non-null selection');
     expect(result.selection.partsPerSheet).toBe(19);
     expect(result.selection.grossWeightPerPartKg).toBeCloseTo(2.0658, 3);
@@ -268,7 +272,7 @@ describe('RTP2 batch-250 consumption math (D+E) -- same formula getCostSummary a
 // ── The Reanalyze hang (root-caused 2026-09-09 from a live timeout) ───────────
 //
 // Reanalyze rebuilds featureGraph.summary from scratch, which used to destroy
-// trueNestCostingCache. An uncached resolve walks all 5 STANDARD_SHEETS
+// trueNestCostingCache. An uncached resolve then walked all 5 candidate sheets
 // sequentially against cad-engine's single-threaded /nest -- 13-30s per sheet on
 // real parts -- and BOTH cost-summary and route-comparison resolve it on the
 // next page load, concurrently. Together that is minutes of work, and the
@@ -311,13 +315,13 @@ describe('resolveTrueShapeNestCosting — surviving Reanalyze without going stal
       trueNestCostingCache: cacheFor([]),
     });
 
-    expect(computeTrueNest).toHaveBeenCalledTimes(STANDARD_SHEETS.length);
+    expect(computeTrueNest).toHaveBeenCalledTimes(1);
   });
 
-  it('does the sheet walk once when two requests resolve the same part concurrently', async () => {
+  it('nests once when two requests resolve the same part concurrently', async () => {
     // cost-summary and route-comparison, both on the same page load, both
-    // missing the cache. Before single-flighting, this ran the whole 5-sheet
-    // walk twice — visible in the cad-engine log as every sheet size requested
+    // missing the cache. Before single-flighting, this ran the whole nest
+    // twice — visible in the cad-engine log as every sheet size requested
     // twice, back to back.
     const computeTrueNest = jest.fn(() => Promise.resolve({ result: { partsPerSheet: 50, utilizationPct: 99 }, reason: '' }));
     const { call } = buildService(computeTrueNest);
@@ -325,7 +329,7 @@ describe('resolveTrueShapeNestCosting — surviving Reanalyze without going stal
 
     const [a, b] = await Promise.all([call(summary), call(summary)]);
 
-    expect(computeTrueNest).toHaveBeenCalledTimes(STANDARD_SHEETS.length);
+    expect(computeTrueNest).toHaveBeenCalledTimes(1);
     expect(a).toEqual(b);
   });
 
@@ -337,6 +341,6 @@ describe('resolveTrueShapeNestCosting — surviving Reanalyze without going stal
     computeTrueNest.mockClear();
     await call({ flatPatternOutlinePointsMm: OUTLINE, flatPatternHolesMm: [{ x: 5, y: 5, d: 3 }] });
 
-    expect(computeTrueNest).toHaveBeenCalledTimes(STANDARD_SHEETS.length);
+    expect(computeTrueNest).toHaveBeenCalledTimes(1);
   });
 });

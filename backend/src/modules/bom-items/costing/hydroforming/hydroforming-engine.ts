@@ -77,7 +77,7 @@ export interface BlankPress {
   setupTimeHr: number | null;
 }
 
-export interface HydroformingInput {
+interface HydroformingInput {
   shell: DrawnShell;
   thicknessMm: number;
   densityKgM3: number;

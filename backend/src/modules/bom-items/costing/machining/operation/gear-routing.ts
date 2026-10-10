@@ -29,7 +29,7 @@ export interface GearRoute {
 const callout = (v: unknown): string | null =>
   typeof v === 'string' && v.trim() !== '' && v.trim().toLowerCase() !== 'none' ? v.trim() : null;
 
-export function findGearQuality(rows: GearQualityRow[], quality: string): GearQualityRow | null {
+function findGearQuality(rows: GearQualityRow[], quality: string): GearQualityRow | null {
   const q = quality.trim().toUpperCase();
   const din = /^DIN\s*(\d+)$/.exec(q);
   return rows.find((r) =>

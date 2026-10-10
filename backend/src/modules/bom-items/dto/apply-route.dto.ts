@@ -73,7 +73,7 @@ export interface ApplyRouteResult {
 // See bom-items.controller.ts's applyCustomRoute for both paths.
 const VALID_BASE_CUTTING_ROUTE_IDS = getCuttingRouteIds();
 
-export class ApplyCustomRouteStepDto {
+class ApplyCustomRouteStepDto {
   @IsString()
   process!: string;
 

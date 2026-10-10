@@ -17,14 +17,14 @@ export interface CalculatorFieldRow {
   display_order?: number | null;
 }
 
-export interface CalculatorFormulaRow {
+interface CalculatorFormulaRow {
   id: string;
   formula_name?: string | null;
   formula_expression?: string | null;
   execution_order?: number | null;
 }
 
-export interface EvaluatorLogger {
+interface EvaluatorLogger {
   log: (message: string) => void;
   error: (message: string) => void;
   warn: (message: string) => void;
@@ -41,7 +41,7 @@ export function normalizeFieldName(name: string): string {
     .replace(/^_+|_+$/g, '');
 }
 
-export interface EvaluateFormulasResult {
+interface EvaluateFormulasResult {
   // Keyed by both field/formula id AND field_name/formula_name, matching
   // the response shape the frontend already reads by name.
   results: Record<string, any>;

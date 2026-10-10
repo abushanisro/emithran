@@ -133,7 +133,7 @@ export function resolveCoreReference(rows: {
   return { reference: missing.length ? null : reference, missing };
 }
 
-export interface CoreRouteInput {
+interface CoreRouteInput {
   reference: CoreReference;
   /** The die-casting calculators (database), keyed by calculator key. */
   calculators: ReferenceCalculators | null;

@@ -16,7 +16,7 @@ import MANIFEST from './memory-reference-domains.json';
  * listing keeps the newest source_version per key, so mixing them would show
  * another folder's value under Machining.
  */
-export interface MemoryDomain {
+interface MemoryDomain {
   key: string;
   label: string;
   folder: string;

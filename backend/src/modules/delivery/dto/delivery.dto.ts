@@ -32,7 +32,7 @@ export enum DeliveryStatus {
   CANCELLED = 'cancelled'
 }
 
-export enum DeliveryPriority {
+enum DeliveryPriority {
   LOW = 'low',
   STANDARD = 'standard',
   HIGH = 'high',
@@ -145,7 +145,7 @@ export class CreateDeliveryAddressDto {
 }
 
 // Delivery Item DTOs
-export class CreateDeliveryItemDto {
+class CreateDeliveryItemDto {
   @ApiProperty()
   @IsUUID()
   qualityApprovedItemId: string;

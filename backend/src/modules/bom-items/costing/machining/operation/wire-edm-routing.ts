@@ -22,7 +22,7 @@
 // proxy in the data available today — a disclosed, deliberate scope limit,
 // not an oversight.
 
-export const NO_HEAT_TREAT_CALLOUT_VALUES = new Set([
+const NO_HEAT_TREAT_CALLOUT_VALUES = new Set([
   'none', 'n/a', 'na', 'as required', 'not required', 'no', 'n/r',
 ]);
 
@@ -40,24 +40,24 @@ export function isRealHeatTreatmentCallout(heatTreatment: string | null | undefi
   return normalized.length > 0 && !NO_HEAT_TREAT_CALLOUT_VALUES.has(normalized);
 }
 
-export interface WireEdmOccurrenceLike {
+interface WireEdmOccurrenceLike {
   length_mm?: number | null;
   [key: string]: unknown;
 }
 
-export interface WireEdmFeatureLike {
+interface WireEdmFeatureLike {
   feature_type?: string;
   variant?: string;
   occurrences?: WireEdmOccurrenceLike[];
   [key: string]: unknown;
 }
 
-export interface WireEdmCandidate {
+interface WireEdmCandidate {
   lengthMm: number;
   count: number;
 }
 
-export interface WireEdmSplitResult {
+interface WireEdmSplitResult {
   /** fgv2Features with every real "slot" feature removed entirely (only
    * when a real heat-treat callout is present — see isRealHeatTreatmentCallout)
    * — pass this, not the original array, into buildOperationSequence() so a

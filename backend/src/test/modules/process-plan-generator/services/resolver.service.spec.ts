@@ -6,8 +6,8 @@ import type { ManufacturingRulesService } from '../../../../modules/manufacturin
 
 const candidates: CandidateSet = {
   rawMaterials: [
-    { candidateId: 'rm-1', dbId: 'mat-1', materialGroup: 'Ferrous & Non-Ferrous', material: 'Aluminium 6061', grade: '6061-T6', densityKgPerM3: 2700, unitCostInrPerKg: 342, location: 'India-Bangalore', score: 0.9 },
-    { candidateId: 'rm-2', dbId: 'mat-2', materialGroup: 'Ferrous & Non-Ferrous', material: 'EN8', grade: 'EN8', densityKgPerM3: 7850, unitCostInrPerKg: 78, location: 'India-Bangalore', score: 0.6 },
+    { candidateId: 'rm-1', dbId: 'mat-1', materialGroup: 'Ferrous & Non-Ferrous', materialClass: 'Non-Ferrous', material: 'Aluminium 6061', grade: '6061-T6', densityKgPerM3: 2700, unitCostInrPerKg: 342, location: 'India-Bangalore', score: 0.9 },
+    { candidateId: 'rm-2', dbId: 'mat-2', materialGroup: 'Ferrous & Non-Ferrous', materialClass: 'Non-Ferrous', material: 'EN8', grade: 'EN8', densityKgPerM3: 7850, unitCostInrPerKg: 78, location: 'India-Bangalore', score: 0.6 },
   ],
   machines: [
     { candidateId: 'mc-1', dbId: 'mhr-1', machineName: 'ASC Lathe 320', commodityCode: 'LATHE', description: 'CNC Lathe', rateInrPerHour: 540, location: 'India-Bangalore', processFamily: 'turned', score: 0.9 },
@@ -65,6 +65,8 @@ describe('ResolverService', () => {
     const raw = out.draftLines.find((l) => l.kind === 'raw_material')!;
     expect((raw.data as any).materialId).toBe('mat-1');
     expect((raw.data as any).unitCost).toBe(342);
+    // The category saved on the line is the candidate's real class, never a keyword guess.
+    expect((raw.data as any).materialCategory).toBe('Non-Ferrous');
 
     const proc = out.draftLines.find((l) => l.kind === 'process')!;
     expect((proc.data as any).processId).toBe('proc-1');
@@ -137,7 +139,7 @@ describe('ResolverService', () => {
     const candidatesNoGrade: CandidateSet = {
       ...candidates,
       rawMaterials: [
-        { candidateId: 'rm-3', dbId: 'mat-3', materialGroup: 'Ferrous & Non-Ferrous', material: 'Aluminium', grade: '', densityKgPerM3: 2700, unitCostInrPerKg: 300, location: 'India-Bangalore', score: 0.9 },
+        { candidateId: 'rm-3', dbId: 'mat-3', materialGroup: 'Ferrous & Non-Ferrous', materialClass: 'Non-Ferrous', material: 'Aluminium', grade: '', densityKgPerM3: 2700, unitCostInrPerKg: 300, location: 'India-Bangalore', score: 0.9 },
       ],
     };
     const planNoGrade: AbstractPlan = {

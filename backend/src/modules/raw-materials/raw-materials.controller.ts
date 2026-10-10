@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Post,
+  HttpCode,
   Put,
   Delete,
   Body,
@@ -21,7 +22,7 @@ import { MaterialStockPricesService } from './services/material-stock-prices.ser
 import { SaveRawMaterialEditorDto } from './dto/raw-material-editor.dto';
 import { RawMaterialEditorService } from './services/raw-material-editor.service';
 import { CreateRawMaterialDto, UpdateRawMaterialDto, QueryRawMaterialsDto } from './dto/raw-materials.dto';
-import { MaterialShape } from './constants/material-categories.constants';
+import { MATERIAL_CLASSES, MaterialShape } from './constants/raw-material.constants';
 import { RawMaterialResponseDto, RawMaterialListResponseDto } from './dto/raw-material-response.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
@@ -49,17 +50,20 @@ export class RawMaterialsController {
     @AccessToken() token: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
-    @Query('category') category?: string,
+    @Query('materialClass') materialClass?: string,
     @Query('search') search?: string,
     @Query('partFamily') partFamily?: string,
   ) {
     const pageNum = page ? parseInt(page) : 1;
     const limitNum = limit ? parseInt(limit) : 50;
+    if (materialClass && !(MATERIAL_CLASSES as readonly string[]).includes(materialClass)) {
+      throw new BadRequestException(`materialClass must be one of: ${MATERIAL_CLASSES.join(', ')}`);
+    }
 
     return this.rawMaterialsService.getEnhancedMaterials({
       page: pageNum,
       limit: limitNum,
-      category,
+      ...(materialClass ? { materialClass } : {}),
       search,
       partFamily,
     }, user.id, token);
@@ -101,100 +105,13 @@ export class RawMaterialsController {
     return this.rawMaterialsService.getStockPrices(token, location);
   }
 
-  @Get('statistics')
-  @ApiOperation({ summary: 'Get material category statistics' })
-  @ApiResponse({ status: 200, description: 'Category statistics retrieved successfully' })
-  async getCategoryStatistics(@CurrentUser() user: User, @AccessToken() token: string) {
-    return this.rawMaterialsService.getMaterialCategoryStatistics(user.id, token);
-  }
-
-  @Get('plastic-rubber')
-  @ApiOperation({ summary: 'Get plastic and rubber materials' })
-  @ApiResponse({ status: 200, description: 'Plastic & rubber materials retrieved successfully', type: RawMaterialListResponseDto })
-  async getPlasticRubberMaterials(@Query() query: QueryRawMaterialsDto, @CurrentUser() user: User, @AccessToken() token: string): Promise<RawMaterialListResponseDto> {
-    return this.rawMaterialsService.getPlasticRubberMaterials(query, user.id, token);
-  }
-
-  @Get('ferrous')
-  @ApiOperation({ summary: 'Get ferrous materials' })
-  @ApiResponse({ status: 200, description: 'Ferrous materials retrieved successfully', type: RawMaterialListResponseDto })
-  async getFerrousMaterials(@Query() query: QueryRawMaterialsDto, @CurrentUser() user: User, @AccessToken() token: string): Promise<RawMaterialListResponseDto> {
-    return this.rawMaterialsService.getFerrousMaterials(query, user.id, token);
-  }
-
-  @Post('plastic-rubber')
-  @UseGuards(OrganizationContextGuard)
-  @ApiOperation({ summary: 'Create a new plastic or rubber material' })
-  @ApiResponse({ status: 201, description: 'Plastic/rubber material created successfully', type: RawMaterialResponseDto })
-  async createPlasticRubberMaterial(
-    @Body() createDto: CreateRawMaterialDto,
-    @CurrentUser() user: User,
-    @AccessToken() token: string,
-    @CurrentOrganization() organizationId: string,
-  ): Promise<RawMaterialResponseDto> {
-    return this.rawMaterialsService.createPlasticRubberMaterial(createDto, user.id, token, organizationId);
-  }
-
-  @Post('ferrous')
-  @UseGuards(OrganizationContextGuard)
-  @ApiOperation({ summary: 'Create a new ferrous material' })
-  @ApiResponse({ status: 201, description: 'Ferrous material created successfully', type: RawMaterialResponseDto })
-  async createFerrousMaterial(
-    @Body() createDto: CreateRawMaterialDto,
-    @CurrentUser() user: User,
-    @AccessToken() token: string,
-    @CurrentOrganization() organizationId: string,
-  ): Promise<RawMaterialResponseDto> {
-    return this.rawMaterialsService.createFerrousMaterial(createDto, user.id, token, organizationId);
-  }
-
-  @Post('ferrous/import')
-  @UseGuards(OrganizationContextGuard)
-  @UseInterceptors(FileInterceptor('file'))
-  @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Import ferrous materials from Excel file' })
-  @ApiResponse({ status: 201, description: 'Ferrous materials imported successfully' })
-  async importFerrousFromExcel(
-    @UploadedFile() file: Express.Multer.File,
-    @CurrentUser() user: User,
-    @AccessToken() token: string,
-    @CurrentOrganization() organizationId: string,
-  ) {
-    if (!file) {
-      throw new BadRequestException('Excel file is required');
-    }
-
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(file.buffer as any);
-    const worksheet = workbook.getWorksheet(1);
-
-    if (!worksheet) {
-      throw new BadRequestException('No worksheet found in Excel file');
-    }
-
-    const data: any[] = [];
-    const headers: string[] = [];
-
-    worksheet.eachRow((row, rowNumber) => {
-      if (rowNumber === 1) {
-        row.eachCell((cell) => {
-          headers.push(cell.text);
-        });
-      } else {
-        const rowData: any = {};
-        row.eachCell((cell, colNumber) => {
-          const header = headers[colNumber - 1];
-          if (header) {
-            rowData[header] = cell.value;
-          }
-        });
-        if (Object.keys(rowData).length > 0) {
-          data.push(rowData);
-        }
-      }
-    });
-
-    return this.rawMaterialsService.importFerrousDataFromExcel(data, user.id, token, organizationId);
+  @Post('classes')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'The material class (Ferrous / Non-Ferrous / Plastic & Rubber) of each named material, exact match only' })
+  async materialClasses(@Body() body: { names?: unknown }, @AccessToken() token: string): Promise<Record<string, string | null>> {
+    const names = Array.isArray(body.names) ? body.names.filter((n): n is string => typeof n === 'string') : [];
+    if (names.length > 2000) throw new BadRequestException('At most 2000 names per request.');
+    return this.rawMaterialsService.materialClassesFor(names, token);
   }
 
   @Get('grouped')
@@ -234,8 +151,14 @@ export class RawMaterialsController {
 
   @Put(':id/editor')
   @ApiOperation({ summary: 'Save the edit form (core fields, property values, stock prices) in one transaction' })
-  async saveEditor(@Param('id') id: string, @Body() body: SaveRawMaterialEditorDto, @CurrentUser() user: User, @AccessToken() token: string) {
-    return this.editorService.save(id, body, user.id, token);
+  async saveEditor(
+    @Param('id') id: string,
+    @Body() body: SaveRawMaterialEditorDto,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+    @CurrentOrganization() organizationId: string | undefined,
+  ) {
+    return this.editorService.save(id, body, user.id, token, organizationId);
   }
 
   @Get(':id')
@@ -448,29 +371,13 @@ export class RawMaterialsController {
             materialTypeFromExcel = getColumnValue(rowData,
               'GROUP', 'Group', 'MaterialGroup', 'Material Group', 'material_group', 'MATERIALGROUP',
               'Material Type', 'MATERIAL TYPE', 'MaterialType', 'material_type');
+            // The group is the catalog the row came from: this template's own
+            // Category column, else the template itself. Never guessed from the
+            // name or the moulding parameters: the material class comes from
+            // material_type (raw_materials.material_class, migration 897 trigger).
             const rawCategory = getColumnValue(rowData,
               'CATEGORY', 'Category', 'MaterialCategory', 'Material Category');
-            materialGroup = rawCategory
-              ? this.mapMaterialGroupFromExcel(rawCategory)
-              : this.mapMaterialGroupFromExcel(materialTypeFromExcel || '');
-            // If the group isn't one of the two canonical values, decide based on
-            // meaningful plastic processing parameters (not just column existence —
-            // combined sheets always have these columns even for metals, with 0/No).
-            const KNOWN_GROUPS = ['Plastic & Rubber', 'Ferrous & Non-Ferrous'];
-            if (!KNOWN_GROUPS.includes(materialGroup)) {
-              const toNum = (v: any) => {
-                const n = parseFloat(String(v ?? '0').replace(/[^0-9.-]/g, ''));
-                return isNaN(n) ? 0 : n;
-              };
-              // Eject deflect temp / clamp pressure / mold temp are non-zero only for
-              // injection-moulded plastics — metals have 0 or N/A in these columns.
-              const hasPlasticIndicators =
-                toNum(rowData['Eject Deflect T (°C)']) > 0 ||
-                toNum(rowData['Clamp Pressure (MPa)']) > 0 ||
-                toNum(rowData['Mold Temp (°C)']) > 0 ||
-                String(rowData['Regrinding'] ?? '').toLowerCase() === 'yes';
-              materialGroup = hasPlasticIndicators ? 'Plastic & Rubber' : 'Ferrous & Non-Ferrous';
-            }
+            materialGroup = typeof rawCategory === 'string' && rawCategory.trim() ? rawCategory.trim() : 'Plastic & Rubber';
           }
 
           const material = getColumnValue(
@@ -710,74 +617,4 @@ export class RawMaterialsController {
     return undefined;
   }
 
-  /**
-   * Maps Excel material group values to system material group values
-   */
-  private mapMaterialGroupFromExcel(excelMaterialGroup: string): string {
-    if (!excelMaterialGroup) {
-      return '';
-    }
-
-    const lowerGroup = excelMaterialGroup.toLowerCase().trim();
-
-    // Map Excel values to PLASTIC & RUBBER materials
-    const plasticKeywords = ['plastic', 'rubber', 'polymer', 'elastomer', 'thermoplastic',
-      'thermoset', 'silicone', 'polyurethane', 'epoxy', 'nylon', 'resin'];
-    // Common resin abbreviations (exact match after trimming)
-    const plasticCodes = new Set([
-      'abs', 'pvc', 'pp', 'pe', 'pa', 'pc', 'pet', 'pom', 'pmma', 'ps', 'san',
-      'pa6', 'pa66', 'pa12', 'pa11', 'pa46', 'pa610', 'pa612',
-      'peek', 'pps', 'lcp', 'pbt', 'pei', 'psu', 'ppsu', 'pes',
-      'eva', 'evoh', 'hips', 'gpps', 'ldpe', 'hdpe', 'lldpe', 'uhmwpe',
-      'tpe', 'tpu', 'tpv', 'tps', 'tpee', 'tpa',
-      'pla', 'pha', 'pu', 'pur', 'pf', 'uf', 'mf', 'ep',
-      'ppsu', 'pvdf', 'ptfe', 'pfa', 'fep', 'etfe',
-      'acetal', 'delrin', 'polycarbonate',
-      // SLA/FDM/MJF photopolymer resin type names (combined-sheet format)
-      'waterclear', 'standard grey', 'black', 'durable', 'tough', 'flexible',
-      'castable', 'dental', 'engineering', 'high temp', 'elastic', 'rigid',
-    ]);
-    if (plasticKeywords.some(kw => lowerGroup.includes(kw)) ||
-        plasticCodes.has(lowerGroup) ||
-        lowerGroup === 'plastics') {
-      return 'Plastic & Rubber';
-    }
-
-    // Map Excel values to FERROUS & NON-FERROUS materials
-    if (lowerGroup.includes('ferrous') ||
-        lowerGroup.includes('steel') ||
-        lowerGroup.includes('iron') ||
-        lowerGroup.includes('metal') ||
-        lowerGroup.includes('aluminum') ||
-        lowerGroup.includes('aluminium') ||
-        lowerGroup.includes('copper') ||
-        lowerGroup.includes('titanium') ||
-        lowerGroup.includes('zinc') ||
-        lowerGroup.includes('brass') ||
-        lowerGroup.includes('bronze') ||
-        lowerGroup.includes('stainless') ||
-        lowerGroup.includes('alloy') ||
-        lowerGroup.includes('nickel') ||
-        lowerGroup.includes('cobalt') ||
-        lowerGroup.includes('magnesium') ||
-        lowerGroup.includes('lead') ||
-        lowerGroup.includes('tin') ||
-        lowerGroup.includes('tungsten') ||
-        lowerGroup.includes('chrome') ||
-        lowerGroup.includes('manganese') ||
-        lowerGroup.includes('cast') ||
-        lowerGroup.includes('ductile') ||
-        lowerGroup.includes('malleable') ||
-        lowerGroup.includes('galvanized') ||
-        lowerGroup.includes('maraging') ||
-        lowerGroup === 'ferrous' ||
-        lowerGroup === 'metals') {
-      return 'Ferrous & Non-Ferrous';
-    }
-
-    // If no mapping found, return original with proper casing
-    return excelMaterialGroup.split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-      .join(' ');
-  }
 }

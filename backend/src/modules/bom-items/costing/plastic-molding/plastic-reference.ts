@@ -127,7 +127,7 @@ export interface PlasticReference {
   toolroomRatesUsa: { designUsdPerHr: number; machiningUsdPerHr: number; assemblyUsdPerHr: number };
 }
 
-export interface PlasticReferenceRows {
+interface PlasticReferenceRows {
   variables: ReadonlyArray<{ key: string; value: string | number | null }>;
   /** The GPPS reference material row (raw), or undefined when not staged. */
   gppsMaterial?: Record<string, unknown>;

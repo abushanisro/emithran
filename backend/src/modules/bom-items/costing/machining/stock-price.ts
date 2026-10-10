@@ -10,7 +10,9 @@
 // No price for that material, form and location = no stock price: the quote
 // keeps its raw_materials price and says a form price is not on file.
 
-export type StockPriceForm = 'round_bar' | 'hex_bar' | 'rectangular_bar' | 'square_bar' | 'round_tube' | 'plate';
+import { isTurnedFamily } from '../../../../domain/part-family';
+
+type StockPriceForm = 'round_bar' | 'hex_bar' | 'rectangular_bar' | 'square_bar' | 'round_tube' | 'plate';
 
 export interface StockPriceRow {
   raw_material_name: string | null;
@@ -23,11 +25,11 @@ export interface StockPriceRow {
 
 export function machiningStockPriceForm(family: string): StockPriceForm | null {
   if (family === 'milled') return 'plate';
-  if (family === 'turned' || family === 'mill_turn') return 'round_bar';
+  if (isTurnedFamily(family)) return 'round_bar';
   return null;
 }
 
-export interface StockPrice {
+interface StockPrice {
   form: StockPriceForm;
   pricePerKg: number;
   currencyCode: string;

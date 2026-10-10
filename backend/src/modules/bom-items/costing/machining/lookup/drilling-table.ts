@@ -19,7 +19,7 @@ import { MACHINING_MATERIAL_HARDNESS_HB, nearestByHardness } from './machining-m
  * (0.00033 mm/rev), off by two orders of magnitude. The derivation is
  * returned so the calculation trace states it.
  */
-export interface DrillingParams {
+interface DrillingParams {
   cuttingSpeedMPerMin: number;
   feedMmPerRev: number;
   construction: string;

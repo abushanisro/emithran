@@ -9,7 +9,7 @@ import { cachedRead } from '../costing/shared/core/request-cache';
  * class never needs a new value here, only a new process_taxonomy row
  * tagged with an existing one.
  */
-export type MachiningRouteRole = 'primary_milling' | 'primary_turning' | 'secondary_operation' | 'inspection';
+type MachiningRouteRole = 'primary_milling' | 'primary_turning' | 'secondary_operation' | 'inspection';
 
 /**
  * Discovers the real, DB-backed set of Machining machine classes eligible

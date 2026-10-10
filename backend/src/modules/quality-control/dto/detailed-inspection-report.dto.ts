@@ -2,7 +2,7 @@ import { IsString, IsNumber, IsOptional, IsEnum, IsArray, ValidateNested, Min, M
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
-export class BalloonAnnotationDto {
+class BalloonAnnotationDto {
   @ApiProperty({ description: 'Unique identifier for the balloon' })
   @IsString()
   id: string;
@@ -20,7 +20,7 @@ export class BalloonAnnotationDto {
   y: number;
 }
 
-export class BalloonDrawingDto {
+class BalloonDrawingDto {
   @ApiProperty({ description: 'Part name' })
   @IsString()
   partName: string;
@@ -49,7 +49,7 @@ export class BalloonDrawingDto {
   balloonAnnotations: BalloonAnnotationDto[];
 }
 
-export class FinalInspectionReportDto {
+class FinalInspectionReportDto {
   @ApiProperty({ description: 'Company name' })
   @IsString()
   companyName: string;
@@ -86,7 +86,7 @@ export class FinalInspectionReportDto {
   status: 'draft' | 'release' | 'rejected';
 }
 
-export class MeasurementDto {
+class MeasurementDto {
   @ApiProperty({ description: 'Measurement ID' })
   @IsString()
   id: string;
@@ -126,7 +126,7 @@ export class MeasurementDto {
   remarks?: string;
 }
 
-export class InspectionTableDto {
+class InspectionTableDto {
   @ApiProperty({ description: 'Number of samples (1-5)', minimum: 1, maximum: 5 })
   @IsNumber()
   @Min(1)

@@ -1,14 +1,4 @@
-import {
-  RATES_SOURCE_LABEL,
-  INSPECTION_SAMPLING_DEFAULT,
-  isoCoarsePitchMm,
-  resolveDrillingSpeedFeed,
-  HOLE_OP_UNLOAD_SEC,
-  TIGHT_TOLERANCE_REAM_THRESHOLD_MM,
-  MACHINE_REGISTRY,
-  type SurfaceTreatmentDbRate,
-  type InspectionStagePolicy,
-} from '../../shared/core/default-rates.constants';
+import { RATES_SOURCE_LABEL, INSPECTION_SAMPLING_DEFAULT, isoCoarsePitchMm, HOLE_OP_UNLOAD_SEC, TIGHT_TOLERANCE_REAM_THRESHOLD_MM, MACHINE_REGISTRY, type SurfaceTreatmentDbRate, type InspectionStagePolicy } from '../../shared/core/default-rates.constants';
 import { resolveSetupMinutes, type SetupTimeResolution } from '../../shared/core/engine-kernel';
 import type { DeepHoleCandidate } from '../operation/deep-hole-routing';
 import { isRealHeatTreatmentCallout } from '../operation/wire-edm-routing';
@@ -62,7 +52,7 @@ export type MaterialClass =
  */
 export type MachineClassId = string & { readonly __machineClassIdBrand: 'MachineClassId' };
 
-export class UnknownMachineClassError extends Error {
+class UnknownMachineClassError extends Error {
   constructor(value: string) {
     super(`Unknown machine class "${value}" — not present in the current, DB-discovered set of valid machine classes.`);
     this.name = 'UnknownMachineClassError';
@@ -447,7 +437,7 @@ export function computeRotaryCycleSec(
   return machiningTimeSec + HOLE_OP_UNLOAD_SEC;
 }
 
-export interface DrillCycle {
+interface DrillCycle {
   /** Seconds for the holes; null when a real input or the calculator is missing. */
   sec: number | null;
   trace: CalculationTraceStep[];
@@ -482,7 +472,7 @@ export function computeDrillCycle(
  * Drilling time for every hole on the part: one "Drilling" calculator run per
  * hole-diameter group. Groups without real inputs are left unpriced and named.
  */
-export function drillHoleGroups(
+function drillHoleGroups(
   holeGroups: Array<{ diameter_mm: number; count: number; depth_mm?: number }>,
   holeCount: number,
   materialGrade: string | null | undefined,
@@ -1150,7 +1140,7 @@ export function computeTapCycle(
 }
 
 /** Tapping time for every thread on the part: one calculator run per thread-size group. */
-export function tapThreadGroups(
+function tapThreadGroups(
   threads: Array<{ size: string; count: number; pitchMm?: number; depthMm?: number }>,
   matClass: MaterialClass,
   tappingTable: any[] | null | undefined,

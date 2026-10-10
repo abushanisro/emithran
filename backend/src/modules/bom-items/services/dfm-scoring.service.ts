@@ -41,7 +41,7 @@ interface RiskFactor {
 
 export type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
 
-export interface OccurrenceScore {
+interface OccurrenceScore {
   occurrenceIndex: number;
   riskScore: number;
   riskLevel: RiskLevel;

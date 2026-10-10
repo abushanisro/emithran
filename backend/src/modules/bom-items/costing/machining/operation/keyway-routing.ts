@@ -25,27 +25,27 @@
 // not an improvement, which is why the CAD-side fix and this module must
 // land together.
 
-export interface KeywayOccurrenceLike {
+interface KeywayOccurrenceLike {
   length_mm?: number | null;
   width_mm?: number | null;
   depth_mm?: number | null;
   [key: string]: unknown;
 }
 
-export interface KeywayFeatureLike {
+interface KeywayFeatureLike {
   feature_type?: string;
   occurrences?: KeywayOccurrenceLike[];
   [key: string]: unknown;
 }
 
-export interface KeywayCandidate {
+interface KeywayCandidate {
   lengthMm: number;
   widthMm: number;
   depthMm: number;
   count: number;
 }
 
-export interface KeywaySplitResult {
+interface KeywaySplitResult {
   /** fgv2Features with every real "keyway" feature removed entirely — pass
    * this, not the original array, into buildOperationSequence() so a keyway
    * never falls into its generic default-case milling cost. */

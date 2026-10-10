@@ -55,7 +55,7 @@ export const CASTING_LOOKUP_KEYS = [
  * a submerged hot-chamber gooseneck, so are always cold-chamber cast) is 2;
  * every Zinc, Lead and Zinc-Aluminum row is 1.
  */
-export type ChamberType = 'hot' | 'cold';
+type ChamberType = 'hot' | 'cold';
 const CHAMBER_BY_CODE: Record<number, ChamberType> = { 1: 'hot', 2: 'cold' };
 
 export interface CastingMaterial {
@@ -221,7 +221,7 @@ export function resolveCastingReference(rows: CastingReferenceRows): { reference
  * promoted as chamber_type_id, is a different column: it reads 2 for the Zinc
  * and Zinc-Aluminum rows that Chamber Type marks 1, so it is not used.)
  */
-export interface CastingMaterialRows {
+interface CastingMaterialRows {
   row: { name: string | null; material_type: string | null; density_kg_m3: unknown; cost_usa: unknown; cut_code: unknown };
   properties: Readonly<Record<string, number | null>>;
 }

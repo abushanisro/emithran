@@ -9,7 +9,7 @@ import { eMithranTerms, resolveSetupMinutes } from '../../shared/core/engine-ker
 // Extracted verbatim from cost-engine.ts's inline PEM Insertion block
 // (Platform Architecture Remediation Phase 1 — engine registry unification,
 // Rule 8).
-export interface PemInsertionInput {
+interface PemInsertionInput {
   pemCount: number;
   batchSize: number;
   rate: MHRRateInput; // pem_press
@@ -31,7 +31,7 @@ export interface PemInsertionInput {
   scrapPricePerKg?: number;
 }
 
-export interface PemInsertionResult {
+interface PemInsertionResult {
   processLines: ProcessLineCost[];
   cycleTimeMin: number;
   warnings: string[];
@@ -116,7 +116,7 @@ export function computePemInsertionCost(input: PemInsertionInput): PemInsertionR
   };
 }
 
-export interface PemInsertionContext extends PemInsertionInput {}
+interface PemInsertionContext extends PemInsertionInput {}
 
 export class PemInsertionEngine implements ManufacturingProcessEngine<PemInsertionContext, PemInsertionResult> {
   readonly machineClass = 'pem_press' as const;

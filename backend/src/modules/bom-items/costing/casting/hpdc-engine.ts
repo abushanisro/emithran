@@ -79,7 +79,7 @@ export interface HpdcCavities {
   defaultCount: number;
 }
 
-export type CavityResult =
+type CavityResult =
   | { ok: true; cavities: HpdcCavities; trace: string; note: string | null }
   | { ok: false; cavities: HpdcCavities; reason: string };
 
@@ -133,10 +133,10 @@ const r3 = (n: number) => Math.round(n * 1000) / 1000;
 
 /** Calculator keys (calculators/die-casting-calculators.json). */
 export const HPDC_CALCULATOR = 'High Pressure Die Casting';
-export const CLAMP_CALCULATOR = 'Clamp Force';
-export const SHOT_CALCULATOR = 'Shot Volume';
+const CLAMP_CALCULATOR = 'Clamp Force';
+const SHOT_CALCULATOR = 'Shot Volume';
 
-export type CycleSeedResult =
+type CycleSeedResult =
   | { ok: true; seeds: SeedSet; surfaceQualityIndex: number }
   | { ok: false; missing: string[] };
 

@@ -18,6 +18,18 @@ import { EMPTY_CAPABILITY, lookupSeedCapability } from '../../../../../../../mod
 import type { MachineCapability } from '../../../../../../../modules/bom-items/costing/shared/capability/machine-selection/seed-registry';
 import { BOMItemsService } from '../../../../../../../modules/bom-items/bom-items.service';
 
+// buildPartRequirements also reads reference data for the laser power
+// (Phase 2) and deburr time rates (Phase 4). These tests are about the other
+// requirement kinds, so those lookups report "nothing on file".
+function withNoLaserPowerData(svc: BOMItemsService): BOMItemsService {
+  (svc as any).smLookup = { getMinLaserPowerRequirement: async () => null, getDeslagSecPerMmByMachine: async () => ({}) };
+  (svc as any).machiningLookup = {
+    getDeburrParams: async () => ({ linearSpeedMmPerSec: 0, dataFound: false }),
+    getDeburrPassesPerEdge: async () => null,
+  };
+  return svc;
+}
+
 function candidate(overrides: {
   machineId?: string;
   machineName?: string;
@@ -112,10 +124,11 @@ describe('physics', () => {
   // table uses as ITS OWN documented last-resort fallback (E250=410, SS304=620,
   // AL6061=310 MPa) — chosen here to keep this test meaningful, not because
   // physics.ts knows about grades at all.
-  it('computes air-bend tonnage near chart values (3mm MS, 1m bend ≈ 22t)', () => {
+  // Bending calculator (calculators/009): theoretical = 3² × 1000 × 410 × 1.33
+  // / (8 × 3) / 9810 = 20.84 t; recommended = × 1.25 = 26.05 t.
+  it('requires the Bending calculator recommended force (3mm MS, 1m bend = 26.05t)', () => {
     const req = pressBrakeRequirement({ bendLengthMm: 1000, thicknessMm: 3, utsMpa: 410 });
-    expect(req.tonnage).toBeGreaterThan(18);
-    expect(req.tonnage).toBeLessThan(26);
+    expect(req.tonnage).toBeCloseTo(26.05, 2);
   });
 
   it('scales tonnage with real per-grade UTS (SS304 > E250 > AL6061)', () => {
@@ -308,6 +321,30 @@ describe('isCapable', () => {
     const big = candidate({ machineClass: 'press_brake', hourlyRate: 600, capability: { maxTonnage: 160, maxLengthMm: 3200, maxThicknessMm: 12 } });
     expect(isCapable(small, req)).toBe(false);
     expect(isCapable(big, req)).toBe(true);
+  });
+
+  // Real machine_library.csv press brakes: SPH-30C (Amada) 323.6 kN / 415 mm
+  // bend length; 11010 (Heller-hydraulic) 1096 kN / 3048 mm.
+  it('rejects a press brake whose bend length is shorter than the part bend', () => {
+    const req = pressBrakeRequirement({ bendLengthMm: 600, thicknessMm: 1.6, utsMpa: 370 });
+    const sph30c = candidate({ machineClass: 'press_brake', hourlyRate: 19.9, capability: { maxTonnage: 323.6 / 9.81, maxLengthMm: 415, maxThicknessMm: 5.8 } });
+    const heller = candidate({ machineClass: 'press_brake', hourlyRate: 19.83, capability: { maxTonnage: 1096 / 9.81, maxLengthMm: 3048, maxThicknessMm: 14.5 } });
+    expect(req.tonnage).toBeLessThan(323.6 / 9.81); // tonnage alone would pass
+    expect(isCapable(sph30c, req)).toBe(false);
+    expect(isCapable(heller, req)).toBe(true);
+  });
+
+  it('explains a press brake pick with the recommended force and the real bend length', () => {
+    const heller = candidate({ machineId: 'heller', machineName: '11010 (Heller-hydraulic)', machineClass: 'press_brake', hourlyRate: 19.83, capability: { maxTonnage: 111.76, maxLengthMm: 3048, maxThicknessMm: 14.5 } });
+    const result = selectMachine({
+      pool: [heller], location: 'USA', machineClass: 'press_brake',
+      requirement: pressBrakeRequirement({ bendLengthMm: 600, thicknessMm: 1.6, utsMpa: 270 }),
+    });
+    const why = result.balanced.reasons.join('; ');
+    expect(why).toContain('recommended force = theoretical × 1.25');
+    expect(why).toContain('≤ 111.8 t machine capacity');
+    expect(why).toContain('Bend 600 mm ≤ 3048 mm bend length');
+    expect(why).not.toContain('15% margin');
   });
 
   it('uses material-specific laser thickness columns', () => {
@@ -565,7 +602,7 @@ describe('P0.4 — integration: buildPartRequirements() feeds selectMachine() wi
   const location = 'India';
 
   function callBuildPartRequirements(input: Record<string, unknown>) {
-    const svc = Object.create(BOMItemsService.prototype) as BOMItemsService;
+    const svc = withNoLaserPowerData(Object.create(BOMItemsService.prototype) as BOMItemsService);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (svc as any).buildPartRequirements({ location: 'India', accessToken: 'test-token', ...input });
   }
@@ -733,7 +770,7 @@ describe('Machine Economics — shear gets its own real ShearRequirement', () =>
   });
 
   it('production wiring: buildPartRequirements() produces a real ShearRequirement for shear, not a shared LaserRequirement', async () => {
-    const svc = Object.create(BOMItemsService.prototype) as BOMItemsService;
+    const svc = withNoLaserPowerData(Object.create(BOMItemsService.prototype) as BOMItemsService);
     const requirements = await (svc as any).buildPartRequirements({
       family: 'sheet_metal',
       grade: 'CRCA',
@@ -793,7 +830,7 @@ describe('Machine Economics — plasma_cut gets its own real PlasmaCutRequiremen
   });
 
   it('production wiring: buildPartRequirements() produces a real PlasmaCutRequirement for plasma_cut, not a shared LaserRequirement', async () => {
-    const svc = Object.create(BOMItemsService.prototype) as BOMItemsService;
+    const svc = withNoLaserPowerData(Object.create(BOMItemsService.prototype) as BOMItemsService);
     const requirements = await (svc as any).buildPartRequirements({
       family: 'sheet_metal',
       grade: 'CRCA',
@@ -825,7 +862,7 @@ describe('Machine Economics — plasma_cut gets its own real PlasmaCutRequiremen
 // shear/plasma_cut before their fixes).
 describe('Machine Economics — plasma_punch correctly gets a generic requirement, not a shared LaserRequirement', () => {
   it('production wiring: buildPartRequirements() assigns kind:generic for plasma_punch', async () => {
-    const svc = Object.create(BOMItemsService.prototype) as BOMItemsService;
+    const svc = withNoLaserPowerData(Object.create(BOMItemsService.prototype) as BOMItemsService);
     const requirements = await (svc as any).buildPartRequirements({
       family: 'sheet_metal',
       grade: 'CRCA',
@@ -917,7 +954,7 @@ describe('Machine Economics — laser_punch gets its own real LaserPunchRequirem
   });
 
   it('production wiring: buildPartRequirements() produces a real LaserPunchRequirement for laser_punch, not a shared LaserRequirement', async () => {
-    const svc = Object.create(BOMItemsService.prototype) as BOMItemsService;
+    const svc = withNoLaserPowerData(Object.create(BOMItemsService.prototype) as BOMItemsService);
     const requirements = await (svc as any).buildPartRequirements({
       family: 'sheet_metal',
       grade: 'CRCA',
@@ -1024,7 +1061,7 @@ describe('Machine Economics — standard_press/tandem_press get their own real P
   });
 
   it('production wiring: buildPartRequirements() produces real PressRequirements for standard_press/tandem_press/progressive_die_press, not the generic fallback', async () => {
-    const svc = Object.create(BOMItemsService.prototype) as BOMItemsService;
+    const svc = withNoLaserPowerData(Object.create(BOMItemsService.prototype) as BOMItemsService);
     const requirements = await (svc as any).buildPartRequirements({
       family: 'sheet_metal',
       grade: 'CRCA',
@@ -1086,7 +1123,7 @@ describe('Machine Economics — roll_bending_2/3/4 get their own real RollBendin
   });
 
   it('production wiring: buildPartRequirements() produces real RollBendingRequirements for roll_bending_2/3/4, not the generic fallback', async () => {
-    const svc = Object.create(BOMItemsService.prototype) as BOMItemsService;
+    const svc = withNoLaserPowerData(Object.create(BOMItemsService.prototype) as BOMItemsService);
     const requirements = await (svc as any).buildPartRequirements({
       family: 'sheet_metal',
       grade: 'CRCA',
@@ -1141,5 +1178,172 @@ describe('selectMachine — why a machine was selected', () => {
 
   it('lists the machine that cannot hold the part as rejected, not silently dropped', () => {
     expect(result.rejected!.map((r) => r.machineId)).toEqual(['tiny']);
+  });
+});
+
+// ── Phase 2: fiber laser chosen by bed fit + source power ─────────────────────
+// Power requirements are rows of sm_lookup_laser_cut (memory Lookup Table 5):
+// Carbon Steel 8 mm -> lowest power with a row is 1000 W. Machines are real
+// machine_library.csv fiber lasers (bed, power_watts).
+describe('fiber laser selection by power and bed (Phase 2)', () => {
+  const cs8 = { material: 'Carbon Steel', tableThicknessMm: 8, requiredW: 1000 };
+  const req = (over: Partial<Parameters<typeof laserRequirement>[0]> = {}) => laserRequirement({
+    thicknessMm: 8, materialGrade: 'SECC', bedLengthMm: 1200, bedWidthMm: 800, power: cs8, ...over,
+  });
+  const laser = (id: string, powerKw: number | null, bed: [number, number] | null, rate = 40) => candidate({
+    machineId: id, machineName: id, machineClass: 'fiber_laser', hourlyRate: rate,
+    capability: { powerKw, ...(bed ? { maxXMm: bed[0], maxYMm: bed[1] } : {}) },
+  });
+  const salvagnini2kW = laser('Salvagnini L3-30 2kW Fiber', 2, [3050, 1525]);
+  const trumpf10kW = laser('Trumpf TruLaser 5030 10kW Fiber', 10, [3050, 1525]);
+  const pool = [salvagnini2kW, trumpf10kW];
+  const opts = { allowUnknownLaserBed: false };
+
+  it('passes a machine with at least the required power', () => {
+    expect(isCapable(salvagnini2kW, req(), opts)).toBe(true);
+  });
+
+  it('rejects a machine below the required power (8 mm CS on 0.5 kW)', () => {
+    expect(isCapable(laser('weak', 0.5, [3050, 1525]), req(), opts)).toBe(false);
+  });
+
+  it('accepts a machine rated exactly at the required power (boundary)', () => {
+    expect(isCapable(laser('exact', 1, [3050, 1525]), req(), opts)).toBe(true);
+  });
+
+  it('rejects a machine whose power is not on file when a power requirement exists', () => {
+    expect(isCapable(laser('no-power', null, [3050, 1525]), req(), opts)).toBe(false);
+  });
+
+  it('rejects every laser when the part is thicker than any laser in the table cuts', () => {
+    const tooThick = req({ thicknessMm: 70, power: { material: 'Carbon Steel', tableThicknessMm: null, requiredW: null } });
+    expect(pool.some((m) => isCapable(m, tooThick, opts))).toBe(false);
+  });
+
+  it('rejects a part larger than the bed (either orientation)', () => {
+    expect(isCapable(salvagnini2kW, req({ bedLengthMm: 3200, bedWidthMm: 1000 }), opts)).toBe(false);
+    expect(isCapable(salvagnini2kW, req({ bedLengthMm: 1000, bedWidthMm: 2700 }), opts)).toBe(true); // rotated: 2700x1.1 <= 3050
+  });
+
+  it('rejects an unknown bed when the class has bed data, accepts it on a class-wide gap', () => {
+    const noBed = laser('no-bed', 4, null);
+    expect(isCapable(noBed, req(), { allowUnknownLaserBed: false })).toBe(false);
+    expect(isCapable(noBed, req(), { allowUnknownLaserBed: true })).toBe(true);
+  });
+
+  it('without a power requirement (material not in the table) keeps the thickness-data rule', () => {
+    const copper = req({ materialGrade: 'Copper C110', power: null });
+    expect(isCapable(salvagnini2kW, copper, { allowUnknownLaserBed: false })).toBe(false); // no thickness data, no class gap
+    expect(isCapable(salvagnini2kW, copper, { allowUnknownLaserBed: false, allowUnknownLaserThickness: true })).toBe(true);
+  });
+
+  it('ranks the least-oversized power higher at equal rate and load', () => {
+    expect(fitScore(salvagnini2kW, req())).toBeGreaterThan(fitScore(trumpf10kW, req()));
+  });
+
+  it('selects by bed + power and explains it with the table row and machine power', () => {
+    const result = selectMachine({ pool: [laser('weak', 0.5, [3050, 1525], 10), ...pool], location: 'USA', machineClass: 'fiber_laser', requirement: req() });
+    expect(result.balanced.candidate.machineId).toBe('Salvagnini L3-30 2kW Fiber');
+    const why = result.balanced.reasons.join('; ');
+    expect(why).toContain('Carbon Steel 8 mm needs ≥ 1 kW (laser cut table, 8 mm row) ≤ 2 kW machine');
+    expect(why).toContain('fits 3050×1525 mm bed');
+    expect(why).not.toContain('capability assumed');
+    expect(result.balanced.capabilityCheck).toMatchObject({ unit: 'kW', value: 1, limit: 2, supported: true });
+  });
+});
+
+describe('Phase 2 wiring: buildPartRequirements attaches the laser power requirement', () => {
+  it('asks the fiber rows for fiber_laser and the CO2 rows for co2_laser, and no other class', async () => {
+    const calls: Array<[string | null, number, string]> = [];
+    const svc = Object.create(BOMItemsService.prototype) as BOMItemsService;
+    (svc as any).smLookup = {
+      getMinLaserPowerRequirement: async (grade: string | null, t: number, tech: 'fiber' | 'co2') => {
+        calls.push([grade, t, tech]);
+        return { material: 'Carbon Steel', tableThicknessMm: 2, requiredW: tech === 'fiber' ? 500 : 2000 };
+      },
+      getDeslagSecPerMmByMachine: async () => ({}),
+    };
+    (svc as any).machiningLookup = {
+      getDeburrParams: async () => ({ linearSpeedMmPerSec: 0, dataFound: false }),
+      getDeburrPassesPerEdge: async () => null,
+    };
+    const requirements = await (svc as any).buildPartRequirements({
+      location: 'India', accessToken: 'test-token', family: 'sheet_metal', grade: 'SECC', sheetThicknessMm: 1.6,
+      bendCount: 0, flatPatternAreaMm2: 300 * 200, flatLenMm: 300, flatWidMm: 200, bboxXMm: 300, bboxYMm: 200,
+      bboxZMm: 1.6, weightKg: 0.5, utsMpa: 270, cutLengthMm: 200, materialShearStrengthMpa: 216,
+    });
+    expect(requirements.fiber_laser.power).toEqual({ material: 'Carbon Steel', tableThicknessMm: 2, requiredW: 500 });
+    expect(requirements.co2_laser.power.requiredW).toBe(2000);
+    expect(calls.map((c) => c[2]).sort()).toEqual(['co2', 'fiber']);
+    expect(calls.every(([g, t]) => g === 'SECC' && t === 1.6)).toBe(true);
+    for (const [cls, r] of Object.entries(requirements)) {
+      if (cls !== 'fiber_laser' && cls !== 'co2_laser') expect((r as any).power).toBeUndefined();
+      // (the deburring requirement is the Phase 4 kind; it carries no power)
+    }
+  });
+});
+
+// ── Phase 4: Deslag + Manual Deburr on one line, ranked by cost per part ─────
+// Real rates: every Deslag machine perimeter_allowance_s_per_mm = 0.01
+// (machine_library.csv); Manual Deburr speed 13.6 mm/s is a real tblDeburring
+// row, 1 pass (defaultNumDeburrPassesEdge). Burr edge 285.5 mm = the cut
+// length of part 830-001720-00.
+import { deburrCycleSec, deburrSecPerMm, type DeburrRequirement } from '../../../../../../../modules/bom-items/costing/shared/capability/machine-selection/physics';
+
+describe('deburr line (Phase 4)', () => {
+  const req: DeburrRequirement = {
+    kind: 'deburr',
+    burrEdgeLengthMm: 285.5,
+    deslagSecPerMmByMachine: { 'default deslag': 0.01, 'flex - l 1109 s': 0.01 },
+    manualDeburr: { secPerMm: 1 / 13.6, source: 'tblDeburring 13.6 mm/s (material code 1.3) × 1 pass' },
+  };
+  const deslag = (rate: number) => candidate({ machineId: 'deslag', machineName: 'Default Deslag', machineClass: 'deburring', hourlyRate: rate });
+  const manual = (rate: number) => candidate({ machineId: 'manual', machineName: 'Default Manual Deburr', machineClass: 'manual_deburr' as any, hourlyRate: rate });
+
+  it('each machine uses its own real time per mm (name match is case-insensitive)', () => {
+    expect(deburrSecPerMm({ machineClass: 'deburring', machineName: '  DEFAULT DESLAG ' }, req)?.secPerMm).toBe(0.01);
+    expect(deburrCycleSec(deslag(20), req)).toBeCloseTo(2.855, 3);
+    expect(deburrCycleSec(manual(14.13), req)).toBeCloseTo(285.5 / 13.6, 3);
+  });
+
+  it('a machine with no rate on file is not capable (never a default rate)', () => {
+    const unknown = candidate({ machineName: 'Unknown Deslag', machineClass: 'deburring', hourlyRate: 1 });
+    expect(deburrSecPerMm(unknown, req)).toBeNull();
+    expect(isCapable(unknown, req)).toBe(false);
+    expect(isCapable(manual(14.13), { ...req, manualDeburr: null })).toBe(false);
+  });
+
+  it('draws from both Deslag and Manual Deburr, recommending the lowest cost per part', () => {
+    // Deslag $20/hr x 2.855 s = $0.016; Manual $14.13/hr x 20.99 s = $0.082 -> Deslag
+    const r = selectMachine({ pool: [deslag(20), manual(14.13)], location: 'USA', machineClass: 'deburring', requirement: req });
+    expect(r.balanced.candidate.machineId).toBe('deslag');
+    expect(r.alternatives.map((a) => a.machineId)).toContain('manual');
+  });
+
+  it('always offers Manual Deburr even when every Deslag machine ranks ahead of it', () => {
+    const fleet = [1, 2, 3, 4, 5].map((n) => candidate({ machineId: `d${n}`, machineName: 'Default Deslag', machineClass: 'deburring', hourlyRate: 14 + n / 100 }));
+    const r = selectMachine({ pool: [...fleet, manual(14.13)], location: 'USA', machineClass: 'deburring', requirement: req });
+    expect(r.balanced.candidate.machineClass).toBe('deburring');
+    expect(r.alternatives.some((a) => a.machineId === 'manual')).toBe(true);
+  });
+
+  it('a cheaper hourly rate does not win when the machine is slower', () => {
+    // Deslag $200/hr x 2.855 s = $0.159 > Manual $0.082 -> Manual wins on cost per part
+    const r = selectMachine({ pool: [deslag(200), manual(14.13)], location: 'USA', machineClass: 'deburring', requirement: req });
+    expect(r.balanced.candidate.machineId).toBe('manual');
+  });
+
+  it('a manual pick of Manual Deburr on the deburr line is honoured without a cross-class warning', () => {
+    const r = selectMachine({ pool: [deslag(20), manual(14.13)], location: 'USA', machineClass: 'deburring', requirement: req, overrideMachineId: 'manual' });
+    expect(r.balanced.candidate.machineId).toBe('manual');
+    expect(r.balanced.reasons.join(' ')).toContain('Manually selected');
+  });
+
+  it('explains the pick with the arithmetic and the source', () => {
+    const r = selectMachine({ pool: [deslag(20)], location: 'USA', machineClass: 'deburring', requirement: req });
+    const why = r.balanced.reasons.join('; ');
+    expect(why).toContain('285.5 mm burr edge × 0.0100 s/mm');
+    expect(why).toContain('perimeter allowance (machine library)');
+    expect(why).toContain('= 2.9 s');
   });
 });

@@ -21,7 +21,7 @@ import { loadMachiningCalculatorSpec } from '../calculators/machining-calculator
  */
 export const MACHINING_REFERENCE_SOURCE_VERSION = '2026-03';
 
-export interface FlatLookupTable {
+interface FlatLookupTable {
   columns: string[];
   rows: Array<Record<string, string | number | boolean | null>>;
 }

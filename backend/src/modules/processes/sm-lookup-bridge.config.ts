@@ -16,7 +16,7 @@
 // scope a shared table (e.g. sm_lookup_op_setup_time, which holds rows for
 // every operation) down to just the one relevant to this route.
 
-export interface SmLookupBridgeEntry {
+interface SmLookupBridgeEntry {
   table: string;
   displayName: string;
   description: string;
@@ -226,11 +226,6 @@ export const SM_LOOKUP_BRIDGE: Record<string, Record<string, SmLookupBridgeEntry
     ],
     'Finishing': [
       {
-        table: 'sm_lookup_deburr_rate',
-        displayName: 'Deburr Cycle-Time Rate',
-        description: 'Manual deburr time (sec) per metre of cut edge and per pierce — migration 413',
-      },
-      {
         table: 'sm_reference_data',
         displayName: 'Reference Data (Staged Import)',
         description: 'Staged reconciliation export rows whose key mentions deburr, deslag, edge, or finish — read-only, not yet wired to a live calculator (migration 479+)',
@@ -278,12 +273,10 @@ export const SM_LOOKUP_BRIDGE: Record<string, Record<string, SmLookupBridgeEntry
     // row-editable — see migration 502's comment for why that combination is
     // unsafe for a narrow per-route admin dialog). Bridged via
     // sm_material_usage_reference (migration 502), a narrow read-only view
-    // exposing only the two columns these calculators actually read. Route's
-    // other real dependency — STANDARD_SHEETS, the candidate sheet sizes
-    // Gross Usage evaluates — is a hardcoded TypeScript constant
-    // (sheet-metal-nesting.engine.ts), not a DB table, so it cannot be
-    // bridged here; noted for a future "make it database driven" pass, not
-    // fixed in this migration.
+    // exposing only the two columns these calculators actually read. The
+    // sheet Gross Usage nests on is database-driven (the selected laser's
+    // nominal sheet, else standardSheetWidth/Length in sm_reference_data —
+    // BOMItemsService.resolveNestingSheet), not bridged here.
     'Material Usage': [
       {
         table: 'sm_material_usage_reference',

@@ -5,7 +5,7 @@ import { DraftPackage } from './draft-line.dto';
 import type { RouteIssue } from '../../manufacturing-knowledge/dto/kb.dto';
 import type { ManufacturingImplication } from './manufacturing-implication.dto';
 
-export type GenerationStatus =
+type GenerationStatus =
   | 'running'
   | 'draft_ready'
   | 'applied'

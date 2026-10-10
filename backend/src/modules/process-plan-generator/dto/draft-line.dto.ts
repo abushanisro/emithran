@@ -33,12 +33,12 @@ export interface DraftLineReferences {
 
 // ─── Per-kind payloads (mirror existing Create...CostDto shapes) ─────────────
 
-export interface DraftRawMaterialPayload {
+interface DraftRawMaterialPayload {
   // Either materialId is set (existing master) OR newMasterRef is set
   // (proposedMasters needs to be inserted at Apply).
   materialId: string | null;
   newMasterRef: string | null;
-  materialCategory: string;          // 'FERROUS_NON_FERROUS' | 'PLASTIC_RUBBER' | ...
+  materialCategory: string | null;   // the material class (Ferrous / Non-Ferrous / Plastic & Rubber); null = unclassified or new
   materialName: string;              // e.g. "Aluminium 6061"
   materialGrade: string;             // e.g. "6061-T6"
   unitCost: number;                  // INR/kg
@@ -78,7 +78,7 @@ export interface DraftProcessPayload {
   featureQty?:   number;         // e.g. 6 holes → drilling ×6
 }
 
-export interface DraftToolingPayload {
+interface DraftToolingPayload {
   toolingType: string;
   description: string;
   specifications: string;
@@ -92,7 +92,7 @@ export interface DraftToolingPayload {
   dbRecordId: string;
 }
 
-export interface DraftLogisticsPayload {
+interface DraftLogisticsPayload {
   costName: string;
   logisticsType: string;
   modeOfTransport: string;
@@ -102,7 +102,7 @@ export interface DraftLogisticsPayload {
   parameters: string;
 }
 
-export interface DraftProcuredPartPayload {
+interface DraftProcuredPartPayload {
   partName: string;
   partNumber: string;
   supplierName: string | null;

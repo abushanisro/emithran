@@ -402,8 +402,9 @@ export class RetrievalService {
   private async queryRawMaterials(client: any, userId: string, family: string, rates: RateSnapshot) {
     const { data, error } = await client
       .from('raw_materials')
-      .select('id, material_group, grade, name, density_kg_m3, cost, currency, location, user_id, material_form, material_family')
-      .or(`material_group.ilike.%ferrous%,material_group.ilike.%non-ferrous%,material_group.ilike.%plastic%,material_group.ilike.%rubber%,material_group.ilike.%metal%`)
+      .select('id, material_group, material_class, grade, name, density_kg_m3, cost, currency, location, user_id, material_form, material_family')
+      // A metal or a plastic: the real class (migration 897), not a keyword in the group name.
+      .not('material_class', 'is', null)
       .limit(120);
 
     if (error) {
@@ -780,21 +781,4 @@ function estimateDensityKgPerM3(materialHint: string | null): number {
   // Pure aluminium alloys — only after all copper/bronze variants are excluded above
   if (/alumin|al\s*6|al\s*7|7050|7075|6061|6082|2024|5083|5052/i.test(h)) return 2700;
   return 7850; // default: mild/alloy steel (EN8, EN24, EN36, H13, P20, ...)
-}
-
-/** Normalise UI location strings to the canonical values stored in mhr_records/lhr_records. */
-function normaliseLocation(loc: string): string {
-  const map: Record<string, string> = {
-    'united states': 'USA', 'us': 'USA', 'usa': 'USA',
-    'germany': 'Germany', 'de': 'Germany',
-    'china': 'China', 'cn': 'China',
-    'united kingdom': 'UK', 'uk': 'UK', 'gb': 'UK',
-    'france': 'France', 'fr': 'France',
-    'vietnam': 'Vietnam', 'vn': 'Vietnam',
-    'mexico': 'Mexico', 'mx': 'Mexico',
-    'india': 'India', 'in': 'India', 'india-bangalore': 'India', 'india-pune': 'India', 'india-chennai': 'India',
-    'w. europe': 'W. Europe', 'western europe': 'W. Europe', 'w europe': 'W. Europe',
-    'e. europe': 'E. Europe', 'eastern europe': 'E. Europe', 'e europe': 'E. Europe',
-  };
-  return map[loc.toLowerCase()] ?? loc;
 }

@@ -15,7 +15,7 @@ import {
 // exists yet, only the placeholder fields) — giving them a detailed nested
 // shape now would describe data that doesn't exist.
 
-export class ThreadCalloutDto {
+class ThreadCalloutDto {
   @IsString()
   size!: string;
 
@@ -39,7 +39,7 @@ export class ThreadCalloutDto {
   extractionSource!: string;
 }
 
-export class DrawingDimensionsDto {
+class DrawingDimensionsDto {
   @IsNumber()
   L!: number;
 

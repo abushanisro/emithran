@@ -21,13 +21,13 @@
 // gets that ONE hole gun-drilled/deep-bored on a real, separate machine —
 // this is a genuine per-occurrence split, not a whole-part classification.
 
-export interface FeatureOccurrenceLike {
+interface FeatureOccurrenceLike {
   depth_mm?: number;
   material_removed_mm3?: number;
   [key: string]: unknown;
 }
 
-export interface HoleFeatureLike {
+interface HoleFeatureLike {
   feature_type?: string;
   variant?: string;
   diameter_mm?: number;
@@ -41,7 +41,7 @@ export interface DeepHoleCandidate {
   count: number;
 }
 
-export interface DeepHoleSplitResult {
+interface DeepHoleSplitResult {
   /** fgv2Features with deep-hole occurrences removed from their feature's
    * occurrence list (feature dropped entirely if it becomes empty) — pass
    * this, not the original array, into buildOperationSequence() so the
@@ -61,7 +61,7 @@ export interface DeepHoleSplitResult {
 // large holes, and gun drills are small-diameter tooling. Holes below both
 // ranges (incl. "Deep Drilling", L/D >= 3) stay ordinary drilling on the
 // part's own machine.
-export interface DeepHoleRules {
+interface DeepHoleRules {
   gunDrillMinLd: number;
   deepBoreMinLd: number;
   deepBoreMinDiameterMm: number;

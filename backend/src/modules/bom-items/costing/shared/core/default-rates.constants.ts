@@ -46,7 +46,7 @@ export const LASER_SPEED_MM_PER_MIN: Record<number, number> = {
 // Material speed factor applied to LASER_SPEED_MM_PER_MIN (mild-steel baseline).
 // 6kW fiber, production gas choices: stainless cuts ~25% slower (N₂, no exothermic
 // assist), aluminium ~10% slower (reflectivity + N₂), mild steel = 1.0 (O₂ assist).
-export const LASER_MATERIAL_SPEED_FACTOR: Record<string, number> = {
+const LASER_MATERIAL_SPEED_FACTOR: Record<string, number> = {
   carbon_steel: 1.0,
   stainless:    0.75,
   aluminum:     0.90,
@@ -105,9 +105,18 @@ export const PRESS_BRAKE_SEC_PER_BEND: Record<number, number> = {
 };
 
 // ── Press brake tonnage physics ───────────────────────────────────────────────
-// Air-bending force: F(kN) = (1.42 × UTS(N/mm²) × L(mm) × t²(mm²)) / (1000 × V(mm)),
-// V-die opening V = 8 × t (industry rule of thumb). Tons = F / 9.81.
-// Sanity: 2mm mild steel (UTS 410), 1m bend, V16 → ~15 t/m — matches brake charts.
+// The "Sheet Metal - Bending Manufacturing" calculator's own formula
+// (calculators/009, from memory/Sheetmetal/Stamping_Bending_Calculator.md):
+//   Theoretical Force (Ton) = (t² × L × UTS × Bending Coefficient) / Shoulder Width / 9810
+//   Recommended Force (Ton) = Theoretical Force × 1.25
+// Shoulder width is taken as the V-die opening, 8 × t (the engine's seed for
+// the calculator's 'Shoulder Width' field). The cost engine, machine
+// selection and the calculator popup all size a brake against this one
+// formula, so the tonnage the engineer sees is the tonnage the machine was
+// chosen for.
+export const BEND_COEFFICIENT = 1.33;
+export const BEND_RECOMMENDED_FORCE_FACTOR = 1.25;
+export const bendShoulderWidthMm = (thicknessMm: number) => 8 * thicknessMm;
 
 // Ultimate tensile strength (MPa) by material family/grade — bend-force lookup.
 // Approved per-family values only. There is deliberately no catch-all
@@ -131,16 +140,26 @@ export function resolveUtsMpa(grade: string | null | undefined): number | null {
   return hit ? MATERIAL_UTS_MPA[hit]! : null;
 }
 
-/** Estimated press-brake force in metric tons for one air bend. */
+/** Theoretical press-brake force in metric tons for one bend (no margin). */
 export function estimateBendTonnage(
   utsMpa: number | null,
   thicknessMm: number,
   bendLengthMm: number,
 ): number | null {
   if (thicknessMm <= 0 || bendLengthMm <= 0 || utsMpa == null || utsMpa <= 0) return null;
-  const vOpeningMm = 8 * thicknessMm;
-  const forceKn = (1.42 * utsMpa * bendLengthMm * thicknessMm * thicknessMm) / (1000 * vOpeningMm);
-  return Math.round((forceKn / 9.81) * 10) / 10;
+  const tons = (thicknessMm * thicknessMm * bendLengthMm * utsMpa * BEND_COEFFICIENT)
+    / bendShoulderWidthMm(thicknessMm) / 9810;
+  return Math.round(tons * 100) / 100;
+}
+
+/** Recommended press-brake capacity for one bend: theoretical force × 1.25. */
+export function recommendedBendTonnage(
+  utsMpa: number | null,
+  thicknessMm: number,
+  bendLengthMm: number,
+): number | null {
+  const theoretical = estimateBendTonnage(utsMpa, thicknessMm, bendLengthMm);
+  return theoretical == null ? null : Math.round(theoretical * BEND_RECOMMENDED_FORCE_FACTOR * 100) / 100;
 }
 
 // ── Minimum bend radius (DFM crack-risk threshold) ────────────────────────────
@@ -158,7 +177,7 @@ export function estimateBendTonnage(
 // thickness above the highest bracket uses that bracket's factor (disclosed
 // extrapolation, same "nearest/highest bracket" convention used elsewhere
 // in this file, e.g. resolveNearestStandardTonnageClass).
-export type BendRadiusMaterial =
+type BendRadiusMaterial =
   | 'steel' | 'stainless_steel' | 'aluminum' | 'galvanized_steel'
   | 'titanium' | 'brass' | 'copper' | 'heat_resistant_super_alloy';
 
@@ -185,7 +204,7 @@ const BEND_RADIUS_MIN_FACTOR: Record<BendRadiusMaterial, Array<[number, number]>
   heat_resistant_super_alloy: [[1.24, 1.0], [6.35, 2.0]],
 };
 
-export function classifyBendRadiusMaterial(grade: string | null | undefined): BendRadiusMaterial {
+function classifyBendRadiusMaterial(grade: string | null | undefined): BendRadiusMaterial {
   const g = (grade ?? '').toUpperCase();
   if (/SECC|SGCC|GALV/.test(g)) return 'galvanized_steel';
   if (/ALUMIN|AA\s?\d{4}|AL\s?\d{4}|6061|6063|5052|5754|7075|2024|\bT6\b/.test(g)) return 'aluminum';
@@ -332,18 +351,18 @@ const ASSUMED_THREAD_PITCH_MM = 1.0;
 //   aluminum (wrought): Viking 80 SFM (24.4 m/min) vs Slugger 6061/5052 20-40 m/min -> 25
 // classifyMaterialFamily()'s 'unknown' case keeps the mild-steel baseline --
 // same fallback convention LASER_MATERIAL_SPEED_FACTOR above already uses.
-export const TAP_SURFACE_SPEED_M_MIN_BY_MATERIAL: Record<string, number> = {
+const TAP_SURFACE_SPEED_M_MIN_BY_MATERIAL: Record<string, number> = {
   carbon_steel: 10,
   stainless: 4.5,
   aluminum: 25,
   __default__: 10,
 };
 
-export const TAP_APPROACH_SEC = 1;    // rapid traverse + engage, fixed allowance
-export const TAP_TOOL_CHANGE_SEC = 3; // once per thread-size group (switch tap/holder)
+const TAP_APPROACH_SEC = 1;    // rapid traverse + engage, fixed allowance
+const TAP_TOOL_CHANGE_SEC = 3; // once per thread-size group (switch tap/holder)
 const TAP_UNLOAD_SEC = 2;      // once per tapping operation (final clear/unload)
 
-export interface TapPhysicsResult {
+interface TapPhysicsResult {
   rpm: number;
   machiningTimeSec: number; // single-pass cutting time (depth-driven)
   approachSec: number;
@@ -381,7 +400,7 @@ export function computeTapPhysics(
   };
 }
 
-export interface TapCycleBreakdown {
+interface TapCycleBreakdown {
   toolChangeSec: number;
   perHoleSec: number;   // approach + tap + retract, for ONE hole
   tapSec: number;       // the depth-driven component of perHoleSec (for display)
@@ -408,7 +427,7 @@ export interface TapCycleBreakdown {
  * solid stock is conventionally ~1.5-2x the nominal diameter for full thread
  * engagement — this function has no way to know which applies.
  */
-export interface TapPhysicsInputs {
+interface TapPhysicsInputs {
   diameterMm: number;
   /** true when sizeStr carried no parseable M-diameter and the assumption was used. */
   diameterIsAssumed: boolean;
@@ -514,7 +533,7 @@ export const DRILL_SURFACE_SPEED_M_MIN_BY_MATERIAL: Record<string, number> = {
 // engineering-standard assumption, disclosed as such — not a per-tool-vendor
 // exact spec, same rigor tier as Press Brake's "Shoulder Width = 8x
 // thickness" convention elsewhere in this file.
-export const DRILL_FEED_MM_PER_REV = 0.15;
+const DRILL_FEED_MM_PER_REV = 0.15;
 
 // Countersinking runs at 25% of the equivalent drill's speed, same feed per
 // rev — a direct, repeatedly-published tool-vendor design rule (Melin Tool /
@@ -532,7 +551,7 @@ export const COUNTERSINK_SPEED_FACTOR = 0.25;
 // mirrors approach, not machining time.
 export const HOLE_OP_UNLOAD_SEC = TAP_UNLOAD_SEC;
 
-export interface DrillingSpeedFeed {
+interface DrillingSpeedFeed {
   surfaceSpeedMMin: number;
   feedMmPerRev: number;
   materialFamily: string;
@@ -563,21 +582,6 @@ export function resolveDrillingSpeedFeed(
 // Deburring: time constants
 export const DEBURR_SEC_PER_METRE = 60;   // per metre of cut edge
 export const DEBURR_SEC_PER_PIERCE = 0.5; // per pierce (hole cleanup)
-
-// Single real formula for deburr cycle time — was previously duplicated
-// inline in both cost-engine.ts and bom-items.service.ts; both now call this.
-// secPerMetre/secPerPierce default to the module constants above ONLY as a
-// last-resort safety net — real callers resolve them from sm_lookup_deburr_rate
-// (migration 413) via SheetMetalLookupService.getDeburrRate() and pass the
-// result in explicitly, disclosing when the DB has no row yet.
-export function computeDeburrCycleSec(
-  cutLengthMm: number,
-  pierceCount: number,
-  secPerMetre: number = DEBURR_SEC_PER_METRE,
-  secPerPierce: number = DEBURR_SEC_PER_PIERCE,
-): number {
-  return (cutLengthMm / 1000) * secPerMetre + pierceCount * secPerPierce;
-}
 
 // Reaming replaces a laser-pierced hole's finish with a drilled+reamed one when
 // tolerance can't be held by piercing alone — same threshold CNC already uses
@@ -623,9 +627,9 @@ export const REAM_SURFACE_SPEED_M_MIN_BY_MATERIAL: Record<string, number> = {
 // signal (speed) is already material-specific above, this coefficient is
 // the same order of rigor as DRILL_FEED_MM_PER_REV's own disclosed-standard
 // convention.
-export const REAM_FEED_MM_PER_REV_PER_MM_DIAMETER = 0.02;
+const REAM_FEED_MM_PER_REV_PER_MM_DIAMETER = 0.02;
 
-export interface ReamPhysicsInputs {
+interface ReamPhysicsInputs {
   surfaceSpeedMMin: number;
   feedMmPerRev: number;
   materialFamily: string;
@@ -681,7 +685,7 @@ export interface SurfaceTreatmentDbRate {
 //      CMM_NAME_PATTERN name-text heuristic (legacy/benchmark rows from before
 //      machine_class existed on this table).
 //   4. Otherwise -- OTHER. Never guessed into CMM or MANUAL_INSPECTION.
-export type InspectionResourceClass = 'CMM' | 'MANUAL_INSPECTION' | 'OTHER';
+type InspectionResourceClass = 'CMM' | 'MANUAL_INSPECTION' | 'OTHER';
 
 // Centralized -- extend this list (not ad-hoc regexes at call sites) as more
 // manual-inspection resource names turn up mistakenly tagged machine_class='cmm'.
@@ -776,7 +780,7 @@ export const DEFAULT_COSTING_LOCATION = 'India';
 // (maxThicknessMm, maxTonnage, maxBendLengthMm, etc.) and use them for selection.
 // For this sprint, resolveMHRRates() picks the lowest-rate DB record per class.
 
-export interface MachineRegistryEntry {
+interface MachineRegistryEntry {
   commodityCodes: readonly string[];
   processGroupKeywords: readonly string[];
   machineClassKeywords: readonly string[];
@@ -1181,7 +1185,7 @@ export type MachineClass = keyof typeof MACHINE_REGISTRY;
 // a real rate lookup came back empty).
 // `materialCol`: column to read from raw_materials for this location.
 
-export interface LocationCurrencyInfo {
+interface LocationCurrencyInfo {
   readonly code: string;          // ISO 4217 currency code
   readonly symbol: string;        // display symbol
   readonly materialCol: string;   // raw_materials column

@@ -40,7 +40,7 @@ export interface OxyfuelInput {
   scrapPricePerKg?: number;
 }
 
-export interface OxyfuelResult {
+interface OxyfuelResult {
   processLines: ProcessLineCost[];
   cuttingMin: number;
   // Always 0 — oxyfuel cutting (oxygen + fuel gas combustion) has no

@@ -11,7 +11,7 @@
 //   99    — no shape on file
 //   100   — actively wrong form for the family (a sheet cannot be a billet)
 
-export const FAMILY_PREFERRED_SHAPES: Record<string, string[]> = {
+const FAMILY_PREFERRED_SHAPES: Record<string, string[]> = {
   sheet_metal:       ['sheets', 'coils', 'plates'],
   milled:        ['plates', 'blocks', 'bars', 'ingots'],
   turned:        ['bars', 'rods', 'tubes', 'profiles'],
@@ -22,7 +22,7 @@ export const FAMILY_PREFERRED_SHAPES: Record<string, string[]> = {
   stamping:          ['coils', 'sheets'],
 };
 
-export const FAMILY_DISCOURAGED_SHAPES: Record<string, string[]> = {
+const FAMILY_DISCOURAGED_SHAPES: Record<string, string[]> = {
   milled:  ['sheets', 'coils'],
   turned:  ['sheets', 'coils', 'plates'],
   mill_turn:   ['sheets', 'coils', 'plates'],

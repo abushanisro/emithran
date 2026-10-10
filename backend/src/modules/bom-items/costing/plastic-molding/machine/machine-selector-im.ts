@@ -33,7 +33,7 @@ export interface IMSelectionRequirements {
   clampModel: ClampModel;
 }
 
-export interface IMCandidateEvaluation {
+interface IMCandidateEvaluation {
   candidate: MachineCandidate;
   capable: boolean;
   blockReasons: string[];
@@ -143,15 +143,15 @@ export function evaluateIMCandidate(
 // ── Tier definitions ──────────────────────────────────────────────────────────
 // Three press size classes the route comparison shows side by side (a display
 // grouping of the real press pool, not a cost input).
-export const IM_TIERS = [
+const IM_TIERS = [
   { id: 'small',    label: 'Small Press',    minT: 0,   maxT: 120  },
   { id: 'medium',   label: 'Standard Press', minT: 121, maxT: 350  },
   { id: 'large',    label: 'Large Press',    minT: 351, maxT: 9999 },
 ] as const;
 
-export type IMTierId = typeof IM_TIERS[number]['id'];
+type IMTierId = typeof IM_TIERS[number]['id'];
 
-export interface IMTierResult {
+interface IMTierResult {
   tierId: IMTierId;
   tierLabel: string;
   /** Every real press in the tier: capable ones first, then by clamp tonnage, largest first. */

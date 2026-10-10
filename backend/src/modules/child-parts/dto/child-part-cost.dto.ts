@@ -25,7 +25,7 @@ import { IsOptionalBoolean } from '../../../common/decorators/validation.decorat
 /**
  * Make/Buy enum for child parts
  */
-export enum MakeBuyType {
+enum MakeBuyType {
   MAKE = 'make',
   BUY = 'buy',
 }

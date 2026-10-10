@@ -1,7 +1,4 @@
-import {
-  MATERIAL_OVERHEAD_PCT, UTILIZATION_ADVISORY_THRESHOLD_PCT,
-  RATES_SOURCE_LABEL, DEFAULT_YIELD_PCT,
-  TIGHT_TOLERANCE_REAM_THRESHOLD_MM, } from './default-rates.constants';
+import { MATERIAL_OVERHEAD_PCT, UTILIZATION_ADVISORY_THRESHOLD_PCT, RATES_SOURCE_LABEL, DEFAULT_YIELD_PCT } from './default-rates.constants';
 import type { InspectionResult } from '../process/inspection-engine';
 import {
   ENERGY_KWH_PER_HR, GRID_CO2_KG_PER_KWH,
@@ -10,7 +7,6 @@ import {
 } from '../physics/sustainability-factors.constants';
 import type { NestingResult } from '../../sheet-metal/machine/sheet-metal-nesting.engine';
 import type { CostSummaryDto, ProcessLineCost, ProcessCO2, SustainabilitySummaryDto, PhysicsGap, ConfidenceLevel } from '../../../dto/cost-breakdown.dto';
-import { computeSurfaceTreatmentLine } from '../process/cost-surface-treatment';
 import type { SurfaceTreatmentDbRate } from './default-rates.constants';
 export { eMithranTerms } from './engine-kernel';
 export type { EMithranTermsArgs, EMithranTermsResult } from './engine-kernel';
@@ -20,15 +16,7 @@ export type { EMithranTermsArgs, EMithranTermsResult } from './engine-kernel';
 // instead of inline math; computeCostSummary() below composes them exactly
 // as it composed the inline blocks before extraction.
 import { computePressBrakeCost } from '../../sheet-metal/process/press-brake-engine';
-import { shouldAddSeparatePressBrakeLine } from './engine-kernel';
 import { composeFeatureDrivenOperations, composeOperationSequence } from '../../sheet-metal/operation/feature-driven-operations';
-import { computeDeburringCost } from '../../sheet-metal/operation/deburring-engine';
-import { computeTappingCost } from '../../sheet-metal/operation/tapping-engine';
-import { computeHoleExtrusionCost } from '../../sheet-metal/operation/hole-extrusion-engine';
-import { computeCounterboringCost } from '../../sheet-metal/operation/counterboring-engine';
-import { computeCountersinkingCost } from '../../sheet-metal/operation/countersinking-engine';
-import { computeReamingCost } from '../../sheet-metal/operation/reaming-engine';
-import { computePemInsertionCost } from '../../sheet-metal/operation/pem-insertion-engine';
 import { computeLaserCuttingCost } from '../../sheet-metal/process/laser-cutting-engine';
 import { overlayRejectionReason, type PersistedCostCurrencyBasis } from './persisted-currency-contract';
 
@@ -240,9 +228,9 @@ export interface CostEngineInput {
   // a pure calculation module with no DB access. Each op is additive: it does NOT
   // remove time from the laser-cutting line, matching real shop routing (the
   // laser/punch still pierces every hole; these are secondary operations layered
-  // on top). See backend/migrations/381_sheet_metal_feature_routing.sql and
-  // SheetMetalFeatureExtractorService.buildHoleFeatures() for how subtype counts
-  // are derived from the CAD engine's counterbore/countersink detection.
+  // on top). See backend/migrations/381_sheet_metal_feature_routing.sql; the
+  // subtype counts are the CAD engine's counterbore/countersink detection
+  // (summary.counterboreGroups / countersinkGroups).
   counterboreCount?: number;
   countersinkCount?: number;
   pemCount?: number;
@@ -771,7 +759,7 @@ export interface AppliedProcessCostRecord {
  * refresh.
  * ──────────────────────────────────────────────────────────────────────────── */
 
-export interface AppliedGenerationContext {
+interface AppliedGenerationContext {
   /** Currency the summary was computed in -- the factory local currency. */
   summaryCurrency: string;
   /** Batch size the current request resolved. */
@@ -780,7 +768,7 @@ export interface AppliedGenerationContext {
   resolvedLocation: string;
 }
 
-export type AppliedGenerationVerdict =
+type AppliedGenerationVerdict =
   | { usable: true; rows: AppliedProcessCostRecord[]; tag: string }
   | { usable: false; reason: string };
 
@@ -966,7 +954,7 @@ function buildLineFromAppliedRecord(
  * One operation whose persisted cost no longer matches what the engine would
  * charge for it now.
  */
-export interface AppliedGenerationDrift {
+interface AppliedGenerationDrift {
   machineClass: string;
   process: string;
   persistedTotalCost: number;

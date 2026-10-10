@@ -62,7 +62,7 @@ export interface MaterialLine {
   totalCost: number;
 }
 
-export interface CostConfidence {
+interface CostConfidence {
   material: 'high' | 'medium' | 'low';
   processRouting: 'high' | 'medium' | 'low';
   cycleTime: 'high' | 'medium' | 'low';

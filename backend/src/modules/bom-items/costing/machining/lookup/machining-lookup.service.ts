@@ -29,33 +29,33 @@ import {
 // from this module.
 export { MACHINING_MATERIAL_HARDNESS_HB, nearestByHardness, nearestByDiameterThenHardness };
 
-export interface DrillingPhysicsParams {
+interface DrillingPhysicsParams {
   cuttingSpeedMPerMin: number;
   feedMmPerRev: number;
   dataFound: boolean;
 }
 
-export interface CounterboreParams {
+interface CounterboreParams {
   cuttingSpeedMPerMin: number;
   feedMmPerRev: number;
   depthMaxMm: number | null;
   dataFound: boolean;
 }
 
-export interface ReamParams {
+interface ReamParams {
   cuttingSpeedMPerMin: number;
   feedMm: number;
   dataFound: boolean;
 }
 
-export interface EdgeToolParams {
+interface EdgeToolParams {
   linearSpeedMmPerSec: number;
   dataFound: boolean;
   /** The material cut code of the row the speed came from. */
   materialCutCode?: string;
 }
 
-export interface CylindricalGrindingParams {
+interface CylindricalGrindingParams {
   wheelSpeedMS: number;
   workSpeedMMin: number;
   roughInfeedMm: number;
@@ -74,7 +74,7 @@ export interface CylindricalGrindingParams {
  * tblCylindricalGrinding is staged with snake_case columns (migration 744),
  * tblInternalGrinding with the source headers (migration 809).
  */
-export type GrindingTable = 'tblCylindricalGrinding' | 'tblInternalGrinding';
+type GrindingTable = 'tblCylindricalGrinding' | 'tblInternalGrinding';
 const GRINDING_COLUMNS: Record<GrindingTable, {
   code: string; wheelSpeed: string; workSpeed: string; roughInfeed: string; finishInfeed: string; roughAxialFeed: string; finishAxialFeed: string;
 }> = {
@@ -90,14 +90,14 @@ const GRINDING_COLUMNS: Record<GrindingTable, {
   },
 };
 
-export interface WireEdmParams {
+interface WireEdmParams {
   roughFeedRateMmPerMin: number;
   finishFeedRateMmPerMin: number;
   dataFound: boolean;
   materialCutCode?: string;
 }
 
-export interface TurningParams {
+interface TurningParams {
   roughCutDepthMm: number;
   roughCuttingSpeedMPerMin: number;
   roughFeedMmPerRev: number;
@@ -191,6 +191,25 @@ export class MachiningLookupService {
     if (error) return { rule: null, missing: [...SETUP_AXIS_VARIABLE_KEYS] };
     this.setupAxisRule = resolveSetupAxisRule(data ?? []);
     return this.setupAxisRule;
+  }
+
+  /** Passes per deburred edge — defaultNumDeburrPassesEdge (machining
+   *  variables, migration 639). null when not on file (never assumed). */
+  private deburrPassesPerEdge: number | null = null;
+  async getDeburrPassesPerEdge(): Promise<number | null> {
+    if (this.deburrPassesPerEdge != null) return this.deburrPassesPerEdge;
+    const { data, error } = await this.supabase
+      .getPrivilegedClient('reference-data: machining lookup tables, global shared')
+      .from('machining_reference_data')
+      .select('value')
+      .eq('category', 'variable')
+      .eq('source_version', MACHINING_REFERENCE_SOURCE_VERSION)
+      .eq('key', 'defaultNumDeburrPassesEdge')
+      .maybeSingle();
+    const passes = Number((data as any)?.value);
+    if (error || !(passes > 0)) return null; // not cached: a read error retries next time
+    this.deburrPassesPerEdge = passes;
+    return passes;
   }
 
   private capabilityRules: { rules: MachiningCapabilityRules | null; missing: string[] } | null = null;

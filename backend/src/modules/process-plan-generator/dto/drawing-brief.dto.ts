@@ -14,7 +14,7 @@
  *   - Counterbore/countersink                  → secondary milling op
  */
 
-export interface DrawingDatum {
+interface DrawingDatum {
   label: string;       // "A", "B", "C"
   feature: string;     // free-text feature description
 }
@@ -53,19 +53,19 @@ export interface DrawingGdt {
   modifier: string | null; // "M" (MMC), "L" (LMC), "P" (proj), etc.
 }
 
-export interface DrawingSurfaceFinish {
+interface DrawingSurfaceFinish {
   feature: string;
   raMicrons: number | null;
   rzMicrons: number | null;
   directionSymbol: string | null; // "‖", "⊥", "X", etc.
 }
 
-export interface DrawingThread {
+interface DrawingThread {
   feature: string;
   spec: string;        // "M6×1", "1/4-20 UNC-2B", "G1/4"
 }
 
-export interface DrawingHole {
+interface DrawingHole {
   feature: string;
   diameter: number;
   depth: number | null;

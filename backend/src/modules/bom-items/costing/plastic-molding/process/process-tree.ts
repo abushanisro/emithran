@@ -51,9 +51,9 @@ export type IMOperationId =
   | 'color_inspection'
   | 'material_verification';
 
-export type IMOperationLevel = 'primary' | 'secondary' | 'inspection';
+type IMOperationLevel = 'primary' | 'secondary' | 'inspection';
 
-export interface IMOperationDef {
+interface IMOperationDef {
   id: IMOperationId;
   label: string;          // display name, e.g. "Gate Trimming"
   level: IMOperationLevel;
@@ -157,7 +157,7 @@ export interface IMProcessTree {
 // "COPPER"; substring matching against material grades is how a copper part
 // ends up with a resin dryer on its route.
 
-export const HYGROSCOPIC_RESIN_TOKENS: ReadonlySet<string> = new Set([
+const HYGROSCOPIC_RESIN_TOKENS: ReadonlySet<string> = new Set([
   'PA', 'PA6', 'PA66', 'PA12', 'NYLON', 'POLYAMIDE',
   'PC', 'POLYCARBONATE',
   'PET', 'PBT',
@@ -171,7 +171,7 @@ export const HYGROSCOPIC_RESIN_TOKENS: ReadonlySet<string> = new Set([
 // All thermoplastic tokens the platform recognizes — superset of the
 // hygroscopic table. Used by isPlasticGradeToken/isPlasticGrade to decide
 // whether a material can be injection molded at all.
-export const THERMOPLASTIC_TOKENS: ReadonlySet<string> = new Set([
+const THERMOPLASTIC_TOKENS: ReadonlySet<string> = new Set([
   ...HYGROSCOPIC_RESIN_TOKENS,
   'POM', 'ACETAL', 'DELRIN',
   'PP', 'POLYPROPYLENE',
@@ -187,7 +187,7 @@ export const THERMOPLASTIC_TOKENS: ReadonlySet<string> = new Set([
 // Tokenize a material grade the same way classifyLaserMaterial does: split
 // letter/digit boundaries so "PA66-GF30" → [PA, 66, GF, 30], "ABS+PC" →
 // [ABS, PC], "SPCC" → [SPCC] (no false PC match).
-export function tokenizeGrade(grade: string): Set<string> {
+function tokenizeGrade(grade: string): Set<string> {
   return new Set(
     grade
       .toUpperCase()
@@ -200,7 +200,7 @@ export function tokenizeGrade(grade: string): Set<string> {
 
 // LSR / silicone-rubber tokens — thermoset, requires Arrhenius cure model.
 // LSR is NOT a thermoplastic and must NOT go through isPlasticGrade / THERMOPLASTIC_TOKENS.
-export const SILICONE_TOKENS: ReadonlySet<string> = new Set([
+const SILICONE_TOKENS: ReadonlySet<string> = new Set([
   'LSR', 'LIQUID', 'SILICONE', 'VMQ', 'PDMS', 'SILASTIC', 'MVQ', 'FVMQ', 'PVMQ',
 ]);
 

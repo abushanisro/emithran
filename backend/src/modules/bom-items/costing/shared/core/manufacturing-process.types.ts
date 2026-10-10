@@ -12,7 +12,7 @@ import type { MachineClass } from './default-rates.constants';
 // number. (Laser Cutting no longer uses this pattern — see
 // cuttingSecFromCalculator below, resolved via the Manufacturing Physics
 // Calculator pipeline instead.)
-export interface WaterjetParams {
+interface WaterjetParams {
   cuttingSpeedMmPerMin: number;
   pierceTimeMin: number;
   dataFound: boolean;
@@ -133,7 +133,7 @@ export interface PlasmaPunchParams {
 // not modeled; this engine assumes steady-state single-pass, the same kind
 // of documented simplification Progressive Die Press's steady-state
 // assumption already uses elsewhere in this codebase.
-export interface RollBendingParams {
+interface RollBendingParams {
   rollingSpeedMmPerSec: number;
   prebendTimeSec: number;
   dataFound: boolean;
@@ -144,7 +144,7 @@ export interface RollBendingParams {
 // via SheetMetalLookupService.getRouterParams(). Only Aluminum/Copper have
 // real data in the source — dataFound:false for anything else is a genuine,
 // disclosed gap, not a guess.
-export interface RouterParams {
+interface RouterParams {
   cuttingSpeedMmPerMin: number;
   dataFound: boolean;
 }

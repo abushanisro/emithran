@@ -46,7 +46,7 @@ export interface LaserCuttingInput {
   scrapPricePerKg?: number;
 }
 
-export interface LaserCuttingResult {
+interface LaserCuttingResult {
   processLines: ProcessLineCost[];
   cuttingMin: number;
   warnings: string[];

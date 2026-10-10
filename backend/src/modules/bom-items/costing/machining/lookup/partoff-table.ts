@@ -14,7 +14,7 @@ import { MACHINING_MATERIAL_HARDNESS_HB, nearestByHardness } from './machining-m
  * reaches that depth, there is no real parameter set — null, not the deepest
  * row stretched past its limit.
  */
-export interface PartoffParams {
+interface PartoffParams {
   cuttingSpeedMPerMin: number;
   feedMmPerRev: number;
   insertWidthMm: number;

@@ -41,7 +41,7 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
 
 /** Calculator key (calculators/die-casting-calculators.json): pour time and metal yield. */
-export const GDC_CALCULATOR = 'Gravity Die Casting';
+const GDC_CALCULATOR = 'Gravity Die Casting';
 
 export function computeGdc(input: {
   reference: CastingReference | null;

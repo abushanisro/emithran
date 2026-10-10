@@ -2,7 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { SupabaseService } from "../../../common/supabase/supabase.service";
 import type { IsoGroup } from "../interfaces/operation-calculator.interface";
 
-export interface MaterialGroupRecord {
+interface MaterialGroupRecord {
   isoGroup: IsoGroup;
   kc1_1_n_mm2: number | null;
   mcExponent: number | null;

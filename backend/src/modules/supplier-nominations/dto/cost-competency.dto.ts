@@ -2,7 +2,7 @@ import { IsString, IsUUID, IsOptional, IsNumber, IsBoolean, IsArray, ValidateNes
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-export class CostVendorValueDto {
+class CostVendorValueDto {
   @ApiProperty()
   @IsUUID()
   id: string;
@@ -87,7 +87,7 @@ export class UpdateCostValueDto {
   textValue?: string;
 }
 
-export class VendorValueUpdateDto {
+class VendorValueUpdateDto {
   @ApiProperty()
   @IsUUID()
   vendorId: string;
@@ -103,7 +103,7 @@ export class VendorValueUpdateDto {
   textValue?: string;
 }
 
-export class CostComponentUpdateDto {
+class CostComponentUpdateDto {
   @ApiProperty()
   @IsString()
   costComponent: string;

@@ -10,7 +10,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 /**
  * Standard pagination metadata
  */
-export class PaginationMeta {
+class PaginationMeta {
   @ApiProperty({ description: 'Total number of records', example: 100 })
   total: number;
 
@@ -57,7 +57,7 @@ export class ApiResponse<T> {
 /**
  * Standard API response wrapper for list/collection resources
  */
-export class ApiListResponse<T> {
+class ApiListResponse<T> {
   @ApiProperty({ description: 'Array of data items', isArray: true })
   data: T[];
 
@@ -92,7 +92,7 @@ export class ApiListResponse<T> {
 /**
  * Standard error response
  */
-export class ApiErrorResponse {
+class ApiErrorResponse {
   @ApiProperty({ description: 'Error message' })
   error: string;
 

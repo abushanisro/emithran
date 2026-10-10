@@ -10,7 +10,7 @@ import type { MachiningCalculatorField, MachiningCalculators } from './machining
  * stations (bom-items.service.ts resolveMachiningCalculators) and which lookup
  * tables the calculators name (machining-lookup-tables.ts).
  */
-export interface SpecField {
+interface SpecField {
   name: string;
   unit: string | null;
   source?: 'cad' | 'lookup' | 'machine' | 'bom' | 'drawing' | 'engine' | 'default';
@@ -22,7 +22,7 @@ export interface SpecField {
   formula?: string;
 }
 
-export interface SpecCalculator {
+interface SpecCalculator {
   name: string;
   operation: string;
   description: string;

@@ -41,7 +41,7 @@ export abstract class BaseCuttingEngine implements ManufacturingProcessEngine {
   abstract computeCost(context: CuttingProcessContext): CuttingProcessResult;
 }
 
-export interface CuttingProcessLineInput {
+interface CuttingProcessLineInput {
   process: string;
   processIdentity?: { processGroup: string; processRoute: string; operation: string };
   setupCost: number;

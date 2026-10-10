@@ -58,35 +58,6 @@ export function IsOptionalBoolean(message?: string, options?: ValidationOptions)
   );
 }
 
-export function IsOptionalPrice(
-  maxDecimalPlaces: number = 2,
-  min?: number,
-  max?: number,
-  message?: string,
-  options?: ValidationOptions
-) {
-  const decorators = [
-    IsOptional(),
-    IsNumber({ maxDecimalPlaces }, {
-      message: message || `Price must be a valid number with up to ${maxDecimalPlaces} decimal places`
-    })
-  ];
-
-  if (min !== undefined) {
-    decorators.push(
-      Min(min, { message: `Price must be ${min} or greater` })
-    );
-  }
-
-  if (max !== undefined) {
-    decorators.push(
-      Max(max, { message: `Price must be ${max} or less` })
-    );
-  }
-
-  return applyDecorators(...decorators);
-}
-
 // Custom business validation
 export function IsProjectName(message?: string, options?: ValidationOptions) {
   return applyDecorators(
