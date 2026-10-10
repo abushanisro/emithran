@@ -8,10 +8,12 @@
  * If any row that carries money cannot be converted, the BOM has NO total: a
  * number assembled from amounts of unknown denomination is worse than none.
  *
- * The aggregation shape is unchanged from before this module existed: per item
- * the best available unit cost (record sums, else the stored aggregate, else
- * the item's own unit_cost) times quantity, then the larger of the leaf sum and
- * the root sum, falling back to the sum of everything.
+ * Hierarchy: an item's unit cost is its OWN cost plus, for each child, the child's
+ * quantity times the child's unit cost; the BOM total is each root's quantity times
+ * its unit cost. Own cost is the item's recorded materials and processes; a leaf
+ * with none falls back to its stored aggregate, then its entered unit_cost. An
+ * assembly never uses its stored aggregate, because that already contains its
+ * children. A cycle, or a parent that is not in the BOM, leaves the total unresolved.
  */
 
 export interface BomTotalItem {
@@ -64,31 +66,50 @@ export function computeBomTotal(input: {
     return row.amount * rate;
   };
 
-  const parentIds = new Set(items.map((i) => i.parent_item_id).filter((p): p is string => !!p));
-  let leafSum = 0;
-  let rootSum = 0;
-  let allSum = 0;
-
+  const byId = new Map(items.map((i) => [i.id, i]));
+  const children = new Map<string, BomTotalItem[]>();
+  const roots: BomTotalItem[] = [];
   for (const item of items) {
-    const itemRows = rowsByItem.get(item.id) ?? [];
+    if (item.parent_item_id && byId.has(item.parent_item_id)) {
+      const arr = children.get(item.parent_item_id) ?? [];
+      arr.push(item);
+      children.set(item.parent_item_id, arr);
+    } else if (item.parent_item_id) {
+      unresolved.add(item.id); // parent missing from this BOM: its cost cannot be placed
+    } else {
+      roots.push(item);
+    }
+  }
+
+  const quantityOf = (item: BomTotalItem) => parseFloat(String(item.quantity)) || 1;
+  const visiting = new Set<string>();
+  const placed = new Set<string>();
+  const unitCost = (item: BomTotalItem): number => {
+    if (visiting.has(item.id)) { unresolved.add(item.id); return 0; } // cycle
+    visiting.add(item.id);
+    placed.add(item.id);
     let recordCost = 0;
     let aggregateCost = 0;
-    for (const r of itemRows) {
+    for (const r of rowsByItem.get(item.id) ?? []) {
       const converted = convert(r);
       if (r.kind === 'aggregate') aggregateCost += converted;
       else recordCost += converted;
     }
-    const quantity = parseFloat(String(item.quantity)) || 1;
-    const ownUnitCost = parseFloat(String(item.unit_cost)) || 0;
-    const bestUnitCost = recordCost > 0 ? recordCost : aggregateCost > 0 ? aggregateCost : ownUnitCost;
-    const itemTotal = bestUnitCost * quantity;
+    const kids = children.get(item.id) ?? [];
+    let own = recordCost;
+    if (own === 0 && kids.length === 0) own = aggregateCost > 0 ? aggregateCost : parseFloat(String(item.unit_cost)) || 0;
+    let sum = own;
+    for (const child of kids) sum += quantityOf(child) * unitCost(child);
+    visiting.delete(item.id);
+    return sum;
+  };
 
-    allSum += itemTotal;
-    if (!parentIds.has(item.id)) leafSum += itemTotal;
-    if (!item.parent_item_id) rootSum += itemTotal;
-  }
+  let total = 0;
+  for (const root of roots) total += quantityOf(root) * unitCost(root);
+
+  // anything not reached from a root (a cycle with no root) is cost we could not place
+  for (const item of items) if (!placed.has(item.id)) unresolved.add(item.id);
 
   if (unresolved.size > 0) return { total: null, unresolvedItems: [...unresolved] };
-  const best = Math.max(leafSum, rootSum);
-  return { total: best > 0 ? best : allSum, unresolvedItems: [] };
+  return { total, unresolvedItems: [] };
 }
