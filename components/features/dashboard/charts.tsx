@@ -278,7 +278,7 @@ export function ManufacturingPerformanceChart({ modules }: { modules: any[] }) {
     active: module.stats.active,
     total: module.stats.total,
     efficiency: ((module.stats.active / module.stats.total) * 100) || 0,
-    value: module.stats.value / 100000, // Convert to lakhs
+    value: module.stats.value == null ? null : module.stats.value / 100000, // Preserve unresolved values
   }));
 
   return (

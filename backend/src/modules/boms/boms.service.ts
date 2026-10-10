@@ -4,10 +4,8 @@ import { SupabaseService } from '../../common/supabase/supabase.service';
 import { CreateBOMDto, UpdateBOMDto, QueryBOMsDto } from './dto/boms.dto';
 import { BOMResponseDto, BOMListResponseDto } from './dto/bom-response.dto';
 import { validate as isValidUUID } from 'uuid';
-import { PERSISTED_PROCESS_COST_COLUMNS, resolvePersistedProcessCost } from '../bom-items/costing/shared/core/persisted-process-cost';
-import { ROLLUP_REPORTING_CURRENCY } from '../bom-items/costing/shared/core/persisted-currency-contract';
 import { ExchangeRateService } from '../../common/exchange-rate/exchange-rate.service';
-import { computeBomTotal, type BomCostRow } from './bom-total';
+import { loadBomTotals } from './bom-totals';
 
 @Injectable()
 export class BOMsService {
@@ -121,109 +119,10 @@ export class BOMsService {
    * they declare, never summed as if they shared one.
    */
   private async computeBomsCosts(accessToken: string, bomIds: string[]): Promise<Map<string, number | null>> {
-    const costMap = new Map<string, number | null>();
-    if (!bomIds.length) return costMap;
-    for (const id of bomIds) costMap.set(id, 0);
-
-    const client = this.supabaseService.getClient(accessToken);
-    const { data: allItems, error: itemsError } = await client
-      .from('bom_items')
-      .select('id, bom_id, make_buy, unit_cost, quantity, parent_item_id')
-      .in('bom_id', bomIds);
-
-    // A cost read that failed is not "no cost": every total becomes unavailable.
-    const unavailable = (what: string, message: string) => {
-      this.logger.error(`BOM totals unavailable: ${what} could not be read (${message})`, 'BOMsService');
-      for (const id of bomIds) costMap.set(id, null);
-      return costMap;
-    };
-    if (itemsError) return unavailable('bom_items', itemsError.message);
-    if (!allItems || allItems.length === 0) return costMap;
-
-    const allItemIds = allItems.map((i: any) => i.id);
-    const rows: BomCostRow[] = [];
-    const trustedBasis = (basis: unknown) => basis === 'local' || basis === 'converted';
-
-    const { data: rmRows, error: rmError } = await client
-      .from('raw_material_cost_records')
-      .select('bom_item_id, gross_usage, unit_cost, overhead, currency, cost_currency_basis')
-      .in('bom_item_id', allItemIds)
-      .eq('is_active', true);
-    if (rmError) return unavailable('raw_material_cost_records', rmError.message);
-
-    for (const r of rmRows ?? []) {
-      const grossUsage = parseFloat(r.gross_usage) || 0;
-      const unitCost   = parseFloat(r.unit_cost)   || 0;
-      const overhead   = parseFloat(r.overhead)    || 0;
-      rows.push({
-        itemId: r.bom_item_id, kind: 'material',
-        amount: grossUsage * unitCost * (1 + overhead / 100),
-        currency: r.currency ?? null, trusted: trustedBasis(r.cost_currency_basis),
-      });
-    }
-
-    // P1b-iv-b: prefer the cost the engine already computed and persisted (labour, QA
-    // sampling, yield loss), falling back to the rate-column formula only for rows that
-    // have nothing stored -- see resolvePersistedProcessCost.
-    const { data: pcRows, error: pcError } = await client
-      .from('process_cost_records')
-      .select(`bom_item_id, currency, cost_currency_basis, ${PERSISTED_PROCESS_COST_COLUMNS}`)
-      .in('bom_item_id', allItemIds)
-      .eq('is_active', true);
-    if (pcError) return unavailable('process_cost_records', pcError.message);
-
-    for (const r of pcRows ?? []) {
-      const { totalCostPerPart } = resolvePersistedProcessCost(r);
-      rows.push({
-        itemId: r.bom_item_id, kind: 'process', amount: totalCostPerPart,
-        currency: r.currency ?? null, trusted: trustedBasis(r.cost_currency_basis),
-      });
-    }
-
-    const { data: bcRows, error: bcError } = await client
-      .from('bom_item_costs')
-      .select('bom_item_id, total_cost, currency_code, currency_integrity, is_stale')
-      .in('bom_item_id', allItemIds);
-    if (bcError) return unavailable('bom_item_costs', bcError.message);
-
-    for (const r of bcRows ?? []) {
-      rows.push({
-        itemId: r.bom_item_id, kind: 'aggregate', amount: parseFloat(r.total_cost) || 0,
-        // a stale aggregate no longer reflects its inputs
-        currency: r.currency_code ?? null, trusted: r.currency_integrity === 'consistent' && r.is_stale !== true,
-      });
-    }
-
-    // ONE FX snapshot for every BOM in this response. If no rates are available the
-    // totals are simply unavailable (null); a cost list must not fail on that.
-    const reporting = ROLLUP_REPORTING_CURRENCY;
-    let rateToReporting: (from: string) => number | null = (from) => (from === reporting ? 1 : null);
-    try {
-      const snapshot = await this.exchangeRates.getSnapshot(accessToken);
-      rateToReporting = (from) => (from === reporting ? 1 : snapshot.convertOptional(from, reporting) ?? null);
-    } catch (e) {
-      this.logger.warn(`BOM totals: FX snapshot unavailable (${e instanceof Error ? e.message : String(e)}); non-${reporting} amounts stay unresolved`, 'BOMsService');
-    }
-
-    const itemsByBom = new Map<string, any[]>();
-    for (const item of allItems) {
-      const arr = itemsByBom.get(item.bom_id) || [];
-      arr.push(item);
-      itemsByBom.set(item.bom_id, arr);
-    }
-
-    for (const [bomId, items] of itemsByBom.entries()) {
-      const ids = new Set(items.map((i: any) => i.id));
-      const result = computeBomTotal({
-        items,
-        rows: rows.filter((r) => ids.has(r.itemId)),
-        reportingCurrency: reporting,
-        rateToReporting,
-      });
-      costMap.set(bomId, result.total);
-    }
-
-    return costMap;
+    const totals = await loadBomTotals(this.supabaseService.getClient(accessToken), bomIds,
+      () => this.exchangeRates.getSnapshot(accessToken),
+      message => this.logger.warn(message, 'BOMsService'));
+    return new Map([...totals].map(([id, value]) => [id, value.totalCost]));
   }
 
   /**

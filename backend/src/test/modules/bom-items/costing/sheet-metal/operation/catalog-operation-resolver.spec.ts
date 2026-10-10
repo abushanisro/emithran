@@ -10,7 +10,7 @@ import {
 // the database holds), the punch factor from memory/ sheet-metal variables and
 // the punch size from the real machine library.
 const REPO = join(__dirname, '../../../../../../../..');
-const CATALOG = readFileSync(join(REPO, 'memory/Sheetmetal/process/process_operations.csv'), 'utf-8')
+const CATALOG = readFileSync(join(REPO, 'memory/sheetmetal/process/process_operations.csv'), 'utf-8')
   .replace(/^﻿/, '').split(/\r?\n/).slice(1).filter(Boolean);
 // Plus the station rows migration 725 seeded for processes the CSV has no block
 // for (the Tapping and Burring stations).
@@ -33,13 +33,13 @@ for (const m of section('sm_feature_variant_kinds').matchAll(/\('([^']+)', '([^'
 
 // Columns: source, variableCount, variableName, stringValue, ...
 const variable = (name: string) => Number(
-  readFileSync(join(REPO, 'memory/Sheetmetal/sheet_metal_variables.csv'), 'utf-8')
+  readFileSync(join(REPO, 'memory/sheetmetal/sheet_metal_variables.csv'), 'utf-8')
     .split(/\r?\n/).map((l) => l.split(',')).find((c) => c[2] === name)![3],
 );
 const MIN_PUNCH_FACTOR = variable('minPunchingThicknessFactor');
 const NIBBLE_CAP = variable('turretMaxPercentNibbledPeriemter');
 
-const library = readFileSync(join(REPO, 'memory/Sheetmetal/machine/machine_library.csv'), 'utf-8').split(/\r?\n/);
+const library = readFileSync(join(REPO, 'memory/sheetmetal/machine/machine_library.csv'), 'utf-8').split(/\r?\n/);
 const header = library[0]!.split(',');
 const turretRow = library.slice(1).map((l) => l.split(','))
   .find((r) => r.length === header.length && r[header.indexOf('machine_category')] === 'Turret Press (Punch Press)'

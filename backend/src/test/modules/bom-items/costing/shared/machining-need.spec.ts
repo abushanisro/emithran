@@ -10,9 +10,9 @@ const { readCsv } = require('../../../../../../migrations/scripts/lib/memory-mac
 const MEM = join(__dirname, '../../../../../../../memory');
 const csv = (rel: string): Array<Record<string, any>> => readCsv(join(MEM, rel)).rows;
 
-const capability = resolveCapabilityTable(csv('Machining/lookup/tblGtolProcessCapabilities.csv'));
+const capability = resolveCapabilityTable(csv('machining/lookup/tblGtolProcessCapabilities.csv'));
 const iso = resolveIsoTable(csv('Standards/lookup/iso286_standard_tolerances.csv'));
-const links = resolveOperationLinks(csv('Machining/lookup/operation_capability_process.csv'));
+const links = resolveOperationLinks(csv('machining/lookup/operation_capability_process.csv'));
 const dc = resolveCastingReference({
   variables: csv('Die Casting/Die casting_variables.csv').map((r) => ({ key: String(r['Variable Name']), value: r['String Value'] })),
   lookups: Object.fromEntries(CASTING_LOOKUP_KEYS.map((k) => [k, csv(`Die Casting/Lookup/${k}.csv`)])),

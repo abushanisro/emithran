@@ -23,7 +23,8 @@ export type Project = {
   // Enriched aggregate fields from BOM data
   bomCount?: number;
   bomItemCount?: number;
-  actualCost?: number;
+  actualCost?: number | null;
+  actualCostCurrency?: string;
 };
 
 export type CreateProjectData = {
