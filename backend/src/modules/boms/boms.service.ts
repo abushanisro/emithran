@@ -126,22 +126,30 @@ export class BOMsService {
     for (const id of bomIds) costMap.set(id, 0);
 
     const client = this.supabaseService.getClient(accessToken);
-    const { data: allItems } = await client
+    const { data: allItems, error: itemsError } = await client
       .from('bom_items')
       .select('id, bom_id, make_buy, unit_cost, quantity, parent_item_id')
       .in('bom_id', bomIds);
 
+    // A cost read that failed is not "no cost": every total becomes unavailable.
+    const unavailable = (what: string, message: string) => {
+      this.logger.error(`BOM totals unavailable: ${what} could not be read (${message})`, 'BOMsService');
+      for (const id of bomIds) costMap.set(id, null);
+      return costMap;
+    };
+    if (itemsError) return unavailable('bom_items', itemsError.message);
     if (!allItems || allItems.length === 0) return costMap;
 
     const allItemIds = allItems.map((i: any) => i.id);
     const rows: BomCostRow[] = [];
     const trustedBasis = (basis: unknown) => basis === 'local' || basis === 'converted';
 
-    const { data: rmRows } = await client
+    const { data: rmRows, error: rmError } = await client
       .from('raw_material_cost_records')
       .select('bom_item_id, gross_usage, unit_cost, overhead, currency, cost_currency_basis')
       .in('bom_item_id', allItemIds)
       .eq('is_active', true);
+    if (rmError) return unavailable('raw_material_cost_records', rmError.message);
 
     for (const r of rmRows ?? []) {
       const grossUsage = parseFloat(r.gross_usage) || 0;
@@ -157,11 +165,12 @@ export class BOMsService {
     // P1b-iv-b: prefer the cost the engine already computed and persisted (labour, QA
     // sampling, yield loss), falling back to the rate-column formula only for rows that
     // have nothing stored -- see resolvePersistedProcessCost.
-    const { data: pcRows } = await client
+    const { data: pcRows, error: pcError } = await client
       .from('process_cost_records')
       .select(`bom_item_id, currency, cost_currency_basis, ${PERSISTED_PROCESS_COST_COLUMNS}`)
       .in('bom_item_id', allItemIds)
       .eq('is_active', true);
+    if (pcError) return unavailable('process_cost_records', pcError.message);
 
     for (const r of pcRows ?? []) {
       const { totalCostPerPart } = resolvePersistedProcessCost(r);
@@ -171,15 +180,17 @@ export class BOMsService {
       });
     }
 
-    const { data: bcRows } = await client
+    const { data: bcRows, error: bcError } = await client
       .from('bom_item_costs')
-      .select('bom_item_id, total_cost, currency_code, currency_integrity')
+      .select('bom_item_id, total_cost, currency_code, currency_integrity, is_stale')
       .in('bom_item_id', allItemIds);
+    if (bcError) return unavailable('bom_item_costs', bcError.message);
 
     for (const r of bcRows ?? []) {
       rows.push({
         itemId: r.bom_item_id, kind: 'aggregate', amount: parseFloat(r.total_cost) || 0,
-        currency: r.currency_code ?? null, trusted: r.currency_integrity === 'consistent',
+        // a stale aggregate no longer reflects its inputs
+        currency: r.currency_code ?? null, trusted: r.currency_integrity === 'consistent' && r.is_stale !== true,
       });
     }
 

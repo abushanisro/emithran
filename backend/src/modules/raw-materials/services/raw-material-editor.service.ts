@@ -42,6 +42,15 @@ export class RawMaterialEditorService {
     if (ownerError || !owner) throw new NotFoundException(`Raw material with ID ${id} not found`);
     assertCanEditMaterial(owner.organization_id, organizationId);
 
+    // Stock prices belong to the reference alloy and are shared by every organization
+    // that uses it, so owning one material does not give the right to change them.
+    const changedPrices = changedStockPrices(await this.stockPrices.listForMaterial(id, accessToken), dto.stockPrices);
+    if (changedPrices.length > 0) {
+      throw new ForbiddenException(
+        `Stock prices are shared across organizations and cannot be changed here (${changedPrices.join(', ')}).`,
+      );
+    }
+
     const known = new Set((await this.rawMaterials.getProperties(id, accessToken)).map((p) => p.propertyKey));
     const unknown = dto.properties.map((p) => p.propertyKey).filter((k) => !known.has(k));
     if (unknown.length > 0) throw new BadRequestException(`Material has no property: ${unknown.join(', ')}`);
@@ -52,7 +61,7 @@ export class RawMaterialEditorService {
       p_material_id: id,
       p_core: dto.core,
       p_properties: dto.properties,
-      p_stock_prices: dto.stockPrices,
+      p_stock_prices: [], // unchanged prices are not rewritten; changes were refused above
     });
     if (error) {
       if (error.code === 'P0002') throw new NotFoundException(error.message);
@@ -78,4 +87,18 @@ export function assertCanEditMaterial(materialOrganizationId: string | null, cal
   if (!callerOrganizationId || materialOrganizationId !== callerOrganizationId) {
     throw new ForbiddenException('This material belongs to another organization.');
   }
+}
+
+/** "form @ location" for every submitted stock price that differs from what is stored (or is new). */
+export function changedStockPrices(
+  current: readonly { stockForm: string; location: string; pricePerKg: number }[],
+  submitted: readonly { stockForm: string; location: string; pricePerKg: number }[],
+): string[] {
+  const stored = new Map(current.map((c) => [`${c.stockForm}|${c.location}`, c.pricePerKg]));
+  return submitted
+    .filter((p) => {
+      const was = stored.get(`${p.stockForm}|${p.location}`);
+      return was === undefined || Math.abs(was - p.pricePerKg) > 1e-9 * Math.max(1, Math.abs(was));
+    })
+    .map((p) => `${p.stockForm} @ ${p.location}`);
 }

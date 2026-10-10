@@ -1538,7 +1538,10 @@ class SheetMetalFeatureExtractor:
             out["flat_pattern_area"] = {
                 "value": round(flat_pattern_area_mm2, 1), "unit": "mm2",
                 "method": flat_pattern_area_method,
-                "occurrences": [{"face_ids": area_ids}], "reconciles": True,
+                "occurrences": [{"face_ids": area_ids}],
+                # Only the true unfold accounts for every panel and bend; the dominant-face
+                # fallback of a bent part covers part of the blank, so it must not read as verified.
+                "reconciles": flat_pattern_area_method.startswith("true_unfold") or not bend_occ,
             }
         return out
 
