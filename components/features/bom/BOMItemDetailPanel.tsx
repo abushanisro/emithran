@@ -173,7 +173,7 @@ interface ManufacturingFeature {
   return (
     <div className="fixed right-0 top-0 h-screen w-full md:w-[90vw] lg:w-[80vw] xl:w-[75vw] bg-background border-l shadow-2xl z-50 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex-shrink-0 border-b bg-background px-6 py-4">
+      <div className="shrink-0 border-b bg-background px-6 py-4">
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">

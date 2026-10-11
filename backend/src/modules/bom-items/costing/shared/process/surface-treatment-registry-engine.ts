@@ -13,7 +13,7 @@ import type { ManufacturingProcessEngine } from '../core/manufacturing-process.t
 // wrapper only adapts its (positional args, mutated warnings array) calling
 // convention to the shared (context, {processLines, warnings}) shape every
 // other registered engine uses — no math changes.
-export interface SurfaceTreatmentContext {
+interface SurfaceTreatmentContext {
   surfaceTreatment: string | null;
   surfaceAreaMm2: number;
   batchSize: number;
@@ -21,7 +21,7 @@ export interface SurfaceTreatmentContext {
   dbRate?: SurfaceTreatmentDbRate | null;
 }
 
-export interface SurfaceTreatmentResult {
+interface SurfaceTreatmentResult {
   processLines: ProcessLineCost[];
   warnings: string[];
 }

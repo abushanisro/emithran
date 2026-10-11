@@ -343,7 +343,7 @@ export function VAVETab({ bomMetrics }: Props) {
   return (
     <div className="space-y-6 mt-4">
       {/* AI Analysis Header */}
-      <Card className="bg-gradient-to-br from-primary/10 via-card to-card border-primary/20 shadow-glow animate-pulse-subtle">
+      <Card className="bg-linear-to-br from-primary/10 via-card to-card border-primary/20 shadow-glow animate-pulse-subtle">
         <CardContent className="p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -400,7 +400,7 @@ export function VAVETab({ bomMetrics }: Props) {
 
       {/* Per-BOM VAVE details */}
       {vaveData.map((v) => (
-        <Card key={v.bom.id} className="bg-card/30 border-border/50 backdrop-blur-sm overflow-hidden">
+        <Card key={v.bom.id} className="bg-card/30 border-border/50 backdrop-blur-xs overflow-hidden">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>VAVE: {v.bom.name}</span>
@@ -527,7 +527,7 @@ export function VAVETab({ bomMetrics }: Props) {
                       {v.aiInsights.specificOpportunities.map((opp, i) => (
                         <div
                           key={i}
-                          className={`p-4 rounded-lg border bg-gradient-to-br transition-all hover:scale-[1.01] duration-200 ${
+                          className={`p-4 rounded-lg border bg-linear-to-br transition-all hover:scale-[1.01] duration-200 ${
                             opp.priority === "Critical"
                               ? "from-destructive/20 to-destructive/10 border-destructive/40 shadow-[0_0_15px_-3px_rgba(239,68,68,0.3)]"
                               : opp.priority === "High"
@@ -642,7 +642,7 @@ export function VAVETab({ bomMetrics }: Props) {
                       )}
                     </div>
 
-                    <div className="mt-6 p-4 bg-gradient-to-r from-primary/20 via-primary/5 to-purple-500/20 rounded-xl border border-primary/30 shadow-glow">
+                    <div className="mt-6 p-4 bg-linear-to-r from-primary/20 via-primary/5 to-purple-500/20 rounded-xl border border-primary/30 shadow-glow">
                       <div className="flex justify-between items-center">
                         <div>
                           <span className="text-sm font-bold text-primary uppercase tracking-wider">AI Total Potential Savings</span>

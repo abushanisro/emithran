@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { requireUserForAi } from "@/lib/server/auth";
 
 import { getAuthenticatedUser } from "@/lib/database/supabase-server";
 
@@ -10,6 +11,8 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
+  const auth = await requireUserForAi("manufacturing-copilot");
+  if (!auth.ok) return auth.response;
   try {
     const auth = await getAuthenticatedUser();
     if (!auth) {

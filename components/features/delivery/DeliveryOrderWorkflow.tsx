@@ -1155,9 +1155,9 @@ export default function DeliveryOrderWorkflow({
                               {/* Address */}
                               <div className="space-y-2 mb-3">
                                 <div className="text-xs text-muted-foreground leading-relaxed">
-                                  <div className="break-words">{address.addressLine1}</div>
+                                  <div className="wrap-break-word">{address.addressLine1}</div>
                                   {address.addressLine2 && (
-                                    <div className="break-words mt-1">{address.addressLine2}</div>
+                                    <div className="wrap-break-word mt-1">{address.addressLine2}</div>
                                   )}
                                 </div>
                                 <div className="text-xs font-medium text-foreground/80">
@@ -1173,13 +1173,13 @@ export default function DeliveryOrderWorkflow({
                                 {address.contactPhone && (
                                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                     <span className="text-primary shrink-0">📞</span>
-                                    <span className="break-words">{address.contactPhone}</span>
+                                    <span className="wrap-break-word">{address.contactPhone}</span>
                                   </div>
                                 )}
                                 {address.contactEmail && (
                                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                     <span className="text-primary shrink-0">✉️</span>
-                                    <span className="break-words">{address.contactEmail}</span>
+                                    <span className="wrap-break-word">{address.contactEmail}</span>
                                   </div>
                                 )}
                               </div>
@@ -1191,7 +1191,7 @@ export default function DeliveryOrderWorkflow({
                                     <span className="text-warning text-xs shrink-0">💡</span>
                                     <div className="flex-1">
                                       <p className="text-xs font-medium text-warning mb-1">Note:</p>
-                                      <p className="text-xs text-foreground/70 break-words leading-relaxed">{address.specialInstructions}</p>
+                                      <p className="text-xs text-foreground/70 wrap-break-word leading-relaxed">{address.specialInstructions}</p>
                                     </div>
                                   </div>
                                 </div>
@@ -1467,9 +1467,9 @@ export default function DeliveryOrderWorkflow({
                               {/* Address */}
                               <div className="space-y-2 mb-3">
                                 <div className="text-xs text-muted-foreground leading-relaxed">
-                                  <div className="break-words">{address.addressLine1}</div>
+                                  <div className="wrap-break-word">{address.addressLine1}</div>
                                   {address.addressLine2 && (
-                                    <div className="break-words mt-1">{address.addressLine2}</div>
+                                    <div className="wrap-break-word mt-1">{address.addressLine2}</div>
                                   )}
                                 </div>
                                 <div className="text-xs font-medium text-foreground/80">
@@ -1485,13 +1485,13 @@ export default function DeliveryOrderWorkflow({
                                 {address.contactPhone && (
                                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                     <span className="text-primary shrink-0">📞</span>
-                                    <span className="break-words">{address.contactPhone}</span>
+                                    <span className="wrap-break-word">{address.contactPhone}</span>
                                   </div>
                                 )}
                                 {address.contactEmail && (
                                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                     <span className="text-primary shrink-0">✉️</span>
-                                    <span className="break-words">{address.contactEmail}</span>
+                                    <span className="wrap-break-word">{address.contactEmail}</span>
                                   </div>
                                 )}
                               </div>
@@ -1503,7 +1503,7 @@ export default function DeliveryOrderWorkflow({
                                     <span className="text-warning text-xs shrink-0">💡</span>
                                     <div className="flex-1">
                                       <p className="text-xs font-medium text-warning mb-1">Note:</p>
-                                      <p className="text-xs text-foreground/70 break-words leading-relaxed">{address.specialInstructions}</p>
+                                      <p className="text-xs text-foreground/70 wrap-break-word leading-relaxed">{address.specialInstructions}</p>
                                     </div>
                                   </div>
                                 </div>
@@ -1712,7 +1712,7 @@ export default function DeliveryOrderWorkflow({
                           }
                           }
                           placeholder="—"
-                          className="w-full text-xs bg-transparent border border-transparent rounded px-1 py-0.5 focus:border-border focus:outline-none focus:bg-muted/30 transition-colors"
+                          className="w-full text-xs bg-transparent border border-transparent rounded px-1 py-0.5 focus:border-border focus:outline-hidden focus:bg-muted/30 transition-colors"
                         />
                       </div>
                     </div>
@@ -1726,7 +1726,7 @@ export default function DeliveryOrderWorkflow({
                       value={checkedBy}
                       onChange={(e) => setCheckedBy(e.target.value)}
                       placeholder="Name"
-                      className="flex-1 text-sm bg-transparent border-b border-muted-foreground/30 focus:border-primary outline-none py-0.5 transition-colors"
+                      className="flex-1 text-sm bg-transparent border-b border-muted-foreground/30 focus:border-primary outline-hidden py-0.5 transition-colors"
                     />
                   </div>
                 </div>
@@ -1939,7 +1939,7 @@ export default function DeliveryOrderWorkflow({
                           className="group flex items-center gap-3 p-3 border border-gray-200 rounded-lg bg-gray-50/50 hover:bg-gray-50 hover:border-purple-300 transition-colors cursor-pointer"
                           onClick={() => handleOpenPreview(f)}
                         >
-                          <div className="flex-shrink-0">
+                          <div className="shrink-0">
                             {f.preview ? (
                               <img src={f.preview} alt={f.file.name} className="h-10 w-10 object-cover rounded" />
                             ) : (
@@ -1958,7 +1958,7 @@ export default function DeliveryOrderWorkflow({
                               e.stopPropagation();
                               handleRemoveFile(f.id, setDocuments);
                             }}
-                            className="flex-shrink-0 p-1 text-gray-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                            className="shrink-0 p-1 text-gray-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
                           >
                             <X className="h-4 w-4" />
                           </button>
@@ -2620,7 +2620,7 @@ export default function DeliveryOrderWorkflow({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           {/* Backdrop */}
           <div
-            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/80 backdrop-blur-xs"
             onClick={handleClosePreview}
           />
 
@@ -2716,7 +2716,7 @@ export default function DeliveryOrderWorkflow({
 
                   {/* Image Counter Overlay */}
                   {currentImageCollection.length > 1 && (
-                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-primary/90 text-primary-foreground px-3 py-1 rounded-full text-sm backdrop-blur-sm">
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-primary/90 text-primary-foreground px-3 py-1 rounded-full text-sm backdrop-blur-xs">
                       {currentImageIndex + 1} / {currentImageCollection.length}
                     </div>
                   )}

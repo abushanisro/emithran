@@ -31,6 +31,9 @@ jobs:
       - name: Type-check
         run: npm run type-check
 
+      - name: Unit tests
+        run: npm test
+
       - name: Production build
         run: npm run build
         env:
@@ -79,6 +82,9 @@ jobs:
 
       - name: RLS boundary and secret check
         run: npm run check:rls
+
+      - name: Unit and domain tests
+        run: npm test -- --runInBand
 
       - name: Production build
         run: npm run build

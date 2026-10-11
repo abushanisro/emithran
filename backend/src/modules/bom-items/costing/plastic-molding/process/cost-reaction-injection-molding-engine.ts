@@ -30,7 +30,7 @@
 import { computePressStrokeCost, type PressStrokeResult } from '../../sheet-metal/process/press-stroke-engine';
 import type { MHRRateInput } from '../../shared/core/cost-engine';
 
-export interface ReactionInjectionMoldingCostInput {
+interface ReactionInjectionMoldingCostInput {
   batchSize: number;
   partWeightKg?: number;
   // rate.pressCycleTimeS must be the real dry-cycle (mechanical open/close)

@@ -69,10 +69,10 @@ export function Combobox({
           <span className="truncate text-left">
             {selectedOption ? selectedOption.label : placeholder}
           </span>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50 flex-shrink-0" />
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50 shrink-0" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+      <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
         {/* shouldFilter left at cmdk's default -- Command's own value/
             onValueChange controls its transient KEYBOARD-CURSOR position
             (aria-selected, cmdk's bg-accent highlight), a different concept
@@ -106,7 +106,7 @@ export function Combobox({
                         ~500 options, rendering an always-present opacity-0
                         SVG per row was real, measurable scroll-perf cost for
                         ~499 icons nobody ever sees. */}
-                    {isSelected && <Check className="mr-2 h-4 w-4 flex-shrink-0" />}
+                    {isSelected && <Check className="mr-2 h-4 w-4 shrink-0" />}
                     <span className={cn("truncate", !isSelected && "pl-6")}>{option.label}</span>
                   </CommandItem>
                 )

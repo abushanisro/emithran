@@ -76,7 +76,7 @@ export const GlareCard = ({
         }
       }}
     >
-      <div className="relative overflow-hidden rounded-[var(--radius)] border border-border bg-card">
+      <div className="relative overflow-hidden rounded-(--radius) border border-border bg-card">
         {/* Content */}
         <div className={cn("relative z-10 h-full w-full", className)}>
           {children}
@@ -84,7 +84,7 @@ export const GlareCard = ({
         
         {/* Glare Effect */}
         <div 
-          className="absolute inset-0 opacity-[var(--opacity)] transition-opacity duration-300 ease-out pointer-events-none"
+          className="absolute inset-0 opacity-(--opacity) transition-opacity duration-300 ease-out pointer-events-none"
           style={{
             background: `radial-gradient(circle at var(--m-x) var(--m-y), 
               hsla(187, 100%, 42%, 0.15) 0%, 

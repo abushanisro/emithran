@@ -32,7 +32,7 @@ export interface FinishingMachine {
   specs: Record<string, unknown>;
 }
 
-export interface VisualInspectionRow { maxWeightKg: number; internalMinPerM2: number; externalMinPerM2: number }
+interface VisualInspectionRow { maxWeightKg: number; internalMinPerM2: number; externalMinPerM2: number }
 
 export type CostContext = Omit<EMithranTermsArgs, 'mhrPerHr' | 'dlrPerHr' | 'setupNDL' | 'cycleNDL' | 'cycleTimeMin' | 'setupTimeMin'>;
 
@@ -280,11 +280,6 @@ export function trimLine(input: {
     warnings,
     forceRun,
   };
-}
-
-/** A route step memory holds no cost data for: shown, named, not priced. */
-export function unpricedStep(process: string, processGroup: string, machineClass: string, reason: string): ProcessLineCost {
-  return gap(process, processGroup, machineClass, reason);
 }
 
 /**

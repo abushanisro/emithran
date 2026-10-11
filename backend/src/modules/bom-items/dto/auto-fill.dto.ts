@@ -18,7 +18,6 @@ export class AutoFillGeometryDto {
 export class AutoFillSuggestionsDto {
   name: string;
   partNumber: string;
-  materialCategory: string | null;
   materialGrade: string;
   materialId: string | null;
   density: number | null;

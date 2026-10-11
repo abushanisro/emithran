@@ -200,14 +200,14 @@ function PreferencesTab() {
                 <button
                   key={value}
                   onClick={() => setTheme(value)}
-                  className={`group relative flex flex-col gap-3 rounded-xl border-2 p-3 text-left transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${
+                  className={`group relative flex flex-col gap-3 rounded-xl border-2 p-3 text-left transition-all duration-150 outline-hidden focus-visible:ring-2 focus-visible:ring-primary/50 ${
                     active
                       ? 'border-primary bg-primary/5 shadow-[0_0_0_3px] shadow-primary/10'
                       : 'border-border bg-card hover:border-muted-foreground/30 hover:bg-muted/30'
                   }`}
                 >
                   {/* Preview thumbnail */}
-                  <div className="aspect-video w-full rounded-lg overflow-hidden shadow-sm ring-1 ring-border/50">
+                  <div className="aspect-video w-full rounded-lg overflow-hidden shadow-xs ring-1 ring-border/50">
                     {preview}
                   </div>
 
@@ -245,7 +245,7 @@ function PreferencesTab() {
               <button
                 key={value}
                 onClick={() => setDensity(value)}
-                className={`group flex flex-col gap-3 rounded-xl border-2 p-3 text-left transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${
+                className={`group flex flex-col gap-3 rounded-xl border-2 p-3 text-left transition-all duration-150 outline-hidden focus-visible:ring-2 focus-visible:ring-primary/50 ${
                   active
                     ? 'border-primary bg-primary/5 shadow-[0_0_0_3px] shadow-primary/10'
                     : 'border-border bg-card hover:border-muted-foreground/30 hover:bg-muted/30'

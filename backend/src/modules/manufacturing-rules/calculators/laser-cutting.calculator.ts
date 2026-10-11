@@ -12,7 +12,7 @@ import type {
   IsoGroup,
 } from "../interfaces/operation-calculator.interface";
 
-export interface LaserGeometry extends FeatureGeometry {
+interface LaserGeometry extends FeatureGeometry {
   thicknessMm: number;
   cutLengthMm: number;         // total cut perimeter (outer profile + internal cutouts)
   pierceCount: number;         // number of pierce starts (holes + 1 outer lead-in)

@@ -672,7 +672,7 @@ We look forward to your competitive proposal and establishing a successful partn
                               className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 hover:bg-blue-600/10 px-2 py-1 rounded transition-colors text-left"
                               title="View 2D Drawing"
                             >
-                              <FileText className="h-3 w-3 flex-shrink-0" />
+                              <FileText className="h-3 w-3 shrink-0" />
                               <span className="truncate max-w-[120px]">{getFileName(part.file2dPath)}</span>
                             </button>
                           )}
@@ -685,7 +685,7 @@ We look forward to your competitive proposal and establishing a successful partn
                               className="flex items-center gap-1.5 text-xs text-purple-400 hover:text-purple-300 hover:bg-purple-600/10 px-2 py-1 rounded transition-colors text-left"
                               title="View 3D Model"
                             >
-                              <Box className="h-3 w-3 flex-shrink-0" />
+                              <Box className="h-3 w-3 shrink-0" />
                               <span className="truncate max-w-[120px]">{getFileName(part.file3dPath)}</span>
                             </button>
                           )}
@@ -805,7 +805,7 @@ We look forward to your competitive proposal and establishing a successful partn
                             className={`border rounded-lg p-4 cursor-pointer transition-all ${
                               selectedVendors.includes(vendor.id)
                                 ? 'border-teal-500 bg-teal-600/10 shadow-md shadow-teal-500/20'
-                                : 'border-gray-700 hover:border-teal-500/50 hover:shadow-sm bg-gray-900/50 hover:bg-gray-900'
+                                : 'border-gray-700 hover:border-teal-500/50 hover:shadow-xs bg-gray-900/50 hover:bg-gray-900'
                             }`}
                             onClick={() => handleVendorToggle(vendor.id, !selectedVendors.includes(vendor.id))}
                           >
@@ -1386,7 +1386,7 @@ We look forward to your competitive proposal and establishing a successful partn
 
         {/* Approve Vendor Selection Modal */}
         {approveModalOpen && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
             <Card className="bg-gray-800 border-gray-700 w-full max-w-2xl max-h-[80vh] overflow-hidden">
               <CardContent className="p-0">
                 <div className="p-6 border-b border-gray-700">

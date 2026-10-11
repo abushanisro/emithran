@@ -41,7 +41,7 @@
 import { computePressStrokeCost, type PressStrokeResult } from '../../sheet-metal/process/press-stroke-engine';
 import type { MHRRateInput } from '../../shared/core/cost-engine';
 
-export interface CompressionMoldingCostInput {
+interface CompressionMoldingCostInput {
   batchSize: number;
   partWeightKg?: number;
   // rate.pressCycleTimeS must be the real open+close platen-motion time,

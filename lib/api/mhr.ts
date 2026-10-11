@@ -190,6 +190,14 @@ export function resolveMhrUsdRate(r: MHRRecord): number {
   return r.mhrUsdPerHour ?? r.calculations?.totalMachineHourRate ?? r.manualMHRValue ?? 0;
 }
 
+/** A machine in a picker list: a slim picker row, or a full record (the saved machine). */
+export type MachineListRow = MHRPickerRow | MHRRecord;
+
+/** A machine's USD rate, from a slim picker row or a full record. */
+export function machineListRateUsd(r: MachineListRow): number {
+  return 'calculations' in r ? resolveMhrUsdRate(r) : r.mhrUsdPerHour;
+}
+
 export type CreateMHRData = {
   location: string;
   commodityCode: string;
@@ -267,6 +275,19 @@ export type MHRQuery = {
   limit?: number;
 };
 
+/** One machine as the process dialog's pickers need it (GET /mhr/picker). */
+export interface MHRPickerRow {
+  id: string;
+  machineName: string;
+  location: string;
+  machineClass?: string;
+  benchmarkSourceKey?: string;
+  processGroup?: string;
+  commodityCode: string | null;
+  /** The same rate resolveMhrUsdRate gives on the full record (engine-priced when none is stored). */
+  mhrUsdPerHour: number;
+}
+
 export type MHRListResponse = {
   records: MHRRecord[];
   total: number;
@@ -298,6 +319,13 @@ export const mhrApi = {
   /**
    * Get all MHR records
    */
+  /**
+   * Every machine at a location, slim, for the Process -> Category -> Machine
+   * pickers. Not silent: a failure must show as an error, never as an empty list.
+   */
+  getPickerRows: async (location?: string): Promise<MHRPickerRow[]> =>
+    apiClient.get<MHRPickerRow[]>('/mhr/picker', { retry: false, ...(location ? { params: { location } } : {}) }),
+
   getAll: async (query?: MHRQuery): Promise<MHRListResponse | null> => {
     const params = new URLSearchParams();
     if (query?.search) params.append('search', query.search);

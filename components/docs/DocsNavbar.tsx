@@ -27,7 +27,7 @@ export function DocsNavbar({ spec }: DocsNavbarProps) {
 
   return (
     <>
-      <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/95 backdrop-blur-sm supports-backdrop-filter:bg-background/80">
         <div className="flex h-14 items-center gap-4 px-6">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2.5 shrink-0">

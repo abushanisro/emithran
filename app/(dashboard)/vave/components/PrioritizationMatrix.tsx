@@ -196,7 +196,7 @@ function MatrixView({ projectId, ideas }: { projectId: string; ideas: VaveIdea[]
                   draggable
                   onDragStart={() => setDraggingId(idea.id)}
                   onDragEnd={() => setDraggingId(null)}
-                  className="bg-muted rounded-lg border border-border/60 px-3 py-1.5 cursor-grab text-xs font-medium hover:shadow-sm"
+                  className="bg-muted rounded-lg border border-border/60 px-3 py-1.5 cursor-grab text-xs font-medium hover:shadow-xs"
                 >
                   {idea.title} · <span className="text-emerald-400">{formatUSD(idea.estSavingsUsd)}</span>
                 </div>

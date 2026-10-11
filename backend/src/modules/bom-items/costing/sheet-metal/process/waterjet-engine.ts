@@ -67,7 +67,7 @@ export interface WaterjetInput {
   scrapPricePerKg?: number;
 }
 
-export interface WaterjetResult {
+interface WaterjetResult {
   processLines: ProcessLineCost[];
   cuttingMin: number;
   abrasiveCost: number;  // same currency as the machine rate / abrasivePricePerKg

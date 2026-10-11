@@ -95,7 +95,7 @@ export function DXFViewerComponent({ fileUrl, fileName }: DXFViewerComponentProp
   return (
     <div className="h-full flex flex-col bg-[#1e1e1e]">
       {/* Toolbar */}
-      <div className="flex-shrink-0 flex items-center gap-2 px-3 py-1.5 bg-[#2d2d2d] border-b border-[#444]">
+      <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 bg-[#2d2d2d] border-b border-[#444]">
         <span className="text-xs text-gray-300 font-mono truncate max-w-[300px]">{fileName}</span>
         <div className="ml-auto flex items-center gap-1">
           <Button variant="ghost" size="sm" onClick={handleFit} className="text-white hover:bg-[#505050] gap-1.5 text-xs" title="Fit to view">

@@ -10,19 +10,19 @@
 // when no real capability is available"), not forgotten Phase-1 scaffolding.
 
 import type { MachineClass } from '../core/default-rates.constants';
-import { estimateBendTonnage, estimateTurretPunchTonnage } from '../core/default-rates.constants';
+import { recommendedBendTonnage, estimateTurretPunchTonnage } from '../core/default-rates.constants';
 import type { MachineCapability } from './machine-selection/seed-registry';
 import { classifyLaserMaterial, TONNAGE_MARGIN, BED_MARGIN } from './machine-selection/physics';
 import { laserThicknessLimit, materialThicknessLimit } from './machine-selection/selector';
 
-export interface MachineCapabilitySpec {
+interface MachineCapabilitySpec {
   maxThicknessMm?: number;
   maxBedLengthMm?: number;
   maxBedWidthMm?: number;
   maxTonnage?: number;
 }
 
-export interface MachineCapabilityEntry {
+interface MachineCapabilityEntry {
   machineClass: MachineClass;
   spec: MachineCapabilitySpec;
 }
@@ -154,12 +154,14 @@ export function checkMachineCapability(
   // because it came from the real-capability code path.
   capabilitySource?: "imported" | "seed" | "default_class",
 ): CapabilityCheck {
-  // Bend tonnage — air-bending physics (1.42 × UTS × t² × L / V), press brake only
+  // Bend tonnage — the Bending calculator's Recommended Force (theoretical ×
+  // 1.25, see recommendedBendTonnage), press brake only. That factor is the
+  // margin, so TONNAGE_MARGIN is not applied to it again below.
   const bendTonnage =
     machineClass === "press_brake" &&
     geometry.materialUtsMpa != null &&
     geometry.bendLengthMm != null
-      ? estimateBendTonnage(geometry.materialUtsMpa, geometry.sheetThicknessMm, geometry.bendLengthMm)
+      ? recommendedBendTonnage(geometry.materialUtsMpa, geometry.sheetThicknessMm, geometry.bendLengthMm)
       : null;
   // Turret punch tonnage — real TPP Manufacturing formula (see
   // estimateTurretPunchTonnage's own doc comment), turret punch only.
@@ -316,12 +318,12 @@ export function checkMachineCapability(
       }
     }
 
-    if (estimatedTonnage != null && realCapability.maxTonnage != null && estimatedTonnage * TONNAGE_MARGIN > realCapability.maxTonnage) {
-      const forceLabel = machineClass === "turret_punch" ? "Estimated punch force" : "Estimated bend force";
-      failures.push({
-        code: "TONNAGE_EXCEEDED",
-        message: `${forceLabel} ${estimatedTonnage}t exceeds machine capacity (${realCapability.maxTonnage}t, incl. 15% margin)`,
-      });
+    const requiredTonnage = bendTonnage ?? (turretTonnage != null ? turretTonnage * TONNAGE_MARGIN : null);
+    if (requiredTonnage != null && realCapability.maxTonnage != null && requiredTonnage > realCapability.maxTonnage) {
+      const message = bendTonnage != null
+        ? `Recommended bend force ${bendTonnage}t exceeds machine capacity (${realCapability.maxTonnage}t)`
+        : `Estimated punch force ${turretTonnage}t exceeds machine capacity (${realCapability.maxTonnage}t, incl. 15% margin)`;
+      failures.push({ code: "TONNAGE_EXCEEDED", message });
     }
 
     // Confidence reflects how real the underlying data is — a class-wide

@@ -109,7 +109,7 @@ export function AppSidebar() {
             end={!!item.exact}
             className={`sidebar-item group relative flex items-center gap-3 rounded-lg px-2.5 py-2 transition-all ${
               active
-                ? 'bg-primary/10 text-primary shadow-sm'
+                ? 'bg-primary/10 text-primary shadow-xs'
                 : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
             }`}
             activeClassName="sidebar-item-active"
@@ -170,7 +170,7 @@ export function AppSidebar() {
       <SidebarFooter className="border-t border-sidebar-border p-3">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex w-full items-center gap-3 rounded-lg px-1 py-1.5 hover:bg-sidebar-accent transition-colors outline-none">
+            <button className="flex w-full items-center gap-3 rounded-lg px-1 py-1.5 hover:bg-sidebar-accent transition-colors outline-hidden">
               <Avatar className="h-8 w-8 shrink-0 border border-sidebar-border">
                 <AvatarImage src={profile?.avatarUrl ?? undefined} alt={getUserDisplayName()} />
                 <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">

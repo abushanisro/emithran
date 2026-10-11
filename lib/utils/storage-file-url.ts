@@ -6,29 +6,14 @@
  * is decided by the caller's own BOM item permissions.
  */
 
+import { isTrustedStorageUrl } from '@/lib/server/safe-fetch';
+
+// One trusted-storage rule for every server route (lib/server/safe-fetch): the
+// project's own storage host (plus TRUSTED_STORAGE_HOSTS), https, no
+// credentials. A generic "*.supabase.co" allowlist would accept any project.
+export { isTrustedStorageUrl };
+
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/v1/api';
-
-// Allowlist of trusted storage hostnames to prevent SSRF abuse
-const TRUSTED_STORAGE_HOSTS = [
-  'supabase.co',
-  'supabase.in',
-  'amazonaws.com',
-  'storage.googleapis.com',
-];
-
-export function isTrustedStorageUrl(rawUrl: string): boolean {
-  try {
-    const parsed = new URL(rawUrl);
-    if (parsed.protocol !== 'https:' || parsed.username || parsed.password) {
-      return false;
-    }
-    return TRUSTED_STORAGE_HOSTS.some(
-      (host) => parsed.hostname === host || parsed.hostname.endsWith(`.${host}`),
-    );
-  } catch {
-    return false;
-  }
-}
 
 // Matches FileStorageService.generateStoragePath:
 // `${userId}/${projectId}/bom-items/${bomItemId}/${fileType}/${timestamp}_${filename}`

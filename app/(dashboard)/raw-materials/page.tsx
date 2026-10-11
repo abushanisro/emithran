@@ -17,12 +17,10 @@ import {
   useStockForms,
   useUploadRawMaterialsExcel,
   useCreateRawMaterial,
-  useUpdateRawMaterial,
   useDeleteRawMaterial,
   useDeleteAllRawMaterials,
   type RawMaterial,
 } from '@/lib/api/hooks/useRawMaterials';
-import { FerrousNonFerrousForm } from '@/components/features/raw-materials/FerrousNonFerrousForm';
 import { RawMaterialEditForm } from '@/components/features/raw-materials/RawMaterialEditForm';
 import { RawMaterialPropertiesDialog } from '@/components/features/raw-materials/RawMaterialPropertiesDialog';
 import { useMaterialFilters } from '@/lib/hooks/useMaterialFilters';
@@ -44,25 +42,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-// One material can genuinely be either family, so this is checked per-material
-// (badge color, edit form choice) rather than driven by a page-level filter —
-// the page shows every material together, one unified list, no group tab.
-function isFerrousMaterial(materialGroup?: string | null): boolean {
-  const g = materialGroup?.toLowerCase() || '';
-  return (
-    g.includes('ferrous') ||
-    g.includes('steel') ||
-    g.includes('iron') ||
-    g.includes('aluminum') ||
-    g.includes('copper') ||
-    g.includes('titanium') ||
-    g.includes('zinc') ||
-    g.includes('magnesium') ||
-    g.includes('nickel') ||
-    (g.includes('metal') && !g.includes('plastic'))
-  );
-}
-
 export default function RawMaterialsPage() {
   // Enhanced filter system
   const {
@@ -70,6 +49,7 @@ export default function RawMaterialsPage() {
     queryFilters,
     setSearch,
     setMaterialGroup,
+    setMaterialClass,
     setSorting,
     setPagination,
     clearFilters,
@@ -168,7 +148,7 @@ export default function RawMaterialsPage() {
     const enhancedQuery = { ...queryFilters };
 
     // Remove fields that might not be supported by the backend yet
-    const { materialCategory, country, currency, shape, minCost, maxCost, minDensity, maxDensity, minMeltingTemp, maxMeltingTemp, ...supportedQuery } = enhancedQuery;
+    const { country, currency, shape, minCost, maxCost, minDensity, maxDensity, minMeltingTemp, maxMeltingTemp, ...supportedQuery } = enhancedQuery;
 
     // Debug logging
     if (process.env.NODE_ENV === 'development') {
@@ -183,7 +163,6 @@ export default function RawMaterialsPage() {
   const { data: stockForms } = useStockForms();
   const uploadMutation = useUploadRawMaterialsExcel();
   const createMutation = useCreateRawMaterial();
-  const updateMutation = useUpdateRawMaterial();
   const deleteMutation = useDeleteRawMaterial();
   const deleteAllMutation = useDeleteAllRawMaterials();
 
@@ -398,87 +377,12 @@ export default function RawMaterialsPage() {
     });
   };
 
+  // The editor loads the material itself (RawMaterialEditForm, by id).
   const handleEditMaterial = (material: RawMaterial) => {
-    // Create a clean material object with all values as strings or proper types for controlled components
-    const cleanMaterial = {
-      ...material,
-      // Convert any null values to empty strings for React form handling
-      materialGrade: material.materialGrade || '',
-      regrinding: material.regrinding || '',
-      astmStandard: material.astmStandard || '',
-      dinStandard: material.dinStandard || '',
-      enStandard: material.enStandard || '',
-      jisStandard: material.jisStandard || '',
-      currency: material.currency || 'USD',
-    };
-    
-    setEditingMaterial(cleanMaterial);
-    setNewMaterial({
-      materialGroup: material.materialGroup || '',
-      material: material.material || '',
-      materialGrade: material.materialGrade || '',
-      materialType: material.materialType || '',
-      materialDescription: material.materialDescription || '',
-      densityKgM3: material.densityKgM3?.toString() || '',
-      // The table's Cost column shows the USA cost, so the dialog edits that same value.
-      unitCost: (material.costUsa ?? material.unitCost ?? material.cost)?.toString() || '',
-      country: material.country || '',
-      currency: material.currency || 'USD',
-      shape: material.shape || '',
-
-      // Material properties
-      density: material.density?.toString() || '',
-      ultimate_tensile_strength: material.ultimateTensileStrength?.toString() || '',
-      yield_tensile_strength: material.yieldTensileStrength?.toString() || '',
-      shearing_strength: material.shearingStrength?.toString() || '',
-
-      // Standards
-      astm_standard: material.astmStandard || '',
-      din_standard: material.dinStandard || '',
-      en_standard: material.enStandard || '',
-      jis_standard: material.jisStandard || '',
-
-      // Plastic-specific properties
-      regrinding: material.regrinding || '',
-      regrindingPercentage: material.regrindingPercentage?.toString() || '',
-      clampingPressureMpa: material.clampingPressureMpa?.toString() || '',
-      ejectDeflectionTempC: material.ejectDeflectionTempC?.toString() || '',
-      meltingTempC: material.meltingTempC?.toString() || '',
-      moldTempC: material.moldTempC?.toString() || '',
-      specificHeatMelt: material.specificHeatMelt?.toString() || '',
-      thermalConductivityMelt: material.thermalConductivityMelt?.toString() || '',
-    });
-    
+    setEditingMaterial(material);
     setEditDialogOpen(true);
   };
 
-  const handleUpdateMaterial = () => {
-    if (!editingMaterial) return;
-    if (!editingMaterial.materialGroup || !editingMaterial.material) {
-      toast.error('Material Group and Material name are required');
-      return;
-    }
-
-    const materialData: any = {
-      materialGroup: editingMaterial.materialGroup,
-      material: editingMaterial.material,
-      materialGrade: editingMaterial.materialGrade || undefined,
-      materialType: editingMaterial.materialType || undefined,
-      materialDescription: editingMaterial.materialDescription || undefined,
-      costUsa: editingMaterial.unitCost ? parseFloat(editingMaterial.unitCost.toString()) : undefined,
-    };
-
-    updateMutation.mutate(
-      { id: editingMaterial.id, data: materialData },
-      {
-        onSuccess: () => {
-          setEditDialogOpen(false);
-          setEditingMaterial(null);
-          resetNewMaterial();
-        },
-      }
-    );
-  };
 
   const toggleSort = (column: string) => {
     setSorting(column);
@@ -667,7 +571,7 @@ export default function RawMaterialsPage() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Material Group *</label>
                   <input
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     placeholder="e.g., Plastic & Rubber, Ferrous & Non-Ferrous"
                     value={newMaterial.materialGroup}
                     onChange={(e) => setNewMaterial({ ...newMaterial, materialGroup: e.target.value })}
@@ -676,7 +580,7 @@ export default function RawMaterialsPage() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Material *</label>
                   <input
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     placeholder="e.g., ABS, PC, PE, 100Cr6, AISI 1045"
                     value={newMaterial.material}
                     onChange={(e) => setNewMaterial({ ...newMaterial, material: e.target.value })}
@@ -685,7 +589,7 @@ export default function RawMaterialsPage() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Grade</label>
                   <input
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     placeholder="e.g., General Purpose, 1.3505"
                     value={newMaterial.materialGrade}
                     onChange={(e) => setNewMaterial({ ...newMaterial, materialGrade: e.target.value })}
@@ -694,7 +598,7 @@ export default function RawMaterialsPage() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Type</label>
                   <input
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     placeholder="e.g., Carbon Steel, Stainless Steel"
                     value={newMaterial.materialType}
                     onChange={(e) => setNewMaterial({ ...newMaterial, materialType: e.target.value })}
@@ -703,7 +607,7 @@ export default function RawMaterialsPage() {
                 <div className="space-y-2 md:col-span-2">
                   <label className="text-sm font-medium">Description</label>
                   <input
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     placeholder="e.g., High Carbon Bearing steel"
                     value={newMaterial.materialDescription}
                     onChange={(e) => setNewMaterial({ ...newMaterial, materialDescription: e.target.value })}
@@ -770,7 +674,7 @@ export default function RawMaterialsPage() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Regrinding</label>
                     <select
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                       value={newMaterial.regrinding}
                       onChange={(e) => setNewMaterial({ ...newMaterial, regrinding: e.target.value })}
                     >
@@ -782,7 +686,7 @@ export default function RawMaterialsPage() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Regrinding Percentage (%)</label>
                     <input
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                       type="number"
                       step="0.1"
                       min="0"
@@ -795,7 +699,7 @@ export default function RawMaterialsPage() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Clamping Pressure (MPa)</label>
                     <input
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                       type="number"
                       step="0.1"
                       placeholder="e.g., 49.4"
@@ -806,7 +710,7 @@ export default function RawMaterialsPage() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Eject Deflection Temp (°C)</label>
                     <input
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                       type="number"
                       step="1"
                       placeholder="e.g., 85"
@@ -817,7 +721,7 @@ export default function RawMaterialsPage() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Melting Temp (°C)</label>
                     <input
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                       type="number"
                       step="1"
                       placeholder="e.g., 240"
@@ -828,7 +732,7 @@ export default function RawMaterialsPage() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Mold Temp (°C)</label>
                     <input
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                       type="number"
                       step="1"
                       placeholder="e.g., 70"
@@ -839,7 +743,7 @@ export default function RawMaterialsPage() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Density (kg/m³)</label>
                     <input
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                       type="number"
                       placeholder="e.g., 1050"
                       value={newMaterial.densityKgM3}
@@ -849,7 +753,7 @@ export default function RawMaterialsPage() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Specific Heat (J/g·°C)</label>
                     <input
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                       type="number"
                       step="0.001"
                       placeholder="e.g., 1.800"
@@ -860,7 +764,7 @@ export default function RawMaterialsPage() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Thermal Conductivity (W/m·°C)</label>
                     <input
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                       type="number"
                       step="0.001"
                       placeholder="e.g., 0.127"
@@ -878,7 +782,7 @@ export default function RawMaterialsPage() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Density (g/cm³)</label>
                     <input
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                       type="number"
                       step="0.01"
                       placeholder="e.g., 7.80"
@@ -889,7 +793,7 @@ export default function RawMaterialsPage() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Ultimate Tensile Strength (MPa)</label>
                     <input
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                       type="number"
                       step="1"
                       placeholder="e.g., 1470"
@@ -900,7 +804,7 @@ export default function RawMaterialsPage() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Yield Tensile Strength (MPa)</label>
                     <input
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                       type="number"
                       step="1"
                       placeholder="e.g., 1130"
@@ -911,7 +815,7 @@ export default function RawMaterialsPage() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Shearing Strength (MPa)</label>
                     <input
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                       type="number"
                       step="1"
                       placeholder="e.g., 850"
@@ -929,7 +833,7 @@ export default function RawMaterialsPage() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium">ASTM Standard</label>
                     <input
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                       placeholder="e.g., ASTM A295"
                       value={newMaterial.astm_standard}
                       onChange={(e) => setNewMaterial({ ...newMaterial, astm_standard: e.target.value })}
@@ -938,7 +842,7 @@ export default function RawMaterialsPage() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium">DIN Standard</label>
                     <input
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                       placeholder="e.g., DIN 1.3505"
                       value={newMaterial.din_standard}
                       onChange={(e) => setNewMaterial({ ...newMaterial, din_standard: e.target.value })}
@@ -947,7 +851,7 @@ export default function RawMaterialsPage() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium">EN Standard</label>
                     <input
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                       placeholder="e.g., EN 10088-2"
                       value={newMaterial.en_standard}
                       onChange={(e) => setNewMaterial({ ...newMaterial, en_standard: e.target.value })}
@@ -956,7 +860,7 @@ export default function RawMaterialsPage() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium">JIS Standard</label>
                     <input
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                       placeholder="e.g., SUJ2"
                       value={newMaterial.jis_standard}
                       onChange={(e) => setNewMaterial({ ...newMaterial, jis_standard: e.target.value })}
@@ -974,7 +878,7 @@ export default function RawMaterialsPage() {
                     Unit Cost ({CURRENCY_SYMBOLS[newMaterial.currency] || '$'})
                   </label>
                   <input
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     type="number"
                     step="0.01"
                     placeholder="e.g., 135.00"
@@ -1041,6 +945,25 @@ export default function RawMaterialsPage() {
           </Select>
         )}
 
+        {/* Material class — Ferrous / Non-Ferrous / Plastic & Rubber, the real
+            raw_materials.material_class values on file (migration 897). */}
+        {(filterOptions?.materialClasses.length ?? 0) > 0 && (
+          <Select
+            value={filters.materialClass ?? 'all'}
+            onValueChange={(v) => { setMaterialClass(v === 'all' ? undefined : v); }}
+          >
+            <SelectTrigger className="h-9 w-[160px] text-xs" aria-label="Material class">
+              <SelectValue placeholder="All Classes" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" className="text-xs">All Classes</SelectItem>
+              {filterOptions?.materialClasses.map((c) => (
+                <SelectItem key={c} value={c} className="text-xs">{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
         {/* Cost region selector */}
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-muted-foreground whitespace-nowrap">Cost region:</span>
@@ -1086,6 +1009,7 @@ export default function RawMaterialsPage() {
               </TableHead>
               <TableHead className="h-10 px-2 text-xs">Source name</TableHead>
               <TableHead className="h-10 px-2 text-xs">Grade</TableHead>
+              <TableHead className="h-10 px-2 text-xs">Class</TableHead>
               <TableHead className="h-10 px-2 text-xs">Process group</TableHead>
               <TableHead className="h-10 px-2 text-xs text-right">Stock prices (USA)</TableHead>
               <TableHead className="h-10 px-2 text-xs text-right">Cost</TableHead>
@@ -1096,7 +1020,7 @@ export default function RawMaterialsPage() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
                   <div className="flex flex-col items-center gap-2">
                     <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                     <span className="text-sm">Loading materials…</span>
@@ -1105,7 +1029,7 @@ export default function RawMaterialsPage() {
               </TableRow>
             ) : displayMaterials.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
                   <div className="flex flex-col items-center gap-2">
                     <FileSpreadsheet className="h-8 w-8 opacity-30" />
                     <span className="text-sm">No materials found. Upload an Excel file to get started.</span>
@@ -1122,6 +1046,9 @@ export default function RawMaterialsPage() {
                   <TableCell className="px-2 py-2 text-xs font-medium">{material.materialGrade || material.material}</TableCell>
                   <TableCell className="px-2 py-2 text-xs">{material.material}</TableCell>
                   <TableCell className="px-2 py-2 text-xs">{material.description ?? '—'}</TableCell>
+                  <TableCell className="px-2 py-2 text-xs" title={material.materialClass ? undefined : 'No class on file for this material type'}>
+                    {material.materialClass ?? '—'}
+                  </TableCell>
                   <TableCell className="px-2 py-2 text-xs">
                     <Badge variant="outline" className="text-[10px] px-1.5 py-0">{material.materialGroup ?? '—'}</Badge>
                   </TableCell>
@@ -1197,35 +1124,10 @@ export default function RawMaterialsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-6 pt-4">
+            {/* One editor for every material (every real source column, cost and
+                stock prices) — the class no longer picks a form. */}
             {editingMaterial && (
-              isFerrousMaterial(editingMaterial.materialGroup) ? (
-                <FerrousNonFerrousForm 
-                  material={editingMaterial}
-                  onMaterialChange={(updatedMaterial) => setEditingMaterial({ ...editingMaterial, ...updatedMaterial })}
-                  isEditing={true}
-                />
-              ) : (
-                <RawMaterialEditForm materialId={editingMaterial.id} onClose={() => setEditDialogOpen(false)} />
-              )
-            )}
-
-            {editingMaterial && isFerrousMaterial(editingMaterial.materialGroup) && (
-              <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => setEditDialogOpen(false)}
-                  className="flex-1"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleUpdateMaterial}
-                  disabled={updateMutation.isPending}
-                  className="flex-1"
-                >
-                  {updateMutation.isPending ? 'Updating...' : 'Update Material'}
-                </Button>
-              </div>
+              <RawMaterialEditForm materialId={editingMaterial.id} onClose={() => { setEditDialogOpen(false); }} />
             )}
           </div>
         </DialogContent>

@@ -187,7 +187,7 @@ export function DatabaseRecordPicker({
               displayLabel: `${item.materialName || item.material || 'Unknown'}${item.materialGrade ? ` - ${item.materialGrade}` : ''}`,
               metadata: {
                 group: item.materialGroup || 'N/A',
-                category: item.categoryName || 'N/A'
+                category: item.materialClass ?? 'Unclassified'
               },
             });
             break;

@@ -22,7 +22,7 @@ import {
 //          fed by real CAD insert_candidate_count rather than always null.
 // v2 → v3: variant-aware routing (LSR Arrhenius path, insert_loading in-mold,
 //          core_unscrewing, overmold/gas_assisted/two_shot stubs, moldingSubtype).
-export const IM_ROUTING_VERSION = 'im_route_v3';
+const IM_ROUTING_VERSION = 'im_route_v3';
 
 export interface InjectionMoldingSignals {
   // Material
@@ -52,7 +52,7 @@ export interface InjectionMoldingSignals {
 // Deflashing threshold on partingComplexity (0–1). A flat parting line rarely
 // flashes; a stepped/curved shutoff-heavy line does. 0.5 = mid-band until the
 // parting-line extractor (Phase 2 plan) produces real values to tune against.
-export const IM_DEFLASH_PARTING_COMPLEXITY_THRESHOLD = 0.5;
+const IM_DEFLASH_PARTING_COMPLEXITY_THRESHOLD = 0.5;
 
 function op(id: IMOperationId, reason: string): IMRoutedOperation {
   const def = IM_OPERATION_REGISTRY[id];

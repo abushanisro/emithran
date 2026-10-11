@@ -62,7 +62,7 @@ export function BomPartsSelectionCard({
   const totalCount = bomItems.length;
 
   return (
-    <Card className="rounded-lg border bg-card text-card-foreground shadow-sm">
+    <Card className="rounded-lg border bg-card text-card-foreground shadow-xs">
       <CardHeader className="flex flex-col space-y-1.5 p-6">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-teal-600 text-white flex items-center justify-center text-sm font-bold">

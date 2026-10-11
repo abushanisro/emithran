@@ -3,7 +3,7 @@ import { Injectable, NotFoundException, InternalServerErrorException, BadRequest
 import { Logger } from '../../common/logger/logger.service';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { CreateMHRDto, UpdateMHRDto, QueryMHRDto } from './dto/mhr.dto';
-import { MHRResponseDto, MHRListResponseDto, MHRCalculationResult, MHRReferenceDetailDto } from './dto/mhr-response.dto';
+import { MHRResponseDto, MHRListResponseDto, MHRCalculationResult, MHRReferenceDetailDto, MHRPickerRowDto, MHR_PICKER_COLUMNS, pickerRateUsdPerHour, type MHRPickerDbRow } from './dto/mhr-response.dto';
 import { validate as isValidUUID } from 'uuid';
 import { MHRCalculationEngine } from './engines/mhr-calculation.engine';
 import { MHRInputValidator } from './validators/mhr-input.validator';
@@ -30,6 +30,9 @@ import * as ExcelJS from 'exceljs';
  *
  * @version 2.0.0
  */
+/** Rows per request when pricing unpriced picker rows (keeps the id list well inside a URL). */
+const PICKER_ENGINE_BATCH = 100;
+
 @Injectable()
 export class MHRService {
   private readonly calculationEngine: MHRCalculationEngine;
@@ -221,6 +224,50 @@ export class MHRService {
       this.logger.error(`MHR calculation failed: ${error.message}`, 'MHRService');
       throw error;
     }
+  }
+
+  /**
+   * Every machine at a location, slim (MHRPickerRowDto), for the process
+   * dialog's pickers. findAll() returns the full row (~2.7 KB each, ~11 MB for
+   * one location), which outran the browser's request timeout.
+   */
+  async findPickerRows(location: string | undefined, accessToken?: string): Promise<MHRPickerRowDto[]> {
+    const { data, error } = await readAllRows<MHRPickerDbRow>((from, to) => {
+      let q = this.supabaseService
+        .getUserClient(accessToken)
+        .from('mhr_records')
+        .select(MHR_PICKER_COLUMNS)
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: true })
+        .range(from, to);
+      if (location) q = q.eq('location', location);
+      return q.overrideTypes<MHRPickerDbRow[], { merge: false }>();
+    });
+    if (error) {
+      this.logger.error(`Error fetching MHR picker rows: ${error.message}`, 'MHRService');
+      throw new InternalServerErrorException('Unable to retrieve machines. Please try again later.');
+    }
+    // A row with no stored rate is priced by the engine, exactly as findAll()
+    // does — only those rows' full columns are read, and they stay server-side.
+    const unpriced = data.filter((row) => pickerRateUsdPerHour(row) === null).map((row) => row.id);
+    const engineRate = new Map<string, number>();
+    for (let i = 0; i < unpriced.length; i += PICKER_ENGINE_BATCH) {
+      const ids = unpriced.slice(i, i + PICKER_ENGINE_BATCH);
+      const { data: full, error: fullError } = await this.supabaseService
+        .getUserClient(accessToken)
+        .from('mhr_records')
+        .select('*')
+        .in('id', ids)
+        .overrideTypes<({ id: string } & Record<string, unknown>)[], { merge: false }>();
+      if (fullError) {
+        this.logger.error(`Error pricing MHR picker rows: ${fullError.message}`, 'MHRService');
+        throw new InternalServerErrorException('Unable to retrieve machines. Please try again later.');
+      }
+      for (const row of full) {
+        engineRate.set(row.id, this.calculateMHR(this.mapRowToDto(row), true).totalMachineHourRate);
+      }
+    }
+    return data.map((row) => MHRPickerRowDto.fromDatabase(row, engineRate.get(row.id)));
   }
 
   async findAll(query: QueryMHRDto, userId?: string, accessToken?: string): Promise<MHRListResponseDto> {
@@ -1963,6 +2010,7 @@ export class MHRService {
    * silently hid "Machining" from the MHR form's Process suggestions even
    * though 141 real machines already exist for it in mhr_records.
    */
+  /** Every process group with machines on file (process_group, set on every row). */
   async getDistinctProcessGroups(accessToken: string): Promise<string[]> {
     const { data, error } = await readAllRows((from, to) => this.supabaseService
       .getClient(accessToken)
@@ -1973,11 +2021,12 @@ export class MHRService {
       .range(from, to));
 
     if (error) {
+      // A failed read is an error, never an empty list (an empty picker hid it).
       this.logger.error(`Error fetching distinct process groups: ${error.message}`, 'MHRService');
-      return [];
+      throw new InternalServerErrorException('Unable to retrieve process groups. Please try again later.');
     }
 
-    return [...new Set(data?.map((r: any) => r.process_group).filter(Boolean) as string[])].sort();
+    return [...new Set(data.map((r: { process_group: string | null }) => r.process_group).filter((g): g is string => !!g))].sort();
   }
 
   async getDistinctManufacturerCountries(accessToken: string): Promise<string[]> {

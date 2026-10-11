@@ -359,7 +359,7 @@ export default function Projects() {
                     <div className="flex items-start justify-between">
                       <div className="flex items-start gap-2 flex-1 min-w-0">
                         {getStatusIcon(project.status)}
-                        <CardTitle className="text-base leading-tight break-words">
+                        <CardTitle className="text-base leading-tight wrap-break-word">
                           {project.name}
                         </CardTitle>
                       </div>
@@ -685,7 +685,7 @@ export default function Projects() {
                   type="submit"
                   onClick={handleCreate}
                   disabled={!name || createMutation.isPending}
-                  className="h-9 px-6 font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm select-none"
+                  className="h-9 px-6 font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-xs select-none"
                 >
                   {createMutation.isPending ? (
                     <div className="flex items-center gap-2">
@@ -956,7 +956,7 @@ export default function Projects() {
                   type="submit"
                   onClick={handleUpdate}
                   disabled={!name || updateMutation.isPending}
-                  className="h-9 px-6 font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm select-none"
+                  className="h-9 px-6 font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-xs select-none"
                 >
                   {updateMutation.isPending ? (
                     <div className="flex items-center gap-2">

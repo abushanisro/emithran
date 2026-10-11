@@ -2,17 +2,6 @@ import { Injectable, Logger, NotFoundException, BadRequestException } from '@nes
 import { InjectKnex, Knex } from 'nestjs-knex';
 import { CreateDeliveryInvoiceDto, InvoiceStatus } from '../dto/delivery.dto';
 
-export interface InvoiceLineItem {
-  deliveryItemId: string;
-  itemDescription: string;
-  partNumber: string;
-  quantity: number;
-  unitPriceInr: number;
-  lineTotalInr: number;
-  taxRate: number;
-  taxAmountInr: number;
-}
-
 @Injectable()
 export class InvoiceService {
   private readonly logger = new Logger(InvoiceService.name);

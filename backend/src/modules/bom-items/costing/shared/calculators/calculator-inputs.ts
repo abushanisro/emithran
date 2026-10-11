@@ -28,7 +28,7 @@ export interface CalculatorInputsDto {
 }
 
 /** One calculator run of a costed part: a process line or a summary calculatorRuns entry. */
-export interface EngineCalculatorRun {
+interface EngineCalculatorRun {
   key: string;
   trace: CalculationTraceStep[];
   lookupMatches: Record<string, LookupMatch>;

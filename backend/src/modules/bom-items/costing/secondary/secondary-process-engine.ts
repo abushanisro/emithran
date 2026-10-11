@@ -19,7 +19,7 @@
 
 export const SECONDARY_SOURCE_VERSION = '2026-Secondary';
 
-export type SecondaryStatus = 'costed' | 'not_applicable' | 'gap';
+type SecondaryStatus = 'costed' | 'not_applicable' | 'gap';
 
 export interface SecondaryTraceStep {
   label: string;
@@ -46,7 +46,7 @@ export interface SecondaryMachine {
   specs: Record<string, unknown>;
 }
 
-export interface SecondaryFeature {
+interface SecondaryFeature {
   id: string;
   feature_type: string;
   occurrences: ReadonlyArray<unknown>;
@@ -63,6 +63,10 @@ export interface SecondaryPartFacts {
   materialCutCode: number | null;
   /** raw_materials.material_group (e.g. "Aluminum Alloy"), when resolved. */
   materialTypeName?: string | null;
+  /** The part is machined (CAD family milled / turned / mill_turn): picks the passivation treatment row. */
+  isMachined?: boolean | null;
+  /** The drawing surface-treatment callout text (e.g. "Anodize Type II"), when stated. */
+  surfaceCallout?: string | null;
   features: ReadonlyArray<SecondaryFeature>;
   batchSize: number | null;
 }
@@ -145,6 +149,43 @@ export function maxPartsInBox(p: [number, number, number], b: [number, number, n
     if (n > best) best = n;
   }
   return best;
+}
+
+/**
+ * Parts that fit one load (a tank window, a loadbar) of a batch line.
+ *
+ * Each part takes its own size plus spacing = spacingFactor x that size on
+ * every axis (the reference meaning of a spacing factor, e.g.
+ * powderCoatCartSpacingFactor: "factor applied to the width of the part to
+ * calculate the minimum spacing between parts"). A window with no depth on
+ * file (a loadbar) hangs one layer: its depth is the part's own thinnest size.
+ * The weight limit and the surface-area limit, when on file, cap the count;
+ * `governedBy` says which limit set it. 0 = the part does not fit.
+ */
+export function partsPerLoad(input: {
+  partMm: [number, number, number];
+  windowMm: [number, number, number | null];
+  spacingFactor: number;
+  partKg?: number | null;
+  weightLimitKg?: number | null;
+  partAreaM2?: number | null;
+  areaLimitM2?: number | null;
+}): { count: number; governedBy: 'window' | 'weight' | 'surface area' } {
+  const f = 1 + input.spacingFactor;
+  const part = input.partMm.map((d) => d * f) as [number, number, number];
+  const depth = input.windowMm[2] ?? Math.min(...part);
+  const box = [input.windowMm[0], input.windowMm[1], depth].sort((a, b) => b - a) as [number, number, number];
+  let count = maxPartsInBox([...part].sort((a, b) => b - a) as [number, number, number], box);
+  let governedBy: 'window' | 'weight' | 'surface area' = 'window';
+  if (input.weightLimitKg != null && input.weightLimitKg > 0 && input.partKg != null && input.partKg > 0) {
+    const byWeight = Math.floor(input.weightLimitKg / input.partKg);
+    if (byWeight < count) { count = byWeight; governedBy = 'weight'; }
+  }
+  if (input.areaLimitM2 != null && input.areaLimitM2 > 0 && input.partAreaM2 != null && input.partAreaM2 > 0) {
+    const byArea = Math.floor(input.areaLimitM2 / input.partAreaM2);
+    if (byArea < count) { count = byArea; governedBy = 'surface area'; }
+  }
+  return { count: Math.max(0, count), governedBy };
 }
 
 /** Hourly cost of running the machine with its crew. */
@@ -250,7 +291,7 @@ export function notCosted(
 }
 
 /** Share of parts tested (defaultPercentToBeTested). */
-export function testedFraction(ref: SecondaryReference, trace: SecondaryTraceStep[]): number | null {
+function testedFraction(ref: SecondaryReference, trace: SecondaryTraceStep[]): number | null {
   const pct = variable(ref, 'defaultPercentToBeTested');
   if (pct == null) return null;
   trace.push({ label: 'Parts tested', value: pct, unit: '%', source: `${SRC_VAR} (defaultPercentToBeTested)` });

@@ -585,7 +585,7 @@ export default function RFQPage() {
                                               onClick={() => handleFileDownload(bomItem.id, '2d', getFileName(file2dPath) || `${part.partNumber}_2D`, part.partNumber)}
                                               title={`Download ${getFileName(file2dPath)} (${getFileExtension(file2dPath)?.toUpperCase()} file)`}
                                             >
-                                              <Download className="h-3 w-3 flex-shrink-0" />
+                                              <Download className="h-3 w-3 shrink-0" />
                                               <span className="truncate">{getFileName(file2dPath) || 'Drawing'}</span>
                                               <Badge variant="secondary" className="text-xs ml-1">
                                                 {getFileExtension(file2dPath)?.toUpperCase()}
@@ -602,7 +602,7 @@ export default function RFQPage() {
                                               onClick={() => handleFileDownload(bomItem.id, '3d', getFileName(file3dPath) || `${part.partNumber}_3D`, part.partNumber)}
                                               title={`Download ${getFileName(file3dPath)} (${getFileExtension(file3dPath)?.toUpperCase()} file)`}
                                             >
-                                              <Download className="h-3 w-3 flex-shrink-0" />
+                                              <Download className="h-3 w-3 shrink-0" />
                                               <span className="truncate">{getFileName(file3dPath) || 'Model'}</span>
                                               <Badge variant="secondary" className="text-xs ml-1">
                                                 {getFileExtension(file3dPath)?.toUpperCase()}

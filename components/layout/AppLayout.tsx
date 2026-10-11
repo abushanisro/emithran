@@ -121,7 +121,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         <SidebarInset className="flex-1 flex flex-col">
           {isFullscreen ? children : (
             <>
-              <header className="h-14 border-b border-border bg-card/50 backdrop-blur-sm flex items-center justify-between px-4 sticky top-0 z-10">
+              <header className="h-14 border-b border-border bg-card/50 backdrop-blur-xs flex items-center justify-between px-4 sticky top-0 z-10">
                 <div className="flex items-center gap-4">
                   <SidebarTrigger className="text-muted-foreground hover:text-foreground transition-colors">
                     <Menu className="h-5 w-5" />
@@ -144,7 +144,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <button className="flex items-center gap-1.5 rounded-full pl-1 pr-1 py-1 hover:bg-secondary/60 transition-colors outline-none">
+                      <button className="flex items-center gap-1.5 rounded-full pl-1 pr-1 py-1 hover:bg-secondary/60 transition-colors outline-hidden">
                         <Avatar className="h-7 w-7 border border-border">
                           <AvatarImage src={profile?.avatarUrl ?? undefined} alt={getUserDisplayName()} />
                           <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">

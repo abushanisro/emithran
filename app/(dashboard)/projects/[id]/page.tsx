@@ -15,6 +15,7 @@ import {
 import { useProject, useBOMs, useUpdateProject } from '@/lib/api/hooks';
 import { ProjectModules } from '@/components/features/projects/ProjectModules';
 import { ProjectDetailsCard } from '@/components/features/projects/ProjectDetailsCard';
+import { formatProjectMoney, projectCostCurrency } from '@/lib/costing/project-costs';
 
 export default function ProjectDetail() {
   const params = useParams<{ id: string }>();
@@ -170,7 +171,7 @@ export default function ProjectDetail() {
               <div>
                 <p className="text-xs text-muted-foreground font-medium">Should Cost</p>
                 <p className="text-xl font-bold text-foreground">
-                  {project.shouldCost ? `$${Number(project.shouldCost).toLocaleString()}` : '-'}
+                  {formatProjectMoney(project.actualCost, projectCostCurrency(project))}
                 </p>
               </div>
             </div>

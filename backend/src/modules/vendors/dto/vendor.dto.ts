@@ -2,7 +2,7 @@ import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { IsString, IsOptional, IsEmail, IsEnum, IsArray, IsNumber, IsBoolean, IsUUID } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 
-export enum VendorStatus {
+enum VendorStatus {
   ACTIVE = 'active',
   INACTIVE = 'inactive',
   PENDING = 'pending',

@@ -12,7 +12,7 @@ import type { ManufacturingProcessEngine } from '../core/manufacturing-process.t
 // (CuttingProcessContext.cuttingSecFromCalculator is pre-resolved by the
 // caller). planInspection() stays a caller-side orchestration helper in
 // bom-items.service.ts, unchanged.
-export interface InspectionContext {
+interface InspectionContext {
   input: InspectionInput;
   plan: InspectionPlan;
   resolved: InspectionResolvedTime;

@@ -158,7 +158,12 @@ class AdvancedCADMemoryOptimizer:
     """
     
     VERSION = "2.2.0"
-    CACHE_VERSION = "geo_v50"  # bumped 2026-09-30: (27) sheet metal emits SimpleHole/countersunk
+    CACHE_VERSION = "geo_v52"  # bumped 2026-10-10: (29) sheet-metal feature_graph_v2.measurements carries the
+    # faces behind pierce_count / bend_line_length / flat_pattern_area (each with a `reconciles` flag).
+    # Previous: geo_v51, 2026-10-09: (28) sheet-metal cut_profile carries one occurrence per
+    # cut category (outer_profile / circular_holes / internal_profiles) with face_ids + length_mm from the
+    # SAME walk that sums cut length -- bend faces are no longer highlighted as cuts.
+    # Previous: geo_v50, 2026-09-30: (27) sheet metal emits SimpleHole/countersunk
     # (shared classify_cone now measures the cone face's real widest radius -- RefRadius
     # could be the narrow end and read every real countersink as a chamfer) and
     # Form/drawn (sheet_metal/features/drawn_shell.py); a drawn shell's curved faces

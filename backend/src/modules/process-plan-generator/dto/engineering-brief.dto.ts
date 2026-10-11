@@ -70,7 +70,7 @@ export interface BriefDfm {
   cadDetectedFamily?: string;
 }
 
-export interface BriefContext {
+interface BriefContext {
   organizationLocation: string;
   currency: 'INR';
   language: 'en';

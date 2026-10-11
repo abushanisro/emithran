@@ -17,8 +17,8 @@
  * surfacing a real warning on disagreement, never silently picking one.
  */
 
-export type MismatchStatus = 'match' | 'mismatch' | 'drawing_only' | 'cad_only';
-export type MismatchSeverity = 'critical' | 'warning' | 'info';
+type MismatchStatus = 'match' | 'mismatch' | 'drawing_only' | 'cad_only';
+type MismatchSeverity = 'critical' | 'warning' | 'info';
 
 export interface FactMismatch {
   fact: string;

@@ -3,7 +3,7 @@ import type { CandidateSet } from '../../../../modules/process-plan-generator/dt
 
 const candidates: CandidateSet = {
   rawMaterials: [
-    { candidateId: 'rm-1', dbId: 'mat-abc', materialGroup: 'Ferrous & Non-Ferrous', material: 'Aluminium 6061', grade: '6061-T6', densityKgPerM3: 2700, unitCostInrPerKg: 342, location: 'India-Bangalore', score: 0.9 },
+    { candidateId: 'rm-1', dbId: 'mat-abc', materialGroup: 'Ferrous & Non-Ferrous', materialClass: 'Non-Ferrous', material: 'Aluminium 6061', grade: '6061-T6', densityKgPerM3: 2700, unitCostInrPerKg: 342, location: 'India-Bangalore', score: 0.9 },
   ],
   machines: [
     { candidateId: 'mc-1', dbId: 'mhr-abc', machineName: 'ASC Lathe 320', commodityCode: 'LATHE', description: 'CNC Lathe', rateInrPerHour: 540, location: 'India-Bangalore', processFamily: 'turned', score: 0.9 },

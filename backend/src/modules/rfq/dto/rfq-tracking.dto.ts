@@ -14,7 +14,7 @@ export enum RfqTrackingStatus {
 // Nested DTOs
 // ============================================================================
 
-export class RfqTrackingVendorDto {
+class RfqTrackingVendorDto {
   @ApiProperty({ description: 'Vendor UUID' })
   @IsUUID()
   id: string;
@@ -29,7 +29,7 @@ export class RfqTrackingVendorDto {
   email?: string;
 }
 
-export class RfqTrackingPartDto {
+class RfqTrackingPartDto {
   @ApiProperty({ description: 'BOM item UUID' })
   @IsUUID()
   id: string;
@@ -135,7 +135,7 @@ export class UpdateTrackingStatusDto {
 // Response DTOs
 // ============================================================================
 
-export class RfqTrackingVendorResponseDto {
+class RfqTrackingVendorResponseDto {
   @ApiProperty({ description: 'Vendor UUID' })
   id: string;
 
@@ -158,7 +158,7 @@ export class RfqTrackingVendorResponseDto {
   leadTimeDays?: number;
 }
 
-export class RfqTrackingPartResponseDto {
+class RfqTrackingPartResponseDto {
   @ApiProperty({ description: 'BOM item UUID' })
   id: string;
 

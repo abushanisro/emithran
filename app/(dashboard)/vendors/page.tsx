@@ -417,7 +417,7 @@ export default function VendorsPage() {
                 {totalAllVendors > 0 && (
                   <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-green-400 to-green-600 transition-all duration-1000 ease-out"
+                      className="h-full bg-linear-to-r from-green-400 to-green-600 transition-all duration-1000 ease-out"
                       style={{
                         width: `${(activeCount / totalAllVendors) * 100}%`,
                       }}

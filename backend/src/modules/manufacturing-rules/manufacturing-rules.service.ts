@@ -12,7 +12,7 @@ import type {
   ToolMaterial,
 } from "./interfaces/operation-calculator.interface";
 
-export interface EvaluateInput {
+interface EvaluateInput {
   operation: string;
   materialGrade: string;
   featureGeometry: Record<string, unknown>;

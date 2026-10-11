@@ -33,7 +33,7 @@ export function topLevelCatalogRows(rawCompoundStrings: readonly string[]): Cata
   return [...out.values()];
 }
 
-export interface FeatureOperationGroup {
+interface FeatureOperationGroup {
   /** "As Cast", "No Coring", ...; null when the operation is undetermined. */
   operation: string | null;
   featureType: string;

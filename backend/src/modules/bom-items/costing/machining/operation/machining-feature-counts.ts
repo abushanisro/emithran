@@ -8,7 +8,7 @@
  * "through_hole", "blind_hole") no longer exist, and reading them silently
  * returned 0 for every machining part, so every consumer reads through here.
  */
-export interface MachiningFeatureCounts {
+interface MachiningFeatureCounts {
   /** Plain axial bores: SimpleHole through + blind (not threaded, cross or PCD-grouped). */
   drilledHoles: number;
   pockets: number;

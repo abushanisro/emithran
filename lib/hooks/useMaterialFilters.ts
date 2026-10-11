@@ -2,12 +2,12 @@
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { COUNTRY_DEFAULT_CURRENCY } from '@/lib/constants/materials';
-import type { Currency, Country, MaterialShape, MaterialCategory } from '@/lib/constants/materials';
+import type { Currency, Country, MaterialShape } from '@/lib/constants/materials';
 
 export interface MaterialFilterState {
   search: string;
   materialGroup?: string;
-  materialCategory?: MaterialCategory;
+  materialClass?: string;
   country?: Country;
   currency?: Currency;
   shape?: MaterialShape;
@@ -131,19 +131,9 @@ export const useMaterialFilters = ({
     updateFilter('materialGroup', materialGroup);
   }, [updateFilter]);
 
-  const setMaterialCategory = useCallback((category?: MaterialCategory) => {
-    setFilters(prev => {
-      const newFilters: MaterialFilterState = { ...prev, ...(category !== undefined ? { materialCategory: category } : {}), page: 1 };
-      
-      // Clear shape if it's incompatible with new category
-      if (category && prev.shape) {
-        // This would use shape-category validation logic
-        // For now, we'll keep the shape
-      }
-      
-      return newFilters;
-    });
-  }, []);
+  const setMaterialClass = useCallback((materialClass?: string) => {
+    updateFilter('materialClass', materialClass);
+  }, [updateFilter]);
 
   const setCountry = useCallback((country?: Country) => {
     setFilters(prev => {
@@ -204,7 +194,7 @@ export const useMaterialFilters = ({
     let count = 0;
     if (filters.search) count++;
     if (filters.materialGroup) count++;
-    if (filters.materialCategory) count++;
+    if (filters.materialClass) count++;
     if (filters.country) count++;
     if (filters.currency) count++;
     if (filters.shape) count++;
@@ -263,9 +253,10 @@ export const useMaterialFilters = ({
       summary.push(`Group: ${filters.materialGroup}`);
     }
 
-    if (filters.materialCategory) {
-      summary.push(`Category: ${filters.materialCategory}`);
+    if (filters.materialClass) {
+      summary.push(`Class: ${filters.materialClass}`);
     }
+
     
     if (filters.country) {
       summary.push(`Country: ${filters.country}`);
@@ -325,7 +316,7 @@ export const useMaterialFilters = ({
     // Specific field setters
     setSearch,
     setMaterialGroup,
-    setMaterialCategory,
+    setMaterialClass,
     setCountry,
     setCurrency,
     setShape,

@@ -563,7 +563,7 @@ export function DetailedEvaluationView({
                   <>
                     {capabilityData.map((criteria, criteriaIndex) => (
                       <div key={criteriaIndex} className="grid grid-cols-3 border-b border-gray-700 hover:bg-gray-800/50">
-                        <div className="text-white py-4 px-6 font-medium break-words">
+                        <div className="text-white py-4 px-6 font-medium wrap-break-word">
                           <span>{getCriteriaName(criteriaIndex)}</span>
                         </div>
                         <div className="text-white text-center py-4 px-4 font-medium">

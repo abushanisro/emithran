@@ -7,6 +7,10 @@ export class RawMaterialResponseDto {
   @ApiProperty()
   materialGroup: string;
 
+  /** Ferrous | Non-Ferrous | Plastic & Rubber, from material_type (migration 897); null = unclassified. */
+  @ApiProperty({ nullable: true })
+  materialClass: string | null;
+
   @ApiProperty()
   material: string;
 
@@ -203,6 +207,7 @@ export class RawMaterialResponseDto {
     return {
       id: row.id,
       materialGroup: row.material_group,
+      materialClass: row.material_class ?? null,
       material: row.grade,
       materialGrade: row.name,
       materialType: row.material_type,

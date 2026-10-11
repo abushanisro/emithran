@@ -37,15 +37,6 @@ export function effectiveProcessGroupOf(row: MachineRowForSelection): string {
   return row.processGroup || row.commodityCode || '-';
 }
 
-/** Real distinct process groups AS DISPLAYED, for a Process picker.
- *
- *  Deliberately derived from the loaded rows rather than from the
- *  /mhr/process-groups endpoint, which queries only the real process_group
- *  column and therefore misses every commodity-code-only group. */
-export function processGroupOptionsFrom(rows: readonly MachineRowForSelection[]): string[] {
-  return [...buildHrRatesIndex(rows).processGroups];
-}
-
 /** A picker's options with its current value kept in them.
  *
  *  A Select renders blank when its value matches none of its items, and the
@@ -151,6 +142,18 @@ export function calculatorMappingsForMachineClass<T extends { machineClass?: str
  */
 export function unambiguousMapping<T>(mappingsForClass: readonly T[]): T | undefined {
   return mappingsForClass.length === 1 ? mappingsForClass[0] : undefined;
+}
+
+/**
+ * The catalog rows that name a machine class's route/operation: its active
+ * rows, or — when it has none — its inactive ones. is_active means "a
+ * calculator is wired", not "this route exists" (Black Oxide: one real row,
+ * no calculator yet). A class with active rows ignores its inactive ones
+ * (deactivated duplicates). Same rule as the backend's identityRows.
+ */
+export function identityMappings<T extends { isActive?: boolean }>(mappingsForClass: readonly T[]): T[] {
+  const active = mappingsForClass.filter((m) => m.isActive);
+  return active.length > 0 ? active : [...mappingsForClass];
 }
 
 // ─── The index ──────────────────────────────────────────────────────────────

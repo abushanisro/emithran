@@ -105,7 +105,7 @@ export interface EMithranSharedContext {
  * means handling an already-threaded part through the remaining operations.
  * Everything else finishes the part after it has been formed.
  */
-export interface FeatureDrivenOperations {
+interface FeatureDrivenOperations {
   /** Performed while the blank is still flat, before any bending. */
   preForm: ProcessLineCost[];
   /** Performed after forming — finishing, hardware insertion, inspection. */

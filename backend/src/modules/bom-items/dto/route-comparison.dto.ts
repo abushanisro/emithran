@@ -34,7 +34,7 @@ export interface RouteCapability {
  * unset rather than fabricate a clamp number for a press that isn't clamped
  * the same way.
  */
-export interface RouteInjectionMoldingDetail {
+interface RouteInjectionMoldingDetail {
   /** Required clamp force (reference clamp model: projected area × cavities × cavity pressure × clampForceSafetyFactor), metric tons-force. */
   clampRequiredT: number | null;
   /** The evaluated machine's real clamp rating (DB machine) or the tier's synthetic fallback tonnage. */
@@ -81,8 +81,12 @@ export interface RouteResultDto {
   // bending/all cutting classes have no such sourced threshold, and none is
   // fabricated for them. Compares the part's real, already-resolved
   // annualVolume against the real threshold and states the real relationship
-  // in each direction; never hides or reorders the route based on this.
+  // in each direction. Below the threshold the route is not feasible (see
+  // hardToolingVolumeCapability), so it is never auto-recommended.
   toolingVolumeNote: string | null;
+  // May Auto routing pick this route (isAutoRoutable): cutting routes, and
+  // hard-tooling routes whose annual volume passed their sourced minimum.
+  autoRoutable: boolean;
   processLines: ProcessLineCost[];
   materialCost: number;
   abrasiveCost: number;

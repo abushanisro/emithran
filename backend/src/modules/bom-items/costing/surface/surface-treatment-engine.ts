@@ -9,12 +9,16 @@
 //                    conveyor lines: seconds per part on a real machine, costed
 //                    at that machine's MHR + crew rate (same assembly as the
 //                    secondary processes).
+//   batch loads      Passivation (tank window) and the loadbar lines Anodize
+//                    and Wet Coat Line: parts per load from the window and its
+//                    spacing factor (partsPerLoad), time per load from the
+//                    reference (treatment time; Load Window Time per loadbar).
 // A process whose reference data does not define its time or price (for
-// example Anodize: stage times are on file but the anodizing duration itself
-// is not) is a disclosed 'gap' naming what is missing, never an estimate.
+// example Black Oxide: every stage time is on file except the blackening
+// immersion) is a disclosed 'gap' naming what is missing, never an estimate.
 
 import {
-  costed, notCosted, pickMachine, variable, num, sorted, envelopeCapable,
+  costed, notCosted, pickMachine, variable, num, sorted, envelopeCapable, partsPerLoad,
   type SecondaryMachine, type SecondaryPartFacts, type SecondaryProcessResult, type SecondaryReference, type SecondaryTraceStep,
 } from '../secondary/secondary-process-engine';
 export { SURFACE_TREATMENT_SOURCE_VERSION } from './surface-treatment-source';
@@ -317,9 +321,153 @@ function blastByWeight(base: Base, part: SecondaryPartFacts, ref: SecondaryRefer
   ], []);
 }
 
+/** pickMachine over the machines that take the part, with the chosen one's fit. */
+function pickFit<F extends { m: SecondaryMachine }>(process: string, fitted: F[], ref: SecondaryReference): F | undefined {
+  const m = pickMachine(process, fitted.map((x) => x.m), ref);
+  return m ? fitted.find((x) => x.m === m) : undefined;
+}
+
+/**
+ * Passivation: a batch tank. Parts per load from the tank window (spacing
+ * factor, height and weight limits), each load immersed for the treatment
+ * time of the part cut code (passivationTreatments). The reference lists a hot
+ * and a cold bath per cut code with no rule between them; the shortest (hot)
+ * one is used and the other is shown (user decision 2026-10-09).
+ */
+function passivation(base: Base, part: SecondaryPartFacts, ref: SecondaryReference, pool: SecondaryMachine[]): SecondaryProcessResult {
+  const table = ref.lookups.get('passivationTreatments');
+  if (!table) return notCosted(base, 'gap', 'passivationTreatments is not staged: run migration 819.');
+  if (part.materialCutCode == null) return notCosted(base, 'gap', 'The material cut code is needed for the passivation treatment (passivationTreatments): choose a material first.');
+  if (part.isMachined == null) return notCosted(base, 'gap', 'Whether the part is machined is needed to pick the passivation treatment.');
+  const bbox = part.bboxMm;
+  if (!bbox) return notCosted(base, 'gap', 'Part size is needed to load the tank.');
+  const batch = part.batchSize;
+  if (batch == null || batch <= 0) return notCosted(base, 'gap', 'Batch size is needed to count tank loads.');
+  const options = table
+    .filter((r) => num(r['Cut Code']) === part.materialCutCode && String(r['Is Machined']) === String(part.isMachined))
+    .map((r) => ({ treatment: typeof r.Treatment === 'string' ? r.Treatment : '', min: num(r['Time (min)']) }))
+    .filter((o): o is { treatment: string; min: number } => o.min != null && o.min > 0)
+    .sort((a, b) => a.min - b.min);
+  const chosen = options.at(0);
+  const others = options.slice(1);
+  if (!chosen) {
+    return notCosted(base, 'not_applicable', `Cut code ${part.materialCutCode} has no passivation treatment in ${SRC_LOOKUP('passivationTreatments')} (passivation is for stainless steels).`);
+  }
+  const fitted = pool.flatMap((m) => {
+    const L = num(m.specs.machine_window_length_mm);
+    const W = num(m.specs.machine_window_width_mm);
+    const H = num(m.specs.machine_height_limit_mm);
+    const f = num(m.specs.part_spacing_factor);
+    if (L == null || W == null || H == null || f == null) return [];
+    const r = partsPerLoad({ partMm: sorted(bbox), windowMm: [L, W, H], spacingFactor: f, partKg: part.weightKg, weightLimitKg: num(m.specs.machine_weight_limit_kg) });
+    return r.count > 0 ? [{ m, n: r.count, by: r.governedBy, f }] : [];
+  });
+  const fit = pickFit(base.process, fitted, ref);
+  if (!fit) return notCosted(base, 'gap', 'No passivation tank window takes this part.');
+  const loads = Math.ceil(batch / fit.n);
+  const trace: SecondaryTraceStep[] = [
+    { label: 'Treatment', value: chosen.treatment, source: `${SRC_LOOKUP('passivationTreatments')} (cut code ${part.materialCutCode}, ${part.isMachined ? 'machined' : 'not machined'}; shortest listed)` },
+    { label: 'Immersion time', value: chosen.min, unit: 'min', source: SRC_LOOKUP('passivationTreatments') },
+    { label: 'Parts per tank load', value: fit.n, source: `tank ${fit.m.name}, spacing factor ${fit.f}, limited by ${fit.by}` },
+    { label: 'Tank loads', value: loads, source: `ceil(${batch} / ${fit.n})` },
+  ];
+  const warnings = others.length > 0 ? [`Other listed treatment(s): ${others.map((o) => `${o.treatment} (${o.min} min)`).join('; ')}.`] : [];
+  return costed(base, fit.m, { perPartSec: (loads * chosen.min * 60) / batch, trace, warnings, highlight: 'whole_part' }, ref, batch);
+}
+
+/**
+ * The anodizing type a callout names, in the reference line naming ("Type I",
+ * "Type IB", "Type IC", "Type II", "Type III"): "Anodize Type II", "type 3",
+ * "TYPE IC". null = the callout names no type.
+ */
+export function anodizeTypeFromCallout(callout: string | null | undefined): string | null {
+  const key = /\btype\s*(iii|ii|ib|ic|i|3|2|1)\b/i.exec(callout ?? '')?.[1];
+  if (!key) return null;
+  const arabic: Record<string, string> = { '1': 'I', '2': 'II', '3': 'III' };
+  return `Type ${arabic[key] ?? key.toUpperCase()}`;
+}
+
+/**
+ * A loadbar line (Anodize, Wet Coat Line): one loaded bar leaves the line
+ * every Load Window Time (user decision 2026-10-09), so a part takes the
+ * window divided by the parts on its loadbar. null = the part does not fit.
+ */
+function loadbarFit(part: SecondaryPartFacts, m: SecondaryMachine, areaLimit: boolean) {
+  const L = num(m.specs.loadbar_window_length_mm);
+  const H = num(m.specs.loadbar_window_height_mm);
+  const f = num(m.specs.loadbar_spacing_factor);
+  const windowHr = num(m.specs.load_window_time_hr);
+  if (L == null || H == null || f == null || windowHr == null || windowHr <= 0 || !part.bboxMm) return null;
+  const r = partsPerLoad({
+    partMm: sorted(part.bboxMm),
+    windowMm: [L, H, num(m.specs.loadbar_window_width_mm)],
+    spacingFactor: f,
+    partKg: part.weightKg,
+    weightLimitKg: num(m.specs.loadbar_weight_limit_kg),
+    partAreaM2: part.surfaceAreaMm2 != null ? part.surfaceAreaMm2 / 1e6 : null,
+    areaLimitM2: areaLimit ? num(m.specs.loadbar_max_load_surface_area_m2) : null,
+  });
+  return r.count > 0 ? { m, n: r.count, by: r.governedBy, f, windowHr } : null;
+}
+
+/** The machines of a pool that take the part on their loadbar, with the fit. */
+const loadbarFits = (part: SecondaryPartFacts, pool: SecondaryMachine[], areaLimit: boolean) =>
+  pool.flatMap((m) => loadbarFit(part, m, areaLimit) ?? []);
+
+function anodize(base: Base, part: SecondaryPartFacts, ref: SecondaryReference, pool: SecondaryMachine[]): SecondaryProcessResult {
+  const type = anodizeTypeFromCallout(part.surfaceCallout);
+  if (!type) return notCosted(base, 'gap', 'The anodizing type (Type I, IB, IC, II or III) is needed from the drawing surface callout: each line runs one type.');
+  if (!part.bboxMm) return notCosted(base, 'gap', 'Part size is needed to load the loadbar.');
+  if (part.surfaceAreaMm2 == null || part.surfaceAreaMm2 <= 0) return notCosted(base, 'gap', 'Part surface area is needed (each loadbar has a maximum load surface area).');
+  const batch = part.batchSize;
+  if (batch == null || batch <= 0) return notCosted(base, 'gap', 'Batch size is needed for the minimum batch cost.');
+  const ofType = pool.filter((m) => m.specs.anodizing_type === type);
+  if (ofType.length === 0) return notCosted(base, 'gap', `No ${type} anodizing line on file for this location.`);
+  const fit = pickFit(base.process, loadbarFits(part, ofType, true), ref);
+  if (!fit) return notCosted(base, 'gap', `No ${type} anodizing loadbar takes this part.`);
+  const r = costed(base, fit.m, {
+    perPartSec: (fit.windowHr * 3600) / fit.n,
+    trace: [
+      { label: 'Anodizing type', value: type, source: 'drawing surface callout' },
+      { label: 'Load window time', value: fit.windowHr, unit: 'hr', source: `line ${fit.m.name} (one loadbar per window)` },
+      { label: 'Parts per loadbar', value: fit.n, source: `loadbar window, spacing factor ${fit.f}, limited by ${fit.by}` },
+    ],
+    highlight: 'whole_part',
+  }, ref, batch);
+  // The line charge for a batch never falls below the line minimum batch cost.
+  const minBatch = num(fit.m.specs.min_batch_cost_usd);
+  if (r.costPerPartUsd != null && minBatch != null && r.costPerPartUsd * batch < minBatch) {
+    r.trace.push({ label: 'Minimum batch cost', value: minBatch, unit: 'USD', source: `line ${fit.m.name}: batch below the minimum, charged at it` });
+    r.costPerPartUsd = Number((minBatch / batch).toFixed(4));
+  }
+  return r;
+}
+
+function wetCoatLine(base: Base, part: SecondaryPartFacts, ref: SecondaryReference, pool: SecondaryMachine[]): SecondaryProcessResult {
+  if (!part.bboxMm) return notCosted(base, 'gap', 'Part size is needed to load the loadbar.');
+  if (part.surfaceAreaMm2 == null || part.surfaceAreaMm2 <= 0) return notCosted(base, 'gap', 'Part surface area is needed for the paint used.');
+  const fit = pickFit(base.process, loadbarFits(part, pool, false), ref);
+  if (!fit) return notCosted(base, 'gap', 'No wet coat loadbar takes this part.');
+  const coverage = num(fit.m.specs.paint_coverage_m2_per_l);
+  const paintUsdPerL = num(fit.m.specs.paint_unit_cost_usd_per_l);
+  if (coverage == null || coverage <= 0 || paintUsdPerL == null) return notCosted(base, 'gap', `Line ${fit.m.name} has no paint coverage or paint cost on file.`);
+  const areaM2 = part.surfaceAreaMm2 / 1e6;
+  const paintUsd = (areaM2 / coverage) * paintUsdPerL;
+  return costed(base, fit.m, {
+    perPartSec: (fit.windowHr * 3600) / fit.n,
+    materialUsdPerPart: Number(paintUsd.toFixed(4)),
+    trace: [
+      { label: 'Load window time', value: fit.windowHr, unit: 'hr', source: `line ${fit.m.name} (one loadbar per window)` },
+      { label: 'Parts per loadbar', value: fit.n, source: `loadbar window, spacing factor ${fit.f}, limited by ${fit.by}` },
+      { label: 'Paint', value: Number(paintUsd.toFixed(4)), unit: 'USD', source: `CAD area ${areaM2.toFixed(4)} m² / ${coverage} m²/L × ${paintUsdPerL} USD/L (line ${fit.m.name})` },
+    ],
+    warnings: ['Primer is not costed: the reference has a primer price but no rule for when primer is applied.'],
+    highlight: 'whole_part',
+  }, ref, part.batchSize);
+}
+
 /** Why each remaining process cannot be timed from the reference data. */
 const UNDEFINED: Record<string, string> = {
-  'Anodize': 'Stage times (clean, etch, rinse, seal) are on the machines, but the anodizing duration itself (from coating thickness and current) has no reference rule.',
   'Black Oxide': 'The blackening immersion time is not in the reference data (only rinse, clean and transfer times are).',
   'Conveyor Conversion Coating': 'The reference has no machine file for this process.',
   'Conveyor Oven Cure': 'No cure time or line speed for the conveyor oven is in the reference data.',
@@ -328,12 +476,10 @@ const UNDEFINED: Record<string, string> = {
   'Mask-Bench': 'Which features are masked is a drawing requirement, not a CAD fact.',
   'Mask-Spray': 'Which surfaces are masked is a drawing requirement, not a CAD fact.',
   'Oven Cure': 'No cure time is in the reference data.',
-  'Passivation': 'The parts-per-load rule for the passivation tank is not in the reference data (immersion times are, per cut code).',
   'Powder Coat Cart': 'The coating thickness and spray time rule are not in the reference data (only flow rates and handling times are).',
   'Screen Printing': 'The printed area is a drawing requirement, not a CAD fact.',
-  'Shot Blast': 'Parts per hanger and the part perimeter are needed; neither is in the reference or the CAD data.',
+  'Shot Blast': 'The machines carry a blast cycle time, hanger positions and per-area / per-perimeter allowances, but the reference does not define how they combine per hanger load.',
   'Vibratory Finishing': 'No tumbling time is in the reference data (media compatibility and container sizes are).',
-  'Wet Coat Line': 'The parts-per-loadbar rule is not in the reference data (coverage and paint cost are).',
 };
 
 type Model = (base: Base, part: SecondaryPartFacts, ref: SecondaryReference, pool: SecondaryMachine[]) => SecondaryProcessResult;
@@ -353,6 +499,9 @@ const MODELS: Record<string, Model> = {
   'Conveyor Part Unloading': handling,
   'Bead Blast': blastByWeight,
   'Sand Blast': blastByWeight,
+  'Passivation': passivation,
+  'Anodize': anodize,
+  'Wet Coat Line': wetCoatLine,
 };
 
 /** The processes this engine can cost. The process catalog marks exactly these

@@ -1,3 +1,4 @@
+import { catalogRowForLine, identityRows, type CatalogRow } from './process-catalog/catalog-row-for-line';
 import {
   Controller,
   Get,
@@ -565,8 +566,8 @@ export class BOMItemsController {
     // Carry the true-shape nest result across the re-analysis.
     //
     // analyzeAndSuggest builds featureGraph.summary as a fresh object, so this
-    // cache used to be destroyed on every Reanalyze. An uncached resolve walks
-    // all 5 STANDARD_SHEETS sequentially against cad-engine's single-threaded
+    // cache used to be destroyed on every Reanalyze. An uncached resolve then
+    // walked 5 candidate sheets sequentially against cad-engine's single-threaded
     // /nest (13-30s per sheet on real parts), and BOTH cost-summary and
     // route-comparison resolve it, concurrently, on the very next page load —
     // which is what made those two requests hang until the client gave up.
@@ -2185,14 +2186,11 @@ export class BOMItemsController {
       const hierarchyClass = line.hostMachineClass ?? line.machineClass;
       const { data: hierarchyRows } = await db
         .from('process_calculator_mappings')
-        .select('process_group, process_route, display_order')
+        .select('process_group, process_route, operation, display_order, is_active')
         .eq('machine_class', hierarchyClass)
-        .eq('is_active', true)
-        .order('display_order', { ascending: true })
-        .limit(1);
-      const hierarchyRow = hierarchyRows?.[0] as
-        | { process_group: string; process_route: string }
-        | undefined;
+        .order('display_order', { ascending: true });
+      const classRows = identityRows((hierarchyRows ?? []) as CatalogRow[]);
+      const hierarchyRow = catalogRowForLine(classRows, line.process);
       // The saved operation is the engine's own name for this line
       // (line.process) — the one identity every other writer (the dialog, the
       // custom route above, the frontend default-route path) saves and the Edit
@@ -2210,7 +2208,7 @@ export class BOMItemsController {
       const lineMhrId = line.machineSelection?.balanced?.candidate?.machineId ?? line.mhrId ?? null;
       const processGroup = line.machineSelection?.balanced?.candidate?.processGroup
         ?? (lineMhrId ? machineGroupById.get(lineMhrId) : undefined)
-        ?? hierarchyRow?.process_group;
+        ?? (hierarchyRow ?? classRows[0])?.process_group;
       if (!processGroup) {
         throw new InternalServerErrorException(
           `"${line.process}" (${hierarchyClass}) has no process group: its machine has none in HR Rates and the class has no process_calculator_mappings row.`,

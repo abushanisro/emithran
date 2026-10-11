@@ -7,7 +7,7 @@ import type {
   ToolMaterial,
 } from "../interfaces/operation-calculator.interface";
 
-export interface ParameterQuery {
+interface ParameterQuery {
   operation: string;
   isoGroup: IsoGroup;
   qualityLevel?: QualityLevel;

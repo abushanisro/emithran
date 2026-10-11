@@ -6,7 +6,7 @@ import { Type } from 'class-transformer';
 
 // ─── Nested types ──────────────────────────────────────────────────────────────
 
-export class SelectedProjectDto {
+class SelectedProjectDto {
   @ApiProperty()
   @IsString()
   id: string;
@@ -21,7 +21,7 @@ export class SelectedProjectDto {
   targetPrice?: number;
 }
 
-export class SelectedBomDto {
+class SelectedBomDto {
   @ApiProperty()
   @IsString()
   id: string;
