@@ -35,6 +35,9 @@ const TRUSTED_STORAGE_HOSTS = [
 function isTrustedUrl(rawUrl: string): boolean {
     try {
         const parsed = new URL(rawUrl);
+        if (parsed.protocol !== 'https:' || parsed.username || parsed.password) {
+            return false;
+        }
         return TRUSTED_STORAGE_HOSTS.some(
             (host) => parsed.hostname === host || parsed.hostname.endsWith(`.${host}`),
         );
@@ -54,14 +57,15 @@ export async function GET(request: NextRequest) {
 
         // ── Mode A: caller already has the signed URL ─────────────────────────────
         if (directUrl) {
-            const decoded = decodeURIComponent(directUrl);
-            if (!isTrustedUrl(decoded)) {
+            // URLSearchParams already decoded the query wrapper. Decoding again
+            // changes escaped object names and invalidates signed URLs.
+            if (!isTrustedUrl(directUrl)) {
                 return NextResponse.json(
-                    { error: 'URL host is not in the trusted storage allowlist' },
+                    { error: 'URL must use HTTPS on a trusted storage host without credentials' },
                     { status: 400 },
                 );
             }
-            fileUrl = decoded;
+            fileUrl = directUrl;
         }
         // ── Mode B: fetch signed URL from NestJS backend ───────────────────────────
         else if (itemId) {
@@ -112,12 +116,28 @@ export async function GET(request: NextRequest) {
             );
         }
 
+        // Apply the same boundary to backend-provided URLs as to direct URLs.
+        if (!isTrustedUrl(fileUrl)) {
+            return NextResponse.json(
+                { error: 'Backend returned an untrusted storage URL' },
+                { status: 502 },
+            );
+        }
+
         // ── Fetch the file bytes server-side ──────────────────────────────────────
         const fileRes = await fetch(fileUrl, {
+            redirect: 'manual', // A trusted host must not redirect us to a private destination.
             headers: {
                 'User-Agent': 'Mozilla/5.0 (compatible; Mithran-FileProxy/1.0)',
             },
         });
+
+        if (fileRes.status >= 300 && fileRes.status < 400) {
+            return NextResponse.json(
+                { error: 'Storage redirects are not allowed' },
+                { status: 502 },
+            );
+        }
 
         if (!fileRes.ok) {
             return NextResponse.json(
