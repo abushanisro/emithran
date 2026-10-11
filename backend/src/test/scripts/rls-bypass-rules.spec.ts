@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { scanSource, scanRepoJwt } = require('../../../scripts/rls-bypass-rules');
 
@@ -5,6 +8,11 @@ const rulesFor = (path: string, text: string) =>
   scanSource(path, text).filter((v: any) => v.severity === 'error').map((v: any) => v.rule);
 
 describe('RLS boundary CI rules', () => {
+  it('keeps raw-material editor privileged access compliant with the literal-reason boundary', () => {
+    const sourcePath = 'src/modules/raw-materials/services/raw-material-editor.service.ts';
+    const text = readFileSync(resolve(__dirname, '../../..', sourcePath), 'utf8');
+    expect(rulesFor(sourcePath, text)).toEqual([]);
+  });
   const svc = 'src/modules/x/x.service.ts';
 
   it.each([
