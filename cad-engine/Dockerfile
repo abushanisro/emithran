@@ -21,32 +21,16 @@ RUN conda create -n cad-env python=3.11 -y && \
 
 # Activate conda environment and install additional packages
 SHELL ["conda", "run", "-n", "cad-env", "/bin/bash", "-c"]
-# Install heavy conda-forge packages (OCCT-compatible ABI pins)
-RUN conda install -n cad-env -c conda-forge \
-    fastapi=0.109.0 \
-    uvicorn=0.27.0 \
-    slowapi=0.1.9 \
-    pydantic=2.5.3 \
-    python-multipart=0.0.6 \
-    aiofiles=23.2.1 \
-    httpx=0.26.0 \
-    python-json-logger=2.0.7 \
-    python-dotenv=1.0.1 -y && \
-    conda clean -afy
-
 # Copy requirements first so pip layer is cached independently of source changes
 COPY requirements.txt ./
 
-# Install remaining Python deps — pip handles packages not available on conda-forge.
-# python-magic-bin is Windows-only; libmagic1 was already installed via apt-get above.
-RUN conda run -n cad-env pip install \
-    --no-cache-dir \
-    anthropic==0.18.1 \
-    "openai>=1.35.0" \
-    python-magic==0.4.27 \
-    "PyMuPDF>=1.24.0" \
-    requests \
-    "shapely>=2.0,<3.0"
+# Every Python dependency except pythonocc-core comes from requirements.txt, the
+# one pinned list (and the one dependency scanners read), so the image runs
+# exactly the versions that are declared and patched. It used to conda-install
+# its own older pins here (python-multipart 0.0.6, fastapi 0.109) and copy
+# requirements.txt without using it.
+# python-magic-bin / pywin32 carry Windows-only markers; libmagic1 is installed above.
+RUN conda run -n cad-env pip install --no-cache-dir -r requirements.txt
 
 # Copy all application source (copilot package, feature extractors, converters, knowledge)
 COPY . .
@@ -57,6 +41,7 @@ RUN echo "# CAD Engine Configuration" > .env && \
     echo "PORT=5000" >> .env && \
     echo "LOG_LEVEL=INFO" >> .env && \
     echo "ENVIRONMENT=production" >> .env && \
+    echo "NODE_ENV=production" >> .env && \
     echo "MAX_FILE_SIZE_MB=50" >> .env && \
     echo "RATE_LIMIT_PER_MINUTE=10" >> .env && \
     echo "LINEAR_DEFLECTION=0.1" >> .env && \

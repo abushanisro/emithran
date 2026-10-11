@@ -103,7 +103,7 @@ export function VendorSelectionCard({
 
   if (isLoading) {
     return (
-      <Card className="rounded-lg border bg-card text-card-foreground shadow-sm">
+      <Card className="rounded-lg border bg-card text-card-foreground shadow-xs">
         <CardHeader className="flex flex-col space-y-1.5 p-6">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-teal-600 text-white flex items-center justify-center text-sm font-bold">
@@ -124,7 +124,7 @@ export function VendorSelectionCard({
   }
 
   return (
-    <Card className="rounded-lg border bg-card text-card-foreground shadow-sm">
+    <Card className="rounded-lg border bg-card text-card-foreground shadow-xs">
       <CardHeader className="flex flex-col space-y-1.5 p-6">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-teal-600 text-white flex items-center justify-center text-sm font-bold">
@@ -315,7 +315,7 @@ function VendorCard({ vendor, isSelected, onToggle, processes, compact = false }
         isSelected 
           ? 'border-teal-300 bg-teal-50 shadow-md' 
           : isActive 
-            ? 'border-gray-200 hover:border-teal-200 hover:shadow-sm bg-white' 
+            ? 'border-gray-200 hover:border-teal-200 hover:shadow-xs bg-white' 
             : 'border-gray-200 bg-gray-50 opacity-75'
       } ${compact ? 'text-sm' : ''}`}
       onClick={() => isActive && onToggle(vendor.id, !isSelected)}

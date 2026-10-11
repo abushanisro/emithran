@@ -385,7 +385,7 @@ export function ModelViewer({
 
         {/* Error Overlay */}
         {error && (
-          <div className="absolute inset-0 bg-background/95 backdrop-blur-sm flex items-center justify-center p-6 z-50">
+          <div className="absolute inset-0 bg-background/95 backdrop-blur-xs flex items-center justify-center p-6 z-50">
             <div className="text-center max-w-md">
               <div className="h-16 w-16 mx-auto mb-4 rounded-full bg-destructive/10 flex items-center justify-center">
                 <span className="text-2xl">⚠️</span>
@@ -414,7 +414,7 @@ export function ModelViewer({
   // STEP File not yet converted - show placeholder  
   if (isOriginalSTEP && !isConvertedToSTL && !shouldShow3DViewer) {
     return (
-      <div className="relative h-full min-h-[400px] border rounded-lg overflow-hidden bg-gradient-to-br from-muted/30 via-muted/10 to-background">
+      <div className="relative h-full min-h-[400px] border rounded-lg overflow-hidden bg-linear-to-br from-muted/30 via-muted/10 to-background">
         <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center">
           {/* File Info */}
           <div className="mb-6 space-y-2">
@@ -546,7 +546,7 @@ export function ModelViewer({
 
         {/* Error Overlay */}
         {error && (
-          <div className="absolute inset-0 bg-background/95 backdrop-blur-sm flex items-center justify-center p-6 z-50">
+          <div className="absolute inset-0 bg-background/95 backdrop-blur-xs flex items-center justify-center p-6 z-50">
             <div className="text-center max-w-md">
               <div className="h-16 w-16 mx-auto mb-4 rounded-full bg-destructive/10 flex items-center justify-center">
                 <span className="text-2xl">⚠️</span>

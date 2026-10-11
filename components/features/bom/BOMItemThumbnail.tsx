@@ -243,7 +243,7 @@ export function BOMItemThumbnail({ item, onClick }: BOMItemThumbnailProps) {
     // Manufacturing Intelligence, and the thumbnail means "open the viewer".
     <div
       ref={containerRef}
-      className="relative flex-shrink-0 w-[120px] h-[90px] rounded-md overflow-hidden cursor-pointer group"
+      className="relative shrink-0 w-[120px] h-[90px] rounded-md overflow-hidden cursor-pointer group"
       onClick={(e) => { e.stopPropagation(); onClick(); }}
     >
       {/* Skeleton during load */}

@@ -783,7 +783,7 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
                       }}
                       className={`px-2 py-0.5 rounded text-xs flex items-center gap-1 font-medium transition-all ${
                         activeShape === 'circle'
-                          ? 'bg-red-50 text-red-600 border border-red-300 font-bold shadow-sm'
+                          ? 'bg-red-50 text-red-600 border border-red-300 font-bold shadow-xs'
                           : 'hover:bg-muted text-foreground'
                       }`}
                       title="Circle Outline"
@@ -799,7 +799,7 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
                       }}
                       className={`px-2 py-0.5 rounded text-xs flex items-center gap-1 font-medium transition-all ${
                         activeShape === 'square'
-                          ? 'bg-red-50 text-red-600 border border-red-300 font-bold shadow-sm'
+                          ? 'bg-red-50 text-red-600 border border-red-300 font-bold shadow-xs'
                           : 'hover:bg-muted text-foreground'
                       }`}
                       title="Square Outline"
@@ -815,7 +815,7 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
                       }}
                       className={`px-2 py-0.5 rounded text-xs flex items-center gap-1 font-medium transition-all ${
                         activeShape === 'diamond'
-                          ? 'bg-red-50 text-red-600 border border-red-300 font-bold shadow-sm'
+                          ? 'bg-red-50 text-red-600 border border-red-300 font-bold shadow-xs'
                           : 'hover:bg-muted text-foreground'
                       }`}
                       title="Diamond Outline"
@@ -826,7 +826,7 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
                   </div>
                 )}
                 {pdfUrl && (
-                  <div className="flex items-center gap-1 bg-blue-50/80 border border-blue-200 rounded-md px-2 py-0.5 shadow-sm">
+                  <div className="flex items-center gap-1 bg-blue-50/80 border border-blue-200 rounded-md px-2 py-0.5 shadow-xs">
                     <span className="text-[11px] font-bold text-blue-900 hidden sm:inline">Sheet:</span>
                     <Button
                       type="button"
@@ -1080,7 +1080,7 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
                   {balloons.filter(b => (b.page || 1) === currentPage).length === 0 && isAnnotationMode && (
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-black/10" style={{ zIndex: 5 }}>
                       <div className="bg-white/95 rounded-lg p-4 text-center border border-red-200 shadow-lg">
-                        <div className="w-8 h-8 bg-white rounded-full border-2 border-red-600 flex items-center justify-center mx-auto mb-2 shadow-sm">
+                        <div className="w-8 h-8 bg-white rounded-full border-2 border-red-600 flex items-center justify-center mx-auto mb-2 shadow-xs">
                           <span className="text-red-600 font-bold text-sm">{balloons.length + 1}</span>
                         </div>
                         <p className="text-sm font-semibold text-gray-800">Click anywhere on Sheet {currentPage} to place balloon #{balloons.length + 1}</p>
@@ -1126,7 +1126,7 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
                   </button>
 
                   {/* Floating sheet switcher badge */}
-                  <div className="absolute bottom-4 right-4 z-40 bg-white/95 backdrop-blur border border-blue-200 rounded-lg shadow-lg px-3 py-1.5 flex items-center gap-2 select-none">
+                  <div className="absolute bottom-4 right-4 z-40 bg-white/95 backdrop-blur-sm border border-blue-200 rounded-lg shadow-lg px-3 py-1.5 flex items-center gap-2 select-none">
                     <span className="text-xs font-bold text-gray-700">Sheet {currentPage} of {totalPages}</span>
                     <div className="flex items-center gap-1">
                       <Button
@@ -2177,7 +2177,7 @@ export default function QualityInspectionPage() {
                 <div className="space-y-4 p-3 sm:p-4">
                   {/* Sleek Part Selector Bar & Tabs */}
                   {bomItems.length > 1 && (
-                    <div className="bg-muted/30 border rounded-xl p-3 sm:p-4 shadow-sm space-y-3">
+                    <div className="bg-muted/30 border rounded-xl p-3 sm:p-4 shadow-xs space-y-3">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div>
                           <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
@@ -2232,7 +2232,7 @@ export default function QualityInspectionPage() {
 
                   {/* Single Active Part Display */}
                   {activeBomItem && (
-                    <div className="border rounded-lg overflow-hidden bg-card shadow-sm">
+                    <div className="border rounded-lg overflow-hidden bg-card shadow-xs">
                       <div className="flex items-center justify-between px-3.5 py-2.5 bg-muted/50 border-b">
                         <div className="flex items-center gap-2">
                           <h4 className="font-semibold text-sm text-foreground">

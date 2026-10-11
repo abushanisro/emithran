@@ -193,7 +193,7 @@ export default function QualityControlPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-card text-card-foreground border-b border-border shadow-sm">
+      <div className="bg-card text-card-foreground border-b border-border shadow-xs">
         <div className="max-w-7xl mx-auto p-4 sm:p-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1">
@@ -291,23 +291,23 @@ export default function QualityControlPage() {
                       </div>
                       <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                         <div className="flex items-center gap-1">
-                          <FileText className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                          <FileText className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
                           <span className="truncate">{inspection.type || 'First Article'}</span>
                         </div>
                         {inspection.inspector && (
                           <div className="flex items-center gap-1">
-                            <User className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                            <User className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
                             <span className="truncate">{inspection.inspector}</span>
                           </div>
                         )}
                         {inspection.plannedDate && (
                           <div className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                            <Calendar className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
                             <span className="truncate">{new Date(inspection.plannedDate).toLocaleDateString()}</span>
                           </div>
                         )}
                         <div className="flex items-center gap-1">
-                          <Shield className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                          <Shield className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
                           <span>{inspection.selectedItems?.length || 0} items</span>
                         </div>
                       </div>
@@ -409,7 +409,7 @@ export default function QualityControlPage() {
                     {/* Quality Standards */}
                     {inspection.qualityStandards && inspection.qualityStandards.length > 0 && (
                       <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                        <span className="text-sm font-medium flex-shrink-0">Standards:</span>
+                        <span className="text-sm font-medium shrink-0">Standards:</span>
                         <div className="flex gap-1 flex-wrap">
                           {inspection.qualityStandards.map((standard: string, index: number) => (
                             <Badge key={index} variant="secondary" className="text-xs">
@@ -431,7 +431,7 @@ export default function QualityControlPage() {
                     {inspection.status === 'rejected' && (
                       <div className="p-3 bg-red-50 border border-red-200 rounded-md">
                         <div className="flex items-start gap-2">
-                          <ThumbsDown className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+                          <ThumbsDown className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
                           <div className="flex-1">
                             <p className="text-sm font-medium text-red-800 mb-1">Declined</p>
                             {(inspection.rejectionReason || inspection.rejection_reason) && (
@@ -454,7 +454,7 @@ export default function QualityControlPage() {
                     {inspection.status === 'approved' && (
                       <div className="p-3 bg-green-50 border border-green-200 rounded-md">
                         <div className="flex items-start gap-2">
-                          <ThumbsUp className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                          <ThumbsUp className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
                           <div className="flex-1">
                             <p className="text-sm font-medium text-green-800 mb-1">Approved</p>
                             {(inspection.approvedBy || inspection.approved_by) && (

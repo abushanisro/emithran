@@ -10,9 +10,8 @@ import json
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request, Security
+from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
-from fastapi.security.api_key import APIKeyHeader
 from pydantic import BaseModel, Field
 
 from copilot import agent
@@ -20,15 +19,6 @@ from copilot import agent
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-_api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
-
-
-async def _require_api_key(request: Request, api_key: str = Security(_api_key_header)):
-    import os
-    cad_key = os.getenv("CAD_ENGINE_API_KEY", "")
-    if cad_key and api_key != cad_key:
-        raise HTTPException(status_code=403, detail="Invalid or missing API key")
 
 
 class CopilotMessage(BaseModel):
@@ -57,7 +47,6 @@ _VALID_MODES = {
 async def copilot_chat(
     body: CopilotChatRequest,
     request: Request,
-    _auth: None = Security(_require_api_key),
 ):
     """
     Main copilot endpoint. Streams SSE token deltas.

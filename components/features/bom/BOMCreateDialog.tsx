@@ -387,7 +387,7 @@ export function BOMCreateDialog({ projectId, open, onOpenChange, onSuccess }: BO
                   ].join(' ')}
                 >
                   <div className="flex items-start gap-3 mb-3">
-                    <Package className="h-5 w-5 mt-1 text-muted-foreground flex-shrink-0" />
+                    <Package className="h-5 w-5 mt-1 text-muted-foreground shrink-0" />
                     <div className="flex-1 space-y-3">
 
                       {/* Name row */}
@@ -410,7 +410,7 @@ export function BOMCreateDialog({ projectId, open, onOpenChange, onSuccess }: BO
                             variant="ghost"
                             size="icon"
                             onClick={() => removeItem(item.id)}
-                            className="flex-shrink-0"
+                            className="shrink-0"
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>

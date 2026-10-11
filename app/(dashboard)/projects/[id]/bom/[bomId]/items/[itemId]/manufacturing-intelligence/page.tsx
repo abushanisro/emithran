@@ -3619,7 +3619,7 @@ function InputRow({ label, value, onChange, onBlur }: { label: string; value: nu
             if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
             if (e.key === 'Escape') { if (priorValue !== null) onChange(priorValue); setIsEditing(false); }
           }}
-          className="text-xs font-medium text-right w-20 shrink-0 border border-border rounded px-1.5 py-0.5 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500 tabular-nums"
+          className="text-xs font-medium text-right w-20 shrink-0 border border-border rounded px-1.5 py-0.5 bg-background focus:outline-hidden focus:ring-1 focus:ring-violet-500 tabular-nums"
         />
       ) : (
         <button
@@ -4694,12 +4694,12 @@ function MaterialPickerDialog({
             value={search}
             onChange={(e) => { setSearch(e.target.value); }}
             autoFocus
-            className="flex-1 text-xs border border-border rounded px-2.5 py-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500"
+            className="flex-1 text-xs border border-border rounded px-2.5 py-1.5 bg-background focus:outline-hidden focus:ring-1 focus:ring-violet-500"
           />
           <select
             value={groupFilter}
             onChange={(e) => { setGroupFilter(e.target.value); }}
-            className="text-xs border border-border rounded px-2 py-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500 cursor-pointer w-40 shrink-0"
+            className="text-xs border border-border rounded px-2 py-1.5 bg-background focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer w-40 shrink-0"
           >
             <option value="">All Groups</option>
             {groups.map((g) => <option key={g} value={g}>{g}</option>)}
@@ -4707,7 +4707,7 @@ function MaterialPickerDialog({
           <select
             value={classFilter}
             onChange={(e) => { setClassFilter(e.target.value); }}
-            className="text-xs border border-border rounded px-2 py-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500 cursor-pointer w-36 shrink-0"
+            className="text-xs border border-border rounded px-2 py-1.5 bg-background focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer w-36 shrink-0"
             aria-label="Material class"
           >
             <option value="">All Classes</option>
@@ -5931,7 +5931,7 @@ function CostGuidePanel({
               <select
                 value={factoryDraft}
                 onChange={(e) => { setFactoryDraft(e.target.value); }}
-                className="w-full text-xs border border-border rounded px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500"
+                className="w-full text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-violet-500"
               >
                 {!factories && <option value={factoryDraft}>{factoryDraft}</option>}
                 {(factories ?? []).map((f) => (
@@ -5958,7 +5958,7 @@ function CostGuidePanel({
                 <select
                   value={selectedProcessGroup ?? ''}
                   onChange={(e) => { patchScenarioOverrides.mutate({ id: item.id, patch: { processGroup: e.target.value || null } }); }}
-                  className="w-full text-xs border border-border rounded px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500"
+                  className="w-full text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-violet-500"
                 >
                   {!selectedProcessGroup && <option value="">Select process…</option>}
                   {processGroupChoices.map((g) => (
@@ -5991,7 +5991,7 @@ function CostGuidePanel({
                   <select
                     value={scenarioCurrencyDraft}
                     onChange={(e) => { handleScenarioCurrencyChange(e.target.value); }}
-                    className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500 cursor-pointer"
+                    className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
                   >
                     {!currencies && <option value={scenarioCurrencyDraft}>{scenarioCurrencyDraft}</option>}
                     {(currencies ?? []).map((c) => (
@@ -6024,7 +6024,7 @@ function CostGuidePanel({
                   <select
                     value={rateTypeDraft}
                     onChange={(e) => { setRateTypeDraft(e.target.value as FxRateType); }}
-                    className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500 cursor-pointer"
+                    className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
                   >
                     <option value="reference">Reference (latest available FX rate)</option>
                     <option value="budget">Budget (admin-set rate)</option>
@@ -6040,7 +6040,7 @@ function CostGuidePanel({
                       placeholder={factoryCurrencyInfo ? `${factoryCurrencyInfo.code} → ${scenarioCurrencyDraft} rate` : 'rate'}
                       value={customRateDraft}
                       onChange={(e) => { setCustomRateDraft(e.target.value); }}
-                      className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500"
+                      className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-violet-500"
                     />
                   </div>
                 ) : null}
@@ -6051,7 +6051,7 @@ function CostGuidePanel({
                       type="text" placeholder="Required — e.g. contract-locked rate"
                       value={customReasonDraft}
                       onChange={(e) => { setCustomReasonDraft(e.target.value); }}
-                      className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500"
+                      className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-violet-500"
                     />
                   </div>
                 ) : null}
@@ -6107,7 +6107,7 @@ function CostGuidePanel({
                       placeholder="Target / quoted price"
                       value={askPriceDraft}
                       onChange={(e) => { setAskPriceDraft(e.target.value); }}
-                      className="w-full text-xs border border-border rounded pl-6 pr-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500"
+                      className="w-full text-xs border border-border rounded pl-6 pr-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-violet-500"
                     />
                   </div>
                 </div>
@@ -6185,7 +6185,7 @@ function CostGuidePanel({
                   }}
                   placeholder={selectedProcessGroup ? `Search ${selectedProcessGroup} materials…` : "Search raw materials database…"}
                   title="Select a material grade from the raw materials database"
-                  className="w-full text-xs border border-border rounded px-2.5 py-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500 pl-8 pr-24"
+                  className="w-full text-xs border border-border rounded px-2.5 py-1.5 bg-background focus:outline-hidden focus:ring-1 focus:ring-violet-500 pl-8 pr-24"
                 />
                 <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
                   <button
@@ -6298,7 +6298,7 @@ function CostGuidePanel({
                           if (e.key === 'Escape') cancelBlankThicknessEdit();
                         }}
                         placeholder={cadThicknessMm > 0 ? String(cadThicknessMm) : '—'}
-                        className="flex-1 text-xs border border-border rounded px-2.5 py-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500"
+                        className="flex-1 text-xs border border-border rounded px-2.5 py-1.5 bg-background focus:outline-hidden focus:ring-1 focus:ring-violet-500"
                       />
                       <span className="text-xs text-muted-foreground shrink-0">mm</span>
                     </>
@@ -6429,7 +6429,7 @@ function CostGuidePanel({
               <div className="flex items-center gap-2 py-0.5">
                 <span className="text-xs text-muted-foreground flex-1 min-w-0 truncate">Product Line</span>
                 <input type="text" value={productLine} onChange={(e) => { setProductLine(e.target.value); }} placeholder="—"
-                  className="text-xs text-right w-20 shrink-0 border border-border rounded px-1.5 py-0.5 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500" />
+                  className="text-xs text-right w-20 shrink-0 border border-border rounded px-1.5 py-0.5 bg-background focus:outline-hidden focus:ring-1 focus:ring-violet-500" />
               </div>
               <Row label="Model Number" value={item.partNumber ?? '—'} />
             </Section>
@@ -8352,7 +8352,7 @@ function MoldCavitiesSection({
       <div className="flex items-center gap-2 py-0.5">
         <span className="text-xs text-muted-foreground w-20 shrink-0">Cavities</span>
         <select
-          className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500 cursor-pointer"
+          className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
           value={override ?? ''}
           onChange={(e) => { onChange(e.target.value === '' ? null : Number(e.target.value)); }}
         >
@@ -8442,7 +8442,7 @@ function BlankStockSection({
         <div className="flex items-center gap-2 py-0.5">
           <span className="text-xs text-muted-foreground w-20 shrink-0">Stock Form</span>
           <select
-            className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500 cursor-pointer"
+            className="flex-1 text-xs border border-border rounded px-2 py-1 bg-background focus:outline-hidden focus:ring-1 focus:ring-violet-500 cursor-pointer"
             value={stockFormOverride ?? ''}
             onChange={(e) => { onStockFormChange(e.target.value === '' ? null : e.target.value); }}
           >
@@ -10588,7 +10588,7 @@ export default function ManufacturingIntelligencePage() {
         {needsFirstAnalysis && !refreshing && (
           <span className="absolute top-full left-1/2 -translate-x-1/2 mt-1 flex flex-col items-center gap-0.5 animate-bounce pointer-events-none z-20">
             <ArrowUp className="h-4 w-4 text-primary" />
-            <span className="text-[10px] font-semibold text-primary bg-background border border-primary/50 rounded px-1.5 py-0.5 shadow-sm whitespace-nowrap">
+            <span className="text-[10px] font-semibold text-primary bg-background border border-primary/50 rounded px-1.5 py-0.5 shadow-xs whitespace-nowrap">
               Click to analyze
             </span>
           </span>

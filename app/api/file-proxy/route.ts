@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+
 import { requireUser } from '@/lib/server/auth';
 import { fetchTrustedFile, isServableContentType, isTrustedStorageUrl, limitStream, UntrustedUrlError } from '@/lib/server/safe-fetch';
+import { resolveBomItemFileUrl } from '@/lib/utils/storage-file-url';
 
 /**
  * File Proxy API Route
@@ -22,9 +24,11 @@ import { fetchTrustedFile, isServableContentType, isTrustedStorageUrl, limitStre
  *   Mode B – let the proxy fetch the signed URL from backend (used by BalloonDiagramViewer):
  *     GET /api/file-proxy?itemId=<bomItemId>&fileType=2d|3d
  *     Requires Authorization header to be forwarded.
+ *
+ * Every destination passes the one trusted-storage rule (lib/server/safe-fetch:
+ * the project's own storage host, https, no credentials), redirects are never
+ * followed, and only documents, images and CAD models are relayed.
  */
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/v1/api';
 
 // Largest file the proxy will relay (bytes); CAD models are the big ones.
 const MAX_PROXY_BYTES = Number(process.env.FILE_PROXY_MAX_BYTES ?? 200 * 1024 * 1024);
@@ -42,14 +46,15 @@ export async function GET(request: NextRequest) {
 
         // ── Mode A: caller already has the signed URL ─────────────────────────────
         if (directUrl) {
-            const decoded = decodeURIComponent(directUrl);
-            if (!isTrustedStorageUrl(decoded)) {
+            // URLSearchParams already decoded the query wrapper. Decoding again
+            // changes escaped object names and invalidates signed URLs.
+            if (!isTrustedStorageUrl(directUrl)) {
                 return NextResponse.json(
-                    { error: 'URL host is not in the trusted storage allowlist' },
+                    { error: 'URL must use HTTPS on a trusted storage host without credentials' },
                     { status: 400 },
                 );
             }
-            fileUrl = decoded;
+            fileUrl = directUrl;
         }
         // ── Mode B: fetch signed URL from NestJS backend ───────────────────────────
         else if (itemId) {
@@ -60,39 +65,18 @@ export async function GET(request: NextRequest) {
                 );
             }
 
-            const authHeader = request.headers.get('Authorization') ?? '';
-            const signedUrlRes = await fetch(
-                `${BACKEND_URL}/bom-items/${itemId}/file-url/${fileType}`,
-                {
-                    headers: {
-                        Authorization: authHeader,
-                        'Content-Type': 'application/json',
-                    },
-                },
+            const resolved = await resolveBomItemFileUrl(
+                itemId,
+                fileType,
+                request.headers.get('Authorization') ?? '',
             );
-
-            if (!signedUrlRes.ok) {
-                const errorText = await signedUrlRes.text().catch(() => signedUrlRes.statusText);
+            if (!resolved.ok) {
                 return NextResponse.json(
-                    { error: `Backend returned ${signedUrlRes.status}`, details: errorText },
-                    { status: signedUrlRes.status },
+                    { error: resolved.error, details: resolved.details },
+                    { status: resolved.status },
                 );
             }
-
-            const signedUrlData = await signedUrlRes.json();
-            fileUrl =
-                signedUrlData?.url ??
-                signedUrlData?.downloadUrl ??
-                signedUrlData?.fileUrl ??
-                signedUrlData?.signedUrl ??
-                signedUrlData?.data?.url;
-
-            if (!fileUrl) {
-                return NextResponse.json(
-                    { error: 'Backend did not return a file URL' },
-                    { status: 502 },
-                );
-            }
+            fileUrl = resolved.url;
         } else {
             return NextResponse.json(
                 { error: 'Provide either "url" or "itemId" query parameter' },
@@ -100,15 +84,17 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        // ── Fetch the file bytes server-side (trusted host only, redirects re-checked) ──
+        // ── Fetch the file bytes server-side (trusted host only, no redirects) ──────
         let fileRes: Response;
         try {
             fileRes = await fetchTrustedFile(fileUrl, {
+                maxRedirects: 0, // A trusted host must not redirect us anywhere.
                 headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Mithran-FileProxy/1.0)' },
             });
         } catch (e) {
+            // The destination was checked above, so a refusal here is a redirect.
             if (e instanceof UntrustedUrlError) {
-                return NextResponse.json({ error: 'File URL is not on the trusted storage host' }, { status: 400 });
+                return NextResponse.json({ error: 'Storage redirects are not allowed' }, { status: 502 });
             }
             throw e;
         }

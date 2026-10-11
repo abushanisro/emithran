@@ -300,7 +300,7 @@ export default function MHRDetailPage() {
         </Card>
 
         {/* MHR */}
-        <Card className="border-2 border-primary bg-gradient-to-br from-primary/5 to-primary/10">
+        <Card className="border-2 border-primary bg-linear-to-br from-primary/5 to-primary/10">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-semibold text-primary uppercase tracking-wide">MHR ({currSym}/hr)</CardTitle>
           </CardHeader>
@@ -336,7 +336,7 @@ export default function MHRDetailPage() {
         </Card>
 
         {/* LHR */}
-        <Card className="border-2 border-blue-400 bg-gradient-to-br from-blue-50/50 to-blue-100/30 dark:from-blue-950/30 dark:to-blue-900/20">
+        <Card className="border-2 border-blue-400 bg-linear-to-br from-blue-50/50 to-blue-100/30 dark:from-blue-950/30 dark:to-blue-900/20">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-semibold text-blue-600 uppercase tracking-wide">LHR (Labour)</CardTitle>
           </CardHeader>
@@ -588,7 +588,7 @@ export default function MHRDetailPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-2 border-primary bg-gradient-to-br from-primary/5 to-primary/10">
+          <Card className="border-2 border-primary bg-linear-to-br from-primary/5 to-primary/10">
             <CardHeader className="pb-2 bg-primary/10"><CardTitle className="text-base font-bold">Final MHR Calculation</CardTitle></CardHeader>
             <CardContent className="space-y-1 text-sm">
               <div className="flex justify-between"><span>Machine Operating Cost</span><span className="font-semibold">{fmtLocal(calc.totalOperatingCostPerHour)}</span></div>

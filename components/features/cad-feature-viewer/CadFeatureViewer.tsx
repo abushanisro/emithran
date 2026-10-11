@@ -57,8 +57,8 @@ export function CadFeatureViewer({ fileUrl, faceMap, faceIds, axes = [] }: CadFe
   const focusBounds = focus.on === 'feature' && selection?.bounds ? selection.bounds : partBounds;
 
   return (
-    <div className="relative h-full w-full bg-gradient-to-b from-[#e6f0e7] to-[#b4d2b7]">
-      <div className="absolute left-2 top-2 z-10 flex items-center gap-1 rounded border border-[#c4cfc6] bg-[#f3f6f3]/95 p-1 shadow-sm">
+    <div className="relative h-full w-full bg-linear-to-b from-[#e6f0e7] to-[#b4d2b7]">
+      <div className="absolute left-2 top-2 z-10 flex items-center gap-1 rounded border border-[#c4cfc6] bg-[#f3f6f3]/95 p-1 shadow-xs">
         <ToolButton title="Home — fit the whole part" onClick={() => { setFocus((f) => ({ on: 'part', nonce: f.nonce + 1 })); }}>
           <Home className="h-4 w-4" />
         </ToolButton>

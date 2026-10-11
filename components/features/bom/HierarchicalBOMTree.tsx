@@ -113,7 +113,7 @@ export function HierarchicalBOMTree({
         <div 
           className={`group border rounded-lg cursor-pointer transition-all ${
             isSelected 
-              ? 'bg-primary/10 border-primary/30 shadow-sm ring-1 ring-primary/20' 
+              ? 'bg-primary/10 border-primary/30 shadow-xs ring-1 ring-primary/20' 
               : 'hover:bg-card/80 hover:border-border/60 border-border/20'
           }`}
           onClick={() => onItemSelect(item)}

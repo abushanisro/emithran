@@ -51,25 +51,28 @@ export class OrganizationContextGuard implements CanActivate {
       throw new ForbiddenException('This account is not a member of any organization.');
     }
 
+    // Explicit selection must be validated even for a single membership:
+    // never silently replace a requested organization with a different one.
+    const requestedOrgId = request.headers['x-organization-id'];
+    if (requestedOrgId !== undefined) {
+      if (typeof requestedOrgId !== 'string' || !requestedOrgId) {
+        throw new BadRequestException('X-Organization-Id must be a non-empty string.');
+      }
+      if (!orgIds.includes(requestedOrgId)) {
+        throw new ForbiddenException('You are not a member of the requested organization.');
+      }
+      request.organizationId = requestedOrgId;
+      return true;
+    }
+
     if (orgIds.length === 1) {
       request.organizationId = orgIds[0];
       return true;
     }
 
-    // Multiple active memberships — require an explicit choice rather than
-    // silently defaulting to "the first one", since that would non-obviously
-    // hide the other organization's data from the caller.
-    const requestedOrgId = request.headers['x-organization-id'];
-    if (!requestedOrgId || typeof requestedOrgId !== 'string') {
-      throw new BadRequestException(
-        'This account belongs to multiple organizations — specify which one via the X-Organization-Id header.',
-      );
-    }
-    if (!orgIds.includes(requestedOrgId)) {
-      throw new ForbiddenException('You are not a member of the requested organization.');
-    }
-
-    request.organizationId = requestedOrgId;
-    return true;
+    // Multiple active memberships require an explicit choice.
+    throw new BadRequestException(
+      'This account belongs to multiple organizations — specify which one via the X-Organization-Id header.',
+    );
   }
 }

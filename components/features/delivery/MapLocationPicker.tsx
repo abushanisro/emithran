@@ -206,7 +206,7 @@ export default function MapLocationPicker({
               ref={searchRef}
               type="text"
               placeholder="Search for an address or place…"
-              className="w-full pl-9 pr-4 py-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+              className="w-full pl-9 pr-4 py-2 text-sm border rounded-md bg-background focus:outline-hidden focus:ring-2 focus:ring-ring focus:border-transparent"
             />
           </div>
         </div>
@@ -230,14 +230,14 @@ export default function MapLocationPicker({
 
           {/* Loading overlay */}
           {!mapReady && (
-            <div className="absolute inset-0 flex items-center justify-center bg-muted/80 backdrop-blur-sm">
+            <div className="absolute inset-0 flex items-center justify-center bg-muted/80 backdrop-blur-xs">
               <p className="text-sm text-muted-foreground animate-pulse">Loading map…</p>
             </div>
           )}
 
           {/* Hint pill */}
           {mapReady && !selectedPlace && (
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-background/90 backdrop-blur-sm text-xs px-3 py-1.5 rounded-full shadow border pointer-events-none whitespace-nowrap">
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-background/90 backdrop-blur-xs text-xs px-3 py-1.5 rounded-full shadow-sm border pointer-events-none whitespace-nowrap">
               Click anywhere on the map to drop a pin
             </div>
           )}

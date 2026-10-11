@@ -44,7 +44,7 @@ export function CadEvidencePanel({
   const { highlight } = evidence;
   const faceIds = useMemo(() => highlight?.node.occurrences.flatMap((o) => o.face_ids) ?? [], [highlight]);
   return (
-    <div className="fixed top-16 left-4 z-[60] w-[480px] rounded-lg border border-border bg-background shadow-xl flex flex-col">
+    <div className="fixed top-16 left-4 z-60 w-[480px] rounded-lg border border-border bg-background shadow-xl flex flex-col">
       <div className="flex items-center justify-between p-3 border-b border-border">
         <div>
           <h3 className="font-semibold text-sm">CAD evidence: {evidence.fieldLabel}</h3>
