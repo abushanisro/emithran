@@ -1,5 +1,7 @@
 import { NextRequest } from "next/server";
 
+import { getAuthenticatedUser } from "@/lib/database/supabase-server";
+
 const CAD_ENGINE_URL = process.env.CAD_ENGINE_URL ?? "http://localhost:5000";
 const CAD_ENGINE_API_KEY = process.env.CAD_ENGINE_API_KEY ?? "";
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -9,6 +11,14 @@ export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await getAuthenticatedUser();
+    if (!auth) {
+      return new Response(JSON.stringify({ error: "Authentication required" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
     const body = await request.json();
 
     // Validate required fields
@@ -19,14 +29,14 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Forward the auth token so the CAD engine can call the NestJS backend
-    // for scenario simulation tools. The JWT is the same one the frontend uses.
-    const authToken = request.headers.get("Authorization")?.replace("Bearer ", "") ?? "";
-
+    // Forward the verified session token so the CAD engine can call the NestJS
+    // backend for scenario simulation tools. Identity, backend destination and
+    // token come from the server, never from the request body.
     const cadPayload = {
       ...body,
+      userId: auth.user.id,
       backendUrl: BACKEND_URL,
-      authToken,
+      authToken: auth.accessToken,
     };
 
     const cadResponse = await fetch(`${CAD_ENGINE_URL}/copilot/chat`, {
