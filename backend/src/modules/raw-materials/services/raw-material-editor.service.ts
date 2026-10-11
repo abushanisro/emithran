@@ -35,7 +35,7 @@ export class RawMaterialEditorService {
     if (unknown.length > 0) throw new BadRequestException(`Material has no property: ${unknown.join(', ')}`);
 
     // Writes need the service role: the tables are read-only for signed-in users (RLS).
-    const db = this.supabase.getPrivilegedClient(`raw-material-editor: save ${id}`);
+    const db = this.supabase.getPrivilegedClient('raw-material-editor: save validated material via transaction RPC');
     const { error } = await db.rpc('save_raw_material_editor', {
       p_material_id: id,
       p_core: dto.core,
