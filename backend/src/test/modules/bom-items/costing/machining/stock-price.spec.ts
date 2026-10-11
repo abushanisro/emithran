@@ -8,7 +8,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { machiningStockPriceForm, resolveStockPrice, type StockPriceRow } from '../../../../../modules/bom-items/costing/machining/stock-price';
 
-const CSV = join(__dirname, '../../../../../../../memory/Plastic Modeling/machine/India/raw_material_stock_costs.csv');
+const CSV = join(__dirname, '../../../../../../../memory/plastic modeling/machine/India/raw_material_stock_costs.csv');
 const FORMS: Record<string, string> = {
   Hex_Bar_USD_per_kg: 'hex_bar', Plate_USD_per_kg: 'plate', Rectangular_Bar_USD_per_kg: 'rectangular_bar',
   Round_Bar_USD_per_kg: 'round_bar', Round_Tube_USD_per_kg: 'round_tube', Square_Bar_USD_per_kg: 'square_bar',
