@@ -36,6 +36,34 @@ describe('OrganizationContextGuard', () => {
     expect(request).toHaveProperty('organizationId', 'org-1');
   });
 
+  it('rejects an explicit foreign organization even for a single membership', async () => {
+    const guard = new OrganizationContextGuard(makeSupabaseService([{ organization_id: 'org-1' }]));
+    const request = { user: { id: 'user-1' }, headers: { 'x-organization-id': 'org-2' } };
+    await expect(guard.canActivate(makeContext(request))).rejects.toThrow(ForbiddenException);
+    expect(request).not.toHaveProperty('organizationId');
+  });
+
+  it('accepts an explicit matching organization for a single membership', async () => {
+    const guard = new OrganizationContextGuard(makeSupabaseService([{ organization_id: 'org-1' }]));
+    const request = { user: { id: 'user-1' }, headers: { 'x-organization-id': 'org-1' } };
+    await expect(guard.canActivate(makeContext(request))).resolves.toBe(true);
+    expect(request).toHaveProperty('organizationId', 'org-1');
+  });
+
+  it.each(['', ['org-1']])('rejects a malformed supplied organization header: %p', async (header) => {
+    const guard = new OrganizationContextGuard(makeSupabaseService([{ organization_id: 'org-1' }]));
+    const request = { user: { id: 'user-1' }, headers: { 'x-organization-id': header } };
+    await expect(guard.canActivate(makeContext(request))).rejects.toThrow(BadRequestException);
+    expect(request).not.toHaveProperty('organizationId');
+  });
+
+  it('fails closed if the organization lookup fails', async () => {
+    const guard = new OrganizationContextGuard(makeSupabaseService([], { message: 'lookup failed' }));
+    const request = { user: { id: 'user-1' }, headers: {} };
+    await expect(guard.canActivate(makeContext(request))).rejects.toThrow(ForbiddenException);
+    expect(request).not.toHaveProperty('organizationId');
+  });
+
   it('requires an X-Organization-Id header when the user has multiple memberships', async () => {
     const guard = new OrganizationContextGuard(
       makeSupabaseService([{ organization_id: 'org-1' }, { organization_id: 'org-2' }]),

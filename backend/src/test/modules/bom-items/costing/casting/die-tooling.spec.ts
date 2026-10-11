@@ -25,13 +25,13 @@ const rows: DieToolingRows = {
   variables: csv('Die Casting/Die casting_variables.csv').map((r) => ({ key: String(r['Variable Name']), value: r['String Value'] })),
   lookups: Object.fromEntries(DIE_TOOLING_LOOKUP_KEYS.map((k) => [k, csv(`Die Casting/Lookup/${k}.csv`)])),
   toolShop: {
-    digital_factory_settings_usa: csv('Plastic Modeling/process/digital_factory_settings_usa.csv'),
-    digital_factory_tool_materials_usa: csv('Plastic Modeling/process/digital_factory_tool_materials_usa.csv'),
+    digital_factory_settings_usa: csv('plastic modeling/process/digital_factory_settings_usa.csv'),
+    digital_factory_tool_materials_usa: csv('plastic modeling/process/digital_factory_tool_materials_usa.csv'),
   },
 };
 const variable = (k: string) => Number(csv('Die Casting/Die casting_variables.csv').find((r) => r['Variable Name'] === k)!['String Value']);
-const shop = csv('Plastic Modeling/process/digital_factory_settings_usa.csv').find((r) => r['name'] === 'Default')!;
-const h13 = csv('Plastic Modeling/process/digital_factory_tool_materials_usa.csv').find((r) => r['name'] === 'AISI H13')!;
+const shop = csv('plastic modeling/process/digital_factory_settings_usa.csv').find((r) => r['name'] === 'Default')!;
+const h13 = csv('plastic modeling/process/digital_factory_tool_materials_usa.csv').find((r) => r['name'] === 'AISI H13')!;
 
 describe('die tooling reference', () => {
   it('resolves every die-casting variable, lookup and the Default tool shop', () => {
