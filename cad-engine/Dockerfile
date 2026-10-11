@@ -57,6 +57,7 @@ RUN echo "# CAD Engine Configuration" > .env && \
     echo "PORT=5000" >> .env && \
     echo "LOG_LEVEL=INFO" >> .env && \
     echo "ENVIRONMENT=production" >> .env && \
+    echo "NODE_ENV=production" >> .env && \
     echo "MAX_FILE_SIZE_MB=50" >> .env && \
     echo "RATE_LIMIT_PER_MINUTE=10" >> .env && \
     echo "LINEAR_DEFLECTION=0.1" >> .env && \

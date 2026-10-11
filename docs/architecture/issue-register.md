@@ -8,15 +8,19 @@ Baseline: `7ea13f68895b6bcb3249c431d49cb61fc8619f8c`, 2026-10-11. No secret valu
 |---|---|---|---|---|
 | EA-001 | Critical | Confirmed history; rotation unverified | BLOCKED | historical Supabase service credential |
 | EA-002 | High | Confirmed repo code/policies; live unverified | BLOCKED | delivery/QC cross-tenant privileged/direct DB access |
-| EA-003 | High | Confirmed | BLOCKED | credential assignments in tracked CAD env files |
+| EA-003 | High | Confirmed | PARTIAL — removed from tree; rotation BLOCKED (owner) | credential assignments in tracked CAD env files |
 | EA-004 | High | Confirmed code; live redirect exploit unverified | FIXED / unit-verified | file-proxy destination boundary bypass |
-| EA-005 | High | Confirmed | BLOCKED | CAD proxy/memory endpoint authentication gaps |
-| EA-006 | High | Confirmed advisories; reachability unassessed | Approval needed | vulnerable dependency baseline |
+| EA-005 | High | Confirmed | FIXED / CAD runtime-verified, Next unit-verified; live Supabase check pending | CAD proxy/memory endpoint authentication gaps |
+| EA-006 | High | Confirmed advisories; reachability unassessed | PARTIAL — runtime fixes applied; dev-tooling majors remain | vulnerable dependency baseline |
 | EA-007 | Medium | Confirmed | FIXED / unit-verified | single-org guard ignores explicit foreign org |
 | EA-008 | Medium | Confirmed | FIXED / full-suite verified | case-sensitive manufacturing reference paths |
 | EA-009 | Medium | Confirmed | FIXED / CI-check verified | RLS-boundary CI violation |
 | EA-010 | Medium | Confirmed | BLOCKED | production/CAD/integration verification gaps |
 | EA-011 | Low | Confirmed | Deferred | lint debt and missing unit suites in CI |
+| EA-012 | High | Confirmed code; live exploit unverified | FIXED / unit-verified | unauthenticated server-side fetch of caller-supplied URL in VAVE drawing proxy |
+| EA-013 | Low | Confirmed | FIXED / runtime-verified | CAD image's baked `ENVIRONMENT=production` is not read by `AppConfig` |
+| EA-014 | High | Confirmed code | FIXED / unit-verified | copilot engineering memory shared across all users and tenants |
+| EA-015 | Medium | Confirmed code; runtime unverified | Open | RFQ email attaches BOM files by storage path |
 
 ## EA-001 — historical privileged credential
 
@@ -44,6 +48,7 @@ Baseline: `7ea13f68895b6bcb3249c431d49cb61fc8619f8c`, 2026-10-11. No secret valu
 - Root cause/impact: runtime secrets in source expose service authority to clones/history copies.
 - Fix/mitigation: owner rotates; move values to approved secret injection/untracked files and value-free examples after checking startup/Docker consumers.
 - Verification/risk: history/presence scan and real CAD key/startup tests. Removing a file is not revocation; deployment compatibility requires approval.
+- Fix (done): nothing loads these files (`load_dotenv()` reads `.env`, compose uses `env_file: .env`, `.dockerignore` and root `.gitignore` exclude them; they were force-added). The three credential values are now empty in place; non-secret settings kept. Metadata scan: 0 nonempty secret assignments in any tracked env file. Values remain in git history, so owner rotation is still required.
 
 ## EA-004 — file-proxy destination boundary
 
@@ -57,20 +62,23 @@ Baseline: `7ea13f68895b6bcb3249c431d49cb61fc8619f8c`, 2026-10-11. No secret valu
 
 ## EA-005 — CAD authentication gaps
 
-**The server key does not protect every path to CAD authority.**
+**The server key did not protect every path to CAD authority, and Next proxies forwarded it for anonymous callers.**
 
-- Location/reproduction: `app/api/cad/route.ts:POST` forwards key without caller auth; `cad-engine/main.py:get_memory_usage_report/optimize_memory_only` omit `Security(require_api_key)`. Next `proxy.ts` never rejects anonymous server requests.
-- Root cause/impact: inconsistent boundary auth exposes compute/resources without verified identity; runtime exploit verification blocked by missing OCC stack.
-- Fix/mitigation: verified caller-auth transport in Next, existing key dependency on Python compute/report routes; approved ingress restrictions meanwhile.
-- Verification/risk: invalid/missing/valid identity tests through actual runtimes; confirm current callers and cookie/token contracts before compatibility changes.
+- Root cause: auth attached per route by hand in `cad-engine` (one router carried a divergent copy that did not fail closed), and no Next API route verified caller identity.
+- Fix (CAD engine): `main.py` registers the copilot and drawing routers with `dependencies=[Security(require_api_key)]` and adds it to both memory routes; duplicate `copilot/router.py:_require_api_key` removed. Verified with `TestClient` against the real app (scratch conda env, `pythonocc-core` 7.7.2): key set → 403 for missing/wrong key; production with no key → 503; development with no key → open (unchanged); `/health` public.
+- Fix (Next): `getAuthenticatedUser()` in `lib/database/supabase-server.ts` verifies the existing Supabase cookie session with `auth.getUser()` (Auth-server validation, not local JWT decode) via the existing `createServerSupabaseClient()`. `/api/cad`, `/api/vave/drawing-analysis`, `/api/manufacturing-copilot/chat` return 401 before any upstream call when it is null. Cookie session chosen on evidence: sessions are cookie-based (`createBrowserClient` + `proxy.ts` refresh), `AppLayout` redirects every dashboard page to `/auth` without a user, every caller is a same-origin dashboard fetch, and no `auth`/`demo`/`developer` page uses these routes, so no client change is needed.
+- Verification: 17 route tests + 4 helper tests (14 route tests fail on the original code); frontend 254/254, `tsc` clean, production build 220 pages. Remaining: one live sign-in → STEP view/copilot/VAVE analysis smoke test against a real Supabase project.
+- Regression risk: `getUser()` adds one Auth round trip per call on these compute/LLM routes; Auth outage now returns 401 instead of proceeding.
+
 
 ## EA-006 — dependency advisories
 
-**Critical/high advisories predate this PR; no package versions changed.**
+**Locked dependency versions carried known advisories.**
 
-- Reproduction: root/backend `npm audit --json`: 26 (3 critical/15 high) and 47 (2 critical/39 high). Not a unique union or GitHub alert count.
-- Root cause/impact: vulnerable locked dependency versions; application reachability not yet established.
-- Fix/verification/risk: approve targeted upgrades, use package manager, re-audit and run contract/runtime tests. No automatic `audit fix` or new/version-changed dependency without approval.
+- Fix (done, owner-approved): `npm audit fix` without `--force` in root and backend (lockfile only, 125 packages changed, 0 major bumps; `next` 16.3.2 → 16.4.0, backend `axios` 1.20.0, `multer` 2.4.0). Backend `nodemailer` ^9.0.5 → ^10.1.0, the only runtime package whose advisories required a major: v10's sole breaking change is Node ≥ 20 (backend Dockerfiles and `.nvmrc` are Node 20); `createTransport`/`SendMailOptions` usage verified with a real v10 message build.
+- Result: root 26 → 17 (critical 3 → 2), backend 47 → 38 (critical 2 → 0). Backend 1,783/1,783, backend build, frontend 254/254 and production build pass.
+- Remaining (decision): all remaining high/critical findings are dev/test tooling requiring majors — root `vitest` 5, `tailwindcss` 4, `eslint-config-next`, `shx`; backend `jest` 30 / `@types/jest` 30. Each is a migration (config/API changes), not a lockfile bump, and none ships in the runtime bundle.
+
 
 ## EA-007 — explicit organization selection
 
@@ -112,3 +120,35 @@ Baseline: `7ea13f68895b6bcb3249c431d49cb61fc8619f8c`, 2026-10-11. No secret valu
 - Location/reproduction: `.github/workflows/ci.yml`, root `npm run lint` (44,225 diagnostics); backend lint scripts only echo skip messages.
 - Root cause/impact: build-only coverage misses real-data regressions; lint debt is not proof every diagnostic is a runtime bug.
 - Fix/verification/risk: restore suites then add real CI test runs; bounded substantive lint remediation, no broad reformat or disabled rules. Validate on CI's Node/conda versions.
+
+## EA-012 — VAVE drawing proxy URL fetch
+
+**An anonymous caller could make the Next server fetch an arbitrary URL.**
+
+- Evidence: `BOMExplorer.tsx` imports `drawingUrl = file2dPath ?? drawing_url`; `file2dPath` is `FileStorageService.generateStoragePath` output (`{user}/{project}/bom-items/{bomItemId}/{2d|3d}/{ts}_{name}`), a storage path, not a URL. `fetch()` of that relative path throws, so the imported-item path was also functionally broken; `CreateVaveItemDto.drawingUrl` accepts any string.
+- Fix: `isTrustedUrl` and file-proxy Mode B extracted to `lib/utils/storage-file-url.ts` (`isTrustedStorageUrl`, `parseBomItemStoragePath`, `resolveBomItemFileUrl`), used by both routes. VAVE route (now authenticated) accepts a BOM-item storage path — resolved through backend `GET /bom-items/:id/file-url/2d` as the caller, which loads the item under RLS and signs its own stored path — or a trusted HTTPS storage URL; everything else is 400. Redirects are never followed.
+- Verification: loopback/metadata/untrusted/credentialed/`file:` URLs rejected without fetching; path resolution uses the session bearer; backend denial propagated; untrusted backend URL rejected; storage redirect refused; base64 path unchanged; file-proxy's 15 EA-004 tests unchanged and passing.
+- Behaviour note: a path resolves to the BOM item's current 2D file, which differs from the imported path only if the drawing was replaced after import.
+- Related, resolved: copilot `backendUrl` is set from server config in the Next proxy (overriding the client body) and the CAD route is key-gated, so a browser cannot choose it.
+
+
+## EA-013 — CAD image environment variable
+
+**`cad-engine/Dockerfile` wrote `ENVIRONMENT=production`, but `shared/config.py` reads `NODE_ENV`.**
+
+- Fix: the baked `.env` also sets `NODE_ENV=production` (`ENVIRONMENT` kept; `copilot/router.py` reads it). `load_dotenv()` never overrides an existing variable, so Railway/root compose (explicit `NODE_ENV`) are unchanged, and dev compose mounts `.:/app`, hiding the baked file.
+- Verification with the exact baked `.env`: no process `NODE_ENV` → production, keyless request 503 (was development / open); explicit `NODE_ENV=development` still wins.
+
+## EA-014 — copilot memory tenancy
+
+**Every copilot user shared one engineering memory.**
+
+- Root cause: `CopilotPanel` never sends `userId`, so `copilot/memory.py` keyed all memory under `anonymous__default`; the Next proxy also took identity/token from the request.
+- Fix: the Next proxy sets `userId` from the verified session user and `authToken` from the verified session, overriding any body values.
+- Follow-up (owner): existing shared memory files may remain in `COPILOT_MEMORY_DIR` (default `/tmp/copilot_memory`) on the CAD host until redeploy; remove `anonymous__*` there.
+
+## EA-015 — RFQ email attachments
+
+**`rfq-email.service.ts:prepareFileAttachments` passes `file2dPath`/`file3dPath` (storage object paths) to nodemailer as `path`, which nodemailer reads from the local filesystem or over HTTP.**
+
+- Impact: attachments resolve against the backend container's filesystem instead of storage, so RFQ sends with files likely fail. Not changed: requires choosing signed-URL vs downloaded-buffer attachments and size limits for multi-file RFQs.

@@ -210,12 +210,6 @@ def _save_cf_to_disk(gh: str, cf: Dict[str, Any]) -> None:
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# Manufacturing Copilot routes (Groq-powered, streaming SSE)
-app.include_router(copilot_router, prefix="/copilot", tags=["copilot"])
-
-# 2D Drawing analysis (Groq vision + PyMuPDF PDF rendering)
-app.include_router(drawing_router, prefix="/drawing", tags=["drawing"])
-
 # ============================================================================
 # API KEY AUTHENTICATION
 # ============================================================================
@@ -234,6 +228,12 @@ async def require_api_key(api_key: str = Security(_api_key_header)):
         return  # key not configured — open only outside production (dev mode)
     if api_key != _CAD_API_KEY:
         raise HTTPException(status_code=403, detail="Invalid or missing API key")
+
+# Manufacturing Copilot routes (Groq-powered, streaming SSE)
+app.include_router(copilot_router, prefix="/copilot", tags=["copilot"], dependencies=[Security(require_api_key)])
+
+# 2D Drawing analysis (Groq vision + PyMuPDF PDF rendering)
+app.include_router(drawing_router, prefix="/drawing", tags=["drawing"], dependencies=[Security(require_api_key)])
 
 # ============================================================================
 # MIDDLEWARE
@@ -931,7 +931,10 @@ async def nest_true_shape(
 
 
 @app.get("/memory/usage-report")
-async def get_memory_usage_report(request: Request) -> Dict[str, Any]:
+async def get_memory_usage_report(
+    request: Request,
+    _auth: None = Security(require_api_key),
+) -> Dict[str, Any]:
     """
     Get comprehensive memory usage and performance report
     
@@ -971,7 +974,8 @@ async def get_memory_usage_report(request: Request) -> Dict[str, Any]:
 async def optimize_memory_only(
     request: Request,
     file: UploadFile = File(...),
-    strategy: str = Form("balanced")
+    strategy: str = Form("balanced"),
+    _auth: None = Security(require_api_key),
 ) -> Dict[str, Any]:
     """
     Memory-focused optimization without full DFM analysis
