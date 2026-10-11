@@ -24,9 +24,9 @@ const { readCsv } = require('../../../../../../migrations/scripts/lib/memory-mac
 const MEM = join(__dirname, '../../../../../../../memory');
 const csv = (rel: string): Array<Record<string, any>> => readCsv(join(MEM, rel)).rows;
 
-const capability = resolveCapabilityTable(csv('Machining/lookup/tblGtolProcessCapabilities.csv'));
+const capability = resolveCapabilityTable(csv('machining/lookup/tblGtolProcessCapabilities.csv'));
 const iso = resolveIsoTable(csv('Standards/lookup/iso286_standard_tolerances.csv'));
-const links = resolveOperationLinks(csv('Machining/lookup/operation_capability_process.csv'));
+const links = resolveOperationLinks(csv('machining/lookup/operation_capability_process.csv'));
 const calculators = specAsCalculators();
 const reamTable = readMachiningMemoryCsv('lookup/tblReaming.csv').map((r) => ({
   ...r, Hardness: Number(r['Hardness']), DiameterMm: Number(r['DiameterMm']),
