@@ -12,7 +12,7 @@ import {
 const { readCsv } = require('../../../../../../migrations/scripts/lib/memory-machine-seed.js');
 const MEM = join(__dirname, '../../../../../../../memory');
 const iso = resolveIsoTable(readCsv(join(MEM, 'Standards/lookup/iso286_standard_tolerances.csv')).rows);
-const capRows: Array<Record<string, any>> = readCsv(join(MEM, 'Machining/lookup/tblGtolProcessCapabilities.csv')).rows;
+const capRows: Array<Record<string, any>> = readCsv(join(MEM, 'machining/lookup/tblGtolProcessCapabilities.csv')).rows;
 const capability = resolveCapabilityTable(capRows);
 const row = (p: string, c: string) => capRows.find((r) => r['Process'] === p && r['GtolCategory'] === c)!;
 
