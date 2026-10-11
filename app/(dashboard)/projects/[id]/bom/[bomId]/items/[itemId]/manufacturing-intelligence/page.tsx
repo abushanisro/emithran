@@ -72,7 +72,7 @@ import { effectiveProcessGroupOf , optionsKeepingSelection } from '@/lib/process
 import { useFactoryCurrency, useFactories, useCurrencies, useFxRate, useRefreshFxRate, useFxRateOnDemand, type FxRateType } from '@/lib/api/hooks/useFx';
 import { useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculatorMappings';
 import { useSmLookupTables, type ReferenceTable } from '@/lib/api/hooks/useProcesses';
-import { useRawMaterials } from '@/lib/api/hooks/useRawMaterials';
+import { useRawMaterials, useRawMaterialFilterOptions } from '@/lib/api/hooks/useRawMaterials';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import type { RawMaterial } from '@/lib/api/hooks/useRawMaterials';
 import { useCreateRawMaterialCost, useRawMaterialCosts } from '@/lib/api/hooks/useRawMaterialCosts';
@@ -4565,6 +4565,10 @@ function MaterialPickerDialog({
 }) {
   const [search, setSearch] = useState('');
   const [groupFilter, setGroupFilter] = useState('');
+  const [classFilter, setClassFilter] = useState('');
+  // The part's process limits the list to its linked material groups (migration 879);
+  // this switch lifts that so every process group is available.
+  const [showAllGroups, setShowAllGroups] = useState(false);
   const [selected, setSelected] = useState<RawMaterial | null>(null);
 
   // Search is ranked SERVER-side (GET /raw-materials?search=) by the same
@@ -4578,20 +4582,29 @@ function MaterialPickerDialog({
   const { debouncedValue: debouncedSearch } = useDebounce(search.trim(), 250);
   const isSearching = debouncedSearch.length > 0;
 
-  // Full catalog (cached): the un-searched browse view and the source of the
-  // Group filter list (which must not shrink to the current search's groups).
-  const scope = processGroup ? { processGroup } : {};
-  const { data: catalog, isLoading: catalogLoading } = useRawMaterials(open ? { limit: 1000, ...scope } : undefined);
+  // Group and class are filtered by the server (the whole catalog is more than one
+  // page), and their option lists come from the catalog's own filter options so a
+  // chosen filter never shrinks the list it was chosen from.
+  const { data: filterOptions } = useRawMaterialFilterOptions();
+  const scope = processGroup && !showAllGroups ? { processGroup } : {};
+  const serverFilters = {
+    ...scope,
+    ...(groupFilter ? { materialGroup: groupFilter } : {}),
+    ...(classFilter ? { materialClass: classFilter } : {}),
+  };
+  const { data: catalog, isLoading: catalogLoading } = useRawMaterials(open ? { limit: 1000, ...serverFilters } : undefined);
   const { data: searchData, isFetching: searchFetching } = useRawMaterials(
-    isSearching ? { search: debouncedSearch, limit: 1000, ...scope } : undefined,
+    isSearching ? { search: debouncedSearch, limit: 1000, ...serverFilters } : undefined,
     { enabled: open && isSearching, keepPrevious: true },
   );
   const isLoading = isSearching ? searchFetching && !searchData : catalogLoading;
   const materials: RawMaterial[] = isSearching ? (searchData?.items ?? []) : (catalog?.items ?? []);
+  const linkedGroups = catalog?.processMaterialGroups ?? [];
+  const groups = scope.processGroup && linkedGroups.length > 0 ? linkedGroups : (filterOptions?.materialGroups ?? []);
+  const classes = filterOptions?.materialClasses ?? [];
+  const total = isSearching ? (searchData?.total ?? materials.length) : (catalog?.total ?? materials.length);
 
-  const groups = Array.from(new Set((catalog?.items ?? []).map((m) => m.materialGroup).filter(Boolean))).sort();
-
-  const filtered = materials.filter((m) => !groupFilter || m.materialGroup === groupFilter);
+  const filtered = materials;
 
   const MATCH_TIER_LABEL: Record<string, string> = {
     exact: 'Exact',
@@ -4658,11 +4671,17 @@ function MaterialPickerDialog({
         <DialogHeader className="px-5 pt-4 pb-3 border-b shrink-0">
           <DialogTitle>Material Database</DialogTitle>
           <p className="text-xs text-muted-foreground">Click a row to view all properties, then apply to this BOM item.</p>
-          {processGroup && catalog?.processMaterialGroups && (
-            <p className="text-xs text-muted-foreground">
-              {catalog.processMaterialGroups.length > 0
-                ? <>Materials for <span className="font-medium text-foreground">{processGroup}</span>: {catalog.processMaterialGroups.join(', ')}</>
-                : <>No material group is linked to <span className="font-medium text-foreground">{processGroup}</span> yet; showing the whole database.</>}
+          {processGroup && (showAllGroups || catalog?.processMaterialGroups) && (
+            <p className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
+              {showAllGroups
+                ? <>Showing every process group.</>
+                : linkedGroups.length > 0
+                  ? <>Materials for <span className="font-medium text-foreground">{processGroup}</span>: {linkedGroups.join(', ')}</>
+                  : <>No material group is linked to <span className="font-medium text-foreground">{processGroup}</span> yet; showing the whole database.</>}
+              <label className="inline-flex items-center gap-1 cursor-pointer text-foreground">
+                <input type="checkbox" checked={showAllGroups} onChange={(e) => { setShowAllGroups(e.target.checked); setGroupFilter(''); }} />
+                Show all process groups
+              </label>
             </p>
           )}
         </DialogHeader>
@@ -4685,8 +4704,17 @@ function MaterialPickerDialog({
             <option value="">All Groups</option>
             {groups.map((g) => <option key={g} value={g}>{g}</option>)}
           </select>
-          <span className="text-[10px] text-muted-foreground shrink-0 w-16 text-right">
-            {filtered.length} result{filtered.length !== 1 ? 's' : ''}
+          <select
+            value={classFilter}
+            onChange={(e) => { setClassFilter(e.target.value); }}
+            className="text-xs border border-border rounded px-2 py-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-violet-500 cursor-pointer w-36 shrink-0"
+            aria-label="Material class"
+          >
+            <option value="">All Classes</option>
+            {classes.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <span className="text-[10px] text-muted-foreground shrink-0 w-20 text-right">
+            {total > filtered.length ? `${filtered.length} of ${total}` : `${filtered.length} result${filtered.length !== 1 ? 's' : ''}`}
           </span>
         </div>
 
@@ -4704,6 +4732,7 @@ function MaterialPickerDialog({
                 <thead className="sticky top-0 z-10">
                   <tr className="border-b bg-muted/60 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                     <th className="px-2.5 py-2 text-left w-28">Group</th>
+                    <th className="px-2.5 py-2 text-left w-24">Class</th>
                     <th className="px-2.5 py-2 text-left">Material</th>
                     <th className="px-2.5 py-2 text-left w-36">Grade</th>
                     <th className="px-2.5 py-2 text-right w-20">Density</th>
@@ -4731,6 +4760,7 @@ function MaterialPickerDialog({
                         )}
                       >
                         <td className="px-2.5 py-1.5 text-muted-foreground text-[10px]">{m.materialGroup ?? '—'}</td>
+                        <td className="px-2.5 py-1.5 text-muted-foreground text-[10px]">{m.materialClass ?? '—'}</td>
                         <td className="px-2.5 py-1.5 font-medium">
                           {disp.material}
                           {isSearching && m.matchTier && (
