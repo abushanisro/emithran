@@ -4,7 +4,7 @@
     {
       "key": "secondary_process",
       "label": "Secondary Process",
-      "folder": "Secondary process",
+      "folder": "secondary process",
       "sourceVersion": "2026-Secondary",
       "processGroup": "Other Secondary Processes",
       "stagedBy": "817"
@@ -108,7 +108,7 @@
     {
       "key": "injection_molding",
       "label": "Plastic Molding",
-      "folder": "Plastic Modeling",
+      "folder": "plastic modeling",
       "sourceVersion": "2026-Plastic",
       "processGroup": "Plastic Molding",
       "stagedBy": "823"

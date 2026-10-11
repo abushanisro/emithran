@@ -5,7 +5,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 const root = path.resolve(__dirname, '../../../..');
-const csv = fs.readFileSync(path.join(root, 'memory/Sheetmetal/machine/machine_library.csv'), 'utf8').replace(/^﻿/, '');
+const csv = fs.readFileSync(path.join(root, 'memory/sheetmetal/machine/machine_library.csv'), 'utf8').replace(/^﻿/, '');
 const sql = fs.readFileSync(path.join(root, 'backend/migrations/894_press_brake_bend_length_thickness_from_machine_library.sql'), 'utf8');
 
 const [header, ...lines] = csv.split(/\r?\n/).filter(Boolean);

@@ -78,7 +78,7 @@ describe('memory reference domains', () => {
     const sql = fs.readdirSync(dir).filter((f) => /^823_stage_memory_domains/.test(f))
       .map((f) => fs.readFileSync(path.join(dir, f), 'utf-8')).join(' ');
     // Each split export (X__records + X__fields/__columns) is ONE lookup table X.
-    const lookups = fs.readdirSync(path.join(REPO, 'memory/Plastic Modeling/lookup'))
+    const lookups = fs.readdirSync(path.join(REPO, 'memory/plastic modeling/lookup'))
       .map((f) => f.replace(/__(records|rows|columns|fields)\.csv$/i, '').replace(/\.csv$/i, ''));
     for (const t of new Set(lookups)) {
       expect(sql).toContain(`($str$lookup_table$str$, 'USA', $str$2026-Plastic$str$, $str$${t}$str$`);

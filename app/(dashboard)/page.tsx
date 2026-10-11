@@ -18,6 +18,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useProjects, useVendors, useRawMaterials, useMHRRecords, useLHR } from '@/lib/api/hooks';
 import dynamic from 'next/dynamic';
+import { formatProjectMoney, projectCostCurrency, projectSavings, summarizeProjectCosts } from '@/lib/costing/project-costs';
 
 // Lazy load heavy chart components
 const CostChart = dynamic(() => import('@/components/features/dashboard/charts').then(mod => ({ default: mod.CostChart })), {
@@ -70,7 +71,7 @@ const getManufacturingModules = (projects: any[]) => [
     stats: {
       active: projects.filter(p => p.status === 'active').length,
       total: projects.length,
-      value: projects.reduce((sum, p) => sum + (Number(p.actualCost) || 0), 0),
+      value: summarizeProjectCosts(projects).actual,
     },
   },
   {
@@ -81,7 +82,7 @@ const getManufacturingModules = (projects: any[]) => [
     stats: {
       active: projects.filter(p => p.status === 'active').length,
       total: projects.length,
-      value: projects.reduce((sum, p) => sum + Math.max(0, (Number(p.targetBomCost) || 0) - (Number(p.actualCost) || 0)), 0),
+      value: summarizeProjectCosts(projects).savings,
     },
   },
   {
@@ -114,7 +115,7 @@ const getManufacturingModules = (projects: any[]) => [
     stats: {
       active: projects.filter(p => ['active', 'completed'].includes(p.status)).length,
       total: projects.length,
-      value: projects.filter(p => p.status === 'completed').reduce((sum, p) => sum + (Number(p.actualCost) || 0), 0),
+      value: summarizeProjectCosts(projects.filter(p => p.status === 'completed')).actual,
     },
   },
   {
@@ -166,11 +167,9 @@ export default function DashboardPage() {
 
   // Cost summary — target = targetBomCost (the field actually set on creation)
   //                should  = actualCost (derived from BOM item costs via enrichment)
-  const totalTarget = projects.reduce((sum, p) => sum + (Number(p.targetBomCost) || 0), 0);
-  const totalActual = projects.reduce((sum, p) => sum + (Number(p.actualCost) || 0), 0);
+  const { target: totalTarget, actual: totalActual, savings, savingsPercent } = summarizeProjectCosts(projects);
+  const savingsLabel = savingsPercent == null ? '—' : `${savingsPercent.toFixed(1)}%`;
   const totalBomItems = projects.reduce((sum, p) => sum + (Number(p.bomItemCount) || 0), 0);
-  const savings = totalTarget - totalActual;
-  const savingsPercent = totalTarget > 0 ? ((savings / totalTarget) * 100).toFixed(1) : '0';
 
   // System efficiency — reflects how thoroughly the manufacturing data is populated.
   // Components:
@@ -218,10 +217,10 @@ export default function DashboardPage() {
   });
 
   // Enrich projects for chart — map actualCost → shouldCost for chart components
-  const projectsForCharts = projects.map(p => ({
+  const projectsForCharts = projects.filter(p => projectSavings(p) != null && projectCostCurrency(p) === 'USD').map(p => ({
     ...p,
-    targetPrice: p.targetBomCost ?? 0,
-    shouldCost: p.actualCost ?? 0,
+    targetPrice: p.targetBomCost!,
+    shouldCost: p.actualCost!,
   }));
 
   return (
@@ -325,10 +324,10 @@ export default function DashboardPage() {
           <CardContent className="p-6">
             <div className="text-center space-y-2">
               <p className="text-3xl font-bold text-green-600">
-                {savings >= 0 ? '+' : ''}{savings.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {savings != null && savings >= 0 ? '+' : ''}{formatProjectMoney(savings)}
               </p>
               <p className="text-sm text-muted-foreground">Cost Savings</p>
-              <p className="text-lg font-semibold text-green-600">{savingsPercent}%</p>
+              <p className="text-lg font-semibold text-green-600">{savingsLabel}</p>
               <p className="text-xs text-muted-foreground">
                 Target vs Actual BOM Cost
               </p>
@@ -349,7 +348,7 @@ export default function DashboardPage() {
               {manufacturingModules.length} Active Modules
             </Badge>
             <Badge variant="outline" className="px-3 py-1">
-              {(totalTarget / 1000).toFixed(0)}K Portfolio Value
+              {totalTarget == null ? '—' : `${(totalTarget / 1000).toFixed(0)}K`} Portfolio Value
             </Badge>
           </div>
         </div>
@@ -370,6 +369,9 @@ export default function DashboardPage() {
       </div>
 
       {/* Advanced Analytics Dashboard */}
+      {projectsForCharts.length < projects.length && (
+        <p className="text-sm text-muted-foreground">Cost charts exclude projects with unresolved costs or non-comparable currencies.</p>
+      )}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Project Pipeline & Trends */}
         <div className="space-y-6">
@@ -455,7 +457,7 @@ export default function DashboardPage() {
                           <div>
                             <span className="text-muted-foreground">Actual: </span>
                             <span className="font-semibold">
-                              {(Number(project.actualCost) || 0).toLocaleString('en-US', { style: 'currency', currency: project.targetBomCostCurrency || 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {formatProjectMoney(project.actualCost, projectCostCurrency(project))}
                             </span>
                           </div>
                         </div>
@@ -468,9 +470,9 @@ export default function DashboardPage() {
                             <Package className="h-3 w-3" />
                             {project.bomItemCount ?? 0} items
                           </span>
-                          {(project.targetBomCost ?? 0) > 0 && (
+                          {(project.targetBomCost ?? 0) > 0 && projectSavings(project) != null && (
                             <span className="font-semibold text-green-600 ml-auto">
-                              {(((Number(project.targetBomCost) - Number(project.actualCost)) / Number(project.targetBomCost)) * 100).toFixed(1)}% saved
+                              {(projectSavings(project)! / project.targetBomCost! * 100).toFixed(1)}% saved
                             </span>
                           )}
                         </div>
@@ -510,23 +512,23 @@ export default function DashboardPage() {
                 <div className="text-center p-6 rounded-xl bg-primary/5 border border-primary/20">
                   <p className="text-sm text-primary mb-1 uppercase tracking-wider font-bold">Total Target</p>
                   <p className="text-2xl font-bold text-foreground">
-                    {totalTarget.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {formatProjectMoney(totalTarget)}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">from {projects.filter(p => (p.targetBomCost ?? 0) > 0).length} projects with targets</p>
                 </div>
                 <div className="text-center p-6 rounded-xl bg-purple-500/5 border border-purple-500/20">
                   <p className="text-sm text-purple-400 mb-1 uppercase tracking-wider font-bold">Actual BOM Cost</p>
                   <p className="text-2xl font-bold text-foreground">
-                    {totalActual.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {formatProjectMoney(totalActual)}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">{totalBomItems} items across all BOMs</p>
                 </div>
                 <div className="text-center p-6 rounded-xl bg-success/5 border border-success/20">
                   <p className="text-sm text-success mb-1 uppercase tracking-wider font-bold">Savings</p>
                   <p className="text-2xl font-bold text-success">
-                    {savings.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {formatProjectMoney(savings)}
                   </p>
-                  <p className="text-xs text-green-600 dark:text-green-400 mt-1">{savingsPercent}% reduction</p>
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-1">{savingsLabel} reduction</p>
                 </div>
               </div>
               <CostChart projects={projectsForCharts} />

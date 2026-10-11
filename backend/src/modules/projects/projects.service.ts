@@ -5,7 +5,9 @@ import { ProjectResponseDto, ProjectListResponseDto } from './dto/project-respon
 import { AddTeamMemberDto, UpdateTeamMemberDto, TeamMemberResponseDto, TeamMembersListResponseDto, TeamMemberRole } from './dto/project-team-member.dto';
 import { ProjectsRepository } from './projects.repository';
 import { Logger as CustomLogger } from '@/common/logger/logger.service';
-import { PERSISTED_PROCESS_COST_COLUMNS, resolvePersistedProcessCost } from '../bom-items/costing/shared/core/persisted-process-cost';
+import { ExchangeRateService } from '../../common/exchange-rate/exchange-rate.service';
+import { ROLLUP_REPORTING_CURRENCY } from '../bom-items/costing/shared/core/persisted-currency-contract';
+import { loadBomTotals, readAllRows } from '../boms/bom-totals';
 
 @Injectable()
 export class ProjectsService {
@@ -15,6 +17,7 @@ export class ProjectsService {
     private readonly supabase: SupabaseService,
     private readonly projectsRepository: ProjectsRepository,
     private readonly customLogger: CustomLogger,
+    private readonly exchangeRates: ExchangeRateService,
   ) {}
 
   async findAll(query: QueryProjectsDto, userId: string, accessToken?: string): Promise<ProjectListResponseDto> {
@@ -58,7 +61,7 @@ export class ProjectsService {
 
       if (projects.length > 0) {
         const projectIds = projects.map(p => p.id);
-        const statsMap = await this.computeProjectsAggregates(client, projectIds);
+        const statsMap = await this.computeProjectsAggregates(client, projectIds, accessToken);
         for (const p of projects) {
           const stats = statsMap.get(p.id);
           if (stats) {
@@ -105,7 +108,7 @@ export class ProjectsService {
       const client = this.supabase.getUserClient(accessToken);
       const project = await this.projectsRepository.findById(client, id);
       const dto = ProjectResponseDto.fromDatabase(project);
-      const stats = (await this.computeProjectsAggregates(client, [id])).get(id);
+      const stats = (await this.computeProjectsAggregates(client, [id], accessToken)).get(id);
       if (stats) {
         dto.bomCount = stats.bomCount;
         dto.bomItemCount = stats.bomItemCount;
@@ -335,16 +338,16 @@ export class ProjectsService {
         this.logger.warn(`Error fetching BOM data for cost analysis: ${bomError.message}`);
       }
 
-      const targetCost = project.target_bom_cost || 0;
-      const actualCost = (await this.computeProjectsAggregates(client, [id])).get(id)?.actualCost || 0;
-      const currency = project.target_bom_cost_currency || 'USD';
+      const targetCost = Number(project.target_bom_cost) || 0;
+      const currency = project.target_bom_cost_currency || ROLLUP_REPORTING_CURRENCY;
+      const actualCost = (await this.computeProjectsAggregates(client, [id], accessToken, currency)).get(id)?.actualCost ?? null;
 
       return {
         projectId: id,
         targetBomCost: targetCost,
         actualBomCost: actualCost,
-        costVariance: actualCost - targetCost,
-        costVariancePercentage: targetCost > 0 ? ((actualCost - targetCost) / targetCost * 100).toFixed(2) : '0',
+        costVariance: actualCost == null ? null : actualCost - targetCost,
+        costVariancePercentage: actualCost == null ? null : targetCost > 0 ? ((actualCost - targetCost) / targetCost * 100).toFixed(2) : '0',
         currency,
         estimatedAnnualVolume: project.estimated_annual_volume || 0,
         costBreakdown: {
@@ -369,114 +372,26 @@ export class ProjectsService {
     }
   }
 
-  private async computeProjectsAggregates(client: any, projectIds: string[]): Promise<Map<string, { bomCount: number; bomItemCount: number; actualCost: number }>> {
-    const resultMap = new Map<string, { bomCount: number; bomItemCount: number; actualCost: number }>();
+  private async computeProjectsAggregates(client: ReturnType<SupabaseService['getUserClient']>, projectIds: string[], accessToken?: string,
+    reportingCurrency = ROLLUP_REPORTING_CURRENCY): Promise<Map<string, { bomCount: number; bomItemCount: number; actualCost: number | null }>> {
+    const resultMap = new Map(projectIds.map(id => [id, { bomCount: 0, bomItemCount: 0, actualCost: 0 as number | null }]));
     if (!projectIds.length) return resultMap;
-
-    for (const pid of projectIds) {
-      resultMap.set(pid, { bomCount: 0, bomItemCount: 0, actualCost: 0 });
+    try {
+      const bomRows = await readAllRows<{ id: string; project_id: string }>((from, to) => client.from('boms')
+        .select('id, project_id', { count: 'exact' }).in('project_id', projectIds).order('id').range(from, to));
+      const totals = await loadBomTotals(client, bomRows.map(bom => bom.id),
+        () => this.exchangeRates.getSnapshot(accessToken ?? null), message => this.logger.warn(message), reportingCurrency);
+      for (const bom of bomRows) {
+        const stats = resultMap.get(bom.project_id)!;
+        const total = totals.get(bom.id)!;
+        stats.bomCount++;
+        stats.bomItemCount += total.itemCount;
+        stats.actualCost = stats.actualCost == null || total.totalCost == null ? null : stats.actualCost + total.totalCost;
+      }
+    } catch (error) {
+      this.logger.warn(`Project totals unavailable: ${error instanceof Error ? error.message : 'read failed'}`);
+      for (const stats of resultMap.values()) stats.actualCost = null;
     }
-
-    const { data: bomRows } = await client
-      .from('boms')
-      .select('id, project_id, bom_items(id, make_buy, unit_cost, quantity, parent_item_id)')
-      .in('project_id', projectIds);
-
-    if (!bomRows || bomRows.length === 0) return resultMap;
-
-    const allItemIds: string[] = [];
-    for (const bom of bomRows) {
-      const items: any[] = (bom as any).bom_items ?? [];
-      for (const item of items) {
-        allItemIds.push(item.id);
-      }
-    }
-
-    const recordCostMap = new Map<string, number>();
-    const tableCostMap = new Map<string, number>();
-
-    if (allItemIds.length > 0) {
-      const { data: rmRows } = await client
-        .from('raw_material_cost_records')
-        .select('bom_item_id, gross_usage, unit_cost, overhead')
-        .in('bom_item_id', allItemIds)
-        .eq('is_active', true);
-
-      for (const r of rmRows ?? []) {
-        const grossUsage = parseFloat(r.gross_usage) || 0;
-        const unitCost   = parseFloat(r.unit_cost)   || 0;
-        const overhead   = parseFloat(r.overhead)    || 0;
-        const cost = grossUsage * unitCost * (1 + overhead / 100);
-        recordCostMap.set(r.bom_item_id, (recordCostMap.get(r.bom_item_id) || 0) + cost);
-      }
-
-      // P1b-iv-b: prefer the persisted engine cost, same as the BOM-level
-      // rollup. This was the fifth copy of the rate-only formula, and like the
-      // others it could not see labour, QA inspection sampling or yield loss --
-      // so project totals silently disagreed with the quote they came from.
-      // The shared resolver falls back to this exact formula only for rows with
-      // nothing stored, so no legacy project total moves.
-      const { data: pcRows } = await client
-        .from('process_cost_records')
-        .select(`bom_item_id, ${PERSISTED_PROCESS_COST_COLUMNS}`)
-        .in('bom_item_id', allItemIds)
-        .eq('is_active', true);
-
-      for (const r of pcRows ?? []) {
-        const { totalCostPerPart } = resolvePersistedProcessCost(r);
-        recordCostMap.set(r.bom_item_id, (recordCostMap.get(r.bom_item_id) || 0) + totalCostPerPart);
-      }
-
-      const { data: bcRows } = await client
-        .from('bom_item_costs')
-        .select('bom_item_id, total_cost')
-        .in('bom_item_id', allItemIds);
-
-      for (const r of bcRows ?? []) {
-        const tc = parseFloat(r.total_cost) || 0;
-        if (tc > 0) tableCostMap.set(r.bom_item_id, tc);
-      }
-    }
-
-    for (const bom of bomRows) {
-      const pid = (bom as any).project_id as string;
-      const stats = resultMap.get(pid);
-      if (!stats) continue;
-
-      const items: any[] = (bom as any).bom_items ?? [];
-      stats.bomCount += 1;
-      stats.bomItemCount += items.length;
-
-      const parentIds = new Set<string>();
-      for (const item of items) {
-        if (item.parent_item_id) parentIds.add(item.parent_item_id);
-      }
-
-      let leafSum = 0;
-      let rootSum = 0;
-      let allSum = 0;
-
-      for (const item of items) {
-        const qty = parseFloat(item.quantity) || 1;
-        const recCost = recordCostMap.get(item.id) || 0;
-        const tblCost = tableCostMap.get(item.id) || 0;
-        const unitCost = parseFloat(item.unit_cost) || 0;
-        const bestUnitCost = recCost > 0 ? recCost : (tblCost > 0 ? tblCost : unitCost);
-        const itemTotal = bestUnitCost * qty;
-
-        allSum += itemTotal;
-        if (!parentIds.has(item.id)) {
-          leafSum += itemTotal;
-        }
-        if (!item.parent_item_id) {
-          rootSum += itemTotal;
-        }
-      }
-
-      const bomCost = Math.max(leafSum, rootSum) > 0 ? Math.max(leafSum, rootSum) : allSum;
-      stats.actualCost += bomCost;
-    }
-
     return resultMap;
   }
 

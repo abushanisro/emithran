@@ -11,7 +11,7 @@ import type { RealResinInputs } from '../../../../../modules/bom-items/costing/p
 
 // The Plastic reference, resolved by the production resolver from the same
 // memory/Plastic Modeling files migration 823 stages (not values typed here).
-const DIR = join(__dirname, '../../../../../../../memory/Plastic Modeling');
+const DIR = join(__dirname, '../../../../../../../memory/plastic modeling');
 
 function parseCsv(text: string): Array<Record<string, string>> {
   const rows: string[][] = [];
