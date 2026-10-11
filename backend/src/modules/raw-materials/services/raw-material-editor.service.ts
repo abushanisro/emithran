@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { SupabaseService } from '../../../common/supabase/supabase.service';
 import { Logger } from '../../../common/logger/logger.service';
 import { RawMaterialsService } from '../raw-materials.service';
@@ -26,21 +26,42 @@ export class RawMaterialEditorService {
     return { material, properties, stockPrices, stockForms: this.stockPrices.stockForms() };
   }
 
-  async save(id: string, dto: SaveRawMaterialEditorDto, userId: string, accessToken: string) {
+  async save(id: string, dto: SaveRawMaterialEditorDto, userId: string, accessToken: string, organizationId: string | undefined) {
     // Throws NotFound unless the caller can see this material.
     await this.rawMaterials.findOne(id, userId, accessToken);
+
+    // Seeing a material is not the right to change it: the save below runs with the
+    // service role and bypasses RLS, so the ownership rule RLS applies to a plain
+    // update (migration 621) is enforced here instead.
+    const { data: owner, error: ownerError } = await this.supabase
+      .getClient(accessToken)
+      .from('raw_materials')
+      .select('organization_id')
+      .eq('id', id)
+      .single();
+    if (ownerError || !owner) throw new NotFoundException(`Raw material with ID ${id} not found`);
+    assertCanEditMaterial(owner.organization_id, organizationId);
+
+    // Stock prices belong to the reference alloy and are shared by every organization
+    // that uses it, so owning one material does not give the right to change them.
+    const changedPrices = changedStockPrices(await this.stockPrices.listForMaterial(id, accessToken), dto.stockPrices);
+    if (changedPrices.length > 0) {
+      throw new ForbiddenException(
+        `Stock prices are shared across organizations and cannot be changed here (${changedPrices.join(', ')}).`,
+      );
+    }
 
     const known = new Set((await this.rawMaterials.getProperties(id, accessToken)).map((p) => p.propertyKey));
     const unknown = dto.properties.map((p) => p.propertyKey).filter((k) => !known.has(k));
     if (unknown.length > 0) throw new BadRequestException(`Material has no property: ${unknown.join(', ')}`);
 
     // Writes need the service role: the tables are read-only for signed-in users (RLS).
-    const db = this.supabase.getPrivilegedClient('raw-material-editor: save validated material via transaction RPC');
+    const db = this.supabase.getPrivilegedClient('raw-material-editor: transactional save after organization ownership check');
     const { error } = await db.rpc('save_raw_material_editor', {
       p_material_id: id,
       p_core: dto.core,
       p_properties: dto.properties,
-      p_stock_prices: dto.stockPrices,
+      p_stock_prices: [], // unchanged prices are not rewritten; changes were refused above
     });
     if (error) {
       if (error.code === 'P0002') throw new NotFoundException(error.message);
@@ -52,4 +73,32 @@ export class RawMaterialEditorService {
     );
     return this.load(id, userId, accessToken);
   }
+}
+
+/**
+ * Only the organization that owns a material may edit it. Global catalog rows
+ * (no organization) and other organizations' rows are read-only here, exactly as
+ * they are for a plain update under the row-level security policy.
+ */
+export function assertCanEditMaterial(materialOrganizationId: string | null, callerOrganizationId: string | undefined): void {
+  if (materialOrganizationId === null || materialOrganizationId === undefined) {
+    throw new ForbiddenException('Shared catalog materials cannot be edited. Create your own material from it instead.');
+  }
+  if (!callerOrganizationId || materialOrganizationId !== callerOrganizationId) {
+    throw new ForbiddenException('This material belongs to another organization.');
+  }
+}
+
+/** "form @ location" for every submitted stock price that differs from what is stored (or is new). */
+export function changedStockPrices(
+  current: readonly { stockForm: string; location: string; pricePerKg: number }[],
+  submitted: readonly { stockForm: string; location: string; pricePerKg: number }[],
+): string[] {
+  const stored = new Map(current.map((c) => [`${c.stockForm}|${c.location}`, c.pricePerKg]));
+  return submitted
+    .filter((p) => {
+      const was = stored.get(`${p.stockForm}|${p.location}`);
+      return was === undefined || Math.abs(was - p.pricePerKg) > 1e-9 * Math.max(1, Math.abs(was));
+    })
+    .map((p) => `${p.stockForm} @ ${p.location}`);
 }

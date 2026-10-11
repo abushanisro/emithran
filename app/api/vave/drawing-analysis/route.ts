@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-
 import { getAuthenticatedUser } from '@/lib/database/supabase-server';
+import { requireUserForAi } from '@/lib/server/auth';
+import { fetchTrustedFile, PayloadTooLargeError, readLimited, UntrustedUrlError } from '@/lib/server/safe-fetch';
 import {
   isTrustedStorageUrl,
   parseBomItemStoragePath,
@@ -15,9 +16,14 @@ const CAD_ENGINE_API_KEY = process.env.CAD_ENGINE_API_KEY ?? '';
  * in the CAD engine's POST /drawing/analyze endpoint.
  */
 export async function POST(request: NextRequest) {
+  const auth = await requireUserForAi('vave-drawing-analysis');
+  if (!auth.ok) return auth.response;
+
   try {
-    const auth = await getAuthenticatedUser();
-    if (!auth) {
+    // The caller's own session: a stored drawing path is signed by the
+    // backend under the caller's permissions.
+    const session = await getAuthenticatedUser();
+    if (!session) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
@@ -38,7 +44,7 @@ export async function POST(request: NextRequest) {
         const resolved = await resolveBomItemFileUrl(
           storagePath.bomItemId,
           storagePath.fileType,
-          `Bearer ${auth.accessToken}`,
+          `Bearer ${session.accessToken}`,
         );
         if (!resolved.ok) {
           return NextResponse.json(
@@ -56,10 +62,13 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // A trusted host must not redirect us to a private destination.
-      const imgRes = await fetch(fileUrl, { redirect: 'manual' });
-      if (imgRes.status >= 300 && imgRes.status < 400) {
-        return NextResponse.json({ error: 'Storage redirects are not allowed' }, { status: 502 });
+      // Trusted host only, and a trusted host must not redirect us anywhere.
+      let imgRes: Response;
+      try {
+        imgRes = await fetchTrustedFile(fileUrl, { maxRedirects: 0 });
+      } catch (e) {
+        if (e instanceof UntrustedUrlError) return NextResponse.json({ error: 'Storage redirects are not allowed' }, { status: 502 });
+        throw e;
       }
       if (!imgRes.ok) {
         return NextResponse.json({ error: 'Failed to fetch drawing image' }, { status: 400 });
@@ -70,8 +79,14 @@ export async function POST(request: NextRequest) {
         : contentType.includes('jpeg') || contentType.includes('jpg')
           ? 'image/jpeg'
           : 'image/png';
-      const buffer = await imgRes.arrayBuffer();
-      body.imageBase64 = Buffer.from(buffer).toString('base64');
+      let buffer: Buffer;
+      try {
+        buffer = await readLimited(imgRes, 15 * 1024 * 1024);
+      } catch (e) {
+        if (e instanceof PayloadTooLargeError) return NextResponse.json({ error: 'Drawing image is too large' }, { status: 413 });
+        throw e;
+      }
+      body.imageBase64 = buffer.toString('base64');
       body.mediaType = mediaType;
       delete body.imageUrl;
     }

@@ -3,6 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { GET } from '@/app/api/file-proxy/route';
 
+// The route requires a signed-in user (lib/server/auth); these tests are about
+// the destination boundary, so the caller is signed in.
+vi.mock('@/lib/server/auth', () => ({
+  requireUser: () => Promise.resolve({ ok: true, userId: 'user-1' }),
+}));
+
 const fetchMock = vi.fn<typeof fetch>();
 const storageUrl = 'https://files.supabase.co/storage/v1/object/sign/drawings/part.pdf';
 const request = (params: Record<string, string>) =>
@@ -11,8 +17,13 @@ const request = (params: Record<string, string>) =>
 beforeEach(() => {
   fetchMock.mockReset();
   vi.stubGlobal('fetch', fetchMock);
+  // The project storage host (lib/server/safe-fetch reads it per call).
+  vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://files.supabase.co');
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+});
 
 describe('file proxy destination boundary', () => {
   it.each([

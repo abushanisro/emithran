@@ -10,7 +10,7 @@ import type {
   ToolRequirements,
 } from "../interfaces/operation-calculator.interface";
 
-export interface MillingGeometry extends FeatureGeometry {
+interface MillingGeometry extends FeatureGeometry {
   cutterDiameterMm: number;
   cuttingLengthMm: number;    // total tool path length
   widthMm: number;             // feature width (pocket or surface width)

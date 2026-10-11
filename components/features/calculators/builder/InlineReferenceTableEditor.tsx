@@ -433,7 +433,7 @@ export function InlineReferenceTableEditor({
       ) : (
         <div className="grid grid-cols-2 gap-2">
           {tables.map((table, tableIndex) => (
-            <div key={table.id || tableIndex} className="border border-border rounded-lg bg-card shadow-sm">
+            <div key={table.id || tableIndex} className="border border-border rounded-lg bg-card shadow-xs">
               {/* Ultra Compact Header */}
               <div className="flex items-center justify-between px-2.5 py-1.5 bg-secondary/40 border-b border-border rounded-t-lg">
                 <div className="flex-1 min-w-0">
@@ -513,7 +513,7 @@ export function InlineReferenceTableEditor({
                                       nextCell?.focus();
                                     }
                                   }}
-                                  className="w-full h-6 px-2 py-0 text-sm border-0 focus:outline-none focus:ring-1 focus:ring-primary/50 focus:ring-inset bg-transparent hover:bg-secondary/30 focus:bg-secondary/50 transition-colors text-foreground placeholder:text-muted-foreground/40"
+                                  className="w-full h-6 px-2 py-0 text-sm border-0 focus:outline-hidden focus:ring-1 focus:ring-primary/50 focus:ring-inset bg-transparent hover:bg-secondary/30 focus:bg-secondary/50 transition-colors text-foreground placeholder:text-muted-foreground/40"
                                   placeholder={col.type === 'number' ? '0' : ''}
                                 />
                               </td>

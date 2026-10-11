@@ -45,7 +45,7 @@ export interface RawMaterialCostInput {
  * Detailed cost breakdown result
  * All monetary values in INR (₹)
  */
-export interface RawMaterialCostResult {
+interface RawMaterialCostResult {
   // Input Summary
   materialName: string;
   costName: string;

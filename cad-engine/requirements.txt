@@ -20,9 +20,10 @@ pydantic==2.10.4
 
 # File handling — python-multipart is never imported directly but is required
 # internally by FastAPI's Form/File/UploadFile parsing (used in main.py).
-# 0.0.6 predates several disclosed DoS/resource-exhaustion fixes in this
-# package's multipart-boundary parsing; 0.0.18 is well past all of them.
-python-multipart==0.0.18
+# Every upload the engine receives is parsed by it, so it tracks the advisory
+# fixes: 0.0.31 closes all 8 open ones (arbitrary file write, header/preamble
+# DoS, querystring CPU DoS, parameter smuggling, negative Content-Length).
+python-multipart==0.0.32
 
 # HTTP client for callbacks
 httpx==0.28.1
@@ -36,7 +37,7 @@ python-magic==0.4.27
 python-magic-bin==0.4.14; sys_platform == "win32"
 
 # Environment variables
-python-dotenv==1.0.1
+python-dotenv==1.2.3
 
 # AI Copilot - Groq (OpenAI-compatible client)
 openai>=1.35.0

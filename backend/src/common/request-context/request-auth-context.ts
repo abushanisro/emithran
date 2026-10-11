@@ -7,7 +7,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
  * token parameter, and without any path that can fall back to the service-role
  * client when the token is missing: no context means no client.
  */
-export interface RequestAuth {
+interface RequestAuth {
   accessToken: string;
   userId: string;
 }

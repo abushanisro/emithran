@@ -13,7 +13,7 @@ import { eMithranTerms, resolveSetupMinutes } from '../../shared/core/engine-ker
 // same real machine type, not three engines competing for one operation.
 // Consumers must key on `process`, never assume machineClass alone selects
 // one engine within this family.
-export interface CountersinkingInput {
+interface CountersinkingInput {
   countersinkCount: number;
   batchSize: number;
   rate: MHRRateInput;
@@ -35,7 +35,7 @@ export interface CountersinkingInput {
   scrapPricePerKg?: number;
 }
 
-export interface CountersinkingResult {
+interface CountersinkingResult {
   processLines: ProcessLineCost[];
   cycleTimeMin: number;
   warnings: string[];
@@ -120,7 +120,7 @@ export function computeCountersinkingCost(input: CountersinkingInput): Countersi
   };
 }
 
-export interface CountersinkingContext extends CountersinkingInput {}
+interface CountersinkingContext extends CountersinkingInput {}
 
 export class CountersinkingEngine implements ManufacturingProcessEngine<CountersinkingContext, CountersinkingResult> {
   readonly machineClass = 'drill_press' as const;

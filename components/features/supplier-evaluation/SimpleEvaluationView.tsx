@@ -436,7 +436,7 @@ export function SimpleEvaluationView({ groupId, onBack }: SimpleEvaluationViewPr
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             {/* Sidebar Filters */}
             <div className="space-y-6">
-              <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50 backdrop-blur-sm">
+              <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50 backdrop-blur-xs">
                 <h3 className="text-white font-bold mb-4 flex items-center gap-2">
                   <Search className="h-4 w-4 text-teal-400" />
                   Filter Results

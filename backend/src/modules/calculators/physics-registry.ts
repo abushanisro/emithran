@@ -1,6 +1,5 @@
 import {
   computeTapPhysics, TAP_UNLOAD_SEC,
-  computeDeburrCycleSec, DEBURR_SEC_PER_METRE, DEBURR_SEC_PER_PIERCE,
 } from '../bom-items/costing/shared/core/default-rates.constants';
 
 /**
@@ -84,41 +83,37 @@ function tapping(inputValues: Record<string, any>): Record<string, any> {
   };
 }
 
+// Deslag / deburr: the burr sits on the cut edge, so time = burr edge length
+// x the machine's own time per mm of edge (a Deslag machine's
+// perimeter_allowance_s_per_mm, or Manual Deburr's 1 / tblDeburring speed —
+// see DeburrRequirement in machine-selection/physics.ts). Both inputs are
+// required: a missing one leaves Total Time unresolved (a reported gap),
+// never a default rate.
 function deburring(inputValues: Record<string, any>): Record<string, any> {
-  const lengthOfCut = num(inputValues['Length Of Cut (mm)']);
-  const noOfStarts = num(inputValues['No Of Starts']);
+  const edgeMm = inputValues['Burr Edge Length'];
+  const secPerMm = inputValues['Deburr Time Per mm'];
   const mhrPerHour = num(inputValues['MHR per Hour']);
   const lhrPerHour = num(inputValues['LHR per Hour']);
   const ole = num(inputValues['OLE']) || 100;
   const _warnings = missingRateWarnings(inputValues, ['MHR per Hour', 'LHR per Hour'], {
     'MHR per Hour': 'Machine Cost', 'LHR per Hour': 'Labour Cost',
   });
+  if (!(typeof edgeMm === 'number' && edgeMm > 0) || !(typeof secPerMm === 'number' && secPerMm > 0)) {
+    return { _warnings: [..._warnings, 'Burr Edge Length and Deburr Time Per mm are both required'] };
+  }
 
-  // 'Sec Per Metre'/'Sec Per Pierce' are optional real-rate overrides — the
-  // caller (resolvePhysicsQuantity) passes the material/process-specific rate
-  // from sm_lookup_deburr_rate when a real row was found, same as
-  // computeDeburrCycleSec()'s own optional parameters. typeof-checked rather
-  // than num()'d directly: num() coerces a genuinely-absent override to 0,
-  // which would silently zero out deburr time instead of falling back to the
-  // documented default rate.
-  const secPerMetre = typeof inputValues['Sec Per Metre'] === 'number' ? inputValues['Sec Per Metre'] : DEBURR_SEC_PER_METRE;
-  const secPerPierce = typeof inputValues['Sec Per Pierce'] === 'number' ? inputValues['Sec Per Pierce'] : DEBURR_SEC_PER_PIERCE;
-  const totalTime = computeDeburrCycleSec(lengthOfCut, noOfStarts, secPerMetre, secPerPierce);
+  const totalTime = edgeMm * secPerMm;
   const machineCost = (mhrPerHour * totalTime) / 3600;
   const labourCost = (lhrPerHour * totalTime) / (3600 * (ole / 100));
   const processCost = machineCost + labourCost;
   const setupCost = 0; // matches cost-engine.ts's explicit setupTimeMin: 0 for Deburring
-  const totalProcessCost = processCost + setupCost;
-
   return {
-    'Sec Per Metre': secPerMetre,
-    'Sec Per Pierce': secPerPierce,
     'Total Time': totalTime,
     'Machine Cost': machineCost,
     'Labour Cost': labourCost,
     'Process Cost': processCost,
     'Setup Cost': setupCost,
-    'Total Process Cost': totalProcessCost,
+    'Total Process Cost': processCost + setupCost,
     ...(_warnings.length > 0 ? { _warnings } : {}),
   };
 }

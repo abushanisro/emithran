@@ -24,6 +24,9 @@ import {
   type LaserRequirement,
   type LaserMaterialFamily,
   type MachineRequirement,
+  DEBURR_MACHINE_CLASSES,
+  deburrCycleSec,
+  deburrSecPerMm,
 } from './physics';
 import {
   EMPTY_CAPABILITY,
@@ -507,8 +510,39 @@ function fitsBed(cap: MachineCapability, lengthMm: number, widthMm: number): boo
 // thickness data for this requirement's material family — a systemic gap,
 // not a per-machine one. See isCapable's laser case for why this
 // distinction matters.
-export function classHasRealLaserThicknessData(classPool: MachineCandidate[], req: LaserRequirement): boolean {
+function classHasRealLaserThicknessData(classPool: MachineCandidate[], req: LaserRequirement): boolean {
   return classPool.some((c) => laserThicknessLimit(c.capability, req) != null);
+}
+
+// Class-wide data facts the laser gate needs. A per-machine gap (one machine
+// missing data the rest of its class has) fails closed; a class-wide gap
+// (no machine in the class has it) fails open, so real machines stay
+// selectable at low confidence instead of all being replaced by "no machine".
+interface LaserClassOpts {
+  allowUnknownLaserThickness?: boolean;
+  allowUnknownLaserBed?: boolean;
+}
+
+function laserClassOpts(classPool: MachineCandidate[], req: LaserRequirement): LaserClassOpts {
+  return {
+    allowUnknownLaserThickness: !classHasRealLaserThicknessData(classPool, req),
+    allowUnknownLaserBed: !classPool.some((c) => c.capability.maxXMm != null && c.capability.maxYMm != null),
+  };
+}
+
+// Laser bed fit. Unlike fitsBed (turret/waterjet), an unknown bed is NOT a
+// pass when the class has real bed data: the part may not fit.
+function fitsLaserBed(cap: MachineCapability, req: LaserRequirement, opts?: LaserClassOpts): boolean {
+  if (cap.maxXMm == null || cap.maxYMm == null) return !!opts?.allowUnknownLaserBed;
+  return fitsBed(cap, req.bedLengthMm, req.bedWidthMm);
+}
+
+// Laser source power vs the laser cut table's minimum for this material and
+// thickness. undefined = no power requirement known (material not in table).
+function laserPowerOk(cap: MachineCapability, req: LaserRequirement): boolean | undefined {
+  if (!req.power) return undefined;
+  if (req.power.requiredW == null) return false; // thicker than any laser in the table cuts
+  return cap.powerKw != null && cap.powerKw * 1000 >= req.power.requiredW;
 }
 
 // Root-caused live 2026-08-31: EVERY real USA fiber_laser/co2_laser machine
@@ -529,7 +563,7 @@ export function classHasRealLaserThicknessData(classPool: MachineCandidate[], re
 export function isCapable(
   candidate: MachineCandidate,
   req: MachineRequirement,
-  opts?: { allowUnknownLaserThickness?: boolean },
+  opts?: LaserClassOpts,
 ): boolean {
   const cap = candidate.capability;
 
@@ -539,7 +573,8 @@ export function isCapable(
 
   switch (req.kind) {
     case 'press_brake': {
-      if (cap.maxTonnage != null && cap.maxTonnage < req.tonnage * TONNAGE_MARGIN) return false;
+      // req.tonnage is already the Recommended Force (theoretical × 1.25).
+      if (cap.maxTonnage != null && cap.maxTonnage < req.tonnage) return false;
       if (cap.maxLengthMm != null && cap.maxLengthMm < req.bendLengthMm * BED_MARGIN) return false;
       if (cap.maxThicknessMm != null && cap.maxThicknessMm < req.thicknessMm) return false;
       return true;
@@ -561,9 +596,14 @@ export function isCapable(
       // zero real data, see doc comment above), a null limit no longer
       // rejects — real machines stay selectable, at low confidence, rather
       // than universally replaced by the synthetic no-machine fallback.
+      // When the laser cut table knows this material, the machine's source
+      // power decides whether it can cut this thickness (a real per-material
+      // thickness limit, if the machine has one, still applies on top).
       const limit = laserThicknessLimit(cap, req);
+      const powerOk = laserPowerOk(cap, req);
+      if (powerOk === false) return false;
       if (limit == null) {
-        if (!opts?.allowUnknownLaserThickness) return false;
+        if (powerOk === undefined && !opts?.allowUnknownLaserThickness) return false;
       } else if (limit < req.thicknessMm) {
         return false;
       }
@@ -574,7 +614,7 @@ export function isCapable(
       ) {
         return false;
       }
-      return fitsBed(cap, req.bedLengthMm, req.bedWidthMm);
+      return fitsLaserBed(cap, req, opts);
     }
     case 'turret_punch': {
       if (cap.maxTonnage != null && cap.maxTonnage < req.tonnage * TONNAGE_MARGIN) return false;
@@ -638,6 +678,9 @@ export function isCapable(
       }
       return true;
     }
+    case 'deburr':
+      // Capable when this machine's own time per mm of burr edge is on file.
+      return deburrCycleSec(candidate, req) != null;
     case 'generic':
       return true;
   }
@@ -660,7 +703,7 @@ export function fitScore(candidate: MachineCandidate, req: MachineRequirement): 
 
   switch (req.kind) {
     case 'press_brake': {
-      const t = ratio(req.tonnage * TONNAGE_MARGIN, cap.maxTonnage);
+      const t = ratio(req.tonnage, cap.maxTonnage);
       const l = ratio(req.bendLengthMm * BED_MARGIN, cap.maxLengthMm);
       if (t != null) parts.push(t);
       if (l != null) parts.push(l);
@@ -675,9 +718,11 @@ export function fitScore(candidate: MachineCandidate, req: MachineRequirement): 
       const x = ratio(req.bedLengthMm * BED_MARGIN, cap.maxXMm);
       const y = ratio(req.bedWidthMm * BED_MARGIN, cap.maxYMm);
       const thk = ratio(req.thicknessMm, laserThicknessLimit(cap, req));
+      const pwr = req.power?.requiredW != null ? ratio(req.power.requiredW, cap.powerKw != null ? cap.powerKw * 1000 : null) : null;
       if (x != null) parts.push(x);
       if (y != null) parts.push(y);
       if (thk != null) parts.push(thk);
+      if (pwr != null) parts.push(pwr);
       break;
     }
     case 'turret_punch': {
@@ -764,6 +809,7 @@ export function fitScore(candidate: MachineCandidate, req: MachineRequirement): 
       if (t != null) parts.push(t);
       break;
     }
+    case 'deburr':
     case 'generic':
       return 0.7;
   }
@@ -802,7 +848,7 @@ function isInMaintenanceWindow(candidate: MachineCandidate, now: Date): boolean 
 function buildReasons(
   candidate: MachineCandidate,
   req: MachineRequirement,
-  opts?: { allowUnknownLaserThickness?: boolean },
+  opts?: LaserClassOpts,
 ): string[] {
   const cap = candidate.capability;
   const reasons: string[] = [];
@@ -810,9 +856,9 @@ function buildReasons(
 
   switch (req.kind) {
     case 'press_brake':
-      reasons.push(`Requires ${r0(req.tonnage * TONNAGE_MARGIN)} t (incl. 15% margin)` +
+      reasons.push(`Requires ${r0(req.tonnage)} t (recommended force = theoretical × 1.25)` +
         (cap.maxTonnage != null ? ` ≤ ${r0(cap.maxTonnage)} t machine capacity` : ''));
-      if (cap.maxLengthMm != null) reasons.push(`Bend ${r0(req.bendLengthMm)} mm ≤ ${r0(cap.maxLengthMm)} mm bed`);
+      if (cap.maxLengthMm != null) reasons.push(`Bend ${r0(req.bendLengthMm)} mm ≤ ${r0(cap.maxLengthMm)} mm bend length`);
       break;
     case 'hole_forming':
       reasons.push(`Requires ${r0(req.tonnage * TONNAGE_MARGIN)} t (incl. 15% margin) for Ø${r0(req.holeDiameterMm)} mm hole extrusion` +
@@ -822,10 +868,16 @@ function buildReasons(
       // Material/thickness-vs-capacity is surfaced structurally via
       // buildCapabilityCheck() below (Material/Thickness/Capacity/Status),
       // not repeated here as flat text.
+      if (req.power?.requiredW != null) {
+        reasons.push(`${req.power.material} ${r0(req.thicknessMm)} mm needs ≥ ${r0(req.power.requiredW / 1000)} kW (laser cut table, ${r0(req.power.tableThicknessMm!)} mm row)` +
+          (cap.powerKw != null ? ` ≤ ${r0(cap.powerKw)} kW machine` : ' — machine power not on file'));
+      }
       if (cap.maxXMm != null && cap.maxYMm != null) {
         reasons.push(`Part ${r0(req.bedLengthMm)}×${r0(req.bedWidthMm)} mm fits ${r0(cap.maxXMm)}×${r0(cap.maxYMm)} mm bed`);
+      } else if (opts?.allowUnknownLaserBed) {
+        reasons.push('No bed size on file for any machine in this class — part fit assumed, not verified');
       }
-      if (opts?.allowUnknownLaserThickness && laserThicknessLimit(cap, req) == null) {
+      if (!req.power && opts?.allowUnknownLaserThickness && laserThicknessLimit(cap, req) == null) {
         reasons.push('No real thickness data on file for any machine in this class — capability assumed, not verified');
       }
       break;
@@ -911,6 +963,17 @@ function buildReasons(
         );
       }
       break;
+    case 'deburr': {
+      const rate = deburrSecPerMm(candidate, req);
+      const sec = deburrCycleSec(candidate, req);
+      if (rate && sec != null) {
+        reasons.push(`${r0(req.burrEdgeLengthMm)} mm burr edge × ${rate.secPerMm.toPrecision(3)} s/mm (${rate.source}) = ${r0(sec)} s`);
+        reasons.push(`$${(candidate.hourlyRate * sec / 3600).toFixed(3)} per part at $${candidate.hourlyRate.toFixed(2)}/hr`);
+      } else {
+        reasons.push('No deburr time rate on file for this machine');
+      }
+      break;
+    }
     case 'generic':
       reasons.push('No dimensional constraints for this process');
       break;
@@ -934,7 +997,7 @@ function buildReasons(
 function buildCapabilityCheck(
   candidate: MachineCandidate,
   req: MachineRequirement,
-  opts?: { allowUnknownLaserThickness?: boolean },
+  opts?: LaserClassOpts,
 ): CapabilityCheck | null {
   if (req.kind === 'shear') {
     const limit = materialThicknessLimit(candidate.capability, req.materialFamily);
@@ -951,6 +1014,18 @@ function buildCapabilityCheck(
     };
   }
   if (req.kind !== 'laser') return null;
+  // Laser cut table knows this material: the check is source power.
+  if (req.power?.requiredW != null) {
+    const kw = candidate.capability.powerKw;
+    return {
+      parameter: `Laser power for ${req.thicknessMm} mm`,
+      materialGrade: req.materialGrade,
+      value: req.power.requiredW / 1000,
+      limit: kw,
+      unit: 'kW',
+      supported: laserPowerOk(candidate.capability, req) === true,
+    };
+  }
   const limit = laserThicknessLimit(candidate.capability, req);
   return {
     parameter: 'Thickness',
@@ -985,7 +1060,7 @@ export function explainCandidate(
   const candidate = pool.find((c) => c.machineClass === machineClass && c.machineId === machineId);
   if (!candidate) return null;
   const opts = requirement.kind === 'laser'
-    ? { allowUnknownLaserThickness: !classHasRealLaserThicknessData(pool.filter((c) => c.machineClass === machineClass), requirement) }
+    ? laserClassOpts(pool.filter((c) => c.machineClass === machineClass), requirement)
     : undefined;
   const reasons = buildReasons(candidate, requirement, opts);
   if (!isCapable(candidate, requirement, opts)) {
@@ -1045,7 +1120,7 @@ function makeNoMachineCandidate(cls: MachineClass): MachineCandidate {
   };
 }
 
-export interface SelectMachineInput {
+interface SelectMachineInput {
   pool: MachineCandidate[];          // full location pool (all classes)
   location: string;
   machineClass: MachineClass;
@@ -1058,9 +1133,12 @@ export function selectMachine(input: SelectMachineInput): MachineSelectionResult
   const { pool, location, machineClass, requirement } = input;
   const now = input.now ?? new Date();
 
-  const classPool = pool.filter((c) => c.machineClass === machineClass);
+  // A deburr line draws from both deburr machine families (Deslag + Manual
+  // Deburr); every other line from its own class only.
+  const lineClasses: readonly string[] = requirement.kind === 'deburr' ? DEBURR_MACHINE_CLASSES : [machineClass];
+  const classPool = pool.filter((c) => lineClasses.includes(c.machineClass));
   const laserOpts = requirement.kind === 'laser'
-    ? { allowUnknownLaserThickness: !classHasRealLaserThicknessData(classPool, requirement) }
+    ? laserClassOpts(classPool, requirement)
     : undefined;
   const eligible = classPool.filter((c) => isCapable(c, requirement, laserOpts));
 
@@ -1084,12 +1162,16 @@ export function selectMachine(input: SelectMachineInput): MachineSelectionResult
     };
   }
 
-  const minRate = Math.min(...eligible.map((c) => c.hourlyRate));
+  // Cost basis: the hourly rate, except where machines of one line run at
+  // different speeds (deburr) — there it is cost per part, rate × time.
+  const costBasis = (c: MachineCandidate) =>
+    requirement.kind === 'deburr' ? c.hourlyRate * (deburrCycleSec(c, requirement) ?? Infinity) : c.hourlyRate;
+  const minRate = Math.min(...eligible.map(costBasis));
 
   const scored = eligible.map((candidate) => {
     const fit = fitScore(candidate, requirement);
     const util = utilizationScore(candidate);
-    const cost = minRate > 0 ? clamp01(minRate / candidate.hourlyRate) : 0;
+    const cost = minRate > 0 ? clamp01(minRate / costBasis(candidate)) : 0;
     const avail = availabilityScore(candidate, now);
     return { candidate, fit, util, cost, avail };
   });
@@ -1114,7 +1196,11 @@ export function selectMachine(input: SelectMachineInput): MachineSelectionResult
   // User override: force the pick, even outside the capability filter (their judgment)
   let overridden = false;
   let balancedRec: MachineRecommendation;
-  const balancedRanked = rank(PROFILES.balanced);
+  // Deburr machines differ in speed, so the recommendation is the lowest cost
+  // per part (rate × time), not the utilization-weighted balance.
+  const balancedRanked = requirement.kind === 'deburr'
+    ? [...scored].sort((a, b) => costBasis(a.candidate) - costBasis(b.candidate))
+    : rank(PROFILES.balanced);
   const cheapestRanked = rank(PROFILES.cheapest);
   const fastestRanked = rank(PROFILES.fastest);
 
@@ -1177,6 +1263,17 @@ export function selectMachine(input: SelectMachineInput): MachineSelectionResult
       alternatives.push(s.candidate);
     }
   }
+  // A line drawing on several machine families (deburr: Deslag + Manual
+  // Deburr) always offers the best machine of every family, so each stays
+  // selectable even when it ranks below the top two.
+  alternatives.splice(2);
+  if (lineClasses.length > 1) {
+    for (const cls of lineClasses) {
+      const shown = [balancedRec.candidate, ...alternatives].some((c) => c.machineClass === cls);
+      const best = balancedRanked.find((s) => s.candidate.machineClass === cls);
+      if (!shown && best) alternatives.push(best.candidate);
+    }
+  }
 
   const balancedFit = fitScore(balancedRec.candidate, requirement);
   const confidence = balancedRec.candidate.capabilitySource === 'default_class'
@@ -1227,7 +1324,7 @@ export function selectMachine(input: SelectMachineInput): MachineSelectionResult
     balanced: balancedRec,
     cheapest: cheapestRec,
     fastest: fastestRec,
-    alternatives: alternatives.slice(0, 2),
+    alternatives,
     confidence,
     requirement,
     allowOverride: true,

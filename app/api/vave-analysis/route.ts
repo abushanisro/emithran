@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireUserForAi } from '@/lib/server/auth';
 
 export async function POST(request: NextRequest) {
+  const auth = await requireUserForAi('vave-analysis');
+  if (!auth.ok) return auth.response;
+
   try {
     const body = await request.json();
     

@@ -913,7 +913,7 @@ export const IntegratedMonitoringBOM = ({ lotId }: IntegratedMonitoringBOMProps)
                                     <div className="space-y-2">
                                       {(item.alerts || []).filter((a: any) => !a.resolved).map((alert: any) => (
                                         <div key={alert.id} className="flex items-start gap-3 text-sm p-3 bg-white border rounded">
-                                          <AlertCircle className="h-4 w-4 text-orange-600 flex-shrink-0 mt-0.5" />
+                                          <AlertCircle className="h-4 w-4 text-orange-600 shrink-0 mt-0.5" />
                                           <div className="flex-1">
                                             <div className="font-semibold">{alert.type}</div>
                                             <div>{alert.message}</div>

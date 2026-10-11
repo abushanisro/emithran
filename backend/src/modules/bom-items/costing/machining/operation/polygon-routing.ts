@@ -11,7 +11,7 @@
  * keyway / Wire EDM splits) so it is broached, not milled as well.
  */
 
-export interface PolygonCandidate {
+interface PolygonCandidate {
   kind?: string;
   side_count?: number;
   across_flats_mm?: number | null;

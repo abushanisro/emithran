@@ -14,6 +14,7 @@ import type { MaterialCandidate } from '../dto/candidate-set.dto';
 interface RawMaterialRow {
   id: string;
   material_group: string | null;
+  material_class?: string | null;
   material: string | null;
   material_grade: string | null;
   density_kg_m3?: number | string | null;
@@ -378,6 +379,7 @@ export function rankMaterials(
     candidateId: `rm-${idx + 1}`,
     dbId: row.id,
     materialGroup: row.material_group ?? '',
+    materialClass: row.material_class ?? null,
     material: row.material ?? '',
     grade: row.material_grade ?? null,
     densityKgPerM3: toNumber(row.density_kg_m3 ?? row.density) || null,

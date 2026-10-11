@@ -136,7 +136,7 @@ function StepRow({
               onClick={onMoveUp}
               disabled={!canMoveUp}
               aria-label={`Move ${step.process} earlier`}
-              className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:pointer-events-none disabled:opacity-25"
+              className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-violet-500 disabled:pointer-events-none disabled:opacity-25"
             >
               <ChevronUp className="h-3.5 w-3.5" />
             </button>
@@ -145,7 +145,7 @@ function StepRow({
               onClick={onMoveDown}
               disabled={!canMoveDown}
               aria-label={`Move ${step.process} later`}
-              className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:pointer-events-none disabled:opacity-25"
+              className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-violet-500 disabled:pointer-events-none disabled:opacity-25"
             >
               <ChevronDown className="h-3.5 w-3.5" />
             </button>
@@ -153,7 +153,7 @@ function StepRow({
               type="button"
               onClick={onRemove}
               aria-label={`Remove ${step.process} from this route`}
-              className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-red-500/15 hover:text-red-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+              className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-red-500/15 hover:text-red-300 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-violet-500"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -249,7 +249,7 @@ export function RouteStepEditor({
                   key={m.machineClass + m.process}
                   type="button"
                   onClick={() => { onAddMissingStep(m); }}
-                  className="inline-flex min-h-6 items-center gap-1 rounded border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-200 transition-colors hover:bg-amber-500/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                  className="inline-flex min-h-6 items-center gap-1 rounded border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-200 transition-colors hover:bg-amber-500/25 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-amber-400"
                 >
                   <Plus className="h-3 w-3" /> {m.process}
                 </button>

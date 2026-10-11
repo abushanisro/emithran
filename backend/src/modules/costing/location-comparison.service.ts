@@ -7,7 +7,7 @@ import {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export interface LocationProcessLine {
+interface LocationProcessLine {
   operation: string;
   processGroup: string;
   mhrUsd: number;
@@ -17,7 +17,7 @@ export interface LocationProcessLine {
   totalCostUsd: number;
 }
 
-export interface LocationCostEntry {
+interface LocationCostEntry {
   location: string;
   currency: string;
   currencySymbol: string;

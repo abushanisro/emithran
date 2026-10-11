@@ -68,7 +68,6 @@ interface RawMaterial {
   materialGrade?: string;
   material?: string;
   materialGroup?: string;
-  categoryName?: string;
   materialType?: string;
   materialDescription?: string;
   description?: string;
@@ -1827,7 +1826,7 @@ export function BOMItemDialog({
                     </div>
                   </PopoverTrigger>
                   <PopoverContent
-                    className="w-[var(--radix-popover-trigger-width)] p-0 bg-popover border-border shadow-lg"
+                    className="w-(--radix-popover-trigger-width) p-0 bg-popover border-border shadow-lg"
                     align="start"
                     onOpenAutoFocus={(e) => e.preventDefault()}
                     onCloseAutoFocus={(e) => e.preventDefault()}

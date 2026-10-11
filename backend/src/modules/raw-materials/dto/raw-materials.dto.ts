@@ -1,7 +1,8 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { IsString, IsOptional, IsNumber, Min, Max, IsEnum } from 'class-validator';
+import { IsString, IsOptional, IsNumber, Min, Max, IsEnum, IsIn } from 'class-validator';
+import { MATERIAL_CLASSES, type MaterialClass } from '../constants/raw-material.constants';
 import { Type } from 'class-transformer';
-import { Currency, MaterialShape } from '../constants/material-categories.constants';
+import { Currency, MaterialShape } from '../constants/raw-material.constants';
 
 export class CreateRawMaterialDto {
   @ApiProperty({ example: 'Plastic & Rubber' })
@@ -301,6 +302,12 @@ export class QueryRawMaterialsDto {
   @IsOptional()
   @IsString()
   materialGroup?: string;
+
+  // Ferrous | Non-Ferrous | Plastic & Rubber (raw_materials.material_class, migration 897).
+  @ApiPropertyOptional({ enum: MATERIAL_CLASSES })
+  @IsOptional()
+  @IsIn(MATERIAL_CLASSES)
+  materialClass?: MaterialClass;
 
   // The part's process group: only the material groups linked to it
   // (process_material_groups, migration 879) are listed.

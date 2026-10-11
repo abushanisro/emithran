@@ -445,7 +445,7 @@ export interface KeywayBroachReference {
   multipassPositioningS: number | null;
 }
 
-export interface KeywayBroachChoice {
+interface KeywayBroachChoice {
   kind: 'pull' | 'shim';
   row: any;
   passes: number;

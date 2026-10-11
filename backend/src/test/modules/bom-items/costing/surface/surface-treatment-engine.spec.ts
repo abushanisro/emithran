@@ -5,8 +5,8 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
-import { computeSurfaceTreatments, SURFACE_MODELED_PROCESSES, SURFACE_PROCESSES } from '../../../../../modules/bom-items/costing/surface/surface-treatment-engine';
-import type { SecondaryMachine, SecondaryPartFacts, SecondaryReference } from '../../../../../modules/bom-items/costing/secondary/secondary-process-engine';
+import { partsPerLoad, type SecondaryMachine, type SecondaryPartFacts, type SecondaryReference } from '../../../../../modules/bom-items/costing/secondary/secondary-process-engine';
+import { computeSurfaceTreatments, anodizeTypeFromCallout, SURFACE_MODELED_PROCESSES, SURFACE_PROCESSES } from '../../../../../modules/bom-items/costing/surface/surface-treatment-engine';
 
 const ROOT = path.resolve(__dirname, '../../../../../../../memory/SurfaceTreatment');
 
@@ -74,6 +74,8 @@ const pool: SecondaryMachine[] = [
   ...machines('dot_peen_machines.csv', 'Dot Peen', [null, null, null]),
   ...machines('conveyor_shot_blast_machines.csv', 'Conveyor Shot Blast', [null, 'Opening Width (mm)', 'Max Nesting Height (mm)']),
   ...machines('anodizing_machines.csv', 'Anodize', ['Loadbar Window Length (mm)', 'Loadbar Window Width (mm)', 'Loadbar Window Height (mm)']),
+  ...machines('passivation_machines.csv', 'Passivation', [null, null, null]),
+  ...machines('wet_coat_line_machines.csv', 'Wet Coat Line', [null, null, null]),
 ];
 
 const plate: SecondaryPartFacts = {
@@ -112,14 +114,101 @@ describe('surface treatment on the reference data', () => {
     expect(r.trace.find((t) => t.label === 'Part spacing')?.value).toBe(spacing);
   });
 
-  it('anodize is a disclosed gap: the anodizing duration has no reference rule', () => {
+  it('anodize without a type on the drawing is a gap naming the missing type', () => {
     const r = byProcess().get('Anodize')!;
     expect(r.status).toBe('gap');
-    expect(r.reason).toMatch(/anodizing duration/);
+    expect(r.reason).toMatch(/anodizing type/);
   });
 
   it('laser engraving needs the material type before it can check compatibility', () => {
     expect(byProcess().get('Laser Engraving')!.status).toBe('gap');
+  });
+});
+
+// Phase 9: the batch-load processes, on the real memory/ machine rows.
+// Expected values are worked by hand from those rows, not from the engine.
+const one = (part: SecondaryPartFacts, process: string) => {
+  const r = computeSurfaceTreatments(part, reference, pool).find((x) => x.process === process);
+  if (!r) throw new Error(`${process} is not a surface process`);
+  return r;
+};
+const step = (r: ReturnType<typeof one>, label: string) => r.trace.find((t) => t.label === label)?.value;
+const block: SecondaryPartFacts = { ...plate, bboxMm: { length: 100, width: 50, height: 20 }, surfaceAreaMm2: 2 * (100 * 50 + 100 * 20 + 50 * 20) };
+
+describe('partsPerLoad', () => {
+  it('spaces each part by factor x its size and packs the best orientation', () => {
+    // 100x50x20 at factor 0.5 -> 150x75x30 in 457.2 x 304.8 x 254: 3 x 4 x 8 = 96
+    expect(partsPerLoad({ partMm: [100, 50, 20], windowMm: [457.2, 304.8, 254], spacingFactor: 0.5 })).toEqual({ count: 96, governedBy: 'window' });
+  });
+  it('the weight limit and the surface-area limit cap the count, and say so', () => {
+    expect(partsPerLoad({ partMm: [100, 50, 20], windowMm: [457.2, 304.8, 254], spacingFactor: 0.5, partKg: 20, weightLimitKg: 1000 }))
+      .toEqual({ count: 50, governedBy: 'weight' });
+    expect(partsPerLoad({ partMm: [200, 100, 2], windowMm: [1219, 1219, 914], spacingFactor: 0.5, partAreaM2: 0.04, areaLimitM2: 28 }))
+      .toEqual({ count: 700, governedBy: 'surface area' });
+  });
+  it('a loadbar with no depth hangs one layer; a part bigger than the window fits 0', () => {
+    expect(partsPerLoad({ partMm: [200, 100, 2], windowMm: [7620, 3505.2, null], spacingFactor: 0.5 }).count).toBe(25 * 23);
+    expect(partsPerLoad({ partMm: [600, 50, 20], windowMm: [457.2, 304.8, 254], spacingFactor: 0.5 }).count).toBe(0);
+  });
+});
+
+describe('passivation (passivationTreatments + tank window)', () => {
+  const stainless: SecondaryPartFacts = { ...block, materialCutCode: 15.11, isMachined: false };
+  it('uses the shortest listed treatment and loads the default tank', () => {
+    const r = one(stainless, 'Passivation');
+    expect(r.status).toBe('costed');
+    expect(r.machine?.name).toBe('Best Technology 188P'); // surface_treatment_processes.csv default
+    expect(step(r, 'Immersion time')).toBe(25);           // hot bath; the 60 min cold bath is shown
+    expect(step(r, 'Parts per tank load')).toBe(96);
+    expect(step(r, 'Tank loads')).toBe(2);                 // ceil(100 / 96)
+    expect(r.warnings.join(' ')).toMatch(/60 min/);
+  });
+  it('a machined part takes the machined treatment', () => {
+    expect(step(one({ ...stainless, isMachined: true }, 'Passivation'), 'Immersion time')).toBe(23);
+  });
+  it('a material with no passivation treatment is not applicable, a missing cut code is a gap', () => {
+    expect(one({ ...stainless, materialCutCode: 1.1 }, 'Passivation').status).toBe('not_applicable');
+    expect(one({ ...stainless, materialCutCode: null }, 'Passivation').status).toBe('gap');
+  });
+});
+
+describe('anodize (one loadbar per Load Window Time)', () => {
+  const typeII: SecondaryPartFacts = { ...plate, surfaceCallout: 'Anodize per MIL-A-8625 Type II, Class 2' };
+  it('runs on a line of the drawing type; a big loadbar is capped by its surface area', () => {
+    const r = one(typeII, 'Anodize');
+    expect(r.status).toBe('costed');
+    expect(r.machine?.name).toMatch(/^Type II Line/);
+    const line = parseCsv('Machine/anodizing_machines.csv').find((m) => m.Name === r.machine?.name);
+    const cap = Number(line?.['Loadbar Max Load Surface Area (m^2)']);
+    expect(step(r, 'Parts per loadbar')).toBe(Math.floor(cap / 0.04)); // 200x100 plate, both faces = 0.04 m²
+  });
+  it('a small batch is charged the line minimum batch cost', () => {
+    const r = one({ ...typeII, batchSize: 1 }, 'Anodize');
+    expect(r.costPerPartUsd).toBe(250); // Min Batch Cost (USD) on every line
+  });
+  it('reads every reference type name from a callout', () => {
+    expect(['type I', 'TYPE IB', 'Type IC', 'type 2', 'Type III'].map(anodizeTypeFromCallout))
+      .toEqual(['Type I', 'Type IB', 'Type IC', 'Type II', 'Type III']);
+    expect(anodizeTypeFromCallout('Anodize clear')).toBeNull();
+  });
+});
+
+describe('wet coat line (one loadbar per Load Window Time + paint)', () => {
+  it('times the part on the default line and prices the paint from coverage', () => {
+    const r = one(plate, 'Wet Coat Line');
+    expect(r.status).toBe('costed');
+    expect(r.machine?.name).toBe('WetCoatLine01');
+    expect(step(r, 'Parts per loadbar')).toBe(575);                   // 300x150 spaced, one layer, in 7620 x 3505.2
+    expect(r.cycleTimeSec).toBeCloseTo((0.25 * 3600) / 575, 3);       // 0.25 h window, yield 1
+    expect(r.materialUsdPerPart).toBeCloseTo((0.04 / 7.36) * 10.04, 4); // area / coverage x USD per L
+  });
+});
+
+describe('performance', () => {
+  it('costs every surface process for a part well inside the request budget', () => {
+    const t0 = performance.now();
+    for (let i = 0; i < 100; i++) computeSurfaceTreatments({ ...block, materialCutCode: 15.11, isMachined: false, surfaceCallout: 'Type II' }, reference, pool);
+    expect((performance.now() - t0) / 100).toBeLessThan(20); // ms per part
   });
 });
 
@@ -134,7 +223,11 @@ describe('migration 821 matches the engine', () => {
     expect(rows.map((r) => [r.process, r.cls]).sort()).toEqual(SURFACE_PROCESSES.map((p) => [p.process, p.machineClass]).sort());
   });
 
-  it('marks modeled exactly the processes the engine costs', () => {
-    expect(new Set(rows.filter((r) => r.modeled).map((r) => r.process))).toEqual(SURFACE_MODELED_PROCESSES);
+  it('marks modeled exactly the processes the engine costs (821, then 898 on top)', () => {
+    const sql898 = fs.readFileSync(path.resolve(__dirname, '../../../../../../migrations/898_surface_treatment_batch_load_processes.sql'), 'utf-8');
+    const block898 = sql898.slice(sql898.indexOf('WITH ref'), sql898.indexOf('UPDATE process_taxonomy'));
+    const now898 = new Map([...block898.matchAll(/\(\$str\$([^$]+)\$str\$, \$str\$([^$]+)\$str\$, (true|false)\)/g)].map((m) => [m[1], m[3] === 'true']));
+    const modeled = rows.map((r) => ({ ...r, modeled: now898.get(r.process) ?? r.modeled }));
+    expect(new Set(modeled.filter((r) => r.modeled).map((r) => r.process))).toEqual(SURFACE_MODELED_PROCESSES);
   });
 });

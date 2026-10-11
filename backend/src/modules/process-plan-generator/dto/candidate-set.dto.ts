@@ -14,6 +14,8 @@ export interface MaterialCandidate {
   candidateId: string;        // 'rm-1', 'rm-2', ...
   dbId: string;               // real raw_materials.id
   materialGroup: string;
+  /** Ferrous | Non-Ferrous | Plastic & Rubber (raw_materials.material_class, migration 897). */
+  materialClass: string | null;
   material: string;
   grade: string | null;
   densityKgPerM3: number | null;
@@ -44,7 +46,7 @@ export interface LabourCandidate {
   score: number;
 }
 
-export interface ProcessReferenceTable {
+interface ProcessReferenceTable {
   tableName: string;
   columnDefinitions: Array<{ name: string; type: string }>;
   rows: Array<Record<string, unknown>>;
@@ -61,14 +63,14 @@ export interface ProcessCandidate {
   referenceTables: ProcessReferenceTable[]; // lookup tables attached to this process
 }
 
-export interface CalculatorFieldDef {
+interface CalculatorFieldDef {
   fieldName: string;
   dataSource: string | null;  // 'mhr' | 'lhr' | 'raw_materials' | 'processes' | 'manual'
   sourceField: string | null; // e.g. 'total_machine_hour_rate', 'cycle_time_minutes'
   defaultValue: string | null;
 }
 
-export interface CalculatorFormulaDef {
+interface CalculatorFormulaDef {
   formulaName: string | null;   // e.g. 'rpm', 'cycle_time' — stored by name in scope for chaining
   formulaExpression: string;
   executionOrder: number;

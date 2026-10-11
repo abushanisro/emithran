@@ -11,7 +11,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
-export class ProposedMasterApprovalDto {
+class ProposedMasterApprovalDto {
   @IsString()
   proposedMasterId!: string;
 

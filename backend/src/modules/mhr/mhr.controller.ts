@@ -17,7 +17,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { MHRService } from './mhr.service';
 import { CreateMHRDto, UpdateMHRDto, QueryMHRDto } from './dto/mhr.dto';
-import { MHRResponseDto, MHRListResponseDto, MHRReferenceDetailDto } from './dto/mhr-response.dto';
+import { MHRResponseDto, MHRListResponseDto, MHRReferenceDetailDto, MHRPickerRowDto } from './dto/mhr-response.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
 
@@ -40,6 +40,13 @@ export class MHRController {
       this.logger.error(`Failed to fetch MHR records: ${error.message}`, error.stack);
       throw error;
     }
+  }
+
+  @Get('picker')
+  @ApiOperation({ summary: 'Every machine at a location, slim, for the Process/Category/Machine pickers' })
+  @ApiResponse({ status: 200, type: [MHRPickerRowDto] })
+  async findPickerRows(@Query('location') location: string | undefined, @AccessToken() token: string): Promise<MHRPickerRowDto[]> {
+    return this.mhrService.findPickerRows(location || undefined, token);
   }
 
   @Get('categories')

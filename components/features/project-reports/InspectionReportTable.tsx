@@ -64,7 +64,7 @@ function BalloonDrawingSection({ report }: { report: InspectionReport }) {
           <ul className="space-y-1 text-sm">
             {report.general_notes.map((note, index) => (
               <li key={index} className="flex items-start">
-                <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-2 flex-shrink-0"></span>
+                <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-2 shrink-0"></span>
                 {note}
               </li>
             ))}

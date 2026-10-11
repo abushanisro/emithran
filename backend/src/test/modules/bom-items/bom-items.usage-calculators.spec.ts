@@ -16,7 +16,6 @@ import { type BlankOptimizerService } from '../../../modules/bom-items/costing/s
 import { type SheetMetalLookupService } from '../../../modules/bom-items/costing/sheet-metal/lookup/sheet-metal-lookup.service';
 import { type MachiningLookupService } from '../../../modules/bom-items/costing/machining/lookup/machining-lookup.service';
 import { realPartSpacingTable } from './costing/sheet-metal/real-part-spacing';
-import { STANDARD_SHEETS } from '../../../modules/bom-items/costing/sheet-metal/machine/sheet-metal-nesting.engine';
 import { type CADAnalysisService } from '../../../modules/bom-items/services/cad-analysis.service';
 import { type RateResolutionService } from '../../../modules/bom-items/services/rate-resolution.service';
 import { type MaterialResolutionService } from '../../../modules/bom-items/services/material-resolution.service';
@@ -41,7 +40,13 @@ function buildService(computeTrueNest: jest.Mock, summary: Record<string, unknow
     {} as unknown as SupabaseService,
     {} as unknown as InspectionKnowledgeService,
     {} as unknown as BlankOptimizerService,
-    { getPartSpacingTable: async () => realPartSpacingTable() } as unknown as SheetMetalLookupService,
+    {
+      getPartSpacingTable: async () => realPartSpacingTable(),
+      // No laser sheet resolvable here; the reference standard sheet is
+      // standardSheetWidth/Length = 1219.2 x 2438.4 (migration 479).
+      getNominalSheetForMachine: async () => null,
+      getStandardSheet: async () => ({ widthMm: 1219.2, lengthMm: 2438.4 }),
+    } as unknown as SheetMetalLookupService,
     {} as unknown as MachiningLookupService,
     {} as unknown as ExchangeRateService,
     cadAnalysisService,
@@ -137,9 +142,28 @@ describe('BOMItemsService.resolveGrossUsageForCalculator — "Sheet Metal - Gros
     expect(result['Gross Weight Per Part']).toBeUndefined();
   });
 
-  it('evaluates every viable standard sheet and reproduces the RTP2 MAG2 FRONTFRAME figures end-to-end', async () => {
-    // Only 1250x2500mm fits at 19 parts/sheet -- same fixture as the
-    // existing true-nest-costing regression spec.
+  it('opened interactively, nests on the sheet this part was last costed on', async () => {
+    const computeTrueNest = jest.fn(() => Promise.resolve({ result: { partsPerSheet: 19, utilizationPct: 0 }, reason: '' }));
+    const { service } = buildService(computeTrueNest, {
+      flatPatternOutlinePointsMm: OUTLINE, flatPatternHolesMm: [],
+      // a cache from another kerf: its SHEET is still the costed sheet
+      trueNestCostingCache: { sheetWidthMm: 1524, sheetLengthMm: 3048, kerfMm: 9, edgeMarginMm: 2 },
+    });
+    await service.resolveGrossUsageForCalculator(validInputs, { itemId: 'item-1', userId: 'u', accessToken: 't' });
+    expect(computeTrueNest).toHaveBeenCalledWith(expect.objectContaining({ sheetWidthMm: 1524, sheetLengthMm: 3048 }));
+  });
+
+  it('with nothing costed yet, nests on the reference standard sheet (1219.2 x 2438.4)', async () => {
+    const computeTrueNest = jest.fn(() => Promise.resolve({ result: { partsPerSheet: 12, utilizationPct: 0 }, reason: '' }));
+    const { service } = buildService(computeTrueNest, { flatPatternOutlinePointsMm: OUTLINE, flatPatternHolesMm: [] });
+    const result = await service.resolveGrossUsageForCalculator(validInputs, { itemId: 'item-1', userId: 'u', accessToken: 't' });
+    expect(computeTrueNest).toHaveBeenCalledWith(expect.objectContaining({ sheetWidthMm: 1219.2, sheetLengthMm: 2438.4 }));
+    expect(result['Selected Sheet Width']).toBe(1219.2);
+  });
+
+  it('nests on the sheet the cost engine hands in and reproduces the RTP2 MAG2 FRONTFRAME figures end-to-end', async () => {
+    // RTP2 was nested on a 1250x2500mm sheet at 19 parts/sheet -- same
+    // fixture as the true-nest-costing regression spec.
     const computeTrueNest = jest.fn(({ sheetWidthMm, sheetLengthMm }: { sheetWidthMm: number; sheetLengthMm: number }) =>
       Promise.resolve(
         sheetWidthMm === 1250 && sheetLengthMm === 2500
@@ -149,9 +173,12 @@ describe('BOMItemsService.resolveGrossUsageForCalculator — "Sheet Metal - Gros
     );
     const { service } = buildService(computeTrueNest, { flatPatternOutlinePointsMm: OUTLINE, flatPatternHolesMm: [] });
 
-    const result = await service.resolveGrossUsageForCalculator(validInputs, { itemId: 'item-1', userId: 'u', accessToken: 't' });
+    const result = await service.resolveGrossUsageForCalculator(
+      { ...validInputs, 'Sheet Width': 1250, 'Sheet Length': 2500 },
+      { itemId: 'item-1', userId: 'u', accessToken: 't' },
+    );
 
-    expect(computeTrueNest).toHaveBeenCalledTimes(STANDARD_SHEETS.length);
+    expect(computeTrueNest).toHaveBeenCalledTimes(1);
     expect(result._gapReason).toBeUndefined();
     expect(result['Nest Method']).toBe('True Shape');
     expect(result['Selected Sheet Width']).toBe(1250);
@@ -175,11 +202,12 @@ describe('BOMItemsService.resolveGrossUsageForCalculator — "Sheet Metal - Gros
     );
     const { service } = buildService(computeTrueNest, { flatPatternOutlinePointsMm: OUTLINE, flatPatternHolesMm: [] });
 
-    const withoutBatch = await service.resolveGrossUsageForCalculator(validInputs, { itemId: 'item-1', userId: 'u', accessToken: 't' });
+    const onRtp2Sheet = { ...validInputs, 'Sheet Width': 1250, 'Sheet Length': 2500 };
+    const withoutBatch = await service.resolveGrossUsageForCalculator(onRtp2Sheet, { itemId: 'item-1', userId: 'u', accessToken: 't' });
     expect(withoutBatch['Sheets Required']).toBeUndefined();
 
     const withBatch = await service.resolveGrossUsageForCalculator(
-      { ...validInputs, 'Batch Quantity': 250 },
+      { ...onRtp2Sheet, 'Batch Quantity': 250 },
       { itemId: 'item-1', userId: 'u', accessToken: 't' },
     );
     expect(withBatch['Sheets Required']).toBe(14);

@@ -10,7 +10,7 @@
 // lathe margins per the ×1.2 rule; laser thickness limits are material-specific
 // and resolved against the machine's per-material columns by the selector.
 
-import { estimateBendTonnage, estimateBurlTonnage, estimateTurretPunchTonnage } from '../../core/default-rates.constants';
+import { recommendedBendTonnage, estimateBurlTonnage, estimateTurretPunchTonnage } from '../../core/default-rates.constants';
 
 // ── Material factor tables ────────────────────────────────────────────────────
 // Baseline MRR (cm³/min) at 100% rigidity — used to size VMC spindle demand
@@ -32,8 +32,8 @@ export const TONNAGE_MARGIN = 1.15;
 
 // IM tie-bar clearance: part footprint + runner allowance + platen-edge clearance.
 // Additive (not proportional) — a 20mm runner is 20mm regardless of part size.
-export const IM_TIEBAR_RUNNER_ALLOWANCE_MM = 20;  // cold-runner edge on mold face
-export const IM_TIEBAR_PLATEN_CLEARANCE_MM = 25;  // platen edge to tie-bar inner face
+const IM_TIEBAR_RUNNER_ALLOWANCE_MM = 20;  // cold-runner edge on mold face
+const IM_TIEBAR_PLATEN_CLEARANCE_MM = 25;  // platen edge to tie-bar inner face
 export const IM_TIEBAR_ADDEND_MM = IM_TIEBAR_RUNNER_ALLOWANCE_MM + IM_TIEBAR_PLATEN_CLEARANCE_MM; // = 45mm
 
 export function classifyLaserMaterial(grade: string | null): LaserMaterialFamily {
@@ -90,14 +90,14 @@ export function classifyLaserMaterial(grade: string | null): LaserMaterialFamily
 
 // ── Requirement types ─────────────────────────────────────────────────────────
 
-export interface PressBrakeRequirement {
+interface PressBrakeRequirement {
   kind: 'press_brake';
-  tonnage: number;        // tons required incl. no margin (selector applies TONNAGE_MARGIN)
+  tonnage: number;        // recommended force (theoretical × 1.25) — already the margin
   bendLengthMm: number;
   thicknessMm: number;
 }
 
-export interface HoleFormingRequirement {
+interface HoleFormingRequirement {
   kind: 'hole_forming';
   tonnage: number;        // tons required incl. no margin (selector applies TONNAGE_MARGIN)
   holeDiameterMm: number;
@@ -111,9 +111,23 @@ export interface LaserRequirement {
   materialGrade: string | null;  // raw grade, checked against cuttable_materials
   bedLengthMm: number;           // flat pattern length
   bedWidthMm: number;            // flat pattern width
+  // Minimum laser power that can cut this material/thickness, from the laser
+  // cut table (sm_lookup_laser_cut). Absent when the table has no rows for
+  // this material — the machine's own thickness limits then decide alone.
+  power?: LaserPowerRequirement;
 }
 
-export interface VmcRequirement {
+// From sm_lookup_laser_cut (memory/Sheetmetal/Lookup_Table_5_Laser_Cutting_Data.md):
+// a power with no row for a material/thickness cannot cut it ("-" in the
+// source). The part's thickness is rounded UP to the next tabulated
+// thickness, so the requirement is never understated.
+export interface LaserPowerRequirement {
+  material: string;                 // table material, e.g. 'Carbon Steel'
+  tableThicknessMm: number | null;  // tabulated thickness used; null = thicker than any row
+  requiredW: number | null;         // lowest power with a row; null = no laser in the table cuts it
+}
+
+interface VmcRequirement {
   kind: 'vmc';
   xMm: number;            // part bbox — selector applies ENVELOPE_MARGIN
   yMm: number;
@@ -122,13 +136,13 @@ export interface VmcRequirement {
   mrrCm3PerMin: number;
 }
 
-export interface LatheRequirement {
+interface LatheRequirement {
   kind: 'lathe';
   diameterMm: number;     // part max diameter — selector applies ENVELOPE_MARGIN
   lengthMm: number;
 }
 
-export interface GenericRequirement {
+interface GenericRequirement {
   kind: 'generic';        // deburring, tapping — no dimensional gate
 }
 
@@ -206,7 +220,7 @@ export interface WaterjetRequirement {
   bedWidthMm: number;
 }
 
-export interface InjectionMoldingRequirement {
+interface InjectionMoldingRequirement {
   kind: 'injection_molding';
   // Reference clamp force for one cavity (plastic-molding/clamp-force.ts), which
   // already includes clampForceSafetyFactor: the selector applies no further
@@ -287,18 +301,55 @@ export type MachineRequirement =
   | PlasmaCutRequirement
   | LaserPunchRequirement
   | PressRequirement
-  | RollBendingRequirement;
+  | RollBendingRequirement
+  | DeburrRequirement;
+
+// Burr removal on a cut sheet part. The burr / slag sits on the cut edge, so
+// the burr edge length is the part's cut length. Two real machine families
+// can do it, each with its own sourced time per mm of edge:
+//   Deslag machine (class 'deburring') — its own perimeter_allowance_s_per_mm
+//     (machine library, memory/Sheetmetal/machine/machine_library.csv)
+//   Manual Deburr (class 'manual_deburr') — 1 / tblDeburring linear speed for
+//     the material (memory/Machining/lookup/tblDeburring)
+// The selector ranks them by cost per part (rate × time); costing prices the
+// picked machine with the same deburrSecPerMm, so the two never disagree.
+export interface DeburrRequirement {
+  kind: 'deburr';
+  burrEdgeLengthMm: number;
+  deslagSecPerMmByMachine: Record<string, number>;   // lower-cased machine name -> s/mm
+  manualDeburr: { secPerMm: number; source: string } | null;
+}
+
+export const DEBURR_MACHINE_CLASSES = ['deburring', 'manual_deburr'] as const;
+
+/** The candidate's own time per mm of burr edge, with its source; null = not on file. */
+export function deburrSecPerMm(
+  candidate: { machineClass: string; machineName: string | null },
+  req: DeburrRequirement,
+): { secPerMm: number; source: string } | null {
+  if (candidate.machineClass === 'manual_deburr') return req.manualDeburr;
+  const s = req.deslagSecPerMmByMachine[(candidate.machineName ?? '').trim().toLowerCase()];
+  return s != null && s > 0
+    ? { secPerMm: s, source: `"${candidate.machineName}" perimeter allowance (machine library)` }
+    : null;
+}
+
+/** Deburr cycle seconds for this candidate, or null when its time rate is not on file. */
+export function deburrCycleSec(
+  candidate: { machineClass: string; machineName: string | null },
+  req: DeburrRequirement,
+): number | null {
+  const rate = deburrSecPerMm(candidate, req);
+  return rate && req.burrEdgeLengthMm > 0 ? req.burrEdgeLengthMm * rate.secPerMm : null;
+}
 
 // ── Requirement builders ──────────────────────────────────────────────────────
 
-// Air-bend tonnage: F(kN) = (1.42 × UTS(N/mm²) × L(mm) × t²(mm²)) / (1000 × V(mm)),
-// V = 8t (mid-range die opening), tons = F / 9.81 — the SAME estimateBendTonnage
-// used by machine-capability.ts's TONNAGE_EXCEEDED check and by
-// bom-items.service.ts's press-brake cost lookup, so machine SELECTION and the
-// displayed/costed tonnage can never silently disagree (previously this
-// function used a separate, coarser MATERIAL_K bucket table — MS/SS/AL/CU —
-// whose ratios didn't match real per-grade UTS at all: e.g. SS/MS = 1.75/1.42
-// ≈ 1.23 here vs the real UTS ratio SS304/E250 = 620/410 ≈ 1.51).
+// Press-brake requirement = the Bending calculator's Recommended Force
+// (theoretical × 1.25, see recommendedBendTonnage), sized to the one longest
+// bend — the SAME number the cost engine and the calculator popup show, so
+// selection and the displayed tonnage never disagree. That factor is the
+// margin: the selector adds no TONNAGE_MARGIN on top for this kind.
 export function pressBrakeRequirement(input: {
   bendLengthMm: number;
   thicknessMm: number;
@@ -306,7 +357,7 @@ export function pressBrakeRequirement(input: {
 }): PressBrakeRequirement {
   const { bendLengthMm, thicknessMm, utsMpa } = input;
   const t = Math.max(thicknessMm, 0);
-  const tonnage = estimateBendTonnage(utsMpa, t, Math.max(bendLengthMm, 0)) ?? 0;
+  const tonnage = recommendedBendTonnage(utsMpa, t, Math.max(bendLengthMm, 0)) ?? 0;
   return { kind: 'press_brake', tonnage, bendLengthMm, thicknessMm: t };
 }
 
@@ -331,6 +382,7 @@ export function laserRequirement(input: {
   materialGrade: string | null;
   bedLengthMm: number;
   bedWidthMm: number;
+  power?: LaserPowerRequirement | null;
 }): LaserRequirement {
   return {
     kind: 'laser',
@@ -339,6 +391,7 @@ export function laserRequirement(input: {
     materialGrade: input.materialGrade,
     bedLengthMm: Math.max(input.bedLengthMm, 0),
     bedWidthMm: Math.max(input.bedWidthMm, 0),
+    ...(input.power ? { power: input.power } : {}),
   };
 }
 

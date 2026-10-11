@@ -26,7 +26,7 @@ export function FeatureExplainCard({ feature, reason, onClose }: Props) {
     conf >= 70           ? 'text-amber-400'   : 'text-red-400';
 
   return (
-    <div className="mt-1.5 rounded-md border bg-card/90 backdrop-blur-sm text-xs shadow-lg">
+    <div className="mt-1.5 rounded-md border bg-card/90 backdrop-blur-xs text-xs shadow-lg">
       <div className="flex items-center justify-between px-2.5 py-1.5 border-b">
         <div className="flex items-center gap-1.5">
           <span

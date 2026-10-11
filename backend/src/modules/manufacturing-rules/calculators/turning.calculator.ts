@@ -10,7 +10,7 @@ import type {
   ToolRequirements,
 } from "../interfaces/operation-calculator.interface";
 
-export interface TurningGeometry extends FeatureGeometry {
+interface TurningGeometry extends FeatureGeometry {
   diameterMm: number;           // part OD being turned
   lengthMm: number;             // length of cut
   materialRemovalMm: number;    // total radial depth to remove (blank OD - finish OD) / 2

@@ -11,7 +11,7 @@ import type {
   ToolRequirements,
 } from "../interfaces/operation-calculator.interface";
 
-export interface InjectionMoldingGeometry extends FeatureGeometry {
+interface InjectionMoldingGeometry extends FeatureGeometry {
   polymerId: string;            // 'PP' | 'ABS' | 'PA66' | etc. — matches polymer_name in DB
   wallThicknessMm: number;      // nominal wall thickness (controls cooling time)
   projectedAreaMm2: number;     // projected area in clamp direction (controls clamp force)

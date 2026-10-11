@@ -1342,7 +1342,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
                       errorSeverity === 'warning' ? 'bg-yellow-50 text-yellow-700 dark:bg-yellow-950/20 dark:text-yellow-300' :
                       'bg-blue-50 text-blue-700 dark:bg-blue-950/20 dark:text-blue-300'
                     }`}>
-                      {ErrorIcon && <ErrorIcon className="h-3 w-3 mt-0.5 flex-shrink-0" />}
+                      {ErrorIcon && <ErrorIcon className="h-3 w-3 mt-0.5 shrink-0" />}
                       <div className="flex-1">
                         <p className="font-medium">{fieldError.message}</p>
                         {fieldError.suggestion && (
@@ -1510,7 +1510,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
 
       {/* Live Calculation Preview */}
       {calculator.fields?.some(field => field.fieldType === 'calculated') && Object.keys(fieldValues).length > 0 && (
-        <Card className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20">
+        <Card className="bg-linear-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Eye className="h-5 w-5" />
@@ -1687,7 +1687,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
                             <CollapsibleContent className="mt-2">
                               {field.defaultValue && (
                                 <div className="space-y-3">
-                                  <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4 rounded-lg border">
+                                  <div className="bg-linear-to-r from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4 rounded-lg border">
                                     <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
                                       <Calculator className="h-4 w-4" />
                                       Step-by-Step Calculation
@@ -1695,7 +1695,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
                                     <div className="space-y-3">
                                       {createCalculationSteps(field.defaultValue, fieldValues).map((step, index) => (
                                         <div key={index} className="flex gap-3 items-start">
-                                          <div className={`flex-shrink-0 w-7 h-7 text-white rounded-full flex items-center justify-center text-xs font-bold ${
+                                          <div className={`shrink-0 w-7 h-7 text-white rounded-full flex items-center justify-center text-xs font-bold ${
                                             step.isIntermediate ? 'bg-blue-500' : step.step === 1 ? 'bg-purple-500' : 'bg-green-500'
                                           }`}>
                                             {step.step}
@@ -1725,7 +1725,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
                                       
                                       <div className="mt-4 pt-3 border-t border-gray-300 dark:border-gray-600">
                                         <div className="flex gap-3 items-center">
-                                          <div className="flex-shrink-0 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                                          <div className="shrink-0 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
                                             ✓
                                           </div>
                                           <div className="flex-1">
@@ -1791,7 +1791,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
                             <CollapsibleContent className="mt-2">
                               {formula.formulaExpression && (
                                 <div className="space-y-3">
-                                  <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4 rounded-lg border">
+                                  <div className="bg-linear-to-r from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4 rounded-lg border">
                                     <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
                                       <Calculator className="h-4 w-4" />
                                       Step-by-Step Calculation
@@ -1799,7 +1799,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
                                     <div className="space-y-3">
                                       {createCalculationSteps(formula.formulaExpression, fieldValues).map((step, index) => (
                                         <div key={index} className="flex gap-3 items-start">
-                                          <div className="flex-shrink-0 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                                          <div className="shrink-0 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
                                             {step.step}
                                           </div>
                                           <div className="flex-1 min-w-0">
@@ -1813,7 +1813,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
                                       
                                       <div className="mt-4 pt-3 border-t border-gray-300 dark:border-gray-600">
                                         <div className="flex gap-3 items-center">
-                                          <div className="flex-shrink-0 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                                          <div className="shrink-0 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
                                             ✓
                                           </div>
                                           <div className="flex-1">

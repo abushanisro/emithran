@@ -86,7 +86,7 @@ export function requiredItGrade(bandMm: number, sizeMm: number, iso: readonly Is
 
 export interface Requirement { category: GtolCategory; value: number }
 
-export type HoldResult =
+type HoldResult =
   | { held: true; detail: string }
   | { held: false; detail: string }
   | { held: null; detail: string };

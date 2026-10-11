@@ -50,9 +50,9 @@ export function resolveEffectiveSheetThicknessMm(
 // rate has since changed (see resolveDisplayCurrency in bom-items.service.ts,
 // which uses this stored rate directly and never re-fetches).
 
-export type ScenarioFxRateType = 'reference' | 'budget' | 'custom';
+type ScenarioFxRateType = 'reference' | 'budget' | 'custom';
 
-export interface ScenarioFxSnapshot {
+interface ScenarioFxSnapshot {
   factoryCurrency: string;
   scenarioCurrency: string;
   provider: string | null;
@@ -64,7 +64,7 @@ export interface ScenarioFxSnapshot {
   customReason?: string;
 }
 
-export interface ScenarioAskPrice {
+interface ScenarioAskPrice {
   amount: number;
   currency: string;
 }
@@ -188,7 +188,7 @@ export function resolveScenarioCavityCount(
 // real stock data to honor them with (see StockForm's own doc comment in
 // blank-optimizer.service.ts) — an unrecognized value is treated the same as
 // unset (auto-decide), never silently coerced into one of the real forms.
-export type ScenarioStockForm = 'round_bar' | 'hex_bar' | 'rectangular_bar' | 'billet';
+type ScenarioStockForm = 'round_bar' | 'hex_bar' | 'rectangular_bar' | 'billet';
 const VALID_SCENARIO_STOCK_FORMS: ReadonlySet<string> = new Set(['round_bar', 'hex_bar', 'rectangular_bar', 'billet']);
 
 /** Persisted scenario Stock Form override. null = unset ("Let eMithran Decide"). */

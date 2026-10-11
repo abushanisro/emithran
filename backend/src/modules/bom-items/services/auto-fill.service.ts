@@ -1,7 +1,6 @@
 import { Injectable, Logger, ServiceUnavailableException, UnprocessableEntityException } from '@nestjs/common';
 import { SupabaseService } from '../../../common/supabase/supabase.service';
 import { StepConverterService } from './step-converter.service';
-import { SheetMetalFeatureExtractorService } from './sheet-metal-feature-extractor.service';
 import axios from 'axios';
 import * as path from 'path';
 import { plainToInstance } from 'class-transformer';
@@ -154,7 +153,6 @@ export class AutoFillService {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly stepConverterService: StepConverterService,
-    private readonly sheetMetalExtractor: SheetMetalFeatureExtractorService,
     private readonly machiningLookup: MachiningLookupService,
   ) {
     this.cadEngineUrl = process.env.CAD_ENGINE_URL || 'http://localhost:5000';
@@ -283,11 +281,6 @@ export class AutoFillService {
     const suggestions: AutoFillSuggestionsDto = {
       name: this.inferName(fileName),
       partNumber: this.generatePartNumber(fileName),
-      // The category selector's starting position, from the classified family;
-      // null when the engine did not classify the part.
-      materialCategory: family.family == null
-        ? null
-        : family.family === 'plastic_molded' ? 'PLASTIC_RUBBER' : 'FERROUS_NON_FERROUS',
       materialGrade: '',
       materialId: null,
       density: null,
@@ -411,7 +404,6 @@ export class AutoFillService {
         classificationSignals: cadMI?.classification_signals ?? undefined,
         classificationReasons: cadMI?.classification_reason ?? undefined,
       },
-      features: isSheetMetal ? this.sheetMetalExtractor.extract(geo) : [],
       processRecommendations,
       summary: {
         bendCount:          geo.bendCount,
@@ -447,6 +439,21 @@ export class AutoFillService {
         // at this top level, not nested under a feature's own recognition object.
         sharpCornerCount:     geo.sharpCornerCount,
         acuteCornerCount:     geo.acuteCornerCount,
+        // The cut path, measured by the CAD engine panel-wire walk (absent on
+        // mesh-only parts: only the combined cutLengthMm is known there).
+        cutLengthBreakdownMm: geo.cutLengthBreakdown
+          ? {
+              outerProfile: geo.cutLengthBreakdown.outerProfileMm,
+              circularHoles: geo.cutLengthBreakdown.circularHolesMm,
+              internalProfiles: geo.cutLengthBreakdown.internalProfilesMm,
+            }
+          : undefined,
+        longestContinuousCutMm: geo.longestContinuousCutMm ?? undefined,
+        rapidTraverseSec:     geo.rapidTraverseSec ?? undefined,
+        // Flat-pattern nesting metrics, when the 2D unfold resolved them.
+        flatPatternBoundingRectMm2: geo.boundingRectMm2 ?? undefined,
+        materialUtilizationPct: geo.boundingRectMm2 ? geo.materialUtilizationPct : undefined,
+        scrapAreaMm2:         geo.boundingRectMm2 ? geo.scrapAreaMm2 : undefined,
         smallHoleCount:       geo.smallHoleCount,
         extrudedFlangeCount:  geo.extrudedFlangeCount,
         rolledFormCount:      geo.rolledFormCount,
@@ -521,6 +528,10 @@ export class AutoFillService {
           castingCurvedSurfaceCount:    cadMI?.features?.curved_surface_count ?? 0,
           castingSharpEdgeCount:        cadMI?.features?.sharp_edge_count ?? 0,
           castingNotSupportedFaceCount: (cadMI?.features?.not_supported_face_ids ?? []).length,
+          // Pull axes the engine proved undercut-free (recognized only), drawn as setup-axis arrows.
+          castingSetupAxes: ((cadMI?.features?.setup_axis_candidates ?? []) as Array<{ recognition_status?: string; axis?: number[] }>)
+            .filter((c) => c.recognition_status === 'recognized' && Array.isArray(c.axis) && c.axis.length === 3)
+            .map((c) => c.axis as number[]),
         } : {}),
       },
       dfmWarnings:            this.buildDFMWarnings(geo, cadResult),
@@ -533,6 +544,8 @@ export class AutoFillService {
       ...(machiningFeatures ? { machining_features: machiningFeatures } : {}),
       // Semantic GD&T from the STEP model itself (cad-engine shared/step_pmi.py).
       ...(cadResult?.pmi ? { pmi: cadResult.pmi } : {}),
+      // Per-face attributes + edge convexity (cad-engine shared/face_attributes.py)
+      ...(cadResult?.face_graph ? { face_graph: cadResult.face_graph } : {}),
       ...(imHeatmapFeatures ? { imHeatmapFeatures } : {}),
       ...(cadResult?.geometry_features?.manufacturing_features?.component_features
         ? { component_features: cadResult.geometry_features.manufacturing_features.component_features }
@@ -1451,17 +1464,4 @@ export class AutoFillService {
     }
     return instance;
   }
-}
-
-// Returns the value from a numeric-keyed Record for the largest key ≤ value.
-// Same logic as in deterministic-planner.service.ts — kept local to avoid a
-// shared-utility circular dependency between bom-items and process-plan-generator.
-function lookupByThresholdLocal(table: Record<number, number>, value: number): number | undefined {
-  const keys = Object.keys(table).map(Number).sort((a, b) => a - b);
-  let result: number | undefined;
-  for (const k of keys) {
-    if (value >= k) result = table[k];
-    else break;
-  }
-  return result;
 }

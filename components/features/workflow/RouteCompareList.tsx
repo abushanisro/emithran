@@ -150,7 +150,7 @@ export function RouteCompareList({
 
         {groups.map((group) => (
           <section key={group.family}>
-            <header className="sticky top-0 z-10 border-b border-border/60 bg-background/95 px-4 py-2 backdrop-blur">
+            <header className="sticky top-0 z-10 border-b border-border/60 bg-background/95 px-4 py-2 backdrop-blur-sm">
               <h4 className="text-[11px] font-semibold uppercase tracking-wide text-foreground/80">{group.title}</h4>
               <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{group.description}</p>
             </header>
@@ -179,7 +179,7 @@ export function RouteCompareList({
                       }
                     }}
                     className={cn(
-                      'group relative flex items-start gap-3 px-4 py-2.5 outline-none transition-colors',
+                      'group relative flex items-start gap-3 px-4 py-2.5 outline-hidden transition-colors',
                       'focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-violet-500',
                       node.selectable ? 'cursor-pointer hover:bg-muted/30' : 'cursor-default',
                       isSelected && 'bg-violet-500/10',

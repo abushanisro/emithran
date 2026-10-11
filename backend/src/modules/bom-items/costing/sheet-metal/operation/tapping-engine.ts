@@ -8,7 +8,7 @@ import { eMithranTerms, resolveSetupMinutes } from '../../shared/core/engine-ker
 
 // Extracted verbatim from cost-engine.ts's inline Tapping block (Platform
 // Architecture Remediation Phase 1 — engine registry unification, Rule 8).
-export interface TappingInput {
+interface TappingInput {
   threadCount: number; // threads.length > 0 gates the line
   batchSize: number;
   rate: MHRRateInput;
@@ -30,7 +30,7 @@ export interface TappingInput {
   scrapPricePerKg?: number;
 }
 
-export interface TappingResult {
+interface TappingResult {
   processLines: ProcessLineCost[];
   cycleTimeMin: number;
   warnings: string[];
@@ -115,7 +115,7 @@ export function computeTappingCost(input: TappingInput): TappingResult {
   };
 }
 
-export interface TappingContext extends TappingInput {}
+interface TappingContext extends TappingInput {}
 
 export class TappingEngine implements ManufacturingProcessEngine<TappingContext, TappingResult> {
   readonly machineClass = 'tapping' as const;

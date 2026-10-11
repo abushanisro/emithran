@@ -17,7 +17,6 @@ import {
 export { CYCLE_TIME_FIELD };
 export type { CalcRun, CalcSeed, LookupMatch };
 export type MachiningCalculatorField = ReferenceCalculatorField;
-export type MachiningCalculatorDef = ReferenceCalculatorDef;
 /** Calculator per catalog operation name ("Drilling", "Rough Turning", ...). */
 export type MachiningCalculators = ReferenceCalculators;
 

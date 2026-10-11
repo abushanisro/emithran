@@ -33,6 +33,10 @@ export default tseslint.config(
 
       "**/*.generated.*",
       "**/generated/**",
+
+      // Playwright output (generated)
+      "e2e/report/**",
+      "test-results/**",
     ],
   },
 
@@ -152,6 +156,10 @@ export default tseslint.config(
       ],
 
       "@typescript-eslint/no-floating-promises": "error",
+      // Numbers in template strings are safe (`${n} mm`); undefined/null/objects stay errors.
+      "@typescript-eslint/restrict-template-expressions": ["error", {
+        allowNumber: true, allowAny: false, allowBoolean: false, allowNullish: false, allowRegExp: false, allowNever: false,
+      }],
 
       "@typescript-eslint/await-thenable": "error",
 
@@ -232,7 +240,8 @@ export default tseslint.config(
        * ======================================
        */
 
-      eqeqeq: ["error", "always"],
+      // `x == null` is the idiomatic null-or-undefined check; every other loose comparison stays banned.
+      eqeqeq: ["error", "always", { null: "ignore" }],
 
       curly: ["error", "all"],
 

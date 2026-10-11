@@ -1,19 +1,29 @@
 "use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Package } from "lucide-react";
-import type { BOMMetricEntry, MaterialCategory } from "../../types";
-import { itemCost, itemWeight, safeNum, formatPrice, buildMaterialCategories, classifyMaterial } from "../../utils";
+
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useMaterialClasses } from "@/lib/api/hooks/useRawMaterials";
+
+import { itemCost, itemWeight, safeNum, formatPrice } from "../../utils";
+
+import type { BOMMetricEntry, EnrichedBOMItem, MaterialCategory } from "../../types";
 
 interface Props {
   bomMetrics: BOMMetricEntry[];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  rawMaterials: any[];
 }
 
-export function MaterialsTab({ bomMetrics, rawMaterials }: Props) {
-  const categories = buildMaterialCategories(rawMaterials);
+const materialOf = (i: EnrichedBOMItem): string | undefined => i.material ?? i.materialGrade ?? undefined;
+
+export function MaterialsTab({ bomMetrics }: Props) {
+  // Each material's stored class (raw_materials.material_class), not a keyword guess.
+  const names = bomMetrics.flatMap((bd) => (bd.items ?? []).map(materialOf).filter((m): m is string => !!m));
+  const { data: classes } = useMaterialClasses(names);
+  const classOf = (m?: string): MaterialCategory => {
+    const c = m ? classes?.[m] : null;
+    return c === "Ferrous" || c === "Non-Ferrous" || c === "Plastic & Rubber" ? c : "Unclassified";
+  };
 
   // Build full material analysis map
   const materialAnalysis = new Map<
@@ -29,7 +39,7 @@ export function MaterialsTab({ bomMetrics, rawMaterials }: Props) {
 
   bomMetrics.forEach((bd, bomIdx) =>
     bd.items?.forEach((item) => {
-      const mat = item.material ?? item.materialGrade;
+      const mat = materialOf(item);
       if (!mat) return;
       if (!materialAnalysis.has(mat)) {
         materialAnalysis.set(mat, {
@@ -52,14 +62,11 @@ export function MaterialsTab({ bomMetrics, rawMaterials }: Props) {
   const categorized: Record<MaterialCategory, CatEntry[]> = {
     Ferrous: [],
     "Non-Ferrous": [],
-    Plastics: [],
-    Rubber: [],
-    Composites: [],
-    Other: [],
+    "Plastic & Rubber": [],
+    Unclassified: [],
   };
   materialAnalysis.forEach((analysis) => {
-    const cat = classifyMaterial(analysis.material, categories);
-    categorized[cat].push(analysis);
+    categorized[classOf(analysis.material)].push(analysis);
   });
 
   return (
@@ -86,37 +93,16 @@ export function MaterialsTab({ bomMetrics, rawMaterials }: Props) {
               <tbody>
                 {(
                   [
-                    {
-                      label: "Ferrous Materials (kg)",
-                      filter: (m?: string) => m ? classifyMaterial(m, categories) === "Ferrous" : false,
-                      aggregate: "weight" as const,
-                    },
-                    {
-                      label: "Non-Ferrous Materials (kg)",
-                      filter: (m?: string) => m ? classifyMaterial(m, categories) === "Non-Ferrous" : false,
-                      aggregate: "weight" as const,
-                    },
-                    {
-                      label: "Plastic Components",
-                      filter: (m?: string) => m ? classifyMaterial(m, categories) === "Plastics" : false,
-                      aggregate: "count" as const,
-                    },
-                    {
-                      label: "Rubber Components", 
-                      filter: (m?: string) => m ? classifyMaterial(m, categories) === "Rubber" : false,
-                      aggregate: "count" as const,
-                    },
-                    {
-                      label: "Composite Materials",
-                      filter: (m?: string) => m ? classifyMaterial(m, categories) === "Composites" : false,
-                      aggregate: "count" as const,
-                    },
+                    { label: "Ferrous Materials (kg)", cls: "Ferrous" as const, aggregate: "weight" as const },
+                    { label: "Non-Ferrous Materials (kg)", cls: "Non-Ferrous" as const, aggregate: "weight" as const },
+                    { label: "Plastic & Rubber Components", cls: "Plastic & Rubber" as const, aggregate: "count" as const },
+                    { label: "Unclassified Components", cls: "Unclassified" as const, aggregate: "count" as const },
                   ] as const
-                ).map(({ label, filter, aggregate }) => (
+                ).map(({ label, cls, aggregate }) => (
                   <tr key={label} className="border-b hover:bg-muted/25">
                     <td className="py-3 px-2 font-medium">{label}</td>
                     {bomMetrics.map((bd) => {
-                      const matching = (bd.items ?? []).filter((i) => filter(i.material));
+                      const matching = (bd.items ?? []).filter((i) => materialOf(i) != null && classOf(materialOf(i)) === cls);
                       const val =
                         aggregate === "weight"
                           ? matching.reduce((s, i) => s + itemWeight(i), 0).toFixed(2)
@@ -173,7 +159,7 @@ export function MaterialsTab({ bomMetrics, rawMaterials }: Props) {
                   </thead>
                   <tbody>
                     {Array.from(materialAnalysis.values()).map((a, idx) => {
-                      const cat = classifyMaterial(a.material, categories);
+                      const cat = classOf(a.material);
                       return (
                         <tr key={idx} className="border-b hover:bg-muted/25">
                           <td className="py-3 px-2 font-medium">{a.material}</td>

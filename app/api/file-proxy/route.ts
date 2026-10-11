@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { isTrustedStorageUrl, resolveBomItemFileUrl } from '@/lib/utils/storage-file-url';
+import { requireUser } from '@/lib/server/auth';
+import { fetchTrustedFile, isServableContentType, isTrustedStorageUrl, limitStream, UntrustedUrlError } from '@/lib/server/safe-fetch';
+import { resolveBomItemFileUrl } from '@/lib/utils/storage-file-url';
 
 /**
  * File Proxy API Route
@@ -22,9 +24,18 @@ import { isTrustedStorageUrl, resolveBomItemFileUrl } from '@/lib/utils/storage-
  *   Mode B – let the proxy fetch the signed URL from backend (used by BalloonDiagramViewer):
  *     GET /api/file-proxy?itemId=<bomItemId>&fileType=2d|3d
  *     Requires Authorization header to be forwarded.
+ *
+ * Every destination passes the one trusted-storage rule (lib/server/safe-fetch:
+ * the project's own storage host, https, no credentials), redirects are never
+ * followed, and only documents, images and CAD models are relayed.
  */
 
+// Largest file the proxy will relay (bytes); CAD models are the big ones.
+const MAX_PROXY_BYTES = Number(process.env.FILE_PROXY_MAX_BYTES ?? 200 * 1024 * 1024);
+
 export async function GET(request: NextRequest) {
+    const auth = await requireUser();
+    if (!auth.ok) return auth.response;
     try {
         const { searchParams } = new URL(request.url);
         const directUrl = searchParams.get('url');
@@ -73,19 +84,19 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        // ── Fetch the file bytes server-side ──────────────────────────────────────
-        const fileRes = await fetch(fileUrl, {
-            redirect: 'manual', // A trusted host must not redirect us to a private destination.
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (compatible; Mithran-FileProxy/1.0)',
-            },
-        });
-
-        if (fileRes.status >= 300 && fileRes.status < 400) {
-            return NextResponse.json(
-                { error: 'Storage redirects are not allowed' },
-                { status: 502 },
-            );
+        // ── Fetch the file bytes server-side (trusted host only, no redirects) ──────
+        let fileRes: Response;
+        try {
+            fileRes = await fetchTrustedFile(fileUrl, {
+                maxRedirects: 0, // A trusted host must not redirect us anywhere.
+                headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Mithran-FileProxy/1.0)' },
+            });
+        } catch (e) {
+            // The destination was checked above, so a refusal here is a redirect.
+            if (e instanceof UntrustedUrlError) {
+                return NextResponse.json({ error: 'Storage redirects are not allowed' }, { status: 502 });
+            }
+            throw e;
         }
 
         if (!fileRes.ok) {
@@ -96,23 +107,35 @@ export async function GET(request: NextRequest) {
         }
 
         // ── Stream back to browser from localhost → same-origin ───────────────────
-        const contentType =
-            fileRes.headers.get('content-type') ?? 'application/octet-stream';
+        const contentType = fileRes.headers.get('content-type');
+        // Only documents, images and CAD models: never something a browser renders as a page.
+        if (!isServableContentType(contentType)) {
+            return NextResponse.json({ error: 'File type is not allowed through the proxy' }, { status: 415 });
+        }
         const contentLength = fileRes.headers.get('content-length');
+        if (contentLength && Number(contentLength) > MAX_PROXY_BYTES) {
+            return NextResponse.json({ error: 'File is too large' }, { status: 413 });
+        }
 
         const responseHeaders: Record<string, string> = {
-            'Content-Type': contentType,
+            'Content-Type': contentType as string,
+            // The type was checked above; the browser must not second-guess it.
+            'X-Content-Type-Options': 'nosniff',
             // Allow embedding in same-origin iframes
             'X-Frame-Options': 'SAMEORIGIN',
             // Conservative cache — signed URLs are short-lived anyway
             'Cache-Control': 'private, max-age=3300',
         };
+        // Anything that is not a PDF or image is data: give it no script capability at all.
+        if (!/^(application\/pdf|image\/)/i.test(contentType as string)) {
+            responseHeaders['Content-Security-Policy'] = "sandbox; default-src 'none'";
+        }
 
         if (contentLength) {
             responseHeaders['Content-Length'] = contentLength;
         }
 
-        return new NextResponse(fileRes.body, {
+        return new NextResponse(fileRes.body ? limitStream(fileRes.body, MAX_PROXY_BYTES) : null, {
             status: 200,
             headers: responseHeaders,
         });

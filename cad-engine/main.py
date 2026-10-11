@@ -699,8 +699,27 @@ async def analyze_geometry_advanced(
             except Exception as _cnc_exc:
                 logger.warning(f"[machining_features] extraction failed: {_cnc_exc}")
 
+            # Per-face attributes + edge convexity for every domain (the attributed
+            # adjacency graph the driver tree and highlight shading read). Bounded:
+            # beyond config.face_graph_max_faces it is skipped, not truncated.
+            face_graph = None
+            try:
+                from shared.face_attributes import build_face_attributes  # type: ignore
+                _faces_total = optimization_result.geometry_features.manufacturing_features.get(
+                    'holes', {}).get('total_face_count', 0)
+                if _faces_total <= config.face_graph_max_faces:
+                    _fa, _eg = build_face_attributes(shape)
+                    face_graph = {"face_attributes": _fa, "edge_graph": _eg}
+                else:
+                    logger.warning(
+                        f"[face_graph] skipped: {_faces_total} faces > {config.face_graph_max_faces}"
+                    )
+            except Exception as _fg_exc:
+                logger.warning(f"[face_graph] extraction failed: {_fg_exc}")
+
             response = {
                 "success": True,
+                "face_graph": face_graph,
                 "analysis_id": optimization_result.geometry_hash[:16],
                 "original_filename": file.filename,
                 "optimization_strategy": optimization_result.optimization_strategy,

@@ -1207,7 +1207,7 @@ export default function ProcessPage() {
           <div className="py-2 space-y-3">
             <p className="text-sm text-muted-foreground">Choose how to handle existing mappings:</p>
             <div className="space-y-2">
-              <label className="flex items-start gap-3 p-3 rounded-lg border border-border cursor-pointer hover:bg-secondary/30 transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+              <label className="flex items-start gap-3 p-3 rounded-lg border border-border cursor-pointer hover:bg-secondary/30 transition-colors has-checked:border-primary has-checked:bg-primary/5">
                 <input
                   type="radio"
                   name="importMode"
@@ -1221,7 +1221,7 @@ export default function ProcessPage() {
                   <p className="text-xs text-muted-foreground mt-0.5">Only new combinations are added. Existing entries are left unchanged.</p>
                 </div>
               </label>
-              <label className="flex items-start gap-3 p-3 rounded-lg border border-border cursor-pointer hover:bg-secondary/30 transition-colors has-[:checked]:border-destructive has-[:checked]:bg-destructive/5">
+              <label className="flex items-start gap-3 p-3 rounded-lg border border-border cursor-pointer hover:bg-secondary/30 transition-colors has-checked:border-destructive has-checked:bg-destructive/5">
                 <input
                   type="radio"
                   name="importMode"

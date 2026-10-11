@@ -4,7 +4,7 @@
 // unchanged by this feature. See cad-engine/nesting.py's own module
 // docstring for the full rationale.
 
-export interface NestPlacementDto {
+interface NestPlacementDto {
   xMm: number;
   yMm: number;
   rotationDeg: number;

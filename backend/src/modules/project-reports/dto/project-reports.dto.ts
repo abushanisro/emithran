@@ -112,7 +112,7 @@ export class BalloonDiagramResponseDto {
   annotations: DiagramAnnotationResponseDto[];
 }
 
-export class DiagramAnnotationResponseDto {
+class DiagramAnnotationResponseDto {
   @ApiProperty({ description: 'Annotation ID' })
   id: string;
 

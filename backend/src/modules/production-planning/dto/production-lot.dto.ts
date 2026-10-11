@@ -5,7 +5,7 @@ import {
   SanitizedQuantity 
 } from '@/common/decorators/validate-input.decorator';
 
-export enum LotStatus {
+enum LotStatus {
   PLANNED = 'planned',
   MATERIALS_ORDERED = 'materials_ordered',
   IN_PRODUCTION = 'in_production',
@@ -14,14 +14,14 @@ export enum LotStatus {
   ON_HOLD = 'on_hold'
 }
 
-export enum LotPriority {
+enum LotPriority {
   LOW = 'low',
   MEDIUM = 'medium',
   HIGH = 'high',
   URGENT = 'urgent'
 }
 
-export enum LotType {
+enum LotType {
   STANDARD = 'standard',
   PROTOTYPE = 'prototype',
   REWORK = 'rework',
@@ -206,7 +206,7 @@ export class ProductionProcessResponseDto {
   subtasks?: ProcessSubtaskResponseDto[];
 }
 
-export class ProcessSubtaskResponseDto {
+class ProcessSubtaskResponseDto {
   id: string;
   productionProcessId: string;
   taskName: string;

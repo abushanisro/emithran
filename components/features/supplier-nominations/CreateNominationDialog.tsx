@@ -740,7 +740,7 @@ export function CreateNominationDialog({
                               </div>
 
                               {isSelected && (
-                                <CheckCircle className="h-5 w-5 text-blue-400 flex-shrink-0" />
+                                <CheckCircle className="h-5 w-5 text-blue-400 shrink-0" />
                               )}
                             </div>
                           </CardContent>

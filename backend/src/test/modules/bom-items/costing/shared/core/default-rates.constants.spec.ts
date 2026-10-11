@@ -1,4 +1,7 @@
-import { classifyInspectionResource } from '../../../../../../modules/bom-items/costing/shared/core/default-rates.constants';
+import {
+  classifyInspectionResource, estimateBendTonnage, recommendedBendTonnage, bendShoulderWidthMm,
+  BEND_COEFFICIENT, BEND_RECOMMENDED_FORCE_FACTOR,
+} from '../../../../../../modules/bom-items/costing/shared/core/default-rates.constants';
 
 describe('classifyInspectionResource', () => {
   // 1 & 4. Explicit machine_class='cmm' wins even when the machine's own name
@@ -47,3 +50,42 @@ describe('classifyInspectionResource', () => {
   });
 });
 
+
+// Press brake tonnage — the "Sheet Metal - Bending Manufacturing" calculator
+// (calculators/009, memory/Sheetmetal/Stamping_Bending_Calculator.md).
+describe('press brake tonnage (Bending calculator formula)', () => {
+  it('uses the calculator constants: coefficient 1.33, recommended = theoretical x 1.25', () => {
+    expect(BEND_COEFFICIENT).toBe(1.33);
+    expect(BEND_RECOMMENDED_FORCE_FACTOR).toBe(1.25);
+    expect(bendShoulderWidthMm(1.6)).toBeCloseTo(12.8, 10);
+  });
+
+  // 830-001720-00: SECC (UTS 270 MPa), 1.6 mm. 1000 mm bend:
+  // 1.6^2 x 1000 x 270 x 1.33 / 12.8 / 9810 = 7.32 t; x 1.25 = 9.15 t.
+  it('theoretical force for 1.6 mm SECC, 1 m bend = 7.32 t', () => {
+    expect(estimateBendTonnage(270, 1.6, 1000)).toBeCloseTo(7.32, 2);
+  });
+
+  it('recommended force is theoretical x 1.25', () => {
+    expect(recommendedBendTonnage(270, 1.6, 1000)).toBeCloseTo(9.15, 2);
+  });
+
+  it('scales linearly with bend length and UTS, with thickness (t^2 / 8t = t/8)', () => {
+    const base = estimateBendTonnage(400, 2, 1000)!;
+    expect(estimateBendTonnage(400, 2, 2000)).toBeCloseTo(base * 2, 2);
+    expect(estimateBendTonnage(800, 2, 1000)).toBeCloseTo(base * 2, 2);
+    expect(estimateBendTonnage(400, 4, 1000)).toBeCloseTo(base * 2, 2);
+  });
+
+  // MC/DC: each guard condition independently returns null.
+  it.each([
+    ['zero thickness', 400, 0, 1000],
+    ['negative thickness', 400, -1, 1000],
+    ['zero bend length', 400, 2, 0],
+    ['null UTS (grade not on file)', null, 2, 1000],
+    ['zero UTS', 0, 2, 1000],
+  ])('returns null (never a guessed tonnage) for %s', (_label, uts, t, len) => {
+    expect(estimateBendTonnage(uts as number | null, t as number, len as number)).toBeNull();
+    expect(recommendedBendTonnage(uts as number | null, t as number, len as number)).toBeNull();
+  });
+});

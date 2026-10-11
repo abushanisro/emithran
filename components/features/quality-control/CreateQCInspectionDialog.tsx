@@ -297,7 +297,7 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="flex items-center gap-2 bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-800 hover:to-gray-900 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200">
+        <Button className="flex items-center gap-2 bg-linear-to-r from-gray-700 to-gray-800 hover:from-gray-800 hover:to-gray-900 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200">
           <Shield className="h-4 w-4" />
           Create QC Inspection
         </Button>

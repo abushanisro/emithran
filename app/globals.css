@@ -1,6 +1,331 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+/* animate-in / fade-in / zoom-in / slide-in-from-* (dialogs, menus, selects,
+   tooltips): the v3 config loaded this plugin; v4 loads JS plugins here. */
+@plugin 'tailwindcss-animate';
+
+@custom-variant dark (&:is(.dark *));
+
+/* space-x-* / space-y-* keep their v3 rule: a margin on every child after the
+   first. v4 instead puts a bottom margin on every child but the last, so a
+   child's own mb-* (PageHeader's mb-6 inside space-y-8) replaces the gap
+   rather than collapsing with it, and every such gap shrinks app-wide. The
+   reset below cancels the v4 margin; it sits after the generated utilities at
+   the same zero specificity, so it wins over them but not over a child's own
+   margin class. */
+@utility space-y-* {
+  & > :not([hidden]) ~ :not([hidden]) {
+    margin-top: --spacing(--value(number));
+    margin-top: --value([length]);
+  }
+}
+@utility space-x-* {
+  & > :not([hidden]) ~ :not([hidden]) {
+    margin-left: --spacing(--value(number));
+    margin-left: --value([length]);
+  }
+}
+@utility space-y-px {
+  & > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 1px;
+  }
+}
+@utility space-x-px {
+  & > :not([hidden]) ~ :not([hidden]) {
+    margin-left: 1px;
+  }
+}
+@layer utilities {
+  :where([class*='space-y-'] > :not(:last-child)) {
+    margin-block-end: 0;
+  }
+  :where([class*='space-x-'] > :not(:last-child)) {
+    margin-inline-end: 0;
+  }
+}
+
+@utility container {
+  margin-inline: auto;
+  padding-inline: 2rem;
+  @media (width >= --theme(--breakpoint-sm)) {
+    max-width: none;
+  }
+  @media (width >= 1400px) {
+    max-width: 1400px;
+  }
+}
+
+@theme {
+  --font-sans: var(--font-sans), system-ui, sans-serif;
+  --font-mono: var(--font-mono), monospace;
+
+  /* text-* line heights stay the v3 absolute values. v4 uses a unitless ratio
+     (text-xs: 1/0.75), which children inherit and rescale to their own size,
+     so mixed-size text (a 9px marker in a text-xs row) sits on a shorter line
+     than before. */
+  --text-xs--line-height: 1rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl--line-height: 2rem;
+  --text-3xl--line-height: 2.25rem;
+  --text-4xl--line-height: 2.5rem;
+
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
+
+  --color-warning: hsl(var(--warning));
+  --color-warning-foreground: hsl(var(--warning-foreground));
+
+  --color-info: hsl(var(--info));
+  --color-info-foreground: hsl(var(--info-foreground));
+
+  --color-sidebar: hsl(var(--sidebar-background));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-primary: hsl(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-ring: hsl(var(--sidebar-ring));
+
+  --color-chart-1: hsl(var(--chart-1));
+  --color-chart-2: hsl(var(--chart-2));
+  --color-chart-3: hsl(var(--chart-3));
+  --color-chart-4: hsl(var(--chart-4));
+  --color-chart-5: hsl(var(--chart-5));
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-elevated: var(--shadow-md);
+  --shadow-floating: var(--shadow-lg);
+  --shadow-glow: var(--shadow-glow);
+
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+  --animate-fade-in: fade-in 0.3s ease-out;
+  --animate-slide-in-right: slide-in-right 0.3s ease-out;
+  --animate-pulse-subtle: pulse-subtle 2s ease-in-out infinite;
+  --animate-glow: glow 2s ease-in-out infinite;
+
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+    to {
+      height: 0;
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes slide-in-right {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+  @keyframes pulse-subtle {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.7;
+    }
+  }
+  @keyframes glow {
+    0%,
+    100% {
+      box-shadow: 0 0 20px hsl(var(--primary) / 0.15);
+    }
+    50% {
+      box-shadow: 0 0 30px hsl(var(--primary) / 0.25);
+    }
+  }
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
+
+@utility glass-card {
+  @apply bg-card/80 backdrop-blur-xs border border-border/50 shadow-card;
+}
+
+@utility stat-card {
+  @apply bg-card border border-border rounded-xl p-5 shadow-card transition-all duration-200 hover:shadow-elevated hover:border-primary/30 hover:bg-primary/5;
+}
+
+@utility sidebar-item {
+  @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all duration-200;
+}
+
+@utility sidebar-item-active {
+  @apply bg-sidebar-accent text-primary font-medium border-l-2 border-primary;
+}
+
+@utility badge-status {
+  @apply inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium;
+}
+
+@utility input-enterprise {
+  @apply h-11 rounded-lg border border-input bg-secondary/50 px-4 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200;
+}
+
+@utility btn-primary {
+  @apply bg-primary text-primary-foreground font-medium rounded-full px-6 py-2.5 hover:bg-primary/90 transition-all duration-200 shadow-glow;
+}
+
+@utility glow-effect {
+  @apply shadow-glow;
+}
+
+@utility card-hover {
+  @apply transition-all duration-300 hover:border-primary/40 hover:shadow-glow hover:bg-primary/5;
+}
+
+@utility text-balance {
+  text-wrap: balance;
+}
+
+@utility animate-fade-in {
+  animation: fadeIn 0.4s ease-out;
+}
+
+@utility animate-slide-in {
+  animation: slideIn 0.4s ease-out;
+}
+
+@utility animate-slide-up {
+  animation: slideUp 0.4s ease-out;
+}
+
+@utility gradient-text {
+  @apply bg-linear-to-r from-primary to-accent bg-clip-text text-transparent;
+}
+
+@utility custom-scrollbar {
+  /* Custom Scrollbar */
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/20 rounded-full;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/40;
+  }
+}
+
+@utility overflow-x-scroll {
+  /* Table horizontal + vertical scrollbar */
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    @apply bg-secondary/40 rounded;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/30 rounded;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/60;
+  }
+}
+
+@utility overflow-y-auto {
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    @apply bg-secondary/40 rounded;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/30 rounded;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/60;
+  }
+}
 
 @layer base {
   :root {
@@ -199,14 +524,16 @@
   }
 }
 
-/* ── Interface density ──────────────────────────────────────────────────────── */
-/* Compact: scale html font-size from 16px → 14px so all rem units shrink      */
-/* proportionally — padding, margin, font-size, border-radius, everything.     */
-html.compact {
-  font-size: 14px;
-}
+@layer utilities {
+  /* ── Interface density ──────────────────────────────────────────────────────── */
+  /* Compact: scale html font-size from 16px → 14px so all rem units shrink      */
+  /* proportionally — padding, margin, font-size, border-radius, everything.     */
+  html.compact {
+    font-size: 14px;
+  }
 
-/* Comfortable (default): no override needed — Tailwind already uses 16px base */
+  /* Comfortable (default): no override needed — Tailwind already uses 16px base */
+}
 
 @layer base {
   * {
@@ -238,104 +565,7 @@ html.compact {
   }
 }
 
-@layer components {
-  .glass-card {
-    @apply bg-card/80 backdrop-blur-sm border border-border/50 shadow-[var(--shadow-card)];
-  }
-
-  .stat-card {
-    @apply bg-card border border-border rounded-xl p-5 shadow-[var(--shadow-card)] transition-all duration-200 hover:shadow-[var(--shadow-md)] hover:border-primary/30 hover:bg-primary/5;
-  }
-
-  .sidebar-item {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all duration-200;
-  }
-
-  .sidebar-item-active {
-    @apply bg-sidebar-accent text-primary font-medium border-l-2 border-primary;
-  }
-
-  .badge-status {
-    @apply inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium;
-  }
-
-  .input-enterprise {
-    @apply h-11 rounded-lg border border-input bg-secondary/50 px-4 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200;
-  }
-
-  .btn-primary {
-    @apply bg-primary text-primary-foreground font-medium rounded-full px-6 py-2.5 hover:bg-primary/90 transition-all duration-200 shadow-[var(--shadow-glow)];
-  }
-
-  .glow-effect {
-    @apply shadow-[var(--shadow-glow)];
-  }
-
-  .card-hover {
-    @apply transition-all duration-300 hover:border-primary/40 hover:shadow-[var(--shadow-glow)] hover:bg-primary/5;
-  }
-}
-
 @layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-
-  .animate-fade-in {
-    animation: fadeIn 0.4s ease-out;
-  }
-
-  .animate-slide-in {
-    animation: slideIn 0.4s ease-out;
-  }
-
-  .animate-slide-up {
-    animation: slideUp 0.4s ease-out;
-  }
-
-  .gradient-text {
-    @apply bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent;
-  }
-
-  /* Custom Scrollbar */
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  .custom-scrollbar::-webkit-scrollbar-track {
-    @apply bg-transparent;
-  }
-
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-muted-foreground/20 rounded-full;
-  }
-
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    @apply bg-muted-foreground/40;
-  }
-
-  /* Table horizontal + vertical scrollbar */
-  .overflow-x-scroll::-webkit-scrollbar,
-  .overflow-y-auto::-webkit-scrollbar {
-    width: 6px;
-    height: 8px;
-  }
-
-  .overflow-x-scroll::-webkit-scrollbar-track,
-  .overflow-y-auto::-webkit-scrollbar-track {
-    @apply bg-secondary/40 rounded;
-  }
-
-  .overflow-x-scroll::-webkit-scrollbar-thumb,
-  .overflow-y-auto::-webkit-scrollbar-thumb {
-    @apply bg-muted-foreground/30 rounded;
-  }
-
-  .overflow-x-scroll::-webkit-scrollbar-thumb:hover,
-  .overflow-y-auto::-webkit-scrollbar-thumb:hover {
-    @apply bg-muted-foreground/60;
-  }
-
   @keyframes fadeIn {
     from {
       opacity: 0;
