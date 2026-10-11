@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import { isTrustedStorageUrl, resolveBomItemFileUrl } from '@/lib/utils/storage-file-url';
+
 /**
  * File Proxy API Route
  *
@@ -22,30 +24,6 @@ import { NextRequest, NextResponse } from 'next/server';
  *     Requires Authorization header to be forwarded.
  */
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/v1/api';
-
-// Allowlist of trusted storage hostnames to prevent SSRF abuse
-const TRUSTED_STORAGE_HOSTS = [
-    'supabase.co',
-    'supabase.in',
-    'amazonaws.com',
-    'storage.googleapis.com',
-];
-
-function isTrustedUrl(rawUrl: string): boolean {
-    try {
-        const parsed = new URL(rawUrl);
-        if (parsed.protocol !== 'https:' || parsed.username || parsed.password) {
-            return false;
-        }
-        return TRUSTED_STORAGE_HOSTS.some(
-            (host) => parsed.hostname === host || parsed.hostname.endsWith(`.${host}`),
-        );
-    } catch {
-        return false;
-    }
-}
-
 export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
@@ -59,7 +37,7 @@ export async function GET(request: NextRequest) {
         if (directUrl) {
             // URLSearchParams already decoded the query wrapper. Decoding again
             // changes escaped object names and invalidates signed URLs.
-            if (!isTrustedUrl(directUrl)) {
+            if (!isTrustedStorageUrl(directUrl)) {
                 return NextResponse.json(
                     { error: 'URL must use HTTPS on a trusted storage host without credentials' },
                     { status: 400 },
@@ -76,51 +54,22 @@ export async function GET(request: NextRequest) {
                 );
             }
 
-            const authHeader = request.headers.get('Authorization') ?? '';
-            const signedUrlRes = await fetch(
-                `${BACKEND_URL}/bom-items/${itemId}/file-url/${fileType}`,
-                {
-                    headers: {
-                        Authorization: authHeader,
-                        'Content-Type': 'application/json',
-                    },
-                },
+            const resolved = await resolveBomItemFileUrl(
+                itemId,
+                fileType,
+                request.headers.get('Authorization') ?? '',
             );
-
-            if (!signedUrlRes.ok) {
-                const errorText = await signedUrlRes.text().catch(() => signedUrlRes.statusText);
+            if (!resolved.ok) {
                 return NextResponse.json(
-                    { error: `Backend returned ${signedUrlRes.status}`, details: errorText },
-                    { status: signedUrlRes.status },
+                    { error: resolved.error, details: resolved.details },
+                    { status: resolved.status },
                 );
             }
-
-            const signedUrlData = await signedUrlRes.json();
-            fileUrl =
-                signedUrlData?.url ??
-                signedUrlData?.downloadUrl ??
-                signedUrlData?.fileUrl ??
-                signedUrlData?.signedUrl ??
-                signedUrlData?.data?.url;
-
-            if (!fileUrl) {
-                return NextResponse.json(
-                    { error: 'Backend did not return a file URL' },
-                    { status: 502 },
-                );
-            }
+            fileUrl = resolved.url;
         } else {
             return NextResponse.json(
                 { error: 'Provide either "url" or "itemId" query parameter' },
                 { status: 400 },
-            );
-        }
-
-        // Apply the same boundary to backend-provided URLs as to direct URLs.
-        if (!isTrustedUrl(fileUrl)) {
-            return NextResponse.json(
-                { error: 'Backend returned an untrusted storage URL' },
-                { status: 502 },
             );
         }
 
