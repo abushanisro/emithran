@@ -5,7 +5,7 @@ import type { PartSpacingRow } from '../../../../../modules/bom-items/costing/sh
 /** tblPartSpacing, every row, read from the file migration 518 staged. */
 export function realPartSpacingTable(): PartSpacingRow[] {
   const text = readFileSync(
-    join(__dirname, '../../../../../../../memory/Sheetmetal/lookuptable/digital_factory_lookup_tables__tblPartSpacing.csv'), 'utf-8',
+    join(__dirname, '../../../../../../../memory/sheetmetal/lookuptable/digital_factory_lookup_tables__tblPartSpacing.csv'), 'utf-8',
   );
   return text.split(/\r?\n/).slice(1).filter(Boolean).map((l) => {
     const [process, t, sp] = l.split(',');

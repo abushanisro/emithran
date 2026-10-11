@@ -1,73 +1,86 @@
 import { computeBomTotal, type BomCostRow, type BomTotalItem } from '../../../modules/boms/bom-total';
 
-const RATES: Record<string, number> = { INR: 0.012, EUR: 1.1 };
-const rate = (from: string) => RATES[from] ?? null;
-
-const item = (id: string, parent: string | null = null, quantity: unknown = 1, unit_cost: unknown = 0): BomTotalItem =>
-  ({ id, parent_item_id: parent, quantity, unit_cost });
-const row = (itemId: string, kind: BomCostRow['kind'], amount: number, currency: string | null, trusted = true): BomCostRow =>
-  ({ itemId, kind, amount, currency, trusted });
-
+const rate = (from: string) => ({ INR: 0.012, EUR: 1.1 } as Record<string, number>)[from] ?? null;
+const item = (id: string, parent: string | null = null, quantity: unknown = 1): BomTotalItem =>
+  ({ id, parent_item_id: parent, quantity });
+const row = (itemId: string, amount: unknown, currency: string | null = 'USD', trusted = true, isStale: boolean | null = false): BomCostRow =>
+  ({ itemId, amount, currency, trusted, isStale });
 const total = (items: BomTotalItem[], rows: BomCostRow[]) =>
   computeBomTotal({ items, rows, reportingCurrency: 'USD', rateToReporting: rate });
 
 describe('computeBomTotal', () => {
-  it('converts each row from its own currency before summing (no mixed-denomination sums)', () => {
-    // 100 USD of material + 5000 INR of process = 100 + 60 USD
-    const r = total([item('a')], [row('a', 'material', 100, 'USD'), row('a', 'process', 5000, 'INR')]);
-    expect(r.total).toBeCloseTo(160);
+  it('converts complete snapshots through one supplied FX lookup', () => {
+    expect(total([item('usd'), item('inr')], [row('usd', 100), row('inr', 5000, 'INR')]).total).toBe(160);
   });
 
-  it('multiplies by quantity and adds root items', () => {
-    const r = total(
-      [item('a', null, 2), item('b', null, 3)],
-      [row('a', 'material', 10, 'USD'), row('b', 'material', 5, 'USD')],
-    );
-    expect(r.total).toBe(2 * 10 + 3 * 5);
+  it('preserves complete own cost including tooling, packaging and procured parts (18, not 10)', () => {
+    expect(total([item('part')], [row('part', 18)]).total).toBe(18);
   });
 
-  it('uses the stored aggregate when an item has no record rows, then its own unit cost', () => {
-    expect(total([item('a')], [row('a', 'aggregate', 42, 'USD')]).total).toBe(42);
-    expect(total([item('a', null, 2, 7)], []).total).toBe(14);
+  it('preserves assembly own work without counting children twice (70, not 30 or 60)', () => {
+    expect(total([item('assembly', null, 2), item('child', 'assembly', 3)], [row('assembly', 5), row('child', 10)]).total).toBe(70);
   });
 
-  it('an assembly is its own cost plus each child at its quantity, times the assembly quantity', () => {
-    // asm x2 = 2 * (own 10 + 3 * 10) = 80
-    const items = [item('asm', null, 2), item('c', 'asm', 3)];
-    const rows = [row('asm', 'material', 10, 'USD'), row('c', 'material', 10, 'USD')];
-    expect(total(items, rows).total).toBe(80);
+  it('multiplies quantities through every level and adds multiple roots', () => {
+    const items = [item('top', null, 2), item('mid', 'top', 3), item('leaf', 'mid', 4), item('other', null, 2)];
+    expect(total(items, [row('top', 0), row('mid', 0), row('leaf', 1), row('other', 5)]).total).toBe(34);
   });
 
-  it('does not count an assembly stored aggregate on top of its children', () => {
-    const items = [item('asm'), item('leaf1', 'asm', 2), item('leaf2', 'asm')];
-    const rows = [row('leaf1', 'material', 10, 'USD'), row('leaf2', 'material', 5, 'USD'), row('asm', 'aggregate', 25, 'USD')];
-    expect(total(items, rows).total).toBe(25);
+  it('accepts numeric database strings and does not turn zero quantity into one', () => {
+    expect(total([item('a', null, '2')], [row('a', '7.5')]).total).toBe(15);
+    expect(total([item('a', null, 0)], [row('a', 99)]).total).toBe(0);
   });
 
-  it('multiplies quantities through every level', () => {
-    // top x2 -> mid x3 -> leaf x4 at 1 each = 2 * 3 * 4
-    const items = [item('top', null, 2), item('mid', 'top', 3), item('leaf', 'mid', 4)];
-    expect(total(items, [row('leaf', 'material', 1, 'USD')]).total).toBe(24);
+  it('rejects cycles, including disconnected cycles, and orphaned parents', () => {
+    expect(total([item('a', 'b'), item('b', 'a')], [row('a', 5), row('b', 0)]).total).toBeNull();
+    expect(total([item('root'), item('a', 'b'), item('b', 'a')], [row('root', 1), row('a', 5), row('b', 0)]).total).toBeNull();
+    expect(total([item('x', 'ghost')], [row('x', 5)]).total).toBeNull();
   });
 
-  it('leaves the total unresolved for a cycle or a parent outside the BOM, never silently dropping cost', () => {
-    expect(total([item('a', 'b'), item('b', 'a')], [row('a', 'material', 5, 'USD')]).total).toBeNull();
-    expect(total([item('x', 'ghost')], [row('x', 'material', 5, 'USD')]).total).toBeNull();
-    expect(total([item('r'), item('a', 'r'), item('b', 'a')], [row('b', 'material', 5, 'USD')]).total).toBe(5);
+  it('rejects duplicate items and ambiguous duplicate snapshots', () => {
+    expect(total([item('a'), item('a')], [row('a', 5)]).total).toBeNull();
+    expect(total([item('a')], [row('a', 5), row('a', 6)]).total).toBeNull();
   });
 
-  it('has NO total when an amount carries money in an undeclared or unverified currency', () => {
-    const r = total([item('a')], [row('a', 'material', 100, 'USD'), row('a', 'process', 900, null)]);
-    expect(r.total).toBeNull();
-    expect(r.unresolvedItems).toEqual(['a']);
-    expect(total([item('a')], [row('a', 'material', 100, 'USD', false)]).total).toBeNull();
+  it('requires a snapshot for every item, including an assembly with zero own work', () => {
+    expect(total([item('a')], []).total).toBeNull();
+    expect(total([item('assembly'), item('child', 'assembly')], [row('child', 5)]).total).toBeNull();
   });
 
-  it('has NO total when the FX snapshot has no rate, instead of guessing', () => {
-    expect(total([item('a')], [row('a', 'process', 100, 'JPY')]).total).toBeNull();
+  it.each([0, 99])('rejects a stale snapshot even when its amount is %s', amount => {
+    expect(total([item('a')], [row('a', amount, 'USD', true, true)]).total).toBeNull();
   });
 
-  it('a zero amount cannot block a total', () => {
-    expect(total([item('a')], [row('a', 'material', 10, 'USD'), row('a', 'process', 0, null, false)]).total).toBe(10);
+  it('distinguishes a verified zero from an uncomputed/unverified zero', () => {
+    expect(total([item('a')], [row('a', 0)]).total).toBe(0);
+    expect(total([item('a')], [row('a', 0, 'USD', false)]).total).toBeNull();
+    expect(total([item('a')], [row('a', 0, 'USD', true, null)]).total).toBeNull();
+    expect(total([item('a')], [row('a', 0, null)]).total).toBeNull();
+  });
+
+  it('does not require FX to convert verified foreign-currency zero money', () => {
+    expect(total([item('a')], [row('a', 0, 'JPY')]).total).toBe(0);
+    expect(total([item('a')], [row('a', 100, 'JPY')]).total).toBeNull();
+  });
+
+  it.each([null, '', -1, '3bad', NaN, Infinity])('rejects invalid quantity %s rather than defaulting it', quantity => {
+    expect(total([item('a', null, quantity)], [row('a', 1)]).total).toBeNull();
+  });
+
+  it.each([null, '', 'bad', NaN, Infinity, -1])('rejects invalid own cost %s', amount => {
+    expect(total([item('a')], [row('a', amount)]).total).toBeNull();
+  });
+
+  it('returns unresolved on arithmetic overflow', () => {
+    expect(total([item('a', null, 2)], [row('a', 1e308)]).total).toBeNull();
+  });
+
+  it('supports deep imported hierarchies without recursion limits', () => {
+    const items = Array.from({ length: 5000 }, (_, index) => item(String(index), index ? String(index - 1) : null));
+    expect(total(items, items.map(i => row(i.id, 1))).total).toBe(5000);
+  });
+
+  it('an empty BOM is genuinely zero', () => {
+    expect(total([], []).total).toBe(0);
   });
 });
