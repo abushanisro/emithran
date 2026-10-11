@@ -101,9 +101,9 @@ Baseline: `7ea13f68895b6bcb3249c431d49cb61fc8619f8c`, 2026-10-11. No secret valu
 
 **Compile-only results cannot certify runtime or tenant behavior.**
 
-- Evidence: unconfigured baseline root build fails Supabase config collection; build-only placeholder URL/anon key permits successful compile/220 pages but does not exercise Auth/RLS. Python deps absent; e2e source uses live dev DB/FX and removed client API.
+- Evidence: unconfigured baseline root build and first PR frontend CI job fail the same Supabase config collection (authenticated logs confirmed). Build-only placeholder URL/anon key permits successful compile/220 pages but does not exercise Auth/RLS. Python deps absent; e2e source uses live dev DB/FX and removed client API.
 - Root cause/impact: incomplete reproducible runtime and isolated fixture prevent production/security verification.
-- Fix/verification/risk: build-only placeholder config (not runtime proof), Node 20, conda/OCC image, isolated two-org fixture; real production build and CAD/integration suites. Never use production writes/migrations to make checks pass.
+- Partial fix/verification: `.github/workflows/ci.yml` supplies placeholders only for absent public frontend Supabase build settings; existing secrets take precedence and no artifact is deployed. YAML assertions and full build with all other CI secret inputs empty PASS locally (Node 22); updated Node 20 CI pending. Runtime/CAD/two-org integration remains BLOCKED; never use production writes/migrations to make checks pass.
 
 ## EA-011 — lint and CI coverage
 

@@ -91,6 +91,15 @@ The reported Dependabot baseline of 89 (3 critical / 39 high) is not independent
 
 Dependency advisories, credential rotation, CAD execution, live tenant/migration checks and live e2e remain unresolved as recorded above. The saved brief's High-risk exception/production-verification gates are not approved or complete. No files/dependencies/migrations/formulas/currency or rounding assumptions/customer data were removed or rewritten.
 
+## CI follow-up
+
+**Build-only CI can compile without deployment secrets; runtime configuration remains a separate requirement.**
+
+- First PR CI head `5cc723df7e0af88c7156146a767448c0438c9688` failed frontend production-build page collection with the same missing Supabase URL/key error observed locally at baseline; authenticated [job logs](https://github.com/abushanisro/emithran/actions/runs/38129569751/job/114440894633) confirmed it, while backend CI passed.
+- `.github/workflows/ci.yml` now supplies public build-only placeholders only when the two frontend Supabase secrets are absent. Supplied configuration takes precedence; no deployment setting or service-role fallback changes. This job does not deploy/upload its build output.
+- Workflow YAML and fallback expressions validated; `npm run build` reproduced with all other workflow secret inputs empty: PASS on this VM (Node 22). Updated Node 20 CI is pending, not reported as passed.
+- CAD execution, live Auth/RLS and production configuration remain unverified; placeholders are not suitable deployment credentials.
+
 ## Remaining blockers and next steps
 
 **The saved brief's full definition of done is not met.**
