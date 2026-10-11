@@ -430,7 +430,7 @@ export function BOMItemsTable({ bomId, onEditItem, onAddChildItem }: BOMItemsTab
         
         <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 max-w-sm">
           <div className="flex items-start gap-3">
-            <Info className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+            <Info className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
             <div className="text-sm text-blue-800 dark:text-blue-200">
               <p className="font-medium mb-1">Quick Start Tips:</p>
               <ul className="text-xs space-y-1 text-blue-700 dark:text-blue-300">
@@ -467,7 +467,7 @@ export function BOMItemsTable({ bomId, onEditItem, onAddChildItem }: BOMItemsTab
         {items.map((item, index) => (
           <div
             key={item.id}
-            className={`rounded-lg border bg-card text-card-foreground shadow-sm border-l-4 transition-all duration-200 hover:shadow-md ${getBorderColor(item.itemType)}`}
+            className={`rounded-lg border bg-card text-card-foreground shadow-xs border-l-4 transition-all duration-200 hover:shadow-md ${getBorderColor(item.itemType)}`}
             style={{ animationDelay: `${index * 50}ms` }}
           >
             <div className="flex flex-col space-y-1.5 p-6 pb-3">
@@ -475,7 +475,7 @@ export function BOMItemsTable({ bomId, onEditItem, onAddChildItem }: BOMItemsTab
                 <div className="flex items-start gap-4 flex-1 w-full">
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2 mb-1">
-                      <Package className="h-5 w-5 text-emerald-600 flex-shrink-0" />
+                      <Package className="h-5 w-5 text-emerald-600 shrink-0" />
                       <h3 className="tracking-tight text-lg font-semibold text-foreground truncate max-w-[200px] md:max-w-none">
                         {item.name}
                       </h3>
@@ -577,7 +577,7 @@ export function BOMItemsTable({ bomId, onEditItem, onAddChildItem }: BOMItemsTab
             {/* Warning about dependencies */}
             <div className="bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
               <div className="flex items-start gap-2">
-                <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+                <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 shrink-0" />
                 <div className="text-sm">
                   <p className="font-medium text-yellow-800 dark:text-yellow-200">Before deleting:</p>
                   <ul className="text-yellow-700 dark:text-yellow-300 text-xs mt-1 space-y-1">

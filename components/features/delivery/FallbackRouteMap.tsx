@@ -575,7 +575,7 @@ export default function FallbackRouteMap({
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select transport mode" />
               </SelectTrigger>
-              <SelectContent position="popper" sideOffset={4} className="z-[9999]">
+              <SelectContent position="popper" sideOffset={4} className="z-9999">
                 {transportModes.map((mode) => (
                   <SelectItem key={mode.value} value={mode.value}>
                     <div className="flex items-center gap-2">
@@ -607,7 +607,7 @@ export default function FallbackRouteMap({
               <SelectTrigger className="w-full">
                 <SelectValue placeholder={transportMode ? 'Select material type' : 'Select transport first'} />
               </SelectTrigger>
-              <SelectContent position="popper" sideOffset={4} className="z-[9999]">
+              <SelectContent position="popper" sideOffset={4} className="z-9999">
                 {materialTypes.map((type) => (
                   <SelectItem key={type.value} value={type.value}>
                     <div>

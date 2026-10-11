@@ -3820,7 +3820,7 @@ export function ProcessCostDialog({
           <>
             {/* Lookup Table: no backdrop, it closes only through its own X */}
             <div
-              className="fixed top-0 left-0 h-screen w-[500px] bg-background border-r border-border shadow-xl z-[60] flex flex-col"
+              className="fixed top-0 left-0 h-screen w-[500px] bg-background border-r border-border shadow-xl z-60 flex flex-col"
               style={{ pointerEvents: 'auto' }}
               onClick={(e) => { e.stopPropagation(); }}
               onMouseDown={(e) => { e.stopPropagation(); }}

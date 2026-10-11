@@ -220,7 +220,7 @@ function RouteCard({
         'rounded-lg border p-4 transition-all',
         infeasible
           ? 'border-border bg-muted/30 opacity-50'
-          : 'border-border bg-card hover:border-primary/50 hover:shadow-sm',
+          : 'border-border bg-card hover:border-primary/50 hover:shadow-xs',
       ].join(' ')}
     >
       <div className="flex items-start justify-between gap-3">
@@ -1012,7 +1012,7 @@ function ProcessPlanningPageContent() {
                     {bomItems.map((item, index) => (
                       <div
                         key={item.id}
-                        className={`rounded-lg border bg-card text-card-foreground shadow-sm border-l-4 ${item.itemType === 'assembly' ? 'border-l-emerald-500' :
+                        className={`rounded-lg border bg-card text-card-foreground shadow-xs border-l-4 ${item.itemType === 'assembly' ? 'border-l-emerald-500' :
                           item.itemType === 'sub_assembly' ? 'border-l-blue-500' : 'border-l-amber-500'
                           }`}
                       >
@@ -1141,7 +1141,7 @@ function ProcessPlanningPageContent() {
                         <select
                           value={location}
                           onChange={(e) => setLocation(e.target.value)}
-                          className="h-6 text-xs bg-white text-gray-800 font-medium border border-green-300 rounded px-1.5 focus:outline-none focus:ring-2 focus:ring-white/60 shadow-sm [&>option]:bg-white [&>option]:text-gray-800"
+                          className="h-6 text-xs bg-white text-gray-800 font-medium border border-green-300 rounded px-1.5 focus:outline-hidden focus:ring-2 focus:ring-white/60 shadow-xs [&>option]:bg-white [&>option]:text-gray-800"
                         >
                           <option value="India">India</option>
                           <option value="USA">USA</option>

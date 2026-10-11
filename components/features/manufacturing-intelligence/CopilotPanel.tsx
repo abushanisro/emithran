@@ -688,7 +688,7 @@ export function CopilotPanel({
           rows={2}
           className={cn(
             "flex-1 resize-none rounded border bg-background text-[11px] px-2.5 py-1.5 placeholder:text-muted-foreground/50",
-            "focus:outline-none focus:ring-1 focus:ring-violet-500",
+            "focus:outline-hidden focus:ring-1 focus:ring-violet-500",
             isStreaming && "opacity-50",
           )}
         />

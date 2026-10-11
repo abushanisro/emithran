@@ -2568,7 +2568,7 @@ function STLModel({
     return (
       <group>
         <Html position={[0, 0, 0]} center>
-          <div className="bg-background/80 backdrop-blur p-4 rounded-lg border">
+          <div className="bg-background/80 backdrop-blur-sm p-4 rounded-lg border">
             <div className="flex flex-col items-center gap-3">
               <div className="w-6 h-6 border-2 border-primary border-t-transparent animate-spin rounded-full" />
               <div className="text-sm font-medium">Loading 3D Model</div>
@@ -2595,7 +2595,7 @@ function STLModel({
     return (
       <group>
         <Html position={[0, 0, 0]} center>
-          <div className="bg-background/80 backdrop-blur p-4 rounded-lg border border-destructive">
+          <div className="bg-background/80 backdrop-blur-sm p-4 rounded-lg border border-destructive">
             <div className="flex flex-col items-center gap-3 text-center max-w-sm">
               <div className="text-destructive">⚠️</div>
               <div className="text-sm font-medium">Failed to Load 3D Model</div>
@@ -3894,7 +3894,7 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
       {/* Main Content */}
       <div className="flex-1 flex relative min-h-0 overflow-hidden">
         {/* 3D Viewport */}
-        <div ref={canvasContainerRef} className="flex-1 relative bg-gradient-to-b from-[#e6f0e7] to-[#b4d2b7]">
+        <div ref={canvasContainerRef} className="flex-1 relative bg-linear-to-b from-[#e6f0e7] to-[#b4d2b7]">
           {bomItemId && (
             // Popup rather than an inline overlay: Nest's own sheet-size
             // picker + custom inputs need real screen space (see
@@ -4076,7 +4076,7 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
           )}
 
           {/* XYZ Axes Indicator */}
-          <div className="absolute bottom-20 left-4 bg-[#3f3f3f]/90 backdrop-blur-sm border border-[#555555] rounded-lg p-3">
+          <div className="absolute bottom-20 left-4 bg-[#3f3f3f]/90 backdrop-blur-xs border border-[#555555] rounded-lg p-3">
             <svg width="80" height="80" viewBox="0 0 80 80">
               {(['x','y','z'] as const).map((axis) => {
                 const rot = axesRotation[axis];
@@ -4102,12 +4102,12 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
             </svg>
           </div>
 
-          <div className="absolute top-4 left-4 bg-[#3f3f3f]/90 backdrop-blur-sm border border-[#555555] rounded-lg px-2 py-1">
+          <div className="absolute top-4 left-4 bg-[#3f3f3f]/90 backdrop-blur-xs border border-[#555555] rounded-lg px-2 py-1">
             <p className="text-[10px] text-white font-medium">{fileName}</p>
           </div>
 
           {highlightOccurrences && (
-            <div className="absolute top-12 left-4 z-10 bg-black/70 backdrop-blur border border-white/20 rounded px-2.5 py-1 text-xs flex items-center gap-2 pointer-events-none">
+            <div className="absolute top-12 left-4 z-10 bg-black/70 backdrop-blur-sm border border-white/20 rounded px-2.5 py-1 text-xs flex items-center gap-2 pointer-events-none">
               <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
               <span className="font-medium text-white">
                 {highlightOccurrences.feature_type === 'SimpleHole'
@@ -4300,7 +4300,7 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
                           className={`w-full text-left p-0.5 rounded border transition-all ${isSel ? 'border-blue-400 bg-blue-900/30' : 'border-[#666666] bg-[#3f3f3f] hover:bg-[#484848]'}`}
                         >
                           <div className="flex items-center gap-1 mb-0.5">
-                            <Crosshair className="h-2.5 w-2.5 flex-shrink-0" style={{ color: featureColor }} />
+                            <Crosshair className="h-2.5 w-2.5 shrink-0" style={{ color: featureColor }} />
                             <span className="text-[9px] font-semibold truncate" style={{ color: featureColor }}>
                               {feature.type.replace('_', ' ').toUpperCase()}
                             </span>
@@ -4311,7 +4311,7 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
                           </div>
                           {feature.warnings.length > 0 && (
                             <div className="flex items-start gap-0.5 mt-0.5">
-                              <AlertTriangle className="h-2 w-2 text-amber-400 flex-shrink-0 mt-px" />
+                              <AlertTriangle className="h-2 w-2 text-amber-400 shrink-0 mt-px" />
                               <span className="text-[7px] text-amber-400 leading-tight">{feature.warnings[0]}</span>
                             </div>
                           )}
@@ -4342,7 +4342,7 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
                       <div className="text-[7px] text-gray-400 mb-0.5">Recommended Processes</div>
                       {dfmAnalysisData.dfmAnalysis.recommendedProcesses.slice(0, 3).map((p: string, i: number) => (
                         <div key={i} className="text-[8px] text-blue-300 flex items-center gap-1">
-                          <span className="w-1 h-1 bg-blue-400 rounded-full flex-shrink-0" />{p}
+                          <span className="w-1 h-1 bg-blue-400 rounded-full shrink-0" />{p}
                         </div>
                       ))}
                     </div>

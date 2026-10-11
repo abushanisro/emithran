@@ -68,7 +68,7 @@ export function CodePanel({ examples, onTryIt }: CodePanelProps) {
           {examples.map((ex) => (
             <TabsContent key={ex.language} value={ex.language} className="m-0 p-4 h-full">
               <div
-                className="text-xs [&>pre]:!bg-transparent [&>pre]:!p-0 [&>pre]:!m-0 [&>pre]:overflow-x-auto [&_code]:!text-xs [&_code]:!leading-relaxed"
+                className="text-xs [&>pre]:bg-transparent! [&>pre]:p-0! [&>pre]:m-0! [&>pre]:overflow-x-auto [&_code]:text-xs! [&_code]:leading-relaxed!"
                 dangerouslySetInnerHTML={{ __html: ex.html }}
               />
             </TabsContent>

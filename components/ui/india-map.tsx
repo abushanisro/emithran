@@ -167,7 +167,7 @@ export function IndiaMap({ stateData, className = '', showLegend = true }: India
 
       {/* Legend */}
       {showLegend && (
-        <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-sm rounded-lg shadow-lg p-3 text-xs z-10 border">
+        <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-xs rounded-lg shadow-lg p-3 text-xs z-10 border">
           <div className="font-medium mb-2 text-gray-700">Supplier Density</div>
           <div className="space-y-1.5">
             <div className="flex items-center gap-2">

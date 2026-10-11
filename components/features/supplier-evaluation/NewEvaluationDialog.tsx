@@ -199,7 +199,7 @@ export function NewEvaluationDialog({
             }
           }}
         >
-          <DialogHeader className="flex-shrink-0">
+          <DialogHeader className="shrink-0">
             <DialogTitle>New Supplier Evaluation</DialogTitle>
             <DialogDescription>
               Create a new supplier evaluation by selecting BOM parts. You'll manage processes and select vendors on the next page.
@@ -384,7 +384,7 @@ export function NewEvaluationDialog({
             </Form>
           </div>
 
-          <DialogFooter className="flex-shrink-0 border-t pt-4">
+          <DialogFooter className="shrink-0 border-t pt-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>

@@ -189,7 +189,7 @@ export default function PlacesAutocomplete({
           defaultValue={value}
           onChange={(e) => onChange?.(e.target.value)}
           placeholder={ready ? (placeholder || 'Start typing an address…') : 'Loading maps…'}
-          className={`pr-[4.5rem] ${className ?? ''} ${hasError ? 'border-red-300 focus:border-red-500' : ''}`}
+          className={`pr-18 ${className ?? ''} ${hasError ? 'border-red-300 focus:border-red-500' : ''}`}
           autoComplete="off"
         />
 

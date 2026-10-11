@@ -457,7 +457,7 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem }: 
             onViewItem?.(item, 'intelligence');
           }}
           className={[
-            'rounded-md border bg-card text-card-foreground shadow-sm border-l-4 transition-all duration-200 relative',
+            'rounded-md border bg-card text-card-foreground shadow-xs border-l-4 transition-all duration-200 relative',
             getBorderColor(item.itemType, depth),
             isBeingDragged  ? 'opacity-50'                                                              : '',
             isDraggedOver   ? 'ring-2 ring-blue-500 ring-offset-2 bg-blue-50 dark:bg-blue-950/20'       : '',

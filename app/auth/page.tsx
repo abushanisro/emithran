@@ -125,7 +125,7 @@ export default function AuthPage() {
       {/* Top Section - Auth Form */}
       <div className="flex relative flex-1">
         {/* Left Side - Branding */}
-        <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-card to-secondary p-12 flex-col relative overflow-hidden"
+        <div className="hidden lg:flex lg:w-1/2 bg-linear-to-br from-card to-secondary p-12 flex-col relative overflow-hidden"
           style={{
             clipPath: 'polygon(0 0, 100% 0, 85% 100%, 0 100%)'
           }}>

@@ -363,7 +363,7 @@ function HierarchicalNode({
                 typeColors.bg,
                 isHovered
                   ? cn('shadow-lg scale-105', typeColors.hoverBg, typeColors.hoverBorderStrong)
-                  : cn('shadow-sm', typeColors.border, typeColors.hoverBorder),
+                  : cn('shadow-xs', typeColors.border, typeColors.hoverBorder),
               )}
               onClick={() => hasChildren && onToggle(node.id)}
             >

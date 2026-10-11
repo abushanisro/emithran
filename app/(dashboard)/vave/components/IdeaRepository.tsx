@@ -243,7 +243,7 @@ function KanbanView({ ideas, onUpdate, onDelete }: KanbanViewProps) {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-5 w-5 opacity-0 group-hover:opacity-100 text-destructive/50 hover:text-destructive flex-shrink-0"
+                      className="h-5 w-5 opacity-0 group-hover:opacity-100 text-destructive/50 hover:text-destructive shrink-0"
                       onClick={() => onDelete(idea.id)}
                     >
                       <Trash2 className="h-3 w-3" />
@@ -305,7 +305,7 @@ function CardsView({ ideas, onUpdate, onDelete }: CardsViewProps) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-6 w-6 flex-shrink-0 text-destructive/50 hover:text-destructive"
+                  className="h-6 w-6 shrink-0 text-destructive/50 hover:text-destructive"
                   onClick={() => onDelete(idea.id)}
                 >
                   <Trash2 className="h-3.5 w-3.5" />

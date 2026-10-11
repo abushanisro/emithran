@@ -138,7 +138,7 @@ export function SupplierNominationsDashboard({
       </div>
 
       {/* OEM Executive Hero Banner */}
-      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-br from-card/90 via-card to-primary/5 p-6 md:p-8 shadow-sm">
+      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-linear-to-br from-card/90 via-card to-primary/5 p-6 md:p-8 shadow-xs">
         <div className="absolute -right-12 -top-12 h-64 w-64 rounded-full bg-primary/10 blur-3xl pointer-events-none" />
         <div className="absolute right-1/4 -bottom-12 h-48 w-48 rounded-full bg-teal-500/10 blur-2xl pointer-events-none" />
 
@@ -189,7 +189,7 @@ export function SupplierNominationsDashboard({
 
         {/* KPI Metrics Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8 pt-6 border-t border-border/40">
-          <div className="flex items-center gap-4 rounded-xl border border-border/40 bg-card/60 p-4 backdrop-blur-sm">
+          <div className="flex items-center gap-4 rounded-xl border border-border/40 bg-card/60 p-4 backdrop-blur-xs">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <Layers className="h-6 w-6" />
             </div>
@@ -204,7 +204,7 @@ export function SupplierNominationsDashboard({
             </div>
           </div>
 
-          <div className="flex items-center gap-4 rounded-xl border border-border/40 bg-card/60 p-4 backdrop-blur-sm">
+          <div className="flex items-center gap-4 rounded-xl border border-border/40 bg-card/60 p-4 backdrop-blur-xs">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-purple-500/10 text-purple-500">
               <Users className="h-6 w-6" />
             </div>
@@ -217,7 +217,7 @@ export function SupplierNominationsDashboard({
             </div>
           </div>
 
-          <div className="flex items-center gap-4 rounded-xl border border-border/40 bg-card/60 p-4 backdrop-blur-sm">
+          <div className="flex items-center gap-4 rounded-xl border border-border/40 bg-card/60 p-4 backdrop-blur-xs">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500">
               <CheckCircle2 className="h-6 w-6" />
             </div>
@@ -230,7 +230,7 @@ export function SupplierNominationsDashboard({
             </div>
           </div>
 
-          <div className="flex items-center gap-4 rounded-xl border border-border/40 bg-card/60 p-4 backdrop-blur-sm">
+          <div className="flex items-center gap-4 rounded-xl border border-border/40 bg-card/60 p-4 backdrop-blur-xs">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-teal-500/10 text-teal-500">
               <Package className="h-6 w-6" />
             </div>
@@ -246,7 +246,7 @@ export function SupplierNominationsDashboard({
       </div>
 
       {/* Filter & Search Toolbar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border border-border/60 bg-card/80 p-4 backdrop-blur">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border border-border/60 bg-card/80 p-4 backdrop-blur-sm">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -268,7 +268,7 @@ export function SupplierNominationsDashboard({
                 onClick={() => setSelectedType(type)}
                 className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
                   isActive
-                    ? 'bg-background text-foreground shadow-sm'
+                    ? 'bg-background text-foreground shadow-xs'
                     : 'text-muted-foreground hover:text-foreground hover:bg-background/40'
                 }`}
               >
@@ -355,13 +355,13 @@ function OEMNominationCard({ nomination, onClick, onEdit, onDelete }: OEMNominat
   return (
     <Card
       onClick={onClick}
-      className="group relative flex flex-col justify-between rounded-xl border border-border/60 bg-card/90 shadow-sm hover:shadow-lg hover:border-primary/50 transition-all duration-300 cursor-pointer overflow-hidden"
+      className="group relative flex flex-col justify-between rounded-xl border border-border/60 bg-card/90 shadow-xs hover:shadow-lg hover:border-primary/50 transition-all duration-300 cursor-pointer overflow-hidden"
     >
       {/* Top accent bar */}
-      <div className="h-1.5 w-full bg-gradient-to-r from-primary/80 via-teal-500 to-purple-500 opacity-80 group-hover:opacity-100 transition-opacity" />
+      <div className="h-1.5 w-full bg-linear-to-r from-primary/80 via-teal-500 to-purple-500 opacity-80 group-hover:opacity-100 transition-opacity" />
 
       {/* Edit/Delete Action Hover Strip */}
-      <div className="absolute top-3 right-3 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-card/90 backdrop-blur rounded-lg border border-border/60 p-0.5 shadow-sm">
+      <div className="absolute top-3 right-3 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-card/90 backdrop-blur-sm rounded-lg border border-border/60 p-0.5 shadow-xs">
         <Button
           size="sm"
           variant="ghost"
@@ -458,7 +458,7 @@ function OEMNominationCard({ nomination, onClick, onEdit, onDelete }: OEMNominat
           </div>
           <div className="w-full bg-muted/70 rounded-full h-1.5 overflow-hidden">
             <div
-              className="bg-gradient-to-r from-primary to-teal-500 h-1.5 rounded-full transition-all duration-500"
+              className="bg-linear-to-r from-primary to-teal-500 h-1.5 rounded-full transition-all duration-500"
               style={{ width: `${Math.min(100, Math.max(0, nomination.completionPercentage || 0))}%` }}
             />
           </div>

@@ -1178,7 +1178,7 @@ export const RemarksIssues = ({ lotId }: RemarksIssuesProps) => {
                         size="sm"
                         variant="outline"
                         onClick={() => setSelectedRemark(remark)}
-                        className="flex-shrink-0"
+                        className="shrink-0"
                       >
                         View Details
                       </Button>
@@ -1186,7 +1186,7 @@ export const RemarksIssues = ({ lotId }: RemarksIssuesProps) => {
                         size="sm"
                         variant="ghost"
                         onClick={() => handleEditRemark(remark)}
-                        className="flex-shrink-0"
+                        className="shrink-0"
                         title="Edit remark"
                       >
                         <Edit className="h-4 w-4" />
@@ -1195,7 +1195,7 @@ export const RemarksIssues = ({ lotId }: RemarksIssuesProps) => {
                         size="sm"
                         variant="ghost"
                         onClick={() => handleDeleteRemark(remark.id)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50 flex-shrink-0"
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50 shrink-0"
                         title="Delete remark"
                       >
                         <Trash2 className="h-4 w-4" />

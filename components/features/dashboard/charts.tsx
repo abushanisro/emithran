@@ -369,7 +369,7 @@ export function CostSavingsChart({ projects }: { projects: any[] }) {
 
     return (
       <div className="h-64 relative">
-        <div className="absolute inset-0 flex items-center justify-center z-10 bg-background/80 backdrop-blur-sm">
+        <div className="absolute inset-0 flex items-center justify-center z-10 bg-background/80 backdrop-blur-xs">
           <div className="text-center">
             <div className="h-12 w-12 rounded-full bg-green-100 dark:bg-green-950/20 flex items-center justify-center mx-auto mb-3">
               <div className="text-xl font-bold text-green-600">$</div>

@@ -71,3 +71,8 @@ logs
 
 # combined env file - contains secrets
 heena.env
+
+# Playwright: stored login session and reports
+e2e/.auth/
+e2e/report/
+test-results/
