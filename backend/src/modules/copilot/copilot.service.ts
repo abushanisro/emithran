@@ -6,7 +6,7 @@ import { CopilotMemoryService } from './copilot-memory.service';
 import type { BOMItemResponseDto } from '../bom-items/dto/bom-item-response.dto';
 import { COPILOT_SYSTEM_PROMPT } from './copilot.prompt';
 import { CostAggregationService } from '../costing/cost-aggregation.service';
-import { COPILOT_TOOLS, CopilotToolRunner, type ToolContext } from './copilot.tools';
+import { COPILOT_TOOLS, CopilotToolRunner, ResultCache, type ToolContext } from './copilot.tools';
 import { COPILOT_MAX_USER_CHARS, type CopilotChatDto } from './dto/chat.dto';
 
 const DEFAULT_MODEL = 'claude-sonnet-5-5';
@@ -38,6 +38,8 @@ export interface PreparedChat {
 @Injectable()
 export class CopilotService {
   private readonly logger = new Logger(CopilotService.name);
+  /** Shared across requests: follow-up questions in one conversation reuse the slow cost computations. */
+  private readonly results = new ResultCache();
   private readonly model: string;
   private readonly client: Anthropic | null;
 
@@ -90,7 +92,7 @@ export class CopilotService {
       batchSize: dto.batchSize,
       productionLifeYears: dto.productionLifeYears,
     };
-    const tools = new CopilotToolRunner(toolCtx, this.bomItems, this.memory, this.costAggregation);
+    const tools = new CopilotToolRunner(toolCtx, this.bomItems, this.memory, this.costAggregation, this.results);
     const messages = this.conversation(dto);
     const usage: CopilotUsage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, iterations: 0 };
     const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]);
@@ -129,7 +131,9 @@ export class CopilotService {
         const calls = message.content.filter((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use');
         const results = await Promise.all(
           calls.map(async (call) => {
+            const toolStart = Date.now();
             const outcome = await tools.run(call.name, call.input);
+            this.logger.log(`copilot tool user=${userId} item=${dto.bomItemId} name=${call.name} ms=${Date.now() - toolStart}${outcome.isError ? ' error=true' : ''}`);
             return {
               type: 'tool_result' as const,
               tool_use_id: call.id,

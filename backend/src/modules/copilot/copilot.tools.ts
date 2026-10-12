@@ -369,6 +369,35 @@ function toolErrorMessage(err: unknown): string {
   return 'The platform could not compute this result right now.';
 }
 
+const RESULT_CACHE_TTL_MS = 45_000;
+const RESULT_CACHE_MAX_ENTRIES = 50;
+
+/**
+ * Short-lived cache of the platform's slow cost computations. The key must carry
+ * the user (row-level security decides what each user sees) and every costing
+ * input. A cost edited within the TTL is not reflected until it expires; that
+ * bounded staleness is what makes follow-up questions fast. Failures are never
+ * cached, and concurrent callers share one in-flight computation.
+ */
+export class ResultCache {
+  private readonly entries = new Map<string, { at: number; value: Promise<unknown> }>();
+
+  constructor(private readonly ttlMs = RESULT_CACHE_TTL_MS, private readonly maxEntries = RESULT_CACHE_MAX_ENTRIES) {}
+
+  get<T>(key: string, compute: () => Promise<T>): Promise<T> {
+    const hit = this.entries.get(key);
+    if (hit && Date.now() - hit.at < this.ttlMs) return hit.value as Promise<T>;
+    const value = compute();
+    this.entries.delete(key);
+    this.entries.set(key, { at: Date.now(), value });
+    value.catch(() => {
+      if (this.entries.get(key)?.value === value) this.entries.delete(key);
+    });
+    while (this.entries.size > this.maxEntries) this.entries.delete(this.entries.keys().next().value as string);
+    return value;
+  }
+}
+
 /**
  * One instance per chat request: the cost summary and route comparison are
  * computed at most once per request however many times the model asks, and
@@ -383,6 +412,7 @@ export class CopilotToolRunner {
     private readonly bomItems: BOMItemsService,
     private readonly memory: CopilotMemoryService,
     private readonly costAggregation: CostAggregationService,
+    private readonly results: ResultCache,
   ) {}
 
   async run(name: string, input: unknown): Promise<ToolOutcome> {
@@ -482,13 +512,19 @@ export class CopilotToolRunner {
 
   private getCostSummary(): Promise<CostSummaryResponseDto> {
     const { bomItemId, userId, accessToken, batchSize, location, productionLifeYears } = this.ctx;
-    this.costSummary ??= this.bomItems.getCostSummary(bomItemId, userId, accessToken, batchSize, location, productionLifeYears);
+    this.costSummary ??= this.results.get(
+      `cost|${userId}|${bomItemId}|${batchSize}|${location}|${productionLifeYears}`,
+      () => this.bomItems.getCostSummary(bomItemId, userId, accessToken, batchSize, location, productionLifeYears),
+    );
     return this.costSummary;
   }
 
   private getRouteComparison(): Promise<RouteComparisonResponseDto> {
     const { bomItemId, userId, accessToken, batchSize, location, productionLifeYears } = this.ctx;
-    this.routeComparison ??= this.bomItems.getRouteComparison(bomItemId, userId, accessToken, batchSize, location, productionLifeYears);
+    this.routeComparison ??= this.results.get(
+      `route|${userId}|${bomItemId}|${batchSize}|${location}|${productionLifeYears}`,
+      () => this.bomItems.getRouteComparison(bomItemId, userId, accessToken, batchSize, location, productionLifeYears),
+    );
     return this.routeComparison;
   }
 }

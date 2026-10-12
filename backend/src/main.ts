@@ -3,7 +3,7 @@ import * as dotenv from 'dotenv';
 dotenv.config({ override: true });
 
 import { NestFactory } from '@nestjs/core';
-import { VersioningType } from '@nestjs/common';
+import { VersioningType, type LogLevel } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import helmet from 'helmet';
@@ -17,8 +17,11 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { Logger } from './common/logger/logger.service';
 
 async function bootstrap() {
+  // Debug lines (one per privileged-client call, hundreds per page load) only with LOG_LEVEL=debug.
+  const logLevels: LogLevel[] = process.env.LOG_LEVEL === 'debug' ? ['log', 'warn', 'error', 'debug'] : ['log', 'warn', 'error'];
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
+    logger: logLevels,
   });
 
   const configService = app.get(ConfigService);
