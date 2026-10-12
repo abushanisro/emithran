@@ -56,6 +56,7 @@ const STORAGE_KEY = (id: string) => `copilot_messages_${id}`;
 /** What the server accepts in one request (backend dto/chat.dto.ts). */
 const MAX_HISTORY_MESSAGES = 8;
 const MAX_QUESTION_CHARS = 2000;
+const MAX_ANSWER_CHARS = 8000;
 
 /** One JSON object per SSE frame, as written by the NestJS copilot controller. */
 type CopilotEvent =
@@ -151,7 +152,11 @@ function useCopilotChat(bomItemId: string, scenario: CopilotScenario) {
       const history = [...messages, userMsg]
         .filter((m) => m.content.trim())
         .slice(-MAX_HISTORY_MESSAGES)
-        .map((m) => ({ role: m.role, content: m.content }));
+        .map((m) => ({
+          role: m.role,
+          // Answers saved from earlier sessions can exceed what the server accepts; trimming old history is harmless.
+          content: m.content.slice(0, m.role === "user" ? MAX_QUESTION_CHARS : MAX_ANSWER_CHARS),
+        }));
       const payload = {
         bomItemId,
         location: scenario.location,
