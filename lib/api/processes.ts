@@ -174,6 +174,10 @@ export const processesApi = {
     return apiClient.get<ReferenceTable>(`/processes/machining-lookup-tables/by-name/${encodeURIComponent(table)}${q}`);
   },
 
+  getDeslagAllowanceTable: async (): Promise<ReferenceTable> => {
+    return apiClient.get<ReferenceTable>('/processes/deslag-allowance-table');
+  },
+
   getSmLookupTableByName: async (table: string): Promise<ReferenceTable> => {
     return apiClient.get<ReferenceTable>(`/processes/sm-lookup-tables/by-name/${encodeURIComponent(table)}`);
   },

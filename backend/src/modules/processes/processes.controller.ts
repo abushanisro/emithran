@@ -189,6 +189,13 @@ export class ProcessesController {
     return this.processesService.getSmLookupTables(group, route, token);
   }
 
+  @Get('deslag-allowance-table')
+  @ApiOperation({ summary: 'Perimeter allowance (s/mm) of every Deslag machine in the machine library, shaped as a lookup table' })
+  @ApiResponse({ status: 200, description: 'Table retrieved successfully' })
+  async getDeslagAllowanceTable() {
+    return this.processesService.getDeslagAllowanceTable();
+  }
+
   @Get('sm-lookup-tables/by-name/:table')
   @ApiOperation({ summary: 'Get one real sm_lookup_* cost-engine table by name (allowlisted tables only) — used by calculator popups\' "view lookup table" button' })
   @ApiResponse({ status: 200, description: 'Live lookup table retrieved successfully' })

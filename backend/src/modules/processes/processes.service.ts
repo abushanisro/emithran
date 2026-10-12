@@ -234,6 +234,34 @@ export class ProcessesService {
    * Same allowlist as updateSmLookupRow — `table` must be a real, registered
    * sm_lookup_* table, never an arbitrary name from the request.
    */
+  /**
+   * Time per mm of cut edge for every Deslag machine (machine library,
+   * memory/Sheetmetal/machine), in the lookup-table payload shape the calculator
+   * dialog's reference panel renders. Deburr Time Per mm is one of these values.
+   */
+  async getDeslagAllowanceTable(): Promise<any> {
+    const { data, error } = await this.supabaseService
+      .getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared')
+      .from('sm_reference_data')
+      .select('raw')
+      .eq('category', 'machine')
+      .eq('raw->>machine_category', 'Deslag Machine');
+    if (error) throw new InternalServerErrorException('Failed to read the Deslag machine library');
+    const rows = (data ?? [])
+      .map((r) => ({ machine_name: String(r.raw?.name ?? ''), perimeter_allowance_s_per_mm: Number(r.raw?.perimeter_allowance_s_per_mm) }))
+      .filter((r) => r.machine_name && r.perimeter_allowance_s_per_mm > 0)
+      .sort((a, b) => a.machine_name.localeCompare(b.machine_name));
+    return {
+      id: 'machine_library:deslag_allowance',
+      tableName: 'Deslag machine library — perimeter allowance',
+      columnDefinitions: [
+        { name: 'machine_name', label: 'Machine' },
+        { name: 'perimeter_allowance_s_per_mm', label: 'Perimeter Allowance', unit: 's/mm' },
+      ],
+      rows,
+    };
+  }
+
   async getSmLookupTableByName(table: string, accessToken: string): Promise<any> {
     if (!getAllSmLookupTableNames().has(table)) {
       throw new BadRequestException(`"${table}" is not a recognized cost-engine lookup table`);

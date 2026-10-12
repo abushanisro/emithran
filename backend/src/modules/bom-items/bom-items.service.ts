@@ -8,6 +8,7 @@ import { Injectable, Logger, NotFoundException, InternalServerErrorException, Ba
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { CreateBOMItemDto, UpdateBOMItemDto } from './dto/bom-items.dto';
 import { BOMItemResponseDto, BOMItemListResponseDto } from './dto/bom-item-response.dto';
+import { reconcileSheetGeometry } from './costing/shared/geometry-reconciliation';
 import type { CalculationTraceStep, PhysicsGap, UnsupportedOperationGap, ManufacturingPhysicsResult, ConfidenceLevel, ResolutionStatus, LookupResolution, ValidatedInput } from './dto/cost-breakdown.dto';
 import { computeCostSummary, computeSustainability, applyPersistedRouteToSummary, selectAppliedGeneration, detectAppliedGenerationDrift } from './costing/shared/core/cost-engine';
 import type { MHRRateInput, AppliedProcessCostRecord } from './costing/shared/core/cost-engine';
@@ -3204,6 +3205,7 @@ export class BOMItemsService {
     // Every real disagreement, in every branch's own warnings — the real
     // numbers, never a vague "mismatch" with nothing to act on.
     materialWarnings.push(...drawingCadConsistency.filter((m) => m.status === 'mismatch').map((m) => m.message));
+    if (family === 'sheet_metal') materialWarnings.push(...reconcileSheetGeometry(fg).map((f) => f.message));
     const {
       materialCostPerKg, materialDensityKgM3, materialSource, utsMpa, shearStrengthMpa,
       meltingTempC, moldTempC, ejectionTempC, specificHeatMeltJgC, thermalConductivityMeltWMK, densityOfMeltKgM3, materialType, clampProperties,
@@ -5694,6 +5696,7 @@ export class BOMItemsService {
     if (geo) comparisonWarnings.push(...geo.warnings);
     if (familyResolutionRC.warning) comparisonWarnings.push(familyResolutionRC.warning);
     comparisonWarnings.push(...drawingCadConsistency.filter((m) => m.status === 'mismatch').map((m) => m.message));
+    if (family === 'sheet_metal') comparisonWarnings.push(...reconcileSheetGeometry(fg).map((f) => f.message));
 
     // ── Material cost — same resolver as getCostSummary, by construction ──────
     const locInfo = LOCATION_INFO[location] ?? LOCATION_INFO['Other'];

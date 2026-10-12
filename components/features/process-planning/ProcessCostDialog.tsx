@@ -53,6 +53,10 @@ import { describeStrokeLookup, strokeComplexity as strokeComplexityOf } from '@/
 import { liveOperationOptions, resolveSavedOperation, type LiveOperationOption } from '@/lib/processCatalog/live-operation-options';
 import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
 
+// The Deburr calculator's time per mm is each Deslag machine's own perimeter allowance
+// in the machine library, so its eye opens that table (not an sm_lookup_* table).
+const DESLAG_ALLOWANCE_FIELD = 'Deburr Time Per mm';
+
 // Known options for calculator fields whose fieldType is 'select' — the
 // calculator engine has no generic options-storage column yet, so this is a
 // small, explicit allowlist rather than an invented generic schema. Fields not
@@ -2203,6 +2207,23 @@ export function ProcessCostDialog({
         return;
       }
 
+      // Deslag machine library: every Deslag machine's perimeter allowance, the
+      // machine this line uses outlined.
+      if (field.fieldName === DESLAG_ALLOWANCE_FIELD && selectedMachineClass === 'deburring') {
+        const table = await processesApi.getDeslagAllowanceTable();
+        setLookupTableData({
+          fieldName: field.fieldName,
+          fieldLabel: field.displayLabel || field.fieldName,
+          tableName: table.tableName,
+          tableId: table.id,
+          column_definitions: table.columnDefinitions || [],
+          rows: table.rows ?? [],
+          matchedRowKeys: selectedMHR?.machineName ? { machine_name: selectedMHR.machineName } : null,
+        });
+        setShowLookupTable(true);
+        return;
+      }
+
       // Case 0: a real sm_lookup_* cost-engine table — the same live data
       // SheetMetalLookupService queries for this exact field's value (Time
       // Per Stroke, Stroke Time, Tool Loading Time, Cutting Speed, Piercing
@@ -3446,6 +3467,7 @@ export function ProcessCostDialog({
                           // fields (dataSource='sheet_metal_lookup') and the handful resolved
                           // via ad-hoc frontend JS instead (resolveAdHocLookupTableKey).
                           (field.dataSource === SM_LOOKUP_DATA_SOURCE && !!field.sourceField) ||
+                          (field.fieldName === DESLAG_ALLOWANCE_FIELD && selectedMachineClass === 'deburring') ||
                           !!resolveAdHocLookupTableKey(field.fieldName, selectedMachineClass);
 
 
