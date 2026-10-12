@@ -1741,8 +1741,16 @@ function CostSummaryTab({
   // read too; without them the press-brake calculator opened with no UTS,
   // thickness or stroke time.
   const engineCalculators = useMemo(
-    () => buildEngineCalculatorSeeds([...(eff?.lines ?? []), ...(cost?.processLines ?? [])]),
-    [eff, cost],
+    () => buildEngineCalculatorSeeds([
+      ...(eff?.lines ?? []),
+      ...(cost?.processLines ?? []),
+      // The applied route is not always identifiable (a saved route can carry another
+      // name), and the cost summary's own lines are saved snapshots without a trace.
+      // The route comparison's lines are current and traced; a calculator's inputs
+      // are the same on every route that contains it.
+      ...(comparison?.routes.flatMap((r) => r.processLines) ?? []),
+    ]),
+    [eff, cost, comparison],
   );
 
   const [expandedProcs, setExpandedProcs] = useState<Set<string>>(new Set());
