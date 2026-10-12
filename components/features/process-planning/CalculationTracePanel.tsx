@@ -204,7 +204,7 @@ export function CalculationTracePanel({ line }: { line: CalculationTraceLine }) 
                     <span className="text-muted-foreground truncate min-w-0">
                       {step.displayLabel}
                       {step.stepType === 'physics' && (
-                        <span className="ml-1.5 text-[9px] font-semibold px-1 py-px rounded bg-violet-500/15 text-violet-700 dark:text-violet-400">
+                        <span className="ml-1.5 text-[9px] font-semibold px-1 py-px rounded bg-brand-500/15 text-brand-700 dark:text-brand-400">
                           physics
                         </span>
                       )}

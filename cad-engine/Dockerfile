@@ -32,7 +32,7 @@ COPY requirements.txt ./
 # python-magic-bin / pywin32 carry Windows-only markers; libmagic1 is installed above.
 RUN conda run -n cad-env pip install --no-cache-dir -r requirements.txt
 
-# Copy all application source (copilot package, feature extractors, converters, knowledge)
+# Copy all application source (feature extractors, converters)
 COPY . .
 
 # Create default .env configuration (can be overridden by environment variables)

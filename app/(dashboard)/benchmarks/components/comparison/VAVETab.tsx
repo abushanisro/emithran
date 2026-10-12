@@ -384,10 +384,10 @@ export function VAVETab({ bomMetrics }: Props) {
           <p className="text-2xl font-bold text-success">{formatPrice(totalPotential)}</p>
           <p className="text-xs text-success/70">Estimated potential</p>
         </Card>
-        <Card className="p-4 bg-card/50 border-purple-500/20 hover:border-purple-500/40 transition-all">
+        <Card className="p-4 bg-card/50 border-brand-500/20 hover:border-brand-500/40 transition-all">
           <h4 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wider">AI Insights Savings</h4>
-          <p className="text-2xl font-bold text-purple-400">{formatPrice(aiTotalSavings)}</p>
-          <p className="text-xs text-purple-400/70">
+          <p className="text-2xl font-bold text-brand-400">{formatPrice(aiTotalSavings)}</p>
+          <p className="text-xs text-brand-400/70">
             {aiInsights.size > 0 ? `From ${aiInsights.size} BOM(s)` : "Generate AI insights"}
           </p>
         </Card>
@@ -407,7 +407,7 @@ export function VAVETab({ bomMetrics }: Props) {
               <div className="flex gap-2">
                 <Badge variant="outline">{formatPrice(v.totalSavings)} rule-based</Badge>
                 {v.aiInsights && (
-                  <Badge variant="default" className="bg-purple-600">
+                  <Badge variant="default" className="bg-brand-600">
                     {formatPrice(v.aiInsights.totalPotentialSavings)} AI insights
                   </Badge>
                 )}
@@ -592,8 +592,8 @@ export function VAVETab({ bomMetrics }: Props) {
                       {/* Design Optimization */}
                       {(v.aiInsights.designOptimization.partConsolidation.length > 0 || 
                         v.aiInsights.designOptimization.toleranceOptimization.length > 0) && (
-                        <div className="p-4 bg-purple-500/5 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all">
-                          <h6 className="text-xs font-bold mb-3 text-purple-400 uppercase tracking-widest">Design Optimization</h6>
+                        <div className="p-4 bg-brand-500/5 rounded-lg border border-brand-500/20 hover:border-brand-500/40 transition-all">
+                          <h6 className="text-xs font-bold mb-3 text-brand-400 uppercase tracking-widest">Design Optimization</h6>
                           {v.aiInsights.designOptimization.partConsolidation.map((con, i) => (
                             <div key={i} className="text-xs mb-3 p-2 bg-background/40 rounded border border-border/50">
                               <div className="flex justify-between items-center mb-1">
@@ -642,7 +642,7 @@ export function VAVETab({ bomMetrics }: Props) {
                       )}
                     </div>
 
-                    <div className="mt-6 p-4 bg-linear-to-r from-primary/20 via-primary/5 to-purple-500/20 rounded-xl border border-primary/30 shadow-glow">
+                    <div className="mt-6 p-4 bg-linear-to-r from-primary/20 via-primary/5 to-brand-500/20 rounded-xl border border-primary/30 shadow-glow">
                       <div className="flex justify-between items-center">
                         <div>
                           <span className="text-sm font-bold text-primary uppercase tracking-wider">AI Total Potential Savings</span>

@@ -93,7 +93,7 @@ export function BOMFilesTable({ items, onViewItem }: BOMFilesTableProps) {
   const getFileIcon = (fileType: '2d' | '3d') => {
     return fileType === '2d' ? 
       <FileText className="h-4 w-4 text-blue-600" /> : 
-      <Box className="h-4 w-4 text-purple-600" />;
+      <Box className="h-4 w-4 text-brand-600" />;
   };
 
   const getFileTypeBadge = (fileType: '2d' | '3d', extension: string) => {
@@ -108,7 +108,7 @@ export function BOMFilesTable({ items, onViewItem }: BOMFilesTableProps) {
       );
     } else {
       return (
-        <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+        <Badge variant="outline" className="bg-brand-50 text-brand-700 border-brand-200">
           3D Model
         </Badge>
       );

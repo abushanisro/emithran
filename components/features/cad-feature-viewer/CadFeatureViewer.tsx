@@ -16,7 +16,7 @@ import { storageKey, type LoadedMesh } from '@/lib/viewer/geometry-store';
 import { viewerGeometryStore } from '@/lib/viewer/viewer-store';
 
 const BODY_COLOR = '#9b9bb4';
-const FEATURE_COLOR = '#e11ddd';
+const FEATURE_COLOR = '#f26822';
 const BOX_COLOR = '#d4b000';
 
 interface CadFeatureViewerProps {

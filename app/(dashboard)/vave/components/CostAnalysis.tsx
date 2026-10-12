@@ -144,7 +144,7 @@ function WaterfallView({ items }: { items: VaveBomItem[] }) {
           <Tooltip {...TOOLTIP_STYLE} formatter={(v: any) => [fmtUSD(v), 'Annual Spend']} />
           <Bar dataKey="spend" maxBarSize={80} radius={[6, 6, 0, 0]}>
             {data.map((_, i) => {
-              const colors = ['hsl(187 100% 42%)', 'hsl(280 70% 50%)', 'hsl(38 92% 50%)', 'hsl(160 70% 45%)'];
+              const colors = ['hsl(187 100% 42%)', 'hsl(21 89% 54%)', 'hsl(38 92% 50%)', 'hsl(160 70% 45%)'];
               return <Cell key={i} fill={colors[i % colors.length]} />;
             })}
           </Bar>
@@ -176,7 +176,7 @@ function WaterfallView({ items }: { items: VaveBomItem[] }) {
 
 function SupplierView({ items }: { items: VaveBomItem[] }) {
   const { suppliers, tailThreshold, total } = buildSupplierData(items);
-  const PIE_COLORS = ['hsl(187 100% 42%)', 'hsl(280 70% 50%)', 'hsl(38 92% 50%)', 'hsl(160 70% 45%)', 'hsl(0 72% 51%)', 'hsl(200 90% 50%)'];
+  const PIE_COLORS = ['hsl(187 100% 42%)', 'hsl(21 89% 54%)', 'hsl(38 92% 50%)', 'hsl(160 70% 45%)', 'hsl(0 72% 51%)', 'hsl(200 90% 50%)'];
   const tail = suppliers.filter((s) => s.spend < tailThreshold);
   const top = suppliers.filter((s) => s.spend >= tailThreshold);
 

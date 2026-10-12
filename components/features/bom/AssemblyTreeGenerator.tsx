@@ -126,7 +126,7 @@ function getTypeColor(type: AssemblyNode['type']): string {
     'sub-assembly': 'bg-blue-500/10 text-blue-700 border-blue-500/20',
     'child-part':   'bg-orange-500/10 text-orange-700 border-orange-500/20',
     part:           'bg-amber-500/10 text-amber-700 border-amber-500/20',
-    hardware:       'bg-purple-500/10 text-purple-700 border-purple-500/20',
+    hardware:       'bg-brand-500/10 text-brand-700 border-brand-500/20',
     fastener:       'bg-gray-500/10 text-gray-700 border-gray-500/20',
   };
   return map[type] ?? 'bg-gray-500/10 text-gray-700 border-gray-500/20';

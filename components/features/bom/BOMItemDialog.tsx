@@ -330,7 +330,7 @@ const AutoBadgeFor = React.memo(function AutoBadgeFor({
   if (!lineage) return null;
   if (lineage.source === 'derived') {
     return (
-      <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 text-purple-400 border-purple-400/40 ml-1">
+      <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 text-brand-400 border-brand-400/40 ml-1">
         DERIVED
       </Badge>
     );

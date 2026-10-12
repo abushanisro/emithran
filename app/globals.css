@@ -59,6 +59,19 @@
   --font-sans: var(--font-sans), system-ui, sans-serif;
   --font-mono: var(--font-mono), monospace;
 
+  /* Brand orange (#F26822 = brand-500), the accent formerly drawn in purple. */
+  --color-brand-50: #fef4ee;
+  --color-brand-100: #fde5d6;
+  --color-brand-200: #fbc8ad;
+  --color-brand-300: #f8a279;
+  --color-brand-400: #f57a44;
+  --color-brand-500: #f26822;
+  --color-brand-600: #e04f12;
+  --color-brand-700: #b93b10;
+  --color-brand-800: #933115;
+  --color-brand-900: #772b14;
+  --color-brand-950: #401308;
+
   /* text-* line heights stay the v3 absolute values. v4 uses a unitless ratio
      (text-xs: 1/0.75), which children inherit and rescale to their own size,
      so mixed-size text (a 9px marker in a text-xs row) sits on a shorter line

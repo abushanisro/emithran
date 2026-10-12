@@ -71,7 +71,7 @@ const DEFAULT_ITEM = (): ItemForm => ({
 const ITEM_TYPE_COLORS: Record<BOMItemType, string> = {
   [BOMItemType.ASSEMBLY]:     'bg-emerald-500/10 text-emerald-700 border-emerald-500/20',
   [BOMItemType.SUB_ASSEMBLY]: 'bg-blue-500/10 text-blue-700 border-blue-500/20',
-  [BOMItemType.CHILD_PART]:   'bg-purple-500/10 text-purple-700 border-purple-500/20',
+  [BOMItemType.CHILD_PART]:   'bg-brand-500/10 text-brand-700 border-brand-500/20',
 };
 
 function getItemTypeColor(type: BOMItemType): string {

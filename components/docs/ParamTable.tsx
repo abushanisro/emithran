@@ -19,7 +19,7 @@ function TypeBadge({ type }: { type: string }) {
   let cls = 'bg-muted text-muted-foreground border-border';
   if (t === 'string') cls = 'bg-blue-500/15 text-blue-400 border-blue-500/30';
   else if (t === 'integer' || t === 'number' || t === 'float') cls = 'bg-green-500/15 text-green-400 border-green-500/30';
-  else if (t === 'boolean') cls = 'bg-purple-500/15 text-purple-400 border-purple-500/30';
+  else if (t === 'boolean') cls = 'bg-brand-500/15 text-brand-400 border-brand-500/30';
   else if (t === 'object') cls = 'bg-amber-500/15 text-amber-400 border-amber-500/30';
   else if (t === 'array') cls = 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30';
   else if (t === 'uuid' || t === 'date' || t === 'datetime') cls = 'bg-orange-500/15 text-orange-400 border-orange-500/30';

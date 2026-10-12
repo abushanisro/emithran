@@ -67,14 +67,14 @@ function StepRow({
     <li
       className={cn(
         'relative flex items-start gap-3 rounded-md border px-3 py-2.5',
-        pinned ? 'border-violet-500/40 bg-violet-500/[0.07]' : 'border-border/60 bg-muted/20',
+        pinned ? 'border-brand-500/40 bg-brand-500/[0.07]' : 'border-border/60 bg-muted/20',
       )}
     >
       <span
         aria-hidden
         className={cn(
           'mt-px flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold tabular-nums',
-          pinned ? 'bg-violet-500 text-white' : 'bg-muted text-muted-foreground',
+          pinned ? 'bg-brand-500 text-white' : 'bg-muted text-muted-foreground',
         )}
       >
         {index}
@@ -84,7 +84,7 @@ function StepRow({
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="text-[13px] font-medium leading-tight">{step.process}</span>
           {pinned && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-violet-500/30 bg-violet-500/15 px-1.5 py-px text-[10px] font-medium leading-4 text-violet-200">
+            <span className="inline-flex items-center gap-1 rounded-full border border-brand-500/30 bg-brand-500/15 px-1.5 py-px text-[10px] font-medium leading-4 text-brand-200">
               <Lock className="h-2.5 w-2.5" /> Set by route
             </span>
           )}
@@ -136,7 +136,7 @@ function StepRow({
               onClick={onMoveUp}
               disabled={!canMoveUp}
               aria-label={`Move ${step.process} earlier`}
-              className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-violet-500 disabled:pointer-events-none disabled:opacity-25"
+              className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-500 disabled:pointer-events-none disabled:opacity-25"
             >
               <ChevronUp className="h-3.5 w-3.5" />
             </button>
@@ -145,7 +145,7 @@ function StepRow({
               onClick={onMoveDown}
               disabled={!canMoveDown}
               aria-label={`Move ${step.process} later`}
-              className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-violet-500 disabled:pointer-events-none disabled:opacity-25"
+              className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-500 disabled:pointer-events-none disabled:opacity-25"
             >
               <ChevronDown className="h-3.5 w-3.5" />
             </button>
@@ -153,7 +153,7 @@ function StepRow({
               type="button"
               onClick={onRemove}
               aria-label={`Remove ${step.process} from this route`}
-              className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-red-500/15 hover:text-red-300 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-violet-500"
+              className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-red-500/15 hover:text-red-300 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-500"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -341,11 +341,11 @@ function FlowChip({ label, machine, index, muted }: { label: string; machine?: s
     <div
       className={cn(
         'shrink-0 rounded border px-2 py-1',
-        muted ? 'border-border/60 bg-muted/40 text-muted-foreground' : 'border-violet-500/40 bg-violet-500/10',
+        muted ? 'border-border/60 bg-muted/40 text-muted-foreground' : 'border-brand-500/40 bg-brand-500/10',
       )}
     >
       <div className="flex items-center gap-1 text-[10px] font-medium leading-tight">
-        {index !== undefined && <span className="tabular-nums text-violet-300">{index}</span>}
+        {index !== undefined && <span className="tabular-nums text-brand-300">{index}</span>}
         <span className="whitespace-nowrap">{label}</span>
       </div>
       {machine && (

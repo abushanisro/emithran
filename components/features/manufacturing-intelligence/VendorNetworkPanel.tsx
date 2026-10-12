@@ -103,7 +103,7 @@ function VendorCard({
   return (
     <div className={cn(
       'rounded border p-2 mb-1.5 text-[10px] transition-colors',
-      selected ? 'border-violet-500/60 bg-violet-900/20' : 'border-slate-700/60 bg-slate-900/40',
+      selected ? 'border-brand-500/60 bg-brand-900/20' : 'border-slate-700/60 bg-slate-900/40',
     )}>
       {/* Row 1: name + code + classification */}
       <div className="flex items-center gap-1.5 mb-1">
@@ -111,7 +111,7 @@ function VendorCard({
           type="checkbox"
           checked={selected}
           onChange={() => onToggle(vendor.id)}
-          className="accent-violet-500 shrink-0"
+          className="accent-brand-500 shrink-0"
         />
         <span className="font-semibold text-slate-200 truncate flex-1 text-[10px]">{vendor.name}</span>
         {vendor.supplierCode && (
@@ -127,7 +127,7 @@ function VendorCard({
         </div>
         <div className="flex items-center gap-0.5 shrink-0" title={`${dots.label} (${vendor.confidenceScore}%)`}>
           {[0, 1, 2].map((i) => (
-            <span key={i} className={cn('text-[8px]', i < dots.filled ? 'text-violet-400' : 'text-slate-600')}>●</span>
+            <span key={i} className={cn('text-[8px]', i < dots.filled ? 'text-brand-400' : 'text-slate-600')}>●</span>
           ))}
         </div>
         {totalCategories > 1 && (
@@ -166,7 +166,7 @@ function VendorCard({
           href={`/vendors/${vendor.id}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-[9px] text-violet-400 hover:text-violet-300 shrink-0"
+          className="text-[9px] text-brand-400 hover:text-brand-300 shrink-0"
         >
           ↗ View
         </a>
@@ -215,7 +215,7 @@ function ProcessGroup({
       {group.vendors.length === 0 ? (
         <div className="text-[9px] text-slate-500 italic py-1">
           No vendors in your network handle this process.{' '}
-          <a href="/vendors" className="text-violet-400 hover:underline">Import vendors →</a>
+          <a href="/vendors" className="text-brand-400 hover:underline">Import vendors →</a>
         </div>
       ) : (
         <>
@@ -231,7 +231,7 @@ function ProcessGroup({
           {group.vendors.length > 4 && !showAll && (
             <button
               onClick={() => setShowAll(true)}
-              className="text-[9px] text-violet-400 hover:text-violet-300 py-0.5"
+              className="text-[9px] text-brand-400 hover:text-brand-300 py-0.5"
             >
               Show all {group.vendors.length} vendors →
             </button>
@@ -448,7 +448,7 @@ export function VendorNetworkPanel({
           </span>
         ))}
         {material && (
-          <span className="text-[8px] bg-violet-900/30 text-violet-300 border border-violet-700/40 rounded px-1.5 py-0.5">
+          <span className="text-[8px] bg-brand-900/30 text-brand-300 border border-brand-700/40 rounded px-1.5 py-0.5">
             {material}
           </span>
         )}
@@ -471,7 +471,7 @@ export function VendorNetworkPanel({
         {groups && groups.length === 0 && (
           <div className="text-[10px] text-slate-400 p-2 text-center">
             No vendors found for these processes.{' '}
-            <a href="/vendors" className="text-violet-400 hover:underline">Import vendors →</a>
+            <a href="/vendors" className="text-brand-400 hover:underline">Import vendors →</a>
           </div>
         )}
 
@@ -504,7 +504,7 @@ export function VendorNetworkPanel({
             className={cn(
               'text-[10px] font-medium px-3 py-1 rounded transition-colors',
               selectedIds.size > 0 && !isSending
-                ? 'bg-violet-600 hover:bg-violet-700 text-white'
+                ? 'bg-brand-600 hover:bg-brand-700 text-white'
                 : 'bg-slate-700 text-slate-500 cursor-not-allowed',
             )}
           >

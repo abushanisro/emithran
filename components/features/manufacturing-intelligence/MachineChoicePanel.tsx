@@ -41,7 +41,7 @@ export function MachineChoicePanel({ choice, currencySymbol }: { choice: Machine
           </div>
         ))}
         {rejected.length > 0 && (
-          <button type="button" onClick={() => setShowRejected((v) => !v)} className="mt-1 text-[10px] text-violet-400 hover:text-violet-300">
+          <button type="button" onClick={() => setShowRejected((v) => !v)} className="mt-1 text-[10px] text-brand-400 hover:text-brand-300">
             {showRejected ? 'Hide' : 'Show'} {rejected.length} not capable
           </button>
         )}

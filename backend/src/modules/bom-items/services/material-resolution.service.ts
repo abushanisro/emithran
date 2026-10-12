@@ -4,6 +4,7 @@ import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../../common/supabase/supabase.service';
 import type { RateSnapshot } from '../../../common/exchange-rate/exchange-rate.service';
 import { resolveUtsMpa, isSheetFormableMaterial } from '../costing/shared/core/default-rates.constants';
+import { CAD_FAMILY_TO_PROCESS_GROUP } from '../costing/shared/core/part-family-process-group';
 import { isPlasticGrade } from '../costing/plastic-molding/process/process-tree';
 import { isDiscouragedShapeForFamily } from '../../raw-materials/constants/material-shape-ranking';
 import type { BOMItemResponseDto } from '../dto/bom-item-response.dto';
@@ -21,12 +22,41 @@ interface MatchedMaterialRow {
   astmStandard: string | null; dinStandard: string | null; enStandard: string | null; jisStandard: string | null;
   hasCost: boolean;
   shape: string | null; locCost: number | null; indiaCost: number | null; densityKgM3: number | null;
-  shearStrengthMpa: number | null; utsMpa: number | null;
+  shearStrengthMpa: number | null; utsMpa: number | null; yieldStrengthMpa: number | null;
   meltingTempC: number | null; moldTempC: number | null; ejectDeflectionTempC: number | null;
   specificHeatMeltJgC: number | null; thermalConductivityMeltWMK: number | null;
   cureTimeMinFromMaterial: number | null;
   imInjectionPressureMaxMpa: number | null; imFlowLengthRatio: number | null; imReferenceMaterial: string | null;
   imDensityOfMeltKgM3: number | null;
+}
+
+/** Strengths a part's material checks use, each with no guessed value. */
+export interface MaterialStrengths {
+  /** Verified row value ('db'), else the approved family table ('family_default'), else null. */
+  utsMpa: number | null;
+  utsSource: 'db' | 'family_default' | 'unavailable';
+  /** Verified row values only — no approved-family table exists for either. */
+  shearStrengthMpa: number | null;
+  yieldStrengthMpa: number | null;
+  /** The raw_materials row the values came from (its name), null when none matched. */
+  materialName: string | null;
+}
+
+/** One rule for the quote and every other reader (DFM, calculator dialog). */
+function materialStrengthsFromRow(
+  row: Pick<MatchedMaterialRow, 'utsMpa' | 'shearStrengthMpa' | 'yieldStrengthMpa' | 'materialGrade' | 'material'> | undefined,
+  grade: string | null,
+): MaterialStrengths {
+  const positive = (v: number | null | undefined) => (v != null && v > 0 ? v : null);
+  const dbUts = positive(row?.utsMpa);
+  const familyUts = dbUts == null ? resolveUtsMpa(grade) : null;
+  return {
+    utsMpa: dbUts ?? familyUts,
+    utsSource: dbUts != null ? 'db' : familyUts != null ? 'family_default' : 'unavailable',
+    shearStrengthMpa: positive(row?.shearStrengthMpa),
+    yieldStrengthMpa: positive(row?.yieldStrengthMpa),
+    materialName: row ? (row.materialGrade ?? row.material) : null,
+  };
 }
 
 interface MaterialMatch {
@@ -160,6 +190,21 @@ export class MaterialResolutionService {
   // with the shared, deterministic material-search ranker, discloses any
   // non-exact match, and REFUSES (returns no row) when the query cannot tell
   // materially different materials apart (a bare "ALUMINUM").
+  /** Material groups a part family draws from (process_material_groups, migration 879); empty when unlinked. */
+  private async materialGroupsForFamily(
+    client: ReturnType<SupabaseService['getClient']>,
+    family: string,
+  ): Promise<Set<string>> {
+    const processGroup = CAD_FAMILY_TO_PROCESS_GROUP[family];
+    if (!processGroup) return new Set();
+    const { data, error } = await client
+      .from('process_material_groups')
+      .select('material_group')
+      .eq('process_group', processGroup);
+    if (error) throw new Error(`Failed to read process material groups for ${processGroup}: ${error.message}`);
+    return new Set((data ?? []).map((r: { material_group: string }) => r.material_group));
+  }
+
   private async matchBestRawMaterialRow(
     client: ReturnType<SupabaseService['getClient']>,
     grade: string,
@@ -188,7 +233,7 @@ export class MaterialResolutionService {
     //
     // id/material/material_group/*_standard: identity columns the ranker
     // needs to score a candidate (materialCol above is only the COST column).
-    const selectCols = `${materialCol}, id, grade, material_group, material_type, astm_standard, din_standard, en_standard, jis_standard, cost_india, cost, density, density_kg_m3, shape, name, shearing_strength, ultimate_tensile_strength, shear_strength_mpa, uts_mpa, melting_temp_c, mold_temp_c, specific_heat_melt, thermal_conductivity_melt, eject_deflection_temp_c` +
+    const selectCols = `${materialCol}, id, grade, material_group, material_type, astm_standard, din_standard, en_standard, jis_standard, cost_india, cost, density, density_kg_m3, shape, name, shearing_strength, ultimate_tensile_strength, shear_strength_mpa, uts_mpa, yield_strength_mpa, yield_tensile_strength, melting_temp_c, mold_temp_c, specific_heat_melt, thermal_conductivity_melt, eject_deflection_temp_c` +
       (cureTimeColumnAvailable ? `, cure_time_min` : '') +
       (imColumnsAvailable ? `, im_injection_pressure_max_mpa, im_flow_length_ratio, im_density_of_melt_kg_m3, im_reference_material` : '');
 
@@ -229,22 +274,38 @@ export class MaterialResolutionService {
     // grouping syntax, so a grade string containing them (confirmed: "(Expanded 1)")
     // silently corrupts the filter and the query returns nothing.
     // LIKE wildcards in the grade ("_", "%") are escaped so they match literally.
+    // Every manufacturing domain carries its own row for a shared material, each
+    // with that domain's properties. The memory/ catalogs name it two ways
+    // (sheet metal rawmetalusa: PrimaryID "Aluminum, ANSI 6061", OtherID
+    // "Generic Aluminum, ANSI 6061"), stored as name and grade — and not the
+    // same way in every domain (Forging's row has the PrimaryID as its grade,
+    // the Ferrous & Non-Ferrous row has it as its name). So both columns are
+    // matched, every hit is kept (a .limit(5) used to drop some at random),
+    // and the rows are narrowed to the part family's own material groups below.
     const exactPattern = escapeLikePattern(g);
     if (!data?.length) {
-      ({ data } = await client
-        .from('raw_materials')
-        .select(selectCols)
-        .ilike('grade', exactPattern)
-        .limit(5));
-      if (data?.length) stage = 'exact';
+      const [byGrade, byName] = await Promise.all([
+        client.from('raw_materials').select(selectCols).ilike('grade', exactPattern).order('id').limit(100),
+        client.from('raw_materials').select(selectCols).ilike('name', exactPattern).order('id').limit(100),
+      ]);
+      const seen = new Set<string>();
+      data = [...(byGrade.data ?? []), ...(byName.data ?? [])].filter((r) => {
+        const id = (r as unknown as { id: string }).id;
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      });
+      if (data.length) stage = 'exact';
     }
-    if (!data?.length) {
-      ({ data } = await client
-        .from('raw_materials')
-        .select(selectCols)
-        .ilike('name', exactPattern)
-        .limit(5));
-      if (data?.length) stage = 'exact';
+    if (stage === 'exact' && data && data.length > 1) {
+      const familyGroups = await this.materialGroupsForFamily(client, family);
+      const rows = data as Array<{ material_group?: string | null; grade?: string | null }>;
+      const inFamily = rows.filter((r) => r.material_group != null && familyGroups.has(r.material_group));
+      // No family link (or none of its groups hold the grade): grade matches
+      // keep their old precedence over name matches.
+      const byGradeOnly = rows.filter((r) => (r.grade ?? '').toLowerCase() === g.toLowerCase());
+      if (inFamily.length > 0) data = inFamily;
+      else if (byGradeOnly.length > 0) data = byGradeOnly;
     }
 
     if (!data?.length) {
@@ -300,6 +361,8 @@ export class MaterialResolutionService {
       // migration 395) numerically identical to today's behavior.
       const shearStrengthMpa = (row.shear_strength_mpa as number | null) ?? (row.shearing_strength as number | null);
       const utsMpa = (row.uts_mpa as number | null) ?? (row.ultimate_tensile_strength as number | null);
+      // Same newer-column-first rule (migration 451 backfilled yield_strength_mpa).
+      const yieldStrengthMpa = (row.yield_strength_mpa as number | null) ?? (row.yield_tensile_strength as number | null);
       const meltingTempC = (row.melting_temp_c as number | null) ?? null;
       const moldTempC = (row.mold_temp_c as number | null) ?? null;
       const ejectDeflectionTempC = (row.eject_deflection_temp_c as number | null) ?? null;
@@ -320,7 +383,7 @@ export class MaterialResolutionService {
         jisStandard: (row.jis_standard as string | null) ?? null,
         hasCost: (locCost != null && locCost > 0) || (indiaCost != null && indiaCost > 0),
         // resolved properties
-        shape: (row.shape as string | null) ?? null, locCost, indiaCost, densityKgM3, shearStrengthMpa, utsMpa,
+        shape: (row.shape as string | null) ?? null, locCost, indiaCost, densityKgM3, shearStrengthMpa, utsMpa, yieldStrengthMpa,
         meltingTempC, moldTempC, ejectDeflectionTempC, specificHeatMeltJgC, thermalConductivityMeltWMK, cureTimeMinFromMaterial,
         imInjectionPressureMaxMpa: numOrNull(row.im_injection_pressure_max_mpa),
         imFlowLengthRatio: numOrNull(row.im_flow_length_ratio),
@@ -405,6 +468,19 @@ export class MaterialResolutionService {
     return { cutCode: Number.isFinite(code) ? code : null, materialName: row.materialGrade ?? row.material, materialGroup: row.materialGroup };
   }
 
+  /**
+   * Tensile, shear and yield strength for a grade, from the SAME matched row
+   * (and family narrowing) the quote prices from — for readers that need only
+   * the strengths: the DFM min-hole check and the calculator dialog.
+   */
+  async resolveMaterialStrengths(accessToken: string, grade: string | null, family: string): Promise<MaterialStrengths> {
+    const g = grade?.trim();
+    if (!g) return materialStrengthsFromRow(undefined, null);
+    const client = this.supabaseService.getClient(accessToken);
+    const { row } = await this.matchBestRawMaterialRow(client, g, family, 'cost');
+    return materialStrengthsFromRow(row, g);
+  }
+
   async resolveDensityKgM3(accessToken: string, grade: string, family: string = 'unknown'): Promise<number | null> {
     const g = grade?.trim();
     if (!g) return null;
@@ -486,17 +562,29 @@ export class MaterialResolutionService {
               `(pending review) — weight/tonnage use its real density; material cost shows as $0 until a cost is added.`,
             );
           }
-          const hasUts = best.utsMpa != null && best.utsMpa > 0 && best.shearStrengthMpa != null && best.shearStrengthMpa > 0;
-          const familyUts = hasUts ? null : resolveUtsMpa(grade);
+          // UTS (press-brake tonnage) and shear strength (turret-punch tonnage)
+          // are separate facts: a row with a verified UTS but no shear strength
+          // still prices bending from its real UTS.
+          const strengths = materialStrengthsFromRow(best, grade);
+          const hasUts = strengths.utsSource === 'db';
+          const hasShear = strengths.shearStrengthMpa != null;
+          const familyUts = strengths.utsSource === 'family_default' ? strengths.utsMpa : null;
           // UTS/shear drive press-brake and turret-punch tonnage and the sheet-metal
           // DFM checks only; no other family reads them (a casting uses its own
           // alloy Shear Strength, casting-reference.ts), so the gap is said there only.
-          if (!hasUts && family === 'sheet_metal') {
-            warnings.push(
-              familyUts != null
-                ? `Material "${grade}" found in raw_materials, but no verified UTS/shear strength — using the approved ${grade} family UTS (${familyUts} MPa) for press-brake tonnage. Shear strength has no approved-family table, so it is unavailable and turret-punch tonnage checks are skipped until verified values are added.`
-                : `Material "${grade}" found in raw_materials, but no verified UTS/shear strength, and the grade matches no approved material family either — press-brake tonnage, turret-punch tonnage, and UTS-dependent DFM checks are skipped until verified values are added.`,
-            );
+          if (family === 'sheet_metal') {
+            if (!hasUts) {
+              warnings.push(
+                familyUts != null
+                  ? `Material "${grade}" found in raw_materials, but no verified UTS — using the approved ${grade} family UTS (${familyUts} MPa) for press-brake tonnage.`
+                  : `Material "${grade}" found in raw_materials, but no verified UTS, and the grade matches no approved material family either — press-brake tonnage and UTS-dependent DFM checks are skipped until a verified value is added.`,
+              );
+            }
+            if (!hasShear) {
+              warnings.push(
+                `Material "${grade}" has no verified shear strength in raw_materials, and shear strength has no approved-family table — turret-punch tonnage checks are skipped until a verified value is added.`,
+              );
+            }
           }
           const hasThermal = best.meltingTempC != null && best.moldTempC != null;
           // A machined part is priced on the stock it is cut from: the stock-form
@@ -519,9 +607,9 @@ export class MaterialResolutionService {
                 : 0,
             materialDensityKgM3: best.densityKgM3 as number,
             materialSource: 'db',
-            utsMpa: hasUts ? (best.utsMpa as number) : familyUts,
-            shearStrengthMpa: hasUts ? (best.shearStrengthMpa as number) : null,
-            utsSource: hasUts ? 'db' : (familyUts != null ? 'family_default' : 'unavailable'),
+            utsMpa: strengths.utsMpa,
+            shearStrengthMpa: strengths.shearStrengthMpa,
+            utsSource: strengths.utsSource,
             meltingTempC: best.meltingTempC, moldTempC: best.moldTempC, ejectionTempC: best.ejectDeflectionTempC,
             specificHeatMeltJgC: best.specificHeatMeltJgC, thermalConductivityMeltWMK: best.thermalConductivityMeltWMK,
             densityOfMeltKgM3: best.imDensityOfMeltKgM3,

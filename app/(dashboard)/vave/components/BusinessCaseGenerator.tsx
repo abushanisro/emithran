@@ -60,7 +60,7 @@ const QUADRANT_COLORS: Record<string, { bar: string; text: string; border: strin
 
 const FRAMEWORK_COLORS: Record<string, { bar: string; text: string }> = {
   SCAMPER: { bar: 'bg-primary',            text: 'text-primary' },
-  TRIZ:    { bar: 'bg-purple-500',         text: 'text-purple-400' },
+  TRIZ:    { bar: 'bg-brand-500',         text: 'text-brand-400' },
   FAST:    { bar: 'bg-amber-500',          text: 'text-amber-400' },
   Manual:  { bar: 'bg-muted-foreground',   text: 'text-muted-foreground' },
 };

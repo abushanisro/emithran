@@ -1893,15 +1893,15 @@ export default function DeliveryOrderWorkflow({
                 {/* Supporting Documents */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 bg-purple-100 rounded-lg">
-                      <Paperclip className="h-5 w-5 text-purple-600" />
+                    <div className="p-2 bg-brand-100 rounded-lg">
+                      <Paperclip className="h-5 w-5 text-brand-600" />
                     </div>
                     <div>
                       <h4 className="font-semibold text-gray-900">Documents</h4>
                       <p className="text-xs text-gray-500">Supporting documentation</p>
                     </div>
                     {documents.length > 0 && (
-                      <Badge variant="default" className="ml-auto bg-purple-500">
+                      <Badge variant="default" className="ml-auto bg-brand-500">
                         {documents.length}
                       </Badge>
                     )}
@@ -1909,16 +1909,16 @@ export default function DeliveryOrderWorkflow({
 
                   <label
                     htmlFor="documents-input"
-                    className="relative group block w-full p-6 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-purple-400 hover:bg-purple-50/50 transition-all duration-200"
+                    className="relative group block w-full p-6 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-brand-400 hover:bg-brand-50/50 transition-all duration-200"
                   >
                     <div className="text-center">
-                      <div className="mx-auto w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center group-hover:bg-purple-200 transition-colors">
-                        <Upload className="h-6 w-6 text-purple-600" />
+                      <div className="mx-auto w-12 h-12 bg-brand-100 rounded-full flex items-center justify-center group-hover:bg-brand-200 transition-colors">
+                        <Upload className="h-6 w-6 text-brand-600" />
                       </div>
                       <div className="mt-3">
                         <p className="text-sm font-medium text-gray-900">Click to upload files</p>
                         <p className="text-xs text-gray-500 mt-1">PDF, Word, Excel, Images</p>
-                        <p className="text-xs text-purple-600 font-medium mt-1">Multiple files allowed</p>
+                        <p className="text-xs text-brand-600 font-medium mt-1">Multiple files allowed</p>
                       </div>
                     </div>
                     <input
@@ -1936,7 +1936,7 @@ export default function DeliveryOrderWorkflow({
                       {documents.map((f) => (
                         <div
                           key={f.id}
-                          className="group flex items-center gap-3 p-3 border border-gray-200 rounded-lg bg-gray-50/50 hover:bg-gray-50 hover:border-purple-300 transition-colors cursor-pointer"
+                          className="group flex items-center gap-3 p-3 border border-gray-200 rounded-lg bg-gray-50/50 hover:bg-gray-50 hover:border-brand-300 transition-colors cursor-pointer"
                           onClick={() => handleOpenPreview(f)}
                         >
                           <div className="shrink-0">

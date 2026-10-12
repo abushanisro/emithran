@@ -4251,10 +4251,10 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
                     )}
                     {(currentSelectedFeature.tooling ?? []).length > 0 && (
                       <div>
-                        <span className="text-purple-400 font-medium">Required Tools:</span>
+                        <span className="text-brand-400 font-medium">Required Tools:</span>
                         <div className="mt-1 flex flex-wrap gap-1">
                           {(currentSelectedFeature.tooling ?? []).map((t: string, i: number) => (
-                            <span key={i} className="bg-purple-900/30 text-purple-300 px-1 py-0.5 rounded text-[7px]">{t}</span>
+                            <span key={i} className="bg-brand-900/30 text-brand-300 px-1 py-0.5 rounded text-[7px]">{t}</span>
                           ))}
                         </div>
                       </div>

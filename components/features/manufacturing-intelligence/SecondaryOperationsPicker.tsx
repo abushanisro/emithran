@@ -69,11 +69,11 @@ export function SecondaryOperationsPicker({
                       checked={o.selected}
                       disabled={disabled}
                       onChange={() => toggle(key, o.process)}
-                      className="accent-violet-600 shrink-0"
+                      className="accent-brand-600 shrink-0"
                     />
                     <span className="flex-1 min-w-0 truncate">
                       {o.process}
-                      {o.fromDrawing && <span className="ml-1 text-[9px] text-violet-400">from drawing</span>}
+                      {o.fromDrawing && <span className="ml-1 text-[9px] text-brand-400">from drawing</span>}
                     </span>
                     <span className={`tabular-nums shrink-0 ${o.costPerPart == null ? 'text-muted-foreground' : ''}`}>{cost(o)}</span>
                   </label>

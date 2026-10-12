@@ -1,6 +1,6 @@
 import {
   classifyInspectionResource, estimateBendTonnage, recommendedBendTonnage, bendShoulderWidthMm,
-  BEND_COEFFICIENT, BEND_RECOMMENDED_FORCE_FACTOR,
+  BEND_COEFFICIENT, BEND_RECOMMENDED_FORCE_FACTOR, resolveUtsMpa,
 } from '../../../../../../modules/bom-items/costing/shared/core/default-rates.constants';
 
 describe('classifyInspectionResource', () => {
@@ -87,5 +87,43 @@ describe('press brake tonnage (Bending calculator formula)', () => {
   ])('returns null (never a guessed tonnage) for %s', (_label, uts, t, len) => {
     expect(estimateBendTonnage(uts as number | null, t as number, len as number)).toBeNull();
     expect(recommendedBendTonnage(uts as number | null, t as number, len as number)).toBeNull();
+  });
+});
+
+describe('resolveUtsMpa', () => {
+  // Real raw_materials names spell the family and alloy apart. The reported
+  // part (Rtp2 Mag2 Backframe, "Aluminum, ANSI 6061") resolved no UTS, so the
+  // Press Brake calculator's UTS stayed blank and tonnage was skipped.
+  it.each([
+    ['Aluminum, ANSI 6061', 310],
+    ['Generic Aluminum, ANSI 6061', 310],
+    ['Aluminum, ANSI 5052', 230],
+    ['Generic Stainless Steel, AISI 304', 620],
+    ['Generic Stainless Steel, AISI 316', 580],
+    ['Generic Stainless Steel, AISI 316L', 560],
+  ])('reads the alloy off the catalog name %s', (grade, uts) => {
+    expect(resolveUtsMpa(grade)).toBe(uts);
+  });
+
+  // A grade without its own approved value never borrows a neighbour's.
+  it.each([
+    'Generic Stainless Steel, AISI 304L',
+    'Generic Stainless Steel, AISI 316Ti',
+    'Aluminum, AA 3105',
+    'Generic Stainless Steel, 310',
+  ])('returns null for %s (no approved family value)', (grade) => {
+    expect(resolveUtsMpa(grade)).toBeNull();
+  });
+
+  it('never reads SS316L as SS316 in compact grades', () => {
+    expect(resolveUtsMpa('SS316L')).toBe(560);
+    expect(resolveUtsMpa('SS316')).toBe(580);
+  });
+
+  it('keeps matching compound grade strings', () => {
+    // First key in table order, as before (CRCA), when no key contains another.
+    expect(resolveUtsMpa('IS2062 E250 CRCA')).toBe(370);
+    expect(resolveUtsMpa('AL6061-T6')).toBe(310);
+    expect(resolveUtsMpa(null)).toBeNull();
   });
 });

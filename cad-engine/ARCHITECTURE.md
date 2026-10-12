@@ -45,7 +45,6 @@ cad-engine/
     memory_optimizer.py          — CAD memory management + extraction orchestration
     sldprt_converter.py          — SolidWorks SLDPRT -> STEP conversion
     services.py / validators.py / config.py / exceptions.py — infrastructure
-  copilot/                       — unchanged, not part of this refactor
 ```
 
 ## Why `feature_extractors.py` split the way it did

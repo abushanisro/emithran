@@ -59,7 +59,7 @@ function Badge({ tone, children }: { tone: 'emerald' | 'blue' | 'amber' | 'viole
     emerald: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
     blue: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
     amber: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-    violet: 'bg-violet-500/15 text-violet-300 border-violet-500/30',
+    violet: 'bg-brand-500/15 text-brand-300 border-brand-500/30',
     red: 'bg-red-500/15 text-red-300 border-red-500/30',
   };
   return (
@@ -121,7 +121,7 @@ export function RouteCompareList({
               className={cn(
                 'min-h-6 rounded px-2 py-1 text-[11px] font-medium transition-colors',
                 sortMode === m.id
-                  ? 'bg-violet-500/20 text-violet-200 ring-1 ring-inset ring-violet-500/40'
+                  ? 'bg-brand-500/20 text-brand-200 ring-1 ring-inset ring-brand-500/40'
                   : 'text-muted-foreground hover:bg-muted/40 hover:text-foreground',
               )}
             >
@@ -180,9 +180,9 @@ export function RouteCompareList({
                     }}
                     className={cn(
                       'group relative flex items-start gap-3 px-4 py-2.5 outline-hidden transition-colors',
-                      'focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-violet-500',
+                      'focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500',
                       node.selectable ? 'cursor-pointer hover:bg-muted/30' : 'cursor-default',
-                      isSelected && 'bg-violet-500/10',
+                      isSelected && 'bg-brand-500/10',
                       !node.feasible && 'opacity-70',
                     )}
                   >
@@ -190,14 +190,14 @@ export function RouteCompareList({
                         from anywhere in the row, unlike a 3px dot */}
                     <span
                       aria-hidden
-                      className={cn('absolute inset-y-0 left-0 w-[3px]', isSelected ? 'bg-violet-500' : 'bg-transparent')}
+                      className={cn('absolute inset-y-0 left-0 w-[3px]', isSelected ? 'bg-brand-500' : 'bg-transparent')}
                     />
 
                     <span
                       aria-hidden
                       className={cn(
                         'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors',
-                        isSelected ? 'border-violet-500 bg-violet-500 text-white' : 'border-muted-foreground/40',
+                        isSelected ? 'border-brand-500 bg-brand-500 text-white' : 'border-muted-foreground/40',
                         !node.selectable && 'opacity-0',
                       )}
                     >
@@ -228,7 +228,7 @@ export function RouteCompareList({
                       {barPct !== null && (
                         <div aria-hidden className="mt-1.5 h-[3px] w-full overflow-hidden rounded-full bg-muted/50">
                           <div
-                            className={cn('h-full rounded-full', isSelected ? 'bg-violet-500' : 'bg-muted-foreground/40')}
+                            className={cn('h-full rounded-full', isSelected ? 'bg-brand-500' : 'bg-muted-foreground/40')}
                             style={{ width: `${String(barPct)}%` }}
                           />
                         </div>

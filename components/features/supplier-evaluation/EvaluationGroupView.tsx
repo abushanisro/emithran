@@ -524,8 +524,8 @@ We look forward to your competitive proposal and establishing a successful partn
           <Card className="bg-gray-800 border-gray-700">
             <CardContent className="p-6">
               <div className="flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-purple-600/20">
-                  <TrendingUp className="h-6 w-6 text-purple-400" />
+                <div className="p-3 rounded-lg bg-brand-600/20">
+                  <TrendingUp className="h-6 w-6 text-brand-400" />
                 </div>
                 <div>
                   <h3 className="text-2xl font-bold text-white">{stats.sentRfqCount}</h3>
@@ -682,7 +682,7 @@ We look forward to your competitive proposal and establishing a successful partn
                                 e.stopPropagation();
                                 onViewFile?.(part, '3d');
                               }}
-                              className="flex items-center gap-1.5 text-xs text-purple-400 hover:text-purple-300 hover:bg-purple-600/10 px-2 py-1 rounded transition-colors text-left"
+                              className="flex items-center gap-1.5 text-xs text-brand-400 hover:text-brand-300 hover:bg-brand-600/10 px-2 py-1 rounded transition-colors text-left"
                               title="View 3D Model"
                             >
                               <Box className="h-3 w-3 shrink-0" />
@@ -715,7 +715,7 @@ We look forward to your competitive proposal and establishing a successful partn
                       <Badge variant="outline" className="text-teal-400 border-teal-400/50">
                         {matchedVendors.length} available
                       </Badge>
-                      <Badge variant="outline" className="text-purple-400 border-purple-400/50">
+                      <Badge variant="outline" className="text-brand-400 border-brand-400/50">
                         {selectedVendors.length} selected
                       </Badge>
                     </div>
@@ -1071,7 +1071,7 @@ We look forward to your competitive proposal and establishing a successful partn
                                           </Badge>
                                         )}
                                         {part.has3dFile && (
-                                          <Badge variant="outline" className="text-xs border-purple-500 text-purple-400">
+                                          <Badge variant="outline" className="text-xs border-brand-500 text-brand-400">
                                             3D
                                           </Badge>
                                         )}

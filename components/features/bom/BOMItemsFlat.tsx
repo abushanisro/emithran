@@ -511,7 +511,7 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem }: 
                   {getItemTypeBadge(item.itemType)}
 
                   {isDragging && !isBeingDragged && draggedItem && (
-                    <Badge variant="outline" className="text-xs bg-purple-50 dark:bg-purple-950/20 border-purple-300">
+                    <Badge variant="outline" className="text-xs bg-brand-50 dark:bg-brand-950/20 border-brand-300">
                       Drop to Swap Positions ↔
                     </Badge>
                   )}
@@ -588,7 +588,7 @@ export function BOMItemsFlat({ bomId, onEditItem, onViewItem, onAddChildItem }: 
                   onClick={(e) => { e.stopPropagation(); onViewItem?.(item, 'intelligence'); }}
                   title="Manufacturing Intelligence"
                 >
-                  <Cpu className="h-4 w-4 text-violet-500" />
+                  <Cpu className="h-4 w-4 text-brand-500" />
                 </Button>
                 {childType && (
                   <Button variant="default" size="icon" className="h-8 w-8 rounded-full" onClick={() => handleAddChild(item)} title="Add Component">

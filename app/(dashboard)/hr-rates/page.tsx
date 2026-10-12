@@ -477,7 +477,7 @@ export default function HRRatesPage() {
                       <TableHead className="h-9 px-2 text-xs w-[100px]">Wage Grade</TableHead>
                       <TableHead className="h-9 px-2 text-xs text-right w-[88px] text-blue-600">Direct OH ($/hr)</TableHead>
                       <TableHead className="h-9 px-2 text-xs text-right w-[92px] text-indigo-600">Indirect OH ($/hr)</TableHead>
-                      <TableHead className="h-9 px-2 text-xs text-right w-[90px] text-purple-600">MHR ($/hr)</TableHead>
+                      <TableHead className="h-9 px-2 text-xs text-right w-[90px] text-brand-600">MHR ($/hr)</TableHead>
                       <TableHead className="h-9 px-2 text-xs text-right w-[100px] text-green-600">LHR (USD/hr)</TableHead>
                       <TableHead className="h-9 px-2 text-xs text-right w-[100px]">Machine Price ($)</TableHead>
                       <TableHead className="h-9 px-2 text-xs sticky right-0 bg-card z-20 w-[72px] border-l border-border text-center">Actions</TableHead>
@@ -521,7 +521,7 @@ export default function HRRatesPage() {
                                 <TableCell className="py-1.5 px-2">{record.wageGrade || '-'}</TableCell>
                                 <TableCell className="py-1.5 px-2 text-right text-blue-600">{record.directOverheadRate != null ? `$${record.directOverheadRate.toFixed(2)}` : '-'}</TableCell>
                                 <TableCell className="py-1.5 px-2 text-right text-indigo-600">{record.indirectOverheadRate != null ? `$${record.indirectOverheadRate.toFixed(2)}` : '-'}</TableCell>
-                                <TableCell className="py-1.5 px-2 text-right text-purple-600">
+                                <TableCell className="py-1.5 px-2 text-right text-brand-600">
                                   {/* Canonical MHR (2026-08-27) = Direct OH + Indirect OH (the standalone
                                       "Total OH" column was removed as a duplicate of this same value),
                                       FX-converted to this row's local currency where applicable

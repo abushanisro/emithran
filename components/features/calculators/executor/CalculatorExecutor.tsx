@@ -1510,7 +1510,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
 
       {/* Live Calculation Preview */}
       {calculator.fields?.some(field => field.fieldType === 'calculated') && Object.keys(fieldValues).length > 0 && (
-        <Card className="bg-linear-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20">
+        <Card className="bg-linear-to-r from-blue-50 to-brand-50 dark:from-blue-950/20 dark:to-brand-950/20">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Eye className="h-5 w-5" />
@@ -1553,7 +1553,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
                               {calculationSteps.slice(0, 4).map((step, index) => (
                                 <div key={index} className="flex gap-2 items-center text-xs">
                                   <div className={`w-5 h-5 text-white rounded-full flex items-center justify-center text-xs font-bold ${
-                                    step.isIntermediate ? 'bg-blue-500' : step.step === 1 ? 'bg-purple-500' : 'bg-green-500'
+                                    step.isIntermediate ? 'bg-blue-500' : step.step === 1 ? 'bg-brand-500' : 'bg-green-500'
                                   }`}>
                                     {step.step}
                                   </div>
@@ -1696,7 +1696,7 @@ export function CalculatorExecutor({ calculatorId }: CalculatorExecutorProps) {
                                       {createCalculationSteps(field.defaultValue, fieldValues).map((step, index) => (
                                         <div key={index} className="flex gap-3 items-start">
                                           <div className={`shrink-0 w-7 h-7 text-white rounded-full flex items-center justify-center text-xs font-bold ${
-                                            step.isIntermediate ? 'bg-blue-500' : step.step === 1 ? 'bg-purple-500' : 'bg-green-500'
+                                            step.isIntermediate ? 'bg-blue-500' : step.step === 1 ? 'bg-brand-500' : 'bg-green-500'
                                           }`}>
                                             {step.step}
                                           </div>

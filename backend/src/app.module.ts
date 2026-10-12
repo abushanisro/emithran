@@ -34,6 +34,7 @@ import { BenchmarkSessionsModule } from './modules/benchmark-sessions/benchmark-
 import { DeveloperModule } from './modules/developer/developer.module';
 import { ProfileModule } from './modules/profile/profile.module';
 import { ProcessPlanGeneratorModule } from './modules/process-plan-generator/process-plan-generator.module';
+import { CopilotModule } from './modules/copilot/copilot.module';
 import { CostEngineeringModule } from './modules/cost-engineering/cost-engineering.module';
 import { ManufacturingIntelligenceModule } from './modules/manufacturing-intelligence/manufacturing-intelligence.module';
 import { ManufacturingKnowledgeModule } from './modules/manufacturing-knowledge/manufacturing-knowledge.module';
@@ -105,6 +106,7 @@ import { AppController } from './app.controller';
     DeveloperModule,
     ProfileModule,
     ProcessPlanGeneratorModule,
+    CopilotModule,
     CostEngineeringModule,
     ManufacturingIntelligenceModule,
     ManufacturingKnowledgeModule,

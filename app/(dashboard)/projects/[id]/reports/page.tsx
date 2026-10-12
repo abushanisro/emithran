@@ -333,10 +333,10 @@ export default function ProjectReportPage() {
               
               <Card className="p-6">
                 <div className="flex items-center">
-                  <Settings className="h-8 w-8 text-purple-500 mr-3" />
+                  <Settings className="h-8 w-8 text-brand-500 mr-3" />
                   <div>
                     <h3 className="text-lg font-semibold">Annotations</h3>
-                    <p className="text-2xl font-bold text-purple-600">
+                    <p className="text-2xl font-bold text-brand-600">
                       {balloonDiagrams?.reduce((sum, d) => sum + (d.annotations?.length || 0), 0) || 0}
                     </p>
                   </div>

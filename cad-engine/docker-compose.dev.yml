@@ -27,6 +27,9 @@ services:
       dockerfile: Dockerfile
     image: mithran-cad-engine:dev
     container_name: mithran-cad-engine-dev
+    # Docker runs inside the WSL distro and stops with it; come back up
+    # whenever the daemon starts again instead of staying Exited.
+    restart: unless-stopped
     ports:
       - "5000:5000"
     volumes:

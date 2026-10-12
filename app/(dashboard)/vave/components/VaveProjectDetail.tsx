@@ -27,7 +27,7 @@ const STATUS_LABELS: Record<string, string> = {
 const STATUS_COLORS: Record<string, string> = {
   phase1: 'bg-blue-100 text-blue-700 border-blue-200',
   phase2: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-  phase3: 'bg-purple-100 text-purple-700 border-purple-200',
+  phase3: 'bg-brand-100 text-brand-700 border-brand-200',
   complete: 'bg-green-100 text-green-700 border-green-200',
 };
 

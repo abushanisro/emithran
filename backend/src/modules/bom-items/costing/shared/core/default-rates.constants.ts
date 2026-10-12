@@ -134,9 +134,29 @@ export const MATERIAL_UTS_MPA: Record<string, number> = {
   AL5052:  230,  AA5052: 230,
 };
 
+// Catalog names spell the family and the alloy apart ("Aluminum, ANSI 6061",
+// "Generic Stainless Steel, AISI 316L"), so the compact keys above never
+// appear in them. The alloy designation is read off the name and must equal
+// a key exactly: 304L, 316Ti and the like are their own grades and never
+// borrow a neighbour's value.
+function catalogAlloyKey(upper: string): string | null {
+  const alloy = /\b(?:ANSI|AISI|AA)?\s*(\d{3,4}[A-Z]{0,2})\b/.exec(upper.replace(/^.*,/, ''))?.[1];
+  if (!alloy) return null;
+  if (/ALUMI(?:N|NI)UM/.test(upper) && /^\d{4}$/.test(alloy)) return `AL${alloy}`;
+  if (/STAINLESS/.test(upper)) return `SS${alloy}`;
+  return null;
+}
+
 export function resolveUtsMpa(grade: string | null | undefined): number | null {
-  const g = (grade ?? '').toUpperCase().replace(/[\s\-]/g, '');
-  const hit = Object.keys(MATERIAL_UTS_MPA).find((k) => g.includes(k));
+  const upper = (grade ?? '').toUpperCase();
+  const catalogKey = catalogAlloyKey(upper);
+  if (catalogKey) return MATERIAL_UTS_MPA[catalogKey] ?? null;
+  // Compact grade strings ("IS2062 E250 CRCA", "SS316L"): first key in table
+  // order, skipping a key that a longer matched key contains, so SS316L is
+  // never read as SS316.
+  const g = upper.replace(/[\s\-]/g, '');
+  const matched = Object.keys(MATERIAL_UTS_MPA).filter((k) => g.includes(k));
+  const hit = matched.find((k) => !matched.some((m) => m !== k && m.includes(k)));
   return hit ? MATERIAL_UTS_MPA[hit]! : null;
 }
 

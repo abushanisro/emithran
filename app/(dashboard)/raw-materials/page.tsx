@@ -827,8 +827,8 @@ export default function RawMaterialsPage() {
               </div>
 
             {/* Material Standards Section */}
-            <div className="space-y-4 p-4 bg-violet-50/30 dark:bg-violet-950/30 rounded-lg border border-violet-200 dark:border-violet-800">
-                <h3 className="text-sm font-semibold text-violet-900 dark:text-violet-100">Material Standards</h3>
+            <div className="space-y-4 p-4 bg-brand-50/30 dark:bg-brand-950/30 rounded-lg border border-brand-200 dark:border-brand-800">
+                <h3 className="text-sm font-semibold text-brand-900 dark:text-brand-100">Material Standards</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">ASTM Standard</label>
