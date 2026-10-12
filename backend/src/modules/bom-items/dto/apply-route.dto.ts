@@ -24,9 +24,16 @@ export const VALID_ROUTE_IDS: RouteId[] = [
   ...DIE_CASTING_PROCESSES.map(dieCastingRouteId),
 ];
 
+/**
+ * Apply whichever route the engine recommends for this part. Resolved on the
+ * server from the same comparison the apply runs on, so the choice and the
+ * costing it is applied with can never come from two different computations.
+ */
+export const AUTO_ROUTE_ID = 'auto';
+
 export class ApplyRouteDto {
   @IsString()
-  @IsIn(VALID_ROUTE_IDS)
+  @IsIn([...VALID_ROUTE_IDS, AUTO_ROUTE_ID])
   routeId!: string;
 
   @IsOptional()

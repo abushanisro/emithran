@@ -1207,6 +1207,8 @@ export function useCostSummary(itemId: string | undefined, batchSize: number | u
       ),
     enabled: useAuthEnabledWith(!!itemId),
     staleTime: 1000 * 60 * 5,
+    // A retry would start a second full server computation behind the first.
+    retry: false,
     // NOT refetchOnMount: 'always'.
     //
     // That was set so a rate edited out-of-band (HR Rates page, Calculators
@@ -1474,18 +1476,38 @@ export interface RouteComparisonDto {
   usdToDisplayRate?: number;
 }
 
+/** The route-comparison cache key and URL, defined once (same reasoning as costSummaryQueryKey). */
+export function routeComparisonQueryKey(
+  itemId: string | undefined,
+  batchSize: number | undefined,
+  location: string,
+) {
+  return ['bom-items', itemId, 'route-comparison', batchSize, location] as const;
+}
+
+export function routeComparisonUrl(
+  itemId: string,
+  batchSize: number | undefined,
+  location: string,
+): string {
+  return `/bom-items/${itemId}/route-comparison?${costingQuery(batchSize, location)}`;
+}
+
 /** `batchSize` semantics are identical to useCostSummary above. */
 export function useRouteComparison(itemId: string | undefined, batchSize: number | undefined, location = 'USA') {
   return useQuery({
-    queryKey: ["bom-items", itemId, "route-comparison", batchSize, location],
+    queryKey: routeComparisonQueryKey(itemId, batchSize, location),
     queryFn: () =>
-      // Observed taking 8-18s in practice — same timeout fix as useCostSummary above.
+      // The server takes 46-157 s for this comparison under load. A shorter client
+      // timeout fails the request while the server keeps computing it, and a retry
+      // then starts a second full computation behind the first.
       apiClient.get<RouteComparisonDto>(
-        `/bom-items/${itemId}/route-comparison?${costingQuery(batchSize, location)}`,
-        { timeout: 60000 },
+        routeComparisonUrl(itemId ?? '', batchSize, location),
+        { timeout: 180000 },
       ),
     enabled: useAuthEnabledWith(!!itemId),
     staleTime: 1000 * 60 * 5,
+    retry: false,
     refetchOnWindowFocus: false,
     // Same reasoning as useCostSummary above: staleTime, prefix invalidation on
     // every relevant mutation, and the explicit Recalculate action already cover
@@ -1537,6 +1559,9 @@ export function useCandidateRoutes(
   });
 }
 
+/** Apply the route the server itself recommends (mirrors AUTO_ROUTE_ID in apply-route.dto.ts). */
+export const AUTO_ROUTE_ID = 'auto';
+
 // ── Apply manufacturing route → create process cost records ──────────────────
 // Posts the user-selected routeId to the backend, which re-runs the route
 // comparison engine, validates feasibility, then writes process_cost_records.
@@ -1549,11 +1574,13 @@ export function useApplyRoute(bomItemId: string | undefined) {
         `/bom-items/${bomItemId}/apply-route`,
         payload,
         // Re-runs the whole route-comparison engine before writing records —
-        // observed taking 12-42s in practice, well past the 15s dev-mode
+        // observed taking 12-157s in practice, well past the 15s dev-mode
         // default (lib/config.ts) and this endpoint has no dynamic-ID-safe
         // entry in endpointTimeouts (those are exact-string keys, which can't
         // match a URL containing this item's UUID) — override per-call instead.
-        { timeout: 60000 },
+        // Shorter than the server's time, the client reports a failure for an apply
+        // that then completes, inviting a second click that applies it twice.
+        { timeout: 180000 },
       ),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['process-costs'], exact: false });

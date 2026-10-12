@@ -131,6 +131,18 @@ Once Sheet Metal reaches this level of readiness:
 
 Only make changes to a frozen domain for a real production bug or a genuinely required new capability — not exploratory redesign.
 
+## Engineering rules (requests, caching, writes)
+
+Found by auditing one Apply click (2026-10-13): two PATCHes, two cost-summary URLs for the same data, three or four 46-157 s route comparisons, the catalog lists re-fetched on every dialog open, all on a single-process backend. Each rule below closes a defect that audit confirmed.
+
+- **One canonical key per resource.** A query or cache key carries every parameter that affects the result (item, batch size, location, ...) and is built in one place (`costSummaryQueryKey`, `routeComparisonQueryKey`). Never subscribe to the same data under a second key, and never default a missing input (`?? 1`).
+- **Cache reference data only, with a TTL.** Global reference tables go through `@ReferenceMemo()` (positive results only, key = method + every argument, TTL, per-caller copy). Scenario-specific costing results are never cached as reference data, and user-scoped reads (RLS) never go into a cross-user cache. Where an edit must show immediately, add explicit invalidation; otherwise the TTL is the bound.
+- **Parallelise independent operations only.** `Promise.all` calls that share no input or output; keep dependent calls sequential.
+- **Guard user-triggered writes.** An action that writes (Apply) runs single-flight (`createSingleFlight`) and releases on success and failure; a server write that must not repeat is idempotent or refuses the repeat. A client timeout must not be shorter than the server's real time, or the user retries a write that is still running.
+- **No unguarded fire-and-forget writes.** Await it, or catch and log its failure (supabase `rpc()` returns `{ error }` instead of throwing). Repeating telemetry is de-duplicated (`RecentKeys`).
+- **Log levels.** `debug` only behind `LOG_LEVEL=debug`; never log tokens, keys, or customer data.
+- **A regression test for every defect fixed**, with real data where the defect came from data.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know

@@ -1,4 +1,4 @@
-import { isCacheable, TtlMemo } from '../../../common/cache/reference-memo';
+import { isCacheable, ReferenceMemo, TtlMemo } from '../../../common/cache/reference-memo';
 
 const make = (now: { t: number }, ttlMs = 1000, maxEntries = 3) => new TtlMemo({ ttlMs, maxEntries, now: () => now.t });
 
@@ -77,5 +77,39 @@ describe('TtlMemo', () => {
     const reload = jest.fn(mk(1));
     await memo.get('a', reload);
     expect(reload).toHaveBeenCalledTimes(1);
+  });
+});
+
+// The decorator's key is the method name plus EVERY argument, so two requests that differ in
+// any parameter that affects the result (grade, thickness, machine) can never share an entry.
+describe('ReferenceMemo key separation', () => {
+  class Lookup {
+    loads: string[] = [];
+
+    @ReferenceMemo()
+    load(grade: string, thicknessMm: number, machine: string | null): Promise<{ v: string; dataFound: boolean }> {
+      this.loads.push(`${grade}|${thicknessMm}|${machine}`);
+      return Promise.resolve({ v: `${grade}${thicknessMm}${machine}`, dataFound: true });
+    }
+  }
+
+  it('loads once per distinct argument tuple and reuses an identical one', async () => {
+    const lookup = new Lookup();
+    await lookup.load('AL', 1.6, 'M1');
+    await lookup.load('AL', 1.6, 'M1');
+    await lookup.load('AL', 2.0, 'M1');
+    await lookup.load('SS', 1.6, 'M1');
+    await lookup.load('AL', 1.6, 'M2');
+    await lookup.load('AL', 1.6, null);
+    expect(lookup.loads).toEqual(['AL|1.6|M1', 'AL|2|M1', 'SS|1.6|M1', 'AL|1.6|M2', 'AL|1.6|null']);
+  });
+
+  it('keeps each instance separate', async () => {
+    const a = new Lookup();
+    const b = new Lookup();
+    await a.load('AL', 1.6, 'M1');
+    await b.load('AL', 1.6, 'M1');
+    expect(a.loads).toHaveLength(1);
+    expect(b.loads).toHaveLength(1);
   });
 });

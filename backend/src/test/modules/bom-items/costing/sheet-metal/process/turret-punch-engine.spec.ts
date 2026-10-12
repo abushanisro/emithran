@@ -1,4 +1,5 @@
 import { computeTurretPunchCost, type TurretPunchInput } from '../../../../../../modules/bom-items/costing/sheet-metal/process/turret-punch-engine';
+import { findRouteDataGaps } from '../../../../../../modules/bom-items/costing/shared/core/engine-kernel';
 
 // Real per-machine nibble/tool-change data for "Amada EM-3510 ZRB"
 // (machine_library.json's "Turret Press (Punch Press)" category,
@@ -26,6 +27,40 @@ describe('computeTurretPunchCost — punching (no real hit-rate data exists)', (
   it('does not warn about punching when pierceCount is 0', () => {
     const result = computeTurretPunchCost(baseInput({ pierceCount: 0 }));
     expect(result.warnings.some((w) => w.includes('no real punch/hit-rate data exists'))).toBe(false);
+  });
+});
+
+// Reported live on Rtp2 Mag2 Backframe (124 holes, 5018 mm of cut, no turret machine
+// data): the route priced punching and nibbling at $0, looked like the cheapest route
+// and Auto applied it. Unpriced work is a data gap, so the route is incomplete.
+describe('computeTurretPunchCost — unpriced work is a data gap, not a $0 operation', () => {
+  const reasonOf = (line: { physicsGap?: unknown }) => {
+    const gap = line.physicsGap as { reason?: string } | undefined;
+    return gap?.reason ?? '';
+  };
+
+  it('raises a gap naming the unpriced punching when there are holes to pierce', () => {
+    const line = computeTurretPunchCost(baseInput({ pierceCount: 128 })).processLines[0]!;
+    expect(line.physicsGap?.gapType).toBe('unsupported_operation');
+    expect(reasonOf(line)).toContain('punching 128 holes');
+  });
+
+  it('raises a gap naming the unpriced nibbling when no nibble rate resolved', () => {
+    const line = computeTurretPunchCost(baseInput({
+      pierceCount: 0, holeCount: 0, cutLengthMm: 5018,
+      turretMachineParams: { nibbleMmPerMin: 0, toolChangeSec: 0, dataFound: false },
+    })).processLines[0]!;
+    expect(reasonOf(line)).toContain('nibbling 5018 mm');
+  });
+
+  it('raises no gap when there is nothing to punch and the nibble rate is real', () => {
+    const line = computeTurretPunchCost(baseInput({ pierceCount: 0, holeCount: 0, cutLengthMm: 1000 })).processLines[0]!;
+    expect(line.physicsGap).toBeUndefined();
+  });
+
+  it('makes the route incomplete, so it cannot be auto-recommended', () => {
+    const result = computeTurretPunchCost(baseInput({ pierceCount: 128 }));
+    expect(findRouteDataGaps(result.processLines)).toHaveLength(1);
   });
 });
 

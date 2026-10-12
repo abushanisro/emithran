@@ -3,6 +3,8 @@ import {
   rollBendingGeometryCapability,
   rolledFormNeedsRollBender,
   routeProducesBlank,
+  cuttingFeatureCoverage,
+  requiredCutFeatures,
   resolveSetupMinutes,
   findRouteDataGaps,
   isRouteDataComplete,
@@ -239,6 +241,93 @@ describe('findRouteDataGaps', () => {
 });
 
 // ── selectRecommendedRoute ────────────────────────────────────────────────────
+// Catalog taxonomy read from the live database (process_taxonomy_operations via
+// process_calculator_mappings), 2026-10-13. A shear and a cut-to-length line are
+// catalogued for Blank only.
+const LIVE_COVERAGE = new Map<string, ReadonlySet<string>>([
+  ['shear', new Set(['Blank'])],
+  ['cut_to_length', new Set(['Blank'])],
+  ['fiber_laser', new Set(['Blank', 'ComplexHole', 'Edge', 'MultiStepHole', 'SimpleHole'])],
+  ['turret_punch', new Set(['Blank', 'ComplexHole', 'SimpleHole'])],
+]);
+
+describe('requiredCutFeatures', () => {
+  it('lists the hole and cutout feature types the part actually has', () => {
+    expect(requiredCutFeatures([
+      { feature_type: 'SimpleHole', occurrences: [{}, {}] },
+      { feature_type: 'StraightBend', occurrences: [{}] },
+      { feature_type: 'ComplexHole', occurrences: [{}] },
+      { feature_type: 'Lance', occurrences: [] },
+    ])).toEqual(['SimpleHole', 'ComplexHole']);
+  });
+
+  it('is empty for a part with no holes, and for a missing graph', () => {
+    expect(requiredCutFeatures([{ feature_type: 'StraightBend', occurrences: [{}] }])).toEqual([]);
+    expect(requiredCutFeatures(null)).toEqual([]);
+  });
+});
+
+describe('cuttingFeatureCoverage', () => {
+  // Reported live on Rtp2 Mag2 Backframe (124 holes + 3 slots): the shear and
+  // cut-to-length routes were ranked second and fourth cheapest, for pricing only
+  // the straight cut they can make.
+  it.each(['shear', 'cut_to_length'])('bars %s from a part with holes, naming what it cannot cut', (cls) => {
+    const r = cuttingFeatureCoverage(cls, ['SimpleHole', 'ComplexHole'], LIVE_COVERAGE);
+    expect(r.capable).toBe(false);
+    expect(r.capable === false && r.missing).toEqual(['SimpleHole', 'ComplexHole']);
+    expect(r.capable === false && r.reason).toContain('catalogued for Blank only');
+  });
+
+  it('lets a shear make a plain blank (nothing to cut but the outline)', () => {
+    expect(cuttingFeatureCoverage('shear', [], LIVE_COVERAGE).capable).toBe(true);
+  });
+
+  it('accepts a process catalogued for every feature the part has', () => {
+    expect(cuttingFeatureCoverage('fiber_laser', ['SimpleHole', 'ComplexHole'], LIVE_COVERAGE).capable).toBe(true);
+  });
+
+  it('names only the features that are missing', () => {
+    const r = cuttingFeatureCoverage('laser_3d', ['SimpleHole', 'ComplexHole'], new Map([['laser_3d', new Set(['SimpleHole'])]]));
+    expect(r.capable === false && r.missing).toEqual(['ComplexHole']);
+  });
+
+  it('has no evidence against any route when the taxonomy could not be read', () => {
+    expect(cuttingFeatureCoverage('shear', ['SimpleHole'], null).capable).toBe(true);
+  });
+
+  it('does not judge a class with no taxonomy rows (routeProducesBlank bars it)', () => {
+    expect(cuttingFeatureCoverage('oxyfuel', ['SimpleHole'], LIVE_COVERAGE).capable).toBe(true);
+  });
+});
+
+// The route set the live comparison returned for Rtp2 Mag2 Backframe (USA, batch 250,
+// Aluminum 6061, 1.6 mm): real totals and flags, 2026-10-13. Before the three fixes the
+// turret route (6.61, "complete" with $0 punching) won; the shear (6.74), router (6.74,
+// 0.01 min of cutting) and cut-to-length (7.13) routes outranked the laser (8.36).
+describe('selectRecommendedRoute — Rtp2 Mag2 Backframe route set', () => {
+  const r = (routeId: string, totalCost: number, over: Partial<RankableRoute> = {}): RankableRoute => ({
+    routeId, totalCost, cycleTimes: { totalMin: 2 }, capability: { overallCapable: true },
+    dataComplete: true, isFeasible: true, ...over,
+  });
+  const before = [
+    r('sm-laser', 8.36), r('sm-turret', 6.61), r('sm-waterjet', 9.95), r('sm-shear', 6.74),
+    r('sm-cut-to-length', 7.13), r('sm-router', 6.74), r('sm-plasma-punch', 8.9), r('sm-plasma', 25.76),
+  ];
+
+  it('picked the turret before the fixes', () => {
+    expect(selectRecommendedRoute(before)?.routeId).toBe('sm-turret');
+  });
+
+  it('picks the fiber laser once turret and router are incomplete and shear and cut-to-length infeasible', () => {
+    const after = before.map((route) => {
+      if (route.routeId === 'sm-turret' || route.routeId === 'sm-router') return { ...route, dataComplete: false };
+      if (route.routeId === 'sm-shear' || route.routeId === 'sm-cut-to-length') return { ...route, isFeasible: false };
+      return route;
+    });
+    expect(selectRecommendedRoute(after)?.routeId).toBe('sm-laser');
+  });
+});
+
 describe('selectRecommendedRoute', () => {
   const route = (
     routeId: string,

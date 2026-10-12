@@ -481,7 +481,7 @@ export function ProcessCostDialog({
   // auto-selected (or any older) calculator has no matching <SelectItem> to
   // render a label for (it still works — fields populate via the direct
   // by-id useCalculator fetch below — but LOOKS unselected in the UI).
-  const { data: calculatorsData, isLoading: isLoadingCalculators, error: calculatorsError } = useCalculators({ limit: 100 });
+  const { data: calculatorsData, isLoading: isLoadingCalculators, error: calculatorsError } = useCalculators({ limit: 100 }, { enabled: open });
   const { data: selectedCalculator } = useCalculator(selectedCalculatorId, { enabled: !!selectedCalculatorId });
   const selectedCalculatorIdRef = useRef(selectedCalculatorId);
   useEffect(() => { selectedCalculatorIdRef.current = selectedCalculatorId; }, [selectedCalculatorId]);

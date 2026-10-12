@@ -35,7 +35,7 @@ import { BOMItemResponseDto, BOMItemListResponseDto } from './dto/bom-item-respo
 import { AutoFillResponseDto } from './dto/auto-fill.dto';
 import { MachineOverrideDto } from './dto/machine-selection.dto';
 import { CostOverrideDto } from './dto/cost-override.dto';
-import { ApplyRouteDto, type ApplyRouteResult, ApplyCustomRouteDto, type ApplyCustomRouteResult } from './dto/apply-route.dto';
+import { ApplyRouteDto, AUTO_ROUTE_ID, type ApplyRouteResult, ApplyCustomRouteDto, type ApplyCustomRouteResult } from './dto/apply-route.dto';
 import type { PhysicsGap } from './dto/cost-breakdown.dto';
 import { LOCATION_INFO } from './costing/shared/core/default-rates.constants';
 import { ExchangeRateService, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
@@ -1721,26 +1721,35 @@ export class BOMItemsController {
     // The batch the route was ACTUALLY costed at — persist that, not the request.
     const batchSize = comparison.resolvedInputs.batchSize;
 
-    // 2. Find the requested route
-    const route = comparison.routes.find((r) => r.routeId === dto.routeId);
+    // 2. Resolve 'auto' to the engine's own recommendation, from THIS comparison.
+    const routeId = dto.routeId === AUTO_ROUTE_ID ? comparison.recommendedRouteId : dto.routeId;
+    if (!routeId) {
+      throw new BadRequestException(
+        'No route is both feasible and fully costed for this part, so none can be applied automatically. ' +
+        'Choose a route manually; the route comparison lists what each one is missing.',
+      );
+    }
+
+    // 3. Find the route
+    const route = comparison.routes.find((r) => r.routeId === routeId);
     if (!route) {
       throw new NotFoundException(
-        `Route '${dto.routeId}' not available for this part. ` +
+        `Route '${routeId}' not available for this part. ` +
         `Available: ${comparison.routes.map((r) => r.routeId).join(', ')}`,
       );
     }
 
-    // 3. Reject infeasible routes — the engine already did the capability check
+    // 4. Reject infeasible routes — the engine already did the capability check
     if (!route.isFeasible) {
       const reason = route.warnings?.[0] ?? 'machine capability constraints not met';
       throw new BadRequestException(
-        `Route '${dto.routeId}' (${route.routeLabel}) is not feasible for this part: ${reason}`,
+        `Route '${routeId}' (${route.routeLabel}) is not feasible for this part: ${reason}`,
       );
     }
 
     if (!route.processLines?.length) {
       throw new BadRequestException(
-        `Route '${dto.routeId}' returned no process lines — cannot create cost records`,
+        `Route '${routeId}' returned no process lines — cannot create cost records`,
       );
     }
 
@@ -1751,18 +1760,18 @@ export class BOMItemsController {
     // (see its localCurrencyOut parameter). The response is still used for
     // everything else -- feasibility, warnings, the route the user picked --
     // because only the money differs between the two.
-    const localRoute = localOut.routes?.find((r) => r.routeId === dto.routeId);
+    const localRoute = localOut.routes?.find((r) => r.routeId === routeId);
     if (!localRoute?.processLines?.length) {
       // Never fall back to the display-currency lines: that is precisely the
       // mislabelled money this phase removes. Fail loudly instead.
       throw new BadRequestException(
-        `Route '${dto.routeId}' produced no pre-conversion process lines — cannot persist ` +
+        `Route '${routeId}' produced no pre-conversion process lines — cannot persist ` +
         `local-currency costs. No records were written.`,
       );
     }
 
     const insertedOps = await this.writeProcessLinesAsRecords(
-      id, localRoute.processLines, batchSize, location, user, token, `auto_fill_from_route:${dto.routeId}`,
+      id, localRoute.processLines, batchSize, location, user, token, `auto_fill_from_route:${routeId}`,
       {
         // The engines compute in the factory local currency, and these lines
         // were captured before the single conversion point, so the money is
@@ -1776,13 +1785,13 @@ export class BOMItemsController {
       },
     );
 
-    this.logger.log(`[apply-route] partId=${id} route=${dto.routeId} wrote ${insertedOps.length} ops`);
+    this.logger.log(`[apply-route] partId=${id} route=${routeId} wrote ${insertedOps.length} ops`);
 
     return {
       created:    insertedOps.length,
       operations: insertedOps,
       routeLabel: route.routeLabel,
-      routeId:    dto.routeId,
+      routeId:    routeId,
     };
   }
 

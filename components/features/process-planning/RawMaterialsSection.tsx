@@ -17,6 +17,13 @@ interface RawMaterialsSectionProps {
   bomItem?: any;
   location?: string;
   batchSize?: number; // order quantity — drives nesting sheetsRequired disclosure
+  /**
+   * The batch to REQUEST for the cost summary (undefined = the server resolves it from the
+   * item's scenario). Not the same as `batchSize`: that is the resolved quantity, and
+   * subscribing with it created a second cache entry (?batchSize=250) for the same data
+   * the page already holds under the request key, doubling a 40-95 s computation.
+   */
+  costBatchSize?: number;
   compact?: boolean; // render without the outer card chrome (for embedding inside other panels)
   currencySymbol?: string; // e.g. '₹', '$', '€' — default '$'
   conversionRate?: number; // multiply stored USD values by this to get factory currency — default 1
@@ -199,7 +206,7 @@ function RawMaterialBreakdown({ m, currencySymbol = '$', conversionRate = 1, bla
 
 // ─── Main component ────────────────────────────────────────────────────────────
 
-export function RawMaterialsSection({ bomItemId, bomItem, location, batchSize, compact, currencySymbol = '$', conversionRate = 1, onAllMaterialsDeleted }: RawMaterialsSectionProps) {
+export function RawMaterialsSection({ bomItemId, bomItem, location, batchSize, costBatchSize, compact, currencySymbol = '$', conversionRate = 1, onAllMaterialsDeleted }: RawMaterialsSectionProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editMaterial, setEditMaterial] = useState<any | null>(null);
   const [openBreakdownId, setOpenBreakdownId] = useState<string | null>(null);
@@ -211,7 +218,7 @@ export function RawMaterialsSection({ bomItemId, bomItem, location, batchSize, c
   // Real nesting result (if any) for the read-only breakdown's Gross Usage
   // disclosure — same source of truth RawMaterialDialog uses, fetched
   // independently here (React Query dedupes on the shared query key).
-  const { data: costSummary } = useCostSummary(bomItemId, batchSize ?? 1, location);
+  const { data: costSummary } = useCostSummary(bomItemId, costBatchSize, location);
   const blankSpec = costSummary?.blankSpec;
 
   const createMutation = useCreateRawMaterialCost();
@@ -534,6 +541,7 @@ export function RawMaterialsSection({ bomItemId, bomItem, location, batchSize, c
       bomItemData={bomItem}
       {...(location !== undefined ? { location } : {})}
       {...(batchSize !== undefined ? { batchSize } : {})}
+      {...(costBatchSize !== undefined ? { costBatchSize } : {})}
     />
   );
 

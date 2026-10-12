@@ -1,14 +1,14 @@
 import { computeRouterCost, type RouterInput, RouterEngine } from '../../../../../../modules/bom-items/costing/sheet-metal/process/router-engine';
+import { findRouteDataGaps } from '../../../../../../modules/bom-items/costing/shared/core/engine-kernel';
 
 function baseInput(overrides: Partial<RouterInput> = {}): RouterInput {
   return {
     cutLengthMm: 1000,
     pierceCount: 2,
     batchSize: 10,
-    // 350.52 m/min = the real, constant tblRouterUtilities.json value for
-    // every Aluminum/Copper row (see migration 604) — expressed here in
-    // mm/min, matching what SheetMetalLookupService.getRouterParams() returns.
-    cuttingSpeedMmPerMin: 350.52 * 1000,
+    // A linear feed along the cut, mm/min. The engine only divides length by it;
+    // the value here is illustrative, since no feed rate is on file (see below).
+    cuttingSpeedMmPerMin: 2000,
     ...overrides,
   };
 }
@@ -32,12 +32,23 @@ describe('computeRouterCost — real material-family cutting speed', () => {
     expect(result.warnings.some((w) => w.includes('plunge/pierce time is not modeled'))).toBe(false);
   });
 
-  it('stays honestly $0/0-min (no guess) when no real cuttingSpeedMmPerMin was resolved for this material family', () => {
-    const result = computeRouterCost(baseInput({ cuttingSpeedMmPerMin: undefined }));
+  // Reported live on Rtp2 Mag2 Backframe: sm_lookup_router_cut's 350.52 m/min is the
+  // cutter's SURFACE speed, and was used as the linear feed, pricing 5018 mm of cut at
+  // 0.014 min. With no feed rate on file the cutting is a data gap, not a $0 line.
+  it('raises a data gap (no guess, no $0 line passed off as costed) when no linear feed was resolved', () => {
+    const result = computeRouterCost(baseInput({ cuttingSpeedMmPerMin: undefined, cutLengthMm: 5018 }));
+    const line = result.processLines[0]!;
+    const gap = line.physicsGap as { reason?: string } | undefined;
 
     expect(result.cuttingMin).toBe(0);
-    expect(result.abrasiveCost).toBe(0);
-    expect(result.warnings.some((w) => w.includes('no sm_lookup_router_cut entry'))).toBe(true);
+    expect(line.physicsGap?.gapType).toBe('unsupported_operation');
+    expect(gap?.reason).toContain('5018 mm');
+    expect(findRouteDataGaps(result.processLines)).toHaveLength(1);
+    expect(result.warnings.some((w) => w.includes('no linear feed rate on file'))).toBe(true);
+  });
+
+  it('raises no gap when a linear feed was resolved', () => {
+    expect(computeRouterCost(baseInput()).processLines[0]!.physicsGap).toBeUndefined();
   });
 
   it('does not cost setup, and says so, when no real setup time resolved', () => {
@@ -121,7 +132,7 @@ describe('RouterEngine — ManufacturingProcessEngine wrapper', () => {
     expect(result.cuttingMin).toBeCloseTo(500 / (350.52 * 1000), 5);
   });
 
-  it('ignores routerParams when dataFound is false, producing an honest $0 cutting line', () => {
+  it('ignores routerParams when dataFound is false: no cutting time, and a data gap on the line', () => {
     const engine = new RouterEngine();
     const result = engine.computeCost({
       sheetThicknessMm: 3,
@@ -135,6 +146,7 @@ describe('RouterEngine — ManufacturingProcessEngine wrapper', () => {
     });
 
     expect(result.cuttingMin).toBe(0);
-    expect(result.warnings.some((w) => w.includes('no sm_lookup_router_cut entry'))).toBe(true);
+    expect(result.warnings.some((w) => w.includes('no linear feed rate on file'))).toBe(true);
+    expect(result.processLines[0]!.physicsGap?.gapType).toBe('unsupported_operation');
   });
 });

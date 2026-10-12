@@ -685,3 +685,47 @@ export function routeProducesBlank(
   if (blankCapableClasses === null) return true;
   return blankCapableClasses.has(machineClass);
 }
+
+/** Feature types a cutting process must be able to produce for the route to make this part. */
+export type CutFeatureType = 'SimpleHole' | 'ComplexHole';
+export const CUT_FEATURE_TYPES: readonly CutFeatureType[] = ['SimpleHole', 'ComplexHole'];
+
+/** The cut feature types actually present on the part (feature_graph_v2), in a stable order. */
+export function requiredCutFeatures(features: ReadonlyArray<{ feature_type?: string; occurrences?: unknown[] }> | null | undefined): CutFeatureType[] {
+  const present = new Set(
+    (features ?? []).filter((f) => (f.occurrences?.length ?? 0) > 0).map((f) => f.feature_type),
+  );
+  return CUT_FEATURE_TYPES.filter((t) => present.has(t));
+}
+
+/**
+ * Can this route's cutting process produce every hole/cutout the part has?
+ *
+ * The catalog taxonomy (process_taxonomy_operations, from the real operation
+ * catalogs) lists, per machine class, the feature types its operations act on.
+ * A shear is catalogued for `Blank` only, so a part with 124 holes is not a
+ * shear part; the engine prices the straight cut it can do and nothing else,
+ * which made it the second-cheapest route. Like routeProducesBlank, this only
+ * governs what may be recommended: the route stays visible, costed and
+ * manually selectable.
+ *
+ * @param coverage machine class -> catalogued feature types, or null when the
+ *   taxonomy could not be read (no evidence against any route; the caller
+ *   discloses it). A class with no taxonomy rows at all is not judged here:
+ *   routeProducesBlank already bars it.
+ */
+export function cuttingFeatureCoverage(
+  machineClass: string,
+  required: readonly CutFeatureType[],
+  coverage: ReadonlyMap<string, ReadonlySet<string>> | null,
+): { capable: true } | { capable: false; missing: CutFeatureType[]; reason: string } {
+  const catalogued = coverage?.get(machineClass);
+  if (!catalogued) return { capable: true };
+  const missing = required.filter((t) => !catalogued.has(t));
+  if (missing.length === 0) return { capable: true };
+  return {
+    capable: false,
+    missing,
+    reason: `This process is catalogued for ${[...catalogued].sort().join(', ')} only, but the part has ${missing.join(' and ')} that it cannot produce, so the route does not make this part.`,
+  };
+}
