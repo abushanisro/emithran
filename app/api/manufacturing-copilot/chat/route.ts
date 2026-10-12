@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
 
   if (!upstream.ok || !upstream.body) {
     // Upstream text can carry internal detail: log the status, return a fixed message.
-    console.error(`[manufacturing-copilot] backend responded ${upstream.status}`);
+    console.error(`[manufacturing-copilot] backend responded ${upstream.status}: ${(await upstream.text().catch(() => "")).slice(0, 300)}`);
     if (upstream.status === 400) return json({ error: "Invalid request" }, 400);
     if (upstream.status === 404) return json({ error: "Part not found" }, 404);
     if (upstream.status === 429) return json({ error: "Too many requests" }, 429, { "Retry-After": upstream.headers.get("Retry-After") ?? "30" });
