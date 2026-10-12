@@ -3170,8 +3170,6 @@ class SheetMetalFeatureExtractor:
         from OCC.Core.TopAbs import TopAbs_FACE  # type: ignore
         from OCC.Core.GeomAbs import GeomAbs_Cylinder  # type: ignore
         from OCC.Core.TopoDS import topods  # type: ignore
-        from OCC.Core.BRepBndLib import brepbndlib  # type: ignore
-        from OCC.Core.Bnd import Bnd_Box  # type: ignore
 
         dnx, dny, dnz = dominant_normal
         max_bend_radius = max(sheet_thickness * 8, 20.0)
@@ -3199,15 +3197,10 @@ class SheetMetalFeatureExtractor:
                         exp2.Next()
                         continue
 
-                    fbox = Bnd_Box()
-                    brepbndlib.Add(face, fbox)
-                    xmin, ymin, zmin, xmax, ymax, zmax = fbox.Get()
-                    corners = [
-                        (xmin, ymin, zmin), (xmax, ymin, zmin), (xmin, ymax, zmin), (xmin, ymin, zmax),
-                        (xmax, ymax, zmin), (xmax, ymin, zmax), (xmin, ymax, zmax), (xmax, ymax, zmax),
-                    ]
-                    projections = [cx * fx + cy * fy + cz * fz for cx, cy, cz in corners]
-                    axial_length = max(projections) - min(projections)
+                    # The face's own extent along its axis. Projecting the face's bounding box onto the
+                    # axis overstates it whenever the axis is oblique to the box (a 1.6 mm corner round
+                    # on a tilted flange measured 8.8 mm and passed the bend-line filter below).
+                    axial_length = abs(adaptor.LastVParameter() - adaptor.FirstVParameter())
                     if axial_length < min_bend_line:
                         exp2.Next()
                         continue  # too short for a real press-brake bend line (edge fillet noise)
