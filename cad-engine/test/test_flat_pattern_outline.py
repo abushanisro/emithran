@@ -367,7 +367,10 @@ def test_hole_not_matching_any_panel_plane_is_skipped(extractor):
     panels = extractor._identify_panels(box, 2.0)
     assert len(panels) == 1
 
-    far_away_centroid = [(50.0, 30.0, 500.0, 10.0)]  # 500mm off the panel's plane
-    result = extractor._compute_flat_pattern_outline(dominant_face, panels, [], far_away_centroid)
+    on_plane = (50.0, 30.0, 1.0, 10.0)
+    far_away = (20.0, 20.0, 500.0, 10.0)  # 500mm off the panel's plane
+    result = extractor._compute_flat_pattern_outline(dominant_face, panels, [], [on_plane, far_away])
     assert result is not None
-    assert result["holes_mm"] == []
+    assert len(result["holes_mm"]) == 1
+    # The dropped hole is counted, so placed + unplaced always accounts for every hole given.
+    assert result["holes_unplaced"] == 1

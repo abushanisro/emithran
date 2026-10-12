@@ -859,6 +859,7 @@ class SheetMetalFeatureExtractor:
             # whether flat_pattern_bounding_rect itself resolved.
             "flat_pattern_outline_points_mm": flat_pattern_outline["outline_points_mm"] if flat_pattern_outline else None,
             "flat_pattern_holes_mm": flat_pattern_outline["holes_mm"] if flat_pattern_outline else None,
+            "flat_pattern_holes_unplaced": flat_pattern_outline["holes_unplaced"] if flat_pattern_outline else None,
             "flat_pattern_outline_source": "wire_walk" if flat_pattern_outline else "unavailable",
             "sheet_geometry_debug": {**geom_debug, **validation_debug},
             "feature_graph_v2": feature_graph_v2,
@@ -4010,6 +4011,7 @@ class SheetMetalFeatureExtractor:
         # straight from inner_cutout_polygons (every real inner wire on every
         # panel), not from these circle diameters.
         holes_mm: List[Dict[str, float]] = []
+        holes_unplaced = 0
         for h in (hole_centroids_mm or []):
             cx, cy, cz, diameter_mm = h[0], h[1], h[2], h[3]
             best_idx, best_dist = None, float("inf")
@@ -4019,7 +4021,10 @@ class SheetMetalFeatureExtractor:
                 if dist < best_dist:
                     best_dist, best_idx = dist, i
             if best_idx is None or best_dist > max(2.0, diameter_mm / 2.0):
-                continue  # doesn't clearly belong to any known panel plane -- skip rather than guess
+                # Holes on a panel this layout does not model (minor flanges) cannot be placed in the
+                # flat frame; they are counted, never guessed onto the wrong panel.
+                holes_unplaced += 1
+                continue
             hx, hy = _to_2d(best_idx, (cx, cy, cz))
             holes_mm.append({"cx_mm": round(hx, 3), "cy_mm": round(hy, 3), "diameter_mm": round(diameter_mm, 3)})
 
@@ -4065,7 +4070,9 @@ class SheetMetalFeatureExtractor:
             f"[SheetMetal] flat_pattern_outline succeeded: {len(outline_points_mm)} points, "
             f"{len(holes_mm)} holes, bounds {maxx - minx:.1f}x{maxy - miny:.1f}mm, area {merged.area:.1f}mm²"
         )
-        return {"outline_points_mm": outline_points_mm, "holes_mm": holes_mm}
+        if holes_unplaced:
+            logger.warning(f"[SheetMetal] flat_pattern_outline: {holes_unplaced} hole(s) sit on panels outside this layout and are not in holes_mm")
+        return {"outline_points_mm": outline_points_mm, "holes_mm": holes_mm, "holes_unplaced": holes_unplaced}
 
     def _detect_slots_v2(
         self,
