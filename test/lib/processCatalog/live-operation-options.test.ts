@@ -78,3 +78,49 @@ describe('resolveSavedOperation', () => {
     expect(resolveSavedOperation([roughTurning, finishTurning], 'Turning', 'cnc_lathe')).toBe('Turning');
   });
 });
+
+// The Deburring step of Rtp2 Mag2 Backframe as the backend reports it (live, 2026-10-13):
+// the Deslag catalog operation on each cut feature the part has. Before, the dialog's
+// "3. Operation" offered the route-style line name ("Finishing") instead.
+describe('liveOperationOptions — sheet-metal catalog operations', () => {
+  const group = (featureType: string, count: number, status = 'resolved') =>
+    ({ operations: ['Deslag'], featureType, count, status });
+  const deburring = {
+    process: 'Finishing', machineClass: 'deburring', cycleTimeMin: 0.84,
+    catalogOperations: [
+      group('Blank', 3), group('ComplexHole', 3),
+      group('SimpleHole', 60), group('SimpleHole', 6), group('SimpleHole', 7), group('SimpleHole', 11),
+      group('SimpleHole', 11), group('SimpleHole', 6), group('SimpleHole', 1), group('SimpleHole', 2),
+      group('SimpleHole', 3), group('SimpleHole', 5), group('SimpleHole', 3), group('SimpleHole', 8), group('SimpleHole', 1),
+    ],
+  };
+
+  it('offers the catalog operation on each feature, not the line name', () => {
+    const opts = liveOperationOptions([deburring], new Set(['deburring']), new Map());
+    expect(opts.map((o) => o.value)).toEqual(['Deslag // Blank', 'Deslag // ComplexHole', 'Deslag // SimpleHole']);
+    expect(opts.map((o) => o.label)).toEqual(['Deslag // Blank [3]', 'Deslag // ComplexHole [3]', 'Deslag // SimpleHole [124]']);
+    expect(opts.every((o) => o.lineProcess === 'Finishing' && o.cycleTimeMin === 0)).toBe(true);
+  });
+
+  it('keeps several candidate operations together and leaves out an infeasible group', () => {
+    const turret = {
+      process: 'Turret Punching', machineClass: 'turret_punch', cycleTimeMin: 1,
+      catalogOperations: [
+        { operations: ['Nibbling', 'Punching'], featureType: 'Blank', count: 1, status: 'undecided' },
+        { operations: [], featureType: 'Lance', count: 2, status: 'infeasible' },
+      ],
+    };
+    expect(liveOperationOptions([turret], new Set(['turret_punch']), new Map()).map((o) => o.value))
+      .toEqual(['Nibbling or Punching // Blank']);
+  });
+
+  it('a line without catalog operations is still offered by its engine name', () => {
+    const inspectionLine = { process: 'Inspection', machineClass: 'cmm', cycleTimeMin: 0.32 };
+    expect(liveOperationOptions([inspectionLine], new Set(['cmm']), new Map()).map((o) => o.value)).toEqual(['Inspection']);
+  });
+
+  it('the line name is not a saved operation; a catalog operation is kept as saved', () => {
+    expect(resolveSavedOperation([deburring], 'Finishing', 'deburring')).toBe('');
+    expect(resolveSavedOperation([deburring], 'Deslag // SimpleHole', 'deburring')).toBe('Deslag // SimpleHole');
+  });
+});

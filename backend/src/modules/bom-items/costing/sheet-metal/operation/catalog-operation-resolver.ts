@@ -53,6 +53,8 @@ export interface CatalogOperation {
 
 interface Pair { operation: string; featureType: string }
 
+const FINISHING_ONLY: ReadonlySet<string> = new Set(['finishing']);
+
 /** The Operation//Feature pairs of a catalog compound string, outermost first. */
 export function catalogPairs(raw: string): Pair[] {
   return raw.split(':').filter((s) => s.includes('//')).map((s) => {
@@ -94,12 +96,22 @@ export function resolveCatalogOperations(input: {
     }
   }
 
+  // A step whose catalog operations are ALL finishing operations (the Deslag
+  // machine: "Deslag//Blank", "Deslag//SimpleHole", "Deslag//ComplexHole") is that
+  // finishing: its job is the operation, applied to the cut features themselves.
+  // A finishing option on a step that makes the features (Restriking on a Turret
+  // Press) stays a process option and is never listed, so this only applies when the
+  // step has nothing else. Every feature variant the catalog names for it is listed.
+  const stepOperations = new Set([...byType.values()].flatMap((ops) => [...ops.keys()]));
+  const finishingOnly = stepOperations.size > 0
+    && [...stepOperations].every((op) => operationKinds.get(op) === 'finishing');
+
   const claimed = facesClaimedBySpecificHoles(features);
   const results: CatalogOperation[] = [];
 
   for (const f of features) {
     const ops = byType.get(f.feature_type);
-    const allowed = variantKinds.get(`${f.feature_type}:${f.variant}`);
+    const allowed = finishingOnly ? FINISHING_ONLY : variantKinds.get(`${f.feature_type}:${f.variant}`);
     if (!ops || !allowed) continue;
 
     const occurrences = f.feature_type === 'SimpleHole' && f.variant === 'through'
