@@ -10438,7 +10438,9 @@ export default function ManufacturingIntelligencePage() {
     let cancelled = false;
     setFile3dUrl(null);
     setFile3dUrlError(null);
-    apiClient.get<{ url: string }>(`/bom-items/${itemId}/file-url/3d`)
+    // A signed-URL lookup is tiny, but it queues behind the cost computations the page starts at the
+    // same time; the default 15 s dev timeout turned that queueing into "could not be loaded".
+    apiClient.get<{ url: string }>(`/bom-items/${itemId}/file-url/3d`, { timeout: 45_000, priority: 'high' })
       .then((r) => {
         if (cancelled) return;
         if (r?.url) setFile3dUrl(r.url);
@@ -10460,7 +10462,7 @@ export default function ManufacturingIntelligencePage() {
   useEffect(() => {
     if (!item?.file2dPath) { setFile2dUrl(null); return; }
     let blobUrl: string | null = null;
-    apiClient.get<{ url: string }>(`/bom-items/${itemId}/file-url/2d`)
+    apiClient.get<{ url: string }>(`/bom-items/${itemId}/file-url/2d`, { timeout: 45_000, priority: 'high' })
       .then(async (r) => {
         if (!r?.url) return;
         // Fetch as blob to bypass Supabase X-Frame-Options header
