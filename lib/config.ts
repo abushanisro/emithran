@@ -45,6 +45,11 @@ export const config = {
     endpointTimeouts: {
       '/calculators/bom-cost': 45000,
       '/calculators/process-cost': 45000,
+      // Edit Process Cost reference lists (~1 MB each). They share the backend with the
+      // cost summary and route comparison the page starts at the same time, which has
+      // pushed them past 15 s in development.
+      '/mhr/picker': 45000,
+      '/processes/calculator-mappings': 45000,
       '/reports': 60000,
       '/export': 60000,
       '/upload': 120000,

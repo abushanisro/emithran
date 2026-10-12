@@ -5910,6 +5910,9 @@ export class BOMItemsService {
     // here (not inside the engine loop below) since only the fiber_laser
     // engine has a registered calculator; waterjet/turret keep their own
     // params-based formulas until their own migration.
+    // Calculator traces by calculator id, attached to the route lines once they are
+    // assembled: the Edit Process Cost calculators open pre-filled from these inputs.
+    const rcTraces = new Map<string, CalculationTraceStep[]>();
     const rcLaserCalc = (cutLengthMm > 0 || pierceCount > 0)
       ? await this.resolvePhysicsQuantity(accessToken, {
           machineClass: 'fiber_laser',
@@ -6776,6 +6779,7 @@ export class BOMItemsService {
         },
       });
 
+      if (rcBendCalc.calculatorId) rcTraces.set(rcBendCalc.calculatorId, rcBendCalc.trace);
       const pbRate = mhrRates.pressBrake;
       const rcCycleTimeSec = rcBendCalc.outputs['Cycle Time'];
       const rcSetupTimeSec = rcBendCalc.outputs['Setup Time'];
@@ -6887,6 +6891,7 @@ export class BOMItemsService {
       // summary can never price the deburr line differently.
       const rcDeburrCalc = await this.resolveDeburrCalc(accessToken, mhrRates.deburring);
       rcDeburrPhysics = rcDeburrCalc;
+      if (rcDeburrCalc.calculatorId) rcTraces.set(rcDeburrCalc.calculatorId, rcDeburrCalc.trace);
     }
 
     // Inspection (general-purpose, tiered — see costing/inspection-engine.ts).
@@ -6972,6 +6977,7 @@ export class BOMItemsService {
         confidence: rcInspectionCalc.confidence,
       });
       rcInspection = rcInspectionResult;
+      if (rcInspectionCalc.calculatorId) rcTraces.set(rcInspectionCalc.calculatorId, rcInspectionCalc.trace);
     }
 
     // ── Feature-driven operations — the canonical composer ─────────────────────
@@ -7464,6 +7470,14 @@ export class BOMItemsService {
       });
     }
     // If capableRoutes is empty — all badges remain false (suppressed)
+
+    if (rcLaserCalc.calculatorId) rcTraces.set(rcLaserCalc.calculatorId, rcLaserCalc.trace);
+    for (const route of routes) {
+      for (const line of route.processLines) {
+        const trace = line.calculatorId ? rcTraces.get(line.calculatorId) : undefined;
+        if (trace?.length && !line.calculationTrace?.length) line.calculationTrace = trace;
+      }
+    }
 
     return attachToRoutes({
       bomItemId: id,

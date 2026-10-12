@@ -215,11 +215,7 @@ export class MHRService {
       }
 
       // Delegate calculation to the specialized engine
-      const result = this.calculationEngine.calculate(dto);
-
-      this.logger.debug('MHR calculation completed', 'MHRService');
-
-      return result;
+      return this.calculationEngine.calculate(dto);
     } catch (error) {
       this.logger.error(`MHR calculation failed: ${error.message}`, 'MHRService');
       throw error;

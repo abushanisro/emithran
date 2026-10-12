@@ -14,6 +14,8 @@ import { parseEnv } from 'util';
 import { SupabaseService } from '../src/common/supabase/supabase.service';
 import { BOMItemsModule } from '../src/modules/bom-items/bom-items.module';
 import { BOMItemsService } from '../src/modules/bom-items/bom-items.service';
+import { CostAggregationService } from '../src/modules/costing/cost-aggregation.service';
+import { CostingModule } from '../src/modules/costing/costing.module';
 import { CopilotMemoryService } from '../src/modules/copilot/copilot-memory.service';
 import { CopilotToolRunner, TOOL_RESULT_MAX_CHARS, type ToolContext } from '../src/modules/copilot/copilot.tools';
 
@@ -37,10 +39,11 @@ describe('[e2e] copilot tools — real DB, no model call', () => {
   let ctx: ToolContext;
   let memory: CopilotMemoryService;
   let runner: CopilotToolRunner;
+  let aggregation: CostAggregationService;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../.env') }), BOMItemsModule],
+      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../.env') }), BOMItemsModule, CostingModule],
     }).compile();
     bomItems = moduleRef.get(BOMItemsService);
     const { token, userId } = await signIn(moduleRef.get(ConfigService));
@@ -60,7 +63,20 @@ describe('[e2e] copilot tools — real DB, no model call', () => {
     const item = await bomItems.findOne(data[0].id, userId, token);
     ctx = { item, bomItemId: item.id, userId, accessToken: token, location: LOCATION, batchSize: BATCH };
     memory = new CopilotMemoryService(moduleRef.get(SupabaseService));
-    runner = new CopilotToolRunner(ctx, bomItems, memory);
+    aggregation = moduleRef.get(CostAggregationService);
+    runner = new CopilotToolRunner(ctx, bomItems, memory, aggregation);
+  });
+
+  it('get_saved_quote relays the saved quote the Cost Guide shows, within its size budget', async () => {
+    const real = await aggregation.computeBomItemCost(ctx.bomItemId, ctx.accessToken);
+    const out = await runner.run('get_saved_quote', {});
+    expect(out.isError).toBe(false);
+    expect(out.content.length).toBeLessThanOrEqual(TOOL_RESULT_MAX_CHARS);
+    const body = JSON.parse(out.content);
+    expect(body.rawMaterialCost).toBe(real.rawMaterialCost);
+    expect(body.manufacturingCost).toBeCloseTo(body.rawMaterialCost + body.processCost + body.toolingCost + body.packagingCost + body.procuredPartCost, 9);
+    expect(body.processLines).toHaveLength(real.processLines.length);
+    expect(body.processCost).toBeCloseTo(body.processLines.reduce((s: number, l: { totalCostPerPart: number }) => s + l.totalCostPerPart, 0), 9);
   });
 
   it('get_cost_summary relays the platform figures, within its size budget', async () => {
@@ -108,7 +124,7 @@ describe('[e2e] copilot tools — real DB, no model call', () => {
   });
 
   it('a part this user cannot see yields an error and no data', async () => {
-    const hidden = new CopilotToolRunner({ ...ctx, bomItemId: ABSENT_ID }, bomItems, memory);
+    const hidden = new CopilotToolRunner({ ...ctx, bomItemId: ABSENT_ID }, bomItems, memory, aggregation);
     const out = await hidden.run('get_cost_summary', {});
     expect(out.isError).toBe(true);
     expect(JSON.parse(out.content)).toEqual({ error: 'This part was not found or you do not have access to it.' });
