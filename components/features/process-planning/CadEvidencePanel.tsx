@@ -84,7 +84,7 @@ export function CadEvidencePanel({
       ) : (
       <div className="h-[360px]">
         {fileType.toLowerCase() === 'stl' ? (
-          <CadFeatureViewer fileUrl={fileUrl} faceMap={faceMap} faceIds={faceIds} {...(axes ? { axes } : {})} />
+          <CadFeatureViewer fileUrl={fileUrl} faceMap={faceMap} faceIds={faceIds} {...(highlight.style === 'edges' ? { initialMode: 'edge' as const } : {})} {...(axes ? { axes } : {})} />
         ) : (
           // STEP/other models need the main viewer's server-side conversion.
           <ModelViewer
