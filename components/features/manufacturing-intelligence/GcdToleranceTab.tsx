@@ -125,7 +125,7 @@ export function GcdToleranceTab({ itemId, fg, onSelectHighlight }: {
                 <span className="font-medium">{type}</span>
                 <span className="text-muted-foreground">[{members.length}]</span>
                 {flagged > 0 && <span className="ml-auto text-[10px] text-amber-600">{flagged} need machining</span>}
-                {flagged === 0 && toleranced > 0 && <span className="ml-auto text-[10px] text-violet-500">{toleranced} toleranced</span>}
+                {flagged === 0 && toleranced > 0 && <span className="ml-auto text-[10px] text-brand-500">{toleranced} toleranced</span>}
               </button>
               {open && members.map(({ instance, requirements }) => (
                 <button
@@ -133,12 +133,12 @@ export function GcdToleranceTab({ itemId, fg, onSelectHighlight }: {
                   type="button"
                   onClick={() => { setSelected(instance.label); highlight(instance); }}
                   onDoubleClick={() => instance.key && setEditing(instance)}
-                  className={`w-full grid grid-cols-[2.5rem_1fr] items-center px-2 py-0.5 text-left hover:bg-muted/40 ${selected === instance.label ? 'bg-violet-500/10' : ''}`}
+                  className={`w-full grid grid-cols-[2.5rem_1fr] items-center px-2 py-0.5 text-left hover:bg-muted/40 ${selected === instance.label ? 'bg-brand-500/10' : ''}`}
                 >
                   <StatusIcon need={needByLabel.get(instance.label)} />
                   <span className="pl-4 truncate">
                     {instance.label}
-                    {requirements.length > 0 && <span className="text-violet-500"> · {requirements.length} tol.</span>}
+                    {requirements.length > 0 && <span className="text-brand-500"> · {requirements.length} tol.</span>}
                   </span>
                 </button>
               ))}
@@ -165,7 +165,7 @@ export function GcdToleranceTab({ itemId, fg, onSelectHighlight }: {
           {toleranced.map(({ instance, requirements }) => (
             <div key={instance.label}>
               <div className="flex items-center justify-between">
-                <button type="button" className="font-medium hover:text-violet-500" onClick={() => { setSelected(instance.label); highlight(instance); }}>
+                <button type="button" className="font-medium hover:text-brand-500" onClick={() => { setSelected(instance.label); highlight(instance); }}>
                   {instance.label}
                 </button>
                 {instance.key && (
@@ -295,11 +295,11 @@ function EditTolerancesDialog({ itemId, instance, current, policy, onClose }: {
                 <fieldset key={c.key} className="border border-border/60 rounded px-2 py-1">
                   <legend className="text-[11px] px-1">{c.label}{c.plusMinus ? ' (±)' : ''}{c.note ? ` — ${c.note}` : ''}</legend>
                   <label className="flex items-center gap-2 text-xs">
-                    <input type="radio" checked={d.mode === 'auto'} onChange={() => { setDraft({ ...draft, [c.key]: { ...d, mode: 'auto' } }); }} className="accent-violet-600" />
+                    <input type="radio" checked={d.mode === 'auto'} onChange={() => { setDraft({ ...draft, [c.key]: { ...d, mode: 'auto' } }); }} className="accent-brand-600" />
                     Auto <span className="text-muted-foreground">[{autoText(c)}]</span>
                   </label>
                   <label className="flex items-center gap-2 text-xs">
-                    <input type="radio" checked={d.mode === 'manual'} onChange={() => { setDraft({ ...draft, [c.key]: { ...d, mode: 'manual' } }); }} className="accent-violet-600" />
+                    <input type="radio" checked={d.mode === 'manual'} onChange={() => { setDraft({ ...draft, [c.key]: { ...d, mode: 'manual' } }); }} className="accent-brand-600" />
                     Manual
                     <input
                       type="number" min={0} step="any"
@@ -401,12 +401,12 @@ function TolerancePolicyDialog({ itemId, policy, onClose }: { itemId: string; po
               what a feature&apos;s Auto categories mean; the values decide which operations the part needs.
             </p>
             <label className="flex items-start gap-2">
-              <input type="radio" checked={mode === 'assume_achieved'} onChange={() => { setMode('assume_achieved'); }} className="mt-0.5 accent-violet-600" />
+              <input type="radio" checked={mode === 'assume_achieved'} onChange={() => { setMode('assume_achieved'); }} className="mt-0.5 accent-brand-600" />
               <span><b>Assume tolerance and roughness achieved by the manufacturing operation selected for the feature is sufficient</b></span>
             </label>
             <div>
               <label className="flex items-start gap-2">
-                <input type="radio" checked={mode === 'uniform'} onChange={() => { setMode('uniform'); }} className="mt-0.5 accent-violet-600" />
+                <input type="radio" checked={mode === 'uniform'} onChange={() => { setMode('uniform'); }} className="mt-0.5 accent-brand-600" />
                 <span><b>Use the following values</b> for every feature:</span>
               </label>
               {mode === 'uniform' && (
@@ -427,7 +427,7 @@ function TolerancePolicyDialog({ itemId, policy, onClose }: { itemId: string; po
             </div>
             <div>
               <label className="flex items-start gap-2">
-                <input type="radio" checked={mode === 'cad'} onChange={() => { setMode('cad'); }} className="mt-0.5 accent-violet-600" />
+                <input type="radio" checked={mode === 'cad'} onChange={() => { setMode('cad'); }} className="mt-0.5 accent-brand-600" />
                 <span><b>Use CAD model values</b> (tolerances carried in the STEP model, applied to the feature whose faces they name)</span>
               </label>
               {mode === 'cad' && (

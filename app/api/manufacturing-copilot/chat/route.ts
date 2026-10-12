@@ -1,79 +1,63 @@
-import { NextRequest } from "next/server";
-import { requireUserForAi } from "@/lib/server/auth";
+import { type NextRequest } from "next/server";
 
 import { getAuthenticatedUser } from "@/lib/database/supabase-server";
+import { requireUserForAi } from "@/lib/server/auth";
 
-const CAD_ENGINE_URL = process.env.CAD_ENGINE_URL ?? "http://localhost:5000";
-const CAD_ENGINE_API_KEY = process.env.CAD_ENGINE_API_KEY ?? "";
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+// NEXT_PUBLIC_API_URL already ends in /v1/api (the NestJS global prefix).
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/v1/api";
+const MAX_BODY_BYTES = 64 * 1024;
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+const json = (body: unknown, status: number, headers?: Record<string, string>) =>
+  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", ...headers } });
+
+/**
+ * Authenticated pass-through to the NestJS copilot. The browser session is
+ * verified here; the backend verifies the forwarded token again and runs every
+ * data read as that user. Nothing identity-related is read from the body.
+ */
 export async function POST(request: NextRequest) {
-  const auth = await requireUserForAi("manufacturing-copilot");
-  if (!auth.ok) return auth.response;
+  const gate = await requireUserForAi("manufacturing-copilot");
+  if (!gate.ok) return gate.response;
+
+  const session = await getAuthenticatedUser();
+  if (!session) return json({ error: "Authentication required" }, 401);
+
+  const raw = await request.text();
+  if (raw.length > MAX_BODY_BYTES) return json({ error: "Request too large" }, 413);
+
+  let upstream: Response;
   try {
-    const auth = await getAuthenticatedUser();
-    if (!auth) {
-      return new Response(JSON.stringify({ error: "Authentication required" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    const body = await request.json();
-
-    // Validate required fields
-    if (!body.bomItemId) {
-      return new Response(JSON.stringify({ error: "bomItemId is required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    // Forward the verified session token so the CAD engine can call the NestJS
-    // backend for scenario simulation tools. Identity, backend destination and
-    // token come from the server, never from the request body.
-    const cadPayload = {
-      ...body,
-      userId: auth.user.id,
-      backendUrl: BACKEND_URL,
-      authToken: auth.accessToken,
-    };
-
-    const cadResponse = await fetch(`${CAD_ENGINE_URL}/copilot/chat`, {
+    upstream = await fetch(`${BACKEND_URL}/copilot/chat`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-API-Key": CAD_ENGINE_API_KEY,
-      },
-      body: JSON.stringify(cadPayload),
-    });
-
-    if (!cadResponse.ok) {
-      const errorText = await cadResponse.text();
-      return new Response(
-        JSON.stringify({ error: `Copilot service error: ${cadResponse.status}`, detail: errorText }),
-        { status: 502, headers: { "Content-Type": "application/json" } },
-      );
-    }
-
-    // Pipe the SSE stream from the CAD engine back to the client
-    return new Response(cadResponse.body, {
-      status: 200,
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-        "X-Accel-Buffering": "no",
-      },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.accessToken}` },
+      body: raw,
+      signal: request.signal,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return new Response(
-      JSON.stringify({ error: "Manufacturing Copilot unavailable", detail: message }),
-      { status: 502, headers: { "Content-Type": "application/json" } },
-    );
+    if (request.signal.aborted) return new Response(null, { status: 499 });
+    console.error("[manufacturing-copilot] backend unreachable:", err instanceof Error ? err.name : "unknown");
+    return json({ error: "Manufacturing Copilot unavailable" }, 502);
   }
+
+  if (!upstream.ok || !upstream.body) {
+    // Upstream text can carry internal detail: log the status, return a fixed message.
+    console.error(`[manufacturing-copilot] backend responded ${upstream.status}`);
+    if (upstream.status === 400) return json({ error: "Invalid request" }, 400);
+    if (upstream.status === 404) return json({ error: "Part not found" }, 404);
+    if (upstream.status === 429) return json({ error: "Too many requests" }, 429, { "Retry-After": upstream.headers.get("Retry-After") ?? "30" });
+    if (upstream.status === 503) return json({ error: "Manufacturing Copilot is not configured" }, 503);
+    return json({ error: "Manufacturing Copilot unavailable" }, 502);
+  }
+
+  return new Response(upstream.body, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      "X-Accel-Buffering": "no",
+    },
+  });
 }

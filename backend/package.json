@@ -28,6 +28,7 @@
     "env:validate": "ts-node -r tsconfig-paths/register scripts/validate-env.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.133.0",
     "@neondatabase/serverless": "^1.1.0",
     "@nestjs/axios": "^3.1.0",
     "@nestjs/common": "^11.0.1",

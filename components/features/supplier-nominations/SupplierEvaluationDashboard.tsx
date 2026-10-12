@@ -460,7 +460,7 @@ export function SupplierEvaluationDashboard({
                                 {[1, 2, 3, 4, 5].map(i => (
                                     <div
                                         key={i}
-                                        className={`h-1.5 flex-1 rounded-full ${i <= (getCapabilityScore(evaluation, evaluationData, capabilityScore) / 20) ? 'bg-purple-500' : 'bg-gray-700'}`}
+                                        className={`h-1.5 flex-1 rounded-full ${i <= (getCapabilityScore(evaluation, evaluationData, capabilityScore) / 20) ? 'bg-brand-500' : 'bg-gray-700'}`}
                                     />
                                 ))}
                             </div>

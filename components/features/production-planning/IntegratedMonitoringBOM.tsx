@@ -465,7 +465,7 @@ export const IntegratedMonitoringBOM = ({ lotId }: IntegratedMonitoringBOMProps)
       BLOCKED: 'bg-red-100 text-red-600',
       PLANNING: 'bg-gray-100 text-gray-600',
       ORDERED: 'bg-blue-100 text-blue-600',
-      SHIPPED: 'bg-purple-100 text-purple-600',
+      SHIPPED: 'bg-brand-100 text-brand-600',
       RECEIVED: 'bg-yellow-100 text-yellow-600',
       INSPECTED: 'bg-orange-100 text-orange-600',
       APPROVED: 'bg-green-100 text-green-600',
@@ -1091,8 +1091,8 @@ export const IntegratedMonitoringBOM = ({ lotId }: IntegratedMonitoringBOMProps)
                   <div className="text-2xl font-bold text-orange-600">{selectedMaterial.consumedQuantity}</div>
                   <div className="text-sm text-muted-foreground">Consumed</div>
                 </div>
-                <div className="text-center p-3 bg-purple-50 rounded-lg">
-                  <div className="text-2xl font-bold text-purple-600">
+                <div className="text-center p-3 bg-brand-50 rounded-lg">
+                  <div className="text-2xl font-bold text-brand-600">
                     {selectedMaterial.totalQuantity - selectedMaterial.consumedQuantity}
                   </div>
                   <div className="text-sm text-muted-foreground">Remaining</div>

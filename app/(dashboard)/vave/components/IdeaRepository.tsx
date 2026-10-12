@@ -23,7 +23,7 @@ type IdeaView = 'table' | 'kanban' | 'cards';
 
 const FRAMEWORK_COLORS: Record<string, string> = {
   SCAMPER: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
-  TRIZ:    'bg-purple-500/10 text-purple-400 border-purple-500/30',
+  TRIZ:    'bg-brand-500/10 text-brand-400 border-brand-500/30',
   FAST:    'bg-amber-500/10 text-amber-400 border-amber-500/30',
   Manual:  'bg-muted/60 text-muted-foreground border-border',
 };

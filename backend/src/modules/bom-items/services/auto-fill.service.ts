@@ -21,6 +21,7 @@ import { REFERENCE_FEATURE_OPERATIONS } from '../costing/shared/reference-featur
 import { MachiningLookupService } from '../costing/machining/lookup/machining-lookup.service';
 import { requiredMilledClassFromToolAxes } from '../costing/machining/setup-axis-rule';
 import { machiningFeatureCounts } from '../costing/machining/operation/machining-feature-counts';
+import { CAD_FAMILY_TO_PROCESS_GROUP } from '../costing/shared/core/part-family-process-group';
 
 export interface RawGeometry {
   volume: number;
@@ -1241,24 +1242,8 @@ export class AutoFillService {
   // never changed the actual returned value (every CNC family's machine
   // classes share the same real 'Machining' process_group; the query only
   // ever needed to confirm SOME real production row exists for that group).
-
-  private static readonly CAD_FAMILY_TO_PROCESS_GROUP: Record<string, string> = {
-    sheet_metal: 'Sheet Metal',
-    plastic_molded: 'Plastic Molding',
-    milled: 'Machining',
-    turned: 'Machining',
-    mill_turn: 'Machining',
-    // Die Casting Phase 1 (2026-10): detection + highlighting only, no cost
-    // engine yet — process_taxonomy's real "Die Casting" rows are all seeded
-    // roadmap_status='not_modeled' (migration 844), so the query below still
-    // correctly returns null until that catalog is promoted to production.
-    // Mapped here now so this needs no further backend change on that day.
-    die_cast: 'Die Casting',
-    // Same casting extractor, validated against each process's own catalog
-    // (cad-engine shared/part_family.py CASTING_FAMILY_DOMAIN).
-    sand_cast: 'Sand Casting',
-    investment_cast: 'Casting Investment',
-  };
+  // The map itself is shared with material resolution.
+  private static readonly CAD_FAMILY_TO_PROCESS_GROUP = CAD_FAMILY_TO_PROCESS_GROUP;
 
   /**
    * The cad-engine family_hint for a user-chosen process_group label — the

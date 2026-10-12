@@ -45,7 +45,6 @@ from shared.exceptions import (
     ConversionError
 )
 from shared import sldprt_converter
-from copilot.router import router as copilot_router
 from shared.drawing_analyzer import router as drawing_router
 
 # ============================================================================
@@ -228,9 +227,6 @@ async def require_api_key(api_key: str = Security(_api_key_header)):
         return  # key not configured — open only outside production (dev mode)
     if api_key != _CAD_API_KEY:
         raise HTTPException(status_code=403, detail="Invalid or missing API key")
-
-# Manufacturing Copilot routes (Groq-powered, streaming SSE)
-app.include_router(copilot_router, prefix="/copilot", tags=["copilot"], dependencies=[Security(require_api_key)])
 
 # 2D Drawing analysis (Groq vision + PyMuPDF PDF rendering)
 app.include_router(drawing_router, prefix="/drawing", tags=["drawing"], dependencies=[Security(require_api_key)])

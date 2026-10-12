@@ -249,7 +249,7 @@ export const BomCostReportWrapper: React.FC<BomCostReportWrapperProps> = ({
                   const getItemTypeColor = (type: string) => {
                     switch (type) {
                       case 'assembly': return 'bg-blue-100 text-blue-800';
-                      case 'sub_assembly': return 'bg-purple-100 text-purple-800';
+                      case 'sub_assembly': return 'bg-brand-100 text-brand-800';
                       case 'child_part': return 'bg-green-100 text-green-800';
                       default: return 'bg-gray-100 text-gray-800';
                     }

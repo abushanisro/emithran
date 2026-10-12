@@ -216,13 +216,13 @@ export const ProcessPlanning = ({ lotId }: ProcessPlanningProps) => {
 
   const sectionBorder: Record<string, string> = {
     'Raw Material': 'border-l-blue-500',
-    'Process':      'border-l-purple-500',
+    'Process':      'border-l-brand-500',
     'Inspection':   'border-l-amber-500',
     'Packing':      'border-l-green-500',
   };
   const sectionNumBg: Record<string, string> = {
     'Raw Material': 'bg-blue-500',
-    'Process':      'bg-purple-500',
+    'Process':      'bg-brand-500',
     'Inspection':   'bg-amber-500',
     'Packing':      'bg-green-500',
   };

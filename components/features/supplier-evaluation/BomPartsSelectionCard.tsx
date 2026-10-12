@@ -217,7 +217,7 @@ export function BomPartsSelectionCard({
                           e.stopPropagation();
                           onViewFile?.(item, '3d');
                         }}
-                        className="p-1 hover:bg-purple-100 rounded text-purple-600 transition-colors"
+                        className="p-1 hover:bg-brand-100 rounded text-brand-600 transition-colors"
                         title="View 3D Model"
                       >
                         <Box className="h-3 w-3" />

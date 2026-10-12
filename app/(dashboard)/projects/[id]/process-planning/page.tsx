@@ -161,7 +161,7 @@ function DimensionValidationDialog({
           </div>
 
           <div className="px-5 py-4 grid grid-cols-3 gap-3 border-b border-[#1a2540]">
-            <DimMetricCard label="Surface Area" value={displaySA}  accent="#a78bfa" />
+            <DimMetricCard label="Surface Area" value={displaySA}  accent="#f57a44" />
             <DimMetricCard label="Volume"        value={displayVol} accent="#38bdf8" />
             <DimMetricCard label="Calc. Weight"  value={displayWt}  accent="#34d399" />
           </div>

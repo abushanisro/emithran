@@ -286,7 +286,7 @@ export default function MHRDetailPage() {
             <div className="flex flex-wrap gap-1 pt-1">
               {record.processGroup && <Badge variant="secondary">{record.processGroup}</Badge>}
               {record.machineClass && <Badge variant="outline">{record.machineClass}</Badge>}
-              {record.automationLevel && <Badge variant="outline" className="text-purple-700 border-purple-300">{record.automationLevel}</Badge>}
+              {record.automationLevel && <Badge variant="outline" className="text-brand-700 border-brand-300">{record.automationLevel}</Badge>}
             </div>
             <div className="text-sm pt-1 space-y-0.5">
               {record.manufacturer && <div><span className="text-muted-foreground">Manufacturer: </span><span className="font-medium">{record.manufacturer}{record.manufacturerCountry ? ` (${record.manufacturerCountry})` : ''}</span></div>}
@@ -524,7 +524,7 @@ export default function MHRDetailPage() {
           </Card>
 
           {!isPreCalc && (
-          <Card className="border-l-4 border-l-purple-500">
+          <Card className="border-l-4 border-l-brand-500">
             <CardHeader className="pb-2"><CardTitle className="text-base font-bold">Capital Investment</CardTitle></CardHeader>
             <CardContent className="space-y-1 text-sm">
               <div className="flex justify-between"><span>Landed Machine Cost</span><span className="font-bold">{fmtLocal(inputs.landedMachineCost)}</span></div>
@@ -592,7 +592,7 @@ export default function MHRDetailPage() {
             <CardHeader className="pb-2 bg-primary/10"><CardTitle className="text-base font-bold">Final MHR Calculation</CardTitle></CardHeader>
             <CardContent className="space-y-1 text-sm">
               <div className="flex justify-between"><span>Machine Operating Cost</span><span className="font-semibold">{fmtLocal(calc.totalOperatingCostPerHour)}</span></div>
-              <div className="flex justify-between"><span>Admin Overhead ({formatNumber(inputs.adminOverheadPercentage)}%)</span><span className="font-semibold text-purple-600">+{fmtLocal(calc.adminOverheadPerHour)}</span></div>
+              <div className="flex justify-between"><span>Admin Overhead ({formatNumber(inputs.adminOverheadPercentage)}%)</span><span className="font-semibold text-brand-600">+{fmtLocal(calc.adminOverheadPerHour)}</span></div>
               <div className="flex justify-between bg-slate-100 dark:bg-slate-800 px-2 py-1.5 rounded font-bold">
                 <span>Subtotal</span><span>{fmtLocal(calc.totalOperatingCostPerHour + calc.adminOverheadPerHour)}</span>
               </div>

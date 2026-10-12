@@ -53,6 +53,7 @@ import { NreService } from './services/nre.service';
 import { resolveCostingInputs } from './costing/shared/physics/costing-inputs';
 import { DFMScoringService } from './services/dfm-scoring.service';
 import { MaterialIntelligenceService, type MaterialCandidate } from './services/material-intelligence.service';
+import { MaterialResolutionService } from './services/material-resolution.service';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { findRouteDataGaps, formatNearestRowsDisclosure, isPerPartCharge } from './costing/shared/core/engine-kernel';
 import { RouteResultDto } from './dto/route-comparison.dto';
@@ -96,6 +97,7 @@ export class BOMItemsController {
     private readonly supabaseService: SupabaseService,
     private readonly exchangeRateService: ExchangeRateService,
     private readonly featureToleranceService: FeatureToleranceService,
+    private readonly materialResolutionService: MaterialResolutionService,
   ) {}
 
   // ── Stateless CAD auto-fill (no DB writes) ──────────────────────────────────
@@ -431,7 +433,7 @@ export class BOMItemsController {
     // every affected occurrence's riskFactors rather than silently scoring
     // against a fabricated 1mm (see that method's own doc comment).
     const t: number | null = (item as any).sheetThicknessMm ?? null;
-    const utsMpa = await this.resolveUtsMpaForDfm(item.materialGrade, token);
+    const { utsMpa } = await this.resolveMaterialStrengths(item, token);
     return {
       bomItemId: id,
       sheetThicknessMm: t,
@@ -441,48 +443,23 @@ export class BOMItemsController {
   }
 
   /**
-   * Real UTS lookup for the min-hole-diameter DFM check (dfm-scoring.service.ts)
-   * — same precedence real cost calculation uses (uts_mpa preferred over the
-   * legacy ultimate_tensile_strength column — see bom-items.service.ts's
-   * resolveMaterialForFamily for why), but deliberately NOT the full
-   * cost-critical resolution chain (that also needs rate/currency/family
-   * context this DFM-only lookup has no reason to carry). Alias lookup first
-   * (material_aliases, migration 382/383) since many real grades only match
-   * that way, then an exact case-insensitive grade match; no fuzzy/tokenized
-   * fallback — an unresolved grade returns null and the DFM check is simply
-   * skipped for that item rather than guessing.
+   * The part's material strengths from the SAME matched raw_materials row and
+   * family narrowing its quote prices from (MaterialResolutionService), so DFM,
+   * the calculator dialog and the quote can never read two different rows.
    */
-  private async resolveUtsMpaForDfm(materialGrade: string | null | undefined, token: string): Promise<number | null> {
-    if (!materialGrade) return null;
-    const db = this.supabaseService.getClient(token);
-    const g = materialGrade.trim();
-    if (!g) return null;
+  private async resolveMaterialStrengths(item: BOMItemResponseDto, token: string) {
+    const fg = item.featureGraph as any;
+    const { family } = this.materialResolutionService.resolveEffectiveFamily({
+      item, fg, grade: item.materialGrade ?? null, sheetThicknessMm: (item as any).sheetThicknessMm ?? 0,
+    });
+    return this.materialResolutionService.resolveMaterialStrengths(token, item.materialGrade ?? null, family);
+  }
 
-    const aliasNormalized = g.toUpperCase().replace(/[\s-]/g, '');
-    if (aliasNormalized) {
-      const { data: aliasRow } = await db
-        .from('material_aliases')
-        .select('raw_material_id')
-        .eq('alias_normalized', aliasNormalized)
-        .maybeSingle();
-      if (aliasRow?.raw_material_id) {
-        const { data } = await db
-          .from('raw_materials')
-          .select('uts_mpa, ultimate_tensile_strength')
-          .eq('id', aliasRow.raw_material_id)
-          .maybeSingle();
-        const uts = (data?.uts_mpa as number | null) ?? (data?.ultimate_tensile_strength as number | null);
-        if (uts != null) return uts;
-      }
-    }
-
-    const { data } = await db
-      .from('raw_materials')
-      .select('uts_mpa, ultimate_tensile_strength')
-      .ilike('name', g)
-      .limit(1)
-      .maybeSingle();
-    return (data?.uts_mpa as number | null) ?? (data?.ultimate_tensile_strength as number | null) ?? null;
+  @Get(':id/material-strengths')
+  @ApiOperation({ summary: 'Tensile, shear and yield strength of the part material, from the row its quote uses' })
+  async getMaterialStrengths(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string) {
+    const item = await this.bomItemsService.findOne(id, user.id, token);
+    return this.resolveMaterialStrengths(item, token);
   }
 
   @Post()

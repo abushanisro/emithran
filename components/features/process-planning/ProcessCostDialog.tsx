@@ -212,6 +212,15 @@ function parseTonnageFromMachineName(machineName: string | undefined): number | 
   return null;
 }
 
+/** GET /bom-items/:id/material-strengths — the row the part's quote prices from. */
+interface MaterialStrengths {
+  utsMpa: number | null;
+  utsSource: 'db' | 'family_default' | 'unavailable';
+  shearStrengthMpa: number | null;
+  yieldStrengthMpa: number | null;
+  materialName: string | null;
+}
+
 interface ProcessCostDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -348,6 +357,9 @@ export function ProcessCostDialog({
   // check it against the machine plate the same way the machine-recommendation
   // panel's own "Why:" line works.
   const [calculatorInputProvenance, setCalculatorInputProvenance] = useState<Record<string, string>>({});
+  // Inputs the cost engine could not source for this part, with the reason —
+  // shown under the blank field instead of a bare empty box.
+  const [calculatorInputGaps, setCalculatorInputGaps] = useState<Record<string, string>>({});
   const calculatorInputProvenanceRef = useRef<Record<string, string>>({});
   useEffect(() => {
     calculatorInputProvenanceRef.current = calculatorInputProvenance;
@@ -1102,6 +1114,7 @@ export function ProcessCostDialog({
     setCalculatorError(null);
     setCalculatorInputs({});
     setCalculatorInputProvenance({});
+    setCalculatorInputGaps({});
     // Don't reset selectedCalculatorId for processCalculator as we want to keep it selected
     if (calculatorTarget !== 'processCalculator') {
       setSelectedCalculatorId('');
@@ -1333,6 +1346,7 @@ export function ProcessCostDialog({
       machiningEditedRef.current = new Set();
       setCalculatorInputs(seed ? { ...seed.inputs } : {});
       setCalculatorInputProvenance(seed ? { ...seed.provenance } : {});
+      setCalculatorInputGaps({});
       setCalculatorMatchedRowKeys(seed
         ? Object.fromEntries(Object.entries(seed.lookupMatches).map(([f, m]) => [f, m.row]))
         : {});
@@ -1604,6 +1618,7 @@ export function ProcessCostDialog({
 
     setCalculatorInputs(newInputs);
     setCalculatorInputProvenance(newProvenance);
+    setCalculatorInputGaps({});
 
     // Cutting Speed (Laser Cutting Manufacturing): a real value from the
     // sm_lookup_laser_cut table (material x thickness x laser power), never a
@@ -1749,81 +1764,54 @@ export function ProcessCostDialog({
       }
     }
 
-    // UTS (database_lookup, data_source: raw_materials) — this field type had
-    // no resolution mechanism anywhere (frontend or backend): unlike Direct/
-    // Skilled Labors' data_source='lhr' fields, which just fall back to their
-    // configured default_value, UTS has default_value=NULL, so it silently
-    // stayed blank forever. Look up the part's actual material by grade —
-    // same /raw-materials search endpoint the Cost Guide panel already uses —
-    // and read its real ultimate_tensile_strength (backfilled Aug 2026 into
-    // uts_mpa too; both columns now agree wherever populated).
-    const utsField = selectedCalculator.fields?.find((f: CalculatorField) => f.fieldName === 'UTS');
-    if (utsField && isBlank(newInputs.UTS)) {
+    // Material strengths — UTS (Press Brake), Shear Strength (Stamping, TPP:
+    // "Shear Strength (Mpa)"), Yield Strength (Drawing/Forming) — come from
+    // GET /bom-items/:id/material-strengths: the same raw_materials row and
+    // family narrowing the quote prices from, after the engine seed above.
+    // Never a raw-materials search of its own: a first-hit search picks
+    // whichever row sorts first (e.g. a Forging row with no UTS) and can
+    // disagree with the row the quote used. A missing value says why.
+    const strengthFields = ([
+      { name: 'UTS', key: 'utsMpa', label: 'ultimate tensile strength' },
+      { name: 'Shear Strength', key: 'shearStrengthMpa', label: 'shear strength' },
+      { name: 'Shear Strength (Mpa)', key: 'shearStrengthMpa', label: 'shear strength' },
+      { name: 'Yield Strength', key: 'yieldStrengthMpa', label: 'yield strength' },
+    ] as const).filter(({ name }) =>
+      selectedCalculator.fields?.some((f: CalculatorField) => f.fieldName === name) && isBlank(newInputs[name]));
+    if (strengthFields.length > 0) {
       const grade = bomItemData.materialGrade || bomItemData.material;
-      if (grade) {
+      let strengths: MaterialStrengths | null = null;
+      let readError: string | null = null;
+      if (grade && bomItemData.id) {
         try {
-          const res = await apiClient.get<{ items: any[] }>('/raw-materials', {
-            params: { search: grade, limit: 5 },
-          });
-          const match = res?.items?.[0];
-          const uts = match?.utsMpa ?? match?.ultimateTensileStrength;
-          if (typeof uts === 'number' && uts > 0) {
-            setCalculatorInputs((prev) => (isBlank(prev.UTS) ? { ...prev, UTS: uts } : prev));
-            setCalculatorInputProvenance((prev) => ({
-              ...prev,
-              UTS: `raw_materials — "${match.material}" ultimate tensile strength`,
-            }));
-          }
-        } catch {
-          // No match / lookup failed — leave blank for manual entry.
+          strengths = await apiClient.get<MaterialStrengths>(`/bom-items/${bomItemData.id}/material-strengths`);
+        } catch (err: any) {
+          readError = err?.message ?? String(err);
         }
       }
-    }
-
-    // Shear Strength (Stamping/TPP) and Yield Strength (Drawing/Forming) —
-    // same class of gap as UTS above: both are database_lookup/raw_materials
-    // fields with no resolution mechanism anywhere. Field name varies by
-    // calculator ("Shear Strength" on Stamping, "Shear Strength (Mpa)" on TPP).
-    const shearField = selectedCalculator.fields?.find(
-      (f: CalculatorField) => f.fieldName === 'Shear Strength' || f.fieldName === 'Shear Strength (Mpa)'
-    );
-    if (shearField && isBlank(newInputs[shearField.fieldName])) {
-      const grade = bomItemData.materialGrade || bomItemData.material;
-      if (grade) {
-        try {
-          const res = await apiClient.get<{ items: any[] }>('/raw-materials', { params: { search: grade, limit: 5 } });
-          const match = res?.items?.[0];
-          const shear = match?.shearStrengthMpa ?? match?.shearingStrength;
-          if (typeof shear === 'number' && shear > 0) {
-            setCalculatorInputs((prev) => (isBlank(prev[shearField.fieldName]) ? { ...prev, [shearField.fieldName]: shear } : prev));
-            setCalculatorInputProvenance((prev) => ({
-              ...prev,
-              [shearField.fieldName]: `raw_materials — "${match.material}" shear strength`,
-            }));
-          }
-        } catch {
-          // No match / lookup failed — leave blank for manual entry.
-        }
-      }
-    }
-
-    const yieldField = selectedCalculator.fields?.find((f: CalculatorField) => f.fieldName === 'Yield Strength');
-    if (yieldField && isBlank(newInputs['Yield Strength'])) {
-      const grade = bomItemData.materialGrade || bomItemData.material;
-      if (grade) {
-        try {
-          const res = await apiClient.get<{ items: any[] }>('/raw-materials', { params: { search: grade, limit: 5 } });
-          const match = res?.items?.[0];
-          const yieldStrength = match?.yieldStrengthMpa ?? match?.yieldTensileStrength;
-          if (typeof yieldStrength === 'number' && yieldStrength > 0) {
-            setCalculatorInputs((prev) => (isBlank(prev['Yield Strength']) ? { ...prev, 'Yield Strength': yieldStrength } : prev));
-            setCalculatorInputProvenance((prev) => ({
-              ...prev,
-              'Yield Strength': `raw_materials — "${match.material}" yield strength`,
-            }));
-          }
-        } catch {
-          // No match / lookup failed — leave blank for manual entry.
+      for (const { name, key, label } of strengthFields) {
+        const value = strengths?.[key];
+        if (strengths && value != null && value > 0) {
+          const familyDefault = key === 'utsMpa' && strengths.utsSource === 'family_default';
+          const rowName = strengths.materialName ?? grade;
+          setCalculatorInputs((prev) => (isBlank(prev[name]) ? { ...prev, [name]: value } : prev));
+          setCalculatorInputProvenance((prev) => ({
+            ...prev,
+            [name]: familyDefault
+              ? `Approved material-family value for "${grade}" (no verified value in raw materials) — the value the quote uses`
+              : `raw_materials — "${rowName}" ${label}, the row the quote uses`,
+          }));
+        } else {
+          setCalculatorInputGaps((prev) => ({
+            ...prev,
+            [name]: !grade
+              ? `No material is set on this part, so there is no ${label} to use. Set the material, or enter a verified value.`
+              : readError
+                ? `Could not read the ${label} of "${grade}": ${readError}. Enter a verified value.`
+                : !strengths?.materialName
+                  ? `"${grade}" matches no row in raw materials, so there is no ${label}. Add the material, or enter a verified value.`
+                  : `"${strengths.materialName}" in raw materials has no ${label}${key === 'utsMpa' ? ', and no approved material-family value exists' : ''}. Enter a verified value to calculate.`,
+          }));
         }
       }
     }
@@ -3496,7 +3484,10 @@ export function ProcessCostDialog({
                           <div key={field.id} className="space-y-2">
                             <Label htmlFor={field.fieldName}>
                               {field.displayLabel || field.fieldName}
-                              {field.unit && <span className="text-muted-foreground ml-1">({field.unit})</span>}
+                              {/* Labels that already name their unit ("... (Mpa)") don't repeat it. */}
+                              {field.unit && !(field.displayLabel || field.fieldName).toLowerCase().includes(`(${field.unit.toLowerCase()})`) && (
+                                <span className="text-muted-foreground ml-1">({field.unit})</span>
+                              )}
                             </Label>
 
                             {field.fieldType === 'select' && selectOptions ? (
@@ -3607,16 +3598,31 @@ export function ProcessCostDialog({
                                 Why: {calculatorInputProvenance[field.fieldName]}
                               </div>
                             )}
+                            {calculatorInputGaps[field.fieldName] && (calculatorInputs[field.fieldName] ?? '') === '' && (
+                              <div className="text-xs text-amber-600 dark:text-amber-400">
+                                Missing: {calculatorInputGaps[field.fieldName]}
+                              </div>
+                            )}
                             {field.fieldName === 'Selected Tonnage' && (() => {
                               // Required (this calculator's Recommended Force) vs the machine's rating.
                               const required = Number(calculatorResults?.['Recommended Force']);
+                              const theoretical = Number(calculatorResults?.['Theoretical Force']);
                               const selected = Number(calculatorInputs['Selected Tonnage']);
-                              if (!(required > 0) || !(selected > 0)) return null;
-                              const ok = required <= selected;
+                              if (!(required > 0)) return null;
+                              const ok = selected > 0 ? required <= selected : null;
                               return (
-                                <div className={`text-xs font-medium ${ok ? 'text-emerald-600' : 'text-destructive'}`}>
-                                  Required {required.toFixed(2)} T (Recommended Force) {ok ? '≤' : '>'} selected {selected.toFixed(1)} T
-                                  {ok ? ' — machine has enough capacity' : ' — machine is undersized for this bend'}
+                                <div className="space-y-0.5 text-xs">
+                                  <div className="text-muted-foreground">
+                                    Calculated tonnage:{' '}
+                                    {theoretical > 0 && <>Theoretical {theoretical.toFixed(2)} T → </>}
+                                    <span className="font-semibold text-foreground">Recommended {required.toFixed(2)} T</span>
+                                  </div>
+                                  {ok !== null && (
+                                    <div className={`font-medium ${ok ? 'text-emerald-600' : 'text-destructive'}`}>
+                                      Required {required.toFixed(2)} T (Recommended Force) {ok ? '≤' : '>'} selected {selected.toFixed(1)} T
+                                      {ok ? ' — machine has enough capacity' : ' — machine is undersized for this bend'}
+                                    </div>
+                                  )}
                                 </div>
                               );
                             })()}

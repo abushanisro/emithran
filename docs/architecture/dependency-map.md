@@ -36,7 +36,7 @@ flowchart TD
 | database clients | `common/supabase/supabase.service.ts`, request-auth context; user JWT vs named privileged authority |
 | signed-file proxy | `app/api/file-proxy/route.ts`; direct signed URL or backend item lookup, streaming response |
 | CAD | `app/api/cad/route.ts`, `cad-engine/main.py`; server key, file validation, temp disk, rate limits/geometry compute |
-| auxiliary Python routes | drawing/copilot routers; separate auth decorators need audit |
+| auxiliary Python routes | drawing router; separate auth decorators need audit |
 | direct database | Supabase PostgREST, RLS/grants/views/RPCs; bypasses Nest |
 
 ## Representative manufacturing path

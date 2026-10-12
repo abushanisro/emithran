@@ -1,23 +1,12 @@
 "use client";
 
-import { useCallback, useRef, useState, useEffect } from "react";
 import { Bot, Send, RotateCcw, Loader2 } from "lucide-react";
+import { useCallback, useRef, useState, useEffect } from "react";
+
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/lib/supabase/client";
-import { useCostSummary, useRouteComparison } from "@/lib/api/hooks/useBOMItems";
-import type { BOMItem, CostSummaryDto, RouteComparisonDto } from "@/lib/api/hooks/useBOMItems";
-import type { FeatureGraph } from "@/lib/types/manufacturing";
 import { cn } from "@/lib/utils";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
-
-type Mode =
-  | "manufacturing_engineer"
-  | "designer"
-  | "purchasing"
-  | "supplier"
-  | "program_manager"
-  | "executive";
 
 interface ChatMessage {
   id: string;
@@ -27,68 +16,6 @@ interface ChatMessage {
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
-
-const MODE_LABELS: Record<Mode, string> = {
-  manufacturing_engineer: "Mfg Engineer",
-  designer: "Designer",
-  purchasing: "Purchasing",
-  supplier: "Supplier",
-  program_manager: "Program Manager",
-  executive: "Executive",
-};
-
-// Keyword buckets for automatic mode detection — order matters (first match wins)
-const MODE_SIGNALS: { mode: Mode; keywords: string[] }[] = [
-  {
-    mode: "executive",
-    keywords: [
-      "executive summary", "executive", "brief me", "top line", "business case",
-      "board", "investor", "stakeholder", "3 bullet", "three bullet",
-    ],
-  },
-  {
-    mode: "program_manager",
-    keywords: [
-      "nre", "investment", "roi", "break-even", "breakeven", "payback",
-      "milestone", "schedule", "timeline", "program", "amortiz",
-    ],
-  },
-  {
-    mode: "supplier",
-    keywords: [
-      "supplier", "vendor", "rfq", "quote to supplier", "lead time",
-      "capacity", "capability statement", "process capability",
-    ],
-  },
-  {
-    mode: "purchasing",
-    keywords: [
-      "cheapest", "lowest cost", "purchase", "procurement", "annual spend",
-      "landed cost", "should cost", "target price", "budget", "buy vs make",
-      "make vs buy",
-    ],
-  },
-  {
-    mode: "designer",
-    keywords: [
-      "redesign", "design change", "modify geometry", "wall thickness",
-      "draft angle", "feature", "rib", "boss", "fillet", "topology",
-      "design for", "dfm fix", "geometry change", "cad",
-    ],
-  },
-];
-
-/**
- * Infer the most appropriate response mode from the user's message.
- * Falls back to manufacturing_engineer when no strong signal is found.
- */
-function detectMode(text: string): Mode {
-  const lower = text.toLowerCase();
-  for (const { mode, keywords } of MODE_SIGNALS) {
-    if (keywords.some((kw) => lower.includes(kw))) return mode;
-  }
-  return "manufacturing_engineer";
-}
 
 const AI_ACTIONS: { label: string; prompt: string }[] = [
   {
@@ -109,7 +36,7 @@ const AI_ACTIONS: { label: string; prompt: string }[] = [
   {
     label: "Simulate",
     prompt:
-      "Run scenarios for: alternative material, 2-cavity mould, and lower-cost factory location. Rank by total cost.",
+      "Compare the total cost per part at three batch sizes (100, 1,000 and 10,000) and rank them. Show what changes between them.",
   },
   {
     label: "Redesign",
@@ -123,82 +50,42 @@ const AI_ACTIONS: { label: string; prompt: string }[] = [
   },
 ];
 
-// ── Context assembler ──────────────────────────────────────────────────────────
-
-function buildContext(
-  item: BOMItem,
-  fg: FeatureGraph | null,
-  batchSize: number,
-  productionLife: number,
-  factory: string,
-  costSummary: CostSummaryDto | null | undefined,
-  routeComparison: RouteComparisonDto | null | undefined,
-  activeTab: string,
-): Record<string, unknown> {
-  const summary = fg?.summary ?? {};
-  const cls = fg?.classification;
-
-  return {
-    part: {
-      name: item.name,
-      partNumber: item.partNumber,
-      family: cls?.family ?? item.familyClassification,
-      confidence: cls?.confidence ?? item.familyConfidence,
-      dimensions: [item.maxLength, item.maxWidth, item.maxHeight].filter(Boolean),
-      volume: item.volume,
-      surfaceArea: item.surfaceArea,
-      weight: item.weight,
-      material: item.material,
-      materialGrade: item.materialGrade,
-      annualVolume: item.annualVolume,
-      batchSize,
-    },
-    geometry: {
-      holeGroups: (summary as any).holeGroups,
-      holeCount: item.holeCount,
-      bendCount: item.bendCount,
-      ribs: (summary as any).ribCount,
-      bosses: (summary as any).bossCount,
-      undraftedFaces: (summary as any).undercutFaceCount ?? (summary as any).undraftedFaceCount,
-      wallThickness: (summary as any).wallThicknessNominalMm,
-      sheetThickness: item.sheetThicknessMm,
-      cutLength: item.cutLengthMm,
-      threads: item.drawingIntelligence?.threads,
-      complexity: item.complexity,
-    },
-    dfm: {
-      score: fg?.summary ? (fg as any).dfm_analysis?.manufacturability_score : null,
-      difficulty: (fg as any)?.classification?.difficultyLevel ?? (fg as any)?.difficultyLevel,
-      warnings: fg?.dfmWarnings ?? [],
-    },
-    cost: costSummary ?? {},
-    routes: routeComparison ?? {},
-    sustainability: costSummary?.sustainability ?? {},
-    investment: {
-      // Investment tab computes NRE client-side; pass null for now — the agent
-      // will use tooling cost from cost.tooling instead.
-      nreTotal: null,
-      amortizedPerUnit: null,
-    },
-    production: {
-      annualVolume: item.annualVolume,
-      batchSize,
-      productionLifeYears: productionLife,
-      lifetimeVolume: (item.annualVolume ?? 0) * productionLife,
-      factory,
-    },
-    activeTab,
-  };
-}
-
 // ── Hooks ──────────────────────────────────────────────────────────────────────
 
 const STORAGE_KEY = (id: string) => `copilot_messages_${id}`;
+/** What the server accepts in one request (backend dto/chat.dto.ts). */
+const MAX_HISTORY_MESSAGES = 8;
+const MAX_QUESTION_CHARS = 2000;
 
-function useCopilotChat(
-  bomItemId: string,
-  getContext: () => Record<string, unknown>,
-) {
+/** One JSON object per SSE frame, as written by the NestJS copilot controller. */
+type CopilotEvent =
+  | { type: "text"; delta: string }
+  | { type: "done" }
+  | { type: "error"; code: string };
+
+const ERROR_TEXT: Record<string, string> = {
+  rate_limited: "The copilot is busy right now. Try again in a moment.",
+  upstream_unavailable: "The AI service is unavailable. Try again shortly.",
+  refused: "The copilot could not answer that question.",
+  tool_limit: "That question needed too many steps. Try a narrower question.",
+};
+
+const HTTP_ERROR_TEXT: Record<number, string> = {
+  400: "That request was not valid. Try a shorter question.",
+  401: "Please sign in again.",
+  404: "This part was not found.",
+  413: "That request was too large.",
+  429: "Too many requests. Wait a moment and try again.",
+  503: "The copilot is not configured.",
+};
+
+interface CopilotScenario {
+  batchSize: number;
+  productionLife: number;
+  location: string;
+}
+
+function useCopilotChat(bomItemId: string, scenario: CopilotScenario) {
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY(bomItemId));
@@ -209,7 +96,6 @@ function useCopilotChat(
   });
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeMode, setActiveMode] = useState<Mode>("manufacturing_engineer");
   const abortRef = useRef<AbortController | null>(null);
 
   // Persist completed messages to localStorage (never save in-flight streaming ones)
@@ -228,18 +114,13 @@ function useCopilotChat(
     setMessages([]);
     setError(null);
     setIsStreaming(false);
-    setActiveMode("manufacturing_engineer");
     try { localStorage.removeItem(STORAGE_KEY(bomItemId)); } catch { /* ignore */ }
   }, [bomItemId]);
 
   const send = useCallback(
     async (text: string) => {
-      const trimmed = text.trim();
+      const trimmed = text.trim().slice(0, MAX_QUESTION_CHARS);
       if (!trimmed || isStreaming) return;
-
-      // Detect mode from user's text and update badge immediately
-      const mode = detectMode(trimmed);
-      setActiveMode(mode);
 
       setError(null);
       abortRef.current?.abort();
@@ -262,47 +143,42 @@ function useCopilotChat(
       setMessages((prev) => [...prev, userMsg, assistantPlaceholder]);
       setIsStreaming(true);
 
-      // Get auth token
-      const { data: sess } = await supabase.auth.getSession();
-      const token = sess.session?.access_token ?? "";
+      const dropPlaceholder = () => {
+        setMessages((prev) => prev.filter((m) => m.id !== assistantId || m.content));
+      };
 
-      // Build conversation history (exclude placeholder)
-      const history = [...messages, userMsg].map((m) => ({
-        role: m.role,
-        content: m.content,
-      }));
-
+      // The server rebuilds everything else (part facts, costs, features) from the part id with this user's own access.
+      const history = [...messages, userMsg]
+        .filter((m) => m.content.trim())
+        .slice(-MAX_HISTORY_MESSAGES)
+        .map((m) => ({ role: m.role, content: m.content }));
       const payload = {
         bomItemId,
-        mode,
+        location: scenario.location,
+        batchSize: scenario.batchSize,
+        productionLifeYears: scenario.productionLife,
         messages: history,
-        context: getContext(),
       };
 
       let resp: Response;
       try {
         resp = await fetch("/api/manufacturing-copilot/chat", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: token ? `Bearer ${token}` : "",
-            Accept: "text/event-stream",
-          },
+          headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
           body: JSON.stringify(payload),
           signal: controller.signal,
         });
       } catch (e) {
-        if ((e as Error)?.name === "AbortError") return;
-        setError("Network error. Is the CAD engine running?");
-        setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+        if ((e as Error).name === "AbortError") return;
+        setError("Network error. Please try again.");
+        dropPlaceholder();
         setIsStreaming(false);
         return;
       }
 
       if (!resp.ok || !resp.body) {
-        const text = await resp.text().catch(() => "");
-        setError(`Copilot error ${resp.status}: ${text.slice(0, 200)}`);
-        setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+        setError(HTTP_ERROR_TEXT[resp.status] ?? "The copilot is unavailable. Try again shortly.");
+        dropPlaceholder();
         setIsStreaming(false);
         return;
       }
@@ -310,6 +186,16 @@ function useCopilotChat(
       const reader = resp.body.getReader();
       const decoder = new TextDecoder("utf-8");
       let buffer = "";
+
+      const handle = (event: CopilotEvent) => {
+        if (event.type === "text") {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + event.delta, streaming: true } : m)),
+          );
+        } else if (event.type === "error") {
+          setError(ERROR_TEXT[event.code] ?? "Something went wrong. Try again.");
+        }
+      };
 
       try {
         for (;;) {
@@ -321,35 +207,26 @@ function useCopilotChat(
             const frame = buffer.slice(0, split);
             buffer = buffer.slice(split + 2);
             const dataLine = frame.split("\n").find((l) => l.startsWith("data: "));
-            if (!dataLine) continue;
-            const raw = dataLine.slice(6);
-            if (raw === "[DONE]") break;
-            // Un-escape newlines (agent escapes \n → \\n in SSE payload)
-            const token = raw.replace(/\\n/g, "\n");
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === assistantId
-                  ? { ...m, content: m.content + token, streaming: true }
-                  : m,
-              ),
-            );
+            if (dataLine) handle(JSON.parse(dataLine.slice(6)) as CopilotEvent);
           }
         }
       } catch (e) {
-        if ((e as Error)?.name === "AbortError") return;
+        if ((e as Error).name === "AbortError") return;
         setError("Stream interrupted.");
       }
 
-      // Finalise — remove streaming flag
+      // Finalise: remove the streaming flag, and drop an answer that never received text.
       setMessages((prev) =>
-        prev.map((m) => (m.id === assistantId ? { ...m, streaming: false } : m)),
+        prev
+          .map((m) => (m.id === assistantId ? { ...m, streaming: false } : m))
+          .filter((m) => m.id !== assistantId || m.content),
       );
       setIsStreaming(false);
     },
-    [bomItemId, isStreaming, messages, getContext],
+    [bomItemId, isStreaming, messages, scenario.batchSize, scenario.productionLife, scenario.location],
   );
 
-  return { messages, isStreaming, error, activeMode, send, reset };
+  return { messages, isStreaming, error, send, reset };
 }
 
 // ── Copilot response renderer ──────────────────────────────────────────────────
@@ -401,7 +278,7 @@ function CopilotResponse({ content, showSources }: { content: string; showSource
           "font-semibold",
           isTitle
             ? "text-[11px] text-foreground mb-1"
-            : "text-[9px] uppercase tracking-wider text-violet-600 dark:text-violet-400 mt-3 mb-1 border-b border-violet-100 dark:border-violet-900 pb-0.5",
+            : "text-[9px] uppercase tracking-wider text-brand-600 dark:text-brand-400 mt-3 mb-1 border-b border-brand-100 dark:border-brand-900 pb-0.5",
         )}>
           {inner}
         </div>
@@ -414,7 +291,7 @@ function CopilotResponse({ content, showSources }: { content: string; showSource
       const rest = trimmed.slice(1).trim();
       nodes.push(
         <div key={i++} className="flex gap-2 py-1.5 border-b border-border/30 last:border-0">
-          <span className="shrink-0 w-4 h-4 rounded-full bg-violet-100 dark:bg-violet-950/60 text-violet-700 dark:text-violet-300 text-[8px] font-bold flex items-center justify-center mt-0.5">
+          <span className="shrink-0 w-4 h-4 rounded-full bg-brand-100 dark:bg-brand-950/60 text-brand-700 dark:text-brand-300 text-[8px] font-bold flex items-center justify-center mt-0.5">
             {trimmed[0]}
           </span>
           <span className="text-[10px] leading-relaxed">{parseInline(rest, showSources)}</span>
@@ -446,7 +323,7 @@ function CopilotResponse({ content, showSources }: { content: string; showSource
     }
 
     // Key-value lines like "Machine: X" / "Total cost: $X"
-    const kvMatch = trimmed.match(/^(Machine|Total cost|Cycle time|Material|NRE|Break-even):\s*(.+)$/);
+    const kvMatch = /^(Machine|Total cost|Cycle time|Material|NRE|Break-even):\s*(.+)$/.exec(trimmed);
     if (kvMatch) {
       nodes.push(
         <div key={i++} className="flex gap-1.5 py-0.5 text-[10px]">
@@ -477,7 +354,7 @@ function MessageBubble({ msg, showSources }: { msg: ChatMessage; showSources: bo
       <div
         className={cn(
           "shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5",
-          isUser ? "bg-violet-100 text-violet-600" : "bg-slate-100 text-slate-500",
+          isUser ? "bg-brand-100 text-brand-600" : "bg-slate-100 text-slate-500",
         )}
       >
         {isUser ? (
@@ -490,7 +367,7 @@ function MessageBubble({ msg, showSources }: { msg: ChatMessage; showSources: bo
         className={cn(
           "max-w-[85%] rounded-lg px-2.5 py-1.5",
           isUser
-            ? "bg-violet-50 text-violet-900 dark:bg-violet-950/40 dark:text-violet-100 text-[11px] leading-relaxed"
+            ? "bg-brand-50 text-brand-900 dark:bg-brand-950/40 dark:text-brand-100 text-[11px] leading-relaxed"
             : "bg-muted text-foreground",
         )}
       >
@@ -507,7 +384,7 @@ function MessageBubble({ msg, showSources }: { msg: ChatMessage; showSources: bo
           </span>
         )}
         {msg.streaming && msg.content && (
-          <span className="inline-block w-1 h-3 bg-violet-500 animate-pulse ml-0.5 align-text-bottom" />
+          <span className="inline-block w-1 h-3 bg-brand-500 animate-pulse ml-0.5 align-text-bottom" />
         )}
       </div>
     </div>
@@ -517,39 +394,22 @@ function MessageBubble({ msg, showSources }: { msg: ChatMessage; showSources: bo
 // ── Main component ─────────────────────────────────────────────────────────────
 
 interface CopilotPanelProps {
-  item: BOMItem;
-  fg: FeatureGraph | null;
+  itemId: string;
   batchSize: number;
   productionLife: number;
   factory: string;
-  activeTab: string;
 }
 
-export function CopilotPanel({
-  item,
-  fg,
-  batchSize,
-  productionLife,
-  factory,
-  activeTab,
-}: CopilotPanelProps) {
+export function CopilotPanel({ itemId, batchSize, productionLife, factory }: CopilotPanelProps) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const { data: costSummary } = useCostSummary(item.id, batchSize, factory);
-  const { data: routeComparison } = useRouteComparison(item.id, batchSize, factory);
-
-  const getContext = useCallback(
-    () =>
-      buildContext(item, fg, batchSize, productionLife, factory, costSummary, routeComparison, activeTab),
-    [item, fg, batchSize, productionLife, factory, costSummary, routeComparison, activeTab],
-  );
-
-  const { messages, isStreaming, error, activeMode, send, reset } = useCopilotChat(
-    item.id,
-    getContext,
-  );
+  const { messages, isStreaming, error, send, reset } = useCopilotChat(itemId, {
+    batchSize,
+    productionLife,
+    location: factory,
+  });
 
   // Auto-scroll to bottom on new tokens
   useEffect(() => {
@@ -587,15 +447,7 @@ export function CopilotPanel({
       {/* ── Header bar ─────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0 bg-muted/30">
         <span className="text-[10px] font-medium text-foreground shrink-0">Manufacturing Copilot</span>
-        <span className="text-[9px] font-semibold px-1 py-0.5 rounded bg-violet-100 text-violet-600 dark:bg-violet-950/40 dark:text-violet-400 border border-violet-200 dark:border-violet-800">BETA</span>
-        {messages.length > 0 && (
-          <span
-            className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border"
-            title="Detected response mode"
-          >
-            {MODE_LABELS[activeMode]}
-          </span>
-        )}
+        <span className="text-[9px] font-semibold px-1 py-0.5 rounded bg-brand-100 text-brand-600 dark:bg-brand-950/40 dark:text-brand-400 border border-brand-200 dark:border-brand-800">BETA</span>
         <div className="flex-1" />
         {messages.length > 0 && (
           <button
@@ -619,7 +471,7 @@ export function CopilotPanel({
               "shrink-0 text-[10px] font-medium px-2 py-0.5 rounded border transition-colors",
               isStreaming
                 ? "opacity-40 cursor-not-allowed border-border text-muted-foreground"
-                : "border-violet-200 text-violet-700 hover:bg-violet-50 dark:border-violet-800 dark:text-violet-300 dark:hover:bg-violet-950/40",
+                : "border-brand-200 text-brand-700 hover:bg-brand-50 dark:border-brand-800 dark:text-brand-300 dark:hover:bg-brand-950/40",
             )}
           >
             {action.label}
@@ -647,7 +499,7 @@ export function CopilotPanel({
                 <button
                   key={q}
                   onClick={() => void handleAction(q)}
-                  className="text-[10px] border border-border rounded-full px-2 py-0.5 text-muted-foreground hover:text-foreground hover:border-violet-400 transition-colors"
+                  className="text-[10px] border border-border rounded-full px-2 py-0.5 text-muted-foreground hover:text-foreground hover:border-brand-400 transition-colors"
                 >
                   {q}
                 </button>
@@ -681,22 +533,23 @@ export function CopilotPanel({
         <textarea
           ref={textareaRef}
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => { setInput(e.target.value); }}
           onKeyDown={handleKeyDown}
           disabled={isStreaming}
+          maxLength={MAX_QUESTION_CHARS}
           placeholder="Ask anything… (Enter to send, Shift+Enter for new line)"
           rows={2}
           className={cn(
             "flex-1 resize-none rounded border bg-background text-[11px] px-2.5 py-1.5 placeholder:text-muted-foreground/50",
-            "focus:outline-hidden focus:ring-1 focus:ring-violet-500",
+            "focus:outline-hidden focus:ring-1 focus:ring-brand-500",
             isStreaming && "opacity-50",
           )}
         />
         <Button
           size="sm"
-          onClick={handleSend}
+          onClick={() => void handleSend()}
           disabled={isStreaming || !input.trim()}
-          className="h-8 w-8 p-0 shrink-0 bg-violet-600 hover:bg-violet-700"
+          className="h-8 w-8 p-0 shrink-0 bg-brand-600 hover:bg-brand-700"
         >
           {isStreaming ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -708,7 +561,7 @@ export function CopilotPanel({
 
       {/* ── Footer attribution ─────────────────────────────────────────────── */}
       <div className="shrink-0 px-3 pb-1.5 text-[9px] text-muted-foreground/40 text-center">
-        Powered by Groq · Figures from Mithran engines · Not a substitute for engineering judgment
+        Powered by Claude · Figures from Mithran engines · Not a substitute for engineering judgment
       </div>
     </div>
   );

@@ -1238,7 +1238,7 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
                   <TableHead className="text-gray-300 font-medium w-[200px]">Cost Component</TableHead>
                   <TableHead className="text-center text-gray-300 font-medium w-[120px]">Base/Reference</TableHead>
                   {vendors.length > 0 ? vendors.map((vendor, index) => {
-                    const colors = ['text-blue-400', 'text-green-400', 'text-yellow-400', 'text-purple-400'];
+                    const colors = ['text-blue-400', 'text-green-400', 'text-yellow-400', 'text-brand-400'];
                     return (
                       <TableHead key={vendor.id} className={`text-center ${colors[index % colors.length]} font-medium w-[100px]`}>
                         {vendor.name}
@@ -1249,7 +1249,7 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
                       <TableHead className="text-center text-blue-400 font-medium w-[100px]">Supplier-1</TableHead>
                       <TableHead className="text-center text-green-400 font-medium w-[100px]">Supplier-2</TableHead>
                       <TableHead className="text-center text-yellow-400 font-medium w-[100px]">Supplier-3</TableHead>
-                      <TableHead className="text-center text-purple-400 font-medium w-[100px]">Supplier-4</TableHead>
+                      <TableHead className="text-center text-brand-400 font-medium w-[100px]">Supplier-4</TableHead>
                     </>
                   )}
                 </TableRow>
@@ -1345,7 +1345,7 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
                     ) : (
                       // Regular Numeric Values - Edit Mode Pattern  
                       row.supplierValues.map((_, index) => {
-                        const colors = ['text-blue-400', 'text-green-400', 'text-yellow-400', 'text-purple-400'];
+                        const colors = ['text-blue-400', 'text-green-400', 'text-yellow-400', 'text-brand-400'];
                         const colorClass = colors[index % colors.length];
                         const currentValue = getCurrentSupplierValue(row.id, index);
 

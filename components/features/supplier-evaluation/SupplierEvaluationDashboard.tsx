@@ -136,7 +136,7 @@ export function SupplierEvaluationDashboard({
           </div>
 
           <div className="flex items-center gap-4 rounded-xl border border-border/40 bg-card/60 p-4 backdrop-blur-xs">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-purple-500/10 text-purple-500">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-500/10 text-brand-500">
               <Factory className="h-6 w-6" />
             </div>
             <div>
@@ -370,7 +370,7 @@ function OEMEvaluationCard({ group, onClick, onEdit }: OEMEvaluationCardProps) {
       className="group relative flex flex-col justify-between rounded-xl border border-border/60 bg-card/90 shadow-xs hover:shadow-lg hover:border-primary/50 transition-all duration-300 cursor-pointer overflow-hidden"
     >
       {/* Top accent border bar */}
-      <div className="h-1.5 w-full bg-linear-to-r from-primary/80 via-teal-500 to-purple-500 opacity-80 group-hover:opacity-100 transition-opacity" />
+      <div className="h-1.5 w-full bg-linear-to-r from-primary/80 via-teal-500 to-brand-500 opacity-80 group-hover:opacity-100 transition-opacity" />
 
       {/* Edit/Delete Action Hover Strip */}
       <div className="absolute top-3 right-3 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-card/90 backdrop-blur-sm rounded-lg border border-border/60 p-0.5 shadow-xs">
