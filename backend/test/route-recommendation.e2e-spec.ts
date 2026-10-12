@@ -36,6 +36,16 @@ describe('[e2e] Auto route recommendation, Rtp2 Mag2 Backframe', () => {
     comparison = await moduleRef.get(BOMItemsService).getRouteComparison(RTP2, data.user!.id, data.session.access_token, 250, 'USA');
   });
 
+  // The dialog's "3. Operation" lists these. The Deburring (Deslag) step used to carry none, because
+  // Deslag is a finishing operation; it is that step's whole job, applied to the cut features.
+  it('the Deburring step performs the catalog Deslag operation on the part cut features', () => {
+    const deburr = route('sm-laser').processLines.find((l) => l.machineClass === 'deburring');
+    const ops = (deburr?.catalogOperations ?? []).map((c) => `${c.operations.join(' or ')} // ${c.featureType}`);
+    expect(new Set(ops)).toEqual(new Set(['Deslag // Blank', 'Deslag // ComplexHole', 'Deslag // SimpleHole']));
+    const holes = (deburr?.catalogOperations ?? []).filter((c) => c.featureType === 'SimpleHole').reduce((n, c) => n + c.count, 0);
+    expect(holes).toBe(124);
+  });
+
   it('recommends the fiber laser route', () => {
     expect(comparison.recommendedRouteId).toBe('sm-laser');
     expect(route('sm-laser')).toMatchObject({ isFeasible: true, dataComplete: true });

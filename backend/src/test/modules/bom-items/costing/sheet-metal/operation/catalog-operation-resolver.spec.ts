@@ -189,3 +189,29 @@ describe('resolveCatalogOperations — the same part on other processes', () => 
     expect(r.map((o) => `${o.operations.join('|')}//${o.featureType}`)).toEqual(['Punching//Blank', 'Punching//SimpleHole']);
   });
 });
+
+// The Deburring (Deslag) step used to show no catalog operations at all, because
+// Deslag is a finishing operation and finishing is never what MAKES a feature. For a
+// step whose catalog is nothing but that finishing, the operation IS the step: the
+// catalog row "Deslag:Deslag//SimpleHole" says it is performed on every simple hole.
+describe('resolveCatalogOperations — a finishing-only step (Deslag)', () => {
+  const r = resolve('Deslag');
+
+  it('lists Deslag on each cut feature the part has, with the real counts', () => {
+    expect(find(r, 'hole_d4')).toMatchObject({ operations: ['Deslag'], status: 'resolved', featureType: 'SimpleHole', count: 14 });
+    // the 20 perforation holes are their own group, deslagged like any other cut edge
+    expect(find(r, 'perforation_0_d4')).toMatchObject({ operations: ['Deslag'], status: 'resolved', count: 20 });
+    expect(find(r, 'slot_all')).toMatchObject({ operations: ['Deslag'], status: 'resolved', featureType: 'ComplexHole', count: 2 });
+    expect(find(r, 'cut_profile')).toMatchObject({ operations: ['Deslag'], status: 'resolved', featureType: 'Blank', count: 1 });
+  });
+
+  it('does not list features the catalog gives the step no operation on', () => {
+    expect(find(r, 'bend_r1')).toBeUndefined();
+    expect(find(r, 'lance')).toBeUndefined();
+  });
+
+  it('does not turn a finishing option on a step that makes features into an operation', () => {
+    const turret = resolve('Turret Press');
+    expect(turret.flatMap((o) => o.operations)).not.toContain('Restriking');
+  });
+});

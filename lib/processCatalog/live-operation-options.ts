@@ -21,6 +21,9 @@ export interface LiveOperationLine {
   /** Catalog operation per feature a forming line performs in one go (the
    *  casting line: "As Cast" on SimpleHole x 3, ...). */
   featureOperations?: ReadonlyArray<{ operation: string | null; featureType: string; instances: ReadonlyArray<unknown> }>;
+  /** Sheet metal: the catalog operations the step performs on the part's CAD features
+   *  ("Fiber Laser Cutting // SimpleHole Ø4 ×11"), one entry per feature group. */
+  catalogOperations?: ReadonlyArray<{ operations: readonly string[]; featureType: string; count: number; status: string }>;
 }
 
 export interface LiveOperationOption {
@@ -99,12 +102,19 @@ export function resolveSavedOperation(
   return onClass.size === 1 ? [...onClass][0]! : savedOperation;
 }
 
-/** "Op // Feature" with its instance count, for each catalog operation group of a line. */
+/** "Op // Feature" with its instance count, for each catalog operation group of a line.
+ *  Sheet-metal groups that differ only in hole diameter are one operation. An
+ *  infeasible group is not an operation the step performs, so it is not offered. */
 function catalogOperationsOf(line: LiveOperationLine): Array<{ operation: string; count: number }> {
   const byOp = new Map<string, number>();
   for (const f of line.featureOperations ?? []) {
     const op = `${f.operation ?? 'Operation not determined'} // ${f.featureType}`;
     byOp.set(op, (byOp.get(op) ?? 0) + f.instances.length);
+  }
+  for (const c of line.catalogOperations ?? []) {
+    if (c.status === 'infeasible' || c.operations.length === 0) continue;
+    const op = `${c.operations.join(' or ')} // ${c.featureType}`;
+    byOp.set(op, (byOp.get(op) ?? 0) + c.count);
   }
   return [...byOp].map(([operation, count]) => ({ operation, count }));
 }

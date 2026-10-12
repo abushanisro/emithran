@@ -253,7 +253,7 @@ interface ProcessCostDialogProps {
   // specific part's real detected geometry produced it. Each line's own
   // featureBreakdown (when present) gives finer-grained real options, e.g.
   // "Drilling Ø4.0mm ×2" instead of just "Drilling".
-  liveProcessLines?: { process: string; machineClass: string; cycleTimeMin: number; featureBreakdown?: { name: string; featureType: string; timeSec: number; count: number }[]; featureOperations?: { operation: string | null; featureType: string; instances: unknown[] }[]; machineSelection?: { balanced?: { candidate?: { machineId?: string | null } } } }[];
+  liveProcessLines?: { process: string; machineClass: string; cycleTimeMin: number; featureBreakdown?: { name: string; featureType: string; timeSec: number; count: number }[]; featureOperations?: { operation: string | null; featureType: string; instances: unknown[] }[]; catalogOperations?: { operations: string[]; featureType: string; count: number; status: string }[]; machineSelection?: { balanced?: { candidate?: { machineId?: string | null } } } }[];
   // Opens the CAD evidence window (the page owns the viewer) for a CAD-derived
   // input; null closes it.
   onShowEvidence?: (evidence: CadEvidence | null) => void;
