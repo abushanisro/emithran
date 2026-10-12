@@ -119,6 +119,8 @@ export interface RawGeometry {
   // reads 'unavailable') -- never a fabricated rectangle standing in.
   flatPatternOutlinePointsMm?: number[][];
   flatPatternHolesMm?: Array<{ cx_mm: number; cy_mm: number; diameter_mm: number }>;
+  /** Holes on panels outside the flat-pattern layout, so absent from flatPatternHolesMm. */
+  flatPatternHolesUnplaced?: number;
   flatPatternOutlineSource?: 'wire_walk' | 'unavailable';
   materialUtilizationPct?: number;
   scrapAreaMm2?: number;
@@ -421,6 +423,7 @@ export class AutoFillService {
         flatPatternBoundingWidthMm: geo.flatPatternBoundingWidthMm,
         flatPatternOutlinePointsMm: geo.flatPatternOutlinePointsMm,
         flatPatternHolesMm: geo.flatPatternHolesMm,
+        flatPatternHolesUnplaced: geo.flatPatternHolesUnplaced,
         flatPatternOutlineSource: geo.flatPatternOutlineSource,
         costDrivers,
         holeDiameters:      geo.holeDiameters ?? [],
@@ -1143,6 +1146,7 @@ export class AutoFillService {
         ? smf.flat_pattern_outline_points_mm
         : undefined,
       flatPatternHolesMm: Array.isArray(smf?.flat_pattern_holes_mm) ? smf.flat_pattern_holes_mm : undefined,
+      flatPatternHolesUnplaced: typeof smf?.flat_pattern_holes_unplaced === 'number' ? smf.flat_pattern_holes_unplaced : undefined,
       flatPatternOutlineSource: smf?.flat_pattern_outline_source === 'wire_walk' ? 'wire_walk' : 'unavailable',
       materialUtilizationPct: smf?.material_utilization_pct != null ? safe(smf.material_utilization_pct, 0) : undefined,
       scrapAreaMm2: smf?.scrap_area_mm2 != null ? safe(smf.scrap_area_mm2, 0) : undefined,
@@ -1378,6 +1382,7 @@ export class AutoFillService {
       flatPatternBoundingWidthMm: geo.flatPatternBoundingWidthMm,
       flatPatternOutlinePointsMm: Array.isArray(geo.flatPatternOutlinePointsMm) ? geo.flatPatternOutlinePointsMm : undefined,
       flatPatternHolesMm: Array.isArray(geo.flatPatternHolesMm) ? geo.flatPatternHolesMm : undefined,
+      flatPatternHolesUnplaced: typeof geo.flatPatternHolesUnplaced === 'number' ? geo.flatPatternHolesUnplaced : undefined,
       flatPatternOutlineSource: geo.flatPatternOutlineSource,
       materialUtilizationPct: geo.materialUtilizationPct,
       scrapAreaMm2: geo.scrapAreaMm2,

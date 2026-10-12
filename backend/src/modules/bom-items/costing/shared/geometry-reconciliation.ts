@@ -51,10 +51,11 @@ export function reconcileSheetGeometry(fg: any): ReconciliationFinding[] {
     out.push({ id: 'hole_count', message: `Hole count: the quote counts ${holeCount} holes but the feature tree lists ${treeHoles}.` });
   }
   const flatHoles = Array.isArray(summary.flatPatternHolesMm) ? summary.flatPatternHolesMm.length : null;
-  if (holeCount !== null && flatHoles !== null && flatHoles !== holeCount) {
+  const unplaced = num(summary.flatPatternHolesUnplaced);
+  if (holeCount !== null && flatHoles !== null && flatHoles + (unplaced ?? 0) !== holeCount) {
     out.push({
       id: 'flat_pattern_holes',
-      message: `Flat pattern: ${flatHoles} of ${holeCount} holes are in the flat-pattern hole list that sheet nesting uses, so the nest may not leave those ${holeCount - flatHoles} holes out of the blank.`,
+      message: `Flat pattern: ${flatHoles} of ${holeCount} holes are in the flat-pattern hole list that sheet nesting uses, and the analysis accounts for ${unplaced ?? 0} more as unplaced, so ${holeCount - flatHoles - (unplaced ?? 0)} hole(s) are unaccounted for.`,
     });
   }
 
