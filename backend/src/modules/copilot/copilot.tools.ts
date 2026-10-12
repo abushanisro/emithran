@@ -5,6 +5,7 @@ import { MAX_PREFERENCE_CHARS, type CopilotMemoryService } from './copilot-memor
 import type { BOMItemResponseDto } from '../bom-items/dto/bom-item-response.dto';
 import type { CostSummaryResponseDto, ProcessLineCost } from '../bom-items/dto/cost-breakdown.dto';
 import type { RouteComparisonResponseDto } from '../bom-items/dto/route-comparison.dto';
+import type { BomItemCostDto, CostAggregationService } from '../costing/cost-aggregation.service';
 
 /** Hard ceiling on one tool result. Past this, lists are halved and `truncated` is set, never cut mid-JSON. */
 export const TOOL_RESULT_MAX_CHARS = 12_000;
@@ -17,6 +18,12 @@ const NO_INPUT = { type: 'object' as const, properties: {}, additionalProperties
 
 // Order and text are part of the cached prompt prefix: change deliberately.
 export const COPILOT_TOOLS: Anthropic.Tool[] = [
+  {
+    name: 'get_saved_quote',
+    description:
+      'The quote the engineer has saved for this part, i.e. the figures the Cost Guide shows: material records, each saved process line (operation, machine, machine and labour rate, the cycle time used and where it came from, setup, batch and location it was saved at, cost per part), tooling, packaging, procured parts and the manufacturing total in USD. Use this first for any question about what the part costs; it is the number the user is looking at.',
+    input_schema: NO_INPUT,
+  },
   {
     name: 'get_cost_summary',
     description:
@@ -150,6 +157,73 @@ function compactLine(line: ProcessLineCost, index: number) {
     rateSource: line.rateSource,
     physicsGap: clipField(line.physicsGap, 600),
     confidence: line.confidence,
+  };
+}
+
+/**
+ * The Cost Guide's own rule (lib/costing/stored-process-lines.ts, mirrored here
+ * because frontend and backend are separate builds): a saved row keeps its
+ * machine and rates, setup is re-amortised over the batch being viewed, and the
+ * cycle time is the engine's current one for the same machine class and
+ * operation when there is one, because a saved cycle goes stale as geometry
+ * logic improves. Without a live match the saved cycle is used.
+ */
+export function compactSavedQuote(
+  q: BomItemCostDto,
+  liveLines: readonly ProcessLineCost[],
+  batchSize: number | undefined,
+  location: string,
+): Record<string, unknown> {
+  const processLines = q.processLines.map((p) => {
+    const batch = Math.max(batchSize ?? p.batchSize, 1);
+    const sameClass = p.machineClass ? liveLines.filter((l) => l.machineClass === p.machineClass) : [];
+    const op = (p.operation ?? '').trim().toLowerCase();
+    const live = sameClass.find((l) => l.process.trim().toLowerCase() === op) ?? (sameClass.length === 1 ? sameClass[0] : undefined);
+    const cycleSec = live ? live.cycleTimeMin * 60 : p.cycleTimeSec;
+    const heads = Math.max(p.heads, 1);
+    const setupPerPart = ((p.setupTimeMin / 60) * (p.machineRate + p.laborRate * Math.max(p.setupManning, 1))) / batch;
+    const cyclePerPart = ((cycleSec / 3600) * (p.machineRate + p.laborRate * heads)) / Math.max(p.partsPerCycle, 1);
+    return {
+      op: p.opNbr,
+      operation: p.operation,
+      processGroup: p.processGroup,
+      machine: p.machineName,
+      machineRatePerHr: p.machineRate,
+      labourRatePerHr: p.laborRate,
+      cycleSec,
+      cycleSource: live ? 'engine_current' : 'saved',
+      savedCycleSec: p.cycleTimeSec,
+      setupMin: p.setupTimeMin,
+      savedAtBatch: p.batchSize,
+      savedAtLocation: p.location,
+      locationDiffersFromView: Boolean(p.location && p.location !== location),
+      setupCostPerPart: setupPerPart,
+      cycleCostPerPart: cyclePerPart,
+      totalCostPerPart: (setupPerPart + cyclePerPart) * (1 + p.scrap / 100),
+    };
+  });
+  const processCost = processLines.reduce((sum, l) => sum + l.totalCostPerPart, 0);
+  return {
+    currency: 'USD',
+    batchSize: batchSize ?? 'as saved on each line',
+    materials: q.materialLines.map((m) => ({
+      name: m.materialName,
+      unitCostPerKg: m.unitCost,
+      grossUsageKg: m.grossUsage,
+      netUsageKg: m.netUsage,
+      utilisationPct: m.materialUtilizationRate,
+      scrapPct: m.scrap,
+      overheadPct: m.overhead,
+      reclaimValue: m.reclaimValue,
+      totalCost: m.totalCost,
+    })),
+    rawMaterialCost: q.rawMaterialCost,
+    processCost,
+    toolingCost: q.toolingCost,
+    packagingCost: q.packagingCost,
+    procuredPartCost: q.procuredPartCost,
+    manufacturingCost: q.rawMaterialCost + processCost + q.toolingCost + q.packagingCost + q.procuredPartCost,
+    processLines,
   };
 }
 
@@ -308,6 +382,7 @@ export class CopilotToolRunner {
     private readonly ctx: ToolContext,
     private readonly bomItems: BOMItemsService,
     private readonly memory: CopilotMemoryService,
+    private readonly costAggregation: CostAggregationService,
   ) {}
 
   async run(name: string, input: unknown): Promise<ToolOutcome> {
@@ -320,6 +395,15 @@ export class CopilotToolRunner {
 
   private async dispatch(name: string, input: unknown): Promise<string> {
     switch (name) {
+      case 'get_saved_quote':
+      {
+        const [saved, routes] = await Promise.all([
+          this.costAggregation.computeBomItemCost(this.ctx.bomItemId, this.ctx.accessToken),
+          this.getRouteComparison(),
+        ]);
+        const live = routes.routes.flatMap((r) => r.processLines ?? []);
+        return fitToBudget(compactSavedQuote(saved, live, this.ctx.batchSize, this.ctx.location));
+      }
       case 'get_cost_summary':
         return fitToBudget(compactCostSummary(await this.getCostSummary()));
       case 'get_process_line_detail': {

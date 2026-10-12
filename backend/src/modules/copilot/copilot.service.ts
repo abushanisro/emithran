@@ -5,6 +5,7 @@ import { BOMItemsService } from '../bom-items/bom-items.service';
 import { CopilotMemoryService } from './copilot-memory.service';
 import type { BOMItemResponseDto } from '../bom-items/dto/bom-item-response.dto';
 import { COPILOT_SYSTEM_PROMPT } from './copilot.prompt';
+import { CostAggregationService } from '../costing/cost-aggregation.service';
 import { COPILOT_TOOLS, CopilotToolRunner, type ToolContext } from './copilot.tools';
 import { COPILOT_MAX_USER_CHARS, type CopilotChatDto } from './dto/chat.dto';
 
@@ -44,6 +45,7 @@ export class CopilotService {
     config: ConfigService,
     private readonly bomItems: BOMItemsService,
     private readonly memory: CopilotMemoryService,
+    private readonly costAggregation: CostAggregationService,
   ) {
     this.model = config.get<string>('COPILOT_MODEL') || DEFAULT_MODEL;
     const apiKey = config.get<string>('ANTHROPIC_API_KEY');
@@ -88,7 +90,7 @@ export class CopilotService {
       batchSize: dto.batchSize,
       productionLifeYears: dto.productionLifeYears,
     };
-    const tools = new CopilotToolRunner(toolCtx, this.bomItems, this.memory);
+    const tools = new CopilotToolRunner(toolCtx, this.bomItems, this.memory, this.costAggregation);
     const messages = this.conversation(dto);
     const usage: CopilotUsage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, iterations: 0 };
     const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]);
