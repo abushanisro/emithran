@@ -12,6 +12,8 @@ export interface FieldHighlight {
   reconciles: boolean;
   /** Why it does not reconcile, for the engineer. */
   note?: string;
+  /** 'edges': the value is a length along edges, so the viewer outlines the faces instead of filling them. */
+  style?: 'edges';
 }
 
 type Source =
@@ -46,7 +48,7 @@ export function resolveFieldHighlight(
     const cut = cutLengthHighlight(graph.features);
     if (!cut) return null;
     const value = cut.parts.reduce((s, p) => s + p.lengthMm, 0);
-    return { node: cut.all, measured: { value, unit: 'mm', label: 'cut length' }, reconciles: true };
+    return { node: cut.all, measured: { value, unit: 'mm', label: 'cut length' }, reconciles: true, style: 'edges' };
   }
 
   if (source.kind === 'longest_bend') {

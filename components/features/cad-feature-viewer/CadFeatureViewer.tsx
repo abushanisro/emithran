@@ -26,15 +26,17 @@ interface CadFeatureViewerProps {
   faceIds: number[];
   /** Real setup-axis directions to draw, when the engine proved any. */
   axes?: Array<[number, number, number]>;
+  /** How the measured faces are first drawn; the toolbar switches it. */
+  initialMode?: Mode;
 }
 
 type Mode = 'face' | 'edge';
 type Focus = { on: 'part' | 'feature'; nonce: number };
 
 /** The part, loaded once through the shared store, with only the measured faces highlighted. */
-export function CadFeatureViewer({ fileUrl, faceMap, faceIds, axes = [] }: CadFeatureViewerProps) {
+export function CadFeatureViewer({ fileUrl, faceMap, faceIds, axes = [], initialMode = 'face' }: CadFeatureViewerProps) {
   const { mesh, error } = useMesh(fileUrl);
-  const [mode, setMode] = useState<Mode>('face');
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [focus, setFocus] = useState<Focus>({ on: 'part', nonce: 0 });
 
   const selection = useMemo(() => {
@@ -195,7 +197,7 @@ function Scene({ mesh, selection, mode, axes }: {
           <lineBasicMaterial color={FEATURE_COLOR} depthTest={mode === 'face'} />
         </lineSegments>
       )}
-      {box && (
+      {box && mode === 'face' && (
         <lineSegments geometry={box.g} position={box.center} renderOrder={5}>
           <lineBasicMaterial color={BOX_COLOR} depthTest={false} />
         </lineSegments>
