@@ -8,6 +8,7 @@ import { Injectable, Logger, NotFoundException, InternalServerErrorException, Ba
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { CreateBOMItemDto, UpdateBOMItemDto } from './dto/bom-items.dto';
 import { BOMItemResponseDto, BOMItemListResponseDto } from './dto/bom-item-response.dto';
+import { RecentKeys } from '../../common/cache/recent-keys';
 import { reconcileSheetGeometry } from './costing/shared/geometry-reconciliation';
 import type { CalculationTraceStep, PhysicsGap, UnsupportedOperationGap, ManufacturingPhysicsResult, ConfidenceLevel, ResolutionStatus, LookupResolution, ValidatedInput } from './dto/cost-breakdown.dto';
 import { computeCostSummary, computeSustainability, applyPersistedRouteToSummary, selectAppliedGeneration, detectAppliedGenerationDrift } from './costing/shared/core/cost-engine';
@@ -94,7 +95,7 @@ import {
   pressFormingRequirement, rollBendingRequirement, deburrSecPerMm,
 } from './costing/shared/capability/machine-selection/physics';
 import { findRouteDataGaps, selectRecommendedRoute, shouldAddSeparatePressBrakeLine, rollBendingGeometryCapability, rolledFormNeedsRollBender,
-  drawnShellNeedsDrawing, routeProducesBlank, preferRealRate, hardToolingVolumeCapability, isAutoRoutable } from './costing/shared/core/engine-kernel';
+  drawnShellNeedsDrawing, routeProducesBlank, cuttingFeatureCoverage, requiredCutFeatures, CUT_FEATURE_TYPES, preferRealRate, hardToolingVolumeCapability, isAutoRoutable } from './costing/shared/core/engine-kernel';
 import { computeProgressiveDieToolingCost, progressiveDieToolingDataGap, buildProgressiveDieToolingLine } from './costing/sheet-metal/process/progressive-die-tooling-engine';
 import { composeFeatureDrivenOperations, composeOperationSequence } from './costing/sheet-metal/operation/feature-driven-operations';
 import {
@@ -2064,14 +2065,20 @@ export class BOMItemsService {
    * Press:Blanking//Blank", "Progressive Die:Die Station:Blanking//Blank".
    * 2/3/4 Roll Bending have no such row at all.
    *
-   * Returns null when the taxonomy could not be read, which routeProducesBlank
-   * treats as "no evidence against any route" — the caller discloses it. Failing
+   * The same rows say which hole/cutout feature types each class can produce
+   * (`SimpleHole`, `ComplexHole`): "Shear:Shear//Blank" is the whole of a shear's
+   * catalog entry. So this returns machine class -> catalogued feature types
+   * (Blank, SimpleHole, ComplexHole), for routeProducesBlank and
+   * cuttingFeatureCoverage.
+   *
+   * Returns null when the taxonomy could not be read, which both predicates
+   * treat as "no evidence against any route" — the caller discloses it. Failing
    * closed here would mark every route blank-less and leave the comparison with
    * no recommendation whatsoever, which is worse than the gap it guards.
    */
-  private async resolveBlankCapableMachineClasses(
+  private async resolveCutFeatureCoverage(
     accessToken: string,
-  ): Promise<ReadonlySet<string> | null> {
+  ): Promise<ReadonlyMap<string, ReadonlySet<string>> | null> {
     try {
       const catalog = await this.loadCalculatorCatalog(accessToken);
       if (catalog.mappingsError) return null;
@@ -2089,23 +2096,27 @@ export class BOMItemsService {
       const client = this.supabaseService.getClient(accessToken);
       const { data, error } = await client
         .from('process_taxonomy_operations')
-        .select('canonical_process_id')
-        .eq('feature_type', 'Blank')
+        .select('canonical_process_id, feature_type')
+        .in('feature_type', ['Blank', ...CUT_FEATURE_TYPES])
         .in('canonical_process_id', canonicalIds);
       if (error) {
-        this.logger.warn(`resolveBlankCapableMachineClasses: ${error.message}`, 'BOMItemsService');
+        this.logger.warn(`resolveCutFeatureCoverage: ${error.message}`, 'BOMItemsService');
         return null;
       }
 
-      const classes = new Set<string>();
+      const coverage = new Map<string, Set<string>>();
       for (const row of (data ?? []) as any[]) {
-        for (const cls of classByCanonicalId.get(row.canonical_process_id) ?? []) classes.add(cls);
+        for (const cls of classByCanonicalId.get(row.canonical_process_id) ?? []) {
+          const features = coverage.get(cls) ?? new Set<string>();
+          features.add(row.feature_type);
+          coverage.set(cls, features);
+        }
       }
       // An empty result is indistinguishable from a taxonomy that was never
       // seeded, so it is reported as unknown rather than as "nothing blanks".
-      return classes.size > 0 ? classes : null;
+      return coverage.size > 0 ? coverage : null;
     } catch (err: any) {
-      this.logger.warn(`resolveBlankCapableMachineClasses failed: ${err.message}`, 'BOMItemsService');
+      this.logger.warn(`resolveCutFeatureCoverage failed: ${err.message}`, 'BOMItemsService');
       return null;
     }
   }
@@ -6026,65 +6037,38 @@ export class BOMItemsService {
       : this.emptyPhysicsResult(['Total Time']);
     const rcCo2LaserCycleTimeSec = rcCo2LaserCalc.outputs['Total Time'];
 
-    // Same pattern for waterjet (migration 398's sm_lookup_waterjet_cut) — resolved
-    // ONCE here and passed into computeWaterjetCost as plain numbers, exactly like
-    // rcLaserParams above, so this is the ONLY place real waterjet cutting speed/
-    // pierce time gets resolved. Without this, computeWaterjetCost silently used its
-    // own hardcoded, material-blind fallback table, which is why the persisted
-    // cycle time for an applied Waterjet Cutting route (via computeWaterjetCost's
-    // caller below) diverged from the real, material-aware number the Cycle Time
-    // calculator (ProcessCostDialog.tsx, wired to this same sm_lookup_waterjet_cut
-    // table) computed for the identical part.
-    const rcWaterjetParams = grade ? await this.smLookup.getWaterjetParams(grade, thk) : null;
-    // Same reasoning as rcWaterjetParams above — real, material-family-specific
-    // router cutting speed (Track B Phase 2, tblRouterUtilities.json), resolved
-    // ONCE here so computeRouterCost never falls back to a fabricated value.
-    const rcRouterParams = grade ? await this.smLookup.getRouterParams(grade) : null;
-    // Same reasoning as rcWaterjetParams above — real, material+thickness-
-    // specific OxyFuel feed-rate/pierce-time data (sm_reference_data
-    // 'nestingCutRate:*:OxyFuelCut:*', migration 492), resolved ONCE here so
-    // computeOxyfuelCost never falls back to a fabricated value.
-    const rcOxyfuelParams = grade ? await this.smLookup.getOxyfuelParams(grade, thk) : null;
-    // Unlike rcWaterjetParams/rcOxyfuelParams/rcRouterParams above (resolved
-    // ONCE from material+thickness before machine selection), Laser Punch's
-    // real punch/nibble physics are per-SELECTED-MACHINE (sm_reference_data
-    // 'laserPunchMachine:*' rows) — resolved here by the machine mhrRates.
-    // laserPunch already picked, so computeLaserPunchCost never falls back
-    // to a fabricated value.
-    const rcLaserPunchParams = await this.smLookup.getLaserPunchMachineParams(mhrRates.laserPunch.machineName);
-    // Turret Punch (2026-09-02): real per-selected-machine nibble/tool-change
-    // data — replaces sm_lookup_turret_punch's fabricated hits/nibble table
-    // for the parts of the formula that have a real substitute. See
-    // TurretPunchMachineParams' own doc comment.
-    const rcTurretPunchMachineParams = await this.smLookup.getTurretPunchMachineParams(mhrRates.turret.machineName);
-    // Plasma Cut/Punch: same per-selected-machine resolution shape as Laser
-    // Punch above, but keyed by the machine's real power_watts (varies
-    // 100W-100,000W / 30W-400W) rather than a fixed per-unit spec — see
-    // getPlasmaCutParams/getPlasmaPunchParams' own doc comments.
-    const rcPlasmaCutParams = await this.smLookup.getPlasmaCutParams(mhrRates.plasmaCut.machineName, grade, thk);
-    const rcPlasmaPunchParams = await this.smLookup.getPlasmaPunchParams(mhrRates.plasmaPunch.machineName, grade, thk);
-    // Roll Bending: same per-selected-machine resolution shape as Laser
-    // Punch — 3 distinct real machine pools (2/3/4 Roll Bender), each
-    // resolved independently since they can select different real machines.
-    const rcRollBending2Params = await this.smLookup.getRollBendingMachineParams(mhrRates.rollBending2.machineName);
-    const rcRollBending3Params = await this.smLookup.getRollBendingMachineParams(mhrRates.rollBending3.machineName);
-    const rcRollBending4Params = await this.smLookup.getRollBendingMachineParams(mhrRates.rollBending4.machineName);
-    // Progressive Die Press (2026-09-02, hardcoded-fallback audit finding):
-    // real per-selected-machine setup time — see
-    // getProgressiveDieMachineSetupMin's own doc comment for why this class
-    // specifically needs per-machine resolution instead of one shared
-    // constant.
-    const rcProgressiveDieSetupMin = await this.smLookup.getProgressiveDieMachineSetupMin(mhrRates.progressiveDiePress.machineName);
-
-    // Real tooling-economics thresholds (progressive_die_press / tandem_press
-    // only — see getToolingAnnualVolumeThresholds' own doc comment).
-    const rcToolingVolumeThresholds = await this.smLookup.getToolingAnnualVolumeThresholds();
-
-    // Real hard-tooling cost inputs for Progressive Die / Tandem Press — see
-    // progressive-die-tooling-engine.ts. Resolved once here (not per-route)
-    // since neither depends on which engine is being costed.
-    const rcProgDieToolingVars = await this.smLookup.getProgressiveDieToolingVariables();
-    const rcToolingComponentCosts = await this.smLookup.getToolingComponentCosts();
+    // Reference lookups for the cutting engines, resolved ONCE here and passed to the
+    // engines as plain numbers, so this is the only place they are resolved (an engine
+    // never falls back to its own hardcoded, material-blind table). Each depends only
+    // on the material, the thickness or the machine already selected above, never on
+    // another lookup, so they run together instead of one round trip after another.
+    //  - waterjet / oxyfuel / plasma: material + thickness (sm_lookup_waterjet_cut,
+    //    sm_reference_data 'nestingCutRate:*', migration 398 / 492)
+    //  - router: no linear feed on file (see SheetMetalLookupService.getRouterParams)
+    //  - laser punch / turret / roll bending / progressive die: per SELECTED machine
+    //    (sm_reference_data 'laserPunchMachine:*', 'turretPunchMachine:*', ...)
+    //  - tooling thresholds, hard-tooling variables and component costs: Progressive
+    //    Die / Tandem Press only, independent of which engine is being costed.
+    const [
+      rcWaterjetParams, rcRouterParams, rcOxyfuelParams, rcLaserPunchParams, rcTurretPunchMachineParams,
+      rcPlasmaCutParams, rcPlasmaPunchParams, rcRollBending2Params, rcRollBending3Params, rcRollBending4Params,
+      rcProgressiveDieSetupMin, rcToolingVolumeThresholds, rcProgDieToolingVars, rcToolingComponentCosts,
+    ] = await Promise.all([
+      grade ? this.smLookup.getWaterjetParams(grade, thk) : null,
+      grade ? this.smLookup.getRouterParams(grade) : null,
+      grade ? this.smLookup.getOxyfuelParams(grade, thk) : null,
+      this.smLookup.getLaserPunchMachineParams(mhrRates.laserPunch.machineName),
+      this.smLookup.getTurretPunchMachineParams(mhrRates.turret.machineName),
+      this.smLookup.getPlasmaCutParams(mhrRates.plasmaCut.machineName, grade, thk),
+      this.smLookup.getPlasmaPunchParams(mhrRates.plasmaPunch.machineName, grade, thk),
+      this.smLookup.getRollBendingMachineParams(mhrRates.rollBending2.machineName),
+      this.smLookup.getRollBendingMachineParams(mhrRates.rollBending3.machineName),
+      this.smLookup.getRollBendingMachineParams(mhrRates.rollBending4.machineName),
+      this.smLookup.getProgressiveDieMachineSetupMin(mhrRates.progressiveDiePress.machineName),
+      this.smLookup.getToolingAnnualVolumeThresholds(),
+      this.smLookup.getProgressiveDieToolingVariables(),
+      this.smLookup.getToolingComponentCosts(),
+    ]);
     // Distinct hole-diameter groups — same real, already-extracted data the
     // hole-extrusion/counterbore/countersink engines already group by,
     // reused here because a progressive-die punch is sized per hole diameter,
@@ -6852,13 +6836,18 @@ export class BOMItemsService {
     ], family);
 
     // Which of those processes really produce the blank, per the seeded catalog
-    // taxonomy. See resolveBlankCapableMachineClasses / routeProducesBlank.
-    const blankCapableClasses = await this.resolveBlankCapableMachineClasses(accessToken);
-    if (blankCapableClasses === null) {
+    // taxonomy. See resolveCutFeatureCoverage / routeProducesBlank.
+    const cutFeatureCoverage = await this.resolveCutFeatureCoverage(accessToken);
+    const blankCapableClasses = cutFeatureCoverage === null
+      ? null
+      : new Set([...cutFeatureCoverage].filter(([, features]) => features.has('Blank')).map(([cls]) => cls));
+    if (cutFeatureCoverage === null) {
       comparisonWarnings.push(
-        'Blank-generation taxonomy unavailable (process_taxonomy_operations) — every route is treated as producing its own blank, so a route that in fact needs an upstream blank-cutting operation is not being held back from the recommendation.',
+        'Cutting-capability taxonomy unavailable (process_taxonomy_operations) — every route is treated as producing its own blank and every hole it needs, so a route that in fact cannot is not being held back from the recommendation.',
       );
     }
+    // The hole/cutout feature types this part has, from its own feature graph.
+    const partCutFeatures = requiredCutFeatures(fg?.feature_graph_v2?.features);
 
     // Disclosed gap: active Sheet Metal cutting-shaped catalog rows (Sheet
     // Cutting / Laser Cutting / Waterjet Cutting routes) whose machine_class has
@@ -7203,9 +7192,16 @@ export class BOMItemsService {
       // and because an infeasible route must still be costed and shown for
       // comparison — never silently dropped.
       const rollGeom = rollBendingGeometryCapability(machineClass, bendCount, rcRolledFormCount);
-      const routeCapabilityWarnings = rollGeom.capable
-        ? capability.warnings
-        : [...capability.warnings, rollGeom.reason];
+      // A cutting process must be able to cut the holes this part has; see
+      // cuttingFeatureCoverage. Forming routes are judged by the gates above.
+      const cutCoverage = processFamily === 'cutting'
+        ? cuttingFeatureCoverage(machineClass, partCutFeatures, cutFeatureCoverage)
+        : { capable: true as const };
+      const routeCapabilityWarnings = [
+        ...capability.warnings,
+        ...(rollGeom.capable ? [] : [rollGeom.reason]),
+        ...(cutCoverage.capable ? [] : [cutCoverage.reason]),
+      ];
 
       // Does this route's own process cut the blank, or does one have to come
       // from somewhere else first? Sourced from the catalog taxonomy's real
@@ -7224,7 +7220,7 @@ export class BOMItemsService {
         autoRoutable: isAutoRoutable(processFamily, toolingVolume),
         processLines: allLines,
         materialCost, abrasiveCost, totalProcessCost,
-        isFeasible: capability.overallCapable && rollGeom.capable && !rcDrawnShellReason && toolingVolume.capable,
+        isFeasible: capability.overallCapable && rollGeom.capable && cutCoverage.capable && !rcDrawnShellReason && toolingVolume.capable,
         producesBlank,
         dataComplete: dataGaps.length === 0,
         dataGaps,
@@ -9476,14 +9472,26 @@ export class BOMItemsService {
   // sees once and forgets. Fire-and-forget from both call sites (never
   // awaited there) and swallows its own errors — a coverage-logging failure
   // must never affect the cost calculation the gap is attached to.
+  //
+  // An identical gap is recorded once a minute, not once per resolve call: one
+  // route comparison resolves the same unresolved lookup many times, and each call
+  // was its own upsert. A failure is logged (supabase's rpc() returns { error }
+  // rather than throwing), at most once per window per gap.
+  private readonly recentCoverageGaps = new RecentKeys(60_000, 500);
+
   private async recordLookupCoverageGap(gap: PhysicsGap): Promise<void> {
+    const gapKey = JSON.stringify([
+      gap.gapType, gap.process, gap.machineClass,
+      gap.gapType === 'missing_lookup' ? [gap.lookupResolution.table, gap.lookupResolution.queryParams] : gap.reason,
+    ]);
+    if (!this.recentCoverageGaps.firstSeen(gapKey)) return;
     try {
       const db = this.supabaseService.getPrivilegedClient('system-telemetry: lookup_coverage_gaps upsert, fire-and-forget, no user context');
       const tableName = gap.gapType === 'missing_lookup' ? gap.lookupResolution.table : null;
       const missingInputs = gap.gapType === 'missing_lookup'
         ? Object.fromEntries(gap.lookupResolution.queryParams.map((p) => [p.column, p.value]))
         : {};
-      await db.rpc('upsert_lookup_coverage_gap', {
+      const { error } = await db.rpc('upsert_lookup_coverage_gap', {
         p_gap_type: gap.gapType,
         p_table_name: tableName,
         p_process: gap.process,
@@ -9494,6 +9502,7 @@ export class BOMItemsService {
         p_required_capability: gap.gapType === 'unsupported_operation' ? (gap.requiredCapability ?? null) : null,
         p_priority: gap.gapType === 'missing_lookup' ? gap.priority : 'medium',
       });
+      if (error) this.logger.warn(`lookup coverage gap not recorded: ${error.message}`, 'BOMItemsService');
     } catch {
       // Diagnostics-only — see doc comment above.
     }

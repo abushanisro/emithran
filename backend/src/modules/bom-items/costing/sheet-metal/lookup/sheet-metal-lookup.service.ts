@@ -143,20 +143,6 @@ interface RollBendingMachineParams {
   dataFound: boolean;
 }
 
-// Real material-family -> sm_lookup_router_cut key mapping. Deliberately NOT
-// normaliseLaserMaterial() below (which speaks a different vocabulary:
-// 'Aluminium'/'Stainless Steel'/'Brass'/'Carbon Steel', with no distinct
-// Copper bucket) — the router table's real source, tblRouterUtilities.json,
-// only ever has 'Aluminum'/'Copper' rows (American spelling, no Steel/
-// Stainless data of any kind), so classifyLaserMaterial()'s AL/CU tokens map
-// onto it directly and honestly. MS/SS/OTHER get no key at all — a genuine,
-// disclosed gap in the source data, not a guess forced into a table that
-// doesn't have it.
-const ROUTER_FAMILY_KEY: Partial<Record<ReturnType<typeof classifyLaserMaterial>, string>> = {
-  AL: 'Aluminum',
-  CU: 'Copper',
-};
-
 // No fallback constants for waterjet: unlike laser (which had years of prior
 // hardcoded defaults to migrate from), there is no pre-existing waterjet
 // speed table anywhere in this codebase to fall back to. If
@@ -368,6 +354,7 @@ export class SheetMetalLookupService {
   // ── Waterjet cutting params (migration 398) ───────────────────────────────
   // No power/pressure axis — see migration 398 for why (this app's real
   // waterjet machine names don't carry a consistently parseable pump rating).
+  @ReferenceMemo()
   async getWaterjetParams(
     grade: string | null | undefined,
     thicknessMm: number,
@@ -411,6 +398,7 @@ export class SheetMetalLookupService {
   // power logic). materialCutCodeFamily is dropped after filtering by
   // materialTypeName — same simplification getWaterjetParams/getLaserParams
   // already make (their tables don't carry that axis at all).
+  @ReferenceMemo()
   async getOxyfuelParams(
     grade: string | null | undefined,
     thicknessMm: number,
@@ -459,6 +447,7 @@ export class SheetMetalLookupService {
   // nibble_tool_overlap_mm) — the standard nibbling step-per-cycle geometry
   // (each cycle advances less than the full tool diameter so the cut edge
   // stays continuous), not a fabricated speed.
+  @ReferenceMemo()
   async getLaserPunchMachineParams(machineName: string | null | undefined): Promise<LaserPunchMachineParams> {
     const noData: LaserPunchMachineParams = { punchRateCyclesPerMin: 0, nibbleMmPerMin: 0, toolChangeSec: 0, dataFound: false };
     if (!machineName) return noData;
@@ -503,6 +492,7 @@ export class SheetMetalLookupService {
   // nibbling/tool-change half of the formula — see TurretPunchMachineParams'
   // own doc comment for why there's no punchRateCyclesPerMin here (no real
   // per-machine punch/hit-rate data exists anywhere in the source).
+  @ReferenceMemo()
   async getTurretPunchMachineParams(machineName: string | null | undefined): Promise<TurretPunchMachineParams> {
     const noData: TurretPunchMachineParams = { nibbleMmPerMin: 0, toolChangeSec: 0, dataFound: false };
     if (!machineName) return noData;
@@ -547,6 +537,7 @@ export class SheetMetalLookupService {
   // thickness match against the shared nestingCutRate table. Material vocab
   // ('Steel'/'Cast Iron'/'Stainless Steel') is the same non-laser vocabulary
   // OxyFuel uses — same remap, not normaliseLaserMaterial's output directly.
+  @ReferenceMemo()
   private async getPlasmaMachinePowerWatts(sourceKeyPrefix: 'plasmaCutMachine' | 'plasmaPunchMachine', machineName: string | null | undefined): Promise<number | null> {
     if (!machineName) return null;
     const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
@@ -561,6 +552,7 @@ export class SheetMetalLookupService {
     return typeof powerWatts === 'number' && powerWatts > 0 ? powerWatts : null;
   }
 
+  @ReferenceMemo()
   private async getPlasmaCutRateParams(
     machineTypeKeyFragment: 'PlasmaCut' | 'PlasmaPunch',
     powerWatts: number,
@@ -659,6 +651,7 @@ export class SheetMetalLookupService {
   // real per-machine setup_time_hr only for the 14 safe machines (the 12
   // cross-category-contaminated ones are never staged here — same
   // exclusion as their press_cycle_time_s backfill, migration 608/2026-09-01).
+  @ReferenceMemo()
   async getProgressiveDieMachineSetupMin(machineName: string | null | undefined): Promise<number | null> {
     if (!machineName) return null;
     const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
@@ -773,6 +766,7 @@ export class SheetMetalLookupService {
   // Default stock sheet when no machine sheet is known: standardSheetWidth /
   // standardSheetLength ("Default standard sheet ... if no stock is
   // available for computed utilization", migration 479).
+  @ReferenceMemo()
   async getStandardSheet(): Promise<{ widthMm: number; lengthMm: number } | null> {
     const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
@@ -906,6 +900,7 @@ export class SheetMetalLookupService {
    * (component, model) pair actually on file; `model` is null for
    * single-variant components.
    */
+  @ReferenceMemo()
   async getToolingComponentCosts(): Promise<Array<{
     componentName: string; model: string | null; sizeMm: number | null;
     costUsd: number; weightKg: number | null;
@@ -931,6 +926,7 @@ export class SheetMetalLookupService {
    * this exact pair has no real seeded rate; never substitutes a different
    * pair's rate.
    */
+  @ReferenceMemo()
   async getToolingCoatingCostPerKg(toolMaterial: string, coatingType: string): Promise<number | null> {
     const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
@@ -951,26 +947,16 @@ export class SheetMetalLookupService {
   // ordering by tool_diameter_mm and taking the first is deterministic (never
   // an arbitrary/unordered pick) even though the diameter itself doesn't
   // currently change the result.
-  async getRouterParams(grade: string | null | undefined): Promise<RouterCutParams> {
-    const noData: RouterCutParams = { cuttingSpeedMmPerMin: 0, dataFound: false };
-    const familyKey = ROUTER_FAMILY_KEY[classifyLaserMaterial(grade ?? null)];
-    if (!familyKey) return noData;
-
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
-    const { data, error } = await db
-      .from('sm_lookup_router_cut')
-      .select('cutting_speed_m_per_min')
-      .eq('material_family', familyKey)
-      .order('tool_diameter_mm', { ascending: true })
-      .limit(1);
-
-    if (error || !data?.length || data[0].cutting_speed_m_per_min == null) {
-      return noData;
-    }
-    return {
-      cuttingSpeedMmPerMin: Number(data[0].cutting_speed_m_per_min) * 1000, // m/min -> mm/min
-      dataFound: true,
-    };
+  // sm_lookup_router_cut holds the cutter's SURFACE speed (350.52 m/min, the
+  // speed of the cutting edge) and feed per tooth. Neither is the table feed the
+  // router moves along the cut at: that is feed per tooth x flutes x RPM, with
+  // RPM = 1000 x surface speed / (pi x tool diameter), and the source has no
+  // flute count. Using the surface speed as the linear feed priced 5018 mm of cut
+  // in 0.014 min and made a 2-axis router the cheapest route for a 124-hole part.
+  // So there is no linear feed on file, and the route reports it as a data gap
+  // (see computeRouterCost) until a flute count (or a real feed rate) is sourced.
+  async getRouterParams(_grade: string | null | undefined): Promise<RouterCutParams> {
+    return { cuttingSpeedMmPerMin: 0, dataFound: false };
   }
 
   // ── Table 2: Handling time (min) for given weight kg ───────────────────────
@@ -1412,6 +1398,7 @@ export class SheetMetalLookupService {
   // ── Turret punch press cycle-time params by thickness ─────────────────────
   // See migration 414 — replaces TURRET_HITS_PER_MIN/TURRET_NIBBLE_MM_PER_MIN/
   // TURRET_TOOL_CHANGE_SEC, which used to live directly in default-rates.ts.
+  @ReferenceMemo()
   async getTurretPunchParams(thicknessMm: number): Promise<{
     hitsPerMin: number; nibbleMmPerMin: number; toolChangeSec: number; dataFound: boolean;
   }> {
@@ -1480,6 +1467,7 @@ export class SheetMetalLookupService {
   // ── Waterjet abrasive (garnet) consumption rate ────────────────────────────
   // See migration 415 — replaces WATERJET_ABRASIVE_KG_PER_MIN, which used to
   // live directly in default-rates.ts.
+  @ReferenceMemo()
   async getWaterjetAbrasiveRate(pumpTier = '50hp_60kpsi'): Promise<{ kgPerMin: number; dataFound: boolean }> {
     const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
@@ -1633,6 +1621,7 @@ export class SheetMetalLookupService {
   // that helper since this one needs an async DB round trip first to build
   // the bracket array, unlike every other resolveBracket() caller which
   // works off a compile-time table.
+  @ReferenceMemo()
   async getHandlingAllowanceUsd(machineClass: string, partWeightKg: number): Promise<{ allowanceUsd: number; dataFound: boolean }> {
     const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
@@ -1654,6 +1643,7 @@ export class SheetMetalLookupService {
   // Composite Carbide' grade — the middle of the 3 real seeded options —
   // until a per-shop nozzle-grade setting exists; disclosed via dataFound,
   // never silently substituted for a genuinely missing table.
+  @ReferenceMemo()
   async getWaterjetNozzleCostPerHr(nozzleGrade = 'Mid-Life Composite Carbide'): Promise<{ costPerHr: number; dataFound: boolean }> {
     const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
@@ -1675,6 +1665,7 @@ export class SheetMetalLookupService {
   // thickness data does not exist in the industry literature (researched —
   // see migration 413's comment), so this resolves a single honest default
   // row rather than a fabricated material-keyed curve.
+  @ReferenceMemo()
   async getDeburrRate(materialFamily = '__default__'): Promise<{ secPerMetre: number; secPerPierce: number; dataFound: boolean }> {
     const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db

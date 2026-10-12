@@ -3,7 +3,7 @@ import {
   DEFAULT_YIELD_PCT,
 } from '../../shared/core/default-rates.constants';
 import type { MHRRateInput } from '../../shared/core/cost-engine';
-import type { ProcessLineCost } from '../../../dto/cost-breakdown.dto';
+import type { PhysicsGap, ProcessLineCost } from '../../../dto/cost-breakdown.dto';
 import type { CuttingProcessContext, CuttingProcessResult, TurretPunchMachineParams } from '../../shared/core/manufacturing-process.types';
 import { r2, noRateFallback, eMithranTerms, resolveSetupMinutes } from '../../shared/core/engine-kernel';
 import { BaseCuttingEngine, buildCuttingProcessLine } from '../../shared/core/engine-orchestrator';
@@ -89,6 +89,20 @@ export function computeTurretPunchCost(input: TurretPunchInput): TurretPunchResu
     warnings.push("Turret: no real nibble-rate data on file for this machine — nibbling time is $0 until real data is sourced, not an estimate");
   }
 
+  // Punching and nibbling that could not be priced are missing data, not a $0
+  // operation: the route would otherwise look cheapest for the work it leaves
+  // unpriced. A gap makes it incomplete (findRouteDataGaps), so it can be shown
+  // and applied by choice but never auto-recommended. Where there is genuinely
+  // nothing to punch or nibble, no gap is raised.
+  const unpriced: string[] = [];
+  if (input.pierceCount > 0) unpriced.push(`punching ${input.pierceCount} holes (no punch/hit-rate field in the Turret Press machine data)`);
+  if (input.cutLengthMm > 0 && !input.turretMachineParams?.dataFound) {
+    unpriced.push(`nibbling ${Math.round(input.cutLengthMm)} mm of contour (no nibble rate for ${rate.machineName ?? 'the selected machine'}: sm_reference_data 'turretPunchMachine:<name>' missing)`);
+  }
+  const physicsGap: PhysicsGap | undefined = unpriced.length > 0
+    ? { gapType: 'unsupported_operation', process: 'Turret Punching', machineClass: 'turret_punch', reason: `Not priced: ${unpriced.join('; ')}.` }
+    : undefined;
+
   const totalSec = punchingSec + toolChangeSec + nibblingSec;
   const cuttingMin = totalSec / 60;
   // Real setup time, most-specific real source first: this machine's own
@@ -130,7 +144,7 @@ export function computeTurretPunchCost(input: TurretPunchInput): TurretPunchResu
       totalCost: t.total,
       cycleTimeMin: cuttingMin,
       rate,
-      extra: { labourRate: rate.labourRate ?? null },
+      extra: { labourRate: rate.labourRate ?? null, ...(physicsGap ? { physicsGap } : {}) },
     }),
   ];
 

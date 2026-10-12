@@ -96,3 +96,20 @@ describe('a non-USA scenario resolves to itself, not to USA', () => {
     expect(LOCATION_INFO['India']!.materialCol).not.toBe(LOCATION_INFO['USA']!.materialCol);
   });
 });
+
+// Auto is resolved on the server from the same comparison the apply runs on, so the
+// client never names a recommended route taken from a different (cached or earlier)
+// computation. It still must state a location, and it must not widen what is accepted.
+describe("apply-route accepts routeId 'auto' without accepting arbitrary ids", () => {
+  it("accepts 'auto' with a location", () => {
+    expect(propertiesWithErrors(ApplyRouteDto, { routeId: 'auto', location: 'USA' })).toEqual([]);
+  });
+
+  it("still requires a location for 'auto'", () => {
+    expect(propertiesWithErrors(ApplyRouteDto, { routeId: 'auto' })).toContain('location');
+  });
+
+  it('rejects an id that is neither a real route nor auto', () => {
+    expect(propertiesWithErrors(ApplyRouteDto, { routeId: 'sm-nonexistent', location: 'USA' })).toContain('routeId');
+  });
+});

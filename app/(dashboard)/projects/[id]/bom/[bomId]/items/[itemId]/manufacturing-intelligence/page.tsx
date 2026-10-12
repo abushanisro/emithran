@@ -60,7 +60,8 @@ import { ModelViewer } from '@/components/ui/model-viewer';
 import { effectiveSheetThicknessMm } from '@/lib/costing/effective-sheet-thickness';
 import { restoredManualRouteId } from '@/lib/routing/restore-manual-route';
 import { buildEngineCalculatorSeeds } from '@/lib/calculators/engine-calculator-seeds';
-import { useBOMItem, useAnalysisVersion, useDFMScores, useMaterialIntelligence, useMaterialDensity, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useCostOverride, useApplyRoute, useApplyCustomRoute, useMachineOverride, costSummaryQueryKey, costSummaryUrl, type BlankSpecDto, type DieToolingDto, type InjectionMoldingBreakdown, type ProcessLineCost, type ApplyCustomRouteStep , type CostSummaryDto, type RouteComparisonDto, type RouteResultDto, type ResolvedCostingInputs , type BOMItem } from '@/lib/api/hooks/useBOMItems';
+import { createSingleFlight } from '@/lib/utils/single-flight';
+import { useBOMItem, useAnalysisVersion, useDFMScores, useMaterialIntelligence, useMaterialDensity, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useCostOverride, useApplyRoute, useApplyCustomRoute, useMachineOverride, costSummaryQueryKey, costSummaryUrl, AUTO_ROUTE_ID, type BlankSpecDto, type DieToolingDto, type InjectionMoldingBreakdown, type ProcessLineCost, type ApplyCustomRouteStep , type CostSummaryDto, type RouteResultDto, type ResolvedCostingInputs , type BOMItem } from '@/lib/api/hooks/useBOMItems';
 import { useMHRPickerRows, useMHRRecord } from '@/lib/api/hooks/useMHR';
 import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
 import { groupFeaturesByType, featureSelectionKey, resolveFeatureSelection, findFeatureByFaceId } from '@/lib/features/machining-feature-tree';
@@ -2108,6 +2109,7 @@ function CostSummaryTab({
           bomItem={item}
           location={factory}
           batchSize={effBatchSize}
+          {...(batchSize !== undefined ? { costBatchSize: batchSize } : {})}
           compact
           currencySymbol={sym}
           conversionRate={fromUsd}
@@ -4968,7 +4970,7 @@ function CostGuidePanel({
   // see its definition). Used for the costing-input rows so they do not wait on
   // this panel's own ~13s cost-summary query.
   resolvedInputs: ResolvedCostingInputs | null;
-  applyScenario: () => Promise<void>;
+  applyScenario: (extraPatch?: Record<string, unknown>) => Promise<void>;
   onManualClick: () => void;
   selectedManualRoute: ManualRouteOption | null;
   onSelectHighlight?: (node: FeatureNodeV2 | null) => void;
@@ -5590,43 +5592,20 @@ function CostGuidePanel({
       // rank them, and have that result reach nothing. A cheaper applicable
       // route could not win no matter what the real data said.
       //
-      // The comparison is fetched with the SAME resolved costing inputs the
-      // Cost Guide is showing (no batchSize stated — the server resolves it
-      // from the committed scenario, which applyScenario has just written), so
-      // annual volume, batch size and production life reach this decision
-      // through the one canonical resolver rather than a second copy.
+      // Automatic routing asks the SERVER to apply its own recommendation
+      // (routeId 'auto'). The server chooses it from the very comparison it then
+      // applies with, so the choice and the costing can never come from two
+      // computations, and there is no separate ~100 s comparison fetch here. Batch
+      // size, annual volume and production life reach that decision through the
+      // one canonical resolver, from the scenario applyScenario has just written.
       //
       // Manual routing deliberately does NOT come through here: a route the
       // user chose is re-applied as-is, never replaced by the recommendation.
-      let routeIdToApply: string | null = existingRouteId;
-      if (routingMode === 'auto') {
-        try {
-          const comparison = await queryClient.fetchQuery({
-            queryKey: ['bom-items', item.id, 'route-comparison', undefined, loc],
-            queryFn: () => apiClient.get<RouteComparisonDto>(
-              `/bom-items/${item.id}/route-comparison?location=${encodeURIComponent(loc)}`,
-              { timeout: 180000 },
-            ),
-            staleTime: 0,
-          });
-          // null means no candidate was both feasible and fully costed. Keep
-          // whatever is already applied rather than inventing a choice — and
-          // say so, instead of silently presenting it as the recommendation.
-          routeIdToApply = comparison.recommendedRouteId ?? existingRouteId;
-          if (!comparison.recommendedRouteId) {
-            toast.warning(existingRouteId
-              ? 'No route is both feasible and fully costed at these settings — the currently applied route was kept. Check the route warnings (e.g. annual volume below a hard-tooling minimum).'
-              : 'No route is both feasible and fully costed at these settings — nothing was applied.');
-          }
-        } catch (e) {
-          // A failed comparison must not silently downgrade to the fixed
-          // default line set — that is the very behaviour being removed.
-          console.error('[reapplyExistingOrDefaultRoute] route comparison failed:', e);
-          if (existingRouteId) {
-            toast.error('Could not re-evaluate routes — the currently applied route was kept.');
-          }
-        }
-      }
+      // When no route is both feasible and fully costed, the server refuses (the
+      // mutation's onError toast says why) and writes nothing, so whatever route is
+      // already applied stays. A failed request must never downgrade to the fixed
+      // default line set.
+      const routeIdToApply: string | null = routingMode === 'auto' ? AUTO_ROUTE_ID : existingRouteId;
 
       if (routeIdToApply) {
         // applyRoute's backend endpoint deletes ALL active rows and inserts the
@@ -5774,7 +5753,8 @@ function CostGuidePanel({
   const updateBOMItem = useUpdateBOMItem();
   const patchScenarioOverrides = usePatchScenarioOverrides();
   const isCastingProcess = isCastingProcessGroup(selectedProcessGroup);
-  const { data: processCatalog } = useProcessCalculatorMappings();
+  // limit 1000 is the key the Edit Process Cost dialog reads: one shared request, not nine pages.
+  const { data: processCatalog } = useProcessCalculatorMappings({ limit: 1000 });
   // The saved / family process group is always an option, so the select shows
   // it while the catalog loads (or if the catalog lacks it) instead of a blank.
   const processGroupChoices = useMemo(
@@ -5802,7 +5782,7 @@ function CostGuidePanel({
   // with no confirmation and no visible progress. Now triggered only after the
   // user confirms via the AlertDialog below, with applyProgress driving a
   // step-by-step indicator instead of a single silent 12-60s wait.
-  const runApplyScenario = async () => {
+  const applyScenarioNow = async () => {
     setApplyProgress({ step: 'Applying manufacturing route…', pct: 10 });
     try {
       try {
@@ -5814,13 +5794,12 @@ function CostGuidePanel({
         // normal case -- clicking the button is what blurs it -- so this cannot
         // rely on onBlur having already fired and settled.
         await commitAnnualVolume();
-        await applyScenario();
-
-        // Persist Currency & Ask Price alongside factory/batch size — same
-        // scenario_overrides bag, one atomic merge (merge_scenario_overrides).
-        // Only written when a real rate resolved (identity, live reference/
-        // budget, or a complete custom rate+reason) — never a fabricated
-        // number under the applied scenario's identity.
+        // Currency & Ask Price ride in the same scenario_overrides bag as factory/batch
+        // size (one atomic merge, merge_scenario_overrides), in the SAME request as
+        // applyScenario's own patch. Only written when a real rate resolved
+        // (identity, live reference/budget, or a complete custom rate+reason) —
+        // never a fabricated number under the applied scenario's identity.
+        let scenarioFxPatch: Record<string, unknown> | undefined;
         if (resolvedFxRate) {
           const fxSnapshot = {
             factoryCurrency: factoryCurrencyInfo?.code ?? '',
@@ -5851,14 +5830,12 @@ function CostGuidePanel({
                 : Number.isFinite(askPriceNum)
                   ? { amount: askPriceNum, currency: scenarioCurrencyDraft }
                   : undefined; // invalid/mid-typing — leave the existing saved value untouched
-          patchScenarioOverrides.mutate({
-            id: item.id,
-            patch: {
-              scenarioCurrency: scenarioCurrencyDraft, fxSnapshot,
-              ...(askPricePatch !== undefined ? { askPrice: askPricePatch } : {}),
-            },
-          });
+          scenarioFxPatch = {
+            scenarioCurrency: scenarioCurrencyDraft, fxSnapshot,
+            ...(askPricePatch !== undefined ? { askPrice: askPricePatch } : {}),
+          };
         }
+        await applyScenario(scenarioFxPatch);
         setApplyProgress({ step: 'Saving material grade…', pct: 40 });
 
         // Single commit point for Material Grade — every picker interaction above
@@ -5875,9 +5852,12 @@ function CostGuidePanel({
         }
 
         setApplyProgress({ step: 'Recalculating cost summary…', pct: 60 });
+        // Active observers only: type 'all' (the default) also refetched every
+        // inactive cache entry for this item, each a 35-95 s computation.
         await queryClient.refetchQueries({
           queryKey: ['bom-items', item.id, 'cost-summary'],
           exact: false,
+          type: 'active',
         });
 
         const currentGrade = pendingGrade || costedGrade(item);
@@ -5898,9 +5878,9 @@ function CostGuidePanel({
           }
         }
 
+        // No final invalidation: the scenario patch, the material write and
+        // apply-route each already invalidated cost-summary and route-comparison.
         setApplyProgress({ step: 'Finishing up…', pct: 95 });
-        void queryClient.invalidateQueries({ queryKey: ['bom-items', item.id, 'cost-summary'] });
-        void queryClient.invalidateQueries({ queryKey: ['bom-items', item.id, 'route-comparison'] });
       } catch { /* outer safety net — never block the toast */ }
 
       const appliedParts: string[] = [
@@ -5915,6 +5895,11 @@ function CostGuidePanel({
       setApplyProgress(null);
     }
   };
+
+  // Single-flight: a second trigger while an apply is running is ignored (not queued),
+  // and the guard is released whether the apply succeeds or fails.
+  const applyGuard = useRef(createSingleFlight());
+  const runApplyScenario = () => applyGuard.current(applyScenarioNow);
 
   return (
     <div className="flex flex-col h-full">
@@ -9554,7 +9539,7 @@ export default function ManufacturingIntelligencePage() {
   // Digital Factory/Batch Size + the staged Workflow Builder route together
   // and only THEN run its own material-grade-driven logic — there is no
   // longer a separate top "Apply Scenario" banner/button.
-  const applyScenario = async () => {
+  const applyScenario = async (extraPatch?: Record<string, unknown>) => {
     const isDieCastPart = (item?.familyClassification ?? fg?.classification?.family) === 'die_cast';
     setFactory(factoryDraft);
     // Only an explicit override becomes a request param. On an auto request the
@@ -9571,7 +9556,11 @@ export default function ManufacturingIntelligencePage() {
       // — merge_scenario_overrides has no key whitelist, so it needs no schema
       // change — and is read back by resolveCostingInputs on the server. Before
       // this it was UI-only state that reached no calculation at all.
-      patchScenarioOverrides.mutate({
+      // One awaited request for the whole scenario (extraPatch carries currency and
+      // ask price): a second, un-awaited PATCH raced this one, doubled the
+      // invalidation waves, and was a fire-and-forget write nothing could fail.
+      try {
+      await patchScenarioOverrides.mutateAsync({
         id: item.id,
         patch: {
           location: factoryDraft,
@@ -9586,8 +9575,10 @@ export default function ManufacturingIntelligencePage() {
           // ceil(annualVolume / BATCHES_PER_YEAR) tier takes over again.
           ...(batchSizeDraft !== null ? { batchSize: batchSizeDraft } : batchSizeAuto ? { batchSize: null } : {}),
           ...(productionLife !== null ? { productionLifeYears: productionLife } : {}),
+          ...(extraPatch ?? {}),
         },
       });
+      } catch { /* the mutation's own onError toast reports the failed save */ }
     }
     // Workflow Builder's "Set Route" only stages selectedManualRoute — the
     // real apply-route/apply-custom-route call (creating process_cost_records)

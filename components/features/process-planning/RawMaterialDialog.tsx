@@ -183,6 +183,8 @@ interface RawMaterialDialogProps {
   bomItemData?: any;
   location?: string; // pre-selects pricing region (India / USA / Germany …)
   batchSize?: number; // order quantity — drives nesting sheetsRequired disclosure
+  /** The batch to REQUEST for the cost summary; see RawMaterialsSection. */
+  costBatchSize?: number;
 }
 
 export function RawMaterialDialog({
@@ -193,6 +195,7 @@ export function RawMaterialDialog({
   bomItemData,
   location,
   batchSize,
+  costBatchSize,
 }: RawMaterialDialogProps) {
   // Real nesting result for this BOM item, if one exists — the single source
   // of truth for sheet-metal Gross Usage (see sheet-metal-nesting.engine.ts).
@@ -201,7 +204,7 @@ export function RawMaterialDialog({
   // the reliable "did nesting run at all" signal — it's only ever set in the
   // backend's `if (smNestingResult)` branch, never the volume-fallback one.
   const nestingItemId = open ? (bomItemData?.id as string | undefined) : undefined;
-  const { data: nestingCostSummary } = useCostSummary(nestingItemId, batchSize ?? 1, location);
+  const { data: nestingCostSummary } = useCostSummary(nestingItemId, costBatchSize, location);
   const nestingBlankSpec = nestingCostSummary?.blankSpec;
   const hasRealNesting = nestingBlankSpec?.form === 'sheet' && typeof nestingBlankSpec.partsPerSheet === 'number';
   // "Nesting ran" is not the same as "nesting is trustworthy": when the true

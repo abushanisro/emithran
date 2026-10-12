@@ -142,7 +142,13 @@ export function useProcessCalculatorMappings(
     // failure mode made MHRFormDialog's Process Route dropdown show only 1
     // of 13 real Sheet Metal routes after the backend had restarted —
     // nothing forced a re-fetch of the already-cached key.
-    refetchOnMount: 'always',
+    //
+    // Bounded by staleTime instead of refetching on EVERY mount: this is a ~1 MB
+    // list, and every open of a dialog that reads it re-requested all of it. A
+    // cached partial result now lives at most staleTime, every mapping mutation
+    // invalidates this key, and a failed fetch is not cached as data.
+    staleTime: 1000 * 60 * 10,
+    refetchOnMount: true,
     throwOnError: false,
   });
 }

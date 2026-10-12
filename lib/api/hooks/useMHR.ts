@@ -55,12 +55,14 @@ export function useMHRPickerRows(location?: string, options?: { enabled?: boolea
   return useQuery({
     queryKey: mhrKeys.picker(location),
     queryFn: () => mhrApi.getPickerRows(location),
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 60 * 10,
     enabled: options?.enabled !== false,
     retry: false,
     refetchOnWindowFocus: false,
-    // Same reason as useMHRRecords: a machine added in HR Rates must show on the next open.
-    refetchOnMount: 'always',
+    // Reopening the dialog inside staleTime reuses the list (a ~1 MB, 4-20 s request).
+    // A machine added or edited in HR Rates still shows on the next open: every MHR
+    // mutation invalidates mhrKeys.lists(), which this key lives under.
+    refetchOnMount: true,
   });
 }
 
