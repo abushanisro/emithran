@@ -17,7 +17,7 @@ import { BOMItemsService } from '../src/modules/bom-items/bom-items.service';
 import { CostAggregationService } from '../src/modules/costing/cost-aggregation.service';
 import { CostingModule } from '../src/modules/costing/costing.module';
 import { CopilotMemoryService } from '../src/modules/copilot/copilot-memory.service';
-import { CopilotToolRunner, TOOL_RESULT_MAX_CHARS, type ToolContext } from '../src/modules/copilot/copilot.tools';
+import { CopilotToolRunner, ResultCache, TOOL_RESULT_MAX_CHARS, type ToolContext } from '../src/modules/copilot/copilot.tools';
 
 jest.setTimeout(240_000);
 
@@ -64,7 +64,7 @@ describe('[e2e] copilot tools — real DB, no model call', () => {
     ctx = { item, bomItemId: item.id, userId, accessToken: token, location: LOCATION, batchSize: BATCH };
     memory = new CopilotMemoryService(moduleRef.get(SupabaseService));
     aggregation = moduleRef.get(CostAggregationService);
-    runner = new CopilotToolRunner(ctx, bomItems, memory, aggregation);
+    runner = new CopilotToolRunner(ctx, bomItems, memory, aggregation, new ResultCache());
   });
 
   it('get_saved_quote relays the saved quote the Cost Guide shows, within its size budget', async () => {
@@ -124,7 +124,7 @@ describe('[e2e] copilot tools — real DB, no model call', () => {
   });
 
   it('a part this user cannot see yields an error and no data', async () => {
-    const hidden = new CopilotToolRunner({ ...ctx, bomItemId: ABSENT_ID }, bomItems, memory, aggregation);
+    const hidden = new CopilotToolRunner({ ...ctx, bomItemId: ABSENT_ID }, bomItems, memory, aggregation, new ResultCache());
     const out = await hidden.run('get_cost_summary', {});
     expect(out.isError).toBe(true);
     expect(JSON.parse(out.content)).toEqual({ error: 'This part was not found or you do not have access to it.' });
