@@ -45,8 +45,23 @@ export function resolveFieldHighlight(
   evidenceKey: string | undefined,
   graph: FeatureGraphV2 | null | undefined,
 ): FieldHighlight | null {
-  const source = evidenceKey ? SOURCE_BY_EVIDENCE[evidenceKey] : undefined;
-  if (!source || !graph) return null;
+  if (!evidenceKey || !graph) return null;
+  // The dialog asks for every CAD field on every render. A feature graph is immutable once
+  // loaded, so each (graph, key) is resolved once and the same object is returned after that
+  // (which also keeps it referentially stable for memoized rows).
+  let byKey = highlightCache.get(graph);
+  if (!byKey) highlightCache.set(graph, byKey = new Map());
+  if (byKey.has(evidenceKey)) return byKey.get(evidenceKey) ?? null;
+  const resolved = computeFieldHighlight(evidenceKey, graph);
+  byKey.set(evidenceKey, resolved);
+  return resolved;
+}
+
+const highlightCache = new WeakMap<FeatureGraphV2, Map<string, FieldHighlight | null>>();
+
+function computeFieldHighlight(evidenceKey: string, graph: FeatureGraphV2): FieldHighlight | null {
+  const source = SOURCE_BY_EVIDENCE[evidenceKey];
+  if (!source) return null;
 
   if (source.kind === 'cut') {
     const cut = cutLengthHighlight(graph.features);
@@ -85,7 +100,9 @@ export function resolveFieldHighlight(
     for (const f of graph.features.filter(isPlainHole)) {
       if (typeof f.diameter_mm !== 'number') continue;
       const key = f.diameter_mm.toFixed(2);
-      byDiameter.set(key, [...(byDiameter.get(key) ?? []), ...f.occurrences.filter((o) => o.face_ids.length > 0)]);
+      const group = byDiameter.get(key) ?? [];
+      for (const o of f.occurrences) if (o.face_ids.length > 0) group.push(o);
+      byDiameter.set(key, group);
     }
     const groups = [...byDiameter.values()].filter((g) => g.length > 0);
     if (groups.length === 0) return null;

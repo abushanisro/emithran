@@ -78,6 +78,11 @@ describe('resolveFieldHighlight', () => {
     expect(resolveFieldHighlight('hole_diameters', single)!.excluded).toBeUndefined();
   });
 
+  it('resolves a (graph, key) once and returns the same object after that', () => {
+    expect(resolveFieldHighlight('cut_length', graph)).toBe(resolveFieldHighlight('cut_length', graph));
+    expect(resolveFieldHighlight('pierce_count', graph)).toBe(resolveFieldHighlight('pierce_count', graph));
+  });
+
   it('no evidence key, or an unknown one, gives no highlight', () => {
     expect(resolveFieldHighlight(undefined, graph)).toBeNull();
     expect(resolveFieldHighlight('cutting_speed', graph)).toBeNull();

@@ -1,9 +1,10 @@
 'use client';
 
-import { Loader2, Calculator as CalculatorIcon, Play, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Calculator as CalculatorIcon, Play } from 'lucide-react';
 import { longestBendLineMm } from '@/lib/features/bend-line-length';
 import { cadEvidenceKeyFor } from '@/lib/features/cad-evidence-fields';
-import { checkAgainstInput, resolveFieldHighlight } from '@/lib/features/field-highlight';
+import { checkAgainstInput, resolveFieldHighlight, type FieldHighlight } from '@/lib/features/field-highlight';
+import { CalculatorInputField, type TonnageCheck } from './CalculatorInputField';
 import type { CadEvidence } from './CadEvidencePanel';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 
@@ -62,6 +63,13 @@ const TURRET_MACHINE_FIELDS: ReadonlySet<string> = new Set(['Punch Rate (hits/mi
 const STROKE_RATE_FACTOR_FIELD = 'Stroke Rate Factor';
 const isTurretReferenceField = (fieldName: string, machineClass: string | undefined) =>
   machineClass === 'turret_punch' && (TURRET_MACHINE_FIELDS.has(fieldName) || fieldName === STROKE_RATE_FACTOR_FIELD);
+
+/** Required vs selected tonnage from the calculator's last run, or null while it has no required force. */
+function tonnageCheckOf(results: Record<string, any> | null | undefined, inputs: Record<string, any>): TonnageCheck | null {
+  const required = Number(results?.['Recommended Force']);
+  if (!(required > 0)) return null;
+  return { required, theoretical: Number(results?.['Theoretical Force']), selected: Number(inputs['Selected Tonnage']) };
+}
 
 // Known options for calculator fields whose fieldType is 'select' — the
 // calculator engine has no generic options-storage column yet, so this is a
@@ -2183,6 +2191,31 @@ export function ProcessCostDialog({
     }
   }, [showLookupTable, lookupTableData]);
 
+  // Stable callbacks for the memoized input rows (CalculatorInputField): state is written through
+  // functional updates and everything else is read from refs, so their identity never changes and
+  // typing in one input does not re-render the others.
+  const handleFieldChange = useCallback((fieldName: string, value: string | number) => {
+    setCalculatorInputs((prev) => ({ ...prev, [fieldName]: value }));
+  }, []);
+  const onMachiningKeyEditedRef = useRef<(fieldName: string) => void>(() => {});
+  const handleFieldBlur = useCallback((fieldName: string) => { onMachiningKeyEditedRef.current(fieldName); }, []);
+  const viewLookupRef = useRef<(field: CalculatorField) => Promise<void>>(async () => {});
+  const handleViewLookup = useCallback((field: CalculatorField) => { void viewLookupRef.current(field); }, []);
+  const onShowEvidenceRef = useRef(onShowEvidence);
+  onShowEvidenceRef.current = onShowEvidence;
+  const handleToggleEvidence = useCallback((field: CalculatorField, highlight: FieldHighlight | null, turnOn: boolean) => {
+    if (!turnOn) { onShowEvidenceRef.current?.(null); return; }
+    // one panel slot: the reference table yields to the evidence, and showing this input
+    // replaces any other input's highlight
+    setShowLookupTable(false);
+    setSelectedLookupField(null);
+    setLookupTableData(null);
+    onShowEvidenceRef.current?.({
+      highlight: highlight ? checkAgainstInput(highlight, calculatorInputsRef.current[field.fieldName]) : null,
+      fieldLabel: field.displayLabel || field.fieldName,
+    });
+  }, []);
+
   // Handle viewing lookup table
   const handleViewLookupTable = async (field: CalculatorField) => {
     setSelectedLookupField(field);
@@ -2387,6 +2420,8 @@ export function ProcessCostDialog({
     } catch (error) {
     }
   };
+  viewLookupRef.current = handleViewLookupTable;
+  onMachiningKeyEditedRef.current = onMachiningKeyEdited;
 
   // Reset calculator when closed
   useEffect(() => {
@@ -3495,202 +3530,45 @@ export function ProcessCostDialog({
                       // when that couldn't be confidently resolved.
                       .filter((field: CalculatorField) => !relevantFieldNames || relevantFieldNames.has(field.fieldName))
                       .map((field: CalculatorField) => {
-                        // Only show eye button for fields that have actual lookup tables configured
-                        const isLookupTableField =
-                          // Only show for explicitly configured database lookup fields
+                        // An eye opens the reference table for inputs read from one.
+                        const hasLookupEye =
                           (field.fieldType === 'database_lookup' && field.dataSource === 'processes') ||
-                          // Only show for fields with sourceField starting with 'from_' (linked to reference tables)
-                          (field.sourceField?.startsWith('from_')) ||
-                          // Real sm_lookup_* cost-engine tables — every field this session's
-                          // whole Manufacturing Physics Calculator work has been wiring up
-                          // (Time Per Stroke, Stroke Time, Tool Loading Time, Cutting Speed,
-                          // Piercing Time Per Start, ...). Covers both DB-marked lookup
-                          // fields (dataSource='sheet_metal_lookup') and the handful resolved
-                          // via ad-hoc frontend JS instead (resolveAdHocLookupTableKey).
+                          !!field.sourceField?.startsWith('from_') ||
+                          // Real sm_lookup_* cost-engine tables, DB-marked or resolved in application code.
                           (field.dataSource === SM_LOOKUP_DATA_SOURCE && !!field.sourceField) ||
                           (field.fieldName === DESLAG_ALLOWANCE_FIELD && selectedMachineClass === 'deburring') ||
                           isTurretReferenceField(field.fieldName, selectedMachineClass) ||
                           !!resolveAdHocLookupTableKey(field.fieldName, selectedMachineClass);
 
-
-
-
-
-                        const selectOptions = SELECT_FIELD_OPTIONS[field.fieldName];
-                        // The eye is offered for every input the cost engine declared as measured
-                        // on CAD faces (trace step `evidence`). Where the part's analysis did not
-                        // record those faces, clicking it opens the popup asking to re-analyse.
-                        // The cost-engine seed names it when there is one; when the dialog filled
-                        // the value itself (BOM autofill), the value's shown CAD source does.
+                        // The CAD eye is offered for every input the cost engine declared as measured on CAD
+                        // faces (trace step `evidence`), or whose shown source is CAD extraction. Where the
+                        // analysis did not record those faces, the panel asks to re-analyse.
                         const cadEvidenceKey = onShowEvidence
                           ? (engineSeedRef.current?.calculatorId === selectedCalculatorId
                               ? engineSeedRef.current
                               : engineSeedsRef.current[selectedCalculatorId] ?? null)?.evidence?.[field.fieldName]
                             ?? cadEvidenceKeyFor(field.fieldName, calculatorInputProvenance[field.fieldName])
                           : undefined;
-                        const cadHighlight = resolveFieldHighlight(cadEvidenceKey, bomItemData?.featureGraph?.feature_graph_v2);
-
-                        // A field is "real" (not a manual guess or the calculator
-                        // schema's blank placeholder) when its Why: caption names
-                        // an actual source — every non-manual provenance string in
-                        // this dialog is either a real source name or the one
-                        // literal fallback "Calculator's own default value" (see
-                        // bom-items.service.ts's calculation-trace builder, same
-                        // string). Highlighting on that single check works
-                        // generically for every field, not just PEM's.
-                        const provenance = calculatorInputProvenance[field.fieldName];
-                        const isRealSourcedValue = !!provenance && provenance !== "Calculator's own default value";
-                        const realValueClassName = isRealSourcedValue
-                          ? 'border-blue-400 bg-blue-50 text-blue-900 dark:border-blue-700 dark:bg-blue-950/30 dark:text-blue-200'
-                          : '';
+                        const label = field.displayLabel || field.fieldName;
 
                         return (
-                          <div key={field.id} className="space-y-2">
-                            <Label htmlFor={field.fieldName}>
-                              {field.displayLabel || field.fieldName}
-                              {/* Labels that already name their unit ("... (Mpa)") don't repeat it. */}
-                              {field.unit && !(field.displayLabel || field.fieldName).toLowerCase().includes(`(${field.unit.toLowerCase()})`) && (
-                                <span className="text-muted-foreground ml-1">({field.unit})</span>
-                              )}
-                            </Label>
-
-                            {field.fieldType === 'select' && selectOptions ? (
-                              <Select
-                                value={calculatorInputs[field.fieldName] ?? ''}
-                                onValueChange={(v) => { setCalculatorInputs({ ...calculatorInputs, [field.fieldName]: v }); }}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder={`Choose ${field.displayLabel || field.fieldName}`} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {selectOptions.map((opt) => (
-                                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            ) : field.fieldType === 'select' || field.fieldType === 'text' ? (
-                              <Input
-                                id={field.fieldName}
-                                type="text"
-                                value={calculatorInputs[field.fieldName] ?? ''}
-                                onChange={(e) => { setCalculatorInputs({ ...calculatorInputs, [field.fieldName]: e.target.value }); }
-                                }
-                                placeholder={`Enter ${field.displayLabel || field.fieldName}`}
-                              />
-                            ) : isLookupTableField ? (
-                              // Input field WITH eye icon for lookup table fields
-                              <div className="flex gap-2">
-                                <Input
-                                  id={field.fieldName}
-                                  type="number"
-                                  step="0.01"
-                                  value={calculatorInputs[field.fieldName] ?? ''}
-                                  onChange={(e) => { setCalculatorInputs({
-                                      ...calculatorInputs,
-                                      [field.fieldName]: parseFloat(e.target.value) || 0,
-                                    }); }
-                                  }
-                                  onBlur={() => { onMachiningKeyEdited(field.fieldName); }}
-                                  placeholder={`Enter ${field.displayLabel || field.fieldName}`}
-                                  className={`flex-1 ${realValueClassName}`}
-                                />
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => { void handleViewLookupTable(field); }}
-                                  className="px-3"
-                                  title="View reference table"
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            ) : (
-                              <div className="flex gap-2">
-                                <Input
-                                  id={field.fieldName}
-                                  type="number"
-                                  step="0.01"
-                                  value={calculatorInputs[field.fieldName] ?? ''}
-                                  onChange={(e) => { setCalculatorInputs({
-                                      ...calculatorInputs,
-                                      [field.fieldName]: parseFloat(e.target.value) || 0,
-                                    }); }
-                                  }
-                                  onBlur={() => { onMachiningKeyEdited(field.fieldName); }}
-                                  placeholder={`Enter ${field.displayLabel || field.fieldName}`}
-                                  className={`flex-1 ${realValueClassName}`}
-                                />
-                                {cadEvidenceKey && (() => {
-                                  const label = field.displayLabel || field.fieldName;
-                                  const isOn = activeEvidenceLabel === label;
-                                  return (
-                                    <Button
-                                      type="button"
-                                      variant={isOn ? 'default' : 'outline'}
-                                      size="sm"
-                                      aria-pressed={isOn}
-                                      onClick={() => {
-                                        if (isOn) { onShowEvidence?.(null); return; }
-                                        // one panel slot: the reference table yields to the evidence,
-                                        // and showing this input replaces any other input's highlight
-                                        setShowLookupTable(false);
-                                        setSelectedLookupField(null);
-                                        setLookupTableData(null);
-                                        onShowEvidence?.({
-                                          highlight: cadHighlight ? checkAgainstInput(cadHighlight, calculatorInputs[field.fieldName]) : null,
-                                          fieldLabel: label,
-                                        });
-                                      }}
-                                      className="px-3"
-                                      title={isOn
-                                        ? 'Hide the CAD faces'
-                                        : cadHighlight
-                                          ? 'Show the CAD faces this value was measured on'
-                                          : 'Show the CAD faces for this value (the part needs re-analysis first)'}
-                                    >
-                                      {isOn ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                                    </Button>
-                                  );
-                                })()}
-                              </div>
-                            )}
-
-
-                            {calculatorInputProvenance[field.fieldName] && (
-                              <div className="text-xs text-muted-foreground">
-                                Why: {calculatorInputProvenance[field.fieldName]}
-                              </div>
-                            )}
-                            {calculatorInputGaps[field.fieldName] && (calculatorInputs[field.fieldName] ?? '') === '' && (
-                              <div className="text-xs text-amber-600 dark:text-amber-400">
-                                Missing: {calculatorInputGaps[field.fieldName]}
-                              </div>
-                            )}
-                            {field.fieldName === 'Selected Tonnage' && (() => {
-                              // Required (this calculator's Recommended Force) vs the machine's rating.
-                              const required = Number(calculatorResults?.['Recommended Force']);
-                              const theoretical = Number(calculatorResults?.['Theoretical Force']);
-                              const selected = Number(calculatorInputs['Selected Tonnage']);
-                              if (!(required > 0)) return null;
-                              const ok = selected > 0 ? required <= selected : null;
-                              return (
-                                <div className="space-y-0.5 text-xs">
-                                  <div className="text-muted-foreground">
-                                    Calculated tonnage:{' '}
-                                    {theoretical > 0 && <>Theoretical {theoretical.toFixed(2)} T → </>}
-                                    <span className="font-semibold text-foreground">Recommended {required.toFixed(2)} T</span>
-                                  </div>
-                                  {ok !== null && (
-                                    <div className={`font-medium ${ok ? 'text-emerald-600' : 'text-destructive'}`}>
-                                      Required {required.toFixed(2)} T (Recommended Force) {ok ? '≤' : '>'} selected {selected.toFixed(1)} T
-                                      {ok ? ' — machine has enough capacity' : ' — machine is undersized for this bend'}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })()}
-                          </div>
+                          <CalculatorInputField
+                            key={field.id}
+                            field={field}
+                            value={calculatorInputs[field.fieldName]}
+                            provenance={calculatorInputProvenance[field.fieldName]}
+                            gap={calculatorInputGaps[field.fieldName]}
+                            selectOptions={SELECT_FIELD_OPTIONS[field.fieldName]}
+                            hasLookupEye={hasLookupEye}
+                            cadEvidenceKey={cadEvidenceKey}
+                            cadHighlight={resolveFieldHighlight(cadEvidenceKey, bomItemData?.featureGraph?.feature_graph_v2)}
+                            evidenceOn={activeEvidenceLabel === label}
+                            tonnageCheck={field.fieldName === 'Selected Tonnage' ? tonnageCheckOf(calculatorResults, calculatorInputs) : null}
+                            onChange={handleFieldChange}
+                            onBlur={handleFieldBlur}
+                            onViewLookup={handleViewLookup}
+                            onToggleEvidence={handleToggleEvidence}
+                          />
                         );
                       })}
 
