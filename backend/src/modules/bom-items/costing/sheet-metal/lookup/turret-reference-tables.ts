@@ -102,8 +102,10 @@ export function strokeRateFactorTable(rows: ReadonlyArray<{ raw: Raw }>): Refere
 /** Every waterjet machine of the machine library with the values the waterjet calculator reads. */
 export function waterjetMachinesTable(machineRows: ReadonlyArray<{ key: string; raw: Raw }>): ReferenceTablePayload {
   const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
-  const rows = machineRows
-    .map((r) => ({
+  // The key exists once per staged export and once per location rate row (rate-only rows carry no
+  // machine data): one row per machine, taking each value from the first row that has it.
+  const byMachine = new Map<string, ReturnType<typeof rowOf>>();
+  const rowOf = (r: { key: string; raw: Raw }) => ({
       machine_name: r.key.replace(/^Waterjet Cutting Machine:/, ''),
       pressure_n_mm2: num(r.raw?.pressure_n_mm2),
       orifice_diameter_mm: num(r.raw?.orifice_diameter_mm),
@@ -111,8 +113,15 @@ export function waterjetMachinesTable(machineRows: ReadonlyArray<{ key: string; 
       abrasive_flow_rate_kg_min: num(r.raw?.abrasive_flow_rate_kg_min),
       rapid_traverse_rate_mm_min: num(r.raw?.rapid_traverse_rate_mm_min),
       nozzle_delay_s: num(r.raw?.nozzle_delay_s),
-    }))
-    .sort((a, b) => a.machine_name.localeCompare(b.machine_name));
+  });
+  for (const r of machineRows) {
+    const row = rowOf(r);
+    const have = byMachine.get(row.machine_name);
+    byMachine.set(row.machine_name, have
+      ? Object.fromEntries(Object.entries(have).map(([k, v]) => [k, v ?? (row as Record<string, unknown>)[k]])) as typeof row
+      : row);
+  }
+  const rows = [...byMachine.values()].sort((a, b) => a.machine_name.localeCompare(b.machine_name));
   return {
     id: 'machine_library:waterjet_machines',
     tableName: 'Waterjet machines — nozzle delay (pierce time) and jet data',

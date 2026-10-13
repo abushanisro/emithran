@@ -58,4 +58,13 @@ describe('waterjet machines table', () => {
     expect(table.rows[1]).toMatchObject({ nozzle_delay_s: 4, pressure_n_mm2: 413.69, rapid_traverse_rate_mm_min: 15240 });
     expect(table.rows[0]!.pressure_n_mm2).toBeNull();
   });
+
+  it('lists each machine once even when the key is staged twice (the rate-only row has no values)', () => {
+    const table = waterjetMachinesTable([
+      { key: 'Waterjet Cutting Machine:OMAX 55100', raw: { nozzle_delay_s: 3.2, pressure_n_mm2: 413.69 } },
+      { key: 'Waterjet Cutting Machine:OMAX 55100', raw: { name: 'OMAX 55100' } },
+    ]);
+    expect(table.rows).toHaveLength(1);
+    expect(table.rows[0]).toMatchObject({ machine_name: 'OMAX 55100', nozzle_delay_s: 3.2, pressure_n_mm2: 413.69 });
+  });
 });

@@ -35,7 +35,9 @@ describe('[e2e] Turret Press reference tables', () => {
 
   it('lists the waterjet machines with their nozzle delay', async () => {
     const table = await service.getWaterjetMachinesTable();
+    expect(table.rows.length).toBe(new Set(table.rows.map((r) => r.machine_name)).size); // no duplicate machines
     expect(table.rows.length).toBeGreaterThanOrEqual(27);
+    expect(table.rows.every((r) => r.nozzle_delay_s != null)).toBe(true);
     expect(table.rows.find((r) => r.machine_name === 'Flow Mach 2 1313b')).toMatchObject({ nozzle_delay_s: 4 });
   });
 });
