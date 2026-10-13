@@ -20,13 +20,11 @@ export interface TurretPunchInput {
   // hardcoded here. Absent means the caller couldn't resolve one; consumers must
   // not fabricate processGroup/processRoute/operation in that case.
   processIdentity?: { processGroup: string; processRoute: string; operation: string };
-  // Real per-SELECTED-MACHINE nibble speed + tool-change time (2026-09-02),
+  // Real per-SELECTED-MACHINE punch rate, nibble speed and tool-change time,
   // resolved by the caller via
   // SheetMetalLookupService.getTurretPunchMachineParams() — see that
-  // method's own doc comment. No real punch/hit-rate data exists for this
-  // class (verified against the full field-name union of all 21 real
-  // machines); punching costs an honest $0 with a disclosed warning when
-  // pierceCount > 0, never a guess.
+  // method's own doc comment. Punching is priced from the machine punch rate x
+  // the Lookup Table 1 stroke rate factor; with either missing it is a data gap.
   turretMachineParams?: TurretPunchMachineParams | null;
   // Per-batch setup time (min) — resolved by the caller from
   // sm_lookup_op_setup_time (migration 416) via getOpSetupTime('turret_punch').
@@ -61,12 +59,16 @@ export function computeTurretPunchCost(input: TurretPunchInput): TurretPunchResu
 
   const rate = input.turretRate ?? noRateFallback("turret_punch");
 
-  // Punching: no real per-machine punch/hit-rate data exists anywhere in the
-  // source for this class (verified against the full field-name union of
-  // all 21 real Turret Press machines) — an honest $0, never a guess.
-  const punchingSec = 0;
-  if (input.pierceCount > 0) {
-    warnings.push("Turret: no real punch/hit-rate data exists for this machine class — punching time is $0 until real data is sourced, not an estimate");
+  // Punching, per the TPP calculator: seconds per hit = 60 / (machine punch rate x
+  // stroke rate factor), one hit per punched hole. Without a real punch rate and
+  // factor for the selected machine the work stays unpriced (a gap below).
+  const mp = input.turretMachineParams;
+  const punchHitsPerMin = mp && mp.punchRateCyclesPerMin > 0 && mp.strokeRateFactor != null
+    ? mp.punchRateCyclesPerMin * mp.strokeRateFactor
+    : 0;
+  const punchingSec = punchHitsPerMin > 0 ? (input.pierceCount / punchHitsPerMin) * 60 : 0;
+  if (input.pierceCount > 0 && punchHitsPerMin > 0) {
+    warnings.push("Turret: one hit per punched hole; a hole larger than the largest tool would need nibbling or a special tool, not modelled");
   }
 
   const toolChangeSecPerHole = input.turretMachineParams?.dataFound ? input.turretMachineParams.toolChangeSec : TURRET_TOOL_CHANGE_SEC;
@@ -95,7 +97,9 @@ export function computeTurretPunchCost(input: TurretPunchInput): TurretPunchResu
   // and applied by choice but never auto-recommended. Where there is genuinely
   // nothing to punch or nibble, no gap is raised.
   const unpriced: string[] = [];
-  if (input.pierceCount > 0) unpriced.push(`punching ${input.pierceCount} holes (no punch/hit-rate field in the Turret Press machine data)`);
+  if (input.pierceCount > 0 && punchHitsPerMin <= 0) {
+    unpriced.push(`punching ${input.pierceCount} holes (${rate.machineName ?? 'the selected machine'} has no punch rate or stroke rate factor on file: sm_reference_data 'turretPunchMachine:<name>' punch_rate_cycles_min, 'strokeRateFactor:<tonnage>')`);
+  }
   if (input.cutLengthMm > 0 && !input.turretMachineParams?.dataFound) {
     unpriced.push(`nibbling ${Math.round(input.cutLengthMm)} mm of contour (no nibble rate for ${rate.machineName ?? 'the selected machine'}: sm_reference_data 'turretPunchMachine:<name>' missing)`);
   }

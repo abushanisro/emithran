@@ -74,15 +74,21 @@ export interface TurretParams {
 // 'turretPunchMachine:<machine name>' rows (machine_library.json's "Turret
 // Press (Punch Press)" category, all 21 real machines) via
 // SheetMetalLookupService.getTurretPunchMachineParams(). Same nibbling-
-// step-per-cycle derivation as LaserPunchParams above. Deliberately has NO
-// punchRateCyclesPerMin field — no real per-machine punch/hit-rate data
-// exists anywhere in the source for this category (verified across the
-// full field-name union of all 21 real machines) — TurretPunchEngine costs
-// punching at an honest $0 with a disclosed warning, never a guess.
+// step-per-cycle derivation as LaserPunchParams above.
+// The punch rate (hits/min) comes from the Countries data export, which lists
+// punchRate for all 21 machines (the machine library export lacks it), staged by
+// migration 902. The calculator multiplies it by the stroke rate factor of Lookup
+// Table 1 (machine tonnage x part complexity): effective hits/min = rate x factor.
+// punchRateCyclesPerMin is 0 and strokeRateFactor null when a row is not on file;
+// the engine then reports a data gap rather than pricing punching at $0.
 export interface TurretPunchMachineParams {
   nibbleMmPerMin: number;
   toolChangeSec: number;
   dataFound: boolean;
+  punchRateCyclesPerMin: number;
+  strokeRateFactor: number | null;
+  /** Machine tonnage the factor was looked up for (press force / 9.80665). */
+  machineTonnageT: number | null;
 }
 
 export interface LaserPunchParams {

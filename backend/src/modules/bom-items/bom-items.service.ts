@@ -6058,7 +6058,7 @@ export class BOMItemsService {
       grade ? this.smLookup.getRouterParams(grade) : null,
       grade ? this.smLookup.getOxyfuelParams(grade, thk) : null,
       this.smLookup.getLaserPunchMachineParams(mhrRates.laserPunch.machineName),
-      this.smLookup.getTurretPunchMachineParams(mhrRates.turret.machineName),
+      this.smLookup.getTurretPunchMachineParams(mhrRates.turret.machineName, rcLookupComplexity),
       this.smLookup.getPlasmaCutParams(mhrRates.plasmaCut.machineName, grade, thk),
       this.smLookup.getPlasmaPunchParams(mhrRates.plasmaPunch.machineName, grade, thk),
       this.smLookup.getRollBendingMachineParams(mhrRates.rollBending2.machineName),

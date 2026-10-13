@@ -5,7 +5,17 @@ import { findRouteDataGaps } from '../../../../../../modules/bom-items/costing/s
 // (machine_library.json's "Turret Press (Punch Press)" category,
 // 2026-09-02): nibble_rate_cycles_min=410, nibble_tool_diameter_mm=6.35,
 // nibble_tool_overlap_mm=0.5 -> nibbleMmPerMin = 410*(6.35-0.5) = 2398.5;
-// tool_change_time_s=1.5.
+// tool_change_time_s=1.5. Punch rate 500 hits/min for the same machine (Countries data
+// export, punchRate) and the Lookup Table 1 factor for its 30.6 t press (nearest row
+// 30 t): simple 0.78, intermediate 0.62, complex 0.55.
+const AMADA_EM3510 = {
+  nibbleMmPerMin: 2398.5, toolChangeSec: 1.5, dataFound: true,
+  punchRateCyclesPerMin: 500, strokeRateFactor: 0.62, machineTonnageT: 30.6,
+};
+const NO_MACHINE_DATA = {
+  nibbleMmPerMin: 0, toolChangeSec: 0, dataFound: false,
+  punchRateCyclesPerMin: 0, strokeRateFactor: null, machineTonnageT: null,
+};
 function baseInput(overrides: Partial<TurretPunchInput> = {}): TurretPunchInput {
   return {
     sheetThicknessMm: 2,
@@ -13,20 +23,46 @@ function baseInput(overrides: Partial<TurretPunchInput> = {}): TurretPunchInput 
     holeCount: 3,
     cutLengthMm: 0,
     batchSize: 10,
-    turretMachineParams: { nibbleMmPerMin: 2398.5, toolChangeSec: 1.5, dataFound: true },
+    turretMachineParams: AMADA_EM3510,
     ...overrides,
   };
 }
 
-describe('computeTurretPunchCost — punching (no real hit-rate data exists)', () => {
-  it('always costs punching at $0, with a disclosed warning, when there are holes to pierce', () => {
-    const result = computeTurretPunchCost(baseInput({ pierceCount: 20 }));
-    expect(result.warnings.some((w) => w.includes('no real punch/hit-rate data exists'))).toBe(true);
+describe('computeTurretPunchCost — punching (punch rate x stroke rate factor)', () => {
+  it('prices one hit per hole at 60 / (punch rate x factor) seconds', () => {
+    // 500 hits/min x 0.62 = 310 effective hits/min; 20 holes -> 20/310 min.
+    const result = computeTurretPunchCost(baseInput({ pierceCount: 20, holeCount: 0, cutLengthMm: 0 }));
+    expect(result.cuttingMin).toBeCloseTo(20 / 310, 6);
+    expect(result.processLines[0]!.physicsGap).toBeUndefined();
   });
 
-  it('does not warn about punching when pierceCount is 0', () => {
-    const result = computeTurretPunchCost(baseInput({ pierceCount: 0 }));
-    expect(result.warnings.some((w) => w.includes('no real punch/hit-rate data exists'))).toBe(false);
+  it('is slower for a more complex part on the same machine (factor 0.55 vs 0.78)', () => {
+    const only = { pierceCount: 100, holeCount: 0, cutLengthMm: 0 };
+    const simple = computeTurretPunchCost(baseInput({ ...only, turretMachineParams: { ...AMADA_EM3510, strokeRateFactor: 0.78 } }));
+    const complex = computeTurretPunchCost(baseInput({ ...only, turretMachineParams: { ...AMADA_EM3510, strokeRateFactor: 0.55 } }));
+    expect(simple.cuttingMin).toBeCloseTo(100 / (500 * 0.78), 6);
+    expect(complex.cuttingMin).toBeCloseTo(100 / (500 * 0.55), 6);
+    expect(complex.cuttingMin).toBeGreaterThan(simple.cuttingMin);
+  });
+
+  it('is faster on a machine with a higher punch rate (500 vs 240 hits/min)', () => {
+    const only = { pierceCount: 100, holeCount: 0, cutLengthMm: 0 };
+    const fast = computeTurretPunchCost(baseInput(only));
+    const slow = computeTurretPunchCost(baseInput({ ...only, turretMachineParams: { ...AMADA_EM3510, punchRateCyclesPerMin: 240 } }));
+    expect(slow.cuttingMin).toBeGreaterThan(fast.cuttingMin);
+  });
+
+  it('is a data gap, not a $0 line, when the machine has a nibble row but no punch rate', () => {
+    const line = computeTurretPunchCost(baseInput({
+      pierceCount: 20, turretMachineParams: { ...AMADA_EM3510, punchRateCyclesPerMin: 0, strokeRateFactor: null },
+    })).processLines[0]!;
+    expect(line.physicsGap?.gapType).toBe('unsupported_operation');
+  });
+
+  it('adds no punching time and no gap when pierceCount is 0', () => {
+    const result = computeTurretPunchCost(baseInput({ pierceCount: 0, holeCount: 0 }));
+    expect(result.cuttingMin).toBe(0);
+    expect(result.processLines[0]!.physicsGap).toBeUndefined();
   });
 });
 
@@ -40,7 +76,7 @@ describe('computeTurretPunchCost — unpriced work is a data gap, not a $0 opera
   };
 
   it('raises a gap naming the unpriced punching when there are holes to pierce', () => {
-    const line = computeTurretPunchCost(baseInput({ pierceCount: 128 })).processLines[0]!;
+    const line = computeTurretPunchCost(baseInput({ pierceCount: 128, turretMachineParams: NO_MACHINE_DATA })).processLines[0]!;
     expect(line.physicsGap?.gapType).toBe('unsupported_operation');
     expect(reasonOf(line)).toContain('punching 128 holes');
   });
@@ -48,7 +84,7 @@ describe('computeTurretPunchCost — unpriced work is a data gap, not a $0 opera
   it('raises a gap naming the unpriced nibbling when no nibble rate resolved', () => {
     const line = computeTurretPunchCost(baseInput({
       pierceCount: 0, holeCount: 0, cutLengthMm: 5018,
-      turretMachineParams: { nibbleMmPerMin: 0, toolChangeSec: 0, dataFound: false },
+      turretMachineParams: NO_MACHINE_DATA,
     })).processLines[0]!;
     expect(reasonOf(line)).toContain('nibbling 5018 mm');
   });
@@ -59,7 +95,7 @@ describe('computeTurretPunchCost — unpriced work is a data gap, not a $0 opera
   });
 
   it('makes the route incomplete, so it cannot be auto-recommended', () => {
-    const result = computeTurretPunchCost(baseInput({ pierceCount: 128 }));
+    const result = computeTurretPunchCost(baseInput({ pierceCount: 128, turretMachineParams: NO_MACHINE_DATA }));
     expect(findRouteDataGaps(result.processLines)).toHaveLength(1);
   });
 });
@@ -76,7 +112,7 @@ describe('computeTurretPunchCost — nibbling (real per-machine rate)', () => {
   it('stays honestly $0 (no guess) when no real nibble data was resolved for this machine', () => {
     const input = baseInput({
       cutLengthMm: 1000, pierceCount: 0, holeCount: 0,
-      turretMachineParams: { nibbleMmPerMin: 0, toolChangeSec: 0, dataFound: false },
+      turretMachineParams: NO_MACHINE_DATA,
     });
     const result = computeTurretPunchCost(input);
     expect(result.cuttingMin).toBe(0);
@@ -95,7 +131,7 @@ describe('computeTurretPunchCost — tool change (real per-machine time)', () =>
   it('falls back to the corrected TURRET_TOOL_CHANGE_SEC constant and discloses it when no real data is resolved', () => {
     const input = baseInput({
       holeCount: 3, pierceCount: 0, cutLengthMm: 0,
-      turretMachineParams: { nibbleMmPerMin: 0, toolChangeSec: 0, dataFound: false },
+      turretMachineParams: NO_MACHINE_DATA,
     });
     const result = computeTurretPunchCost(input);
     expect(result.warnings.some((w) => w.includes('tool-change time from fallback'))).toBe(true);
