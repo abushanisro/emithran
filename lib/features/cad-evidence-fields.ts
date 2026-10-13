@@ -14,11 +14,17 @@ const EVIDENCE_BY_FIELD: Readonly<Record<string, string>> = {
   'No Of Bends': 'bend_count',
   'Bending Line Length': 'bend_line_length',
   'Flat Pattern Area': 'flat_pattern_area',
+  'Punch Count': 'pierce_count',
+  'Nibble Length': 'cut_length',
+  'Tool Changes': 'hole_diameters',
 };
+
+/** "Nibble Length (mm)" -> "Nibble Length": live calculator fields carry their unit in the name. */
+const withoutUnit = (name: string) => name.replace(/\s*\([^)]*\)\s*$/, '').trim();
 
 export function cadEvidenceKeyFor(fieldName: string, source: string | undefined): string | undefined {
   if (!source || !/^CAD\b/i.test(source)) return undefined;
-  return EVIDENCE_BY_FIELD[fieldName];
+  return EVIDENCE_BY_FIELD[fieldName] ?? EVIDENCE_BY_FIELD[withoutUnit(fieldName)];
 }
 
 /** For the drift test only. */

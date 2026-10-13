@@ -14,6 +14,13 @@ describe('cadEvidenceKeyFor', () => {
     expect(cadEvidenceKeyFor('Cutting Length', undefined)).toBeUndefined();
   });
 
+  it('names the TPP calculator inputs, with or without the unit in the field name', () => {
+    expect(cadEvidenceKeyFor('Punch Count', 'CAD feature extraction — punched hole count')).toBe('pierce_count');
+    expect(cadEvidenceKeyFor('Nibble Length (mm)', 'CAD feature extraction — total cut path length')).toBe('cut_length');
+    expect(cadEvidenceKeyFor('Tool Changes', 'CAD feature extraction — distinct punched hole diameters')).toBe('hole_diameters');
+    expect(cadEvidenceKeyFor('Punch Rate (hits/min)', 'CAD feature extraction')).toBeUndefined();
+  });
+
   it('is identical to the backend table (no drift between the two ends)', () => {
     const source = readFileSync(
       resolve(__dirname, '../../../backend/src/modules/bom-items/costing/shared/cad-evidence.ts'), 'utf-8',

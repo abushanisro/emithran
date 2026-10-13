@@ -14,6 +14,10 @@ const graph: FeatureGraphV2 = {
       ],
     },
     { id: 'bend_r1', feature_type: 'StraightBend', occurrences: [{ centroid: [1, 1, 1], face_ids: [8, 9] }] },
+    // Real Rtp2 shape: one node per diameter, one occurrence per hole.
+    { id: 'hole_d2.5', feature_type: 'SimpleHole', variant: 'through', diameter_mm: 2.5, occurrences: [
+      { centroid: [0, 0, 0], face_ids: [20, 21] }, { centroid: [0, 0, 0], face_ids: [22, 23] }, { centroid: [0, 0, 0], face_ids: [24, 25] } ] },
+    { id: 'hole_d4.0', feature_type: 'SimpleHole', variant: 'through', diameter_mm: 4, occurrences: [{ centroid: [0, 0, 0], face_ids: [30, 31] }] },
   ],
   measurements: {
     pierce_count: {
@@ -44,11 +48,34 @@ describe('resolveFieldHighlight', () => {
     expect(faces(resolveFieldHighlight('bend_count', graph)!.node)).toEqual([8, 9]);
   });
 
+  it('the longest bend is counted and the other bends are left out', () => {
+    const bends: FeatureGraphV2 = {
+      ...graph,
+      measurements: { bend_line_length: { value: 90, unit: 'mm', reconciles: true, occurrences: [
+        { kind: 'bend', face_ids: [8, 9], length_mm: 90 }, { kind: 'bend', face_ids: [10, 11], length_mm: 40 } ] } },
+    };
+    const h = resolveFieldHighlight('bend_line_length', bends)!;
+    expect(faces(h.node)).toEqual([8, 9]);
+    expect(faces(h.excluded!)).toEqual([10, 11]);
+  });
+
   it('a part analysed before the engine recorded a set gets no highlight, not a guess', () => {
     const legacy: FeatureGraphV2 = { metadata: { face_map: [] }, features: [] };
     expect(resolveFieldHighlight('pierce_count', legacy)).toBeNull();
     expect(resolveFieldHighlight('bend_line_length', graph)).toBeNull();
     expect(resolveFieldHighlight('cut_length', legacy)).toBeNull();
+  });
+
+  it('tool changes: the first hole of each diameter is counted, the further holes of that diameter are left out', () => {
+    const h = resolveFieldHighlight('hole_diameters', graph)!;
+    expect(faces(h.node)).toEqual([20, 21, 30, 31]);
+    expect(faces(h.excluded!)).toEqual([22, 23, 24, 25]);
+    expect(h.measured).toMatchObject({ value: 2, unit: 'count' });
+  });
+
+  it('tool changes: no excluded group when every diameter has a single hole', () => {
+    const single: FeatureGraphV2 = { ...graph, features: graph.features.filter((f) => f.id === 'hole_d4.0') };
+    expect(resolveFieldHighlight('hole_diameters', single)!.excluded).toBeUndefined();
   });
 
   it('no evidence key, or an unknown one, gives no highlight', () => {

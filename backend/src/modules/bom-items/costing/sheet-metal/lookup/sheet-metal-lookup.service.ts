@@ -4,6 +4,7 @@ import { SupabaseService } from '../../../../../common/supabase/supabase.service
 import type { LookupResolution, LookupQueryParam, LookupTableRow } from '../../../dto/cost-breakdown.dto';
 import { classifyLaserMaterial, type LaserPowerRequirement } from '../../shared/capability/machine-selection/physics';
 import { ReferenceMemo } from '../../../../../common/cache/reference-memo';
+import { pressForceKnOf, pressForceTonnes, turretNibbleMmPerMin } from './turret-reference-tables';
 import type { TurretPunchMachineParams } from '../../shared/core/manufacturing-process.types';
 
 // No fallback constants in this file. Every lookup below returns
@@ -534,19 +535,9 @@ export class SheetMetalLookupService {
     const raw = data?.[0]?.raw as Record<string, unknown> | undefined;
     if (error || !raw) return noData;
 
-    const nibbleRate = raw.nibble_rate_cycles_min;
-    const nibbleDia = raw.nibble_tool_diameter_mm;
-    const nibbleOverlap = raw.nibble_tool_overlap_mm;
+    const nibbleMmPerMin = turretNibbleMmPerMin(raw);
     const toolChangeSec = raw.tool_change_time_s;
-    if (
-      typeof nibbleRate !== 'number' || nibbleRate <= 0 ||
-      typeof nibbleDia !== 'number' || typeof nibbleOverlap !== 'number' ||
-      typeof toolChangeSec !== 'number'
-    ) {
-      return noData;
-    }
-    const nibbleStepMm = nibbleDia - nibbleOverlap;
-    if (nibbleStepMm <= 0) return noData;
+    if (nibbleMmPerMin == null || typeof toolChangeSec !== 'number') return noData;
 
     // The punch rate sits on the same row (migration 902). The machine tonnage the
     // factor is looked up for comes from the machine library row (press force, kN).
@@ -560,18 +551,12 @@ export class SheetMetalLookupService {
         .select('raw')
         .eq('category', 'machine')
         .eq('key', `Turret Press (Punch Press):${machineName}`);
-      // The key exists once per staged export; only some carry the press force.
-      const pressForceKn = (lib ?? [])
-        .map((r) => (r.raw as Record<string, unknown> | null)?.press_force_kn)
-        .find((v): v is number => typeof v === 'number' && v > 0);
-      if (typeof pressForceKn === 'number' && pressForceKn > 0) {
-        machineTonnageT = pressForceKn / 9.80665;
-        strokeRateFactor = await this.getStrokeRateFactor(machineTonnageT, complexity);
-      }
+      machineTonnageT = pressForceTonnes(pressForceKnOf(lib ?? []));
+      if (machineTonnageT != null) strokeRateFactor = await this.getStrokeRateFactor(machineTonnageT, complexity);
     }
 
     return {
-      nibbleMmPerMin: nibbleRate * nibbleStepMm,
+      nibbleMmPerMin,
       toolChangeSec,
       dataFound: true,
       punchRateCyclesPerMin: punchRate,

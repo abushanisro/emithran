@@ -196,6 +196,20 @@ export class ProcessesController {
     return this.processesService.getDeslagAllowanceTable();
   }
 
+  @Get('turret-machines-table')
+  @ApiOperation({ summary: 'Punch rate, tool change time and nibble speed of every Turret Press machine, shaped as a lookup table' })
+  @ApiResponse({ status: 200, description: 'Table retrieved successfully' })
+  async getTurretMachinesTable() {
+    return this.processesService.getTurretMachinesTable();
+  }
+
+  @Get('stroke-rate-factor-table')
+  @ApiOperation({ summary: 'Lookup Table 1: stroke rate factor by machine tonnage and part complexity' })
+  @ApiResponse({ status: 200, description: 'Table retrieved successfully' })
+  async getStrokeRateFactorTable() {
+    return this.processesService.getStrokeRateFactorTable();
+  }
+
   @Get('sm-lookup-tables/by-name/:table')
   @ApiOperation({ summary: 'Get one real sm_lookup_* cost-engine table by name (allowlisted tables only) — used by calculator popups\' "view lookup table" button' })
   @ApiResponse({ status: 200, description: 'Live lookup table retrieved successfully' })
