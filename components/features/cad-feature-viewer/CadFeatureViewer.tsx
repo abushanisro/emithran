@@ -6,24 +6,27 @@ import { OrbitControls } from '@react-three/drei';
 import { Crosshair, Home, Loader2, Square, SquareDashed } from 'lucide-react';
 import * as THREE from 'three';
 
-import { BodyEdges, SetupAxisArrows } from '@/components/viewer/body-overlays';
+import { SetupAxisArrows } from '@/components/viewer/body-overlays';
 import { fitCameraToBox, type Box3Like } from '@/lib/geometry/camera-fit';
 import type { FaceMapEntry } from '@/lib/types/manufacturing';
 import {
-  boundaryEdges, boundsOf, buildFaceIndex, subsetPositions, trianglesOfFaces, type Bounds,
+  boundaryEdges, boundsOf, boundsOfPositions, buildFaceIndex, subsetPositions, trianglesOfFaces, type Bounds,
 } from '@/lib/viewer/highlight-geometry';
 import { storageKey, type LoadedMesh } from '@/lib/viewer/geometry-store';
 import { viewerGeometryStore } from '@/lib/viewer/viewer-store';
 
 const BODY_COLOR = '#9b9bb4';
-const FEATURE_COLOR = '#f26822';
-const BOX_COLOR = '#d4b000';
+/** Faces the value counted, and same-kind faces it left out. Nothing else on the part is colored. */
+const COUNTED_COLOR = '#22c55e';
+const EXCLUDED_COLOR = '#ef4444';
 
 interface CadFeatureViewerProps {
   fileUrl: string;
   faceMap: FaceMapEntry[] | null;
   /** Faces the measured value was taken from (OCC ordinals, indices into faceMap). */
   faceIds: number[];
+  /** Same-kind faces the value left out, drawn in their own color. */
+  excludedFaceIds?: number[];
   /** Real setup-axis directions to draw, when the engine proved any. */
   axes?: Array<[number, number, number]>;
   /** How the measured faces are first drawn; the toolbar switches it. */
@@ -34,27 +37,20 @@ type Mode = 'face' | 'edge';
 type Focus = { on: 'part' | 'feature'; nonce: number };
 
 /** The part, loaded once through the shared store, with only the measured faces highlighted. */
-export function CadFeatureViewer({ fileUrl, faceMap, faceIds, axes = [], initialMode = 'face' }: CadFeatureViewerProps) {
+export function CadFeatureViewer({ fileUrl, faceMap, faceIds, excludedFaceIds, axes = [], initialMode = 'face' }: CadFeatureViewerProps) {
   const { mesh, error } = useMesh(fileUrl);
   const [mode, setMode] = useState<Mode>(initialMode);
   const [focus, setFocus] = useState<Focus>({ on: 'part', nonce: 0 });
 
-  const selection = useMemo(() => {
-    if (!mesh || !faceMap) return null;
-    const triangles = trianglesOfFaces(buildFaceIndex(faceMap, mesh.triTotal), faceIds);
-    if (triangles.length === 0) return null;
-    return {
-      positions: subsetPositions(mesh.positions, triangles),
-      edges: boundaryEdges(mesh.positions, triangles),
-      bounds: boundsOf(mesh.positions, triangles),
-    };
-  }, [mesh, faceMap, faceIds]);
+  // One face index per part, shared by both groups.
+  const faceIndex = useMemo(() => (mesh && faceMap ? buildFaceIndex(faceMap, mesh.triTotal) : null), [mesh, faceMap]);
+  const selection = useMemo(() => (mesh && faceIndex ? selectFaces(mesh, faceIndex, faceIds) : null), [mesh, faceIndex, faceIds]);
+  const excluded = useMemo(
+    () => (mesh && faceIndex && excludedFaceIds?.length ? selectFaces(mesh, faceIndex, excludedFaceIds) : null),
+    [mesh, faceIndex, excludedFaceIds],
+  );
 
-  const partBounds = useMemo(() => {
-    if (!mesh) return null;
-    const all = new Int32Array(mesh.triTotal).map((_, i) => i);
-    return boundsOf(mesh.positions, all);
-  }, [mesh]);
+  const partBounds = useMemo(() => (mesh ? boundsOfPositions(mesh.positions) : null), [mesh]);
 
   const focusBounds = focus.on === 'feature' && selection?.bounds ? selection.bounds : partBounds;
 
@@ -85,7 +81,7 @@ export function CadFeatureViewer({ fileUrl, faceMap, faceIds, axes = [], initial
           <ambientLight intensity={0.7} />
           <directionalLight position={[10, 10, 5]} intensity={1.1} />
           <directionalLight position={[-10, -10, -5]} intensity={0.4} />
-          <Scene mesh={mesh} selection={selection} mode={mode} axes={axes} />
+          <Scene mesh={mesh} selection={selection} excluded={excluded} mode={mode} axes={axes} />
           <CameraRig bounds={focusBounds} nonce={focus.nonce} />
           <OrbitControls makeDefault enableDamping />
         </Canvas>
@@ -145,9 +141,55 @@ function useMesh(fileUrl: string): { mesh: LoadedMesh | null; error: string | nu
   return state;
 }
 
-function Scene({ mesh, selection, mode, axes }: {
+type FaceSelection = { triangles: Int32Array; positions: Float32Array; bounds: Bounds | null };
+
+function selectFaces(mesh: LoadedMesh, faceIndex: ReturnType<typeof buildFaceIndex>, faceIds: number[]): FaceSelection | null {
+  const triangles = trianglesOfFaces(faceIndex, faceIds);
+  if (triangles.length === 0) return null;
+  return {
+    triangles,
+    positions: subsetPositions(mesh.positions, triangles),
+    bounds: boundsOf(mesh.positions, triangles),
+  };
+}
+
+/** The filled faces and the outline of one group, built once per selection and disposed with it. */
+function SelectionLayer({ mesh, selection, color, mode }: { mesh: LoadedMesh; selection: FaceSelection; color: string; mode: Mode }) {
+  const fill = useMemo(() => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(selection.positions, 3));
+    return g;
+  }, [selection]);
+  // The outline is only needed (and only computed) in edge mode.
+  const outline = useMemo(() => {
+    if (mode !== 'edge') return null;
+    const edges = boundaryEdges(mesh.positions, selection.triangles);
+    if (edges.length === 0) return null;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(edges, 3));
+    return g;
+  }, [mesh, selection, mode]);
+  useEffect(() => () => { fill.dispose(); outline?.dispose(); }, [fill, outline]);
+  return (
+    <>
+      {mode === 'face' && (
+        <mesh geometry={fill} renderOrder={3}>
+          <meshBasicMaterial color={color} side={THREE.DoubleSide} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2} />
+        </mesh>
+      )}
+      {mode === 'edge' && outline && (
+        <lineSegments geometry={outline} renderOrder={4}>
+          <lineBasicMaterial color={color} depthTest={false} />
+        </lineSegments>
+      )}
+    </>
+  );
+}
+
+function Scene({ mesh, selection, excluded, mode, axes }: {
   mesh: LoadedMesh;
-  selection: { positions: Float32Array; edges: Float32Array; bounds: Bounds | null } | null;
+  selection: FaceSelection | null;
+  excluded: FaceSelection | null;
   mode: Mode;
   axes: Array<[number, number, number]>;
 }) {
@@ -159,49 +201,13 @@ function Scene({ mesh, selection, mode, axes }: {
   }, [mesh]);
   useEffect(() => () => { body.dispose(); }, [body]);
 
-  const fill = useMemo(() => {
-    if (!selection) return null;
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(selection.positions, 3));
-    return g;
-  }, [selection]);
-  const outline = useMemo(() => {
-    if (!selection || selection.edges.length === 0) return null;
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(selection.edges, 3));
-    return g;
-  }, [selection]);
-  const box = useMemo(() => {
-    if (!selection?.bounds) return null;
-    const { min, max } = selection.bounds;
-    const size = new THREE.Vector3(max[0] - min[0], max[1] - min[1], max[2] - min[2]);
-    const g = new THREE.EdgesGeometry(new THREE.BoxGeometry(size.x || 0.01, size.y || 0.01, size.z || 0.01));
-    const center = new THREE.Vector3((min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2);
-    return { g, center };
-  }, [selection]);
-  useEffect(() => () => { fill?.dispose(); outline?.dispose(); box?.g.dispose(); }, [fill, outline, box]);
-
   return (
     <group>
       <mesh geometry={body}>
         <meshStandardMaterial color={BODY_COLOR} metalness={0.05} roughness={0.6} side={THREE.DoubleSide} polygonOffset polygonOffsetFactor={1} polygonOffsetUnits={1} />
       </mesh>
-      <BodyEdges geometry={body} />
-      {fill && mode === 'face' && (
-        <mesh geometry={fill} renderOrder={3}>
-          <meshBasicMaterial color={FEATURE_COLOR} side={THREE.DoubleSide} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2} />
-        </mesh>
-      )}
-      {outline && (
-        <lineSegments geometry={outline} renderOrder={4}>
-          <lineBasicMaterial color={FEATURE_COLOR} depthTest={mode === 'face'} />
-        </lineSegments>
-      )}
-      {box && mode === 'face' && (
-        <lineSegments geometry={box.g} position={box.center} renderOrder={5}>
-          <lineBasicMaterial color={BOX_COLOR} depthTest={false} />
-        </lineSegments>
-      )}
+      {selection && <SelectionLayer mesh={mesh} selection={selection} color={COUNTED_COLOR} mode={mode} />}
+      {excluded && <SelectionLayer mesh={mesh} selection={excluded} color={EXCLUDED_COLOR} mode={mode} />}
       {axes.length > 0 && <SetupAxisArrows geometry={body} axes={axes} />}
     </group>
   );

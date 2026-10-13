@@ -79,8 +79,11 @@ export function boundaryEdges(positions: Float32Array, triangles: Int32Array, we
     return id;
   };
 
-  const edgeUse = new Map<number, number>();
-  const edgeEnds = new Map<number, [number, number]>();
+  // Edge key -> slot in the parallel arrays below: one Map lookup per edge use, no per-use allocation.
+  const edgeSlot = new Map<number, number>();
+  const endA: number[] = [];
+  const endB: number[] = [];
+  const uses: number[] = [];
   const tri = new Array<number>(3);
   for (const t of triangles) {
     for (let v = 0; v < 3; v++) {
@@ -94,15 +97,23 @@ export function boundaryEdges(positions: Float32Array, triangles: Int32Array, we
       const lo = Math.min(a, b);
       const hi = Math.max(a, b);
       const key = lo * 0x4000000 + hi; // vertex ids stay far below 2^26 for any part we load
-      edgeUse.set(key, (edgeUse.get(key) ?? 0) + 1);
-      edgeEnds.set(key, [lo, hi]);
+      const slot = edgeSlot.get(key);
+      if (slot === undefined) {
+        edgeSlot.set(key, uses.length);
+        endA.push(lo);
+        endB.push(hi);
+        uses.push(1);
+      } else {
+        uses[slot]! += 1;
+      }
     }
   }
 
   const out: number[] = [];
-  for (const [key, uses] of edgeUse) {
-    if (uses !== 1) continue;
-    const [a, b] = edgeEnds.get(key)!;
+  for (let slot = 0; slot < uses.length; slot++) {
+    if (uses[slot] !== 1) continue;
+    const a = endA[slot]!;
+    const b = endB[slot]!;
     out.push(coords[a * 3]!, coords[a * 3 + 1]!, coords[a * 3 + 2]!, coords[b * 3]!, coords[b * 3 + 1]!, coords[b * 3 + 2]!);
   }
   return Float32Array.from(out);
@@ -125,6 +136,21 @@ export function boundsOf(positions: Float32Array, triangles: Int32Array): Bounds
         if (value < min[k]!) min[k] = value;
         if (value > max[k]!) max[k] = value;
       }
+    }
+  }
+  return { min, max };
+}
+
+/** Axis-aligned box of every vertex, in one pass; null for an empty mesh. */
+export function boundsOfPositions(positions: Float32Array): Bounds | null {
+  if (positions.length < 3) return null;
+  const min: [number, number, number] = [Infinity, Infinity, Infinity];
+  const max: [number, number, number] = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i + 2 < positions.length; i += 3) {
+    for (let k = 0; k < 3; k++) {
+      const value = positions[i + k]!;
+      if (value < min[k]!) min[k] = value;
+      if (value > max[k]!) max[k] = value;
     }
   }
   return { min, max };

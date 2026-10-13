@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { boundaryEdges, boundsOf, buildFaceIndex, subsetPositions, trianglesOfFaces } from '@/lib/viewer/highlight-geometry';
+import { boundaryEdges, boundsOf, boundsOfPositions, buildFaceIndex, subsetPositions, trianglesOfFaces } from '@/lib/viewer/highlight-geometry';
 
 // A unit square in the XY plane (2 triangles = face 0) and a second square
 // above it (2 triangles = face 1), as non-indexed STL positions.
@@ -45,5 +45,17 @@ describe('highlight geometry', () => {
     expect(boundsOf(positions, tris)).toEqual({ min: [0, 0, 1], max: [1, 1, 1] });
     expect(subsetPositions(positions, tris).length).toBe(18);
     expect(boundsOf(positions, new Int32Array(0))).toBeNull();
+  });
+});
+
+describe('boundsOfPositions', () => {
+  it('is the box of every vertex, equal to boundsOf over all triangles', () => {
+    const all = Int32Array.from([0, 1, 2, 3]);
+    expect(boundsOfPositions(positions)).toEqual(boundsOf(positions, all));
+    expect(boundsOfPositions(positions)).toEqual({ min: [0, 0, 0], max: [1, 1, 1] });
+  });
+
+  it('is null for an empty mesh', () => {
+    expect(boundsOfPositions(new Float32Array(0))).toBeNull();
   });
 });

@@ -46,6 +46,7 @@ export function CadEvidencePanel({
 }: CadEvidencePanelProps) {
   const { highlight } = evidence;
   const faceIds = useMemo(() => highlight?.node.occurrences.flatMap((o) => o.face_ids) ?? [], [highlight]);
+  const excludedFaceIds = useMemo(() => highlight?.excluded?.occurrences.flatMap((o) => o.face_ids), [highlight]);
   return (
     <div className="fixed top-16 left-4 z-60 w-[480px] rounded-lg border border-border bg-background shadow-xl flex flex-col">
       <div className="flex items-center justify-between p-3 border-b border-border">
@@ -93,7 +94,7 @@ export function CadEvidencePanel({
       ) : (
       <div className="h-[360px]">
         {fileType.toLowerCase() === 'stl' ? (
-          <CadFeatureViewer fileUrl={fileUrl} faceMap={faceMap} faceIds={faceIds} {...(highlight.style === 'edges' ? { initialMode: 'edge' as const } : {})} {...(axes ? { axes } : {})} />
+          <CadFeatureViewer fileUrl={fileUrl} faceMap={faceMap} faceIds={faceIds} {...(excludedFaceIds ? { excludedFaceIds } : {})} {...(highlight.style === 'edges' ? { initialMode: 'edge' as const } : {})} {...(axes ? { axes } : {})} />
         ) : (
           // STEP/other models need the main viewer's server-side conversion.
           <ModelViewer
