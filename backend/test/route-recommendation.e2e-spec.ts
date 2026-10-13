@@ -57,10 +57,21 @@ describe('[e2e] Auto route recommendation, Rtp2 Mag2 Backframe', () => {
     expect([...r.warnings, ...r.capability.warnings].join(' ')).toContain('catalogued for Blank only');
   });
 
-  it.each(['sm-turret', 'sm-router'])('%s is incomplete because work is unpriced, with the reason on the line', (id) => {
-    const r = route(id);
+  it('sm-router is incomplete because its cutting is unpriced, with the reason on the line', () => {
+    const r = route('sm-router');
     expect(r.dataComplete).toBe(false);
     expect(r.dataGaps.map((g) => g.reason).join(' ')).toContain('Not priced');
+  });
+
+  // The turret force is that of the largest single hit (a 20 mm hole), so a turret is
+  // selected; its punching is priced from the machine punch rate x stroke rate factor.
+  it('sm-turret selects a machine and prices punching and nibbling, with no data gap', () => {
+    const r = route('sm-turret');
+    const line = r.processLines[0]!;
+    expect(line.machineName).toBeTruthy();
+    expect(line.cycleTimeMin).toBeGreaterThan(1);
+    expect(r.dataComplete).toBe(true);
+    expect(r.dataGaps).toEqual([]);
   });
 
   it('every route cheaper than the laser is excluded from Auto for one of those reasons', () => {

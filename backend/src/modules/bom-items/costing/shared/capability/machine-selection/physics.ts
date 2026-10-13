@@ -395,11 +395,23 @@ export function laserRequirement(input: {
   };
 }
 
+// A punch press delivers its force one hit at a time, so the force a machine must
+// carry is the one of the largest single tool, not of the whole part contour: the
+// TPP calculator's "Length Of Cut" is the length cut by that hit. Circular holes are
+// punched with a round tool (perimeter = pi x diameter); everything else (outline,
+// slots, internal profiles) is nibbled with a small tool, whose force is below that
+// of the largest punched hole. 0 when the part has no punched hole.
+export function largestPunchHitPerimeterMm(holeDiametersMm: readonly number[] | null | undefined): number {
+  const largest = Math.max(0, ...(holeDiametersMm ?? []).filter((d) => Number.isFinite(d) && d > 0));
+  return Math.PI * largest;
+}
+
 // TPP Manufacturing punching force formula — the SAME estimateTurretPunchTonnage
 // already used by machine-capability.ts's post-selection TONNAGE_EXCEEDED check
-// (fed by the identical cutLengthMm/materialShearStrengthMpa/thicknessMm), so
-// machine SELECTION and the post-selection capability verdict can never
-// silently disagree.
+// (fed by the identical largest-hit perimeter/materialShearStrengthMpa/thicknessMm),
+// so machine SELECTION and the post-selection capability verdict can never
+// silently disagree. cutLengthMm here is the perimeter of ONE hit
+// (largestPunchHitPerimeterMm), not the total contour of the part.
 export function punchingRequirement(input: {
   cutLengthMm: number;
   materialShearStrengthMpa: number;
