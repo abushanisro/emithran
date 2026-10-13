@@ -76,6 +76,8 @@ const pool: SecondaryMachine[] = [
     (r) => [numOrNull(r['Basket Length (mm)']), numOrNull(r['Basket Width (mm)']), numOrNull(r['Basket Height (mm)'])]),
   ...machines('magnetic_particle_testing_machines.csv', 'magnetic_particle_testing', () => ({}), none),
   ...machines('hydrostatic_leak_testing_machines.csv', 'hydrostatic_leak_testing', () => ({}), none),
+  ...machines('ct_scan_machines.csv', 'ct_scan', () => ({}), none),
+  ...machines('xray_inspection_machines.csv', 'xray_inspection', () => ({}), none),
   ...machines('ultrasonic_c_scan_machines.csv', 'ultrasonic_c_scan',
     (r) => ({ surface_scan_rate_mm2_per_s: numOrNull(r['Surface Scan Rate (mm^2 / s)'] ?? Object.entries(r).find(([k]) => /Surface Scan Rate/.test(k))?.[1]) }),
     (r) => [numOrNull(Object.entries(r).find(([k]) => /Useable Length/.test(k))?.[1]), numOrNull(Object.entries(r).find(([k]) => /Useable Width/.test(k))?.[1]), numOrNull(Object.entries(r).find(([k]) => /Useable Height/.test(k))?.[1])]),
@@ -145,6 +147,13 @@ describe('secondary processes on the reference data', () => {
     const m = byProcess(block);
     expect(m.get('CT Scan')!.status).toBe('gap');
     expect(m.get('Xray Inspection')!.status).toBe('gap');
+  });
+
+  it('CT scan and X-ray name the machine on file even though the cycle time is a gap', () => {
+    const m = byProcess(block);
+    expect(m.get('Xray Inspection')!.machine?.name).toBe('Default'); // xray_inspection_machines.csv
+    expect(m.get('CT Scan')!.machine?.name).toBeTruthy();
+    expect(m.get('CT Scan')!.cycleTimeSec).toBeNull();
   });
 
   it('a class with no machine at the location is a gap, never a stand-in rate', () => {

@@ -280,10 +280,13 @@ export function notCosted(
   base: { process: string; machineClass: string },
   status: Exclude<SecondaryStatus, 'costed'>,
   reason: string,
-  extra: Partial<Pick<SecondaryProcessResult, 'trace' | 'highlight' | 'featureIds' | 'warnings'>> = {},
+  extra: Partial<Pick<SecondaryProcessResult, 'trace' | 'highlight' | 'featureIds' | 'warnings'>> & { machine?: SecondaryMachine | null } = {},
 ): SecondaryProcessResult {
+  const m = extra.machine;
   return {
-    ...base, status, reason, machine: null, cycleTimeSec: null, setupMin: null,
+    ...base, status, reason,
+    machine: m ? { id: m.id, name: m.name, mhrUsd: m.mhrUsd, lhrUsd: m.lhrUsd, operators: m.operators, setupHr: m.setupHr, goodPartYield: m.goodPartYield } : null,
+    cycleTimeSec: null, setupMin: null,
     materialUsdPerPart: 0, costPerPartUsd: null,
     highlight: extra.highlight ?? 'none', featureIds: extra.featureIds ?? [],
     trace: extra.trace ?? [], warnings: extra.warnings ?? [],
@@ -580,8 +583,11 @@ export function computeSecondaryProcesses(
       case 'Carton Sealing': return cartonProcess(base, part, ref, pool, 'max_carton_seal_rate_cartons_per_min', false);
       case 'Pack & Load': return packAndLoad(base, part, ref, pool);
       default:
+        // CT Scan / Xray Inspection: the machine is on file, only the cycle time is missing,
+        // so the line names the machine the reference would use and stays a disclosed gap.
         return notCosted(base, 'gap',
-          `The reference has ${pool.length > 0 ? 'machines and rates' : 'no machine'} for ${base.process} but no cycle-time data, so it cannot be costed.`);
+          `The reference has ${pool.length > 0 ? 'machines and rates' : 'no machine'} for ${base.process} but no cycle-time data, so it cannot be costed.`,
+          { machine: pickMachine(base.process, envelopeCapable(pool, part), ref) });
     }
   });
 }
