@@ -76,8 +76,9 @@ const pool: SecondaryMachine[] = [
     (r) => [numOrNull(r['Basket Length (mm)']), numOrNull(r['Basket Width (mm)']), numOrNull(r['Basket Height (mm)'])]),
   ...machines('magnetic_particle_testing_machines.csv', 'magnetic_particle_testing', () => ({}), none),
   ...machines('hydrostatic_leak_testing_machines.csv', 'hydrostatic_leak_testing', () => ({}), none),
-  ...machines('ct_scan_machines.csv', 'ct_scan', () => ({}), none),
-  ...machines('xray_inspection_machines.csv', 'xray_inspection', () => ({}), none),
+  // Times as staged by migration 903 (Countries data export, rows named Default).
+  ...machines('ct_scan_machines.csv', 'ct_scan', () => ({ constant_inspect_time_min: 1, inspect_time_min_per_kg: 0.02 }), none),
+  ...machines('xray_inspection_machines.csv', 'xray_inspection', () => ({ constant_inspect_time_min: 3, inspect_time_min_per_kg: 0.2 }), none),
   ...machines('ultrasonic_c_scan_machines.csv', 'ultrasonic_c_scan',
     (r) => ({ surface_scan_rate_mm2_per_s: numOrNull(r['Surface Scan Rate (mm^2 / s)'] ?? Object.entries(r).find(([k]) => /Surface Scan Rate/.test(k))?.[1]) }),
     (r) => [numOrNull(Object.entries(r).find(([k]) => /Useable Length/.test(k))?.[1]), numOrNull(Object.entries(r).find(([k]) => /Useable Width/.test(k))?.[1]), numOrNull(Object.entries(r).find(([k]) => /Useable Height/.test(k))?.[1])]),
@@ -143,17 +144,22 @@ describe('secondary processes on the reference data', () => {
     expect(r.highlight).toBe('whole_part');
   });
 
-  it('CT scan and X-ray have no cycle-time data in the reference', () => {
-    const m = byProcess(block);
-    expect(m.get('CT Scan')!.status).toBe('gap');
-    expect(m.get('Xray Inspection')!.status).toBe('gap');
+  it('CT scan and X-ray: constant + per-kg time on the tested share, on the machine named Default', () => {
+    const m = byProcess({ ...block, weightKg: 2, batchSize: 100 });
+    const ct = m.get('CT Scan')!;
+    const xray = m.get('Xray Inspection')!;
+    expect(ct.status).toBe('costed');
+    expect(ct.machine?.name).toBe('Default');
+    expect(xray.machine?.name).toBe('Default');
+    // (constant + per-kg x 2 kg) minutes x 100 % tested, before the shared adjustment factors.
+    expect(ct.trace.map((t) => t.label)).toContain('Constant inspection time');
+    expect(xray.cycleTimeSec!).toBeGreaterThan(ct.cycleTimeSec!); // (3 + 0.4) min vs (1 + 0.04) min
   });
 
-  it('CT scan and X-ray name the machine on file even though the cycle time is a gap', () => {
-    const m = byProcess(block);
-    expect(m.get('Xray Inspection')!.machine?.name).toBe('Default'); // xray_inspection_machines.csv
-    expect(m.get('CT Scan')!.machine?.name).toBeTruthy();
-    expect(m.get('CT Scan')!.cycleTimeSec).toBeNull();
+  it('CT scan and X-ray need the part weight: without a material it is a gap, not a guess', () => {
+    const r = byProcess({ ...block, weightKg: null }).get('CT Scan')!;
+    expect(r.status).toBe('gap');
+    expect(r.cycleTimeSec).toBeNull();
   });
 
   it('a class with no machine at the location is a gap, never a stand-in rate', () => {

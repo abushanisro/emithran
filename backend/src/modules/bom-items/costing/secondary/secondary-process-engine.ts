@@ -14,8 +14,8 @@
 //   which part?  the feature ids (CMM) or the whole part (surface processes),
 //                so the UI can highlight what the process acts on.
 // When a needed input does not exist the result is a 'gap' naming it, never a
-// substituted value. CT Scan and Xray Inspection have machines and rates but
-// no cycle-time data in the reference, so they are always a disclosed gap.
+// substituted value. CT Scan and Xray Inspection take their time from the
+// machine row (constant + per-kg, migration 903).
 
 export const SECONDARY_SOURCE_VERSION = '2026-Secondary';
 
@@ -485,6 +485,30 @@ function ultrasonicScan(base: { process: string; machineClass: string }, part: S
   return costed(base, m, { perPartSec: (part.surfaceAreaMm2 / scanRate + handlingRow.s) * tested, trace, highlight: 'whole_part' }, ref, part.batchSize);
 }
 
+/**
+ * CT Scan and Xray Inspection: constantInspectTimeMins + inspectTimeMinsPerWeight x part
+ * weight, on the share of parts tested. Both come from the machine row (migration 903,
+ * Countries data export; weight unit taken as kg).
+ */
+function volumetricInspection(base: { process: string; machineClass: string }, part: SecondaryPartFacts, ref: SecondaryReference, pool: SecondaryMachine[]): SecondaryProcessResult {
+  if (part.weightKg == null || part.weightKg <= 0) return notCosted(base, 'gap', 'Part weight is needed (scan time is per kg): choose a material first.');
+  const priced = envelopeCapable(pool, part).filter((m) => num(m.specs['constant_inspect_time_min']) != null && num(m.specs['inspect_time_min_per_kg']) != null);
+  const m = pickMachine(base.process, priced, ref);
+  if (!m) {
+    return notCosted(base, 'gap', pool.length === 0 ? `No ${base.process} machine on file for this location.` : `No ${base.process} machine carries an inspection time (run migration 903).`);
+  }
+  const constMin = num(m.specs['constant_inspect_time_min'])!;
+  const perKg = num(m.specs['inspect_time_min_per_kg'])!;
+  const trace: SecondaryTraceStep[] = [
+    { label: 'Constant inspection time', value: constMin, unit: 'min', source: `machine ${m.name} (constantInspectTimeMins)` },
+    { label: 'Inspection time per weight', value: perKg, unit: 'min/kg', source: `machine ${m.name} (inspectTimeMinsPerWeight, weight taken as kg)` },
+    { label: 'Part weight', value: Number(part.weightKg.toFixed(4)), unit: 'kg', source: 'CAD volume × material density' },
+  ];
+  const tested = testedFraction(ref, trace);
+  if (tested == null) return notCosted(base, 'gap', 'defaultPercentToBeTested is not staged.', { trace });
+  return costed(base, m, { perPartSec: (constMin + perKg * part.weightKg) * 60 * tested, trace, highlight: 'whole_part' }, ref, part.batchSize);
+}
+
 /** Smallest standard carton the part fits in, and how many parts fit it. */
 function cartonFor(part: SecondaryPartFacts, ref: SecondaryReference, trace: SecondaryTraceStep[], warnings: string[]):
   { l: number; w: number; h: number; costUsd: number; perCarton: number } | string {
@@ -579,12 +603,12 @@ export function computeSecondaryProcesses(
       case 'Hydrostatic Leak Testing': return hydrostaticLeak(base, part, ref, pool);
       case 'Ultrasonic A-Scan':
       case 'Ultrasonic C-Scan': return ultrasonicScan(base, part, ref, pool);
+      case 'CT Scan':
+      case 'Xray Inspection': return volumetricInspection(base, part, ref, pool);
       case 'Carton Forming': return cartonProcess(base, part, ref, pool, 'max_carton_form_rate_cartons_per_min', true);
       case 'Carton Sealing': return cartonProcess(base, part, ref, pool, 'max_carton_seal_rate_cartons_per_min', false);
       case 'Pack & Load': return packAndLoad(base, part, ref, pool);
       default:
-        // CT Scan / Xray Inspection: the machine is on file, only the cycle time is missing,
-        // so the line names the machine the reference would use and stays a disclosed gap.
         return notCosted(base, 'gap',
           `The reference has ${pool.length > 0 ? 'machines and rates' : 'no machine'} for ${base.process} but no cycle-time data, so it cannot be costed.`,
           { machine: pickMachine(base.process, envelopeCapable(pool, part), ref) });
