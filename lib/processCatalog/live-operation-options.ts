@@ -79,7 +79,7 @@ export function liveOperationOptions(
 /**
  * The live operation a saved line stands for.
  *
- * Its saved name, when a live line still has it. Otherwise — a line written
+ * Its saved name, when a live line still has it (a line's own process name included). Otherwise — a line written
  * before every writer saved the engine's line name, when apply-route stored the
  * machine class's catalog name ("CMM Inspection" for the "Inspection" line) —
  * the only identity it carries is its machine_class: when exactly one live line
@@ -94,9 +94,9 @@ export function resolveSavedOperation(
   if (!savedOperation) return savedOperation;
   // A catalog operation of a multi-operation line is an operation as saved.
   if (lines.some((l) => catalogOperationsOf(l).some((c) => c.operation === savedOperation))) return savedOperation;
-  // A multi-operation line's own process name is not one of its operations:
-  // nothing is pre-selected, the engineer picks the operation.
-  if (lines.some((l) => l.process === savedOperation && catalogOperationsOf(l).length > 0)) return '';
+  // A line saved under its own process name ("Press Brake") keeps it: the dialog lists it as
+  // "Press Brake (saved on this line)" and selects it, so a reopened line never shows a blank
+  // Operation. The engineer may re-pick one of the line's catalog operations.
   if (lines.some((l) => l.process === savedOperation)) return savedOperation;
   const onClass = new Set(lines.filter((l) => l.machineClass === savedMachineClass).map((l) => l.process));
   return onClass.size === 1 ? [...onClass][0]! : savedOperation;

@@ -59,8 +59,8 @@ describe('liveOperationOptions', () => {
     expect(opts.map((o) => o.value)).toEqual(['As Cast // Void', 'No Coring // SimpleHole']);
     expect(opts.map((o) => o.label)).toEqual(['As Cast // Void [3]', 'No Coring // SimpleHole [17]']);
     expect(opts.every((o) => o.lineProcess === 'High Pressure Die Casting' && o.cycleTimeMin === 0)).toBe(true);
-    // The line's own name is not an operation: nothing pre-selected.
-    expect(resolveSavedOperation([hpdc], 'High Pressure Die Casting', 'die_casting_high_pressure_die_casting')).toBe('');
+    // A line saved under its own name keeps it, so the reopened dialog shows it.
+    expect(resolveSavedOperation([hpdc], 'High Pressure Die Casting', 'die_casting_high_pressure_die_casting')).toBe('High Pressure Die Casting');
     expect(resolveSavedOperation([hpdc], 'As Cast // Void', 'die_casting_high_pressure_die_casting')).toBe('As Cast // Void');
   });
 });
@@ -119,8 +119,8 @@ describe('liveOperationOptions — sheet-metal catalog operations', () => {
     expect(liveOperationOptions([inspectionLine], new Set(['cmm']), new Map()).map((o) => o.value)).toEqual(['Inspection']);
   });
 
-  it('the line name is not a saved operation; a catalog operation is kept as saved', () => {
-    expect(resolveSavedOperation([deburring], 'Finishing', 'deburring')).toBe('');
+  it('a line saved under its own name keeps it (never a blank Operation); a catalog operation is kept as saved', () => {
+    expect(resolveSavedOperation([deburring], 'Finishing', 'deburring')).toBe('Finishing');
     expect(resolveSavedOperation([deburring], 'Deslag // SimpleHole', 'deburring')).toBe('Deslag // SimpleHole');
   });
 });
