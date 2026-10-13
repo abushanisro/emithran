@@ -3768,7 +3768,7 @@ export function ProcessCostDialog({
           <>
             {/* Lookup Table: no backdrop, it closes only through its own X */}
             <div
-              className="fixed top-0 left-0 h-screen w-[500px] bg-background border-r border-border shadow-xl z-60 flex flex-col"
+              className="fixed top-0 left-0 h-screen w-[560px] bg-background border-r border-border shadow-xl z-60 flex flex-col"
               style={{ pointerEvents: 'auto' }}
               onClick={(e) => { e.stopPropagation(); }}
               onMouseDown={(e) => { e.stopPropagation(); }}
@@ -3813,9 +3813,8 @@ export function ProcessCostDialog({
           </div>
 
           <div
-            className="flex-1 px-3 pb-3 relative overflow-auto"
+            className="flex-1 min-h-0 px-3 pb-3 relative overflow-auto"
             style={{
-              height: 'calc(100vh - 120px)',
               pointerEvents: 'auto',
               zIndex: 10000
             }}
@@ -3901,7 +3900,7 @@ export function ProcessCostDialog({
                           ? `Currently used for ${lookupTableData.fieldLabel}`
                           : (outputCol ? `Click to use: ${outputCol.label} = ${outputValue}` : `Click to select`)}
                       >
-                        <td className={`border border-border text-center text-xs py-1 px-1 font-mono ${isCurrentMatch ? 'text-primary bg-primary/20' : 'text-muted-foreground bg-muted/20'}`}>
+                        <td className={`border border-border text-center text-xs py-0.5 px-1 font-mono ${isCurrentMatch ? 'text-primary bg-primary/20' : 'text-muted-foreground bg-muted/20'}`}>
                           {isCurrentMatch ? '★' : rowIndex + 1}
                         </td>
                         {lookupTableData.column_definitions.map((col: any) => {
@@ -3910,7 +3909,7 @@ export function ProcessCostDialog({
                           return (
                             <td
                               key={col.name}
-                              className={`border border-border py-1 px-2 text-xs${isOutput ? ' font-semibold text-primary bg-primary/5' : ''}`}
+                              className={`border border-border py-0.5 px-2 text-xs${isOutput ? ' font-semibold text-primary bg-primary/5' : ''}`}
                             >
                               {value !== undefined && value !== null ? String(value) : '—'}
                             </td>
