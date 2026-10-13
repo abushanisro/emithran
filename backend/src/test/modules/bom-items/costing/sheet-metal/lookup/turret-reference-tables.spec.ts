@@ -1,5 +1,5 @@
 import {
-  pressForceKnOf, pressForceTonnes, strokeRateFactorTable, turretMachinesTable, turretNibbleMmPerMin,
+  pressForceKnOf, pressForceTonnes, strokeRateFactorTable, turretMachinesTable, turretNibbleMmPerMin, waterjetMachinesTable,
 } from '../../../../../../modules/bom-items/costing/sheet-metal/lookup/turret-reference-tables';
 
 // Amada EM-3510 ZRB as staged (machine library nibble data, Countries punchRate, library press force 300 kN).
@@ -45,5 +45,17 @@ describe('turret reference tables', () => {
       { raw: { tonnage_t: 20, simple: 0.8 } },
     ]);
     expect(table.rows.map((r) => r.tonnage_t)).toEqual([10, 30]);
+  });
+});
+
+describe('waterjet machines table', () => {
+  it('carries the nozzle delay and jet data of each machine (Flow Mach 2 1313b as staged)', () => {
+    const table = waterjetMachinesTable([
+      { key: 'Waterjet Cutting Machine:Flow Mach 2 1313b', raw: { nozzle_delay_s: 4, pressure_n_mm2: 413.69, orifice_diameter_mm: 0.356, mixing_tube_diameter_mm: 1.061, abrasive_flow_rate_kg_min: 0.46, rapid_traverse_rate_mm_min: 15240 } },
+      { key: 'Waterjet Cutting Machine:ESAB Hydrocut LX 6500', raw: { nozzle_delay_s: 6 } },
+    ]);
+    expect(table.rows.map((r) => r.machine_name)).toEqual(['ESAB Hydrocut LX 6500', 'Flow Mach 2 1313b']);
+    expect(table.rows[1]).toMatchObject({ nozzle_delay_s: 4, pressure_n_mm2: 413.69, rapid_traverse_rate_mm_min: 15240 });
+    expect(table.rows[0]!.pressure_n_mm2).toBeNull();
   });
 });

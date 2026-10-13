@@ -1,11 +1,9 @@
 import {
   WATERJET_ABRASIVE_KG_PER_MIN,
-  WATERJET_LEAD_IN_MM,
-  WATERJET_CUT_TIME_ADJUSTMENT_FACTOR,
   DEFAULT_YIELD_PCT,
 } from '../../shared/core/default-rates.constants';
 import type { MHRRateInput } from '../../shared/core/cost-engine';
-import type { ProcessLineCost } from '../../../dto/cost-breakdown.dto';
+import type { ConfidenceLevel, PhysicsGap, ProcessLineCost } from '../../../dto/cost-breakdown.dto';
 import type { CuttingProcessContext, CuttingProcessResult } from '../../shared/core/manufacturing-process.types';
 import { r2, noRateFallback, eMithranTerms, resolveSetupMinutes } from '../../shared/core/engine-kernel';
 import { BaseCuttingEngine, buildCuttingProcessLine } from '../../shared/core/engine-orchestrator';
@@ -25,17 +23,18 @@ export interface WaterjetInput {
   // hardcoded here. Absent means the caller couldn't resolve one; consumers must
   // not fabricate processGroup/processRoute/operation in that case.
   processIdentity?: { processGroup: string; processRoute: string; operation: string };
-  // Real, material+thickness-specific cutting speed/pierce time from
-  // sm_lookup_waterjet_cut (migration 398), resolved by the caller via
-  // SheetMetalLookupService.getWaterjetParams() — same pattern as laser's
-  // rcLaserParams in bom-items.service.ts. This function stays a pure,
-  // synchronous calculation; it never queries the DB itself and has NO
-  // hardcoded speed/pierce-time table of its own to fall back to. When the
-  // caller has no real data (material grade not yet set, or genuinely no
-  // sm_lookup_waterjet_cut row for this material/thickness), cutting/pierce
-  // time are honestly 0 with a warning — never an invented number.
-  cuttingSpeedMmPerMin?: number;
-  pierceTimeSec?: number;
+  // Cycle time comes from the "Sheet Metal - Waterjet Cutting Manufacturing" DB calculator ONLY
+  // (migration 905), resolved by the caller's resolvePhysicsQuantity: contour cut length plus the
+  // lead-in and lead-out of every start at the material cutting speed, times the cut-time
+  // adjustment factor, plus the machine nozzle delay at every pierce. `activeCuttingSec` is the
+  // cutting part of that (abrasive and nozzle wear are charged on it, not on piercing).
+  // Undefined when the calculator could not resolve one; `physicsGap` then carries the reason.
+  cuttingSecFromCalculator?: number;
+  activeCuttingSecFromCalculator?: number;
+  calculatorId?: string | null;
+  calculatorVersion?: number | null;
+  physicsGap?: PhysicsGap | null;
+  confidence?: ConfidenceLevel;
   // Real garnet consumption rate (kg/min of ACTIVE cutting time) for this
   // shop's pump/orifice tier — resolved by the caller from
   // sm_lookup_waterjet_abrasive_rate (migration 413) via
@@ -74,32 +73,45 @@ interface WaterjetResult {
   warnings: string[];
 }
 
+/** Why the waterjet calculator cannot be seeded, or null when every input is on file. */
+export function waterjetMissingInputs(input: {
+  machineName: string | null | undefined;
+  hasCuttingSpeed: boolean;
+  nozzleDelaySec: number | null;
+  leadInMm: number | null;
+  adjustmentFactor: number | null;
+}): string | null {
+  if (!input.machineName) {
+    return 'no waterjet machine could be selected for this part, so there is no machine pierce time to read; see the capability warning for the thickness and bed size that ruled every machine out';
+  }
+  if (input.nozzleDelaySec == null) return `${input.machineName} has no nozzle_delay_s on file (machine library)`;
+  if (!input.hasCuttingSpeed) return 'no sm_lookup_waterjet_cut cutting speed for this material and thickness';
+  if (input.leadInMm == null) return 'variable standardWaterjetCutLeadInAmount is not staged';
+  if (input.adjustmentFactor == null) return 'variable waterjetCutTimeAdjustmentFactor is not staged';
+  return null;
+}
+
 export function computeWaterjetCost(input: WaterjetInput): WaterjetResult {
   const warnings: string[] = [];
   if (input.sheetThicknessMm === 0) warnings.push("Waterjet: thickness 0 — cutting speed lookup cannot resolve without a real thickness");
 
   const rate = input.waterjetRate ?? noRateFallback("waterjet");
 
-  // No hardcoded speed/pierce-time table here — see WaterjetInput's doc comment.
-  // Missing real data means an honest $0/0-sec cutting line, not a guess.
+  // Work with no calculator time is missing data, not a $0 operation: the route would otherwise
+  // look cheapest for the work it leaves unpriced (a gap makes it incomplete, so it is never
+  // auto-recommended). Where there is nothing to cut, no gap.
+  let totalSec = 0;
   let cuttingSec = 0;
-  let pierceSec = 0;
-  if (input.cuttingSpeedMmPerMin != null && input.pierceTimeSec != null) {
-    // Each contour start (pierceCount) needs an entry ramp-up and a mirrored
-    // exit ramp-down — real travel at cutting speed, not "useful" cut length.
-    // See WATERJET_LEAD_IN_MM's own comment for the physical justification.
-    const effectiveCutLengthMm = input.cutLengthMm > 0
-      ? input.cutLengthMm + input.pierceCount * 2 * WATERJET_LEAD_IN_MM
-      : 0;
-    const rawCuttingSec = effectiveCutLengthMm > 0 ? (effectiveCutLengthMm / input.cuttingSpeedMmPerMin) * 60 : 0;
-    // Acceleration/deceleration overhead beyond the lead-in distance itself —
-    // see WATERJET_CUT_TIME_ADJUSTMENT_FACTOR's own comment.
-    cuttingSec = rawCuttingSec * WATERJET_CUT_TIME_ADJUSTMENT_FACTOR;
-    pierceSec = input.pierceCount * input.pierceTimeSec;
+  let physicsGap: PhysicsGap | undefined;
+  if (typeof input.cuttingSecFromCalculator === 'number' && Number.isFinite(input.cuttingSecFromCalculator)) {
+    totalSec = input.cuttingSecFromCalculator;
+    cuttingSec = input.activeCuttingSecFromCalculator ?? input.cuttingSecFromCalculator;
   } else if (input.cutLengthMm > 0 || input.pierceCount > 0) {
-    warnings.push("Waterjet: no sm_lookup_waterjet_cut entry for this material/thickness — cutting/pierce time is $0 until real data is added for it, not an estimate");
+    physicsGap = input.physicsGap ?? {
+      gapType: 'unsupported_operation', process: 'Waterjet Cutting', machineClass: 'waterjet',
+      reason: 'Not priced: the Sheet Metal - Waterjet Cutting Manufacturing calculator returned no cycle time and reported no gap (unexpected; check resolvePhysicsQuantity).',
+    };
   }
-  const totalSec = cuttingSec + pierceSec;
   const cuttingMin = totalSec / 60;
 
   // Abrasive charged only for active cutting time, not piercing
@@ -151,7 +163,13 @@ export function computeWaterjetCost(input: WaterjetInput): WaterjetResult {
       totalCost: t.total,
       cycleTimeMin: cuttingMin,
       rate,
-      extra: { labourRate: rate.labourRate ?? null },
+      extra: {
+        labourRate: rate.labourRate ?? null,
+        ...(input.calculatorId ? { calculatorId: input.calculatorId } : {}),
+        ...(input.calculatorVersion != null ? { calculatorVersion: input.calculatorVersion } : {}),
+        ...(physicsGap ? { physicsGap } : {}),
+        ...(input.confidence ? { confidence: input.confidence } : {}),
+      },
     }),
   ];
 
@@ -211,10 +229,12 @@ export class WaterjetEngine extends BaseCuttingEngine {
       netMatCost: context.netMatCost,
       netWeightKg: context.netWeightKg,
       scrapPricePerKg: context.scrapPricePerKg,
-      ...(context.waterjetParams?.dataFound ? {
-        cuttingSpeedMmPerMin: context.waterjetParams.cuttingSpeedMmPerMin,
-        pierceTimeSec: context.waterjetParams.pierceTimeMin * 60,
-      } : {}),
+      cuttingSecFromCalculator: context.cuttingSecFromCalculator,
+      activeCuttingSecFromCalculator: context.activeCuttingSecFromCalculator,
+      calculatorId: context.calculatorId,
+      calculatorVersion: context.calculatorVersion,
+      physicsGap: context.physicsGap,
+      confidence: context.confidence,
     });
   }
 }

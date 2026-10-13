@@ -19,6 +19,7 @@ import { evaluateCalculatorFormulas, normalizeFieldName } from '../calculators/c
 import type { CalculatorFieldRow } from '../calculators/calculator-formula-evaluator';
 import { PHYSICS_REGISTRY } from '../calculators/physics-registry';
 import { distinctHoleDiameterCount, turretMissingInputs } from './costing/sheet-metal/process/turret-punch-engine';
+import { waterjetMissingInputs } from './costing/sheet-metal/process/waterjet-engine';
 import { SheetMetalLookupService, roundUpToStandardTonnageClass } from './costing/sheet-metal/lookup/sheet-metal-lookup.service';
 import { MachiningLookupService } from './costing/machining/lookup/machining-lookup.service';
 import type { LaserCutParams } from './costing/sheet-metal/lookup/sheet-metal-lookup.service';
@@ -7338,6 +7339,57 @@ export class BOMItemsService {
         : null
     );
 
+    // Waterjet cycle time: the "Sheet Metal - Waterjet Cutting Manufacturing" DB calculator (cut
+    // length + lead-in per start at the material cutting speed x the cut-time adjustment, plus the
+    // machine nozzle delay per pierce; migration 905). Run only when every input is on file;
+    // otherwise the engine reports why as a data gap, never a default.
+    const [rcWaterjetDelaySec, rcWaterjetVars] = await Promise.all([
+      this.smLookup.getWaterjetNozzleDelaySec(mhrRates.waterjet.machineName),
+      this.smLookup.getNumericVariables(['standardWaterjetCutLeadInAmount', 'waterjetCutTimeAdjustmentFactor']),
+    ]);
+    const rcWaterjetLeadIn = rcWaterjetVars.get('standardWaterjetCutLeadInAmount') ?? null;
+    const rcWaterjetAdjustment = rcWaterjetVars.get('waterjetCutTimeAdjustmentFactor') ?? null;
+    const rcWaterjetMissing = waterjetMissingInputs({
+      machineName: mhrRates.waterjet.machineName,
+      hasCuttingSpeed: !!rcWaterjetParams?.dataFound,
+      nozzleDelaySec: rcWaterjetDelaySec,
+      leadInMm: rcWaterjetLeadIn,
+      adjustmentFactor: rcWaterjetAdjustment,
+    });
+    const rcWaterjetCalc = (cutLengthMm > 0 || pierceCount > 0) && rcWaterjetMissing == null
+      ? await this.resolvePhysicsQuantity(accessToken, {
+          machineClass: 'waterjet',
+          process: 'Waterjet Cutting',
+          targetFieldNames: ['Total Time', 'Cutting Time'],
+          seedScope: {
+            'Cutting Length': cutLengthMm,
+            'No Of Starts': pierceCount,
+            'Lead In Per Start': rcWaterjetLeadIn!,
+            'Cutting Speed': rcWaterjetParams!.cuttingSpeedMmPerMin,
+            'Cut Time Adjustment Factor': rcWaterjetAdjustment!,
+            'Pierce Delay Per Start': rcWaterjetDelaySec!,
+            'Lot Size': batchSize,
+          },
+          seedProvenance: {
+            'Cutting Length': 'CAD feature extraction — total cut path length',
+            'No Of Starts': 'CAD feature extraction — pierce/start count',
+            'Lead In Per Start': 'Sheet metal variable standardWaterjetCutLeadInAmount (lead-in and lead-out of each start)',
+            'Cutting Speed': `sm_lookup_waterjet_cut — ${grade || 'material'}, ${thk}mm sheet (curve fitted to two published anchor points; the machine reference data has no cut speed model)`,
+            'Cut Time Adjustment Factor': 'Sheet metal variable waterjetCutTimeAdjustmentFactor (acceleration and deceleration)',
+            'Pierce Delay Per Start': `${mhrRates.waterjet.machineName} — nozzle_delay_s (machine library)`,
+            'Lot Size': 'Batch Size entered on this process cost form',
+          },
+          lookupTableByField: { 'Cutting Speed': 'sm_lookup_waterjet_cut' },
+        })
+      : this.emptyPhysicsResult(['Total Time', 'Cutting Time']);
+    const rcWaterjetCycleSec = rcWaterjetCalc.outputs['Total Time'];
+    const rcWaterjetCuttingMin = rcWaterjetCalc.outputs['Cutting Time'];
+    const rcWaterjetGap: PhysicsGap | null = rcWaterjetCalc.gap ?? (
+      (cutLengthMm > 0 || pierceCount > 0) && rcWaterjetMissing != null
+        ? { gapType: 'unsupported_operation', process: 'Waterjet Cutting', machineClass: 'waterjet', reason: `Not priced: ${rcWaterjetMissing}.` }
+        : null
+    );
+
     const routes: RouteResultDto[] = [];
     // Standard Press / Tandem Press / Progressive Die / Roll Bending are a
     // real, registered engine family (sheet_metal_forming) but not a
@@ -7360,7 +7412,6 @@ export class BOMItemsService {
         sheetThicknessMm, cutLengthMm, pierceCount, holeCount, batchSize, grade, rate,
         processIdentity: identity,
         abrasivePricePerKg: waterjetAbrasivePricePerKg,
-        waterjetParams: rcWaterjetParams,
         routerParams: rcRouterParams,
         oxyfuelParams: rcOxyfuelParams,
         laserPunchParams: rcLaserPunchParams,
@@ -7390,7 +7441,15 @@ export class BOMItemsService {
           physicsGap: rcTurretGap,
           confidence: rcTurretCalc.confidence,
         } : {}),
-        ...(engine.machineClass === 'waterjet' ? { nozzleRate: rcNozzleRate } : {}),
+        ...(engine.machineClass === 'waterjet' ? {
+          nozzleRate: rcNozzleRate,
+          cuttingSecFromCalculator: rcWaterjetCycleSec,
+          ...(rcWaterjetCuttingMin != null ? { activeCuttingSecFromCalculator: rcWaterjetCuttingMin * 60 } : {}),
+          calculatorId: rcWaterjetCalc.calculatorId,
+          calculatorVersion: rcWaterjetCalc.calculatorVersion,
+          physicsGap: rcWaterjetGap,
+          confidence: rcWaterjetCalc.confidence,
+        } : {}),
         ...(engine.machineClass === 'fiber_laser' ? {
           cuttingSecFromCalculator: rcLaserCycleTimeSec,
           calculatorId: rcLaserCalc.calculatorId,
@@ -7507,6 +7566,7 @@ export class BOMItemsService {
 
     if (rcLaserCalc.calculatorId) rcTraces.set(rcLaserCalc.calculatorId, rcLaserCalc.trace);
     if (rcTurretCalc.calculatorId) rcTraces.set(rcTurretCalc.calculatorId, rcTurretCalc.trace);
+    if (rcWaterjetCalc.calculatorId) rcTraces.set(rcWaterjetCalc.calculatorId, rcWaterjetCalc.trace);
     for (const route of routes) {
       for (const line of route.processLines) {
         const trace = line.calculatorId ? rcTraces.get(line.calculatorId) : undefined;

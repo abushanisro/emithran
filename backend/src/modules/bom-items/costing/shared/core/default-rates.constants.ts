@@ -733,24 +733,9 @@ export function classifyInspectionResource(
 // above.
 export const WATERJET_ABRASIVE_KG_PER_MIN = 0.5; // kg/min of active cutting
 
-// Every contour the head cuts needs a ramp-up run before it reaches full
-// pressure/speed and a mirrored ramp-down on exit — this distance is real
-// machine travel that isn't "useful" cut length but still consumes cutting
-// time. pierceCount already means "contour starts" (see WaterjetInput's own
-// doc comment), so each one gets 2x this amount (entry + exit) added to the
-// cut length before the speed-based time calculation. Sourced from a real
-// USA-region manufacturing reference dataset (2026-03 snapshot); see
-// sm_reference_data (category='variable', key='standardWaterjetCutLeadInAmount').
-export const WATERJET_LEAD_IN_MM = 5;
-
-// Global overhead on top of the lead-in distance above — accounts for
-// acceleration/deceleration the head does mid-path (direction changes,
-// speed ramping) that a straight length/speed calculation doesn't capture.
-// Sourced alongside WATERJET_LEAD_IN_MM from the same real reference
-// dataset (sm_reference_data key='waterjetCutTimeAdjustmentFactor') — the
-// source models both as part of one combined cut-time formula, not
-// alternatives, so both apply together here too.
-export const WATERJET_CUT_TIME_ADJUSTMENT_FACTOR = 1.4;
+// Waterjet lead-in (standardWaterjetCutLeadInAmount) and the cut-time adjustment
+// (waterjetCutTimeAdjustmentFactor) are read from sm_reference_data by the waterjet calculator
+// seed (migration 905), not held here.
 
 // A guillotine/power shear cuts one full straight line per stroke — it
 // cannot follow a contour. "Shear:Shear//Blank" is the ONLY feature type

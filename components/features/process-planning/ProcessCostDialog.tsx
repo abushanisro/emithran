@@ -5,6 +5,7 @@ import { longestBendLineMm } from '@/lib/features/bend-line-length';
 import { cadEvidenceKeyFor } from '@/lib/features/cad-evidence-fields';
 import { checkAgainstInput, resolveFieldHighlight, type FieldHighlight } from '@/lib/features/field-highlight';
 import { CalculatorInputField, type TonnageCheck } from './CalculatorInputField';
+import { strokeFactorColumnOf, withOutputColumnLast } from '@/lib/processCatalog/reference-table-columns';
 import type { CadEvidence } from './CadEvidencePanel';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 
@@ -61,8 +62,18 @@ const DESLAG_ALLOWANCE_FIELD = 'Deburr Time Per mm';
 // The eye shows the table with the selected machine's row (or its tonnage row) marked.
 const TURRET_MACHINE_FIELDS: ReadonlySet<string> = new Set(['Punch Rate (hits/min)', 'Tool Change Time (s)', 'Nibble Speed (mm/min)']);
 const STROKE_RATE_FACTOR_FIELD = 'Stroke Rate Factor';
+// The machine-table column each input reads (the table puts it last: clicking a row fills the input with it).
+const TURRET_FIELD_COLUMN: Readonly<Record<string, string>> = {
+  'Punch Rate (hits/min)': 'punch_rate_cycles_min',
+  'Tool Change Time (s)': 'tool_change_time_s',
+  'Nibble Speed (mm/min)': 'nibble_speed_mm_per_min',
+};
 const isTurretReferenceField = (fieldName: string, machineClass: string | undefined) =>
   machineClass === 'turret_punch' && (TURRET_MACHINE_FIELDS.has(fieldName) || fieldName === STROKE_RATE_FACTOR_FIELD);
+// Waterjet: the pierce delay is the nozzle delay of the selected machine.
+const WATERJET_PIERCE_DELAY_FIELD = 'Pierce Delay Per Start';
+const isWaterjetReferenceField = (fieldName: string, machineClass: string | undefined) =>
+  machineClass === 'waterjet' && fieldName === WATERJET_PIERCE_DELAY_FIELD;
 
 /** Required vs selected tonnage from the calculator's last run, or null while it has no required force. */
 function tonnageCheckOf(results: Record<string, any> | null | undefined, inputs: Record<string, any>): TonnageCheck | null {
@@ -2249,7 +2260,9 @@ export function ProcessCostDialog({
         const machineName = selectedMHR?.machineName;
         let table: any;
         let matchedRowKeys: Record<string, unknown> | null = machineName ? { machine_name: machineName } : null;
+        let outputColumn: string | undefined = TURRET_FIELD_COLUMN[field.fieldName];
         if (field.fieldName === STROKE_RATE_FACTOR_FIELD) {
+          outputColumn = strokeFactorColumnOf(calculatorInputProvenance[field.fieldName]);
           const [factors, machines] = await Promise.all([processesApi.getStrokeRateFactorTable(), processesApi.getTurretMachinesTable()]);
           table = factors;
           const tonnage = Number(((machines.rows ?? []) as any[]).find((r) => r.machine_name === machineName)?.machine_tonnage_t);
@@ -2265,9 +2278,25 @@ export function ProcessCostDialog({
           fieldLabel: field.displayLabel || field.fieldName,
           tableName: table.tableName,
           tableId: table.id,
-          column_definitions: table.columnDefinitions || [],
+          column_definitions: withOutputColumnLast(table.columnDefinitions || [], outputColumn),
           rows: table.rows ?? [],
           matchedRowKeys,
+        });
+        setShowLookupTable(true);
+        return;
+      }
+
+      // Waterjet: every waterjet machine, the selected one marked; the nozzle delay is the value taken.
+      if (isWaterjetReferenceField(field.fieldName, selectedMachineClass)) {
+        const table = await processesApi.getWaterjetMachinesTable();
+        setLookupTableData({
+          fieldName: field.fieldName,
+          fieldLabel: field.displayLabel || field.fieldName,
+          tableName: table.tableName,
+          tableId: table.id,
+          column_definitions: withOutputColumnLast(table.columnDefinitions || [], 'nozzle_delay_s'),
+          rows: table.rows ?? [],
+          matchedRowKeys: selectedMHR?.machineName ? { machine_name: selectedMHR.machineName } : null,
         });
         setShowLookupTable(true);
         return;
@@ -3530,6 +3559,7 @@ export function ProcessCostDialog({
                           (field.dataSource === SM_LOOKUP_DATA_SOURCE && !!field.sourceField) ||
                           (field.fieldName === DESLAG_ALLOWANCE_FIELD && selectedMachineClass === 'deburring') ||
                           isTurretReferenceField(field.fieldName, selectedMachineClass) ||
+                          isWaterjetReferenceField(field.fieldName, selectedMachineClass) ||
                           !!resolveAdHocLookupTableKey(field.fieldName, selectedMachineClass);
 
                         // The CAD eye is offered for every input the cost engine declared as measured on CAD

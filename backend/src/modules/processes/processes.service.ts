@@ -9,7 +9,7 @@ import { dieCastingLookupTableNames } from '../bom-items/costing/casting/calcula
 import { castingMaterialsAsTable, castingTableQuery, castingVariablesAsTable, type CastingFlatTable } from '../bom-items/costing/casting/casting-lookup-tables';
 import * as ExcelJS from 'exceljs';
 import { REFERENCE_DOMAINS, REFERENCE_GROUP_DOMAIN, type ReferenceDomain } from './reference-domains';
-import { strokeRateFactorTable, turretMachinesTable, type ReferenceTablePayload } from '../bom-items/costing/sheet-metal/lookup/turret-reference-tables';
+import { strokeRateFactorTable, turretMachinesTable, waterjetMachinesTable, type ReferenceTablePayload } from '../bom-items/costing/sheet-metal/lookup/turret-reference-tables';
 import { Logger } from '../../common/logger/logger.service';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import {
@@ -272,6 +272,18 @@ export class ProcessesService {
     ]);
     if (machines.error || library.error) throw new InternalServerErrorException('Failed to read the Turret Press machine library');
     return turretMachinesTable(machines.data ?? [], library.data ?? []);
+  }
+
+  /** Every waterjet machine with its nozzle delay (the waterjet calculator pierce time) and jet data. */
+  async getWaterjetMachinesTable(): Promise<ReferenceTablePayload> {
+    const { data, error } = await this.supabaseService
+      .getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared')
+      .from('sm_reference_data')
+      .select('key, raw')
+      .eq('category', 'machine')
+      .like('key', 'Waterjet Cutting Machine:%');
+    if (error) throw new InternalServerErrorException('Failed to read the waterjet machine library');
+    return waterjetMachinesTable(data ?? []);
   }
 
   /** Lookup Table 1: stroke rate factor by machine tonnage and part complexity. */

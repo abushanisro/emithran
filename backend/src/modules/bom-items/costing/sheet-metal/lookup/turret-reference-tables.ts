@@ -98,3 +98,33 @@ export function strokeRateFactorTable(rows: ReadonlyArray<{ raw: Raw }>): Refere
     rows: table,
   };
 }
+
+/** Every waterjet machine of the machine library with the values the waterjet calculator reads. */
+export function waterjetMachinesTable(machineRows: ReadonlyArray<{ key: string; raw: Raw }>): ReferenceTablePayload {
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+  const rows = machineRows
+    .map((r) => ({
+      machine_name: r.key.replace(/^Waterjet Cutting Machine:/, ''),
+      pressure_n_mm2: num(r.raw?.pressure_n_mm2),
+      orifice_diameter_mm: num(r.raw?.orifice_diameter_mm),
+      mixing_tube_diameter_mm: num(r.raw?.mixing_tube_diameter_mm),
+      abrasive_flow_rate_kg_min: num(r.raw?.abrasive_flow_rate_kg_min),
+      rapid_traverse_rate_mm_min: num(r.raw?.rapid_traverse_rate_mm_min),
+      nozzle_delay_s: num(r.raw?.nozzle_delay_s),
+    }))
+    .sort((a, b) => a.machine_name.localeCompare(b.machine_name));
+  return {
+    id: 'machine_library:waterjet_machines',
+    tableName: 'Waterjet machines — nozzle delay (pierce time) and jet data',
+    columnDefinitions: [
+      { name: 'machine_name', label: 'Machine' },
+      { name: 'pressure_n_mm2', label: 'Pressure', unit: 'N/mm²' },
+      { name: 'orifice_diameter_mm', label: 'Orifice', unit: 'mm' },
+      { name: 'mixing_tube_diameter_mm', label: 'Mixing Tube', unit: 'mm' },
+      { name: 'abrasive_flow_rate_kg_min', label: 'Abrasive Flow', unit: 'kg/min' },
+      { name: 'rapid_traverse_rate_mm_min', label: 'Rapid Traverse', unit: 'mm/min' },
+      { name: 'nozzle_delay_s', label: 'Nozzle Delay (pierce)', unit: 's' },
+    ],
+    rows,
+  };
+}

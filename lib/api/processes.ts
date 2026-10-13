@@ -182,6 +182,10 @@ export const processesApi = {
     return apiClient.get<ReferenceTable>('/processes/turret-machines-table');
   },
 
+  getWaterjetMachinesTable: async (): Promise<ReferenceTable> => {
+    return apiClient.get<ReferenceTable>('/processes/waterjet-machines-table');
+  },
+
   getStrokeRateFactorTable: async (): Promise<ReferenceTable> => {
     return apiClient.get<ReferenceTable>('/processes/stroke-rate-factor-table');
   },
