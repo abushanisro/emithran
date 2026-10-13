@@ -573,199 +573,10 @@ function findNode(node: ProcessTreeNode, id: string): ProcessTreeNode | null {
   return null;
 }
 
-// ── Real cycle-time lookups for the Properties tree ────────────────────────────
-// The backend already computes per-feature cycle time for Laser Cutting/Press
-// Brake lines (featureBreakdown on ProcessLineCost, from bom-items.service.ts's
-// buildLaserFeatureBreakdown/buildPressBrakeFeatureBreakdown — same lookup tables
-// cost-engine.ts uses for real costing). These read that real data instead of the
-// flat 2.5 sec/pierce, 42 sec/bend, /4000mm/min constants the tree used to guess.
-
-function realPierceCycleTimeSec(count: number, cost: CostSummaryDto | null | undefined): number | null {
-  const pierceEntry = cost?.processLines
-    ?.find((l) => l.process === 'Laser Cutting')
-    ?.featureBreakdown?.find((f) => f.featureType === 'pierce');
-  if (!pierceEntry?.count) return null;
-  // Real aggregate isn't split per hole-diameter group — allocate this group's
-  // share by count. Labelled "≈" at the call site since it's a real-data-derived
-  // allocation, not an independently measured per-group figure.
-  return (count / pierceEntry.count) * pierceEntry.timeSec;
-}
-
-function realBendCycleTimeSec(count: number, radiusMm: number | null, cost: CostSummaryDto | null | undefined): number | null {
-  const breakdown = cost?.processLines
-    ?.find((l) => l.process === 'Press Brake')
-    ?.featureBreakdown?.filter((f) => f.featureType === 'bend') ?? [];
-  if (!breakdown.length) return null;
-  if (radiusMm != null) {
-    // Backend buckets radii identically (Math.round(r*2)/2) before naming each
-    // group "Bend R{bucket}mm ×{count}" — match that exact group, no allocation needed.
-    const bucket = Math.round(radiusMm * 2) / 2;
-    const exact = breakdown.find((f) => f.name.includes(`R${bucket}mm`));
-    if (exact) return exact.timeSec;
-  }
-  const totalCount = breakdown.reduce((s, f) => s + f.count, 0);
-  const totalSec = breakdown.reduce((s, f) => s + f.timeSec, 0);
-  if (!totalCount) return null;
-  return (count / totalCount) * totalSec;
-}
-
-// Load/Unload is a real, but PART-level (not per-radius-group) handling time —
-// buildPressBrakeFeatureBreakdown emits it once per part, not once per bend
-// group. Surfaced on whichever bend node is selected for reference; not
-// summed across multiple bend nodes if a part has more than one radius group.
-function realBendHandlingSec(cost: CostSummaryDto | null | undefined): number | null {
-  const entry = cost?.processLines
-    ?.find((l) => l.process === 'Press Brake')
-    ?.featureBreakdown?.find((f) => f.featureType === 'handling');
-  return entry ? entry.timeSec : null;
-}
-
-// Real machine-selection result for Press Brake — same object the
-// MachineSelector component renders elsewhere; surfaced here too so the Bend
-// tree node can show "why this machine" (tonnage/bed-length reasons) and
-// required tonnage (from the SAME PressBrakeRequirement the selector used —
-// see physics.ts's pressBrakeRequirement) without recomputing anything.
-function realBendMachineSelection(cost: CostSummaryDto | null | undefined) {
-  return cost?.processLines?.find((l) => l.process === 'Press Brake')?.machineSelection ?? null;
-}
-
-// Matched by the real, applied process name — not a hardcoded 'Laser Cutting'
-// literal — so this resolves correctly for whichever cutting process (Laser,
-// Waterjet, Plasma...) is actually applied. cycleTimes.laserMin is a laser-
-// specific fallback field on CostSummaryDto with no equivalent for other
-// cutting processes yet, so it's only consulted when processName really is
-// 'Laser Cutting'; otherwise this honestly returns null rather than reusing
-// a laser-specific number for a different process.
-function realCutTimeSec(cost: CostSummaryDto | null | undefined, processName: string): number | null {
-  const line = cost?.processLines?.find((l) => l.process === processName);
-  const cutEntry = line?.featureBreakdown?.find((f) => f.featureType === 'laser_cut');
-  if (cutEntry) return cutEntry.timeSec;
-  if (processName === 'Laser Cutting' && typeof cost?.cycleTimes?.laserMin === 'number' && cost.cycleTimes.laserMin > 0) {
-    return cost.cycleTimes.laserMin * 60;
-  }
-  return null;
-}
-
-// Real Cutting/Piercing split from the SAME featureBreakdown entries that
-// drive the actual $ cost (buildLaserFeatureBreakdown, backend) — not a
-// separate client-side re-estimate. Returns null (not a guess) unless BOTH
-// entries are present, e.g. cost summary hasn't loaded yet, or the applied
-// process's cost line doesn't have a per-feature breakdown at all.
-function realCutTimeSplit(cost: CostSummaryDto | null | undefined, processName: string): { cuttingSec: number; piercingSec: number } | null {
-  const line = cost?.processLines?.find((l) => l.process === processName);
-  const cutEntry = line?.featureBreakdown?.find((f) => f.featureType === 'laser_cut');
-  const pierceEntry = line?.featureBreakdown?.find((f) => f.featureType === 'pierce');
-  if (!cutEntry && !pierceEntry) return null;
-  return { cuttingSec: cutEntry?.timeSec ?? 0, piercingSec: pierceEntry?.timeSec ?? 0 };
-}
-
 function formatEstCycleTime(sec: number | null, allocated = false): string {
   if (sec == null || !Number.isFinite(sec)) return 'unavailable';
   return allocated ? `≈${sec.toFixed(0)} sec` : `${sec.toFixed(0)} sec`;
 }
-
-// ── Sheet-metal tree nodes (from the CAD feature summary and feature_graph_v2) ──
-
-/** Flat Pattern: the cut blank, every value a real CAD summary fact. */
-function flatPatternNode(summary: FeatureGraphSummary, factory: string, machine: string, cost: CostSummaryDto | null | undefined, processName: string): ProcessTreeNode {
-  const realCutSec = realCutTimeSec(cost, processName);
-  const timeSplit = realCutTimeSplit(cost, processName);
-  const b = summary.cutLengthBreakdownMm;
-  return {
-    id: 'feat_flat', kind: 'feature', label: 'Flat Pattern', factory, machine,
-    attrs: [
-      { name: 'Part Area', value: `${fmtInt(summary.flatPatternAreaMm2)} mm²` },
-      // Nesting metrics: only when the 2D unfold resolved the flat pattern.
-      ...(summary.flatPatternBoundingRectMm2 ? [
-        { name: 'Bounding Rectangle', value: `${fmtInt(summary.flatPatternBoundingRectMm2)} mm²` },
-        { name: 'Material Utilization', value: `${fmt(summary.materialUtilizationPct ?? 0, 1)}%` },
-        { name: 'Scrap', value: `${fmtInt(summary.scrapAreaMm2 ?? 0)} mm²` },
-      ] : []),
-      ...(summary.cutLengthMm > 0 ? [{ name: 'Cut Length', value: `${fmt(summary.cutLengthMm, 0)} mm` }] : []),
-      // Breakdown: only when the CAD panel-wire walk produced it (STEP topology).
-      ...(b ? [
-        { name: '— Outer Profile', value: `${fmt(b.outerProfile, 1)} mm` },
-        ...(b.circularHoles > 0 ? [{ name: '— Circular Holes', value: `${fmt(b.circularHoles, 1)} mm` }] : []),
-        ...(b.internalProfiles > 0 ? [{ name: '— Internal Profiles', value: `${fmt(b.internalProfiles, 1)} mm` }] : []),
-      ] : []),
-      ...(summary.longestContinuousCutMm != null ? [{ name: 'Longest Continuous Cut', value: `${fmt(summary.longestContinuousCutMm, 1)} mm` }] : []),
-      // Acute is a subset of sharp, not a separate total.
-      ...(summary.sharpCornerCount != null ? [
-        { name: 'Sharp Corners (>60°)', value: String(summary.sharpCornerCount) },
-        { name: 'Acute Corners (<30°)', value: String(summary.acuteCornerCount ?? 0) },
-      ] : []),
-      // One lead-in and one lead-out per pierce (no chain cutting modelled).
-      ...(summary.pierceCount > 0 ? [
-        { name: 'Lead-ins', value: String(summary.pierceCount) },
-        { name: 'Lead-outs', value: String(summary.pierceCount) },
-      ] : []),
-      ...(summary.smallHoleCount != null ? [{ name: 'Small Holes (<2×Thickness)', value: String(summary.smallHoleCount) }] : []),
-      ...(summary.sheetThicknessMm > 0 ? [{ name: 'Sheet Thickness', value: `${fmt(summary.sheetThicknessMm, 1)} mm` }] : []),
-      // Cutting and piercing are the costed featureBreakdown entries; rapid
-      // traverse is the CAD head-travel time on top. Without both, the one
-      // costed cut time.
-      ...(timeSplit && summary.rapidTraverseSec != null ? [
-        { name: 'Rapid Traverse', value: `${fmt(summary.rapidTraverseSec, 1)} sec` },
-        { name: 'Piercing', value: `${fmt(timeSplit.piercingSec, 1)} sec` },
-        { name: processName, value: `${fmt(timeSplit.cuttingSec, 1)} sec` },
-        { name: 'Total', value: `${fmt(summary.rapidTraverseSec + timeSplit.piercingSec + timeSplit.cuttingSec, 1)} sec` },
-      ] : [
-        { name: `Est. ${processName} Time`, value: formatEstCycleTime(realCutSec) },
-      ]),
-    ],
-  };
-}
-
-/**
- * One bend group (one radius) of feature_graph_v2: its count, the longest
- * bend line (the one that sizes press-brake tonnage) and the mean angle, from
- * the per-bend occurrences. The node id is the v2 feature id, so selecting it
- * highlights exactly these bends.
- */
-function bendGroupNode(bend: FeatureNodeV2, factory: string, machine: string, cost: CostSummaryDto | null | undefined): ProcessTreeNode {
-  const count = bend.occurrences.length;
-  const radius = bend.radius_mm ?? null;
-  const lengths = bend.occurrences.map((o) => o.bend_length_mm).filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
-  const angles = bend.occurrences.map((o) => o.bend_angle_deg).filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
-  const longest = lengths.length > 0 ? Math.max(...lengths) : null;
-  const meanAngle = angles.length > 0 ? angles.reduce((a, v) => a + v, 0) / angles.length : null;
-
-  const realSec = realBendCycleTimeSec(count, radius, cost);
-  const handlingSec = realBendHandlingSec(cost);
-  const totalSec = realSec != null || handlingSec != null ? (realSec ?? 0) + (handlingSec ?? 0) : null;
-  const ms = realBendMachineSelection(cost);
-  const req = ms?.requirement as ({ kind: string; tonnage?: number } | undefined);
-  const requiredTonnage = req?.kind === 'press_brake' && typeof req.tonnage === 'number' ? req.tonnage : null;
-  const pickedMachine = ms?.balanced.candidate ?? null;
-  const maxTonnage = pickedMachine?.capability.maxTonnage ?? null;
-  const utilizationPct = requiredTonnage != null && maxTonnage != null && maxTonnage > 0
-    ? Math.round((requiredTonnage / maxTonnage) * 1000) / 10
-    : null;
-  return {
-    id: bend.id, kind: 'feature',
-    label: radius != null ? `R${radius.toFixed(1)} × ${count}` : `Bends × ${count}`,
-    factory, machine,
-    attrs: [
-      ...(radius != null ? [{ name: 'Bend Radius', value: `${radius.toFixed(1)} mm` }] : []),
-      { name: 'Bend Count', value: String(count) },
-      ...(meanAngle != null ? [{ name: 'Bend Angle', value: `${meanAngle.toFixed(0)}°` }] : []),
-      ...(longest != null ? [{ name: 'Bend Length', value: `${longest.toFixed(1)} mm` }] : []),
-      // The same PressBrakeRequirement + selectMachine result that priced the line.
-      ...(requiredTonnage != null ? [{ name: 'Required Force', value: `${requiredTonnage.toFixed(2)} ton` }] : []),
-      ...(pickedMachine?.machineName ? [{ name: 'Recommended Machine', value: pickedMachine.machineName }] : []),
-      ...(utilizationPct != null ? [{ name: 'Capacity Utilization', value: `${utilizationPct.toFixed(1)}%` }] : []),
-      ...((ms?.balanced.reasons ?? []).map((reason) => ({ name: '— Why', value: reason }))),
-      ...(realSec != null || handlingSec != null ? [
-        { name: 'Bending', value: formatEstCycleTime(realSec) },
-        { name: 'Load / Unload', value: formatEstCycleTime(handlingSec) },
-        { name: 'Total', value: formatEstCycleTime(totalSec) },
-      ] : [
-        { name: 'Est. Cycle Time', value: formatEstCycleTime(realSec, radius == null) },
-      ]),
-    ],
-  };
-}
-
 
 // tappingCandidateCount was here — a Ø<=6mm-holes-in-thin-sheet heuristic that
 // claimed to be the "single source of truth for does this part need X", shared
@@ -785,7 +596,7 @@ function buildProcessTree(
   overrideProcesses?: string[],
   cost?: CostSummaryDto | null,
   materialDensityGcm3?: number | null,
-  procRecords?: { opNbr?: number; category?: string; operation?: string; processGroup?: string; machineName?: string; isActive?: boolean }[] | null,
+  procRecords?: { opNbr?: number; category?: string; operation?: string; processGroup?: string; machineName?: string; machineClass?: string | null; isActive?: boolean }[] | null,
   secondaryLines?: SecondaryProcessLine[] | null,
 ): ProcessTreeNode {
   const family = resolveDisplayFamily(item, fg);
@@ -842,6 +653,9 @@ function buildProcessTree(
         .map((r) => ({
           process: r.category || r.operation || r.processGroup || 'Process',
           estimated_time_sec: null as number | null,
+          // The machine class is the step's real identity: a saved row is named by its category or
+          // operation ("Deburring"), its live cost line by the engine ("Finishing").
+          machineClass: r.machineClass ?? null,
         }))
     : null;
   // Real machine actually recorded on the stored row for a given process
@@ -863,7 +677,8 @@ function buildProcessTree(
   // (not null/undefined) — `??` only falls through on nullish, not on falsy
   // length — so each candidate is explicitly checked for real content before
   // falling through to the next.
-  const recs = (overrideRecs && overrideRecs.length > 0 ? overrideRecs : null)
+  type TreeRec = { process: string; estimated_time_sec?: number | null; machineClass?: string | null };
+  const recs: TreeRec[] = (overrideRecs && overrideRecs.length > 0 ? overrideRecs : null)
     ?? (storedRecs && storedRecs.length > 0 ? storedRecs : null)
     ?? (fgRecs && fgRecs.length > 0 ? fgRecs : null)
     ?? costRecs
@@ -880,9 +695,17 @@ function buildProcessTree(
   const isMachiningFamily = family !== '' && family !== 'sheet_metal' && family !== 'plastic_molded';
   const v2All = fg?.feature_graph_v2?.features ?? [];
   const v2ById = new Map(v2All.map((f) => [f.id, f]));
-  const lineForRec = (process: string) => cost?.processLines?.find((l) => l.process === process);
+  // The cost line of a step: by the engine's name for it, else by machine class when exactly one line
+  // runs on that class (a step saved as "Deburring" is the engine's "Finishing" line).
+  const lineForRec = (rec: TreeRec) => {
+    const lines = cost?.processLines ?? [];
+    const byName = lines.find((l) => l.process === rec.process);
+    if (byName || !rec.machineClass) return byName;
+    const onClass = lines.filter((l) => l.machineClass === rec.machineClass);
+    return onClass.length === 1 ? onClass[0] : undefined;
+  };
   const claimedIds = new Set(
-    recs.flatMap((r) => (lineForRec(r.process)?.featureBreakdown ?? []).flatMap((b) => b.featureIds ?? [])),
+    recs.flatMap((r) => (lineForRec(r)?.featureBreakdown ?? []).flatMap((b) => b.featureIds ?? [])),
   );
 
   const featureLeaf = (idPrefix: string, f: FeatureNodeV2, machine: string): ProcessTreeNode => {
@@ -924,8 +747,6 @@ function buildProcessTree(
 
   const operations: ProcessTreeNode[] = recs.map((rec, opIdx) => {
     const isSheetMetal = family === 'sheet_metal';
-    const isCutting = rec.process.includes('Laser') || rec.process.includes('Cutting');
-    const isBending = rec.process.includes('Press Brake') || rec.process.includes('Bending');
     // Moulded-part geometry is PART-level: it belongs to the part's first
     // resolved operation, whatever the engineer named or however many steps
     // they added (exact-name gates on "Injection"/"Molding" silently dropped it).
@@ -933,7 +754,7 @@ function buildProcessTree(
 
     // Only the real machine: the stored row's own machine, else the live cost
     // line's DB-resolved machine, else '—'. Matched by exact process name.
-    const matchedCostLine = lineForRec(rec.process);
+    const matchedCostLine = lineForRec(rec);
     const machine = storedMachineByProcess.get(rec.process) ?? matchedCostLine?.machineName ?? '—';
     const breakdown = matchedCostLine?.featureBreakdown ?? [];
     const featureNodes: ProcessTreeNode[] = [];
@@ -956,113 +777,10 @@ function buildProcessTree(
       featureNodes.push(...gdtCalloutNodes(`gdt_${opIdx}`, matchedCostLine.gdtCallouts).map((n) => ({ ...n, factory, machine })));
     }
 
-    // isCutting/isBending below are the pre-catalog-operations legacy display —
-    // grouped-by-diameter holes, grouped-by-radius bends, all real CAD data,
-    // never fabricated, but a SECOND representation of the same features the
-    // catalog-operations block above already rendered once real catalog data
-    // is there. Gated to fire only when that block found nothing, so a step
-    // never shows both "Bending // StraightBend ×17" AND a legacy "R0.8 × 17"
-    // for the exact same 17 bends — one database-driven answer, not two.
-    if (isSheetMetal && isCutting && featureNodes.length === 0) {
-      const flatNode: ProcessTreeNode | null = summary.flatPatternAreaMm2 > 0
-        ? flatPatternNode(summary, factory, machine, cost, matchedCostLine?.process ?? rec.process)
-        : null;
-
-      // Every hole feature — grouped-by-diameter ("symmetric" repeats) and any
-      // ungrouped/one-off ("asymmetric") hole below in the SECONDARY/TERTIARY
-      // fallbacks alike — nests under Flat Pattern instead of showing as its
-      // own top-level row: a dozen+ separate "Ø1.6 × 24" / "Ø2.5 × 10" / ...
-      // siblings cluttered the tree. Each is still individually selectable,
-      // just as a child. Flat Pattern's own Cut Length/Pierce Count attrs
-      // above already sum every real hole via the backend's
-      // _compute_cut_length, so this nesting only ever changes display, never
-      // the cost-accuracy number itself.
-      const holeNodes: ProcessTreeNode[] = [];
-      const holeGroups = summary.holeGroups ?? [];
-      if (holeGroups.length > 0) {
-        // PRIMARY: pre-grouped from CAD engine — diameter guaranteed correct
-        holeGroups.forEach((g) => {
-          holeNodes.push({
-            id: g.id ?? `hole_d${g.diameter_mm.toFixed(1)}_c${g.count}`, kind: 'feature',
-            label: `Ø${g.diameter_mm.toFixed(1)} × ${g.count}`,
-            factory, machine,
-            holeDiameterMm: g.diameter_mm,
-            attrs: [
-              { name: 'Diameter',        value: `${g.diameter_mm.toFixed(1)} mm` },
-              { name: 'Count',           value: String(g.count) },
-              { name: 'Process',         value: rec.process },
-              { name: 'Est. Cycle Time', value: formatEstCycleTime(realPierceCycleTimeSec(g.count, cost), true) },
-            ],
-          });
-        });
-      } else {
-        // SECONDARY: flat diameter list → group on the fly
-        const diameters = summary.holeDiameters ?? [];
-        if (diameters.length > 0) {
-          const diaGroups: Record<string, number> = {};
-          for (const d of diameters) { const k = d.toFixed(1); diaGroups[k] = (diaGroups[k] ?? 0) + 1; }
-          Object.entries(diaGroups).forEach(([d, count], i) => {
-            holeNodes.push({
-              id: `feat_hole_d${i}`, kind: 'feature', label: `Ø${d} × ${count}`, factory, machine,
-              holeDiameterMm: parseFloat(d),
-              attrs: [
-                { name: 'Diameter',        value: `${d} mm` },
-                { name: 'Count',           value: String(count) },
-                { name: 'Process',         value: rec.process },
-                { name: 'Est. Cycle Time', value: formatEstCycleTime(realPierceCycleTimeSec(count, cost), true) },
-              ],
-            });
-          });
-        } else if (summary.holeCount > 0) {
-          holeNodes.push({
-            id: 'feat_holes', kind: 'feature', label: `Holes (${summary.holeCount})`, factory, machine,
-            attrs: [{ name: 'Count', value: String(summary.holeCount) }, { name: 'Process', value: rec.process }],
-          });
-        }
-      }
-
-      if (flatNode) {
-        if (holeNodes.length > 0) flatNode.children = holeNodes;
-        featureNodes.push(flatNode);
-      } else {
-        // No flat-pattern data at all (rare) — still surface hole info rather
-        // than silently dropping it with no parent to nest under.
-        featureNodes.push(...holeNodes);
-      }
-
-    } else if (isSheetMetal && isBending && summary.bendCount > 0 && featureNodes.length === 0) {
-      // One node per real bend group (radius) of feature_graph_v2.
-      const bendFeats = (fg?.feature_graph_v2?.features ?? []).filter(isBend);
-      if (bendFeats.length > 0) {
-        bendFeats.forEach((f) => featureNodes.push(bendGroupNode(f, factory, machine, cost)));
-      } else {
-        const radii = summary.bendRadii ?? [];
-        if (radii.length > 0) {
-          const radGroups: Record<string, number> = {};
-          for (const r of radii) { const k = r.toFixed(1); radGroups[k] = (radGroups[k] ?? 0) + 1; }
-          Object.entries(radGroups).forEach(([r, count], i) => {
-            featureNodes.push({
-              id: `feat_bend_r${i}`, kind: 'feature', label: `R${r} × ${count}`, factory, machine,
-              attrs: [
-                { name: 'Radius', value: `${r} mm` },
-                { name: 'Count', value: String(count) },
-                { name: 'PB Hits', value: String(count) },
-                { name: 'Est. Cycle Time', value: formatEstCycleTime(realBendCycleTimeSec(count, parseFloat(r), cost)) },
-              ],
-            });
-          });
-        } else {
-          featureNodes.push({
-            id: 'feat_bends', kind: 'feature', label: `Bends × ${summary.bendCount}`, factory, machine,
-            attrs: [
-              { name: 'Count', value: String(summary.bendCount) },
-              { name: 'PB Hits', value: String(summary.bendCount) },
-              { name: 'Est. Cycle Time', value: formatEstCycleTime(realBendCycleTimeSec(summary.bendCount, null, cost), true) },
-            ],
-          });
-        }
-      }
-    } else if (isMachiningFamily && (matchedCostLine?.featureOperations?.length ?? 0) > 0) {
+    // Sheet metal steps show only the catalog operations above (the backend attaches them to every
+    // line, live or applied). The earlier grouped-by-diameter hole and grouped-by-radius bend rows were a
+    // second representation of the same CAD features and are gone.
+    if (isMachiningFamily && (matchedCostLine?.featureOperations?.length ?? 0) > 0) {
       // Casting: "Operation // Feature [n]" from the catalog, each listing the
       // feature instances it applies to (highlight exactly those).
       matchedCostLine!.featureOperations!.forEach((g, i) => {
@@ -1237,7 +955,7 @@ function buildProcessTree(
   });
   // The process group of each step: its cost line's own processGroup (the
   // machining after a casting is "Machining"), else the part's group.
-  const opGroups = recs.map((rec) => lineForRec(rec.process)?.processGroup ?? groupLabel);
+  const opGroups = recs.map((rec) => lineForRec(rec)?.processGroup ?? groupLabel);
 
   // Inject Threaded Features from drawing intelligence for CNC families.
   //
@@ -1331,7 +1049,7 @@ function buildProcessTree(
   const groups: ProcessTreeNode[] = [];
   operations.forEach((op) => {
     const idx = recs.findIndex((_, i) => op.id === `op_${i}`);
-    const line = idx >= 0 ? lineForRec(recs[idx]!.process) : gapLineByOpId.get(op.id);
+    const line = idx >= 0 ? lineForRec(recs[idx]!) : gapLineByOpId.get(op.id);
     const name = idx >= 0 ? opGroups[idx]! : line?.processGroup ?? groupLabel;
     let g = groups.find((x) => x.label === name);
     if (!g) {
