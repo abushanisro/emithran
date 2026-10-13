@@ -3979,6 +3979,22 @@ function RouteSelectionDialog({
           }
           return node;
         }
+        // Reported live (Rtp2): a staged Turret Punching route was refused at Apply
+        // with 400 "cycle time is unavailable ... No records were written" because
+        // its punching/nibbling has no costing data. apply-custom-route refuses any
+        // route with a data gap, so the builder must not offer one: state the exact
+        // gap here, before the click, instead of after Apply.
+        if (isSheetMetal) {
+          const dto = allRoutesForTree.find((r) => r.routeId === node.id);
+          const gap = dto && !dto.dataComplete ? dto.dataGaps[0] : undefined;
+          if (gap) {
+            return {
+              ...node,
+              selectable: false,
+              selectionNote: `Incomplete data — cannot be applied: ${gap.reason}`,
+            };
+          }
+        }
         if (isIM && !IM_DIRECT_APPLY_ROUTE_IDS.has(node.id)) {
           return {
             ...node,
@@ -3996,7 +4012,7 @@ function RouteSelectionDialog({
       }
       return [];
     }
-  }, [allRoutesForTree, isIM, isMachining]);
+  }, [allRoutesForTree, isIM, isMachining, isSheetMetal]);
   // The selected route as the comparison list itself models it, plus the raw
   // DTO behind it — the editor needs route-level material cost and the display
   // currency, which are real fields on RouteResultDto that the tree adapter's
