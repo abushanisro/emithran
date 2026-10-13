@@ -636,6 +636,10 @@ export interface SecondaryOptionDto {
   /** Named by the drawing (heat-treatment / surface-treatment callout). */
   fromDrawing: boolean;
   selected: boolean;
+  /** The machine the cost was computed on (mhr_records); null when none is on file. */
+  machineName: string | null;
+  /** Cycle time per part in seconds; null when not costed. */
+  cycleTimeSec: number | null;
 }
 
 export interface SecondaryOperationsDto {

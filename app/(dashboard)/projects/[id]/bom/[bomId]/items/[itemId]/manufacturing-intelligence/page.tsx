@@ -4364,8 +4364,8 @@ function RouteSelectionDialog({
           are comparing it against, not stacked behind an accordion inside one
           of them — a 672px column could never do both at once. */}
       <DialogContent
-        className="w-[95vw] max-w-[1120px] p-0 gap-0 overflow-hidden flex flex-col"
-        style={{ height: 'min(88vh, 780px)' }}
+        className="w-[96vw] max-w-[1400px] p-0 gap-0 overflow-hidden flex flex-col"
+        style={{ height: 'min(94vh, 900px)' }}
       >
 
         <DialogHeader className="px-5 py-3 border-b shrink-0 space-y-1 text-left sm:text-left">
@@ -4382,7 +4382,7 @@ function RouteSelectionDialog({
         </DialogHeader>
 
         {isSheetMetal ? (
-          <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[minmax(320px,400px)_1fr] divide-y md:divide-y-0 md:divide-x divide-border/60">
+          <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[minmax(300px,380px)_minmax(0,1fr)_minmax(250px,300px)] divide-y md:divide-y-0 md:divide-x divide-border/60">
             <RouteCompareList
               nodes={routeTree}
               selectedId={cuttingRouteId}
@@ -4417,6 +4417,27 @@ function RouteSelectionDialog({
                 : null}
               previouslyAppliedLabel={previouslyAppliedRouteLabel}
             />
+            {/* Side panel: every pane scrolls on its own, so the route list, the
+                workflow and the secondary operations are all visible at once
+                instead of stacking under the grid and squeezing it. */}
+            <aside className="min-h-0 overflow-y-auto p-4 space-y-2 bg-muted/10">
+              <div>
+                <h4 className="text-xs font-semibold">Secondary operations</h4>
+                <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                  Heat treatment, surface treatment and other. Added to the route you set, Auto or Manual; saved as soon as you tick.
+                </p>
+              </div>
+              {cost?.secondaryOperations && itemId ? (
+                <SecondaryOperationsPicker
+                  ops={cost.secondaryOperations}
+                  currencySymbol={cost.currencySymbol ?? '$'}
+                  disabled={patchSecondary.isPending}
+                  onChange={(sel) => { patchSecondary.mutate({ id: itemId, patch: { secondaryOperations: sel } }); }}
+                />
+              ) : (
+                <p className="text-[11px] text-muted-foreground">Not available for this part yet.</p>
+              )}
+            </aside>
           </div>
         ) : isCompleteRouteFamily ? (
           /* Complete-route path (plastic_molded, milled/turned/mill_turn): a
@@ -4489,7 +4510,7 @@ function RouteSelectionDialog({
           </div>
         )}
 
-        {cost?.secondaryOperations && itemId && (
+        {!isSheetMetal && cost?.secondaryOperations && itemId && (
           <div className="px-5 py-3 border-t shrink-0">
             <h4 className="text-xs font-semibold mb-1">Secondary operations (heat treatment, surface treatment, other)</h4>
             <p className="text-[10px] text-muted-foreground mb-1.5">Added to whichever route is set, Auto or Manual; saved as soon as you tick.</p>
