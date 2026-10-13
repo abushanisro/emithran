@@ -16,17 +16,14 @@ import { storageKey, type LoadedMesh } from '@/lib/viewer/geometry-store';
 import { viewerGeometryStore } from '@/lib/viewer/viewer-store';
 
 const BODY_COLOR = '#9b9bb4';
-/** Faces the value counted, and same-kind faces it left out. Nothing else on the part is colored. */
+/** The faces the value counted. Nothing else on the part is colored. */
 const COUNTED_COLOR = '#22c55e';
-const EXCLUDED_COLOR = '#ef4444';
 
 interface CadFeatureViewerProps {
   fileUrl: string;
   faceMap: FaceMapEntry[] | null;
   /** Faces the measured value was taken from (OCC ordinals, indices into faceMap). */
   faceIds: number[];
-  /** Same-kind faces the value left out, drawn in their own color. */
-  excludedFaceIds?: number[];
   /** Real setup-axis directions to draw, when the engine proved any. */
   axes?: Array<[number, number, number]>;
   /** How the measured faces are first drawn; the toolbar switches it. */
@@ -37,18 +34,15 @@ type Mode = 'face' | 'edge';
 type Focus = { on: 'part' | 'feature'; nonce: number };
 
 /** The part, loaded once through the shared store, with only the measured faces highlighted. */
-export function CadFeatureViewer({ fileUrl, faceMap, faceIds, excludedFaceIds, axes = [], initialMode = 'face' }: CadFeatureViewerProps) {
+export function CadFeatureViewer({ fileUrl, faceMap, faceIds, axes = [], initialMode = 'face' }: CadFeatureViewerProps) {
   const { mesh, error } = useMesh(fileUrl);
   const [mode, setMode] = useState<Mode>(initialMode);
   const [focus, setFocus] = useState<Focus>({ on: 'part', nonce: 0 });
 
-  // One face index per part, shared by both groups.
-  const faceIndex = useMemo(() => (mesh && faceMap ? buildFaceIndex(faceMap, mesh.triTotal) : null), [mesh, faceMap]);
-  const selection = useMemo(() => (mesh && faceIndex ? selectFaces(mesh, faceIndex, faceIds) : null), [mesh, faceIndex, faceIds]);
-  const excluded = useMemo(
-    () => (mesh && faceIndex && excludedFaceIds?.length ? selectFaces(mesh, faceIndex, excludedFaceIds) : null),
-    [mesh, faceIndex, excludedFaceIds],
-  );
+  const selection = useMemo(() => {
+    if (!mesh || !faceMap) return null;
+    return selectFaces(mesh, buildFaceIndex(faceMap, mesh.triTotal), faceIds);
+  }, [mesh, faceMap, faceIds]);
 
   const partBounds = useMemo(() => (mesh ? boundsOfPositions(mesh.positions) : null), [mesh]);
 
@@ -81,7 +75,7 @@ export function CadFeatureViewer({ fileUrl, faceMap, faceIds, excludedFaceIds, a
           <ambientLight intensity={0.7} />
           <directionalLight position={[10, 10, 5]} intensity={1.1} />
           <directionalLight position={[-10, -10, -5]} intensity={0.4} />
-          <Scene mesh={mesh} selection={selection} excluded={excluded} mode={mode} axes={axes} />
+          <Scene mesh={mesh} selection={selection} mode={mode} axes={axes} />
           <CameraRig bounds={focusBounds} nonce={focus.nonce} />
           <OrbitControls makeDefault enableDamping />
         </Canvas>
@@ -160,15 +154,15 @@ function SelectionLayer({ mesh, selection, color, mode }: { mesh: LoadedMesh; se
     g.setAttribute('position', new THREE.BufferAttribute(selection.positions, 3));
     return g;
   }, [selection]);
-  // The outline is only needed (and only computed) in edge mode.
+  // The outline is drawn on top in both modes: a hole wall seen from above is edge-on, so its rim is
+  // what makes it visible.
   const outline = useMemo(() => {
-    if (mode !== 'edge') return null;
     const edges = boundaryEdges(mesh.positions, selection.triangles);
     if (edges.length === 0) return null;
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(edges, 3));
     return g;
-  }, [mesh, selection, mode]);
+  }, [mesh, selection]);
   useEffect(() => () => { fill.dispose(); outline?.dispose(); }, [fill, outline]);
   return (
     <>
@@ -177,7 +171,7 @@ function SelectionLayer({ mesh, selection, color, mode }: { mesh: LoadedMesh; se
           <meshBasicMaterial color={color} side={THREE.DoubleSide} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2} />
         </mesh>
       )}
-      {mode === 'edge' && outline && (
+      {outline && (
         <lineSegments geometry={outline} renderOrder={4}>
           <lineBasicMaterial color={color} depthTest={false} />
         </lineSegments>
@@ -186,10 +180,9 @@ function SelectionLayer({ mesh, selection, color, mode }: { mesh: LoadedMesh; se
   );
 }
 
-function Scene({ mesh, selection, excluded, mode, axes }: {
+function Scene({ mesh, selection, mode, axes }: {
   mesh: LoadedMesh;
   selection: FaceSelection | null;
-  excluded: FaceSelection | null;
   mode: Mode;
   axes: Array<[number, number, number]>;
 }) {
@@ -207,7 +200,6 @@ function Scene({ mesh, selection, excluded, mode, axes }: {
         <meshStandardMaterial color={BODY_COLOR} metalness={0.05} roughness={0.6} side={THREE.DoubleSide} polygonOffset polygonOffsetFactor={1} polygonOffsetUnits={1} />
       </mesh>
       {selection && <SelectionLayer mesh={mesh} selection={selection} color={COUNTED_COLOR} mode={mode} />}
-      {excluded && <SelectionLayer mesh={mesh} selection={excluded} color={EXCLUDED_COLOR} mode={mode} />}
       {axes.length > 0 && <SetupAxisArrows geometry={body} axes={axes} />}
     </group>
   );

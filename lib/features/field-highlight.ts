@@ -4,10 +4,8 @@ import { cutLengthHighlight } from './cut-length-highlight';
 import { isBend, isPlainHole } from './feature-graph';
 
 export interface FieldHighlight {
-  /** What the viewer highlights: the faces this field counted. */
+  /** What the viewer highlights: only the faces this field counted. */
   node: FeatureNodeV2;
-  /** Faces of the same kind the calculation did not use (drawn in a second color); absent when every face of that kind was used. */
-  excluded?: FeatureNodeV2;
   /** What the CAD engine measured on those faces, for the engineer to compare with the field. */
   measured: { value: number; unit: string; label: string };
   /** False when the faces do not account for the number (engine-side) or for the input's current value. */
@@ -82,12 +80,8 @@ function computeFieldHighlight(evidenceKey: string, graph: FeatureGraphV2): Fiel
       .filter((o) => o.face_ids.length > 0 && typeof o.length_mm === 'number' && o.length_mm > 0);
     if (bends.length === 0) return null;
     const longest = bends.reduce((a, b) => ((b.length_mm ?? 0) > (a.length_mm ?? 0) ? b : a));
-    const others = bends.filter((b) => b !== longest);
     return {
       node: { id: 'longest_bend', feature_type: 'StraightBend', occurrences: [{ centroid: [0, 0, 0], face_ids: longest.face_ids }] },
-      ...(others.length > 0 ? {
-        excluded: { id: 'other_bends', feature_type: 'StraightBend', occurrences: others.map((b) => ({ centroid: [0, 0, 0] as [number, number, number], face_ids: b.face_ids })) },
-      } : {}),
       measured: { value: longest.length_mm ?? 0, unit: 'mm', label: `longest of ${bends.length} bends` },
       reconciles: m?.reconciles ?? true,
     };
@@ -95,7 +89,7 @@ function computeFieldHighlight(evidenceKey: string, graph: FeatureGraphV2): Fiel
 
   if (source.kind === 'tool_changes') {
     // One tool change per distinct hole diameter: the first hole of each diameter is where the
-    // turret changes tool; every further hole of that diameter reuses it.
+    // turret changes tool. Only those holes are highlighted.
     const byDiameter = new Map<string, FeatureOccurrence[]>();
     for (const f of graph.features.filter(isPlainHole)) {
       if (typeof f.diameter_mm !== 'number') continue;
@@ -106,10 +100,8 @@ function computeFieldHighlight(evidenceKey: string, graph: FeatureGraphV2): Fiel
     }
     const groups = [...byDiameter.values()].filter((g) => g.length > 0);
     if (groups.length === 0) return null;
-    const reused = groups.flatMap((g) => g.slice(1));
     return {
       node: { id: 'tool_changes', feature_type: 'SimpleHole', occurrences: groups.map((g) => g[0]!) },
-      ...(reused.length > 0 ? { excluded: { id: 'tool_reused', feature_type: 'SimpleHole', occurrences: reused } } : {}),
       measured: { value: groups.length, unit: 'count', label: 'distinct hole diameters' },
       reconciles: true,
     };
