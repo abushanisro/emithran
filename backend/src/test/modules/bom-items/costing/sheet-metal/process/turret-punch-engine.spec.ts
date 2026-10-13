@@ -1,4 +1,4 @@
-import { computeTurretPunchCost, turretMissingInputs, type TurretPunchInput } from '../../../../../../modules/bom-items/costing/sheet-metal/process/turret-punch-engine';
+import { computeTurretPunchCost, distinctHoleDiameterCount, turretMissingInputs, type TurretPunchInput } from '../../../../../../modules/bom-items/costing/sheet-metal/process/turret-punch-engine';
 import { findRouteDataGaps } from '../../../../../../modules/bom-items/costing/shared/core/engine-kernel';
 
 // Cycle time is the TPP calculator result (migration 904; the formula is checked in
@@ -139,5 +139,27 @@ describe('computeTurretPunchCost — material handling allowance (closeout Plan 
     const result = computeTurretPunchCost(baseInput({ handlingAllowance: { allowanceUsd: 9, dataFound: true } }));
 
     expect(result.processLines.some((l) => l.process === 'Material Handling')).toBe(false);
+  });
+});
+
+// Rtp2 Mag2 Backframe, real feature graph: 124 plain holes of 13 distinct diameters. The tool
+// changes are the 13 diameters, not the 124 holes.
+describe('distinctHoleDiameterCount', () => {
+  const rtp2 = [[2.5, 60], [3, 6], [3.5, 7], [4, 11], [4.8, 11], [5, 6], [6, 1], [7, 2], [8, 3], [9, 5], [10, 3], [12, 8], [20, 1]]
+    .flatMap(([d, n]) => Array.from({ length: n! }, () => d!));
+
+  it('counts one tool per diameter, not one per hole', () => {
+    expect(rtp2).toHaveLength(124);
+    expect(distinctHoleDiameterCount(rtp2)).toBe(13);
+  });
+
+  it('treats diameters within 0.01 mm as one tool', () => {
+    expect(distinctHoleDiameterCount([5, 4.999, 5.001])).toBe(1);
+    expect(distinctHoleDiameterCount([5, 5.02])).toBe(2);
+  });
+
+  it('is null, not 0, when no diameters were recorded', () => {
+    expect(distinctHoleDiameterCount([])).toBeNull();
+    expect(distinctHoleDiameterCount(undefined)).toBeNull();
   });
 });

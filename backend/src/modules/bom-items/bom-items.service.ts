@@ -18,7 +18,7 @@ import type { InspectionInput } from './costing/shared/process/inspection-engine
 import { evaluateCalculatorFormulas, normalizeFieldName } from '../calculators/calculator-formula-evaluator';
 import type { CalculatorFieldRow } from '../calculators/calculator-formula-evaluator';
 import { PHYSICS_REGISTRY } from '../calculators/physics-registry';
-import { turretMissingInputs } from './costing/sheet-metal/process/turret-punch-engine';
+import { distinctHoleDiameterCount, turretMissingInputs } from './costing/sheet-metal/process/turret-punch-engine';
 import { SheetMetalLookupService, roundUpToStandardTonnageClass } from './costing/sheet-metal/lookup/sheet-metal-lookup.service';
 import { MachiningLookupService } from './costing/machining/lookup/machining-lookup.service';
 import type { LaserCutParams } from './costing/sheet-metal/lookup/sheet-metal-lookup.service';
@@ -7301,7 +7301,9 @@ export class BOMItemsService {
     // (punching + tool changes + nibbling, migration 904), seeded with the selected
     // machine's own rates. Run only when every machine input is on file; otherwise the
     // engine reports why as a data gap, never a default.
-    const rcTurretMissing = turretMissingInputs(mhrRates.turret.machineName, rcTurretPunchMachineParams);
+    const rcToolChanges = pierceCount > 0 ? distinctHoleDiameterCount(summary.holeDiameters as number[] | undefined) : 0;
+    const rcTurretMissing = turretMissingInputs(mhrRates.turret.machineName, rcTurretPunchMachineParams)
+      ?? (rcToolChanges == null ? 'no hole diameters were recorded for this part, so the tool changes cannot be counted (re-analyse the part)' : null);
     const rcTurretCalc = (cutLengthMm > 0 || pierceCount > 0) && rcTurretMissing == null && rcTurretPunchMachineParams
       ? await this.resolvePhysicsQuantity(accessToken, {
           machineClass: 'turret_punch',
@@ -7311,7 +7313,7 @@ export class BOMItemsService {
             'Punch Count': pierceCount,
             'Punch Rate (hits/min)': rcTurretPunchMachineParams.punchRateCyclesPerMin,
             'Stroke Rate Factor': rcTurretPunchMachineParams.strokeRateFactor!,
-            'Tool Changes': holeCount,
+            'Tool Changes': rcToolChanges!,
             'Tool Change Time (s)': rcTurretPunchMachineParams.toolChangeSec,
             'Nibble Length (mm)': cutLengthMm,
             'Nibble Speed (mm/min)': rcTurretPunchMachineParams.nibbleMmPerMin,
@@ -7321,7 +7323,7 @@ export class BOMItemsService {
             'Punch Count': 'CAD feature extraction — punched hole count',
             'Punch Rate (hits/min)': `${mhrRates.turret.machineName} — punchRate (Countries data export, sm_reference_data turretPunchMachine)`,
             'Stroke Rate Factor': `Lookup Table 1 — ${rcTurretPunchMachineParams.machineTonnageT?.toFixed(1)} t machine, ${rcLookupComplexity} part (sm_reference_data strokeRateFactor)`,
-            'Tool Changes': 'CAD feature extraction — distinct hole diameters (one tool change each)',
+            'Tool Changes': 'CAD feature extraction — distinct punched hole diameters (holes of one diameter share a tool)',
             'Tool Change Time (s)': `${mhrRates.turret.machineName} — tool_change_time_s (machine library)`,
             'Nibble Length (mm)': 'CAD feature extraction — total cut path length',
             'Nibble Speed (mm/min)': `${mhrRates.turret.machineName} — nibble rate x tool step (diameter - overlap)`,

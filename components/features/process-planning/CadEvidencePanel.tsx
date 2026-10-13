@@ -9,6 +9,9 @@ import { CadFeatureViewer } from '@/components/features/cad-feature-viewer/CadFe
 import type { FieldHighlight } from '@/lib/features/field-highlight';
 import type { FaceMapEntry } from '@/lib/types/manufacturing';
 
+/** Faces this field counted (the viewer draws the left-out ones red). */
+const USED_COLOR = '#22c55e';
+
 export interface CadEvidence {
   fieldLabel: string;
   /** null when this analysis did not record the CAD faces for the value: the part needs re-analysis. */
@@ -49,10 +52,16 @@ export function CadEvidencePanel({
         <div>
           <h3 className="font-semibold text-sm">CAD evidence: {evidence.fieldLabel}</h3>
           {highlight ? (
+            <>
             <p className={`text-xs ${highlight.reconciles ? 'text-muted-foreground' : 'text-amber-600'}`}>
               {highlight.measured.label} = {Math.round(highlight.measured.value * 10) / 10} {highlight.measured.unit}
               {!highlight.reconciles && ` — ${highlight.note ?? 'these faces do not fully account for the extracted value'}`}
             </p>
+            <p className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm" style={{ backgroundColor: USED_COLOR }} />counted</span>
+              {highlight.excluded && <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-red-500" />same kind, not counted</span>}
+            </p>
+            </>
           ) : (
             <p className="text-xs text-amber-600">The CAD faces for this value were not recorded by this analysis</p>
           )}
@@ -93,6 +102,8 @@ export function CadEvidencePanel({
             fileName={fileName}
             fileType={fileType}
             highlightOccurrences={highlight.node}
+            highlightColor={USED_COLOR}
+            {...(highlight.excluded ? { excludedOccurrences: highlight.excluded } : {})}
             faceMap={faceMap}
             {...(sheetThickness !== undefined ? { sheetThickness } : {})}
           />

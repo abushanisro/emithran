@@ -54,6 +54,16 @@ interface TurretPunchResult {
 }
 
 /**
+ * Tool changes of a turret part: one per distinct punched hole diameter (holes of one diameter
+ * share a tool). Diameters are compared to 0.01 mm, the resolution of the CAD feature ids.
+ * Null when the analysis recorded no hole diameters.
+ */
+export function distinctHoleDiameterCount(diametersMm: readonly number[] | null | undefined): number | null {
+  const valid = (diametersMm ?? []).filter((d) => Number.isFinite(d) && d > 0);
+  return valid.length === 0 ? null : new Set(valid.map((d) => d.toFixed(2))).size;
+}
+
+/**
  * Why the TPP calculator cannot be seeded for this machine, or null when every
  * machine input is on file. With no machine there is nothing to read a rate from:
  * that is a selection result (no turret meets the part's force or size need), not

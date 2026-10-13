@@ -178,6 +178,14 @@ export const processesApi = {
     return apiClient.get<ReferenceTable>('/processes/deslag-allowance-table');
   },
 
+  getTurretMachinesTable: async (): Promise<ReferenceTable> => {
+    return apiClient.get<ReferenceTable>('/processes/turret-machines-table');
+  },
+
+  getStrokeRateFactorTable: async (): Promise<ReferenceTable> => {
+    return apiClient.get<ReferenceTable>('/processes/stroke-rate-factor-table');
+  },
+
   getSmLookupTableByName: async (table: string): Promise<ReferenceTable> => {
     return apiClient.get<ReferenceTable>(`/processes/sm-lookup-tables/by-name/${encodeURIComponent(table)}`);
   },

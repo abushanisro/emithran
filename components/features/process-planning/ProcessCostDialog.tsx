@@ -56,6 +56,12 @@ import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
 // The Deburr calculator's time per mm is each Deslag machine's own perimeter allowance
 // in the machine library, so its eye opens that table (not an sm_lookup_* table).
 const DESLAG_ALLOWANCE_FIELD = 'Deburr Time Per mm';
+// TPP calculator inputs read from the Turret Press machine library and from Lookup Table 1.
+// The eye shows the table with the selected machine's row (or its tonnage row) marked.
+const TURRET_MACHINE_FIELDS: ReadonlySet<string> = new Set(['Punch Rate (hits/min)', 'Tool Change Time (s)', 'Nibble Speed (mm/min)']);
+const STROKE_RATE_FACTOR_FIELD = 'Stroke Rate Factor';
+const isTurretReferenceField = (fieldName: string, machineClass: string | undefined) =>
+  machineClass === 'turret_punch' && (TURRET_MACHINE_FIELDS.has(fieldName) || fieldName === STROKE_RATE_FACTOR_FIELD);
 
 // Known options for calculator fields whose fieldType is 'select' — the
 // calculator engine has no generic options-storage column yet, so this is a
@@ -2212,6 +2218,36 @@ export function ProcessCostDialog({
         return;
       }
 
+      // Turret Press: the machine table (punch rate, tool change, nibble speed) with the selected
+      // machine marked, or Lookup Table 1 with the row of that machine's tonnage marked.
+      if (isTurretReferenceField(field.fieldName, selectedMachineClass)) {
+        const machineName = selectedMHR?.machineName;
+        let table: any;
+        let matchedRowKeys: Record<string, unknown> | null = machineName ? { machine_name: machineName } : null;
+        if (field.fieldName === STROKE_RATE_FACTOR_FIELD) {
+          const [factors, machines] = await Promise.all([processesApi.getStrokeRateFactorTable(), processesApi.getTurretMachinesTable()]);
+          table = factors;
+          const tonnage = Number(((machines.rows ?? []) as any[]).find((r) => r.machine_name === machineName)?.machine_tonnage_t);
+          const nearest = Number.isFinite(tonnage)
+            ? ((factors.rows ?? []) as any[]).reduce<any>((best, r) => (best == null || Math.abs(r.tonnage_t - tonnage) < Math.abs(best.tonnage_t - tonnage) ? r : best), null)
+            : null;
+          matchedRowKeys = nearest ? { tonnage_t: nearest.tonnage_t } : null;
+        } else {
+          table = await processesApi.getTurretMachinesTable();
+        }
+        setLookupTableData({
+          fieldName: field.fieldName,
+          fieldLabel: field.displayLabel || field.fieldName,
+          tableName: table.tableName,
+          tableId: table.id,
+          column_definitions: table.columnDefinitions || [],
+          rows: table.rows ?? [],
+          matchedRowKeys,
+        });
+        setShowLookupTable(true);
+        return;
+      }
+
       // Deslag machine library: every Deslag machine's perimeter allowance, the
       // machine this line uses outlined.
       if (field.fieldName === DESLAG_ALLOWANCE_FIELD && selectedMachineClass === 'deburring') {
@@ -3473,6 +3509,7 @@ export function ProcessCostDialog({
                           // via ad-hoc frontend JS instead (resolveAdHocLookupTableKey).
                           (field.dataSource === SM_LOOKUP_DATA_SOURCE && !!field.sourceField) ||
                           (field.fieldName === DESLAG_ALLOWANCE_FIELD && selectedMachineClass === 'deburring') ||
+                          isTurretReferenceField(field.fieldName, selectedMachineClass) ||
                           !!resolveAdHocLookupTableKey(field.fieldName, selectedMachineClass);
 
 

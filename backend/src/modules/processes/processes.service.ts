@@ -9,6 +9,7 @@ import { dieCastingLookupTableNames } from '../bom-items/costing/casting/calcula
 import { castingMaterialsAsTable, castingTableQuery, castingVariablesAsTable, type CastingFlatTable } from '../bom-items/costing/casting/casting-lookup-tables';
 import * as ExcelJS from 'exceljs';
 import { REFERENCE_DOMAINS, REFERENCE_GROUP_DOMAIN, type ReferenceDomain } from './reference-domains';
+import { strokeRateFactorTable, turretMachinesTable, type ReferenceTablePayload } from '../bom-items/costing/sheet-metal/lookup/turret-reference-tables';
 import { Logger } from '../../common/logger/logger.service';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import {
@@ -260,6 +261,29 @@ export class ProcessesService {
       ],
       rows,
     };
+  }
+
+  /** Every Turret Press machine with the values the TPP calculator reads from it (Punch Rate, Tool Change Time, Nibble Speed). */
+  async getTurretMachinesTable(): Promise<ReferenceTablePayload> {
+    const db = this.supabaseService.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const [machines, library] = await Promise.all([
+      db.from('sm_reference_data').select('key, raw').eq('category', 'machine').like('key', 'turretPunchMachine:%'),
+      db.from('sm_reference_data').select('key, raw').eq('category', 'machine').like('key', 'Turret Press (Punch Press):%'),
+    ]);
+    if (machines.error || library.error) throw new InternalServerErrorException('Failed to read the Turret Press machine library');
+    return turretMachinesTable(machines.data ?? [], library.data ?? []);
+  }
+
+  /** Lookup Table 1: stroke rate factor by machine tonnage and part complexity. */
+  async getStrokeRateFactorTable(): Promise<ReferenceTablePayload> {
+    const { data, error } = await this.supabaseService
+      .getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared')
+      .from('sm_reference_data')
+      .select('raw')
+      .eq('category', 'lookup_table')
+      .like('key', 'strokeRateFactor:%');
+    if (error) throw new InternalServerErrorException('Failed to read the stroke rate factor table');
+    return strokeRateFactorTable(data ?? []);
   }
 
   async getSmLookupTableByName(table: string, accessToken: string): Promise<any> {

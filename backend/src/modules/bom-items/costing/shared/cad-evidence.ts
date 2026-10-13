@@ -10,6 +10,7 @@ export const CAD_EVIDENCE_KEYS = [
   'bend_count',
   'bend_line_length',
   'flat_pattern_area',
+  'hole_diameters',
 ] as const;
 
 export type CadEvidenceKey = (typeof CAD_EVIDENCE_KEYS)[number];
@@ -23,7 +24,13 @@ const EVIDENCE_BY_FIELD: Readonly<Record<string, CadEvidenceKey>> = {
   'No Of Bends': 'bend_count',
   'Bending Line Length': 'bend_line_length',
   'Flat Pattern Area': 'flat_pattern_area',
+  'Punch Count': 'pierce_count',
+  'Nibble Length': 'cut_length',
+  'Tool Changes': 'hole_diameters',
 };
+
+/** "Nibble Length (mm)" -> "Nibble Length": live calculator fields carry their unit in the name. */
+const withoutUnit = (name: string) => name.replace(/\s*\([^)]*\)\s*$/, '').trim();
 
 /**
  * The evidence key for an input step, or undefined. Requires the value's declared
@@ -32,5 +39,5 @@ const EVIDENCE_BY_FIELD: Readonly<Record<string, CadEvidenceKey>> = {
  */
 export function cadEvidenceKey(fieldName: string, source: string | undefined): CadEvidenceKey | undefined {
   if (!source || !/^CAD\b/i.test(source)) return undefined;
-  return EVIDENCE_BY_FIELD[fieldName];
+  return EVIDENCE_BY_FIELD[fieldName] ?? EVIDENCE_BY_FIELD[withoutUnit(fieldName)];
 }

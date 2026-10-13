@@ -127,6 +127,8 @@ interface ModelViewerProps {
   cameraPreset?: 'top' | 'front' | 'right' | 'isometric' | null;
   onScreenshotReady?: (dataUrl: string) => void;
   highlightOccurrences?: FeatureNodeV2HL | null;
+  /** Same-kind faces left out of the calculation, drawn in their own color. */
+  excludedOccurrences?: FeatureNodeV2HL | null;
   selectedOccurrenceIndex?: number | null;
   onOccurrenceSelect?: (index: number | null) => void;
   faceMap?: FaceMapEntry[] | null;
@@ -186,6 +188,7 @@ export function ModelViewer({
   cameraPreset,
   onScreenshotReady,
   highlightOccurrences,
+  excludedOccurrences,
   selectedOccurrenceIndex,
   onOccurrenceSelect,
   faceMap,
@@ -346,6 +349,7 @@ export function ModelViewer({
               {...(cameraPreset !== undefined ? { cameraPreset } : {})}
               {...(onScreenshotReady ? { onScreenshotReady } : {})}
               {...(highlightOccurrences !== undefined ? { highlightOccurrences } : {})}
+              {...(excludedOccurrences !== undefined ? { excludedOccurrences } : {})}
               {...(selectedOccurrenceIndex !== undefined ? { selectedOccurrenceIndex } : {})}
               {...(onOccurrenceSelect ? { onOccurrenceSelect } : {})}
               {...(faceMap !== undefined ? { faceMap } : {})}
@@ -507,6 +511,7 @@ export function ModelViewer({
               {...(cameraPreset !== undefined ? { cameraPreset } : {})}
               {...(onScreenshotReady ? { onScreenshotReady } : {})}
               {...(highlightOccurrences !== undefined ? { highlightOccurrences } : {})}
+              {...(excludedOccurrences !== undefined ? { excludedOccurrences } : {})}
               {...(selectedOccurrenceIndex !== undefined ? { selectedOccurrenceIndex } : {})}
               {...(onOccurrenceSelect ? { onOccurrenceSelect } : {})}
               {...(faceMap !== undefined ? { faceMap } : {})}
