@@ -4986,7 +4986,8 @@ function CostGuidePanel({
   // see its definition). Used for the costing-input rows so they do not wait on
   // this panel's own ~13s cost-summary query.
   resolvedInputs: ResolvedCostingInputs | null;
-  applyScenario: (extraPatch?: Record<string, unknown>) => Promise<void>;
+  /** Resolves false when the staged route could not be applied (nothing was written for it). */
+  applyScenario: (extraPatch?: Record<string, unknown>) => Promise<boolean>;
   onManualClick: () => void;
   selectedManualRoute: ManualRouteOption | null;
   onSelectHighlight?: (node: FeatureNodeV2 | null) => void;
@@ -5851,7 +5852,11 @@ function CostGuidePanel({
             ...(askPricePatch !== undefined ? { askPrice: askPricePatch } : {}),
           };
         }
-        await applyScenario(scenarioFxPatch);
+        const routeApplied = await applyScenario(scenarioFxPatch);
+        if (!routeApplied) {
+          toast.error('Scenario not applied — the staged route was refused, see the message above. It has been cleared; Apply again to use the Auto-recommended route, or pick another route in the Workflow Builder.');
+          return;
+        }
         setApplyProgress({ step: 'Saving material grade…', pct: 40 });
 
         // Single commit point for Material Grade — every picker interaction above
@@ -5867,14 +5872,7 @@ function CostGuidePanel({
           } catch { /* non-fatal — proceed with whatever is on the server */ }
         }
 
-        setApplyProgress({ step: 'Recalculating cost summary…', pct: 60 });
-        // Active observers only: type 'all' (the default) also refetched every
-        // inactive cache entry for this item, each a 35-95 s computation.
-        await queryClient.refetchQueries({
-          queryKey: ['bom-items', item.id, 'cost-summary'],
-          exact: false,
-          type: 'active',
-        });
+        setApplyProgress({ step: 'Updating material and process cost…', pct: 60 });
 
         const currentGrade = pendingGrade || costedGrade(item);
         if (currentGrade) {
@@ -5894,9 +5892,17 @@ function CostGuidePanel({
           }
         }
 
-        // No final invalidation: the scenario patch, the material write and
-        // apply-route each already invalidated cost-summary and route-comparison.
-        setApplyProgress({ step: 'Finishing up…', pct: 95 });
+        // ONE cost-summary computation, after every write. It used to be forced
+        // here before the material and route writes, then refetched again by each
+        // write's own invalidation: up to three 35-95 s computations per Apply.
+        // cancelRefetch:false joins the fetch the last invalidation already started
+        // instead of cancelling and restarting it.
+        setApplyProgress({ step: 'Recalculating cost summary…', pct: 90 });
+        await queryClient.refetchQueries({
+          queryKey: ['bom-items', item.id, 'cost-summary'],
+          exact: false,
+          type: 'active',
+        }, { cancelRefetch: false });
       } catch { /* outer safety net — never block the toast */ }
 
       const appliedParts: string[] = [
@@ -6488,7 +6494,6 @@ function CostGuidePanel({
             disabled={isApplying}
             className="flex-1 text-xs bg-brand-600 hover:bg-brand-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded px-2 py-1 font-medium transition-colors flex items-center justify-center gap-1.5"
           >
-            {isApplying && <Loader2 className="h-3 w-3 animate-spin" />}
             {isApplying ? 'Applying…' : 'Apply'}
           </button>
           <button className="text-xs border border-border rounded px-2 py-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">Copy</button>
@@ -9555,7 +9560,8 @@ export default function ManufacturingIntelligencePage() {
   // Digital Factory/Batch Size + the staged Workflow Builder route together
   // and only THEN run its own material-grade-driven logic — there is no
   // longer a separate top "Apply Scenario" banner/button.
-  const applyScenario = async (extraPatch?: Record<string, unknown>) => {
+  const applyScenario = async (extraPatch?: Record<string, unknown>): Promise<boolean> => {
+    let routeApplied = true;
     const isDieCastPart = (item?.familyClassification ?? fg?.classification?.family) === 'die_cast';
     setFactory(factoryDraft);
     // Only an explicit override becomes a request param. On an auto request the
@@ -9635,19 +9641,28 @@ export default function ManufacturingIntelligencePage() {
         try {
           await applyCustomRoute.mutateAsync({ baseCuttingRouteId: route.dynamicCuttingRouteId, steps, ...(batchSizeDraft !== null ? { batchSize: batchSizeDraft } : {}), location: factoryDraft });
           await applyMachineOverrides();
-        } catch { /* errors surfaced by the mutation's own onError toast */ }
+        } catch { routeApplied = false; /* the mutation's own onError toast states why */ }
       } else if (route.directApplyRouteId) {
         try {
           await applyRoute.mutateAsync({ routeId: route.directApplyRouteId, ...(batchSizeDraft !== null ? { batchSize: batchSizeDraft } : {}), location: factoryDraft });
           await applyMachineOverrides();
-        } catch { /* errors surfaced by the mutation's own onError toast */ }
+        } catch { routeApplied = false; /* the mutation's own onError toast states why */ }
       } else {
         // A selectedManualRoute with neither dynamicCuttingRouteId nor
         // directApplyRouteId has no real apply target. Say so, rather than
         // leave the Process Routing panel showing a route nothing wrote.
         toast.error(`"${route.label}" cannot be applied — no real route target was resolved for it. Reopen Workflow Builder and pick a route again.`);
+        routeApplied = false;
+      }
+      // A staged route the server refused stays staged otherwise, and every later
+      // Apply re-sends and re-fails it (reported: the same Turret 400 on each click).
+      // Drop it so the next Apply runs Auto; nothing was written for it.
+      if (!routeApplied) {
+        setSelectedManualRoute(null);
+        setProcessRouting('auto');
       }
     }
+    return routeApplied;
   };
   const [refreshing, setRefreshing] = useState(false);
   // Applies the real machine picked per step in the Workflow Builder, after
