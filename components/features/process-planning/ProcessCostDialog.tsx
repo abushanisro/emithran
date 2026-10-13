@@ -51,7 +51,7 @@ import { useDebounce } from '@/lib/hooks/useDebounce';
 import type { EngineCalculatorSeed } from '@/lib/calculators/engine-calculator-seeds';
 import { isMatchedLookupRow } from '@/lib/calculators/lookup-row-match';
 import { describeStrokeLookup, strokeComplexity as strokeComplexityOf } from '@/lib/calculators/stroke-lookup';
-import { liveOperationOptions, resolveSavedOperation, type LiveOperationOption } from '@/lib/processCatalog/live-operation-options';
+import { effectiveOperation, liveOperationOptions, resolveSavedOperation, type LiveOperationOption } from '@/lib/processCatalog/live-operation-options';
 import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
 
 // The Deburr calculator's time per mm is each Deslag machine's own perimeter allowance
@@ -316,7 +316,9 @@ export function ProcessCostDialog({
   // suggestion list and each row's own displayed category always agree.
   const [selectedGroup, setSelectedGroup] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [selectedOperation, setSelectedOperation] = useState<string>('');
+  // The engineer's own pick; null until they touch it. The Operation actually shown and saved is
+  // `selectedOperation`, derived below (effectiveOperation) so it never depends on effect timing.
+  const [operationChoice, setOperationChoice] = useState<string | null>(null);
   const [selectedProcessCalculatorId, setSelectedProcessCalculatorId] = useState<string>('');
 
   // Preserved, NOT edited. Older rows were configured through the retired
@@ -875,10 +877,14 @@ export function ProcessCostDialog({
     if (!savedOperationApplies || !savedLiveOperation || operationOptions.some((op) => op.value === savedLiveOperation)) return operationOptions;
     return [...operationOptions, { value: savedLiveOperation, label: `${savedLiveOperation} (saved on this line)`, detail: null, cycleTimeMin: 0, lineProcess: savedLiveOperation }];
   }, [operationOptions, savedLiveOperation, savedOperationApplies]);
-  // A selection that is no longer offered (machine class changed) is cleared.
-  useEffect(() => {
-    if (selectedOperation && !operationOptionsWithSaved.some((o) => o.value === selectedOperation)) setSelectedOperation('');
-  }, [operationOptionsWithSaved, selectedOperation]);
+  const selectedOperation = effectiveOperation({
+    choice: operationChoice,
+    options: operationOptionsWithSaved,
+    savedOperation: savedLiveOperation,
+    savedApplies: savedOperationApplies,
+  });
+  // A pick belongs to one open dialog: closing it forgets the pick.
+  useEffect(() => { if (!open) setOperationChoice(null); }, [open]);
   // The route + operation this line will be saved with.
   const lineIdentity = resolveLineIdentity({
     savedMachineClass: editData?.machineClass,
@@ -1027,20 +1033,6 @@ export function ProcessCostDialog({
     if (!selectedCategory && derived.category) setSelectedCategory(derived.category);
     backfilledFromMachineRef.current = true;
   }, [open, editData, editDataApplied, savedMHRId, savedMHRRecord, isLoadingMHR, hrRatesIndex, selectedGroup, selectedCategory]);
-
-  // Pre-select "3. Operation" when editing an existing line, from its real
-  // saved operation string. operationOptionsWithSaved (saved value kept)
-  // guarantees a matching item always exists once savedOperation is known,
-  // so this no longer races against liveProcessLines loading — once per
-  // open, so it never overwrites a deliberate in-progress change.
-  const backfilledOperationRef = useRef(false);
-  useEffect(() => {
-    if (!open) { backfilledOperationRef.current = false; return; }
-    if (backfilledOperationRef.current) return;
-    if (!savedLiveOperation || selectedOperation || !savedOperationApplies) return;
-    setSelectedOperation(savedLiveOperation);
-    backfilledOperationRef.current = true;
-  }, [open, savedLiveOperation, selectedOperation, savedOperationApplies]);
 
   // Auto-select the machine the COST ENGINE selected for this category's live
   // line (machineSelection.balanced) — never simply the first row of the list,
@@ -2907,7 +2899,7 @@ export function ProcessCostDialog({
                           value={selectedCategory}
                           onValueChange={(value) => {
                             setSelectedCategory(value);
-                            setSelectedOperation('');
+                            setOperationChoice(null);
                             setSelectedProcessCalculatorId('');
                           }}
                           disabled={!selectedGroup}
@@ -2989,7 +2981,7 @@ export function ProcessCostDialog({
                         </Label>
                         <Select
                           value={selectedOperation}
-                          onValueChange={setSelectedOperation}
+                          onValueChange={setOperationChoice}
                           disabled={!selectedCategory || operationOptionsWithSaved.length === 0}
                         >
                           <SelectTrigger>

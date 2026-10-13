@@ -118,3 +118,25 @@ function catalogOperationsOf(line: LiveOperationLine): Array<{ operation: string
   }
   return [...byOp].map(([operation, count]) => ({ operation, count }));
 }
+
+/**
+ * The Operation the dialog shows and saves, as a pure function of its inputs: the engineer's own
+ * pick while it is still offered, else the line's saved operation while that still applies,
+ * else none. It is derived on every render instead of being copied into state by effects, so it
+ * cannot race the asynchronous loads it depends on (the machine, the category, the live lines)
+ * or be cleared by a render in which those have not settled yet.
+ */
+export function effectiveOperation(input: {
+  /** What the engineer picked in this dialog; null while they have not touched it. */
+  choice: string | null;
+  options: ReadonlyArray<{ value: string }>;
+  /** The line's saved operation as the live lines name it (see resolveSavedOperation). */
+  savedOperation: string;
+  /** The line is still on its saved machine class (see keepsSavedOperation). */
+  savedApplies: boolean;
+}): string {
+  const offered = (value: string) => input.options.some((o) => o.value === value);
+  if (input.choice !== null && offered(input.choice)) return input.choice;
+  if (input.savedApplies && input.savedOperation && offered(input.savedOperation)) return input.savedOperation;
+  return '';
+}
