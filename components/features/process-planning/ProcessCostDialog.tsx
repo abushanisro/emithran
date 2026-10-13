@@ -503,9 +503,13 @@ export function ProcessCostDialog({
   // here) means this summary can never drift from whatever formula the
   // calculator actually used.
   const CYCLE_TIME_FIELD_NAMES = ['Total Time', 'Cycle Time'];
+  // Live calculators carry the unit in the field name ("Cycle Time (sec)",
+  // "Thickness (mm)"), so a name is matched without its trailing "(unit)".
+  const baseFieldName = (name: string) => name.replace(/\s*\([^)]*\)\s*$/, '').trim();
+  const isCycleTimeField = (name: string) => CYCLE_TIME_FIELD_NAMES.includes(baseFieldName(name));
   const computedCycleTime = useMemo(() => {
     if (!calculatorResults || !selectedCalculator?.fields) return null;
-    const totalTimeField = selectedCalculator.fields.find((f: CalculatorField) => CYCLE_TIME_FIELD_NAMES.includes(f.fieldName));
+    const totalTimeField = selectedCalculator.fields.find((f: CalculatorField) => isCycleTimeField(f.fieldName));
     if (!totalTimeField) return null;
     const raw = calculatorResults[totalTimeField.fieldName];
     const hasError = raw && typeof raw === 'object' && 'error' in raw;
@@ -577,16 +581,17 @@ export function ProcessCostDialog({
   const relevantFieldNames = useMemo(() => {
     if (!selectedCalculator?.fields || calculatorTarget !== 'cycleTime') return null;
     const fields = selectedCalculator.fields as any[];
-    const byName = new Map(fields.map((f) => [f.fieldName, f]));
-    const targetField = fields.find((f) => CYCLE_TIME_FIELD_NAMES.includes(f.fieldName));
+    const byName = new Map<string, any>();
+    for (const f of fields) byName.set(f.fieldName, f);
+    for (const f of fields) if (!byName.has(baseFieldName(f.fieldName))) byName.set(baseFieldName(f.fieldName), f);
+    const targetField = fields.find((f) => isCycleTimeField(f.fieldName));
     if (!targetField) return null;
 
     const visited = new Set<string>();
     const resolve = (fieldName: string) => {
-      if (visited.has(fieldName)) return;
-      visited.add(fieldName);
-      const f = byName.get(fieldName);
-      if (!f) return;
+      const f = byName.get(fieldName) ?? byName.get(baseFieldName(fieldName));
+      if (!f || visited.has(f.fieldName)) return;
+      visited.add(f.fieldName);
       const formula = typeof f.defaultValue === 'string' ? f.defaultValue : '';
       for (const ref of formula.match(/\{([^}]+)\}/g) ?? []) resolve(ref.slice(1, -1));
       if (f.dataSource === SM_LOOKUP_DATA_SOURCE && f.sourceField) {
@@ -3741,7 +3746,7 @@ export function ProcessCostDialog({
                         // defines (see CYCLE_TIME_FIELD_NAMES above) — the
                         // same field computedCycleTime/"Use as Cycle Time"
                         // below already keys off.
-                        .filter((field: CalculatorField) => calculatorTarget !== 'cycleTime' || CYCLE_TIME_FIELD_NAMES.includes(field.fieldName))
+                        .filter((field: CalculatorField) => calculatorTarget !== 'cycleTime' || isCycleTimeField(field.fieldName))
                         .map((field: CalculatorField) => {
                           const result = calculatorResults[field.fieldName];
                           const hasError = result && typeof result === 'object' && 'error' in result;

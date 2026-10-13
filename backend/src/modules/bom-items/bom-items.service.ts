@@ -18,6 +18,7 @@ import type { InspectionInput } from './costing/shared/process/inspection-engine
 import { evaluateCalculatorFormulas, normalizeFieldName } from '../calculators/calculator-formula-evaluator';
 import type { CalculatorFieldRow } from '../calculators/calculator-formula-evaluator';
 import { PHYSICS_REGISTRY } from '../calculators/physics-registry';
+import { turretMissingInputs } from './costing/sheet-metal/process/turret-punch-engine';
 import { SheetMetalLookupService, roundUpToStandardTonnageClass } from './costing/sheet-metal/lookup/sheet-metal-lookup.service';
 import { MachiningLookupService } from './costing/machining/lookup/machining-lookup.service';
 import type { LaserCutParams } from './costing/sheet-metal/lookup/sheet-metal-lookup.service';
@@ -6661,10 +6662,8 @@ export class BOMItemsService {
     // via comparisonWarnings when a table has no row yet (never silent).
     // See migrations 413 (deburr), 414 (turret punch), 415 (waterjet abrasive),
     // 416 (setup times).
-    const [rcOpSetupTimes, rcTurretParams, rcRealTurretParams, rcAbrasiveRate, rcRealAbrasiveRate, rcHandlingAllowance, rcNozzleRate] = await Promise.all([
+    const [rcOpSetupTimes, rcAbrasiveRate, rcRealAbrasiveRate, rcHandlingAllowance, rcNozzleRate] = await Promise.all([
       this.smLookup.getOpSetupTimes(),
-      this.smLookup.getTurretPunchParams(thk),
-      this.smLookup.getTurretPunchParamsForMachine(mhrRates.turret.machineName),
       this.smLookup.getWaterjetAbrasiveRate(),
       this.smLookup.getWaterjetAbrasiveRateForMachine(mhrRates.waterjet.machineName),
       this.smLookup.getHandlingAllowanceUsd('turret_punch', grossWeightKg),
@@ -6674,26 +6673,9 @@ export class BOMItemsService {
     // via sm_reference_data) always wins over the generic pump-tier average when
     // it's on file — see getWaterjetAbrasiveRateForMachine's own doc comment.
     const effectiveAbrasiveRate = rcRealAbrasiveRate.dataFound ? rcRealAbrasiveRate : rcAbrasiveRate;
-    // Same real-machine-wins-outright rule for turret punch rate/tool-change
-    // time — see getTurretPunchParamsForMachine's own doc comment for why
-    // nibbleMmPerMin is deliberately left untouched (no direct real-data
-    // source for it). Only applied when the thickness curve itself found a
-    // row (so nibbleMmPerMin/dataFound still come from a real source) —
-    // TurretParams.dataFound is all-or-nothing, so partial real data can't
-    // safely stand in when there's no thickness-curve row at all.
-    const effectiveTurretParams = rcTurretParams.dataFound
-      ? {
-          ...rcTurretParams,
-          hitsPerMin: rcRealTurretParams.hitsPerMin ?? rcTurretParams.hitsPerMin,
-          toolChangeSec: rcRealTurretParams.toolChangeSec ?? rcTurretParams.toolChangeSec,
-        }
-      : rcTurretParams;
     const rcPbSetupMin = this.smLookup.resolveOpSetupMin(rcOpSetupTimes, 'press_brake');
     if (!rcPbSetupMin.dataFound) {
       comparisonWarnings.push("Press brake setup time from fallback — seed sm_lookup_op_setup_time for 'press_brake'");
-    }
-    if (!rcTurretParams.dataFound) {
-      comparisonWarnings.push('Turret punch cycle-time params from fallback — seed sm_lookup_turret_punch for this thickness');
     }
     if (!effectiveAbrasiveRate.dataFound) {
       comparisonWarnings.push('Waterjet abrasive consumption rate from fallback — seed sm_lookup_waterjet_abrasive_rate, or add this machine to the machine library reference data');
@@ -7315,6 +7297,45 @@ export class BOMItemsService {
       [mhrRates.rollBending4.machineClass, mhrRates.rollBending4],
     ]);
 
+    // Turret Punching cycle time: the "Sheet Metal - TPP Manufacturing" DB calculator
+    // (punching + tool changes + nibbling, migration 904), seeded with the selected
+    // machine's own rates. Run only when every machine input is on file; otherwise the
+    // engine reports why as a data gap, never a default.
+    const rcTurretMissing = turretMissingInputs(mhrRates.turret.machineName, rcTurretPunchMachineParams);
+    const rcTurretCalc = (cutLengthMm > 0 || pierceCount > 0) && rcTurretMissing == null && rcTurretPunchMachineParams
+      ? await this.resolvePhysicsQuantity(accessToken, {
+          machineClass: 'turret_punch',
+          process: 'Turret Punching',
+          targetFieldNames: ['Cycle Time (sec)'],
+          seedScope: {
+            'Punch Count': pierceCount,
+            'Punch Rate (hits/min)': rcTurretPunchMachineParams.punchRateCyclesPerMin,
+            'Stroke Rate Factor': rcTurretPunchMachineParams.strokeRateFactor!,
+            'Tool Changes': holeCount,
+            'Tool Change Time (s)': rcTurretPunchMachineParams.toolChangeSec,
+            'Nibble Length (mm)': cutLengthMm,
+            'Nibble Speed (mm/min)': rcTurretPunchMachineParams.nibbleMmPerMin,
+            'Lot size': batchSize,
+          },
+          seedProvenance: {
+            'Punch Count': 'CAD feature extraction — punched hole count',
+            'Punch Rate (hits/min)': `${mhrRates.turret.machineName} — punchRate (Countries data export, sm_reference_data turretPunchMachine)`,
+            'Stroke Rate Factor': `Lookup Table 1 — ${rcTurretPunchMachineParams.machineTonnageT?.toFixed(1)} t machine, ${rcLookupComplexity} part (sm_reference_data strokeRateFactor)`,
+            'Tool Changes': 'CAD feature extraction — distinct hole diameters (one tool change each)',
+            'Tool Change Time (s)': `${mhrRates.turret.machineName} — tool_change_time_s (machine library)`,
+            'Nibble Length (mm)': 'CAD feature extraction — total cut path length',
+            'Nibble Speed (mm/min)': `${mhrRates.turret.machineName} — nibble rate x tool step (diameter - overlap)`,
+            'Lot size': 'Batch Size entered on this process cost form',
+          },
+        })
+      : this.emptyPhysicsResult(['Cycle Time (sec)']);
+    const rcTurretCycleTimeSec = rcTurretCalc.outputs['Cycle Time (sec)'];
+    const rcTurretGap: PhysicsGap | null = rcTurretCalc.gap ?? (
+      (cutLengthMm > 0 || pierceCount > 0) && rcTurretMissing != null
+        ? { gapType: 'unsupported_operation', process: 'Turret Punching', machineClass: 'turret_punch', reason: `Not priced: ${rcTurretMissing}.` }
+        : null
+    );
+
     const routes: RouteResultDto[] = [];
     // Standard Press / Tandem Press / Progressive Die / Roll Bending are a
     // real, registered engine family (sheet_metal_forming) but not a
@@ -7338,11 +7359,9 @@ export class BOMItemsService {
         processIdentity: identity,
         abrasivePricePerKg: waterjetAbrasivePricePerKg,
         waterjetParams: rcWaterjetParams,
-        turretParams: effectiveTurretParams,
         routerParams: rcRouterParams,
         oxyfuelParams: rcOxyfuelParams,
         laserPunchParams: rcLaserPunchParams,
-        turretPunchMachineParams: rcTurretPunchMachineParams,
         plasmaCutParams: rcPlasmaCutParams,
         plasmaPunchParams: rcPlasmaPunchParams,
         flatPatternLengthMm,
@@ -7361,7 +7380,14 @@ export class BOMItemsService {
         // them). Same shared context every other engine call in this method
         // now uses.
         ...rcEMithranCtx,
-        ...(engine.machineClass === 'turret_punch' ? { handlingAllowance: rcHandlingAllowance } : {}),
+        ...(engine.machineClass === 'turret_punch' ? {
+          handlingAllowance: rcHandlingAllowance,
+          cuttingSecFromCalculator: rcTurretCycleTimeSec,
+          calculatorId: rcTurretCalc.calculatorId,
+          calculatorVersion: rcTurretCalc.calculatorVersion,
+          physicsGap: rcTurretGap,
+          confidence: rcTurretCalc.confidence,
+        } : {}),
         ...(engine.machineClass === 'waterjet' ? { nozzleRate: rcNozzleRate } : {}),
         ...(engine.machineClass === 'fiber_laser' ? {
           cuttingSecFromCalculator: rcLaserCycleTimeSec,
@@ -7478,6 +7504,7 @@ export class BOMItemsService {
     // If capableRoutes is empty — all badges remain false (suppressed)
 
     if (rcLaserCalc.calculatorId) rcTraces.set(rcLaserCalc.calculatorId, rcLaserCalc.trace);
+    if (rcTurretCalc.calculatorId) rcTraces.set(rcTurretCalc.calculatorId, rcTurretCalc.trace);
     for (const route of routes) {
       for (const line of route.processLines) {
         const trace = line.calculatorId ? rcTraces.get(line.calculatorId) : undefined;

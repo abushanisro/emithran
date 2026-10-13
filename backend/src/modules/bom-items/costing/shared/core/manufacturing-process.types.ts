@@ -35,30 +35,11 @@ export interface OxyfuelParams {
   dataFound: boolean;
 }
 
-// Real, thickness-specific turret-punch cycle-time params resolved by the
-// caller from sm_lookup_turret_punch (migration 414) — same disclosed-
-// fallback convention as WaterjetParams above.
-// DEPRECATED as of 2026-09-02 — kept only because sm_lookup_turret_punch
-// (the DB source this resolves from) still exists and may still be surfaced
-// through the Process page's "Lookup Tables" admin editor. TurretPunchEngine
-// no longer reads hitsPerMin/nibbleMmPerMin from this: that DB table's own
-// seeded values (migration 414) turned out to be IDENTICAL to what used to
-// be a hardcoded "fallback" table in code — i.e. not independently-sourced
-// real machine data at all, just the same synthetic thickness-vs-speed
-// estimate duplicated into the DB. See TurretPunchMachineParams below for
-// the real per-machine data that replaced it.
-export interface TurretParams {
-  hitsPerMin: number;
-  nibbleMmPerMin: number;
-  toolChangeSec: number;
-  dataFound: boolean;
-}
-
 // Real, per-SELECTED-MACHINE punch/nibble physics (2026-09-01), resolved by
 // the caller from sm_reference_data's staged 'laserPunchMachine:<machine
 // name>' rows (machine_library.json's "Laser Punch / Punch Press" category,
 // all 26 real machines) via SheetMetalLookupService.getLaserPunchMachineParams().
-// Unlike WaterjetParams/OxyfuelParams/TurretParams (resolved ONCE from
+// Unlike WaterjetParams/OxyfuelParams (resolved ONCE from
 // material+thickness before machine selection), this is keyed by the
 // specific machine mhrRates.laserPunch resolved to — a genuinely different
 // class of combo laser+punch machine where hits/min and nibble speed are
@@ -80,7 +61,7 @@ export interface TurretParams {
 // migration 902. The calculator multiplies it by the stroke rate factor of Lookup
 // Table 1 (machine tonnage x part complexity): effective hits/min = rate x factor.
 // punchRateCyclesPerMin is 0 and strokeRateFactor null when a row is not on file;
-// the engine then reports a data gap rather than pricing punching at $0.
+// the route then reports a data gap rather than pricing punching at $0.
 export interface TurretPunchMachineParams {
   nibbleMmPerMin: number;
   toolChangeSec: number;
@@ -175,8 +156,6 @@ export interface CuttingProcessContext {
   abrasivePricePerKg?: number;
   waterjetParams?: WaterjetParams | null;
   oxyfuelParams?: OxyfuelParams | null;
-  turretParams?: TurretParams | null;
-  turretPunchMachineParams?: TurretPunchMachineParams | null;
   routerParams?: RouterParams | null;
   laserPunchParams?: LaserPunchParams | null;
   plasmaCutParams?: PlasmaCutParams | null;
@@ -196,8 +175,8 @@ export interface CuttingProcessContext {
   progressiveDieSetupMinFromMachine?: number | null;
   // Manufacturing Physics Calculator architecture: pre-resolved by the caller
   // via resolvePhysicsQuantity (bom-items.service.ts) for the engine whose
-  // machineClass has a registered calculator (Laser Cutting today). Engines
-  // without one (Waterjet, Turret Punch) simply ignore these fields — see
+  // machineClass has a registered calculator (Laser Cutting, Turret Punching).
+  // Engines without one (Waterjet) simply ignore these fields — see
   // rule 1's per-process migration, not a batch cutover.
   cuttingSecFromCalculator?: number;
   calculatorId?: string | null;

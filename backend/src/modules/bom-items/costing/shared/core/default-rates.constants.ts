@@ -725,23 +725,6 @@ export function classifyInspectionResource(
   return 'OTHER';
 }
 
-export const TURRET_TOOL_CHANGE_SEC = 1.5;  // per unique hole diameter — real, cited above
-
-// REMOVED (2026-09-02): TURRET_HITS_PER_MIN and TURRET_NIBBLE_MM_PER_MIN used
-// to live here as "fallback" tables for when sm_lookup_turret_punch had no
-// row — but sm_lookup_turret_punch's own seeded values (migration 414) are
-// IDENTICAL to these tables. That DB table is not independently-sourced real
-// machine data; it's the same synthetic thickness-vs-speed estimate, just
-// duplicated into the DB and then this file. No real per-machine punch/hit-
-// rate field exists anywhere in machine_library.json's Turret Press category
-// (verified: full field-name union across all 21 real machines checked) — a
-// genuine, disclosed capability gap, not fabricated. Real per-machine nibble
-// data DOES exist (nibble_rate_cycles_min + nibble_tool_diameter_mm/
-// nibble_tool_overlap_mm — same shape as Laser Punch's real data) and is now
-// resolved via getTurretPunchMachineParams() instead. Punching (hits/min)
-// has no real substitute and now costs an honest $0 with a disclosed warning
-// — see computeTurretPunchCost's own comment.
-
 // Generic fallback of last resort, behind getWaterjetAbrasiveRateForMachine's
 // real per-machine abrasive_flow_rate_kg_min (0.34-0.46 across the 27 real
 // machines) — this constant is only reached when no per-machine row

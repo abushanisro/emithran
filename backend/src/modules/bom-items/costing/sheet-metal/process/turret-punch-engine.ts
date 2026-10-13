@@ -1,9 +1,8 @@
 import {
-  TURRET_TOOL_CHANGE_SEC,
   DEFAULT_YIELD_PCT,
 } from '../../shared/core/default-rates.constants';
 import type { MHRRateInput } from '../../shared/core/cost-engine';
-import type { PhysicsGap, ProcessLineCost } from '../../../dto/cost-breakdown.dto';
+import type { ConfidenceLevel, PhysicsGap, ProcessLineCost } from '../../../dto/cost-breakdown.dto';
 import type { CuttingProcessContext, CuttingProcessResult, TurretPunchMachineParams } from '../../shared/core/manufacturing-process.types';
 import { r2, noRateFallback, eMithranTerms, resolveSetupMinutes } from '../../shared/core/engine-kernel';
 import { BaseCuttingEngine, buildCuttingProcessLine } from '../../shared/core/engine-orchestrator';
@@ -11,7 +10,6 @@ import { BaseCuttingEngine, buildCuttingProcessLine } from '../../shared/core/en
 export interface TurretPunchInput {
   sheetThicknessMm: number;
   pierceCount: number;   // total punched holes
-  holeCount: number;     // unique hole diameters → one tool change each
   cutLengthMm: number;   // contour length to nibble
   batchSize: number;
   turretRate?: MHRRateInput;
@@ -20,12 +18,16 @@ export interface TurretPunchInput {
   // hardcoded here. Absent means the caller couldn't resolve one; consumers must
   // not fabricate processGroup/processRoute/operation in that case.
   processIdentity?: { processGroup: string; processRoute: string; operation: string };
-  // Real per-SELECTED-MACHINE punch rate, nibble speed and tool-change time,
-  // resolved by the caller via
-  // SheetMetalLookupService.getTurretPunchMachineParams() — see that
-  // method's own doc comment. Punching is priced from the machine punch rate x
-  // the Lookup Table 1 stroke rate factor; with either missing it is a data gap.
-  turretMachineParams?: TurretPunchMachineParams | null;
+  // Cycle time comes from the "Sheet Metal - TPP Manufacturing" DB calculator
+  // ONLY (punching + tool changes + nibbling, see migration 904), resolved by the
+  // caller's resolvePhysicsQuantity, so the quote and the interactive Cycle Time
+  // calculator can never disagree. Undefined when it could not resolve one;
+  // `physicsGap` then carries the reason.
+  cuttingSecFromCalculator?: number;
+  calculatorId?: string | null;
+  calculatorVersion?: number | null;
+  physicsGap?: PhysicsGap | null;
+  confidence?: ConfidenceLevel;
   // Per-batch setup time (min) — resolved by the caller from
   // sm_lookup_op_setup_time (migration 416) via getOpSetupTime('turret_punch').
   setupMin?: number;
@@ -51,71 +53,52 @@ interface TurretPunchResult {
   warnings: string[];
 }
 
+/**
+ * Why the TPP calculator cannot be seeded for this machine, or null when every
+ * machine input is on file. With no machine there is nothing to read a rate from:
+ * that is a selection result (no turret meets the part's force or size need), not
+ * missing reference data.
+ */
+export function turretMissingInputs(machineName: string | null | undefined, mp: TurretPunchMachineParams | null | undefined): string | null {
+  if (!machineName) {
+    return 'no turret machine could be selected for this part, so there is no machine rate to read; see the capability warning for the force and size that ruled every machine out';
+  }
+  if (!mp?.dataFound) {
+    return `no nibble rate or tool-change time for ${machineName}: sm_reference_data 'turretPunchMachine:<name>' missing`;
+  }
+  if (!(mp.punchRateCyclesPerMin > 0) || mp.strokeRateFactor == null) {
+    return `${machineName} has no punch rate or stroke rate factor on file: sm_reference_data 'turretPunchMachine:<name>' punch_rate_cycles_min, 'strokeRateFactor:<tonnage>'`;
+  }
+  return null;
+}
+
 export function computeTurretPunchCost(input: TurretPunchInput): TurretPunchResult {
   const warnings: string[] = [];
-  const thk = input.sheetThicknessMm > 0 ? input.sheetThicknessMm : 2.0;
-  if (input.sheetThicknessMm === 0) warnings.push("Turret: thickness 0 — defaulting to 2.0 mm");
+  const thk = input.sheetThicknessMm;
   if (thk > 6) warnings.push(`Turret: ${thk}mm exceeds typical turret punch range (≤6 mm)`);
 
   const rate = input.turretRate ?? noRateFallback("turret_punch");
+  const hasWork = input.pierceCount > 0 || input.cutLengthMm > 0;
 
-  // Punching, per the TPP calculator: seconds per hit = 60 / (machine punch rate x
-  // stroke rate factor), one hit per punched hole. Without a real punch rate and
-  // factor for the selected machine the work stays unpriced (a gap below).
-  const mp = input.turretMachineParams;
-  const punchHitsPerMin = mp && mp.punchRateCyclesPerMin > 0 && mp.strokeRateFactor != null
-    ? mp.punchRateCyclesPerMin * mp.strokeRateFactor
-    : 0;
-  const punchingSec = punchHitsPerMin > 0 ? (input.pierceCount / punchHitsPerMin) * 60 : 0;
-  if (input.pierceCount > 0 && punchHitsPerMin > 0) {
-    warnings.push("Turret: one hit per punched hole; a hole larger than the largest tool would need nibbling or a special tool, not modelled");
+  // Punched holes, tool changes and contour nibbling are one calculator run. When it
+  // could not resolve, that work is missing data, not a $0 operation: the route would
+  // otherwise look cheapest for the work it leaves unpriced. A gap makes it incomplete
+  // (findRouteDataGaps), so it can be shown and applied by choice but never
+  // auto-recommended. Where there is genuinely nothing to punch or nibble, no gap.
+  let cuttingSec = 0;
+  let physicsGap: PhysicsGap | undefined;
+  if (typeof input.cuttingSecFromCalculator === 'number' && Number.isFinite(input.cuttingSecFromCalculator)) {
+    cuttingSec = input.cuttingSecFromCalculator;
+    if (input.pierceCount > 0) warnings.push("Turret: one hit per punched hole; a hole larger than the largest tool would need nibbling or a special tool, not modelled");
+    if (input.cutLengthMm > 0) warnings.push("Turret: contour assumed nibbled — actual method depends on tooling setup");
+  } else if (hasWork) {
+    physicsGap = input.physicsGap ?? {
+      gapType: 'unsupported_operation', process: 'Turret Punching', machineClass: 'turret_punch',
+      reason: 'Not priced: the Sheet Metal - TPP Manufacturing calculator returned no cycle time and reported no gap (unexpected; check resolvePhysicsQuantity).',
+    };
   }
 
-  const toolChangeSecPerHole = input.turretMachineParams?.dataFound ? input.turretMachineParams.toolChangeSec : TURRET_TOOL_CHANGE_SEC;
-  if (!input.turretMachineParams?.dataFound && input.holeCount > 0) {
-    warnings.push("Turret: tool-change time from fallback — seed sm_reference_data 'turretPunchMachine:<name>' for the selected machine");
-  }
-  // Tool change penalty — amortised over batchSize
-  const toolChangeSec = (input.holeCount * toolChangeSecPerHole) / Math.max(input.batchSize, 1);
-
-  // Nibbling for contour cuts — real per-machine nibble speed (derived from
-  // nibble_rate_cycles_min × step-per-cycle geometry), same resolution shape
-  // as Laser Punch. Honest $0 when no real row resolves for this machine.
-  let nibblingSec = 0;
-  if (input.turretMachineParams?.dataFound) {
-    nibblingSec = input.cutLengthMm > 0 ? (input.cutLengthMm / input.turretMachineParams.nibbleMmPerMin) * 60 : 0;
-    if (input.cutLengthMm > 0) {
-      warnings.push("Turret: contour assumed nibbled — actual method depends on tooling setup");
-    }
-  } else if (input.cutLengthMm > 0) {
-    warnings.push("Turret: no real nibble-rate data on file for this machine — nibbling time is $0 until real data is sourced, not an estimate");
-  }
-
-  // Punching and nibbling that could not be priced are missing data, not a $0
-  // operation: the route would otherwise look cheapest for the work it leaves
-  // unpriced. A gap makes it incomplete (findRouteDataGaps), so it can be shown
-  // and applied by choice but never auto-recommended. Where there is genuinely
-  // nothing to punch or nibble, no gap is raised.
-  const unpriced: string[] = [];
-  // With no machine selected there is nothing to read a rate from: that is a selection
-  // result (no turret meets the part's force or size need), not missing reference data.
-  const noMachineReason = 'no turret machine could be selected for this part, so there is no machine rate to read; see the capability warning for the force and size that ruled every machine out';
-  if (input.pierceCount > 0 && punchHitsPerMin <= 0) {
-    unpriced.push(`punching ${input.pierceCount} holes (${rate.machineName
-      ? `${rate.machineName} has no punch rate or stroke rate factor on file: sm_reference_data 'turretPunchMachine:<name>' punch_rate_cycles_min, 'strokeRateFactor:<tonnage>'`
-      : noMachineReason})`);
-  }
-  if (input.cutLengthMm > 0 && !input.turretMachineParams?.dataFound) {
-    unpriced.push(`nibbling ${Math.round(input.cutLengthMm)} mm of contour (${rate.machineName
-      ? `no nibble rate for ${rate.machineName}: sm_reference_data 'turretPunchMachine:<name>' missing`
-      : noMachineReason})`);
-  }
-  const physicsGap: PhysicsGap | undefined = unpriced.length > 0
-    ? { gapType: 'unsupported_operation', process: 'Turret Punching', machineClass: 'turret_punch', reason: `Not priced: ${unpriced.join('; ')}.` }
-    : undefined;
-
-  const totalSec = punchingSec + toolChangeSec + nibblingSec;
-  const cuttingMin = totalSec / 60;
+  const cuttingMin = cuttingSec / 60;
   // Real setup time, most-specific real source first: this machine's own
   // mhr_records.setup_time_hr, then the per-operation sm_lookup_op_setup_time
   // row, then the cited class constant. See resolveSetupMinutes().
@@ -155,7 +138,13 @@ export function computeTurretPunchCost(input: TurretPunchInput): TurretPunchResu
       totalCost: t.total,
       cycleTimeMin: cuttingMin,
       rate,
-      extra: { labourRate: rate.labourRate ?? null, ...(physicsGap ? { physicsGap } : {}) },
+      extra: {
+        labourRate: rate.labourRate ?? null,
+        ...(input.calculatorId ? { calculatorId: input.calculatorId } : {}),
+        ...(input.calculatorVersion != null ? { calculatorVersion: input.calculatorVersion } : {}),
+        ...(physicsGap ? { physicsGap } : {}),
+        ...(input.confidence ? { confidence: input.confidence } : {}),
+      },
     }),
   ];
 
@@ -199,12 +188,15 @@ export class TurretPunchEngine extends BaseCuttingEngine {
     const result = computeTurretPunchCost({
       sheetThicknessMm: context.sheetThicknessMm,
       pierceCount: context.pierceCount,
-      holeCount: context.holeCount,
       cutLengthMm: context.cutLengthMm,
       batchSize: context.batchSize,
       turretRate: context.rate,
       processIdentity: context.processIdentity,
-      turretMachineParams: context.turretPunchMachineParams,
+      cuttingSecFromCalculator: context.cuttingSecFromCalculator,
+      calculatorId: context.calculatorId,
+      calculatorVersion: context.calculatorVersion,
+      physicsGap: context.physicsGap,
+      confidence: context.confidence,
       setupMin: context.opSetupMin,
       partWeightKg: context.partWeightKg,
       handlingAllowance: context.handlingAllowance,

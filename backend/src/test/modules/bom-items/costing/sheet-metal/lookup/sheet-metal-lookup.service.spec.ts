@@ -124,42 +124,6 @@ describe('SheetMetalLookupService.getWaterjetAbrasiveRateForMachine', () => {
   });
 });
 
-// getTurretPunchParamsForMachine() — real per-machine punch_rate_cycles_min/
-// tool_change_time_s, preferred outright over the thickness-keyed
-// sm_lookup_turret_punch curve per explicit product decision.
-describe('SheetMetalLookupService.getTurretPunchParamsForMachine', () => {
-  it('returns both real fields on an unambiguous exact name match', async () => {
-    const svc = new SheetMetalLookupService(fakeMachineReferenceData([
-      { raw: { name: 'Whitney 3700 SST', punch_rate_cycles_min: 350, tool_change_time_s: 2.5 } },
-    ]));
-    const result = await svc.getTurretPunchParamsForMachine('Whitney 3700 SST');
-    expect(result).toEqual({ hitsPerMin: 350, toolChangeSec: 2.5, dataFound: true });
-  });
-
-  it('returns dataFound: true with a partial result when only one field is real', async () => {
-    const svc = new SheetMetalLookupService(fakeMachineReferenceData([
-      { raw: { name: 'Whitney 3700 SST', punch_rate_cycles_min: 350, tool_change_time_s: null } },
-    ]));
-    const result = await svc.getTurretPunchParamsForMachine('Whitney 3700 SST');
-    expect(result).toEqual({ hitsPerMin: 350, toolChangeSec: null, dataFound: true });
-  });
-
-  it('returns dataFound: false when no machine name is given', async () => {
-    const svc = new SheetMetalLookupService(fakeMachineReferenceData([]));
-    const result = await svc.getTurretPunchParamsForMachine(undefined);
-    expect(result).toEqual({ hitsPerMin: null, toolChangeSec: null, dataFound: false });
-  });
-
-  it('never guesses across an ambiguous (duplicate-name) match', async () => {
-    const svc = new SheetMetalLookupService(fakeMachineReferenceData([
-      { raw: { name: 'Whitney 3700 SST', punch_rate_cycles_min: 350, tool_change_time_s: 2.5 } },
-      { raw: { name: 'Whitney 3700 SST', punch_rate_cycles_min: 400, tool_change_time_s: 3.0 } },
-    ]));
-    const result = await svc.getTurretPunchParamsForMachine('Whitney 3700 SST');
-    expect(result).toEqual({ hitsPerMin: null, toolChangeSec: null, dataFound: false });
-  });
-});
-
 describe('SheetMetalLookupService.getBendCycleTimeForMachine', () => {
   it('returns the real per-machine bend cycle time on an unambiguous match', async () => {
     const svc = new SheetMetalLookupService(fakeMachineReferenceData([
