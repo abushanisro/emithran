@@ -3813,7 +3813,7 @@ export function ProcessCostDialog({
           </div>
 
           <div
-            className="flex-1 p-3 relative overflow-auto"
+            className="flex-1 px-3 pb-3 relative overflow-auto"
             style={{
               height: 'calc(100vh - 120px)',
               pointerEvents: 'auto',
@@ -3825,8 +3825,9 @@ export function ProcessCostDialog({
             <div className="w-full">
               <table className="w-full border-collapse text-sm bg-background">
                 <thead>
-                  <tr className="bg-muted/60">
-                    <th className="border border-border text-center text-xs font-medium py-1 px-1 text-muted-foreground w-6">
+                  {/* The heading row stays pinned while the rows scroll. */}
+                  <tr>
+                    <th className="sticky top-0 z-10 bg-muted border border-border text-center text-xs font-medium py-1 px-1 text-muted-foreground w-6">
                       #
                     </th>
                     {lookupTableData.column_definitions.map((col: any, colIdx: number) => {
@@ -3834,7 +3835,7 @@ export function ProcessCostDialog({
                       return (
                         <th
                           key={col.name}
-                          className={`border border-border text-left text-xs font-semibold py-1 px-2 ${isOutputCol ? 'text-primary bg-primary/10' : 'text-foreground'
+                          className={`sticky top-0 z-10 bg-muted border border-border text-left text-xs font-semibold py-1 px-2 ${isOutputCol ? 'text-primary' : 'text-foreground'
                             }`}
                         >
                           {col.label}

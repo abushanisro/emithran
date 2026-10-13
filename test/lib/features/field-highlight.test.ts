@@ -48,7 +48,7 @@ describe('resolveFieldHighlight', () => {
     expect(faces(resolveFieldHighlight('bend_count', graph)!.node)).toEqual([8, 9]);
   });
 
-  it('the longest bend is counted and the other bends are left out', () => {
+  it('bending line length highlights only the longest bend', () => {
     const bends: FeatureGraphV2 = {
       ...graph,
       measurements: { bend_line_length: { value: 90, unit: 'mm', reconciles: true, occurrences: [
@@ -56,7 +56,6 @@ describe('resolveFieldHighlight', () => {
     };
     const h = resolveFieldHighlight('bend_line_length', bends)!;
     expect(faces(h.node)).toEqual([8, 9]);
-    expect(faces(h.excluded!)).toEqual([10, 11]);
   });
 
   it('a part analysed before the engine recorded a set gets no highlight, not a guess', () => {
@@ -66,16 +65,10 @@ describe('resolveFieldHighlight', () => {
     expect(resolveFieldHighlight('cut_length', legacy)).toBeNull();
   });
 
-  it('tool changes: the first hole of each diameter is counted, the further holes of that diameter are left out', () => {
+  it('tool changes highlight only the first hole of each diameter', () => {
     const h = resolveFieldHighlight('hole_diameters', graph)!;
     expect(faces(h.node)).toEqual([20, 21, 30, 31]);
-    expect(faces(h.excluded!)).toEqual([22, 23, 24, 25]);
     expect(h.measured).toMatchObject({ value: 2, unit: 'count' });
-  });
-
-  it('tool changes: no excluded group when every diameter has a single hole', () => {
-    const single: FeatureGraphV2 = { ...graph, features: graph.features.filter((f) => f.id === 'hole_d4.0') };
-    expect(resolveFieldHighlight('hole_diameters', single)!.excluded).toBeUndefined();
   });
 
   it('resolves a (graph, key) once and returns the same object after that', () => {

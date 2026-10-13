@@ -9,7 +9,7 @@ import { CadFeatureViewer } from '@/components/features/cad-feature-viewer/CadFe
 import type { FieldHighlight } from '@/lib/features/field-highlight';
 import type { FaceMapEntry } from '@/lib/types/manufacturing';
 
-/** Faces this field counted (the viewer draws the left-out ones red). */
+/** The faces this field counted; nothing else is colored. */
 const USED_COLOR = '#22c55e';
 
 export interface CadEvidence {
@@ -46,7 +46,6 @@ export function CadEvidencePanel({
 }: CadEvidencePanelProps) {
   const { highlight } = evidence;
   const faceIds = useMemo(() => highlight?.node.occurrences.flatMap((o) => o.face_ids) ?? [], [highlight]);
-  const excludedFaceIds = useMemo(() => highlight?.excluded?.occurrences.flatMap((o) => o.face_ids), [highlight]);
   return (
     <div className="fixed top-16 left-4 z-60 w-[480px] rounded-lg border border-border bg-background shadow-xl flex flex-col">
       <div className="flex items-center justify-between p-3 border-b border-border">
@@ -58,9 +57,8 @@ export function CadEvidencePanel({
               {highlight.measured.label} = {Math.round(highlight.measured.value * 10) / 10} {highlight.measured.unit}
               {!highlight.reconciles && ` — ${highlight.note ?? 'these faces do not fully account for the extracted value'}`}
             </p>
-            <p className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
-              <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm" style={{ backgroundColor: USED_COLOR }} />counted</span>
-              {highlight.excluded && <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-red-500" />same kind, not counted</span>}
+            <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+              <span className="h-2 w-2 rounded-sm" style={{ backgroundColor: USED_COLOR }} />the faces this value counted (the rest of the part is grey)
             </p>
             </>
           ) : (
@@ -94,7 +92,7 @@ export function CadEvidencePanel({
       ) : (
       <div className="h-[360px]">
         {fileType.toLowerCase() === 'stl' ? (
-          <CadFeatureViewer fileUrl={fileUrl} faceMap={faceMap} faceIds={faceIds} {...(excludedFaceIds ? { excludedFaceIds } : {})} {...(highlight.style === 'edges' ? { initialMode: 'edge' as const } : {})} {...(axes ? { axes } : {})} />
+          <CadFeatureViewer fileUrl={fileUrl} faceMap={faceMap} faceIds={faceIds} {...(highlight.style === 'edges' ? { initialMode: 'edge' as const } : {})} {...(axes ? { axes } : {})} />
         ) : (
           // STEP/other models need the main viewer's server-side conversion.
           <ModelViewer
@@ -104,7 +102,6 @@ export function CadEvidencePanel({
             fileType={fileType}
             highlightOccurrences={highlight.node}
             highlightColor={USED_COLOR}
-            {...(highlight.excluded ? { excludedOccurrences: highlight.excluded } : {})}
             faceMap={faceMap}
             {...(sheetThickness !== undefined ? { sheetThickness } : {})}
           />

@@ -112,8 +112,6 @@ interface EDrawingsViewerProps {
   onScreenshotReady?: (dataUrl: string) => void;
   // Feature Graph v2 occurrence highlighting
   highlightOccurrences?: FeatureNodeV2HL | null;
-  /** Faces of the same kind that were left out of the calculation: drawn in their own color beside the highlighted ones. */
-  excludedOccurrences?: FeatureNodeV2HL | null;
   selectedOccurrenceIndex?: number | null;
   onOccurrenceSelect?: (index: number | null) => void;
   /** face_map from feature_graph_v2.metadata — enables exact face highlighting */
@@ -1453,7 +1451,6 @@ function STLModel({
   occurrenceFaceIndices,
   isDimmed,
   groupFaceIndices,
-  excludedFaceIndices,
   riskGroups = [],
   selectedOccurrenceColor = '#f97316',
   groupHighlightColor,
@@ -1497,8 +1494,6 @@ function STLModel({
   isDimmed?: boolean;
   /** Triangle indices for all occurrences of the selected feature (group highlight, fallback amber) */
   groupFaceIndices?: number[];
-  /** Triangle indices of same-kind faces the calculation left out (drawn red) */
-  excludedFaceIndices?: number[];
   /** Risk-level-bucketed triangle indices — replaces amber group when scores are available */
   riskGroups: Array<{ level: string; indices: number[] }>;
   /** Color for selected occurrence highlight — risk color when scores available, else orange */
@@ -2832,9 +2827,6 @@ function STLModel({
       {!heatmapActive && riskGroups.length === 0 && groupFaceIndices && groupFaceIndices.length > 0 && geometry && (
         <FaceHighlight triangleIndices={groupFaceIndices} geometry={geometry} color={groupHighlightColor ?? '#d97706'} opacity={0.65} />
       )}
-      {!heatmapActive && excludedFaceIndices && excludedFaceIndices.length > 0 && geometry && (
-        <FaceHighlight triangleIndices={excludedFaceIndices} geometry={geometry} color="#ef4444" opacity={0.65} />
-      )}
       {!heatmapActive && !isWireframe && geometry && <BodyEdges geometry={geometry} />}
       {geometry && setupAxes.length > 0 && <SetupAxisArrows geometry={geometry} axes={setupAxes} />}
 
@@ -2891,7 +2883,7 @@ function Scene({
   projectedFaceIndices, projectedHighlightColor, showProjectedHighlight,
   highlightOccurrences,
   selectedOccurrenceIndex,
-  occurrenceFaceIndices, groupFaceIndices, excludedFaceIndices,
+  occurrenceFaceIndices, groupFaceIndices,
   riskGroups, selectedOccurrenceColor, groupHighlightColor,
   heatmapActive, heatmapSources, heatmapNormalization, heatmapRiskValuesRef, onHeatmapInspect, onTrianglePick,
 }: {
@@ -2921,7 +2913,6 @@ function Scene({
   selectedOccurrenceIndex: number | null;
   occurrenceFaceIndices: number[];
   groupFaceIndices: number[];
-  excludedFaceIndices: number[];
   riskGroups: Array<{ level: string; indices: number[] }>;
   selectedOccurrenceColor: string;
   groupHighlightColor?: string | undefined;
@@ -3024,7 +3015,6 @@ function Scene({
             occurrenceFaceIndices={occurrenceFaceIndices}
             isDimmed={!!highlightOccurrences}
             groupFaceIndices={groupFaceIndices}
-            excludedFaceIndices={excludedFaceIndices}
             riskGroups={riskGroups}
             selectedOccurrenceColor={selectedOccurrenceColor}
             groupHighlightColor={groupHighlightColor}
@@ -3058,7 +3048,7 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
   onMeasurements, manufacturingFeatures, selectedFeature, onFeatureSelect,
   selectedBOMItems, showOnlySelected = false, hoveredBOMItem, onPartsDetected, dfmAnalysisData,
   cameraPreset, onScreenshotReady,
-  highlightOccurrences, excludedOccurrences, selectedOccurrenceIndex = null,
+  highlightOccurrences, selectedOccurrenceIndex = null,
   faceMap, sheetThickness,
   dfmOccurrenceScores,
   heatmapSources,
@@ -3195,15 +3185,6 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
     }
     return result;
   }, [highlightOccurrences, faceMapIndex, selectedOccurrenceIndex]);
-
-  // Faces of the same kind the calculation left out, in their own color.
-  const excludedFaceIndices = useMemo((): number[] => {
-    if (!excludedOccurrences || !faceMapIndex.size) return [];
-    return excludedOccurrences.occurrences.flatMap((occ) => (occ.face_ids ?? []).flatMap((fid) => {
-      const entry = faceMapIndex.get(fid);
-      return entry && entry.tri_count > 0 ? Array.from({ length: entry.tri_count }, (_, k) => entry.tri_start + k) : [];
-    }));
-  }, [excludedOccurrences, faceMapIndex]);
 
   // Risk-colored group highlights — one bucket per risk level, replaces amber group when scores available
   const riskGroups = useMemo((): Array<{ level: string; indices: number[] }> => {
@@ -4060,7 +4041,6 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
               selectedOccurrenceIndex={selectedOccurrenceIndex}
               occurrenceFaceIndices={occurrenceFaceIndices}
               groupFaceIndices={groupFaceIndices}
-              excludedFaceIndices={excludedFaceIndices}
               riskGroups={riskGroups}
               selectedOccurrenceColor={selectedOccurrenceColor}
               groupHighlightColor={highlightColor}
