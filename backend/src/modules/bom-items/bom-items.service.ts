@@ -5114,14 +5114,6 @@ export class BOMItemsService {
       smResult.geometryProvenance = { bendSource: geo.bendSource, blankAreaSource: geo.blankAreaSource };
     }
     this.attachMachineSelections(smResult.processLines, mhrRates);
-    smResult.warnings.push(...await this.smCatalogOperations.attach({
-      lines: smResult.processLines,
-      features: (fg?.feature_graph_v2?.features ?? []) as SheetMetalFeature[],
-      threads,
-      thicknessMm: sheetThicknessMm,
-      family,
-      accessToken,
-    }));
     // Attach eMithran-style feature breakdowns to laser + press brake + deburr lines
     {
       const bendRadii = (fg?.summary?.bendRadii ?? []) as number[];
@@ -5292,6 +5284,19 @@ export class BOMItemsService {
         'BOMItemsService',
       );
     }
+    // The catalog operations each step performs on the part CAD features. Attached HERE, after the
+    // applied-route overlay above: the overlay replaces the live lines with lines rebuilt from the saved
+    // process records, and anything attached before it was lost for every part with an applied route
+    // (the Manufacturing Process tree then fell back to its legacy Flat Pattern / bend-radius rows).
+    // Runs on whichever lines the summary ends up with, live or applied.
+    smResult.warnings.push(...await this.smCatalogOperations.attach({
+      lines: smResult.processLines,
+      features: (fg?.feature_graph_v2?.features ?? []) as SheetMetalFeature[],
+      threads,
+      thicknessMm: sheetThicknessMm,
+      family,
+      accessToken,
+    }));
     await this.attachSavedMachineExplanations(smResult.processLines, id, accessToken, location);
     this.appendRateWarnings(smResult, location);
     this.applyCostOverrides(smResult, costOverrides);
