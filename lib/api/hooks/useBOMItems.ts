@@ -1588,7 +1588,10 @@ export function useApplyRoute(bomItemId: string | undefined) {
       // cost-summary/route-comparison after a successful apply — the new
       // process_cost_records were real, but nothing told the UI to refetch.
       queryClient.invalidateQueries({ queryKey: ['bom-items', bomItemId, 'cost-summary'] });
-      queryClient.invalidateQueries({ queryKey: ['bom-items', bomItemId, 'route-comparison'] });
+      // Marked stale, not refetched now: writing process records does not change what
+      // the comparison computes (its inputs are location, batch and scenario), and
+      // re-running it is a 46-157 s server computation on the Apply critical path.
+      queryClient.invalidateQueries({ queryKey: ['bom-items', bomItemId, 'route-comparison'], refetchType: 'none' });
       toast.success(`${data.created} operations filled from "${data.routeLabel}"`);
     },
     onError: (err: Error) => {
@@ -1618,14 +1621,19 @@ export function useApplyCustomRoute(bomItemId: string | undefined) {
       apiClient.post<{ created: number; operations: string[]; routeLabel: string; needsManualCycleTime: string[] }>(
         `/bom-items/${bomItemId}/apply-custom-route`,
         payload,
-        { timeout: 60000 }, // same route-comparison re-run cost as apply-route
+        // Same route-comparison re-run as apply-route (46-157 s). A shorter client
+        // timeout reports failure for a write still running and invites a second click.
+        { timeout: 180000 },
       ),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['process-costs'], exact: false });
       // Same gap as useApplyRoute above — the Cost tab never refetched after
       // a successful custom-route apply without these.
       queryClient.invalidateQueries({ queryKey: ['bom-items', bomItemId, 'cost-summary'] });
-      queryClient.invalidateQueries({ queryKey: ['bom-items', bomItemId, 'route-comparison'] });
+      // Marked stale, not refetched now: writing process records does not change what
+      // the comparison computes (its inputs are location, batch and scenario), and
+      // re-running it is a 46-157 s server computation on the Apply critical path.
+      queryClient.invalidateQueries({ queryKey: ['bom-items', bomItemId, 'route-comparison'], refetchType: 'none' });
       toast.success(`${data.created} operations filled from "${data.routeLabel}"`);
       if (data.needsManualCycleTime.length) {
         toast.warning(`Set cycle time via Edit Process Cost for: ${data.needsManualCycleTime.join(', ')} — no real geometric trigger found, so cost is $0 until then.`);
