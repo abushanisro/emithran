@@ -55,6 +55,23 @@ export function SecondaryOperationsPicker({
                 {picked.length === 0 ? 'None' : picked.map((o) => o.process).join(', ')}
               </span>
             </button>
+            {/* The selection, with the machine each pick is costed on. */}
+            {picked.length > 0 && (
+              <ul className="mt-1 space-y-1">
+                {picked.map((o) => (
+                  <li key={o.process} className="rounded border border-border/60 bg-muted/20 px-2 py-1 text-[11px]">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="font-medium truncate">{o.process}</span>
+                      <span className="tabular-nums shrink-0">{cost(o)}</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground truncate" title={o.reason}>
+                      {o.machineName ?? 'No machine on file'}
+                      {o.cycleTimeSec != null && ` · ${(o.cycleTimeSec / 60).toFixed(2)} min`}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
             {open === key && (
               <div className="mt-1 max-h-56 overflow-y-auto rounded border border-border bg-background">
                 {ops[key].length === 0 && <p className="px-2 py-1 text-[10px] text-muted-foreground">No processes on file.</p>}

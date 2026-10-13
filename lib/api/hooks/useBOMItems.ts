@@ -971,6 +971,8 @@ export interface SecondaryOptionDto {
   reason: string;
   fromDrawing: boolean;
   selected: boolean;
+  machineName: string | null;
+  cycleTimeSec: number | null;
 }
 
 /** Mirrors the backend's SecondaryOperationsDto (cost-breakdown.dto.ts). */

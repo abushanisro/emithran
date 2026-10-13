@@ -5580,6 +5580,8 @@ export class BOMItemsService {
         process: r.process, status: r.status, reason: r.reason,
         costPerPart: r.status === 'costed' && r.local.costPerPart != null ? r.local.costPerPart * conv : null,
         fromDrawing: drawing[g].includes(r.process), selected,
+        machineName: r.machine?.name ?? null,
+        cycleTimeSec: r.status === 'costed' ? r.cycleTimeSec : null,
       };
     });
     const dto: SecondaryOperationsDto = {
