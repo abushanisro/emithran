@@ -4,6 +4,7 @@ import { SupabaseService } from '../../../../../common/supabase/supabase.service
 import type { LookupResolution, LookupQueryParam, LookupTableRow } from '../../../dto/cost-breakdown.dto';
 import { classifyLaserMaterial, type LaserPowerRequirement } from '../../shared/capability/machine-selection/physics';
 import { ReferenceMemo } from '../../../../../common/cache/reference-memo';
+import type { TurretPunchMachineParams } from '../../shared/core/manufacturing-process.types';
 
 // No fallback constants in this file. Every lookup below returns
 // `dataFound: false` (with a neutral 0/empty value that is never priced —
@@ -114,12 +115,6 @@ interface OxyfuelCutParams {
 
 interface LaserPunchMachineParams {
   punchRateCyclesPerMin: number;
-  nibbleMmPerMin: number;
-  toolChangeSec: number;
-  dataFound: boolean;
-}
-
-export interface TurretPunchMachineParams {
   nibbleMmPerMin: number;
   toolChangeSec: number;
   dataFound: boolean;
@@ -492,9 +487,41 @@ export class SheetMetalLookupService {
   // nibbling/tool-change half of the formula — see TurretPunchMachineParams'
   // own doc comment for why there's no punchRateCyclesPerMin here (no real
   // per-machine punch/hit-rate data exists anywhere in the source).
+  // Stroke rate factor of Lookup Table 1 (staged by migration 902 as
+  // 'strokeRateFactor:<tonnage>' rows): the share of the machine stroke rate that is
+  // reached in production, by machine tonnage and part complexity. The row nearest to
+  // the machine tonnage is used (the table steps 10, 20, 30, 50 t ...).
   @ReferenceMemo()
-  async getTurretPunchMachineParams(machineName: string | null | undefined): Promise<TurretPunchMachineParams> {
-    const noData: TurretPunchMachineParams = { nibbleMmPerMin: 0, toolChangeSec: 0, dataFound: false };
+  async getStrokeRateFactor(tonnageT: number, complexity: 'simple' | 'inter' | 'complex'): Promise<number | null> {
+    if (!(tonnageT > 0)) return null;
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const { data, error } = await db
+      .from('sm_reference_data')
+      .select('raw')
+      .eq('category', 'lookup_table')
+      .like('key', 'strokeRateFactor:%');
+    if (error || !data?.length) return null;
+    const column = complexity === 'inter' ? 'intermediate' : complexity;
+    let best: { distance: number; factor: number } | null = null;
+    for (const row of data as Array<{ raw: Record<string, unknown> | null }>) {
+      const rowTonnage = row.raw?.tonnage_t;
+      const factor = row.raw?.[column];
+      if (typeof rowTonnage !== 'number' || typeof factor !== 'number' || factor <= 0) continue;
+      const distance = Math.abs(rowTonnage - tonnageT);
+      if (!best || distance < best.distance) best = { distance, factor };
+    }
+    return best?.factor ?? null;
+  }
+
+  @ReferenceMemo()
+  async getTurretPunchMachineParams(
+    machineName: string | null | undefined,
+    complexity: 'simple' | 'inter' | 'complex',
+  ): Promise<TurretPunchMachineParams> {
+    const noData: TurretPunchMachineParams = {
+      nibbleMmPerMin: 0, toolChangeSec: 0, dataFound: false,
+      punchRateCyclesPerMin: 0, strokeRateFactor: null, machineTonnageT: null,
+    };
     if (!machineName) return noData;
 
     const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
@@ -503,13 +530,14 @@ export class SheetMetalLookupService {
       .select('raw')
       .eq('category', 'machine')
       .eq('key', `turretPunchMachine:${machineName}`)
-      .maybeSingle();
-    if (error || !data?.raw) return noData;
+      .limit(1);
+    const raw = data?.[0]?.raw as Record<string, unknown> | undefined;
+    if (error || !raw) return noData;
 
-    const nibbleRate = data.raw.nibble_rate_cycles_min;
-    const nibbleDia = data.raw.nibble_tool_diameter_mm;
-    const nibbleOverlap = data.raw.nibble_tool_overlap_mm;
-    const toolChangeSec = data.raw.tool_change_time_s;
+    const nibbleRate = raw.nibble_rate_cycles_min;
+    const nibbleDia = raw.nibble_tool_diameter_mm;
+    const nibbleOverlap = raw.nibble_tool_overlap_mm;
+    const toolChangeSec = raw.tool_change_time_s;
     if (
       typeof nibbleRate !== 'number' || nibbleRate <= 0 ||
       typeof nibbleDia !== 'number' || typeof nibbleOverlap !== 'number' ||
@@ -520,10 +548,33 @@ export class SheetMetalLookupService {
     const nibbleStepMm = nibbleDia - nibbleOverlap;
     if (nibbleStepMm <= 0) return noData;
 
+    // The punch rate sits on the same row (migration 902). The machine tonnage the
+    // factor is looked up for comes from the machine library row (press force, kN).
+    const punchRate = typeof raw.punch_rate_cycles_min === 'number' && raw.punch_rate_cycles_min > 0
+      ? raw.punch_rate_cycles_min : 0;
+    let machineTonnageT: number | null = null;
+    let strokeRateFactor: number | null = null;
+    if (punchRate > 0) {
+      const { data: lib } = await db
+        .from('sm_reference_data')
+        .select('raw')
+        .eq('category', 'machine')
+        .eq('key', `Turret Press (Punch Press):${machineName}`)
+        .limit(1);
+      const pressForceKn = (lib?.[0]?.raw as Record<string, unknown> | undefined)?.press_force_kn;
+      if (typeof pressForceKn === 'number' && pressForceKn > 0) {
+        machineTonnageT = pressForceKn / 9.80665;
+        strokeRateFactor = await this.getStrokeRateFactor(machineTonnageT, complexity);
+      }
+    }
+
     return {
       nibbleMmPerMin: nibbleRate * nibbleStepMm,
       toolChangeSec,
       dataFound: true,
+      punchRateCyclesPerMin: punchRate,
+      strokeRateFactor,
+      machineTonnageT,
     };
   }
 
