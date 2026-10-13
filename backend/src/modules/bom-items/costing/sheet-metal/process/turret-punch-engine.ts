@@ -97,11 +97,18 @@ export function computeTurretPunchCost(input: TurretPunchInput): TurretPunchResu
   // and applied by choice but never auto-recommended. Where there is genuinely
   // nothing to punch or nibble, no gap is raised.
   const unpriced: string[] = [];
+  // With no machine selected there is nothing to read a rate from: that is a selection
+  // result (no turret meets the part's force or size need), not missing reference data.
+  const noMachineReason = 'no turret machine could be selected for this part, so there is no machine rate to read; see the capability warning for the force and size that ruled every machine out';
   if (input.pierceCount > 0 && punchHitsPerMin <= 0) {
-    unpriced.push(`punching ${input.pierceCount} holes (${rate.machineName ?? 'the selected machine'} has no punch rate or stroke rate factor on file: sm_reference_data 'turretPunchMachine:<name>' punch_rate_cycles_min, 'strokeRateFactor:<tonnage>')`);
+    unpriced.push(`punching ${input.pierceCount} holes (${rate.machineName
+      ? `${rate.machineName} has no punch rate or stroke rate factor on file: sm_reference_data 'turretPunchMachine:<name>' punch_rate_cycles_min, 'strokeRateFactor:<tonnage>'`
+      : noMachineReason})`);
   }
   if (input.cutLengthMm > 0 && !input.turretMachineParams?.dataFound) {
-    unpriced.push(`nibbling ${Math.round(input.cutLengthMm)} mm of contour (no nibble rate for ${rate.machineName ?? 'the selected machine'}: sm_reference_data 'turretPunchMachine:<name>' missing)`);
+    unpriced.push(`nibbling ${Math.round(input.cutLengthMm)} mm of contour (${rate.machineName
+      ? `no nibble rate for ${rate.machineName}: sm_reference_data 'turretPunchMachine:<name>' missing`
+      : noMachineReason})`);
   }
   const physicsGap: PhysicsGap | undefined = unpriced.length > 0
     ? { gapType: 'unsupported_operation', process: 'Turret Punching', machineClass: 'turret_punch', reason: `Not priced: ${unpriced.join('; ')}.` }

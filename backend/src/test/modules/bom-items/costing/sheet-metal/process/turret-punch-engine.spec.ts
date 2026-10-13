@@ -81,6 +81,21 @@ describe('computeTurretPunchCost — unpriced work is a data gap, not a $0 opera
     expect(reasonOf(line)).toContain('punching 128 holes');
   });
 
+  it('says no machine was selected, not that data is missing, when the route has no machine', () => {
+    const line = computeTurretPunchCost(baseInput({ pierceCount: 128, turretMachineParams: NO_MACHINE_DATA })).processLines[0]!;
+    expect(reasonOf(line)).toContain('no turret machine could be selected');
+    expect(reasonOf(line)).not.toContain('has no punch rate');
+  });
+
+  it('names the machine and the missing field when a machine is selected but has no punch rate', () => {
+    const line = computeTurretPunchCost(baseInput({
+      pierceCount: 128,
+      turretRate: { rate: 40, source: 'mhr_database', machineClass: 'turret_punch', machineName: 'Amada Vipros 255', commodityCode: null },
+      turretMachineParams: { ...AMADA_EM3510, punchRateCyclesPerMin: 0, strokeRateFactor: null },
+    })).processLines[0]!;
+    expect(reasonOf(line)).toContain('Amada Vipros 255 has no punch rate');
+  });
+
   it('raises a gap naming the unpriced nibbling when no nibble rate resolved', () => {
     const line = computeTurretPunchCost(baseInput({
       pierceCount: 0, holeCount: 0, cutLengthMm: 5018,
