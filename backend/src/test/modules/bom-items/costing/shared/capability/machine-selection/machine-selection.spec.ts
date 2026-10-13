@@ -621,6 +621,8 @@ describe('P0.4 — integration: buildPartRequirements() feeds selectMachine() wi
     weightKg: 0.5,
     utsMpa: 410,
     cutLengthMm: 200,
+    // One hit of a turret: the perimeter of the largest punched hole, not the whole contour.
+    punchHitPerimeterMm: 200,
     materialShearStrengthMpa: 300,
   };
 

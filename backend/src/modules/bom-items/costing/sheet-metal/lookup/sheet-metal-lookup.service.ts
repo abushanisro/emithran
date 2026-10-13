@@ -559,9 +559,11 @@ export class SheetMetalLookupService {
         .from('sm_reference_data')
         .select('raw')
         .eq('category', 'machine')
-        .eq('key', `Turret Press (Punch Press):${machineName}`)
-        .limit(1);
-      const pressForceKn = (lib?.[0]?.raw as Record<string, unknown> | undefined)?.press_force_kn;
+        .eq('key', `Turret Press (Punch Press):${machineName}`);
+      // The key exists once per staged export; only some carry the press force.
+      const pressForceKn = (lib ?? [])
+        .map((r) => (r.raw as Record<string, unknown> | null)?.press_force_kn)
+        .find((v): v is number => typeof v === 'number' && v > 0);
       if (typeof pressForceKn === 'number' && pressForceKn > 0) {
         machineTonnageT = pressForceKn / 9.80665;
         strokeRateFactor = await this.getStrokeRateFactor(machineTonnageT, complexity);

@@ -59,9 +59,9 @@ export interface PartGeometryForCapability {
   bendLengthMm?: number | null;
   materialUtsMpa?: number | null;
   // Turret-punch force inputs (optional — tonnage skipped when absent).
-  // punchCutLengthMm is the same real cut/contour length the turret engine's
-  // own nibbling calc already uses (turret-punch-engine.ts) — the "Length Of
-  // Cut (Internal & External)" input to the real TPP Manufacturing formula.
+  // punchCutLengthMm is the perimeter of the largest single punched hole
+  // (largestPunchHitPerimeterMm): a turret delivers its force one hit at a time,
+  // so that, not the whole contour, is the "Length Of Cut" of the TPP formula.
   punchCutLengthMm?: number | null;
   materialShearStrengthMpa?: number | null;
   // Raw material grade — used only for laser material-family-specific thickness

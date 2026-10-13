@@ -91,7 +91,7 @@ import type { GdtAnalysisDto, GdtFeatureDto } from './dto/gdt-analysis.dto';
 import {
   classifyLaserMaterial, laserRequirement, latheRequirement,
   pressBrakeRequirement, holeFormingRequirement, vmcRequirement, injectionMoldingRequirement,
-  punchingRequirement, waterjetRequirement, shearRequirement, plasmaCutRequirement, laserPunchRequirement,
+  largestPunchHitPerimeterMm, punchingRequirement, waterjetRequirement, shearRequirement, plasmaCutRequirement, laserPunchRequirement,
   pressFormingRequirement, rollBendingRequirement, deburrSecPerMm,
 } from './costing/shared/capability/machine-selection/physics';
 import { findRouteDataGaps, selectRecommendedRoute, shouldAddSeparatePressBrakeLine, rollBendingGeometryCapability, rolledFormNeedsRollBender,
@@ -1298,6 +1298,9 @@ export class BOMItemsService {
     // punchCutLengthMm/materialShearStrengthMpa), so machine SELECTION and the
     // post-selection TONNAGE_EXCEEDED capability check can never disagree.
     cutLengthMm?: number;
+    // Perimeter of the largest single punched hole (largestPunchHitPerimeterMm): the
+    // force one hit of a turret or laser-punch machine must carry.
+    punchHitPerimeterMm?: number;
     materialShearStrengthMpa?: number | null;
     // Needed only for the Machining branches below, which discover their
     // eligible primary machine classes from the database (MachineDiscoveryService)
@@ -1339,7 +1342,7 @@ export class BOMItemsService {
         const cls = engine.machineClass as MachineClass;
         if (cls === 'turret_punch') {
           requirements[cls] = punchingRequirement({
-            cutLengthMm: input.cutLengthMm ?? 0,
+            cutLengthMm: input.punchHitPerimeterMm ?? 0,
             materialShearStrengthMpa: input.materialShearStrengthMpa ?? 0,
             thicknessMm: input.sheetThicknessMm,
             bedLengthMm: flatLen,
@@ -1395,7 +1398,7 @@ export class BOMItemsService {
           // actually have on file. Real capability backfilled directly into
           // mhr_records — migration 699.
           requirements[cls] = laserPunchRequirement({
-            cutLengthMm: input.cutLengthMm ?? 0,
+            cutLengthMm: input.punchHitPerimeterMm ?? 0,
             materialShearStrengthMpa: input.materialShearStrengthMpa ?? 0,
             thicknessMm: input.sheetThicknessMm,
             materialGrade: input.grade,
@@ -3270,6 +3273,7 @@ export class BOMItemsService {
             extrudedFlangeCount: fg?.summary?.extrudedFlangeCount ?? 0,
             burlDiameterMm: estimateBurlDiameterMm(threads, (fg?.summary?.holeDiameters ?? []) as number[]),
             cutLengthMm,
+            punchHitPerimeterMm: largestPunchHitPerimeterMm(fg?.summary?.holeDiameters as number[] | undefined),
             materialShearStrengthMpa: shearStrengthMpa,
             location,
             accessToken,
@@ -5762,9 +5766,9 @@ export class BOMItemsService {
         : null,
       materialUtsMpa: utsMpa,
       // Real turret-punch force inputs — see estimateTurretPunchTonnage's doc
-      // comment. cutLengthMm is the same real geometry the turret engine's own
-      // nibbling calc already uses; null when there's nothing to punch/cut.
-      punchCutLengthMm: cutLengthMm > 0 ? cutLengthMm : null,
+      // comment. The perimeter of the largest punched hole (one hit); null when
+      // the part has no punched hole.
+      punchCutLengthMm: largestPunchHitPerimeterMm(fg?.summary?.holeDiameters as number[] | undefined) || null,
       materialShearStrengthMpa: rcShearStrengthMpa,
       // Real material grade — only used for laser material-family-specific
       // thickness limits when a real per-machine capability is available.
@@ -5813,6 +5817,7 @@ export class BOMItemsService {
             extrudedFlangeCount: fg?.summary?.extrudedFlangeCount ?? 0,
             burlDiameterMm: estimateBurlDiameterMm(threads, (fg?.summary?.holeDiameters ?? []) as number[]),
             cutLengthMm,
+            punchHitPerimeterMm: largestPunchHitPerimeterMm(fg?.summary?.holeDiameters as number[] | undefined),
             materialShearStrengthMpa: rcShearStrengthMpa,
             location,
             accessToken,
