@@ -1273,7 +1273,7 @@ export class SheetMetalLookupService {
   // brake ── machine_library.json carries a real bend_cycle_time_s for all
   // 16 named "Bend Press Brake" machines. Same exact-name, non-ambiguous
   // matching discipline as getWaterjetAbrasiveRateForMachine/
-  // getTurretPunchParamsForMachine.
+  // getWaterjetAbrasiveRateForMachine.
   @ReferenceMemo()
   async getBendCycleTimeForMachine(machineName: string | null | undefined): Promise<{ secondsPerBend: number | null; dataFound: boolean }> {
     const empty = { secondsPerBend: null, dataFound: false };
@@ -1446,75 +1446,6 @@ export class SheetMetalLookupService {
       sampling_default: r.sampling_default ?? null,
       equipment: r.equipment ?? null,
     }));
-  }
-
-  // ── Turret punch press cycle-time params by thickness ─────────────────────
-  // See migration 414 — replaces TURRET_HITS_PER_MIN/TURRET_NIBBLE_MM_PER_MIN/
-  // TURRET_TOOL_CHANGE_SEC, which used to live directly in default-rates.ts.
-  @ReferenceMemo()
-  async getTurretPunchParams(thicknessMm: number): Promise<{
-    hitsPerMin: number; nibbleMmPerMin: number; toolChangeSec: number; dataFound: boolean;
-  }> {
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
-    const { data } = await db
-      .from('sm_lookup_turret_punch')
-      .select('thickness_mm, hits_per_min, nibble_mm_per_min, tool_change_sec')
-      .order('thickness_mm', { ascending: true });
-
-    if (!data?.length) {
-      return { hitsPerMin: 0, nibbleMmPerMin: 0, toolChangeSec: 0, dataFound: false };
-    }
-    const thicknesses = data.map((r) => Number(r.thickness_mm));
-    const nearestThick = nearestKey(thicknessMm, thicknesses);
-    const row = data.find((r) => Number(r.thickness_mm) === nearestThick)!;
-    return {
-      hitsPerMin: Number(row.hits_per_min),
-      nibbleMmPerMin: Number(row.nibble_mm_per_min),
-      toolChangeSec: Number(row.tool_change_sec),
-      dataFound: true,
-    };
-  }
-
-  // ── Turret Punch rate for the SPECIFIC selected machine, not the generic
-  // thickness curve ── machine_library.json carries real per-machine
-  // punch_rate_cycles_min/tool_change_time_s for every named turret/laser-
-  // punch machine (47 total). Unlike getWaterjetAbrasiveRateForMachine, this
-  // deliberately does NOT touch nibble speed — the real source has no
-  // matching mm/min field (only nibble_rate_cycles_min, cycles/min, which
-  // would need an inferred tool-diameter/overlap conversion formula, not a
-  // direct substitution — left for a separate, reviewed follow-up).
-  // Same exact-name, non-ambiguous matching discipline as
-  // lookupMachineLibraryBenchmark()/getWaterjetAbrasiveRateForMachine —
-  // never guesses. Per explicit product decision, the real machine's own
-  // rate is preferred outright over the generic thickness-keyed curve
-  // whenever the selected machine has real data — even though this specific
-  // real value is not itself thickness-adjusted.
-  async getTurretPunchParamsForMachine(machineName: string | null | undefined): Promise<{
-    hitsPerMin: number | null; toolChangeSec: number | null; dataFound: boolean;
-  }> {
-    const empty = { hitsPerMin: null, toolChangeSec: null, dataFound: false };
-    if (!machineName?.trim()) return empty;
-
-    const { data, error } = await this.machineReferenceRowsNamed(machineName);
-    if (error || !data) return empty;
-
-    const nameLower = machineName.trim().toLowerCase();
-    // See getBendCycleTimeForMachine's doc comment above (root-caused
-    // 2026-09-11) — migration 594's per-location rate-only rows reuse the
-    // same canonical `name` as the real physics-spec row, so matching on
-    // name alone almost never resolves to exactly one row anymore. Narrow
-    // to rows that actually carry a punch-rate/tool-change field first.
-    const matches = data.filter((r: any) =>
-      String(r.raw?.name ?? '').trim().toLowerCase() === nameLower &&
-      (typeof r.raw?.punch_rate_cycles_min === 'number' || typeof r.raw?.tool_change_time_s === 'number'),
-    );
-    if (matches.length !== 1) return empty;
-
-    const raw = matches[0].raw ?? {};
-    const numOrNull = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null);
-    const hitsPerMin = numOrNull(raw.punch_rate_cycles_min);
-    const toolChangeSec = numOrNull(raw.tool_change_time_s);
-    return { hitsPerMin, toolChangeSec, dataFound: hitsPerMin != null || toolChangeSec != null };
   }
 
   // ── Waterjet abrasive (garnet) consumption rate ────────────────────────────
