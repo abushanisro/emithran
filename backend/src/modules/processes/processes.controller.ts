@@ -203,6 +203,13 @@ export class ProcessesController {
     return this.processesService.getTurretMachinesTable();
   }
 
+  @Get('waterjet-machines-table')
+  @ApiOperation({ summary: 'Nozzle delay (pierce time) and jet data of every waterjet machine, shaped as a lookup table' })
+  @ApiResponse({ status: 200, description: 'Table retrieved successfully' })
+  async getWaterjetMachinesTable() {
+    return this.processesService.getWaterjetMachinesTable();
+  }
+
   @Get('stroke-rate-factor-table')
   @ApiOperation({ summary: 'Lookup Table 1: stroke rate factor by machine tonnage and part complexity' })
   @ApiResponse({ status: 200, description: 'Table retrieved successfully' })

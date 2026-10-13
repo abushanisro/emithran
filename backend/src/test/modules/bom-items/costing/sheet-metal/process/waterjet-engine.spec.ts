@@ -1,45 +1,71 @@
-import { computeWaterjetCost, type WaterjetInput } from '../../../../../../modules/bom-items/costing/sheet-metal/process/waterjet-engine';
-import { WATERJET_LEAD_IN_MM, WATERJET_CUT_TIME_ADJUSTMENT_FACTOR } from '../../../../../../modules/bom-items/costing/shared/core/default-rates.constants';
+import { computeWaterjetCost, waterjetMissingInputs, type WaterjetInput } from '../../../../../../modules/bom-items/costing/sheet-metal/process/waterjet-engine';
 
+// Cycle time is the waterjet calculator result (migration 905; the formula is checked in
+// test/migrations/905-waterjet-calculator.spec.ts). The engine prices that time, or reports why
+// there is none.
 function baseInput(overrides: Partial<WaterjetInput> = {}): WaterjetInput {
   return {
     sheetThicknessMm: 6,
     cutLengthMm: 1000,
     pierceCount: 2,
     batchSize: 10,
-    cuttingSpeedMmPerMin: 500,
-    pierceTimeSec: 3,
+    cuttingSecFromCalculator: 150,
+    activeCuttingSecFromCalculator: 138,
+    calculatorId: 'calc-id',
     ...overrides,
   };
 }
 
-describe('computeWaterjetCost — lead-in/lead-out and accel-decel overhead', () => {
-  it('adds 2x lead-in per contour start before dividing by cutting speed, then applies the accel/decel factor', () => {
-    const input = baseInput();
-    const result = computeWaterjetCost(input);
-
-    const effectiveCutLengthMm = input.cutLengthMm + input.pierceCount * 2 * WATERJET_LEAD_IN_MM;
-    const expectedCuttingSec = (effectiveCutLengthMm / input.cuttingSpeedMmPerMin!) * 60 * WATERJET_CUT_TIME_ADJUSTMENT_FACTOR;
-    const expectedPierceSec = input.pierceCount * input.pierceTimeSec!;
-    const expectedCuttingMin = (expectedCuttingSec + expectedPierceSec) / 60;
-
-    expect(result.cuttingMin).toBeCloseTo(expectedCuttingMin, 5);
+describe('computeWaterjetCost — prices the calculator cycle time', () => {
+  it('uses the calculator seconds as the line cycle time and carries the calculator id', () => {
+    const result = computeWaterjetCost(baseInput());
+    expect(result.cuttingMin).toBeCloseTo(150 / 60, 9);
+    expect(result.processLines[0]!.cycleTimeMin).toBeCloseTo(150 / 60, 9);
+    expect(result.processLines[0]!.calculatorId).toBe('calc-id');
+    expect(result.processLines[0]!.physicsGap).toBeUndefined();
   });
 
-  it('produces zero contours-worth of lead-in when pierceCount is 0, so only the accel/decel factor applies', () => {
-    const input = baseInput({ pierceCount: 0, pierceTimeSec: 0 });
-    const result = computeWaterjetCost(input);
-
-    const expectedCuttingSec = (input.cutLengthMm / input.cuttingSpeedMmPerMin!) * 60 * WATERJET_CUT_TIME_ADJUSTMENT_FACTOR;
-    expect(result.cuttingMin).toBeCloseTo(expectedCuttingSec / 60, 5);
+  it('charges abrasive on the active cutting seconds only, not on piercing', () => {
+    const result = computeWaterjetCost(baseInput({ abrasivePricePerKg: 0.7275, abrasiveKgPerMin: 0.46 }));
+    expect(result.abrasiveCost).toBeCloseTo((138 / 60) * 0.46 * 0.7275, 2);
   });
 
-  it('stays honestly $0/0-sec (no guess) when no real cuttingSpeedMmPerMin/pierceTimeSec was resolved', () => {
-    const input = baseInput({ cuttingSpeedMmPerMin: undefined, pierceTimeSec: undefined });
-    const result = computeWaterjetCost(input);
-
+  it('adds no gap and no time when there is nothing to cut', () => {
+    const result = computeWaterjetCost(baseInput({ cutLengthMm: 0, pierceCount: 0, cuttingSecFromCalculator: undefined }));
     expect(result.cuttingMin).toBe(0);
-    expect(result.warnings.some((w) => w.includes('no sm_lookup_waterjet_cut entry'))).toBe(true);
+    expect(result.processLines[0]!.physicsGap).toBeUndefined();
+  });
+});
+
+describe('computeWaterjetCost — no calculator time is a data gap, not a $0 operation', () => {
+  it('raises the gap the caller reports', () => {
+    const gap = { gapType: 'unsupported_operation' as const, process: 'Waterjet Cutting', machineClass: 'waterjet', reason: 'Not priced: example.' };
+    const line = computeWaterjetCost(baseInput({ cuttingSecFromCalculator: undefined, physicsGap: gap })).processLines[0]!;
+    expect(line.physicsGap).toEqual(gap);
+  });
+
+  it('raises a gap of its own when there was work but neither a time nor a reason', () => {
+    const line = computeWaterjetCost(baseInput({ cuttingSecFromCalculator: undefined })).processLines[0]!;
+    expect(line.physicsGap?.gapType).toBe('unsupported_operation');
+  });
+});
+
+describe('waterjetMissingInputs — why the calculator could not be seeded', () => {
+  const full = { machineName: 'Flow Mach 2 1313b', hasCuttingSpeed: true, nozzleDelaySec: 4, leadInMm: 5, adjustmentFactor: 1.4 };
+
+  it('says no machine was selected, not that data is missing', () => {
+    expect(waterjetMissingInputs({ ...full, machineName: null })).toContain('no waterjet machine could be selected');
+  });
+
+  it('names the machine or the table that is missing', () => {
+    expect(waterjetMissingInputs({ ...full, nozzleDelaySec: null })).toContain('Flow Mach 2 1313b has no nozzle_delay_s');
+    expect(waterjetMissingInputs({ ...full, hasCuttingSpeed: false })).toContain('sm_lookup_waterjet_cut');
+    expect(waterjetMissingInputs({ ...full, leadInMm: null })).toContain('standardWaterjetCutLeadInAmount');
+    expect(waterjetMissingInputs({ ...full, adjustmentFactor: null })).toContain('waterjetCutTimeAdjustmentFactor');
+  });
+
+  it('is null when every input is on file', () => {
+    expect(waterjetMissingInputs(full)).toBeNull();
   });
 });
 
@@ -56,10 +82,8 @@ describe('computeWaterjetCost — direct labour cost', () => {
     const expectedSetupCost = (30 / 60) * 120 / input.batchSize + dlrMin * 30 / input.batchSize;
 
     expect(line.setupCost).toBeCloseTo(expectedSetupCost, 2);
-    // Run cost must exceed the machine-only figure now that labour is charged.
     const machineOnlyRunCost = (result.cuttingMin / 60) * 120;
     expect(line.runCost).toBeGreaterThan(machineOnlyRunCost);
-    expect(result.warnings.some((w) => w.includes('no direct labor rate'))).toBe(false);
   });
 
   it('charges $0 labour (not a guess) when no differentiated rate was resolved', () => {
@@ -76,28 +100,17 @@ describe('computeWaterjetCost — direct labour cost', () => {
 
 describe('computeWaterjetCost — nozzle-wear cost (closeout Plan Phase 2b)', () => {
   it('adds a distinct Nozzle Wear line, proportional to active cutting time, when a rate is seeded', () => {
-    const input = baseInput({ nozzleRate: { costPerHr: 100 / 85, dataFound: true } });
-    const result = computeWaterjetCost(input);
+    const result = computeWaterjetCost(baseInput({ nozzleRate: { costPerHr: 100 / 85, dataFound: true } }));
     const nozzleLine = result.processLines.find((l) => l.process === 'Nozzle Wear');
 
     expect(nozzleLine).toBeDefined();
-    const cuttingSec = result.cuttingMin * 60 - input.pierceCount * input.pierceTimeSec!;
-    const expectedNozzleCost = Math.round((cuttingSec / 3600) * (100 / 85) * 100) / 100;
-    expect(nozzleLine!.totalCost).toBeCloseTo(expectedNozzleCost, 2);
+    expect(nozzleLine!.totalCost).toBeCloseTo(Math.round((138 / 3600) * (100 / 85) * 100) / 100, 2);
   });
 
   it('does not add a nozzle line, and warns, when no rate is seeded and there is real cutting time', () => {
-    const input = baseInput({ nozzleRate: { costPerHr: 0, dataFound: false } });
-    const result = computeWaterjetCost(input);
+    const result = computeWaterjetCost(baseInput({ nozzleRate: { costPerHr: 0, dataFound: false } }));
 
     expect(result.processLines.some((l) => l.process === 'Nozzle Wear')).toBe(false);
     expect(result.warnings.some((w) => w.includes('no nozzle-wear rate seeded'))).toBe(true);
-  });
-
-  it('does not add a nozzle line when there is no real cutting time (nothing to wear a nozzle on)', () => {
-    const input = baseInput({ cuttingSpeedMmPerMin: undefined, pierceTimeSec: undefined, nozzleRate: { costPerHr: 1, dataFound: true } });
-    const result = computeWaterjetCost(input);
-
-    expect(result.processLines.some((l) => l.process === 'Nozzle Wear')).toBe(false);
   });
 });

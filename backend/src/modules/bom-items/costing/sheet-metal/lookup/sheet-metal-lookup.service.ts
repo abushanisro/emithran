@@ -1487,6 +1487,20 @@ export class SheetMetalLookupService {
     return { kgPerMin: rate, dataFound: true };
   }
 
+  // ── Waterjet pierce time of the SPECIFIC selected machine ── the machine library carries a
+  // real nozzle_delay_s for every named waterjet (the time the head dwells to pierce the
+  // material). Same exact-name, non-ambiguous matching as getWaterjetAbrasiveRateForMachine.
+  async getWaterjetNozzleDelaySec(machineName: string | null | undefined): Promise<number | null> {
+    if (!machineName?.trim()) return null;
+    const { data, error } = await this.machineReferenceRowsNamed(machineName);
+    if (error || !data) return null;
+    const nameLower = machineName.trim().toLowerCase();
+    const matches = data.filter((r: any) =>
+      String(r.raw?.name ?? '').trim().toLowerCase() === nameLower && typeof r.raw?.nozzle_delay_s === 'number');
+    const delay = matches.length === 1 ? matches[0].raw?.nozzle_delay_s : null;
+    return typeof delay === 'number' && Number.isFinite(delay) && delay > 0 ? delay : null;
+  }
+
   // ── Roll Bending (3/4-Roll) real per-machine cycle time ────────────────────
   // machine_library.json (staged into sm_reference_data, category='machine')
   // carries real per-machine roll-bending physics for every "3 Roll Bender"/

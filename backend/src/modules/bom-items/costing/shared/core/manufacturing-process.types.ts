@@ -4,20 +4,6 @@ import type { CapabilityCheck, PartGeometryForCapability } from '../capability/m
 import type { MachineCapability } from '../capability/machine-selection/seed-registry';
 import type { MachineClass } from './default-rates.constants';
 
-// Real, material+thickness-specific process params resolved by the caller
-// from a DB lookup table (sm_lookup_waterjet_cut) — never computed or
-// guessed inside an engine. `dataFound: false` means the caller had no real
-// row for this material/thickness; the engine falls back to its own
-// documented baseline table with a disclosed warning, never an invented
-// number. (Laser Cutting no longer uses this pattern — see
-// cuttingSecFromCalculator below, resolved via the Manufacturing Physics
-// Calculator pipeline instead.)
-interface WaterjetParams {
-  cuttingSpeedMmPerMin: number;
-  pierceTimeMin: number;
-  dataFound: boolean;
-}
-
 // Real, material+thickness-specific OxyFuel Cut feed-rate/pierce-time
 // params (2026-09-01), resolved by the caller from sm_reference_data's
 // staged 'nestingCutRate:*:OxyFuelCut:*' rows (migration 492, real "USA
@@ -27,8 +13,7 @@ interface WaterjetParams {
 // feedRateSmallFeaturesMmPerMin exists in the source but is deliberately
 // NOT used yet (this app has no real per-hole "small feature length" to
 // apply it to without fabricating one — a disclosed scoping choice, not
-// an oversight). Same disclosed-fallback convention as WaterjetParams
-// above: dataFound:false means an honest $0 cutting line, never a guess.
+// an oversight). dataFound:false means an honest $0 cutting line, never a guess.
 export interface OxyfuelParams {
   feedRateLargeFeaturesMmPerMin: number;
   pierceTimeSec: number;
@@ -39,7 +24,7 @@ export interface OxyfuelParams {
 // the caller from sm_reference_data's staged 'laserPunchMachine:<machine
 // name>' rows (machine_library.json's "Laser Punch / Punch Press" category,
 // all 26 real machines) via SheetMetalLookupService.getLaserPunchMachineParams().
-// Unlike WaterjetParams/OxyfuelParams (resolved ONCE from
+// Unlike OxyfuelParams (resolved ONCE from
 // material+thickness before machine selection), this is keyed by the
 // specific machine mhrRates.laserPunch resolved to — a genuinely different
 // class of combo laser+punch machine where hits/min and nibble speed are
@@ -154,7 +139,6 @@ export interface CuttingProcessContext {
   // one; engines must not fabricate processGroup/processRoute/operation.
   processIdentity?: { processGroup: string; processRoute: string; operation: string };
   abrasivePricePerKg?: number;
-  waterjetParams?: WaterjetParams | null;
   oxyfuelParams?: OxyfuelParams | null;
   routerParams?: RouterParams | null;
   laserPunchParams?: LaserPunchParams | null;
@@ -175,10 +159,12 @@ export interface CuttingProcessContext {
   progressiveDieSetupMinFromMachine?: number | null;
   // Manufacturing Physics Calculator architecture: pre-resolved by the caller
   // via resolvePhysicsQuantity (bom-items.service.ts) for the engine whose
-  // machineClass has a registered calculator (Laser Cutting, Turret Punching).
-  // Engines without one (Waterjet) simply ignore these fields — see
+  // machineClass has a registered calculator (Laser Cutting, Turret Punching, Waterjet).
+  // Engines without one simply ignore these fields — see
   // rule 1's per-process migration, not a batch cutover.
   cuttingSecFromCalculator?: number;
+  /** The cutting part of cuttingSecFromCalculator (waterjet: abrasive and nozzle wear are charged on it). */
+  activeCuttingSecFromCalculator?: number;
   calculatorId?: string | null;
   calculatorVersion?: number | null;
   physicsGap?: PhysicsGap | null;
