@@ -3790,7 +3790,7 @@ export function ProcessCostDialog({
           <>
             {/* Lookup Table: no backdrop, it closes only through its own X */}
             <div
-              className="fixed top-0 left-0 h-screen w-[560px] bg-background border-r border-border shadow-xl z-60 flex flex-col"
+              className={`fixed top-0 left-0 h-screen max-w-[95vw] bg-background border-r border-border shadow-xl z-60 flex flex-col ${lookupTableData.column_definitions.length > 5 ? 'w-[820px]' : 'w-[560px]'}`}
               style={{ pointerEvents: 'auto' }}
               onClick={(e) => { e.stopPropagation(); }}
               onMouseDown={(e) => { e.stopPropagation(); }}
@@ -3856,7 +3856,7 @@ export function ProcessCostDialog({
                       return (
                         <th
                           key={col.name}
-                          className={`sticky top-0 z-10 bg-muted border border-border text-left text-xs font-semibold py-1 px-2 ${isOutputCol ? 'text-primary' : 'text-foreground'
+                          className={`sticky top-0 z-10 bg-muted border border-border text-left text-xs font-semibold py-1 px-2 whitespace-nowrap ${isOutputCol ? 'text-primary' : 'text-foreground'
                             }`}
                         >
                           {col.label}
@@ -3931,7 +3931,7 @@ export function ProcessCostDialog({
                           return (
                             <td
                               key={col.name}
-                              className={`border border-border py-0.5 px-2 text-xs${isOutput ? ' font-semibold text-primary bg-primary/5' : ''}`}
+                              className={`border border-border py-0.5 px-2 text-xs whitespace-nowrap${isOutput ? ' font-semibold text-primary bg-primary/5' : ''}`}
                             >
                               {value !== undefined && value !== null ? String(value) : '—'}
                             </td>
