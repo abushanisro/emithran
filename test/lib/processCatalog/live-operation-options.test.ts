@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { liveOperationOptions, resolveSavedOperation } from '@/lib/processCatalog/live-operation-options';
+import { effectiveOperation, liveOperationOptions, resolveSavedOperation } from '@/lib/processCatalog/live-operation-options';
 
 // Line shapes as the cost engine emits them: the inspection engine names its
 // line "Inspection" and carries a per-feature breakdown; the machining engine
@@ -122,5 +122,31 @@ describe('liveOperationOptions — sheet-metal catalog operations', () => {
   it('a line saved under its own name keeps it (never a blank Operation); a catalog operation is kept as saved', () => {
     expect(resolveSavedOperation([deburring], 'Finishing', 'deburring')).toBe('Finishing');
     expect(resolveSavedOperation([deburring], 'Deslag // SimpleHole', 'deburring')).toBe('Deslag // SimpleHole');
+  });
+});
+
+// Reported on the Rtp2 Inspection line (saved operation 'Inspection', machine class cmm, no machine):
+// the reopened dialog showed "Select operation". The operation is now derived, not synchronised.
+describe('effectiveOperation', () => {
+  const options = [{ value: 'Inspection' }, { value: 'Deslag // SimpleHole' }];
+
+  it('shows the line saved operation as soon as it applies and is offered, with no pick made', () => {
+    expect(effectiveOperation({ choice: null, options, savedOperation: 'Inspection', savedApplies: true })).toBe('Inspection');
+  });
+
+  it('is blank only while the saved operation does not apply (the line moved to another machine class)', () => {
+    expect(effectiveOperation({ choice: null, options, savedOperation: 'Inspection', savedApplies: false })).toBe('');
+  });
+
+  it('the engineer pick wins while it is offered, and falls back to the saved one when it is not', () => {
+    expect(effectiveOperation({ choice: 'Deslag // SimpleHole', options, savedOperation: 'Inspection', savedApplies: true })).toBe('Deslag // SimpleHole');
+    expect(effectiveOperation({ choice: 'Gone', options, savedOperation: 'Inspection', savedApplies: true })).toBe('Inspection');
+  });
+
+  it('is a pure function of its inputs: the same inputs give the same answer in any order of loading', () => {
+    const settled = { choice: null, options, savedOperation: 'Inspection', savedApplies: true };
+    const loading = { ...settled, options: [] as Array<{ value: string }>, savedApplies: false };
+    expect(effectiveOperation(loading)).toBe('');
+    expect(effectiveOperation(settled)).toBe('Inspection'); // no stale state from the loading render
   });
 });
