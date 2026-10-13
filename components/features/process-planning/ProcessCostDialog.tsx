@@ -3773,7 +3773,7 @@ export function ProcessCostDialog({
               onClick={(e) => { e.stopPropagation(); }}
               onMouseDown={(e) => { e.stopPropagation(); }}
             >
-          <div className="flex items-center justify-between p-3 border-b border-border bg-background">
+          <div className="shrink-0 flex items-center justify-between p-3 border-b border-border bg-background">
             <div>
               <h3 className="font-semibold text-sm">Reference Table</h3>
               <p className="text-xs text-muted-foreground">{lookupTableData.tableName}</p>
@@ -3800,7 +3800,7 @@ export function ProcessCostDialog({
           </div>
 
           {/* Hint */}
-          <div className="px-3 py-1.5 bg-primary/5 border-b border-border text-xs text-muted-foreground flex items-center gap-1.5">
+          <div className="shrink-0 px-3 py-1.5 bg-primary/5 border-b border-border text-xs text-muted-foreground flex flex-wrap items-center gap-x-1.5">
             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
             Click any row to use that value for <strong className="text-foreground mx-0.5">{lookupTableData.fieldLabel}</strong>. Highlighted column = selected value.
             {lookupTableData.matchedRowKeys && (
