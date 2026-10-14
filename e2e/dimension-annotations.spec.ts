@@ -79,8 +79,10 @@ const BSPLINE_PART = `${BOM}/items/b42dd401-2ceb-45e2-9781-b80c62ec7f9e/manufact
 test('B-spline part: holes and the large radius are found, grouped, and the toggle is offered', async ({ page }) => {
   const toggle = await openWithDimensions(page, BSPLINE_PART);
   await toggle.click();
-  await expect(labels(page).first()).toBeVisible({ timeout: 30_000 });
-  await page.waitForTimeout(1000);
+  // the toolbar states how many callouts there are; labels mount one by one, so wait for all of them
+  const total = Number(/\((\d+)\)/.exec((await toggle.textContent()) ?? '')?.[1]);
+  expect(total).toBeGreaterThan(0);
+  await expect(labels(page)).toHaveCount(total, { timeout: 30_000 });
   const texts = await labels(page).allTextContents();
   // the STEP's own PMI tolerances, matched by size (its shape aspects carry no faces)
   expect(texts).toContain('R45.75 ±0.15');
