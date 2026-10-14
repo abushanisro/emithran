@@ -762,6 +762,18 @@ async def analyze_geometry_advanced(
             # one 3D-model source of GD&T; all families. See shared/step_pmi.py.
             from shared.step_pmi import read_step_gdt  # type: ignore
             response["pmi"] = read_step_gdt(step_path)
+            # The PMI graphics are in STEP model coordinates; the viewer's mesh is centred on its
+            # bounding box, so it needs that centre (same one feature_graph_v2 is centred on).
+            if response["pmi"].get("graphics"):
+                try:
+                    from machining.machining_feature_recognizer import _part_bounding_box  # type: ignore
+                    _b = _part_bounding_box(shape)
+                    response["pmi"]["graphics_origin"] = [
+                        round((_b["xmin"] + _b["xmax"]) / 2, 4), round((_b["ymin"] + _b["ymax"]) / 2, 4), round((_b["zmin"] + _b["zmax"]) / 2, 4),
+                    ]
+                except Exception as _gexc:
+                    logger.warning(f"[step_pmi] graphics origin failed: {_gexc}")
+                    response["pmi"]["graphics"] = []
 
             # Component feature analysis (eMithran-style decomposition).
             # GCD adjacency walk is the bottleneck (30–70 s for complex sheet metal).
