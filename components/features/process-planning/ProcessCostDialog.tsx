@@ -2590,8 +2590,10 @@ export function ProcessCostDialog({
         // machine that actually has a valid rate on file.
         ? resolveMhrUsdRate(savedMHRRecord)
         : 0;
-  // The selected machine's own labour rate, or none.
-  const effectiveLaborRate = machineLabour ? machineLabour.rate : 0;
+  // The selected machine's own labour rate; a line with no machine (Inspection: labour, no equipment)
+  // keeps the labour rate the cost engine costed it with, which the page passes in.
+  const lineOnlyLabourRate = !selectedMHR && Number(editData?.liveLabourRate) > 0 ? Number(editData.liveLabourRate) : null;
+  const effectiveLaborRate = machineLabour ? machineLabour.rate : (lineOnlyLabourRate ?? 0);
 
   // Cost preview: calls the exact same eMithranTerms()-based engine that computes the
   // saved record server-side (POST /process-costs/calculate → ProcessCostCalculationEngine),
@@ -3197,6 +3199,16 @@ export function ProcessCostDialog({
                                 ? ' — ★ a benchmark value; enter this shop&rsquo;s real rate against the machine in HR Rates to override'
                                 : ''}
                               .
+                            </p>
+                          </>
+                        ) : lineOnlyLabourRate != null && !isNonMachineOperation ? (
+                          <>
+                            <div className="flex items-center justify-between gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm">
+                              <span>This line&apos;s labour</span>
+                              <span className="font-semibold">${lineOnlyLabourRate.toFixed(2)}/hr</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              The labour rate the cost engine used for this line. It has no machine rate; pick a machine above to use that machine&apos;s own labour rate instead.
                             </p>
                           </>
                         ) : isNonMachineOperation ? (

@@ -2037,7 +2037,7 @@ function CostSummaryTab({
               <div className="shrink-0 flex items-center gap-0.5 pr-1">
                 <button
                   type="button"
-                  onClick={() => { setProcDialogPrefill({ ...proc, engineCalculators }); setProcDialogAutoOpenCalculator(false); setProcDialogOpen(true); }}
+                  onClick={() => { setProcDialogPrefill({ ...proc, engineCalculators, ...(laborRate > 0 ? { liveLabourRate: laborRate } : {}) }); setProcDialogAutoOpenCalculator(false); setProcDialogOpen(true); }}
                   className="px-1.5 flex items-center text-muted-foreground/60 hover:text-foreground transition-colors"
                   title="Edit"
                 >
@@ -2186,6 +2186,8 @@ function CostSummaryTab({
                           // dropped real precision the schema already supports).
                           ...(liveCycleSec != null ? { ...proc, cycleTime: Math.round(liveCycleSec * 100) / 100 } : proc),
                           ...(matchedEngineLine?.featureBreakdown ? { featureBreakdown: matchedEngineLine.featureBreakdown } : {}),
+                          // The labour rate the engine costed this line with, for a line that has no machine.
+                          ...(laborRate > 0 ? { liveLabourRate: laborRate } : {}),
                           // A machining line was computed BY a database calculator:
                           // open that calculator with the engine's own inputs, their
                           // sources, and the lookup rows they came from.
