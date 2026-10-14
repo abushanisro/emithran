@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -750,9 +750,22 @@ export function RawMaterialDialog({
     return aliasedId ? pool.find(m => m.id === aliasedId) : undefined;
   };
 
+  // The form is seeded from the saved line (or reset for a new one) ONCE per open. These effects also
+  // depend on the loaded material lists, which a background refetch replaces with a new array: seeding
+  // on every change put the saved values back over whatever the engineer had just picked or typed (the
+  // material they chose "did not select"). The refs remember what this open has already seeded.
+  const seededKeyRef = useRef<string | null>(null);
+  const materialSeededRef = useRef(false);
+  useEffect(() => {
+    if (!open) { seededKeyRef.current = null; materialSeededRef.current = false; }
+  }, [open]);
+  const seedKey = (editData as any)?.id ?? (editData ? `edit:${editData.materialName ?? ''}` : 'new');
+
   // Load edit data first (wait for data to be loaded AND options to be available)
   useEffect(() => {
     if (editData && open && !isLoading && !isLoadingOptions && materialGroups.length > 0) {
+      if (seededKeyRef.current === seedKey) return;
+      seededKeyRef.current = seedKey;
       const allMaterials = rawMaterialsData?.items || [];
       const materialToUse = findMaterialByEditData(allMaterials, editData);
 
@@ -795,6 +808,8 @@ export function RawMaterialDialog({
       }
       setGrossUsage(savedGross);
     } else if (!editData && open) {
+      if (seededKeyRef.current === seedKey) return;
+      seededKeyRef.current = seedKey;
       // Reset for new entry — pre-select pricing location from parent context
       setMaterialGroup('');
       setCountry(location || '');
@@ -812,7 +827,8 @@ export function RawMaterialDialog({
 
   // Set selected material ID after material group filter is applied (separate effect for edit mode)
   useEffect(() => {
-    if (editData && open && !isLoading && !isLoadingOptions && materials.length > 0 && materialGroup) {
+    if (editData && open && !isLoading && !isLoadingOptions && materials.length > 0 && materialGroup && !materialSeededRef.current) {
+      materialSeededRef.current = true;
       const materialToUse = findMaterialByEditData(materials, editData);
       setSelectedMaterialId(materialToUse?.id ?? '');
     }
@@ -1165,7 +1181,9 @@ export function RawMaterialDialog({
                   </Card>
                 )}
 
-                {/* Filters Row */}
+                {/* Material first, and always in view: the group and material pickers stay at the top
+                    while the rest of the form scrolls under them. */}
+                <div className="sticky top-0 z-20 space-y-3 bg-background pb-3">
                 <div className="space-y-2">
                   {/* Material Group */}
                   <label className="text-sm font-semibold">Material Group</label>
@@ -1212,6 +1230,7 @@ export function RawMaterialDialog({
                     searchPlaceholder="Search by name or grade (e.g. AL6101)..."
                     emptyText={materialGroup ? 'No materials found' : 'Select material group first'}
                   />
+                </div>
                 </div>
               </>
             )}
