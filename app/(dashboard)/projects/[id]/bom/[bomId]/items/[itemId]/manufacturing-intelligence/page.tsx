@@ -63,6 +63,7 @@ import { buildEngineCalculatorSeeds } from '@/lib/calculators/engine-calculator-
 import { createSingleFlight } from '@/lib/utils/single-flight';
 import { useBOMItem, useAnalysisVersion, useDFMScores, useMaterialIntelligence, useMaterialDensity, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useCostOverride, useApplyRoute, useApplyCustomRoute, useMachineOverride, costSummaryQueryKey, costSummaryUrl, AUTO_ROUTE_ID, type BlankSpecDto, type DieToolingDto, type InjectionMoldingBreakdown, type ProcessLineCost, type ApplyCustomRouteStep , type CostSummaryDto, type RouteResultDto, type ResolvedCostingInputs , type BOMItem } from '@/lib/api/hooks/useBOMItems';
 import { useMHRPickerRows, useMHRRecord } from '@/lib/api/hooks/useMHR';
+import { usePrefetchProcessDialogData } from '@/lib/api/hooks/usePrefetchProcessDialog';
 import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
 import { groupFeaturesByType, featureSelectionKey, resolveFeatureSelection, findFeatureByFaceId } from '@/lib/features/machining-feature-tree';
 import { groupDieCastFeatures, occurrenceProperties } from '@/lib/features/die-casting-feature-tree';
@@ -9160,6 +9161,8 @@ export default function ManufacturingIntelligencePage() {
   // against a scenario that isn't actually the one committed yet.
   const [factoryDraft, setFactoryDraft] = useState(factory);
   const [batchSizeDraft, setBatchSizeDraft] = useState<number | null>(null);
+  // The machine list and calculator list of the Edit Process Cost dialog, read before it is opened.
+  usePrefetchProcessDialogData(factory);
   // Tri-state, because "no override typed this session" and "the user asked for
   // automatic" are different intents and must not be collapsed:
   //   batchSizeDraft = number -> explicit override, persist it
