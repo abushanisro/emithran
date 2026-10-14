@@ -221,6 +221,10 @@ def read_step_gdt(step_path: str) -> Dict[str, Any]:
         result["datums"] = extra["datums"]
         result["presentation_only"] = extra["presentation_only"]
         result["items"] = build_pmi_items(result.get("gdt_callouts", []), extra)
+        from shared.step_pmi_graphics import read_step_pmi_graphics
+        drawn = read_step_pmi_graphics(raw.decode("latin-1"))
+        result["graphics"] = drawn["graphics"]
+        result["unresolved"] = list(result.get("unresolved", [])) + drawn["unresolved"]
         result["unresolved"] = list(result.get("unresolved", [])) + extra["unresolved"]
     except Exception as exc:  # disclosed, never guessed
         logger.warning(f"[step_pmi] dimension read failed: {exc}")
