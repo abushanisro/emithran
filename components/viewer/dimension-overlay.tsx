@@ -140,7 +140,8 @@ export function DimensionOverlay({ geometry }: { geometry: THREE.BufferGeometry 
     const projected = placement.placed.map(({ annotation, label }) => {
       const world = label.clone().applyMatrix4(group.matrixWorld);
       ndc.copy(world).project(camera);
-      const extra = (state?.frames?.get(annotation.id)?.length ?? 0) + (state?.datums?.get(annotation.id)?.length ?? 0);
+      const extra = (state?.frames?.get(annotation.id)?.length ?? 0) + (state?.datums?.get(annotation.id)?.length ?? 0)
+        + (annotation.pmiNote && state?.frames ? 1 : 0);
       const frameChars = Math.max(0, ...(state?.frames?.get(annotation.id) ?? []).map((f) => formatTolValue(f.zoneMm).length + 4));
       const chars = Math.max(annotation.label.length, frameChars);
       return {
@@ -191,6 +192,11 @@ export function DimensionOverlay({ geometry }: { geometry: THREE.BufferGeometry 
               >
                 {annotation.label}
               </button>
+              {annotation.pmiNote && state.frames && (
+                <div title={annotation.pmiNote} style={{ color, font: '10px/14px ui-monospace, SFMono-Regular, Menlo, monospace', whiteSpace: 'nowrap', marginTop: 1 }}>
+                  PMI: no tolerance stored
+                </div>
+              )}
               {(state.frames?.get(annotation.id) ?? []).map((f) => (
                 <FrameBox key={f.itemId} color={color} title={`${f.type} ${formatTolValue(f.zoneMm)} from STEP PMI (${f.cadFeature ?? 'unnamed'}), placed by ${f.via}. Datum references are not stored in this STEP.`}>
                   <span>{f.symbol}</span><span>{formatTolValue(f.zoneMm)}</span>

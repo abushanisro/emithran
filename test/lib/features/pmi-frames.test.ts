@@ -96,9 +96,45 @@ describe('PMI view mode', () => {
     const shown = visibleAnnotations(annotations, 'pmi', onModel);
     expect(shown.length).toBeGreaterThan(0);
     expect(shown.length).toBeLessThan(annotations.length);
-    for (const a of shown) expect(a.tolerance !== null || onModel.has(a.id)).toBe(true);
+    for (const a of shown) expect(a.tolerance !== null || a.pmiNote !== null || onModel.has(a.id)).toBe(true);
     // the many R1.5 blends have no PMI and are not part of the PMI view
     expect(shown.some((a) => /R1\.5$/.test(a.label))).toBe(false);
     expect(shown.map((a) => a.label)).toContain('R45.75 ±0.15');
+  });
+});
+
+describe('the centre slot', () => {
+  const slot = annotations.find((a) => a.kind === 'slot' && a.label === 'Slot 15 × 29')!;
+
+  it('is one callout from the two R7.5 ends, with the width and length the geometry gives', () => {
+    expect(slot).toBeDefined();
+    expect(slot.valueMm).toBe(15);
+    expect(slot.count).toBe(1);
+    expect(slot.faceIds.length).toBeGreaterThan(0);
+  });
+
+  it('states what the PMI says about it: a Width of 15 with no tolerance behind it', () => {
+    expect(slot.pmiNote).toMatch(/Width2@Width1\(15\)/);
+    expect(slot.pmiNote).toMatch(/no tolerance stored/);
+    expect(slot.tolerance).toBeNull();
+  });
+
+  it('a slot the PMI never mentions carries no note and no tolerance', () => {
+    const other = annotations.find((a) => a.kind === 'slot' && a.label !== 'Slot 15 × 29')!;
+    expect(other.pmiNote).toBeNull();
+    expect(other.tolerance).toBeNull();
+  });
+
+  it('shows in the all and PMI views, never in the Ø or R views', () => {
+    expect(visibleAnnotations(annotations, 'all')).toContain(slot);
+    expect(visibleAnnotations(annotations, 'diameter')).not.toContain(slot);
+    expect(visibleAnnotations(annotations, 'radius')).not.toContain(slot);
+    const pmiView = visibleAnnotations(annotations, 'pmi', new Set());
+    expect(pmiView).toContain(slot);
+    expect(pmiView.filter((a) => a.kind === 'slot')).toEqual([slot]); // only the slot the PMI speaks about
+  });
+
+  it('its end arcs are no longer separate R7.5 callouts', () => {
+    expect(annotations.find((a) => a.kind === 'radius' && a.valueMm === 7.5)).toBeUndefined();
   });
 });
