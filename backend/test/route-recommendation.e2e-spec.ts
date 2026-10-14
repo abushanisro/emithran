@@ -11,6 +11,7 @@ import { parseEnv } from 'util';
 import { BOMItemsModule } from '../src/modules/bom-items/bom-items.module';
 import { BOMItemsService } from '../src/modules/bom-items/bom-items.service';
 import type { RouteComparisonResponseDto } from '../src/modules/bom-items/dto/route-comparison.dto';
+import { findRouteDataGaps } from '../src/modules/bom-items/costing/shared/core/engine-kernel';
 
 jest.setTimeout(400_000);
 
@@ -54,6 +55,15 @@ describe('[e2e] Auto route recommendation, Rtp2 Mag2 Backframe', () => {
     expect(line?.machineClass).toBe('machining_inspection');
     expect(line?.mhrId).toBeTruthy();
     expect(line?.hourlyRate).toBeGreaterThan(0);
+  });
+
+  // A priced service (Bead Blast: a price per m2, no machine time) is a per-part charge: it must not make a
+  // route unapplicable for having no cycle time.
+  it('a selected priced surface treatment does not block applying the route', () => {
+    const line = route('sm-laser').processLines.find((l) => l.process === 'Bead Blast');
+    if (!line) return; // not selected on this part's scenario
+    expect(line.rateSource).toBe('consumable_allowance');
+    expect(findRouteDataGaps([line])).toEqual([]);
   });
 
   it('recommends the fiber laser route', () => {
