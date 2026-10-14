@@ -878,12 +878,17 @@ export function BOMItemDialog({
   pendingFilesRef.current = pendingFiles;
   const activeFileIdRef = useRef(activeFileId);
   activeFileIdRef.current = activeFileId;
+  // The engine's classification of each dropped model, started on drop so it
+  // runs while the engineer reads the form and is usually done by the time a
+  // material is picked (analysis is the slow step, not the decision).
+  const classifyRef = useRef(new Map<string, Promise<AutoFillResponse>>());
   const detectProcessAmong = useCallback(async (candidates: readonly string[]) => {
     const target = pendingFilesRef.current.find(pf => !/\.(dxf|dwg)$/i.test(pf.file.name));
     if (!target || target.status === 'analyzing') return;
     updatePendingFileStatus(target.id, 'analyzing');
     try {
-      const result = await analyzeForAutoFill(target.file);
+      const result = await (classifyRef.current.get(target.id) ?? analyzeForAutoFill(target.file));
+      classifyRef.current.delete(target.id);
       const detected = result.suggestions.processType;
       const settled = formDataRef.current.processType;
       if (!settled && detected && candidates.includes(detected)) {
@@ -900,6 +905,7 @@ export function BOMItemDialog({
         updatePendingFileStatus(target.id, 'pending');
       }
     } catch (e: any) {
+      classifyRef.current.delete(target.id);
       updatePendingFileStatus(target.id, 'pending');
       toast.error(`Could not detect the process for ${target.file.name}`, { description: e?.message ?? 'Analysis failed', duration: 10000 });
     }
@@ -976,6 +982,13 @@ export function BOMItemDialog({
         });
       }
       const chosen = formDataRef.current.processType;
+      if (!chosen) {
+        for (const item of modelItems) {
+          const started = analyzeForAutoFill(item.file);
+          started.catch(() => undefined); // the reason is shown when a material asks for it
+          classifyRef.current.set(item.id, started);
+        }
+      }
       if (chosen) {
         const hinted = modelItems.map((item) => ({ ...item, familyOverride: chosen }));
         setPendingFiles(prev => prev.map(pf => hinted.find(h => h.id === pf.id) ?? pf));
@@ -1938,6 +1951,11 @@ export function BOMItemDialog({
               {!formData.processType && materialProcessChoices.length > 1 && (
                 <p className="text-xs text-muted-foreground">
                   {formData.material} is used by {materialProcessChoices.join(', ')}: the model did not decide, choose the process.
+                </p>
+              )}
+              {!formData.processType && pendingFiles.some(pf => pf.status === 'analyzing') && (
+                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />Reading the model to select the process…
                 </p>
               )}
               {!formData.processType && pendingFiles.some(pf => pf.status === 'pending' && !/\.(dxf|dwg)$/i.test(pf.file.name)) && (
