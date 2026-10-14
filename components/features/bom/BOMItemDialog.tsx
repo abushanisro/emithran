@@ -869,13 +869,54 @@ export function BOMItemDialog({
   // A chosen material decides Process when its groups serve exactly one
   // process (a die-casting alloy -> Die Casting); several -> the engineer
   // picks among them. Never overrides a Process the engineer set.
+  // A material shared by several processes (a sheet / bar grade serves Sheet
+  // Metal, Machining, ...) is settled by the model itself: the CAD engine
+  // classifies the first 3D model, and its family decides Process only when
+  // it is one the material supports. The analysis it ran is the one kept, so
+  // features are extracted once. Otherwise the engineer picks from the list.
+  const pendingFilesRef = useRef(pendingFiles);
+  pendingFilesRef.current = pendingFiles;
+  const activeFileIdRef = useRef(activeFileId);
+  activeFileIdRef.current = activeFileId;
+  const detectProcessAmong = useCallback(async (candidates: readonly string[]) => {
+    const target = pendingFilesRef.current.find(pf => !/\.(dxf|dwg)$/i.test(pf.file.name));
+    if (!target || target.status === 'analyzing') return;
+    updatePendingFileStatus(target.id, 'analyzing');
+    try {
+      const result = await analyzeForAutoFill(target.file);
+      const detected = result.suggestions.processType;
+      const settled = formDataRef.current.processType;
+      if (!settled && detected && candidates.includes(detected)) {
+        setProcessSource('material');
+        setFormData(prev => ({ ...prev, processType: detected }));
+        setPendingFiles(prev => prev.map(p => (p.id === target.id ? { ...p, familyOverride: detected } : p)));
+        updatePendingFileResult(target.id, result);
+        if (target.id === activeFileIdRef.current) populateFormFromResult(result);
+        // Any further model is analysed for the same process.
+        for (const pf of pendingFilesRef.current) {
+          if (pf.id !== target.id && !/\.(dxf|dwg)$/i.test(pf.file.name)) handleFamilyOverrideChange(pf, detected);
+        }
+      } else {
+        updatePendingFileStatus(target.id, 'pending');
+      }
+    } catch (e: any) {
+      updatePendingFileStatus(target.id, 'pending');
+      toast.error(`Could not detect the process for ${target.file.name}`, { description: e?.message ?? 'Analysis failed', duration: 10000 });
+    }
+  }, [updatePendingFileStatus, updatePendingFileResult, populateFormFromResult, handleFamilyOverrideChange]);
+
   const applyMaterialProcess = useCallback((name: string) => {
     const candidates = processesForMaterialGroups([...(materialGroupsByName.get(name) ?? [])], processMaterialLinks ?? [], processGroupOptions);
     setMaterialProcessChoices(candidates.length > 1 ? candidates : []);
-    if (candidates.length !== 1 || processSource === 'user') return;
+    if (processSource === 'user') return;
+    if (candidates.length > 1) {
+      if (!formDataRef.current.processType) void detectProcessAmong(candidates);
+      return;
+    }
+    if (candidates.length !== 1) return;
     if (formDataRef.current.processType === candidates[0]) return;
     selectProcess(candidates[0]!, 'material');
-  }, [materialGroupsByName, processMaterialLinks, processGroupOptions, processSource, selectProcess]);
+  }, [materialGroupsByName, processMaterialLinks, processGroupOptions, processSource, selectProcess, detectProcessAmong]);
 
   const handleFileDrop = useCallback(async (acceptedFiles: File[]) => {
     if (!acceptedFiles.length) return;
@@ -1896,7 +1937,7 @@ export function BOMItemDialog({
               </Select>
               {!formData.processType && materialProcessChoices.length > 1 && (
                 <p className="text-xs text-muted-foreground">
-                  {formData.material} is used by {materialProcessChoices.join(', ')}: choose the process.
+                  {formData.material} is used by {materialProcessChoices.join(', ')}: the model did not decide, choose the process.
                 </p>
               )}
               {!formData.processType && pendingFiles.some(pf => pf.status === 'pending' && !/\.(dxf|dwg)$/i.test(pf.file.name)) && (
