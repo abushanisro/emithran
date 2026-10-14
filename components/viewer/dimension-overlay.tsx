@@ -53,8 +53,9 @@ export function placeAnnotations(
   const diagonal = box.getSize(new THREE.Vector3()).length() || 1;
   const placed: Placed[] = [];
   annotations.forEach((annotation) => {
+    // Drawn on the first feature of the group; a click highlights all of them.
     const triangles = trianglesOfFaces(index, annotation.faceIds);
-    const b = boundsOf(positions, triangles);
+    const b = boundsOf(positions, trianglesOfFaces(index, annotation.instances[0] ?? annotation.faceIds));
     if (!b) return; // the faces are not on this mesh: no callout rather than a misplaced one
     const anchor = new THREE.Vector3((b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2);
     const dir = anchor.clone().sub(centre);

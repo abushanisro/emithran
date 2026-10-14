@@ -26,10 +26,14 @@ export interface DimensionAnnotation {
   kind: AnnotationKind;
   /** The largest diameter / the radius, mm. */
   valueMm: number;
-  /** Text shown on the callout, e.g. "Ø10", "R0.5", "Ø27.6 / Ø24.8". */
+  /** Text shown on the callout, e.g. "Ø10", "4× R0.5", "Ø27.6 / Ø24.8". */
   label: string;
-  /** B-Rep faces the callout points at, ascending. */
+  /** B-Rep faces of every feature the callout stands for, ascending (what a click highlights). */
   faceIds: number[];
+  /** How many physical features share this size ("4×"); 1 for a single feature. */
+  count: number;
+  /** The faces of each feature, in order; the callout is drawn on the first. */
+  instances: number[][];
   /** Engine feature type it came from (SimpleHole, MultiStepHole, Edge, Ring, StraightBend). */
   featureType: string;
 }
@@ -153,16 +157,36 @@ export function buildDimensionAnnotations(source: AnnotationSource | null | unde
   const candidates = machining.length > 0
     ? fromMachining(machining)
     : fromSheetMetal(source?.feature_graph_v2?.features ?? []);
-  return merge(candidates).map((c) => {
-    const prefix = c.kind === 'diameter' ? 'Ø' : 'R';
-    const label = c.diameters && c.diameters.length > 1
-      ? c.diameters.map((d) => `Ø${formatDimension(d)}`).join(' / ')
-      : `${prefix}${formatDimension(c.valueMm)}`;
+
+  // Identical features share one callout, as a drawing writes "4x R1.5": same kind and the same
+  // label. Each keeps its own faces, so the label sits on the first and a click lights all.
+  const groups = new Map<string, Candidate[]>();
+  for (const c of merge(candidates)) {
+    const key = `${c.kind}|${labelOf(c)}`;
+    groups.set(key, [...(groups.get(key) ?? []), c]);
+  }
+  return [...groups.values()].map((members) => {
+    const first = members[0]!;
+    const faceIds = [...new Set(members.flatMap((m) => m.faceIds))].sort((a, b) => a - b);
+    const label = labelOf(first);
     return {
-      id: `${c.kind === 'diameter' ? 'd' : 'r'}${formatDimension(c.valueMm)}-f${String(c.faceIds[0])}`,
-      kind: c.kind, valueMm: c.valueMm, label, faceIds: c.faceIds, featureType: c.featureType,
+      id: `${first.kind === 'diameter' ? 'd' : 'r'}${formatDimension(first.valueMm)}-f${String(first.faceIds[0])}`,
+      kind: first.kind,
+      valueMm: first.valueMm,
+      label: members.length > 1 ? `${members.length}× ${label}` : label,
+      faceIds,
+      count: members.length,
+      instances: members.map((m) => m.faceIds),
+      featureType: first.featureType,
     };
   });
+}
+
+function labelOf(c: Candidate): string {
+  const prefix = c.kind === 'diameter' ? 'Ø' : 'R';
+  return c.diameters && c.diameters.length > 1
+    ? c.diameters.map((d) => `Ø${formatDimension(d)}`).join(' / ')
+    : `${prefix}${formatDimension(c.valueMm)}`;
 }
 
 export function visibleAnnotations(all: readonly DimensionAnnotation[], mode: AnnotationMode): DimensionAnnotation[] {
