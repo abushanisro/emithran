@@ -63,6 +63,7 @@ import { buildEngineCalculatorSeeds } from '@/lib/calculators/engine-calculator-
 import { createSingleFlight } from '@/lib/utils/single-flight';
 import { useBOMItem, useAnalysisVersion, useDFMScores, useMaterialIntelligence, useMaterialDensity, useUpdateBOMItem, usePatchScenarioOverrides, useCostSummary, useRouteComparison, useCostOverride, useApplyRoute, useApplyCustomRoute, useMachineOverride, costSummaryQueryKey, costSummaryUrl, AUTO_ROUTE_ID, type BlankSpecDto, type DieToolingDto, type InjectionMoldingBreakdown, type ProcessLineCost, type ApplyCustomRouteStep , type CostSummaryDto, type RouteResultDto, type ResolvedCostingInputs , type BOMItem } from '@/lib/api/hooks/useBOMItems';
 import { useMHRPickerRows, useMHRRecord } from '@/lib/api/hooks/useMHR';
+import { usePmiRecords, useReviewPmiRecord } from '@/lib/api/hooks/usePmiReview';
 import { usePrefetchProcessDialogData } from '@/lib/api/hooks/usePrefetchProcessDialog';
 import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
 import { groupFeaturesByType, featureSelectionKey, resolveFeatureSelection, findFeatureByFaceId } from '@/lib/features/machining-feature-tree';
@@ -9455,6 +9456,15 @@ export default function ManufacturingIntelligencePage() {
     if (heatmapInspector) rightPanelScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   }, [heatmapInspector]);
 
+  const pmiRecordsQuery = usePmiRecords(item?.id);
+  const reviewPmi = useReviewPmiRecord(item?.id);
+  const pmiReviewProps = useMemo(
+    () => pmiRecordsQuery.data
+      ? { records: pmiRecordsQuery.data.records, canReview: pmiRecordsQuery.data.canReview, role: pmiRecordsQuery.data.role, bases: pmiRecordsQuery.data.bases, saving: reviewPmi.isPending, onReview: (request: Parameters<typeof reviewPmi.mutate>[0]) => reviewPmi.mutate(request) }
+      : null,
+    [pmiRecordsQuery.data, reviewPmi.isPending, reviewPmi.mutate],
+  );
+
   // All hooks must appear before any conditional returns
   const fg = useMemo(
     () => normalizeFeatureGraph(item ? ((item.featureGraph) ?? null) : null),
@@ -10668,6 +10678,7 @@ export default function ManufacturingIntelligencePage() {
                       onOccurrenceSelect={setSelectedOccurrenceIndex}
                       faceMap={faceMap}
                       {...(item.featureGraph ? { annotationSource: item.featureGraph } : {})}
+                      {...(pmiReviewProps ? { pmiReview: pmiReviewProps } : {})}
                       sheetThickness={effectiveSheetThicknessMm(item)}
                       {...(setupAxes.length ? { setupAxes } : {})}
                       {...(selectedFeatureScores !== undefined && !operationVisual ? { dfmOccurrenceScores: selectedFeatureScores } : {})}
@@ -10835,6 +10846,7 @@ export default function ManufacturingIntelligencePage() {
                             onOccurrenceSelect={setSelectedOccurrenceIndex}
                             faceMap={faceMap}
                             {...(item.featureGraph ? { annotationSource: item.featureGraph } : {})}
+                      {...(pmiReviewProps ? { pmiReview: pmiReviewProps } : {})}
                             sheetThickness={effectiveSheetThicknessMm(item)}
                             {...(setupAxes.length ? { setupAxes } : {})}
                             {...(selectedFeatureScores !== undefined && !operationVisual ? { dfmOccurrenceScores: selectedFeatureScores } : {})}

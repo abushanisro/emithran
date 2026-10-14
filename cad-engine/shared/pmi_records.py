@@ -17,6 +17,8 @@ manufacturing decision.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
@@ -34,6 +36,37 @@ CHARACTERISTICS = {
 }
 _LABEL_KIND = re.compile(r"^([A-Za-z]+)\d*@")
 _LABEL_VALUE = re.compile(r"\((-?[\d.]+)\)(?:-\d+)?$")
+
+
+def _digest(payload: Any) -> str:
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf8")).hexdigest()
+
+
+def record_fingerprint(rec: Dict[str, Any]) -> str:
+    """
+    What an engineer's approval is bound to: the annotation, the values it states, how they were obtained and
+    which model faces they are tied to. Any change to one of these changes the fingerprint, so an approval
+    given to the old content can never be read as an approval of the new (the backend and the database compare
+    it at approval time and at read time). The STEP file itself is bound separately (pmi.source.file_sha256).
+    """
+    decode = (rec.get("provenance") or {}).get("decode") or {}
+    return _digest({
+        "annotation_ref": rec.get("annotation_ref"), "record_type": rec.get("record_type"),
+        "dimension_type": rec.get("dimension_type"), "characteristic": rec.get("characteristic"),
+        "nominal": rec.get("nominal"), "tolerance": rec.get("tolerance"), "zone": rec.get("zone"),
+        "datum_refs": rec.get("datum_refs"), "letter": rec.get("letter"), "source": rec.get("source"),
+        "status": (rec.get("validation") or {}).get("status"), "decoded_text": decode.get("text"),
+        "face_ids": (rec.get("feature_ref") or {}).get("face_ids"),
+    })
+
+
+def datum_refs_fingerprint(rec: Dict[str, Any]) -> str:
+    """The same, for the datum references of a frame whose zone is native: a separate reviewable claim."""
+    decode = (rec.get("provenance") or {}).get("decode") or {}
+    return _digest({
+        "annotation_ref": rec.get("annotation_ref"), "zone": rec.get("zone"), "datum_refs": rec.get("datum_refs"),
+        "decoded_text": decode.get("text"), "face_ids": (rec.get("feature_ref") or {}).get("face_ids"),
+    })
 
 
 def _dimension_type(kind: Optional[str]) -> str:
@@ -356,6 +389,11 @@ def build_pmi_records(
             rec["feature_ref"] = ({**ref, "association": f"through the dimension of CAD feature {rec['cad_feature']!r}: {ref['association']}"}
                                   if ref else {"cad_feature": rec.get("cad_feature"), "engine_feature_ids": [], "face_ids": [],
                                                "association": "the file dimensions no CAD feature of this name"})
+
+    for rec in records:
+        rec["fingerprint"] = record_fingerprint(rec)
+        if rec.get("datum_refs") is not None:
+            rec["datum_refs_fingerprint"] = datum_refs_fingerprint(rec)
 
     counts: Dict[str, int] = {}
     for rec in records:

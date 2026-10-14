@@ -158,7 +158,9 @@ class AdvancedCADMemoryOptimizer:
     """
     
     VERSION = "2.2.0"
-    CACHE_VERSION = "geo_v58"  # bumped 2026-10-15: (35) pmi.records: typed engineering records (native PMI, decoded
+    CACHE_VERSION = "geo_v59"  # bumped 2026-10-15: (36) pmi.records carry a content `fingerprint` (and
+    # `datum_refs_fingerprint`) and pmi.source.file_sha256: what an engineer's approval of a decoded value is bound to.
+    # Previous: geo_v58, 2026-10-15: (35) pmi.records: typed engineering records (native PMI, decoded
     # graphics flagged for review, unresolved) with limits and engine-feature association (shared/pmi_records.py).
     # Previous: geo_v57, 2026-10-14: (34) pmi.graphics: the callouts' drawn polylines and glyph
     # triangles (shared/step_pmi_graphics.py) + pmi.graphics_origin, so the viewer can draw the PMI as authored.
