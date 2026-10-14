@@ -12,6 +12,7 @@ import { BodyEdges, SetupAxisArrows } from '@/components/viewer/body-overlays';
 import { DimensionOverlay, DimensionOverlayCtx } from '@/components/viewer/dimension-overlay';
 import { PmiPanel } from '@/components/viewer/pmi-panel';
 import { layoutPmi, type PmiDatumMark, type PmiFrame } from '@/lib/features/pmi-frames';
+import { buildPmiGraphicsBuffers } from '@/lib/features/pmi-graphics';
 import { buildDimensionAnnotations, visibleAnnotations, type AnnotationMode, type AnnotationSource } from '@/lib/features/dimension-annotations';
 import { freshWorldBoundsOf } from '@/lib/geometry/scene-bounds';
 import { Button } from '@/components/ui/button';
@@ -3129,15 +3130,21 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
     return { frames, datums, ids: new Set([...frames.keys(), ...datums.keys()]) };
   }, [pmiLayout]);
   const showsPmi = annotationMode === 'all' || annotationMode === 'pmi';
+  const pmiGraphics = useMemo(
+    () => buildPmiGraphicsBuffers(annotationSource?.pmi?.graphics, annotationSource?.pmi?.graphics_origin),
+    [annotationSource],
+  );
   const dimensionOverlay = useMemo(() => ({
     annotations: visibleAnnotations(allAnnotations, annotationMode, pmiOnModel.ids),
     faceMap: faceMap ?? [],
     selectedId: selectedAnnotationId,
     onSelect: setSelectedAnnotationId,
     ...(showsPmi ? { frames: pmiOnModel.frames, datums: pmiOnModel.datums } : {}),
-  }), [allAnnotations, annotationMode, faceMap, selectedAnnotationId, pmiOnModel, showsPmi]);
+    graphics: annotationMode === 'graphics' ? pmiGraphics : null,
+  }), [allAnnotations, annotationMode, faceMap, selectedAnnotationId, pmiOnModel, showsPmi, pmiGraphics]);
   const annotationModes = useMemo<AnnotationMode[]>(
-    () => ['off', 'all', 'diameter', 'radius', ...(hasPmi ? (['pmi'] as AnnotationMode[]) : [])], [hasPmi],
+    () => ['off', 'all', 'diameter', 'radius', ...(hasPmi ? (['pmi'] as AnnotationMode[]) : []), ...(pmiGraphics ? (['graphics'] as AnnotationMode[]) : [])],
+    [hasPmi, pmiGraphics],
   );
   const cycleAnnotationMode = useCallback(() => {
     setSelectedAnnotationId(null);
@@ -3866,15 +3873,15 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
               </Button>
             )}
 
-            {allAnnotations.length > 0 && (
+            {(allAnnotations.length > 0 || pmiGraphics) && (
               <>
                 <Separator orientation="vertical" className="h-6 bg-[#c4cfc6]" />
                 <Button variant="outline" size="sm" onClick={cycleAnnotationMode} data-testid="dimension-toggle"
-                  title="Dimensions: off, all (with the STEP's GD&T frames), diameters (Ø) only, radii (R) only, PMI only"
+                  title="Dimensions: off, all (with the STEP's GD&T frames), diameters (Ø) only, radii (R) only, PMI only, PMI graphics (the CAD's own drawn PMI)"
                   className={`gap-1.5 font-medium text-xs ${annotationMode !== 'off' ? 'bg-teal-600 hover:bg-teal-700 text-white border-teal-700' : 'bg-white hover:bg-[#e8efe9] text-[#1f2d3a] border-[#c4cfc6]'}`}>
                   <Ruler className="h-3.5 w-3.5" />
-                  {annotationMode === 'off' ? 'Dimensions' : annotationMode === 'all' ? 'Ø + R' : annotationMode === 'diameter' ? 'Ø only' : annotationMode === 'radius' ? 'R only' : 'PMI'}
-                  {' '}({dimensionOverlay.annotations.length || allAnnotations.length})
+                  {annotationMode === 'off' ? 'Dimensions' : annotationMode === 'all' ? 'Ø + R' : annotationMode === 'diameter' ? 'Ø only' : annotationMode === 'radius' ? 'R only' : annotationMode === 'pmi' ? 'PMI' : 'PMI graphics'}
+                  {' '}({annotationMode === 'graphics' ? (pmiGraphics?.callouts ?? 0) : dimensionOverlay.annotations.length || allAnnotations.length})
                 </Button>
               </>
             )}

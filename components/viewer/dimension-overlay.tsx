@@ -8,6 +8,7 @@ import { buildFaceIndex, boundsOf, trianglesOfFaces, subsetPositions } from '@/l
 import type { FaceMapEntry } from '@/lib/types/manufacturing';
 import { formatTolValue, type DimensionAnnotation } from '@/lib/features/dimension-annotations';
 import type { PmiDatumMark, PmiFrame } from '@/lib/features/pmi-frames';
+import type { PmiGraphicsBuffers } from '@/lib/features/pmi-graphics';
 import { LABEL_CHAR_PX, LABEL_HEIGHT_PX, LABEL_PAD_PX, separateLabels } from '@/lib/viewer/label-separation';
 
 /**
@@ -29,6 +30,8 @@ export interface DimensionOverlayState {
   /** GD&T frames and datum marks placed on a callout, by callout id (shown with that callout). */
   frames?: ReadonlyMap<string, readonly PmiFrame[]>;
   datums?: ReadonlyMap<string, readonly PmiDatumMark[]>;
+  /** The STEP's own PMI graphics, drawn as authored ('PMI graphics' mode). */
+  graphics?: PmiGraphicsBuffers | null;
 }
 
 export const DimensionOverlayCtx = React.createContext<DimensionOverlayState | null>(null);
@@ -85,6 +88,31 @@ function Arrowhead({ from, to, size, color }: { from: THREE.Vector3; to: THREE.V
       <coneGeometry args={[size * 0.35, size, 10]} />
       <meshBasicMaterial color={color} depthTest={false} />
     </mesh>
+  );
+}
+
+/** The PMI the CAD drew (leaders, frames, glyph text), in the mesh's frame, on top of the model like the CAD shows it. */
+function PmiGraphicsLayer({ buffers }: { buffers: PmiGraphicsBuffers }) {
+  const lineGeometry = useMemo(() => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(buffers.lines, 3));
+    return g;
+  }, [buffers]);
+  const triangleGeometry = useMemo(() => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(buffers.triangles, 3));
+    return g;
+  }, [buffers]);
+  React.useEffect(() => () => { lineGeometry.dispose(); triangleGeometry.dispose(); }, [lineGeometry, triangleGeometry]);
+  return (
+    <group name="pmi-graphics" userData={{ callouts: buffers.callouts }}>
+      <lineSegments geometry={lineGeometry} renderOrder={103}>
+        <lineBasicMaterial color={TEAL} depthTest={false} />
+      </lineSegments>
+      <mesh geometry={triangleGeometry} renderOrder={103}>
+        <meshBasicMaterial color={TEAL} depthTest={false} side={THREE.DoubleSide} />
+      </mesh>
+    </group>
   );
 }
 
@@ -161,11 +189,13 @@ export function DimensionOverlay({ geometry }: { geometry: THREE.BufferGeometry 
     setSpread({ source: placement, labels });
   });
 
+  if (state?.graphics && !placement) return <PmiGraphicsLayer buffers={state.graphics} />;
   if (!state || !placement) return null;
   const arrow = placement.diagonal * 0.02;
   const labelAt = (i: number, fallback: THREE.Vector3) => (spread?.source === placement ? spread.labels[i] ?? fallback : fallback);
   return (
     <group ref={groupRef}>
+      {state.graphics && <PmiGraphicsLayer buffers={state.graphics} />}
       {highlight && (
         <mesh geometry={highlight} renderOrder={101}>
           <meshBasicMaterial color={TEAL_SELECTED} transparent opacity={0.9} depthTest={false} side={THREE.DoubleSide} />
@@ -194,7 +224,7 @@ export function DimensionOverlay({ geometry }: { geometry: THREE.BufferGeometry 
               </button>
               {annotation.pmiNote && state.frames && (
                 <div title={annotation.pmiNote} style={{ color, font: '10px/14px ui-monospace, SFMono-Regular, Menlo, monospace', whiteSpace: 'nowrap', marginTop: 1 }}>
-                  PMI: no tolerance stored
+                  PMI: tolerance only in the graphics
                 </div>
               )}
               {(state.frames?.get(annotation.id) ?? []).map((f) => (

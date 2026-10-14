@@ -113,9 +113,10 @@ describe('the centre slot', () => {
     expect(slot.faceIds.length).toBeGreaterThan(0);
   });
 
-  it('states what the PMI says about it: a Width of 15 with no tolerance behind it', () => {
+  it('states what the PMI says about it: a label-only Width of 15 whose tolerance is only in the drawn graphics', () => {
     expect(slot.pmiNote).toMatch(/Width2@Width1\(15\)/);
-    expect(slot.pmiNote).toMatch(/no tolerance stored/);
+    expect(slot.pmiNote).toMatch(/label-only callout/);
+    expect(slot.pmiNote).toMatch(/drawn in the PMI graphics/); // the tolerance exists only as drawn text
     expect(slot.tolerance).toBeNull();
   });
 
