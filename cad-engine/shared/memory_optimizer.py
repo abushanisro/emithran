@@ -158,7 +158,10 @@ class AdvancedCADMemoryOptimizer:
     """
     
     VERSION = "2.2.0"
-    CACHE_VERSION = "geo_v52"  # bumped 2026-10-10: (29) sheet-metal feature_graph_v2.measurements carries the
+    CACHE_VERSION = "geo_v53"  # bumped 2026-10-14: (30) machining collect_cylinders recognises a cylinder
+    # in a B-spline / revolution / extrusion face from its own curvature and axis (shared/bspline_cylinder.py).
+    # A STEP that wrote every face, holes included, as a B-spline used to yield no holes and one CurvedSurface.
+    # Previous: geo_v52, 2026-10-10: (29) sheet-metal feature_graph_v2.measurements carries the
     # faces behind pierce_count / bend_line_length / flat_pattern_area (each with a `reconciles` flag).
     # Previous: geo_v51, 2026-10-09: (28) sheet-metal cut_profile carries one occurrence per
     # cut category (outer_profile / circular_holes / internal_profiles) with face_ids + length_mm from the

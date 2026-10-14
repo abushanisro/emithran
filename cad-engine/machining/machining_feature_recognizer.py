@@ -573,7 +573,31 @@ class MachiningFeatureRecognizer:
         bore_idx = 0
         bore_id_to_cyl: Dict[str, Dict] = {}
 
+        round_idx = 0
         for cyl in cylinders:
+            # A bore wraps (almost) all the way round its axis. A cylinder face that sweeps
+            # less is an arc of something else: an inside fillet, a slot end, a rounded
+            # pocket corner (concave) or a rounded outside edge (convex). Its radius is real,
+            # so it is kept, as a round, with the sweep and orientation that justify it.
+            sweep = cyl.get("u_range", 2.0 * math.pi)
+            if sweep < HOLE_MIN_SWEEP_RAD:
+                if cyl["radius"] >= MIN_ARC_RADIUS_MM:
+                    rx, ry, rz = cyl["centroid"]
+                    features.append(MachiningFeature(
+                        id=f"arc_{round_idx}",
+                        type="Edge",
+                        variant="round",
+                        params={
+                            "radius_mm": round(cyl["radius"], 3),
+                            "sweep_deg": round(math.degrees(sweep), 1),
+                            "concave": cyl["kind"] in ("through_hole", "blind_hole", "cross_hole"),
+                            "centroid": [round(rx, 3), round(ry, 3), round(rz, 3)],
+                        },
+                        confidence=0.70,
+                        face_ids=cyl.get("face_indices", []),
+                    ))
+                    round_idx += 1
+                continue
             # Outward-facing (convex) cylinders are never holes — skip turned
             # diameters and off-axis profile faces alike.
             if cyl["kind"] in ("external_diameter", "offset_profile"):
@@ -1072,6 +1096,27 @@ def _count_face_types(shape) -> Dict[str, int]:
 # ── Deduplication ────────────────────────────────────────────────────────────
 
 
+# A cylinder face is a bore only if it sweeps at least this much of a full turn (its patches
+# merged). 97 %: a bore split into patches measures 2*pi to within the sampling of the sweep.
+HOLE_MIN_SWEEP_RAD = 0.97 * 2.0 * math.pi
+# Smallest partial arc kept as a round (the torus detector uses the same 0.5 mm floor).
+MIN_ARC_RADIUS_MM = 0.5
+
+
+def _same_axis_line(a: Dict, b: Dict) -> bool:
+    """Patches of ONE cylinder lie on the same axis line. Arcs that only share a radius and a
+    distance from the part axis (the four corners of a rounded pocket) are different features."""
+    ax, bx = a.get("axis"), b.get("axis")
+    ca, cb = a.get("centroid"), b.get("centroid")
+    if ax is None or bx is None or ca is None or cb is None:
+        return True  # no axis recorded: the position / distance test above is all there is
+    if abs(sum(x * y for x, y in zip(ax, bx))) < 0.9999:
+        return False
+    d = (cb[0] - ca[0], cb[1] - ca[1], cb[2] - ca[2])
+    cross = (d[1] * ax[2] - d[2] * ax[1], d[2] * ax[0] - d[0] * ax[2], d[0] * ax[1] - d[1] * ax[0])
+    return math.sqrt(sum(c * c for c in cross)) <= 0.02 + 0.005 * a["radius"]
+
+
 def _deduplicate_cylinders(raw: List[Dict]) -> List[Dict]:
     """
     Merges OCC face patches that represent the same physical cylindrical feature.
@@ -1096,27 +1141,46 @@ def _deduplicate_cylinders(raw: List[Dict]) -> List[Dict]:
     """
     ONE_CIRCLE = 2.0 * math.pi
 
-    buckets: Dict[Tuple, List[Dict]] = {}
-    for cyl in raw:
-        r_key    = round(cyl["radius"]          / 0.5) * 0.5
-        pos_key  = round(cyl["position"]         / 3.0) * 3.0
-        dist_key = round(cyl["dist_from_axis"]   / 2.0) * 2.0
-        key = (cyl["kind"], r_key, pos_key, dist_key)
-        buckets.setdefault(key, []).append(cyl)
+    # Cluster by tolerance (union-find), not by rounding to a grid: a grid puts two halves
+    # of one bore in different buckets whenever the bore sits on a rounding boundary, and
+    # each half then reads as a separate feature.
+    parent = list(range(len(raw)))
+
+    def find(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    for i in range(len(raw)):
+        for j in range(i + 1, len(raw)):
+            a_, b_ = raw[i], raw[j]
+            if (a_["kind"] == b_["kind"]
+                    and abs(a_["radius"] - b_["radius"]) <= 0.5
+                    and abs(a_["position"] - b_["position"]) <= 3.0
+                    and abs(a_["dist_from_axis"] - b_["dist_from_axis"]) <= 2.0
+                    and _same_axis_line(a_, b_)):
+                parent[find(i)] = find(j)
+
+    clusters: Dict[int, List[Dict]] = {}
+    for i, cyl in enumerate(raw):
+        clusters.setdefault(find(i), []).append(cyl)
 
     result: List[Dict] = []
-    for group in buckets.values():
+    for group in clusters.values():
         if len(group) == 1:
             result.append(group[0])
             continue
         total_arc = sum(c.get("u_range", ONE_CIRCLE) for c in group)
         if total_arc <= 1.1 * ONE_CIRCLE:
-            # Arc patches of one bore/OD — merge, keeping best length estimate
+            # Arc patches of one bore/OD — merge, keeping best length estimate. The merged
+            # feature sweeps the patches' combined angle (a full bore: 2*pi).
             rep = dict(max(group, key=lambda c: c["length"]))
             merged_face_indices: List[int] = []
             for c in group:
                 merged_face_indices.extend(c.get("face_indices", []))
             rep["face_indices"] = merged_face_indices
+            rep["u_range"] = min(total_arc, ONE_CIRCLE)
             result.append(rep)
         else:
             # Multiple separate holes sharing radius and position (e.g. PCD holes)
