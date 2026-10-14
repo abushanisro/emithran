@@ -106,3 +106,44 @@ def test_a_labelled_callout_that_has_a_semantic_dimension_is_not_also_presentati
 def test_a_file_with_no_pmi_reads_as_empty():
     r = read_step_dimensions("ISO-10303-21;\nDATA;\n#1=CARTESIAN_POINT('',(0.,0.,0.));\nENDSEC;\n")
     assert r == {"dimensions": [], "datums": [], "presentation_only": [], "unresolved": []}
+
+
+# ── pmi.items[]: one record per PMI item ─────────────────────────────────────
+
+from shared.step_pmi_dimensions import build_pmi_items, cad_feature_of
+
+
+@pytest.mark.parametrize("label,feature", [
+    ("Radius8@Cylinder Pattern1(4.75)", "Cylinder Pattern1"),
+    ("Diameter5@Simple Hole7(40.08)-2", "Simple Hole7"),
+    ("Datum451@Simple Hole1(C)", "Simple Hole1"),
+    ("Position2@Simple Hole8", "Simple Hole8"),
+    ("Width2@Width1(15)", "Width1"),
+    ("no at sign", None),
+    (None, None),
+])
+def test_the_cad_feature_a_label_names(label, feature):
+    assert cad_feature_of(label) == feature
+
+
+def test_every_pmi_item_becomes_one_normalized_record():
+    extra = read_step_dimensions(_step(
+        _dimension(100, "radius", 4.75, (-0.15, 0.15)),
+        ["#200=DRAUGHTING_CALLOUT('Datum443@Plane10(A)',(#99));", "#201=DRAUGHTING_CALLOUT('Width2@Width1(15)',(#99));"],
+    ))
+    gdt = [{"type": "position", "tolerance": 0.15, "face_ids": [], "name": "Position1@Hole Pattern2"}]
+    items = build_pmi_items(gdt, extra)
+    assert sorted(i["kind"] for i in items) == ["datum", "dimension", "geometric", "label_only"]
+    dim = next(i for i in items if i["kind"] == "dimension")
+    assert (dim["cad_feature"], dim["nominal_mm"], dim["lower_mm"], dim["upper_mm"]) == ("Cylinder Pattern1", 4.75, -0.15, 0.15)
+    geo = next(i for i in items if i["kind"] == "geometric")
+    assert (geo["type"], geo["zone_mm"], geo["cad_feature"]) == ("position", 0.15, "Hole Pattern2")
+    assert next(i for i in items if i["kind"] == "datum")["letter"] == "A"
+    assert next(i for i in items if i["kind"] == "label_only")["nominal_mm"] == 15.0
+    assert len({i["id"] for i in items}) == len(items)
+
+
+def test_a_geometric_tolerance_never_carries_datum_references_the_file_does_not_store():
+    items = build_pmi_items([{"type": "position", "tolerance": 0.05, "face_ids": [], "name": "Position2@Simple Hole8"}],
+                            {"dimensions": [], "datums": [], "presentation_only": []})
+    assert items[0]["datum_refs"] == []

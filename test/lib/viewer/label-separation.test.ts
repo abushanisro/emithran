@@ -34,3 +34,16 @@ describe('separateLabels', () => {
     expect(separateLabels([])).toEqual([]);
   });
 });
+
+describe('separateLabels with taller labels', () => {
+  it('a label with frames under it takes its own height, so a neighbour is moved clear of all of it', () => {
+    const tall = { x: 200, y: 200, w: 60, depth: 0, h: LABEL_HEIGHT_PX * 3 };
+    const below = { x: 200, y: 200 + LABEL_HEIGHT_PX * 2, w: 60, depth: 1 }; // inside the tall label's lower rows
+    const out = separateLabels([tall, below]);
+    const rect = (l: { x: number; y: number; w: number; h?: number }, o: { dx: number; dy: number }) => ({
+      x: l.x + o.dx - l.w / 2, y: l.y + o.dy - (l.h ?? LABEL_HEIGHT_PX) / 2, w: l.w, h: l.h ?? LABEL_HEIGHT_PX,
+    });
+    const a = rect(tall, out[0]!), b = rect(below, out[1]!);
+    expect(a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h).toBe(false);
+  });
+});

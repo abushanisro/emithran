@@ -215,11 +215,12 @@ def read_step_gdt(step_path: str) -> Dict[str, Any]:
         return {"status": "no_tolerance_entities", "gdt_callouts": [], "unresolved": []}
     result = _read_step_gdt_entities(step_path, raw)
     try:
-        from shared.step_pmi_dimensions import read_step_dimensions
+        from shared.step_pmi_dimensions import build_pmi_items, read_step_dimensions
         extra = read_step_dimensions(raw.decode("latin-1"))
         result["dimensions"] = extra["dimensions"]
         result["datums"] = extra["datums"]
         result["presentation_only"] = extra["presentation_only"]
+        result["items"] = build_pmi_items(result.get("gdt_callouts", []), extra)
         result["unresolved"] = list(result.get("unresolved", [])) + extra["unresolved"]
     except Exception as exc:  # disclosed, never guessed
         logger.warning(f"[step_pmi] dimension read failed: {exc}")

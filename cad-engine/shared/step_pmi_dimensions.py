@@ -144,3 +144,54 @@ def read_step_dimensions(step_text: str) -> Dict[str, Any]:
         if v and name not in semantic_callouts:
             presentation_only.append({"callout": name, "kind": v.group(1).lower(), "nominal_mm": float(v.group(2))})
     return {"dimensions": dimensions, "datums": datums, "presentation_only": presentation_only, "unresolved": unresolved}
+
+
+# ── One normalized list of every PMI item ────────────────────────────────────
+
+_FEATURE_OF_LABEL = re.compile(r"^[^@]*@(.+?)(?:\([^()]*\))?(?:-\d+)?$")
+
+
+def cad_feature_of(label: Optional[str]) -> Optional[str]:
+    """The CAD feature a callout is attached to, from its label: 'Radius8@Cylinder Pattern1(4.75)' -> 'Cylinder Pattern1'."""
+    m = _FEATURE_OF_LABEL.match(label or "")
+    return m.group(1).strip() if m else None
+
+
+def build_pmi_items(gdt_callouts: List[Dict[str, Any]], extra: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Every PMI item of the file as one record, whatever entity it came from:
+      kind 'dimension'   semantic size with its +/- bounds (or basic)
+      kind 'geometric'   semantic geometric tolerance (zone in mm)
+      kind 'datum'       a datum letter read from a callout label
+      kind 'label_only'  a value that exists only in a callout label (no tolerance stored)
+    `cad_feature` is the CAD feature the label names. `datum_refs` is always [] for a geometric
+    tolerance: no datum reference is stored in a file this reader understands, and none is guessed
+    from how the CAD tool draws the frame.
+    """
+    items: List[Dict[str, Any]] = []
+    for d in extra.get("dimensions", []):
+        items.append({
+            "id": f"dimension:{d.get('callout') or len(items)}", "kind": "dimension", "source": "semantic",
+            "dimension_kind": d["kind"], "nominal_mm": d["nominal_mm"],
+            "lower_mm": d["lower_mm"], "upper_mm": d["upper_mm"], "basic": d["basic"],
+            "label": d.get("callout"), "cad_feature": cad_feature_of(d.get("callout")),
+        })
+    for g in gdt_callouts:
+        items.append({
+            "id": f"geometric:{g.get('name') or len(items)}", "kind": "geometric", "source": "semantic",
+            "type": g["type"], "zone_mm": g["tolerance"], "datum_refs": [],
+            "label": g.get("name"), "cad_feature": cad_feature_of(g.get("name")),
+            "face_ids": list(g.get("face_ids") or []),
+        })
+    for d in extra.get("datums", []):
+        items.append({
+            "id": f"datum:{d['letter']}", "kind": "datum", "source": "label",
+            "letter": d["letter"], "label": d["callout"], "cad_feature": d["feature"],
+        })
+    for p in extra.get("presentation_only", []):
+        items.append({
+            "id": f"label_only:{p['callout']}", "kind": "label_only", "source": "label",
+            "dimension_kind": p["kind"], "nominal_mm": p["nominal_mm"],
+            "label": p["callout"], "cad_feature": cad_feature_of(p["callout"]),
+        })
+    return items
