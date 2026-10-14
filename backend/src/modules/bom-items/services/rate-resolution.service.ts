@@ -617,6 +617,35 @@ export class RateResolutionService {
           mhrRecordId: realBench.id,
         };
       }
+      // No bench in the cmm pool (its machines are all real CMMs): the general inspection resource of
+      // memory/Machining/machine/inspection_usa.csv, class machining_inspection, is the machine for
+      // checks that need no CMM. Its own class is kept so the line, the machine list and the
+      // process catalog all agree on what the machine is.
+      const benchRows = await cachedRead(`mhr:machining_inspection:${location}`, async () => {
+        const { data } = await client
+          .from('mhr_records')
+          .select('id, machine_name, machine_class, total_machine_hour_rate, manual_mhr_value, is_manual_entry, commodity_code, setup_time_hr')
+          .eq('machine_class', 'machining_inspection')
+          .eq('location', location);
+        return data;
+      });
+      const inspectionDefault = (benchRows ?? [])
+        .map((r: any) => ({
+          id: r.id as string,
+          machineName: r.machine_name as string,
+          rate: Number(r.is_manual_entry ? r.manual_mhr_value : r.total_machine_hour_rate) || 0,
+          commodityCode: r.commodity_code ?? null,
+          setupTimeHr: r.setup_time_hr != null ? Number(r.setup_time_hr) || null : null,
+        }))
+        .filter((r) => r.rate > 0)
+        .sort((x, y) => x.rate - y.rate)[0];
+      if (inspectionDefault) {
+        return {
+          rate: inspectionDefault.rate, source: 'mhr_database', machineClass: 'machining_inspection',
+          machineName: inspectionDefault.machineName, commodityCode: inspectionDefault.commodityCode,
+          mhrRecordId: inspectionDefault.id, setupTimeHr: inspectionDefault.setupTimeHr,
+        };
+      }
     } catch (err: any) {
       this.logger.error(`resolveGenericInspectionRate: inspection machine read failed for ${location}: ${err?.message ?? err}`);
     }

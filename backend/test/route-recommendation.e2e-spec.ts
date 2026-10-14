@@ -46,6 +46,16 @@ describe('[e2e] Auto route recommendation, Rtp2 Mag2 Backframe', () => {
     expect(holes).toBe(124);
   });
 
+  // Visual and caliper checks need no CMM: the line takes the general inspection machine of
+  // memory/Machining/machine/inspection_usa.csv (the cmm pool holds only real CMMs).
+  it('the Inspection step is on a real machine with a rate', () => {
+    const line = route('sm-laser').processLines.find((l) => l.process === 'Inspection');
+    expect(line?.machineName).toBe('Default');
+    expect(line?.machineClass).toBe('machining_inspection');
+    expect(line?.mhrId).toBeTruthy();
+    expect(line?.hourlyRate).toBeGreaterThan(0);
+  });
+
   it('recommends the fiber laser route', () => {
     expect(comparison.recommendedRouteId).toBe('sm-laser');
     expect(route('sm-laser')).toMatchObject({ isFeasible: true, dataComplete: true });
