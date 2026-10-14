@@ -114,6 +114,17 @@ test('PMI view: GD&T frames sit on the callouts the file names, the rest is list
   await expect(panel).toContainText('⏥0.25'); // flatness on Plane10 (not dimensioned, cannot be placed)
   await expect(panel).toContainText('⌖0.05'); // position on Simple Hole8 (named by no dimension)
   await expect(panel).toContainText('Width 15');
+  // the typed records: the slot width is decoded from the drawing, with its limits, and flagged for review
+  const review = page.getByTestId('pmi-review');
+  await expect(review).toContainText('Needs review');
+  await expect(review).toContainText('15 ±0.25 (14.75–15.25 mm)');
+  await expect(review).toContainText('decoded from drawing');
+  await expect(page.locator('[title^="PMI Width 15 ±0.25"]').first()).toBeVisible(); // the slot callout's own note
+  // the panel can be folded away to uncover the model
+  await page.getByTestId('pmi-panel-toggle').click();
+  await expect(page.getByTestId('pmi-review')).toHaveCount(0);
+  await page.getByTestId('pmi-panel-toggle').click();
+  await expect(page.getByTestId('pmi-review')).toBeVisible();
   await expect(panel).toContainText('Datum references (A-B-C) are not stored as data in this STEP');
   // no frame shows datum references
   expect(text).not.toMatch(/A-B-C/);

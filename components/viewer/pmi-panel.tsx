@@ -3,6 +3,7 @@
 import React from 'react';
 import { formatDimension, formatTolValue } from '@/lib/features/dimension-annotations';
 import type { PmiLayout } from '@/lib/features/pmi-frames';
+import { describeRecord, recordsNeedingReview, STATUS_LABEL, type PmiRecordView } from '@/lib/features/pmi-records';
 
 /**
  * The PMI the STEP states but cannot place on the model: a tolerance or datum whose CAD feature
@@ -16,10 +17,12 @@ function callName(item: { label?: string | null | undefined; dimension_kind?: st
   return words || item.dimension_kind || 'value';
 }
 
-export function PmiPanel({ layout }: { layout: PmiLayout }) {
+export function PmiPanel({ layout, records }: { layout: PmiLayout; records?: readonly PmiRecordView[] | undefined }) {
+  const [collapsed, setCollapsed] = React.useState(false);
   const frames = layout.frames.filter((f) => f.annotationId === null);
   const datums = layout.datums.filter((d) => d.annotationId === null);
-  if (frames.length === 0 && datums.length === 0 && layout.labelOnly.length === 0) return null;
+  const review = recordsNeedingReview(records);
+  if (frames.length === 0 && datums.length === 0 && layout.labelOnly.length === 0 && review.length === 0) return null;
   const row: React.CSSProperties = { display: 'flex', gap: 6, alignItems: 'baseline', lineHeight: '16px' };
   return (
     <div
@@ -30,7 +33,14 @@ export function PmiPanel({ layout }: { layout: PmiLayout }) {
         padding: '6px 8px', font: '11px/16px ui-monospace, SFMono-Regular, Menlo, monospace',
       }}
     >
-      <div style={{ fontWeight: 700, marginBottom: 2 }}>PMI in the file, not tied to a face</div>
+      <button
+        type="button" data-testid="pmi-panel-toggle" onClick={() => setCollapsed((c) => !c)}
+        title={collapsed ? 'Show the PMI list' : 'Hide the PMI list'}
+        style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, display: 'block', width: '100%' }}
+      >
+        {collapsed ? '▸' : '▾'} PMI in the file, not tied to a face{review.length ? ` · ${review.length} to review` : ''}
+      </button>
+      {!collapsed && <div style={{ marginTop: 2 }}>
       {frames.map((f) => (
         <div key={f.itemId} style={row} title={f.via}>
           <span>{f.symbol}</span><span>{formatTolValue(f.zoneMm)}</span>
@@ -48,7 +58,20 @@ export function PmiPanel({ layout }: { layout: PmiLayout }) {
           <span style={{ opacity: 0.8 }}>label only: any tolerance is in the PMI graphics</span>
         </div>
       ))}
+      {review.length > 0 && (
+        <div data-testid="pmi-review" style={{ marginTop: 4, borderTop: '1px solid #2dd4bf', paddingTop: 3 }}>
+          <div style={{ fontWeight: 700 }}>Needs review: not verified native PMI</div>
+          {review.map((r) => (
+            <div key={r.annotation_ref} style={{ ...row, flexWrap: 'wrap' }} title={(r.validation.reasons ?? []).join(' · ')}>
+              <span>{r.annotation_ref.split('@')[0]}</span>
+              <span style={{ fontWeight: 700 }}>{describeRecord(r)}</span>
+              <span style={{ opacity: 0.8 }}>{STATUS_LABEL[r.validation.status]}</span>
+            </div>
+          ))}
+        </div>
+      )}
       <div style={{ opacity: 0.65, marginTop: 2 }}>Datum references (A-B-C) are not stored as data in this STEP; see the PMI graphics view for what the CAD drew.</div>
+      </div>}
     </div>
   );
 }
