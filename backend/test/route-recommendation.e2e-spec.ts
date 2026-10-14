@@ -16,9 +16,11 @@ import { findRouteDataGaps } from '../src/modules/bom-items/costing/shared/core/
 jest.setTimeout(400_000);
 
 const RTP2 = 'b035cccf-8fd2-45cf-97b6-9cce68d53d6a';
+const CUT_LENGTH_MM = 5018; // the extracted cut length of this part
 
 describe('[e2e] Auto route recommendation, Rtp2 Mag2 Backframe', () => {
   let comparison: RouteComparisonResponseDto;
+  let admin: ReturnType<typeof createClient<any>>;
   const route = (id: string) => {
     const r = comparison.routes.find((x) => x.routeId === id);
     if (!r) throw new Error(`route ${id} missing from the comparison`);
@@ -30,6 +32,7 @@ describe('[e2e] Auto route recommendation, Rtp2 Mag2 Backframe', () => {
       imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../.env') }), BOMItemsModule],
     }).compile();
     const config = moduleRef.get(ConfigService);
+    admin = createClient(config.getOrThrow<string>('SUPABASE_URL'), config.getOrThrow<string>('SUPABASE_SERVICE_KEY'));
     const env = parseEnv(fs.readFileSync(path.resolve(__dirname, '../../.env.local'), 'utf8'));
     const anon = createClient(config.getOrThrow<string>('SUPABASE_URL'), config.getOrThrow<string>('SUPABASE_ANON_KEY'));
     const { data, error } = await anon.auth.signInWithPassword({ email: env.E2E_EMAIL!, password: env.E2E_PASSWORD! });
@@ -77,10 +80,29 @@ describe('[e2e] Auto route recommendation, Rtp2 Mag2 Backframe', () => {
     expect([...r.warnings, ...r.capability.warnings].join(' ')).toContain('catalogued for Blank only');
   });
 
-  it('sm-router is incomplete because its cutting is unpriced, with the reason on the line', () => {
+  // The router is priced from the selected machine feed once migration 906 has staged it; before
+  // that the cutting is an unpriced gap with the reason on the line.
+  it('sm-router is priced from its machine feed when staged, else a gap with the reason', async () => {
     const r = route('sm-router');
-    expect(r.dataComplete).toBe(false);
-    expect(r.dataGaps.map((g) => g.reason).join(' ')).toContain('Not priced');
+    const machine = r.processLines[0]!.machineName;
+    const { data } = await admin.from('sm_reference_data').select('raw').eq('category', 'machine').eq('key', `routerMachine:${machine}`).maybeSingle();
+    const feedMmPerSec = (data as { raw?: { feed_rate_mm_s?: number } } | null)?.raw?.feed_rate_mm_s;
+    if (feedMmPerSec) {
+      expect(r.dataComplete).toBe(true);
+      expect(r.processLines[0]!.cycleTimeMin).toBeCloseTo(CUT_LENGTH_MM / (feedMmPerSec * 60), 2);
+    } else {
+      expect(r.dataComplete).toBe(false);
+      expect(r.dataGaps.map((g) => g.reason).join(' ')).toContain('Not priced');
+    }
+  });
+
+  // Memory states a power (2-5 kW) for every 3D laser but no technology; the fiber cut-speed table at
+  // the machine own power prices it, so the route has a cycle time and no gap.
+  it('sm-laser-3d prices its cutting from the fiber table at the machine power', () => {
+    const r = route('sm-laser-3d');
+    expect(r.dataComplete).toBe(true);
+    expect(r.dataGaps).toEqual([]);
+    expect(r.processLines[0]!.cycleTimeMin).toBeGreaterThan(0.5);
   });
 
   // The turret force is that of the largest single hit (a 20 mm hole), so a turret is

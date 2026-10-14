@@ -15,9 +15,9 @@ export interface RouterInput {
   // never hardcoded here.
   processIdentity?: { processGroup: string; processRoute: string; operation: string };
   // Linear feed rate along the cut (mm/min), resolved by the caller via
-  // SheetMetalLookupService.getRouterParams(). Absent means no feed rate is on
-  // file (today: always, see getRouterParams), which is reported as a data gap on
-  // the line, never a guess. The source also has no plunge/pierce-time data at
+  // SheetMetalLookupService.getRouterMachineParams() from the selected machine.
+  // Absent means no feed rate is on file for it, which is reported as a data gap
+  // on the line, never a guess. The source also has no plunge/pierce-time data at
   // all — pierceCount is disclosed via a warning, never given a fabricated
   // per-plunge time.
   cuttingSpeedMmPerMin?: number;
@@ -51,7 +51,7 @@ export function computeRouterCost(input: RouterInput): RouterResult {
   if (input.cuttingSpeedMmPerMin != null && input.cutLengthMm > 0) {
     cuttingMin = input.cutLengthMm / input.cuttingSpeedMmPerMin;
   } else if (input.cutLengthMm > 0) {
-    warnings.push("2-Axis Router: no linear feed rate on file (sm_lookup_router_cut has cutter surface speed and feed per tooth, but no flute count to derive the table feed) — cutting time is not priced");
+    warnings.push("2-Axis Router: no linear feed rate on file (the selected machine has no feedRate staged in sm_reference_data routerMachine:*) — cutting time is not priced");
   }
   // Unpriced cutting is missing data, not a $0 operation: it would make the route
   // look cheapest for work it leaves unpriced. See the same rule in the turret engine.
@@ -60,7 +60,7 @@ export function computeRouterCost(input: RouterInput): RouterResult {
         gapType: 'unsupported_operation',
         process: 'Router Cutting',
         machineClass: 'router_2axis',
-        reason: `Not priced: cutting ${Math.round(input.cutLengthMm)} mm (no linear feed rate on file: sm_lookup_router_cut lacks the flute count needed to derive it from cutter surface speed).`,
+        reason: `Not priced: cutting ${Math.round(input.cutLengthMm)} mm (no feed rate on file for this router machine).`,
       }
     : undefined;
   if (input.pierceCount > 0) {
