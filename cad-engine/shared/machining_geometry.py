@@ -495,6 +495,11 @@ def collect_cylinders(
                 (fx, fy, fz),
             )
             length = max(face_span, 0.1)
+            # Where the face lies along its own axis: what lets two arcs be recognised as the two ends
+            # of one slot (they share an axial extent).
+            corners = [(x, y, z) for x in (xmin, xmax) for y in (ymin, ymax) for z in (zmin, zmax)]
+            projections = [c[0] * fx + c[1] * fy + c[2] * fz for c in corners]
+            axial_range = (min(projections), max(projections))
 
             # Angular position of centroid around main axis (for PCD grouping)
             angle_deg = angle_around_axis((cx - ox, cy - oy, cz - oz), (ax, ay, az))
@@ -533,6 +538,7 @@ def collect_cylinders(
                 "dist_from_axis": dist_from_axis,
                 "angle_deg": angle_deg,
                 "u_range": u_range,
+                "axial_range": axial_range,
                 "face_indices": [face_idx],  # OCC face ordinal — matches face_map in memory_optimizer
             })
         face_idx += 1  # increment for EVERY face, not just cylinders
