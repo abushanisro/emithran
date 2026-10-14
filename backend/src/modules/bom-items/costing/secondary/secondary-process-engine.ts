@@ -303,6 +303,19 @@ function testedFraction(ref: SecondaryReference, trace: SecondaryTraceStep[]): n
 
 // ── process models ───────────────────────────────────────────────────────────
 
+/**
+ * The machine pool with the engineer's picks applied: for a machine class with a pick (bom_item_machine_overrides,
+ * process_key = machine class), only the picked machine is offered, so the models cost the part on it. A pick that
+ * is not a machine of that class here (stale id, other location) is ignored: the class keeps its whole pool.
+ */
+export function applyMachineOverrides(machines: SecondaryMachine[], overrides: ReadonlyMap<string, string>): SecondaryMachine[] {
+  if (overrides.size === 0) return machines;
+  return machines.filter((m) => {
+    const picked = overrides.get(m.machineClass);
+    return picked === undefined || m.id === picked || !machines.some((x) => x.machineClass === m.machineClass && x.id === picked);
+  });
+}
+
 /** Machines whose envelope and mass limit take the part. */
 export function envelopeCapable(machines: SecondaryMachine[], part: SecondaryPartFacts): SecondaryMachine[] {
   if (!part.bboxMm) return machines;

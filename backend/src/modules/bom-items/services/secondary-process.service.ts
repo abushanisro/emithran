@@ -7,6 +7,7 @@ import { MaterialResolutionService } from './material-resolution.service';
 import {
   SECONDARY_PROCESSES,
   SECONDARY_SOURCE_VERSION,
+  applyMachineOverrides,
   computeSecondaryProcesses,
   type SecondaryMachine,
   type SecondaryPartFacts,
@@ -201,20 +202,23 @@ export class SecondaryProcessService {
     location: string;
     batchSize: number | null;
     accessToken: string;
+    /** The machine the engineer picked per machine class (bom_item_machine_overrides). */
+    machineOverrides?: ReadonlyMap<string, string>;
   }): Promise<SecondaryProcessesResponse> {
     const { item, location, batchSize, accessToken } = input;
+    const overrides = input.machineOverrides ?? new Map<string, string>();
     const dataWarnings: string[] = [];
     const ref = await this.loadReference(SECONDARY_SOURCE_VERSION);
     if (!ref) dataWarnings.push('Secondary process reference data is not staged: run migration 817.');
     const surfaceRef = await this.loadReference(SURFACE_TREATMENT_SOURCE_VERSION);
     if (!surfaceRef) dataWarnings.push('Surface treatment reference data is not staged: run migration 819.');
-    const machines = await this.loadMachines(location, SECONDARY_PROCESSES.map((p) => p.machineClass), accessToken);
+    const machines = applyMachineOverrides(await this.loadMachines(location, SECONDARY_PROCESSES.map((p) => p.machineClass), accessToken), overrides);
     if (machines.length === 0) dataWarnings.push(`No secondary process machines on file for ${location} (migrations 806/818 seed USA only).`);
-    const surfaceMachines = await this.loadMachines(location, SURFACE_PROCESSES.map((p) => p.machineClass), accessToken);
+    const surfaceMachines = applyMachineOverrides(await this.loadMachines(location, SURFACE_PROCESSES.map((p) => p.machineClass), accessToken), overrides);
     if (surfaceMachines.length === 0) dataWarnings.push(`No surface treatment machines on file for ${location} (migration 820 seeds USA only).`);
     const heatRef = await this.loadReference(HEAT_TREATMENT_SOURCE_VERSION);
     if (!heatRef) dataWarnings.push('Heat treatment reference data is not staged: run migration 823.');
-    const heatMachines = await this.loadMachines(location, HEAT_TREATMENT_PROCESSES.map((p) => p.machineClass), accessToken);
+    const heatMachines = applyMachineOverrides(await this.loadMachines(location, HEAT_TREATMENT_PROCESSES.map((p) => p.machineClass), accessToken), overrides);
     if (heatMachines.length === 0) dataWarnings.push(`No heat treatment machines on file for ${location} (migration 826 seeds USA only).`);
 
     const fg = item.featureGraph ?? {};

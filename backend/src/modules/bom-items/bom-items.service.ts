@@ -1790,9 +1790,6 @@ export class BOMItemsService {
     mhrRecordId: string | null,
     location: string,
   ): Promise<{ processKey: string; mhrRecordId: string | null; location: string }> {
-    if (!(processKey in MACHINE_REGISTRY)) {
-      throw new BadRequestException(`Unknown process key: ${processKey}`);
-    }
     // findOne enforces the caller can access this BOM item
     await this.findOne(bomItemId, userId, accessToken);
     const client = this.supabaseService.getClient(accessToken);
@@ -1812,10 +1809,20 @@ export class BOMItemsService {
     // revert to auto-selection later, which reads as data loss to the user
     const { data: machine, error: mhrError } = await client
       .from('mhr_records')
-      .select('id, location')
+      .select('id, location, machine_class')
       .eq('id', mhrRecordId)
       .maybeSingle();
     if (mhrError || !machine) throw new BadRequestException(`MHR record ${mhrRecordId} not found`);
+
+    // A pick is for a machine class: one of the engine-selected classes (MACHINE_REGISTRY), or a class the
+    // secondary engines cost (surface, heat, inspection ...), whose machine is then the picked one. Either
+    // way the machine must be a machine of that class.
+    const pickedClass = (machine as { machine_class?: string | null }).machine_class;
+    if (!(processKey in MACHINE_REGISTRY) && pickedClass !== processKey) {
+      throw new BadRequestException(
+        `Unknown process key: ${processKey}` + (pickedClass ? ` (the machine is a ${pickedClass})` : ''),
+      );
+    }
 
     // A machine belongs to exactly one location; forcing it into another
     // location's costing applies the wrong currency AND the wrong shop rate.
@@ -5566,7 +5573,8 @@ export class BOMItemsService {
    * to display rate).
    */
   private async resolveSecondaryOperations(item: any, location: string, batchSize: number, accessToken: string, conv: number) {
-    const all = await this.secondaryProcessService.compute({ item, location, batchSize, accessToken });
+    const machineOverrides = await this.fetchMachineOverrides(item.id, accessToken, location);
+    const all = await this.secondaryProcessService.compute({ item, location, batchSize, accessToken, machineOverrides });
     const surfaceCallout = matchSurfaceTreatmentCallout(surfaceCalloutOf(item));
     const drawing: SecondarySelection = {
       heat: all.heatTreatmentCalloutProcess ? [all.heatTreatmentCalloutProcess] : [],

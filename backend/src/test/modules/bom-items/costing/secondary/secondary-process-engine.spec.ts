@@ -6,6 +6,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import {
+  applyMachineOverrides,
   computeSecondaryProcesses,
   type SecondaryMachine,
   type SecondaryPartFacts,
@@ -166,3 +167,29 @@ describe('secondary processes on the reference data', () => {
     expect(byProcess(block).get('Fluorescent Penetrant Testing')!.reason).toMatch(/No Fluorescent Penetrant Testing machine/);
   });
 });
+
+// Reported: picking a machine for a surface treatment line failed with "Unknown process key". A pick for a
+// machine class the secondary engines cost now pins that machine for the class.
+describe('applyMachineOverrides', () => {
+  it('offers only the picked machine of a class, leaving every other class whole', () => {
+    const zenith = pool.find((m) => m.name === 'Axiom Zenith 3000')!;
+    const result = applyMachineOverrides(pool, new Map([['cmm', zenith.id]]));
+    expect(result.filter((m) => m.machineClass === 'cmm').map((m) => m.name)).toEqual(['Axiom Zenith 3000']);
+    expect(result.filter((m) => m.machineClass !== 'cmm')).toEqual(pool.filter((m) => m.machineClass !== 'cmm'));
+  });
+
+  it('costs the part on the picked machine', () => {
+    const zenith = pool.find((m) => m.name === 'Axiom Zenith 3000')!;
+    const cmm = computeSecondaryProcesses(block, reference, applyMachineOverrides(pool, new Map([['cmm', zenith.id]]))).find((r) => r.process === 'CMM Inspection')!;
+    expect(cmm.machine?.name).toBe('Axiom Zenith 3000');
+  });
+
+  it('ignores a pick that is not a machine of that class here (stale id): the class keeps its pool', () => {
+    expect(applyMachineOverrides(pool, new Map([['cmm', 'no-such-machine']]))).toEqual(pool);
+  });
+
+  it('no picks leaves the pool as it is', () => {
+    expect(applyMachineOverrides(pool, new Map())).toBe(pool);
+  });
+});
+
