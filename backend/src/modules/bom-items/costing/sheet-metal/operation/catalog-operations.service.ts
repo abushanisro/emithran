@@ -139,11 +139,15 @@ export class SheetMetalCatalogOperationsService {
   ): Promise<Map<string, number>> {
     const ids = [...new Set(lines
       .map((l) => l.machineSelection?.balanced?.candidate?.machineId ?? l.mhrId ?? null)
-      .filter((id): id is string => !!id))];
+      .filter((id): id is string => !!id))].sort();
     const result = new Map<string, number>();
     if (ids.length === 0) return result;
-    const { data } = await client.from('mhr_records').select('id, specs').in('id', ids);
-    for (const row of (data ?? []) as Array<{ id: string; specs: Record<string, unknown> | null }>) {
+    // One request attaches every route, and most routes share their machines: one read per id set.
+    const rows = await cachedRead(`sm-max-punch-specs:${ids.join(',')}`, async () => {
+      const { data } = await client.from('mhr_records').select('id, specs').in('id', ids);
+      return data;
+    });
+    for (const row of (rows ?? []) as Array<{ id: string; specs: Record<string, unknown> | null }>) {
       const v = Number(row.specs?.max_punch_size_mm);
       if (Number.isFinite(v) && v > 0) result.set(row.id, v);
     }

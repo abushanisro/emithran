@@ -6096,18 +6096,20 @@ export class BOMItemsService {
       hardToolingVolumeCapability(machineClass, annualVolumeRC, rcToolingVolumeThresholds);
 
     const attachToRoutes = async (dto: Omit<RouteComparisonDto, 'recommendedRouteId'>): Promise<RouteComparisonResponseDto> => {
-      for (const route of dto.routes) {
+      // The routes are independent, so their catalog operations resolve together: the same
+      // catalog and kind reads are shared through the request cache, not awaited route by route.
+      const routeWarnings = await Promise.all(dto.routes.map(async (route) => {
         this.attachMachineSelections(route.processLines, mhrRates);
-        if (family === 'sheet_metal') {
-          dto.comparisonWarnings.push(...await this.smCatalogOperations.attach({
-            lines: route.processLines,
-            features: (fg?.feature_graph_v2?.features ?? []) as SheetMetalFeature[],
-            threads,
-            thicknessMm: sheetThicknessMm,
-            family,
-            accessToken,
-          }));
-        }
+        const warnings = family === 'sheet_metal'
+          ? await this.smCatalogOperations.attach({
+              lines: route.processLines,
+              features: (fg?.feature_graph_v2?.features ?? []) as SheetMetalFeature[],
+              threads,
+              thicknessMm: sheetThicknessMm,
+              family,
+              accessToken,
+            })
+          : [];
         // Inherited tapping runs on THIS route's primary machine — surface that
         // machine on the Tapping line, not the "class default (tapping)" panel.
         if (mhrRates.tapping.source !== 'mhr_database') {
@@ -6122,7 +6124,9 @@ export class BOMItemsService {
             if (line.process === 'Tapping') line.machineSelection = tapSelection;
           }
         }
-      }
+        return warnings;
+      }));
+      dto.comparisonWarnings.push(...routeWarnings.flat());
       this.appendRateWarnings(
         { processLines: dto.routes.flatMap((r) => r.processLines), warnings: dto.comparisonWarnings },
         location,
