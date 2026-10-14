@@ -8,6 +8,8 @@ import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import * as THREE from 'three';
 import { fitCameraToBox } from '@/lib/geometry/camera-fit';
 import { BodyEdges, SetupAxisArrows } from '@/components/viewer/body-overlays';
+import { DimensionOverlay, DimensionOverlayCtx } from '@/components/viewer/dimension-overlay';
+import { buildDimensionAnnotations, visibleAnnotations, type AnnotationMode, type AnnotationSource } from '@/lib/features/dimension-annotations';
 import { freshWorldBoundsOf } from '@/lib/geometry/scene-bounds';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -116,6 +118,8 @@ interface EDrawingsViewerProps {
   onOccurrenceSelect?: (index: number | null) => void;
   /** face_map from feature_graph_v2.metadata — enables exact face highlighting */
   faceMap?: FaceMapEntry[] | null;
+  /** The part's stored feature graph: diameter and radius callouts are built from it (needs faceMap). */
+  annotationSource?: AnnotationSource | null;
   /** Sheet thickness in mm — sizes HAZ ring (holes) and influence zone (bends) */
   sheetThickness?: number;
   /** Per-occurrence DFM risk scores — drives highlight color when provided */
@@ -2843,6 +2847,8 @@ function STLModel({
       {occurrenceFaceIndices && occurrenceFaceIndices.length > 0 && geometry && (
         <ContextBendInfluenceGlow occurrenceFaceIndices={occurrenceFaceIndices} geometry={geometry} />
       )}
+
+      {geometry && <DimensionOverlay geometry={geometry} />}
     </group>
   );
 }
@@ -3049,7 +3055,7 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
   selectedBOMItems, showOnlySelected = false, hoveredBOMItem, onPartsDetected, dfmAnalysisData,
   cameraPreset, onScreenshotReady,
   highlightOccurrences, selectedOccurrenceIndex = null,
-  faceMap, sheetThickness,
+  faceMap, sheetThickness, annotationSource,
   dfmOccurrenceScores,
   heatmapSources,
   heatmapNormalization = 'absolute',
@@ -3094,6 +3100,26 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
     projectedArea?: number;
   } | null>(null);
   const [internalShowFeatures, setInternalShowFeatures] = useState(false);
+
+  // Diameter / radius callouts over the model (lib/features/dimension-annotations.ts).
+  const [annotationMode, setAnnotationMode] = useState<AnnotationMode>('off');
+  const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
+  const allAnnotations = useMemo(
+    () => (faceMap?.length ? buildDimensionAnnotations(annotationSource) : []),
+    [annotationSource, faceMap],
+  );
+  const dimensionOverlay = useMemo(() => ({
+    annotations: visibleAnnotations(allAnnotations, annotationMode),
+    faceMap: faceMap ?? [],
+    selectedId: selectedAnnotationId,
+    onSelect: setSelectedAnnotationId,
+  }), [allAnnotations, annotationMode, faceMap, selectedAnnotationId]);
+  const ANNOTATION_MODES: AnnotationMode[] = ['off', 'all', 'diameter', 'radius'];
+  const cycleAnnotationMode = useCallback(() => {
+    setSelectedAnnotationId(null);
+    setAnnotationMode((m) => ANNOTATION_MODES[(ANNOTATION_MODES.indexOf(m) + 1) % ANNOTATION_MODES.length]!);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [internalSelectedFeature, setInternalSelectedFeature] = useState<ManufacturingFeature | null>(null);
 
   const features = manufacturingFeatures ?? [];
@@ -3817,6 +3843,19 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
               </Button>
             )}
 
+            {allAnnotations.length > 0 && (
+              <>
+                <Separator orientation="vertical" className="h-6 bg-[#c4cfc6]" />
+                <Button variant="outline" size="sm" onClick={cycleAnnotationMode} data-testid="dimension-toggle"
+                  title="Dimensions: off, all, diameters (Ø) only, radii (R) only"
+                  className={`gap-1.5 font-medium text-xs ${annotationMode !== 'off' ? 'bg-teal-600 hover:bg-teal-700 text-white border-teal-700' : 'bg-white hover:bg-[#e8efe9] text-[#1f2d3a] border-[#c4cfc6]'}`}>
+                  <Ruler className="h-3.5 w-3.5" />
+                  {annotationMode === 'off' ? 'Dimensions' : annotationMode === 'all' ? 'Ø + R' : annotationMode === 'diameter' ? 'Ø only' : 'R only'}
+                  {' '}({dimensionOverlay.annotations.length || allAnnotations.length})
+                </Button>
+              </>
+            )}
+
             {features.length > 0 && (
               <>
                 <Separator orientation="vertical" className="h-6 bg-[#c4cfc6]" />
@@ -3955,6 +3994,7 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
             </Dialog>
           )}
           <SetupAxesCtx.Provider value={setupAxesValue}>
+          <DimensionOverlayCtx.Provider value={dimensionOverlay}>
           <FeatureOverlayCtx.Provider value={{ featureType: highlightOccurrences?.feature_type ?? '', sheetThickness: sheetThickness ?? 2 }}>
           <Canvas
             shadows
@@ -4063,6 +4103,7 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
             )}
           </Canvas>
           </FeatureOverlayCtx.Provider>
+          </DimensionOverlayCtx.Provider>
           </SetupAxesCtx.Provider>
 
           {loading && (

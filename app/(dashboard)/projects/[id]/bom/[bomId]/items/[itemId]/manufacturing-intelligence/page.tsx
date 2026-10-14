@@ -10667,6 +10667,7 @@ export default function ManufacturingIntelligencePage() {
                       selectedOccurrenceIndex={selectedOccurrenceIndex}
                       onOccurrenceSelect={setSelectedOccurrenceIndex}
                       faceMap={faceMap}
+                      {...(item.featureGraph ? { annotationSource: item.featureGraph } : {})}
                       sheetThickness={effectiveSheetThicknessMm(item)}
                       {...(setupAxes.length ? { setupAxes } : {})}
                       {...(selectedFeatureScores !== undefined && !operationVisual ? { dfmOccurrenceScores: selectedFeatureScores } : {})}
@@ -10833,6 +10834,7 @@ export default function ManufacturingIntelligencePage() {
                             selectedOccurrenceIndex={selectedOccurrenceIndex}
                             onOccurrenceSelect={setSelectedOccurrenceIndex}
                             faceMap={faceMap}
+                            {...(item.featureGraph ? { annotationSource: item.featureGraph } : {})}
                             sheetThickness={effectiveSheetThicknessMm(item)}
                             {...(setupAxes.length ? { setupAxes } : {})}
                             {...(selectedFeatureScores !== undefined && !operationVisual ? { dfmOccurrenceScores: selectedFeatureScores } : {})}
