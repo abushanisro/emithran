@@ -18,6 +18,7 @@
  */
 
 import type { PmiItem } from '@/lib/features/pmi-frames';
+import type { PmiGraphic } from '@/lib/features/pmi-graphics';
 
 export type AnnotationKind = 'diameter' | 'radius' | 'slot';
 
@@ -37,7 +38,7 @@ export interface PmiDimension {
   upper_mm?: number | null | undefined;
   basic?: boolean | undefined;
 }
-export type AnnotationMode = 'off' | 'diameter' | 'radius' | 'all' | 'pmi';
+export type AnnotationMode = 'off' | 'diameter' | 'radius' | 'all' | 'pmi' | 'graphics';
 
 export interface DimensionAnnotation {
   /** Stable for the same stored analysis: kind, value and the smallest face id. */
@@ -77,7 +78,12 @@ interface StoredV2Feature {
 export interface AnnotationSource {
   machining_features?: { features?: ReadonlyArray<StoredFeature> | undefined } | null | undefined;
   feature_graph_v2?: { features?: ReadonlyArray<StoredV2Feature> | undefined } | null | undefined;
-  pmi?: { dimensions?: ReadonlyArray<PmiDimension> | undefined; items?: ReadonlyArray<PmiItem> | undefined } | null | undefined;
+  pmi?: {
+    dimensions?: ReadonlyArray<PmiDimension> | undefined;
+    items?: ReadonlyArray<PmiItem> | undefined;
+    graphics?: ReadonlyArray<PmiGraphic> | undefined;
+    graphics_origin?: readonly [number, number, number] | undefined;
+  } | null | undefined;
 }
 
 const SAME_SIZE_MM = 0.01;
@@ -248,7 +254,7 @@ export function formatTolerance(t: DimensionTolerance): string {
 function slotPmiNote(widthMm: number, items: ReadonlyArray<PmiItem> | undefined): string | null {
   const hit = (items ?? []).find((i) => i.kind === 'label_only' && i.dimension_kind === 'width'
     && i.nominal_mm != null && Math.abs(i.nominal_mm - widthMm) <= SAME_NOMINAL_MM);
-  return hit ? `PMI: ${hit.label ?? 'Width'} = ${formatDimension(hit.nominal_mm!)}, label only, no tolerance stored` : null;
+  return hit ? `PMI: ${hit.label ?? 'Width'} = ${formatDimension(hit.nominal_mm!)} is a label-only callout: any tolerance on it is drawn in the PMI graphics, not stored as data` : null;
 }
 
 function labelOf(c: Candidate): string {
@@ -266,7 +272,7 @@ function labelOf(c: Candidate): string {
 export function visibleAnnotations(
   all: readonly DimensionAnnotation[], mode: AnnotationMode, pmiIds: ReadonlySet<string> = new Set(),
 ): DimensionAnnotation[] {
-  if (mode === 'off') return [];
+  if (mode === 'off' || mode === 'graphics') return [];
   if (mode === 'pmi') return all.filter((a) => a.tolerance !== null || a.pmiNote !== null || pmiIds.has(a.id));
   return mode === 'all' ? [...all] : all.filter((a) => a.kind === mode);
 }

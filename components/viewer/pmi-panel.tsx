@@ -43,12 +43,12 @@ export function PmiPanel({ layout }: { layout: PmiLayout }) {
         </div>
       ))}
       {layout.labelOnly.map((l) => (
-        <div key={l.id} style={row} title="A value in the callout label only; the file stores no tolerance for it.">
+        <div key={l.id} style={row} title="A value in the callout label only. The file stores no tolerance data for it; if the CAD drew one, it is in the PMI graphics view.">
           <span>{callName(l)} {formatDimension(l.nominal_mm ?? 0)}</span>
-          <span style={{ opacity: 0.8 }}>label only, no tolerance stored</span>
+          <span style={{ opacity: 0.8 }}>label only: any tolerance is in the PMI graphics</span>
         </div>
       ))}
-      <div style={{ opacity: 0.65, marginTop: 2 }}>Datum references (A-B-C) are not stored in this STEP.</div>
+      <div style={{ opacity: 0.65, marginTop: 2 }}>Datum references (A-B-C) are not stored as data in this STEP; see the PMI graphics view for what the CAD drew.</div>
     </div>
   );
 }

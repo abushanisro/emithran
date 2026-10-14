@@ -114,8 +114,19 @@ test('PMI view: GD&T frames sit on the callouts the file names, the rest is list
   await expect(panel).toContainText('⏥0.25'); // flatness on Plane10 (not dimensioned, cannot be placed)
   await expect(panel).toContainText('⌖0.05'); // position on Simple Hole8 (named by no dimension)
   await expect(panel).toContainText('Width 15');
-  await expect(panel).toContainText('Datum references (A-B-C) are not stored in this STEP');
+  await expect(panel).toContainText('Datum references (A-B-C) are not stored as data in this STEP');
   // no frame shows datum references
   expect(text).not.toMatch(/A-B-C/);
   await page.screenshot({ path: (process.env.SHOTS_DIR ?? 'test-results') + '/pmi-view.png' });
+});
+
+test('PMI graphics view: the CAD\'s own drawn PMI is on the model, including the slot width tolerance', async ({ page }) => {
+  const toggle = await openWithDimensions(page, BSPLINE_PART);
+  // off -> all -> Ø -> R -> PMI -> PMI graphics
+  for (let i = 0; i < 5; i++) await toggle.click();
+  await expect(toggle).toContainText('PMI graphics');
+  await expect(toggle).toContainText('(20)'); // twenty drawn callouts in this file
+  await page.waitForTimeout(1500);
+  expect(await page.locator('button[title*=": "]:not([data-testid])').count()).toBe(0); // no Ø/R labels: only the authored PMI
+  await page.screenshot({ path: (process.env.SHOTS_DIR ?? 'test-results') + '/pmi-graphics.png' });
 });
