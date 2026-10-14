@@ -111,11 +111,9 @@ interface RollBendingParams {
   dataFound: boolean;
 }
 
-// Real material-family cutting speed for 2-Axis Router, resolved by the
-// caller from sm_lookup_router_cut (Track B Phase 2, tblRouterUtilities.json)
-// via SheetMetalLookupService.getRouterParams(). Only Aluminum/Copper have
-// real data in the source — dataFound:false for anything else is a genuine,
-// disclosed gap, not a guess.
+// Linear feed of the selected 2-Axis Router machine, resolved by the caller via
+// SheetMetalLookupService.getRouterMachineParams(); dataFound:false when the
+// machine has no feed staged, a disclosed gap, not a guess.
 interface RouterParams {
   cuttingSpeedMmPerMin: number;
   dataFound: boolean;

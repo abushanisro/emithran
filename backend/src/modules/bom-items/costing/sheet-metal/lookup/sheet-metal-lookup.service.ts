@@ -434,7 +434,7 @@ export class SheetMetalLookupService {
   // ── Laser Punch per-machine physics (2026-09-01, sm_reference_data
   // 'laserPunchMachine:<machine name>' rows staged from machine_library.json's
   // "Laser Punch / Punch Press" category, all 26 real machines). Unlike
-  // getWaterjetParams/getOxyfuelParams/getRouterParams above (resolved ONCE
+  // getWaterjetParams/getOxyfuelParams/getRouterMachineParams above (resolved ONCE
   // from material+thickness before machine selection), this is keyed by the
   // SPECIFIC machine name mhrRates.laserPunch resolved to — these combo
   // laser+punch machines report punch/nibble rate as a per-unit spec, not a
@@ -978,23 +978,26 @@ export class SheetMetalLookupService {
     return Number.isFinite(v) ? v : null;
   }
 
-  // ── 2-Axis Router cutting params (Track B Phase 2, tblRouterUtilities.json) ──
-  // Real data covers only Aluminum/Copper — see ROUTER_FAMILY_KEY's own
-  // comment. Multiple tool_diameter_mm rows exist per material family, all
-  // sharing the same real cutting_speed_m_per_min value in the source data;
-  // ordering by tool_diameter_mm and taking the first is deterministic (never
-  // an arbitrary/unordered pick) even though the diameter itself doesn't
-  // currently change the result.
-  // sm_lookup_router_cut holds the cutter's SURFACE speed (350.52 m/min, the
-  // speed of the cutting edge) and feed per tooth. Neither is the table feed the
-  // router moves along the cut at: that is feed per tooth x flutes x RPM, with
-  // RPM = 1000 x surface speed / (pi x tool diameter), and the source has no
-  // flute count. Using the surface speed as the linear feed priced 5018 mm of cut
-  // in 0.014 min and made a 2-axis router the cheapest route for a 124-hole part.
-  // So there is no linear feed on file, and the route reports it as a data gap
-  // (see computeRouterCost) until a flute count (or a real feed rate) is sourced.
-  async getRouterParams(_grade: string | null | undefined): Promise<RouterCutParams> {
-    return { cuttingSpeedMmPerMin: 0, dataFound: false };
+  // ── 2-Axis Router feed, per selected machine ─────────────────────────────
+  // sm_reference_data 'routerMachine:<name>' rows (migration 906) hold the
+  // machine feedRate from memory/Countries data, taken as mm/s (owner decision
+  // 2026-10-14; the export states no unit). The cutter surface speed in
+  // sm_lookup_router_cut is not a table feed and is not used. Plunge time is
+  // not on file and stays a disclosed gap in the engine.
+  @ReferenceMemo()
+  async getRouterMachineParams(machineName: string | null | undefined): Promise<RouterCutParams> {
+    const noData: RouterCutParams = { cuttingSpeedMmPerMin: 0, dataFound: false };
+    if (!machineName) return noData;
+    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const { data, error } = await db
+      .from('sm_reference_data')
+      .select('raw')
+      .eq('category', 'machine')
+      .eq('key', `routerMachine:${machineName}`)
+      .maybeSingle();
+    const feedMmPerSec = data?.raw?.feed_rate_mm_s;
+    if (error || typeof feedMmPerSec !== 'number' || feedMmPerSec <= 0) return noData;
+    return { cuttingSpeedMmPerMin: feedMmPerSec * 60, dataFound: true };
   }
 
   // ── Table 2: Handling time (min) for given weight kg ───────────────────────

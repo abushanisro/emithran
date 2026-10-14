@@ -6059,6 +6059,55 @@ export class BOMItemsService {
       : this.emptyPhysicsResult(['Total Time']);
     const rcCo2LaserCycleTimeSec = rcCo2LaserCalc.outputs['Total Time'];
 
+    // 3D laser: priced from the fiber cut-speed table at the selected machine's
+    // own laser power (owner decision 2026-10-14: memory does not state the
+    // technology of the 3D machines, 2-5 kW). Same Laser Cut calculator as the
+    // fiber class, so there is no second formula; a power that is not on file
+    // is a data gap, never a guess.
+    const rcLaser3dCandidate = mhrRates.laser3d.selection?.balanced?.candidate as any;
+    const rcLaser3dPowerW: number | null = rcLaser3dCandidate?.capability?.powerKw ? rcLaser3dCandidate.capability.powerKw * 1000 : null;
+    const rcLaser3dParams = (grade && rcLaser3dPowerW != null) ? await this.smLookup.getLaserParams(grade, thk, rcLaser3dPowerW, 'fiber') : null;
+    const rcLaser3dCalc = (cutLengthMm > 0 || pierceCount > 0)
+      ? await this.resolvePhysicsQuantity(accessToken, {
+          machineClass: 'fiber_laser',
+          process: 'Laser Cutting',
+          targetFieldNames: ['Total Time'],
+          seedScope: {
+            'Cutting Length': cutLengthMm,
+            'No Of Starts': pierceCount,
+            ...(rcLaser3dParams?.dataFound ? {
+              'Cutting Speed': rcLaser3dParams.cuttingSpeedMPerMin,
+              'Piercing Time Per Start': rcLaser3dParams.pierceTimeMin,
+            } : {}),
+          },
+          seedProvenance: {
+            'Cutting Length': 'CAD feature extraction — total cut path length',
+            'No Of Starts': 'CAD feature extraction — pierce/start count',
+            'Cutting Speed': `sm_lookup_laser_cut (fiber) — ${grade || 'material'}, ${thk}mm sheet at ${rcLaser3dPowerW ?? 'unknown'} W (selected 3D laser)`,
+            'Piercing Time Per Start': 'sm_lookup_laser_cut (fiber) — same row as Cutting Speed',
+          },
+          lookupTableByField: {
+            'Cutting Speed': 'sm_lookup_laser_cut',
+            'Piercing Time Per Start': 'sm_lookup_laser_cut',
+          },
+          ...(rcLaser3dPowerW == null ? {
+            lookupResolutions: {
+              'Cutting Speed': {
+                table: 'sm_lookup_laser_cut',
+                policy: await this.smLookup.resolveLookupPolicy('sm_lookup_laser_cut', 'INTERPOLATE'),
+                queryParams: [{
+                  column: 'laser_power_w',
+                  value: `unknown — ${rcLaser3dCandidate?.machineName ?? mhrRates.laser3d.machineName ?? 'the selected 3D laser'} has no verified power_kw on file (never inferred from its name)`,
+                }],
+                matchedRow: null,
+                nearestRows: [],
+              },
+            },
+          } : {}),
+        })
+      : this.emptyPhysicsResult(['Total Time']);
+    const rcLaser3dCycleTimeSec = rcLaser3dCalc.outputs['Total Time'];
+
     // Reference lookups for the cutting engines, resolved ONCE here and passed to the
     // engines as plain numbers, so this is the only place they are resolved (an engine
     // never falls back to its own hardcoded, material-blind table). Each depends only
@@ -6066,7 +6115,7 @@ export class BOMItemsService {
     // another lookup, so they run together instead of one round trip after another.
     //  - waterjet / oxyfuel / plasma: material + thickness (sm_lookup_waterjet_cut,
     //    sm_reference_data 'nestingCutRate:*', migration 398 / 492)
-    //  - router: no linear feed on file (see SheetMetalLookupService.getRouterParams)
+    //  - router: the selected machine's feed (sm_reference_data 'routerMachine:*')
     //  - laser punch / turret / roll bending / progressive die: per SELECTED machine
     //    (sm_reference_data 'laserPunchMachine:*', 'turretPunchMachine:*', ...)
     //  - tooling thresholds, hard-tooling variables and component costs: Progressive
@@ -6077,7 +6126,7 @@ export class BOMItemsService {
       rcProgressiveDieSetupMin, rcToolingVolumeThresholds, rcProgDieToolingVars, rcToolingComponentCosts,
     ] = await Promise.all([
       grade ? this.smLookup.getWaterjetParams(grade, thk) : null,
-      grade ? this.smLookup.getRouterParams(grade) : null,
+      this.smLookup.getRouterMachineParams(mhrRates.router.machineName),
       grade ? this.smLookup.getOxyfuelParams(grade, thk) : null,
       this.smLookup.getLaserPunchMachineParams(mhrRates.laserPunch.machineName),
       this.smLookup.getTurretPunchMachineParams(mhrRates.turret.machineName, rcLookupComplexity),
@@ -7478,6 +7527,13 @@ export class BOMItemsService {
         // above. Same shape as fiber_laser's own block: cuttingSecFromCalculator
         // when the real co2 lookup resolved, a real structured physicsGap
         // (never fiber substitution) when it didn't.
+        ...(engine.machineClass === 'laser_3d' ? {
+          cuttingSecFromCalculator: rcLaser3dCycleTimeSec,
+          calculatorId: rcLaser3dCalc.calculatorId,
+          calculatorVersion: rcLaser3dCalc.calculatorVersion,
+          physicsGap: rcLaser3dCalc.gap,
+          confidence: rcLaser3dCalc.confidence,
+        } : {}),
         ...(engine.machineClass === 'co2_laser' ? {
           cuttingSecFromCalculator: rcCo2LaserCycleTimeSec,
           calculatorId: rcCo2LaserCalc.calculatorId,
