@@ -10,6 +10,8 @@ import { fitCameraToBox } from '@/lib/geometry/camera-fit';
 import { centreGeometry } from '@/lib/geometry/centre-geometry';
 import { BodyEdges, SetupAxisArrows } from '@/components/viewer/body-overlays';
 import { DimensionOverlay, DimensionOverlayCtx } from '@/components/viewer/dimension-overlay';
+import { PmiPanel } from '@/components/viewer/pmi-panel';
+import { layoutPmi, type PmiDatumMark, type PmiFrame } from '@/lib/features/pmi-frames';
 import { buildDimensionAnnotations, visibleAnnotations, type AnnotationMode, type AnnotationSource } from '@/lib/features/dimension-annotations';
 import { freshWorldBoundsOf } from '@/lib/geometry/scene-bounds';
 import { Button } from '@/components/ui/button';
@@ -3116,18 +3118,31 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
     () => (faceMap?.length ? buildDimensionAnnotations(annotationSource) : []),
     [annotationSource, faceMap],
   );
+  // The STEP's GD&T frames and datum marks, tied to the callouts (lib/features/pmi-frames.ts).
+  const pmiLayout = useMemo(() => layoutPmi(annotationSource?.pmi?.items, allAnnotations), [annotationSource, allAnnotations]);
+  const hasPmi = pmiLayout.frames.length > 0 || pmiLayout.datums.length > 0 || allAnnotations.some((a) => a.tolerance !== null);
+  const pmiOnModel = useMemo(() => {
+    const frames = new Map<string, PmiFrame[]>();
+    const datums = new Map<string, PmiDatumMark[]>();
+    for (const f of pmiLayout.frames) if (f.annotationId) frames.set(f.annotationId, [...(frames.get(f.annotationId) ?? []), f]);
+    for (const d of pmiLayout.datums) if (d.annotationId) datums.set(d.annotationId, [...(datums.get(d.annotationId) ?? []), d]);
+    return { frames, datums, ids: new Set([...frames.keys(), ...datums.keys()]) };
+  }, [pmiLayout]);
+  const showsPmi = annotationMode === 'all' || annotationMode === 'pmi';
   const dimensionOverlay = useMemo(() => ({
-    annotations: visibleAnnotations(allAnnotations, annotationMode),
+    annotations: visibleAnnotations(allAnnotations, annotationMode, pmiOnModel.ids),
     faceMap: faceMap ?? [],
     selectedId: selectedAnnotationId,
     onSelect: setSelectedAnnotationId,
-  }), [allAnnotations, annotationMode, faceMap, selectedAnnotationId]);
-  const ANNOTATION_MODES: AnnotationMode[] = ['off', 'all', 'diameter', 'radius'];
+    ...(showsPmi ? { frames: pmiOnModel.frames, datums: pmiOnModel.datums } : {}),
+  }), [allAnnotations, annotationMode, faceMap, selectedAnnotationId, pmiOnModel, showsPmi]);
+  const annotationModes = useMemo<AnnotationMode[]>(
+    () => ['off', 'all', 'diameter', 'radius', ...(hasPmi ? (['pmi'] as AnnotationMode[]) : [])], [hasPmi],
+  );
   const cycleAnnotationMode = useCallback(() => {
     setSelectedAnnotationId(null);
-    setAnnotationMode((m) => ANNOTATION_MODES[(ANNOTATION_MODES.indexOf(m) + 1) % ANNOTATION_MODES.length]!);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    setAnnotationMode((m) => annotationModes[(annotationModes.indexOf(m) + 1) % annotationModes.length]!);
+  }, [annotationModes]);
   const [internalSelectedFeature, setInternalSelectedFeature] = useState<ManufacturingFeature | null>(null);
 
   const features = manufacturingFeatures ?? [];
@@ -3855,10 +3870,10 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
               <>
                 <Separator orientation="vertical" className="h-6 bg-[#c4cfc6]" />
                 <Button variant="outline" size="sm" onClick={cycleAnnotationMode} data-testid="dimension-toggle"
-                  title="Dimensions: off, all, diameters (Ø) only, radii (R) only"
+                  title="Dimensions: off, all (with the STEP's GD&T frames), diameters (Ø) only, radii (R) only, PMI only"
                   className={`gap-1.5 font-medium text-xs ${annotationMode !== 'off' ? 'bg-teal-600 hover:bg-teal-700 text-white border-teal-700' : 'bg-white hover:bg-[#e8efe9] text-[#1f2d3a] border-[#c4cfc6]'}`}>
                   <Ruler className="h-3.5 w-3.5" />
-                  {annotationMode === 'off' ? 'Dimensions' : annotationMode === 'all' ? 'Ø + R' : annotationMode === 'diameter' ? 'Ø only' : 'R only'}
+                  {annotationMode === 'off' ? 'Dimensions' : annotationMode === 'all' ? 'Ø + R' : annotationMode === 'diameter' ? 'Ø only' : annotationMode === 'radius' ? 'R only' : 'PMI'}
                   {' '}({dimensionOverlay.annotations.length || allAnnotations.length})
                 </Button>
               </>
@@ -3942,6 +3957,7 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
       <div className="flex-1 flex relative min-h-0 overflow-hidden">
         {/* 3D Viewport */}
         <div ref={canvasContainerRef} className="flex-1 relative bg-linear-to-b from-[#e6f0e7] to-[#b4d2b7]">
+          {showsPmi && <PmiPanel layout={pmiLayout} />}
           {bomItemId && (
             // Popup rather than an inline overlay: Nest's own sheet-size
             // picker + custom inputs need real screen space (see

@@ -193,3 +193,13 @@ describe('PMI tolerances on callouts', () => {
     expect(build([feat('SimpleHole', 'blind', { diameter_mm: 8, centroid: [0, 0, 0] }, [1])], null)[0]!.label).toBe('Ø8');
   });
 });
+
+describe('tolerance values keep the precision the file states', () => {
+  it('0.015 is not rounded to 0.01 or 0.02', async () => {
+    const { formatTolValue, formatTolerance } = await import('@/lib/features/dimension-annotations');
+    expect(formatTolValue(0.015)).toBe('0.015');
+    expect(formatTolValue(0.25)).toBe('0.25');
+    expect(formatTolValue(0.1)).toBe('0.1');
+    expect(formatTolerance({ lowerMm: -0.015, upperMm: 0.015, callout: null })).toBe('±0.015');
+  });
+});

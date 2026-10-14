@@ -17,6 +17,8 @@
  * them, else the sheet-metal feature_graph_v2 (holes and bends).
  */
 
+import type { PmiItem } from '@/lib/features/pmi-frames';
+
 export type AnnotationKind = 'diameter' | 'radius';
 
 export interface DimensionTolerance {
@@ -35,7 +37,7 @@ export interface PmiDimension {
   upper_mm?: number | null | undefined;
   basic?: boolean | undefined;
 }
-export type AnnotationMode = 'off' | 'diameter' | 'radius' | 'all';
+export type AnnotationMode = 'off' | 'diameter' | 'radius' | 'all' | 'pmi';
 
 export interface DimensionAnnotation {
   /** Stable for the same stored analysis: kind, value and the smallest face id. */
@@ -73,7 +75,7 @@ interface StoredV2Feature {
 export interface AnnotationSource {
   machining_features?: { features?: ReadonlyArray<StoredFeature> | undefined } | null | undefined;
   feature_graph_v2?: { features?: ReadonlyArray<StoredV2Feature> | undefined } | null | undefined;
-  pmi?: { dimensions?: ReadonlyArray<PmiDimension> | undefined } | null | undefined;
+  pmi?: { dimensions?: ReadonlyArray<PmiDimension> | undefined; items?: ReadonlyArray<PmiItem> | undefined } | null | undefined;
 }
 
 const SAME_SIZE_MM = 0.01;
@@ -221,10 +223,15 @@ export function toleranceFor(
   return { lowerMm: only.lower_mm, upperMm: only.upper_mm, callout: only.callout ?? null };
 }
 
+/** A tolerance value, to the precision the file states it (0.015 stays 0.015; a size is shown to 2 decimals). */
+export function formatTolValue(mm: number): string {
+  return String(Number(mm.toFixed(4)));
+}
+
 export function formatTolerance(t: DimensionTolerance): string {
-  if (Math.abs(t.upperMm + t.lowerMm) < 1e-9) return `±${formatDimension(t.upperMm)}`;
+  if (Math.abs(t.upperMm + t.lowerMm) < 1e-9) return `±${formatTolValue(t.upperMm)}`;
   const sign = (v: number) => (v >= 0 ? '+' : '−');
-  return `${sign(t.upperMm)}${formatDimension(Math.abs(t.upperMm))}/${sign(t.lowerMm)}${formatDimension(Math.abs(t.lowerMm))}`;
+  return `${sign(t.upperMm)}${formatTolValue(Math.abs(t.upperMm))}/${sign(t.lowerMm)}${formatTolValue(Math.abs(t.lowerMm))}`;
 }
 
 function labelOf(c: Candidate): string {
@@ -234,7 +241,14 @@ function labelOf(c: Candidate): string {
     : `${prefix}${formatDimension(c.valueMm)}`;
 }
 
-export function visibleAnnotations(all: readonly DimensionAnnotation[], mode: AnnotationMode): DimensionAnnotation[] {
+/**
+ * The callouts a mode shows. 'pmi' is the reference view: only the callouts the STEP's PMI speaks
+ * about, those with a stated tolerance or a GD&T frame / datum mark placed on them (`pmiIds`).
+ */
+export function visibleAnnotations(
+  all: readonly DimensionAnnotation[], mode: AnnotationMode, pmiIds: ReadonlySet<string> = new Set(),
+): DimensionAnnotation[] {
   if (mode === 'off') return [];
+  if (mode === 'pmi') return all.filter((a) => a.tolerance !== null || pmiIds.has(a.id));
   return mode === 'all' ? [...all] : all.filter((a) => a.kind === mode);
 }

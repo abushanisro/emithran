@@ -94,3 +94,28 @@ test('B-spline part: holes and the large radius are found, grouped, and the togg
   expect(texts.length).toBeLessThan(40); // grouped: not one label per face
   await page.screenshot({ path: (process.env.SHOTS_DIR ?? 'test-results') + '/dimensions-bspline.png' });
 });
+
+test('PMI view: GD&T frames sit on the callouts the file names, the rest is listed, no datum references are invented', async ({ page }) => {
+  const toggle = await openWithDimensions(page, BSPLINE_PART);
+  // off -> all -> Ø -> R -> PMI
+  for (let i = 0; i < 4; i++) await toggle.click();
+  await expect(toggle).toContainText('PMI');
+  const frames = page.locator('[title*="from STEP PMI ("]');
+  await expect(frames.first()).toBeVisible({ timeout: 30_000 });
+  const text = (await frames.allTextContents()).join(' ');
+  expect(text).toContain('⌖0.15'); // position on the Ø5.5 hole pattern, placed through the name the file writes
+  expect(text).toContain('⌭0.015'); // cylindricity on Simple Hole1 = the Ø26.5 hole
+  expect(await page.locator('[title^="Datum C"]').count()).toBe(1); // datum C is that same hole
+  // the PMI view drops everything the PMI does not speak about
+  const labelTexts = await page.locator('button[title*=": "]:not([data-testid])').allTextContents();
+  expect(labelTexts.some((t) => /R1\.5$/.test(t))).toBe(false);
+  // what the file does not tie to a face is listed, with the datum note
+  const panel = page.getByTestId('pmi-panel');
+  await expect(panel).toContainText('⏥0.25'); // flatness on Plane10 (not dimensioned, cannot be placed)
+  await expect(panel).toContainText('⌖0.05'); // position on Simple Hole8 (named by no dimension)
+  await expect(panel).toContainText('Width 15');
+  await expect(panel).toContainText('Datum references (A-B-C) are not stored in this STEP');
+  // no frame shows datum references
+  expect(text).not.toMatch(/A-B-C/);
+  await page.screenshot({ path: (process.env.SHOTS_DIR ?? 'test-results') + '/pmi-view.png' });
+});

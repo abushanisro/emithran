@@ -16,14 +16,15 @@ const overlaps = (a: Rect, b: Rect) => a.x < b.x + b.w + 2 && b.x < a.x + a.w + 
  * when the camera has stopped.
  */
 export function separateLabels(
-  labels: ReadonlyArray<{ x: number; y: number; w: number; depth: number }>,
+  labels: ReadonlyArray<{ x: number; y: number; w: number; depth: number; h?: number }>,
 ): Array<{ dx: number; dy: number }> {
   const order = labels.map((_, i) => i).sort((a, b) => labels[a]!.depth - labels[b]!.depth);
   const placed: Rect[] = [];
   const out = labels.map(() => ({ dx: 0, dy: 0 }));
   for (const i of order) {
     const l = labels[i]!;
-    const rect = (dx: number, dy: number): Rect => ({ x: l.x + dx - l.w / 2, y: l.y + dy - LABEL_HEIGHT_PX / 2, w: l.w, h: LABEL_HEIGHT_PX });
+    const h = l.h ?? LABEL_HEIGHT_PX;
+    const rect = (dx: number, dy: number): Rect => ({ x: l.x + dx - l.w / 2, y: l.y + dy - h / 2, w: l.w, h });
     let chosen = { dx: 0, dy: 0 };
     search: for (let ring = 0; ring <= NUDGE_RINGS; ring++) {
       const steps = ring === 0 ? 1 : 8;

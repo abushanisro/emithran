@@ -6,8 +6,9 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { Html, Line } from '@react-three/drei';
 import { buildFaceIndex, boundsOf, trianglesOfFaces, subsetPositions } from '@/lib/viewer/highlight-geometry';
 import type { FaceMapEntry } from '@/lib/types/manufacturing';
-import type { DimensionAnnotation } from '@/lib/features/dimension-annotations';
-import { LABEL_CHAR_PX, LABEL_PAD_PX, separateLabels } from '@/lib/viewer/label-separation';
+import { formatTolValue, type DimensionAnnotation } from '@/lib/features/dimension-annotations';
+import type { PmiDatumMark, PmiFrame } from '@/lib/features/pmi-frames';
+import { LABEL_CHAR_PX, LABEL_HEIGHT_PX, LABEL_PAD_PX, separateLabels } from '@/lib/viewer/label-separation';
 
 /**
  * Diameter / radius callouts drawn over the model: a teal label joined by a
@@ -25,6 +26,9 @@ export interface DimensionOverlayState {
   faceMap: readonly FaceMapEntry[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
+  /** GD&T frames and datum marks placed on a callout, by callout id (shown with that callout). */
+  frames?: ReadonlyMap<string, readonly PmiFrame[]>;
+  datums?: ReadonlyMap<string, readonly PmiDatumMark[]>;
 }
 
 export const DimensionOverlayCtx = React.createContext<DimensionOverlayState | null>(null);
@@ -84,6 +88,23 @@ function Arrowhead({ from, to, size, color }: { from: THREE.Vector3; to: THREE.V
   );
 }
 
+/** One cell row of a feature control frame: [ symbol | value ] or a datum box [ A ]. */
+function FrameBox({ color, title, children }: { color: string; title: string; children: React.ReactNode }) {
+  return (
+    <div
+      title={title}
+      style={{
+        display: 'inline-flex', gap: 0, marginTop: 2, marginRight: 2, color, border: `1px solid ${color}`, background: 'rgba(15,23,42,0.55)',
+        font: '600 12px/16px ui-monospace, SFMono-Regular, Menlo, monospace', whiteSpace: 'nowrap',
+      }}
+    >
+      {React.Children.map(children, (c, i) => (
+        <span style={{ padding: '0 5px', borderLeft: i > 0 ? `1px solid ${color}` : undefined }}>{c}</span>
+      ))}
+    </div>
+  );
+}
+
 export function DimensionOverlay({ geometry }: { geometry: THREE.BufferGeometry }) {
   const state = React.useContext(DimensionOverlayCtx);
   const placement = useMemo(
@@ -105,6 +126,8 @@ export function DimensionOverlay({ geometry }: { geometry: THREE.BufferGeometry 
   const [spread, setSpread] = React.useState<{ source: unknown; labels: THREE.Vector3[] } | null>(null);
   const lastView = React.useRef(new THREE.Matrix4());
   const movedAt = React.useRef<number | null>(0);
+  // A new set of labels (another mode, another selection of callouts) must be spread too, even though the camera has not moved.
+  React.useEffect(() => { movedAt.current = performance.now(); }, [placement]);
   useFrame(() => {
     const group = groupRef.current;
     if (!group || !placement || !(camera as THREE.PerspectiveCamera).isPerspectiveCamera) return;
@@ -117,7 +140,13 @@ export function DimensionOverlay({ geometry }: { geometry: THREE.BufferGeometry 
     const projected = placement.placed.map(({ annotation, label }) => {
       const world = label.clone().applyMatrix4(group.matrixWorld);
       ndc.copy(world).project(camera);
-      return { world, x: (ndc.x + 1) / 2 * size.width, y: (1 - ndc.y) / 2 * size.height, w: annotation.label.length * LABEL_CHAR_PX + LABEL_PAD_PX, depth: ndc.z };
+      const extra = (state?.frames?.get(annotation.id)?.length ?? 0) + (state?.datums?.get(annotation.id)?.length ?? 0);
+      const frameChars = Math.max(0, ...(state?.frames?.get(annotation.id) ?? []).map((f) => formatTolValue(f.zoneMm).length + 4));
+      const chars = Math.max(annotation.label.length, frameChars);
+      return {
+        world, x: (ndc.x + 1) / 2 * size.width, y: (1 - ndc.y) / 2 * size.height,
+        w: chars * LABEL_CHAR_PX + LABEL_PAD_PX, h: LABEL_HEIGHT_PX * (1 + extra), depth: ndc.z,
+      };
     });
     const offsets = separateLabels(projected);
     const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
@@ -162,6 +191,16 @@ export function DimensionOverlay({ geometry }: { geometry: THREE.BufferGeometry 
               >
                 {annotation.label}
               </button>
+              {(state.frames?.get(annotation.id) ?? []).map((f) => (
+                <FrameBox key={f.itemId} color={color} title={`${f.type} ${formatTolValue(f.zoneMm)} from STEP PMI (${f.cadFeature ?? 'unnamed'}), placed by ${f.via}. Datum references are not stored in this STEP.`}>
+                  <span>{f.symbol}</span><span>{formatTolValue(f.zoneMm)}</span>
+                </FrameBox>
+              ))}
+              {(state.datums?.get(annotation.id) ?? []).map((d) => (
+                <FrameBox key={d.itemId} color={color} title={`Datum ${d.letter} is ${d.cadFeature ?? 'unnamed'} (label in the STEP), placed by ${d.via}`}>
+                  <span style={{ fontWeight: 800 }}>{d.letter}</span>
+                </FrameBox>
+              ))}
             </Html>
           </group>
         );

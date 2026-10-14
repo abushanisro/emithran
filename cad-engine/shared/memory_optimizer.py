@@ -158,7 +158,9 @@ class AdvancedCADMemoryOptimizer:
     """
     
     VERSION = "2.2.0"
-    CACHE_VERSION = "geo_v54"  # bumped 2026-10-14: (31) pmi carries dimensions (+/- bounds), datums read from callout
+    CACHE_VERSION = "geo_v55"  # bumped 2026-10-14: (32) pmi.items[] is one normalized record per PMI item
+    # (dimension / geometric / datum / label_only) with the CAD feature each label names.
+    # Previous: geo_v54, 2026-10-14: (31) pmi carries dimensions (+/- bounds), datums read from callout
     # labels, and label-only callouts, read from the STEP text (shared/step_pmi_dimensions.py); each geometric
     # callout carries the CAD's own `name`.
     # Previous: geo_v53, 2026-10-14: (30) machining collect_cylinders recognises a cylinder
