@@ -774,6 +774,18 @@ async def analyze_geometry_advanced(
                 except Exception as _gexc:
                     logger.warning(f"[step_pmi] graphics origin failed: {_gexc}")
                     response["pmi"]["graphics"] = []
+            # Typed engineering records: native PMI where the file has it, decoded graphics (always flagged,
+            # never automation-ready) where it does not, unresolved otherwise. See shared/pmi_records.py.
+            if response["pmi"].get("items"):
+                try:
+                    from shared.pmi_records import build_pmi_records, engine_features  # type: ignore
+                    _mf = (machining_features_result or {}).get("features") if machining_features_result else None
+                    _built = build_pmi_records(response["pmi"], engine_features(_mf))
+                    response["pmi"]["records"] = _built["records"]
+                    response["pmi"]["records_summary"] = _built["summary"]
+                except Exception as _rexc:
+                    logger.warning(f"[step_pmi] records failed: {_rexc}")
+                    response["pmi"]["unresolved"] = list(response["pmi"].get("unresolved", [])) + [f"records: {_rexc}"]
 
             # Component feature analysis (eMithran-style decomposition).
             # GCD adjacency walk is the bottleneck (30–70 s for complex sheet metal).

@@ -52,3 +52,9 @@ def test_an_out_of_range_index_is_reported_not_crashing():
     bad = [s.replace("((1,2,3,4))", "((1,2,3,99))") for s in CALLOUT]
     r = read_step_pmi_graphics(_text(bad))
     assert any("Width2@Width1(15)" in u for u in r["unresolved"])
+
+
+def test_each_filled_set_is_reported_with_its_triangle_count_so_characters_can_be_cut_apart():
+    g = read_step_pmi_graphics(_text(CALLOUT))["graphics"][0]
+    assert g["glyph_triangle_counts"] == [4]  # one filled set: 2 strip triangles + a 4-index fan (2 triangles)
+    assert sum(g["glyph_triangle_counts"]) * 9 == len(g["triangles"])

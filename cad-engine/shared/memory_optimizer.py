@@ -158,7 +158,9 @@ class AdvancedCADMemoryOptimizer:
     """
     
     VERSION = "2.2.0"
-    CACHE_VERSION = "geo_v57"  # bumped 2026-10-14: (34) pmi.graphics: the callouts' drawn polylines and glyph
+    CACHE_VERSION = "geo_v58"  # bumped 2026-10-15: (35) pmi.records: typed engineering records (native PMI, decoded
+    # graphics flagged for review, unresolved) with limits and engine-feature association (shared/pmi_records.py).
+    # Previous: geo_v57, 2026-10-14: (34) pmi.graphics: the callouts' drawn polylines and glyph
     # triangles (shared/step_pmi_graphics.py) + pmi.graphics_origin, so the viewer can draw the PMI as authored.
     # Previous: geo_v56, 2026-10-14: (33) machining: two opposite concave half-turn arcs of equal
     # radius on parallel axes sharing a depth are one Slot/straight (width, length, centre distance, area), not two rounds.

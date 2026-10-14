@@ -108,6 +108,7 @@ def read_step_pmi_graphics(step_text: str) -> Dict[str, Any]:
             continue
         curves: List[List[List[float]]] = []
         triangles: List[float] = []
+        glyph_triangle_counts: List[int] = []  # triangles per filled set, in file order: one set per drawn character
         for item_id in (int(x) for x in _REF.findall(target)):
             item = E.get(item_id, "")
             coord_ref = next((int(x) for x in _REF.findall(item) if E.get(int(x), "").startswith("COORDINATES_LIST")), None)
@@ -122,7 +123,9 @@ def read_step_pmi_graphics(step_text: str) -> Dict[str, Any]:
                     for line in _indices(_split_args(item)[2]):
                         curves.append([pts[k - 1] for k in line])
                 elif "TRIANGULATED_SURFACE_SET" in item.split("(")[0]:
-                    triangles.extend(_triangles(item, pts))
+                    drawn = _triangles(item, pts)
+                    triangles.extend(drawn)
+                    glyph_triangle_counts.append(len(drawn) // 9)
             except (IndexError, ValueError) as exc:
                 unresolved.append(f"#{item_id} {name}: {exc}")
         if curves or triangles:
@@ -130,5 +133,7 @@ def read_step_pmi_graphics(step_text: str) -> Dict[str, Any]:
                 "callout": name,
                 "curves": [[[round(v, 3) for v in p] for p in c] for c in curves],
                 "triangles": [round(v, 3) for v in triangles],
+                # the CAD writes each character as its own filled set; the counts let a decoder cut them apart
+                "glyph_triangle_counts": glyph_triangle_counts,
             })
     return {"graphics": graphics, "unresolved": unresolved}

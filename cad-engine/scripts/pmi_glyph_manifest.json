@@ -1,0 +1,28 @@
+{
+  "source": "RMP-00015-B.STP (AP242 export, SolidWorks MBD, annotation font as drawn)",
+  "verified_by": "read by eye from the rendered glyphs (decoder reading frames), glyph counts cross-checked against the character counts",
+  "callouts": {
+    "Width2@Width1(15)":              { "turn": 0, "text": "15.00 ±0.25" },
+    "Radius8@Cylinder Pattern1(4.75)": { "turn": 2, "text": "4 x R4.75 ±0.15" },
+    "Width4@Width3(15.04)":           { "turn": 0, "text": "15.04 ±0.1" },
+    "Datum443@Plane10(A)":            { "turn": 1, "text": "▼A", "order": "vertical" },
+    "Datum446@Plane11(B)":            { "turn": 1, "text": "▼B", "order": "vertical" },
+    "Datum451@Simple Hole1(C)":       { "turn": 1, "text": "▼C", "order": "vertical" },
+    "Diameter5@Simple Hole7(40.08)":  { "turn": 2, "text": "40.08±0.1" },
+    "Diameter5@Simple Hole7(40.08)-2": { "turn": 2, "text": "39.50±0.5" },
+    "Radius6@Cylinder4(22.54)":       { "turn": 1, "text": "R22.54 ±0.15" },
+    "DistanceBetween2@Plane13(6)":    { "turn": 2, "text": "6.00" },
+    "Diameter3@Simple Hole1(26.5)":   { "turn": 3, "text": "26.50±0.25" },
+    "Radius1@Cylinder2(45.75)":       { "turn": 3, "text": "R45.75 ±0.15" },
+    "Diameter4@Hole Pattern2(5.5)":   { "turn": 3, "text": "4 x 5.50±0.15" },
+    "Radius5@Cylinder3(28.5)":        { "turn": 3, "text": "R28.50 ±0.25" },
+    "DistanceBetween1@Cylinder13(6)": { "turn": 3, "text": "6.00" },
+    "Cylindricity1@Simple Hole1":     { "turn": 3, "text": "0.015" },
+    "Position1@Hole Pattern2":        { "turn": 3, "text": "0.15 A-B-C" },
+    "Position2@Simple Hole8":         { "turn": 3, "text": ".05 A-B-C" }
+  },
+  "not_used": {
+    "Flatness2@Plane10": "5 filled sets for '0.25': one is a stray dot; which one is not verified, so it is not used to build templates",
+    "Perpendicularity1@Plane11": "6 filled sets for '0.25 A': one is a stray dot; not used to build templates"
+  }
+}
