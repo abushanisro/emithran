@@ -47,8 +47,17 @@ describe('computeRouterCost — real material-family cutting speed', () => {
     expect(result.warnings.some((w) => w.includes('no linear feed rate on file'))).toBe(true);
   });
 
-  it('raises no gap when a linear feed was resolved', () => {
-    expect(computeRouterCost(baseInput()).processLines[0]!.physicsGap).toBeUndefined();
+  it('raises no gap when a linear feed was resolved and nothing plunges', () => {
+    expect(computeRouterCost(baseInput({ pierceCount: 0 })).processLines[0]!.physicsGap).toBeUndefined();
+  });
+
+  // Plunging is unpriced (no plunge time in any source): left out silently it made the router
+  // the cheapest route for a 124-hole part.
+  it('raises a data gap for plunges even when the feed is on file', () => {
+    const result = computeRouterCost(baseInput({ pierceCount: 124 }));
+    const gap = result.processLines[0]!.physicsGap as { reason?: string } | undefined;
+    expect(gap?.reason).toContain('124 plunges');
+    expect(findRouteDataGaps(result.processLines)).toHaveLength(1);
   });
 
   it('does not cost setup, and says so, when no real setup time resolved', () => {
