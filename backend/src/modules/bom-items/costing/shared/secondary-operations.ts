@@ -74,7 +74,10 @@ export function secondaryProcessLine(r: SecondaryResultLike, group: SecondaryGro
     ...(r.setupMin != null ? { setupTimeMin: r.setupMin, setupTimeSource: 'machine' as const } : {}),
     operators: r.machine?.operators ?? null,
     hourlyRate: r.local.machineRate != null ? r.local.machineRate * conv : 0,
-    rateSource: 'mhr_database',
+    // A priced service (plating, bead blast: a price per m2) has no machine time. It is a per-part
+    // charge, which a route can be applied with; labelled as a machine-time line it was refused
+    // for having no cycle time.
+    rateSource: r.cycleTimeSec == null ? 'consumable_allowance' : 'mhr_database',
     machineClass: r.machineClass, machineName: r.machine?.name ?? null, commodityCode: null,
     labourRate: r.local.laborRate != null ? r.local.laborRate * conv : null,
     ...(r.machine?.id ? { mhrId: r.machine.id } : {}),
