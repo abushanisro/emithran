@@ -16,11 +16,9 @@ import { findRouteDataGaps } from '../src/modules/bom-items/costing/shared/core/
 jest.setTimeout(400_000);
 
 const RTP2 = 'b035cccf-8fd2-45cf-97b6-9cce68d53d6a';
-const CUT_LENGTH_MM = 5018; // the extracted cut length of this part
 
 describe('[e2e] Auto route recommendation, Rtp2 Mag2 Backframe', () => {
   let comparison: RouteComparisonResponseDto;
-  let admin: ReturnType<typeof createClient<any>>;
   const route = (id: string) => {
     const r = comparison.routes.find((x) => x.routeId === id);
     if (!r) throw new Error(`route ${id} missing from the comparison`);
@@ -32,7 +30,6 @@ describe('[e2e] Auto route recommendation, Rtp2 Mag2 Backframe', () => {
       imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../.env') }), BOMItemsModule],
     }).compile();
     const config = moduleRef.get(ConfigService);
-    admin = createClient(config.getOrThrow<string>('SUPABASE_URL'), config.getOrThrow<string>('SUPABASE_SERVICE_KEY'));
     const env = parseEnv(fs.readFileSync(path.resolve(__dirname, '../../.env.local'), 'utf8'));
     const anon = createClient(config.getOrThrow<string>('SUPABASE_URL'), config.getOrThrow<string>('SUPABASE_ANON_KEY'));
     const { data, error } = await anon.auth.signInWithPassword({ email: env.E2E_EMAIL!, password: env.E2E_PASSWORD! });
@@ -80,20 +77,12 @@ describe('[e2e] Auto route recommendation, Rtp2 Mag2 Backframe', () => {
     expect([...r.warnings, ...r.capability.warnings].join(' ')).toContain('catalogued for Blank only');
   });
 
-  // The router is priced from the selected machine feed once migration 906 has staged it; before
-  // that the cutting is an unpriced gap with the reason on the line.
-  it('sm-router is priced from its machine feed when staged, else a gap with the reason', async () => {
+  // The router cuts at its machine feed (migration 906), but a plunge has no time in any source, so a
+  // part with holes is never fully priced: the route is a gap, never the cheapest by omission.
+  it('sm-router is incomplete: its plunges are unpriced, with the reason on the line', () => {
     const r = route('sm-router');
-    const machine = r.processLines[0]!.machineName;
-    const { data } = await admin.from('sm_reference_data').select('raw').eq('category', 'machine').eq('key', `routerMachine:${machine}`).maybeSingle();
-    const feedMmPerSec = (data as { raw?: { feed_rate_mm_s?: number } } | null)?.raw?.feed_rate_mm_s;
-    if (feedMmPerSec) {
-      expect(r.dataComplete).toBe(true);
-      expect(r.processLines[0]!.cycleTimeMin).toBeCloseTo(CUT_LENGTH_MM / (feedMmPerSec * 60), 2);
-    } else {
-      expect(r.dataComplete).toBe(false);
-      expect(r.dataGaps.map((g) => g.reason).join(' ')).toContain('Not priced');
-    }
+    expect(r.dataComplete).toBe(false);
+    expect(r.dataGaps.map((g) => g.reason).join(' ')).toContain('plunges');
   });
 
   // Memory states a power (2-5 kW) for every 3D laser but no technology; the fiber cut-speed table at

@@ -55,12 +55,18 @@ export function computeRouterCost(input: RouterInput): RouterResult {
   }
   // Unpriced cutting is missing data, not a $0 operation: it would make the route
   // look cheapest for work it leaves unpriced. See the same rule in the turret engine.
-  const physicsGap: PhysicsGap | undefined = input.cutLengthMm > 0 && input.cuttingSpeedMmPerMin == null
+  // A plunge is work the source does not price (no plunge time in any file), so a part with
+  // pierces is not fully costed: the route is a gap, never the cheapest by leaving plunging out.
+  const cutGap = input.cutLengthMm > 0 && input.cuttingSpeedMmPerMin == null;
+  const plungeGap = input.pierceCount > 0;
+  const physicsGap: PhysicsGap | undefined = cutGap || plungeGap
     ? {
         gapType: 'unsupported_operation',
         process: 'Router Cutting',
         machineClass: 'router_2axis',
-        reason: `Not priced: cutting ${Math.round(input.cutLengthMm)} mm (no feed rate on file for this router machine).`,
+        reason: cutGap
+          ? `Not priced: cutting ${Math.round(input.cutLengthMm)} mm (no feed rate on file for this router machine).`
+          : `Not priced: ${input.pierceCount} plunges (no plunge time on file in any source, so the route would leave them out).`,
       }
     : undefined;
   if (input.pierceCount > 0) {
