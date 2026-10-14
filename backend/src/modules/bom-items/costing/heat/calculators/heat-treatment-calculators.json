@@ -1,0 +1,85 @@
+{
+  "domain": "heat treatment",
+  "processGroup": "Heat Treatment",
+  "calculators": [
+    {
+      "key": "priced-by-weight",
+      "name": "Heat Treatment - Priced by Weight",
+      "description": "A heat-treatment service priced by weight: Unit Weight Cost x batch weight, or the Min Batch Cost below the Min Batch Weight, times the case-depth multiplier (1 when the process has none), per part. Cycle Time is the handling time for the weight of the part (tblHandlingTimes).",
+      "operations": [
+        "Additional Temper", "Atmosphere Oil Harden", "Carbonitride", "Carburize", "Cryogenic Freeze",
+        "High Speed Steel Harden", "High Temp Vacuum Anneal", "Induction Harden", "Low Temp Vacuum Anneal",
+        "Solution", "Spring Steel Harden", "Stainless Steel Harden", "Standard Anneal", "Standard Temper",
+        "Stress Relief", "Vacuum Air Harden", "Vacuum Air Harden with High Temper", "Vacuum Temper"
+      ],
+      "fields": [
+        { "name": "Part Weight", "unit": "kg" },
+        { "name": "Batch Size", "unit": null },
+        { "name": "Unit Weight Cost", "unit": "USD/kg" },
+        { "name": "Min Batch Cost", "unit": "USD" },
+        { "name": "Min Batch Weight", "unit": "kg" },
+        { "name": "Case Depth Multiplier", "unit": null },
+        { "name": "Handling Time", "unit": "s" },
+        { "name": "Batch Weight", "unit": "kg", "formula": "{Part Weight} * {Batch Size}" },
+        { "name": "Batch Service Cost", "unit": "USD", "formula": "IF({Batch Weight} < {Min Batch Weight}, {Min Batch Cost}, {Batch Weight} * {Unit Weight Cost}) * {Case Depth Multiplier}" },
+        { "name": "Service Cost per Part", "unit": "USD", "formula": "{Batch Service Cost} / {Batch Size}" },
+        { "name": "Cycle Time", "unit": "s", "formula": "{Handling Time}" }
+      ]
+    },
+    {
+      "key": "certification",
+      "name": "Heat Treatment - Certification",
+      "description": "Certification is charged once per batch: Certification Cost / Batch Size per part. It takes no machine time.",
+      "operations": ["Certification"],
+      "fields": [
+        { "name": "Certification Cost", "unit": "USD" },
+        { "name": "Batch Size", "unit": null },
+        { "name": "Service Cost per Part", "unit": "USD", "formula": "{Certification Cost} / {Batch Size}" },
+        { "name": "Cycle Time", "unit": "s", "formula": "0" }
+      ]
+    },
+    {
+      "key": "straighten",
+      "name": "Heat Treatment - Straighten",
+      "description": "Straightening runs at the parts-per-hour rate of the weight class of the part (small, medium or large): Cycle Time = 3600 / Straightening Rate.",
+      "operations": ["Straighten"],
+      "fields": [
+        { "name": "Straightening Rate", "unit": "parts/hr" },
+        { "name": "Cycle Time", "unit": "s", "formula": "3600 / {Straightening Rate}" }
+      ]
+    },
+    {
+      "key": "age",
+      "name": "Heat Treatment - Age",
+      "description": "Aging runs in oven loads: Oven Loads = ceil(Batch Size / Parts per Oven Load); Cycle Time per part = Oven Loads x Aging Time x 3600 / Batch Size.",
+      "operations": ["Age"],
+      "fields": [
+        { "name": "Aging Time", "unit": "hr" },
+        { "name": "Parts per Oven Load", "unit": null },
+        { "name": "Batch Size", "unit": null },
+        { "name": "Oven Loads", "unit": null, "formula": "CEIL({Batch Size} / {Parts per Oven Load})" },
+        { "name": "Cycle Time", "unit": "s", "formula": "{Oven Loads} * {Aging Time} * 3600 / {Batch Size}" }
+      ]
+    },
+    {
+      "key": "hip",
+      "name": "Heat Treatment - Hot Isostatic Pressing",
+      "description": "One HIP load = heat-up + hold + cool-down + pressurize + vacuum purge; Loads = ceil(Batch Size / Parts per Load); Cycle Time per part = Loads x Load Time x 60 / Batch Size.",
+      "operations": ["Hot Isostatic Pressing"],
+      "fields": [
+        { "name": "Hold Temperature", "unit": "°C" },
+        { "name": "Room Temperature", "unit": "°C" },
+        { "name": "Heating Rate", "unit": "°C/min" },
+        { "name": "Cooling Rate", "unit": "°C/min" },
+        { "name": "Hold Time", "unit": "hr" },
+        { "name": "Pressurize Time", "unit": "min" },
+        { "name": "Vacuum Purge Time", "unit": "min" },
+        { "name": "Parts per Load", "unit": null },
+        { "name": "Batch Size", "unit": null },
+        { "name": "Load Time", "unit": "min", "formula": "({Hold Temperature} - {Room Temperature}) / {Heating Rate} + {Hold Time} * 60 + ({Hold Temperature} - {Room Temperature}) / {Cooling Rate} + {Pressurize Time} + {Vacuum Purge Time}" },
+        { "name": "Loads", "unit": null, "formula": "CEIL({Batch Size} / {Parts per Load})" },
+        { "name": "Cycle Time", "unit": "s", "formula": "{Loads} * {Load Time} * 60 / {Batch Size}" }
+      ]
+    }
+  ]
+}

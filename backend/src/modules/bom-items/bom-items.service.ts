@@ -8172,9 +8172,13 @@ export class BOMItemsService {
     if (Object.values(machining).some((c) => c.calculatorId === calculatorId)) {
       return { ...(await this.resolveMachiningCalculatorInputs(id, calculatorId, keys, userId, accessToken, location, batchSize)), processGroup: 'Machining' };
     }
+    const heat = await this.calculatorCatalogService.loadHeatTreatmentCalculators(accessToken);
+    if (Object.values(heat).some((c) => c.calculatorId === calculatorId)) {
+      return this.resolveHeatTreatmentCalculatorInputs(id, calculatorId, heat, keys, userId, accessToken, location, batchSize, runKey);
+    }
     const casting = await this.calculatorCatalogService.loadDieCastingCalculators(accessToken);
     const operation = Object.keys(casting).find((k) => casting[k]!.calculatorId === calculatorId);
-    if (!operation) throw new BadRequestException(`Calculator ${calculatorId} is not a reference calculator of a costed process (Machining, Die Casting)`);
+    if (!operation) throw new BadRequestException(`Calculator ${calculatorId} is not a reference calculator of a costed process (Machining, Die Casting, Heat Treatment)`);
     if (!location) throw new BadRequestException('location is required: die-casting inputs come from costing the part at a location');
     const def = casting[operation]!;
     const inputFields = new Set(def.fields.filter((f) => f.field_type !== 'calculated').map((f) => f.field_name));
@@ -8198,6 +8202,54 @@ export class BOMItemsService {
       delete fromEngine.lookupMatches[field];
     }
     return { ...base, ...fromEngine, run: run.key };
+  }
+
+  /**
+   * The inputs a heat-treatment line ran its calculator on. One calculator can
+   * serve several operations (Priced by Weight), so `runKey` names the process;
+   * without it the first costed process of this calculator answers.
+   */
+  private async resolveHeatTreatmentCalculatorInputs(
+    id: string,
+    calculatorId: string,
+    heat: ReferenceCalculators,
+    keys: Record<string, number>,
+    userId: string,
+    accessToken: string,
+    location?: string,
+    batchSize?: number,
+    runKey?: string,
+  ): Promise<CalculatorInputsDto> {
+    if (!location) throw new BadRequestException('location is required: heat-treatment inputs come from costing the part at a location');
+    const operations = Object.keys(heat).filter((k) => heat[k]!.calculatorId === calculatorId);
+    const operation = runKey && operations.includes(runKey) ? runKey : operations[0]!;
+    const def = heat[operation]!;
+    const inputFields = new Set(def.fields.filter((f) => f.field_type !== 'calculated').map((f) => f.field_name));
+    const item = await this.findOne(id, userId, accessToken);
+    const machineOverrides = await this.fetchMachineOverrides(item.id, accessToken, location);
+    const all = await this.secondaryProcessService.compute({ item: item as any, location, batchSize: batchSize ?? null, accessToken, machineOverrides });
+    const lines = all.heatTreatmentLines.filter((l) => operations.includes(l.process));
+    const line = (runKey ? lines.find((l) => l.process === runKey) : undefined) ?? lines.find((l) => l.calculator) ?? lines[0];
+    const base = { calculatorId, operation: line?.process ?? operation, processGroup: 'Heat Treatment' };
+    if (!line?.calculator) {
+      return {
+        ...base, inputs: {}, provenance: {}, lookupMatches: {},
+        missing: [line ? `${line.process}: ${line.reason}` : `${def.name} has no heat-treatment line for this part at ${location}`],
+      };
+    }
+    const inputs: Record<string, number> = {};
+    const provenance: Record<string, string> = {};
+    for (const [field, value] of Object.entries(line.calculator.inputs)) {
+      if (!inputFields.has(field)) continue;
+      inputs[field] = value;
+      provenance[field] = line.calculator.provenance[field] ?? '';
+    }
+    for (const [field, value] of Object.entries(keys)) {
+      if (!inputFields.has(field)) continue;
+      inputs[field] = value;
+      provenance[field] = 'Entered in the calculator';
+    }
+    return { ...base, inputs, provenance, lookupMatches: {}, missing: [], run: line.process };
   }
 
   async resolveMachiningCalculatorInputs(

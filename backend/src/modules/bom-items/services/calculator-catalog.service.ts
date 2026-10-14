@@ -3,6 +3,8 @@ import { SupabaseService } from '../../../common/supabase/supabase.service';
 import { cachedRead } from '../costing/shared/core/request-cache';
 import { loadDieCastingCalculatorSpec } from '../costing/casting/calculators/die-casting-calculator-spec';
 import type { ReferenceCalculators } from '../costing/shared/calculators/reference-calculator';
+import type { DomainCalculatorSpec } from '../costing/shared/calculators/domain-calculator-spec';
+import { loadHeatTreatmentCalculatorSpec } from '../costing/heat/calculators/heat-treatment-calculator-spec';
 
 @Injectable()
 export class CalculatorCatalogService {
@@ -100,5 +102,43 @@ export class CalculatorCatalogService {
       }
       return out;
     });
+  }
+
+  /**
+   * The calculators of a domain spec (heat treatment, ...), keyed by catalog
+   * operation: the global, current calculator of each spec name with its fields,
+   * under every operation it computes. A calculator not in the database is
+   * absent, so the line that needs it is a named gap (run the domain migration).
+   */
+  loadDomainCalculators(accessToken: string, spec: DomainCalculatorSpec): Promise<ReferenceCalculators> {
+    return cachedRead(`domain-calculators:${spec.domain}`, async () => {
+      const client = this.supabaseService.getClient(accessToken);
+      const { data: calcs } = await client
+        .from('calculators')
+        .select('id, name, version')
+        .in('name', spec.calculators.map((c) => c.name))
+        .is('user_id', null)
+        .is('retired_at', null);
+      const ids = (calcs ?? []).map((c: any) => c.id);
+      if (ids.length === 0) return {};
+      const { data: fields } = await client
+        .from('calculator_fields')
+        .select('calculator_id, field_name, display_label, field_type, unit, default_value, display_order, data_source, source_table, source_field')
+        .in('calculator_id', ids)
+        .order('display_order');
+      const out: ReferenceCalculators = {};
+      for (const c of spec.calculators) {
+        const row = (calcs ?? []).find((x: any) => x.name === c.name);
+        const fs = (fields ?? []).filter((f: any) => f.calculator_id === row?.id);
+        if (!row || fs.length === 0) continue;
+        const def = { calculatorId: row.id, name: row.name, version: row.version ?? 1, fields: fs };
+        for (const op of c.operations) out[op] = def;
+      }
+      return out;
+    });
+  }
+
+  loadHeatTreatmentCalculators(accessToken: string): Promise<ReferenceCalculators> {
+    return this.loadDomainCalculators(accessToken, loadHeatTreatmentCalculatorSpec());
   }
 }

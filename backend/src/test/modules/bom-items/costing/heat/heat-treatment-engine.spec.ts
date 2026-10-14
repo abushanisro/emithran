@@ -6,10 +6,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import {
-  computeHeatTreatments, matchHeatTreatmentCallout, caseDepthFromCallout, HEAT_TREATMENT_SOURCE_VERSION,
+  computeHeatTreatments, matchHeatTreatmentCallout, caseDepthFromCallout, HEAT_TREATMENT_SOURCE_VERSION, HEAT_TREATMENT_PROCESSES,
   type HeatTreatmentFacts,
 } from '../../../../../modules/bom-items/costing/heat/heat-treatment-engine';
 import type { SecondaryMachine, SecondaryReference } from '../../../../../modules/bom-items/costing/secondary/secondary-process-engine';
+import { heatTreatmentCalculatorsFromSpec } from '../../../../../modules/bom-items/costing/heat/calculators/heat-treatment-calculator-spec';
 import { MEMORY_DOMAINS } from '../../../../../modules/processes/reference-domains';
 
 const ROOT = path.resolve(__dirname, '../../../../../../../memory/Heat treatment');
@@ -40,6 +41,7 @@ const specKey = (col: string) => col
   .replace(/\(([^)]*)\)/g, (_, u: string) => ' ' + u.replace(/\^2/g, '2').replace(/\^3/g, '3').replace(/\s*\/\s*/g, ' per ').replace(/%/g, 'pct').replace(/µ/g, 'u'))
   .replace(/\+/g, ' plus ')
   .toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+const num = (v: unknown) => Number(v);
 const classOf = (p: string) => 'heat_treat_' + p.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 
 const reference: SecondaryReference = {
@@ -69,7 +71,8 @@ const steelPart: HeatTreatmentFacts = {
   bboxMm: { length: 120, width: 60, height: 20 }, surfaceAreaMm2: 21_000, weightKg: 1.13, wallThicknessMm: null,
   materialCutCode: 1.1, materialTypeName: 'Steel', features: [], batchSize: 100, caseDepthMm: 0.7, volumeMm3: 144_000,
 };
-const run = (p: HeatTreatmentFacts) => new Map(computeHeatTreatments(p, reference, machines).map((r) => [r.process, r]));
+const calculators = heatTreatmentCalculatorsFromSpec();
+const run = (p: HeatTreatmentFacts, calcs = calculators) => new Map(computeHeatTreatments(p, reference, machines, calcs).map((r) => [r.process, r]));
 
 describe('heat treatment on the reference data', () => {
   it('manifest version is the engine version', () => {
@@ -79,7 +82,7 @@ describe('heat treatment on the reference data', () => {
   it('carburize: carburizable cut code, case-depth multiplier, priced by weight plus handling', () => {
     const r = run(steelPart).get('Carburize')!;
     expect(r.status).toBe('costed');
-    expect(r.trace.find((t) => t.label === 'Case depth multiplier')?.value).toBe(1.25); // 0.7 mm <= 0.79 mm row
+    expect(r.trace.find((t) => t.label === 'Case Depth Multiplier')?.value).toBe(1.25); // 0.7 mm <= 0.79 mm row
     expect(r.materialUsdPerPart).toBeGreaterThan(0);
   });
 
@@ -93,13 +96,14 @@ describe('heat treatment on the reference data', () => {
 
   it('straightening uses the small-part rate for a part under smallPartsWeightLimit', () => {
     const r = run(steelPart).get('Straighten')!;
-    expect(r.trace[0]!.label).toMatch(/small/);
+    expect(r.trace.find((t) => t.label.startsWith('Straightening Rate'))?.source).toMatch(/smallPartsStraighteningRatePerHr/);
+    expect(r.calculator?.name).toBe('Heat Treatment - Straighten');
   });
 
   it('HIP cycle from the material hold temperature and the reference averages', () => {
     const r = run(steelPart).get('Hot Isostatic Pressing')!;
     expect(r.status).toBe('costed');
-    expect(r.trace.find((t) => t.label === 'Hold temperature')?.value).toBe(1163);
+    expect(r.trace.find((t) => t.label === 'Hold Temperature (°C)')?.value).toBe(1163);
   });
 
   it('processes with no reference machine are disclosed gaps', () => {
@@ -111,5 +115,44 @@ describe('heat treatment on the reference data', () => {
     expect(matchHeatTreatmentCallout('Vacuum air harden with high temper')).toBe('Vacuum Air Harden with High Temper');
     expect(caseDepthFromCallout('Carburize, case depth 0.8 mm')).toBe(0.8);
     expect(caseDepthFromCallout('Stress relieve')).toBeNull();
+  });
+});
+
+describe('heat treatment calculators', () => {
+  it('every heat-treatment process has exactly one calculator in the spec', () => {
+    for (const { process } of HEAT_TREATMENT_PROCESSES) expect(Object.keys(calculators)).toContain(process);
+    expect(Object.keys(calculators).sort()).toEqual(HEAT_TREATMENT_PROCESSES.map((p) => p.process).sort());
+  });
+
+  it('a calculator missing from the database is a gap naming the migration, never a fallback price', () => {
+    const r = run(steelPart, {}).get('Straighten')!;
+    expect(r.status).toBe('gap');
+    expect(r.reason).toMatch(/migration 907/);
+    expect(r.costPerPartUsd).toBeNull();
+  });
+
+  it('the line carries the calculator and the inputs it ran on, each with its source', () => {
+    const r = run(steelPart).get('Age')!;
+    expect(r.status).toBe('costed');
+    expect(r.calculator).toMatchObject({ name: 'Heat Treatment - Age' });
+    expect(Object.keys(r.calculator!.inputs).sort()).toEqual(['Aging Time', 'Batch Size', 'Parts per Oven Load']);
+    expect(r.calculator!.provenance['Aging Time']).toMatch(/tblMaterialAgingTime/);
+  });
+
+  it('the cycle time is the calculator formula, and follows the part (not a per-part case)', () => {
+    const small = run({ ...steelPart, weightKg: 0.05 }).get('Straighten')!;
+    const large = run({ ...steelPart, weightKg: 400 }).get('Straighten')!;
+    expect(small.cycleTimeSec).not.toBe(large.cycleTimeSec);
+    const few = run({ ...steelPart, batchSize: 10 }).get('Age')!;
+    const many = run({ ...steelPart, batchSize: 100_000 }).get('Age')!;
+    expect(few.cycleTimeSec).not.toBe(many.cycleTimeSec);
+  });
+
+  it('a weight-priced service without a minimum batch is priced by weight alone', () => {
+    const noMin = machines.map((m) => (m.machineClass === 'heat_treat_standard_anneal'
+      ? { ...m, specs: { ...m.specs, min_batch_cost_usd: null, min_batch_weight_kg: null } } : m));
+    const r = new Map(computeHeatTreatments(steelPart, reference, noMin, calculators).map((x) => [x.process, x])).get('Standard Anneal')!;
+    expect(r.status).toBe('costed');
+    expect(r.materialUsdPerPart).toBeCloseTo(num((machines.find((m) => m.machineClass === 'heat_treat_standard_anneal')!.specs as any).unit_weight_cost_usd_per_kg) * steelPart.weightKg!, 4);
   });
 });
