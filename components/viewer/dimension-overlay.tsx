@@ -224,7 +224,7 @@ export function DimensionOverlay({ geometry }: { geometry: THREE.BufferGeometry 
               </button>
               {annotation.pmiNote && state.frames && (
                 <div title={annotation.pmiNote} style={{ color, font: '10px/14px ui-monospace, SFMono-Regular, Menlo, monospace', whiteSpace: 'nowrap', marginTop: 1 }}>
-                  PMI: tolerance only in the graphics
+                  {annotation.pmiNote.includes(' · ') ? `${annotation.pmiNote.split(' · ')[0]} · review` : 'PMI: tolerance only in the graphics'}
                 </div>
               )}
               {(state.frames?.get(annotation.id) ?? []).map((f) => (

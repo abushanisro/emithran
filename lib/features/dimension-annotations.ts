@@ -19,6 +19,7 @@
 
 import type { PmiItem } from '@/lib/features/pmi-frames';
 import type { PmiGraphic } from '@/lib/features/pmi-graphics';
+import { describeRecord, STATUS_LABEL, widthRecordOfSlot, type PmiRecordView } from '@/lib/features/pmi-records';
 
 export type AnnotationKind = 'diameter' | 'radius' | 'slot';
 
@@ -83,6 +84,7 @@ export interface AnnotationSource {
     items?: ReadonlyArray<PmiItem> | undefined;
     graphics?: ReadonlyArray<PmiGraphic> | undefined;
     graphics_origin?: readonly [number, number, number] | undefined;
+    records?: ReadonlyArray<PmiRecordView> | undefined;
   } | null | undefined;
 }
 
@@ -206,7 +208,8 @@ export function buildDimensionAnnotations(source: AnnotationSource | null | unde
     const faceIds = [...new Set(members.flatMap((m) => m.faceIds))].sort((a, b) => a - b);
     const label = labelOf(first);
     const tolerance = first.kind !== 'slot' && !first.diameters ? toleranceFor(first.kind, first.valueMm, source?.pmi?.dimensions) : null;
-    const pmiNote = first.kind === 'slot' ? slotPmiNote(first.valueMm, source?.pmi?.items) : null;
+    const faceIdsAll = [...new Set(members.flatMap((m) => m.faceIds))];
+    const pmiNote = first.kind === 'slot' ? slotPmiNote(first.valueMm, source?.pmi?.items, source?.pmi?.records, faceIdsAll) : null;
     return {
       id: `${first.kind === 'diameter' ? 'd' : first.kind === 'slot' ? 's' : 'r'}${formatDimension(first.valueMm)}-f${String(first.faceIds[0])}`,
       kind: first.kind,
@@ -251,7 +254,15 @@ export function formatTolerance(t: DimensionTolerance): string {
 }
 
 /** The PMI's own statement about a slot's width: a label-only Width callout of that size, with no tolerance behind it. */
-function slotPmiNote(widthMm: number, items: ReadonlyArray<PmiItem> | undefined): string | null {
+function slotPmiNote(
+  widthMm: number, items: ReadonlyArray<PmiItem> | undefined,
+  records: ReadonlyArray<PmiRecordView> | undefined, slotFaceIds: readonly number[],
+): string | null {
+  // The engine's typed record for the slot's width (decoded from the drawn glyphs, flagged), when it has one.
+  const record = widthRecordOfSlot(records, slotFaceIds);
+  if (record && record.nominal?.value != null && Math.abs(record.nominal.value - widthMm) <= SAME_NOMINAL_MM) {
+    return `PMI Width ${describeRecord(record)} · ${STATUS_LABEL[record.validation.status]}`;
+  }
   const hit = (items ?? []).find((i) => i.kind === 'label_only' && i.dimension_kind === 'width'
     && i.nominal_mm != null && Math.abs(i.nominal_mm - widthMm) <= SAME_NOMINAL_MM);
   return hit ? `PMI: ${hit.label ?? 'Width'} = ${formatDimension(hit.nominal_mm!)} is a label-only callout: any tolerance on it is drawn in the PMI graphics, not stored as data` : null;

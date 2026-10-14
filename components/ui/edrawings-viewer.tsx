@@ -3964,7 +3964,7 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
       <div className="flex-1 flex relative min-h-0 overflow-hidden">
         {/* 3D Viewport */}
         <div ref={canvasContainerRef} className="flex-1 relative bg-linear-to-b from-[#e6f0e7] to-[#b4d2b7]">
-          {showsPmi && <PmiPanel layout={pmiLayout} />}
+          {showsPmi && <PmiPanel layout={pmiLayout} records={annotationSource?.pmi?.records} />}
           {bomItemId && (
             // Popup rather than an inline overlay: Nest's own sheet-size
             // picker + custom inputs need real screen space (see
