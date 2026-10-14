@@ -379,6 +379,29 @@ def part_bounding_box(shape) -> Dict:
 COAXIAL_TOLERANCE_MM = 0.01
 
 
+class _Point:
+    """The X/Y/Z accessors of a gp_Pnt, for a cylinder location that was fitted rather than read."""
+
+    def __init__(self, x: float, y: float, z: float):
+        self._v = (x, y, z)
+
+    def X(self) -> float:
+        return self._v[0]
+
+    def Y(self) -> float:
+        return self._v[1]
+
+    def Z(self) -> float:
+        return self._v[2]
+
+
+def _freeform_surface_types():
+    from OCC.Core.GeomAbs import (  # type: ignore
+        GeomAbs_BSplineSurface, GeomAbs_BezierSurface, GeomAbs_SurfaceOfRevolution, GeomAbs_SurfaceOfExtrusion,
+    )
+    return frozenset({GeomAbs_BSplineSurface, GeomAbs_BezierSurface, GeomAbs_SurfaceOfRevolution, GeomAbs_SurfaceOfExtrusion})
+
+
 def collect_cylinders(
     shape,
     main_axis: Tuple[float, float, float],
@@ -405,7 +428,9 @@ def collect_cylinders(
     from OCC.Core.TopAbs import TopAbs_FACE, TopAbs_FORWARD  # type: ignore
     from OCC.Core.BRepBndLib import brepbndlib  # type: ignore
     from OCC.Core.Bnd import Bnd_Box  # type: ignore
+    from shared.bspline_cylinder import face_is_internal, fit_cylinder
 
+    _FREEFORM_SURFACES = _freeform_surface_types()
     ax, ay, az = main_axis
     axis_norm = math.sqrt(ax * ax + ay * ay + az * az) or 1.0
     ax, ay, az = ax / axis_norm, ay / axis_norm, az / axis_norm
@@ -425,14 +450,28 @@ def collect_cylinders(
     while exp.More():
         face = exp.Current()
         surf = BRepAdaptor_Surface(face)
-        if surf.GetType() == GeomAbs_Cylinder:
-            cyl = surf.Cylinder()
-            radius = cyl.Radius()
-            loc = cyl.Location()
-            d = cyl.Axis().Direction()
+        # An analytic cylinder is read as it is. A B-spline (or revolution / extrusion) face is
+        # a cylinder only if its own geometry says so (shared/bspline_cylinder.py): some CAD
+        # exports write every face, holes included, as B-splines.
+        fitted = fit_cylinder(face) if surf.GetType() in _FREEFORM_SURFACES else None
+        if surf.GetType() == GeomAbs_Cylinder or fitted is not None:
+            if fitted is None:
+                cyl = surf.Cylinder()
+                radius = cyl.Radius()
+                loc = cyl.Location()
+                d = cyl.Axis().Direction()
+                fx, fy, fz = d.X(), d.Y(), d.Z()
+                fnorm = math.sqrt(fx * fx + fy * fy + fz * fz) or 1.0
+                is_reversed = face_is_internal(face, (loc.X(), loc.Y(), loc.Z()), (fx / fnorm, fy / fnorm, fz / fnorm))
+                u_range = abs(surf.LastUParameter() - surf.FirstUParameter())
+            else:
+                radius = fitted.radius
+                loc = _Point(*fitted.location)
+                fx, fy, fz = fitted.axis
+                is_reversed = fitted.internal
+                u_range = fitted.u_range
 
             # Normalize face axis
-            fx, fy, fz = d.X(), d.Y(), d.Z()
             fn = math.sqrt(fx * fx + fy * fy + fz * fz) or 1.0
             fx, fy, fz = fx / fn, fy / fn, fz / fn
 
@@ -456,8 +495,6 @@ def collect_cylinders(
                 (fx, fy, fz),
             )
             length = max(face_span, 0.1)
-
-            is_reversed = face.Orientation() != TopAbs_FORWARD
 
             # Angular position of centroid around main axis (for PCD grouping)
             angle_deg = angle_around_axis((cx - ox, cy - oy, cz - oz), (ax, ay, az))
@@ -486,8 +523,6 @@ def collect_cylinders(
             # Used by _deduplicate_cylinders to distinguish arc patches of
             # one bore (each ~π/2, total ≈ 2π) from separate holes
             # (each ≈ 2π, total >> 2π).
-            u_range = abs(surf.LastUParameter() - surf.FirstUParameter())
-
             results.append({
                 "radius": radius,
                 "length": length,
