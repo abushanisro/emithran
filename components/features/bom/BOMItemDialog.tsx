@@ -1756,8 +1756,117 @@ export function BOMItemDialog({
               </div>
             </div>
 
-            {/* Process + Material — side by side, Process first */}
+            {/* Material + Process — side by side, Material first: the material can decide the process */}
             <div className="grid grid-cols-2 gap-4">
+            {/* Material */}
+            <div className="grid gap-2">
+              <Label htmlFor="material" className="flex items-center">Material <AutoBadge field="material" /></Label>
+                <Popover open={materialOpen} onOpenChange={setMaterialOpen}>
+                  <PopoverTrigger asChild>
+                    <div className="relative">
+                      <Input
+                        id="material"
+                        value={formData.material || ''}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setFormData((prev) => ({ ...prev, material: value, materialGrade: '' }));
+                          setMaterialSearch(value);
+                          if (!value.trim()) setMaterialProcessChoices([]);
+                          if (!materialOpen) setMaterialOpen(true);
+                        }}
+                        onFocus={() => { setMaterialOpen(true); setMaterialSearch(formData.material || ''); }}
+                        onClick={(e) => { e.stopPropagation(); setMaterialOpen(true); }}
+                        placeholder="Type or select material..."
+                        className="pr-10"
+                      />
+                      <span className="absolute right-0 top-0 h-full px-3 flex items-center pointer-events-none">
+                        <ChevronsUpDown className="h-4 w-4 opacity-50" />
+                      </span>
+                    </div>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-(--radix-popover-trigger-width) p-0 bg-popover border-border shadow-lg"
+                    align="start"
+                    onOpenAutoFocus={(e) => e.preventDefault()}
+                    onCloseAutoFocus={(e) => e.preventDefault()}
+                  >
+                    <Command shouldFilter={false}>
+                      <CommandList
+                        className="max-h-[280px] overflow-y-auto"
+                        onWheel={(e) => e.stopPropagation()}
+                        onScroll={(e) => setMaterialListScrollTop(e.currentTarget.scrollTop)}
+                      >
+                        <CommandGroup>
+                          {/* Custom value row — withheld while the server search for the
+                              latest keystroke is still pending, so this never flashes
+                              against a result set that hasn't caught up yet. */}
+                          {materialSearch && !isMaterialSearchPending && !materialOptionMatches.some(n => n.toLowerCase() === materialSearch.toLowerCase()) && (
+                            <div
+                              onClick={() => {
+                                setFormData((prev) => ({ ...prev, material: materialSearch, materialGrade: '' }));
+                                setMaterialOpen(false);
+                              }}
+                              className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm text-primary hover:bg-secondary border-b border-border"
+                            >
+                              <Plus className="h-3.5 w-3.5 shrink-0" />
+                              <span>Use <span className="font-medium">&quot;{materialSearch}&quot;</span> as custom material</span>
+                            </div>
+                          )}
+                          {/* DB material names — virtualized: the wrapper reserves the
+                              full scroll height for every real match, but only the rows
+                              in (or near) view are actually mounted. */}
+                          {materialOptionMatches.length > 0 && (
+                            <div
+                              style={{ position: 'relative', height: materialOptionMatches.length * MATERIAL_ROW_HEIGHT_PX }}
+                            >
+                              {materialOptionMatches.slice(materialVisibleRange.start, materialVisibleRange.end).map((name, i) => {
+                                const index = materialVisibleRange.start + i;
+                                return (
+                                  <div
+                                    key={name}
+                                    onClick={() => {
+                                      // Picking a row always selects it: typing the full name sets the
+                                      // text as a custom material, and clicking the matching row must
+                                      // make it the verified grade, not switch it off. Clearing is done
+                                      // by clearing the text.
+                                      // A raw_materials row is a grade: it is the part's Material Grade,
+                                      // which costing, machining need and the item page all read. A typed
+                                      // custom value stays material only (not a verified grade).
+                                      setFormData((prev) => ({ ...prev, material: name, materialGrade: name, materialSource: 'manual' }));
+                                      setMaterialOpen(false);
+                                      applyMaterialProcess(name);
+                                    }}
+                                    style={{ position: 'absolute', top: index * MATERIAL_ROW_HEIGHT_PX, left: 0, right: 0, height: MATERIAL_ROW_HEIGHT_PX }}
+                                    className={`flex cursor-pointer items-center px-3 text-sm ${
+                                      formData.material === name
+                                        ? 'bg-primary text-primary-foreground font-medium'
+                                        : 'text-popover-foreground hover:bg-secondary'
+                                    }`}
+                                  >
+                                    <Check className={`mr-2 h-4 w-4 shrink-0 ${formData.material === name ? 'opacity-100' : 'opacity-0'}`} />
+                                    <span className="font-medium truncate">{name}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                          {!isMaterialSearchPending && materialOptionMatches.length === 0 && materialSearch && (
+                            <div className="px-3 py-4 text-sm text-muted-foreground text-center">
+                              No matches in database — custom value will be saved.
+                            </div>
+                          )}
+                        </CommandGroup>
+                        {(isLoadingMaterials || isMaterialSearchPending) && (
+                          <div className="flex items-center justify-center gap-2 py-2 border-t border-border text-xs text-muted-foreground">
+                            <Loader2 className="h-3 w-3 animate-spin" />Searching…
+                          </div>
+                        )}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+            </div>
+
             {/* Process — auto-filled from the 3D model's CAD-detected family
                 when the import classified it; always editable so the
                 engineer can correct a wrong detection or choose manually
@@ -1798,116 +1907,6 @@ export function BOMItemDialog({
               {processSource === 'material' && formData.processType && (
                 <p className="text-xs text-muted-foreground">Set from the material ({formData.material}).</p>
               )}
-            </div>
-
-            {/* Material */}
-            <div className="grid gap-2">
-              <Label htmlFor="material" className="flex items-center">Material <AutoBadge field="material" /></Label>
-                <Popover open={materialOpen} onOpenChange={setMaterialOpen}>
-                  <PopoverTrigger asChild>
-                    <div className="relative">
-                      <Input
-                        id="material"
-                        value={formData.material || ''}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setFormData({ ...formData, material: value, materialGrade: '' });
-                          setMaterialSearch(value);
-                          if (!materialOpen) setMaterialOpen(true);
-                        }}
-                        onFocus={() => { setMaterialOpen(true); setMaterialSearch(formData.material || ''); }}
-                        onClick={(e) => { e.stopPropagation(); setMaterialOpen(true); }}
-                        placeholder="Type or select material..."
-                        className="pr-10"
-                      />
-                      <span className="absolute right-0 top-0 h-full px-3 flex items-center pointer-events-none">
-                        <ChevronsUpDown className="h-4 w-4 opacity-50" />
-                      </span>
-                    </div>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    className="w-(--radix-popover-trigger-width) p-0 bg-popover border-border shadow-lg"
-                    align="start"
-                    onOpenAutoFocus={(e) => e.preventDefault()}
-                    onCloseAutoFocus={(e) => e.preventDefault()}
-                  >
-                    <Command shouldFilter={false}>
-                      <CommandList
-                        className="max-h-[280px] overflow-y-auto"
-                        onWheel={(e) => e.stopPropagation()}
-                        onScroll={(e) => setMaterialListScrollTop(e.currentTarget.scrollTop)}
-                      >
-                        <CommandGroup>
-                          {/* Custom value row — withheld while the server search for the
-                              latest keystroke is still pending, so this never flashes
-                              against a result set that hasn't caught up yet. */}
-                          {materialSearch && !isMaterialSearchPending && !materialOptionMatches.some(n => n.toLowerCase() === materialSearch.toLowerCase()) && (
-                            <div
-                              onClick={() => {
-                                setFormData({ ...formData, material: materialSearch, materialGrade: '' });
-                                setMaterialOpen(false);
-                              }}
-                              className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm text-primary hover:bg-secondary border-b border-border"
-                            >
-                              <Plus className="h-3.5 w-3.5 shrink-0" />
-                              <span>Use <span className="font-medium">&quot;{materialSearch}&quot;</span> as custom material</span>
-                            </div>
-                          )}
-                          {/* DB material names — virtualized: the wrapper reserves the
-                              full scroll height for every real match, but only the rows
-                              in (or near) view are actually mounted. */}
-                          {materialOptionMatches.length > 0 && (
-                            <div
-                              style={{ position: 'relative', height: materialOptionMatches.length * MATERIAL_ROW_HEIGHT_PX }}
-                            >
-                              {materialOptionMatches.slice(materialVisibleRange.start, materialVisibleRange.end).map((name, i) => {
-                                const index = materialVisibleRange.start + i;
-                                return (
-                                  <div
-                                    key={name}
-                                    onClick={() => {
-                                      const picked = name === formData.material ? '' : name;
-                                      // A raw_materials row is a grade: it is the part's
-                                      // Material Grade, which costing, machining need and
-                                      // the item page all read. A typed custom value stays
-                                      // material only (not a verified grade).
-                                      setFormData({
-                                        ...formData, material: picked, materialGrade: picked,
-                                        ...(picked ? { materialSource: 'manual' } : {}),
-                                      });
-                                      setMaterialOpen(false);
-                                      if (picked) applyMaterialProcess(picked);
-                                      else setMaterialProcessChoices([]);
-                                    }}
-                                    style={{ position: 'absolute', top: index * MATERIAL_ROW_HEIGHT_PX, left: 0, right: 0, height: MATERIAL_ROW_HEIGHT_PX }}
-                                    className={`flex cursor-pointer items-center px-3 text-sm ${
-                                      formData.material === name
-                                        ? 'bg-primary text-primary-foreground font-medium'
-                                        : 'text-popover-foreground hover:bg-secondary'
-                                    }`}
-                                  >
-                                    <Check className={`mr-2 h-4 w-4 shrink-0 ${formData.material === name ? 'opacity-100' : 'opacity-0'}`} />
-                                    <span className="font-medium truncate">{name}</span>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                          {!isMaterialSearchPending && materialOptionMatches.length === 0 && materialSearch && (
-                            <div className="px-3 py-4 text-sm text-muted-foreground text-center">
-                              No matches in database — custom value will be saved.
-                            </div>
-                          )}
-                        </CommandGroup>
-                        {(isLoadingMaterials || isMaterialSearchPending) && (
-                          <div className="flex items-center justify-center gap-2 py-2 border-t border-border text-xs text-muted-foreground">
-                            <Loader2 className="h-3 w-3 animate-spin" />Searching…
-                          </div>
-                        )}
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
             </div>
             </div>
 
