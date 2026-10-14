@@ -7,7 +7,7 @@ const BOM = '/projects/2c1918e2-ce1e-4ef5-a5dc-bf9420b9701d/bom/287bd252-8f92-46
 const SHEET_METAL = `${BOM}/items/71cd6a44-904c-4691-9497-3d240f070b5e/manufacturing-intelligence`;
 const MILLED = `${BOM}/items/896c87dc-2822-4a64-8c52-197cedd9be27/manufacturing-intelligence`;
 
-const labels = (page: Page) => page.locator('button[title*=": "]:not([data-testid])').filter({ hasText: /^(\d+× )?(Ø|R)/ });
+const labels = (page: Page) => page.locator('button[title*=": "]:not([data-testid])').filter({ hasText: /^(\d+× )?(Ø|R|Slot )/ });
 
 async function openWithDimensions(page: Page, url: string) {
   await page.goto(url);
@@ -88,8 +88,8 @@ test('B-spline part: holes and the large radius are found, grouped, and the togg
   expect(texts).toContain('R45.75 ±0.15');
   expect(texts).toContain('Ø40.08 ±0.1');
   expect(texts).toContain('4× R4.75 ±0.15');
-  // the 15 mm slot ends (2x R7.5): the file stores no tolerance for the slot, so none is shown
-  expect(texts).toContain('2× R7.5');
+  // the centre slot (two R7.5 ends, 15 wide): the file states a Width of 15 but no tolerance for it, so none is shown
+  expect(texts).toContain('Slot 15 × 29');
   expect(texts.some((t) => /^\d+× R1\.5$/.test(t))).toBe(true); // the many R1.5 blends are one grouped callout
   expect(texts.length).toBeLessThan(40); // grouped: not one label per face
   await page.screenshot({ path: (process.env.SHOTS_DIR ?? 'test-results') + '/dimensions-bspline.png' });

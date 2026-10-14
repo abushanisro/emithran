@@ -19,7 +19,7 @@
 
 import type { PmiItem } from '@/lib/features/pmi-frames';
 
-export type AnnotationKind = 'diameter' | 'radius';
+export type AnnotationKind = 'diameter' | 'radius' | 'slot';
 
 export interface DimensionTolerance {
   lowerMm: number;
@@ -55,6 +55,8 @@ export interface DimensionAnnotation {
   instances: number[][];
   /** The +/- tolerance the STEP's PMI states for this size, or null (none stored, or not one-to-one). */
   tolerance: DimensionTolerance | null;
+  /** What the PMI says about a slot's width when it states a value but no tolerance, or null. */
+  pmiNote: string | null;
   /** Engine feature type it came from (SimpleHole, MultiStepHole, Edge, Ring, StraightBend). */
   featureType: string;
 }
@@ -94,6 +96,8 @@ export function formatDimension(mm: number): string {
 interface Candidate {
   kind: AnnotationKind;
   valueMm: number;
+  /** A slot's overall length, mm. */
+  slotLengthMm?: number;
   diameters?: number[];
   faceIds: number[];
   featureType: string;
@@ -117,6 +121,10 @@ function fromMachining(features: ReadonlyArray<StoredFeature>): Candidate[] {
         .filter((d): d is number => d != null)
         .sort((a, b) => b - a);
       if (ds.length > 0) out.push({ kind: 'diameter', valueMm: ds[0]!, diameters: ds, faceIds, featureType: f.type, centroid });
+    } else if (f.type === 'Slot' && f.variant === 'straight') {
+      // Two opposite half-turn ends joined by straight walls (cad-engine _pair_slot_ends).
+      const w = pos(p['width_mm']), l = pos(p['length_mm']);
+      if (w && l) out.push({ kind: 'slot', valueMm: w, slotLengthMm: l, faceIds, featureType: f.type, centroid });
     } else if (f.type === 'Edge' && f.variant === 'countersink') {
       const d = pos(p['entry_diameter_mm']);
       if (d) out.push({ kind: 'diameter', valueMm: d, faceIds, featureType: f.type, centroid });
@@ -191,9 +199,10 @@ export function buildDimensionAnnotations(source: AnnotationSource | null | unde
     const first = members[0]!;
     const faceIds = [...new Set(members.flatMap((m) => m.faceIds))].sort((a, b) => a - b);
     const label = labelOf(first);
-    const tolerance = members.length > 0 && !first.diameters ? toleranceFor(first.kind, first.valueMm, source?.pmi?.dimensions) : null;
+    const tolerance = first.kind !== 'slot' && !first.diameters ? toleranceFor(first.kind, first.valueMm, source?.pmi?.dimensions) : null;
+    const pmiNote = first.kind === 'slot' ? slotPmiNote(first.valueMm, source?.pmi?.items) : null;
     return {
-      id: `${first.kind === 'diameter' ? 'd' : 'r'}${formatDimension(first.valueMm)}-f${String(first.faceIds[0])}`,
+      id: `${first.kind === 'diameter' ? 'd' : first.kind === 'slot' ? 's' : 'r'}${formatDimension(first.valueMm)}-f${String(first.faceIds[0])}`,
       kind: first.kind,
       valueMm: first.valueMm,
       label: `${members.length > 1 ? `${members.length}× ` : ''}${label}${tolerance ? ` ${formatTolerance(tolerance)}` : ''}`,
@@ -201,6 +210,7 @@ export function buildDimensionAnnotations(source: AnnotationSource | null | unde
       count: members.length,
       instances: members.map((m) => m.faceIds),
       tolerance,
+      pmiNote,
       featureType: first.featureType,
     };
   });
@@ -234,7 +244,15 @@ export function formatTolerance(t: DimensionTolerance): string {
   return `${sign(t.upperMm)}${formatTolValue(Math.abs(t.upperMm))}/${sign(t.lowerMm)}${formatTolValue(Math.abs(t.lowerMm))}`;
 }
 
+/** The PMI's own statement about a slot's width: a label-only Width callout of that size, with no tolerance behind it. */
+function slotPmiNote(widthMm: number, items: ReadonlyArray<PmiItem> | undefined): string | null {
+  const hit = (items ?? []).find((i) => i.kind === 'label_only' && i.dimension_kind === 'width'
+    && i.nominal_mm != null && Math.abs(i.nominal_mm - widthMm) <= SAME_NOMINAL_MM);
+  return hit ? `PMI: ${hit.label ?? 'Width'} = ${formatDimension(hit.nominal_mm!)}, label only, no tolerance stored` : null;
+}
+
 function labelOf(c: Candidate): string {
+  if (c.kind === 'slot') return `Slot ${formatDimension(c.valueMm)} × ${formatDimension(c.slotLengthMm ?? c.valueMm)}`;
   const prefix = c.kind === 'diameter' ? 'Ø' : 'R';
   return c.diameters && c.diameters.length > 1
     ? c.diameters.map((d) => `Ø${formatDimension(d)}`).join(' / ')
@@ -249,6 +267,6 @@ export function visibleAnnotations(
   all: readonly DimensionAnnotation[], mode: AnnotationMode, pmiIds: ReadonlySet<string> = new Set(),
 ): DimensionAnnotation[] {
   if (mode === 'off') return [];
-  if (mode === 'pmi') return all.filter((a) => a.tolerance !== null || pmiIds.has(a.id));
+  if (mode === 'pmi') return all.filter((a) => a.tolerance !== null || a.pmiNote !== null || pmiIds.has(a.id));
   return mode === 'all' ? [...all] : all.filter((a) => a.kind === mode);
 }
