@@ -19,7 +19,7 @@ import { evaluateCalculatorFormulas, normalizeFieldName } from '../calculators/c
 import type { CalculatorFieldRow } from '../calculators/calculator-formula-evaluator';
 import { PHYSICS_REGISTRY } from '../calculators/physics-registry';
 import { distinctHoleDiameterCount, turretMissingInputs } from './costing/sheet-metal/process/turret-punch-engine';
-import { waterjetMissingInputs } from './costing/sheet-metal/process/waterjet-engine';
+import { waterjetMissingInputs, waterjetSpeedFactor, WATERJET_REFERENCE_MACHINE } from './costing/sheet-metal/process/waterjet-engine';
 import { SheetMetalLookupService, roundUpToStandardTonnageClass } from './costing/sheet-metal/lookup/sheet-metal-lookup.service';
 import { MachiningLookupService } from './costing/machining/lookup/machining-lookup.service';
 import type { LaserCutParams } from './costing/sheet-metal/lookup/sheet-metal-lookup.service';
@@ -7409,14 +7409,18 @@ export class BOMItemsService {
     // length + lead-in per start at the material cutting speed x the cut-time adjustment, plus the
     // machine nozzle delay per pierce; migration 905). Run only when every input is on file;
     // otherwise the engine reports why as a data gap, never a default.
-    const [rcWaterjetDelaySec, rcWaterjetVars] = await Promise.all([
+    const [rcWaterjetDelaySec, rcWaterjetTubeMm, rcWaterjetRefTubeMm, rcWaterjetVars] = await Promise.all([
       this.smLookup.getWaterjetNozzleDelaySec(mhrRates.waterjet.machineName),
+      this.smLookup.getWaterjetMixingTubeMm(mhrRates.waterjet.machineName),
+      this.smLookup.getWaterjetMixingTubeMm(WATERJET_REFERENCE_MACHINE),
       this.smLookup.getNumericVariables(['standardWaterjetCutLeadInAmount', 'waterjetCutTimeAdjustmentFactor']),
     ]);
     const rcWaterjetLeadIn = rcWaterjetVars.get('standardWaterjetCutLeadInAmount') ?? null;
     const rcWaterjetAdjustment = rcWaterjetVars.get('waterjetCutTimeAdjustmentFactor') ?? null;
+    const rcWaterjetSpeedFactor = waterjetSpeedFactor(rcWaterjetTubeMm, rcWaterjetRefTubeMm);
     const rcWaterjetMissing = waterjetMissingInputs({
       machineName: mhrRates.waterjet.machineName,
+      speedFactor: rcWaterjetSpeedFactor,
       hasCuttingSpeed: !!rcWaterjetParams?.dataFound,
       nozzleDelaySec: rcWaterjetDelaySec,
       leadInMm: rcWaterjetLeadIn,
@@ -7431,7 +7435,7 @@ export class BOMItemsService {
             'Cutting Length': cutLengthMm,
             'No Of Starts': pierceCount,
             'Lead In Per Start': rcWaterjetLeadIn!,
-            'Cutting Speed': rcWaterjetParams!.cuttingSpeedMmPerMin,
+            'Cutting Speed': rcWaterjetParams!.cuttingSpeedMmPerMin * rcWaterjetSpeedFactor!,
             'Cut Time Adjustment Factor': rcWaterjetAdjustment!,
             'Pierce Delay Per Start': rcWaterjetDelaySec!,
             'Lot Size': batchSize,
@@ -7440,7 +7444,7 @@ export class BOMItemsService {
             'Cutting Length': 'CAD feature extraction — total cut path length',
             'No Of Starts': 'CAD feature extraction — pierce/start count',
             'Lead In Per Start': 'Sheet metal variable standardWaterjetCutLeadInAmount (lead-in and lead-out of each start)',
-            'Cutting Speed': `sm_lookup_waterjet_cut — ${grade || 'material'}, ${thk}mm sheet (curve fitted to two published anchor points; the machine reference data has no cut speed model)`,
+            'Cutting Speed': `ESTIMATE: sm_lookup_waterjet_cut — ${grade || 'material'}, ${thk}mm sheet (reference tier, curve fitted to two published anchor points) x ${rcWaterjetSpeedFactor!.toFixed(3)} for ${mhrRates.waterjet.machineName} mixing tube ${rcWaterjetTubeMm} mm vs ${WATERJET_REFERENCE_MACHINE} ${rcWaterjetRefTubeMm} mm; the machine reference data has no cut-speed model`,
             'Cut Time Adjustment Factor': 'Sheet metal variable waterjetCutTimeAdjustmentFactor (acceleration and deceleration)',
             'Pierce Delay Per Start': `${mhrRates.waterjet.machineName} — nozzle_delay_s (machine library)`,
             'Lot Size': 'Batch Size entered on this process cost form',
