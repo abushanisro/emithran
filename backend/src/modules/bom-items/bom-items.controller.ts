@@ -41,6 +41,7 @@ import { LOCATION_INFO } from './costing/shared/core/default-rates.constants';
 import { ExchangeRateService, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
 import { deriveImplications } from '../process-plan-generator/dto/manufacturing-implication.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { PmiReviewService, type PmiReviewRequest } from './services/pmi-review.service';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
 import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
 import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
@@ -97,6 +98,7 @@ export class BOMItemsController {
     private readonly supabaseService: SupabaseService,
     private readonly exchangeRateService: ExchangeRateService,
     private readonly featureToleranceService: FeatureToleranceService,
+    private readonly pmiReviewService: PmiReviewService,
     private readonly materialResolutionService: MaterialResolutionService,
   ) {}
 
@@ -407,6 +409,25 @@ export class BOMItemsController {
     @AccessToken() token: string,
   ) {
     return this.featureToleranceService.setFeature(id, featureKey, values, token);
+  }
+
+  // ── Engineer review of PMI values decoded from drawn glyphs (migration 908) ──
+  @Get(':id/pmi-records')
+  @ApiOperation({ summary: 'The part PMI engineering records with their review state, and whether the caller may approve or reject' })
+  async getPmiRecords(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string) {
+    return this.pmiReviewService.get(id, user.id, token);
+  }
+
+  @Post(':id/pmi-records/review')
+  @ApiOperation({ summary: 'Approve or reject one decoded PMI record or a frame datum references (organization owners only; stale or ineligible records are refused)' })
+  async reviewPmiRecord(@Param('id') id: string, @Body() body: PmiReviewRequest, @CurrentUser() user: User, @AccessToken() token: string) {
+    return this.pmiReviewService.review(id, user.id, token, body);
+  }
+
+  @Get(':id/pmi-records/history')
+  @ApiOperation({ summary: 'Every decision taken on one PMI record, newest first' })
+  async getPmiRecordHistory(@Param('id') id: string, @Query('recordKey') recordKey: string, @AccessToken() token: string) {
+    return this.pmiReviewService.history(id, recordKey, token);
   }
 
   @Get(':id/machining-need')

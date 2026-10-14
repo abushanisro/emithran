@@ -11,6 +11,7 @@ import { centreGeometry } from '@/lib/geometry/centre-geometry';
 import { BodyEdges, SetupAxisArrows } from '@/components/viewer/body-overlays';
 import { DimensionOverlay, DimensionOverlayCtx } from '@/components/viewer/dimension-overlay';
 import { PmiPanel } from '@/components/viewer/pmi-panel';
+import type { PmiReviewProps } from '@/components/viewer/pmi-review-list';
 import { layoutPmi, type PmiDatumMark, type PmiFrame } from '@/lib/features/pmi-frames';
 import { buildPmiGraphicsBuffers } from '@/lib/features/pmi-graphics';
 import { buildDimensionAnnotations, visibleAnnotations, type AnnotationMode, type AnnotationSource } from '@/lib/features/dimension-annotations';
@@ -124,6 +125,8 @@ interface EDrawingsViewerProps {
   faceMap?: FaceMapEntry[] | null;
   /** The part's stored feature graph: diameter and radius callouts are built from it (needs faceMap). */
   annotationSource?: AnnotationSource | null;
+  /** Engineer review of decoded PMI values: records with their decisions, the caller's permission, and the action. */
+  pmiReview?: PmiReviewProps | null;
   /** Sheet thickness in mm — sizes HAZ ring (holes) and influence zone (bends) */
   sheetThickness?: number;
   /** Per-occurrence DFM risk scores — drives highlight color when provided */
@@ -3066,7 +3069,7 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
   selectedBOMItems, showOnlySelected = false, hoveredBOMItem, onPartsDetected, dfmAnalysisData,
   cameraPreset, onScreenshotReady,
   highlightOccurrences, selectedOccurrenceIndex = null,
-  faceMap, sheetThickness, annotationSource,
+  faceMap, sheetThickness, annotationSource, pmiReview,
   dfmOccurrenceScores,
   heatmapSources,
   heatmapNormalization = 'absolute',
@@ -3115,6 +3118,7 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
   // Diameter / radius callouts over the model (lib/features/dimension-annotations.ts).
   const [annotationMode, setAnnotationMode] = useState<AnnotationMode>('off');
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
+  const [reviewHighlightFaces, setReviewHighlightFaces] = useState<number[]>([]);
   const allAnnotations = useMemo(
     () => (faceMap?.length ? buildDimensionAnnotations(annotationSource) : []),
     [annotationSource, faceMap],
@@ -3141,7 +3145,8 @@ export const EDrawingsViewer = React.memo(function EDrawingsViewer({
     onSelect: setSelectedAnnotationId,
     ...(showsPmi ? { frames: pmiOnModel.frames, datums: pmiOnModel.datums } : {}),
     graphics: annotationMode === 'graphics' ? pmiGraphics : null,
-  }), [allAnnotations, annotationMode, faceMap, selectedAnnotationId, pmiOnModel, showsPmi, pmiGraphics]);
+    highlightFaces: reviewHighlightFaces,
+  }), [allAnnotations, annotationMode, faceMap, selectedAnnotationId, pmiOnModel, showsPmi, pmiGraphics, reviewHighlightFaces]);
   const annotationModes = useMemo<AnnotationMode[]>(
     () => ['off', 'all', 'diameter', 'radius', ...(hasPmi ? (['pmi'] as AnnotationMode[]) : []), ...(pmiGraphics ? (['graphics'] as AnnotationMode[]) : [])],
     [hasPmi, pmiGraphics],
@@ -3964,7 +3969,7 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
       <div className="flex-1 flex relative min-h-0 overflow-hidden">
         {/* 3D Viewport */}
         <div ref={canvasContainerRef} className="flex-1 relative bg-linear-to-b from-[#e6f0e7] to-[#b4d2b7]">
-          {showsPmi && <PmiPanel layout={pmiLayout} records={annotationSource?.pmi?.records} />}
+          {showsPmi && <PmiPanel layout={pmiLayout} records={annotationSource?.pmi?.records} review={pmiReview ?? undefined} onSelectRecord={setReviewHighlightFaces} />}
           {bomItemId && (
             // Popup rather than an inline overlay: Nest's own sheet-size
             // picker + custom inputs need real screen space (see

@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { apiClient } from '@/lib/api/client';
 import type { HeatmapSource, HeatmapNormalization } from '@/lib/heatmap/types';
 import type { AnnotationSource } from '@/lib/features/dimension-annotations';
+import type { PmiReviewProps } from '@/components/viewer/pmi-review-list';
 import { isWebGLAvailable } from '@/lib/utils/webgl';
 
 export type { HeatmapSource, HeatmapNormalization, HeatmapLayerType } from '@/lib/heatmap/types';
@@ -133,6 +134,8 @@ interface ModelViewerProps {
   faceMap?: FaceMapEntry[] | null;
   /** The part's stored feature graph, for the diameter / radius callouts (needs faceMap). */
   annotationSource?: AnnotationSource | null;
+  /** Engineer review of decoded PMI values (records, permission, action). */
+  pmiReview?: PmiReviewProps | null;
   sheetThickness?: number;
   dfmOccurrenceScores?: Array<{ occurrenceIndex: number; riskLevel: string }>;
   heatmapActive?: boolean;
@@ -193,6 +196,7 @@ export function ModelViewer({
   onOccurrenceSelect,
   faceMap,
   annotationSource,
+  pmiReview,
   sheetThickness,
   dfmOccurrenceScores,
   heatmapActive,
@@ -354,6 +358,7 @@ export function ModelViewer({
               {...(onOccurrenceSelect ? { onOccurrenceSelect } : {})}
               {...(faceMap !== undefined ? { faceMap } : {})}
               {...(annotationSource !== undefined ? { annotationSource } : {})}
+              {...(pmiReview ? { pmiReview } : {})}
               {...(sheetThickness !== undefined ? { sheetThickness } : {})}
               {...(dfmOccurrenceScores !== undefined ? { dfmOccurrenceScores } : {})}
               {...(heatmapActive !== undefined ? { heatmapActive } : {})}
@@ -516,6 +521,7 @@ export function ModelViewer({
               {...(onOccurrenceSelect ? { onOccurrenceSelect } : {})}
               {...(faceMap !== undefined ? { faceMap } : {})}
               {...(annotationSource !== undefined ? { annotationSource } : {})}
+              {...(pmiReview ? { pmiReview } : {})}
               {...(sheetThickness !== undefined ? { sheetThickness } : {})}
               {...(dfmOccurrenceScores !== undefined ? { dfmOccurrenceScores } : {})}
               {...(heatmapActive !== undefined ? { heatmapActive } : {})}

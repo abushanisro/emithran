@@ -32,6 +32,8 @@ export interface DimensionOverlayState {
   datums?: ReadonlyMap<string, readonly PmiDatumMark[]>;
   /** The STEP's own PMI graphics, drawn as authored ('PMI graphics' mode). */
   graphics?: PmiGraphicsBuffers | null;
+  /** Faces to highlight (the record the engineer is reviewing), independent of any callout. */
+  highlightFaces?: readonly number[];
 }
 
 export const DimensionOverlayCtx = React.createContext<DimensionOverlayState | null>(null);
@@ -141,11 +143,17 @@ export function DimensionOverlay({ geometry }: { geometry: THREE.BufferGeometry 
   );
   const highlight = useMemo(() => {
     const sel = placement?.placed.find((p) => p.annotation.id === state?.selectedId);
-    if (!sel) return null;
+    let triangles: Int32Array | null = sel?.triangles ?? null;
+    if (!triangles && state?.highlightFaces?.length) {
+      const positions = geometry.getAttribute('position').array as Float32Array;
+      const t = trianglesOfFaces(buildFaceIndex(state.faceMap, Math.floor(positions.length / 9)), state.highlightFaces);
+      triangles = t.length ? t : null;
+    }
+    if (!triangles) return null;
     const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(subsetPositions(geometry.getAttribute('position').array as Float32Array, sel.triangles), 3));
+    g.setAttribute('position', new THREE.BufferAttribute(subsetPositions(geometry.getAttribute('position').array as Float32Array, triangles), 3));
     return g;
-  }, [placement, state?.selectedId, geometry]);
+  }, [placement, state?.selectedId, state?.highlightFaces, state?.faceMap, geometry]);
   React.useEffect(() => () => { highlight?.dispose(); }, [highlight]);
 
   // Label positions after the screen-space separation; the placement's own positions until the camera settles.
@@ -189,7 +197,18 @@ export function DimensionOverlay({ geometry }: { geometry: THREE.BufferGeometry 
     setSpread({ source: placement, labels });
   });
 
-  if (state?.graphics && !placement) return <PmiGraphicsLayer buffers={state.graphics} />;
+  if (state && !placement && (state.graphics || highlight)) {
+    return (
+      <group>
+        {state.graphics && <PmiGraphicsLayer buffers={state.graphics} />}
+        {highlight && (
+          <mesh geometry={highlight} renderOrder={101} name="pmi-review-highlight">
+            <meshBasicMaterial color={TEAL_SELECTED} transparent opacity={0.9} depthTest={false} side={THREE.DoubleSide} />
+          </mesh>
+        )}
+      </group>
+    );
+  }
   if (!state || !placement) return null;
   const arrow = placement.diagonal * 0.02;
   const labelAt = (i: number, fallback: THREE.Vector3) => (spread?.source === placement ? spread.labels[i] ?? fallback : fallback);

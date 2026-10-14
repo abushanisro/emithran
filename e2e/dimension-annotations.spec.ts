@@ -116,9 +116,9 @@ test('PMI view: GD&T frames sit on the callouts the file names, the rest is list
   await expect(panel).toContainText('Width 15');
   // the typed records: the slot width is decoded from the drawing, with its limits, and flagged for review
   const review = page.getByTestId('pmi-review');
-  await expect(review).toContainText('Needs review');
-  await expect(review).toContainText('15 ±0.25 (14.75–15.25 mm)');
-  await expect(review).toContainText('decoded from drawing');
+  await expect(review).toContainText('Engineer review');
+  await expect(review).toContainText('Width2');
+  await expect(review.getByTestId('pmi-review-state').first()).toBeVisible();
   await expect(page.locator('[title^="PMI Width 15 ±0.25"]').first()).toBeVisible(); // the slot callout's own note
   // the panel can be folded away to uncover the model
   await page.getByTestId('pmi-panel-toggle').click();

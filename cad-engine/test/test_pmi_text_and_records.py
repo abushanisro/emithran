@@ -173,3 +173,48 @@ def test_every_record_names_its_original_annotation_and_every_tolerance_has_cons
             assert tol["min_mm"] == pytest.approx(r["nominal"]["value"] + tol["lower_mm"], abs=1e-6)
             assert tol["max_mm"] == pytest.approx(r["nominal"]["value"] + tol["upper_mm"], abs=1e-6)
             assert tol["min_mm"] < tol["max_mm"]
+
+
+# ── fingerprints: what an approval is bound to ───────────────────────────────
+
+from shared.pmi_records import datum_refs_fingerprint, record_fingerprint
+
+
+def test_every_record_has_a_stable_content_fingerprint():
+    a = build_pmi_records(copy.deepcopy(PMI), FEATURES)["records"]
+    b = build_pmi_records(copy.deepcopy(PMI), FEATURES)["records"]
+    assert [r["fingerprint"] for r in a] == [r["fingerprint"] for r in b]  # deterministic
+    assert all(len(r["fingerprint"]) == 64 for r in a)
+    assert len({r["fingerprint"] for r in a}) == len(a)  # distinct annotations never collide
+
+
+def test_the_fingerprint_changes_when_anything_an_approval_depends_on_changes():
+    rec = _records()["Width2@Width1(15)"]
+    base = record_fingerprint(rec)
+    for mutate in (
+        lambda r: r["nominal"].__setitem__("value", 15.5),
+        lambda r: r["tolerance"].__setitem__("upper_mm", 0.3),
+        lambda r: r["feature_ref"].__setitem__("face_ids", r["feature_ref"]["face_ids"] + [1]),
+        lambda r: r["provenance"]["decode"].__setitem__("text", "15.00 ±0.35"),
+        lambda r: r.__setitem__("source", "native_pmi"),
+    ):
+        changed = copy.deepcopy(rec)
+        mutate(changed)
+        assert record_fingerprint(changed) != base
+
+
+def test_the_fingerprint_ignores_things_that_are_not_content():
+    rec = _records()["Width2@Width1(15)"]
+    other = copy.deepcopy(rec)
+    other["validation"]["reasons"].append("an extra explanatory note")
+    other["id"] = "pmi:renamed"
+    assert record_fingerprint(other) == record_fingerprint(rec)
+
+
+def test_datum_references_are_a_separate_reviewable_claim_with_their_own_fingerprint():
+    rec = _records()["Position1@Hole Pattern2"]
+    assert rec["datum_refs_fingerprint"] == datum_refs_fingerprint(rec)
+    changed = copy.deepcopy(rec)
+    changed["datum_refs"] = ["A", "B"]
+    assert datum_refs_fingerprint(changed) != rec["datum_refs_fingerprint"]
+    assert "datum_refs_fingerprint" not in _records()["Width2@Width1(15)"]

@@ -776,6 +776,8 @@ async def analyze_geometry_advanced(
                     response["pmi"]["graphics"] = []
             # Typed engineering records: native PMI where the file has it, decoded graphics (always flagged,
             # never automation-ready) where it does not, unresolved otherwise. See shared/pmi_records.py.
+            # The STEP file the PMI was read from: an engineer's approval of a decoded value is bound to it.
+            response["pmi"]["source"] = {"file_sha256": file_hash}
             if response["pmi"].get("items"):
                 try:
                     from shared.pmi_records import build_pmi_records, engine_features  # type: ignore

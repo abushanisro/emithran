@@ -4,6 +4,8 @@ import React from 'react';
 import { formatDimension, formatTolValue } from '@/lib/features/dimension-annotations';
 import type { PmiLayout } from '@/lib/features/pmi-frames';
 import { describeRecord, recordsNeedingReview, STATUS_LABEL, type PmiRecordView } from '@/lib/features/pmi-records';
+import { PmiReviewList, type PmiReviewProps } from '@/components/viewer/pmi-review-list';
+import { reviewableRecords } from '@/lib/features/pmi-review-ui';
 
 /**
  * The PMI the STEP states but cannot place on the model: a tolerance or datum whose CAD feature
@@ -17,12 +19,19 @@ function callName(item: { label?: string | null | undefined; dimension_kind?: st
   return words || item.dimension_kind || 'value';
 }
 
-export function PmiPanel({ layout, records }: { layout: PmiLayout; records?: readonly PmiRecordView[] | undefined }) {
+export function PmiPanel({ layout, records, review, onSelectRecord }: {
+  layout: PmiLayout;
+  records?: readonly PmiRecordView[] | undefined;
+  /** The reviewable records with their decisions and the caller's permission (from the backend); when given, the engineer review list replaces the read-only one. */
+  review?: PmiReviewProps | undefined;
+  onSelectRecord?: ((faceIds: number[]) => void) | undefined;
+}) {
   const [collapsed, setCollapsed] = React.useState(false);
   const frames = layout.frames.filter((f) => f.annotationId === null);
   const datums = layout.datums.filter((d) => d.annotationId === null);
-  const review = recordsNeedingReview(records);
-  if (frames.length === 0 && datums.length === 0 && layout.labelOnly.length === 0 && review.length === 0) return null;
+  const readOnly = review ? [] : recordsNeedingReview(records);
+  const toReview = review ? reviewableRecords(review.records).filter((r) => r.reviewState !== 'approved' && r.reviewState !== 'verified' || r.datumRefsReviewState === 'awaiting_review' || r.datumRefsReviewState === 'stale').length : readOnly.length;
+  if (frames.length === 0 && datums.length === 0 && layout.labelOnly.length === 0 && readOnly.length === 0 && !(review && reviewableRecords(review.records).length)) return null;
   const row: React.CSSProperties = { display: 'flex', gap: 6, alignItems: 'baseline', lineHeight: '16px' };
   return (
     <div
@@ -38,7 +47,7 @@ export function PmiPanel({ layout, records }: { layout: PmiLayout; records?: rea
         title={collapsed ? 'Show the PMI list' : 'Hide the PMI list'}
         style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, display: 'block', width: '100%' }}
       >
-        {collapsed ? '▸' : '▾'} PMI in the file, not tied to a face{review.length ? ` · ${review.length} to review` : ''}
+        {collapsed ? '▸' : '▾'} PMI in the file, not tied to a face{toReview ? ` · ${toReview} to review` : ''}
       </button>
       {!collapsed && <div style={{ marginTop: 2 }}>
       {frames.map((f) => (
@@ -58,10 +67,11 @@ export function PmiPanel({ layout, records }: { layout: PmiLayout; records?: rea
           <span style={{ opacity: 0.8 }}>label only: any tolerance is in the PMI graphics</span>
         </div>
       ))}
-      {review.length > 0 && (
+      {review && <PmiReviewList review={review} onSelectRecord={onSelectRecord ?? (() => undefined)} />}
+      {readOnly.length > 0 && (
         <div data-testid="pmi-review" style={{ marginTop: 4, borderTop: '1px solid #2dd4bf', paddingTop: 3 }}>
           <div style={{ fontWeight: 700 }}>Needs review: not verified native PMI</div>
-          {review.map((r) => (
+          {readOnly.map((r) => (
             <div key={r.annotation_ref} style={{ ...row, flexWrap: 'wrap' }} title={(r.validation.reasons ?? []).join(' · ')}>
               <span>{r.annotation_ref.split('@')[0]}</span>
               <span style={{ fontWeight: 700 }}>{describeRecord(r)}</span>
