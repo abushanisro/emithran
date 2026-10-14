@@ -7,6 +7,7 @@ import { OrbitControls, PerspectiveCamera, Grid, Center, Html } from '@react-thr
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import * as THREE from 'three';
 import { fitCameraToBox } from '@/lib/geometry/camera-fit';
+import { centreGeometry } from '@/lib/geometry/centre-geometry';
 import { BodyEdges, SetupAxisArrows } from '@/components/viewer/body-overlays';
 import { DimensionOverlay, DimensionOverlayCtx } from '@/components/viewer/dimension-overlay';
 import { buildDimensionAnnotations, visibleAnnotations, type AnnotationMode, type AnnotationSource } from '@/lib/features/dimension-annotations';
@@ -2192,6 +2193,13 @@ function STLModel({
         return;
       }
     }
+
+    // Centre BEFORE the geometry is published. Everything built from it (the blue body
+    // edges, face highlights, dimension callouts, exploded parts) is computed from the
+    // vertices as they are at that moment; centring later (the measurements effect used to
+    // be the first to do it) moved the mesh and left those overlays at the file's original
+    // coordinates, off the model by the part's distance from the origin.
+    centreGeometry(loadedGeometry);
 
     setIsLoading(false);
     setLoadingProgress(100);

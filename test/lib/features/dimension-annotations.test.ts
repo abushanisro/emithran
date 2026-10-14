@@ -16,7 +16,9 @@ describe('dimension annotations from real stored parts', () => {
     const physical = new Set(raw.map((f) => `${f.params.diameter_mm}@${f.params.centroid.map((c: number) => c.toFixed(1)).join(',')}`));
     const holes = buildDimensionAnnotations(steppedDups as any).filter((a) => a.featureType === 'SimpleHole');
     expect(raw.length).toBeGreaterThan(physical.size); // the engine really did report duplicates
-    expect(holes).toHaveLength(physical.size);
+    // physical holes = the features the callouts stand for ("5x" counts five)
+    expect(holes.reduce((n, a) => n + a.count, 0)).toBe(physical.size);
+    for (const a of holes) expect(a.instances).toHaveLength(a.count);
   });
 
   it('no two callouts of one kind and size share a face', () => {
@@ -58,11 +60,15 @@ describe('dimension annotations from real stored parts', () => {
     const list = buildDimensionAnnotations(sheetMetal as any);
     const holes = (sheetMetal.feature_graph_v2.features as any[]).filter((f) => f.feature_type === 'SimpleHole');
     const holeCount = holes.reduce((n, f) => n + f.occurrences.length, 0);
-    expect(list.filter((a) => a.kind === 'diameter')).toHaveLength(holeCount);
+    const count = (kind: string) => list.filter((a) => a.kind === kind).reduce((n, a) => n + a.count, 0);
+    expect(count('diameter')).toBe(holeCount); // 10 holes
     const bends = (sheetMetal.feature_graph_v2.features as any[]).filter((f) => f.feature_type === 'StraightBend');
-    expect(list.filter((a) => a.kind === 'radius')).toHaveLength(bends.reduce((n, f) => n + f.occurrences.length, 0));
-    expect(list.filter((a) => a.kind === 'radius').every((a) => a.label === 'R0.5')).toBe(true);
-    expect(list.map((a) => a.label)).toContain('Ø4.8');
+    expect(count('radius')).toBe(bends.reduce((n, f) => n + f.occurrences.length, 0)); // 5 bends
+    // identical features share one callout, as a drawing writes it
+    expect(list.map((a) => a.label).sort()).toEqual(['2× Ø3', '2× Ø3.5', '5× R0.5', '5× Ø4.8', 'Ø1.6'].sort());
+    const fives = list.find((a) => a.label === '5× Ø4.8')!;
+    expect(fives.instances).toHaveLength(5);
+    expect(fives.faceIds).toEqual([...new Set(fives.instances.flat())].sort((a, b) => a - b));
   });
 });
 
@@ -95,12 +101,21 @@ describe('dimension annotation rules', () => {
     expect(list[0]!.faceIds).toEqual([1, 2, 3]);
   });
 
-  it('two holes of the same size at different positions stay two callouts', () => {
+  it('two holes of the same size at different positions are two features under one grouped callout', () => {
     const list = buildDimensionAnnotations(src(
       feat('SimpleHole', 'through', { diameter_mm: 6, centroid: [0, 0, 0] }, [1]),
       feat('SimpleHole', 'through', { diameter_mm: 6, centroid: [20, 0, 0] }, [2]),
     ));
-    expect(list).toHaveLength(2);
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ label: '2× Ø6', count: 2, instances: [[1], [2]], faceIds: [1, 2] });
+  });
+
+  it('different sizes never share a callout', () => {
+    const list = buildDimensionAnnotations(src(
+      feat('SimpleHole', 'through', { diameter_mm: 6, centroid: [0, 0, 0] }, [1]),
+      feat('SimpleHole', 'through', { diameter_mm: 8, centroid: [20, 0, 0] }, [2]),
+    ));
+    expect(list.map((a) => a.label).sort()).toEqual(['Ø6', 'Ø8']);
   });
 
   it('formats without trailing zeros and the mode filter splits diameter from radius', () => {
