@@ -96,6 +96,16 @@ export interface SecondaryProcessResult {
   featureIds: string[];
   trace: SecondaryTraceStep[];
   warnings: string[];
+  /** The database calculator that computed this line, with the inputs it ran on (for the cost dialog). */
+  calculator?: SecondaryCalculatorRun;
+}
+
+export interface SecondaryCalculatorRun {
+  calculatorId: string;
+  name: string;
+  version: number;
+  inputs: Record<string, number>;
+  provenance: Record<string, string>;
 }
 
 export const SECONDARY_PROCESSES: ReadonlyArray<{ process: string; machineClass: string }> = [
@@ -214,6 +224,7 @@ export interface Timing {
   warnings?: string[];
   highlight: SecondaryProcessResult['highlight'];
   featureIds?: string[];
+  calculator?: SecondaryCalculatorRun;
 }
 
 export function costed(
@@ -273,6 +284,7 @@ export function costed(
     featureIds: t.featureIds ?? [],
     trace,
     warnings,
+    ...(t.calculator ? { calculator: t.calculator } : {}),
   };
 }
 

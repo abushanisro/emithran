@@ -4,6 +4,7 @@ import { ExchangeRateService } from '../../../common/exchange-rate/exchange-rate
 import { isMachiningFamily } from '../../../domain/part-family';
 import { getCurrencyForLocation } from '../../mhr/constants/mhr-calculation.constants';
 import { MaterialResolutionService } from './material-resolution.service';
+import { CalculatorCatalogService } from './calculator-catalog.service';
 import {
   SECONDARY_PROCESSES,
   SECONDARY_SOURCE_VERSION,
@@ -67,6 +68,7 @@ export class SecondaryProcessService {
     private readonly supabase: SupabaseService,
     private readonly exchangeRates: ExchangeRateService,
     private readonly materials: MaterialResolutionService,
+    private readonly calculatorCatalog: CalculatorCatalogService,
   ) {}
 
   /** Variables, lookup tables and default machines of one staged folder
@@ -252,7 +254,7 @@ export class SecondaryProcessService {
     const results = ref ? computeSecondaryProcesses(part, ref, machines) : unstaged(SECONDARY_PROCESSES, '817');
     const surfaceResults = surfaceRef ? computeSurfaceTreatments(part, surfaceRef, surfaceMachines) : unstaged(SURFACE_PROCESSES, '819');
     const heatFacts = { ...part, caseDepthMm: caseDepthFromCallout(item.heatTreatment), volumeMm3: num(item.volume) };
-    const heatResults = heatRef ? computeHeatTreatments(heatFacts, heatRef, heatMachines) : unstaged(HEAT_TREATMENT_PROCESSES, '823');
+    const heatResults = heatRef ? computeHeatTreatments(heatFacts, heatRef, heatMachines, await this.calculatorCatalog.loadHeatTreatmentCalculators(accessToken)) : unstaged(HEAT_TREATMENT_PROCESSES, '823');
 
     const chemCallout = chemicalMillingCallout(item.drawingIntelligence);
     let chemResults: SecondaryProcessResult[];
