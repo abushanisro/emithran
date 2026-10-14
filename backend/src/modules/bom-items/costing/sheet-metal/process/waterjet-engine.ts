@@ -73,10 +73,26 @@ interface WaterjetResult {
   warnings: string[];
 }
 
+// The machine whose mixing tube the sm_lookup_waterjet_cut reference tier is taken to describe: a
+// 50 HP, 60,000 psi Flow pump, the tier migration 398 states for that table.
+export const WATERJET_REFERENCE_MACHINE = 'Flow Mach 2 1313b';
+
+/**
+ * Cut-speed factor of a machine against the reference tier: its focusing tube diameter over the
+ * reference machine. The revised abrasive waterjet model (Hlavac et al., Materials 2021,
+ * PMC8303882, eq. 28) scales the traverse speed limit with the focusing tube diameter. An
+ * estimate, shown as such on the line; null when either tube is not on file.
+ */
+export function waterjetSpeedFactor(machineTubeMm: number | null, referenceTubeMm: number | null): number | null {
+  if (machineTubeMm == null || referenceTubeMm == null || machineTubeMm <= 0 || referenceTubeMm <= 0) return null;
+  return machineTubeMm / referenceTubeMm;
+}
+
 /** Why the waterjet calculator cannot be seeded, or null when every input is on file. */
 export function waterjetMissingInputs(input: {
   machineName: string | null | undefined;
   hasCuttingSpeed: boolean;
+  speedFactor: number | null;
   nozzleDelaySec: number | null;
   leadInMm: number | null;
   adjustmentFactor: number | null;
@@ -86,6 +102,7 @@ export function waterjetMissingInputs(input: {
   }
   if (input.nozzleDelaySec == null) return `${input.machineName} has no nozzle_delay_s on file (machine library)`;
   if (!input.hasCuttingSpeed) return 'no sm_lookup_waterjet_cut cutting speed for this material and thickness';
+  if (input.speedFactor == null) return `${input.machineName} or the reference machine ${WATERJET_REFERENCE_MACHINE} has no mixing_tube_diameter_mm on file (machine library)`;
   if (input.leadInMm == null) return 'variable standardWaterjetCutLeadInAmount is not staged';
   if (input.adjustmentFactor == null) return 'variable waterjetCutTimeAdjustmentFactor is not staged';
   return null;

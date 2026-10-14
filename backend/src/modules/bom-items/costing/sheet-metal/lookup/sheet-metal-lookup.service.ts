@@ -1504,6 +1504,19 @@ export class SheetMetalLookupService {
     return typeof delay === 'number' && Number.isFinite(delay) && delay > 0 ? delay : null;
   }
 
+  // Focusing (mixing) tube diameter of the named waterjet, from the machine library.
+  // The cut speed scales with it (waterjetSpeedFactor).
+  async getWaterjetMixingTubeMm(machineName: string | null | undefined): Promise<number | null> {
+    if (!machineName?.trim()) return null;
+    const { data, error } = await this.machineReferenceRowsNamed(machineName);
+    if (error || !data) return null;
+    const nameLower = machineName.trim().toLowerCase();
+    const matches = data.filter((r: any) =>
+      String(r.raw?.name ?? '').trim().toLowerCase() === nameLower && typeof r.raw?.mixing_tube_diameter_mm === 'number');
+    const tube = matches.length === 1 ? matches[0].raw?.mixing_tube_diameter_mm : null;
+    return typeof tube === 'number' && Number.isFinite(tube) && tube > 0 ? tube : null;
+  }
+
   // ── Roll Bending (3/4-Roll) real per-machine cycle time ────────────────────
   // machine_library.json (staged into sm_reference_data, category='machine')
   // carries real per-machine roll-bending physics for every "3 Roll Bender"/

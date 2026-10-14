@@ -1,4 +1,4 @@
-import { computeWaterjetCost, waterjetMissingInputs, type WaterjetInput } from '../../../../../../modules/bom-items/costing/sheet-metal/process/waterjet-engine';
+import { computeWaterjetCost, waterjetMissingInputs, waterjetSpeedFactor, type WaterjetInput } from '../../../../../../modules/bom-items/costing/sheet-metal/process/waterjet-engine';
 
 // Cycle time is the waterjet calculator result (migration 905; the formula is checked in
 // test/migrations/905-waterjet-calculator.spec.ts). The engine prices that time, or reports why
@@ -51,7 +51,7 @@ describe('computeWaterjetCost — no calculator time is a data gap, not a $0 ope
 });
 
 describe('waterjetMissingInputs — why the calculator could not be seeded', () => {
-  const full = { machineName: 'Flow Mach 2 1313b', hasCuttingSpeed: true, nozzleDelaySec: 4, leadInMm: 5, adjustmentFactor: 1.4 };
+  const full = { machineName: 'Flow Mach 2 1313b', hasCuttingSpeed: true, speedFactor: 1, nozzleDelaySec: 4, leadInMm: 5, adjustmentFactor: 1.4 };
 
   it('says no machine was selected, not that data is missing', () => {
     expect(waterjetMissingInputs({ ...full, machineName: null })).toContain('no waterjet machine could be selected');
@@ -60,6 +60,7 @@ describe('waterjetMissingInputs — why the calculator could not be seeded', () 
   it('names the machine or the table that is missing', () => {
     expect(waterjetMissingInputs({ ...full, nozzleDelaySec: null })).toContain('Flow Mach 2 1313b has no nozzle_delay_s');
     expect(waterjetMissingInputs({ ...full, hasCuttingSpeed: false })).toContain('sm_lookup_waterjet_cut');
+    expect(waterjetMissingInputs({ ...full, speedFactor: null })).toContain('mixing_tube_diameter_mm');
     expect(waterjetMissingInputs({ ...full, leadInMm: null })).toContain('standardWaterjetCutLeadInAmount');
     expect(waterjetMissingInputs({ ...full, adjustmentFactor: null })).toContain('waterjetCutTimeAdjustmentFactor');
   });
@@ -112,5 +113,19 @@ describe('computeWaterjetCost — nozzle-wear cost (closeout Plan Phase 2b)', ()
 
     expect(result.processLines.some((l) => l.process === 'Nozzle Wear')).toBe(false);
     expect(result.warnings.some((w) => w.includes('no nozzle-wear rate seeded'))).toBe(true);
+  });
+});
+
+describe('waterjetSpeedFactor — cut speed of a machine against the reference tier', () => {
+  // Mixing tubes from the machine library: Flow Mach 2 1313b 1.061 mm (the reference), OMAX 55100 0.762 mm.
+  it('is the focusing tube diameter over the reference machine tube', () => {
+    expect(waterjetSpeedFactor(1.061, 1.061)).toBe(1);
+    expect(waterjetSpeedFactor(0.762, 1.061)).toBeCloseTo(0.718, 3);
+    expect(waterjetSpeedFactor(1.016, 1.061)).toBeCloseTo(0.9576, 3);
+  });
+
+  it('is null, never 1, when either tube is not on file', () => {
+    expect(waterjetSpeedFactor(null, 1.061)).toBeNull();
+    expect(waterjetSpeedFactor(0.762, null)).toBeNull();
   });
 });
