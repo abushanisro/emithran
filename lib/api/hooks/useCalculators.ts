@@ -40,6 +40,9 @@ export const calculatorKeys = {
 // CALCULATOR QUERIES
 // ========================================
 
+/** The calculator list the Edit Process Cost dialog picks from: rows only, no fields or formulas. */
+export const PROCESS_DIALOG_CALCULATOR_QUERY: CalculatorQuery = { limit: 100, summary: true };
+
 export function useCalculators(query?: CalculatorQuery, options?: { enabled?: boolean }) {
   const { user, loading: authLoading } = useAuth();
 

@@ -50,12 +50,15 @@ export function useMHRRecords(query?: MHRQuery, options?: { enabled?: boolean })
   });
 }
 
+/** How long a read machine list is reused (the page prefetches it with the same value). */
+export const MHR_PICKER_STALE_MS = 1000 * 60 * 10;
+
 /** Slim machine rows for the process dialog's pickers (see mhrApi.getPickerRows). */
 export function useMHRPickerRows(location?: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: mhrKeys.picker(location),
     queryFn: () => mhrApi.getPickerRows(location),
-    staleTime: 1000 * 60 * 10,
+    staleTime: MHR_PICKER_STALE_MS,
     enabled: options?.enabled !== false,
     retry: false,
     refetchOnWindowFocus: false,

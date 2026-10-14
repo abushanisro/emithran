@@ -409,6 +409,10 @@ export class QueryCalculatorDto {
   @Max(200)
   @Type(() => Number)
   limit?: number;
+
+  @ApiPropertyOptional({ description: 'Calculators only, without their fields and formulas (a list to pick from, a fraction of the size)' })
+  @IsOptionalBoolean()
+  summary?: boolean;
 }
 
 /**

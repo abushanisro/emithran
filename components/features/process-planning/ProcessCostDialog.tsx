@@ -32,7 +32,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import type { CalculatorField } from '@/lib/api/calculators';
 import { calculatorsApi } from '@/lib/api/calculators';
 import { apiClient } from '@/lib/api/client';
-import { useCalculators, useCalculator, useExecuteCalculator } from '@/lib/api/hooks/useCalculators';
+import { PROCESS_DIALOG_CALCULATOR_QUERY, useCalculators, useCalculator, useExecuteCalculator } from '@/lib/api/hooks/useCalculators';
 import { useMHRPickerRows, useMHRRecord } from '@/lib/api/hooks/useMHR';
 import { keepsSavedOperation, resolveLineIdentity } from '@/lib/processCatalog/line-identity';
 import {
@@ -508,7 +508,7 @@ export function ProcessCostDialog({
   // auto-selected (or any older) calculator has no matching <SelectItem> to
   // render a label for (it still works — fields populate via the direct
   // by-id useCalculator fetch below — but LOOKS unselected in the UI).
-  const { data: calculatorsData, isLoading: isLoadingCalculators, error: calculatorsError } = useCalculators({ limit: 100 }, { enabled: open });
+  const { data: calculatorsData, isLoading: isLoadingCalculators, error: calculatorsError } = useCalculators(PROCESS_DIALOG_CALCULATOR_QUERY, { enabled: open });
   const { data: selectedCalculator } = useCalculator(selectedCalculatorId, { enabled: !!selectedCalculatorId });
   const selectedCalculatorIdRef = useRef(selectedCalculatorId);
   useEffect(() => { selectedCalculatorIdRef.current = selectedCalculatorId; }, [selectedCalculatorId]);

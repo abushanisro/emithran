@@ -59,8 +59,12 @@ export class CalculatorsServiceV2 {
     // second, driftable source of truth for the same rule.
     let queryBuilder = client
       .from('calculators')
+      // A picker needs the calculator rows only: with their fields and formulas the list of 77 was
+      // 634 KB and over a second, for a list whose consumers read id, name and category.
       .select(
-        `
+        query.summary
+          ? '*'
+          : `
         *,
         fields:calculator_fields(*),
         formulas:calculator_formulas(*)

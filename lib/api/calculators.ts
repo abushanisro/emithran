@@ -207,6 +207,8 @@ export type CalculatorQuery = {
   isPublic?: boolean;
   page?: number;
   limit?: number;
+  /** Calculators without their fields and formulas: for a list to pick from. */
+  summary?: boolean;
 };
 
 export type ExecutionQuery = {
@@ -270,6 +272,7 @@ export const calculatorsApi = {
     if (query?.isPublic !== undefined) params.append('isPublic', query.isPublic.toString());
     if (query?.page) params.append('page', query.page.toString());
     if (query?.limit) params.append('limit', query.limit.toString());
+    if (query?.summary) params.append('summary', 'true');
 
     const queryString = params.toString();
     return apiClient.get<CalculatorListResponse>(
