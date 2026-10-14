@@ -18,6 +18,23 @@
  */
 
 export type AnnotationKind = 'diameter' | 'radius';
+
+export interface DimensionTolerance {
+  lowerMm: number;
+  upperMm: number;
+  /** The CAD's own label of the PMI dimension, e.g. "Radius1@Cylinder2(45.75)". */
+  callout: string | null;
+}
+
+/** One dimension from the STEP's PMI (cad-engine shared/step_pmi_dimensions.py). */
+export interface PmiDimension {
+  callout?: string | null | undefined;
+  kind?: string | undefined;
+  nominal_mm?: number | undefined;
+  lower_mm?: number | null | undefined;
+  upper_mm?: number | null | undefined;
+  basic?: boolean | undefined;
+}
 export type AnnotationMode = 'off' | 'diameter' | 'radius' | 'all';
 
 export interface DimensionAnnotation {
@@ -34,6 +51,8 @@ export interface DimensionAnnotation {
   count: number;
   /** The faces of each feature, in order; the callout is drawn on the first. */
   instances: number[][];
+  /** The +/- tolerance the STEP's PMI states for this size, or null (none stored, or not one-to-one). */
+  tolerance: DimensionTolerance | null;
   /** Engine feature type it came from (SimpleHole, MultiStepHole, Edge, Ring, StraightBend). */
   featureType: string;
 }
@@ -54,6 +73,7 @@ interface StoredV2Feature {
 export interface AnnotationSource {
   machining_features?: { features?: ReadonlyArray<StoredFeature> | undefined } | null | undefined;
   feature_graph_v2?: { features?: ReadonlyArray<StoredV2Feature> | undefined } | null | undefined;
+  pmi?: { dimensions?: ReadonlyArray<PmiDimension> | undefined } | null | undefined;
 }
 
 const SAME_SIZE_MM = 0.01;
@@ -169,17 +189,42 @@ export function buildDimensionAnnotations(source: AnnotationSource | null | unde
     const first = members[0]!;
     const faceIds = [...new Set(members.flatMap((m) => m.faceIds))].sort((a, b) => a - b);
     const label = labelOf(first);
+    const tolerance = members.length > 0 && !first.diameters ? toleranceFor(first.kind, first.valueMm, source?.pmi?.dimensions) : null;
     return {
       id: `${first.kind === 'diameter' ? 'd' : 'r'}${formatDimension(first.valueMm)}-f${String(first.faceIds[0])}`,
       kind: first.kind,
       valueMm: first.valueMm,
-      label: members.length > 1 ? `${members.length}× ${label}` : label,
+      label: `${members.length > 1 ? `${members.length}× ` : ''}${label}${tolerance ? ` ${formatTolerance(tolerance)}` : ''}`,
       faceIds,
       count: members.length,
       instances: members.map((m) => m.faceIds),
+      tolerance,
       featureType: first.featureType,
     };
   });
+}
+
+const SAME_NOMINAL_MM = 0.005;
+
+/**
+ * The tolerance the PMI states for a radius or diameter of this size. The STEP ties a dimension
+ * to its CAD feature by name only (its shape aspects carry no faces), so the match is by kind and
+ * nominal value, and only when it is one-to-one: two PMI dimensions of the same size are ambiguous,
+ * and a basic or tolerance-free dimension has nothing to show.
+ */
+export function toleranceFor(
+  kind: AnnotationKind, valueMm: number, dimensions: ReadonlyArray<PmiDimension> | undefined,
+): DimensionTolerance | null {
+  const same = (dimensions ?? []).filter((d) => d.kind === kind && d.nominal_mm != null && Math.abs(d.nominal_mm - valueMm) <= SAME_NOMINAL_MM);
+  const only = same.length === 1 ? same[0]! : null;
+  if (!only || only.basic || only.lower_mm == null || only.upper_mm == null) return null;
+  return { lowerMm: only.lower_mm, upperMm: only.upper_mm, callout: only.callout ?? null };
+}
+
+export function formatTolerance(t: DimensionTolerance): string {
+  if (Math.abs(t.upperMm + t.lowerMm) < 1e-9) return `±${formatDimension(t.upperMm)}`;
+  const sign = (v: number) => (v >= 0 ? '+' : '−');
+  return `${sign(t.upperMm)}${formatDimension(Math.abs(t.upperMm))}/${sign(t.lowerMm)}${formatDimension(Math.abs(t.lowerMm))}`;
 }
 
 function labelOf(c: Candidate): string {

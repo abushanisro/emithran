@@ -82,8 +82,12 @@ test('B-spline part: holes and the large radius are found, grouped, and the togg
   await expect(labels(page).first()).toBeVisible({ timeout: 30_000 });
   await page.waitForTimeout(1000);
   const texts = await labels(page).allTextContents();
-  expect(texts).toContain('R45.75');
-  expect(texts).toContain('Ø40.08');
+  // the STEP's own PMI tolerances, matched by size (its shape aspects carry no faces)
+  expect(texts).toContain('R45.75 ±0.15');
+  expect(texts).toContain('Ø40.08 ±0.1');
+  expect(texts).toContain('4× R4.75 ±0.15');
+  // the 15 mm slot ends (2x R7.5): the file stores no tolerance for the slot, so none is shown
+  expect(texts).toContain('2× R7.5');
   expect(texts.some((t) => /^\d+× R1\.5$/.test(t))).toBe(true); // the many R1.5 blends are one grouped callout
   expect(texts.length).toBeLessThan(40); // grouped: not one label per face
   await page.screenshot({ path: (process.env.SHOTS_DIR ?? 'test-results') + '/dimensions-bspline.png' });

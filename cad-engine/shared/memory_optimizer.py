@@ -158,7 +158,10 @@ class AdvancedCADMemoryOptimizer:
     """
     
     VERSION = "2.2.0"
-    CACHE_VERSION = "geo_v53"  # bumped 2026-10-14: (30) machining collect_cylinders recognises a cylinder
+    CACHE_VERSION = "geo_v54"  # bumped 2026-10-14: (31) pmi carries dimensions (+/- bounds), datums read from callout
+    # labels, and label-only callouts, read from the STEP text (shared/step_pmi_dimensions.py); each geometric
+    # callout carries the CAD's own `name`.
+    # Previous: geo_v53, 2026-10-14: (30) machining collect_cylinders recognises a cylinder
     # in a B-spline / revolution / extrusion face from its own curvature and axis (shared/bspline_cylinder.py).
     # A STEP that wrote every face, holes included, as a B-spline used to yield no holes and one CurvedSurface.
     # Previous: geo_v52, 2026-10-10: (29) sheet-metal feature_graph_v2.measurements carries the
