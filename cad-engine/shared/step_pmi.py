@@ -210,8 +210,27 @@ def read_step_gdt(step_path: str) -> Dict[str, Any]:
      "unresolved": [str, ...]}   # tolerances found but not convertible, named
     """
     with open(step_path, "rb") as fh:
-        if not _TOLERANCE_ENTITY.search(fh.read()):
-            return {"status": "no_tolerance_entities", "gdt_callouts": [], "unresolved": []}
+        raw = fh.read()
+    if not _TOLERANCE_ENTITY.search(raw) and b"DIMENSIONAL_SIZE" not in raw:
+        return {"status": "no_tolerance_entities", "gdt_callouts": [], "unresolved": []}
+    result = _read_step_gdt_entities(step_path, raw)
+    try:
+        from shared.step_pmi_dimensions import read_step_dimensions
+        extra = read_step_dimensions(raw.decode("latin-1"))
+        result["dimensions"] = extra["dimensions"]
+        result["datums"] = extra["datums"]
+        result["presentation_only"] = extra["presentation_only"]
+        result["unresolved"] = list(result.get("unresolved", [])) + extra["unresolved"]
+    except Exception as exc:  # disclosed, never guessed
+        logger.warning(f"[step_pmi] dimension read failed: {exc}")
+        result["unresolved"] = list(result.get("unresolved", [])) + [f"dimensions: {exc}"]
+    return result
+
+
+def _read_step_gdt_entities(step_path: str, raw: bytes) -> Dict[str, Any]:
+    """Geometric tolerances through the STEP entity model (the original read_step_gdt body)."""
+    if not _TOLERANCE_ENTITY.search(raw):
+        return {"status": "read", "gdt_callouts": [], "unresolved": []}
 
     try:
         from OCC.Core.IFSelect import IFSelect_RetDone
@@ -244,7 +263,11 @@ def read_step_gdt(step_path: str) -> Dict[str, Any]:
             except Exception as exc:
                 logger.warning(f"[step_pmi] #{i} {symbol}: face resolution failed: {exc}")
                 face_ids = []
-            callouts.append({"type": symbol, "tolerance": round(magnitude_mm, 6), "face_ids": face_ids})
+            callouts.append({
+                "type": symbol, "tolerance": round(magnitude_mm, 6), "face_ids": face_ids,
+                # the CAD's own label, e.g. 'Position2@Simple Hole8': what the tolerance was attached to
+                "name": tol.Name().ToCString() if tol.Name() is not None else None,
+            })
         return {"status": "read", "gdt_callouts": callouts, "unresolved": unresolved}
     except Exception as exc:  # disclosed, never guessed
         logger.warning(f"[step_pmi] GD&T read failed: {exc}")

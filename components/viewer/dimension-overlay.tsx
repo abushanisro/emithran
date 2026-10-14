@@ -153,7 +153,7 @@ export function DimensionOverlay({ geometry }: { geometry: THREE.BufferGeometry 
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); state.onSelect(selected ? null : annotation.id); }}
-                title={`${annotation.featureType}: ${annotation.label}`}
+                title={`${annotation.featureType}: ${annotation.label}${annotation.tolerance ? ` (tolerance from STEP PMI${annotation.tolerance.callout ? `: ${annotation.tolerance.callout}` : ''}, matched by size)` : ''}`}
                 style={{
                   color, background: 'rgba(15,23,42,0.55)', border: `1px solid ${color}`, borderRadius: 3,
                   padding: '0 4px', font: '600 12px/16px ui-monospace, SFMono-Regular, Menlo, monospace',

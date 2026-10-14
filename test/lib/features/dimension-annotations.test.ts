@@ -128,3 +128,68 @@ describe('dimension annotation rules', () => {
     expect(visibleAnnotations(list, 'all')).toHaveLength(list.length);
   });
 });
+
+// The PMI of RMP-00015, as the engine reads it (cad-engine shared/step_pmi_dimensions.py).
+const pmi = {
+  dimensions: [
+    { callout: 'Radius8@Cylinder Pattern1(4.75)', kind: 'radius', nominal_mm: 4.75, lower_mm: -0.15, upper_mm: 0.15, basic: false },
+    { callout: 'Diameter5@Simple Hole7(40.08)', kind: 'diameter', nominal_mm: 40.08, lower_mm: -0.1, upper_mm: 0.1, basic: false },
+    { callout: 'Diameter3@Simple Hole1(26.5)', kind: 'diameter', nominal_mm: 26.5, lower_mm: -0.25, upper_mm: 0.25, basic: false },
+    { callout: 'Radius1@Cylinder2(45.75)', kind: 'radius', nominal_mm: 45.75, lower_mm: -0.15, upper_mm: 0.15, basic: false },
+    { callout: 'DistanceBetween1@Cylinder13(6)', kind: 'curve length', nominal_mm: 6, lower_mm: null, upper_mm: null, basic: true },
+  ],
+};
+
+describe('PMI tolerances on callouts', () => {
+  const feat = (type: string, variant: string, params: object, face_ids: number[]) => ({ type, variant, params, face_ids });
+  const build = (features: any[], p: any = pmi) => buildDimensionAnnotations({ machining_features: { features }, pmi: p } as any);
+
+  it('a radius and a diameter take the tolerance the STEP states for that size', () => {
+    const list = build([
+      feat('Edge', 'round', { radius_mm: 45.75, centroid: [0, 0, 0] }, [1]),
+      feat('SimpleHole', 'blind', { diameter_mm: 40.08, centroid: [9, 0, 0] }, [2]),
+    ]);
+    expect(list.map((a) => a.label).sort()).toEqual(['R45.75 ±0.15', 'Ø40.08 ±0.1']);
+    expect(list.find((a) => a.kind === 'radius')!.tolerance).toEqual({ lowerMm: -0.15, upperMm: 0.15, callout: 'Radius1@Cylinder2(45.75)' });
+  });
+
+  it('a grouped callout carries the tolerance once: "4x R4.75 +/-0.15"', () => {
+    const list = build([
+      feat('Edge', 'round', { radius_mm: 4.75, centroid: [0, 0, 0] }, [1]),
+      feat('Edge', 'round', { radius_mm: 4.75, centroid: [9, 0, 0] }, [2]),
+    ]);
+    expect(list[0]!.label).toBe('2× R4.75 ±0.15');
+  });
+
+  it('a size the PMI does not state gets no tolerance (never a general one)', () => {
+    const list = build([feat('SimpleHole', 'blind', { diameter_mm: 9.6, centroid: [0, 0, 0] }, [1])]);
+    expect(list[0]!.label).toBe('Ø9.6');
+    expect(list[0]!.tolerance).toBeNull();
+  });
+
+  it('a radius is never given a diameter tolerance of the same number, nor the reverse', () => {
+    const list = build([feat('Edge', 'round', { radius_mm: 26.5, centroid: [0, 0, 0] }, [1])]);
+    expect(list[0]!.tolerance).toBeNull();
+  });
+
+  it('two PMI dimensions of the same size are ambiguous: no tolerance is shown', () => {
+    const twice = { dimensions: [pmi.dimensions[3]!, { ...pmi.dimensions[3]!, callout: 'Radius9@Other(45.75)', lower_mm: -0.5, upper_mm: 0.5 }] };
+    const list = build([feat('Edge', 'round', { radius_mm: 45.75, centroid: [0, 0, 0] }, [1])], twice);
+    expect(list[0]!.tolerance).toBeNull();
+    expect(list[0]!.label).toBe('R45.75');
+  });
+
+  it('a basic dimension or one with no stored bounds has nothing to show', () => {
+    const basic = { dimensions: [{ kind: 'radius', nominal_mm: 6, lower_mm: null, upper_mm: null, basic: true }] };
+    expect(build([feat('Edge', 'round', { radius_mm: 6, centroid: [0, 0, 0] }, [1])], basic)[0]!.tolerance).toBeNull();
+  });
+
+  it('asymmetric bounds are written as +upper/-lower', () => {
+    const asym = { dimensions: [{ kind: 'diameter', nominal_mm: 8, lower_mm: -0.05, upper_mm: 0.2, basic: false }] };
+    expect(build([feat('SimpleHole', 'blind', { diameter_mm: 8, centroid: [0, 0, 0] }, [1])], asym)[0]!.label).toBe('Ø8 +0.2/−0.05');
+  });
+
+  it('a part with no PMI is unchanged', () => {
+    expect(build([feat('SimpleHole', 'blind', { diameter_mm: 8, centroid: [0, 0, 0] }, [1])], null)[0]!.label).toBe('Ø8');
+  });
+});
