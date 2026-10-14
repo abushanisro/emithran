@@ -573,8 +573,50 @@ class MachiningFeatureRecognizer:
         bore_idx = 0
         bore_id_to_cyl: Dict[str, Dict] = {}
 
+        # Two opposite half-turn arcs are the ends of one slot, not two separate rounds.
+        half_turns = [c for c in cylinders if c["kind"] in ("through_hole", "blind_hole", "cross_hole")
+                      and c.get("u_range", 2.0 * math.pi) < HOLE_MIN_SWEEP_RAD]
+        walls_of = None
+        if len(half_turns) >= 2:
+            from shared.face_topology import FaceTopology
+            topology = FaceTopology(shape)
+            walls_of = lambda cyl: topology.walls_of(list(cyl.get("face_indices", [])), cyl["axis"])  # noqa: E731
+        slot_ends = _pair_slot_ends(half_turns, walls_of)
+        slot_arc_ids = {id(a) for a, _b, _d in slot_ends} | {id(b) for _a, b, _d in slot_ends}
+        seen_slots: set = set()
+        slot_idx = -1
+        for a, b, distance in slot_ends:
+            r = (a["radius"] + b["radius"]) / 2
+            lo = max(a["axial_range"][0], b["axial_range"][0])
+            hi = min(a["axial_range"][1], b["axial_range"][1])
+            # The slot's centre: midway between the two end axes, at the middle of the shared depth.
+            ax = a["axis"]
+            mid = [(a["centroid"][k] + b["centroid"][k]) / 2 for k in range(3)]
+            along = sum(mid[k] * ax[k] for k in range(3))
+            shift = (lo + hi) / 2 - along
+            centre = [mid[k] + shift * ax[k] for k in range(3)]
+            slot_idx += 1
+            features.append(MachiningFeature(
+                id=f"slot_{slot_idx}",
+                type="Slot",
+                variant="straight",
+                params={
+                    "width_mm": round(2 * r, 3),
+                    "length_mm": round(distance + 2 * r, 3),
+                    "centre_distance_mm": round(distance, 3),
+                    "end_radius_mm": round(r, 3),
+                    "depth_mm": round(hi - lo, 3),
+                    # the obround's area: a rectangle between the ends plus the two half-discs
+                    "area_mm2": round(2 * r * distance + math.pi * r * r, 3),
+                    "centroid": [round(c, 3) for c in centre],
+                },
+                confidence=0.75,
+                face_ids=sorted(set(a.get("face_indices", [])) | set(b.get("face_indices", []))),
+            ))
         round_idx = 0
         for cyl in cylinders:
+            if id(cyl) in slot_arc_ids:
+                continue
             # A bore wraps (almost) all the way round its axis. A cylinder face that sweeps
             # less is an arc of something else: an inside fillet, a slot end, a rounded
             # pocket corner (concave) or a rounded outside edge (convex). Its radius is real,
@@ -1103,6 +1145,59 @@ HOLE_MIN_SWEEP_RAD = 0.97 * 2.0 * math.pi
 MIN_ARC_RADIUS_MM = 0.5
 
 
+# Two concave half-turns are the ends of one slot when they are this close to 180 degrees.
+SLOT_END_SWEEP_TOL_RAD = 0.12
+
+
+def _axis_line_distance(a: Dict, b: Dict) -> float:
+    ax = a["axis"]
+    d = tuple(b["centroid"][i] - a["centroid"][i] for i in range(3))
+    cross = (d[1] * ax[2] - d[2] * ax[1], d[2] * ax[0] - d[0] * ax[2], d[0] * ax[1] - d[1] * ax[0])
+    return math.sqrt(sum(c * c for c in cross))
+
+
+def _pair_slot_ends(arcs: List[Dict], walls_of=None) -> List[Tuple[Dict, Dict, float]]:
+    """
+    Pairs of concave half-turn arcs that are the two ends of one slot: equal radius, parallel but
+    distinct axes, both ~180 degrees, sharing an axial extent (they cut the same depth), and joined
+    by the same two straight side walls (`walls_of(arc)`: flat faces next to the arc, parallel to its
+    axis). Each arc is used once, nearest partner first. (arc, arc, distance between the axes).
+    Evidence only: two lone half-turns elsewhere on a part do not pair, a quarter-round pocket corner
+    (90 degrees) never does, and without `walls_of` nothing pairs: arcs alone are not a slot.
+    """
+    if walls_of is None:
+        return []
+    candidates = [c for c in arcs
+                  if abs(c.get("u_range", 0.0) - math.pi) <= SLOT_END_SWEEP_TOL_RAD and c.get("axial_range") and c.get("axis")]
+    pairs: List[Tuple[float, int, int]] = []
+    for i in range(len(candidates)):
+        for j in range(i + 1, len(candidates)):
+            a, b = candidates[i], candidates[j]
+            if abs(a["radius"] - b["radius"]) > 0.02 + 0.002 * a["radius"]:
+                continue
+            if abs(sum(x * y for x, y in zip(a["axis"], b["axis"]))) < 0.9999:
+                continue
+            d = _axis_line_distance(a, b)
+            if d < 0.05:
+                continue  # the same axis: two halves of one bore, not two ends
+            lo = max(a["axial_range"][0], b["axial_range"][0])
+            hi = min(a["axial_range"][1], b["axial_range"][1])
+            shorter = min(a["axial_range"][1] - a["axial_range"][0], b["axial_range"][1] - b["axial_range"][0])
+            if hi - lo < 0.8 * shorter or shorter <= 0:
+                continue
+            if len(walls_of(a) & walls_of(b)) < 2:
+                continue  # not joined by two shared straight walls: two unrelated half-turns
+            pairs.append((d, i, j))
+    used: set = set()
+    out: List[Tuple[Dict, Dict, float]] = []
+    for d, i, j in sorted(pairs):
+        if i in used or j in used:
+            continue
+        used.update((i, j))
+        out.append((candidates[i], candidates[j], d))
+    return out
+
+
 def _same_axis_line(a: Dict, b: Dict) -> bool:
     """Patches of ONE cylinder lie on the same axis line. Arcs that only share a radius and a
     distance from the part axis (the four corners of a rounded pocket) are different features."""
@@ -1181,6 +1276,9 @@ def _deduplicate_cylinders(raw: List[Dict]) -> List[Dict]:
                 merged_face_indices.extend(c.get("face_indices", []))
             rep["face_indices"] = merged_face_indices
             rep["u_range"] = min(total_arc, ONE_CIRCLE)
+            ranges = [c["axial_range"] for c in group if c.get("axial_range")]
+            if ranges:
+                rep["axial_range"] = (min(r[0] for r in ranges), max(r[1] for r in ranges))
             result.append(rep)
         else:
             # Multiple separate holes sharing radius and position (e.g. PCD holes)
@@ -1539,7 +1637,9 @@ def build_machining_feature_graph_v2(
 
         elif shape == _VOLUMETRIC:
             dims = [p.get("depth_mm", 0) or 0, p.get("width_mm", 0) or 0, p.get("length_mm", 0) or 0]
-            entry = {**base, "material_removed_mm3": round(dims[2] * dims[1] * dims[0], 2)}
+            area = p.get("area_mm2")  # an obround slot states its own area; a rectangle is length x width
+            removed = (area * dims[0]) if area else dims[2] * dims[1] * dims[0]
+            entry = {**base, "material_removed_mm3": round(removed, 2)}
             if ftype == "Keyway":
                 for fld in _KEYWAY_DIM_FIELDS:
                     entry[fld] = p.get(fld)
