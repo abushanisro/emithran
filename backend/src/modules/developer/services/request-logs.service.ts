@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../../common/supabase/supabase.service';
 import type { QueryLogsDto, RequestLogDto, LogStatsDto } from '../dto/request-log.dto';
 
@@ -13,13 +13,19 @@ interface WriteLogPayload {
 
 @Injectable()
 export class RequestLogsService {
+  private readonly logger = new Logger(RequestLogsService.name);
+  private lastFailureLoggedAt = 0;
+
   constructor(private readonly supabase: SupabaseService) {}
 
+  /**
+   * Written by the backend with the service role: the table has a SELECT policy for the owner and no
+   * INSERT policy (migration 200), so a user-scoped client is always refused (42501). The row's user_id
+   * comes from the authenticated request, never from client input.
+   */
   async write(payload: WriteLogPayload): Promise<void> {
     try {
-      // Use admin client to bypass RLS for write path
-      const client = this.supabase.getUserClient();
-      await client.from('api_request_logs').insert({
+      const { error } = await this.supabase.getPrivilegedClient('system-write: api_request_logs has no user INSERT policy (migration 200)').from('api_request_logs').insert({
         user_id: payload.userId,
         method: payload.method,
         path: payload.path,
@@ -27,9 +33,18 @@ export class RequestLogsService {
         duration_ms: payload.durationMs,
         error_code: payload.errorCode ?? null,
       });
-    } catch {
-      // Fire-and-forget — never throw from logging
+      if (error) this.reportFailure(error.message);
+    } catch (e) {
+      this.reportFailure(e instanceof Error ? e.message : String(e));
     }
+  }
+
+  /** Logging must never break a request, but a failing log table must be visible: at most one warning a minute. */
+  private reportFailure(message: string): void {
+    const now = Date.now();
+    if (now - this.lastFailureLoggedAt < 60_000) return;
+    this.lastFailureLoggedAt = now;
+    this.logger.warn(`Request log write failed: ${message}`);
   }
 
   async findAll(userId: string, accessToken: string, query: QueryLogsDto): Promise<{ logs: RequestLogDto[]; total: number }> {
