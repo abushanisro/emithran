@@ -5,6 +5,7 @@ import { MachineDiscoveryService } from './machine-discovery.service';
 import { SecondaryProcessService } from './secondary-process.service';
 import { MACHINING_REFERENCE_SOURCE_VERSION } from '../costing/machining/lookup/machining-lookup-tables';
 import { resolveCostingInputs } from '../costing/shared/physics/costing-inputs';
+import { cachedRead } from '../costing/shared/core/request-cache';
 
 // One-time (non-recurring) investment for a part, from reference data only.
 //
@@ -76,15 +77,17 @@ export class NreService {
   /** A selected machine's reference record (accounting block), by its mhr row. */
   private async machineAccounting(mhrId: string, accessToken: string): Promise<{ key: string; accounting: Record<string, unknown> } | null> {
     const db = this.supabase.getClient(accessToken);
-    const { data: m } = await db.from('mhr_records').select('benchmark_source_key').eq('id', mhrId).maybeSingle();
+    const { data: m } = await cachedRead(`mhr:benchmark-key:${mhrId}`, async () =>
+      await db.from('mhr_records').select('benchmark_source_key').eq('id', mhrId).maybeSingle());
     const key = (m as any)?.benchmark_source_key as string | undefined;
     if (!key) return null;
-    const { data } = await this.supabase.getPrivilegedClient('reference-data: machining_reference_data, public-read')
-      .from('machining_reference_data')
-      .select('raw')
-      .eq('category', 'machine')
-      .eq('key', key)
-      .limit(1);
+    const { data } = await cachedRead(`machining-reference-machine:${key}`, async () =>
+      await this.supabase.getPrivilegedClient('reference-data: machining_reference_data, public-read')
+        .from('machining_reference_data')
+        .select('raw')
+        .eq('category', 'machine')
+        .eq('key', key)
+        .limit(1));
     const raw = (data?.[0] as any)?.raw;
     return raw ? { key, accounting: (raw.accounting ?? {}) as Record<string, unknown> } : null;
   }
