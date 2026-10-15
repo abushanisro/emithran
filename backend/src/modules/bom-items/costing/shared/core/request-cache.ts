@@ -69,3 +69,38 @@ export function cachedRead<T>(key: string, load: () => Promise<T>): Promise<T> {
   cache.set(key, pending);
   return pending;
 }
+
+/**
+ * Per-id reads for ONE request: each id is loaded at most once, and a caller that asks for a different
+ * set of ids (one route's machines, the next route's, overlapping) only pays for the ids not yet asked
+ * for, in a single batched call. Concurrent callers share the in-flight load of an id.
+ *
+ * Why not cachedRead with the id set as the key: route comparison attaches every route, and each route
+ * has a different set that mostly overlaps the others (measured on the live database: 14 reads of
+ * mhr_records id,specs in one second, every one repeating the same two machines), so the set never hits.
+ *
+ * Same scope and the same constraint as cachedRead: catalog-style reads the request does not write.
+ * A failed load is evicted for every id it covered and rethrown to every caller waiting on it.
+ */
+export async function cachedBatch<V>(
+  scope: string,
+  ids: readonly string[],
+  load: (missing: string[]) => Promise<Map<string, V>>,
+): Promise<Map<string, V>> {
+  const known = await cachedRead(`batch:${scope}`, async () => new Map<string, Promise<V | undefined>>());
+  const missing = [...new Set(ids)].filter((id) => !known.has(id));
+  if (missing.length > 0) {
+    const batch = load(missing);
+    for (const id of missing) {
+      const one = batch.then((m) => m.get(id));
+      one.catch(() => { if (known.get(id) === one) known.delete(id); });
+      known.set(id, one);
+    }
+  }
+  const out = new Map<string, V>();
+  await Promise.all([...new Set(ids)].map(async (id) => {
+    const v = await known.get(id);
+    if (v !== undefined) out.set(id, v);
+  }));
+  return out;
+}

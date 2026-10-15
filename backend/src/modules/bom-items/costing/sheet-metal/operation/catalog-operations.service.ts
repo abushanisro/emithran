@@ -3,7 +3,8 @@ import { SupabaseService } from '../../../../../common/supabase/supabase.service
 import { readAllRows, type RowPage } from '../../../../../common/supabase/read-all-rows';
 import { RateResolutionService } from '../../../services/rate-resolution.service';
 import { SheetMetalLookupService } from '../lookup/sheet-metal-lookup.service';
-import { cachedRead } from '../../shared/core/request-cache';
+import { cachedBatch, cachedRead } from '../../shared/core/request-cache';
+import { ReferenceMemo } from '../../../../../common/cache/reference-memo';
 import type { ProcessLineCost } from '../../../dto/cost-breakdown.dto';
 import { resolveCatalogOperations, type SheetMetalFeature } from './catalog-operation-resolver';
 
@@ -65,25 +66,14 @@ export class SheetMetalCatalogOperationsService {
     if (canonicalIds.length === 0) return [];
 
     const [catalog, kinds, variables] = await Promise.all([
-      cachedRead(`sm-catalog-operations:${canonicalIds.join(',')}`, () =>
-        readAllRows<{ canonical_process_id: string; raw_compound_string: string }>((from, to) =>
-          client.from('process_taxonomy_operations')
-            .select('canonical_process_id, raw_compound_string')
-            .in('canonical_process_id', canonicalIds)
-            .order('id')
-            .range(from, to) as unknown as PromiseLike<RowPage<{ canonical_process_id: string; raw_compound_string: string }>>)),
-      cachedRead('sm-operation-kinds', () => this.loadKinds(client)),
+      this.catalogRowsByProcess(client, canonicalIds),
+      this.loadKinds(),
       this.smLookup.getNumericVariables(['minPunchingThicknessFactor', 'turretMaxPercentNibbledPeriemter']),
     ]);
-    if (catalog.error) return [`Catalog operations not shown: process_taxonomy_operations could not be read (${catalog.error.message}).`];
+    if ('error' in catalog) return [`Catalog operations not shown: process_taxonomy_operations could not be read (${catalog.error}).`];
     if ('error' in kinds) return [`Catalog operations not shown: ${kinds.error} (migration 842).`];
 
-    const rawByProcess = new Map<string, string[]>();
-    for (const r of catalog.data) {
-      const list = rawByProcess.get(r.canonical_process_id) ?? [];
-      list.push(r.raw_compound_string);
-      rawByProcess.set(r.canonical_process_id, list);
-    }
+    const rawByProcess = catalog;
 
     const maxPunchByMachine = await this.maxPunchSizes(client, lines);
     const punchFactor = variables.get('minPunchingThicknessFactor');
@@ -111,9 +101,44 @@ export class SheetMetalCatalogOperationsService {
     return [];
   }
 
-  private async loadKinds(client: ReturnType<SupabaseService['getClient']>): Promise<
+  /**
+   * The catalog operation strings of each process, read once per process per request (a route comparison
+   * attaches every route and the routes share most processes). Organization-scoped under RLS, so it stays
+   * in the request-scoped cache, never in a cross-request one.
+   */
+  private async catalogRowsByProcess(
+    client: ReturnType<SupabaseService['getClient']>,
+    canonicalIds: readonly string[],
+  ): Promise<Map<string, string[]> | { error: string }> {
+    try {
+      const rows = await cachedBatch<string[]>('sm-catalog-operations', canonicalIds, async (missing) => {
+        const res = await readAllRows<{ canonical_process_id: string; raw_compound_string: string }>((from, to) =>
+          client.from('process_taxonomy_operations')
+            .select('canonical_process_id, raw_compound_string')
+            .in('canonical_process_id', missing)
+            .order('id')
+            .range(from, to) as unknown as PromiseLike<RowPage<{ canonical_process_id: string; raw_compound_string: string }>>);
+        if (res.error) throw new Error(res.error.message);
+        // a process with no catalog rows is a real answer too: remember it as empty, not as unasked
+        const byProcess = new Map<string, string[]>(missing.map((id) => [id, []]));
+        for (const r of res.data) byProcess.get(r.canonical_process_id)?.push(r.raw_compound_string);
+        return byProcess;
+      });
+      return rows;
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : String(e) };
+    }
+  }
+
+  /**
+   * Global reference tables (read policy USING (true), migration 842): the same rows for everyone, changed only
+   * by migration, so one short-lived copy serves every request. An error is never remembered.
+   */
+  @ReferenceMemo({ cacheable: (v) => !!v && !('error' in (v as object)) })
+  private async loadKinds(): Promise<
     { operationKinds: Map<string, string>; variantKinds: Map<string, Set<string>> } | { error: string }
   > {
+    const client = this.supabaseService.getPrivilegedClient('reference-data: sm_operation_kinds and sm_feature_variant_kinds, global shared (migration 842)');
     const [ops, variants] = await Promise.all([
       client.from('sm_operation_kinds').select('operation_category, kind'),
       client.from('sm_feature_variant_kinds').select('feature_type, variant, kind'),
@@ -142,14 +167,14 @@ export class SheetMetalCatalogOperationsService {
       .filter((id): id is string => !!id))].sort();
     const result = new Map<string, number>();
     if (ids.length === 0) return result;
-    // One request attaches every route, and most routes share their machines: one read per id set.
-    const rows = await cachedRead(`sm-max-punch-specs:${ids.join(',')}`, async () => {
-      const { data } = await client.from('mhr_records').select('id, specs').in('id', ids);
-      return data;
+    // One request attaches every route and the routes share most machines: each machine is read once.
+    const specs = await cachedBatch<Record<string, unknown> | null>('sm-max-punch-specs', ids, async (missing) => {
+      const { data } = await client.from('mhr_records').select('id, specs').in('id', missing);
+      return new Map(((data ?? []) as Array<{ id: string; specs: Record<string, unknown> | null }>).map((r) => [r.id, r.specs]));
     });
-    for (const row of (rows ?? []) as Array<{ id: string; specs: Record<string, unknown> | null }>) {
-      const v = Number(row.specs?.max_punch_size_mm);
-      if (Number.isFinite(v) && v > 0) result.set(row.id, v);
+    for (const [id, s] of specs) {
+      const v = Number(s?.max_punch_size_mm);
+      if (Number.isFinite(v) && v > 0) result.set(id, v);
     }
     return result;
   }
