@@ -262,7 +262,7 @@ export default function ProjectProductionPlanningPage() {
                     <p className="text-sm text-muted-foreground mb-4">
                       This project doesn't have any BOMs yet. Create a BOM first to start production planning.
                     </p>
-                    <Link href={`/projects/${projectId}/bom`}>
+                    <Link href={`/bom?projectId=${projectId}`}>
                       <Button>Manage BOMs</Button>
                     </Link>
                   </div>

@@ -9,6 +9,7 @@ import {
   calculatorMappingsForMachineClass,
   unambiguousMapping,
   optionsKeepingSelection,
+  filterHrRatesRows,
   selectionForMachineClass,
   buildHrRatesIndex,
 } from '@/lib/processCatalog/hr-rates-process-selection';
@@ -255,5 +256,35 @@ describe('identityMappings (the route and operation a line saves as)', () => {
   it('active rows win over deactivated duplicates', () => {
     const laser = { processRoute: 'Laser Cutting', operation: 'Laser Cut', isActive: true };
     expect(identityMappings([laser, { processRoute: 'Sheet Cutting', operation: 'Co2 Laser Cutting', isActive: false }])).toEqual([laser]);
+  });
+});
+
+describe('filterHrRatesRows', () => {
+  const rows = [
+    { machineName: 'Trumpf TruLaser 3030', machineDescription: 'Fiber laser', processGroup: 'Sheet Metal' },
+    { machineName: 'Amada HG 1003', processGroup: null, commodityCode: 'Sheet Metal' },
+    { machineName: 'Haas VF-2', machineDescription: 'Vertical mill', processGroup: 'Machining' },
+  ];
+
+  it('keeps the chosen process group, including rows that carry it only in commodity_code', () => {
+    expect(filterHrRatesRows(rows, 'Sheet Metal', '').map((r) => r.machineName)).toEqual([
+      'Trumpf TruLaser 3030',
+      'Amada HG 1003',
+    ]);
+  });
+
+  it('matches the search in the name or the description, ignoring case and surrounding spaces', () => {
+    expect(filterHrRatesRows(rows, '', '  trumpf ').map((r) => r.machineName)).toEqual(['Trumpf TruLaser 3030']);
+    expect(filterHrRatesRows(rows, '', 'VERTICAL').map((r) => r.machineName)).toEqual(['Haas VF-2']);
+  });
+
+  it('applies the group and the search together', () => {
+    expect(filterHrRatesRows(rows, 'Sheet Metal', 'haas')).toEqual([]);
+  });
+
+  it('returns every row when neither is set, without mutating the input', () => {
+    const result = filterHrRatesRows(rows, '', '');
+    expect(result).toEqual(rows);
+    expect(result).not.toBe(rows);
   });
 });

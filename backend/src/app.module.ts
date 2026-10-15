@@ -46,6 +46,7 @@ import { RequestLogInterceptor } from './modules/developer/interceptors/request-
 import { LoggerModule } from './common/logger/logger.module';
 import { SupabaseService } from './common/supabase/supabase.service';
 import { SupabaseAuthGuard } from './common/guards/supabase-auth.guard';
+import { SessionModule } from './common/session/session.module';
 import { validate } from './config/env.validation';
 import { AppController } from './app.controller';
 
@@ -114,6 +115,7 @@ import { AppController } from './app.controller';
     CostingModule,
     ManufacturingRulesModule,
     FxModule,
+    SessionModule,
   ],
   controllers: [AppController],
   providers: [

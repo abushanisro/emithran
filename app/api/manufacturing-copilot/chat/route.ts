@@ -1,6 +1,5 @@
 import { type NextRequest } from "next/server";
 
-import { getAuthenticatedUser } from "@/lib/database/supabase-server";
 import { requireUserForAi } from "@/lib/server/auth";
 
 // NEXT_PUBLIC_API_URL already ends in /v1/api (the NestJS global prefix).
@@ -22,9 +21,6 @@ export async function POST(request: NextRequest) {
   const gate = await requireUserForAi("manufacturing-copilot");
   if (!gate.ok) return gate.response;
 
-  const session = await getAuthenticatedUser();
-  if (!session) return json({ error: "Authentication required" }, 401);
-
   const raw = await request.text();
   if (raw.length > MAX_BODY_BYTES) return json({ error: "Request too large" }, 413);
 
@@ -32,7 +28,7 @@ export async function POST(request: NextRequest) {
   try {
     upstream = await fetch(`${BACKEND_URL}/copilot/chat`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.accessToken}` },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${gate.accessToken}` },
       body: raw,
       signal: request.signal,
     });

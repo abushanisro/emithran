@@ -51,6 +51,12 @@ export class LHRController {
     return this.LHRService.findAll(search, user.id, token);
   }
 
+  @Get('count')
+  @ApiOperation({ summary: 'Number of LHR records, without the rows' })
+  async count(@AccessToken() token: string) {
+    return this.LHRService.count(token);
+  }
+
 
   @Get('benchmark')
   @ApiOperation({ summary: 'Get global benchmark LHR rates (no auth required beyond JWT)' })

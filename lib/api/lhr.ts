@@ -109,6 +109,12 @@ export const lhrApi = {
     return response ?? { records: [], total: 0 };
   },
 
+  /** How many LHR records exist, without downloading them. */
+  getCount: async (): Promise<number> => {
+    const response = await apiClient.get<{ total: number }>('/lhr/count', { silent: true, retry: false });
+    return response?.total ?? 0;
+  },
+
   getById: async (id: string | number): Promise<LHREntry> => {
     const response = await apiClient.get<LHREntry>(`/lhr/${id}`);
     if (!response) throw new Error('LHR record not found');

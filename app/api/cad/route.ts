@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { getAuthenticatedUser } from '@/lib/database/supabase-server';
+import { requireUser } from '@/lib/server/auth';
 
 const CAD_ENGINE_URL = process.env.CAD_ENGINE_URL ?? 'http://localhost:5000';
 const CAD_ENGINE_API_KEY = process.env.CAD_ENGINE_API_KEY ?? '';
@@ -14,12 +14,8 @@ const CAD_ENGINE_API_KEY = process.env.CAD_ENGINE_API_KEY ?? '';
  */
 export async function POST(req: NextRequest) {
   try {
-    if (!(await getAuthenticatedUser())) {
-      return NextResponse.json(
-        { success: false, error: 'Authentication required' },
-        { status: 401 },
-      );
-    }
+    const auth = await requireUser();
+    if (!auth.ok) return auth.response;
 
     const formData = await req.formData();
 

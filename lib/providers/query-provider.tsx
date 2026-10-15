@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from '@tanstack/react-query'
 import { useState, type ReactNode } from 'react'
 import { ApiError } from '@/lib/api/client'
+import { SESSION_IDLE_TIMEOUT_CODE } from '@/lib/auth/session-idle/policy'
 import { supabase } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 
@@ -58,6 +59,12 @@ export function QueryProvider({ children }: { children: ReactNode }) {
  * Handle errors from React Query
  */
 function handleQueryError(error: unknown): void {
+  // An inactivity timeout is handled by SessionIdleProvider, which signs out
+  // only this session and returns the user to this page after login.
+  if (error instanceof ApiError && error.code === SESSION_IDLE_TIMEOUT_CODE) {
+    return;
+  }
+
   // Check if it's an authentication error (401 OR network-level session expiry)
   if (error instanceof ApiError && (error.isUnauthorized() || error.code === 'AUTH_EXPIRED')) {
     // Prevent duplicate notifications

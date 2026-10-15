@@ -1,23 +1,41 @@
 import { NextResponse } from 'next/server';
 
+import { SESSION_IDLE_TIMEOUT_CODE } from '@/lib/auth/session-idle/policy';
 import { createServerSupabaseClient } from '@/lib/database/supabase-server';
 import { checkRateLimit } from '@/lib/server/rate-limit';
+import { checkSessionActive } from '@/lib/server/session-idle-check';
+import { verifiedSession } from '@/lib/server/verified-session';
 
-export type AuthResult = { ok: true; userId: string } | { ok: false; response: NextResponse };
+export type AuthResult =
+  | { ok: true; userId: string; accessToken: string }
+  | { ok: false; response: NextResponse };
 
 /**
  * The signed-in user behind this request, verified with Supabase (getUser asks
- * the auth server; it does not trust the cookie's contents). Routes that spend
- * money (AI) or fetch on the caller's behalf call this first.
+ * the auth server, at most once a minute per token; see verified-session.ts)
+ * and inside its inactivity deadline. Routes that spend money (AI) or fetch on
+ * the caller's behalf call this first.
  */
 export async function requireUser(): Promise<AuthResult> {
   try {
-    const supabase = await createServerSupabaseClient();
-    const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user) {
+    const verified = await verifiedSession(await createServerSupabaseClient());
+    if (!verified) {
       return { ok: false, response: NextResponse.json({ error: 'Authentication required' }, { status: 401 }) };
     }
-    return { ok: true, userId: data.user.id };
+    const check = await checkSessionActive(verified.accessToken);
+    if (check === 'unavailable') {
+      return { ok: false, response: NextResponse.json({ error: 'Session check unavailable' }, { status: 503 }) };
+    }
+    if (check !== 'active') {
+      return {
+        ok: false,
+        response: NextResponse.json(
+          { error: 'Authentication required', ...(check === 'idle' && { code: SESSION_IDLE_TIMEOUT_CODE }) },
+          { status: 401 },
+        ),
+      };
+    }
+    return { ok: true, userId: verified.user.id, accessToken: verified.accessToken };
   } catch {
     return { ok: false, response: NextResponse.json({ error: 'Authentication required' }, { status: 401 }) };
   }

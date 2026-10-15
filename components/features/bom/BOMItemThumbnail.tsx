@@ -15,7 +15,9 @@ import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 // Module-level thumbnail cache — persists across remounts for the page session
 // ---------------------------------------------------------------------------
 
-const thumbnailCache = new Map<string, string>(); // item.id → dataUrl
+// Keyed by item and model path, so replacing the model never shows the old picture.
+const thumbnailCache = new Map<string, string>(); // `${item.id}:${file3dPath}` → dataUrl
+const cacheKeyOf = (item: BOMItem) => `${item.id}:${item.file3dPath ?? item.file2dPath ?? ''}`;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -141,7 +143,7 @@ function STLScene({ url, onCapture, onError }: STLCaptureProps) {
       // useFrame runs before R3F's implicit render — call explicitly so the
       // canvas has the model on it when we screenshot it.
       gl.render(scene, camera);
-      const dataUrl = gl.domElement.toDataURL('image/jpeg', 0.92);
+      const dataUrl = gl.domElement.toDataURL('image/jpeg', 0.8);
       onCaptureRef.current(dataUrl);
     } catch {
       onErrorRef.current();
@@ -164,7 +166,10 @@ function STLScene({ url, onCapture, onError }: STLCaptureProps) {
 
 export function BOMItemThumbnail({ item, onClick }: BOMItemThumbnailProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const cached = thumbnailCache.get(item.id) ?? null;
+  // The thumbnail stored on the item comes first: drawing one means
+  // downloading the whole 3D model, which is the costliest thing this list
+  // could do on every visit.
+  const cached = item.thumbnailUrl ?? thumbnailCache.get(cacheKeyOf(item)) ?? null;
   const [phase, setPhase] = useState<Phase>(cached ? 'done' : 'idle');
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [dataUrl, setDataUrl] = useState<string | null>(cached);
@@ -175,6 +180,18 @@ export function BOMItemThumbnail({ item, onClick }: BOMItemThumbnailProps) {
 
   const is3d = !!item.file3dPath;
   const resolvedCategory = useRef<FileCategory>(fileCategory);
+
+  // Start over whenever the model or its stored picture changes while mounted:
+  // a replaced model clears the stored thumbnail and changes the path, and the
+  // old part's picture must not stay on screen.
+  const cacheKey = cacheKeyOf(item);
+  useEffect(() => {
+    const known = item.thumbnailUrl ?? thumbnailCache.get(cacheKey) ?? null;
+    resolvedCategory.current = fileCategory;
+    setFileUrl(null);
+    setDataUrl(known);
+    setPhase(known ? 'done' : 'idle');
+  }, [cacheKey, item.thumbnailUrl, fileCategory]);
 
   // Lazy trigger via IntersectionObserver — skip if already cached
   useEffect(() => {
@@ -229,10 +246,13 @@ export function BOMItemThumbnail({ item, onClick }: BOMItemThumbnailProps) {
   }, [phase, item.id, is3d, fileCategory]);
 
   const handleCapture = useCallback((url: string) => {
-    thumbnailCache.set(item.id, url);
+    thumbnailCache.set(cacheKeyOf(item), url);
     setDataUrl(url);
     setPhase('done');
-  }, [item.id]);
+    // Stored on the item, so no later visit downloads the model for this
+    // picture again. Best-effort: on failure it is simply drawn next time.
+    void apiClient.patch(`/bom-items/${item.id}/thumbnail`, { thumbnailUrl: url }, { silent: true });
+  }, [item]);
 
   const handleCaptureError = useCallback(() => {
     setPhase('error');
