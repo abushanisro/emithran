@@ -36,6 +36,17 @@ export const useLHR = (search?: string) => useQuery({
     select: (data) => data ?? { records: [], total: 0 },
   });
 
+// Only how many LHR records exist (the dashboard's setup checklist), so the
+// whole table is never downloaded just to be counted.
+export const useLHRCount = () => useQuery({
+    queryKey: ['lhr', 'count'],
+    queryFn: () => lhrApi.getCount(),
+    retry: false,
+    staleTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    throwOnError: false,
+  });
+
 // The real cost-engine-aligned Skill Rate for a (location, process_group) —
 // same resolver the MHR form's Labour tab shows read-only and mhr.service.ts
 // snapshots server-side on save. Disabled until both args are real, non-empty

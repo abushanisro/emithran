@@ -7,6 +7,8 @@ import {
 import { Reflector } from '@nestjs/core';
 import { SupabaseService } from '../supabase/supabase.service';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { SessionActivityService } from '../session/session-activity.service';
+import { sessionIdFromAccessToken } from '../session/session-idle-policy';
 
 @Injectable()
 export class SupabaseAuthGuard implements CanActivate {
@@ -21,6 +23,7 @@ export class SupabaseAuthGuard implements CanActivate {
   constructor(
     private reflector: Reflector,
     private supabaseService: SupabaseService,
+    private sessionActivity: SessionActivityService,
   ) {}
 
   /**
@@ -121,11 +124,9 @@ export class SupabaseAuthGuard implements CanActivate {
       return true;
     }
 
+    let user;
     try {
-      const user = await this.supabaseService.verifyToken(token);
-      request.user = user;
-      request.accessToken = token;
-      return true;
+      user = await this.supabaseService.verifyToken(token);
     } catch (err) {
       // Token invalid → development fallback, no network call.
       // Never applies in production — a bad token is rejected outright.
@@ -138,6 +139,22 @@ export class SupabaseAuthGuard implements CanActivate {
       request.accessToken = await this.getBypassAccessToken();
       return true;
     }
+
+    // Inactivity timeout, enforced here so no client can skip it. Outside the
+    // try above on purpose: an idle session must be rejected in every
+    // environment, never handed to the development fallback.
+    // verifyToken has already confirmed the token with Supabase, so its
+    // session_id claim can be trusted.
+    const sessionId = sessionIdFromAccessToken(token);
+    if (!sessionId) {
+      throw new UnauthorizedException('Invalid or expired token');
+    }
+    await this.sessionActivity.assertActive(sessionId, user.id, token);
+
+    request.user = user;
+    request.accessToken = token;
+    request.sessionId = sessionId;
+    return true;
   }
 
   /**

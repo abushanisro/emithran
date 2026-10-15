@@ -489,27 +489,21 @@ export class CADAnalysisService {
   }
 
   private async getFileUrl(filePath: string, accessToken: string): Promise<string> {
-    // Test storage connection first
-    const connectionOk = await this.fileStorageService.testConnection();
-    if (!connectionOk) {
-      throw new Error(`Supabase storage connection failed or bucket 'bom-files' not found`);
+    // Signing fails for a missing object, so it is the existence check. The
+    // connection test, two-bucket search, directory listing and exists probe
+    // that used to run first were five extra Storage requests per analysis,
+    // each billed against the Supabase log quota.
+    try {
+      return await this.fileStorageService.getSignedUrl(filePath, 3600);
+    } catch (error) {
+      // Only a missing object is reported as missing; any other failure
+      // (Storage outage, timeout, auth) keeps its own message so it is not
+      // mistaken for a lost upload.
+      if (/not found/i.test(error.message)) {
+        throw new Error(`File not found in storage: ${filePath} (${error.message})`);
+      }
+      throw error;
     }
-    
-    // Debug: Check file in both buckets
-    await this.fileStorageService.findFileInBuckets(filePath);
-    
-    // Debug: List files in the directory
-    const directoryPath = filePath.substring(0, filePath.lastIndexOf('/'));
-    await this.fileStorageService.listFiles(directoryPath);
-    
-    // Check if the file exists
-    const exists = await this.fileStorageService.fileExists(filePath);
-    if (!exists) {
-      throw new Error(`File not found in storage: ${filePath}. Check logs above for directory contents and bucket search results.`);
-    }
-    
-    const signedUrl = await this.fileStorageService.getSignedUrl(filePath, 3600);
-    return signedUrl;
   }
 
   private async downloadFile(fileUrl: string): Promise<Buffer> {

@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
 import { requireUserForAi } from "@/lib/server/auth";
 
-import { getAuthenticatedUser } from "@/lib/database/supabase-server";
 
 const CAD_ENGINE_URL = process.env.CAD_ENGINE_URL ?? "http://localhost:5000";
 const CAD_ENGINE_API_KEY = process.env.CAD_ENGINE_API_KEY ?? "";
@@ -14,14 +13,6 @@ export async function POST(request: NextRequest) {
   const auth = await requireUserForAi("manufacturing-copilot");
   if (!auth.ok) return auth.response;
   try {
-    const auth = await getAuthenticatedUser();
-    if (!auth) {
-      return new Response(JSON.stringify({ error: "Authentication required" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
     const body = await request.json();
 
     // Validate required fields
@@ -37,7 +28,7 @@ export async function POST(request: NextRequest) {
     // token come from the server, never from the request body.
     const cadPayload = {
       ...body,
-      userId: auth.user.id,
+      userId: auth.userId,
       backendUrl: BACKEND_URL,
       authToken: auth.accessToken,
     };
