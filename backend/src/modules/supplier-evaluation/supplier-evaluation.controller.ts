@@ -22,6 +22,7 @@ import {
 } from './dto/supplier-evaluation.dto';
 import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AccessToken } from '../../common/decorators/access-token.decorator';
 
 @ApiTags('Supplier Evaluation')
 @ApiBearerAuth()
@@ -48,7 +49,7 @@ export class SupplierEvaluationController {
   async create(
     @Body() dto: CreateSupplierEvaluationDto,
     @CurrentUser('id') userId: string,
-    @CurrentUser('accessToken') accessToken: string,
+    @AccessToken() accessToken: string,
   ): Promise<SupplierEvaluationResponseDto> {
     try {
       this.logger.log(`Creating supplier evaluation for vendor ${dto.vendorId} and process ${dto.processId}`);
@@ -70,7 +71,7 @@ export class SupplierEvaluationController {
   async findAll(
     @Query() query: QuerySupplierEvaluationDto,
     @CurrentUser('id') userId: string,
-    @CurrentUser('accessToken') accessToken: string,
+    @AccessToken() accessToken: string,
   ): Promise<SupplierEvaluationResponseDto[]> {
     try {
       this.logger.log(`Fetching supplier evaluations for user ${userId}`);
@@ -93,7 +94,7 @@ export class SupplierEvaluationController {
   async findOne(
     @Param('id') id: string,
     @CurrentUser('id') userId: string,
-    @CurrentUser('accessToken') accessToken: string,
+    @AccessToken() accessToken: string,
   ): Promise<SupplierEvaluationResponseDto> {
     try {
       this.logger.log(`Fetching supplier evaluation ${id}`);
@@ -119,7 +120,7 @@ export class SupplierEvaluationController {
     @Param('id') id: string,
     @Body() dto: UpdateSupplierEvaluationDto,
     @CurrentUser('id') userId: string,
-    @CurrentUser('accessToken') accessToken: string,
+    @AccessToken() accessToken: string,
   ): Promise<SupplierEvaluationResponseDto> {
     try {
       this.logger.log(`Updating supplier evaluation ${id}`);
@@ -140,7 +141,7 @@ export class SupplierEvaluationController {
   async delete(
     @Param('id') id: string,
     @CurrentUser('id') userId: string,
-    @CurrentUser('accessToken') accessToken: string,
+    @AccessToken() accessToken: string,
   ): Promise<void> {
     try {
       this.logger.log(`Deleting supplier evaluation ${id}`);
@@ -168,7 +169,7 @@ export class SupplierEvaluationController {
   async complete(
     @Param('id') id: string,
     @CurrentUser('id') userId: string,
-    @CurrentUser('accessToken') accessToken: string,
+    @AccessToken() accessToken: string,
   ): Promise<SupplierEvaluationResponseDto> {
     try {
       this.logger.log(`Marking supplier evaluation ${id} as completed`);
@@ -200,7 +201,7 @@ export class SupplierEvaluationController {
   async approve(
     @Param('id') id: string,
     @CurrentUser('id') userId: string,
-    @CurrentUser('accessToken') accessToken: string,
+    @AccessToken() accessToken: string,
   ): Promise<{ snapshotId: string }> {
     try {
       this.logger.log(`Approving and freezing supplier evaluation ${id}`);
