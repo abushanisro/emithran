@@ -51,6 +51,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { createBOMItem, updateBOMItem, analyzeForAutoFill, measureForAutoFill, type AutoFillResponse } from '@/lib/api/hooks/useBOMItems';
+import { beginProtectedJob } from '@/lib/auth/session-idle/protected-jobs';
 import { familyToProcessGroupLabel, processGroupOptionsFrom, processGroupToFamilyHint, processesForMaterialGroups } from '@/lib/features/process-group';
 import { useProcessCalculatorMappings } from '@/lib/api/hooks/useProcessCalculatorMappings';
 import type { DrawingAnalysisResult } from '@/lib/api/vave';
@@ -1560,6 +1561,9 @@ export function BOMItemDialog({
     const readyFiles = pendingFiles.filter(pf => pf.status === 'ready' && pf.result);
     if (!readyFiles.length) return;
     setIsBatchCreating(true);
+    // Protected from the inactivity sign-out (up to 15 extra minutes): each
+    // file is created, configured and uploaded from this tab in turn.
+    const endProtectedJob = beginProtectedJob('bom-batch-create');
 
     const finalParentId = parentItemId !== undefined ? parentItemId : autoParentId;
     let successCount = 0;
@@ -1613,6 +1617,7 @@ export function BOMItemDialog({
         });
       }
     }
+    endProtectedJob();
 
     await queryClient.invalidateQueries({ queryKey: ['bom-items', 'list', bomId] });
     setIsBatchCreating(false);

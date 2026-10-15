@@ -2,6 +2,13 @@ import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { currentRequestAuth } from '../request-context/request-auth-context';
+import { getVerified, rememberVerified } from './token-verification-cache';
+
+interface VerifiedUser {
+  id: string;
+  email: string | undefined;
+  role: string;
+}
 
 @Injectable()
 export class SupabaseService {
@@ -70,15 +77,14 @@ export class SupabaseService {
       },
     };
 
-    const userClient = createClient(this.supabaseUrl, this.supabaseAnonKey, clientOptions);
-    
-    // Set the session with the provided token
-    userClient.auth.setSession({
-      access_token: accessToken,
-      refresh_token: '', // Not needed for server-side operations
-    });
-
-    return userClient;
+    // No auth.setSession() here. The Authorization header above already
+    // carries the user's token on every database and storage request (supabase-js
+    // never overrides an Authorization header it is given), so RLS sees the user.
+    // setSession() added nothing but cost: for an unexpired token it calls
+    // GET /auth/v1/user, one extra Auth request and log line for every client
+    // created, across hundreds of call sites. The guard has already verified
+    // the token before any of them run.
+    return createClient(this.supabaseUrl, this.supabaseAnonKey, clientOptions);
   }
 
   /**
@@ -133,18 +139,23 @@ export class SupabaseService {
       throw new UnauthorizedException('Access token is required');
     }
 
+    const cached = getVerified<VerifiedUser>(token);
+    if (cached) return cached;
+
     try {
       const { data: user, error } = await this.adminClient.auth.getUser(token);
-      
+
       if (error || !user?.user) {
         throw new UnauthorizedException('Invalid or expired token');
       }
 
-      return {
+      const verified: VerifiedUser = {
         id: user.user.id,
         email: user.user.email,
         role: user.user.user_metadata?.role || 'user'
       };
+      rememberVerified(token, verified);
+      return verified;
     } catch (error) {
       if (error instanceof UnauthorizedException) {
         throw error;

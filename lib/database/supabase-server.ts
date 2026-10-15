@@ -7,8 +7,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-import type { User } from '@supabase/supabase-js'
-
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || ''
 
@@ -61,26 +59,6 @@ export async function createServerSupabaseClient() {
       },
     }
   )
-}
-
-/**
- * The caller's identity for API routes, verified against Supabase Auth.
- *
- * getUser() validates the session cookie with the Auth server rather than
- * trusting the locally decoded JWT, so a forged or revoked cookie is rejected.
- * Returns null when there is no valid session.
- */
-export async function getAuthenticatedUser(): Promise<{ user: User; accessToken: string } | null> {
-  try {
-    const supabase = await createServerSupabaseClient()
-    const { data: { user }, error } = await supabase.auth.getUser()
-    if (error || !user) return null
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session?.access_token) return null
-    return { user, accessToken: session.access_token }
-  } catch {
-    return null
-  }
 }
 
 // Retry utility for database operations

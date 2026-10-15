@@ -65,6 +65,7 @@ import {
 import { COST_ENGINE_CONTRACT_VERSION } from './costing/shared/core/persisted-process-cost';
 import axios from 'axios';
 import { CalculatorInputsRequestDto, MachiningCalculatorInputsRequestDto } from './dto/machining-calculator-inputs.dto';
+import { SIGNED_URL_TTL_SEC, getReusableSignedUrl, rememberSignedUrl } from './services/signed-url-cache';
 
 // Define User type if not available
 interface User {
@@ -717,15 +718,22 @@ export class BOMItemsController {
     @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<{ url: string }> {
-    const bomItem = await this.bomItemsService.findOne(id, user.id, token);
-
-    const filePath = fileType === '2d' ? bomItem.file2dPath : bomItem.file3dPath;
+    const filePath = await this.bomItemsService.findFilePath(id, fileType, token);
 
     if (!filePath) {
       throw new BadRequestException(`No ${fileType} file found for this item`);
     }
 
-    const signedUrl = await this.fileStorageService.getSignedUrl(filePath, 3600);
+    // The same link is handed out again while it has plenty of life left, so
+    // the browser's HTTP cache serves repeat views instead of downloading the
+    // file from Supabase each time (see signed-url-cache.ts). Keyed by user:
+    // a link only ever goes back to someone whose access was checked above.
+    const cacheKey = `${user.id}:${filePath}`;
+    const reused = getReusableSignedUrl(cacheKey);
+    if (reused) return { url: reused };
+
+    const signedUrl = await this.fileStorageService.getSignedUrl(filePath, SIGNED_URL_TTL_SEC);
+    rememberSignedUrl(cacheKey, signedUrl, SIGNED_URL_TTL_SEC);
 
     return { url: signedUrl };
   }

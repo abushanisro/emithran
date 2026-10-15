@@ -7,7 +7,7 @@ import type { SheetMetalFeature } from './costing/sheet-metal/operation/catalog-
 import { Injectable, Logger, NotFoundException, InternalServerErrorException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { CreateBOMItemDto, UpdateBOMItemDto } from './dto/bom-items.dto';
-import { BOMItemResponseDto, BOMItemListResponseDto } from './dto/bom-item-response.dto';
+import { BOM_ITEM_DTO_COLUMNS, BOMItemResponseDto, BOMItemListResponseDto } from './dto/bom-item-response.dto';
 import { RecentKeys } from '../../common/cache/recent-keys';
 import { reconcileSheetGeometry } from './costing/shared/geometry-reconciliation';
 import type { CalculationTraceStep, PhysicsGap, UnsupportedOperationGap, ManufacturingPhysicsResult, ConfidenceLevel, ResolutionStatus, LookupResolution, ValidatedInput } from './dto/cost-breakdown.dto';
@@ -143,6 +143,7 @@ import type { DieCastingProcessChoiceDto, DieCastingProcessOptionDto } from './d
 import { cadEvidenceKey } from './costing/shared/cad-evidence';
 import { realBendLengthsMm } from './costing/shared/bend-lengths';
 import { cachedRead } from './costing/shared/core/request-cache';
+import { ReferenceMemo } from '../../common/cache/reference-memo';
 
 /** A quote with extra lines appended: process total, total, cycle time and completeness follow. */
 function appendLines<T extends CostSummaryDto>(dto: T, lines: ProcessLineCost[]): T {
@@ -245,6 +246,15 @@ export class BOMItemsService {
       }
     }
 
+    // A new 3D model makes a stored thumbnail a picture of the old part; clear
+    // it so the BOM list renders and stores a fresh one.
+    if (
+      (transformed.file_3d_path !== undefined || transformed.file_step_path !== undefined) &&
+      transformed.thumbnail_url === undefined
+    ) {
+      transformed.thumbnail_url = null;
+    }
+
     // Denormalise family classification from featureGraph so it is queryable
     // without jsonb extraction. Only writes if not already explicitly provided.
     if (transformed.feature_graph && transformed.family_classification === undefined) {
@@ -271,7 +281,7 @@ export class BOMItemsService {
 
     let query = client
       .from('bom_items')
-      .select('*')
+      .select(BOM_ITEM_DTO_COLUMNS)
       .order('created_at', { ascending: false });
 
     // Apply filters
@@ -342,7 +352,7 @@ export class BOMItemsService {
 
     const { data, error } = await client
       .from('bom_items')
-      .select('*')
+      .select(BOM_ITEM_DTO_COLUMNS)
       .eq('id', id)
       .limit(1);
 
@@ -574,35 +584,28 @@ export class BOMItemsService {
     }
   }
 
-  async getFileUrl(
-    id: string,
-    fileType: '2d' | '3d',
-    userId?: string,
-    accessToken?: string,
-  ): Promise<{ url: string }> {
-    this.logger.log(`Getting ${fileType} file URL for BOM item: ${id}`, 'BOMItemsService');
-
-    const bomItem = await this.findOne(id, userId, accessToken);
-
-    if (fileType === '2d' && bomItem.file2dPath) {
-      const { data } = await this.supabaseService
-        .getUserClient(accessToken)
-        .storage
-        .from('bom-files')
-        .createSignedUrl(bomItem.file2dPath, 3600);
-      return { url: data?.signedUrl || '' };
+  /**
+   * The stored path of an item's 2D or 3D file, read as the caller (so RLS
+   * decides whether they may see the item), or null if it has none.
+   * Only the two path columns: the full row (feature graph, analyses, embedded
+   * thumbnail) is many KB per call, and this runs for every thumbnail.
+   */
+  async findFilePath(id: string, fileType: '2d' | '3d', accessToken?: string): Promise<string | null> {
+    const { data, error } = await this.supabaseService
+      .getUserClient(accessToken)
+      .from('bom_items')
+      .select('file_2d_path, file_3d_path')
+      .eq('id', id)
+      .limit(1);
+    if (error) {
+      this.logger.error(`Error fetching BOM item file paths: ${error.message}`, 'BOMItemsService');
+      throw new InternalServerErrorException(`Failed to fetch BOM item: ${error.message}`);
     }
-
-    if (fileType === '3d' && bomItem.file3dPath) {
-      const { data } = await this.supabaseService
-        .getUserClient(accessToken)
-        .storage
-        .from('bom-files')
-        .createSignedUrl(bomItem.file3dPath, 3600);
-      return { url: data?.signedUrl || '' };
+    const row = (data as { file_2d_path: string | null; file_3d_path: string | null }[] | null)?.[0];
+    if (!row) {
+      throw new NotFoundException(`BOM item with ID ${id} not found`);
     }
-
-    throw new NotFoundException(`${fileType} file not found for BOM item ${id}`);
+    return (fileType === '2d' ? row.file_2d_path : row.file_3d_path) ?? null;
   }
 
 
@@ -2235,6 +2238,9 @@ export class BOMItemsService {
    * memory/Machining variables (migration 639): Identing defaultIdentingTime,
    * Spark Testing defaultSparkTestTime.
    */
+  // Memoised across requests; kept only when both times resolved, so a failed
+  // read is never remembered.
+  @ReferenceMemo({ cacheable: (v) => (v as Array<{ sec: number | null }>).every((s) => s.sec != null) })
   private async resolveBenchSteps(): Promise<Array<{ operation: string; sec: number | null; source: string }>> {
     const keys = { Identing: 'defaultIdentingTime', 'Spark Testing': 'defaultSparkTestTime' } as const;
     const { data } = await this.supabaseService.getPrivilegedClient('reference-data: machining variables, public-read')

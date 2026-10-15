@@ -226,6 +226,19 @@ export class LHRService {
     return { records, total: count ?? records.length };
   }
 
+  /** How many LHR records the caller can see. Head-only: no rows are transferred. */
+  async count(accessToken?: string): Promise<{ total: number }> {
+    const { count, error } = await this.supabaseService
+      .getUserClient(accessToken)
+      .from('lhr_records')
+      .select('id', { count: 'exact', head: true });
+    if (error) {
+      this.logger.error(`Error counting LHR records: ${error.message}`, 'LHRService');
+      throw new InternalServerErrorException('Failed to count LHR records');
+    }
+    return { total: count ?? 0 };
+  }
+
   async findOne(id: string, userId: string, accessToken: string) {
     this.logger.log(`Fetching LHR record: ${id}`, 'LHRService');
 

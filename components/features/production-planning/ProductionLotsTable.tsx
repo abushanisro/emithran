@@ -86,7 +86,8 @@ export function ProductionLotsTable({ lots, isLoading }: ProductionLotsTableProp
   };
 
   const handleEditLot = (lot: ProductionLot) => {
-    router.push(`/production-planning/${lot.id}/edit`);
+    // There is no separate edit page: a lot is managed on its own page.
+    router.push(`/production-planning/${lot.id}`);
   };
 
   const handleDeleteLot = (lot: ProductionLot) => {

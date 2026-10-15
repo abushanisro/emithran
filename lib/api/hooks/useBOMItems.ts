@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tansta
 import { apiClient } from '../client';
 import { useAuthEnabledWith } from './useAuthEnabled';
 import { toast } from 'sonner';
+import { runProtectedJob } from '@/lib/auth/session-idle/protected-jobs';
 import type { FeatureGraph, DFMScoresResponse, OccurrenceScore } from '@/lib/types/manufacturing';
 
 export type { OccurrenceScore };
@@ -475,7 +476,9 @@ export async function analyzeForAutoFill(file: File, familyHint?: string): Promi
   const form = new FormData();
   form.append('file', file);
   if (familyHint) form.append('familyHint', familyHint);
-  const promise = (async () => {
+  // Protected from the inactivity sign-out (up to 15 extra minutes): the
+  // result only reaches the form through this polling loop.
+  const promise = runProtectedJob('cad-autofill', async () => {
     const { jobId } = await apiClient.uploadFiles<{ jobId: string }>('/bom-items/analyze-for-autofill/start', form);
     if (!jobId) throw new Error('No job started for auto-fill analysis');
 
@@ -495,7 +498,7 @@ export async function analyzeForAutoFill(file: File, familyHint?: string): Promi
       await sleep(ANALYZE_POLL_INTERVAL_MS);
     }
     throw new Error('Analysis timed out');
-  })().finally(() => _analyzeInFlight.delete(key));
+  }).finally(() => _analyzeInFlight.delete(key));
 
   _analyzeInFlight.set(key, promise);
   return promise;

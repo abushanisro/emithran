@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthenticatedUser } from '@/lib/database/supabase-server';
 import { requireUserForAi } from '@/lib/server/auth';
 import { fetchTrustedFile, PayloadTooLargeError, readLimited, UntrustedUrlError } from '@/lib/server/safe-fetch';
 import {
@@ -20,13 +19,6 @@ export async function POST(request: NextRequest) {
   if (!auth.ok) return auth.response;
 
   try {
-    // The caller's own session: a stored drawing path is signed by the
-    // backend under the caller's permissions.
-    const session = await getAuthenticatedUser();
-    if (!session) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-    }
-
     const body = await request.json();
 
     if (!body.imageBase64 && !body.imageUrl) {
@@ -44,7 +36,7 @@ export async function POST(request: NextRequest) {
         const resolved = await resolveBomItemFileUrl(
           storagePath.bomItemId,
           storagePath.fileType,
-          `Bearer ${session.accessToken}`,
+          `Bearer ${auth.accessToken}`,
         );
         if (!resolved.ok) {
           return NextResponse.json(

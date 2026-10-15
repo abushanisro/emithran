@@ -29,6 +29,7 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { useSidebar } from '@/components/ui/sidebar';
 import type { HeatmapSource, HeatmapLayerType, HeatmapNormalization } from '@/components/ui/model-viewer';
+import { beginProtectedJob } from '@/lib/auth/session-idle/protected-jobs';
 import {
   resolveStoredProcessLines,
   selectProcessTotal,
@@ -5543,6 +5544,10 @@ function CostGuidePanel({
   // user confirms via the AlertDialog below, with applyProgress driving a
   // step-by-step indicator instead of a single silent 12-60s wait.
   const applyScenarioNow = async () => {
+    // Protected from the inactivity sign-out (up to 15 extra minutes): every
+    // step below is sent from this tab, so a sign-out midway would leave the
+    // item partly applied.
+    const endProtectedJob = beginProtectedJob('apply-scenario');
     setApplyProgress({ step: 'Applying manufacturing route…', pct: 10 });
     try {
       try {
@@ -5657,6 +5662,7 @@ function CostGuidePanel({
       appliedParts.push(`Location: ${factoryDraft}`);
       toast.success('Scenario applied', { description: appliedParts.join(' · ') });
     } finally {
+      endProtectedJob();
       setApplyProgress(null);
     }
   };
@@ -9120,6 +9126,17 @@ export default function ManufacturingIntelligencePage() {
   const [file3dUrlRetryToken, setFile3dUrlRetryToken] = useState(0);
   const [file2dUrl, setFile2dUrl] = useState<string | null>(null);
   const [viewerTab, setViewerTab] = useState<'3d' | '2d'>('3d');
+  const [file2dFailed, setFile2dFailed] = useState(false);
+  // The drawing is downloaded only once someone looks at it (the 2D tab, or at
+  // once when there is no 3D model to show instead), then kept for this item
+  // so switching tabs never downloads it again.
+  const wants2d = viewerTab === '2d' || !item?.file3dPath;
+  const drawingKey = item?.file2dPath ? `${itemId}:${item.file2dPath}` : null;
+  const [requestedDrawing, setRequestedDrawing] = useState<string | null>(null);
+  useEffect(() => {
+    if (wants2d && drawingKey) setRequestedDrawing(drawingKey);
+  }, [wants2d, drawingKey]);
+  const loadDrawing = drawingKey !== null && requestedDrawing === drawingKey;
   const [maximized, setMaximized] = useState<PanelId | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(
     () => new Set(['root', 'grp_0', 'grp_1', 'op_0', 'op_1', 'op_2', 'op_threads', 'thread_features']),
@@ -10236,21 +10253,36 @@ export default function ManufacturingIntelligencePage() {
   }, [itemId, item?.file3dPath, file3dUrlRetryToken]);
 
   useEffect(() => {
-    if (!item?.file2dPath) { setFile2dUrl(null); return; }
+    setFile2dUrl(null);
+    setFile2dFailed(false);
+    if (!item?.file2dPath || !loadDrawing) return;
+    // A download still in flight when the item or drawing changes is
+    // cancelled, so it neither lands on the new one nor keeps downloading.
+    const controller = new AbortController();
+    const { signal } = controller;
     let blobUrl: string | null = null;
-    apiClient.get<{ url: string }>(`/bom-items/${itemId}/file-url/2d`, { timeout: 45_000, priority: 'high' })
+    apiClient.get<{ url: string }>(`/bom-items/${itemId}/file-url/2d`, { timeout: 45_000, priority: 'high', signal })
       .then(async (r) => {
         if (!r?.url) return;
         // Fetch as blob to bypass Supabase X-Frame-Options header
-        const resp = await fetch(r.url);
+        const resp = await fetch(r.url, { signal });
         const blob = await resp.blob();
+        // Cancelled while reading: the catch below ignores it.
+        signal.throwIfAborted();
         blobUrl = URL.createObjectURL(blob);
         setFile2dUrl(blobUrl);
       })
-      // No 2D drawing (none uploaded, or it failed to load): the viewer shows none.
-      .catch(() => { setFile2dUrl(null); });
-    return () => { if (blobUrl) URL.revokeObjectURL(blobUrl); };
-  }, [itemId, item?.file2dPath]);
+      // The drawing failed to load: the viewer says there is none to show.
+      .catch(() => {
+        if (signal.aborted) return;
+        setFile2dUrl(null);
+        setFile2dFailed(true);
+      });
+    return () => {
+      controller.abort();
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+    };
+  }, [itemId, item?.file2dPath, loadDrawing]);
 
   const toggleNode = (id: string) => { setExpandedNodes((prev) => {
     const next = new Set(prev);
@@ -10805,7 +10837,7 @@ export default function ManufacturingIntelligencePage() {
                             : (item.file2dPath?.split('/').pop() ?? '').replace(/^\d+_/, '').replace(/_/g, ' ')}
                         </span>
                         {/* 3D / 2D tab pills — right-aligned, only shown when 2D drawing exists */}
-                        {file2dUrl && (
+                        {item.file2dPath && (
                           <div className="flex items-center gap-0.5 shrink-0">
                             <button
                               type="button"
@@ -10908,7 +10940,9 @@ export default function ManufacturingIntelligencePage() {
                         ) : (
                           <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground">
                             <AlertCircle className="h-8 w-8 opacity-30" />
-                            <span className="text-sm">No 2D drawing attached</span>
+                            <span className="text-sm">
+                              {item.file2dPath && !file2dFailed ? 'Loading 2D drawing…' : 'No 2D drawing attached'}
+                            </span>
                           </div>
                         )
                       )}
