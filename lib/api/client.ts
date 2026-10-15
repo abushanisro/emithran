@@ -16,6 +16,7 @@
 
 import { config as appConfig } from '../config';
 import { apiConfig } from './config';
+import { SESSION_IDLE_TIMEOUT_CODE, SESSION_IDLE_TIMEOUT_EVENT } from '../auth/session-idle/policy';
 import { supabase } from '../supabase/client';
 import { authTokenManager } from '../auth/token-manager';
 
@@ -646,6 +647,23 @@ class ApiClient {
         }
 
         if (!response.ok) {
+          // The backend ended this session for inactivity and has already
+          // revoked it, so a token refresh cannot help. The session idle
+          // controller signs out (this session only) and returns the user here
+          // after login.
+          if (response.status === 401 && data.error?.code === SESSION_IDLE_TIMEOUT_CODE) {
+            authTokenManager.clearToken();
+            tracker.recordError(401, SESSION_IDLE_TIMEOUT_CODE);
+            if (typeof window !== 'undefined') window.dispatchEvent(new Event(SESSION_IDLE_TIMEOUT_EVENT));
+            if (silent) return null;
+            throw new ApiError(
+              'Your session ended after 30 minutes of inactivity. Please sign in again.',
+              401,
+              SESSION_IDLE_TIMEOUT_CODE,
+              { needsAuth: true },
+            );
+          }
+
           // Handle 401 Unauthorized - try to refresh Supabase session ONCE
           if (response.status === 401 && attemptNumber === 1) {
             if (supabase) {

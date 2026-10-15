@@ -12,6 +12,7 @@ import {
 } from './machining-material-hardness';
 import { MACHINING_REFERENCE_SOURCE_VERSION } from './machining-lookup-tables';
 import { SETUP_AXIS_VARIABLE_KEYS, resolveSetupAxisRule, type SetupAxisRule } from '../setup-axis-rule';
+import { ReferenceMemo } from '../../../../../common/cache/reference-memo';
 import {
   CAPABILITY_GTOL_TABLE,
   CAPABILITY_RULES_SOURCE_VERSION,
@@ -306,6 +307,16 @@ export class MachiningLookupService {
 
   // ── Hobbing — tblHobbing (809), tblAnsiHobbing (740), variables
   // defaultNumStarts (639). Null when neither table is staged.
+  // Memoised: these variable reads hit the database on every call otherwise.
+  // A failed read and a missing table look the same here (an empty part), so
+  // these lookups are kept only when EVERY part resolved; anything less is
+  // simply read again next time, never remembered as "no data".
+  @ReferenceMemo({
+    cacheable: (v) => {
+      const h = v as HobbingReference | null;
+      return !!h && h.hobRows.length > 0 && h.ansiRows.length > 0 && h.defaultNumStarts != null;
+    },
+  })
   async getHobbingReference(): Promise<HobbingReference | null> {
     const [hobRows, ansiRows] = await Promise.all([this.loadTable('tblHobbing'), this.loadTable('tblAnsiHobbing')]);
     if (!hobRows?.length && !ansiRows?.length) return null;
@@ -324,6 +335,12 @@ export class MachiningLookupService {
   // ── Gear routing and shaving — tblGearQuality (739, staged under
   // "qualities"), tblShaving (810), variables gearQualityDefaultAgmaNewStd and
   // maxShavingWorkpieceSpeed (639).
+  @ReferenceMemo({
+    cacheable: (v) => {
+      const g = v as { qualityRows: unknown[]; defaultQuality: string | null; shaving: { rows: unknown[]; maxWorkpieceRpm: number | null } };
+      return g.qualityRows.length > 0 && g.defaultQuality != null && g.shaving.rows.length > 0 && g.shaving.maxWorkpieceRpm != null;
+    },
+  })
   async getGearReference(): Promise<{ qualityRows: GearQualityRow[]; defaultQuality: string | null; shaving: { rows: any[]; maxWorkpieceRpm: number | null } }> {
     const [quality, shavingRows] = await Promise.all([this.loadObjectTable('tblGearQuality'), this.loadTable('tblShaving')]);
     const { data } = await this.supabase
@@ -344,6 +361,12 @@ export class MachiningLookupService {
 
   // ── Rotary broaching — tblRotaryBroaching (750) and the rotary-broach
   // variables (639): feed adjustment and the hex / square pilot-hole ratios.
+  @ReferenceMemo({
+    cacheable: (v) => {
+      const r = v as RotaryBroachReference | null;
+      return !!r && r.feedAdjustment != null && r.pilotLengthRatio != null && Object.keys(r.pilotDiameterRatio).length === 2;
+    },
+  })
   async getRotaryBroachReference(): Promise<RotaryBroachReference | null> {
     const rows = await this.loadTable('tblRotaryBroaching');
     if (!rows?.length) return null;
@@ -567,6 +590,15 @@ export class MachiningLookupService {
   // positioning-time variables (migration 639). The broach is chosen per
   // keyway in the pure engine (machining-lookup-seeds.ts resolveKeywayBroach).
   // Null when neither table is staged.
+  @ReferenceMemo({
+    cacheable: (v) => {
+      const k = v as KeywayBroachReference | null;
+      return (
+        !!k && k.pullRows.length > 0 && k.shimRows.length > 0 &&
+        k.singlePassPositioningS != null && k.multipassPositioningS != null
+      );
+    },
+  })
   async getKeywayBroachReference(): Promise<KeywayBroachReference | null> {
     const [pullRows, shimRows] = await Promise.all([
       this.loadTable('tblPullTypeKeywayBroach'),

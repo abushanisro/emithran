@@ -37,6 +37,28 @@ export function effectiveProcessGroupOf(row: MachineRowForSelection): string {
   return row.processGroup || row.commodityCode || '-';
 }
 
+/**
+ * The HR Rates table's rows: those in the chosen process group (if any) whose
+ * machine name or description contains the search text, ignoring case.
+ *
+ * Searching here, over rows already loaded, rather than on the server: a
+ * server-side search refetched the whole group (several MB) on every
+ * keystroke. It matches what the server's search matched (name or
+ * description, case-insensitive substring).
+ */
+export function filterHrRatesRows<T extends MachineRowForSelection & { machineName: string; machineDescription?: string | undefined }>(
+  rows: readonly T[],
+  processGroup: string,
+  search: string,
+): T[] {
+  const inGroup = processGroup ? rows.filter((r) => effectiveProcessGroupOf(r) === processGroup) : [...rows];
+  const term = search.trim().toLowerCase();
+  if (!term) return inGroup;
+  return inGroup.filter(
+    (r) => r.machineName.toLowerCase().includes(term) || (r.machineDescription ?? '').toLowerCase().includes(term),
+  );
+}
+
 /** A picker's options with its current value kept in them.
  *
  *  A Select renders blank when its value matches none of its items, and the

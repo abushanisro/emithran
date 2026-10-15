@@ -6,6 +6,24 @@ import { BOMItemType } from './bom-items.dto';
  * BOM Item Response DTO
  * Defines the API contract for BOM Item responses
  */
+/**
+ * Exactly the bom_items columns BOMItemResponseDto.fromDatabase reads. A read
+ * that only builds this DTO selects these instead of '*': the other columns
+ * (drawing_extraction, geometry_analysis, dfm_analysis, ...) are large JSONB
+ * that no caller of the DTO ever sees, yet every row of them was billed as
+ * Supabase egress. Kept in step with fromDatabase by bom-item-dto-columns.spec.ts.
+ */
+export const BOM_ITEM_DTO_COLUMNS =
+  'annual_volume,bend_count,bom_id,coating,coating_confidence,complexity,created_at,' +
+  'cut_length_mm,description,drawing_intelligence,family_classification,family_confidence,' +
+  'feature_graph,file_2d_path,file_3d_path,file_dxf_path,file_step_path,' +
+  'flat_pattern_area_mm2,heat_treatment,hole_count,id,item_type,make_buy,' +
+  'manufacturing_family_override,material,material_confidence,material_grade,material_source,' +
+  'max_height,max_length,max_width,name,parent_item_id,part_number,pierce_count,quantity,' +
+  'scenario_overrides,sheet_thickness_mm,sort_order,surface_area,surface_finish_confidence,' +
+  'surface_finish_ra,thumbnail_url,tightest_tolerance_mm,tolerance_confidence,unit,unit_cost,' +
+  'updated_at,volume,weight';
+
 export class BOMItemResponseDto {
   @ApiProperty({ example: 'uuid' })
   id: string;

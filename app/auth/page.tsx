@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { consumeInactivitySignOutNotice } from '@/lib/auth/session-idle/browser'
 import { useAuth } from '@/lib/providers/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,6 +19,12 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false)
   const { signIn, signInWithGoogle } = useAuth()
   const router = useRouter()
+
+  useEffect(() => {
+    if (consumeInactivitySignOutNotice()) {
+      toast.info('You were signed out after 30 minutes of inactivity. Sign in to continue where you left off.', { duration: 8000 })
+    }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

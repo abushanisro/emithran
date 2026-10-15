@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { ReferenceMemo } from '../../../common/cache/reference-memo';
 import { BOMItemsService } from '../bom-items.service';
 import { MachineDiscoveryService } from './machine-discovery.service';
 import { SecondaryProcessService } from './secondary-process.service';
@@ -63,6 +64,9 @@ export class NreService {
     private readonly secondary: SecondaryProcessService,
   ) {}
 
+  // Global reference variables, memoised across requests (an empty result,
+  // e.g. after a failed read, is never kept).
+  @ReferenceMemo()
   private async machiningVariables(keys: string[]): Promise<Map<string, string>> {
     const { data } = await this.supabase.getPrivilegedClient('reference-data: machining_reference_data, public-read')
       .from('machining_reference_data')

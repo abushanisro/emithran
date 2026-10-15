@@ -648,7 +648,7 @@ export default function ProcessPage() {
 
   // Redirect if not authenticated
   if (!user) {
-    router.push('/auth/login');
+    router.push('/auth');
     return null;
   }
 

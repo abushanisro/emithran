@@ -6,6 +6,7 @@ import { addAoaSheet, createWorkbook, downloadWorkbook } from '@/lib/utils/excel
 import { mhrCategoryOf } from '@/lib/utils/mhrCategoryOf';
 import {
   effectiveProcessGroupOf,
+  filterHrRatesRows,
   buildHrRatesIndex,
   optionsKeepingSelection,
 } from '@/lib/processCatalog/hr-rates-process-selection';
@@ -141,8 +142,9 @@ export default function HRRatesPage() {
   // show one group made the request slow enough to fail. "All Process Groups"
   // still loads everything. The client-side filter below stays as a guard for
   // any row that still lacks process_group.
+  // The search box filters the loaded rows here, in the browser. Sent to the
+  // server it refetched the whole group (several MB) on every keystroke.
   const { data: mhrData, isLoading: isMhrLoading } = useMHRRecords({
-    search: mhrSearch,
     ...(mhrLocation ? { location: mhrLocation } : {}),
     ...(mhrCurrency ? { currency: mhrCurrency } : {}),
     ...(mhrProcessGroupFilter ? { processGroup: mhrProcessGroupFilter } : {}),
@@ -152,11 +154,10 @@ export default function HRRatesPage() {
   const { data: mhrLocations = [] } = useMHRLocations();
   const { data: mhrServerProcessGroups = [] } = useMHRProcessGroups();
 
-  const filteredMhrRecords = useMemo(() => {
-    const records = mhrData?.records ?? [];
-    if (!mhrProcessGroupFilter) return records;
-    return records.filter(r => effectiveProcessGroupOf(r) === mhrProcessGroupFilter);
-  }, [mhrData?.records, mhrProcessGroupFilter]);
+  const filteredMhrRecords = useMemo(
+    () => filterHrRatesRows(mhrData?.records ?? [], mhrProcessGroupFilter, mhrSearch),
+    [mhrData?.records, mhrProcessGroupFilter, mhrSearch],
+  );
 
   // Every process group with machines on file (/mhr/process-groups, a light
   // query), plus the groups of the loaded rows as displayed (processGroup ??
