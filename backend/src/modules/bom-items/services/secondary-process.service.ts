@@ -23,6 +23,7 @@ import {
   chemicalMillingCallout, computeChemicalMilling, type ChemMillPocket,
 } from '../costing/chemical-milling/chemical-milling-engine';
 import { detectMaterialClass } from '../costing/machining/process/cost-machining-engine';
+import { cachedRead } from '../costing/shared/core/request-cache';
 
 export interface SecondaryProcessLine extends SecondaryProcessResult {
   /** The same line in the item's location currency, ready to save as a
@@ -145,12 +146,13 @@ export class SecondaryProcessService {
 
   /** The location's real machines for these classes (migrations 806/818/820). */
   private async loadMachines(location: string, classes: string[], accessToken: string): Promise<SecondaryMachine[]> {
-    const { data, error } = await this.supabase
-      .getClient(accessToken)
-      .from('mhr_records')
-      .select('id, machine_name, machine_class, mhr_usd_per_hour, usd_lhr_total, operators, labor_time_standard, setup_time_hr, good_part_yield, max_x_mm, max_y_mm, max_z_mm, max_length_mm, max_workpiece_weight_kg, specs')
-      .eq('location', location)
-      .in('machine_class', classes);
+    const { data, error } = await cachedRead(`mhr:secondary:${location}:${[...classes].sort().join(',')}`, async () =>
+      await this.supabase
+        .getClient(accessToken)
+        .from('mhr_records')
+        .select('id, machine_name, machine_class, mhr_usd_per_hour, usd_lhr_total, operators, labor_time_standard, setup_time_hr, good_part_yield, max_x_mm, max_y_mm, max_z_mm, max_length_mm, max_workpiece_weight_kg, specs')
+        .eq('location', location)
+        .in('machine_class', classes));
     if (error || !data) return [];
     return (data as any[])
       .map((r): SecondaryMachine | null => {

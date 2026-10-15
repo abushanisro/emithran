@@ -142,6 +142,7 @@ import type { CalculatorRunDto, SecondaryOperationsDto, SecondaryOptionDto } fro
 import type { DieCastingProcessChoiceDto, DieCastingProcessOptionDto } from './dto/cost-breakdown.dto';
 import { cadEvidenceKey } from './costing/shared/cad-evidence';
 import { realBendLengthsMm } from './costing/shared/bend-lengths';
+import { cachedRead } from './costing/shared/core/request-cache';
 
 /** A quote with extra lines appended: process total, total, cycle time and completeness follow. */
 function appendLines<T extends CostSummaryDto>(dto: T, lines: ProcessLineCost[]): T {
@@ -2106,11 +2107,14 @@ export class BOMItemsService {
       if (canonicalIds.length === 0) return null;
 
       const client = this.supabaseService.getClient(accessToken);
-      const { data, error } = await client
-        .from('process_taxonomy_operations')
-        .select('canonical_process_id, feature_type')
-        .in('feature_type', ['Blank', ...CUT_FEATURE_TYPES])
-        .in('canonical_process_id', canonicalIds);
+      const { data, error } = await cachedRead(`taxonomy-cut-features:${[...canonicalIds].sort().join(',')}`, async () => {
+        const res = await client
+          .from('process_taxonomy_operations')
+          .select('canonical_process_id, feature_type')
+          .in('feature_type', ['Blank', ...CUT_FEATURE_TYPES])
+          .in('canonical_process_id', canonicalIds);
+        return { data: res.data, error: res.error };
+      });
       if (error) {
         this.logger.warn(`resolveCutFeatureCoverage: ${error.message}`, 'BOMItemsService');
         return null;
@@ -2214,13 +2218,14 @@ export class BOMItemsService {
   private async machiningReferenceSetupHr(machine: MHRRateInput, accessToken: string): Promise<number | null> {
     const id = (machine.selection?.balanced?.candidate as { machineId?: string } | undefined)?.machineId ?? machine.mhrRecordId ?? null;
     if (!id) return null;
-    const { data: row } = await this.supabaseService.getUserClient(accessToken)
-      .from('mhr_records').select('benchmark_source_key').eq('id', id).maybeSingle();
+    const { data: row } = await cachedRead(`mhr:benchmark-key:${id}`, async () =>
+      await this.supabaseService.getUserClient(accessToken).from('mhr_records').select('benchmark_source_key').eq('id', id).maybeSingle());
     const key = (row as { benchmark_source_key?: string | null } | null)?.benchmark_source_key;
     if (!key) return null;
-    const { data } = await this.supabaseService.getPrivilegedClient('reference-data: machining_reference_data, public-read')
-      .from('machining_reference_data').select('raw')
-      .eq('category', 'machine').eq('key', key).limit(1);
+    const { data } = await cachedRead(`machining-reference-machine:${key}`, async () =>
+      await this.supabaseService.getPrivilegedClient('reference-data: machining_reference_data, public-read')
+        .from('machining_reference_data').select('raw')
+        .eq('category', 'machine').eq('key', key).limit(1));
     const v = (data?.[0] as { raw?: { time?: { setupTimeHr?: unknown } } } | undefined)?.raw?.time?.setupTimeHr;
     return typeof v === 'number' && Number.isFinite(v) ? v : null;
   }
@@ -3879,11 +3884,13 @@ export class BOMItemsService {
       // from that process's own catalog rows (migration 844).
       const attachCatalogOperations = async (line: ProcessLineCost | undefined, processName: string, need: Awaited<ReturnType<typeof priceMachiningAfter>>['need']) => {
         if (!line || !need.assessed) return [] as string[];
-        const { data: proc } = await client.from('process_taxonomy').select('id')
-          .eq('process_group', 'Die Casting').eq('process_name', processName).maybeSingle();
-        const { data: rows } = proc
-          ? await client.from('process_taxonomy_operations').select('raw_compound_string').eq('canonical_process_id', (proc as { id: string }).id)
-          : { data: null };
+        const { data: rows } = await cachedRead(`die-casting-catalog-operations:${processName}`, async () => {
+          const { data: proc } = await client.from('process_taxonomy').select('id')
+            .eq('process_group', 'Die Casting').eq('process_name', processName).maybeSingle();
+          return proc
+            ? await client.from('process_taxonomy_operations').select('raw_compound_string').eq('canonical_process_id', (proc as { id: string }).id)
+            : { data: null };
+        });
         const catalog = topLevelCatalogRows(((rows ?? []) as Array<{ raw_compound_string: string }>).map((r) => r.raw_compound_string));
         if (catalog.length === 0) return [`${processName} catalog operations not found (migration 844): operations per feature not shown.`];
         line.featureOperations = selectCastingOperations({
