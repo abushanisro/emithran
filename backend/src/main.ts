@@ -2,6 +2,12 @@
 import * as dotenv from 'dotenv';
 dotenv.config({ override: true });
 
+// Telemetry starts here, after .env is loaded and before http/express are required by the imports below,
+// so the instrumentations can patch them. A no-op (and loads no SDK) unless OTEL_EXPORTER_OTLP_ENDPOINT is set.
+import { startTelemetry, flushOnTermination } from './telemetry/start';
+const telemetry = startTelemetry();
+if (telemetry) flushOnTermination(telemetry);
+
 import { NestFactory } from '@nestjs/core';
 import { VersioningType, type LogLevel } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
@@ -16,17 +22,23 @@ import { RequestAuthInterceptor } from './common/interceptors/request-auth.inter
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { Logger } from './common/logger/logger.service';
 import { SupabaseService } from './common/supabase/supabase.service';
+import { CorrelatedConsoleLogger } from './telemetry/correlated-console-logger';
+import { httpMetricsMiddleware } from './telemetry/http-metrics.middleware';
 
 async function bootstrap() {
   // Debug lines (one per privileged-client call, hundreds per page load) only with LOG_LEVEL=debug.
   const logLevels: LogLevel[] = process.env.LOG_LEVEL === 'debug' ? ['log', 'warn', 'error', 'debug'] : ['log', 'warn', 'error'];
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
-    logger: logLevels,
+    // Same levels either way; with telemetry on, each line also carries the active trace and span id.
+    logger: telemetry ? new CorrelatedConsoleLogger({ logLevels }) : logLevels,
   });
 
   const configService = app.get(ConfigService);
   const logger = app.get(Logger);
+
+  // First middleware, so it times (and counts) every request, including ones rejected by guards.
+  if (telemetry) app.use(httpMetricsMiddleware);
 
   // No global prefix - all controllers use explicit prefixes
   // AppController uses no prefix for root routes

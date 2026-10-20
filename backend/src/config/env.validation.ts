@@ -89,6 +89,24 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   ADMIN_FALLBACK_EMAIL: string = '';
+
+  // Telemetry (OpenTelemetry). Off unless OTEL_EXPORTER_OTLP_ENDPOINT is set. src/telemetry/start.ts reads
+  // these directly from process.env, before this validation runs, and disables telemetry (with a warning)
+  // on a bad value instead of stopping the API: monitoring must never decide whether the product boots.
+  // So they are declared here only to document the supported set, as unvalidated strings.
+  // OTEL_EXPORTER_OTLP_HEADERS (the ingest credential) is read by the exporters themselves and is
+  // deliberately not declared or logged here.
+  @IsString()
+  @IsOptional()
+  OTEL_EXPORTER_OTLP_ENDPOINT?: string;
+
+  @IsString()
+  @IsOptional()
+  OTEL_SERVICE_NAME?: string;
+
+  @IsString()
+  @IsOptional()
+  OTEL_TRACES_SAMPLER_ARG?: string;
 }
 
 export function validate(config: Record<string, unknown>) {
