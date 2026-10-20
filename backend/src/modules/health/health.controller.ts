@@ -13,6 +13,7 @@ import { Controller, Get, Post, VERSION_NEUTRAL } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { HealthCheckService, HealthCheck, HealthCheckResult } from '@nestjs/terminus';
 import { SupabaseHealthIndicator } from './indicators/supabase.health';
+import { EngineHealthIndicator } from './indicators/engine.health';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { Public } from '../../common/decorators/public.decorator';
 
@@ -24,7 +25,40 @@ export class HealthController {
     private readonly health: HealthCheckService,
     private readonly supabaseIndicator: SupabaseHealthIndicator,
     private readonly supabaseService: SupabaseService,
+    private readonly engineIndicator: EngineHealthIndicator,
   ) { }
+
+  /**
+   * Liveness: the process is up and its event loop answers. Depends on NOTHING external, so a database
+   * or engine outage can never make a platform restart a healthy process. Use this for restart decisions.
+   */
+  @Get('live')
+  @ApiOperation({ summary: 'Liveness (process only, no dependencies)' })
+  @ApiResponse({ status: 200, description: 'Process is alive' })
+  live(): { status: 'ok' } {
+    return { status: 'ok' };
+  }
+
+  /**
+   * Readiness: the dependencies this API needs to serve costing and CAD work answer. Returns 503 with a
+   * per-dependency reason code when one does not. For monitoring and alerting, NOT for restart or
+   * traffic-removal decisions (an engine outage should page someone, not take the whole API away).
+   * A dependency with no URL configured is reported `configured: false` and does not fail readiness.
+   * The electronics queue (pg-boss) is not probed yet: its port has no health operation (added with its
+   * instrumentation in the engines/jobs phase).
+   */
+  @Get('ready')
+  @ApiOperation({ summary: 'Readiness (database and engines)' })
+  @ApiResponse({ status: 200, description: 'Dependencies are reachable' })
+  @ApiResponse({ status: 503, description: 'A dependency is not ready' })
+  @HealthCheck()
+  ready(): Promise<HealthCheckResult> {
+    return this.health.check([
+      () => this.supabaseIndicator.isReachable('database'),
+      () => this.engineIndicator.check('cad_engine', 'CAD_ENGINE_URL', '/health'),
+      () => this.engineIndicator.check('ecad_engine', 'ECAD_ENGINE_URL', '/ready'),
+    ]);
+  }
 
   @Get()
   @ApiOperation({ summary: 'Overall health check' })

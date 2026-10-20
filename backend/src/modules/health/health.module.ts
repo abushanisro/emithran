@@ -3,11 +3,12 @@ import { TerminusModule } from '@nestjs/terminus';
 import { HttpModule } from '@nestjs/axios';
 import { HealthController } from './health.controller';
 import { SupabaseHealthIndicator } from './indicators/supabase.health';
+import { EngineHealthIndicator } from './indicators/engine.health';
 import { SupabaseModule } from '../../common/supabase/supabase.module';
 
 @Module({
   imports: [TerminusModule, HttpModule, SupabaseModule],
   controllers: [HealthController],
-  providers: [SupabaseHealthIndicator],
+  providers: [SupabaseHealthIndicator, EngineHealthIndicator],
 })
 export class HealthModule {}

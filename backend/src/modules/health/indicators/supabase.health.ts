@@ -21,6 +21,24 @@ export class SupabaseHealthIndicator extends HealthIndicator {
   }
 
   /**
+   * Readiness probe: one minimal real query, bounded to 2 s. Unlike isHealthy() (an MVP stub kept
+   * for the existing /api/health contract) this actually reaches the database. The failure carries a
+   * short reason code only, never the driver's message, because /api/health/ready is public.
+   */
+  async isReachable(key: string): Promise<HealthIndicatorResult> {
+    let reason = 'unreachable';
+    try {
+      const client = this.supabaseService.getPrivilegedClient('health-check: readiness probe, no user context');
+      const { error } = await client.from('projects').select('id').limit(1).abortSignal(AbortSignal.timeout(2_000));
+      if (!error) return this.getStatus(key, true);
+      reason = /abort|timeout/i.test(error.message) ? 'timeout' : 'query_failed';
+    } catch {
+      // keep the default reason
+    }
+    throw new HealthCheckError('Database is not ready', this.getStatus(key, false, { reason }));
+  }
+
+  /**
    * Check database connectivity and verify tables exist
    */
   async checkDatabase(key: string): Promise<HealthIndicatorResult> {

@@ -1,6 +1,14 @@
 import { Injectable, LoggerService as NestLoggerService } from '@nestjs/common';
 import * as winston from 'winston';
 import DailyRotateFile from 'winston-daily-rotate-file';
+import { currentTraceFields } from '../../telemetry/trace-context';
+
+// Adds trace_id/span_id to the entry only while a trace is active. With telemetry off, or outside a
+// request, the entry is untouched, so the existing console and file output is unchanged.
+const traceCorrelation = winston.format((info) => {
+  const fields = currentTraceFields();
+  return fields ? Object.assign(info, fields) : info;
+});
 
 @Injectable()
 export class Logger implements NestLoggerService {
@@ -11,6 +19,7 @@ export class Logger implements NestLoggerService {
     this.logger = winston.createLogger({
       level: process.env.LOG_LEVEL || 'info',
       format: winston.format.combine(
+        traceCorrelation(),
         winston.format.timestamp(),
         winston.format.errors({ stack: true }),
         winston.format.json(),

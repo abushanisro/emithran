@@ -144,6 +144,7 @@ import { cadEvidenceKey } from './costing/shared/cad-evidence';
 import { realBendLengthsMm } from './costing/shared/bend-lengths';
 import { cachedRead } from './costing/shared/core/request-cache';
 import { ReferenceMemo } from '../../common/cache/reference-memo';
+import { Traced } from '../../telemetry/traced';
 
 /** A quote with extra lines appended: process total, total, cycle time and completeness follow. */
 function appendLines<T extends CostSummaryDto>(dto: T, lines: ProcessLineCost[]): T {
@@ -3044,6 +3045,7 @@ export class BOMItemsService {
    * The part's quote: its family route (computeCostSummary) plus the shared
    * secondary operations (heat / surface / other) selected for it.
    */
+  @Traced('cost_summary')
   async getCostSummary(
     id: string,
     userId: string,
@@ -5549,6 +5551,7 @@ export class BOMItemsService {
    * with the same selected shared secondary operations appended, so a route's
    * total is what the quote would be on it.
    */
+  @Traced('route_comparison')
   async getRouteComparison(
     id: string,
     userId: string,

@@ -1,0 +1,31 @@
+# Local observability backend (OpenObserve, single node). Dev and proof only.
+#   docker compose -f docker-compose.observability.yml up -d
+# Separate from docker-compose.yml on purpose: telemetry must be startable alone and must
+# never become a dependency of the application stack. See docs/ops/observability.md.
+
+services:
+  openobserve:
+    # Pinned. Upgrade deliberately, after reading the release notes.
+    image: public.ecr.aws/zinclabs/openobserve:v1.0.4
+    container_name: mithran-openobserve
+    environment:
+      ZO_ROOT_USER_EMAIL: ${OPENOBSERVE_ROOT_EMAIL:?set OPENOBSERVE_ROOT_EMAIL}
+      ZO_ROOT_USER_PASSWORD: ${OPENOBSERVE_ROOT_PASSWORD:?set OPENOBSERVE_ROOT_PASSWORD}
+      ZO_DATA_DIR: /data
+      # Retention floor; per-stream retention is set in the UI (logs 14d, traces 7d, metrics 30d).
+      ZO_COMPACT_DATA_RETENTION_DAYS: ${OPENOBSERVE_RETENTION_DAYS:-30}
+    ports:
+      # Loopback only: the UI and the ingest API are not reachable from other machines.
+      - "127.0.0.1:${OPENOBSERVE_PORT:-5080}:5080"
+    volumes:
+      - openobserve-data:/data
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  openobserve-data:
+    driver: local
