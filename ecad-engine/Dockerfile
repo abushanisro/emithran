@@ -8,7 +8,7 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Only the service code. Test data (customer board files) and tests are not shipped.
-COPY main.py config.py ./
+COPY main.py config.py telemetry.py ./
 COPY parsers ./parsers
 COPY extraction ./extraction
 

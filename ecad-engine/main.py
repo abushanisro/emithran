@@ -30,6 +30,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
+import telemetry
 from config import AppConfig
 from extraction.board import (
     CONTRACT_VERSION,
@@ -70,6 +71,7 @@ async def lifespan(app: FastAPI):
     app.state.config = config
     yield
     log.info("ecad-engine shutting down")
+    telemetry.shutdown()  # bounded flush; a no-op when telemetry is off
 
 
 app = FastAPI(
@@ -88,6 +90,8 @@ app.add_middleware(
     allow_headers=["*"],
     max_age=3600,
 )
+# Off unless OTEL_EXPORTER_OTLP_ENDPOINT is set (see telemetry.py). Continues an inbound traceparent from the backend.
+telemetry.setup(app, service_name="mithran-ecad-engine", environment=config.environment)
 
 
 @app.middleware("http")
@@ -211,7 +215,9 @@ async def extract(request: Request, files: list[UploadFile] = File(...), manifes
         return inputs
     started = time.perf_counter()
     try:
-        result = extract_board(inputs, lookups, supplied, tier)
+        # A refusal of the files (ExtractionError, unreadable file) is an outcome "rejected", not a failure.
+        with telemetry.stage("extract_board", expected=(ExtractionError, ValueError)):
+            result = extract_board(inputs, lookups, supplied, tier)
     except ExtractionError as error:
         return _bad("extraction_failed", str(error))
     except ValueError as error:  # a file that cannot be read
@@ -233,7 +239,8 @@ async def render(request: Request, files: list[UploadFile] = File(...), manifest
         return inputs
     started = time.perf_counter()
     try:
-        preview = render_board(inputs, lookups.placement_layers)
+        with telemetry.stage("render_board", expected=(ExtractionError, ValueError)):
+            preview = render_board(inputs, lookups.placement_layers)
     except ExtractionError as error:
         return _bad("render_failed", str(error))
     log.info("rendered %d layers in %.2fs (request %s)", len(preview["layers"]), time.perf_counter() - started, request.state.request_id)
