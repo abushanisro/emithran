@@ -27,14 +27,15 @@ export class SupabaseAuthGuard implements CanActivate {
   ) {}
 
   /**
-   * The development auth bypass must never activate in production, regardless of
+   * The development auth bypass needs an explicit opt-in (ALLOW_DEV_AUTH_BYPASS=true, default
+   * off) AND a non-production environment. It must never activate in production, regardless of
    * whether ADMIN_FALLBACK_EMAIL happens to resolve to a real account. env.validation.ts
    * already refuses to boot if that variable is set with NODE_ENV=production; this is the
    * second, independent gate for the same rule, checked on every request rather than once
    * at startup, so a request never authenticates as admin in production for any reason.
    */
   private get bypassAllowed(): boolean {
-    return process.env.NODE_ENV !== 'production';
+    return this.supabaseService.isDevAuthBypassEnabled();
   }
 
   /**

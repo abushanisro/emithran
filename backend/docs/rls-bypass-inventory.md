@@ -12,14 +12,18 @@ Authoritative as of 2026-10-01. `npm run check:rls` (scripts/rls-bypass-rules.js
 | Service role (RLS bypassed) | `getPrivilegedClient('<specific reason>')` | Reason is mandatory, a plain literal (CI-enforced), logged at debug. |
 | Dev auth bypass | `mintUserAccessToken(email)` | Mints a real user JWT for `ADMIN_FALLBACK_EMAIL`, so the bypass user goes through RLS. Never runs in production. |
 
+**Dev auth bypass is opt-in (2026-10-16).** A missing or invalid bearer token is a 401 unless `ALLOW_DEV_AUTH_BYPASS=true` AND `NODE_ENV` is not `production` (`SupabaseService.isDevAuthBypassEnabled()`; default `false`). `ADMIN_FALLBACK_EMAIL` alone enables nothing, and env validation refuses to boot in production with either variable set. Local development needs `ALLOW_DEV_AUTH_BYPASS=true` in `backend/.env`. Covered by `test/auth-bypass-off.e2e-spec.ts` (401s), `test/auth-bypass-on.e2e-spec.ts` and `src/config/env.validation.spec.ts`.
+
 There is no second database path: `typeorm`, `knex`, `pg` are not imported anywhere in `src` (CI rule `second-db-path`). They remain in `package.json` as dead dependencies, as does `redis` (kept deliberately for now).
+
+**One deliberate exception: the electronics job queue (2026-10-15).** `pg-boss` holds a dedicated Postgres connection (`ELECTRONICS_QUEUE_DATABASE_URL`) and owns its own `pgboss` schema (it creates and versions it at start; `ELECTRONICS_QUEUE_MIGRATE=false` stops that). This is a queue connection, not a data path: job rows hold ids only (upload id, organization id, batch size), never customer files or design data. Every read or write of tenant data by a job handler still goes through `SupabaseService` (`getPrivilegedClient` with a literal reason, filtered by the organization id in the payload). Give the queue connection a role limited to the `pgboss` schema when the deployment allows it. The `second-db-path` rule does not match `pg-boss`; the queue sits behind the `JobQueue` port in `infrastructure/queue`, so a BullMQ adapter can replace it without touching this boundary.
 
 The deprecated `getAdminClient()` and `.client` accessors have been removed from `SupabaseService`; CI rule `get-admin-client` / `dot-client` rejects their reintroduction.
 
 ## Counts (production code, excluding specs)
 
 - `getUserClient(...)`: 195 call sites (all tenant-data access)
-- `getPrivilegedClient(...)`: 124 call sites, all with a named reason (table below)
+- `getPrivilegedClient(...)`: 128 call sites, all with a named reason (table below)
 - `getAdminClient()` / `.client`: **removed** (0 callers, aliases deleted)
 - zero-argument `getClient()`: **0**
 - `createClient(` outside `SupabaseService`: **0** (two were found and routed through the service, see below)
@@ -45,6 +49,11 @@ The deprecated `getAdminClient()` and `.client` accessors have been removed from
 | 1 | auth: resolve organization membership before an org context exists | `organization-context.guard.ts` |
 | 1 | health-check: connectivity probe | `supabase.health.ts` |
 | 1 | storage: CAD and drawing file bucket operations | `file-storage.service.ts` |
+| 1 | storage: electronics design-file bucket (private, organization-prefixed keys, no end-user policy) | `electronics-file-store.ts` |
+| 1 | reference-data: `electronics_reference_data` (global rates, read-only, migration 910) | `electronics-reference.repository.ts` |
+| 1 | reference-data: machine and labour hour rates (`mhr_records`) for electronics quotes, benchmark rows and the quoting organization rows only | `electronics-rate-book.loader.ts` |
+| 1 | system-job: electronics pipeline worker has no user context; every statement filters by the organization id in the job payload | `electronics.repository.ts` |
+| 1 | user-delete: electronics designs and uploads have no end-user DELETE policy; the caller is proven to see the design first and every statement filters by organization id | `electronics.repository.ts` |
 | 22 | **OPEN RISK** delivery: no tenancy column; repo policy is `USING (true)` for authenticated (see Open items 2) | `delivery.service.ts` |
 | 22 | **OPEN RISK** quality-control: no tenancy column; repo policy is per-creator, not per-organization | `quality-control.service.ts` (6), `quality-inspection.service.ts` (16) |
 | 1 | **OPEN** `lhr_records` bulk delete: no RLS policy in repo migrations, live state unverified | `lhr.service.ts` |

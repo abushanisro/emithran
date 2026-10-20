@@ -13,6 +13,10 @@ import jsxA11y from "eslint-plugin-jsx-a11y";
 import globals from "globals";
 import prettier from "eslint-config-prettier";
 
+// Import boundary for backend/src/modules/electronics-costing/domain (also run standalone
+// in backend CI: npm run lint:electronics-boundary).
+import electronicsBoundary from "./backend/eslint.electronics-boundary.cjs";
+
 export default tseslint.config(
   /**
    * ==========================================
@@ -273,6 +277,17 @@ export default tseslint.config(
 
       "@next/next/no-html-link-for-pages": "off",
     },
+  },
+
+  /**
+   * ==========================================
+   * ELECTRONICS DOMAIN IMPORT BOUNDARY
+   * ==========================================
+   */
+  // Rules only: the root config already owns the parser and the @typescript-eslint plugin.
+  {
+    files: electronicsBoundary.electronicsDomainBoundary.files,
+    rules: electronicsBoundary.electronicsDomainBoundary.rules,
   },
 
   /**

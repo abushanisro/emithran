@@ -1,0 +1,262 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://emithran.com/schemas/electronics/harness_feature_graph.v1.json",
+  "title": "harness_feature_graph",
+  "description": "The one versioned contract every wire-harness input tier reduces to. Engines read only this, never the raw upload. A value the input could not provide is listed in `unresolved`, never guessed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "kind",
+    "inputTier",
+    "reviewStatus",
+    "circuits",
+    "connectors",
+    "provenance",
+    "unresolved"
+  ],
+  "properties": {
+    "contractVersion": {
+      "const": "1.1"
+    },
+    "kind": {
+      "const": "harness"
+    },
+    "inputTier": {
+      "description": "A/B: wire list. C: harness drawing PDF. D: photos.",
+      "enum": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ]
+    },
+    "reviewStatus": {
+      "enum": [
+        "needs_review",
+        "confirmed"
+      ]
+    },
+    "circuits": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "awg",
+          "lengthMm",
+          "terminalCount",
+          "sealCount"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "awg": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "lengthMm": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "colour": {
+            "type": "string"
+          },
+          "terminalCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2
+          },
+          "sealCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2
+          }
+        }
+      }
+    },
+    "connectors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "cavities"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cavities": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "sleeveLengthMm": {
+      "type": "number",
+      "minimum": 0
+    },
+    "grommetCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "spliceCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "branchCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "labelCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "sourceFiles": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "extraction": {
+      "$ref": "#/definitions/extraction"
+    },
+    "provenance": {
+      "type": "object",
+      "description": "One entry per data field present in the graph, keyed by its top-level field name. A field with no entry, or an entry for an absent field, is rejected.",
+      "additionalProperties": {
+        "$ref": "#/definitions/provenanceEntry"
+      }
+    },
+    "unresolved": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "field",
+          "reason"
+        ],
+        "properties": {
+          "field": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "findings": {
+      "description": "Cross-checks and warnings the extraction recorded (for example a drill count that matches or disagrees with the drill report). Evidence for the reviewer; not data.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "severity",
+          "message"
+        ],
+        "properties": {
+          "field": {
+            "type": "string",
+            "minLength": 1
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "warning"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "provenanceEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "basis",
+        "confidence"
+      ],
+      "description": "Where one field of the graph came from. measured: read from a source file by a parser. supplied: stated by a person or a drawing. derived: computed from other graph fields.",
+      "properties": {
+        "basis": {
+          "enum": [
+            "measured",
+            "supplied",
+            "derived"
+          ]
+        },
+        "confidence": {
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ]
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "file": {
+              "type": "string",
+              "minLength": 1
+            },
+            "reference": {
+              "type": "string",
+              "minLength": 1
+            },
+            "note": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "derivedFrom": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "extraction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parserId",
+        "parserVersion"
+      ],
+      "description": "The parser that produced the measured fields. The same inputs with the same parserVersion must give the same graph.",
+      "properties": {
+        "parserId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parserVersion": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

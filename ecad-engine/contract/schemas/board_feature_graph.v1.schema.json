@@ -1,0 +1,444 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://emithran.com/schemas/electronics/board_feature_graph.v1.json",
+  "title": "board_feature_graph",
+  "description": "The one versioned contract every PCBA input tier reduces to. Engines read only this, never the raw upload. A value the input could not provide is listed in `unresolved`, never guessed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "kind",
+    "inputTier",
+    "reviewStatus",
+    "outline",
+    "layers",
+    "placements",
+    "thtParts",
+    "provenance",
+    "unresolved"
+  ],
+  "properties": {
+    "contractVersion": {
+      "description": "1.2 adds `fabrication`. A 1.1 graph stays valid: every 1.2 addition is optional.",
+      "enum": [
+        "1.1",
+        "1.2"
+      ]
+    },
+    "kind": {
+      "const": "board"
+    },
+    "inputTier": {
+      "description": "A: ODB++/IPC-2581. B: Gerber+drill+BOM+XY or KiCad project. C: BOM + size + sides. D: photos.",
+      "enum": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ]
+    },
+    "reviewStatus": {
+      "description": "needs_review until a person confirms the graph (always for tier D).",
+      "enum": [
+        "needs_review",
+        "confirmed"
+      ]
+    },
+    "outline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lengthMm",
+        "widthMm"
+      ],
+      "properties": {
+        "lengthMm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "widthMm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "thicknessMm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "areaMm2": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Area enclosed by the outline path (a stepped or L-shaped board is smaller than length x width)."
+        }
+      }
+    },
+    "layers": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 64
+    },
+    "sidesPopulated": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "top",
+          "bottom"
+        ]
+      }
+    },
+    "panel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "boardsPerPanel"
+      ],
+      "properties": {
+        "boardsPerPanel": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "panelLengthMm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "panelWidthMm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "depanel": {
+          "enum": [
+            "router",
+            "v_score",
+            "none"
+          ]
+        },
+        "depanelLengthMm": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "placements": {
+      "description": "SMT placements by package class and side.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "side",
+          "packageClass",
+          "count"
+        ],
+        "properties": {
+          "side": {
+            "enum": [
+              "top",
+              "bottom"
+            ]
+          },
+          "packageClass": {
+            "enum": [
+              "chip_0402",
+              "chip_0603",
+              "chip_0805",
+              "chip_1206",
+              "sot",
+              "sod",
+              "qfn",
+              "htssop",
+              "dpak",
+              "smd_electrolytic",
+              "unknown"
+            ]
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "footprint": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The footprint name the placement was grouped by, kept so a package class can be assigned later by exact name."
+          }
+        }
+      }
+    },
+    "thtParts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "label",
+          "count",
+          "jointsPerPart"
+        ],
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "jointsPerPart": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "uniquePartNumbers": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "flags": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "fine_pitch",
+          "bga",
+          "qfn_under_body",
+          "tall",
+          "heavy"
+        ]
+      }
+    },
+    "pasteAreaMm2": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "top": {
+          "type": "number",
+          "minimum": 0
+        },
+        "bottom": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "testPoints": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "coating": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "coatAreaMm2": {
+          "type": "number",
+          "minimum": 0
+        },
+        "pottingVolumeMl": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "sourceFiles": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "extraction": {
+      "$ref": "#/definitions/extraction"
+    },
+    "provenance": {
+      "type": "object",
+      "description": "One entry per data field present in the graph, keyed by its top-level field name. A field with no entry, or an entry for an absent field, is rejected.",
+      "additionalProperties": {
+        "$ref": "#/definitions/provenanceEntry"
+      }
+    },
+    "unresolved": {
+      "description": "Fields the input could not provide. A listed field must be absent from the graph, never filled with a guess.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "field",
+          "reason"
+        ],
+        "properties": {
+          "field": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "findings": {
+      "description": "Cross-checks and warnings the extraction recorded (for example a drill count that matches or disagrees with the drill report). Evidence for the reviewer; not data.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "severity",
+          "message"
+        ],
+        "properties": {
+          "field": {
+            "type": "string",
+            "minLength": 1
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "warning"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "fabrication": {
+      "description": "Bare-board fabrication facts a Gerber set can state. Colour, finish, copper weight, impedance and stack-up are never in Gerber: they are supplied through the PCB specification, not here.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "soldermask": {
+          "$ref": "#/definitions/sideFlags"
+        },
+        "silkscreen": {
+          "$ref": "#/definitions/sideFlags"
+        },
+        "minHoleMm": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Smallest drilled hole diameter in the drill file."
+        },
+        "minTraceWidthMm": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Narrowest drawn conductor stroke on the copper layers. Pour and region copper is not a stroke and is not counted."
+        }
+      }
+    },
+    "holes": {
+      "description": "Drilled holes grouped by finished diameter and plating.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "diameterMm",
+          "plated",
+          "count"
+        ],
+        "properties": {
+          "diameterMm": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "plated": {
+            "type": "boolean"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "sideFlags": {
+      "description": "true for each side whose layer file is in the set. A missing layer is left out and listed in `unresolved`: an absent file cannot tell a board without the feature from an incomplete set.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "top": {
+          "type": "boolean"
+        },
+        "bottom": {
+          "type": "boolean"
+        }
+      }
+    },
+    "provenanceEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "basis",
+        "confidence"
+      ],
+      "description": "Where one field of the graph came from. measured: read from a source file by a parser. supplied: stated by a person or a drawing. derived: computed from other graph fields.",
+      "properties": {
+        "basis": {
+          "enum": [
+            "measured",
+            "supplied",
+            "derived"
+          ]
+        },
+        "confidence": {
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ]
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "file": {
+              "type": "string",
+              "minLength": 1
+            },
+            "reference": {
+              "type": "string",
+              "minLength": 1
+            },
+            "note": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "derivedFrom": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "extraction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parserId",
+        "parserVersion"
+      ],
+      "description": "The parser that produced the measured fields. The same inputs with the same parserVersion must give the same graph.",
+      "properties": {
+        "parserId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parserVersion": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

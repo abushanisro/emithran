@@ -15,6 +15,7 @@ import { RequestCacheInterceptor } from './common/interceptors/request-cache.int
 import { RequestAuthInterceptor } from './common/interceptors/request-auth.interceptor';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { Logger } from './common/logger/logger.service';
+import { SupabaseService } from './common/supabase/supabase.service';
 
 async function bootstrap() {
   // Debug lines (one per privileged-client call, hundreds per page load) only with LOG_LEVEL=debug.
@@ -108,8 +109,8 @@ async function bootstrap() {
       'Idempotency-Key',
       'idempotency-key',
       // Development auth bypass headers — never advertised as an accepted transport-layer
-      // header outside development, so a production deployment never even offers this surface.
-      ...(process.env.NODE_ENV !== 'production'
+      // header unless ALLOW_DEV_AUTH_BYPASS=true outside production, so no other deployment offers this surface.
+      ...(app.get(SupabaseService).isDevAuthBypassEnabled()
         ? ['x-auth-bypass', 'x-mock-user', 'x-dev-mode', 'x-mock-user-id', 'x-mock-user-email']
         : []),
     ],

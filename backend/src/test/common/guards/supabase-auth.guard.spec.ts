@@ -1,7 +1,7 @@
 import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { SupabaseAuthGuard } from '../../../common/guards/supabase-auth.guard';
-import { type SupabaseService } from '../../../common/supabase/supabase.service';
+import { SupabaseService } from '../../../common/supabase/supabase.service';
 import { type SessionActivityService } from '../../../common/session/session-activity.service';
 
 /** A token shaped like a Supabase access token, carrying a session_id claim. */
@@ -32,11 +32,14 @@ function makeSupabaseService(opts: {
   verifyToken?: jest.Mock;
   adminFallbackEmail?: string | null;
   adminUserId?: string | null;
+  bypassFlag?: string;
 }): SupabaseService {
   const adminFallbackEmail = 'adminFallbackEmail' in opts ? opts.adminFallbackEmail : 'admin@example.com';
   const adminUserId = 'adminUserId' in opts ? opts.adminUserId : 'admin-uuid-1';
   return {
     verifyToken: opts.verifyToken ?? jest.fn().mockRejectedValue(new Error('invalid token')),
+    // The real predicate (not production AND flag 'true'), fed the flag the test wants.
+    isDevAuthBypassEnabled: () => SupabaseService.prototype.isDevAuthBypassEnabled.call({ configService: { get: () => opts.bypassFlag ?? 'true' } }),
     getAdminFallbackEmail: jest.fn().mockReturnValue(adminFallbackEmail),
     getAdminUserId: jest.fn().mockResolvedValue(adminUserId),
     mintUserAccessToken: jest.fn().mockResolvedValue('minted-jwt'),
@@ -48,6 +51,16 @@ describe('SupabaseAuthGuard', () => {
 
   afterEach(() => {
     process.env.NODE_ENV = originalNodeEnv;
+  });
+
+  it('with ALLOW_DEV_AUTH_BYPASS off, rejects a missing and an invalid token even outside production', async () => {
+    process.env.NODE_ENV = 'development';
+    const noToken = { headers: {} };
+    await expect(newGuard(makeReflector(false), makeSupabaseService({ bypassFlag: 'false' })).canActivate(makeContext(noToken))).rejects.toThrow(UnauthorizedException);
+    expect(noToken).not.toHaveProperty('user');
+    const forged = { headers: { authorization: `Bearer ${REAL_JWT}` } };
+    await expect(newGuard(makeReflector(false), makeSupabaseService({ bypassFlag: 'false' })).canActivate(makeContext(forged))).rejects.toThrow(UnauthorizedException);
+    expect(forged).not.toHaveProperty('user');
   });
 
   it('lets public routes through without a token, in any environment', async () => {

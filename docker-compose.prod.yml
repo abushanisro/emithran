@@ -3,6 +3,22 @@
 version: '3.8'
 
 services:
+  ecad-engine:
+    build:
+      context: ./ecad-engine
+      dockerfile: Dockerfile
+    container_name: mithran-ecad-engine-prod
+    environment:
+      PORT: 5100
+      ECAD_ENGINE_API_KEY: ${ECAD_ENGINE_API_KEY:?set ECAD_ENGINE_API_KEY in the deploy environment}
+      LOG_LEVEL: info
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:5100/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   cad-engine:
     build:
       context: ./cad-engine
@@ -74,6 +90,8 @@ services:
       JWT_SECRET: production_jwt_secret_key_here
       CORS_ORIGIN: http://localhost:3000
       CAD_ENGINE_URL: http://cad-engine:5000
+      ECAD_ENGINE_URL: http://ecad-engine:5100
+      ECAD_ENGINE_API_KEY: ${ECAD_ENGINE_API_KEY:?set ECAD_ENGINE_API_KEY in the deploy environment}
     ports:
       - "4000:4000"
     restart: unless-stopped
@@ -85,6 +103,7 @@ services:
       start_period: 60s
     depends_on:
       - cad-engine
+      - ecad-engine
 
 volumes:
   cad-temp:

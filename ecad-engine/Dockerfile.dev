@@ -1,0 +1,12 @@
+# Test image for the ecad-engine: the runtime requirements plus test-only tooling.
+#
+#   docker compose -f docker-compose.dev.yml run --rm tests
+#
+# The tests need no board files. memory/Electronics is mounted by the compose file, not copied here.
+FROM python:3.12-slim
+
+ENV PYTHONUNBUFFERED=1
+WORKDIR /app
+COPY requirements.txt requirements-dev.txt ./
+RUN pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
+CMD ["python", "-m", "pytest", "-q"]

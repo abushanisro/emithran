@@ -1,0 +1,8 @@
+# ecad-engine: electronics design-file extraction service (pure Python, no OpenCascade)
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+python-multipart==0.0.32
+slowapi==0.1.9
+gerbonara==1.6.3
+openpyxl==3.1.5

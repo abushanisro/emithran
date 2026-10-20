@@ -52,6 +52,8 @@ function ModuleCard({
         return 'https://png.pngtree.com/thumb_back/fh260/background/20250415/pngtree-logistic-and-transportation-concept-showing-a-world-map-network-with-freight-image_17184384.jpg';
       case 'Benchmark Analysis':
         return 'https://thumbs.dreamstime.com/b/benchmark-businessman-hologram-concept-benchmark-businessman-hologram-concept-futuristic-177138441.jpg';
+      case 'Electronics':
+        return '/images/modules/electronics.png';
       case 'VAVE':
         return 'https://gidelkocal.com/wp-content/uploads/2023/10/3-value-engineering-examples-in-construction2.png';
       default:
@@ -151,6 +153,15 @@ export function ProjectModules({ projectId, bomCount, firstBomId: _firstBomId }:
       onClick: () => {
         // Navigate to global BOM management page with project context
         router.push(`/bom?projectId=${projectId}`);
+      },
+    },
+    {
+      title: 'Electronics',
+      description: 'PCB assemblies and wire harnesses: board file extraction, BOM lines, part prices and assembly cost',
+      borderColor: 'border-l-4 border-l-cyan-500',
+      status: 'available' as const,
+      onClick: () => {
+        router.push(`/projects/${projectId}/electronics`);
       },
     },
     {

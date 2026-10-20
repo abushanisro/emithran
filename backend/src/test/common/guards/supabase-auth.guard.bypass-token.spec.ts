@@ -1,7 +1,7 @@
 import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { SupabaseAuthGuard } from '../../../common/guards/supabase-auth.guard';
-import { type SupabaseService } from '../../../common/supabase/supabase.service';
+import { SupabaseService } from '../../../common/supabase/supabase.service';
 import { type SessionActivityService } from '../../../common/session/session-activity.service';
 
 /** A token shaped like a Supabase access token, carrying a session_id claim. */
@@ -23,6 +23,8 @@ const reflector = { getAllAndOverride: jest.fn().mockReturnValue(false) } as unk
 function service(over: Partial<Record<keyof SupabaseService, jest.Mock>> = {}) {
   return {
     verifyToken: jest.fn().mockRejectedValue(new Error('invalid')),
+    // The real predicate (not production AND flag 'true'), fed the flag the test wants.
+    isDevAuthBypassEnabled: () => SupabaseService.prototype.isDevAuthBypassEnabled.call({ configService: { get: () => 'true' } }),
     getAdminFallbackEmail: jest.fn().mockReturnValue('dev@example.com'),
     getAdminUserId: jest.fn().mockResolvedValue('dev-uuid'),
     mintUserAccessToken: jest.fn().mockResolvedValue('minted.real.jwt'),
