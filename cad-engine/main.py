@@ -42,8 +42,10 @@ from shared.part_family import MACHINING_FAMILIES
 from shared.exceptions import (
     CADEngineException,
     FileValidationError,
-    ConversionError
+    ConversionError,
+    StepReadError,
 )
+from shared import telemetry
 from shared import sldprt_converter
 from shared.drawing_analyzer import router as drawing_router
 
@@ -150,7 +152,7 @@ async def lifespan(app: FastAPI):
     
     # Shutdown
     logger.info("Shutting down CAD Engine...")
-    # Cleanup if needed
+    telemetry.shutdown()  # bounded flush; a no-op when telemetry is off
 
 # ============================================================================
 # FASTAPI APPLICATION
@@ -245,6 +247,9 @@ app.add_middleware(
     max_age=3600,  # Cache preflight requests for 1 hour
 )
 
+# Off unless OTEL_EXPORTER_OTLP_ENDPOINT is set (see shared/telemetry.py). Continues an inbound traceparent from the backend.
+telemetry.setup(app, service_name="mithran-cad-engine", environment=config.environment)
+
 # ============================================================================
 # UTILITY FUNCTIONS
 # ============================================================================
@@ -275,6 +280,21 @@ async def root() -> Dict[str, Any]:
         "engine": "OpenCascade Technology (OCCT)",
         "environment": config.environment
     }
+
+
+@app.get("/ready")
+async def ready() -> JSONResponse:
+    """Readiness: can this instance take work? 200, or 503 with reason codes only (the response is unauthenticated).
+
+    /health stays a plain capability report. Backend readiness probes this route, so a production instance
+    with no API key, or with an unwritable temp directory, is reported before it fails a real upload.
+    """
+    problems = []
+    if config.environment == "production" and not _CAD_API_KEY:
+        problems.append("api_key_not_configured")
+    if not (os.path.isdir(config.temp_dir) and os.access(config.temp_dir, os.W_OK)):
+        problems.append("temp_dir_not_writable")
+    return JSONResponse(status_code=503 if problems else 200, content={"ready": not problems, "problems": problems})
 
 
 @app.get("/health")
@@ -603,22 +623,24 @@ async def analyze_geometry_advanced(
 
         try:
             step_reader = StepReader()
-            shape = step_reader.read(step_path)
+            with telemetry.stage("step_load", expected=(StepReadError,)):
+                shape = step_reader.read(step_path)
             logger.info("STEP file successfully read for analysis")
         except Exception as e:
             cleanup_files(step_path)
             raise HTTPException(status_code=422, detail=f"Failed to read STEP file: {str(e)}")
 
         try:
-            optimization_result = memory_optimizer.analyze_and_optimize(
-                shape=shape,
-                file_path=step_path,
-                strategy=strategy,
-                force_reanalysis=force_reanalysis,
-                user_processes=parsed_processes,
-                file_hash=file_hash,
-                family_hint=family_hint,
-            )
+            with telemetry.stage("geometry_analysis"):
+                optimization_result = memory_optimizer.analyze_and_optimize(
+                    shape=shape,
+                    file_path=step_path,
+                    strategy=strategy,
+                    force_reanalysis=force_reanalysis,
+                    user_processes=parsed_processes,
+                    file_hash=file_hash,
+                    family_hint=family_hint,
+                )
 
             logger.info(f"Advanced analysis completed for {file.filename}")
 
@@ -828,10 +850,12 @@ async def analyze_geometry_advanced(
                     _mfg = optimization_result.geometry_features.manufacturing_features
                     _bbox = optimization_result.geometry_features.bounding_box
                     _loop = asyncio.get_event_loop()
-                    _cf = await _loop.run_in_executor(
-                        _cf_executor,
-                        lambda: ComponentFeatureAnalyzer().analyze(shape, _mfg, _bbox),
-                    )
+                    # The span is opened on the event-loop side and covers the await; the worker thread needs no context.
+                    with telemetry.stage("component_features"):
+                        _cf = await _loop.run_in_executor(
+                            _cf_executor,
+                            lambda: ComponentFeatureAnalyzer().analyze(shape, _mfg, _bbox),
+                        )
                     # Populate both cache layers so the next request is instant
                     with _cf_cache_lock:
                         if len(_cf_cache) >= 50:
