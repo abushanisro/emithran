@@ -25,7 +25,11 @@
     "prestart:dev": "rimraf dist tsconfig.tsbuildinfo",
     "db:migrate": "ts-node -r tsconfig-paths/register scripts/run-migrations.ts migrate",
     "db:migrate:reset": "ts-node -r tsconfig-paths/register scripts/run-migrations.ts reset",
-    "env:validate": "ts-node -r tsconfig-paths/register scripts/validate-env.ts"
+    "env:validate": "ts-node -r tsconfig-paths/register scripts/validate-env.ts",
+    "electronics:sync-contract": "node scripts/sync-electronics-contract.js",
+    "lint:electronics-boundary": "node scripts/lint-electronics-boundary.js",
+    "check:electronics-memory": "node scripts/check-electronics-memory.js",
+    "electronics:sync-lookups": "node scripts/sync-electronics-lookups.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",
@@ -46,6 +50,7 @@
     "@types/mathjs": "^9.4.1",
     "@types/multer": "^2.0.0",
     "@types/nodemailer": "^7.0.5",
+    "ajv8": "npm:ajv@^8.17.1",
     "axios": "^1.6.5",
     "camel-case": "^4.1.2",
     "canvas": "^3.2.1",
@@ -66,6 +71,7 @@
     "pdf-lib": "^1.17.1",
     "pdf2pic": "^3.2.0",
     "pg": "^8.16.3",
+    "pg-boss": "^10.4.2",
     "pg-query-stream": "^4.12.0",
     "redis": "^4.6.12",
     "reflect-metadata": "^0.1.14",

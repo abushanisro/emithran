@@ -187,6 +187,15 @@ export class SupabaseService {
    * replaced with one of the real accounts either — which identity a bypass
    * assumes is deployment configuration, not something source should decide.
    */
+  /**
+   * Whether the development auth bypass may serve a request that has no valid token. Both
+   * conditions are required: not production, and ALLOW_DEV_AUTH_BYPASS explicitly 'true'
+   * (default 'false'). Having ADMIN_FALLBACK_EMAIL configured is not enough.
+   */
+  isDevAuthBypassEnabled(): boolean {
+    return process.env.NODE_ENV !== 'production' && this.configService.get<string>('ALLOW_DEV_AUTH_BYPASS') === 'true';
+  }
+
   getAdminFallbackEmail(): string | null {
     return this.configService.get<string>('ADMIN_FALLBACK_EMAIL')?.trim() || null;
   }

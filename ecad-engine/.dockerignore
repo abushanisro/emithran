@@ -1,0 +1,6 @@
+tests
+contract
+docs
+**/__pycache__
+.pytest_cache
+*.md

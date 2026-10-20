@@ -41,6 +41,7 @@ import { ManufacturingKnowledgeModule } from './modules/manufacturing-knowledge/
 import { ShouldCostModule } from './modules/should-cost/should-cost.module';
 import { CostingModule } from './modules/costing/costing.module';
 import { ManufacturingRulesModule } from './modules/manufacturing-rules/manufacturing-rules.module';
+import { ElectronicsCostingModule } from './modules/electronics-costing/electronics-costing.module';
 import { FxModule } from './common/fx/fx.module';
 import { RequestLogInterceptor } from './modules/developer/interceptors/request-log.interceptor';
 import { LoggerModule } from './common/logger/logger.module';
@@ -114,6 +115,7 @@ import { AppController } from './app.controller';
     ShouldCostModule,
     CostingModule,
     ManufacturingRulesModule,
+    ElectronicsCostingModule,
     FxModule,
     SessionModule,
   ],

@@ -83,11 +83,37 @@ jobs:
       - name: RLS boundary and secret check
         run: npm run check:rls
 
+      - name: Electronics domain import boundary
+        run: npm run lint:electronics-boundary
+
+      - name: Electronics memory data format
+        run: npm run check:electronics-memory
+
       - name: Unit and domain tests
         run: npm test -- --runInBand
 
       - name: Production build
         run: npm run build
+
+  ecad-engine-contract:
+    name: Electronics extraction engine (Python)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r ecad-engine/requirements.txt -r ecad-engine/requirements-dev.txt
+
+      - name: Contract and service tests
+        working-directory: ecad-engine
+        run: python -I -m pytest -q
+
+      - name: Build the service image
+        run: docker build -t ecad-engine:ci ecad-engine
 
   cad-engine:
     name: CAD Engine (Docker build)

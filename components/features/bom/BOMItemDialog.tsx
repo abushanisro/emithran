@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useDropzone } from 'react-dropzone';
+import { useDropzone, type FileRejection } from 'react-dropzone';
+import { useFileFormats } from '@/lib/api/hooks/useElectronics';
+import { describeRejection } from '@/lib/electronics/rejections';
 import {
   Dialog,
   DialogContent,
@@ -296,6 +298,8 @@ interface BOMItemDialogProps {
   parentItemId?: string | null;
   defaultItemType?: BOMItemType;
   getAutoParent?: (type: BOMItemType) => string | null;
+  /** The Electronics module of this BOM's project. Board files point there; absent, the dialog only says it cannot read them. */
+  electronicsHref?: string;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -358,7 +362,8 @@ export function BOMItemDialog({
   onSuccess,
   parentItemId,
   defaultItemType,
-  getAutoParent
+  getAutoParent,
+  electronicsHref
 }: BOMItemDialogProps) {
   const queryClient = useQueryClient();
 
@@ -1016,8 +1021,25 @@ export function BOMItemDialog({
     });
   }, [activeFileId, populateFormFromResult]);
 
+  // react-dropzone drops files of other types silently, which looked like "no file found". Name them, and when they are
+  // board files (Gerber, drill, Pick Place: types from the electronics file-role table) say where they belong.
+  const { data: boardFormats } = useFileFormats();
+  const handleFileRejected = useCallback((rejections: FileRejection[]) => {
+    const message = describeRejection(
+      rejections.map((r) => ({ name: r.file.name, tooLarge: r.errors.some((e) => e.code === 'file-too-large') })),
+      new Set(boardFormats?.boardFiles.map((r) => r.extension) ?? []),
+      100,
+    );
+    toast.error(message.title, {
+      description: message.description,
+      duration: message.boardFiles ? 12000 : 10000,
+      ...(message.boardFiles && electronicsHref ? { action: { label: 'Open Electronics', onClick: () => window.location.assign(electronicsHref) } } : {}),
+    });
+  }, [boardFormats, electronicsHref]);
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: handleFileDrop,
+    onDropRejected: handleFileRejected,
     accept: {
       // STEP/STP are analysed by the CAD engine (the only 3D formats it reads);
       // DXF/DWG are stored as the 2D drawing, not analysed.
@@ -1717,6 +1739,14 @@ export function BOMItemDialog({
                       {isDragActive ? 'Drop files here…' : 'Drop STEP (.step / .stp) or DXF / DWG files, or click to browse'}
                     </p>
                     <p className="text-xs">Multiple files supported · 100 MB max each · STEP is analysed by the CAD engine and fills the form · DXF/DWG are stored as the drawing only (not analysed)</p>
+                    <p className="text-xs">
+                      Circuit board files (Gerber, drill, Pick Place)? This form cannot read them.{' '}
+                      {electronicsHref ? (
+                        <a href={electronicsHref} onClick={(e) => e.stopPropagation()} className="font-medium text-primary underline underline-offset-2">Open the project Electronics module</a>
+                      ) : (
+                        <span>Use the Electronics module of a project.</span>
+                      )}
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-1" onClick={(e) => e.stopPropagation()}>

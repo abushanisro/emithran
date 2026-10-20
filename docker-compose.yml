@@ -183,6 +183,38 @@ services:
           cpus: '0.5'
           memory: 512M
 
+  # Electronics design-file extraction (Gerber, drill, Pick Place)
+  ecad-engine:
+    build:
+      context: ./ecad-engine
+      dockerfile: Dockerfile
+    container_name: mithran-ecad-engine
+    environment:
+      PORT: 5100
+      ECAD_ENGINE_API_KEY: ${ECAD_ENGINE_API_KEY:?ECAD_ENGINE_API_KEY is required}
+      ECAD_MAX_FILE_MB: ${ECAD_MAX_FILE_MB:-25}
+      ECAD_RATE_LIMIT: ${ECAD_RATE_LIMIT:-30/minute}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    networks:
+      - backend-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:5100/health')" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+
   # NestJS Backend API
   backend:
     build:
@@ -222,6 +254,10 @@ services:
       # CAD Engine
       CAD_ENGINE_URL: http://cad-engine:5000
 
+      # Electronics extraction engine
+      ECAD_ENGINE_URL: http://ecad-engine:5100
+      ECAD_ENGINE_API_KEY: ${ECAD_ENGINE_API_KEY:?ECAD_ENGINE_API_KEY is required}
+
       # Authentication
       SUPABASE_URL: ${SUPABASE_URL:?SUPABASE_URL is required}
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY:?SUPABASE_SERVICE_KEY is required}
@@ -254,6 +290,8 @@ services:
       minio:
         condition: service_healthy
       cad-engine:
+        condition: service_healthy
+      ecad-engine:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:

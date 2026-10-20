@@ -1,0 +1,48 @@
+# Local development runtime for the ecad-engine (the same image production builds).
+#
+#   docker compose -f docker-compose.dev.yml up --build
+#   docker compose -f docker-compose.dev.yml run --rm tests
+#
+# Unlike the CAD engine, this service is pure Python (no OpenCascade), so it also runs natively; see RUNNING.md. Use this file
+# when you want the production image, with the source mounted and the reloader on.
+#
+# Requires ECAD_ENGINE_API_KEY in ecad-engine/.env (or the shell): the service refuses every request without one.
+
+services:
+  ecad-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mithran-ecad-engine:dev
+    container_name: mithran-ecad-engine-dev
+    restart: unless-stopped
+    ports:
+      - "5100:5100"
+    volumes:
+      # Live source: edits apply without a rebuild.
+      - ./main.py:/app/main.py
+      - ./config.py:/app/config.py
+      - ./parsers:/app/parsers
+      - ./extraction:/app/extraction
+    environment:
+      PORT: "5100"
+      ENVIRONMENT: development
+      ECAD_ENGINE_API_KEY: ${ECAD_ENGINE_API_KEY:?set ECAD_ENGINE_API_KEY in ecad-engine/.env or the shell}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:4000}
+      PYTHONUNBUFFERED: "1"
+    command: ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5100", "--reload", "--reload-dir", "/app"]
+
+  # The tests need no board files.
+  tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    image: mithran-ecad-engine-tests:dev
+    profiles: ["tests"]
+    working_dir: /app
+    volumes:
+      - .:/app
+      - ../memory:/memory:ro
+    environment:
+      PYTHONDONTWRITEBYTECODE: "1"
+    command: ["python", "-m", "pytest", "-q"]
