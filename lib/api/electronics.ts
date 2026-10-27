@@ -54,6 +54,26 @@ export type BoardGraph = GraphEnvelope & {
   thtParts: { label: string; count: number; jointsPerPart: number }[];
   testPoints?: number;
   pasteAreaMm2?: { top?: number; bottom?: number };
+  fabrication?: {
+    soldermask?: { top?: boolean; bottom?: boolean };
+    silkscreen?: { top?: boolean; bottom?: boolean };
+    minHoleMm?: number;
+    minTraceWidthMm?: number;
+    minSpacingMm?: number;
+    minAnnularRingMm?: number;
+    minCopperToEdgeMm?: number;
+  };
+  /** Contract 1.3: copper area per side, separate conductors, holes that belong to no part. */
+  copper?: { areaMm2: { top?: number; bottom?: number }; conductors: number; viaCount?: number };
+  /** Contract 1.3: parts tied to nets through their copper pins, and series chains of two-pin parts. */
+  connectivity?: {
+    netsWithPins: number;
+    pins: number;
+    largestNetPins: number;
+    seriesChains: { count: number; partsPerChain: number; composition: { footprint: string; count: number }[] }[];
+    chainEndNets: number;
+    shortedParts?: string[];
+  };
 };
 
 export type HarnessGraph = GraphEnvelope & {
@@ -140,6 +160,48 @@ export interface JobStatus {
   costResultId?: string;
 }
 
+/** A value a person states in a scenario, with where it comes from. */
+export interface StatedValue { value: number; note: string }
+
+/** The costing scenario sent with a quote (backend domain/scenario/scenario.ts). */
+export interface ElectronicsScenario {
+  location: string;
+  displayCurrency?: string;
+  annualVolume?: number;
+  /** HR Rates machine (mhr_records id) per assembly step. */
+  machines: Record<string, string>;
+  inputs: Record<string, StatedValue>;
+}
+
+export interface ScenarioStepOption {
+  id: string;
+  label: string;
+  applies: boolean;
+  inputs: { key: string; unit: string; requiredSource: string }[];
+}
+
+export interface ScenarioOptions {
+  steps: ScenarioStepOption[];
+  facts: { key: string; unit: string; label: string; integer: boolean }[];
+  counts: { surfaceMount: number; surfaceSides: number; uniqueSurfaceFootprints: number; throughHoleParts: number; throughHoleJoints: number; lengthMm: number; widthMm: number };
+}
+
+export interface CostTraceStep { fieldName: string; displayLabel: string; kind: 'input' | 'calculated'; value: number | string | null; unit?: string | null; source?: string; formula?: string }
+
+export interface CostLine {
+  process: string;
+  setupCost: number;
+  runCost: number;
+  totalCost: number;
+  cycleTimeMin: number;
+  setupTimeMin?: number;
+  operators?: number | null;
+  hourlyRate: number;
+  labourRate?: number | null;
+  machineName: string | null;
+  calculationTrace?: CostTraceStep[];
+}
+
 export interface CostResult {
   id: string;
   uploadId: string;
@@ -149,9 +211,11 @@ export interface CostResult {
   batchSize: number;
   assemblyCostPerUnit: number | null;
   complete: boolean;
+  createdAt?: string;
   result: {
     gaps: { gapType: string; process: string; reason?: string; requiredCapability?: string }[];
-    lines: unknown[];
+    lines: CostLine[];
+    scenario?: ElectronicsScenario;
   };
 }
 
@@ -180,7 +244,20 @@ export interface RevisionView {
 }
 
 export type GraphSummary =
-  | { kind: 'board'; assembled: boolean; layers: number; lengthMm: number; widthMm: number; thicknessMm: number | null; holeCount: number; placementCount: number; unresolvedCount: number }
+  | {
+      kind: 'board';
+      assembled: boolean;
+      layers: number;
+      lengthMm: number;
+      widthMm: number;
+      thicknessMm: number | null;
+      holeCount: number;
+      placementCount: number;
+      /** Series chains traced from the copper; absent or null when the graph has none. */
+      seriesChains?: number | null;
+      minSpacingMm?: number | null;
+      unresolvedCount: number;
+    }
   | { kind: 'harness'; circuitCount: number; connectorCount: number; unresolvedCount: number };
 
 export type ItemType = 'assembly' | 'sub_assembly' | 'child_part';
@@ -247,7 +324,10 @@ export const electronicsApi = {
   /** A small SVG of the board for list cards, read from storage by the platform (svg is null when none can be shown). */
   thumbnail: (uploadId: string) => apiClient.get<{ svg: string | null }>(`/electronics/uploads/${uploadId}/thumbnail`, { retry: false }),
   features: (uploadId: string) => apiClient.get<UploadFeatures>(`/electronics/uploads/${uploadId}/features`, { retry: false }),
-  requestQuote: (uploadId: string, batchSize: number) => apiClient.post<{ jobId: string }>('/electronics/quotes', { uploadId, batchSize }),
+  requestQuote: (uploadId: string, batchSize: number, scenario?: ElectronicsScenario) =>
+    apiClient.post<{ jobId: string }>('/electronics/quotes', { uploadId, batchSize, ...(scenario ? { scenario } : {}) }),
+  scenarioOptions: (uploadId: string) => apiClient.get<ScenarioOptions | null>(`/electronics/uploads/${uploadId}/scenario-options`, { retry: false }),
+  latestResult: (uploadId: string) => apiClient.get<CostResult | null>(`/electronics/uploads/${uploadId}/latest-result`, { retry: false }),
   result: (resultId: string) => apiClient.get<CostResult>(`/electronics/results/${resultId}`, { retry: false }),
   coverage: () => apiClient.get<ReferenceCoverage>('/electronics/reference-coverage', { retry: false }),
 };

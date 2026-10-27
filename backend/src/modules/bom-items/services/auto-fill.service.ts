@@ -2,6 +2,7 @@ import { Injectable, Logger, ServiceUnavailableException, UnprocessableEntityExc
 import { SupabaseService } from '../../../common/supabase/supabase.service';
 import { StepConverterService } from './step-converter.service';
 import axios from 'axios';
+import { cadEngineHttp } from '../../../common/resilience/engine-http';
 import * as path from 'path';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
@@ -1000,7 +1001,7 @@ export class AutoFillService {
     const FormData = require('form-data');
     const form = new FormData();
     form.append('file', fileBuffer, { filename: `model.${ext}`, contentType: 'application/octet-stream' });
-    const response = await axios.post(`${this.cadEngineUrl}/measure/geometry`, form, {
+    const response = await cadEngineHttp.post(`${this.cadEngineUrl}/measure/geometry`, form, {
       headers: { ...form.getHeaders(), ...(this.cadEngineApiKey && { 'X-API-Key': this.cadEngineApiKey }) },
       // OCC's STEP transfer dominates and can take minutes on large files (see callCADEngineStateless).
       timeout: 600_000,
@@ -1050,7 +1051,7 @@ export class AutoFillService {
       form.append('family_hint', familyHint);
     }
 
-    const response = await axios.post(
+    const response = await cadEngineHttp.post(
       `${this.cadEngineUrl}/analyze/geometry`,
       form,
       {
@@ -1431,7 +1432,7 @@ export class AutoFillService {
   // reinterpret or reshape its field values.
   async analyzeDrawing(pdfBuffer: Buffer, partNumber?: string): Promise<DrawingIntelligenceDto> {
     const imageBase64 = pdfBuffer.toString('base64');
-    const response = await axios.post(
+    const response = await cadEngineHttp.post(
       `${this.cadEngineUrl}/drawing/analyze`,
       { imageBase64, mediaType: 'application/pdf', ...(partNumber ? { partNumber } : {}) },
       {

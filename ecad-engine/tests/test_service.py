@@ -74,8 +74,8 @@ def test_root_describes_the_service(client):
 
 def test_health_reports_capabilities_limits_and_library_versions(client):
     body = client.get("/health").json()
-    assert body["status"] == "ok" and body["contractVersion"] == "1.2"
-    assert body["extractor"] == {"id": "ecad-engine-board", "version": "0.2.0"}
+    assert body["status"] == "ok" and body["contractVersion"] == "1.3"
+    assert body["extractor"] == {"id": "ecad-engine-board", "version": "0.3.0"}
     assert body["libraries"]["gerbonara"] not in ("", "unknown") and body["libraries"]["openpyxl"] != "unknown"
     assert body["limits"]["maxFiles"] >= 16 and body["limits"]["maxFileSizeMb"] >= 1
     assert "board_outline" in body["renderedRoles"] and len(body["capabilities"]) >= 5

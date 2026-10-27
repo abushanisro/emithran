@@ -1,5 +1,6 @@
 import type { BomItemCostAnalysis } from '@/lib/api/hooks/useCostAnalysis';
 import type { PartInfo } from './generate-emithran-pdf';
+import { escapeHtml } from './escape-html';
 
 // ── Formatting ────────────────────────────────────────────────────────────────
 const rs = (v: number) =>
@@ -13,16 +14,16 @@ const s = (obj: Record<string, string | number>) =>
   Object.entries(obj).map(([k, v]) => `${k.replace(/([A-Z])/g, '-$1').toLowerCase()}:${v}`).join(';');
 
 const th = (text: string) =>
-  `<th style="${s({ padding: '8px 10px', textAlign: 'left', fontWeight: '700', fontSize: '12px', color: '#fff', backgroundColor: '#1a1a1a', borderBottom: '2px solid #1a1a1a' })}">${text}</th>`;
+  `<th style="${s({ padding: '8px 10px', textAlign: 'left', fontWeight: '700', fontSize: '12px', color: '#fff', backgroundColor: '#1a1a1a', borderBottom: '2px solid #1a1a1a' })}">${escapeHtml(text)}</th>`;
 
 const thR = (text: string) =>
-  `<th style="${s({ padding: '8px 10px', textAlign: 'right', fontWeight: '700', fontSize: '12px', color: '#fff', backgroundColor: '#1a1a1a', borderBottom: '2px solid #1a1a1a' })}">${text}</th>`;
+  `<th style="${s({ padding: '8px 10px', textAlign: 'right', fontWeight: '700', fontSize: '12px', color: '#fff', backgroundColor: '#1a1a1a', borderBottom: '2px solid #1a1a1a' })}">${escapeHtml(text)}</th>`;
 
 const td = (text: string, right = false, bold = false, bg = '') =>
-  `<td style="${s({ padding: '7px 10px', fontSize: '12px', textAlign: right ? 'right' : 'left', fontWeight: bold ? '700' : '400', backgroundColor: bg || '#fff', borderBottom: '1px solid #eee', color: '#282828' })}">${text}</td>`;
+  `<td style="${s({ padding: '7px 10px', fontSize: '12px', textAlign: right ? 'right' : 'left', fontWeight: bold ? '700' : '400', backgroundColor: bg || '#fff', borderBottom: '1px solid #eee', color: '#282828' })}">${escapeHtml(text)}</td>`;
 
 const tdFoot = (text: string, right = false) =>
-  `<td style="${s({ padding: '7px 10px', fontSize: '12px', textAlign: right ? 'right' : 'left', fontWeight: '700', backgroundColor: '#f3f3f3', borderBottom: '1px solid #ddd', color: '#1a1a1a' })}">${text}</td>`;
+  `<td style="${s({ padding: '7px 10px', fontSize: '12px', textAlign: right ? 'right' : 'left', fontWeight: '700', backgroundColor: '#f3f3f3', borderBottom: '1px solid #ddd', color: '#1a1a1a' })}">${escapeHtml(text)}</td>`;
 
 const tableWrap = (content: string) =>
   `<table style="${s({ width: '100%', borderCollapse: 'collapse', marginBottom: '0' })}">${content}</table>`;
@@ -39,7 +40,7 @@ function buildHtml(analysis: BomItemCostAnalysis, part: PartInfo): string {
 
   // thumbnail
   const thumbHtml = part.thumbnailUrl
-    ? `<img src="${part.thumbnailUrl}" style="${s({ width: '80px', height: '80px', objectFit: 'contain', border: '1px solid #e5e7eb', borderRadius: '4px', backgroundColor: '#f9f9f9', marginRight: '20px', flexShrink: '0' })}" />`
+    ? `<img src="${escapeHtml(part.thumbnailUrl)}" style="${s({ width: '80px', height: '80px', objectFit: 'contain', border: '1px solid #e5e7eb', borderRadius: '4px', backgroundColor: '#f9f9f9', marginRight: '20px', flexShrink: '0' })}" />`
     : '';
 
   // cost summary rows
@@ -128,9 +129,9 @@ function buildHtml(analysis: BomItemCostAnalysis, part: PartInfo): string {
   <div style="${s({ display: 'flex', alignItems: 'flex-start', marginBottom: '16px' })}">
     ${thumbHtml}
     <div style="${s({ flex: '1' })}">
-      <div style="${s({ fontSize: '17px', fontWeight: '700', color: '#1a1a1a', marginBottom: '4px' })}">${part.partName ?? part.partNumber ?? 'Part'}</div>
-      ${part.partNumber ? `<div style="${s({ fontSize: '12px', color: '#666', marginBottom: '2px' })}">PN: ${part.partNumber}</div>` : ''}
-      ${part.material ? `<div style="${s({ fontSize: '12px', color: '#666', marginBottom: '12px' })}">Material: ${part.material}</div>` : ''}
+      <div style="${s({ fontSize: '17px', fontWeight: '700', color: '#1a1a1a', marginBottom: '4px' })}">${escapeHtml(part.partName ?? part.partNumber ?? 'Part')}</div>
+      ${part.partNumber ? `<div style="${s({ fontSize: '12px', color: '#666', marginBottom: '2px' })}">PN: ${escapeHtml(part.partNumber)}</div>` : ''}
+      ${part.material ? `<div style="${s({ fontSize: '12px', color: '#666', marginBottom: '12px' })}">Material: ${escapeHtml(part.material)}</div>` : ''}
       <div style="${s({ display: 'flex', gap: '40px', marginTop: '10px' })}">
         <div>
           <div style="${s({ fontSize: '10px', color: '#888', letterSpacing: '0.06em', marginBottom: '3px' })}">MFG COST</div>

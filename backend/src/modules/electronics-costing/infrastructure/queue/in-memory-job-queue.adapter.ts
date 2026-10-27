@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import type { ElectronicsQueueName, JobHandler, JobQueue, JobStatus } from './job-queue.port';
+import type { ElectronicsQueueName, JobHandler, JobQueue, JobStatus, QueueHealth } from './job-queue.port';
 
 interface Entry {
   queue: ElectronicsQueueName;
@@ -39,6 +39,14 @@ export class InMemoryJobQueue implements JobQueue {
   async status(queue: ElectronicsQueueName, jobId: string): Promise<JobStatus | null> {
     const entry = this.jobs.get(jobId);
     return entry && entry.queue === queue ? { ...entry.status } : null;
+  }
+
+  async health(): Promise<QueueHealth> {
+    return { configured: true, ready: true };
+  }
+
+  async depth(queue: ElectronicsQueueName): Promise<number | null> {
+    return [...this.jobs.values()].filter((entry) => entry.queue === queue && entry.status.state === 'queued').length;
   }
 
   /** Resolves when every enqueued job has finished. For tests. */

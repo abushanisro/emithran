@@ -4,8 +4,31 @@
  * Production-ready real-time tracking system integrated with Supabase
  */
 
-import { supabaseAdmin } from '@/lib/database/supabase-server';
+import { createServerSupabaseClient, supabaseAdmin } from '@/lib/database/supabase-server';
 import { carrierTrackingService } from '@/lib/services/carrier-tracking';
+
+/**
+ * True when the signed-in caller may see this delivery order. The order is read
+ * with the admin client (delivery tables carry no tenant column), so the
+ * caller's access is decided by its project: the project must be visible to the
+ * caller through RLS on `projects`. Call before any admin read or write of the
+ * order; a false answer is reported as "not found" so order ids are not probed.
+ */
+export async function callerCanAccessOrder(orderId: string): Promise<boolean> {
+  const { data: order } = await supabaseAdmin
+    .from('delivery_orders')
+    .select('project_id')
+    .eq('id', orderId)
+    .maybeSingle();
+  if (!order?.project_id) return false;
+  const userClient = await createServerSupabaseClient();
+  const { data: project } = await userClient
+    .from('projects')
+    .select('id')
+    .eq('id', order.project_id)
+    .maybeSingle();
+  return !!project;
+}
 
 export interface TrackingData {
   orderId: string;
@@ -66,6 +89,8 @@ export interface LocationUpdate {
   notes?: string;
   address?: string;
   timestamp?: string;
+  /** auth.users id of the caller recording the event. */
+  createdBy: string;
 }
 
 /**
@@ -237,7 +262,7 @@ export async function updateDeliveryLocation(update: LocationUpdate): Promise<{
         event_type: update.status || 'location_update',
         internal_notes: update.notes,
         event_timestamp: timestamp,
-        created_by: 'system' // In production, get from auth context
+        created_by: update.createdBy
       })
       .select('id')
       .single();

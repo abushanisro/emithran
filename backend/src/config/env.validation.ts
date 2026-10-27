@@ -69,6 +69,12 @@ class EnvironmentVariables {
   @IsIn(['true', 'false'])
   ELECTRONICS_QUEUE_MIGRATE: string = 'true';
 
+  // Live-progress event bus (SSE) across backend instances: Postgres LISTEN/NOTIFY. A session or direct connection
+  // (Supabase port 5432); LISTEN does not work through the transaction pooler (6543). Unset: events stay in-process.
+  @IsString()
+  @IsOptional()
+  EVENT_BUS_DATABASE_URL?: string;
+
   // Development auth bypass opt-in. Off unless explicitly 'true': with it off, a missing or
   // invalid bearer token is a 401 in every environment. ADMIN_FALLBACK_EMAIL alone enables nothing.
   @IsString()
@@ -133,6 +139,15 @@ export function validate(config: Record<string, unknown>) {
       throw new Error(
         'SECURITY ERROR: ALLOW_DEV_AUTH_BYPASS must not be true in production — it turns a missing or ' +
         'invalid token into a signed-in admin. Remove it from the production environment configuration.'
+      );
+    }
+
+    // The in-memory queue runs jobs inside one process: they are lost on restart and a second backend instance never
+    // sees them. Production uses pg-boss (a direct Postgres connection), so it survives restarts and scales out.
+    if (validatedConfig.ELECTRONICS_QUEUE_DRIVER === 'memory') {
+      throw new Error(
+        'CONFIGURATION ERROR: ELECTRONICS_QUEUE_DRIVER=memory is for local development only. In production set ' +
+        'ELECTRONICS_QUEUE_DRIVER=pg-boss with ELECTRONICS_QUEUE_DATABASE_URL (a direct Postgres connection string).'
       );
     }
 

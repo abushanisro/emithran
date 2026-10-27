@@ -19,6 +19,7 @@ import { StartUploadUseCase } from './application/start-upload.use-case';
 import { ElectronicsWorkers } from './electronics-workers';
 import { EcadEngineClient } from './infrastructure/ecad/ecad-engine.client';
 import { electronicsJobQueueProvider } from './infrastructure/queue/queue.provider';
+import { ElectronicsQueueHealthIndicator } from './infrastructure/queue/queue.health';
 import { ElectronicsRateBookLoader } from './infrastructure/repositories/electronics-rate-book.loader';
 import { ElectronicsReferenceRepository } from './infrastructure/repositories/electronics-reference.repository';
 import { ElectronicsRepository } from './infrastructure/repositories/electronics.repository';
@@ -30,6 +31,7 @@ import { SupabaseModule } from '../../common/supabase/supabase.module';
   controllers: [ElectronicsController],
   providers: [
     electronicsJobQueueProvider,
+    ElectronicsQueueHealthIndicator,
     EcadEngineClient,
     BoardSetParser,
     // Registered parsers, in priority order. A new input tier is one new entry here.
@@ -57,5 +59,7 @@ import { SupabaseModule } from '../../common/supabase/supabase.module';
     ProcessQuoteJob,
     ElectronicsWorkers,
   ],
+  // The readiness probe for this module's queue, for the health module to call.
+  exports: [ElectronicsQueueHealthIndicator],
 })
 export class ElectronicsCostingModule {}

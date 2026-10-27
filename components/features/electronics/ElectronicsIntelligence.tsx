@@ -16,7 +16,8 @@ import { listHref, statusLabel, typeLabel } from '@/lib/electronics/design-view'
 import { driverInputs, geometryRows, processSteps } from '@/lib/electronics/drivers';
 
 import { HResizeHandle, Pane, VResizeHandle } from './panes';
-import { BatchInput, FeatureSections, FileTable, FindingsList, QuoteOutcome, UnresolvedList } from './report-parts';
+import { FeatureSections, FileTable, FindingsList, QuoteOutcome, UnresolvedList } from './report-parts';
+import { ScenarioPanel } from './ScenarioPanel';
 import { useQuoteFlow } from './useQuoteFlow';
 import { useViewerState } from './viewer/useViewerState';
 import { ViewerCanvas } from './viewer/ViewerCanvas';
@@ -133,22 +134,17 @@ export function ElectronicsIntelligence({ projectId, design, revision, uploadId,
           <TabsTrigger className={tabTrigger} value="unknowns">Unknowns</TabsTrigger>
         </TabsList>
         <TabsContent value="scenario" className={`${scroll} mt-0 space-y-4 p-3`}>
-          <BatchInput flow={flow} />
-          <div className="space-y-1 text-xs">
-            <p className="font-medium">Facts supplied with these files</p>
-            {supplied.length === 0 ? (
-              <p className="text-muted-foreground">None. Everything comes from the files. To state a fact the files cannot (board thickness, layers, boards per panel), upload a new revision with it.</p>
-            ) : (
+          <ScenarioPanel uploadId={uploadId} flow={flow} />
+          {supplied.length > 0 && (
+            <div className="space-y-1 text-xs">
+              <p className="font-medium">Facts supplied with these files</p>
               <ul className="space-y-0.5">
                 {supplied.map(([key, fact]) => (
                   <li key={key}><span className="font-mono">{key}</span> = {fact.value} <span className="text-muted-foreground">({fact.note})</span></li>
                 ))}
               </ul>
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {flow.result ? `Last calculation used rate version ${flow.result.rateVersion?.slice(0, 12) ?? 'none'}.` : 'The rate version is recorded with each calculation, so a later rate change never alters a stored result.'}
-          </p>
+            </div>
+          )}
         </TabsContent>
         <TabsContent value="drawing" className={`${scroll} mt-0 p-3`}>{features.data ? <FileTable data={features.data} /> : null}</TabsContent>
         <TabsContent value="features" className={`${scroll} mt-0 p-3`}>{graph ? <FeatureSections graph={graph} /> : <p className="text-xs text-muted-foreground">No features were extracted from this revision.</p>}</TabsContent>

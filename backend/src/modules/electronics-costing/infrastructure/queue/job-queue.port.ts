@@ -24,6 +24,13 @@ export interface JobStatus {
 // A handler returns a small, JSON-safe output (ids). Throwing marks the attempt failed.
 export type JobHandler<TPayload extends object> = (payload: TPayload) => Promise<Record<string, unknown>>;
 
+export interface QueueHealth {
+  /** False when no queue backend was configured at all (the feature then reports that itself). */
+  configured: boolean;
+  /** True when the backend answered a cheap probe just now. */
+  ready: boolean;
+}
+
 export interface JobQueue {
   /** Connects and creates the queues. Safe to call once at module init. */
   start(): Promise<void>;
@@ -32,4 +39,8 @@ export interface JobQueue {
   enqueue<TPayload extends object>(queue: ElectronicsQueueName, payload: TPayload): Promise<string>;
   work<TPayload extends object>(queue: ElectronicsQueueName, handler: JobHandler<TPayload>): Promise<void>;
   status(queue: ElectronicsQueueName, jobId: string): Promise<JobStatus | null>;
+  /** Cheap reachability probe for readiness. Bounded; resolves (never rejects) with what it found. */
+  health(): Promise<QueueHealth>;
+  /** Jobs waiting to run (queued or awaiting retry); null when the backend cannot tell. For the depth metric. */
+  depth(queue: ElectronicsQueueName): Promise<number | null>;
 }

@@ -28,11 +28,6 @@ const nextConfig: NextConfig = {
     root: process.cwd(),
   },
 
-  // TypeScript configuration for production
-  typescript: {
-    ignoreBuildErrors: process.env.NODE_ENV === 'production',
-  },
-
   // Experimental features for better performance
   experimental: {
     // Enable optimizePackageImports for better bundle size
@@ -99,7 +94,7 @@ const nextConfig: NextConfig = {
     return [
       { source: '/portal',             destination: '/settings?tab=portal',   permanent: false },
       { source: '/portal/api-keys',    destination: '/settings?tab=api-keys', permanent: false },
-      { source: '/portal/logs',        destination: '/settings?tab=logs',     permanent: false },
+      { source: '/portal/logs',        destination: '/settings?tab=portal',   permanent: false },
       { source: '/developer/portal',   destination: '/settings?tab=portal',   permanent: false },
     ];
   },

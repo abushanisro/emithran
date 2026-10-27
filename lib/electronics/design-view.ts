@@ -63,6 +63,8 @@ export function detailItems(design: DesignView): DetailItem[] {
       { label: 'Thickness', value: s.thicknessMm === null ? '—' : `${s.thicknessMm} mm` },
       { label: 'Holes', value: s.holeCount.toLocaleString() },
       { label: 'Placements', value: s.placementCount.toLocaleString() },
+      ...(s.seriesChains ? [{ label: 'Series chains', value: s.seriesChains.toLocaleString() }] : []),
+      ...(s.minSpacingMm != null ? [{ label: 'Min spacing', value: `${s.minSpacingMm} mm` }] : []),
       { label: 'Unresolved', value: String(s.unresolvedCount) },
     ];
   }

@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { FeatureGraph, FileReportRow, UploadFeatures } from '@/lib/api/electronics';
 import { useReferenceCoverage } from '@/lib/api/hooks/useElectronics';
+import { useFxRate } from '@/lib/api/hooks/useFx';
 import { describeGraph, roleLabel, unresolvedRows } from '@/lib/electronics/graph-view';
 
 import type { QuoteFlow } from './useQuoteFlow';
@@ -147,35 +148,61 @@ export function BatchInput({ flow }: { flow: QuoteFlow }) {
   );
 }
 
-/** The outcome of the last calculation: a cost, or what stops one. A missing rate is reported, never priced at zero. */
+/** The outcome of the last calculation: per-step lines and a total, or what stops one. A missing rate is reported, never priced at zero. */
 export function QuoteOutcome({ flow }: { flow: QuoteFlow }) {
   const { job, result } = flow;
+  const currency = result?.result.scenario?.displayCurrency ?? flow.draft.displayCurrency;
+  const fx = useFxRate({ base: 'USD', quote: currency, rateType: 'reference', enabled: currency !== 'USD' });
+  const rate = currency === 'USD' ? 1 : fx.data?.rate;
+  const money = (usd: number) => (rate === undefined ? `${usd.toFixed(3)} USD` : `${(usd * rate).toFixed(currency === 'USD' ? 3 : 2)} ${currency}`);
+  const lines = result?.result.lines ?? [];
   return (
     <div className="space-y-3">
       {flow.running && <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Calculating…</div>}
       {job?.state === 'failed' && (
         <Alert variant="destructive"><XCircle className="h-4 w-4" /><AlertTitle>The calculation failed</AlertTitle><AlertDescription>{job.error}</AlertDescription></Alert>
       )}
-      {!job && <p className="text-sm text-muted-foreground">Enter a batch size and calculate to see the assembly cost, or what is missing to price it.</p>}
+      {!job && !result && <p className="text-sm text-muted-foreground">Set the scenario (location, machines, inputs, batch) and calculate to see the cost, or what is missing to price it.</p>}
       {result && (
         <div className="space-y-3" data-testid="cost-result">
           {result.complete && result.assemblyCostPerUnit !== null ? (
-            <p className="text-2xl font-semibold">{result.assemblyCostPerUnit.toFixed(2)} <span className="text-sm font-normal text-muted-foreground">per board, batch of {result.batchSize}</span></p>
+            <p className="text-2xl font-semibold">{money(result.assemblyCostPerUnit)} <span className="text-sm font-normal text-muted-foreground">per board, batch of {result.batchSize}</span></p>
           ) : (
             <Alert>
               <CircleHelp className="h-4 w-4" />
-              <AlertTitle>Cannot price this yet</AlertTitle>
-              <AlertDescription>No assembly cost is shown because rates are missing. The features are real; the cost needs the data listed under each process.</AlertDescription>
+              <AlertTitle>Not priced yet</AlertTitle>
+              <AlertDescription>The steps below that could be priced are shown; no total is given until every step has its machine and inputs.</AlertDescription>
             </Alert>
           )}
-          {result.result.gaps.length > 0 && (
-            <ul className="space-y-1 text-xs text-muted-foreground">
-              {result.result.gaps.map((g, i) => (
-                <li key={i}><span className="font-medium text-foreground">{g.process}</span>{g.reason ? `: ${g.reason}` : g.requiredCapability ? `: needs ${g.requiredCapability}` : ''}</li>
-              ))}
-            </ul>
+          {currency !== 'USD' && rate !== undefined && <p className="text-[11px] text-muted-foreground">1 USD = {rate.toFixed(4)} {currency} ({fx.data?.source ?? 'platform rate'}{fx.data?.rateDate ? `, ${fx.data.rateDate}` : ''})</p>}
+          {lines.length > 0 && (
+            <Table>
+              <TableHeader><TableRow><TableHead>Step</TableHead><TableHead>Machine</TableHead><TableHead className="text-right">Time/board</TableHead><TableHead className="text-right">Setup</TableHead><TableHead className="text-right">Run</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {lines.map((l, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="font-medium" title={(l.calculationTrace ?? []).map((t) => `${t.displayLabel}: ${String(t.value)}${t.unit ? ` ${  t.unit}` : ''}${t.formula ? ` = ${  t.formula}` : t.source ? ` (${  t.source  })` : ''}`).join(' · ')}>{l.process}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{l.machineName ?? 'stated price'}</TableCell>
+                    <TableCell className="text-right text-xs">{l.cycleTimeMin > 0 ? `${(l.cycleTimeMin * 60).toFixed(1)} s` : '—'}</TableCell>
+                    <TableCell className="text-right text-xs">{money(l.setupCost)}</TableCell>
+                    <TableCell className="text-right text-xs">{money(l.runCost)}</TableCell>
+                    <TableCell className="text-right text-xs font-medium">{money(l.totalCost)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
-          <p className="text-xs text-muted-foreground">Revision {result.revisionId?.slice(0, 8) ?? 'none'} · rate version {result.rateVersion?.slice(0, 12) ?? 'none'} · {result.ratesUsed?.length ?? 0} rate(s) used</p>
+          {result.result.gaps.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-xs font-medium">Still needed</p>
+              <ul className="space-y-1 text-xs text-muted-foreground">
+                {result.result.gaps.map((g, i) => (
+                  <li key={i}><span className="font-medium text-foreground">{g.process}</span>{g.reason ? `: ${g.reason}` : ''}{g.requiredCapability ? ` ${g.requiredCapability}` : ''}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground">Batch {result.batchSize} · rate version {result.rateVersion?.slice(0, 12) ?? 'none'} · {result.ratesUsed?.length ?? 0} rate(s) cited · hover a step for its calculation</p>
         </div>
       )}
     </div>

@@ -85,6 +85,13 @@ export function ElectronicsBomPage({ projectId }: { projectId: string }) {
       </Button>
       <PageHeader title="Electronics" description="PCB assemblies and wire harnesses of this project, with features measured from their files." />
 
+      <ElectronicsUpload
+        projectId={projectId}
+        onUploaded={uploaded}
+        title="Electronics Processing Pipeline"
+        description="Upload a .zip design pack, a folder, or Gerber / drill / Pick Place files — every board is reverse-engineered (size, holes, placements, copper, nets and series chains, spacing) and an item is created ready for costing"
+      />
+
       <Tabs defaultValue="items">
         <TabsList>
           <TabsTrigger value="items"><FileSpreadsheet className="mr-2 h-4 w-4" />Items &amp; Parts</TabsTrigger>

@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { useVaveIdeas, useVaveShouldCosts } from '@/lib/api/hooks/useVave';
 import type { VaveIdea } from '@/lib/api/vave';
 import { toast } from 'sonner';
+import { escapeHtml } from '@/lib/utils/escape-html';
 
 interface Props {
   projectId: string;
@@ -490,12 +491,12 @@ export function BusinessCaseGenerator({ projectId }: Props) {
         (idea, i) =>
           `<tr style="background:${i % 2 === 0 ? '#f9fafb' : '#ffffff'}">
             <td style="padding:6px 10px;border:1px solid #e2e8f0">${i + 1}</td>
-            <td style="padding:6px 10px;border:1px solid #e2e8f0;font-weight:500">${idea.title}</td>
-            <td style="padding:6px 10px;border:1px solid #e2e8f0">${idea.framework}</td>
+            <td style="padding:6px 10px;border:1px solid #e2e8f0;font-weight:500">${escapeHtml(idea.title)}</td>
+            <td style="padding:6px 10px;border:1px solid #e2e8f0">${escapeHtml(idea.framework)}</td>
             <td style="padding:6px 10px;border:1px solid #e2e8f0;color:#059669;font-weight:600">$${idea.estSavingsUsd.toLocaleString()}</td>
             <td style="padding:6px 10px;border:1px solid #e2e8f0">$${idea.estInvestmentUsd.toLocaleString()}</td>
-            <td style="padding:6px 10px;border:1px solid #e2e8f0">${idea.complexity}</td>
-            <td style="padding:6px 10px;border:1px solid #e2e8f0">${idea.risk}</td>
+            <td style="padding:6px 10px;border:1px solid #e2e8f0">${escapeHtml(idea.complexity)}</td>
+            <td style="padding:6px 10px;border:1px solid #e2e8f0">${escapeHtml(idea.risk)}</td>
             <td style="padding:6px 10px;border:1px solid #e2e8f0">${idea.timeToImplementMonths ? idea.timeToImplementMonths + ' mo' : '3 mo (est.)'}</td>
           </tr>`
       )

@@ -23,6 +23,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { Logger } from './common/logger/logger.service';
 import { SupabaseService } from './common/supabase/supabase.service';
 import { CorrelatedConsoleLogger } from './telemetry/correlated-console-logger';
+import { FileErrorConsoleLogger } from './common/logger/file-error-console-logger';
 import { httpMetricsMiddleware } from './telemetry/http-metrics.middleware';
 
 async function bootstrap() {
@@ -31,7 +32,8 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
     // Same levels either way; with telemetry on, each line also carries the active trace and span id.
-    logger: telemetry ? new CorrelatedConsoleLogger({ logLevels }) : logLevels,
+    // Errors from every logger are also kept in the rotating error file (common/logger/error-log-file.ts).
+    logger: telemetry ? new CorrelatedConsoleLogger({ logLevels }) : new FileErrorConsoleLogger({ logLevels }),
   });
 
   const configService = app.get(ConfigService);

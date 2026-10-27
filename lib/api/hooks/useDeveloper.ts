@@ -1,11 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { developerApi, type CreateApiKeyData, type LogsQuery } from '../developer';
+import { developerApi, type CreateApiKeyData } from '../developer';
 import { toast } from 'sonner';
 
 export const developerKeys = {
   apiKeys: ['developer', 'api-keys'] as const,
-  logs: (query?: LogsQuery) => ['developer', 'logs', query] as const,
-  stats: ['developer', 'stats'] as const,
 };
 
 export function useApiKeys() {
@@ -40,21 +38,5 @@ export function useRevokeApiKey() {
     onError: () => {
       toast.error('Failed to revoke API key');
     },
-  });
-}
-
-export function useRequestLogs(query?: LogsQuery) {
-  return useQuery({
-    queryKey: developerKeys.logs(query),
-    queryFn: () => developerApi.listLogs(query),
-    staleTime: 1000 * 30,
-  });
-}
-
-export function useLogStats() {
-  return useQuery({
-    queryKey: developerKeys.stats,
-    queryFn: () => developerApi.getStats(),
-    staleTime: 1000 * 60 * 2,
   });
 }

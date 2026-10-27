@@ -12,6 +12,7 @@ import { SupabaseService } from '../src/common/supabase/supabase.service';
 import { ExchangeRateService } from '../src/common/exchange-rate/exchange-rate.service';
 import { MaterialResolutionService } from '../src/modules/bom-items/services/material-resolution.service';
 import { SecondaryProcessService } from '../src/modules/bom-items/services/secondary-process.service';
+import { CalculatorCatalogService } from '../src/modules/bom-items/services/calculator-catalog.service';
 
 jest.setTimeout(120_000);
 
@@ -32,7 +33,7 @@ describe('[e2e] Phase 9 surface treatment — real DB, no mocks', () => {
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
       imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../.env') })],
-      providers: [SupabaseService, ExchangeRateService, MaterialResolutionService, SecondaryProcessService],
+      providers: [SupabaseService, ExchangeRateService, MaterialResolutionService, CalculatorCatalogService, SecondaryProcessService],
     }).compile();
     service = moduleRef.get(SecondaryProcessService);
     supabase = moduleRef.get(SupabaseService);

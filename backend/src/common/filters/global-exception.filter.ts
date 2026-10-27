@@ -135,7 +135,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const httpStatus = this.getHttpStatus(exception);
     const userFriendlyMessage = this.getUserFriendlyMessage(exception);
     const timestamp = new Date().toISOString();
-    const path = request.url;
+    // Path only: the query string can carry a session token (?token= for SSE); it is logged below.
+    const path = String(request.url ?? '').split('?')[0];
     const method = request.method;
     const userAgent = request.get('User-Agent') || 'Unknown';
     const ip = request.ip || request.connection.remoteAddress || 'Unknown';

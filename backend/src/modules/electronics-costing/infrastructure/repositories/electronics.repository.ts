@@ -229,6 +229,19 @@ export class ElectronicsRepository {
     return data as JobRow;
   }
 
+  async getLatestCostResult(uploadId: string, token: string): Promise<CostResultRow | null> {
+    const { data, error } = await this.supabase
+      .getUserClient(token)
+      .from('electronics_cost_results')
+      .select('*')
+      .eq('upload_id', uploadId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new Error(`electronics_cost_results read failed: ${error.message}`);
+    return (data as CostResultRow | null) ?? null;
+  }
+
   async getCostResult(id: string, token: string): Promise<CostResultRow> {
     const { data, error } = await this.supabase.getUserClient(token).from('electronics_cost_results').select('*').eq('id', id).maybeSingle();
     if (error) throw new Error(`electronics_cost_results read failed: ${error.message}`);

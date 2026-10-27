@@ -64,6 +64,19 @@ describe('design view helpers', () => {
     expect(detailItems(design).find((i) => i.label === 'Features')?.value).toBe('being read…');
   });
 
+  it('shows the series chains and spacing traced from the copper, and nothing when the graph has none', () => {
+    const traced: DesignView = {
+      ...design,
+      revisions: [{ ...design.revisions[1], status: 'needs_review' }],
+      summary: { kind: 'board', assembled: true, layers: 2, lengthMm: 273.7, widthMm: 170.7, thicknessMm: null, holeCount: 226, placementCount: 626, seriesChains: 89, minSpacingMm: 0.357, unresolvedCount: 3 },
+    };
+    const items = Object.fromEntries(detailItems(traced).map((i) => [i.label, i.value]));
+    expect(items).toMatchObject({ 'Series chains': '89', 'Min spacing': '0.357 mm' });
+    const untraced: DesignView = { ...traced, summary: { ...traced.summary, seriesChains: null, minSpacingMm: null } as DesignView['summary'] };
+    expect(detailItems(untraced).map((i) => i.label)).not.toContain('Series chains');
+    expect(detailItems(untraced).map((i) => i.label)).not.toContain('Min spacing');
+  });
+
   it('shows circuits and connectors of a harness', () => {
     const harness: DesignView = { ...design, kind: 'harness', summary: { kind: 'harness', circuitCount: 2, connectorCount: 4, unresolvedCount: 0 } };
     const items = Object.fromEntries(detailItems(harness).map((i) => [i.label, i.value]));

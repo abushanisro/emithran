@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 
 import { StartUploadUseCase, type StartUploadResult } from './start-upload.use-case';
+import { expandArchive } from '../domain/uploads/expand-archive';
 import { planAssembly, type PlanNode } from '../domain/uploads/plan-assembly';
 import { validateUpload, type UploadVerdict } from '../domain/uploads/validate-upload';
 import { ElectronicsRepository, type DesignRow } from '../infrastructure/repositories/electronics.repository';
@@ -30,6 +31,19 @@ export interface StartAssemblyResult {
   skipped: { path: string; reason: string }[];
   /** Files in folders with no board or harness below them: kept out of every part rather than guessed into one. */
   unplaced: string[];
+}
+
+export interface StartArchiveInput {
+  /** The uploaded .zip design pack. */
+  name: string;
+  bytes: Buffer;
+  projectId?: string;
+  parentDesignId?: string;
+  /** Add the pack's files as a new revision of this child part instead of building items from its folders. */
+  designId?: string;
+  organizationId: string;
+  userId: string;
+  token: string;
 }
 
 interface Leaf {
@@ -117,6 +131,45 @@ export class StartAssemblyUploadUseCase {
       skipped,
       unplaced: plan.unplaced.map((i) => (accepted[i] as AssemblyFileInput).path),
     };
+  }
+
+  // A .zip design pack is read as the folder it was made from: unpacked here, then planned like a dropped folder, so one
+  // pack of several boards becomes Assembly > Sub-Assembly > Child Parts and each board is parsed on its own. A pack sent
+  // for a revision of one part adds its files (folders flattened) to that part.
+  async executeArchive(input: StartArchiveInput): Promise<StartAssemblyResult | (StartUploadResult & { skipped: StartAssemblyResult['skipped'] })> {
+    const verdict = validateUpload(input.name, input.bytes);
+    if (!verdict.ok) throw new BadRequestException({ code: verdict.code, message: `${input.name}: ${verdict.message}` });
+    const archive = expandArchive(input.name, input.bytes);
+    if (!archive.ok) throw new BadRequestException({ code: archive.code, message: `${input.name}: ${archive.message}` });
+    const scope = { organizationId: input.organizationId, userId: input.userId, token: input.token };
+
+    if (input.designId) {
+      const skipped = [...archive.skipped];
+      const files: { name: string; bytes: Buffer }[] = [];
+      const seen = new Set<string>();
+      for (const entry of archive.entries) {
+        const check = validateUpload(entry.name, entry.bytes);
+        if (!check.ok && (check.code === 'unsupported_extension' || check.code === 'empty')) {
+          skipped.push({ path: entry.path, reason: check.message });
+          continue;
+        }
+        if (seen.has(entry.name)) {
+          throw new BadRequestException({ code: 'invalid_assembly_folder', message: `${input.name}: two files are named ${entry.name}; a revision takes one set of files.` });
+        }
+        seen.add(entry.name);
+        files.push({ name: entry.name, bytes: entry.bytes });
+      }
+      const result = await this.startUpload.execute({ files, designId: input.designId, ...scope });
+      return { ...result, skipped };
+    }
+
+    const result = await this.execute({
+      files: archive.entries,
+      ...(input.projectId ? { projectId: input.projectId } : {}),
+      ...(input.parentDesignId ? { parentDesignId: input.parentDesignId } : {}),
+      ...scope,
+    });
+    return { ...result, skipped: [...archive.skipped, ...result.skipped] };
   }
 
   private async resolveScope(input: StartAssemblyInput): Promise<{ projectId: string; parent: DesignRow | null }> {

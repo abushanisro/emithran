@@ -4,6 +4,10 @@ import { createTransport, Transporter, SendMailOptions } from 'nodemailer';
 import * as path from 'path';
 import { RfqRecord } from '../dto/rfq-response.dto';
 
+const BOM_FILES_BUCKET = process.env.SUPABASE_BUCKET_BOM_FILES || 'bom-files';
+// Most mail servers refuse messages over ~25 MB.
+const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
+
 interface BomItemDetails {
   id: string;
   name: string;
@@ -64,6 +68,10 @@ export class RfqEmailService {
           user: process.env.SMTP_USER,
           pass: process.env.SMTP_PASS,
         },
+        // Attachments are always in-memory bytes (prepareFileAttachments). Never
+        // let a stored value make nodemailer read a server file or fetch a URL.
+        disableFileAccess: true,
+        disableUrlAccess: true,
       });
       
       this.logger.log('Email transporter initialized successfully');
@@ -87,8 +95,11 @@ export class RfqEmailService {
       // Fetch vendor details with email contacts
       const vendors = await this.fetchVendorDetails(rfq.vendorIds, accessToken);
       
+      // The same files go to every vendor: read them from storage once.
+      const attachments = await this.prepareFileAttachments(bomItems, accessToken);
+
       // Send individual emails to each vendor
-      const emailPromises = vendors.map(vendor => this.sendIndividualRfqEmail(rfq, bomItems, vendor));
+      const emailPromises = vendors.map(vendor => this.sendIndividualRfqEmail(rfq, bomItems, vendor, attachments));
       
       await Promise.all(emailPromises);
       
@@ -103,7 +114,8 @@ export class RfqEmailService {
   private async sendIndividualRfqEmail(
     rfq: RfqRecord, 
     bomItems: BomItemDetails[], 
-    vendor: VendorDetails
+    vendor: VendorDetails,
+    attachments: SendMailOptions['attachments']
   ): Promise<void> {
     try {
       // Get primary email for vendor
@@ -116,9 +128,6 @@ export class RfqEmailService {
       // Generate email content
       const emailTemplate = await this.generateEmailTemplate(rfq, bomItems, vendor);
       
-      // Prepare file attachments
-      const attachments = await this.prepareFileAttachments(bomItems);
-
       // Send email
       const mailOptions: SendMailOptions = {
         from: {
@@ -450,32 +459,38 @@ ${templateData.companyName}
     return { subject, html, text };
   }
 
-  private async prepareFileAttachments(bomItems: BomItemDetails[]): Promise<any[]> {
-    const attachments: any[] = [];
+  /**
+   * The parts' drawings and models as in-memory attachments. Each stored path is
+   * a key in the BOM files bucket and is downloaded with the caller's own client,
+   * so storage RLS decides what may be read: a path pointing at another tenant's
+   * object, a server file or a URL is never attached (it is only ever used as a
+   * storage key, and the transport refuses file and URL attachments anyway).
+   */
+  private async prepareFileAttachments(bomItems: BomItemDetails[], accessToken?: string): Promise<NonNullable<SendMailOptions['attachments']>> {
+    const attachments: NonNullable<SendMailOptions['attachments']> = [];
+    const storage = this.supabaseService.getUserClient(accessToken).storage.from(BOM_FILES_BUCKET);
 
     for (const item of bomItems) {
-      try {
-        // Add 2D files
-        if (item.file2dPath) {
-          const fileName = this.extractFileName(item.file2dPath, item.partNumber || item.name, '2D');
+      for (const [storagePath, type] of [[item.file2dPath, '2D'], [item.file3dPath, '3D']] as const) {
+        if (!storagePath) continue;
+        try {
+          const { data, error } = await storage.download(storagePath);
+          if (error || !data) {
+            this.logger.warn(`Skipped ${type} file of item ${item.id}: ${error?.message ?? 'not found'}`);
+            continue;
+          }
+          if (data.size > MAX_ATTACHMENT_BYTES) {
+            this.logger.warn(`Skipped ${type} file of item ${item.id}: ${data.size} bytes exceeds the attachment limit`);
+            continue;
+          }
           attachments.push({
-            filename: fileName,
-            path: item.file2dPath,
-            contentType: 'application/octet-stream'
+            filename: this.extractFileName(storagePath, item.partNumber || item.name, type),
+            content: Buffer.from(await data.arrayBuffer()),
+            contentType: 'application/octet-stream',
           });
+        } catch (error) {
+          this.logger.warn(`Failed to attach ${type} file of item ${item.id}: ${error instanceof Error ? error.message : error}`);
         }
-
-        // Add 3D files
-        if (item.file3dPath) {
-          const fileName = this.extractFileName(item.file3dPath, item.partNumber || item.name, '3D');
-          attachments.push({
-            filename: fileName,
-            path: item.file3dPath,
-            contentType: 'application/octet-stream'
-          });
-        }
-      } catch (error) {
-        this.logger.warn(`Failed to attach files for item ${item.name}:`, error);
       }
     }
 

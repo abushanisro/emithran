@@ -117,12 +117,18 @@ describe('[e2e] electronics costing over HTTP — real app, real auth, real DB',
       expect(exe.status).toBe(400);
     });
 
-    it('records a failed parse (no parser for a gerber archive) as a failed job, not a server error', async () => {
-      const res = await post().field('kind', 'board').field('tier', 'B').attach('files', EMPTY_ZIP, 'gerbers.zip');
+    it('records a failed parse (no parser for a board given only as a document) as a failed job, not a server error', async () => {
+      const res = await post().field('kind', 'board').field('tier', 'B').attach('files', Buffer.from('%PDF-1.4\n%%EOF\n'), 'drawing.pdf');
       expect(res.status).toBe(201);
       const job = await waitForJob(res.body.data.jobId);
       expect(job.state).toBe('failed');
       expect(job.error).toMatch(/No parser/);
+    });
+
+    it('unpacks a .zip design pack before anything is stored, so an empty pack is refused at the edge', async () => {
+      const res = await post().attach('files', EMPTY_ZIP, 'gerbers.zip');
+      expect(res.status).toBe(400);
+      expect(JSON.stringify(res.body)).toMatch(/archive_empty/);
     });
   });
 });

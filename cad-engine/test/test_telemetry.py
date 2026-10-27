@@ -345,7 +345,8 @@ def _rss_mb():
         import resource  # POSIX only
     except ImportError:
         return None
-    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+    # ru_maxrss is bytes on macOS, kilobytes on Linux
+    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / (1024 * 1024 if sys.platform == "darwin" else 1024)
 
 
 def test_a_failure_to_start_is_reported_and_the_engine_runs_without_telemetry(monkeypatch, caplog):

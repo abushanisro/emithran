@@ -5,6 +5,7 @@
 // generations once RLS enforces the org boundary instead).
 import { OrchestratorService } from '../../../../modules/process-plan-generator/services/orchestrator.service';
 import { type SupabaseService } from '../../../../common/supabase/supabase.service';
+import { InProcessEventBus } from '../../../../common/events/event-bus';
 
 function makeChain(result: { data: any; error: any }) {
   const chain: any = {};
@@ -31,6 +32,7 @@ function makeService(fromMock: jest.Mock) {
     {} as any, // alternativeRoutePlanner
     {} as any, // kb
     {} as any, // processValidation
+    new InProcessEventBus(),
   );
 }
 
@@ -93,5 +95,22 @@ describe('OrchestratorService.getLatestDraft', () => {
     await service.getLatestDraft('item-1', 'user-456', 'token-abc');
 
     expect(chain.eq).not.toHaveBeenCalledWith('user_id', expect.anything());
+  });
+});
+
+describe('OrchestratorService SSE through the event bus', () => {
+  it('a stream receives events published for its (user, item) channel and completes when the generation ends', async () => {
+    const bus = new InProcessEventBus();
+    const service = new OrchestratorService({} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, bus);
+    const seen: string[] = [];
+    const done = new Promise<void>((resolve) => {
+      service.streamFor('item-1', 'user-1').subscribe({ next: (e) => seen.push(String(e.type)), complete: () => resolve() });
+    });
+    const key = (service as any).streamKey('item-1', 'user-1');
+    (service as any).emit((service as any).streamKey('item-2', 'user-1'), { type: 'scope_decided', data: {} }); // another item
+    (service as any).emit(key, { type: 'draft_ready', data: { generationId: 'g1' } });
+    (service as any).closeStream(key);
+    await done;
+    expect(seen).toEqual(['draft_ready']);
   });
 });

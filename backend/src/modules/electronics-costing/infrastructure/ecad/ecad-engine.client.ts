@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+import { breakerFor, CircuitOpenError, ECAD_ENGINE } from '../../../../common/resilience/circuit-breaker';
 import { PACKAGE_CLASS_LOOKUP } from '../../domain/lookups/package-class-lookup.generated';
 import { PLACEMENT_LAYERS } from '../../domain/lookups/placement-layers.generated';
 
@@ -78,7 +79,19 @@ export class EcadEngineClient {
     return this.post<BoardPreview>('/render/board', files, {});
   }
 
+  // Behind the process-wide ecad-engine breaker: while the engine is down, calls fail at once (the parse job is retried
+  // by the queue) instead of each waiting out the timeout. Only "unavailable" counts as a failure, never a rejection of
+  // the files.
   private async post<T>(path: string, files: EngineFile[], extra: { supplied?: SuppliedFacts; inputTier?: string }): Promise<T> {
+    try {
+      return await breakerFor(ECAD_ENGINE).exec(() => this.send<T>(path, files, extra), (error) => error instanceof ExtractionUnavailable);
+    } catch (error) {
+      if (error instanceof CircuitOpenError) throw new ExtractionUnavailable(error.message);
+      throw error;
+    }
+  }
+
+  private async send<T>(path: string, files: EngineFile[], extra: { supplied?: SuppliedFacts; inputTier?: string }): Promise<T> {
     const url = this.config.get<string>('ECAD_ENGINE_URL', '');
     const key = this.config.get<string>('ECAD_ENGINE_API_KEY', '');
     if (!url || !key) throw new ExtractionUnavailable('The extraction engine is not configured: set ECAD_ENGINE_URL and ECAD_ENGINE_API_KEY.');

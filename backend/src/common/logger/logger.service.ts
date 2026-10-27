@@ -1,7 +1,7 @@
 import { Injectable, LoggerService as NestLoggerService } from '@nestjs/common';
 import * as winston from 'winston';
-import DailyRotateFile from 'winston-daily-rotate-file';
 import { currentTraceFields } from '../../telemetry/trace-context';
+import { writeErrorToFile } from './error-log-file';
 
 // Adds trace_id/span_id to the entry only while a trace is active. With telemetry off, or outside a
 // request, the entry is untouched, so the existing console and file output is unchanged.
@@ -36,22 +36,6 @@ export class Logger implements NestLoggerService {
             }),
           ),
         }),
-        // File logging disabled in production (Railway doesn't support persistent logs)
-        ...(process.env.NODE_ENV !== 'production' ? [
-          new DailyRotateFile({
-            filename: 'logs/application-%DATE%.log',
-            datePattern: 'YYYY-MM-DD',
-            maxSize: '20m',
-            maxFiles: '14d',
-          }),
-          new DailyRotateFile({
-            filename: 'logs/error-%DATE%.log',
-            datePattern: 'YYYY-MM-DD',
-            level: 'error',
-            maxSize: '20m',
-            maxFiles: '30d',
-          }),
-        ] : []),
       ],
     });
   }
@@ -64,8 +48,10 @@ export class Logger implements NestLoggerService {
     this.logger.info(message, { context: context || this.context });
   }
 
+  // Console for every level; errors are also kept in the error log file.
   error(message: string, trace?: string, context?: string) {
     this.logger.error(message, { trace, context: context || this.context });
+    writeErrorToFile(message, context || this.context, trace);
   }
 
   warn(message: string, context?: string) {

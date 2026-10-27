@@ -134,7 +134,15 @@ function startSdk(config: TelemetryConfig, options: StartOptions): TelemetryHand
       'deployment.environment.name': config.environment,
     }),
     resourceDetectors: [envDetector],
-    sampler: new ParentBasedSampler({ root: new TraceIdRatioBasedSampler(config.samplerRatio) }),
+    // The keep-or-drop decision is always made HERE. An incoming traceparent still lends its trace id (so a browser
+    // request and its backend trace correlate) but never its sampling flag: the web client marks every request
+    // "sampled", and anyone on the internet can send that flag, so honouring it would defeat the ratio and let a
+    // caller force-fill the span queue. The ratio sampler is deterministic per trace id, so a trace is kept or
+    // dropped consistently. What this service then sends downstream carries THIS decision, which the engines honour.
+    sampler: (() => {
+      const local = new TraceIdRatioBasedSampler(config.samplerRatio);
+      return new ParentBasedSampler({ root: local, remoteParentSampled: local, remoteParentNotSampled: local });
+    })(),
     // Bounded queue, bounded export time: with a dead or hanging collector spans are dropped, never accumulated.
     spanProcessors: [new AllowListSpanProcessor(batchProcessor)],
     metricReaders: [metricReader],

@@ -2,6 +2,7 @@ import { Injectable, Logger, InternalServerErrorException, BadRequestException }
 import { SupabaseService } from '../../../common/supabase/supabase.service';
 import { FileStorageService } from './file-storage.service';
 import axios from 'axios';
+import { cadEngineHttp } from '../../../common/resilience/engine-http';
 
 interface CADAnalysisRequest {
   bomItemId: string;
@@ -626,7 +627,7 @@ export class CADAnalysisService {
       this.logger.warn('Bypassing format check for development/testing');
     }
 
-    const response = await axios.post(
+    const response = await cadEngineHttp.post(
       `${this.cadEngineUrl}/analyze/geometry`,
       formData,
       {
@@ -672,7 +673,7 @@ export class CADAnalysisService {
         formData.append('force_reanalysis', String(forceReanalysis));
         formData.append('bypass_format_check', 'true');
 
-        const response = await axios.post(
+        const response = await cadEngineHttp.post(
           `${this.cadEngineUrl}/analyze/geometry`,
           formData,
           {
@@ -714,7 +715,7 @@ export class CADAnalysisService {
     form.append('strategy', 'balanced');
     form.append('bypass_format_check', 'true');
 
-    axios
+    cadEngineHttp
       .post(`${this.cadEngineUrl}/analyze/geometry`, form, {
         headers: {
           ...form.getHeaders(),
@@ -1282,7 +1283,7 @@ export class CADAnalysisService {
    */
   async computeTrueNest(request: TrueNestRequest): Promise<{ result: TrueNestCadEngineResult | null; reason: string }> {
     try {
-      const response = await axios.post(
+      const response = await cadEngineHttp.post(
         `${this.cadEngineUrl}/nest`,
         {
           outline_points_mm: request.outlinePointsMm,
