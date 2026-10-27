@@ -24,9 +24,11 @@ import { Logger } from './common/logger/logger.service';
 import { SupabaseService } from './common/supabase/supabase.service';
 import { CorrelatedConsoleLogger } from './telemetry/correlated-console-logger';
 import { FileErrorConsoleLogger } from './common/logger/file-error-console-logger';
+import { startErrorLogCleanup } from './common/logger/error-log-file';
 import { httpMetricsMiddleware } from './telemetry/http-metrics.middleware';
 
 async function bootstrap() {
+  startErrorLogCleanup();
   // Debug lines (one per privileged-client call, hundreds per page load) only with LOG_LEVEL=debug.
   const logLevels: LogLevel[] = process.env.LOG_LEVEL === 'debug' ? ['log', 'warn', 'error', 'debug'] : ['log', 'warn', 'error'];
   const app = await NestFactory.create(AppModule, {
