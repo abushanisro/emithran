@@ -5,8 +5,8 @@
 // only.
 //
 // Retention: ERROR_LOG_RETENTION_DAYS (15). Rotation deletes files past it, and
-// on start-up any older *.log left in the directory (including the retired
-// application-*.log files) is removed too.
+// at start-up and then daily (startErrorLogCleanup, main.ts) any older *.log in
+// the directory (including the retired application-*.log files) is removed too.
 //
 // ERROR_LOG_DIR (default "logs"); ERROR_LOG_FILE=false turns the file off.
 // Off under Jest so tests never write files.
@@ -52,6 +52,18 @@ export function pruneOldLogFiles(dir: string, days = ERROR_LOG_RETENTION_DAYS, n
     }
   }
   return removed;
+}
+
+/**
+ * Removes expired log files now and then once a day, so retention holds even
+ * when no error is written (the file sink itself is created on the first error).
+ */
+export function startErrorLogCleanup(): NodeJS.Timeout | null {
+  if (!enabled()) return null;
+  pruneOldLogFiles(errorLogDir());
+  const timer = setInterval(() => pruneOldLogFiles(errorLogDir()), DAY_MS);
+  timer.unref();
+  return timer;
 }
 
 function errorSink(): winston.Logger | null {

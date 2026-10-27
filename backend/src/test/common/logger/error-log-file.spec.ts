@@ -9,6 +9,7 @@ import {
   ERROR_LOG_RETENTION_DAYS,
   pruneOldLogFiles,
   resetErrorLogFileForTests,
+  startErrorLogCleanup,
   writeErrorToFile,
 } from '../../../common/logger/error-log-file';
 import { FileErrorConsoleLogger } from '../../../common/logger/file-error-console-logger';
@@ -92,5 +93,31 @@ describe('error log file', () => {
     touch('.error-log-audit.json', 30);
     expect(pruneOldLogFiles(dir, 15, now).sort()).toEqual(['application-2026-10-01.log', 'error-2026-10-11.log']);
     expect(fs.readdirSync(dir).sort()).toEqual(['.error-log-audit.json', 'error-2026-10-20.log']);
+  });
+
+  it('cleanup runs at start-up without any error being written, then daily', () => {
+    jest.useFakeTimers();
+    try {
+      const stale = (name: string) => {
+        const f = path.join(dir, name);
+        fs.writeFileSync(f, 'x');
+        const t = new Date(Date.now() - 20 * DAY);
+        fs.utimesSync(f, t, t);
+      };
+      stale('application-2026-10-01.log');
+      const timer = startErrorLogCleanup();
+      expect(fs.readdirSync(dir)).toEqual([]);
+      stale('error-2026-10-02.log');
+      jest.advanceTimersByTime(DAY);
+      expect(fs.readdirSync(dir)).toEqual([]);
+      clearInterval(timer!);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('cleanup is off when the error file is off', () => {
+    process.env.ERROR_LOG_FILE = 'false';
+    expect(startErrorLogCleanup()).toBeNull();
   });
 });
