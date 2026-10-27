@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { isAssemblyResult, type StartAssemblyResult, type StartUploadResult, type SuppliedFacts } from '@/lib/api/electronics';
 import { useFileFormats, useStartUpload } from '@/lib/api/hooks/useElectronics';
-import { classifyFile, roleLabel } from '@/lib/electronics/graph-view';
+import { classifyFile, extensionOf, roleLabel } from '@/lib/electronics/graph-view';
 import { folderName, isFolder, relativePath } from '@/lib/electronics/upload-paths';
 import { createSingleFlight } from '@/lib/utils/single-flight';
 
@@ -38,13 +38,16 @@ interface Props {
   designId?: string;
   /** Place what is uploaded inside this assembly or sub-assembly. */
   parentDesignId?: string;
+  /** Card heading; the page-level upload uses its own title, the Add dialog the default. */
+  title?: string;
+  description?: string;
 }
 
 /**
  * The one way to add electronics: drop files, or a whole folder. Loose files are one design (a PCB, a PCBA or a wire harness,
  * decided by the files). A folder becomes an assembly with sub-assemblies and child parts following its structure.
  */
-export function ElectronicsUpload({ onUploaded, projectId, designId, parentDesignId }: Props) {
+export function ElectronicsUpload({ onUploaded, projectId, designId, parentDesignId, title, description }: Props) {
   const { data: formats, isLoading, error } = useFileFormats();
   const upload = useStartUpload();
   const [flight] = useState(() => createSingleFlight());
@@ -92,29 +95,48 @@ export function ElectronicsUpload({ onUploaded, projectId, designId, parentDesig
   }, [facts]);
 
   const blockedByUnrecognised = !folder && unrecognised.length > 0;
-  const canUpload = included.length > 0 && !blockedByUnrecognised && !missingOutline && (!hasBoardFiles || supplied.problems.length === 0) && !upload.isPending;
+  // A .zip design pack is unpacked on the server and read like the folder it was made from, so it travels on its own.
+  const archives = classified.filter((c) => c.kind.kind === 'archive');
+  const isPack = archives.length === 1 && classified.length === 1;
+  const blockedByMixedArchive = archives.length > 0 && !isPack;
+  // Loose files with nothing a design can be read from (a BOM workbook, a drawing): the server would refuse them, so say why
+  // first. A board needs its Gerber or drill files; a harness arrives as a feature graph (.json); a pack or folder is planned
+  // on the server.
+  const nothingToRead =
+    !folder && !isPack && included.length > 0 && !included.some((c) => c.kind.kind === 'board' || extensionOf(c.file.name) === 'json');
+  const canUpload = included.length > 0 && !blockedByUnrecognised && !blockedByMixedArchive && !nothingToRead && !missingOutline && (!hasBoardFiles || supplied.problems.length === 0) && !upload.isPending;
 
   const submit = () =>
     flight(async () => {
-      const result = await upload.mutateAsync({
-        files: included.map((e) => e.file),
-        ...(folder ? { paths: included.map((e) => e.path) } : {}),
-        ...(!folder && designName.trim() ? { designName: designName.trim() } : {}),
-        ...(projectId ? { projectId } : {}),
-        ...(designId ? { designId } : {}),
-        ...(parentDesignId ? { parentDesignId } : {}),
-        ...(!folder && revision.trim() ? { revision: revision.trim() } : {}),
-        supplied: hasBoardFiles ? supplied.out : {},
-      });
+      let result: StartUploadResult | StartAssemblyResult;
+      try {
+        result = await upload.mutateAsync({
+          files: included.map((e) => e.file),
+          ...(folder ? { paths: included.map((e) => e.path) } : {}),
+          ...(!folder && designName.trim() ? { designName: designName.trim() } : {}),
+          ...(projectId ? { projectId } : {}),
+          ...(designId ? { designId } : {}),
+          ...(parentDesignId ? { parentDesignId } : {}),
+          ...(!folder && revision.trim() ? { revision: revision.trim() } : {}),
+          supplied: hasBoardFiles ? supplied.out : {},
+        });
+      } catch {
+        return; // useStartUpload already showed the reason; the picked files stay so they can be corrected
+      }
       if (isAssemblyResult(result)) {
         const notes = [
-          result.skipped.length > 0 ? `Not uploaded (type not accepted): ${result.skipped.map((s) => s.path).join(', ')}.` : '',
+          result.skipped.length > 0 ? `Left out: ${result.skipped.map((s) => `${s.path} (${s.reason})`).join(', ')}.` : '',
           result.unplaced.length > 0 ? `Not in any part: ${result.unplaced.join(', ')}.` : '',
         ].filter(Boolean);
-        toast.success(`${result.items.length} part${result.items.length === 1 ? '' : 's'} uploaded from the folder`, notes.length > 0 ? { description: notes.join(' ') } : {});
+        toast.success(`${result.items.length} part${result.items.length === 1 ? '' : 's'} uploaded from the ${isPack ? 'design pack' : 'folder'}`, notes.length > 0 ? { description: notes.join(' ') } : {});
       } else if (result.reused) {
         toast.info('These exact files were already uploaded', { description: `Showing revision ${result.revision}.` });
       }
+      // The page-level card stays mounted after an upload, so it is cleared for the next one.
+      setEntries([]);
+      setDesignName('');
+      setRevision('');
+      setFacts({});
       onUploaded(result);
     });
 
@@ -123,10 +145,13 @@ export function ElectronicsUpload({ onUploaded, projectId, designId, parentDesig
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Design files</CardTitle>
+        <CardTitle className={title ? undefined : 'text-base'}>{title ?? 'Design files'}</CardTitle>
         <CardDescription>
-          One upload for a PCB, a PCBA, a wire harness or a whole assembly. Drop files for one design (the files decide what it is), or drop a
-          folder: its structure becomes the assembly, sub-assemblies and child parts.
+          {description ?? (<>
+          One upload for a PCB, a PCBA, a wire harness or a whole assembly. Drop files for one design (the files decide what it is), drop a
+          folder, or drop a .zip design pack: a folder or pack becomes the assembly, sub-assemblies and child parts, and every board in it is
+          reverse-engineered (size, holes, placements, copper, nets and series chains, spacing).
+          </>)}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -139,7 +164,7 @@ export function ElectronicsUpload({ onUploaded, projectId, designId, parentDesig
         >
           <input {...getInputProps()} data-testid="design-file-input" />
           <Upload className="h-8 w-8 text-muted-foreground" />
-          <p className="text-sm font-medium">{isLoading ? 'Loading accepted types…' : 'Drop design files or a folder here, or click to browse'}</p>
+          <p className="text-sm font-medium">{isLoading ? 'Loading accepted types…' : 'Drop a .zip design pack, a folder or design files here, or click to browse'}</p>
           {formats && (
             <p className="max-w-xl text-xs text-muted-foreground">
               Board files: {formats.boardFiles.map((r) => `.${r.extension}`).join(' ')} · Tables: {formats.tabular.map((e) => `.${e}`).join(' ')}
@@ -197,6 +222,35 @@ export function ElectronicsUpload({ onUploaded, projectId, designId, parentDesig
             ))}
           </ul>
         )}
+        {isPack && (
+          <Alert data-testid="design-pack">
+            <AlertTitle>Design pack: {archives[0]?.file.name}</AlertTitle>
+            <AlertDescription>
+              The archive is unpacked on the server and read like the folder it was made from. Each board in it (its Gerber, drill and Pick Place
+              files) becomes a child part and is reverse-engineered; files of a type the platform does not read are listed afterwards, not dropped silently.
+            </AlertDescription>
+          </Alert>
+        )}
+        {nothingToRead && (
+          <Alert data-testid="nothing-to-read">
+            <AlertTitle>No board or harness in these files</AlertTitle>
+            <AlertDescription>
+              {included.map((c) => c.file.name).join(', ')} {included.length === 1 ? 'is' : 'are'} kept as reference beside a design, but a design is read from its
+              board files (Gerber layers, drill file) or a harness feature graph. Add those files here, or drop the whole .zip design pack or folder, which
+              carries the BOM along with every board in it.
+            </AlertDescription>
+          </Alert>
+        )}
+        {blockedByMixedArchive && (
+          <Alert variant="destructive" data-testid="mixed-archive">
+            <AlertTitle>Upload a .zip on its own</AlertTitle>
+            <AlertDescription>
+              A design pack is unpacked and read as a whole folder, so it cannot be combined with other files or archives in one upload. Remove the other
+              files, or unpack the archive and drop its folder instead.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {blockedByUnrecognised && (
           <Alert variant="destructive">
             <AlertTitle>Remove the files that are not accepted</AlertTitle>
@@ -237,7 +291,7 @@ export function ElectronicsUpload({ onUploaded, projectId, designId, parentDesig
         )}
 
         <Button onClick={() => void submit()} disabled={!canUpload}>
-          {upload.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}{folder ? 'Upload assembly' : 'Upload and extract'}
+          {upload.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}{folder ? 'Upload assembly' : isPack ? 'Upload design pack' : 'Upload and extract'}
         </Button>
       </CardContent>
     </Card>

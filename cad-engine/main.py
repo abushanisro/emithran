@@ -14,6 +14,7 @@ import json
 import logging
 import tempfile
 import hashlib
+import hmac
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -62,6 +63,22 @@ logging.basicConfig(
     level=getattr(logging, config.log_level),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+
+# Errors only are kept, in a daily file deleted after 15 days -- never in a
+# database. ERROR_LOG_DIR (default "logs"); ERROR_LOG_FILE=false turns it off.
+if os.getenv("ERROR_LOG_FILE", "true").lower() != "false":
+    import logging.handlers
+    _error_log_dir = os.getenv("ERROR_LOG_DIR", "logs")
+    try:
+        os.makedirs(_error_log_dir, exist_ok=True)
+        _error_file = logging.handlers.TimedRotatingFileHandler(
+            os.path.join(_error_log_dir, "error.log"), when="midnight", backupCount=15, encoding="utf-8",
+        )
+        _error_file.setLevel(logging.ERROR)
+        _error_file.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+        logging.getLogger().addHandler(_error_file)
+    except OSError as _e:
+        logging.getLogger(__name__).warning(f"error log file disabled: {_e}")
 logger = logging.getLogger(__name__)
 
 # Log startup configuration (sanitized)
@@ -227,7 +244,7 @@ async def require_api_key(api_key: str = Security(_api_key_header)):
                 detail="Service misconfigured: CAD_ENGINE_API_KEY is not set",
             )
         return  # key not configured — open only outside production (dev mode)
-    if api_key != _CAD_API_KEY:
+    if not api_key or not hmac.compare_digest(api_key, _CAD_API_KEY):
         raise HTTPException(status_code=403, detail="Invalid or missing API key")
 
 # 2D Drawing analysis (Groq vision + PyMuPDF PDF rendering)

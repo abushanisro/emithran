@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { 
-  updateDeliveryLocation 
+import {
+  callerCanAccessOrder,
+  updateDeliveryLocation
 } from '@/lib/api/delivery-tracking';
+import { requireUser } from '@/lib/server/auth';
 import { addressGeocodingService } from '@/lib/services/address-geocoding';
 import { carrierTrackingService } from '@/lib/services/carrier-tracking';
 
@@ -156,18 +158,17 @@ async function transformBackendOrderToTrackingData(order: any) {
 
 // GET /api/delivery/tracking - Get all delivery tracking data for a project
 export async function GET(request: NextRequest) {
+  const auth = await requireUser();
+  if (!auth.ok) return auth.response;
+
   try {
-    console.log('=== TRACKING API CALLED ===');
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get('projectId');
     const from = searchParams.get('from');
     const to = searchParams.get('to');
     const status = searchParams.getAll('status');
-    
-    console.log('Request params:', { projectId, from, to, status });
 
     if (!projectId) {
-      console.log('Missing project ID');
       return NextResponse.json(
         { 
           success: false,
@@ -188,11 +189,11 @@ export async function GET(request: NextRequest) {
     if (to) params.append('endDate', to);
     status.forEach(s => params.append('status', s));
 
-    console.log('Calling backend API:', `${backendUrl}/v1/api/delivery/orders?${params.toString()}`);
-    
-    const response = await fetch(`${backendUrl}/v1/api/delivery/orders?${params.toString()}`);
-    console.log('Backend response status:', response.status);
-    
+    // The backend's global SupabaseAuthGuard decides what this caller may see.
+    const response = await fetch(`${backendUrl}/v1/api/delivery/orders?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${auth.accessToken}` },
+    });
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Backend API error:', response.status, response.statusText, errorText);
@@ -200,17 +201,14 @@ export async function GET(request: NextRequest) {
     }
     
     const backendData = await response.json();
-    console.log('Backend data received:', backendData);
-    
+
     // Backend returns nested structure: { data: { data: [...] } }
     const ordersArray = backendData.data?.data || [];
-    console.log('Orders array:', ordersArray);
-    
+
     // Transform orders with proper address handling
     const deliveries = await Promise.all(
       ordersArray.map((order: any) => transformBackendOrderToTrackingData(order))
     );
-    console.log('Transformed deliveries:', deliveries.length, 'items');
 
     return NextResponse.json({
       success: true,
@@ -243,6 +241,9 @@ export async function GET(request: NextRequest) {
 
 // POST /api/delivery/tracking - Create new tracking entry
 export async function POST(request: NextRequest) {
+  const auth = await requireUser();
+  if (!auth.ok) return auth.response;
+
   try {
     const body = await request.json();
     const { orderId, latitude, longitude, status, notes, address } = body;
@@ -274,6 +275,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!(await callerCanAccessOrder(orderId))) {
+      return NextResponse.json(
+        { success: false, error: { message: 'Order not found', code: 'ORDER_NOT_FOUND' } },
+        { status: 404 }
+      );
+    }
+
     // Update location in database with real-time tracking
     const result = await updateDeliveryLocation({
       orderId,
@@ -282,7 +290,8 @@ export async function POST(request: NextRequest) {
       status: status || 'Location Update',
       notes,
       address,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      createdBy: auth.userId
     });
 
     return NextResponse.json({

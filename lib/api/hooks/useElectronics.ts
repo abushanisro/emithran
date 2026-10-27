@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { isInFlight } from '@/lib/electronics/design-view';
 
 import { ApiError } from '../client';
-import { electronicsApi, type JobStatus } from '../electronics';
+import { electronicsApi, type ElectronicsScenario, type JobStatus } from '../electronics';
 
 export const electronicsKeys = {
   all: ['electronics'] as const,
@@ -24,6 +24,8 @@ export const electronicsKeys = {
   preview: (uploadId: string) => [...electronicsKeys.all, 'preview', uploadId] as const,
   thumbnail: (uploadId: string) => [...electronicsKeys.all, 'thumbnail', uploadId] as const,
   result: (resultId: string) => [...electronicsKeys.all, 'result', resultId] as const,
+  scenarioOptions: (uploadId: string) => [...electronicsKeys.all, 'scenario-options', uploadId] as const,
+  latestResult: (uploadId: string) => [...electronicsKeys.all, 'latest-result', uploadId] as const,
 };
 
 const JOB_POLL_MS = 1000;
@@ -127,6 +129,28 @@ export function useBoardThumbnail(uploadId: string | null, enabled: boolean) {
   });
 }
 
+/** The steps a scenario can price for this board and the inputs each reads. */
+export function useScenarioOptions(uploadId: string | null) {
+  return useQuery({
+    queryKey: electronicsKeys.scenarioOptions(uploadId ?? 'none'),
+    queryFn: () => electronicsApi.scenarioOptions(required(uploadId)),
+    enabled: !!uploadId,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+}
+
+/** The upload's most recent cost result, which carries the scenario it was priced with. */
+export function useLatestResult(uploadId: string | null) {
+  return useQuery({
+    queryKey: electronicsKeys.latestResult(uploadId ?? 'none'),
+    queryFn: () => electronicsApi.latestResult(required(uploadId)),
+    enabled: !!uploadId,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+}
+
 export function useCostResult(resultId: string | null) {
   return useQuery({
     queryKey: electronicsKeys.result(resultId ?? 'none'),
@@ -199,7 +223,7 @@ export function useStartUpload() {
 export function useRequestQuote() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (args: { uploadId: string; batchSize: number }) => electronicsApi.requestQuote(args.uploadId, args.batchSize),
+    mutationFn: (args: { uploadId: string; batchSize: number; scenario?: ElectronicsScenario }) => electronicsApi.requestQuote(args.uploadId, args.batchSize, args.scenario),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: electronicsKeys.all }),
     onError: (error: unknown) => {
       toast.error('Could not start the calculation', { description: error instanceof ApiError ? error.message : 'Try again.' });

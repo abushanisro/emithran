@@ -37,3 +37,17 @@ describe('env validation: development auth bypass', () => {
     expect(validate(production).ALLOW_DEV_AUTH_BYPASS).toBe('false');
   });
 });
+
+describe('env validation: electronics job queue in production', () => {
+  it('refuses to boot in production with the in-memory queue (jobs lost on restart, not shared between instances)', () => {
+    expect(() => validate({ ...production, ELECTRONICS_QUEUE_DRIVER: 'memory' })).toThrow(/ELECTRONICS_QUEUE_DRIVER=memory is for local development only/);
+  });
+
+  it('allows the in-memory queue outside production', () => {
+    expect(validate({ ...base, ELECTRONICS_QUEUE_DRIVER: 'memory' }).ELECTRONICS_QUEUE_DRIVER).toBe('memory');
+  });
+
+  it('boots in production with pg-boss, the default', () => {
+    expect(validate(production).ELECTRONICS_QUEUE_DRIVER).toBe('pg-boss');
+  });
+});

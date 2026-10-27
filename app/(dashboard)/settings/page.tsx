@@ -4,8 +4,8 @@ import { useState, useRef, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Key, Plus, Copy, Check,
-  Camera, Loader2, Activity, CheckCircle2, Clock,
-  RefreshCw, ExternalLink, ArrowRight,
+  Camera, Loader2,
+  ExternalLink, ArrowRight,
   Monitor, Sun, Moon, Building2, Trash2,
   LayoutGrid, Mail, X,
 } from 'lucide-react';
@@ -21,11 +21,10 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MethodBadge } from '@/components/docs/MethodBadge';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { useProfile, useUpdateProfile } from '@/lib/api/hooks/useProfile';
-import { useApiKeys, useCreateApiKey, useRevokeApiKey, useRequestLogs, useLogStats } from '@/lib/api/hooks/useDeveloper';
+import { useApiKeys, useCreateApiKey, useRevokeApiKey } from '@/lib/api/hooks/useDeveloper';
 import {
   useFeatureProcessMappings,
   useRoutingRules,
@@ -44,7 +43,6 @@ import {
   useWorkspaces, useCreateWorkspace, useDeleteWorkspace,
 } from '@/lib/api/hooks/useOrganization';
 import type { ApiKey } from '@/lib/api/developer';
-import type { HttpMethod } from '@/lib/docs/api-spec-types';
 
 const TIMEZONES = [
   'UTC', 'Asia/Kolkata', 'Asia/Tokyo', 'Asia/Shanghai', 'Asia/Singapore',
@@ -56,8 +54,6 @@ const SCOPE_OPTIONS = [
   { value: 'read',  label: 'Read',  description: 'Fetch data from any endpoint' },
   { value: 'write', label: 'Write', description: 'Create, update, and delete resources' },
 ] as const;
-
-const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 
 // ─────────────────────────────────────────────────────────────
 // Preferences Tab
@@ -667,20 +663,18 @@ function ApiKeysTab() {
 // Developer Portal Tab
 // ─────────────────────────────────────────────────────────────
 function DeveloperPortalTab() {
-  const { data: stats, isLoading: statsLoading } = useLogStats();
   const { data: keys } = useApiKeys();
 
+  // Request history is no longer stored (only errors are logged, to a file), so
+  // there are no request statistics to show.
   const statCards = [
     { label: 'Active API Keys', value: keys?.length ?? 0, icon: Key, color: 'text-primary', bg: 'bg-primary/10', border: 'border-l-primary' },
-    { label: 'Requests (30d)', value: statsLoading ? '…' : (stats?.total ?? 0).toLocaleString(), icon: Activity, color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-l-blue-500' },
-    { label: 'Success Rate', value: statsLoading ? '…' : `${stats?.successRate ?? 0}%`, icon: CheckCircle2, color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-l-green-500' },
-    { label: 'Avg Response', value: statsLoading ? '…' : `${stats?.avgDurationMs ?? 0}ms`, icon: Clock, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-l-amber-500' },
   ];
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">API usage overview for the last 30 days.</p>
+        <p className="text-sm text-muted-foreground">API keys and reference.</p>
         <Button asChild variant="outline" size="sm" className="gap-2">
           <Link href="/developer" target="_blank"><ExternalLink className="h-4 w-4" />API Reference</Link>
         </Button>
@@ -720,140 +714,8 @@ function DeveloperPortalTab() {
           </CardContent>
         </Card>
 
-        <Card className="hover:border-primary/40 transition-colors">
-          <CardHeader>
-            <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center mb-2">
-              <Activity className="h-5 w-5 text-blue-400" />
-            </div>
-            <CardTitle className="text-base">Request Logs</CardTitle>
-            <CardDescription>View your API request history with status codes and timings.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild variant="outline" size="sm" className="gap-2 w-full">
-              <Link href="/settings?tab=logs">View Logs <ArrowRight className="h-4 w-4" /></Link>
-            </Button>
-          </CardContent>
-        </Card>
       </div>
 
-      {stats?.topEndpoints && stats.topEndpoints.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Top Endpoints (Last 30 Days)</CardTitle>
-            <CardDescription>Most frequently called API endpoints</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {stats.topEndpoints.map((ep) => (
-                <div key={ep.path} className="flex items-center justify-between gap-4">
-                  <code className="text-xs font-mono text-muted-foreground truncate">{ep.path}</code>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <div className="h-1.5 rounded-full bg-primary/40" style={{ width: `${Math.max(20, (ep.count / (stats.topEndpoints[0]?.count ?? 1)) * 120)}px` }} />
-                    <span className="text-xs text-muted-foreground w-16 text-right">{ep.count.toLocaleString()} req</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
-// Request Logs Tab
-// ─────────────────────────────────────────────────────────────
-function StatusBadge({ code }: { code: number }) {
-  const color =
-    code >= 200 && code < 300 ? 'bg-green-500/15 text-green-400 border-green-500/30'
-    : code >= 400 && code < 500 ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
-    : 'bg-red-500/15 text-red-400 border-red-500/30';
-  return <Badge variant="outline" className={`font-mono text-[11px] ${color}`}>{code}</Badge>;
-}
-
-function RequestLogsTab() {
-  const [method, setMethod] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [page, setPage] = useState(1);
-
-  const statusRange =
-    statusFilter === '2xx' ? { statusMin: 200, statusMax: 299 }
-    : statusFilter === '4xx' ? { statusMin: 400, statusMax: 499 }
-    : statusFilter === '5xx' ? { statusMin: 500, statusMax: 599 }
-    : {};
-
-  const { data, isLoading, refetch } = useRequestLogs({ page, limit: 50, method: method || undefined, ...statusRange });
-  const logs = data?.logs ?? [];
-  const total = data?.total ?? 0;
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3 flex-wrap">
-        <Select value={method} onValueChange={(v) => { setMethod(v === 'all' ? '' : v); setPage(1); }}>
-          <SelectTrigger className="w-36"><SelectValue placeholder="All Methods" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Methods</SelectItem>
-            {HTTP_METHODS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-          </SelectContent>
-        </Select>
-
-        <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v === 'all' ? '' : v); setPage(1); }}>
-          <SelectTrigger className="w-36"><SelectValue placeholder="All Status" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="2xx">2xx Success</SelectItem>
-            <SelectItem value="4xx">4xx Client Error</SelectItem>
-            <SelectItem value="5xx">5xx Server Error</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {(method || statusFilter) && (
-          <Button variant="ghost" size="sm" onClick={() => { setMethod(''); setStatusFilter(''); setPage(1); }}>Clear filters</Button>
-        )}
-
-        <div className="ml-auto flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">{total.toLocaleString()} total</span>
-          <Button variant="outline" size="sm" className="gap-2" onClick={() => refetch()}>
-            <RefreshCw className="h-3.5 w-3.5" />Refresh
-          </Button>
-        </div>
-      </div>
-
-      <Card>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : logs.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground text-sm">No requests found</div>
-          ) : (
-            <div className="divide-y divide-border">
-              <div className="grid grid-cols-[80px_1fr_60px_80px_140px] gap-4 px-4 py-2 bg-muted/30 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                <span>Method</span><span>Path</span><span>Status</span><span>Duration</span><span>Time</span>
-              </div>
-              {logs.map((log) => (
-                <div key={log.id} className="grid grid-cols-[80px_1fr_60px_80px_140px] gap-4 px-4 py-3 hover:bg-muted/20 transition-colors items-center">
-                  <MethodBadge method={log.method as HttpMethod} size="sm" />
-                  <code className="text-xs font-mono text-muted-foreground truncate" title={log.path}>{log.path}</code>
-                  <StatusBadge code={log.statusCode} />
-                  <span className="text-xs text-muted-foreground">{log.durationMs != null ? `${log.durationMs}ms` : '—'}</span>
-                  <span className="text-xs text-muted-foreground">{format(new Date(log.createdAt), 'MMM d, HH:mm:ss')}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {total > 50 && (
-        <div className="flex items-center justify-between">
-          <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>Previous</Button>
-          <span className="text-xs text-muted-foreground">Page {page} of {Math.ceil(total / 50)}</span>
-          <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={page * 50 >= total}>Next</Button>
-        </div>
-      )}
     </div>
   );
 }
@@ -1898,7 +1760,7 @@ function FeedbackSubtab() {
 // ─────────────────────────────────────────────────────────────
 // Settings Page — vertical sidebar layout
 // ─────────────────────────────────────────────────────────────
-const VALID_TABS = ['profile', 'preferences', 'organization', 'workspaces', 'api-keys', 'portal', 'logs', 'manufacturing-knowledge'] as const;
+const VALID_TABS = ['profile', 'preferences', 'organization', 'workspaces', 'api-keys', 'portal', 'manufacturing-knowledge'] as const;
 type Tab = typeof VALID_TABS[number];
 
 const NAV_SECTIONS = [
@@ -1921,7 +1783,6 @@ const NAV_SECTIONS = [
     items: [
       { id: 'api-keys'     as Tab, label: 'API Keys' },
       { id: 'portal'       as Tab, label: 'Developer Portal' },
-      { id: 'logs'         as Tab, label: 'Request Logs' },
     ],
   },
   {
@@ -1939,7 +1800,6 @@ const TAB_TITLES: Record<Tab, string> = {
   'workspaces':               'Workspaces',
   'api-keys':                 'API Keys',
   'portal':                   'Developer Portal',
-  'logs':                     'Request Logs',
   'manufacturing-knowledge':  'Manufacturing Knowledge',
 };
 
@@ -1960,7 +1820,6 @@ function SettingsInner() {
     'workspaces':               <WorkspacesTab />,
     'api-keys':                 <ApiKeysTab />,
     'portal':                   <DeveloperPortalTab />,
-    'logs':                     <RequestLogsTab />,
     'manufacturing-knowledge':  <ManufacturingKnowledgeTab />,
   };
 

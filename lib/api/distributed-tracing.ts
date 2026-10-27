@@ -80,6 +80,32 @@ export function generateRequestId(): string {
 }
 
 /**
+ * The identity of ONE logical API request: its own trace and its own x-request-id, shared by that request's retry
+ * attempts and by nothing else. (The session-wide context below is for grouping client-side logs, not for the
+ * headers sent to the backend: one trace per tab would be one ever-growing trace.)
+ */
+export interface RequestTrace {
+  traceId: string; // 32 hex chars
+  requestId: string; // UUID, sent as x-request-id
+}
+
+export function createRequestTrace(): RequestTrace {
+  return { traceId: generateTraceId(), requestId: generateRequestId() };
+}
+
+/**
+ * The tracing headers for one attempt of a request. `spanId` is that attempt's own span, which the backend
+ * parents its server span on. The flag is 00 ("not sampled") on purpose: this client records and exports no spans,
+ * so it must not claim a sampling decision. The backend decides what to record, and ignores this flag.
+ */
+export function requestTraceHeaders(trace: RequestTrace, spanId: string): Record<string, string> {
+  return {
+    traceparent: `00-${trace.traceId}-${spanId}-00`,
+    'x-request-id': trace.requestId,
+  };
+}
+
+/**
  * Parse W3C traceparent header
  * Format: 00-{trace-id}-{parent-id}-{trace-flags}
  */
@@ -153,6 +179,9 @@ export function formatTracestate(state: Record<string, string>): string {
 /**
  * Trace Manager for maintaining trace context across requests
  */
+/** How many client-side spans a tab keeps for debugging (traceManager.getSpans()). */
+export const MAX_RETAINED_SPANS = 200;
+
 export class TraceManager {
   private currentContext: TraceContext | null = null;
   private spans = new Map<string, Span>();
@@ -198,13 +227,14 @@ export class TraceManager {
   /**
    * Create a child span
    */
-  startSpan(name: string, attributes: Record<string, any> = {}): Span {
+  startSpan(name: string, attributes: Record<string, any> = {}, traceId?: string): Span {
     const context = this.getOrCreateContext();
 
     const span: Span = {
       spanId: generateSpanId(),
       parentSpanId: context.spanId,
-      traceId: context.traceId,
+      // A request passes its own trace id so the local span and the headers it sends carry the same one.
+      traceId: traceId ?? context.traceId,
       name,
       startTime: Date.now(),
       attributes,
@@ -212,6 +242,12 @@ export class TraceManager {
     };
 
     this.spans.set(span.spanId, span);
+    // Bounded: a long-lived tab makes thousands of requests and nothing here exports or clears them. Oldest first.
+    while (this.spans.size > MAX_RETAINED_SPANS) {
+      const oldest = this.spans.keys().next();
+      if (oldest.done) break;
+      this.spans.delete(oldest.value);
+    }
     return span;
   }
 

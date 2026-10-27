@@ -12,6 +12,9 @@
  */
 
 const SUPABASE_SERVICE = 'src/common/supabase/supabase.service.ts';
+// The one file allowed to import 'pg': the LISTEN/NOTIFY event bus. Its connection carries notifications only (ids and
+// counts), never tenant data. See docs/rls-bypass-inventory.md.
+const EVENT_BUS_CONNECTION = 'src/common/events/postgres-event-bus.ts';
 
 const MIN_REASON_LENGTH = 10;
 
@@ -62,6 +65,7 @@ function scanSource(relPath, text) {
 
   // 5. Only one database path exists: Supabase.
   for (const m of text.matchAll(/(?:from\s+|require\(\s*)['"](typeorm|knex|pg|@nestjs\/typeorm)['"]/g)) {
+    if (m[1] === 'pg' && path === EVENT_BUS_CONNECTION) continue;
     add('second-db-path', m.index, `importing "${m[1]}" adds a second database path that bypasses RLS`);
   }
 
@@ -113,4 +117,4 @@ function scanRepoJwt(relPath, text) {
   return out;
 }
 
-module.exports = { scanSource, scanRepoJwt, SUPABASE_SERVICE };
+module.exports = { scanSource, scanRepoJwt, SUPABASE_SERVICE, EVENT_BUS_CONNECTION };

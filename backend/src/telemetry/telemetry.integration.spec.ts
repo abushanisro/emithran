@@ -104,6 +104,31 @@ describe('enabled: propagation, correlation, duplicates, sensitive data', () => 
   });
 });
 
+describe('sampling is decided by this service, never by the caller', () => {
+  const SERVER = 1;
+
+  it('does not record a request just because the caller says "sampled" (the web client says it on every request)', () => {
+    const { result: r } = run('propagation.fixture.ts', ['0', '01']);
+    expect(r.spans).toEqual([]); // ratio 0: nothing recorded, whatever the incoming flag
+    // The trace id still continues downstream (correlation survives), carrying THIS service's decision: not sampled.
+    const [, traceId, , flags] = r.seen[0].traceparent.split('-');
+    expect(traceId).toBe(r.upstreamTrace);
+    expect(flags).toBe('00');
+  });
+
+  it('does record a request the caller marked "not sampled" when the local ratio keeps it', () => {
+    const { result: r } = run('propagation.fixture.ts', ['1', '00']);
+    expect(r.spans.some((s: any) => s.traceId === r.upstreamTrace && s.kind === SERVER)).toBe(true);
+    expect(r.seen[0].traceparent.split('-')[3]).toBe('01'); // downstream is told to record, by this service's decision
+  });
+
+  it('still counts the request in metrics when the trace is not sampled', () => {
+    const { result: r } = run('propagation.fixture.ts', ['0', '01']);
+    const server = r.metrics.find((m: any) => m.name === 'emithran.http.server.duration');
+    expect(server.labels).toContainEqual(expect.objectContaining({ 'http.route': '/parts/:id', 'emithran.status_class': '2xx' }));
+  });
+});
+
 describe('disabled: no OTEL_EXPORTER_OTLP_ENDPOINT', () => {
   it('loads and initialises no SDK, passes @Traced straight through, and adds no trace fields', () => {
     const { result } = run('disabled.fixture.ts');

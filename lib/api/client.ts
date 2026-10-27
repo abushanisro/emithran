@@ -22,7 +22,7 @@ import { authTokenManager } from '../auth/token-manager';
 
 import { CircuitBreaker, CircuitBreakerError } from './circuit-breaker';
 import { requestMetrics } from './request-metrics';
-import { traceManager, getTraceHeaders } from './distributed-tracing';
+import { traceManager, createRequestTrace, requestTraceHeaders, generateSpanId } from './distributed-tracing';
 import type { Span } from './distributed-tracing';
 import { idempotencyManager, createIdempotencyMiddleware } from './idempotency';
 import type { IdempotencyOptions } from './idempotency';
@@ -508,6 +508,9 @@ class ApiClient {
       }
     }
 
+    // One trace and one x-request-id per logical request, kept across its retry attempts.
+    const requestTrace = createRequestTrace();
+
     const executeRequest = async (attemptNumber = 1): Promise<T | null> => {
       // Initialize metrics tracker
       const tracker = requestMetrics.startRequest(endpoint, method);
@@ -520,7 +523,7 @@ class ApiClient {
           'http.url': url,
           'http.target': endpoint,
           'http.retry_count': attemptNumber - 1,
-        });
+        }, requestTrace.traceId);
       }
 
       // Get token from single source of truth
@@ -536,8 +539,7 @@ class ApiClient {
 
       // Add distributed tracing headers
       if (tracing) {
-        const traceHeaders = getTraceHeaders();
-        Object.assign(headers, traceHeaders);
+        Object.assign(headers, requestTraceHeaders(requestTrace, traceSpan?.spanId ?? generateSpanId()));
       }
 
       // Add idempotency headers

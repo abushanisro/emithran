@@ -61,6 +61,15 @@ describe('RLS boundary CI rules', () => {
     expect(rulesFor('src/modules/y/y.service.ts', 'SUPABASE_SERVICE_KEY: string;')).toContain('service-key-outside-boundary');
   });
 
+  it("allows 'pg' only in the LISTEN/NOTIFY event bus, and nothing else there", () => {
+    const bus = 'src/common/events/postgres-event-bus.ts';
+    expect(rulesFor(bus, "import { Client } from 'pg';")).toEqual([]);
+    expect(rulesFor(bus, "import knex from 'knex';")).toContain('second-db-path');
+    expect(rulesFor('src/common/events/event-bus.ts', "import { Client } from 'pg';")).toContain('second-db-path');
+    const real = readFileSync(resolve(__dirname, '../../..', bus), 'utf8');
+    expect(rulesFor(bus, real)).toEqual([]);
+  });
+
   it('treats a reintroduced getAdminClient() as an error everywhere, with no allowlist', () => {
     for (const file of ['src/app.controller.ts', 'src/modules/z/z.service.ts']) {
       expect(rulesFor(file, 'x.getAdminClient()')).toContain('get-admin-client');

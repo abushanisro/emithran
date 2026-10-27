@@ -12,6 +12,7 @@ import { isTelemetryActive } from '../../src/telemetry/telemetry-state';
 import { Traced } from '../../src/telemetry/traced';
 import { Logger as WinstonLogger } from '../../src/common/logger/logger.service';
 import { CorrelatedConsoleLogger } from '../../src/telemetry/correlated-console-logger';
+import { finish } from './exit';
 
 const handle = startTelemetry();
 
@@ -53,4 +54,4 @@ async function main() {
   console.log(`RESULT:${JSON.stringify({ handleIsNull: handle === null, active: isTelemetryActive(), loaded, samePromise, rejection, winstonLines: lines, consoleLines: stdout })}`);
 }
 
-main().then(() => process.exit(0), (error) => { console.error(error); process.exit(1); });
+main().then(() => finish(0), (error) => { console.error(error); void finish(1); });

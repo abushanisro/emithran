@@ -1,5 +1,6 @@
 import PgBoss from 'pg-boss';
 
+import { withTimeout } from '../../../../common/async/with-timeout';
 import {
   ELECTRONICS_QUEUES,
   type ElectronicsQueueName,
@@ -7,6 +8,7 @@ import {
   type JobQueue,
   type JobState,
   type JobStatus,
+  type QueueHealth,
 } from './job-queue.port';
 
 const STATE_MAP: Record<PgBoss.JobWithMetadata['state'], JobState> = {
@@ -20,6 +22,7 @@ const STATE_MAP: Record<PgBoss.JobWithMetadata['state'], JobState> = {
 
 const RETRY_LIMIT = 2;
 const JOB_EXPIRE_SECONDS = 15 * 60;
+const HEALTH_TIMEOUT_MS = 2_000;
 
 export interface PgBossJobQueueOptions {
   connectionString: string;
@@ -70,6 +73,21 @@ export class PgBossJobQueue implements JobQueue {
       if (!job) return;
       return handler(job.data);
     });
+  }
+
+  // One cheap read through the queue's own connection: proves the database answers AND pg-boss is started.
+  async health(): Promise<QueueHealth> {
+    try {
+      await withTimeout(this.boss.getQueueSize(ELECTRONICS_QUEUES.parse), HEALTH_TIMEOUT_MS, 'pg-boss probe');
+      return { configured: true, ready: true };
+    } catch {
+      return { configured: true, ready: false };
+    }
+  }
+
+  // Created + retry jobs: the ones waiting for a worker.
+  async depth(queue: ElectronicsQueueName): Promise<number | null> {
+    return withTimeout(this.boss.getQueueSize(queue), HEALTH_TIMEOUT_MS, 'pg-boss queue size');
   }
 
   async status(queue: ElectronicsQueueName, jobId: string): Promise<JobStatus | null> {

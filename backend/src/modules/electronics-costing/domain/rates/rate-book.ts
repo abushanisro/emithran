@@ -26,8 +26,30 @@ export interface RateEntry {
   recordedAt?: string;
 }
 
+// A machine a process may run on, as read from mhr_records, with the capability facts the engine matches the
+// part against (never a machine name matched to a process name). Rates are per hour, in the stated currency.
+export interface MachineCandidate {
+  recordId: string;
+  name: string;
+  machineClass: string;
+  location: string;
+  /** Machine-hour rate (machine and overhead only; labour is separate). */
+  mhrPerHour: number;
+  /** Labour-hour rate for one operator. */
+  lhrPerHour: number;
+  operators: number;
+  setupTimeHr: number;
+  currency: string;
+  /** The machine's own specs (table size, head count, ...), as stored. */
+  specs: Readonly<Record<string, unknown>>;
+  recordVersion?: string;
+  recordedAt?: string;
+}
+
 export interface RateBook {
   entries: readonly RateEntry[];
+  /** Machines available per class and location; absent when the caller loaded none. */
+  machines?: readonly MachineCandidate[];
 }
 
 export const EMPTY_RATE_BOOK: RateBook = { entries: [] };

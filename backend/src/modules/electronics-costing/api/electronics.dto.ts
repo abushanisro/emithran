@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { IsIn, IsInt, IsObject, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength } from 'class-validator';
 
 export class StartUploadDto {
   // Optional: the files say what they are (a board file set, or a feature graph that states its kind).
@@ -62,6 +62,11 @@ export class RequestQuoteDto {
   @Min(1)
   @Max(10_000_000)
   batchSize: number;
+
+  // Location, the HR Rates machine per step and the stated inputs; validated by the use case (validateScenario).
+  @IsOptional()
+  @IsObject()
+  scenario?: Record<string, unknown>;
 }
 
 export class CreateContainerDto {

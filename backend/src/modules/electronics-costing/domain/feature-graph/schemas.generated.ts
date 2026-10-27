@@ -20,10 +20,11 @@ export const BOARD_FEATURE_GRAPH_SCHEMA = {
   ],
   "properties": {
     "contractVersion": {
-      "description": "1.2 adds `fabrication`. A 1.1 graph stays valid: every 1.2 addition is optional.",
+      "description": "1.2 adds `fabrication`. 1.3 adds `copper`, `connectivity` and the spacing, annular-ring and copper-to-edge facts. Older graphs stay valid: every addition is optional.",
       "enum": [
         "1.1",
-        "1.2"
+        "1.2",
+        "1.3"
       ]
     },
     "kind": {
@@ -326,6 +327,21 @@ export const BOARD_FEATURE_GRAPH_SCHEMA = {
           "type": "number",
           "exclusiveMinimum": 0,
           "description": "Narrowest drawn conductor stroke on the copper layers. Pour and region copper is not a stroke and is not counted."
+        },
+        "minSpacingMm": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Smallest edge-to-edge gap between copper of two different conductors on one copper layer (pads, strokes and regions)."
+        },
+        "minAnnularRingMm": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Smallest (landing-pad width - hole diameter) / 2 over the plated holes."
+        },
+        "minCopperToEdgeMm": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Nearest copper to the centre line of the board outline."
         }
       }
     },
@@ -352,6 +368,124 @@ export const BOARD_FEATURE_GRAPH_SCHEMA = {
             "type": "integer",
             "minimum": 1
           }
+        }
+      }
+    },
+    "copper": {
+      "description": "Copper read from the copper layers: area per side (overlaps counted once), separate conductors, and plated holes that belong to no placed part.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "areaMm2",
+        "conductors"
+      ],
+      "properties": {
+        "areaMm2": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "top": {
+              "type": "number",
+              "minimum": 0
+            },
+            "bottom": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        "conductors": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Separate pieces of copper after joining the layers through the plated holes (nets, including unconnected pads)."
+        },
+        "viaCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Plated holes whose pads belong to no placed part: vias, and holes for wires soldered in."
+        }
+      }
+    },
+    "connectivity": {
+      "description": "Parts tied to nets through their copper pins, and the series chains of two-pin parts (runs joined by nets that carry exactly two pins).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "netsWithPins",
+        "pins",
+        "largestNetPins",
+        "seriesChains",
+        "chainEndNets"
+      ],
+      "properties": {
+        "netsWithPins": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pins": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "largestNetPins": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "chainEndNets": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Nets that end two or more chains (for example the supply rails of an LED array)."
+        },
+        "seriesChains": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "count",
+              "partsPerChain",
+              "composition"
+            ],
+            "properties": {
+              "count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "partsPerChain": {
+                "type": "integer",
+                "minimum": 2
+              },
+              "composition": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "footprint",
+                    "count"
+                  ],
+                  "properties": {
+                    "footprint": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "count": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "shortedParts": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Parts whose pins all sit on one net (a jumper, or a part the copper shorts)."
         }
       }
     }

@@ -5,8 +5,12 @@
 // through axios and through global fetch, and prints one RESULT line of JSON for the test to assert on.
 process.env.NODE_ENV = 'production'; // winston: console transport only, no log files
 process.env.LOG_LEVEL = 'info';
+// argv: <sampling ratio, default 1> <flags of the incoming traceparent, default 01>
+const RATIO = process.argv[2] ?? '1';
+const INCOMING_FLAGS = process.argv[3] ?? '01';
 
 import { startTelemetry } from '../../src/telemetry/start';
+import { finish } from './exit';
 import { InMemorySpanExporter } from '@opentelemetry/sdk-trace';
 import { InMemoryMetricExporter, PeriodicExportingMetricReader, AggregationTemporality } from '@opentelemetry/sdk-metrics';
 
@@ -15,7 +19,7 @@ const metricExporter = new InMemoryMetricExporter(AggregationTemporality.CUMULAT
 const metricReader = new PeriodicExportingMetricReader({ exporter: metricExporter, exportIntervalMillis: 3_600_000 });
 
 const handle = startTelemetry({
-  env: { ...process.env, OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:9', OTEL_TRACES_SAMPLER_ARG: '1' },
+  env: { ...process.env, OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:9', OTEL_TRACES_SAMPLER_ARG: RATIO },
   traceExporter: spanExporter,
   metricReader,
 });
@@ -94,7 +98,7 @@ async function main() {
 
   // 1) an upstream trace arrives with a traceparent; 2) a request with none starts a new root trace.
   const upstreamTrace = '0af7651916cd43dd8448eb211c80319c';
-  await fetch(`${base}/parts/item-aaa-111?token=QUERY-SECRET`, { headers: { traceparent: `00-${upstreamTrace}-b7ad6b7169203331-01` } });
+  await fetch(`${base}/parts/item-aaa-111?token=QUERY-SECRET`, { headers: { traceparent: `00-${upstreamTrace}-b7ad6b7169203331-${INCOMING_FLAGS}` } });
   const afterFirst = seen.length;
   await fetch(`${base}/parts/item-bbb-222`);
   const blocked = await fetch(`${base}/blocked`);
@@ -128,10 +132,10 @@ async function main() {
 }
 
 main().then(
-  () => process.exit(0),
+  () => finish(0),
   (error) => {
     // eslint-disable-next-line no-console
     console.error('FIXTURE FAILED', error);
-    process.exit(1);
+    void finish(1);
   },
 );

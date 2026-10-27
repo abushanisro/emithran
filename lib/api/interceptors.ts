@@ -64,9 +64,12 @@ export const correlationIdInterceptor = (config: RequestConfig): RequestConfig =
     context = generateCorrelationContext();
   }
 
-  // Add W3C Trace Context and correlation headers
-  const tracingHeaders = correlationManager.getHeaders();
-  Object.assign(config.headers, tracingHeaders);
+  // Only the session-level grouping ids. traceparent and x-request-id belong to the request itself (the API client
+  // sets one trace and one request id per request); this session-wide context used to overwrite them, putting every
+  // request of a tab in one trace under one request id. x-user-id is never sent: nothing on the backend reads it.
+  const { 'x-correlation-id': correlationId, 'x-session-id': sessionId } = correlationManager.getHeaders();
+  if (correlationId) config.headers['x-correlation-id'] = correlationId;
+  if (sessionId) config.headers['x-session-id'] = sessionId;
 
   return config;
 };

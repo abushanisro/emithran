@@ -1,12 +1,15 @@
-import { ConsoleLogger, type LogLevel } from '@nestjs/common';
+import { type LogLevel } from '@nestjs/common';
+
+import { FileErrorConsoleLogger } from '../common/logger/file-error-console-logger';
 
 import { currentTraceFields } from './trace-context';
 
-// Nest's own ConsoleLogger (what the 80 `new Logger(Name)` call sites write through) with the
+// Nest's own ConsoleLogger (what the 80 `new Logger(Name)` call sites write through, errors also
+// kept in the error log file by FileErrorConsoleLogger) with the
 // active trace appended to each line. Outside a traced request the line is byte-identical to
 // the stock logger's. Only used when telemetry is enabled (main.ts), so with it off the stock
 // logger runs unchanged.
-export class CorrelatedConsoleLogger extends ConsoleLogger {
+export class CorrelatedConsoleLogger extends FileErrorConsoleLogger {
   protected override formatMessage(
     logLevel: LogLevel,
     message: unknown,

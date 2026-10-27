@@ -13,17 +13,21 @@ from extraction.fabrication import measure_trace_width, smallest_hole_mm
 from extraction.holes import compare_with_report, group_holes
 from extraction.outline import measure_outline
 from extraction.paste import measure_paste
-from extraction.placements import PlacementError, group_placements
+from extraction.placements import PlacementError, group_placements, read_components
+from extraction.copper_facts import analyse_copper as _analyse_copper
 from parsers.drill_report import parse_drill_report
 from parsers.excellon import load_holes
 from parsers.gerber_layer import UnsupportedGerber, load_gerber
 from parsers.tabular import Table, read_csv_table, read_sheet_table
 
 PARSER_ID = "ecad-engine-board"
-PARSER_VERSION = "0.2.0"
-CONTRACT_VERSION = "1.2"
+PARSER_VERSION = "0.3.0"
+CONTRACT_VERSION = "1.3"
 
 PLACEMENT_MARKER = "Designator"
+# Files without a board-file role that can hold a table (a Pick Place file, a BOM workbook). Any other role-less file in the
+# set (a drawing PDF, a photo, a requirements document) travels with the board as reference and is never parsed as a table.
+TABULAR_EXTENSIONS = (".csv", ".tsv", ".txt", ".xlsx", ".xlsm")
 COPPER_ROLES = ("copper_top", "copper_bottom")
 # Roles that are recognised files but are not measured yet.
 REFERENCE_ROLES = (
@@ -117,8 +121,10 @@ def extract_board(
     for f in files:
         if f.role:
             by_role.setdefault(f.role, []).append(f)
-        else:
+        elif f.name.lower().endswith(TABULAR_EXTENSIONS):
             tabular.append(f)
+        else:
+            report.append({"name": f.name, "role": "document", "status": "reference", "note": "kept with the board for review; not a table or a board layer, so not read"})
 
     def one(role: str) -> InputFile | None:
         found = by_role.get(role, [])
@@ -184,6 +190,7 @@ def extract_board(
 
     # ---- holes ---------------------------------------------------------------------------------------------
     drill_file = one("drill_data")
+    drilled: list = []
     if drill_file is None:
         unresolved.append({"field": "holes", "reason": "the set has no drill file"})
     else:
@@ -266,9 +273,7 @@ def extract_board(
             _finding(findings, "info", f"{skipped_strokes} copper stroke(s) use a non-circular aperture and are not in the narrowest-trace measurement", "fabrication.minTraceWidthMm")
     else:
         unresolved.append({"field": "fabrication.minTraceWidthMm", "reason": "the copper layers hold no circular-aperture strokes to measure"})
-    unresolved.append({"field": "fabrication.minSpacingMm", "reason": "conductor spacing needs polygon clearance geometry, which this engine does not measure yet; it comes from the fabrication drawing"})
-    if fabrication:
-        graph["fabrication"] = fabrication
+    graph["fabrication"] = fabrication  # removed again at the end when nothing was measured
 
     # ---- placements ----------------------------------------------------------------------------------------
     placement_tables: list[tuple[InputFile, Table]] = []
@@ -282,8 +287,15 @@ def extract_board(
             report.append({"name": f.name, "role": "bom", "status": "reference", "note": "shown for review; not matched to placements (no designators)"})
     if len(placement_tables) > 1:
         raise ExtractionError("more than one Pick Place file")
+    components: list | None = None
+    pp_used: InputFile | None = None
     if placement_tables:
         pp_file, table = placement_tables[0]
+        pp_used = pp_file
+        try:
+            components = read_components(table, lookups.placement_layers)
+        except PlacementError:
+            components = None  # positions missing: placements are still counted, pins cannot be traced
         try:
             groups_pp, duplicates = group_placements(table, lookups.placement_layers)
         except PlacementError as error:
@@ -330,6 +342,9 @@ def extract_board(
             graph["sidesPopulated"] = [s for s in ("top", "bottom") if s in paste]
             provenance["sidesPopulated"] = {"basis": "derived", "confidence": "low", "derivedFrom": ["pasteAreaMm2"]}
 
+    # ---- copper reverse engineering: nets, pins, mount type, chains, spacing ------------------------------------
+    _analyse_copper(graph, provenance, unresolved, findings, used, copper, by_role, drilled, components, outline_file, drill_file, pp_used)
+
     unresolved.append({"field": "uniquePartNumbers", "reason": "the BOM lists no designators, so its lines cannot be matched to the placements"})
     unresolved.append({"field": "testPoints", "reason": "no netlist or test point layer in the set"})
 
@@ -351,6 +366,16 @@ def extract_board(
         note = {"reference": "recognised; not measured yet", "ignored": "not needed for this set"}.get(status, "")
         report.append({"name": f.name, "role": f.role, "status": status, "note": note})
 
+    if not graph.get("fabrication"):
+        graph.pop("fabrication", None)
+    else:
+        # Every present top-level field needs its own provenance entry; each fabrication fact keeps its dotted one.
+        first = next(provenance[k] for k in provenance if k.startswith("fabrication."))
+        provenance["fabrication"] = {
+            "basis": "measured",
+            "confidence": first["confidence"],
+            "source": {"file": first["source"]["file"], "reference": "each fact has its own fabrication.* entry"},
+        }
     graph["sourceFiles"] = [f.name for f in files if f.name in used or any(r["name"] == f.name and r["status"] == "used" for r in report)]
     if findings:
         graph["findings"] = findings

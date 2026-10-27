@@ -5,6 +5,7 @@ import { ConfigModule } from '@nestjs/config';
 import * as path from 'path';
 import { ProcessesModule } from '../src/modules/processes/processes.module';
 import { ProcessesService } from '../src/modules/processes/processes.service';
+import { SessionModule } from '../src/common/session/session.module';
 
 jest.setTimeout(120_000);
 
@@ -13,7 +14,8 @@ describe('[e2e] Turret Press reference tables', () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../.env') }), ProcessesModule],
+      // SessionModule is global in AppModule; the auth guard ProcessesModule wires needs it.
+      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../.env') }), SessionModule, ProcessesModule],
     }).compile();
     service = moduleRef.get(ProcessesService);
   });

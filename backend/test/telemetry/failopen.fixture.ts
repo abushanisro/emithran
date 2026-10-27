@@ -9,6 +9,7 @@ import * as net from 'net';
 
 import { startTelemetry } from '../../src/telemetry/start';
 import { Traced } from '../../src/telemetry/traced';
+import { finish } from './exit';
 
 const mode = process.argv[2] === 'hanging' ? 'hanging' : 'dead';
 let unhandled = 0;
@@ -27,8 +28,9 @@ async function main() {
   let collectorPort = 1; // reserved port: connection refused
   let collector: net.Server | undefined;
   let connections = 0;
+  const heldSockets: net.Socket[] = [];
   if (mode === 'hanging') {
-    collector = net.createServer((socket) => { connections += 1; socket.on('data', () => undefined); socket.on('error', () => undefined); });
+    collector = net.createServer((socket) => { connections += 1; heldSockets.push(socket); socket.on('data', () => undefined); socket.on('error', () => undefined); });
     await new Promise<void>((resolve) => collector!.listen(0, '127.0.0.1', resolve));
     collectorPort = (collector.address() as net.AddressInfo).port;
   }
@@ -95,7 +97,8 @@ async function main() {
     uncaught,
   })}`);
   server.close();
+  for (const socket of heldSockets) socket.destroy(); // the hung exports' connections, so the process can end
   collector?.close();
 }
 
-main().then(() => setTimeout(() => process.exit(0), 200), (error) => { console.error(error); process.exit(1); });
+main().then(() => finish(0), (error) => { console.error(error); void finish(1); });

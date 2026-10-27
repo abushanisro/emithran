@@ -47,6 +47,22 @@ from extraction.render import DRAWN_ROLES, render_board
 
 config = AppConfig.from_env()
 logging.basicConfig(level=getattr(logging, config.log_level), format="%(asctime)s %(levelname)s %(name)s %(message)s")
+
+# Errors only are kept, in a daily file deleted after 15 days -- never in a
+# database. ERROR_LOG_DIR (default "logs"); ERROR_LOG_FILE=false turns it off.
+if os.getenv("ERROR_LOG_FILE", "true").lower() != "false":
+    import logging.handlers
+    _error_log_dir = os.getenv("ERROR_LOG_DIR", "logs")
+    try:
+        os.makedirs(_error_log_dir, exist_ok=True)
+        _error_file = logging.handlers.TimedRotatingFileHandler(
+            os.path.join(_error_log_dir, "error.log"), when="midnight", backupCount=15, encoding="utf-8",
+        )
+        _error_file.setLevel(logging.ERROR)
+        _error_file.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+        logging.getLogger().addHandler(_error_file)
+    except OSError as _e:
+        logging.getLogger(__name__).warning(f"error log file disabled: {_e}")
 log = logging.getLogger("ecad-engine")
 
 SERVICE_VERSION = "0.2.0"
@@ -154,6 +170,11 @@ def health() -> dict[str, Any]:
             "Drilled holes by diameter and plating, cross-checked against the drill report",
             "Solder paste opening area per side",
             "Placements by side and footprint (Pick Place CSV or workbook)",
+            "Nets traced through the copper layers and plated holes; parts tied to them through their copper pins",
+            "Series chains of two-pin parts (for example LED strings and their ballast resistors)",
+            "Through-hole or surface-mount, and pins per part, read from the copper and drill file for unlisted footprints",
+            "Narrowest spacing between conductors, smallest annular ring, copper nearest the board edge",
+            "Copper area per side and vias",
             "Layered SVG board preview, with the parts (Pick Place) and drilled holes positioned on the same frame",
         ],
         "renderedRoles": list(DRAWN_ROLES),

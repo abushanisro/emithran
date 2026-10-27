@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
+import { cadEngineHttp } from '../../../common/resilience/engine-http';
 import FormData from 'form-data';
 
 /**
@@ -98,7 +99,7 @@ export class StepConverterService {
       this.logger.log(`Converting STEP file: ${originalFilename || 'model.step'}`);
 
       // Send to CAD engine for conversion
-      const response = await axios.post(
+      const response = await cadEngineHttp.post(
         `${this.cadEngineUrl}/convert/step-to-stl`,
         formData,
         {

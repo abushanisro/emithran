@@ -1,14 +1,16 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   Logger,
   MessageEvent,
   NotFoundException,
 } from '@nestjs/common';
-import { Subject, Observable, takeUntil, timer } from 'rxjs';
+import { Observable } from 'rxjs';
 import { createHash } from 'crypto';
 
 import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { EVENT_BUS, EventBus } from '../../../common/events/event-bus';
 
 import type { EngineeringBrief } from '../dto/engineering-brief.dto';
 import type { CandidateSet } from '../dto/candidate-set.dto';
@@ -39,6 +41,8 @@ interface InternalEvent {
 
 const STREAM_KEEPALIVE_MS = 15_000;
 const STREAM_MAX_DURATION_MS = 90_000;
+/** Bus-only marker after a generation's last event: the SSE stream completes on it and never forwards it. */
+const STREAM_END = 'stream.end';
 
 /**
  * Top-level orchestrator. Ties Stages 1–3 together, persists the generation
@@ -51,9 +55,8 @@ const STREAM_MAX_DURATION_MS = 90_000;
 export class OrchestratorService {
   private readonly logger = new Logger(OrchestratorService.name);
 
-  // SSE bus: one Subject per (bomItemId, userId) so multiple users on the
-  // same BOM item don't cross-leak events. Auto-cleaned on completion.
-  private readonly streams = new Map<string, Subject<InternalEvent>>();
+  // SSE events go through the event bus on one channel per (bomItemId, userId), so multiple users on the same BOM item
+  // don't cross-leak events, and the POST that generates and the GET that streams may run on different instances.
 
   constructor(
     private readonly supabaseService: SupabaseService,
@@ -64,6 +67,7 @@ export class OrchestratorService {
     private readonly alternativeRoutePlanner: AlternativeRoutePlannerService,
     private readonly kb: ManufacturingKnowledgeService,
     private readonly processValidation: ProcessValidationService,
+    @Inject(EVENT_BUS) private readonly bus: EventBus,
   ) {}
 
   async generate(args: GenerateArgs): Promise<GenerationResponse> {
@@ -395,21 +399,20 @@ export class OrchestratorService {
   }
 
   streamFor(bomItemId: string, userId: string): Observable<MessageEvent> {
-    const key = this.streamKey(bomItemId, userId);
-    const subj = this.getOrCreateStream(key);
-    const stop$ = timer(STREAM_MAX_DURATION_MS);
+    const channel = this.channelOf(this.streamKey(bomItemId, userId));
     return new Observable<MessageEvent>((sub) => {
-      const sub1 = subj.pipe(takeUntil(stop$)).subscribe({
-        next: (ev) => sub.next({ type: ev.type, data: JSON.stringify(ev.data) } as MessageEvent),
-        complete: () => sub.complete(),
-        error: (e) => sub.error(e),
+      const unsubscribe = this.bus.subscribe(channel, (ev) => {
+        if (ev.type === STREAM_END) sub.complete();
+        else sub.next({ type: ev.type, data: JSON.stringify(ev.data) } as MessageEvent);
       });
+      const stop = setTimeout(() => sub.complete(), STREAM_MAX_DURATION_MS);
       // Keepalive
       const keep = setInterval(() => {
         sub.next({ type: 'ping', data: JSON.stringify({ t: Date.now() }) } as MessageEvent);
       }, STREAM_KEEPALIVE_MS);
       return () => {
-        sub1.unsubscribe();
+        unsubscribe();
+        clearTimeout(stop);
         clearInterval(keep);
       };
     });
@@ -421,28 +424,17 @@ export class OrchestratorService {
     return `${userId}:${bomItemId}`;
   }
 
-  private getOrCreateStream(key: string): Subject<InternalEvent> {
-    let s = this.streams.get(key);
-    if (!s) {
-      s = new Subject<InternalEvent>();
-      this.streams.set(key, s);
-    }
-    return s;
-  }
-
   private emit(key: string, ev: InternalEvent) {
-    this.getOrCreateStream(key).next(ev);
+    // Published in order on one connection; a failed publish is logged, never thrown into the generation.
+    this.bus.publish(this.channelOf(key), ev).catch((e: unknown) => this.logger.warn(`SSE publish failed: ${(e as Error)?.message}`));
   }
 
   private closeStream(key: string) {
-    const s = this.streams.get(key);
-    if (s) {
-      // Defer close to next tick so the last event has a chance to flush
-      setTimeout(() => {
-        s.complete();
-        this.streams.delete(key);
-      }, 100);
-    }
+    this.bus.publish(this.channelOf(key), { type: STREAM_END, data: {} }).catch((e: unknown) => this.logger.warn(`SSE close failed: ${(e as Error)?.message}`));
+  }
+
+  private channelOf(key: string): string {
+    return `process-plan:${key}`;
   }
 
   private async findRecentByIdempotencyKey(client: any, key: string): Promise<GenerationResponse | null> {

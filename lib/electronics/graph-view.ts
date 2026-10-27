@@ -101,6 +101,57 @@ function board(graph: BoardGraph): Section[] {
       rows: graph.thtParts.map((t) => ({ label: t.label, value: `${t.count} parts × ${t.jointsPerPart} joints`, provenance: prov('thtParts') })),
     });
   }
+
+  const fab = graph.fabrication;
+  if (fab) {
+    const facts: [string, number | undefined, string][] = [
+      ['Narrowest trace', fab.minTraceWidthMm, 'fabrication.minTraceWidthMm'],
+      ['Narrowest spacing between conductors', fab.minSpacingMm, 'fabrication.minSpacingMm'],
+      ['Smallest drilled hole', fab.minHoleMm, 'fabrication.minHoleMm'],
+      ['Smallest annular ring', fab.minAnnularRingMm, 'fabrication.minAnnularRingMm'],
+      ['Copper nearest the board edge', fab.minCopperToEdgeMm, 'fabrication.minCopperToEdgeMm'],
+    ];
+    const rows: Row[] = facts.flatMap(([label, value, key]) => (value === undefined ? [] : [{ label, value: mm(value, 3), provenance: prov(key) }]));
+    for (const [label, sides, key] of [['Solder mask', fab.soldermask, 'fabrication.soldermask'], ['Silkscreen', fab.silkscreen, 'fabrication.silkscreen']] as const) {
+      if (sides) rows.push({ label, value: (['top', 'bottom'] as const).filter((s) => sides[s]).join(' and ') || 'none', provenance: prov(key) });
+    }
+    if (rows.length > 0) sections.push({ title: 'Fabrication', rows });
+  }
+
+  if (graph.copper) {
+    const area = (side: 'top' | 'bottom') => graph.copper?.areaMm2[side];
+    const boardArea = graph.outline.areaMm2;
+    const rows: Row[] = (['top', 'bottom'] as const).flatMap((side) => {
+      const a = area(side);
+      if (a === undefined) return [];
+      const share = boardArea ? ` (${Math.round((a / boardArea) * 100)}% of the board)` : '';
+      return [{ label: `Copper area, ${side}`, value: `${Number(a.toFixed(0)).toLocaleString('en-US')} mm²${share}`, provenance: prov('copper') }];
+    });
+    rows.push({ label: 'Separate conductors', value: graph.copper.conductors.toLocaleString('en-US'), provenance: prov('copper') });
+    if (graph.copper.viaCount !== undefined) {
+      rows.push({ label: 'Vias (plated holes of no part)', value: graph.copper.viaCount.toLocaleString('en-US'), provenance: prov('copper.viaCount') });
+    }
+    sections.push({ title: 'Copper', rows });
+  }
+
+  if (graph.connectivity) {
+    const c = graph.connectivity;
+    const rows: Row[] = [
+      { label: 'Nets with part pins', value: c.netsWithPins.toLocaleString('en-US'), provenance: prov('connectivity') },
+      { label: 'Pins traced', value: c.pins.toLocaleString('en-US'), provenance: prov('connectivity') },
+      { label: 'Largest net', value: `${c.largestNetPins} pins`, provenance: prov('connectivity') },
+    ];
+    for (const chain of c.seriesChains) {
+      rows.push({
+        label: `${chain.count} × series chain of ${chain.partsPerChain} parts`,
+        value: chain.composition.map((p) => `${p.count} × ${p.footprint}`).join(' + '),
+        provenance: prov('connectivity'),
+      });
+    }
+    if (c.seriesChains.length > 0) rows.push({ label: 'Nets the chains end on', value: String(c.chainEndNets), provenance: prov('connectivity') });
+    if (c.shortedParts && c.shortedParts.length > 0) rows.push({ label: 'Parts with every pin on one net', value: c.shortedParts.join(', '), provenance: prov('connectivity') });
+    sections.push({ title: 'Circuit (traced from the copper)', rows });
+  }
   return sections;
 }
 

@@ -20,10 +20,12 @@ const board: BoardFeatureGraph = {
 };
 
 describe('electronics engine registry', () => {
-  it('lists every canonical process id exactly once', () => {
+  it('lists every canonical process id exactly once, except the two engines kept but not registered', () => {
     const ids = ELECTRONICS_ENGINE_REGISTRY.map((e) => e.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect([...ids].sort()).toEqual([...ELECTRONICS_PROCESS_IDS].sort());
+    const unregistered = ELECTRONICS_PROCESS_IDS.filter((id) => !ids.includes(id));
+    // foundation_probe always reported a gap; pcb_fab_drilling is parked (bare PCB is priced from the fab quote).
+    expect([...unregistered].sort()).toEqual(['foundation_probe', 'pcb_fab_drilling']);
   });
 
   describe.each(ELECTRONICS_ENGINE_REGISTRY.map((e) => [e.id, e] as const))('%s', (_id, engine) => {
@@ -32,7 +34,7 @@ describe('electronics engine registry', () => {
       const result = engine.computeCost({ graph: board, input, batchSize: 500, rates: EMPTY_RATE_BOOK });
       if (result.status === 'costed') {
         expect(result.line.totalCost).toBeGreaterThan(0);
-      } else {
+      } else if (result.status === 'gap') {
         expect(result.gap.gapType).toBeDefined();
         expect(result.gap.process).not.toBe('');
       }

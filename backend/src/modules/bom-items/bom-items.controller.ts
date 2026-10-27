@@ -1,3 +1,4 @@
+import { breakerFor, CAD_ENGINE, isServiceUnavailable } from '../../common/resilience/circuit-breaker';
 import { catalogRowForLine, identityRows, type CatalogRow } from './process-catalog/catalog-row-for-line';
 import {
   Controller,
@@ -1359,14 +1360,19 @@ export class BOMItemsController {
 
     let cadResponse: globalThis.Response;
     try {
-      cadResponse = await fetch(`${this.cadEngineUrl}/analyze/geometry`, {
-        method: 'POST',
-        body: formData,
-        headers: {
-          'Accept': 'application/json',
-          ...(this.cadEngineApiKey && { 'X-API-Key': this.cadEngineApiKey }),
-        },
-      });
+      // Behind the cad-engine breaker: while the engine is down this fails at once instead of hanging.
+      cadResponse = await breakerFor(CAD_ENGINE).exec(async () => {
+        const r = await fetch(`${this.cadEngineUrl}/analyze/geometry`, {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'Accept': 'application/json',
+            ...(this.cadEngineApiKey && { 'X-API-Key': this.cadEngineApiKey }),
+          },
+        });
+        if (r.status >= 500) throw Object.assign(new Error(`CAD engine answered ${r.status}`), { response: { status: r.status } });
+        return r;
+      }, isServiceUnavailable);
     } catch (e: any) {
       throw new ServiceUnavailableException(
         `CAD engine is not reachable, so ${stepFile.originalname} was not processed. Start the CAD engine and try again (${e?.message ?? e}).`,

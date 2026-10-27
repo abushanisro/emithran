@@ -32,6 +32,9 @@ import { ReparseUploadUseCase } from '../application/reparse-upload.use-case';
 import { StartAssemblyUploadUseCase, type StartAssemblyResult } from '../application/start-assembly-upload.use-case';
 import { StartUploadUseCase, type StartUploadResult } from '../application/start-upload.use-case';
 import { validateSuppliedFacts, type SuppliedFacts } from '../domain/supplied-facts';
+import { scenarioOptions, type ScenarioOptions } from '../domain/engines/assembly-steps.engine';
+import { PLANNED_ENGINES } from '../domain/reference/engine-inputs';
+import { isArchiveName } from '../domain/uploads/expand-archive';
 import { isFolderUpload, parseUploadPaths } from '../domain/uploads/upload-paths';
 import { acceptedFormats, MAX_UPLOAD_BYTES } from '../domain/uploads/validate-upload';
 import { ElectronicsRepository, type CostResultRow, type RevisionRow } from '../infrastructure/repositories/electronics.repository';
@@ -41,6 +44,36 @@ interface User {
 }
 
 const MAX_FILES_PER_UPLOAD = 30;
+
+// A stored cost result as the screen reads it. Column names are mapped here, once; numeric columns arrive as strings
+// from PostgREST when they are numeric, so the per-unit cost is turned back into a number.
+export interface CostResultView {
+  id: string;
+  uploadId: string;
+  revisionId: string | null;
+  rateVersion: string | null;
+  ratesUsed: CostResultRow['rates_used'];
+  batchSize: number;
+  assemblyCostPerUnit: number | null;
+  complete: boolean;
+  result: CostResultRow['result'];
+  createdAt: string;
+}
+
+export function toCostResultView(row: CostResultRow): CostResultView {
+  return {
+    id: row.id,
+    uploadId: row.upload_id,
+    revisionId: row.revision_id,
+    rateVersion: row.rate_version,
+    ratesUsed: row.rates_used,
+    batchSize: Number(row.batch_size),
+    assemblyCostPerUnit: row.assembly_cost_per_unit === null ? null : Number(row.assembly_cost_per_unit),
+    complete: row.complete,
+    result: row.result,
+    createdAt: row.created_at,
+  };
+}
 
 @ApiTags('Electronics costing')
 @ApiBearerAuth()
@@ -75,6 +108,20 @@ export class ElectronicsController {
     @CurrentOrganization() organizationId: string,
   ): Promise<StartUploadResult | StartAssemblyResult> {
     if (!files || files.length === 0) throw new BadRequestException('files is required');
+    const archive = files.length === 1 && files[0] && isArchiveName(files[0].originalname) ? files[0] : null;
+    if (archive) {
+      // A design pack: unpacked and read as the folder it was made from (one board, or an assembly of several).
+      return this.startAssembly.executeArchive({
+        name: archive.originalname,
+        bytes: archive.buffer,
+        ...(body.projectId ? { projectId: body.projectId } : {}),
+        ...(body.parentDesignId ? { parentDesignId: body.parentDesignId } : {}),
+        ...(body.designId ? { designId: body.designId } : {}),
+        organizationId,
+        userId: user.id,
+        token,
+      });
+    }
     if (body.paths !== undefined) {
       const parsed = parseUploadPaths(body.paths, files.length, files.map((f) => f.originalname));
       if (!parsed.ok) throw new BadRequestException(parsed.message);
@@ -129,6 +176,7 @@ export class ElectronicsController {
     return this.requestQuote.execute({
       uploadId: body.uploadId,
       batchSize: body.batchSize,
+      ...(body.scenario !== undefined ? { scenario: body.scenario } : {}),
       organizationId,
       userId: user.id,
       token,
@@ -265,9 +313,24 @@ export class ElectronicsController {
     return this.jobStatus.execute(jobId, token);
   }
 
+  @Get('uploads/:uploadId/scenario-options')
+  @ApiOperation({ summary: 'The assembly steps a scenario can price for this board, whether each applies, and the inputs each reads' })
+  async scenarioOptions(@Param('uploadId', ParseUUIDPipe) uploadId: string, @AccessToken() token: string): Promise<ScenarioOptions | null> {
+    const graph = await this.repository.getLatestFeatureGraph(uploadId, token);
+    if (!graph || graph.graph.kind !== 'board') return null;
+    return scenarioOptions(graph.graph, PLANNED_ENGINES);
+  }
+
+  @Get('uploads/:uploadId/latest-result')
+  @ApiOperation({ summary: 'The most recent cost result of an upload (with the scenario it was priced with), or null' })
+  async latestResult(@Param('uploadId', ParseUUIDPipe) uploadId: string, @AccessToken() token: string): Promise<CostResultView | null> {
+    const row = await this.repository.getLatestCostResult(uploadId, token);
+    return row ? toCostResultView(row) : null;
+  }
+
   @Get('results/:resultId')
   @ApiOperation({ summary: 'A versioned cost result with its full trace' })
-  async result(@Param('resultId', ParseUUIDPipe) resultId: string, @AccessToken() token: string): Promise<CostResultRow> {
-    return this.repository.getCostResult(resultId, token);
+  async result(@Param('resultId', ParseUUIDPipe) resultId: string, @AccessToken() token: string): Promise<CostResultView> {
+    return toCostResultView(await this.repository.getCostResult(resultId, token));
   }
 }

@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { ElectronicsReferenceRepository } from './electronics-reference.repository';
 import { SupabaseService } from '../../../../common/supabase/supabase.service';
 
-import type { RateBook, RateEntry } from '../../domain/rates/rate-book';
+import type { MachineCandidate, RateBook, RateEntry } from '../../domain/rates/rate-book';
 
 export interface MachineRateRow {
   id: string;
@@ -56,6 +56,33 @@ export class ElectronicsRateBookLoader {
       .filter((r) => r.status === 'sourced')
       .map((r) => ({ kind: 'reference', key: r.key, scope: r.scope, value: r.value, unit: r.unit, sourceRef: r.source_ref }));
     return { entries: [...confirmed, ...machineEntries] };
+  }
+
+  // The HR Rates machines a scenario chose, by id: benchmark rows and the quoting organisation's own rows only. A machine
+  // that is not found is simply absent; the step that wanted it reports the gap.
+  async machinesById(organizationId: string, ids: string[]): Promise<MachineCandidate[]> {
+    if (ids.length === 0) return [];
+    const { data, error } = await this.supabase
+      .getPrivilegedClient('reference-data: the HR Rates machines an electronics scenario chose, benchmark rows and the quoting organization rows only')
+      .from('mhr_records')
+      .select('id, machine_name, machine_class, location, mhr_usd_per_hour, usd_labor_rate_per_hr, operators, setup_time_hr, currency_code, specs, economics_version, updated_at')
+      .in('id', ids)
+      .or(`organization_id.is.null,organization_id.eq.${organizationId}`);
+    if (error) throw new Error(`mhr_records read failed: ${error.message}`);
+    return (data as Record<string, unknown>[]).map((r) => ({
+      recordId: String(r.id),
+      name: String(r.machine_name),
+      machineClass: typeof r.machine_class === 'string' ? r.machine_class : 'unclassified',
+      location: String(r.location ?? ''),
+      mhrPerHour: Number(r.mhr_usd_per_hour ?? 0),
+      lhrPerHour: Number(r.usd_labor_rate_per_hr ?? 0),
+      operators: Number(r.operators ?? 0),
+      setupTimeHr: Number(r.setup_time_hr ?? 0),
+      currency: 'USD', // the *_usd_* columns are read; currency_code is the row's local currency
+      specs: (r.specs as Record<string, unknown> | null) ?? {},
+      recordVersion: r.economics_version === null || r.economics_version === undefined ? undefined : String(r.economics_version),
+      recordedAt: String(r.updated_at),
+    }));
   }
 
   private async machineRates(organizationId: string, names: string[], location: string): Promise<RateEntry[]> {

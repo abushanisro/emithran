@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { HttpModule } from '@nestjs/axios';
-import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_GUARD } from '@nestjs/core';
 
 import { ProjectsModule } from './modules/projects/projects.module'; 862 
 import { VendorsModule } from './modules/vendors/vendors.module';
@@ -43,7 +43,6 @@ import { CostingModule } from './modules/costing/costing.module';
 import { ManufacturingRulesModule } from './modules/manufacturing-rules/manufacturing-rules.module';
 import { ElectronicsCostingModule } from './modules/electronics-costing/electronics-costing.module';
 import { FxModule } from './common/fx/fx.module';
-import { RequestLogInterceptor } from './modules/developer/interceptors/request-log.interceptor';
 import { LoggerModule } from './common/logger/logger.module';
 import { SupabaseService } from './common/supabase/supabase.service';
 import { SupabaseAuthGuard } from './common/guards/supabase-auth.guard';
@@ -133,10 +132,6 @@ import { AppController } from './app.controller';
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
-    },
-    {
-      provide: APP_INTERCEPTOR,
-      useClass: RequestLogInterceptor,
     },
   ],
 })

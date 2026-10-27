@@ -5,7 +5,7 @@ import type { BoardFeatureGraph, ElectronicsFeatureGraph, HarnessFeatureGraph } 
 // file list, extraction, provenance, unresolved) describe the graph itself and carry no entry.
 export const BOARD_DATA_FIELDS: readonly (keyof BoardFeatureGraph)[] = [
   'outline', 'layers', 'sidesPopulated', 'panel', 'placements', 'holes', 'thtParts', 'uniquePartNumbers',
-  'flags', 'pasteAreaMm2', 'testPoints', 'coating', 'fabrication',
+  'flags', 'pasteAreaMm2', 'testPoints', 'coating', 'fabrication', 'copper', 'connectivity',
 ];
 
 export const HARNESS_DATA_FIELDS: readonly (keyof HarnessFeatureGraph)[] = [

@@ -55,6 +55,7 @@ import {
 import { toast } from 'sonner';
 import RouteCalculator from './RouteCalculator';
 import dynamic from 'next/dynamic';
+import { escapeHtml } from '@/lib/utils/escape-html';
 
 const RouteMap = dynamic(() => import('./RouteMap'), {
   ssr: false,
@@ -1993,15 +1994,15 @@ export default function DeliveryOrderWorkflow({
               const addrBlock = (addr: any, label: string) => addr ? `
                 <div class="addr-card">
                   <div class="addr-label">${label}</div>
-                  <div class="addr-name">${addr.companyName || addr.contactPerson || ''}</div>
-                  ${addr.companyName && addr.contactPerson ? `<div>${addr.contactPerson}</div>` : ''}
-                  <div>${addr.addressLine1 || ''}</div>
-                  ${addr.addressLine2 ? `<div>${addr.addressLine2}</div>` : ''}
-                  <div>${addr.city || ''}, ${addr.stateProvince || ''} – ${addr.postalCode || ''}</div>
-                  <div>${addr.country || ''}</div>
-                  ${addr.contactPhone ? `<div>📞 ${addr.contactPhone}</div>` : ''}
-                  ${addr.contactEmail ? `<div>✉ ${addr.contactEmail}</div>` : ''}
-                  ${addr.specialInstructions ? `<div class="instructions"><b>Instructions:</b> ${addr.specialInstructions}</div>` : ''}
+                  <div class="addr-name">${escapeHtml(addr.companyName || addr.contactPerson || '')}</div>
+                  ${addr.companyName && addr.contactPerson ? `<div>${escapeHtml(addr.contactPerson)}</div>` : ''}
+                  <div>${escapeHtml(addr.addressLine1 || '')}</div>
+                  ${addr.addressLine2 ? `<div>${escapeHtml(addr.addressLine2)}</div>` : ''}
+                  <div>${escapeHtml(addr.city || '')}, ${escapeHtml(addr.stateProvince || '')} – ${escapeHtml(addr.postalCode || '')}</div>
+                  <div>${escapeHtml(addr.country || '')}</div>
+                  ${addr.contactPhone ? `<div>📞 ${escapeHtml(addr.contactPhone)}</div>` : ''}
+                  ${addr.contactEmail ? `<div>✉ ${escapeHtml(addr.contactEmail)}</div>` : ''}
+                  ${addr.specialInstructions ? `<div class="instructions"><b>Instructions:</b> ${escapeHtml(addr.specialInstructions)}</div>` : ''}
                 </div>` : `<div class="addr-card"><i>Not selected</i></div>`;
 
               const html = `<!DOCTYPE html>
@@ -2121,10 +2122,10 @@ export default function DeliveryOrderWorkflow({
     <div class="breakdown-row"><span>Total Shipping</span><span style="color:#16a34a">$${(routeData.cost ?? 0).toLocaleString('en-IN')}</span></div>
   </div>
   <div class="chips">
-    ${formData.transportMode ? `<span class="chip">🚛 ${formData.transportMode}</span>` : ''}
-    ${formData.materialType ? `<span class="chip secondary">📦 ${formData.materialType}</span>` : ''}
+    ${formData.transportMode ? `<span class="chip">🚛 ${escapeHtml(formData.transportMode)}</span>` : ''}
+    ${formData.materialType ? `<span class="chip secondary">📦 ${escapeHtml(formData.materialType)}</span>` : ''}
     ${routeData.isEstimated ? `<span class="chip warn">⚠ Estimated route</span>` : ''}
-    ${routeData.routeProvider ? `<span class="chip secondary">via ${routeData.routeProvider}</span>` : ''}
+    ${routeData.routeProvider ? `<span class="chip secondary">via ${escapeHtml(routeData.routeProvider)}</span>` : ''}
   </div>` : ''}` : ''}
 
   <!-- ITEMS -->
@@ -2134,8 +2135,8 @@ export default function DeliveryOrderWorkflow({
     <tbody>
       ${selectedItems.map(item => `
         <tr>
-          <td><b>${item.bomItem.partNumber}</b></td>
-          <td style="color:#555">${item.bomItem.description || ''}</td>
+          <td><b>${escapeHtml(item.bomItem.partNumber)}</b></td>
+          <td style="color:#555">${escapeHtml(item.bomItem.description || '')}</td>
           <td class="center">${item.deliveryQuantity}</td>
           <td class="right">$${(item.bomItem.unitCost || 0).toLocaleString('en-IN')}</td>
           <td class="right">$${((item.bomItem.unitCost || 0) * item.deliveryQuantity).toLocaleString('en-IN')}</td>
@@ -2150,9 +2151,9 @@ export default function DeliveryOrderWorkflow({
 
   <!-- META -->
   <div class="grid2" style="margin-top:3mm">
-    <div><b>Priority:</b> ${formData.priority}</div>
+    <div><b>Priority:</b> ${escapeHtml(formData.priority)}</div>
     ${formData.requestedDate ? `<div><b>Requested Delivery:</b> ${new Date(formData.requestedDate).toLocaleDateString('en-IN')}</div>` : ''}
-    ${formData.specialHandling ? `<div><b>Special Handling:</b> ${formData.specialHandling}</div>` : ''}
+    ${formData.specialHandling ? `<div><b>Special Handling:</b> ${escapeHtml(formData.specialHandling)}</div>` : ''}
   </div>
 
   ${(partsPhotos.length > 0 || packingPhotos.length > 0 || documents.length > 0) ? `
@@ -2161,22 +2162,22 @@ export default function DeliveryOrderWorkflow({
     ${partsPhotos.length > 0 ? `
     <div style="margin-bottom:2mm">
       <b>📷 Parts Photos (${partsPhotos.length}):</b><br/>
-      ${partsPhotos.map(f => `<span style="display:inline-block;margin:1mm 2mm 1mm 0;padding:1mm 3mm;background:#f3f4f6;border:1px solid #ddd;border-radius:3px;font-size:9pt">${f.file.name}</span>`).join('')}
+      ${partsPhotos.map(f => `<span style="display:inline-block;margin:1mm 2mm 1mm 0;padding:1mm 3mm;background:#f3f4f6;border:1px solid #ddd;border-radius:3px;font-size:9pt">${escapeHtml(f.file.name)}</span>`).join('')}
     </div>` : ''}
     ${packingPhotos.length > 0 ? `
     <div style="margin-bottom:2mm">
       <b>📦 Packing Photos (${packingPhotos.length}):</b><br/>
-      ${packingPhotos.map(f => `<span style="display:inline-block;margin:1mm 2mm 1mm 0;padding:1mm 3mm;background:#f3f4f6;border:1px solid #ddd;border-radius:3px;font-size:9pt">${f.file.name}</span>`).join('')}
+      ${packingPhotos.map(f => `<span style="display:inline-block;margin:1mm 2mm 1mm 0;padding:1mm 3mm;background:#f3f4f6;border:1px solid #ddd;border-radius:3px;font-size:9pt">${escapeHtml(f.file.name)}</span>`).join('')}
     </div>` : ''}
     ${documents.length > 0 ? `
     <div style="margin-bottom:2mm">
       <b>📄 Documents (${documents.length}):</b><br/>
-      ${documents.map(f => `<span style="display:inline-block;margin:1mm 2mm 1mm 0;padding:1mm 3mm;background:#f3f4f6;border:1px solid #ddd;border-radius:3px;font-size:9pt">${f.file.name}</span>`).join('')}
+      ${documents.map(f => `<span style="display:inline-block;margin:1mm 2mm 1mm 0;padding:1mm 3mm;background:#f3f4f6;border:1px solid #ddd;border-radius:3px;font-size:9pt">${escapeHtml(f.file.name)}</span>`).join('')}
     </div>` : ''}
   </div>` : ''}
 
-  ${formData.deliveryInstructions ? `<h3 style="margin-top:4mm">Delivery Instructions</h3><p>${formData.deliveryInstructions}</p>` : ''}
-  ${formData.notes ? `<h3 style="margin-top:4mm">Notes</h3><p>${formData.notes}</p>` : ''}
+  ${formData.deliveryInstructions ? `<h3 style="margin-top:4mm">Delivery Instructions</h3><p>${escapeHtml(formData.deliveryInstructions)}</p>` : ''}
+  ${formData.notes ? `<h3 style="margin-top:4mm">Notes</h3><p>${escapeHtml(formData.notes)}</p>` : ''}
 
   <div class="footer">
     <span>Document 6.5 – Dock Audit Check Sheet</span>

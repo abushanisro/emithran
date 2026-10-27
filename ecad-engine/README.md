@@ -15,10 +15,17 @@ platform tables in `memory/Electronics` (the backend generates TypeScript copies
 | Drilled holes by finished diameter and plating, checked against the drill report | Excellon `.TXT`, `.DRR` |
 | Solder paste opening area per side | paste layers (`.GTP`, `.GBP`) |
 | Placements by side and footprint | Pick Place CSV or workbook |
+| Nets: copper joined on each layer and through the plated holes; separate conductors; copper area per side | copper layers + drill file |
+| Pins of each part: pads at its Pick Place position whose offset recurs on the parts of the same footprint | copper layers + Pick Place |
+| Series chains of two-pin parts (an LED string and its ballast resistor), by composition | copper + drill + Pick Place |
+| Through-hole or surface-mount and pins per part, for footprints the package lookup does not hold | copper + drill + Pick Place |
+| Narrowest spacing between conductors, smallest annular ring, copper nearest the board edge, vias | copper, drill, outline |
 
 Never measured, never guessed: board thickness, boards per panel and the layer count a document states arrive as **supplied**
-facts (each with who stated it); part counts, test points, package classes (until `package_class_lookup.csv` has the footprint)
-and through-hole versus surface-mount stay in `unresolved`. The BOM workbook is attached for review; it has no designators, so
+facts (each with who stated it); part counts, test points and package classes (until `package_class_lookup.csv` has the
+footprint) stay in `unresolved`. Through-hole versus surface-mount is read from the copper when every pin of every part of a
+footprint is (or none is) a plated hole; a footprint that reads both ways stays unresolved with a finding. Copper drawn with
+clear polarity (cut-outs) is not traced: nets, spacing and copper area are then listed in `unresolved`. The BOM workbook is attached for review; it has no designators, so
 it is not matched to placements.
 
 ## Running it

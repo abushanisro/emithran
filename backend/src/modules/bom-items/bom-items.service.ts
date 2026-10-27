@@ -9562,7 +9562,7 @@ export class BOMItemsService {
         machineClass: params.machineClass,
         reason: `No calculator registered for machine class '${params.machineClass}' — this process has not been migrated onto the Manufacturing Physics Calculator pipeline yet.`,
       };
-      void this.recordLookupCoverageGap(gap);
+      this.recordLookupCoverageGap(gap);
       return empty(gap);
     }
 
@@ -9695,7 +9695,7 @@ export class BOMItemsService {
         reason: gapReasonOverride ?? `Calculator '${calculatorId}' (v${calculatorVersion}) did not resolve ${unresolved.join(', ')} from the given inputs — check the calculator's formula/fields, not a missing lookup row.`,
       };
     }
-    void this.recordLookupCoverageGap(gap);
+    this.recordLookupCoverageGap(gap);
     return {
       calculatorId, calculatorVersion, formulaVersion: calculatorVersion,
       inputs, lookupTrace, formulas, intermediateResults,
@@ -9705,48 +9705,22 @@ export class BOMItemsService {
     };
   }
 
-  // Persists this gap into lookup_coverage_gaps (migration 429's table,
-  // migration 431's upsert function) — the raw event log the Lookup
-  // Coverage Dashboard's per-table stats are aggregated FROM. Matches
-  // migration 429's own comment ("upsert-on-gap") — real occurrence counts
-  // and last-seen timestamps, not a one-off runtime message the engineer
-  // sees once and forgets. Fire-and-forget from both call sites (never
-  // awaited there) and swallows its own errors — a coverage-logging failure
-  // must never affect the cost calculation the gap is attached to.
-  //
-  // An identical gap is recorded once a minute, not once per resolve call: one
-  // route comparison resolves the same unresolved lookup many times, and each call
-  // was its own upsert. A failure is logged (supabase's rpc() returns { error }
-  // rather than throwing), at most once per window per gap.
+  // Reports a lookup / capability gap on the console, once a minute per
+  // identical gap (one route comparison resolves the same unresolved lookup many
+  // times). Not stored: logs are kept only as errors in the error log file, never
+  // in the database (2026-10-27) -- the gap itself is already on the quote as a
+  // warning. lookup_coverage_gaps (migration 429) had no reader and is no longer
+  // written.
   private readonly recentCoverageGaps = new RecentKeys(60_000, 500);
 
-  private async recordLookupCoverageGap(gap: PhysicsGap): Promise<void> {
+  private recordLookupCoverageGap(gap: PhysicsGap): void {
     const gapKey = JSON.stringify([
       gap.gapType, gap.process, gap.machineClass,
       gap.gapType === 'missing_lookup' ? [gap.lookupResolution.table, gap.lookupResolution.queryParams] : gap.reason,
     ]);
     if (!this.recentCoverageGaps.firstSeen(gapKey)) return;
-    try {
-      const db = this.supabaseService.getPrivilegedClient('system-telemetry: lookup_coverage_gaps upsert, fire-and-forget, no user context');
-      const tableName = gap.gapType === 'missing_lookup' ? gap.lookupResolution.table : null;
-      const missingInputs = gap.gapType === 'missing_lookup'
-        ? Object.fromEntries(gap.lookupResolution.queryParams.map((p) => [p.column, p.value]))
-        : {};
-      const { error } = await db.rpc('upsert_lookup_coverage_gap', {
-        p_gap_type: gap.gapType,
-        p_table_name: tableName,
-        p_process: gap.process,
-        p_machine_class: gap.machineClass,
-        p_missing_inputs: missingInputs,
-        p_suggested_sources: gap.gapType === 'missing_lookup' ? (gap.suggestedSources ?? null) : null,
-        p_reason: gap.gapType === 'unsupported_operation' ? gap.reason : null,
-        p_required_capability: gap.gapType === 'unsupported_operation' ? (gap.requiredCapability ?? null) : null,
-        p_priority: gap.gapType === 'missing_lookup' ? gap.priority : 'medium',
-      });
-      if (error) this.logger.warn(`lookup coverage gap not recorded: ${error.message}`, 'BOMItemsService');
-    } catch {
-      // Diagnostics-only — see doc comment above.
-    }
+    const what = gap.gapType === 'missing_lookup' ? `missing lookup ${gap.lookupResolution.table}` : gap.reason;
+    this.logger.warn(`coverage gap [${gap.process} / ${gap.machineClass ?? '-'}]: ${what}`, 'BOMItemsService');
   }
 
   /**

@@ -2,9 +2,10 @@
 // upload. The canonical definition is the JSON Schema in ecad-engine/contract/schemas;
 // these interfaces mirror it and a fixture spec keeps the two honest.
 
-// The version the extractor emits. 1.2 added `fabrication`; every addition is optional, so a stored 1.1 graph stays valid.
-export const FEATURE_GRAPH_CONTRACT_VERSION = '1.2' as const;
-export type BoardContractVersion = '1.1' | '1.2';
+// The version the extractor emits. 1.2 added `fabrication`; 1.3 added `copper`, `connectivity` and the spacing,
+// annular-ring and copper-to-edge facts. Every addition is optional, so a stored 1.1 or 1.2 graph stays valid.
+export const FEATURE_GRAPH_CONTRACT_VERSION = '1.3' as const;
+export type BoardContractVersion = '1.1' | '1.2' | '1.3';
 export type HarnessContractVersion = '1.1';
 
 export type InputTier = 'A' | 'B' | 'C' | 'D';
@@ -79,6 +80,30 @@ export interface BoardFeatureGraph {
     silkscreen?: { top?: boolean; bottom?: boolean };
     minHoleMm?: number;
     minTraceWidthMm?: number;
+    /** Smallest gap between copper of two different conductors on one layer (contract 1.3). */
+    minSpacingMm?: number;
+    /** Smallest (landing-pad width - hole) / 2 over the plated holes (contract 1.3). */
+    minAnnularRingMm?: number;
+    /** Nearest copper to the outline centre line (contract 1.3). */
+    minCopperToEdgeMm?: number;
+  };
+  /** Copper read from the copper layers (contract 1.3). */
+  copper?: {
+    areaMm2: { top?: number; bottom?: number };
+    /** Separate pieces of copper after joining the layers through the plated holes. */
+    conductors: number;
+    /** Plated holes whose pads belong to no placed part: vias, and holes for wires soldered in. */
+    viaCount?: number;
+  };
+  /** Parts tied to nets through their copper pins, and the series chains of two-pin parts (contract 1.3). */
+  connectivity?: {
+    netsWithPins: number;
+    pins: number;
+    largestNetPins: number;
+    seriesChains: { count: number; partsPerChain: number; composition: { footprint: string; count: number }[] }[];
+    /** Nets that end two or more chains (for example the supply rails of an LED array). */
+    chainEndNets: number;
+    shortedParts?: string[];
   };
   thtParts: { label: string; count: number; jointsPerPart: number }[];
   uniquePartNumbers?: number;

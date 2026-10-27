@@ -16,7 +16,9 @@ export class LoggingInterceptor implements NestInterceptor {
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
-    const { method, url, ip } = request;
+    const { method, ip } = request;
+    // Path only: the query string can carry a session token (?token= for SSE) and must never be logged.
+    const url = String(request.originalUrl ?? request.url ?? '').split('?')[0];
     const userAgent = request.get('user-agent') || '';
     const requestId = request.headers['x-request-id'] || this.generateRequestId();
 
