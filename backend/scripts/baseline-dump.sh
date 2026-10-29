@@ -15,7 +15,7 @@ IMAGE="postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56b
 [ ! -e "$out" ] || { echo "refusing: $out already exists"; exit 1; }
 mkdir -p "$out"
 net=(); [ -z "${DOCKER_NETWORK:-}" ] || net=(--network "$DOCKER_NETWORK")
-pg() { docker run --rm -i "${net[@]}" -e SRC="$source_url" "$IMAGE" "$@"; }
+pg() { docker run --rm -i ${net[@]+"${net[@]}"} -e SRC="$source_url" "$IMAGE" "$@"; }
 
 echo "dumping the public schema..."
 pg sh -c 'pg_dump "$SRC" --schema=public --exclude-table=public.schema_migrations --no-owner --no-privileges --format=custom' > "$out/db.dump"
