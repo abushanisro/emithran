@@ -10,6 +10,7 @@
     )
 )]
 pub mod backend;
+pub mod health;
 pub mod job;
 pub mod names;
 pub mod worker;

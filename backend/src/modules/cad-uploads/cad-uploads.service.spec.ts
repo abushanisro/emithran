@@ -10,7 +10,7 @@ const input = { fileName: 'part.step', bytes: BYTES, bomId: 'bom-1', userId: 'us
 
 const stored = (over: Partial<CadUploadRow> = {}): CadUploadRow => ({
   id: 'up-1', organization_id: 'org-1', created_by: 'user-1', bom_id: 'bom-1', project_id: 'proj-1', file_name: 'part.step', sha256: SHA,
-  size_bytes: BYTES.length, storage_path: `cad-uploads/org-1/${SHA}.step`, status: 'queued', attempts: 0, error_code: null, error_detail: null,
+  size_bytes: BYTES.length, storage_path: `cad-uploads/org-1/${SHA}.step`, status: 'queued', attempts: 0, materialize_attempts: 0, error_code: null, error_detail: null,
   result: null, created_item_ids: [], created_at: '', started_at: null, finished_at: null, source_deleted_at: null, ...over,
 });
 
