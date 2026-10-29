@@ -1,0 +1,50 @@
+# Development data stack on this machine, with no Supabase: Postgres, the PostgREST data API in front of it, and an S3-compatible file store.
+# Same pieces (and the same pinned images) the tests and the production profile use, so development behaves like stage and production.
+#   npm --prefix backend run local:up                 start Postgres and the file store
+#   npm --prefix backend run local:load -- <dir>      load a baseline (backend/scripts/baseline-dump.sh), apply newer migrations, start the API
+#   npm --prefix backend run local:use                point the root .env at it
+# Binds to 127.0.0.1 only. The passwords below are for this throwaway local stack, never reused anywhere else.
+name: emithran-local-data
+
+services:
+  postgres:
+    image: postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: postgres
+    ports: ["127.0.0.1:${LOCAL_PG_PORT:-54322}:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  # Started by `local:load` once the database holds the schema and the `authenticator` role exists.
+  postgrest:
+    image: postgrest/postgrest@sha256:1347d7552b88f17832912c06afbf7c43209af6eeeb60834b04aae12c9bd9d5cc
+    platform: linux/amd64
+    profiles: [api]
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      PGRST_DB_URI: postgres://authenticator:authpw@postgres:5432/postgres
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${DB_JWT_SECRET:?run local:use first, it creates DB_JWT_SECRET}
+      PGRST_SERVER_HOST: 0.0.0.0
+    ports: ["127.0.0.1:${LOCAL_API_PORT:-3001}:3000"]
+
+  storage:
+    image: chrislusf/seaweedfs@sha256:c2658820e763294a9e9de7b36c81e59b879e3459148351aee4e31a126ca64860
+    restart: unless-stopped
+    command: ["server", "-s3", "-s3.config=/s3.json", "-dir=/data"]
+    ports: ["127.0.0.1:${LOCAL_S3_PORT:-8333}:8333"]
+    volumes:
+      - ./backend/test/storage/s3.json:/s3.json:ro
+      - storage-data:/data
+
+volumes:
+  pgdata:
+  storage-data:
