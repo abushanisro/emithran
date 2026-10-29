@@ -1,0 +1,22 @@
+[package]
+name = "runner"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "cad-runner"
+path = "src/main.rs"
+
+[dependencies]
+archive = { path = "../archive" }
+domain = { path = "../domain" }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.154"
+tempfile = "=3.27.0"
+tokio = { version = "=1.54.1", features = ["rt-multi-thread", "macros", "process", "time", "fs", "signal", "io-util"] }
+reqwest = { version = "=0.13.5", default-features = false, features = ["json", "rustls"] }
+
+[lints]
+workspace = true
