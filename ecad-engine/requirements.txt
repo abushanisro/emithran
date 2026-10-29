@@ -4,7 +4,7 @@ fastapi==0.162.0
 # FastAPI only says starlette>=0.46, so pin it: otherwise every rebuild could pick a different release.
 starlette==1.10.0
 uvicorn[standard]==0.34.0
-pydantic==2.10.4
+pydantic==2.14.1
 python-multipart==0.0.32
 slowapi==0.1.9
 gerbonara==1.6.3
