@@ -30,12 +30,8 @@ const createLotSchema = z.object({
   bomId: z.string().min(1, 'Please select a BOM'),
   lotNumber: z.string().min(1, 'Lot number is required'),
   productionQuantity: z.number().min(1, 'Quantity must be at least 1'),
-  plannedStartDate: z.date({
-    required_error: 'Start date is required',
-  }),
-  plannedEndDate: z.date({
-    required_error: 'End date is required',
-  }),
+  plannedStartDate: z.date({ error: 'Start date is required' }),
+  plannedEndDate: z.date({ error: 'End date is required' }),
   priority: z.enum(['low', 'medium', 'high', 'urgent']),
   lotType: z.enum(['standard', 'prototype', 'rework', 'urgent']),
   remarks: z.string().optional(),
