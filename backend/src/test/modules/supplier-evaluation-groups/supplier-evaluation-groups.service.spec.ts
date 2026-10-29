@@ -1,4 +1,4 @@
-// Org-scoped tenancy Phase 6 (.claude/plans/delegated-gliding-swan.md):
+// Org-scoped tenancy Phase 6 (the internal plan):
 // proves create() writes organization_id on all 3 inserted rows (the group
 // itself, plus its bom_items and processes rows).
 import { SupplierEvaluationGroupsService } from '../../../modules/supplier-evaluation-groups/supplier-evaluation-groups.service';

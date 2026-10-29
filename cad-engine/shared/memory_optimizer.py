@@ -73,7 +73,7 @@ class DFMAnalysis:
     Design for Manufacturing analysis result carried through this pipeline
     step. cad-engine does NOT compute a manufacturability verdict — the
     backend's DFMScoringService (dfm-scoring.service.ts) is the sole DFM
-    authority for this app (see CLAUDE.md). manufacturability_score/
+    authority for this app (see docs/ENGINEERING.md). manufacturability_score/
     difficulty_level/confidence are Optional and are always None from
     _analyze_dfm_advanced below; a real per-feature DFM score is available
     from GET /bom-items/:id/dfm-scores once feature extraction has run.
@@ -1248,7 +1248,7 @@ class AdvancedCADMemoryOptimizer:
         heuristics with no real material/thickness basis), took their max as
         manufacturability_score, and derived a fake confidence from
         len(recommended_processes) — a second, undocumented DFM judgment
-        that could silently contradict the app's real one. CLAUDE.md
+        that could silently contradict the app's real one. docs/ENGINEERING.md
         designates dfm-scoring.service.ts as the sole DFM authority; this
         method now returns an explicit "not computed here" result so no
         consumer mistakes a cad-engine placeholder for a real verdict.

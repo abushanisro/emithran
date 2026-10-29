@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     const delta       = part.unitCost - shouldCost;
     const deltaPct    = part.unitCost > 0 ? (delta / part.unitCost) * 100 : 0;
 
-    // If the part has drawing analysis or the gap is significant (>15%), enrich with Claude
+    // If the part has drawing analysis or the gap is significant (>15%), enrich with the model
     if ((part.drawingAnalysis || Math.abs(deltaPct) > 15) && part.unitCost > 0) {
       const enrichPrompt = `You are a manufacturing cost engineer. Provide a refined should-cost estimate for:
 Part: ${part.partNumber} — ${part.description ?? ''}

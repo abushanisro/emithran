@@ -1,4 +1,4 @@
-// Org-scoped tenancy Phase 5 (.claude/plans/delegated-gliding-swan.md):
+// Org-scoped tenancy Phase 5 (the internal plan):
 // proves the org-scoping fix on process_plan_generations — organization_id
 // is written on insert, and the read/discard paths no longer manually
 // filter/check user_id (that would wrongly exclude an org-mate's

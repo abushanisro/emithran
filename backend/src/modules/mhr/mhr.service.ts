@@ -389,7 +389,7 @@ export class MHRService {
     return MHRResponseDto.fromDatabase({ ...data, calculations: JSON.stringify(calculations) });
   }
 
-  // ── Machine Economics provenance (Phase 1, see CLAUDE.md "Machine Economics") ──
+  // ── Machine Economics provenance (Phase 1, see docs/ENGINEERING.md "Machine Economics") ──
 
   /**
    * Live, unambiguous exact-name lookup against sm_reference_data's staged
@@ -1890,7 +1890,7 @@ export class MHRService {
    * "Fiber Laser Cutting Machine"), one "Press Brake 160T" (bending, not
    * progressive-die stamping — verified "Bend Press Brake"), and ten others
    * (deburring, cmm, cnc_lathe, cnc_3ax_vmc, cnc_5ax_mc, injection_molding)
-   * from manufacturing domains this app hasn't built yet (CLAUDE.md's
+   * from manufacturing domains this app hasn't built yet (docs/ENGINEERING.md's
    * domain-by-domain roadmap) or a genuinely distinct process (a general
    * deburring bench isn't the same thing as "Deslag Machine") — kept as
    * their own real category via mhrCategoryOf, not merged into a Sheet Metal

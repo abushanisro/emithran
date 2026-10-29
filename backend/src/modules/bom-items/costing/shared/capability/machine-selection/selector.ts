@@ -456,7 +456,7 @@ export async function fetchMachinePool(
 
 // ── Eligibility ───────────────────────────────────────────────────────────────
 
-// P0.6 documented data gap (not fabricated -- see CLAUDE.md's "do not guess a
+// P0.6 documented data gap (not fabricated -- see docs/ENGINEERING.md's "do not guess a
 // threshold to make a check pass" rule): a `null` return here means "no limit
 // on file". P0.7 changed isCapable's laser case to treat that as NOT
 // CAPABLE (fail-closed) rather than ungated -- a machine with zero real
@@ -550,7 +550,7 @@ function laserPowerOk(cap: MachineCapability, req: LaserRequirement): boolean | 
 // searched memory/sheetmetal/ for a tier legend to backfill it — genuinely
 // doesn't exist anywhere). P0.7's fail-closed check (below) was written
 // assuming this was a per-machine gap (a few machines missing data among
-// many that had it) — CLAUDE.md itself still says "3 of 7". In reality it's
+// many that had it) — docs/ENGINEERING.md itself still says "3 of 7". In reality it's
 // a systemic, class-wide gap: fail-closed against a 0%-covered class means
 // NO real laser machine can ever be selected, silently replacing a $40-90/hr
 // real machine with the synthetic no-machine fallback (no rate, no power) —

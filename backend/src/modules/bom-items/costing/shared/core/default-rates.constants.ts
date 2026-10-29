@@ -831,7 +831,7 @@ export const MACHINE_REGISTRY = {
   // matched ANY machine whose machine_class contains the word "press" as a
   // substring — including the entire, genuinely distinct "Press/Forming
   // family" (Progressive Die Press, Standard Press, Tandem Press, Turret
-  // Press — CLAUDE.md's own documented "unwired placeholders", none of which
+  // Press — docs/ENGINEERING.md's own documented "unwired placeholders", none of which
   // bend sheet metal) — pulling machines like "Aida UMX-600" (a Progressive
   // Die Press machine) into real, currently-active Bend Brake quotes. Same
   // over-broad-keyword bug class already fixed once for router_2axis's own
@@ -864,7 +864,7 @@ export const MACHINE_REGISTRY = {
   // Machine" category (no cross-category contamination like the Press
   // family had). machineClassKeywords deliberately specific ('Oxyfuel',
   // 'Oxy Fuel', 'Oxy-Fuel') so a genuinely different thermal-cutting class
-  // (Plasma, still unwired — see CLAUDE.md) never keyword-matches here.
+  // (Plasma, still unwired — see docs/ENGINEERING.md) never keyword-matches here.
   oxyfuel_cut:    { commodityCodes: [],                                                                                              processGroupKeywords: ['Sheet Metal', 'Sheet metal', 'Cutting'],                                                                             machineClassKeywords: ['Oxyfuel', 'Oxy Fuel', 'Oxy-Fuel'] },
   // Shearing (2026-09-01) — real cost engine (reuses computePressStrokeCost,
   // see SHEARING_CUTS_PER_BLANK's doc comment) + 10 real machines in
@@ -1062,7 +1062,7 @@ export const MACHINE_REGISTRY = {
   // Real, granular primary CNC milling/turning classes — replaces the 6
   // generic cnc_3ax_vmc/cnc_4ax_vmc/cnc_5ax_mc/cnc_lathe/cnc_lathe_live/
   // cnc_mill_turn buckets that used to sit here (Machining Engine
-  // Re-Architecture, see the plan at C:\Users\singi\.claude\plans\
+  // Re-Architecture, see the plan at (an internal plan document)
   // logical-noodling-lampson.md). Each is a real, distinct station category
   // seeded into mhr_records by migration 693 (source: memory/machining/
   // machine/machiningusa.json), no longer coarsened by selector.ts's

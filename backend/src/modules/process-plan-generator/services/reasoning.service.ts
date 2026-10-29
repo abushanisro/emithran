@@ -38,7 +38,7 @@ interface ReasoningOutput {
 }
 
 /**
- * Stage 2 — runs the Claude tool-use loop. The model has access to two
+ * Stage 2 — runs the model tool-use loop. The model has access to two
  * tools (expand_candidates, save_draft). The session ends when `save_draft`
  * is called (success) or when caps are hit (failure).
  *
@@ -121,9 +121,9 @@ export class ReasoningService {
 
       let resp: any;
       try {
-        resp = await this.callClaude(systemBlocks, messages);
+        resp = await this.callModel(systemBlocks, messages);
       } catch (e: any) {
-        out.error = `Claude API call failed: ${e.message ?? e}`;
+        out.error = `Model API call failed: ${e.message ?? e}`;
         this.logger.error(out.error);
         return out;
       }
@@ -270,7 +270,7 @@ export class ReasoningService {
 
   // ── HTTP call ─────────────────────────────────────────────────────────────
 
-  private async callClaude(systemBlocks: any[], messages: any[]): Promise<any> {
+  private async callModel(systemBlocks: any[], messages: any[]): Promise<any> {
     const body = {
       model: REASONING_MODEL,
       max_tokens: MAX_TOKENS_OUT,

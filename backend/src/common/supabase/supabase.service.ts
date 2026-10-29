@@ -21,7 +21,7 @@ export class SupabaseService {
   private supabaseServiceKey: string;
   private adminClient: SupabaseClient;
   // DB_BACKEND=postgrest: no Supabase at all. Data goes to a PostgREST (POSTGREST_URL) with tokens this backend signs itself
-  // (DB_JWT_SECRET); see docs and CLAUDE.md "Leaving Supabase". Default `supabase` keeps today's behaviour.
+  // (DB_JWT_SECRET); see docs and docs/ENGINEERING.md "Leaving Supabase". Default `supabase` keeps today's behaviour.
   private postgrestUrl = '';
   private minter?: DbTokenMinter;
 
