@@ -1,0 +1,19 @@
+# The assembly core: everything about turning an uploaded ZIP/STEP into a validated assembly report EXCEPT reading CAD
+# (that is the C++ geometry-worker, as in Petrus). Layering: runner -> archive, domain. `domain` and `archive` do no I/O.
+[workspace]
+resolver = "3"
+members = ["crates/archive", "crates/domain"]
+
+[workspace.package]
+edition = "2024"
+license = "UNLICENSED"
+publish = false
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+indexing_slicing = "deny"
+panic = "deny"

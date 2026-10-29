@@ -135,6 +135,21 @@ jobs:
       # Applies the migrations under test to a throwaway Postgres (pinned by digest) and runs their assertions.
       - run: bash backend/test/sql/run.sh
 
+  core:
+    name: Assembly core (Rust)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: core
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The runner image ships a stable Rust toolchain; the lock file and exact-pinned versions make the build reproducible.
+      - run: cargo fmt --check
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      - run: cargo test --locked
+
   cad-engine:
     name: CAD Engine (Docker build)
     runs-on: ubuntu-latest
