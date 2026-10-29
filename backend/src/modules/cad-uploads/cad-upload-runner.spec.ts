@@ -1,5 +1,6 @@
 import { zip } from '../../common/archive/test-zip';
 import { cadEngineHttp } from '../../common/resilience/engine-http';
+import * as telemetryMetrics from '../../telemetry/metrics';
 import { CadUploadRunner } from './cad-upload-runner';
 
 import type { AssemblyReport } from './assembly-report';
@@ -46,15 +47,10 @@ function setup(claimed: CadUploadRow | null, expired: { id: string; storage_path
       update: (patch: Record<string, unknown>) => ({ eq: async () => { updates.push(patch); return { error: null }; } }),
       select: () => sweep,
     }),
-    storage: {
-      from: () => ({
-        download: async (path: string) => {
-          downloads.push(path);
-          return { data: { arrayBuffer: async () => STEP }, error: null };
-        },
-        remove: async (paths: string[]) => { removed.push(paths); return { error: null }; },
-      }),
-    },
+  };
+  const objects = {
+    get: async (_bucket: string, path: string) => { downloads.push(path); return Buffer.from(STEP); },
+    remove: async (_bucket: string, paths: string[]) => { removed.push(paths); },
   };
   let next = 0;
   const bomItems = {
@@ -64,7 +60,7 @@ function setup(claimed: CadUploadRow | null, expired: { id: string; storage_path
   };
   const files = { uploadFile: jest.fn(async () => ({ storagePath: 'bom/path.step' })), removeUnreferencedFiles: jest.fn(async (_paths: string[]) => 0) };
   const audit = { recordBestEffort: jest.fn(async () => undefined) };
-  const runner = new CadUploadRunner({ getPrivilegedClient: () => admin } as never, bomItems as never, files as never, audit as never);
+  const runner = new CadUploadRunner({ getPrivilegedClient: () => admin } as never, bomItems as never, files as never, audit as never, objects as never);
   return { runner, updates, removed, bomItems, files, audit, rpcCalls: () => rpcCalls, rpcNames, downloads };
 }
 
@@ -182,6 +178,25 @@ describe('CadUploadRunner', () => {
     const retried = setup(row({ attempts: 1 }));
     await retried.runner.tick();
     expect(retried.audit.recordBestEffort).not.toHaveBeenCalled();
+  });
+
+  it('records the attempt duration with a closed outcome: ok when done, retry when requeued, error when final', async () => {
+    const record = jest.spyOn(telemetryMetrics, 'recordCadUploadDuration');
+    engineAnswers(report());
+    await setup(row()).runner.tick();
+    engineFails(undefined);
+    await setup(row({ attempts: 1 })).runner.tick();
+    engineFails(400, 'no good');
+    await setup(row()).runner.tick();
+    expect(record.mock.calls.map(([seconds, outcome]) => [typeof seconds, outcome])).toEqual([['number', 'ok'], ['number', 'retry'], ['number', 'error']]);
+  });
+
+  it('a metrics failure never changes the result of an upload', async () => {
+    jest.spyOn(telemetryMetrics, 'recordCadUploadDuration').mockImplementation(() => { throw new Error('exporter down'); });
+    engineAnswers(report());
+    const { runner, updates } = setup(row());
+    await runner.tick();
+    expect(last(updates)).toMatchObject({ status: 'done' });
   });
 
   it('removes the stored original once the upload is done, and records that it is gone', async () => {

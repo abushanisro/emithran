@@ -23,6 +23,17 @@ describe('readTelemetryConfig', () => {
     });
   });
 
+  it('sends metrics to <endpoint>/v1/metrics unless OTEL_EXPORTER_OTLP_METRICS_ENDPOINT names another URL', () => {
+    const base = { OTEL_EXPORTER_OTLP_ENDPOINT: 'http://o2:5080/api/default/' };
+    expect(readTelemetryConfig(base).config?.metricsEndpoint).toBe('http://o2:5080/api/default/v1/metrics');
+    const split = readTelemetryConfig({ ...base, OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: 'http://prometheus:9090/api/v1/otlp/v1/metrics' });
+    expect(split.config?.metricsEndpoint).toBe('http://prometheus:9090/api/v1/otlp/v1/metrics');
+    expect(split.config?.endpoint).toBe('http://o2:5080/api/default');
+    const bad = readTelemetryConfig({ ...base, OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: 'prometheus:9090' });
+    expect(bad.config).toBeNull();
+    expect(bad.warning).toMatch(/METRICS_ENDPOINT.*disabled/);
+  });
+
   it('takes the sampling ratio from OTEL_TRACES_SAMPLER_ARG within 0..1 and rejects anything else', () => {
     const base = { OTEL_EXPORTER_OTLP_ENDPOINT: 'http://c:4318' };
     expect(readTelemetryConfig({ ...base, OTEL_TRACES_SAMPLER_ARG: '0.25' }).config?.samplerRatio).toBe(0.25);

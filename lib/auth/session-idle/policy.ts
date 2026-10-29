@@ -59,9 +59,15 @@ export function sessionDeadline(
   return Math.max(idleDeadline, jobDeadline);
 }
 
-/** The Supabase session id in an access token's claims, or null. */
+/**
+ * The session id in an access token's claims, or null: Supabase's `session_id`, or Auth0's `sid` (as a namespaced claim such as
+ * https://emithran.com/sid, which is how a post-login Action must add it to an access token).
+ */
 export function sessionIdFromAccessToken(token: string): string | null {
-  const sessionId = decodeJwtPayload(token)?.session_id;
+  const claims = decodeJwtPayload(token);
+  if (!claims) return null;
+  const key = 'session_id' in claims ? 'session_id' : Object.keys(claims).find((k) => k === 'sid' || k.endsWith('/sid'));
+  const sessionId = key ? claims[key] : undefined;
   return typeof sessionId === 'string' && sessionId ? sessionId : null;
 }
 

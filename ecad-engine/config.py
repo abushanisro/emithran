@@ -30,7 +30,7 @@ class AppConfig:
         if level not in ("DEBUG", "INFO", "WARNING", "ERROR"):
             raise ValueError(f"LOG_LEVEL must be DEBUG, INFO, WARNING or ERROR, got {level}")
         return cls(
-            port=int(os.getenv("PORT", "5100")),
+            port=int(os.getenv("ECAD_ENGINE_PORT", os.getenv("PORT", "5100"))),  # ECAD_ENGINE_PORT in the shared local .env; PORT in containers
             host=os.getenv("HOST", "0.0.0.0"),
             environment=environment,
             cors_origins=origins,

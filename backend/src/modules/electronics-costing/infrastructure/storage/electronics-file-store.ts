@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 
-import { SupabaseService } from '../../../../common/supabase/supabase.service';
+import { OBJECT_STORE, type ObjectStore } from '../../../../common/storage/object-store';
 
 export const ELECTRONICS_BUCKET = 'electronics-uploads';
 
@@ -26,51 +26,35 @@ export function thumbnailArtifactPathFor(organizationId: string, uploadId: strin
   return `${organizationId}/${uploadId}/thumbnail.json.gz`;
 }
 
-// The bucket is private with no end-user policy: only the service role reaches it, and the
+// The bucket is private with no end-user policy: only the backend reaches it, and the
 // path always starts with the caller organization id. Files are never logged.
 @Injectable()
 export class ElectronicsFileStore {
-  constructor(private readonly supabase: SupabaseService) {}
-
-  private bucket() {
-    return this.supabase
-      .getPrivilegedClient('storage: electronics design-file bucket, private, organization-prefixed object keys')
-      .storage.from(ELECTRONICS_BUCKET);
-  }
+  constructor(@Inject(OBJECT_STORE) private readonly objects: ObjectStore) {}
 
   async put(path: string, bytes: Buffer): Promise<void> {
-    const { error } = await this.bucket().upload(path, bytes, { contentType: 'application/octet-stream', upsert: false });
-    if (error) throw new Error(`electronics-uploads put failed: ${error.message}`);
+    await this.objects.put(ELECTRONICS_BUCKET, path, bytes, { contentType: 'application/octet-stream', upsert: false });
   }
 
   /** Writes a derived artifact, replacing the previous one at the same key. */
   async putArtifact(path: string, bytes: Buffer): Promise<void> {
-    const { error } = await this.bucket().upload(path, bytes, { contentType: 'application/gzip', upsert: true });
-    if (error) throw new Error(`electronics-uploads put artifact failed: ${error.message}`);
+    await this.objects.put(ELECTRONICS_BUCKET, path, bytes, { contentType: 'application/gzip', upsert: true });
   }
 
   /** The stored bytes, or null when nothing is stored at the key. Any other failure throws. */
   async getIfExists(path: string, organizationId: string): Promise<Buffer | null> {
     if (!path.startsWith(`${organizationId}/`)) throw new Error('Object key is outside the organization prefix');
-    const { data, error } = await this.bucket().download(path);
-    if (error) {
-      const status = String((error as { statusCode?: string | number }).statusCode ?? '');
-      if (status === '404' || /not found/i.test(error.message)) return null;
-      throw new Error(`electronics-uploads get failed: ${error.message}`);
-    }
-    return data ? Buffer.from(await data.arrayBuffer()) : null;
+    return this.objects.get(ELECTRONICS_BUCKET, path);
   }
 
   async remove(paths: string[]): Promise<void> {
     if (paths.length === 0) return;
-    const { error } = await this.bucket().remove(paths);
-    if (error) throw new Error(`electronics-uploads remove failed: ${error.message}`);
+    await this.objects.remove(ELECTRONICS_BUCKET, paths);
   }
 
   async get(path: string, organizationId: string): Promise<Buffer> {
-    if (!path.startsWith(`${organizationId}/`)) throw new Error('Object key is outside the organization prefix');
-    const { data, error } = await this.bucket().download(path);
-    if (error || !data) throw new Error(`electronics-uploads get failed: ${error?.message ?? 'no data'}`);
-    return Buffer.from(await data.arrayBuffer());
+    const bytes = await this.getIfExists(path, organizationId);
+    if (!bytes) throw new Error('electronics-uploads get failed: not found');
+    return bytes;
   }
 }

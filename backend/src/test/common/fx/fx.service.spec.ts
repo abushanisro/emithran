@@ -32,7 +32,7 @@ function makeExchangeRateService(rows: ReferenceRow[] = REFERENCE): ExchangeRate
     then: (resolve: (v: { data: ReferenceRow[]; error: null }) => unknown) => resolve({ data: rows, error: null }),
   };
   const supabaseService = { getUserClient: () => ({ from: () => query }) } as any;
-  return new ExchangeRateService(supabaseService);
+  return new ExchangeRateService(supabaseService, {} as any);
 }
 
 function makeFakeFxRateCacheService() {

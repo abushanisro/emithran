@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '../client';
-import { useAuthReady } from '@/lib/providers/supabase-auth-provider';
+import { useAuthReady } from '@/lib/providers/auth-context';
 
 // Production-ready types
 export interface DeliveryOrder {

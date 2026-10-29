@@ -47,12 +47,12 @@ function setup(existing: CadUploadRow | null, options: { raceOnInsert?: boolean 
   };
   const admin = {
     from: () => table,
-    storage: { from: () => ({ upload: async (path: string) => { calls.storage.push(path); return { error: null }; } }) },
   };
+  const objects = { put: async (_bucket: string, path: string) => { calls.storage.push(path); } };
   const bomItems = { getProjectIdForBOM: jest.fn(async () => 'proj-1') };
   const runner = { wake: jest.fn() };
   const audit = { recordBestEffort: jest.fn(async () => undefined) };
-  const service = new CadUploadsService({ getPrivilegedClient: () => admin } as never, bomItems as never, runner as never, audit as never);
+  const service = new CadUploadsService({ getPrivilegedClient: () => admin } as never, bomItems as never, runner as never, audit as never, objects as never);
   return { service, calls, bomItems, runner, audit };
 }
 

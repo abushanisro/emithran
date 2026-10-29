@@ -13,4 +13,6 @@ pub mod backend;
 pub mod health;
 pub mod job;
 pub mod names;
+pub mod s3;
+pub mod token;
 pub mod worker;

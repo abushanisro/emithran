@@ -7,6 +7,8 @@
 export interface TelemetryConfig {
   /** OTLP/HTTP base URL, no signal path (the exporters append /v1/traces, /v1/metrics). */
   endpoint: string;
+  /** Full URL metrics are sent to when it differs from `<endpoint>/v1/metrics` (e.g. Prometheus' OTLP receiver). */
+  metricsEndpoint: string;
   serviceName: string;
   environment: string;
   /** Head-sampling ratio for new root traces, 0..1. A parent's decision always wins. */
@@ -41,6 +43,18 @@ export function readTelemetryConfig(env: NodeJS.ProcessEnv = process.env): Telem
     return { config: null, warning: 'OTEL_EXPORTER_OTLP_ENDPOINT is not an http(s) URL; telemetry is disabled.' };
   }
 
+  const rawMetrics = env.OTEL_EXPORTER_OTLP_METRICS_ENDPOINT?.trim();
+  let metricsEndpoint = `${endpoint.replace(/\/+$/, '')}/v1/metrics`;
+  if (rawMetrics) {
+    try {
+      const url = new URL(rawMetrics);
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('not http(s)');
+      metricsEndpoint = rawMetrics;
+    } catch {
+      return { config: null, warning: 'OTEL_EXPORTER_OTLP_METRICS_ENDPOINT is not an http(s) URL; telemetry is disabled.' };
+    }
+  }
+
   let samplerRatio = DEFAULT_SAMPLER_RATIO;
   const rawRatio = env.OTEL_TRACES_SAMPLER_ARG?.trim();
   if (rawRatio) {
@@ -54,6 +68,7 @@ export function readTelemetryConfig(env: NodeJS.ProcessEnv = process.env): Telem
   return {
     config: {
       endpoint: endpoint.replace(/\/+$/, ''),
+      metricsEndpoint,
       serviceName: env.OTEL_SERVICE_NAME?.trim() || 'mithran-backend',
       environment: env.NODE_ENV || 'development',
       samplerRatio,
