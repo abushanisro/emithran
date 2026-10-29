@@ -84,10 +84,14 @@ $$;
 
 -- functions created later (by the roles migrations and the dashboard run as)
 ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon;
+-- Functions the dashboard creates run as supabase_admin, whose defaults the `postgres` role cannot change on Supabase. Where this
+-- is refused the closed default simply does not apply to them; the grant check in the QA run (and 921 re-run) still catches any.
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'supabase_admin') THEN
     ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon;
   END IF;
+EXCEPTION WHEN insufficient_privilege THEN
+  RAISE NOTICE 'not allowed to change supabase_admin default privileges; re-run this migration after creating new functions';
 END
 $$;
