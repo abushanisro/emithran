@@ -149,6 +149,14 @@ jobs:
       - run: cargo fmt --check
       - run: cargo clippy --locked --all-targets -- -D warnings
       - run: cargo test --locked
+      # The Rust nester must answer like the Python/shapely nester it replaces, placement for placement (its result feeds material cost).
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+      - run: pip install 'shapely>=2.0,<3.0'
+      - run: cargo build --release --locked -p nesting
+      - run: python crates/nesting/tests/differential.py 300 11
+      - run: python crates/nesting/tests/differential.py heavy
 
   core-image:
     name: Assembly core image (runner + worker, end to end)

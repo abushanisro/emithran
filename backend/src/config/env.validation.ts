@@ -76,6 +76,13 @@ class EnvironmentVariables {
   @IsIn(['on', 'off'])
   CAD_UPLOAD_RUNNER: string = 'on';
 
+  // True-shape nesting: 'python' (cad-engine /nest) or 'rust' (the `nester` binary, docs/ASSEMBLY_CORE.md). With 'rust' an unavailable
+  // binary falls back to the Python engine until the Rust nester has run in production.
+  @IsString()
+  @IsOptional()
+  @IsIn(['python', 'rust'])
+  NESTING_ENGINE: string = 'python';
+
   // Who analyses an uploaded CAD file: 'python' (this backend calls the Python cad-engine and creates the BOM items) or 'rust'
   // (the Rust cad-runner analyses with the C++ geometry worker; this backend only creates the BOM items). See docs/ASSEMBLY_CORE.md.
   @IsString()

@@ -90,6 +90,8 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      additional_contexts:
+        core: ./core
     environment:
       NODE_ENV: production
       PORT: 4000
@@ -106,6 +108,8 @@ services:
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-50}
       # python: this backend analyses uploads with the Python cad-engine. rust: the cad-core service does, and this backend only creates the BOM items.
       CAD_CORE: ${CAD_CORE:-python}
+      # python: cad-engine /nest. rust: the nester binary shipped in this image (falls back to python if it is unavailable).
+      NESTING_ENGINE: ${NESTING_ENGINE:-python}
       CAD_ENGINE_URL: http://cad-engine:5055
       # Shared secret between the backend and the engine; the engine refuses protected routes in production without it.
       CAD_ENGINE_API_KEY: ${CAD_ENGINE_API_KEY:?set CAD_ENGINE_API_KEY in the env file}

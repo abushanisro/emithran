@@ -2,7 +2,7 @@
 //! JSON answer on stdout:  {"ok": true, "result": {...}}  or  {"ok": false, "reason": "..."}  (the Python endpoint's 422).
 //! Exit codes: 0 answered (either way), 64 bad arguments, 65 the request was not valid JSON for the contract.
 //!   nester [--deadline-ms <ms>]    past the deadline it stops and answers with what it placed, `capped: true`.
-use std::io::Read;
+use std::io::{Read, Write};
 use std::time::{Duration, Instant};
 
 fn main() {
@@ -31,7 +31,10 @@ fn main() {
         Ok(result) => serde_json::json!({ "ok": true, "result": result }),
         Err(reason) => serde_json::json!({ "ok": false, "reason": reason }),
     };
-    println!("{answer}");
+    // A reader that goes away early (a closed pipe) is not a panic: report it and stop.
+    if writeln!(std::io::stdout(), "{answer}").is_err() {
+        std::process::exit(74);
+    }
 }
 
 fn usage() {
