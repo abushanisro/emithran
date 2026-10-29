@@ -2,6 +2,8 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+import { getAuth0 } from '@/lib/auth0'
+import { usesAuth0 } from '@/lib/auth/backend'
 import { supabaseCspHosts } from '@/lib/supabase/csp'
 import { supabasePublishableKey, supabaseUrl } from '@/lib/supabase/env'
 
@@ -26,13 +28,12 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next()
   }
 
-  const requestHeaders = new Headers(request.headers)
-
-  const response = NextResponse.next({
-    request: {
-      headers: requestHeaders,
-    },
-  })
+  // Auth0: its handler serves /auth/login, /auth/callback, /auth/logout, /auth/access-token and /auth/profile, and keeps the
+  // session cookie rolling on every other request. Our headers are then added to whatever it returns.
+  const response = usesAuth0
+    ? await getAuth0().middleware(request)
+    : NextResponse.next({ request: { headers: new Headers(request.headers) } })
+  if (usesAuth0 && pathname.startsWith('/auth/') && !pathname.startsWith('/auth/callback/')) return response
 
 
   // Add comprehensive security headers
@@ -40,6 +41,8 @@ export async function proxy(request: NextRequest) {
 
   // Add performance and monitoring headers
   addMonitoringHeaders(response, request, startTime)
+
+  if (usesAuth0) return response
 
   // Refresh the Supabase session — writes updated tokens back to cookies so
   // the browser client stays in sync and doesn't fire SIGNED_OUT on expiry.

@@ -14,10 +14,10 @@ import {
 } from '@/components/ui/alert-dialog';
 import { fetchSessionStatus, sendSessionHeartbeat, signOutForInactivity } from '@/lib/auth/session-idle/browser';
 import { SessionIdleController, type IdleSnapshot } from '@/lib/auth/session-idle/controller';
-import { SESSION_IDLE_TIMEOUT_EVENT, sessionIdFromAccessToken } from '@/lib/auth/session-idle/policy';
+import { SESSION_IDLE_TIMEOUT_EVENT } from '@/lib/auth/session-idle/policy';
 import { protectedJobCount, subscribeProtectedJobs } from '@/lib/auth/session-idle/protected-jobs';
 import { browserIdleStorage } from '@/lib/auth/session-idle/shared-state';
-import { supabase } from '@/lib/supabase/client';
+import { sessionSource } from '@/lib/auth/session-source';
 
 import type { ReactNode } from 'react';
 
@@ -34,15 +34,10 @@ export function useSessionIdle(): SessionIdleValue {
   return useContext(SessionIdleContext);
 }
 
-/** The current Supabase session id; changes on a new sign-in, not on token refresh. */
-function useSupabaseSessionId(): string | null {
+/** The current session id; changes on a new sign-in, not on token refresh. */
+function useSessionId(): string | null {
   const [sessionId, setSessionId] = useState<string | null>(null);
-  useEffect(() => {
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSessionId(session?.access_token ? sessionIdFromAccessToken(session.access_token) : null);
-    });
-    return () => { data.subscription.unsubscribe(); };
-  }, []);
+  useEffect(() => sessionSource.onSessionChange(setSessionId), []);
   return sessionId;
 }
 
@@ -60,7 +55,7 @@ export function formatRemaining(ms: number): string {
  */
 export function SessionIdleProvider({ children }: { children: ReactNode }) {
   const disabled = process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true';
-  const sessionId = useSupabaseSessionId();
+  const sessionId = useSessionId();
   const controllerRef = useRef<SessionIdleController | null>(null);
   const [snapshot, setSnapshot] = useState<IdleSnapshot | null>(null);
 

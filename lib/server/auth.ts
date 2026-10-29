@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 
 import { SESSION_IDLE_TIMEOUT_CODE } from '@/lib/auth/session-idle/policy';
+import { getAuth0 } from '@/lib/auth0';
+import { usesAuth0 } from '@/lib/auth/backend';
+import { resolveAuth0Caller } from '@/lib/server/auth0-caller';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/server/rate-limit';
 import { checkSessionActive } from '@/lib/server/session-idle-check';
@@ -17,6 +20,7 @@ export type AuthResult =
  * the caller's behalf call this first.
  */
 export async function requireUser(): Promise<AuthResult> {
+  if (usesAuth0) return requireAuth0User();
   try {
     const verified = await verifiedSession(await createServerSupabaseClient());
     if (!verified) {
@@ -38,6 +42,26 @@ export async function requireUser(): Promise<AuthResult> {
     return { ok: true, userId: verified.user.id, accessToken: verified.accessToken };
   } catch {
     return { ok: false, response: NextResponse.json({ error: 'Authentication required' }, { status: 401 }) };
+  }
+}
+
+const refuse = (error: string, status: number, code?: string): AuthResult => ({ ok: false, response: NextResponse.json({ error, ...(code && { code }) }, { status }) });
+
+/** Auth0: the SDK's session cookie gives the API token; the backend verifies it and enforces invitation and the idle deadline. */
+async function requireAuth0User(): Promise<AuthResult> {
+  let accessToken: string;
+  try {
+    accessToken = (await getAuth0().getAccessToken()).token;
+  } catch {
+    return refuse('Authentication required', 401);
+  }
+  const caller = await resolveAuth0Caller(accessToken);
+  switch (caller.status) {
+    case 'ok': return { ok: true, userId: caller.userId, accessToken };
+    case 'idle': return refuse('Authentication required', 401, SESSION_IDLE_TIMEOUT_CODE);
+    case 'forbidden': return refuse('Access denied', 403);
+    case 'unavailable': return refuse('Session check unavailable', 503);
+    default: return refuse('Authentication required', 401);
   }
 }
 

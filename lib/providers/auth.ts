@@ -1,7 +1,5 @@
 /**
- * Auth Module
- *
- * Re-exports the Supabase auth hooks for convenience
+ * Auth Module: the hooks the app uses, whichever service signs people in (see auth-provider.tsx).
  */
 
-export { useAuth, useAuthReady } from './supabase-auth-provider';
+export { useAuth, useAuthReady } from './auth-context';
