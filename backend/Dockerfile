@@ -12,7 +12,7 @@ COPY --from=core Cargo.toml Cargo.lock ./
 COPY --from=core crates ./crates
 RUN cargo build --release --locked -p nesting --bin nester
 
-FROM node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85 AS build
+FROM node:25-alpine@sha256:bdf2cca6fe3dabd014ea60163eca3f0f7015fbd5c7ee1b0e9ccb4ced6eb02ef4 AS build
 # No native module here needs a compiler (sharp ships prebuilt binaries for x86 and ARM, glibc and musl).
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -21,7 +21,7 @@ RUN npm ci --legacy-peer-deps --no-audit --no-fund
 COPY . .
 RUN npm run build && npm prune --omit=dev --legacy-peer-deps
 
-FROM node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85 AS runtime
+FROM node:25-alpine@sha256:bdf2cca6fe3dabd014ea60163eca3f0f7015fbd5c7ee1b0e9ccb4ced6eb02ef4 AS runtime
 # A runtime image runs `node` and nothing else: no npm or corepack (a package manager is attack surface, and ships its own
 # vulnerable copies of libraries). Patched OS packages are applied at build time.
 RUN apk upgrade --no-cache && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
