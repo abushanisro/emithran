@@ -1,16 +1,38 @@
-# CAD Engine — Domain Architecture
+# CAD Engine — Architecture
 
-Domain-boundary refactor, 2026-09-01. Scope: reorganize the CAD feature-extraction
-codebase by manufacturing domain (mirrors `memory/`'s Sheet Metal / Machining /
-Injection Molding taxonomy), splitting the former 5,980-line `feature_extractors.py`
-along its real, already-existing class boundaries. No formula/logic rewrites —
-every moved function/class is verbatim, relocated only.
+Current state first (updated 2026-10-29); the domain-boundary refactor log of 2026-09-01 follows it (its layout block is corrected; the narrative is historical).
 
-Method: evidence-based, not assumed. Every file's real top-level definitions and
-every cross-file import (including deferred/in-function imports) were enumerated
-via `ast` (Python's own parser) and `grep` across the whole tree before any file
-was moved, specifically to avoid organizing by filename guess instead of actual
-domain ownership and dependency reality.
+## How a request flows
+
+```
+STEP upload (backend runner, or the browser through the backend)
+  -> main.py handler (plain `def`: runs in the threadpool, never on the event loop)
+     -> analysis_gate (shared/analysis_gate.py): at most MAX_CONCURRENT_ANALYSES at once, otherwise 429 + Retry-After
+        -> POST /analyze/assembly : shared/assembly.py reads the STEP through OpenCascade XDE
+              (definitions + instances; repeated instances collapse into a quantity; each distinct part once)
+              shared/assembly_report.py measures each distinct part and returns the contract JSON
+        -> POST /assembly/parts   : a zip with one STEP per requested part id (same files, same order as /analyze/assembly)
+        -> POST /analyze/geometry : shared/part_analysis.py analyze_part() (one part: features, DFM, PMI, component features)
+        -> POST /measure/geometry : volume, area, bounding box only
+```
+
+- **Contract.** `contract/assembly.schema.json` (version 1, additive within a version) is the canonical shape of
+  `/analyze/assembly`. The backend keeps a generated copy (`npm run cad:sync-contract`); a backend spec fails when they
+  drift. A measurement that cannot be taken is `null` with a code in `problems`, never an invented number.
+- **Concurrency and hangs.** The gate bounds concurrent heavy requests. A thread stuck inside OpenCascade cannot be
+  cancelled, so a watchdog ends the process (exit code 70) when any request runs longer than
+  `ANALYSIS_HARD_LIMIT_SECONDS` (default 900); the container restart policy replaces it and callers retry.
+  `/health` reports `limits.max_concurrent_analyses` and `load.{analyses_running, oldest_analysis_seconds}`.
+- **Memory.** Measured peak is about 16 MB of RAM per MB of STEP (a 50 MB, 150-part assembly peaks near 800 MB). Size
+  `MAX_CONCURRENT_ANALYSES` and the container memory limit together; the compose files default to 1.
+- **Limits.** `MAX_FILE_SIZE_MB` (default 100) is the engine's per-file limit and matches the backend
+  (`backend/src/common/upload-limits.ts`) and the upload UI.
+- **Component-features cache.** `ComponentFeatureCache` (memory LRU + disk, 7 days) is keyed by geometry hash plus a
+  digest of `component_feature_analyzer.py`, so a code change invalidates it without a hand-bumped version.
+- **Not done on purpose.** A shared topology index for the extractors: typical parts analyse in 0.02–0.8 s, so the
+  rewrite of the 4,265-line sheet-metal extractor would risk costing inputs for no measured gain. Revisit only if
+  profiling larger parts shows a hot spot.
+- **Upload pipeline** (backend side): `backend/src/modules/cad-uploads`, queue table `cad_uploads` (migration 917).
 
 ## Layout
 
@@ -23,6 +45,10 @@ cad-engine/
     nesting.py                   — real-polygon 2D nesting (Nest View)
   injection_molding/
     feature_extractor.py         — InjectionMoldedFeatureExtractor
+  die_casting/
+    feature_extractor.py         — die-casting extractor (reached through family_hint="die_cast")
+  contract/
+    assembly.schema.json         — /analyze/assembly result contract
   machining/
     machining_feature_recognizer.py — MachiningFeature/MachiningFeatureTree/
                                        MachiningFeatureRecognizer orchestration
@@ -31,16 +57,16 @@ cad-engine/
                                        not CNC" architecture mandate)
     feature_models.py            — MachiningFeatureType/MachiningFeature/MachiningFeatureTree
                                     data shapes (own module since the same rename)
-    cnc_feature_recognizer.py    — DEPRECATED compatibility shim only (re-exports
-                                    the above under their old CNC* names); no new
-                                    imports of this module, no duplicate implementation
   shared/                        — cross-domain, not owned by one manufacturing family
     machining_geometry.py        — hole/cone/counterbore classification + cylinder
                                     collection primitives, extracted out of Machining
                                     (2026-09-19) since Sheet Metal genuinely depends
                                     on them directly — see below
     component_feature_analyzer.py — ComponentFeatureAnalyzer + detect_part_family()
-    feature_contract.py          — additive versioned feature envelope
+    assembly.py / assembly_report.py — STEP assembly structure + the /analyze/assembly result
+    part_analysis.py             — analyze_part() (the body of /analyze/geometry) + ComponentFeatureCache
+    analysis_gate.py             — concurrency gate + hung-request watchdog
+    reference_features.json      — the one canonical feature vocabulary (generated; see scripts/)
     drawing_analyzer.py          — 2D drawing/PDF title-block extraction
     memory_optimizer.py          — CAD memory management + extraction orchestration
     sldprt_converter.py          — SolidWorks SLDPRT -> STEP conversion

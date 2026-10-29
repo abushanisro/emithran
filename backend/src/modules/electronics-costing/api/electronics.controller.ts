@@ -34,7 +34,7 @@ import { StartUploadUseCase, type StartUploadResult } from '../application/start
 import { validateSuppliedFacts, type SuppliedFacts } from '../domain/supplied-facts';
 import { scenarioOptions, type ScenarioOptions } from '../domain/engines/assembly-steps.engine';
 import { PLANNED_ENGINES } from '../domain/reference/engine-inputs';
-import { isArchiveName } from '../domain/uploads/expand-archive';
+import { isArchiveName } from '../../../common/archive/expand-archive';
 import { isFolderUpload, parseUploadPaths } from '../domain/uploads/upload-paths';
 import { acceptedFormats, MAX_UPLOAD_BYTES } from '../domain/uploads/validate-upload';
 import { ElectronicsRepository, type CostResultRow, type RevisionRow } from '../infrastructure/repositories/electronics.repository';

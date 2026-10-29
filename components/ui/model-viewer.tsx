@@ -278,10 +278,10 @@ export function ModelViewer({
       console.error('Conversion error:', error);
       let message = 'Failed to convert STEP file.';
       if (error instanceof Error) {
-        if (error.message.includes('CAD Engine not available') || error.message.includes('localhost:5000')) {
+        if (error.message.includes('CAD Engine not available') || error.message.includes('localhost:5055')) {
           message = 'CAD Engine is offline. Start the Python CAD service (cad-engine/) to enable STEP conversion.';
         } else if (error.message.includes('unexpected error') || error.message.includes('unexpected')) {
-          message = 'CAD Engine is offline or returned an error. Make sure the cad-engine service is running on port 5000.';
+          message = 'CAD Engine is offline or returned an error. Make sure the cad-engine service is running on port 5055.';
         } else {
           message = error.message;
         }

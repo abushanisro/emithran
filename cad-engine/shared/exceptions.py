@@ -30,6 +30,16 @@ class StepReadError(CADEngineException):
     pass
 
 
+class UnknownPartError(CADEngineException):
+    """Raised when a requested part id is not in the uploaded files"""
+    pass
+
+
+class StepWriteError(CADEngineException):
+    """Raised when a shape cannot be written to a STEP file"""
+    pass
+
+
 class MeshingError(CADEngineException):
     """Raised when meshing operation fails"""
     pass

@@ -22,6 +22,11 @@ class AppConfig:
     cors_origins: List[str]
     max_file_size_bytes: int
     rate_limit_per_minute: int
+
+    # Heavy OCC requests running at once, and how long one waits for a slot before a 503
+    max_concurrent_analyses: int
+    queue_wait_seconds: int
+    analysis_hard_limit_seconds: int  # a request running longer ends the process so it restarts; 0 = off
     
     # Conversion settings
     linear_deflection: float
@@ -60,12 +65,15 @@ class AppConfig:
             raise ValueError(f"ANGULAR_DEFLECTION must be between 0.1 and 1.0, got {angular_deflection}")
         
         return cls(
-            port=int(os.getenv("PORT", "5000")),
+            port=int(os.getenv("PORT", "5055")),
             host=os.getenv("HOST", "0.0.0.0"),
             environment=os.getenv("NODE_ENV", "development"),
             cors_origins=cors_origins,
             max_file_size_bytes=max_file_size_bytes,
             rate_limit_per_minute=int(os.getenv("RATE_LIMIT_PER_MINUTE", "10")),
+            max_concurrent_analyses=int(os.getenv("MAX_CONCURRENT_ANALYSES", "2")),
+            queue_wait_seconds=int(os.getenv("QUEUE_WAIT_SECONDS", "30")),
+            analysis_hard_limit_seconds=int(os.getenv("ANALYSIS_HARD_LIMIT_SECONDS", "900")),
             linear_deflection=linear_deflection,
             angular_deflection=angular_deflection,
             face_graph_max_faces=int(os.getenv("FACE_GRAPH_MAX_FACES", "20000")),
@@ -88,5 +96,8 @@ class AppConfig:
         if self.rate_limit_per_minute < 1:
             raise ValueError("RATE_LIMIT_PER_MINUTE must be at least 1")
         
+        if self.max_concurrent_analyses < 1:
+            raise ValueError("MAX_CONCURRENT_ANALYSES must be at least 1")
+
         if not self.cors_origins:
             raise ValueError("CORS_ORIGINS cannot be empty")

@@ -12,5 +12,6 @@
   },
   "moduleNameMapper": {
     "^@/(.*)$": "<rootDir>/src/$1"
-  }
+  },
+  "globalSetup": "<rootDir>/test/support/global-setup.ts"
 }

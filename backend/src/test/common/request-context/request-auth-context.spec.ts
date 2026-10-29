@@ -40,7 +40,7 @@ describe('RequestAuthInterceptor', () => {
   it("exposes the authenticated caller's access token to the route handler", async () => {
     const request = { accessToken: 'real.jwt', user: { id: 'user-1' } };
     const seen = await lastValueFrom(interceptor.intercept(ctxFor(request), handlerReadingContext) as any);
-    expect(seen).toEqual({ accessToken: 'real.jwt', userId: 'user-1' });
+    expect(seen).toEqual({ accessToken: 'real.jwt', userId: 'user-1', ip: 'unknown', requestId: expect.any(String) });
   });
 
   it.each([

@@ -1,5 +1,5 @@
 // The only queue surface the electronics module depends on. Today it is backed by
-// pg-boss on the existing Postgres; swapping to BullMQ later means one new adapter
+// the job_queue table (migration 920); swapping to BullMQ later means one new adapter
 // implementing this interface, with no change to the use cases or the controller.
 
 export const ELECTRONICS_JOB_QUEUE = Symbol('ELECTRONICS_JOB_QUEUE');

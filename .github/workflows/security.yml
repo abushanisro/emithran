@@ -1,0 +1,130 @@
+name: Security
+
+# Open-source scanners, no paid services. Each job maps to a standard (docs/DEPLOYMENT_SECURITY.md):
+#   secrets       gitleaks   OWASP ASVS V2/V6 (no secrets in source), OpenSSF Scorecard
+#   dependencies  dependency review (PRs) + Trivy on the lock files: OWASP Top 10 A06 (vulnerable components), SLSA
+#   containers    Trivy on the Dockerfiles, compose file and pinned base images: CIS Docker Benchmark
+#   codeql        CodeQL SAST: OWASP Top 10 A03 (injection) and friends
+# The scheduled run catches new advisories on code that has not changed.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '23 4 * * 1'
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege: jobs that need more ask for it themselves.
+permissions:
+  contents: read
+
+env:
+  # Scanner images are pinned by digest like everything else; Dependabot proposes bumps.
+  GITLEAKS_IMAGE: ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+  TRIVY_IMAGE: aquasec/trivy@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c
+
+jobs:
+  secrets:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the whole history: a secret removed in a later commit is still leaked
+          persist-credentials: false
+      # Findings already in history are in .github/gitleaks-baseline.json (redacted) and were rotated; anything new fails.
+      - name: Scan history
+        run: |
+          docker run --rm -v "$PWD":/repo:ro "$GITLEAKS_IMAGE" git /repo \
+            --redact --no-banner --baseline-path /repo/.github/gitleaks-baseline.json
+
+  dependencies:
+    name: Dependency vulnerabilities
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Review dependency changes in this pull request
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+      - name: Scan the lock files (fixable HIGH and CRITICAL fail)
+        run: |
+          docker run --rm -v "$PWD":/w:ro -v trivy-cache:/root/.cache "$TRIVY_IMAGE" fs /w \
+            --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 \
+            --skip-dirs /w/node_modules,/w/backend/node_modules,/w/petrus-demo,/w/memory \
+            --ignorefile /w/.trivyignore.yaml
+
+  containers:
+    name: Containers and deployment config (Trivy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Dockerfiles and the compose file against the CIS Docker Benchmark rules. The two Dockerfile.dev files run as root
+      # on purpose: dev containers bind-mount source, and a non-root user breaks file ownership there.
+      - name: Dockerfile and compose misconfiguration
+        run: |
+          docker run --rm -v "$PWD":/w:ro -v trivy-cache:/root/.cache "$TRIVY_IMAGE" config /w \
+            --severity HIGH,CRITICAL --exit-code 1 \
+            --skip-dirs /w/node_modules,/w/backend/node_modules,/w/petrus-demo,/w/memory \
+            --skip-files /w/cad-engine/Dockerfile.dev,/w/ecad-engine/Dockerfile.dev
+      # The base images are read from the Dockerfiles and the compose file, so there is no second list to forget to update.
+      - name: Pinned base images
+        run: |
+          images=$(grep -hE '^FROM [^ ]+@sha256:|^\s*image: [^ ]+@sha256:' backend/Dockerfile Dockerfile.frontend cad-engine/Dockerfile ecad-engine/Dockerfile docker-compose.prod.yml \
+            | sed -E 's/^FROM //; s/^\s*image: //; s/ AS .*//' | sort -u)
+          test -n "$images"
+          status=0
+          for image in $images; do
+            echo "::group::$image"
+            docker run --rm -v trivy-cache:/root/.cache -v "$PWD/.trivyignore.yaml":/.trivyignore.yaml:ro "$TRIVY_IMAGE" image \
+              --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --ignorefile /.trivyignore.yaml "$image" || status=1
+            echo "::endgroup::"
+          done
+          exit $status
+
+  policy:
+    name: Deployment policy tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # Fails if a later edit weakens the compose hardening, un-pins an image, or lets an env file into a build context.
+      - run: npx vitest run test/deploy test/lib/supabase
+
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript, python]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          languages: ${{ matrix.language }}
+      - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          category: /language:${{ matrix.language }}

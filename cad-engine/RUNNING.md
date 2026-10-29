@@ -17,7 +17,7 @@ there is no `-d`:
 wsl -d Ubuntu-24.04 -- bash -lc "cd /mnt/c/Users/singi/OneDrive/Desktop/mithran/cad-engine && docker compose -f docker-compose.dev.yml up"
 ```
 
-Then open http://localhost:5000/health - it should return `"status":"healthy"`.
+Then open http://localhost:5055/health - it should return `"status":"healthy"`.
 Ctrl+C in that terminal stops the engine.
 
 While it runs, the source tree is bind-mounted and uvicorn runs with `--reload`,
@@ -135,13 +135,13 @@ wsl -d Ubuntu-24.04 -- bash -lc "cd /mnt/c/Users/singi/OneDrive/Desktop/mithran/
 ## Checking it works
 
 ```powershell
-curl http://localhost:5000/health
+curl http://localhost:5055/health
 ```
 
 Healthy output contains `"status":"healthy"` and
 `"opencascade":"pythonocc-core 7.7.2"`.
 
-The NestJS backend defaults `CAD_ENGINE_URL` to `http://localhost:5000`, and
+The NestJS backend defaults `CAD_ENGINE_URL` to `http://localhost:5055`, and
 WSL2 forwards the published port to Windows `localhost`, so no backend
 configuration is needed to point at this container.
 
@@ -149,7 +149,7 @@ configuration is needed to point at this container.
 
 ## Troubleshooting
 
-### `http://localhost:5000` does not respond
+### `http://localhost:5055` does not respond
 
 Almost always the WSL VM shut itself down and took the container with it. WSL2
 stops an idle VM when no client is attached - systemd and a running container do

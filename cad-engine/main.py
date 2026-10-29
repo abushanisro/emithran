@@ -8,26 +8,23 @@ Author: mithran Platform
 Standards: ISO 10303 (STEP), STL Binary Format
 """
 
-import os
-import asyncio
 import json
+import os
 import logging
 import tempfile
 import hashlib
 import hmac
-import threading
-import time
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, List, Optional
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 load_dotenv()
 
-from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Request, Security, Form
+from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Request, Security, Form, Depends
 from pydantic import BaseModel
 from fastapi.responses import FileResponse, JSONResponse
+from starlette.background import BackgroundTask
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security.api_key import APIKeyHeader
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -38,13 +35,16 @@ import uvicorn
 from shared.config import AppConfig
 from shared.services import StepReader, ShapeMesher, StlWriter, ConversionService
 from shared.validators import FileValidator
+from shared.analysis_gate import AnalysisGate
+from shared.assembly_report import build_report, export_parts
+from shared.part_analysis import ComponentFeatureCache, analyze_part
 from shared.memory_optimizer import AdvancedCADMemoryOptimizer
-from shared.part_family import MACHINING_FAMILIES
 from shared.exceptions import (
     CADEngineException,
     FileValidationError,
     ConversionError,
     StepReadError,
+    UnknownPartError,
 )
 from shared import telemetry
 from shared import sldprt_converter
@@ -103,8 +103,6 @@ limiter = Limiter(key_func=get_remote_address)
 async def lifespan(app: FastAPI):
     """Application lifespan manager - handles startup and shutdown"""
     
-    global _CF_DISK_CACHE_DIR
-
     # Startup
     logger.info("Initializing CAD Engine services...")
 
@@ -112,25 +110,9 @@ async def lifespan(app: FastAPI):
     os.makedirs(config.temp_dir, exist_ok=True)
     logger.info(f"Temp directory: {config.temp_dir}")
 
-    # Initialise GCD-adj disk cache and warm in-memory cache from persisted entries.
-    _CF_DISK_CACHE_DIR = Path(config.temp_dir) / "cf_disk_cache"
-    _CF_DISK_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    _warm_count = 0
-    for _p in _CF_DISK_CACHE_DIR.glob("*.json"):
-        try:
-            _data = json.loads(_p.read_text(encoding="utf-8"))
-            if time.time() - _data.get("ts", 0) <= _CF_DISK_CACHE_TTL_SEC:
-                _gh = _p.stem
-                with _cf_cache_lock:
-                    if len(_cf_cache) < 50:
-                        _cf_cache[_gh] = _data["cf"]
-                _warm_count += 1
-            else:
-                _p.unlink(missing_ok=True)
-        except Exception:
-            pass
-    logger.info(f"[cf-disk-cache] warmed {_warm_count} GCD-adj entries from disk at {_CF_DISK_CACHE_DIR}")
-    
+    app.state.component_cache = ComponentFeatureCache(Path(config.temp_dir) / "cf_disk_cache")
+    analysis_gate.start_watchdog()
+
     # Initialize services with dependency injection
     step_reader = StepReader()
     shape_mesher = ShapeMesher(
@@ -181,48 +163,6 @@ app = FastAPI(
     version="2.0.0",
     lifespan=lifespan
 )
-
-# Process-lifetime cache for GCD adjacency (35–70s computation per unique STEP file).
-# Keyed by geometry_hash from memory_optimizer; evicted LRU-style at 50 entries.
-_cf_cache: Dict[str, Any] = {}
-_cf_cache_lock = threading.Lock()
-
-# Disk cache for GCD-adj results — survives Uvicorn restarts.
-# Stored as {geometry_hash}.json under CF_DISK_CACHE_DIR.
-_CF_DISK_CACHE_TTL_SEC = 7 * 24 * 3600  # 7 days
-_CF_DISK_CACHE_DIR: Path = Path("/tmp/cad_engine/cf_disk_cache")  # overridden in lifespan
-
-# Single-threaded executor keeps GCD-adj off the async event loop without
-# saturating CPU with parallel O(n²) walks.
-_cf_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="gcd-adj")
-
-
-def _cf_disk_path(gh: str) -> Path:
-    return _CF_DISK_CACHE_DIR / f"{gh}.json"
-
-
-def _load_cf_from_disk(gh: str) -> Optional[Dict[str, Any]]:
-    """Return cached component_features dict or None if absent / expired / corrupt."""
-    p = _cf_disk_path(gh)
-    if not p.exists():
-        return None
-    try:
-        data = json.loads(p.read_text(encoding="utf-8"))
-        if time.time() - data.get("ts", 0) > _CF_DISK_CACHE_TTL_SEC:
-            p.unlink(missing_ok=True)
-            return None
-        return data["cf"]
-    except Exception:
-        return None
-
-
-def _save_cf_to_disk(gh: str, cf: Dict[str, Any]) -> None:
-    """Persist component_features dict to disk. Non-fatal on any error."""
-    try:
-        p = _cf_disk_path(gh)
-        p.write_text(json.dumps({"ts": time.time(), "cf": cf}), encoding="utf-8")
-    except Exception as exc:
-        logger.warning(f"[cf-disk-cache] write failed for {gh[:12]}: {exc}")
 
 # Add rate limiter to app state
 app.state.limiter = limiter
@@ -299,6 +239,14 @@ async def root() -> Dict[str, Any]:
     }
 
 
+# Heavy OCC work runs in the threadpool (the handlers are plain `def`); the gate bounds how many run at once and
+# restarts the process if one hangs (see shared/analysis_gate.py).
+analysis_gate = AnalysisGate(config.max_concurrent_analyses, config.queue_wait_seconds, config.analysis_hard_limit_seconds)
+analysis_slot = analysis_gate.slot
+MAX_ASSEMBLY_FILES = 500
+
+
+
 @app.get("/ready")
 async def ready() -> JSONResponse:
     """Readiness: can this instance take work? 200, or 503 with reason codes only (the response is unauthenticated).
@@ -332,7 +280,12 @@ async def health() -> Dict[str, Any]:
             "max_file_size_mb": config.max_file_size_bytes / (1024 * 1024),
             "rate_limit_per_minute": config.rate_limit_per_minute,
             "max_memory_mb": 2048,
-            "max_concurrent_analyses": 50
+            "max_concurrent_analyses": analysis_gate.max_concurrent,
+            "analysis_hard_limit_seconds": config.analysis_hard_limit_seconds
+        },
+        "load": {
+            "analyses_running": analysis_gate.running(),
+            "oldest_analysis_seconds": round(analysis_gate.oldest_seconds(), 1)
         },
         "conversion_settings": {
             "linear_deflection": config.linear_deflection,
@@ -399,7 +352,7 @@ async def convert_step_to_stl(
             step_path = temp_step.name
             
             # Write uploaded file to temp location
-            content = await file.read()
+            content = file.file.read()
             temp_step.write(content)  # type: ignore
             temp_step.flush()
         
@@ -504,7 +457,7 @@ async def convert_step_to_stl_base64(
         file_ext = Path(file.filename).suffix.lower()
         with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext, dir=config.temp_dir, mode="wb") as temp_step:
             step_path = temp_step.name
-            content = await file.read()
+            content = file.file.read()
             temp_step.write(content)  # type: ignore
             temp_step.flush()
         
@@ -564,14 +517,15 @@ async def convert_step_to_stl_base64(
 
 @app.post("/analyze/geometry")
 @limiter.limit(f"{config.rate_limit_per_minute}/minute")
-async def analyze_geometry_advanced(
+def analyze_geometry_advanced(
     request: Request,
     file: UploadFile = File(...),
     strategy: str = Form("balanced"),
     force_reanalysis: bool = Form(False),
     user_processes: str = Form(""),
     family_hint: str = Form(""),
-    _auth: None = Security(require_api_key)
+    _auth: None = Security(require_api_key),
+    _slot: None = Depends(analysis_slot),
 ) -> Dict[str, Any]:
     """
     Advanced geometry analysis with DFM insights and memory optimization.
@@ -614,7 +568,7 @@ async def analyze_geometry_advanced(
         file_ext = Path(file.filename).suffix.lower()
         with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext, dir=config.temp_dir, mode="wb") as temp_step:
             step_path = temp_step.name
-            content = await file.read()
+            content = file.file.read()
             file_hash = hashlib.sha256(content).hexdigest()
             temp_step.write(content)
             temp_step.flush()
@@ -648,246 +602,13 @@ async def analyze_geometry_advanced(
             raise HTTPException(status_code=422, detail=f"Failed to read STEP file: {str(e)}")
 
         try:
-            with telemetry.stage("geometry_analysis"):
-                optimization_result = memory_optimizer.analyze_and_optimize(
-                    shape=shape,
-                    file_path=step_path,
-                    strategy=strategy,
-                    force_reanalysis=force_reanalysis,
-                    user_processes=parsed_processes,
-                    file_hash=file_hash,
-                    family_hint=family_hint,
-                )
-
+            response = analyze_part(
+                shape=shape, step_path=step_path, filename=file.filename, file_hash=file_hash,
+                memory_optimizer=memory_optimizer, component_cache=request.app.state.component_cache,
+                face_graph_max_faces=config.face_graph_max_faces, strategy=strategy,
+                force_reanalysis=force_reanalysis, user_processes=parsed_processes, family_hint=family_hint,
+            )
             logger.info(f"Advanced analysis completed for {file.filename}")
-
-            # Machining feature recognition — runs only for non-sheet-metal
-            # families. STEP/3D CAD -> MachiningFeatureRecognizer ->
-            # MachiningFeatureTree (renamed 2026-09-19 from
-            # CNCFeatureRecognizer per the "Machining is the canonical
-            # domain, not CNC" architecture mandate). The response key
-            # "machining_features" and the shared/part_family.py machining family
-            # family strings below are real, existing manufacturing/process
-            # classifications already read throughout the backend's
-            # DB-driven costing/taxonomy code -- deliberately left
-            # unchanged by this rename, not part of it.
-            machining_features_result = None
-            try:
-                mfg_intel = (
-                    optimization_result.geometry_features.manufacturing_features
-                    .get("manufacturing_intelligence", {})
-                )
-                detected_family = mfg_intel.get("detected_family", "")
-                if detected_family in MACHINING_FAMILIES:
-                    from machining.machining_feature_recognizer import MachiningFeatureRecognizer  # type: ignore
-                    machining_features_result = MachiningFeatureRecognizer().recognize(shape, detected_family).to_dict()
-                    # Real sharp-edge length (deburring path) measured from the
-                    # B-Rep — replaces the backend estimating it from surface area.
-                    try:
-                        from shared.edge_length import sharp_edge_length  # type: ignore
-                        machining_features_result["edges"] = sharp_edge_length(shape)
-                    except Exception as _edge_exc:
-                        logger.warning(f"[machining_features] edge length failed: {_edge_exc}")
-                    # Embed face_map so the frontend can resolve face_ids → STL triangle ranges.
-                    # For sheet_metal this lives in feature_graph_v2.metadata.face_map; for Machining
-                    # we carry it here since the SheetMetalFeatureExtractor is never called.
-                    _holes = optimization_result.geometry_features.manufacturing_features.get('holes', {})
-                    _face_map = _holes.get('face_map', [])
-                    if _face_map:
-                        machining_features_result['face_map'] = _face_map
-                    logger.info(
-                        f"[machining_features] family={detected_family} "
-                        f"features={len(machining_features_result.get('features', []))} "
-                        f"face_map_entries={len(_face_map)}"
-                    )
-                    try:
-                        from machining.machining_feature_recognizer import build_machining_feature_graph_v2, _part_bounding_box  # type: ignore
-                        from shared.stable_face_id import build_stable_face_id_map  # type: ignore
-                        _bbox_raw = _part_bounding_box(shape)
-                        _bcx = (_bbox_raw["xmin"] + _bbox_raw["xmax"]) / 2
-                        _bcy = (_bbox_raw["ymin"] + _bbox_raw["ymax"]) / 2
-                        _bcz = (_bbox_raw["zmin"] + _bbox_raw["zmax"]) / 2
-                        _total_tris = sum(e.get("tri_count", 0) for e in _face_map)
-                        # Content-based face identity, stable across STEP
-                        # regeneration -- same module/pattern Sheet Metal
-                        # already proved (feature_extractor.py). Additive:
-                        # face_ids (raw OCC ordinals) stay the primary key
-                        # every existing consumer reads unchanged.
-                        try:
-                            _stable_face_ids = build_stable_face_id_map(shape)
-                        except Exception as _sfid_exc:
-                            logger.warning(f"[machining_fgv2] stable_face_id build failed: {_sfid_exc}")
-                            _stable_face_ids = {}
-                        machining_features_result["feature_graph_v2"] = build_machining_feature_graph_v2(
-                            machining_features_result, (_bcx, _bcy, _bcz), _face_map, _total_tris,
-                            stable_face_ids=_stable_face_ids,
-                        )
-                        # Nominal size for ISO 286 grading of tolerances on non-hole features.
-                        from shared.feature_extent import annotate_occurrence_extents
-                        annotate_occurrence_extents(shape, machining_features_result["feature_graph_v2"]["features"])
-                        logger.info(
-                            f"[machining_fgv2] synthesised "
-                            f"{len(machining_features_result['feature_graph_v2']['features'])} features"
-                        )
-                    except Exception as _fgv2_exc:
-                        logger.warning(f"[machining_fgv2] synthesis failed: {_fgv2_exc}")
-            except Exception as _cnc_exc:
-                logger.warning(f"[machining_features] extraction failed: {_cnc_exc}")
-
-            # Per-face attributes + edge convexity for every domain (the attributed
-            # adjacency graph the driver tree and highlight shading read). Bounded:
-            # beyond config.face_graph_max_faces it is skipped, not truncated.
-            face_graph = None
-            try:
-                from shared.face_attributes import build_face_attributes  # type: ignore
-                _faces_total = optimization_result.geometry_features.manufacturing_features.get(
-                    'holes', {}).get('total_face_count', 0)
-                if _faces_total <= config.face_graph_max_faces:
-                    _fa, _eg = build_face_attributes(shape)
-                    face_graph = {"face_attributes": _fa, "edge_graph": _eg}
-                else:
-                    logger.warning(
-                        f"[face_graph] skipped: {_faces_total} faces > {config.face_graph_max_faces}"
-                    )
-            except Exception as _fg_exc:
-                logger.warning(f"[face_graph] extraction failed: {_fg_exc}")
-
-            response = {
-                "success": True,
-                "face_graph": face_graph,
-                "analysis_id": optimization_result.geometry_hash[:16],
-                "original_filename": file.filename,
-                "optimization_strategy": optimization_result.optimization_strategy,
-                "model_version": optimization_result.model_version,
-                "timestamp": optimization_result.timestamp.isoformat(),
-
-                "geometry_features": {
-                    "volume_mm3": optimization_result.geometry_features.volume,
-                    "surface_area_mm2": optimization_result.geometry_features.surface_area,
-                    "bounding_box": optimization_result.geometry_features.bounding_box,
-                    "complexity_score": optimization_result.geometry_features.complexity_score,
-                    "feature_count": optimization_result.geometry_features.feature_count,
-                    "manufacturing_features": optimization_result.geometry_features.manufacturing_features,
-                    "mass_properties": optimization_result.geometry_features.mass_properties
-                },
-
-                "memory_optimization": {
-                    "original_size_kb": optimization_result.memory_metrics.original_size_kb,
-                    "optimized_size_kb": optimization_result.memory_metrics.optimized_size_kb,
-                    "compression_ratio": optimization_result.memory_metrics.compression_ratio,
-                    "memory_reduction_percent": optimization_result.memory_metrics.memory_reduction_percent,
-                    "processing_time_ms": optimization_result.memory_metrics.processing_time_ms,
-                    "cache_efficiency": optimization_result.memory_metrics.cache_efficiency
-                },
-
-                "dfm_analysis": {
-                    "manufacturability_score": optimization_result.dfm_analysis.manufacturability_score,
-                    "difficulty_level": optimization_result.dfm_analysis.difficulty_level,
-                    "recommended_processes": optimization_result.dfm_analysis.recommended_processes,
-                    "warnings": optimization_result.dfm_analysis.warnings,
-                    "confidence": optimization_result.dfm_analysis.confidence,
-                },
-
-                "performance_metrics": {
-                    "lod_levels_generated": optimization_result.lod_levels_generated,
-                    "recommendations": optimization_result.recommendations
-                }
-            }
-
-            if machining_features_result is not None:
-                response["machining_features"] = machining_features_result
-
-            # Semantic GD&T carried in the STEP model itself (AP242 PMI) — the
-            # one 3D-model source of GD&T; all families. See shared/step_pmi.py.
-            from shared.step_pmi import read_step_gdt  # type: ignore
-            response["pmi"] = read_step_gdt(step_path)
-            # The PMI graphics are in STEP model coordinates; the viewer's mesh is centred on its
-            # bounding box, so it needs that centre (same one feature_graph_v2 is centred on).
-            if response["pmi"].get("graphics"):
-                try:
-                    from machining.machining_feature_recognizer import _part_bounding_box  # type: ignore
-                    _b = _part_bounding_box(shape)
-                    response["pmi"]["graphics_origin"] = [
-                        round((_b["xmin"] + _b["xmax"]) / 2, 4), round((_b["ymin"] + _b["ymax"]) / 2, 4), round((_b["zmin"] + _b["zmax"]) / 2, 4),
-                    ]
-                except Exception as _gexc:
-                    logger.warning(f"[step_pmi] graphics origin failed: {_gexc}")
-                    response["pmi"]["graphics"] = []
-            # Typed engineering records: native PMI where the file has it, decoded graphics (always flagged,
-            # never automation-ready) where it does not, unresolved otherwise. See shared/pmi_records.py.
-            # The STEP file the PMI was read from: an engineer's approval of a decoded value is bound to it.
-            response["pmi"]["source"] = {"file_sha256": file_hash}
-            if response["pmi"].get("items"):
-                try:
-                    from shared.pmi_records import build_pmi_records, engine_features  # type: ignore
-                    _mf = (machining_features_result or {}).get("features") if machining_features_result else None
-                    _built = build_pmi_records(response["pmi"], engine_features(_mf))
-                    response["pmi"]["records"] = _built["records"]
-                    response["pmi"]["records_summary"] = _built["summary"]
-                except Exception as _rexc:
-                    logger.warning(f"[step_pmi] records failed: {_rexc}")
-                    response["pmi"]["unresolved"] = list(response["pmi"].get("unresolved", [])) + [f"records: {_rexc}"]
-
-            # Component feature analysis (eMithran-style decomposition).
-            # GCD adjacency walk is the bottleneck (30–70 s for complex sheet metal).
-            # Three-layer cache: in-memory → disk → fresh computation in thread pool.
-            # The thread pool keeps the async event loop responsive so concurrent
-            # requests (e.g. route-comparison, cost-summary) are not blocked.
-            try:
-                from shared.component_feature_analyzer import ComponentFeatureAnalyzer  # type: ignore
-                _gh = optimization_result.geometry_hash
-
-                # Layer 1: in-memory (hot path — same process, any previous call).
-                # Gated on force_reanalysis too -- Layer 2 (disk) already was,
-                # but this one wasn't, so within the same server process a
-                # "force reanalysis" request could still be silently served a
-                # stale component-features result computed before a code
-                # change, same bug class just fixed one layer down for
-                # force_reanalysis not reaching cad-engine at all.
-                _cf = None
-                if not force_reanalysis:
-                    with _cf_cache_lock:
-                        _cf = _cf_cache.get(_gh)
-
-                # Layer 2: disk (warm path — survives Uvicorn restarts)
-                if _cf is None and not force_reanalysis:
-                    _cf = _load_cf_from_disk(_gh)
-                    if _cf is not None:
-                        with _cf_cache_lock:
-                            if len(_cf_cache) >= 50:
-                                _cf_cache.pop(next(iter(_cf_cache)))
-                            _cf_cache[_gh] = _cf
-                        logger.info(f"[component_features] disk-cache hit {_gh[:12]}")
-
-                if _cf is not None:
-                    logger.info(f"[component_features] cache hit {_gh[:12]}")
-                else:
-                    # Layer 3: fresh computation — run in thread pool so the event loop
-                    # stays responsive for other concurrent requests during the 30–70 s walk.
-                    _mfg = optimization_result.geometry_features.manufacturing_features
-                    _bbox = optimization_result.geometry_features.bounding_box
-                    _loop = asyncio.get_event_loop()
-                    # The span is opened on the event-loop side and covers the await; the worker thread needs no context.
-                    with telemetry.stage("component_features"):
-                        _cf = await _loop.run_in_executor(
-                            _cf_executor,
-                            lambda: ComponentFeatureAnalyzer().analyze(shape, _mfg, _bbox),
-                        )
-                    # Populate both cache layers so the next request is instant
-                    with _cf_cache_lock:
-                        if len(_cf_cache) >= 50:
-                            _cf_cache.pop(next(iter(_cf_cache)))
-                        _cf_cache[_gh] = _cf
-                    _save_cf_to_disk(_gh, _cf)
-                    logger.info(
-                        f"[component_features] computed blank={_cf['blank']['face_id']} "
-                        f"setup_axes={len(_cf['setup_axes_candidates'])} "
-                        f"gcd_relations={len(_cf['gcd_relations'])}"
-                    )
-                response["geometry_features"]["manufacturing_features"]["component_features"] = _cf
-            except Exception as _cf_exc:
-                logger.warning(f"[component_features] extraction failed: {_cf_exc}")
-
             return response
 
         except Exception as e:
@@ -922,10 +643,11 @@ class NestRequest(BaseModel):
 
 @app.post("/measure/geometry")
 @limiter.limit(f"{config.rate_limit_per_minute}/minute")
-async def measure_geometry(
+def measure_geometry(
     request: Request,
     file: UploadFile = File(...),
-    _auth: None = Security(require_api_key)
+    _auth: None = Security(require_api_key),
+    _slot: None = Depends(analysis_slot),
 ) -> Dict[str, Any]:
     """
     The process-independent measurements of a solid only: volume (mm3),
@@ -942,7 +664,7 @@ async def measure_geometry(
         file_ext = Path(file.filename).suffix.lower()
         with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext, dir=config.temp_dir, mode="wb") as temp_step:
             step_path = temp_step.name
-            temp_step.write(await file.read())
+            temp_step.write(file.file.read())
             temp_step.flush()
         try:
             file_validator.validate_file(step_path, file.filename)
@@ -968,6 +690,85 @@ async def measure_geometry(
     finally:
         if step_path:
             cleanup_files(step_path)
+
+
+def _stage_step_uploads(request: Request, files: List[UploadFile], paths: List[str]) -> List[tuple]:
+    """Writes the uploaded STEP files to temp files (their paths are appended to `paths` for cleanup) and validates them."""
+    if len(files) > MAX_ASSEMBLY_FILES:
+        raise HTTPException(status_code=400, detail=f"At most {MAX_ASSEMBLY_FILES} files per assembly")
+    file_validator: FileValidator = request.app.state.file_validator
+    named = []
+    for upload in files:
+        if Path(upload.filename).suffix.lower() not in (".step", ".stp"):
+            raise HTTPException(status_code=400, detail=f"{upload.filename}: only STEP files are supported (export as STEP AP242)")
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".step", dir=config.temp_dir, mode="wb") as tmp:
+            paths.append(tmp.name)
+            tmp.write(upload.file.read())
+        try:
+            file_validator.validate_file(tmp.name, upload.filename)
+        except FileValidationError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        named.append((upload.filename, tmp.name))
+    return named
+
+
+@app.post("/analyze/assembly")
+@limiter.limit(f"{config.rate_limit_per_minute}/minute")
+def analyze_assembly(
+    request: Request,
+    files: List[UploadFile] = File(...),
+    _auth: None = Security(require_api_key),
+    _slot: None = Depends(analysis_slot),
+) -> Dict[str, Any]:
+    """
+    One product from one or more STEP files: the assembly tree (instances of the same part collapse into a quantity),
+    and each distinct part measured once. Contract: contract/assembly.schema.json. A file that cannot be read makes
+    the result `partial` instead of failing the call.
+    """
+    paths: List[str] = []
+    try:
+        named = _stage_step_uploads(request, files, paths)
+        with telemetry.stage("assembly_analysis"):
+            return build_report(named)
+    finally:
+        cleanup_files(*paths)
+
+
+@app.post("/assembly/parts")
+@limiter.limit(f"{config.rate_limit_per_minute}/minute")
+def export_assembly_parts(
+    request: Request,
+    files: List[UploadFile] = File(...),
+    parts: str = Form(..., description="JSON array of part ids from /analyze/assembly"),
+    _auth: None = Security(require_api_key),
+    _slot: None = Depends(analysis_slot),
+) -> FileResponse:
+    """
+    A zip with one STEP file per requested part (`<id with ':' as '_'>.step`), so a part that exists only inside an
+    assembly file can be stored and analysed on its own. Send the same files, in the same order, as to /analyze/assembly.
+    """
+    try:
+        wanted = json.loads(parts)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="parts must be a JSON array of part ids")
+    if not isinstance(wanted, list) or not all(isinstance(p, str) for p in wanted) or not wanted:
+        raise HTTPException(status_code=400, detail="parts must be a non-empty JSON array of part ids")
+    paths: List[str] = []
+    fd, zip_path = tempfile.mkstemp(suffix=".zip", dir=config.temp_dir)
+    os.close(fd)
+    try:
+        named = _stage_step_uploads(request, files, paths)
+        with telemetry.stage("assembly_analysis"):
+            export_parts(named, wanted, zip_path, config.temp_dir)
+    except UnknownPartError as e:
+        cleanup_files(zip_path)
+        raise HTTPException(status_code=400, detail=str(e))
+    except BaseException:
+        cleanup_files(zip_path)
+        raise
+    finally:
+        cleanup_files(*paths)
+    return FileResponse(zip_path, media_type="application/zip", filename="parts.zip", background=BackgroundTask(cleanup_files, zip_path))
 
 
 @app.post("/nest")
@@ -1085,7 +886,7 @@ async def optimize_memory_only(
         file_ext = Path(file.filename).suffix.lower()
         with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext, dir=config.temp_dir, mode="wb") as temp_step:
             step_path = temp_step.name
-            content = await file.read()
+            content = file.file.read()
             file_hash = hashlib.sha256(content).hexdigest()
             temp_step.write(content)
             temp_step.flush()

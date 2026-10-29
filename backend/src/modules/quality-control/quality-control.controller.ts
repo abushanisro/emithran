@@ -15,7 +15,6 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SupabaseAuthGuard } from '@/common/guards/supabase-auth.guard';
-import { RateLimitGuard } from '@/common/guards/rate-limit.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { createResponse, ApiResponse as CustomApiResponse } from '@/common/dto/api-response.dto';
 import { QualityControlService } from './quality-control.service';
@@ -34,7 +33,7 @@ import {
 @ApiTags('Quality Control')
 @ApiBearerAuth()
 @Controller('api/quality-control')
-@UseGuards(SupabaseAuthGuard, RateLimitGuard)
+@UseGuards(SupabaseAuthGuard)
 export class QualityControlController {
   private readonly logger = new Logger(QualityControlController.name);
 

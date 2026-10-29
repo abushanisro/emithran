@@ -18,9 +18,8 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { SupabaseAuthGuard } from '@/common/guards/supabase-auth.guard';
-import { RateLimitGuard } from '@/common/guards/rate-limit.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
-import { RateLimit, RateLimits } from '@/common/decorators/rate-limit.decorator';
+import { Throttle } from '@nestjs/throttler';
 import { createResponse, ApiResponse } from '@/common/dto/api-response.dto';
 import { ProductionPlanningService } from './production-planning.service';
 import { ProductionMaterialTrackingService } from './services/production-material-tracking.service';
@@ -45,7 +44,7 @@ import {
 } from './dto/daily-production.dto';
 
 @Controller({ path: 'api/production-planning', version: '1' })
-@UseGuards(SupabaseAuthGuard, RateLimitGuard)
+@UseGuards(SupabaseAuthGuard)
 export class ProductionPlanningController {
   private readonly logger = new Logger(ProductionPlanningController.name);
 
@@ -161,7 +160,8 @@ export class ProductionPlanningController {
   }
 
   @Put('lots/:id')
-  @RateLimit(RateLimits.CRITICAL_OPERATIONS)
+  // 20 per 15 minutes per client: production changes are deliberate, not bulk
+  @Throttle({ default: { limit: 20, ttl: 15 * 60 * 1000 } })
   async updateProductionLot(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateDto: UpdateProductionLotDto,

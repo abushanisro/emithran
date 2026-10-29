@@ -6,7 +6,7 @@ const base = {
   SUPABASE_ANON_KEY: 'a'.repeat(30),
   SUPABASE_SERVICE_KEY: 's'.repeat(30),
 };
-const production = { ...base, NODE_ENV: 'production', CORS_ORIGIN: 'https://app.example.com' };
+const production = { ...base, NODE_ENV: 'production', CORS_ORIGIN: 'https://app.example.com', APP_ENV: 'prd' };
 
 describe('env validation: development auth bypass', () => {
   it('is off by default', () => {
@@ -47,7 +47,25 @@ describe('env validation: electronics job queue in production', () => {
     expect(validate({ ...base, ELECTRONICS_QUEUE_DRIVER: 'memory' }).ELECTRONICS_QUEUE_DRIVER).toBe('memory');
   });
 
-  it('boots in production with pg-boss, the default', () => {
-    expect(validate(production).ELECTRONICS_QUEUE_DRIVER).toBe('pg-boss');
+  it('boots in production with the table queue, the default', () => {
+    expect(validate(production).ELECTRONICS_QUEUE_DRIVER).toBe('table');
+  });
+});
+
+describe('env validation: APP_ENV', () => {
+  it('defaults to local, so a developer machine needs nothing set', () => {
+    expect(validate(base).APP_ENV).toBe('local');
+  });
+
+  it('refuses a production boot that does not say whether it is stage or prd', () => {
+    const { APP_ENV: _omitted, ...withoutEnv } = production;
+    expect(() => validate(withoutEnv)).toThrow(/APP_ENV must be set to "stage" or "prd"/);
+    expect(() => validate({ ...production, APP_ENV: 'local' })).toThrow(/APP_ENV must be set to "stage" or "prd"/);
+  });
+
+  it('accepts stage and prd in production, and rejects any other name', () => {
+    expect(validate({ ...production, APP_ENV: 'stage' }).APP_ENV).toBe('stage');
+    expect(validate(production).APP_ENV).toBe('prd');
+    expect(() => validate({ ...production, APP_ENV: 'staging' })).toThrow(/Configuration validation error/);
   });
 });

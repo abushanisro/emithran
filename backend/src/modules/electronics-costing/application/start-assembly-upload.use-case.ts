@@ -1,9 +1,9 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 
 import { StartUploadUseCase, type StartUploadResult } from './start-upload.use-case';
-import { expandArchive } from '../domain/uploads/expand-archive';
+import { expandArchive } from '../../../common/archive/expand-archive';
 import { planAssembly, type PlanNode } from '../domain/uploads/plan-assembly';
-import { validateUpload, type UploadVerdict } from '../domain/uploads/validate-upload';
+import { ELECTRONICS_ARCHIVE_LIMITS, validateUpload, type UploadVerdict } from '../domain/uploads/validate-upload';
 import { ElectronicsRepository, type DesignRow } from '../infrastructure/repositories/electronics.repository';
 
 export interface AssemblyFileInput {
@@ -139,7 +139,7 @@ export class StartAssemblyUploadUseCase {
   async executeArchive(input: StartArchiveInput): Promise<StartAssemblyResult | (StartUploadResult & { skipped: StartAssemblyResult['skipped'] })> {
     const verdict = validateUpload(input.name, input.bytes);
     if (!verdict.ok) throw new BadRequestException({ code: verdict.code, message: `${input.name}: ${verdict.message}` });
-    const archive = expandArchive(input.name, input.bytes);
+    const archive = expandArchive(input.name, input.bytes, ELECTRONICS_ARCHIVE_LIMITS);
     if (!archive.ok) throw new BadRequestException({ code: archive.code, message: `${input.name}: ${archive.message}` });
     const scope = { organizationId: input.organizationId, userId: input.userId, token: input.token };
 

@@ -17,12 +17,12 @@ describe('env.validation', () => {
 
   it('rejects CORS_ORIGIN left at the localhost default in production', () => {
     expect(() =>
-      validate(baseConfig({ NODE_ENV: 'production', CORS_ORIGIN: 'http://localhost:3000' })),
+      validate(baseConfig({ NODE_ENV: 'production', APP_ENV: 'prd', CORS_ORIGIN: 'http://localhost:3000' })),
     ).toThrow(/CORS_ORIGIN must be set/);
   });
 
   it('rejects CORS_ORIGIN of "*" in production', () => {
-    expect(() => validate(baseConfig({ NODE_ENV: 'production', CORS_ORIGIN: '*' }))).toThrow(
+    expect(() => validate(baseConfig({ NODE_ENV: 'production', APP_ENV: 'prd', CORS_ORIGIN: '*' }))).toThrow(
       /CORS_ORIGIN must be set/,
     );
   });
@@ -31,7 +31,7 @@ describe('env.validation', () => {
     expect(() =>
       validate(
         baseConfig({
-          NODE_ENV: 'production',
+          NODE_ENV: 'production', APP_ENV: 'prd',
           CORS_ORIGIN: 'https://app.emithran.com',
           ADMIN_FALLBACK_EMAIL: 'admin@example.com',
         }),
@@ -54,7 +54,7 @@ describe('env.validation', () => {
     expect(() =>
       validate(
         baseConfig({
-          NODE_ENV: 'production',
+          NODE_ENV: 'production', APP_ENV: 'prd',
           CORS_ORIGIN: 'https://app.emithran.com',
         }),
       ),

@@ -1,0 +1,49 @@
+# Keeps every pin current. Digest-pinned images, SHA-pinned actions and lock files only stay safe if something proposes the
+# bumps; without this they quietly age. Updates arrive as pull requests, so CI (ci.yml and security.yml) vets each one.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch: { update-types: [minor, patch] }
+
+  - package-ecosystem: npm
+    directory: /backend
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch: { update-types: [minor, patch] }
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    groups:
+      actions: { patterns: ["*"] }
+
+  # Base images pinned by digest in the Dockerfiles
+  - package-ecosystem: docker
+    directory: /
+    schedule: { interval: weekly }
+  - package-ecosystem: docker
+    directory: /backend
+    schedule: { interval: weekly }
+  - package-ecosystem: docker
+    directory: /cad-engine
+    schedule: { interval: weekly }
+  - package-ecosystem: docker
+    directory: /ecad-engine
+    schedule: { interval: weekly }
+
+  # The cloudflared image pinned in docker-compose.prod.yml
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule: { interval: weekly }
+
+  - package-ecosystem: pip
+    directory: /cad-engine
+    schedule: { interval: weekly }
+  - package-ecosystem: pip
+    directory: /ecad-engine
+    schedule: { interval: weekly }

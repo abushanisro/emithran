@@ -2,11 +2,9 @@
 // different HTTP requests, so with more than one backend instance they can land on different servers: the bus carries
 // an event from the instance that publishes it to every instance that has a subscriber.
 //
-// Two implementations behind one token:
-//   InProcessEventBus   one process only (local development, a single instance)
-//   PostgresEventBus    Postgres LISTEN/NOTIFY, every instance (EVENT_BUS_DATABASE_URL set)
+// One implementation today (InProcessEventBus, one process); the token lets a shared bus replace it for several instances.
 //
-// Events are small: Postgres caps a NOTIFY payload at 8000 bytes. Send ids and counts, and let the client fetch the rest.
+// Events are small: send ids and counts, and let the client fetch the rest.
 
 export const EVENT_BUS = Symbol('EVENT_BUS');
 
@@ -23,7 +21,7 @@ export interface EventBus {
   subscribe(channel: string, handler: BusHandler): () => void;
 }
 
-/** Local fan-out shared by both implementations: channel -> handlers. A throwing handler does not stop the others. */
+/** Local fan-out: channel -> handlers. A throwing handler does not stop the others. */
 export class LocalSubscribers {
   private readonly handlers = new Map<string, Set<BusHandler>>();
 

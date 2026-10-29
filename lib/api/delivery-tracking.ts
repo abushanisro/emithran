@@ -4,7 +4,7 @@
  * Production-ready real-time tracking system integrated with Supabase
  */
 
-import { createServerSupabaseClient, supabaseAdmin } from '@/lib/database/supabase-server';
+import { createServerSupabaseClient, supabaseAdmin } from '@/lib/supabase/server';
 import { carrierTrackingService } from '@/lib/services/carrier-tracking';
 
 /**

@@ -273,7 +273,7 @@ Report security vulnerabilities to [security@mithran.com](mailto:security@mithra
 
 - **API Documentation**: Available at `/api/docs` when running the backend
 - **Component Storybook**: `npm run storybook` (if configured)
-- **Database Schema**: See `backend/database/migrations/`
+- **Database Schema**: See `backend/migrations/` (applied with `npm run db:migrate`)
 
 ### Getting Help
 

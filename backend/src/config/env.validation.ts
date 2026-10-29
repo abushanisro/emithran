@@ -1,5 +1,6 @@
+import { DEFAULT_CAD_ENGINE_URL } from '../common/engine-urls';
 import { plainToClass } from 'class-transformer';
-import { IsString, IsNumber, IsOptional, validateSync, IsUrl, IsEnum, MinLength, IsIn } from 'class-validator';
+import { IsString, IsNumber, IsOptional, validateSync, IsUrl, IsEnum, MinLength, IsIn, Min, Max } from 'class-validator';
 
 enum Environment {
   Development = 'development',
@@ -11,6 +12,21 @@ class EnvironmentVariables {
   @IsEnum(Environment)
   @IsOptional()
   NODE_ENV: Environment = Environment.Development;
+
+  // Which deployment this is. It names the environment in logs and on /api/health/live, and gates what may run
+  // against it: the data-creating e2e suites refuse to start unless this is 'local' or 'stage'. A production process
+  // must say 'stage' or 'prd' (never the default 'local'), so a misconfigured deploy fails at boot, not after a release.
+  @IsString()
+  @IsOptional()
+  @IsIn(['local', 'stage', 'prd'])
+  APP_ENV: string = 'local';
+
+  // True only when the API is reachable solely through a Cloudflare Tunnel: it then takes the client address from
+  // CF-Connecting-IP (see common/client-ip.ts). Never enable it on a server that is directly reachable.
+  @IsString()
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  TRUST_CLOUDFLARE_HEADERS: string = 'false';
 
   @IsNumber()
   @IsOptional()
@@ -47,33 +63,31 @@ class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
-  CAD_ENGINE_URL: string = 'http://localhost:5000';
+  CAD_ENGINE_URL: string = DEFAULT_CAD_ENGINE_URL;
 
   @IsString()
   @IsOptional()
   CAD_ENGINE_API_KEY: string = '';
 
-  // Electronics costing job queue. 'pg-boss' needs ELECTRONICS_QUEUE_DATABASE_URL (a direct
-  // Postgres connection string); 'memory' is for local development only.
+  // The CAD upload runner (ZIP / STEP assembly upload) polls for queued uploads in this process. Set to 'off' on
+  // replicas that should only serve the API.
   @IsString()
   @IsOptional()
-  @IsIn(['pg-boss', 'memory'])
-  ELECTRONICS_QUEUE_DRIVER: string = 'pg-boss';
+  @IsIn(['on', 'off'])
+  CAD_UPLOAD_RUNNER: string = 'on';
 
+  // Electronics costing job queue. 'table' is the job_queue table (migration 920); 'memory' is for local development only.
   @IsString()
   @IsOptional()
-  ELECTRONICS_QUEUE_DATABASE_URL: string = '';
+  @IsIn(['table', 'memory'])
+  ELECTRONICS_QUEUE_DRIVER: string = 'table';
 
-  @IsString()
+  // The one upload limit in megabytes (see common/upload-limits.ts). 50 is the Supabase free tier's cap on one stored object.
+  @IsNumber()
   @IsOptional()
-  @IsIn(['true', 'false'])
-  ELECTRONICS_QUEUE_MIGRATE: string = 'true';
-
-  // Live-progress event bus (SSE) across backend instances: Postgres LISTEN/NOTIFY. A session or direct connection
-  // (Supabase port 5432); LISTEN does not work through the transaction pooler (6543). Unset: events stay in-process.
-  @IsString()
-  @IsOptional()
-  EVENT_BUS_DATABASE_URL?: string;
+  @Min(1)
+  @Max(500)
+  MAX_UPLOAD_MB: number = 50;
 
   // Development auth bypass opt-in. Off unless explicitly 'true': with it off, a missing or
   // invalid bearer token is a 401 in every environment. ADMIN_FALLBACK_EMAIL alone enables nothing.
@@ -129,6 +143,13 @@ export function validate(config: Record<string, unknown>) {
   }
 
   if (validatedConfig.NODE_ENV === Environment.Production) {
+    if (validatedConfig.APP_ENV === 'local') {
+      throw new Error(
+        'CONFIGURATION ERROR: APP_ENV must be set to "stage" or "prd" when NODE_ENV=production, so the deployment ' +
+        'knows which environment it is (and the e2e suites can refuse to run against prd).'
+      );
+    }
+
     if (config.CORS_ORIGIN === 'http://localhost:3000' || config.CORS_ORIGIN === '*') {
       throw new Error(
         'SECURITY ERROR: CORS_ORIGIN must be set to your production domain, not localhost or *'
@@ -143,11 +164,11 @@ export function validate(config: Record<string, unknown>) {
     }
 
     // The in-memory queue runs jobs inside one process: they are lost on restart and a second backend instance never
-    // sees them. Production uses pg-boss (a direct Postgres connection), so it survives restarts and scales out.
+    // sees them. Production uses the job_queue table, so it survives restarts and scales out.
     if (validatedConfig.ELECTRONICS_QUEUE_DRIVER === 'memory') {
       throw new Error(
         'CONFIGURATION ERROR: ELECTRONICS_QUEUE_DRIVER=memory is for local development only. In production set ' +
-        'ELECTRONICS_QUEUE_DRIVER=pg-boss with ELECTRONICS_QUEUE_DATABASE_URL (a direct Postgres connection string).'
+        'ELECTRONICS_QUEUE_DRIVER=table (the default).'
       );
     }
 

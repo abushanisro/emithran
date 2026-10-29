@@ -183,8 +183,18 @@ async function bootstrap() {
   const publicDomain = process.env.RAILWAY_PUBLIC_DOMAIN;
   const baseUrl = publicDomain ? `https://${publicDomain}` : `http://0.0.0.0:${port}`;
   
+  logger.log(`Environment: ${configService.get<string>('APP_ENV', 'local')} | Supabase: ${supabaseHost(configService.get<string>('SUPABASE_URL'))}`, 'Bootstrap');
   logger.log(`API Gateway running on: ${baseUrl}`, 'Bootstrap');
   logger.log(`API Documentation: ${baseUrl}/docs`, 'Bootstrap');
+}
+
+/** The host of the Supabase project this process uses, for the startup log. Host only: never a key. */
+function supabaseHost(url: string | undefined): string {
+  try {
+    return url ? new URL(url).host : '(not set)';
+  } catch {
+    return '(invalid URL)';
+  }
 }
 
 bootstrap();

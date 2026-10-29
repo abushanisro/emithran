@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { requireUser } from '@/lib/server/auth';
 
-const CAD_ENGINE_URL = process.env.CAD_ENGINE_URL ?? 'http://localhost:5000';
+const CAD_ENGINE_URL = process.env.CAD_ENGINE_URL ?? 'http://localhost:5055';
 const CAD_ENGINE_API_KEY = process.env.CAD_ENGINE_API_KEY ?? '';
 
 /**

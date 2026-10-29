@@ -90,7 +90,9 @@ def test_off_by_default_and_imports_nothing_from_opentelemetry():
         "app = FastAPI()\n"
         "on = t.setup(app, service_name='x', environment='test', env={})\n"
         "with t.stage('extract_board'):\n    pass\n"
-        "print(json.dumps({'on': on, 'active': t.is_active(), 'otel': [m for m in sys.modules if m.startswith('opentelemetry')], "
+        # FastAPI itself imports the OpenTelemetry *API* (an inert, no-op interface) when it is installed. What "off" must
+        # guarantee is that nothing that does work is loaded: no SDK, no exporter, no instrumentation.
+        "print(json.dumps({'on': on, 'active': t.is_active(), 'otel': [m for m in sys.modules if m.startswith(('opentelemetry.sdk', 'opentelemetry.exporter', 'opentelemetry.instrumentation'))], "
         "'stage_is_null': type(t.stage('extract_board')) is contextlib.nullcontext}))\n"
     ).replace("print(json", "import json; print(json")
     out = subprocess.run([sys.executable, "-I", "-c", f"import sys; sys.path.insert(0, {str(CWD)!r})\n{code}"], capture_output=True, text=True, cwd=CWD, timeout=60)

@@ -1084,16 +1084,13 @@ export default function BOMDetailPage() {
           <CardHeader>
             <CardTitle>CAD Processing Pipeline</CardTitle>
             <CardDescription>
-              Upload a STEP / STL file — geometry is extracted and a BOM item is created ready for costing
+              Upload a .zip of STEP files, or one assembly — parts and quantities become BOM items ready for costing
             </CardDescription>
           </CardHeader>
           <AssemblyTreeGenerator
             bomId={bomId}
             projectId={projectId}
-            onAssemblyGenerated={(tree, assemblyData) => {
-              if (assemblyData) setUploadedAssembly3D(assemblyData);
-              if (assemblyData || tree?.length) refetchBOMItems();
-            }}
+            onUploaded={refetchBOMItems}
           />
         </Card>
       )}

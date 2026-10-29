@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { clientIp } from '../client-ip';
 
 // Extend Request interface to include user property
 interface AuthenticatedRequest extends Request {
@@ -139,7 +140,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const path = String(request.url ?? '').split('?')[0];
     const method = request.method;
     const userAgent = request.get('User-Agent') || 'Unknown';
-    const ip = request.ip || request.connection.remoteAddress || 'Unknown';
+    const ip = clientIp(request);
 
     // Extract validation errors if present
     const validationErrors = this.extractValidationErrors(exception);

@@ -2,6 +2,9 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+import { supabaseCspHosts } from '@/lib/supabase/csp'
+import { supabasePublishableKey, supabaseUrl } from '@/lib/supabase/env'
+
 /**
  * Production-ready proxy with security, performance, and auth protection
  * - Security headers optimization
@@ -41,8 +44,8 @@ export async function proxy(request: NextRequest) {
   // Refresh the Supabase session — writes updated tokens back to cookies so
   // the browser client stays in sync and doesn't fire SIGNED_OUT on expiry.
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl(),
+    supabasePublishableKey(),
     {
       cookies: {
         getAll() {
@@ -83,6 +86,8 @@ function addSecurityHeaders(response: NextResponse, request: NextRequest) {
   // NOTE: PDFs are now served from same-origin (/api/file-proxy) not Supabase directly.
   // object-src / frame-src / child-src must include 'self' blob: data: for Chrome's
   // built-in PDF plugin to work when the PDF is loaded through the proxy route.
+  const supabaseHosts = supabaseCspHosts(supabaseUrl())
+  const supabaseConnect = supabaseHosts ? `${supabaseHosts.https} ${supabaseHosts.wss}` : ''
   const csp = isProduction
     ? [
       "default-src 'self'",
@@ -90,7 +95,7 @@ function addSecurityHeaders(response: NextResponse, request: NextRequest) {
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' 'unsafe-inline' data: blob: https://fonts.gstatic.com https://r2cdn.perplexity.ai",
       "img-src 'self' data: blob: https:",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://oukuetgeuuviyncsjxrk.supabase.co wss://oukuetgeuuviyncsjxrk.supabase.co https://vercel.live https://*.railway.app https://backend.emithran.com https://cad.emithran.com https://router.project-osrm.org https://maps.googleapis.com https://*.googleapis.com",
+      `connect-src 'self' ${supabaseConnect} https://vercel.live https://*.railway.app https://backend.emithran.com https://cad.emithran.com https://router.project-osrm.org https://maps.googleapis.com https://*.googleapis.com`,
       // 'self' covers /api/file-proxy; blob: covers Chrome PDF plugin internals
       "object-src 'self' blob: data:",
       // frame-src: only 'self' needed — PDF iframe src is now always localhost/api/file-proxy
@@ -106,7 +111,7 @@ function addSecurityHeaders(response: NextResponse, request: NextRequest) {
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
-      "connect-src 'self' ws://localhost:* http://localhost:* http://localhost:4000 http://localhost:5000 https://*.supabase.co wss://*.supabase.co https://oukuetgeuuviyncsjxrk.supabase.co wss://oukuetgeuuviyncsjxrk.supabase.co https://*.railway.app https://backend.emithran.com https://cad.emithran.com https://router.project-osrm.org",
+      `connect-src 'self' ws://localhost:* http://localhost:* http://localhost:4000 http://localhost:5055 ${supabaseConnect} https://*.railway.app https://backend.emithran.com https://cad.emithran.com https://router.project-osrm.org`,
       "font-src 'self' 'unsafe-inline' data: blob: https://fonts.gstatic.com",
       // 'self' covers /api/file-proxy; blob: covers Chrome PDF plugin internals
       "object-src 'self' blob: data:",

@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { HydroformingReferenceService } from './costing/hydroforming/hydroforming-reference.service';
 import { isMachiningFamily, isTurnedFamily, type MachiningFamily } from '../../domain/part-family';
 import { computeHydroforming } from './costing/hydroforming/hydroforming-engine';
@@ -380,9 +381,15 @@ export class BOMItemsService {
       `Creating BOM item: ${createBOMItemDto.partNumber}`,
       'BOMItemsService',
     );
+    return this.insertItem(this.supabaseService.getUserClient(accessToken), createBOMItemDto, userId, organizationId);
+  }
 
-    const client = this.supabaseService.getUserClient(accessToken);
-
+  private async insertItem(
+    client: SupabaseClient,
+    createBOMItemDto: CreateBOMItemDto,
+    userId?: string,
+    organizationId?: string | null,
+  ): Promise<BOMItemResponseDto> {
     // Transform camelCase DTO to snake_case database columns
     const dbData = this.transformDtoToDb(createBOMItemDto);
 
@@ -404,6 +411,45 @@ export class BOMItemsService {
     const row = Array.isArray(data) ? data[0] : data;
     if (!row) throw new InternalServerErrorException('Failed to create BOM item: no row returned');
     return BOMItemResponseDto.fromDatabase(row);
+  }
+
+  /**
+   * The three methods below serve the CAD upload runner, a background job with no user session. The upload
+   * endpoint has already checked, through RLS, that the user can see the BOM, and the items carry that user and
+   * organization exactly as if they had created them.
+   */
+  async createForUpload(dto: CreateBOMItemDto, userId: string, organizationId: string | null): Promise<BOMItemResponseDto> {
+    return this.insertItem(
+      this.supabaseService.getPrivilegedClient('cad-upload runner: create BOM items for a checked upload'),
+      dto,
+      userId,
+      organizationId,
+    );
+  }
+
+  async setFile3dPathForUpload(itemId: string, file3dPath: string): Promise<void> {
+    const { error } = await this.supabaseService
+      .getPrivilegedClient('cad-upload runner: attach the uploaded 3D file to its item')
+      .from('bom_items')
+      .update({ file_3d_path: file3dPath, thumbnail_url: null }) // a new model invalidates any stored thumbnail, as update() does
+      .eq('id', itemId);
+    if (error) throw new InternalServerErrorException(`Failed to attach the 3D file: ${error.message}`);
+  }
+
+  /**
+   * Removes the items of a failed or retried upload and returns their stored 3D file paths, so the caller can remove
+   * those files too. Children go before parents (reverse creation order), so no item is removed while another still
+   * points at it.
+   */
+  async deleteItemsForUpload(itemIds: string[]): Promise<string[]> {
+    const client = this.supabaseService.getPrivilegedClient('cad-upload runner: remove the items of a failed or retried upload');
+    const { data } = await client.from('bom_items').select('file_3d_path').in('id', itemIds);
+    const paths = (data ?? []).map((row: { file_3d_path: string | null }) => row.file_3d_path).filter((p): p is string => !!p);
+    for (const id of [...itemIds].reverse()) {
+      const { error } = await client.from('bom_items').delete().eq('id', id);
+      if (error) this.logger.warn(`Could not remove BOM item ${id} of an upload: ${error.message}`);
+    }
+    return paths;
   }
 
   async update(

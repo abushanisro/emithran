@@ -61,13 +61,10 @@ describe('RLS boundary CI rules', () => {
     expect(rulesFor('src/modules/y/y.service.ts', 'SUPABASE_SERVICE_KEY: string;')).toContain('service-key-outside-boundary');
   });
 
-  it("allows 'pg' only in the LISTEN/NOTIFY event bus, and nothing else there", () => {
-    const bus = 'src/common/events/postgres-event-bus.ts';
-    expect(rulesFor(bus, "import { Client } from 'pg';")).toEqual([]);
-    expect(rulesFor(bus, "import knex from 'knex';")).toContain('second-db-path');
-    expect(rulesFor('src/common/events/event-bus.ts', "import { Client } from 'pg';")).toContain('second-db-path');
-    const real = readFileSync(resolve(__dirname, '../../..', bus), 'utf8');
-    expect(rulesFor(bus, real)).toEqual([]);
+  it("allows no database driver anywhere in src (the backend holds no Postgres connection)", () => {
+    for (const file of ['src/common/events/event-bus.ts', 'src/modules/z/z.service.ts']) {
+      for (const driver of ['pg', 'knex', 'nestjs-knex', 'typeorm']) expect(rulesFor(file, `import x from '${driver}';`)).toContain('second-db-path');
+    }
   });
 
   it('treats a reintroduced getAdminClient() as an error everywhere, with no allowlist', () => {

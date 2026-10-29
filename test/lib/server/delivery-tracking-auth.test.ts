@@ -28,7 +28,7 @@ function fakeClient(rows: Record<string, unknown>) {
     },
   };
 }
-vi.mock('@/lib/database/supabase-server', () => ({
+vi.mock('@/lib/supabase/server', () => ({
   supabaseAdmin: fakeClient(adminRows),
   createServerSupabaseClient: async () => fakeClient(userRows),
 }));

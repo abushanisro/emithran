@@ -4,6 +4,7 @@ import { SupabaseService } from '../../../common/supabase/supabase.service';
 import * as crypto from 'crypto';
 import { gzip } from 'zlib';
 import { promisify } from 'util';
+import { MAX_CAD_FILE_BYTES } from '../../../common/upload-limits';
 
 const gzipAsync = promisify(gzip);
 
@@ -33,7 +34,7 @@ export class FileStorageService {
   private readonly logger = new Logger(FileStorageService.name);
   private supabase: SupabaseClient;
   private readonly BUCKET_NAME = 'bom-files';
-  private readonly MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+  private readonly MAX_FILE_SIZE = MAX_CAD_FILE_BYTES;
 
   // Industry standard: Define allowed file types explicitly
   private readonly ALLOWED_3D_TYPES = [
@@ -342,6 +343,25 @@ export class FileStorageService {
       this.logger.error(`Exception checking file existence:`, error);
       return false;
     }
+  }
+
+  /**
+   * Deletes the files nothing references any more, and returns how many it removed. Parts of an assembly can share one stored
+   * object, so a path is only deleted when no item (and no upload that still needs its original) points at it. If the
+   * reference check cannot be answered, nothing is deleted: not knowing is never a reason to remove someone's file.
+   */
+  async removeUnreferencedFiles(storagePaths: string[]): Promise<number> {
+    const paths = [...new Set(storagePaths)];
+    if (paths.length === 0) return 0;
+    const { data, error } = await this.supabase.rpc('file_paths_in_use', { p_paths: paths });
+    if (error) throw new InternalServerErrorException(`Could not check which files are still in use: ${error.message}`);
+    const inUse = new Set((data ?? []) as string[]);
+    const unreferenced = paths.filter((p) => !inUse.has(p));
+    for (let i = 0; i < unreferenced.length; i += 100) {
+      const { error: removeError } = await this.supabase.storage.from(this.BUCKET_NAME).remove(unreferenced.slice(i, i + 100));
+      if (removeError) throw new InternalServerErrorException(`Failed to delete files: ${removeError.message}`);
+    }
+    return unreferenced.length;
   }
 
   /**

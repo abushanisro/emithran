@@ -7,11 +7,11 @@ yarn-error.log*
 # Production build
 dist
 
-# Environment files
+# Environment files: never in an image (they hold service keys); config arrives as runtime environment variables
 .env
-.env.local
-.env.*.local
-!.env.production
+.env.*
+*.pem
+*.key
 
 # Logs
 logs

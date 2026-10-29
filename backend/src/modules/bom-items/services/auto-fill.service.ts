@@ -23,6 +23,7 @@ import { MachiningLookupService } from '../costing/machining/lookup/machining-lo
 import { requiredMilledClassFromToolAxes } from '../costing/machining/setup-axis-rule';
 import { machiningFeatureCounts } from '../costing/machining/operation/machining-feature-counts';
 import { CAD_FAMILY_TO_PROCESS_GROUP } from '../costing/shared/core/part-family-process-group';
+import { DEFAULT_CAD_ENGINE_URL } from '../../../common/engine-urls';
 
 export interface RawGeometry {
   volume: number;
@@ -159,7 +160,7 @@ export class AutoFillService {
     private readonly stepConverterService: StepConverterService,
     private readonly machiningLookup: MachiningLookupService,
   ) {
-    this.cadEngineUrl = process.env.CAD_ENGINE_URL || 'http://localhost:5000';
+    this.cadEngineUrl = process.env.CAD_ENGINE_URL || DEFAULT_CAD_ENGINE_URL;
     this.cadEngineApiKey = process.env.CAD_ENGINE_API_KEY || '';
   }
 

@@ -1,0 +1,88 @@
+name: Operations
+
+# Free-tier operations (docs/DEPLOYMENT_SECURITY.md, "Operations"). Each job runs for stage first, then production:
+#   keep-alive   a free project pauses after a week without activity; one API request every 3 days prevents it
+#   backup       nightly pg_dump of the public schema, encrypted with age, kept as a workflow artifact (7 days; Sundays 28 days).
+#                Not included: auth users and stored files (Supabase keeps those; there are no automated backups on the free tier).
+#   usage        database and storage size against the free-tier limits: warns at 70%, fails at 85%
+# Secrets live in the GitHub Environments `stage` and `production` (never in the repo):
+#   SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY    keep-alive
+#   MIGRATE_DATABASE_URL                      session-pooler connection string, backup and usage
+#   BACKUP_AGE_RECIPIENT                      the age PUBLIC key; the private key stays offline with the operator
+
+on:
+  schedule:
+    - cron: '11 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ops
+  cancel-in-progress: false
+
+env:
+  # Same pinned image as the SQL tests (backend/test/sql/run.sh): the dump client must match the server's major version.
+  POSTGRES_IMAGE: postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+
+jobs:
+  ops:
+    name: ${{ matrix.environment }}
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 1 # stage first; production only runs if stage's checks passed
+      fail-fast: true
+      matrix:
+        environment: [stage, production]
+    environment: ${{ matrix.environment }}
+    steps:
+      - name: Keep the project awake
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          curl --fail --silent --show-error --max-time 30 -o /dev/null \
+            -H "apikey: $SUPABASE_PUBLISHABLE_KEY" "$SUPABASE_URL/auth/v1/health"
+
+      - name: Database and storage usage
+        env:
+          MIGRATE_DATABASE_URL: ${{ secrets.MIGRATE_DATABASE_URL }}
+        run: |
+          read -r db storage < <(docker run --rm -e MIGRATE_DATABASE_URL "$POSTGRES_IMAGE" sh -c \
+            'psql "$MIGRATE_DATABASE_URL" -At -F" " -c "select pg_database_size(current_database()), coalesce((select sum((metadata->>'"'"'size'"'"')::bigint) from storage.objects), 0)"')
+          check() { # name, used bytes, limit bytes
+            pct=$(( $2 * 100 / $3 ))
+            echo "$1: $(( $2 / 1048576 )) MB of $(( $3 / 1048576 )) MB ($pct%)"
+            if [ "$pct" -ge 85 ]; then echo "::error::$1 is at $pct% of the free tier"; return 1; fi
+            if [ "$pct" -ge 70 ]; then echo "::warning::$1 is at $pct% of the free tier"; fi
+          }
+          status=0
+          check "database" "$db" $(( 500 * 1048576 )) || status=1
+          check "storage" "$storage" $(( 1024 * 1048576 )) || status=1
+          exit $status
+
+      - name: Dump, count and encrypt
+        env:
+          MIGRATE_DATABASE_URL: ${{ secrets.MIGRATE_DATABASE_URL }}
+          BACKUP_AGE_RECIPIENT: ${{ secrets.BACKUP_AGE_RECIPIENT }}
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y --no-install-recommends age >/dev/null
+          mkdir backup
+          docker run --rm -e MIGRATE_DATABASE_URL "$POSTGRES_IMAGE" sh -c \
+            'pg_dump "$MIGRATE_DATABASE_URL" --schema=public --no-owner --no-privileges --format=custom' > backup/db.dump
+          # Exact row counts per table: restore-check.sh compares a restored copy against these.
+          docker run --rm -e MIGRATE_DATABASE_URL "$POSTGRES_IMAGE" sh -c \
+            'psql "$MIGRATE_DATABASE_URL" -At -F" " -c "select table_name, (xpath('"'"'/row/c/text()'"'"', query_to_xml(format('"'"'select count(*) as c from %I.%I'"'"', table_schema, table_name), false, true, '"'"''"'"')))[1]::text::bigint from information_schema.tables where table_schema = '"'"'public'"'"' and table_type = '"'"'BASE TABLE'"'"' order by 1"' > backup/counts.txt
+          test -s backup/db.dump && test -s backup/counts.txt
+          tar -C backup -cf - db.dump counts.txt | age --recipient "$BACKUP_AGE_RECIPIENT" --output "backup-${{ matrix.environment }}.tar.age"
+          rm -rf backup
+          echo "RETENTION=$([ "$(date -u +%u)" = 7 ] && echo 28 || echo 7)" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: backup-${{ matrix.environment }}-${{ github.run_id }}
+          path: backup-${{ matrix.environment }}.tar.age
+          retention-days: ${{ env.RETENTION }}
+          if-no-files-found: error

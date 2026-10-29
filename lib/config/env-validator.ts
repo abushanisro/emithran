@@ -1,3 +1,4 @@
+import { isSupabaseKeyFormat, supabasePublishableKey } from '@/lib/supabase/env';
 /**
  * Environment Configuration Validator
  * Production-grade validation | 2026 Best Practices
@@ -54,8 +55,8 @@ class EnvironmentValidator {
 
     // Supabase Configuration
     const supabaseUrl = this.getEnvVar('NEXT_PUBLIC_SUPABASE_URL');
-    const supabaseKey = this.getEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY');
-    const hasSupabase = !!(supabaseUrl && supabaseKey && supabaseKey.startsWith('eyJ'));
+    const supabaseKey = supabasePublishableKey();
+    const hasSupabase = !!(supabaseUrl && supabaseKey && isSupabaseKeyFormat(supabaseKey));
 
 
     // Production-specific validations

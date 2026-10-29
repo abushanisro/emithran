@@ -1,8 +1,17 @@
 import { defineConfig, devices } from '@playwright/test';
+
 // Test-account credentials (E2E_EMAIL / E2E_PASSWORD) live in .env.local,
 // which is git-ignored — never in this file or the repo. Node's built-in
 // loader; a missing file just leaves them unset (auth.setup.ts says so).
 try { process.loadEnvFile('.env.local'); } catch { /* no .env.local */ }
+// These specs sign in and create data in the running app; they never run against production. Same rule as the backend's
+// src/common/environment-guard.ts, written out here because this file is type-checked by the frontend image build, which
+// has no backend folder (test/lib/environment-guard-parity.test.ts keeps the two production hosts identical).
+const PRD_SUPABASE_HOST = 'udvcydhvlgjfsohueryv.supabase.co';
+const supabaseHost = (() => { try { return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').hostname.toLowerCase(); } catch { return ''; } })();
+if (process.env.APP_ENV === 'prd' || supabaseHost === PRD_SUPABASE_HOST) {
+  throw new Error('Refusing to run the data-creating e2e suites against production. Point them at local or stage (APP_ENV=local|stage and the stage Supabase URL).');
+}
 
 // UI end-to-end tests against the RUNNING dev servers (frontend :3000,
 // backend :4000) — they are not started here. Cost summaries are slow on a

@@ -3,6 +3,7 @@ import { SupabaseService } from '../../../common/supabase/supabase.service';
 import { FileStorageService } from './file-storage.service';
 import axios from 'axios';
 import { cadEngineHttp } from '../../../common/resilience/engine-http';
+import { DEFAULT_CAD_ENGINE_URL } from '../../../common/engine-urls';
 
 interface CADAnalysisRequest {
   bomItemId: string;
@@ -84,7 +85,7 @@ export class CADAnalysisService {
     private readonly supabaseService: SupabaseService,
     private readonly fileStorageService: FileStorageService,
   ) {
-    this.cadEngineUrl = process.env.CAD_ENGINE_URL || 'http://localhost:5000';
+    this.cadEngineUrl = process.env.CAD_ENGINE_URL || DEFAULT_CAD_ENGINE_URL;
     this.cadEngineApiKey = process.env.CAD_ENGINE_API_KEY || '';
     this.logger.log(`CAD Analysis Service initialized with engine URL: ${this.cadEngineUrl}`);
   }

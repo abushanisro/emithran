@@ -14,7 +14,10 @@
 # environment (that binding isn't pip-installable here — it ships via the
 # project's conda environment) — re-run this service's own test/startup path
 # after upgrading, before deploying.
-fastapi==0.115.6
+# 0.162 lets starlette move to 1.x, which closes three HIGH advisories in the 0.41 line (request parsing).
+fastapi==0.162.0
+# FastAPI only says starlette>=0.46, so pin it: otherwise every rebuild could pick a different release.
+starlette==1.10.0
 uvicorn[standard]==0.34.0
 pydantic==2.10.4
 

@@ -7,9 +7,14 @@ import { AsyncLocalStorage } from 'node:async_hooks';
  * token parameter, and without any path that can fall back to the service-role
  * client when the token is missing: no context means no client.
  */
-interface RequestAuth {
+export interface RequestAuth {
   accessToken: string;
   userId: string;
+  /** The organization the route resolved (OrganizationContextGuard), when it runs on this route. */
+  organizationId?: string;
+  /** The real client address (see common/client-ip.ts) and a correlation id, for the audit trail. */
+  ip?: string;
+  requestId?: string;
 }
 
 const storage = new AsyncLocalStorage<RequestAuth>();
