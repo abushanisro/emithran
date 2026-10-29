@@ -14,7 +14,7 @@ IMAGE="postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56b
 here="$(cd "$(dirname "$0")" && pwd)"
 dir="$(cd "$dir" && pwd)"
 net=(); [ -z "${DOCKER_NETWORK:-}" ] || net=(--network "$DOCKER_NETWORK")
-pg() { docker run --rm -i "${net[@]}" -e TARGET="$target" -v "$dir":/baseline:ro -v "$here/../migrations":/migrations:ro "$IMAGE" "$@"; }
+pg() { docker run --rm -i --add-host host.docker.internal:host-gateway ${net[@]+"${net[@]}"} -e TARGET="$target" -v "$dir":/baseline:ro -v "$here/../migrations":/migrations:ro "$IMAGE" "$@"; }
 
 (cd "$dir" && shasum -a 256 -c SHA256SUMS >/dev/null) || { echo "refusing: the baseline files do not match SHA256SUMS"; exit 1; }
 existing="$(pg sh -c 'psql "$TARGET" -At -c "select count(*) from information_schema.tables where table_schema = '"'"'public'"'"'"')"
