@@ -17,7 +17,7 @@
 import { config as appConfig } from '../config';
 import { apiConfig } from './config';
 import { SESSION_IDLE_TIMEOUT_CODE, SESSION_IDLE_TIMEOUT_EVENT } from '../auth/session-idle/policy';
-import { supabase } from '../supabase/client';
+import { sessionSource } from '../auth/session-source';
 import { authTokenManager } from '../auth/token-manager';
 
 import { CircuitBreaker, CircuitBreakerError } from './circuit-breaker';
@@ -178,25 +178,7 @@ class ApiClient {
    * @returns Current access token or null
    */
   async getAuthToken(): Promise<string | null> {
-    try {
-      if (!supabase) return null;
-
-      // supabase-js serializes every getSession()/refreshSession() call in a
-      // tab behind one internal lock. If any prior call anywhere (e.g. the
-      // 401-triggered refreshSession() below) gets wedged, this call — which
-      // every single API request awaits before it can even be sent — would
-      // otherwise hang forever, permanently freezing every request in the tab
-      // with no backend log line ever produced. A bounded timeout guarantees
-      // this always resolves, falling back to "unauthenticated" (which the
-      // normal 401 handling already deals with) instead of hanging the UI.
-      const session = await Promise.race([
-        supabase.auth.getSession().then((r) => r.data.session),
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
-      ]);
-      return session?.access_token || null;
-    } catch (error) {
-      return null;
-    }
+    return sessionSource.getAccessToken();
   }
 
   // Sync version for circuit breaker checks
@@ -666,27 +648,13 @@ class ApiClient {
             );
           }
 
-          // Handle 401 Unauthorized - try to refresh Supabase session ONCE
+          // Handle 401 Unauthorized - try to refresh the session ONCE
           if (response.status === 401 && attemptNumber === 1) {
-            if (supabase) {
-              try {
-                const { data: { session }, error } = await supabase.auth.refreshSession();
-                if (!error && session?.access_token) {
-                  tracker.incrementRetry();
-
-                  // Update token manager with new token
-                  const expiresInSeconds = session.expires_in || 3600;
-                  const expiresAt = Date.now() + (expiresInSeconds * 1000);
-                  authTokenManager.setToken({
-                    token: session.access_token,
-                    expiresAt
-                  });
-
-                  return executeRequest(attemptNumber + 1);
-                }
-              } catch (error) {
-                // Refresh failed - user needs to log in
-              }
+            const refreshed = await sessionSource.refresh();
+            if (refreshed) {
+              tracker.incrementRetry();
+              authTokenManager.setToken({ token: refreshed.token, expiresAt: Date.now() + refreshed.expiresInSeconds * 1000 });
+              return executeRequest(attemptNumber + 1);
             }
 
             // Clear token manager - user needs to authenticate

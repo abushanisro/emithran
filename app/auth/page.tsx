@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { consumeInactivitySignOutNotice } from '@/lib/auth/session-idle/browser'
+import { Auth0SignIn } from '@/components/features/auth/Auth0SignIn'
+import { usesAuth0 } from '@/lib/auth/backend'
 import { useAuth } from '@/lib/providers/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,7 +14,8 @@ import { Loader2, Eye, EyeOff } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 
-export default function AuthPage() {
+/** The Supabase email-and-password page; deleted with Supabase. */
+function SupabaseSignInPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -463,4 +466,7 @@ export default function AuthPage() {
       </footer>
     </div>
   )
+}
+export default function AuthPage() {
+  return usesAuth0 ? <Auth0SignIn /> : <SupabaseSignInPage />
 }
