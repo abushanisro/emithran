@@ -170,6 +170,45 @@ jobs:
       - run: docker build --platform linux/amd64 --build-context geometry=geometry-worker --build-context fixtures=backend/test/fixtures/cad -t cad-core:dev core
       - run: python3 core/tests/e2e.py
 
+  postgres-compat:
+    name: Plain Postgres + PostgREST (Supabase-free data layer)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci --legacy-peer-deps --no-audit --no-fund
+        working-directory: backend
+      # Migration 930 on a bare Postgres, then a real PostgREST: tokens the backend mints must drive unchanged RLS policies.
+      - run: npm run test:postgrest
+        working-directory: backend
+
+  object-store:
+    name: S3-compatible object store (real server)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci --legacy-peer-deps --no-audit --no-fund
+        working-directory: backend
+      # The real S3ObjectStore against a real S3-compatible server: binary safety, no-overwrite, isolation, listing, signed URLs.
+      - run: npm run test:s3
+        working-directory: backend
+      # The built app starts with no Supabase settings at all (Auth0 + PostgREST + S3) and refuses unauthenticated requests.
+      - run: npx nest build && npm run test:boot
+        working-directory: backend
+
   geometry-worker:
     name: Geometry worker (C++ build, hand-worked checks, parity with the Python engine)
     runs-on: ubuntu-latest

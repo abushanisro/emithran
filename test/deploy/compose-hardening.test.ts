@@ -52,6 +52,14 @@ describe('docker-compose.prod.yml', () => {
     expect(s.healthcheck).toBeTruthy();
   });
 
+  it('no Dockerfile writes an env file into its image: settings come from the environment, never from a baked file', () => {
+    for (const dockerfile of ['backend/Dockerfile', 'Dockerfile.frontend', 'cad-engine/Dockerfile', 'ecad-engine/Dockerfile', 'core/Dockerfile']) {
+      const text = read(dockerfile);
+      expect(text, dockerfile).not.toMatch(/>>?\s*\.env\b/);
+      expect(text, dockerfile).not.toMatch(/COPY[^\n]*\.env(\s|$)/);
+    }
+  });
+
   it('publishes no host port: the Cloudflare tunnel is the only way in', () => {
     for (const [, s] of services) expect(s.ports).toBeUndefined();
   });
