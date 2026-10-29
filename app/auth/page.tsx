@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { consumeInactivitySignOutNotice } from '@/lib/auth/session-idle/browser'
-import { Auth0SignIn } from '@/components/features/auth/Auth0SignIn'
 import { usesAuth0 } from '@/lib/auth/backend'
 import { useAuth } from '@/lib/providers/auth'
 import { Button } from '@/components/ui/button'
@@ -14,13 +13,12 @@ import { Loader2, Eye, EyeOff } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 
-/** The Supabase email-and-password page; deleted with Supabase. */
-function SupabaseSignInPage() {
+export default function AuthPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
-  const { signIn, signInWithGoogle } = useAuth()
+  const { signIn, signInWithGoogle, signOut, accessDenied } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
@@ -31,6 +29,13 @@ function SupabaseSignInPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Auth0: this page keeps its look, but the credentials are typed on Auth0's own (branded) page, so there is nothing to validate here.
+    if (usesAuth0) {
+      setLoading(true)
+      await signIn('', '')
+      return
+    }
     
     // Client-side validation
     if (!email.trim()) {
@@ -178,6 +183,16 @@ function SupabaseSignInPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
+              {accessDenied && (
+                <div role="alert" className="rounded-xl border border-border bg-secondary/50 p-4 text-sm text-muted-foreground">
+                  Your account has not been invited to eMithran. Ask your administrator for access, or{' '}
+                  <button type="button" onClick={() => void signOut()} className="text-primary hover:underline font-medium">use another account</button>.
+                </div>
+              )}
+
+              {/* Supabase signs in with the fields below; with Auth0 the same two buttons lead to Auth0's login page. */}
+              {!usesAuth0 && (
+                <>
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-sm font-semibold text-foreground">
                   Email
@@ -223,6 +238,8 @@ function SupabaseSignInPage() {
                   </button>
                 </div>
               </div>
+                </>
+              )}
 
               <Button
                 type="submit"
@@ -466,7 +483,4 @@ function SupabaseSignInPage() {
       </footer>
     </div>
   )
-}
-export default function AuthPage() {
-  return usesAuth0 ? <Auth0SignIn /> : <SupabaseSignInPage />
 }
