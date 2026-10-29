@@ -1,5 +1,5 @@
 // Copilot tool layer — REAL BOMItemsService and SupabaseService, real sign-in
-// (the test account in ../.env.local, so row-level security is the real one),
+// (the test account in ../.env, so row-level security is the real one),
 // read-only, no model call and no mocks. What is asserted is what the copilot
 // is allowed to rely on: a tool result is the platform's own figure (same as
 // getCostSummary), it fits its size budget, a part this user cannot see
@@ -26,8 +26,8 @@ const BATCH = 250;
 const ABSENT_ID = '11111111-1111-4111-8111-111111111111';
 
 async function signIn(config: ConfigService): Promise<{ token: string; userId: string }> {
-  const env = parseEnv(fs.readFileSync(path.resolve(__dirname, '../../.env.local'), 'utf8'));
-  if (!env.E2E_EMAIL || !env.E2E_PASSWORD) throw new Error('Add E2E_EMAIL / E2E_PASSWORD to .env.local');
+  const env = parseEnv(fs.readFileSync(path.resolve(__dirname, '../../.env'), 'utf8'));
+  if (!env.E2E_EMAIL || !env.E2E_PASSWORD) throw new Error('Add E2E_EMAIL / E2E_PASSWORD to .env');
   const anon = createClient(config.getOrThrow<string>('SUPABASE_URL'), config.getOrThrow<string>('SUPABASE_ANON_KEY'));
   const { data, error } = await anon.auth.signInWithPassword({ email: env.E2E_EMAIL, password: env.E2E_PASSWORD });
   if (error || !data.session) throw new Error(`sign-in failed: ${error?.message}`);
@@ -43,7 +43,7 @@ describe('[e2e] copilot tools — real DB, no model call', () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../.env') }), BOMItemsModule, CostingModule],
+      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../../.env') }), BOMItemsModule, CostingModule],
     }).compile();
     bomItems = moduleRef.get(BOMItemsService);
     const { token, userId } = await signIn(moduleRef.get(ConfigService));

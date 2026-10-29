@@ -16,8 +16,8 @@ powershell -ExecutionPolicy Bypass -File ecad-engine/scripts/start-local.ps1
 It needs Python 3.11 or 3.12 (the pinned pydantic-core has no wheel for 3.14 yet). The first run creates `ecad-engine/.venv`
 from the first one it finds: `-Python <path>`, the py launcher (`py -3.12`, `py -3.11`), or a conda environment with 3.12/3.11
 (on this machine: the conda env `mithran`). Later runs reuse `.venv`. The API key is read from `ECAD_ENGINE_API_KEY`, then
-`ecad-engine/.env`, then `backend/.env`, so the engine and the backend share one key without copying it by hand (a random key
-is generated only when none exists). Leave the window open; Ctrl+C stops it. If port 5100 is busy the script says which process
+the repo-root `.env`, so the engine and the backend share one key without copying it by hand (a random key
+is generated for the run, and not saved, only when none exists). Leave the window open; Ctrl+C stops it. If port 5100 is busy the script says which process
 holds it. Check: `curl http://127.0.0.1:5100/ready` answers `{"ready": true}`.
 
 **Docker (the production image, source mounted, reloader on)** - same WSL pattern as the CAD engine:
@@ -31,12 +31,12 @@ wsl -d Ubuntu-24.04 -- bash -lc "cd /mnt/c/Users/singi/OneDrive/Desktop/mithran/
 
 ## 2. Point the backend at it
 
-In `backend/.env` (same key as the engine):
+In the repo-root `.env` (the one env file; same key as the engine):
 
 ```
 ECAD_ENGINE_URL=http://127.0.0.1:5100
 ECAD_ENGINE_API_KEY=<the key>
-ELECTRONICS_QUEUE_DRIVER=memory      # local development: jobs run in-process (use pg-boss + ELECTRONICS_QUEUE_DATABASE_URL elsewhere)
+ELECTRONICS_QUEUE_DRIVER=memory      # local development: jobs run in-process (table = the job_queue table, migration 920)
 ```
 
 Restart the backend: it reads `.env` at start. Migrations 912 to 916 must be applied.
@@ -82,6 +82,6 @@ Every response carries `X-Request-ID` (your own is echoed); logs carry it too an
 ## Troubleshooting
 
 - **`Address already in use` on start**: an old instance still holds the port. `netstat -ano | findstr :5100`, then `taskkill /PID <pid> /F`.
-- **Upload fails with `extraction_unavailable`**: the backend cannot reach the engine or has no key. Check the two `.env` lines and restart the backend.
+- **Upload fails with `extraction_unavailable`**: the backend cannot reach the engine or has no key. Check those two lines in the root `.env` and restart the backend.
 - **`Failed to build pydantic-core`**: you are on Python 3.14. Use 3.12 (`py -3.12`).
 - **Jobs sit in `queued`**: the backend has `ELECTRONICS_QUEUE_DRIVER` unset or pg-boss without `ELECTRONICS_QUEUE_DATABASE_URL`.

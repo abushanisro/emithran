@@ -16,8 +16,8 @@ describe('[e2e] sheet geometry reconciliation', () => {
   let rtp2: { id: string; feature_graph: any };
 
   beforeAll(async () => {
-    const be = parseEnv(fs.readFileSync(path.resolve(__dirname, '../.env'), 'utf8'));
-    const e2e = parseEnv(fs.readFileSync(path.resolve(__dirname, '../../.env.local'), 'utf8'));
+    const be = parseEnv(fs.readFileSync(path.resolve(__dirname, '../../.env'), 'utf8'));
+    const e2e = parseEnv(fs.readFileSync(path.resolve(__dirname, '../../.env'), 'utf8'));
     const client = createClient(be.SUPABASE_URL!, be.SUPABASE_ANON_KEY!);
     const { error: authError } = await client.auth.signInWithPassword({ email: e2e.E2E_EMAIL!, password: e2e.E2E_PASSWORD! });
     if (authError) throw new Error(`sign-in failed: ${authError.message}`);

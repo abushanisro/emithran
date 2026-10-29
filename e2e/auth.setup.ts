@@ -5,7 +5,7 @@ setup('log in with the test account', async ({ page }) => {
   const email = process.env.E2E_EMAIL;
   const password = process.env.E2E_PASSWORD;
   if (!email || !password) {
-    throw new Error('Add E2E_EMAIL and E2E_PASSWORD (a test account) to .env.local to run the UI tests.');
+    throw new Error('Add E2E_EMAIL and E2E_PASSWORD (a test account) to .env to run the UI tests.');
   }
   await page.goto('/auth');
   await page.locator('#email').fill(email);

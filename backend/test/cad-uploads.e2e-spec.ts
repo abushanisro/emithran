@@ -1,5 +1,5 @@
 // ZIP / STEP assembly upload over HTTP: real app, real auth, real database and storage, and a real cad-engine. Needs
-// migration 917, both test accounts in .env.local (E2E_EMAIL / E2E_PASSWORD, E2E_EMAIL_B / E2E_PASSWORD_B, the second in
+// migration 917, both test accounts in .env (E2E_EMAIL / E2E_PASSWORD, E2E_EMAIL_B / E2E_PASSWORD_B, the second in
 // another organization) and the engine running at CAD_ENGINE_URL with the same CAD_ENGINE_API_KEY and
 // MAX_FILE_SIZE_MB >= 1 (cd cad-engine && python main.py; it listens on 5055). The files are small real STEP files made with OpenCascade
 // (test/fixtures/cad).
@@ -55,9 +55,9 @@ describe('[e2e] CAD upload: zip / STEP assembly to BOM items', () => {
     await app.init();
 
     const config = app.get(ConfigService);
-    const env = parseEnv(fs.readFileSync(path.resolve(__dirname, '../../.env.local'), 'utf8'));
+    const env = parseEnv(fs.readFileSync(path.resolve(__dirname, '../../.env'), 'utf8'));
     if (!env.E2E_EMAIL || !env.E2E_PASSWORD || !env.E2E_EMAIL_B || !env.E2E_PASSWORD_B) {
-      throw new Error('Add E2E_EMAIL / E2E_PASSWORD and E2E_EMAIL_B / E2E_PASSWORD_B to .env.local');
+      throw new Error('Add E2E_EMAIL / E2E_PASSWORD and E2E_EMAIL_B / E2E_PASSWORD_B to .env');
     }
     const url = config.getOrThrow<string>('SUPABASE_URL');
     const anon = createClient(url, config.getOrThrow<string>('SUPABASE_ANON_KEY'));
