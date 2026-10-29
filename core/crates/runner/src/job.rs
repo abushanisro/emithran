@@ -364,6 +364,7 @@ mod tests {
         WorkerConfig {
             program: path,
             wrapper: vec![],
+            pass_env: vec![],
             deadline: Duration::from_millis(300),
             grace: Duration::from_millis(300),
         }

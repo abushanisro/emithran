@@ -11,8 +11,10 @@ export interface CadUploadRow {
   sha256: string;
   size_bytes: number;
   storage_path: string;
-  status: 'queued' | 'running' | 'done' | 'failed';
+  status: 'queued' | 'running' | 'analysed' | 'materializing' | 'done' | 'failed';
   attempts: number;
+  /** Tries at the second step (creating the BOM items) when the Rust core does the analysis; migration 923. */
+  materialize_attempts: number;
   error_code: string | null;
   error_detail: string | null;
   result: unknown;

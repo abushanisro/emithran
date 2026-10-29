@@ -2,7 +2,7 @@
 # (that is the C++ geometry-worker, as in Petrus). Layering: runner -> archive, domain. `domain` and `archive` do no I/O.
 [workspace]
 resolver = "3"
-members = ["crates/archive", "crates/domain", "crates/runner"]
+members = ["crates/archive", "crates/domain", "crates/runner", "crates/nesting"]
 
 [workspace.package]
 edition = "2024"

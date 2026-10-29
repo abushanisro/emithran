@@ -13,6 +13,8 @@ pub struct WorkerConfig {
     /// A command that wraps the worker to limit it, e.g. `prlimit --as=4294967296 --cpu=630 --fsize=2147483648 --`. Empty: none.
     pub wrapper: Vec<String>,
     pub deadline: Duration,
+    /// The only variables the worker sees (e.g. LD_LIBRARY_PATH for the shared libraries it links). Never a credential.
+    pub pass_env: Vec<(String, String)>,
     /// How long past its own deadline the worker may take to exit before it is killed.
     pub grace: Duration,
 }
@@ -88,6 +90,7 @@ pub async fn run(
         .arg(out_dir)
         .args(inputs)
         .env_clear() // no credentials ever reach the process that parses customer files
+        .envs(config.pass_env.iter().cloned())
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(stderr)

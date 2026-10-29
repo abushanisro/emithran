@@ -23,7 +23,7 @@ const asmReport = (): AssemblyReport => ({
 
 const row = (over: Partial<CadUploadRow> = {}): CadUploadRow => ({
   id: 'aaaaaa-1', organization_id: 'org', created_by: 'user', bom_id: 'bom', project_id: 'proj', file_name: 'gear.step', sha256: 'h',
-  size_bytes: 13, storage_path: 'cad-uploads/org/h.step', status: 'running', attempts: 1, error_code: null, error_detail: null,
+  size_bytes: 13, storage_path: 'cad-uploads/org/h.step', status: 'running', attempts: 1, materialize_attempts: 0, error_code: null, error_detail: null,
   result: null, created_item_ids: [], created_at: '', started_at: '', finished_at: null, source_deleted_at: null, ...over,
 });
 
@@ -33,9 +33,12 @@ function setup(claimed: CadUploadRow | null, expired: { id: string; storage_path
   const removed: string[][] = [];
   let claims = 0;
   let rpcCalls = 0;
+  const rpcNames: string[] = [];
+  const downloads: string[] = [];
   const sweep: any = { eq: () => sweep, is: () => sweep, lt: () => sweep, limit: async () => ({ data: expired, error: null }) };
   const admin = {
-    rpc: async () => {
+    rpc: async (name: string) => {
+      rpcNames.push(name);
       rpcCalls += 1;
       return { data: claimed && claims++ === 0 ? [claimed] : [], error: null };
     },
@@ -45,7 +48,10 @@ function setup(claimed: CadUploadRow | null, expired: { id: string; storage_path
     }),
     storage: {
       from: () => ({
-        download: async () => ({ data: { arrayBuffer: async () => STEP }, error: null }),
+        download: async (path: string) => {
+          downloads.push(path);
+          return { data: { arrayBuffer: async () => STEP }, error: null };
+        },
         remove: async (paths: string[]) => { removed.push(paths); return { error: null }; },
       }),
     },
@@ -59,7 +65,7 @@ function setup(claimed: CadUploadRow | null, expired: { id: string; storage_path
   const files = { uploadFile: jest.fn(async () => ({ storagePath: 'bom/path.step' })), removeUnreferencedFiles: jest.fn(async (_paths: string[]) => 0) };
   const audit = { recordBestEffort: jest.fn(async () => undefined) };
   const runner = new CadUploadRunner({ getPrivilegedClient: () => admin } as never, bomItems as never, files as never, audit as never);
-  return { runner, updates, removed, bomItems, files, audit, rpcCalls: () => rpcCalls };
+  return { runner, updates, removed, bomItems, files, audit, rpcCalls: () => rpcCalls, rpcNames, downloads };
 }
 
 /** What the engine really does: the report names each file as it arrived, so a fake that answers with plain names must follow suit. */
@@ -277,5 +283,65 @@ describe('CadUploadRunner', () => {
     const { runner, updates } = setup(row());
     await runner.tick();
     expect(last(updates)).toMatchObject({ status: 'failed', error_code: 'no_solids' });
+  });
+});
+
+describe('CadUploadRunner with CAD_CORE=rust (the Rust core analysed the upload; this only creates the BOM items)', () => {
+  const analysed = (over: Partial<CadUploadRow> = {}) =>
+    row({ status: 'materializing', result: { report: asmReport(), skipped: [{ path: 'notes.txt', reason: 'not a STEP file' }] }, materialize_attempts: 1, ...over });
+
+  beforeEach(() => {
+    process.env.CAD_CORE = 'rust';
+  });
+  afterEach(() => {
+    delete process.env.CAD_CORE;
+  });
+
+  it('claims analysed uploads, never calls the engine, builds the tree from the stored report and the stored part files', async () => {
+    const post = jest.spyOn(cadEngineHttp, 'post');
+    const { runner, updates, bomItems, files, rpcNames, downloads, removed } = setup(analysed());
+    await runner.tick();
+    expect(rpcNames[0]).toBe('claim_next_analysed_upload');
+    expect(post).not.toHaveBeenCalled();
+    const dtos = (bomItems.createForUpload.mock.calls as unknown as [Record<string, unknown>][]).map(([d]) => d);
+    expect(dtos.map((d) => [d.name, d.parentItemId, d.quantity])).toEqual([['Top', undefined, 1], ['Box', 'item-1', 2], ['Cyl', 'item-1', 1]]);
+    expect(downloads.filter((p) => p.includes('/parts/'))).toEqual(['cad-uploads/org/aaaaaa-1/parts/0_2.step', 'cad-uploads/org/aaaaaa-1/parts/0_3.step']);
+    expect(files.uploadFile).toHaveBeenCalledTimes(2);
+    expect(bomItems.setFile3dPathForUpload).toHaveBeenCalledTimes(2);
+    expect(last(updates)).toMatchObject({ status: 'done' });
+    // the work copies of the parts and then the original are removed
+    expect(removed[0]).toEqual(['cad-uploads/org/aaaaaa-1/parts/0_2.step', 'cad-uploads/org/aaaaaa-1/parts/0_3.step']);
+    expect(removed[1]).toEqual(['cad-uploads/org/h.step']);
+  });
+
+  it('attaches a single-part upload\'s stored file to its item', async () => {
+    const { runner, bomItems, files } = setup(analysed({ result: { report: report(), skipped: [] } }));
+    await runner.tick();
+    expect(bomItems.createForUpload).toHaveBeenCalledTimes(1);
+    const [file] = (files.uploadFile.mock.calls as unknown as [{ originalname: string; buffer: Buffer }][])[0]!;
+    expect([file.originalname, file.buffer.toString()]).toEqual(['gear.step', STEP.toString()]);
+  });
+
+  it('fails for good when the stored result is outside the contract (a core bug, not a bad upload)', async () => {
+    const { runner, updates, bomItems } = setup(analysed({ result: { report: { hello: 1 } } }));
+    await runner.tick();
+    expect(bomItems.createForUpload).not.toHaveBeenCalled();
+    expect(last(updates)).toMatchObject({ status: 'failed', error_code: 'invalid_engine_result' });
+  });
+
+  it('puts a failed attempt back to analysed (not queued: the analysis is not repeated) until the attempts are used', async () => {
+    const failing = () => {
+      const made = setup(analysed({ materialize_attempts: 1 }));
+      made.bomItems.createForUpload.mockRejectedValue(new Error('database down'));
+      return made;
+    };
+    const first = failing();
+    await first.runner.tick();
+    expect(last(first.updates)).toMatchObject({ status: 'analysed' });
+
+    const exhausted = setup(analysed({ materialize_attempts: 3 }));
+    exhausted.bomItems.createForUpload.mockRejectedValue(new Error('database down'));
+    await exhausted.runner.tick();
+    expect(last(exhausted.updates)).toMatchObject({ status: 'failed', error_code: 'processing_failed' });
   });
 });

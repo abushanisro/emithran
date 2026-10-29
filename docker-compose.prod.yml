@@ -104,6 +104,8 @@ services:
       TRUST_CLOUDFLARE_HEADERS: "true"
       # 50 MB is the Supabase free tier's cap on one stored object; set 100 here on a paid plan (frontend and engine follow).
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-50}
+      # python: this backend analyses uploads with the Python cad-engine. rust: the cad-core service does, and this backend only creates the BOM items.
+      CAD_CORE: ${CAD_CORE:-python}
       CAD_ENGINE_URL: http://cad-engine:5055
       # Shared secret between the backend and the engine; the engine refuses protected routes in production without it.
       CAD_ENGINE_API_KEY: ${CAD_ENGINE_API_KEY:?set CAD_ENGINE_API_KEY in the env file}
@@ -173,6 +175,41 @@ services:
       resources:
         limits: { cpus: '2', memory: 2G, pids: 512 }
         reservations: { cpus: '0.5', memory: 512M }
+
+  # --- Assembly core: claims queued CAD uploads and analyses them with the C++ geometry worker (docs/ASSEMBLY_CORE.md). It talks to Supabase
+  # over HTTPS only (no Postgres connection) and parses untrusted files in a child process that runs with an empty environment under
+  # prlimit and a deadline. Runs only when CAD_CORE=rust (`docker compose --profile rust-core up`); with CAD_CORE=python the backend does it itself. ---
+  cad-core:
+    <<: *hardened
+    profiles: [rust-core]
+    platform: linux/amd64
+    build:
+      context: ./core
+      dockerfile: Dockerfile
+      additional_contexts:
+        geometry: ./geometry-worker
+        fixtures: ./backend/test/fixtures/cad
+    environment:
+      SUPABASE_URL: ${SUPABASE_URL:?set SUPABASE_URL in the env file}
+      SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY:?set SUPABASE_SECRET_KEY in the env file}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-50}
+      WORKER_DEADLINE_SECONDS: 600
+      # The container limit below is 2 GB; the worker's own address-space limit stays under it (~16 MB of RAM per MB of STEP).
+      WORKER_MEMORY_MB: 1536
+    healthcheck:
+      # No HTTP port: the runner rewrites a heartbeat file every 10 s from its own task, and `health` checks that it is recent.
+      test: ["CMD", "cad-runner", "health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    tmpfs:
+      - /tmp:size=1g
+    networks: [edge]
+    deploy:
+      resources:
+        limits: { cpus: '2', memory: 2G, pids: 256 }
+        reservations: { cpus: '0.5', memory: 256M }
 
   ecad-engine:
     <<: *hardened

@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use archive::Limits;
 use runner::backend::Supabase;
+use runner::health;
 use runner::job::{self, Config};
 use runner::worker::WorkerConfig;
 
@@ -34,6 +35,11 @@ fn config() -> Result<(Config, Supabase, Duration), String> {
     } else {
         vec![]
     };
+    // Only what the worker needs to start: where its shared libraries are. Everything else (keys, URLs) stays out.
+    let pass_env: Vec<(String, String)> = ["LD_LIBRARY_PATH"]
+        .iter()
+        .filter_map(|n| std::env::var(n).ok().map(|v| ((*n).to_string(), v)))
+        .collect();
     let config = Config {
         worker: WorkerConfig {
             program: PathBuf::from(
@@ -41,6 +47,7 @@ fn config() -> Result<(Config, Supabase, Duration), String> {
                     .unwrap_or_else(|_| "/usr/local/bin/geometry-worker".to_string()),
             ),
             wrapper,
+            pass_env,
             deadline,
             grace: Duration::from_secs(15),
         },
@@ -59,8 +66,19 @@ fn config() -> Result<(Config, Supabase, Duration), String> {
     ))
 }
 
+fn heartbeat_path() -> PathBuf {
+    PathBuf::from(
+        std::env::var("HEARTBEAT_FILE").unwrap_or_else(|_| "/tmp/cad-runner.alive".to_string()),
+    )
+}
+
 #[tokio::main]
 async fn main() {
+    // `cad-runner health`: the container's healthcheck. Exit 0 while the heartbeat is recent.
+    if std::env::args().nth(1).as_deref() == Some("health") {
+        let alive = health::is_fresh(&heartbeat_path(), health::MAX_AGE);
+        std::process::exit(if alive { 0 } else { 1 });
+    }
     let (config, backend, poll) = match config() {
         Ok(parts) => parts,
         Err(message) => {
@@ -68,6 +86,15 @@ async fn main() {
             std::process::exit(78);
         }
     };
+    let beat_path = heartbeat_path();
+    tokio::spawn(async move {
+        loop {
+            if let Err(error) = health::beat(&beat_path) {
+                eprintln!("cad-runner: cannot write the heartbeat: {error}");
+            }
+            tokio::time::sleep(health::BEAT_EVERY).await;
+        }
+    });
     eprintln!(
         "cad-runner started (poll every {}s, worker deadline {}s)",
         poll.as_secs(),

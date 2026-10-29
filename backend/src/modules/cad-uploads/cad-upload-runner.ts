@@ -23,6 +23,7 @@ const MAINTENANCE_EVERY_MS = 60 * 60 * 1000;
 const MAX_ATTEMPTS = 3;
 // Longer than the slowest legitimate run (engine call up to 10 min, plus item creation), so a live job is never re-claimed.
 const STALE_SECONDS = 1800;
+const MATERIALIZE_STALE_SECONDS = 900;
 const ENGINE_TIMEOUT_MS = 600_000;
 // A zip is unpacked in memory, so what it may expand to follows the upload limit (8x) instead of a fixed gigabyte.
 const CAD_ARCHIVE_LIMITS: ArchiveLimits = { maxEntries: 10_000, maxEntryBytes: MAX_CAD_FILE_BYTES, maxTotalBytes: MAX_ARCHIVE_EXPANDED_BYTES };
@@ -168,7 +169,69 @@ export class CadUploadRunner implements OnModuleInit, OnModuleDestroy {
     return this.supabase.getPrivilegedClient('cad-upload runner: claim and update queued CAD uploads');
   }
 
+  /** CAD_CORE=rust: the Rust `cad-runner` analyses (queued -> analysed) and this runner only creates the BOM items (analysed -> done). */
+  private get rustCore(): boolean {
+    return process.env.CAD_CORE === 'rust';
+  }
+
   private async runNext(): Promise<boolean> {
+    return this.rustCore ? this.materializeNext() : this.analyseNext();
+  }
+
+  private async materializeNext(): Promise<boolean> {
+    const { data, error } = await this.admin.rpc('claim_next_analysed_upload', { p_stale_seconds: MATERIALIZE_STALE_SECONDS, p_max_attempts: MAX_ATTEMPTS });
+    if (error) throw new Error(`could not claim an analysed upload: ${error.message}`);
+    const row = (data as CadUploadRow[] | null)?.[0];
+    if (!row) return false;
+    try {
+      await this.materialize(row);
+    } catch (error) {
+      await this.fail(row, error, true);
+    }
+    return true;
+  }
+
+  /** The second half of an upload analysed by the Rust core: the report and one STEP file per distinct part are already stored. */
+  private async materialize(row: CadUploadRow): Promise<void> {
+    const startedAt = Date.now();
+    if (row.created_item_ids.length > 0) {
+      await this.removeItems(row.created_item_ids);
+      await this.saveCreated(row.id, []);
+    }
+    const stored = row.result as { report?: unknown; skipped?: { path: string; reason: string }[] } | null;
+    let report: AssemblyReport;
+    try {
+      report = parseAssemblyReport(stored?.report);
+    } catch (error) {
+      throw new PermanentFailure('invalid_engine_result', error instanceof Error ? error.message : String(error));
+    }
+    const items = planItems(report, row.id.slice(0, 6));
+    const partsPrefix = `cad-uploads/${row.organization_id}/${row.id}/parts`;
+    const exported = new Map<string, Buffer>();
+    for (const definition of new Set(items.flatMap((i) => (i.definition ? [i.definition] : [])))) {
+      const downloaded = await this.admin.storage.from(CAD_BUCKET).download(`${partsPrefix}/${partFileName(definition)}`);
+      if (downloaded.error || !downloaded.data) throw new Error(`could not read the stored part ${definition}: ${downloaded.error?.message ?? 'no data'}`);
+      exported.set(definition, Buffer.from(await downloaded.data.arrayBuffer()));
+    }
+    await this.createItems(row, items, [], exported);
+    const { error } = await this.admin.from('cad_uploads').update({ status: 'done', finished_at: new Date().toISOString() }).eq('id', row.id);
+    if (error) throw new Error(`could not save the result: ${error.message}`);
+    // The parts now live on their BOM items; the work copies and the original are no longer needed.
+    const removed = await this.admin.storage.from(CAD_BUCKET).remove([...exported.keys()].map((d) => `${partsPrefix}/${partFileName(d)}`));
+    if (removed.error) this.logger.warn(`could not remove the work files of upload ${row.id}: ${removed.error.message}`);
+    await this.dropSource(row);
+    await this.audit.recordBestEffort({
+      action: 'upload.completed',
+      targetType: 'cad_upload',
+      targetId: row.id,
+      organizationId: row.organization_id,
+      actor: { kind: 'system' },
+      meta: { fileName: row.file_name, parts: report.parts.length, items: items.length, durationMs: Date.now() - startedAt },
+    });
+    this.logger.log(`CAD upload ${row.id} materialized in ${Date.now() - startedAt} ms: ${items.length} items, ${report.parts.length} distinct parts (attempt ${row.materialize_attempts})`);
+  }
+
+  private async analyseNext(): Promise<boolean> {
     const { data, error } = await this.admin.rpc('claim_next_cad_upload', { p_stale_seconds: STALE_SECONDS, p_max_attempts: MAX_ATTEMPTS });
     if (error) throw new Error(`could not claim an upload: ${error.message}`);
     const row = (data as CadUploadRow[] | null)?.[0];
@@ -350,16 +413,16 @@ export class CadUploadRunner implements OnModuleInit, OnModuleDestroy {
     if (error) throw new Error(`could not record the created items: ${error.message}`);
   }
 
-  private async fail(row: CadUploadRow, error: unknown): Promise<void> {
+  private async fail(row: CadUploadRow, error: unknown, materializing = false): Promise<void> {
     const permanent = error instanceof PermanentFailure;
     const detail = (error instanceof Error ? error.message : String(error)).slice(0, 500);
-    const retry = !permanent && row.attempts < MAX_ATTEMPTS;
+    const retry = !permanent && (materializing ? row.materialize_attempts : row.attempts) < MAX_ATTEMPTS;
     this.logger.warn(`CAD upload ${row.id} ${retry ? 'will be retried' : 'failed'}: ${detail}`);
     const { error: writeError } = await this.admin
       .from('cad_uploads')
       .update(
         retry
-          ? { status: 'queued', error_detail: detail }
+          ? { status: materializing ? 'analysed' : 'queued', error_detail: detail }
           : { status: 'failed', error_code: permanent ? error.code : 'processing_failed', error_detail: detail, finished_at: new Date().toISOString() },
       )
       .eq('id', row.id);
