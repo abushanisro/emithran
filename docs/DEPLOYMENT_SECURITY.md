@@ -146,8 +146,6 @@ authentication for all members.
 
 ## Open items
 
-- **zod** `^3.25.76` has an advisory (GHSA-mrhx-c7xc-m3w5, memory exhaustion on very large validated collections) fixed only in zod 4.
-  It is used in 6 files (forms and catalog parsing); migrate when convenient.
 - **cloudflared** carries one HIGH CVE in its bundled go-jose with no upstream fix yet; `.trivyignore.yaml` records the exception and
   it expires on 2026-12-15 so it is re-checked.
 - The cad-engine image is `linux/amd64` only (`pythonocc-core` 7.7.2 is not published for aarch64).

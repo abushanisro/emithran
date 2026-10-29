@@ -176,7 +176,7 @@ export type MHRFormData = z.infer<typeof mhrFormSchema>;
  */
 export function getMHRValidationError(error: unknown): string {
   if (error instanceof z.ZodError) {
-    return error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
+    return error.issues.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
   }
 
   if (error instanceof Error) {
