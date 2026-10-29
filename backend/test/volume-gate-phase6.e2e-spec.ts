@@ -19,7 +19,7 @@ function memoryVariable(key: string): number {
 describe('[e2e] Phase 6 volume gate — real DB, no mocks', () => {
   it('the live limits equal progDieAnnualVolumeLimit / stageToolingAnnualVolumeLimit in memory/', async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../.env') })],
+      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../../.env') })],
       providers: [SupabaseService, SheetMetalLookupService],
     }).compile();
     const limits = await moduleRef.get(SheetMetalLookupService).getToolingAnnualVolumeThresholds();

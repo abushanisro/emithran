@@ -1,5 +1,5 @@
 // Material strengths — REAL services, real sign-in (the test account in
-// ../.env.local), read-only. Expected values are read at test time from
+// ../.env), read-only. Expected values are read at test time from
 // memory/Sheetmetal/rawmetrial/rawmetalusa.csv (the roadmap source), never
 // typed in here.
 //
@@ -19,8 +19,8 @@ import { MaterialResolutionService } from '../src/modules/bom-items/services/mat
 jest.setTimeout(120_000);
 
 async function signIn(config: ConfigService): Promise<string> {
-  const env = parseEnv(fs.readFileSync(path.resolve(__dirname, '../../.env.local'), 'utf8'));
-  if (!env.E2E_EMAIL || !env.E2E_PASSWORD) throw new Error('Add E2E_EMAIL / E2E_PASSWORD to .env.local');
+  const env = parseEnv(fs.readFileSync(path.resolve(__dirname, '../../.env'), 'utf8'));
+  if (!env.E2E_EMAIL || !env.E2E_PASSWORD) throw new Error('Add E2E_EMAIL / E2E_PASSWORD to .env');
   const anon = createClient(config.getOrThrow<string>('SUPABASE_URL'), config.getOrThrow<string>('SUPABASE_ANON_KEY'));
   const { data, error } = await anon.auth.signInWithPassword({ email: env.E2E_EMAIL, password: env.E2E_PASSWORD });
   if (error || !data.session) throw new Error(`sign-in failed: ${error?.message}`);
@@ -55,7 +55,7 @@ describe('[e2e] material strengths — real DB, no mocks', () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../.env') })],
+      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../../.env') })],
       providers: [SupabaseService, MaterialResolutionService],
     }).compile();
     resolver = moduleRef.get(MaterialResolutionService);

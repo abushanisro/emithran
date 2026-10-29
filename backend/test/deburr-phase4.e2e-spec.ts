@@ -23,7 +23,7 @@ describe('[e2e] Phase 4 deburr — real DB, no mocks', () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../.env') })],
+      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../../.env') })],
       providers: [SupabaseService, SheetMetalLookupService, MachiningLookupService],
     }).compile();
     sm = moduleRef.get(SheetMetalLookupService);

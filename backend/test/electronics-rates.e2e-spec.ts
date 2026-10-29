@@ -21,7 +21,7 @@ describe('[e2e] electronics rate book — real mhr_records rows', () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../.env') })],
+      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../../.env') })],
       providers: [SupabaseService, ElectronicsReferenceRepository, ElectronicsRateBookLoader],
     }).compile();
     loader = moduleRef.get(ElectronicsRateBookLoader);

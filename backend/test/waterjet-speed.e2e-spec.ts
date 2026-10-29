@@ -13,7 +13,7 @@ describe('[e2e] waterjet speed factor', () => {
   let lookup: SheetMetalLookupService;
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../.env') }), BOMItemsModule],
+      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../../.env') }), BOMItemsModule],
     }).compile();
     lookup = moduleRef.get(SheetMetalLookupService);
   });
