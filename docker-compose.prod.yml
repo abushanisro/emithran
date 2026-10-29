@@ -77,7 +77,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
-    networks: [edge, internal]
+    networks: [edge, internal, db]
     depends_on:
       backend:
         condition: service_healthy
@@ -110,6 +110,16 @@ services:
       CAD_CORE: ${CAD_CORE:-python}
       # python: cad-engine /nest. rust: the nester binary shipped in this image (falls back to python if it is unavailable).
       NESTING_ENGINE: ${NESTING_ENGINE:-python}
+      # supabase (default) or postgrest: with `postgrest` the backend talks to the postgrest service below and signs its own tokens.
+      DB_BACKEND: ${DB_BACKEND:-supabase}
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-supabase}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_REGION: ${S3_REGION:-}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      POSTGREST_URL: http://postgrest:3000
+      DB_JWT_SECRET: ${DB_JWT_SECRET:-}
       CAD_ENGINE_URL: http://cad-engine:5055
       # Shared secret between the backend and the engine; the engine refuses protected routes in production without it.
       CAD_ENGINE_API_KEY: ${CAD_ENGINE_API_KEY:?set CAD_ENGINE_API_KEY in the env file}
@@ -194,8 +204,19 @@ services:
         geometry: ./geometry-worker
         fixtures: ./backend/test/fixtures/cad
     environment:
-      SUPABASE_URL: ${SUPABASE_URL:?set SUPABASE_URL in the env file}
-      SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY:?set SUPABASE_SECRET_KEY in the env file}
+      # Same switch as the backend: DB_BACKEND=postgrest needs POSTGREST_URL, DB_JWT_SECRET and S3_*; otherwise Supabase (the runner
+      # refuses to start, naming the missing setting, when the ones its mode needs are empty).
+      DB_BACKEND: ${DB_BACKEND:-supabase}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY:-}
+      POSTGREST_URL: http://postgrest:3000
+      DB_JWT_SECRET: ${DB_JWT_SECRET:-}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_REGION: ${S3_REGION:-}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-}
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-50}
       WORKER_DEADLINE_SECONDS: 600
       # The container limit below is 2 GB; the worker's own address-space limit stays under it (~16 MB of RAM per MB of STEP).
@@ -209,11 +230,47 @@ services:
       start_period: 20s
     tmpfs:
       - /tmp:size=1g
-    networks: [edge]
+    networks: [edge, db]
     deploy:
       resources:
         limits: { cpus: '2', memory: 2G, pids: 256 }
         reservations: { cpus: '0.5', memory: 256M }
+
+  # --- PostgREST: the data API in front of the managed Postgres (docs: CLAUDE.md "Leaving Supabase"). Runs only with
+  # `--profile postgrest` (DB_BACKEND=postgrest). Reachable ONLY from the backend: it is on the private `db` network with it and nothing
+  # else, never published, and it accepts only tokens the backend signs with DB_JWT_SECRET. It needs outbound access to the database,
+  # which is why it is not on the no-internet `internal` network. Connects as the `authenticator` role, which can only switch to
+  # anon/authenticated/service_role. ---
+  postgrest:
+    <<: *hardened
+    profiles: [postgrest]
+    image: postgrest/postgrest@sha256:1347d7552b88f17832912c06afbf7c43209af6eeeb60834b04aae12c9bd9d5cc
+    platform: linux/amd64
+    user: "10004:10004"
+    environment:
+      # No `:?` here: Compose checks it for every service, even one in an inactive profile, and would stop the default stack. Empty means
+      # PostgREST refuses to start (no database), and an empty secret means it rejects every token: both fail closed.
+      PGRST_DB_URI: ${POSTGREST_DB_URI:-}
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${DB_JWT_SECRET:-}
+      PGRST_SERVER_HOST: 0.0.0.0
+      PGRST_SERVER_PORT: 3000
+      PGRST_ADMIN_SERVER_PORT: 3001
+      PGRST_DB_POOL: 10
+      # A transaction-mode pooler (Neon's, PgBouncer) cannot hold prepared statements; harmless with a direct connection.
+      PGRST_DB_PREPARED_STATEMENTS: ${PGRST_DB_PREPARED_STATEMENTS:-false}
+      PGRST_LOG_LEVEL: warn
+    healthcheck:
+      test: ["CMD", "postgrest", "--ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks: [db]
+    deploy:
+      resources:
+        limits: { cpus: '1', memory: 512M, pids: 128 }
 
   ecad-engine:
     <<: *hardened
@@ -243,6 +300,9 @@ volumes:
   backend-logs:
 
 networks:
+  # The backend and PostgREST only: PostgREST needs a route out to the database, so it cannot live on `internal`, and it must not share
+  # `edge` with the tunnel and the frontend.
+  db: {}
   # Has a route to the internet (the tunnel dials out; the backend and frontend call Supabase).
   edge: {}
   # No route out and none in: engines can neither phone home nor be reached from outside.

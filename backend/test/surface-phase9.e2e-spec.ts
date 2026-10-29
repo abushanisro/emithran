@@ -1,5 +1,5 @@
 // Phase 9 (Passivation, Anodize, Wet Coat Line) — REAL services, real sign-in
-// (the test account in ../.env.local), read-only. The three processes cost
+// (the test account in ../.env), read-only. The three processes cost
 // from the staged reference data (819) and machines (820) for a real
 // stainless material, and migration 898 marks them production in the catalog.
 import { Test } from '@nestjs/testing';
@@ -17,8 +17,8 @@ import { CalculatorCatalogService } from '../src/modules/bom-items/services/calc
 jest.setTimeout(120_000);
 
 async function signIn(config: ConfigService): Promise<string> {
-  const env = parseEnv(fs.readFileSync(path.resolve(__dirname, '../../.env.local'), 'utf8'));
-  if (!env.E2E_EMAIL || !env.E2E_PASSWORD) throw new Error('Add E2E_EMAIL / E2E_PASSWORD to .env.local');
+  const env = parseEnv(fs.readFileSync(path.resolve(__dirname, '../../.env'), 'utf8'));
+  if (!env.E2E_EMAIL || !env.E2E_PASSWORD) throw new Error('Add E2E_EMAIL / E2E_PASSWORD to .env');
   const anon = createClient(config.getOrThrow<string>('SUPABASE_URL'), config.getOrThrow<string>('SUPABASE_ANON_KEY'));
   const { data, error } = await anon.auth.signInWithPassword({ email: env.E2E_EMAIL, password: env.E2E_PASSWORD });
   if (error || !data.session) throw new Error(`sign-in failed: ${error?.message}`);
@@ -32,7 +32,7 @@ describe('[e2e] Phase 9 surface treatment — real DB, no mocks', () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../.env') })],
+      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../../.env') })],
       providers: [SupabaseService, ExchangeRateService, MaterialResolutionService, CalculatorCatalogService, SecondaryProcessService],
     }).compile();
     service = moduleRef.get(SecondaryProcessService);

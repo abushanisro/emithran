@@ -14,7 +14,7 @@ jest.setTimeout(120_000);
 describe('[e2e] Deslag allowance table', () => {
   it('lists the Deslag machines with their allowance, in the lookup-table shape', async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../.env') }), SupabaseModule, LoggerModule],
+      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../../.env') }), SupabaseModule, LoggerModule],
     }).compile();
     const service = new ProcessesService(moduleRef.get(SupabaseService), moduleRef.get(Logger));
 

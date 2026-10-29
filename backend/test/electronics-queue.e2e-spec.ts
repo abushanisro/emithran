@@ -11,7 +11,7 @@ import { TableJobQueue } from '../src/modules/electronics-costing/infrastructure
 jest.setTimeout(120_000);
 
 function setting(name: string): string {
-  const fromFile = fs.existsSync(path.resolve(__dirname, '../.env')) ? parseEnv(fs.readFileSync(path.resolve(__dirname, '../.env'), 'utf8'))[name] : undefined;
+  const fromFile = fs.existsSync(path.resolve(__dirname, '../../.env')) ? parseEnv(fs.readFileSync(path.resolve(__dirname, '../../.env'), 'utf8'))[name] : undefined;
   const value = process.env[name] ?? fromFile;
   if (!value) throw new Error(`Set ${name} (process env or backend/.env) to run this suite.`);
   return value;

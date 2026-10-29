@@ -26,7 +26,7 @@ describe('[e2e] Phase 8 material class — real DB, no mocks', () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../.env') })],
+      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../../.env') })],
       providers: [SupabaseService],
     }).compile();
     db = moduleRef.get(SupabaseService).getPrivilegedClient('phase 8 e2e: read-only check of raw_materials.material_class');
@@ -70,11 +70,11 @@ describe('[e2e] Phase 8 material class — real DB, no mocks', () => {
 describe('[e2e] Phase 8 material class lookup by name — real DB, real sign-in', () => {
   it('returns the stored class for picked names and null for an unknown one', async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../.env') })],
+      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../../.env') })],
       providers: [SupabaseService, Logger, RawMaterialsService],
     }).compile();
     const config = moduleRef.get(ConfigService);
-    const env = parseEnv(fs.readFileSync(path.resolve(__dirname, '../../.env.local'), 'utf8'));
+    const env = parseEnv(fs.readFileSync(path.resolve(__dirname, '../../.env'), 'utf8'));
     const anon = createClient(config.getOrThrow<string>('SUPABASE_URL'), config.getOrThrow<string>('SUPABASE_ANON_KEY'));
     const { data: auth, error } = await anon.auth.signInWithPassword({ email: env.E2E_EMAIL ?? '', password: env.E2E_PASSWORD ?? '' });
     if (error || !auth.session) throw new Error(`sign-in failed: ${error?.message}`);

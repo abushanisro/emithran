@@ -1,4 +1,5 @@
 import { Injectable, Logger, ServiceUnavailableException, UnprocessableEntityException } from '@nestjs/common';
+import { UserDirectory } from '../supabase/user-directory';
 import { SupabaseService } from '../supabase/supabase.service';
 
 /** One active budget rate with its provenance (see listRates). */
@@ -109,7 +110,10 @@ export class ExchangeRateService {
   private lastLoaded: number = 0;
   private static readonly CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly directory: UserDirectory,
+  ) {}
 
   /**
    * Load the active budget rates from DB (cached per TTL).
@@ -232,11 +236,8 @@ export class ExchangeRateService {
       throw new ServiceUnavailableException(`Exchange rates unavailable — failed to read exchange_rates: ${error.message}`);
     }
     const editorIds = [...new Set((data ?? []).map((r) => r.set_by).filter((id): id is string => !!id))];
-    const editorEmails = new Map<string, string | null>();
-    for (const id of editorIds) {
-      const { data: user } = await this.supabaseService.getPrivilegedClient('auth-admin: resolve rate editor email for audit display').auth.admin.getUserById(id);
-      editorEmails.set(id, user?.user?.email ?? null);
-    }
+    const editors = await this.directory.findByIds(editorIds);
+    const editorEmails = new Map<string, string | null>(editorIds.map((id) => [id, editors.get(id)?.email ?? null]));
     return (data ?? []).map((r) => ({
       currency: r.to_currency,
       name: r.currency_name,

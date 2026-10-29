@@ -16,18 +16,15 @@ describe('RfqEmailService attachments', () => {
   });
   afterEach(() => { process.env = { ...env }; });
 
-  function setup(objects: Record<string, string>) {
-    const download = jest.fn(async (p: string) =>
-      p in objects
-        ? { data: new Blob([objects[p]]), error: null }
-        : { data: null, error: { message: 'Object not found' } });
-    const from = jest.fn().mockReturnValue({ download });
+  function setup(objects: Record<string, string>, readable = true) {
+    const get = jest.fn(async (_bucket: string, p: string) => (p in objects ? Buffer.from(objects[p]) : null));
+    const canRead = jest.fn(async () => readable);
     const supabaseService = {
-      getUserClient: jest.fn().mockReturnValue({ storage: { from } }),
+      getUserClient: jest.fn(),
       getPrivilegedClient: jest.fn(() => { throw new Error('attachments must not use the privileged client'); }),
     } as unknown as SupabaseService;
-    const service = new RfqEmailService(supabaseService);
-    return { service, supabaseService, download };
+    const service = new RfqEmailService(supabaseService, { canRead } as never, { get } as never);
+    return { service, supabaseService, get, canRead };
   }
 
   it('locks the transport against file and URL attachments', () => {
@@ -37,18 +34,28 @@ describe('RfqEmailService attachments', () => {
     expect(options.disableUrlAccess).toBe(true);
   });
 
-  it('attaches storage objects as bytes, read with the caller\'s client', async () => {
-    const { service, supabaseService, download } = setup({ 'u1/p1/bom-items/i1/2d/a.pdf': 'PDF' });
+  it('attaches storage objects as bytes, after checking the caller may read them', async () => {
+    const { service, get, canRead } = setup({ 'u1/p1/bom-items/i1/2d/a.pdf': 'PDF' });
     const attachments = await (service as any).prepareFileAttachments(
       [{ id: 'i1', name: 'Bracket', itemType: 'part', quantity: 1, file2dPath: 'u1/p1/bom-items/i1/2d/a.pdf' }],
       'token-abc',
     );
-    expect(supabaseService.getUserClient).toHaveBeenCalledWith('token-abc');
-    expect(download).toHaveBeenCalledWith('u1/p1/bom-items/i1/2d/a.pdf');
+    expect(canRead).toHaveBeenCalledWith('u1/p1/bom-items/i1/2d/a.pdf', 'token-abc');
+    expect(get).toHaveBeenCalledWith('bom-files', 'u1/p1/bom-items/i1/2d/a.pdf');
     expect(attachments).toHaveLength(1);
     expect(attachments[0].path).toBeUndefined();
     expect(Buffer.isBuffer(attachments[0].content)).toBe(true);
     expect(attachments[0].content.toString()).toBe('PDF');
+  });
+
+  it('never reads a file the caller may not read (another tenant\'s object), even though it exists', async () => {
+    const { service, get } = setup({ 'other/p/x/f.pdf': 'SECRET' }, false);
+    const attachments = await (service as any).prepareFileAttachments(
+      [{ id: 'i1', name: 'x', itemType: 'part', quantity: 1, file2dPath: 'other/p/x/f.pdf' }],
+      'token-abc',
+    );
+    expect(attachments).toEqual([]);
+    expect(get).not.toHaveBeenCalled();
   });
 
   it('never attaches a server file or URL written into the path columns', async () => {

@@ -1,10 +1,12 @@
 import {
   Injectable,
+  Optional,
   CanActivate,
   ExecutionContext,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { IdentityService } from '../../modules/auth/identity.service';
 import { SupabaseService } from '../supabase/supabase.service';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { SessionActivityService } from '../session/session-activity.service';
@@ -24,6 +26,8 @@ export class SupabaseAuthGuard implements CanActivate {
     private reflector: Reflector,
     private supabaseService: SupabaseService,
     private sessionActivity: SessionActivityService,
+    // Present only when AUTH_BACKEND=auth0 (see AuthModule); then it replaces the Supabase token check below.
+    @Optional() private identity?: IdentityService,
   ) {}
 
   /**
@@ -122,6 +126,17 @@ export class SupabaseAuthGuard implements CanActivate {
       }
       request.user = await this.getAdminFallbackUser();
       request.accessToken = await this.getBypassAccessToken();
+      return true;
+    }
+
+    if (this.identity) {
+      // Auth0: an invalid token, an uninvited person or an unreachable key set is rejected outright; the dev bypass above only
+      // covers a request with no token at all. The inactivity timeout applies exactly as for Supabase sessions.
+      const who = await this.identity.authenticate(token);
+      await this.sessionActivity.assertActive(who.sessionId, who.user.id, token);
+      request.user = who.user;
+      request.accessToken = who.dbToken;
+      request.sessionId = who.sessionId;
       return true;
     }
 

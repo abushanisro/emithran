@@ -1,6 +1,6 @@
 import { apiClient } from '@/lib/api/client';
 import { apiConfig } from '@/lib/api/config';
-import { supabase } from '@/lib/supabase/client';
+import { sessionSource } from '@/lib/auth/session-source';
 
 import { SESSION_IDLE_TIMEOUT_CODE } from './policy';
 
@@ -43,9 +43,8 @@ export const sendSessionHeartbeat = (kind: 'user' | 'job') => call('POST', '/act
 
 /**
  * Ends this session for inactivity: remembers the page so login returns to it
- * (AppLayout restores sessionStorage.redirectAfterAuth), revokes only THIS
- * session in Supabase (scope 'local'; other devices stay signed in), then
- * fully reloads into /auth so no previous data stays in memory.
+ * (AppLayout restores sessionStorage.redirectAfterAuth), ends only THIS
+ * device's session, then fully reloads into /auth so no previous data stays in memory.
  */
 export async function signOutForInactivity(): Promise<void> {
   try {
@@ -56,10 +55,7 @@ export async function signOutForInactivity(): Promise<void> {
     // storage blocked: still sign out
   }
   try {
-    await Promise.race([
-      supabase.auth.signOut({ scope: 'local' }),
-      new Promise((resolve) => setTimeout(resolve, 5_000)),
-    ]);
+    await sessionSource.signOutThisDevice();
   } catch {
     // the server has already ended the session or will on the next request
   }

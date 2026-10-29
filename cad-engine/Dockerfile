@@ -40,22 +40,8 @@ RUN conda run -n cad-env pip install --no-cache-dir -r requirements.txt
 # Copy all application source (feature extractors, converters)
 COPY . .
 
-# Create default .env configuration (can be overridden by environment variables)
-RUN echo "# CAD Engine Configuration" > .env && \
-    echo "HOST=0.0.0.0" >> .env && \
-    echo "PORT=5055" >> .env && \
-    echo "LOG_LEVEL=INFO" >> .env && \
-    echo "ENVIRONMENT=production" >> .env && \
-    echo "NODE_ENV=production" >> .env && \
-    echo "MAX_FILE_SIZE_MB=50" >> .env && \
-    echo "RATE_LIMIT_PER_MINUTE=10" >> .env && \
-    echo "LINEAR_DEFLECTION=0.1" >> .env && \
-    echo "ANGULAR_DEFLECTION=0.5" >> .env && \
-    echo "TEMP_DIR=/tmp/cad_engine" >> .env && \
-    echo "ANTHROPIC_API_KEY=" >> .env && \
-    echo "CLAUDE_MODEL=claude-3-5-sonnet-20241022" >> .env && \
-    echo "BYPASS_CAD_FORMAT_CHECK=false" >> .env
-
+# No .env file is created in the image: every setting comes from the environment (docker-compose.prod.yml), with defaults in
+# shared/config.py. A baked file would hide which value wins and can drift from what compose sets.
 # Create temp directory for CAD conversions
 RUN mkdir -p /tmp/cad-files /app/logs
 

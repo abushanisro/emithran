@@ -23,10 +23,10 @@ const CLASSES_WITH_CATALOG_OPERATIONS = new Set([
 describe('[e2e] Cost summary lines carry their catalog operations, applied route or not', () => {
   it('every cutting, punching, bending and deburring line has catalog operations on the part cut features', async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../.env') }), BOMItemsModule],
+      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../../.env') }), BOMItemsModule],
     }).compile();
     const config = moduleRef.get(ConfigService);
-    const env = parseEnv(fs.readFileSync(path.resolve(__dirname, '../../.env.local'), 'utf8'));
+    const env = parseEnv(fs.readFileSync(path.resolve(__dirname, '../../.env'), 'utf8'));
     const anon = createClient(config.getOrThrow<string>('SUPABASE_URL'), config.getOrThrow<string>('SUPABASE_ANON_KEY'));
     const { data, error } = await anon.auth.signInWithPassword({ email: env.E2E_EMAIL!, password: env.E2E_PASSWORD! });
     if (error || !data.session) throw new Error(`sign-in failed: ${error?.message}`);

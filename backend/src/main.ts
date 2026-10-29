@@ -1,6 +1,9 @@
-// Load .env with override:true so .env values always win over system env vars
+// Load the root .env with override:true so its values always win over system env vars (local development only: containers have no file)
 import * as dotenv from 'dotenv';
-dotenv.config({ override: true });
+import * as path from 'node:path';
+// The one local env file lives at the repo root (backend/dist/main.js -> ../../.env). Deployed containers have no file: compose sets the
+// variables, and a missing file is not an error.
+dotenv.config({ path: path.resolve(__dirname, '..', '..', '.env'), override: true });
 
 // Telemetry starts here, after .env is loaded and before http/express are required by the imports below,
 // so the instrumentations can patch them. A no-op (and loads no SDK) unless OTEL_EXPORTER_OTLP_ENDPOINT is set.
@@ -177,7 +180,8 @@ async function bootstrap() {
   SwaggerModule.setup('docs', app, document);
 
   // Railway provides PORT environment variable automatically
-  const port = process.env.PORT ? parseInt(process.env.PORT, 10) : configService.get<number>('PORT', 4000);
+  const configuredPort = process.env.BACKEND_PORT ?? process.env.PORT; // BACKEND_PORT in the shared local .env; PORT in containers
+  const port = configuredPort ? parseInt(configuredPort, 10) : configService.get<number>('PORT', 4000);
   await app.listen(port, '0.0.0.0');
 
   const publicDomain = process.env.RAILWAY_PUBLIC_DOMAIN;
