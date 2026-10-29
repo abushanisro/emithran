@@ -1,10 +1,14 @@
 import { Injectable } from '@nestjs/common';
+import { UserDirectory } from '../../common/supabase/user-directory';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import type { UpdateProfileDto, ProfileResponseDto } from './dto/profile.dto';
 
 @Injectable()
 export class ProfileService {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly directory: UserDirectory,
+  ) {}
 
   async getProfile(userId: string, accessToken: string): Promise<ProfileResponseDto> {
     const client = this.supabase.getClient(accessToken);
@@ -26,10 +30,7 @@ export class ProfileService {
       data = created;
     }
 
-    const adminClient = this.supabase.getPrivilegedClient('auth-admin: read or sync the caller own auth user (email, display name)');
-    const { data: authData } = await adminClient.auth.admin.getUserById(userId);
-
-    return this.mapProfile(data, authData?.user?.email);
+    return this.mapProfile(data, await this.emailOf(userId));
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto, accessToken: string): Promise<ProfileResponseDto> {
@@ -53,16 +54,15 @@ export class ProfileService {
 
     // Keep Supabase auth user_metadata in sync so the sidebar shows the correct name
     if (dto.displayName !== undefined) {
-      const adminClient = this.supabase.getPrivilegedClient('auth-admin: read or sync the caller own auth user (email, display name)');
-      await adminClient.auth.admin.updateUserById(userId, {
-        user_metadata: { full_name: dto.displayName },
-      });
+      await this.directory.setFullName(userId, dto.displayName);
     }
 
-    const adminClient = this.supabase.getPrivilegedClient('auth-admin: read or sync the caller own auth user (email, display name)');
-    const { data: authData } = await adminClient.auth.admin.getUserById(userId);
+    return this.mapProfile(data, await this.emailOf(userId));
+  }
 
-    return this.mapProfile(data, authData?.user?.email);
+  private async emailOf(userId: string): Promise<string | undefined> {
+    const found = await this.directory.findByIds([userId]);
+    return found.get(userId)?.email ?? undefined;
   }
 
   private mapProfile(data: any, email?: string): ProfileResponseDto {

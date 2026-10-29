@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto';
 
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 
 import { AuditService } from '../../common/audit/audit.service';
+import { OBJECT_STORE, type ObjectStore } from '../../common/storage/object-store';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { BOMItemsService } from '../bom-items/bom-items.service';
 import { CadUploadRunner } from './cad-upload-runner';
@@ -27,6 +28,7 @@ export class CadUploadsService {
     private readonly bomItems: BOMItemsService,
     private readonly runner: CadUploadRunner,
     private readonly audit: AuditService,
+    @Inject(OBJECT_STORE) private readonly objects: ObjectStore,
   ) {}
 
   /** `duplicate` is true when these exact bytes were already uploaded to this BOM (the existing upload is returned). */
@@ -61,7 +63,7 @@ export class CadUploadsService {
     if (existing && existing.status !== 'failed') return { upload: existing, duplicate: true };
 
     // New, or failed earlier. Only a failed upload whose original is still stored can be retried without sending the bytes again.
-    if (!existing || existing.source_deleted_at) await this.store(admin, storagePath, input.bytes);
+    if (!existing || existing.source_deleted_at) await this.objects.put(CAD_BUCKET, storagePath, input.bytes, { upsert: true });
 
     if (existing) return { upload: await this.requeue(admin, existing.id), duplicate: false };
 
@@ -103,11 +105,6 @@ export class CadUploadsService {
     const { data, error } = await admin.from('cad_uploads').select('*').eq('bom_id', bomId).eq('sha256', sha256).maybeSingle();
     if (error) throw new Error(`Could not look up the upload: ${error.message}`);
     return (data as CadUploadRow | null) ?? null;
-  }
-
-  private async store(admin: ReturnType<SupabaseService['getPrivilegedClient']>, path: string, bytes: Buffer): Promise<void> {
-    const stored = await admin.storage.from(CAD_BUCKET).upload(path, bytes, { upsert: true, contentType: 'application/octet-stream' });
-    if (stored.error) throw new Error(`Could not store the upload: ${stored.error.message}`);
   }
 
   /** Uploading the same file again after a failure is a request to retry it. */

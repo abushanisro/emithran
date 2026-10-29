@@ -2,6 +2,7 @@ import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 
 import { AuditModule } from '../../common/audit/audit.module';
+import { StorageModule } from '../../common/storage/storage.module';
 import { ElectronicsQueueHealthIndicator } from '../electronics-costing/infrastructure/queue/queue.health';
 import { HealthController } from './health.controller';
 import { HealthModule } from './health.module';
@@ -25,6 +26,7 @@ describe('HealthModule wiring', () => {
           ],
         }),
         AuditModule, // global in the app
+        StorageModule, // global in the app
         HealthModule,
       ],
     }).compile();

@@ -1,9 +1,10 @@
-import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import FormData from 'form-data';
 
 import { expandArchive, type ArchiveLimits } from '../../common/archive/expand-archive';
 import { AuditService } from '../../common/audit/audit.service';
 import { cadEngineHttp } from '../../common/resilience/engine-http';
+import { OBJECT_STORE, type ObjectStore } from '../../common/storage/object-store';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { MAX_ARCHIVE_EXPANDED_BYTES, MAX_CAD_FILE_BYTES } from '../../common/upload-limits';
 import { type CreateBOMItemDto } from '../bom-items/dto/bom-items.dto';
@@ -97,6 +98,7 @@ export class CadUploadRunner implements OnModuleInit, OnModuleDestroy {
     private readonly bomItems: BOMItemsService,
     private readonly files: FileStorageService,
     private readonly audit: AuditService,
+    @Inject(OBJECT_STORE) private readonly objects: ObjectStore,
   ) {}
 
   onModuleInit(): void {
@@ -156,8 +158,7 @@ export class CadUploadRunner implements OnModuleInit, OnModuleDestroy {
   /** Removes the stored original (the parts are stored on their own) and records that it is gone. A failure is logged, not fatal. */
   private async dropSource(row: Pick<CadUploadRow, 'id' | 'storage_path'>): Promise<void> {
     try {
-      const removed = await this.admin.storage.from(CAD_BUCKET).remove([row.storage_path]);
-      if (removed.error) throw new Error(removed.error.message);
+      await this.objects.remove(CAD_BUCKET, [row.storage_path]);
       const { error } = await this.admin.from('cad_uploads').update({ source_deleted_at: new Date().toISOString() }).eq('id', row.id);
       if (error) throw new Error(error.message);
     } catch (error) {
@@ -209,16 +210,16 @@ export class CadUploadRunner implements OnModuleInit, OnModuleDestroy {
     const partsPrefix = `cad-uploads/${row.organization_id}/${row.id}/parts`;
     const exported = new Map<string, Buffer>();
     for (const definition of new Set(items.flatMap((i) => (i.definition ? [i.definition] : [])))) {
-      const downloaded = await this.admin.storage.from(CAD_BUCKET).download(`${partsPrefix}/${partFileName(definition)}`);
-      if (downloaded.error || !downloaded.data) throw new Error(`could not read the stored part ${definition}: ${downloaded.error?.message ?? 'no data'}`);
-      exported.set(definition, Buffer.from(await downloaded.data.arrayBuffer()));
+      const stored = await this.objects.get(CAD_BUCKET, `${partsPrefix}/${partFileName(definition)}`);
+      if (!stored) throw new Error(`could not read the stored part ${definition}: not found`);
+      exported.set(definition, stored);
     }
     await this.createItems(row, items, [], exported);
     const { error } = await this.admin.from('cad_uploads').update({ status: 'done', finished_at: new Date().toISOString() }).eq('id', row.id);
     if (error) throw new Error(`could not save the result: ${error.message}`);
     // The parts now live on their BOM items; the work copies and the original are no longer needed.
-    const removed = await this.admin.storage.from(CAD_BUCKET).remove([...exported.keys()].map((d) => `${partsPrefix}/${partFileName(d)}`));
-    if (removed.error) this.logger.warn(`could not remove the work files of upload ${row.id}: ${removed.error.message}`);
+    await this.objects.remove(CAD_BUCKET, [...exported.keys()].map((d) => `${partsPrefix}/${partFileName(d)}`))
+      .catch((error: unknown) => this.logger.warn(`could not remove the work files of upload ${row.id}: ${error instanceof Error ? error.message : String(error)}`));
     await this.dropSource(row);
     await this.audit.recordBestEffort({
       action: 'upload.completed',
@@ -253,9 +254,9 @@ export class CadUploadRunner implements OnModuleInit, OnModuleDestroy {
     }
 
     if (row.source_deleted_at) throw new PermanentFailure('source_expired', 'The original upload was removed to save space. Upload the file again.');
-    const downloaded = await this.admin.storage.from(CAD_BUCKET).download(row.storage_path);
-    if (downloaded.error || !downloaded.data) throw new Error(`could not read the stored upload: ${downloaded.error?.message ?? 'no data'}`);
-    const { files, skipped } = this.stepFiles(row, Buffer.from(await downloaded.data.arrayBuffer()));
+    const original = await this.objects.get(CAD_BUCKET, row.storage_path);
+    if (!original) throw new Error('could not read the stored upload: not found');
+    const { files, skipped } = this.stepFiles(row, original);
 
     const report = await this.analyse(files);
     if (report.assembly.length === 0) throw new PermanentFailure('no_solids', 'None of the STEP files could be read as a part or assembly.');

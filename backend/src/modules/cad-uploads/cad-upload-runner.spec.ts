@@ -46,15 +46,10 @@ function setup(claimed: CadUploadRow | null, expired: { id: string; storage_path
       update: (patch: Record<string, unknown>) => ({ eq: async () => { updates.push(patch); return { error: null }; } }),
       select: () => sweep,
     }),
-    storage: {
-      from: () => ({
-        download: async (path: string) => {
-          downloads.push(path);
-          return { data: { arrayBuffer: async () => STEP }, error: null };
-        },
-        remove: async (paths: string[]) => { removed.push(paths); return { error: null }; },
-      }),
-    },
+  };
+  const objects = {
+    get: async (_bucket: string, path: string) => { downloads.push(path); return Buffer.from(STEP); },
+    remove: async (_bucket: string, paths: string[]) => { removed.push(paths); },
   };
   let next = 0;
   const bomItems = {
@@ -64,7 +59,7 @@ function setup(claimed: CadUploadRow | null, expired: { id: string; storage_path
   };
   const files = { uploadFile: jest.fn(async () => ({ storagePath: 'bom/path.step' })), removeUnreferencedFiles: jest.fn(async (_paths: string[]) => 0) };
   const audit = { recordBestEffort: jest.fn(async () => undefined) };
-  const runner = new CadUploadRunner({ getPrivilegedClient: () => admin } as never, bomItems as never, files as never, audit as never);
+  const runner = new CadUploadRunner({ getPrivilegedClient: () => admin } as never, bomItems as never, files as never, audit as never, objects as never);
   return { runner, updates, removed, bomItems, files, audit, rpcCalls: () => rpcCalls, rpcNames, downloads };
 }
 
