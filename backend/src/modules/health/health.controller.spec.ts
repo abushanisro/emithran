@@ -44,6 +44,9 @@ const databaseReturning = (error: { message: string } | null) => ({
   getPrivilegedClient: () => ({ from: () => ({ select: () => ({ limit: () => ({ abortSignal: async () => ({ error }) }) }) }) }),
 });
 
+// Each test boots the whole NestJS app, which can take longer than Jest's 5 s default when many suites run in parallel.
+jest.setTimeout(30_000);
+
 describe('HealthController: liveness and readiness', () => {
   let app: INestApplication | undefined;
   const cad = new FakeEngine();

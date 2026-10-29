@@ -30,7 +30,8 @@ describe('error log file', () => {
   afterEach(() => {
     resetErrorLogFileForTests();
     process.env = { ...env };
-    fs.rmSync(dir, { recursive: true, force: true });
+    // winston may still hold the file for a moment (Windows refuses to delete it then): retry instead of failing the test
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 
   /** Entries written so far, once winston has flushed the file. */
