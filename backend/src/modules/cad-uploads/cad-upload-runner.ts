@@ -1,9 +1,10 @@
-import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import FormData from 'form-data';
 
 import { expandArchive, type ArchiveLimits } from '../../common/archive/expand-archive';
 import { AuditService } from '../../common/audit/audit.service';
 import { cadEngineHttp } from '../../common/resilience/engine-http';
+import { OBJECT_STORE, type ObjectStore } from '../../common/storage/object-store';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { MAX_ARCHIVE_EXPANDED_BYTES, MAX_CAD_FILE_BYTES } from '../../common/upload-limits';
 import { type CreateBOMItemDto } from '../bom-items/dto/bom-items.dto';
@@ -13,6 +14,7 @@ import { parseAssemblyReport, type AssemblyNode, type AssemblyReport } from './a
 import { CAD_BUCKET, type CadUploadRow } from './cad-upload.types';
 import { planItems, type PlannedItem } from './plan-items';
 import { DEFAULT_CAD_ENGINE_URL } from '../../common/engine-urls';
+import { observeQueueDepth, recordCadUploadDuration, type CadUploadOutcome } from '../../telemetry/metrics';
 
 // The runner starts the moment an upload is queued (wake()); this slow poll only recovers from a restart or another replica's
 // rows, so an idle runner costs a few requests an hour, not one every two seconds.
@@ -97,9 +99,12 @@ export class CadUploadRunner implements OnModuleInit, OnModuleDestroy {
     private readonly bomItems: BOMItemsService,
     private readonly files: FileStorageService,
     private readonly audit: AuditService,
+    @Inject(OBJECT_STORE) private readonly objects: ObjectStore,
   ) {}
 
   onModuleInit(): void {
+    // Reported by every replica that serves the API, runner or not, so the backlog is visible even if no runner is up.
+    observeQueueDepth(['cad_upload'], () => this.waitingCount());
     if (process.env.CAD_UPLOAD_RUNNER === 'off') return;
     this.timer = setInterval(() => void this.tick(), POLL_MS);
   }
@@ -156,12 +161,35 @@ export class CadUploadRunner implements OnModuleInit, OnModuleDestroy {
   /** Removes the stored original (the parts are stored on their own) and records that it is gone. A failure is logged, not fatal. */
   private async dropSource(row: Pick<CadUploadRow, 'id' | 'storage_path'>): Promise<void> {
     try {
-      const removed = await this.admin.storage.from(CAD_BUCKET).remove([row.storage_path]);
-      if (removed.error) throw new Error(removed.error.message);
+      await this.objects.remove(CAD_BUCKET, [row.storage_path]);
       const { error } = await this.admin.from('cad_uploads').update({ source_deleted_at: new Date().toISOString() }).eq('id', row.id);
       if (error) throw new Error(error.message);
     } catch (error) {
       this.logger.warn(`could not remove the original of upload ${row.id}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /** Uploads waiting for a runner (queued, or analysed and waiting to be materialized); null when it cannot be read. */
+  private async waitingCount(): Promise<number | null> {
+    const { count, error } = await this.admin.from('cad_uploads').select('id', { count: 'exact', head: true }).in('status', ['queued', 'analysed']);
+    return error ? null : (count ?? 0);
+  }
+
+  /** Times one processing attempt and records how it ended; a metric failure never changes the attempt's result. */
+  private async measured(row: CadUploadRow, attempt: () => Promise<void>, materializing = false): Promise<void> {
+    const started = process.hrtime.bigint();
+    const record = (outcome: CadUploadOutcome) => {
+      try {
+        recordCadUploadDuration(Number(process.hrtime.bigint() - started) / 1e9, outcome);
+      } catch {
+        // metrics are best effort
+      }
+    };
+    try {
+      await attempt();
+      record('ok');
+    } catch (error) {
+      record(await this.fail(row, error, materializing));
     }
   }
 
@@ -183,11 +211,7 @@ export class CadUploadRunner implements OnModuleInit, OnModuleDestroy {
     if (error) throw new Error(`could not claim an analysed upload: ${error.message}`);
     const row = (data as CadUploadRow[] | null)?.[0];
     if (!row) return false;
-    try {
-      await this.materialize(row);
-    } catch (error) {
-      await this.fail(row, error, true);
-    }
+    await this.measured(row, () => this.materialize(row), true);
     return true;
   }
 
@@ -209,16 +233,16 @@ export class CadUploadRunner implements OnModuleInit, OnModuleDestroy {
     const partsPrefix = `cad-uploads/${row.organization_id}/${row.id}/parts`;
     const exported = new Map<string, Buffer>();
     for (const definition of new Set(items.flatMap((i) => (i.definition ? [i.definition] : [])))) {
-      const downloaded = await this.admin.storage.from(CAD_BUCKET).download(`${partsPrefix}/${partFileName(definition)}`);
-      if (downloaded.error || !downloaded.data) throw new Error(`could not read the stored part ${definition}: ${downloaded.error?.message ?? 'no data'}`);
-      exported.set(definition, Buffer.from(await downloaded.data.arrayBuffer()));
+      const stored = await this.objects.get(CAD_BUCKET, `${partsPrefix}/${partFileName(definition)}`);
+      if (!stored) throw new Error(`could not read the stored part ${definition}: not found`);
+      exported.set(definition, stored);
     }
     await this.createItems(row, items, [], exported);
     const { error } = await this.admin.from('cad_uploads').update({ status: 'done', finished_at: new Date().toISOString() }).eq('id', row.id);
     if (error) throw new Error(`could not save the result: ${error.message}`);
     // The parts now live on their BOM items; the work copies and the original are no longer needed.
-    const removed = await this.admin.storage.from(CAD_BUCKET).remove([...exported.keys()].map((d) => `${partsPrefix}/${partFileName(d)}`));
-    if (removed.error) this.logger.warn(`could not remove the work files of upload ${row.id}: ${removed.error.message}`);
+    await this.objects.remove(CAD_BUCKET, [...exported.keys()].map((d) => `${partsPrefix}/${partFileName(d)}`))
+      .catch((error: unknown) => this.logger.warn(`could not remove the work files of upload ${row.id}: ${error instanceof Error ? error.message : String(error)}`));
     await this.dropSource(row);
     await this.audit.recordBestEffort({
       action: 'upload.completed',
@@ -236,11 +260,7 @@ export class CadUploadRunner implements OnModuleInit, OnModuleDestroy {
     if (error) throw new Error(`could not claim an upload: ${error.message}`);
     const row = (data as CadUploadRow[] | null)?.[0];
     if (!row) return false;
-    try {
-      await this.process(row);
-    } catch (error) {
-      await this.fail(row, error);
-    }
+    await this.measured(row, () => this.process(row));
     return true;
   }
 
@@ -253,9 +273,9 @@ export class CadUploadRunner implements OnModuleInit, OnModuleDestroy {
     }
 
     if (row.source_deleted_at) throw new PermanentFailure('source_expired', 'The original upload was removed to save space. Upload the file again.');
-    const downloaded = await this.admin.storage.from(CAD_BUCKET).download(row.storage_path);
-    if (downloaded.error || !downloaded.data) throw new Error(`could not read the stored upload: ${downloaded.error?.message ?? 'no data'}`);
-    const { files, skipped } = this.stepFiles(row, Buffer.from(await downloaded.data.arrayBuffer()));
+    const original = await this.objects.get(CAD_BUCKET, row.storage_path);
+    if (!original) throw new Error('could not read the stored upload: not found');
+    const { files, skipped } = this.stepFiles(row, original);
 
     const report = await this.analyse(files);
     if (report.assembly.length === 0) throw new PermanentFailure('no_solids', 'None of the STEP files could be read as a part or assembly.');
@@ -413,7 +433,7 @@ export class CadUploadRunner implements OnModuleInit, OnModuleDestroy {
     if (error) throw new Error(`could not record the created items: ${error.message}`);
   }
 
-  private async fail(row: CadUploadRow, error: unknown, materializing = false): Promise<void> {
+  private async fail(row: CadUploadRow, error: unknown, materializing = false): Promise<CadUploadOutcome> {
     const permanent = error instanceof PermanentFailure;
     const detail = (error instanceof Error ? error.message : String(error)).slice(0, 500);
     const retry = !permanent && (materializing ? row.materialize_attempts : row.attempts) < MAX_ATTEMPTS;
@@ -438,5 +458,6 @@ export class CadUploadRunner implements OnModuleInit, OnModuleDestroy {
         meta: { fileName: row.file_name, errorCode: permanent ? error.code : 'processing_failed' },
       });
     }
+    return retry ? 'retry' : 'error';
   }
 }

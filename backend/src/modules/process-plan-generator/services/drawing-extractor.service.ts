@@ -1,7 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import axios from 'axios';
 
+import { BomFileAccess } from '../../../common/storage/bom-file-access';
+import { OBJECT_STORE, type ObjectStore } from '../../../common/storage/object-store';
 import { SupabaseService } from '../../../common/supabase/supabase.service';
 import type { DrawingBrief } from '../dto/drawing-brief.dto';
 import { UNAVAILABLE_DRAWING_BRIEF } from '../dto/drawing-brief.dto';
@@ -10,7 +11,7 @@ const EXTRACTION_MODEL = 'claude-sonnet-4-6';
 const EXTRACTION_MAX_TOKENS = 8192;
 const VISION_TIMEOUT_MS = 60_000;
 const STORAGE_BUCKET = process.env.SUPABASE_BUCKET_BOM_FILES || 'bom-files';
-const SIGNED_URL_TTL_SEC = 300;
+const MAX_PDF_BYTES = 50 * 1024 * 1024;
 
 /**
  * Extracts a structured DrawingBrief from a BOM item's 2D PDF drawing.
@@ -34,6 +35,8 @@ export class DrawingExtractorService {
   constructor(
     private readonly configService: ConfigService,
     private readonly supabaseService: SupabaseService,
+    private readonly fileAccess: BomFileAccess,
+    @Inject(OBJECT_STORE) private readonly objects: ObjectStore,
   ) {
     this.apiKey =
       this.configService.get<string>('ANTHROPIC_API_KEY') ??
@@ -98,24 +101,22 @@ export class DrawingExtractorService {
   // No rasterisation — we send the PDF bytes directly to Claude.
 
   private async fetchPdfBase64(storagePath: string, accessToken: string | null): Promise<string | null> {
-    const client = this.supabaseService.getUserClient(accessToken ?? undefined);
-    const { data, error } = await client
-      .storage
-      .from(STORAGE_BUCKET)
-      .createSignedUrl(storagePath, SIGNED_URL_TTL_SEC);
-    if (error || !data?.signedUrl) {
-      this.logger.warn(`Signed URL for ${storagePath} failed: ${error?.message ?? 'unknown'}`);
+    // Read with the service role, so the caller's right to this file is checked first (their own folder, a project they own).
+    if (!(await this.fileAccess.canRead(storagePath, accessToken ?? undefined))) {
+      this.logger.warn(`Drawing ${storagePath} is not readable by the caller`);
       return null;
     }
-
-    const res = await axios.get<ArrayBuffer>(data.signedUrl, {
-      responseType: 'arraybuffer',
-      timeout: 30_000,
-      maxContentLength: 50 * 1024 * 1024,
-    });
-    const base64 = Buffer.from(res.data).toString('base64');
-    this.logger.log(`PDF downloaded for ${storagePath}: ${(res.data.byteLength / 1024).toFixed(1)} KB`);
-    return base64;
+    const pdf = await this.objects.get(STORAGE_BUCKET, storagePath);
+    if (!pdf) {
+      this.logger.warn(`Drawing ${storagePath} not found`);
+      return null;
+    }
+    if (pdf.length > MAX_PDF_BYTES) {
+      this.logger.warn(`Drawing ${storagePath} is ${pdf.length} bytes, over the ${MAX_PDF_BYTES} limit`);
+      return null;
+    }
+    this.logger.log(`PDF downloaded for ${storagePath}: ${(pdf.length / 1024).toFixed(1)} KB`);
+    return pdf.toString('base64');
   }
 
   // ── Claude PDF extraction ────────────────────────────────────────────────

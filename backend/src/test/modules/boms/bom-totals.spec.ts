@@ -53,7 +53,7 @@ function services(client: SupabaseClient) {
   const fx = rates();
   const boms = new BOMsService(supabase, logger, fx as unknown as ExchangeRateService);
   const projectRepository = { findById: async () => ({ target_bom_cost: 100, target_bom_cost_currency: 'INR' }) };
-  const projects = new ProjectsService(supabase, projectRepository as any, logger, fx as unknown as ExchangeRateService);
+  const projects = new ProjectsService(supabase, projectRepository as any, logger, fx as unknown as ExchangeRateService, {} as any);
   return { boms, projects, fx };
 }
 

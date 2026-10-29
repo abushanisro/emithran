@@ -50,6 +50,9 @@ import { LoggerModule } from './common/logger/logger.module';
 import { SupabaseService } from './common/supabase/supabase.service';
 import { SupabaseAuthGuard } from './common/guards/supabase-auth.guard';
 import { SessionModule } from './common/session/session.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { StorageModule } from './common/storage/storage.module';
+import { SupabaseModule } from './common/supabase/supabase.module';
 import { validate } from './config/env.validation';
 import { AppController } from './app.controller';
 
@@ -57,7 +60,7 @@ import { AppController } from './app.controller';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
+      envFilePath: ['../.env', '.env'], // the repo-root file when run from backend/; a missing file is fine (containers)
       validate,
     }),
 
@@ -122,6 +125,9 @@ import { AppController } from './app.controller';
     ElectronicsCostingModule,
     FxModule,
     SessionModule,
+    AuthModule,
+    SupabaseModule,
+    StorageModule,
   ],
   controllers: [AppController],
   providers: [

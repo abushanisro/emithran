@@ -110,7 +110,7 @@ function startSdk(config: TelemetryConfig, options: StartOptions): TelemetryHand
   const metricReader =
     options.metricReader ??
     new PeriodicExportingMetricReader({
-      exporter: new OTLPMetricExporter({ url: `${config.endpoint}/v1/metrics`, ...exporterLimits }),
+      exporter: new OTLPMetricExporter({ url: config.metricsEndpoint, ...exporterLimits }),
       exportIntervalMillis: config.metricIntervalMs,
       exportTimeoutMillis: config.exportTimeoutMs,
     });

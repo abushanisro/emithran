@@ -31,7 +31,6 @@ import {
   CreateDeliveryAddressDto,
   CreateTrackingEventDto
 } from './dto/delivery.dto';
-// import { AuthGuard } from '@nestjs/passport';
 // import { CurrentUser } from '@/common/decorators/current-user.decorator';
 
 @ApiTags('Delivery')

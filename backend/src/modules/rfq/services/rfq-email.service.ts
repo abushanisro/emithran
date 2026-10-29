@@ -1,5 +1,7 @@
-import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, Inject, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { BomFileAccess } from '../../../common/storage/bom-file-access';
+import { OBJECT_STORE, type ObjectStore } from '../../../common/storage/object-store';
 import { createTransport, Transporter, SendMailOptions } from 'nodemailer';
 import * as path from 'path';
 import { RfqRecord } from '../dto/rfq-response.dto';
@@ -48,7 +50,11 @@ export class RfqEmailService {
   private readonly logger = new Logger(RfqEmailService.name);
   private transporter: Transporter;
 
-  constructor(private readonly supabaseService: SupabaseService) {
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly fileAccess: BomFileAccess,
+    @Inject(OBJECT_STORE) private readonly objects: ObjectStore,
+  ) {
     // Only initialize if SMTP credentials are provided
     if (process.env.SMTP_USER && process.env.SMTP_PASS) {
       this.initializeTransporter();
@@ -460,32 +466,33 @@ ${templateData.companyName}
   }
 
   /**
-   * The parts' drawings and models as in-memory attachments. Each stored path is
-   * a key in the BOM files bucket and is downloaded with the caller's own client,
-   * so storage RLS decides what may be read: a path pointing at another tenant's
-   * object, a server file or a URL is never attached (it is only ever used as a
-   * storage key, and the transport refuses file and URL attachments anyway).
+   * The parts' drawings and models as in-memory attachments. Each stored path is a key in the BOM files bucket, read with the
+   * service role only after BomFileAccess confirms the caller may read it (their own folder, a project they own): a path pointing at
+   * another tenant's object, a server file or a URL is never attached.
    */
   private async prepareFileAttachments(bomItems: BomItemDetails[], accessToken?: string): Promise<NonNullable<SendMailOptions['attachments']>> {
     const attachments: NonNullable<SendMailOptions['attachments']> = [];
-    const storage = this.supabaseService.getUserClient(accessToken).storage.from(BOM_FILES_BUCKET);
 
     for (const item of bomItems) {
       for (const [storagePath, type] of [[item.file2dPath, '2D'], [item.file3dPath, '3D']] as const) {
         if (!storagePath) continue;
         try {
-          const { data, error } = await storage.download(storagePath);
-          if (error || !data) {
-            this.logger.warn(`Skipped ${type} file of item ${item.id}: ${error?.message ?? 'not found'}`);
+          if (!(await this.fileAccess.canRead(storagePath, accessToken))) {
+            this.logger.warn(`Skipped ${type} file of item ${item.id}: not readable by the sender`);
             continue;
           }
-          if (data.size > MAX_ATTACHMENT_BYTES) {
-            this.logger.warn(`Skipped ${type} file of item ${item.id}: ${data.size} bytes exceeds the attachment limit`);
+          const content = await this.objects.get(BOM_FILES_BUCKET, storagePath);
+          if (!content) {
+            this.logger.warn(`Skipped ${type} file of item ${item.id}: not found`);
+            continue;
+          }
+          if (content.length > MAX_ATTACHMENT_BYTES) {
+            this.logger.warn(`Skipped ${type} file of item ${item.id}: ${content.length} bytes exceeds the attachment limit`);
             continue;
           }
           attachments.push({
             filename: this.extractFileName(storagePath, item.partNumber || item.name, type),
-            content: Buffer.from(await data.arrayBuffer()),
+            content,
             contentType: 'application/octet-stream',
           });
         } catch (error) {

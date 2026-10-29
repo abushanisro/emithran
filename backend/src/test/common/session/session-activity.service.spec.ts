@@ -43,7 +43,7 @@ function fakeSupabase(opts: { readError?: object; writeError?: object } = {}) {
     },
     auth: { admin: { signOut } },
   };
-  const service = { getPrivilegedClient: jest.fn().mockReturnValue(client) } as unknown as SupabaseService;
+  const service = { getPrivilegedClient: jest.fn().mockReturnValue(client), usesPostgrest: jest.fn().mockReturnValue(false) } as unknown as SupabaseService;
   return { service, rows, reads, signOut };
 }
 
@@ -114,6 +114,16 @@ describe('SessionActivityService', () => {
     expect(err).toBeInstanceOf(UnauthorizedException);
     expect(err.getResponse()).toMatchObject({ code: SESSION_IDLE_TIMEOUT_CODE });
     expect(db.signOut).toHaveBeenCalledWith('tok', 'local');
+  });
+
+  it('on plain Postgres (Auth0) rejects an idle session without any Supabase revoke, and keeps rejecting it', async () => {
+    const db = fakeSupabase();
+    (db.service.usesPostgrest as jest.Mock).mockReturnValue(true);
+    const svc = new SessionActivityService(db.service);
+    await svc.assertActive('s1', 'u1', 'tok', T0);
+    await expect(svc.assertActive('s1', 'u1', 'tok', T0 + 30 * MIN)).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(svc.assertActive('s1', 'u1', 'tok', T0 + 31 * MIN)).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(db.signOut).not.toHaveBeenCalled();
   });
 
   it('drops the revoked token from the verified-token cache the guard uses', async () => {

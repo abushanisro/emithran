@@ -106,11 +106,13 @@ export class SessionActivityService {
     return toTimes(data);
   }
 
-  /** Revokes the Supabase session; its row goes with it (ON DELETE CASCADE). */
+  /** Supabase: revokes the session (its row goes with it, ON DELETE CASCADE). Plain Postgres: only forgets it; the row stays and keeps rejecting. */
   private async expire(sessionId: string, accessToken: string): Promise<void> {
     this.cache.delete(sessionId);
     // The guard's verified-token cache must not keep accepting this token.
     forgetVerified(accessToken);
+    // Auth0 sessions have nothing to revoke here: the stored deadline keeps rejecting this session, and the browser signs out.
+    if (this.supabaseService.usesPostgrest()) return;
     const { error } = await this.supabaseService
       .getPrivilegedClient('session-idle: revoke a Supabase session that passed its inactivity deadline')
       .auth.admin.signOut(accessToken, 'local');

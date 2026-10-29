@@ -1,6 +1,9 @@
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+
+import { DbTokenMinter } from '../db/db-token';
+import { createDbClient } from '../db/postgrest-client';
 import { currentRequestAuth } from '../request-context/request-auth-context';
 import { getVerified, rememberVerified } from './token-verification-cache';
 
@@ -17,9 +20,23 @@ export class SupabaseService {
   private supabaseAnonKey: string;
   private supabaseServiceKey: string;
   private adminClient: SupabaseClient;
+  // DB_BACKEND=postgrest: no Supabase at all. Data goes to a PostgREST (POSTGREST_URL) with tokens this backend signs itself
+  // (DB_JWT_SECRET); see docs and CLAUDE.md "Leaving Supabase". Default `supabase` keeps today's behaviour.
+  private postgrestUrl = '';
+  private minter?: DbTokenMinter;
 
   constructor(private configService: ConfigService) {
     // Backend uses server-side environment variables (not NEXT_PUBLIC_ prefix)
+    if (this.configService.get<string>('DB_BACKEND') === 'postgrest') {
+      this.postgrestUrl = this.configService.get<string>('POSTGREST_URL') || '';
+      const secret = this.configService.get<string>('DB_JWT_SECRET') || '';
+      if (!this.postgrestUrl || !secret) {
+        this.logger.error('DB_BACKEND=postgrest needs POSTGREST_URL and DB_JWT_SECRET');
+        return;
+      }
+      this.minter = new DbTokenMinter(secret);
+      return; // Supabase's URL and keys are not used in this mode
+    }
     this.supabaseUrl = this.configService.get<string>('SUPABASE_URL') || '';
     this.supabaseAnonKey = this.configService.get<string>('SUPABASE_ANON_KEY') || '';
     this.supabaseServiceKey = this.configService.get<string>('SUPABASE_SERVICE_KEY') || '';
@@ -50,6 +67,12 @@ export class SupabaseService {
    * @returns Authenticated Supabase client
    */
   getClient(accessToken: string): SupabaseClient {
+    if (this.minter) {
+      if (typeof accessToken !== 'string' || accessToken.trim() === '') {
+        throw new UnauthorizedException('Access token is required for a user-scoped database client');
+      }
+      return createDbClient(this.postgrestUrl, accessToken);
+    }
     if (!this.adminClient) {
       throw new Error('Supabase admin client not initialized');
     }
@@ -209,6 +232,11 @@ export class SupabaseService {
       );
       return null;
     }
+    if (this.minter) {
+      const { data, error } = await this.getPrivilegedClient('dev-bypass: find ADMIN_FALLBACK_EMAIL in the directory').rpc('directory_find_by_email', { p_email: adminEmail });
+      if (error) this.logger.warn(`Failed to get admin user ID: ${error.message}`);
+      return (data as string | null) ?? null;
+    }
     try {
       const { data: users, error } = await this.adminClient.auth.admin.listUsers();
 
@@ -261,11 +289,26 @@ export class SupabaseService {
     if (!reason || !reason.trim()) {
       throw new Error('getPrivilegedClient requires a non-empty reason');
     }
+    if (this.minter) {
+      this.logger.debug(`privileged client: ${reason}`);
+      return createDbClient(this.postgrestUrl, this.minter.forService());
+    }
     if (!this.adminClient) {
       throw new Error('Supabase not configured');
     }
     this.logger.debug(`privileged client: ${reason}`);
     return this.adminClient;
+  }
+
+  /** True when data goes to a PostgREST on plain Postgres (no Supabase auth/admin API exists). */
+  usesPostgrest(): boolean {
+    return !!this.minter;
+  }
+
+  /** DB_BACKEND=postgrest: the token PostgREST trusts for this user (RLS sees `userId` through auth.uid()). */
+  mintDbUserToken(userId: string, extra: { email?: string; sessionId?: string } = {}): string {
+    if (!this.minter) throw new Error('mintDbUserToken needs DB_BACKEND=postgrest');
+    return this.minter.forUser(userId, extra);
   }
 
   /** email -> cached real session token, so the dev bypass mints at most once per token lifetime. */
@@ -279,6 +322,11 @@ export class SupabaseService {
    * API and redeemed through the anon client; nothing is sent by email.
    */
   async mintUserAccessToken(email: string): Promise<string | null> {
+    if (this.minter) {
+      // No sessions to redeem on plain Postgres: the backend signs the bypass user's database token itself.
+      const id = await this.getAdminUserId();
+      return id ? this.minter.forUser(id, { email }) : null;
+    }
     const cached = this.mintedTokens.get(email);
     // Refresh a minute before expiry.
     if (cached && cached.expiresAtMs - 60_000 > Date.now()) return cached.token;
