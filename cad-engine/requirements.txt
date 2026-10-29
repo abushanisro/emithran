@@ -39,7 +39,7 @@ opentelemetry-instrumentation-fastapi==0.66b1
 httpx==0.28.1
 
 # Security - Rate limiting
-slowapi==0.1.9
+slowapi==0.1.10
 
 # Security - File type validation (magic number checking)
 # python-magic-bin is Windows-only; on Linux libmagic is provided by the OS / conda libmagic
