@@ -1,0 +1,142 @@
+# Alert rules. Thresholds are literals here (Prometheus rules take no variables): edit, run `promtool check rules`, restart
+# Prometheus. Every threshold is an INITIAL value to be tuned from a week of real baseline, and every alert waits (`for:`) so a
+# short spike does not fire it. No notification is configured: alerts show in Prometheus (/alerts) and Grafana until an Alertmanager
+# or Grafana contact point is set up (docs/ops/monitoring.md).
+#
+# Metric names: OpenTelemetry name, dots -> underscores, unit suffix. Labels carry the same translation (http.route -> http_route).
+groups:
+  - name: availability
+    rules:
+      - alert: AppDown
+        expr: probe_success{job="probe-live"} == 0
+        for: 3m
+        labels: { severity: critical }
+        annotations:
+          summary: "Backend process is not answering /api/health/live"
+          response: "Check the backend container (docker ps, docker logs). Liveness depends on nothing external, so this is the process, the container or the network, not the database."
+
+      - alert: DatabaseUnavailable
+        expr: probe_success{job="probe-database"} == 0 and on() probe_success{job="probe-live"} == 1
+        for: 3m
+        labels: { severity: critical }
+        annotations:
+          summary: "Backend is up but its database check fails"
+          response: "Check the database provider status and the backend's SUPABASE_URL / POSTGREST_URL. Free-tier projects pause after a week idle."
+
+      - alert: EngineUnavailable
+        expr: probe_success{job="probe-engines"} == 0
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $labels.engine }}-engine does not answer /ready"
+          response: "CAD/ECAD uploads will fail or retry. Check the engine container, its memory limit (about 16 MB per MB of STEP) and /ready's reason code."
+
+      - alert: BackendTelemetryMissing
+        expr: probe_success{job="probe-live"} == 1 and on() absent_over_time(target_info{job="mithran-backend"}[10m])
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Backend is up but sends no metrics"
+          response: "Check OTEL_EXPORTER_OTLP_ENDPOINT / OTEL_EXPORTER_OTLP_METRICS_ENDPOINT on the backend and that Prometheus runs with --web.enable-otlp-receiver. Application alerts below cannot fire without data."
+
+  - name: api
+    rules:
+      # More than 5% of requests answered 5xx, with enough traffic (> 0.05 req/s) for the ratio to mean something.
+      - alert: HighServerErrorRate
+        expr: |
+          sum(rate(emithran_http_server_duration_seconds_count{emithran_status_class="5xx"}[10m]))
+            / sum(rate(emithran_http_server_duration_seconds_count[10m])) > 0.05
+          and sum(rate(emithran_http_server_duration_seconds_count[10m])) > 0.05
+        for: 10m
+        labels: { severity: critical }
+        annotations:
+          summary: "More than 5% of API requests fail with 5xx"
+          response: "Open Application Performance, find the route with the errors, then the backend log for its trace/request id. Check the database and engine alerts first."
+
+      # Routes that legitimately run for minutes (costing, route comparison, uploads, analysis) are measured by their own alerts.
+      - alert: HighApiLatencyP95
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(emithran_http_server_duration_seconds_bucket{http_route!~".*(apply-route|route-comparison|cost-summary|cad-uploads|analy[sz]e|upload).*"}[10m]))) > 5
+          and sum(rate(emithran_http_server_duration_seconds_count{http_route!~".*(apply-route|route-comparison|cost-summary|cad-uploads|analy[sz]e|upload).*"}[10m])) > 0.05
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "p95 latency of ordinary API routes is above 5 s"
+          response: "Open Application Performance, Slow endpoints. Check the database latency and the outbound client durations (http_client_request_duration)."
+
+  - name: pipelines
+    rules:
+      # Terminal attempts only: a retry is neither a success nor a failure. At least 5 finished uploads in the hour.
+      - alert: CadProcessingFailureSpike
+        expr: |
+          sum(increase(emithran_cad_upload_duration_seconds_count{emithran_outcome="error"}[1h]))
+            / sum(increase(emithran_cad_upload_duration_seconds_count{emithran_outcome=~"ok|error"}[1h])) > 0.25
+          and sum(increase(emithran_cad_upload_duration_seconds_count{emithran_outcome=~"ok|error"}[1h])) >= 5
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "More than 25% of CAD uploads ended in failure in the last hour"
+          response: "Open CAD and Costing. Failed rows carry error_code in cad_uploads (a bad file is permanent, 'processing_failed' is the engine). Check the engine alert and its logs."
+
+      - alert: CostingFailureSpike
+        expr: |
+          sum(increase(emithran_costing_duration_seconds_count{emithran_outcome="error"}[1h]))
+            / sum(increase(emithran_costing_duration_seconds_count[1h])) > 0.25
+          and sum(increase(emithran_costing_duration_seconds_count[1h])) >= 10
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "More than 25% of costing runs failed in the last hour"
+          response: "Open CAD and Costing; the costing.cost_summary / costing.route_comparison traces show the failing step. Check recent rate or reference-data migrations."
+
+      - alert: CostingSlow
+        expr: histogram_quantile(0.95, sum by (le) (rate(emithran_costing_duration_seconds_bucket[30m]))) > 180
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "p95 costing run is above 3 minutes (route comparisons normally take 1-3 minutes)"
+          response: "Check backend CPU, the engine stage durations and database latency."
+
+      # The gauge is read when metrics are exported; it must stay above the limit for the whole window.
+      - alert: BackgroundQueueBacklog
+        expr: min_over_time(emithran_job_queue_depth[15m]) > 10
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $labels.emithran_queue }}: more than 10 jobs have been waiting for 15 minutes"
+          response: "Runner stopped or too slow. CAD_UPLOAD_RUNNER=off on every replica leaves uploads queued; check the runner log and the engine."
+
+  - name: host
+    rules:
+      - alert: HighCpuUtilization
+        expr: 1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) > 0.85
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "Host CPU above 85% for 15 minutes"
+          response: "Find the busy container (docker stats). Engine analyses are CPU heavy; lower MAX_CONCURRENT_ANALYSES or add capacity."
+
+      - alert: HighMemoryUtilization
+        expr: 1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes > 0.9
+        for: 10m
+        labels: { severity: critical }
+        annotations:
+          summary: "Host memory above 90%"
+          response: "Large STEP files cost about 16 MB per MB each. Check engine memory limits and concurrency before the OOM killer picks a container."
+
+      - alert: DiskSpaceLow
+        expr: |
+          node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs"} < 0.15
+        for: 10m
+        labels: { severity: critical }
+        annotations:
+          summary: "Less than 15% disk space free on {{ $labels.mountpoint }}"
+          response: "docker system df; prune old images, check log volumes (backend-logs, cad-logs) and the Prometheus volume (PROM_RETENTION_SIZE)."
+
+      - alert: DiskWillFillIn24h
+        expr: predict_linear(node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs"}[6h], 24 * 3600) < 0
+        for: 30m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $labels.mountpoint }} is on course to fill within 24 hours"
+          response: "Find what is growing (du -xh). Act before the 15% free alert."

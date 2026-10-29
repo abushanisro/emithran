@@ -9,6 +9,14 @@ Separate from the customer-facing request logs (`backend/src/modules/developer`)
 - **Not a system of record.** Losing telemetry (redeploy gap, restore from an older backup) is acceptable; losing business data is not.
 - No customer data, credentials, headers, BOM contents or CAD/ECAD filenames in any attribute. Metric labels are bounded enums only.
 
+## Metrics: Prometheus + Grafana (2026-10-30)
+Metrics (not traces) can go to Prometheus, which ingests the same OTLP data; dashboards, alerts and the business-KPI views are in
+[monitoring.md](monitoring.md). Set `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` (a full URL, standard OTel name) to send metrics there while
+`OTEL_EXPORTER_OTLP_ENDPOINT` keeps pointing at the trace backend; unset, metrics go to `<endpoint>/v1/metrics` as before. The backend now
+labels the deployment with `APP_ENV` (stage, prd) when set. New metrics: `emithran.cad_upload.duration`, `emithran.http.server.active_requests`,
+a CAD-upload reader on `emithran.job.queue.depth` (the gauge now takes one reader per queue name instead of the last caller's), and explicit
+histogram buckets.
+
 ## Backend: OpenObserve, single node
 Pinned image: `public.ecr.aws/zinclabs/openobserve:v1.0.4` (see `docker-compose.observability.yml`).
 
