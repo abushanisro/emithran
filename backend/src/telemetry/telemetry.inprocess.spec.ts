@@ -11,7 +11,7 @@ import * as winston from 'winston';
 import { Logger as WinstonLogger } from '../common/logger/logger.service';
 import { CorrelatedConsoleLogger } from './correlated-console-logger';
 import { httpMetricsMiddleware, routeTemplate } from './http-metrics.middleware';
-import { METRIC_LABEL_KEYS, recordCostingDuration, recordHttpServerDuration, resetMetricInstruments, statusClassOf } from './metrics';
+import { METRIC_LABEL_KEYS, observeQueueDepth, recordCadUploadDuration, recordCostingDuration, recordHttpServerDuration, resetMetricInstruments, statusClassOf } from './metrics';
 import { setTelemetryActive } from './telemetry-state';
 import { Traced } from './traced';
 
@@ -192,6 +192,43 @@ describe('metric labels are a closed set', () => {
 
   it('maps status codes to a fixed set of classes', () => {
     expect([100, 200, 204, 301, 404, 429, 500, 503].map(statusClassOf)).toEqual(['1xx', '2xx', '2xx', '3xx', '4xx', '4xx', '5xx', '5xx']);
+  });
+});
+
+describe('CAD upload, queue depth and active request metrics', () => {
+  const find = async (name: string) => (await collectedMetrics()).find((m) => m.descriptor.name === name);
+
+  it('records upload durations by outcome only, in buckets that reach the 10-minute engine timeout', async () => {
+    recordCadUploadDuration(12, 'ok');
+    recordCadUploadDuration(30, 'retry');
+    recordCadUploadDuration(600, 'error');
+    const metric = (await find('emithran.cad_upload.duration'))!;
+    expect(metric.dataPoints.map((p) => p.attributes['emithran.outcome']).sort()).toEqual(['error', 'ok', 'retry']);
+    for (const point of metric.dataPoints) {
+      expect(Object.keys(point.attributes)).toEqual(['emithran.outcome']);
+      expect((point.value as { buckets: { boundaries: number[] } }).buckets.boundaries).toContain(600);
+    }
+  });
+
+  it('reports each registered queue under one gauge, skips one that cannot be read, and keeps the others', async () => {
+    observeQueueDepth(['electronics_queue'], async () => 3);
+    observeQueueDepth(['cad_upload'], async () => 5);
+    observeQueueDepth(['broken'], async () => { throw new Error('db down'); });
+    const metric = (await find('emithran.job.queue.depth'))!;
+    const byQueue = Object.fromEntries(metric.dataPoints.map((p) => [p.attributes['emithran.queue'], p.value]));
+    expect(byQueue).toMatchObject({ electronics_queue: 3, cad_upload: 5 });
+    expect(byQueue).not.toHaveProperty('broken');
+  });
+
+  it('counts requests in flight up on start and back down on close, aborted or not, without labels', async () => {
+    const before = (await find('emithran.http.server.active_requests'))?.dataPoints[0]?.value ?? 0;
+    const response = Object.assign(new EventEmitter(), { statusCode: 200, writableFinished: false });
+    httpMetricsMiddleware({ method: 'GET', route: { path: '/x' } } as never, response as never, jest.fn());
+    expect((await find('emithran.http.server.active_requests'))!.dataPoints[0]!.value).toBe(Number(before) + 1);
+    response.emit('close');
+    const after = (await find('emithran.http.server.active_requests'))!.dataPoints[0]!;
+    expect(after.value).toBe(before);
+    expect(after.attributes).toEqual({});
   });
 });
 

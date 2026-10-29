@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException, InternalServerErrorException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { UserDirectory } from '../../common/supabase/user-directory';
 import { SupabaseService } from '@/common/supabase/supabase.service';
 import { CreateProjectDto, UpdateProjectDto, QueryProjectsDto } from './dto/projects.dto';
 import { ProjectResponseDto, ProjectListResponseDto } from './dto/project-response.dto';
@@ -18,6 +19,7 @@ export class ProjectsService {
     private readonly projectsRepository: ProjectsRepository,
     private readonly customLogger: CustomLogger,
     private readonly exchangeRates: ExchangeRateService,
+    private readonly directory: UserDirectory,
   ) {}
 
   async findAll(query: QueryProjectsDto, userId: string, accessToken?: string): Promise<ProjectListResponseDto> {
@@ -459,20 +461,12 @@ export class ProjectsService {
 
       // Get user details separately to avoid relationship issues
       const userIds = (teamMembers || []).map(m => m.user_id).filter(Boolean);
-      let userDetails: Record<string, any> = {};
-      
-      if (userIds.length > 0) {
-        const { data: users } = await client.auth.admin.listUsers();
-        const usersList = users?.users || [];
-        for (const user of usersList) {
-          userDetails[user.id] = user;
-        }
-      }
+      const userDetails = await this.directory.findByIds(userIds);
 
       const formattedMembers = (teamMembers || []).map(member => {
-        const user = userDetails[member.user_id];
+        const user = userDetails.get(member.user_id);
         const email = user?.email || (member as any).email || 'unknown@example.com';
-        const name = user?.user_metadata?.full_name || email?.split('@')[0] || 'Team Member';
+        const name = user?.fullName || email?.split('@')[0] || 'Team Member';
         
         return {
           id: member.id,
@@ -531,11 +525,9 @@ export class ProjectsService {
       if (dto.email && !targetUserId) {
         try {
           // Try to find user in Supabase auth
-          const { data: authUsers } = await client.auth.admin.listUsers();
-          const authUser = authUsers?.users?.find((u: any) => u.email === dto.email);
-          
-          if (authUser) {
-            targetUserId = authUser.id;
+          const existingId = await this.directory.findIdByEmail(dto.email);
+          if (existingId) {
+            targetUserId = existingId;
           } else {
             // For MVP: Create a placeholder UUID for pending user (using crypto.randomUUID if available)
             if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -706,11 +698,10 @@ export class ProjectsService {
       
       try {
         if (updatedMember.user_id && !updatedMember.user_id.startsWith('pending-')) {
-          const { data: authUsers } = await client.auth.admin.listUsers();
-          const authUser = authUsers?.users?.find((u: any) => u.id === updatedMember.user_id);
+          const authUser = (await this.directory.findByIds([updatedMember.user_id])).get(updatedMember.user_id);
           if (authUser) {
             userEmail = authUser.email || '';
-            userName = authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || '';
+            userName = authUser.fullName || authUser.email?.split('@')[0] || '';
           }
         }
       } catch (authError) {

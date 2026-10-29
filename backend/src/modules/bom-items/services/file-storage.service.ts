@@ -1,6 +1,7 @@
-import { Injectable, Logger, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import { Inject, Injectable, Logger, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { OBJECT_STORE, type ObjectStore } from '../../../common/storage/object-store';
 import * as crypto from 'crypto';
 import { gzip } from 'zlib';
 import { promisify } from 'util';
@@ -23,7 +24,7 @@ interface UploadedFile {
  *
  * Responsibilities:
  * - Validate files (type, size, content)
- * - Upload files to Supabase Storage
+ * - Upload files to the object store (Supabase Storage or an S3-compatible bucket)
  * - Generate secure signed URLs
  * - Track file metadata in database
  * - Handle file versioning
@@ -54,12 +55,12 @@ export class FileStorageService {
   private readonly ALLOWED_3D_EXTENSIONS = ['.stp', '.step', '.stl', '.obj', '.iges', '.igs'];
   private readonly ALLOWED_2D_EXTENSIONS = ['.pdf', '.dwg', '.dxf', '.png', '.jpg', '.jpeg'];
 
-  constructor(private readonly supabaseService: SupabaseService) {
-    // Storage-bucket operations on CAD/drawing files run as the service role by
-    // design (bucket access is not RLS-scoped per row); obtained through the one
-    // audited privileged entrypoint rather than a client built here.
-    this.supabase = this.supabaseService.getPrivilegedClient('storage: CAD and drawing file bucket operations');
-    this.logger.log(`Supabase client initialized successfully for bucket: ${this.BUCKET_NAME}`);
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    @Inject(OBJECT_STORE) private readonly store: ObjectStore,
+  ) {
+    // Only the file-reference check (an RPC) needs the database; the bytes go through the ObjectStore.
+    this.supabase = this.supabaseService.getPrivilegedClient('storage: which stored files are still referenced');
   }
 
   /**
@@ -162,7 +163,6 @@ export class FileStorageService {
     const checksum = this.calculateChecksum(file.buffer);
 
     // Compress DXF/DWG files with gzip — they're text-based and compress ~90%,
-    // keeping uploads well under Supabase's 50 MB free-tier hard cap.
     const ext = '.' + (file.originalname.split('.').pop()?.toLowerCase() ?? '');
     const shouldCompress = ['.dxf', '.dwg'].includes(ext);
     const uploadBuffer = shouldCompress
@@ -179,22 +179,13 @@ export class FileStorageService {
     ) + (shouldCompress ? '.gz' : '');
 
     try {
-      // Upload to Supabase Storage
-      const { data, error } = await this.supabase.storage
-        .from(this.BUCKET_NAME)
-        .upload(storagePath, uploadBuffer, {
-          contentType: shouldCompress ? 'application/octet-stream' : file.mimetype,
-          upsert: false,
-        });
-
-      if (error) {
-        throw new InternalServerErrorException(
-          `Failed to upload file: ${error.message}`,
-        );
-      }
+      await this.store.put(this.BUCKET_NAME, storagePath, uploadBuffer, {
+        contentType: shouldCompress ? 'application/octet-stream' : file.mimetype,
+        upsert: false,
+      });
 
       return {
-        storagePath: data.path,
+        storagePath,
         fileName: file.originalname,
         fileSize: file.size,
         mimeType: file.mimetype,
@@ -217,131 +208,20 @@ export class FileStorageService {
     expiresIn: number = 3600, // 1 hour in seconds
   ): Promise<string> {
     try {
-      this.logger.log(`Attempting to generate signed URL for path: ${storagePath} in bucket: ${this.BUCKET_NAME}`);
-      
-      const { data, error } = await this.supabase.storage
-        .from(this.BUCKET_NAME)
-        .createSignedUrl(storagePath, expiresIn);
-
-      if (error) {
-        this.logger.error(`Supabase storage error:`, error);
-        throw new InternalServerErrorException(
-          `Failed to generate signed URL - Supabase error: ${error.message}`,
-        );
-      }
-
-      if (!data || !data.signedUrl) {
-        this.logger.error(`No data returned from Supabase storage for path: ${storagePath}`);
-        throw new InternalServerErrorException(
-          `Failed to generate signed URL - No data returned for path: ${storagePath}`,
-        );
-      }
-
-      this.logger.log(`Successfully generated signed URL for path: ${storagePath}`);
-      return data.signedUrl;
+      return await this.store.signedGetUrl(this.BUCKET_NAME, storagePath, expiresIn);
     } catch (error) {
-      this.logger.error(`Exception in getSignedUrl for path ${storagePath}:`, error);
-      throw new InternalServerErrorException(
-        `Failed to generate signed URL: ${error.message}`,
-      );
+      this.logger.error(`Could not sign a download URL for ${storagePath}: ${error instanceof Error ? error.message : error}`);
+      throw new InternalServerErrorException('Failed to generate a download URL');
     }
   }
 
-  /**
-   * Test Supabase storage connection
-   */
-  async testConnection(): Promise<boolean> {
-    try {
-      this.logger.log(`Testing connection to bucket: ${this.BUCKET_NAME}`);
-      const { data, error } = await this.supabase.storage.listBuckets();
-      
-      if (error) {
-        this.logger.error('Failed to list buckets:', error);
-        return false;
-      }
-      
-      this.logger.log('Available buckets:', data?.map(b => b.name));
-      return data?.some(bucket => bucket.name === this.BUCKET_NAME) || false;
-    } catch (error) {
-      this.logger.error('Exception testing connection:', error);
-      return false;
-    }
-  }
-
-  /**
-   * List files in a directory path for debugging
-   */
+  /** The names directly under a folder of the bucket. A listing that fails is an empty list (callers fall back). */
   async listFiles(directoryPath: string): Promise<string[]> {
     try {
-      this.logger.log(`Listing files in directory: ${directoryPath}`);
-      
-      const { data, error } = await this.supabase.storage
-        .from(this.BUCKET_NAME)
-        .list(directoryPath, { limit: 100 });
-      
-      if (error) {
-        this.logger.error(`Error listing files in ${directoryPath}:`, error);
-        return [];
-      }
-      
-      const fileNames = data?.map(item => item.name) || [];
-      this.logger.log(`Found ${fileNames.length} files in ${directoryPath}:`, fileNames);
-      return fileNames;
+      return await this.store.list(this.BUCKET_NAME, directoryPath);
     } catch (error) {
-      this.logger.error(`Exception listing files in ${directoryPath}:`, error);
+      this.logger.warn(`Could not list ${directoryPath}: ${error instanceof Error ? error.message : error}`);
       return [];
-    }
-  }
-
-  /**
-   * Check file in both buckets for debugging
-   */
-  async findFileInBuckets(filePath: string): Promise<{bucket: string, exists: boolean}[]> {
-    const buckets = ['bom-files', 'Bom'];
-    const results: {bucket: string, exists: boolean}[] = [];
-    
-    for (const bucketName of buckets) {
-      try {
-        const { data } = await this.supabase.storage
-          .from(bucketName)
-          .list(filePath.substring(0, filePath.lastIndexOf('/')), {
-            limit: 1,
-            search: filePath.substring(filePath.lastIndexOf('/') + 1)
-          });
-        
-        const exists = !!(data && data.length > 0);
-        results.push({ bucket: bucketName, exists });
-        this.logger.log(`File ${filePath} in bucket '${bucketName}': ${exists ? 'EXISTS' : 'NOT FOUND'}`);
-      } catch (error) {
-        this.logger.error(`Error checking ${filePath} in bucket ${bucketName}:`, error);
-        results.push({ bucket: bucketName, exists: false });
-      }
-    }
-    
-    return results;
-  }
-
-  /**
-   * Check if file exists in storage
-   */
-  async fileExists(storagePath: string): Promise<boolean> {
-    try {
-      const { data, error } = await this.supabase.storage
-        .from(this.BUCKET_NAME)
-        .list(storagePath.substring(0, storagePath.lastIndexOf('/')), {
-          limit: 1,
-          search: storagePath.substring(storagePath.lastIndexOf('/') + 1)
-        });
-      
-      if (error) {
-        this.logger.error(`Error checking file existence:`, error);
-        return false;
-      }
-      
-      return data && data.length > 0;
-    } catch (error) {
-      this.logger.error(`Exception checking file existence:`, error);
-      return false;
     }
   }
 
@@ -357,43 +237,20 @@ export class FileStorageService {
     if (error) throw new InternalServerErrorException(`Could not check which files are still in use: ${error.message}`);
     const inUse = new Set((data ?? []) as string[]);
     const unreferenced = paths.filter((p) => !inUse.has(p));
-    for (let i = 0; i < unreferenced.length; i += 100) {
-      const { error: removeError } = await this.supabase.storage.from(this.BUCKET_NAME).remove(unreferenced.slice(i, i + 100));
-      if (removeError) throw new InternalServerErrorException(`Failed to delete files: ${removeError.message}`);
+    try {
+      await this.store.remove(this.BUCKET_NAME, unreferenced);
+    } catch (error) {
+      throw new InternalServerErrorException(`Failed to delete files: ${error instanceof Error ? error.message : error}`);
     }
     return unreferenced.length;
   }
 
-  /**
-   * Delete file from Supabase Storage
-   */
+  /** Deletes one stored file (missing is fine). */
   async deleteFile(storagePath: string): Promise<void> {
     try {
-      const { error } = await this.supabase.storage
-        .from(this.BUCKET_NAME)
-        .remove([storagePath]);
-
-      if (error) {
-        throw new InternalServerErrorException(
-          `Failed to delete file: ${error.message}`,
-        );
-      }
+      await this.store.remove(this.BUCKET_NAME, [storagePath]);
     } catch (error) {
-      throw new InternalServerErrorException(
-        `File deletion failed: ${error.message}`,
-      );
+      throw new InternalServerErrorException(`File deletion failed: ${error instanceof Error ? error.message : error}`);
     }
-  }
-
-  /**
-   * Get file public URL (for public buckets only)
-   * Note: Our bucket is private, so use getSignedUrl instead
-   */
-  getPublicUrl(storagePath: string): string {
-    const { data } = this.supabase.storage
-      .from(this.BUCKET_NAME)
-      .getPublicUrl(storagePath);
-
-    return data.publicUrl;
   }
 }

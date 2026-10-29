@@ -24,8 +24,16 @@ export const METRIC_LABEL_KEYS = [
 export type StatusClass = '1xx' | '2xx' | '3xx' | '4xx' | '5xx' | 'aborted';
 export type CostingOperation = 'cost_summary' | 'route_comparison';
 export type Outcome = 'ok' | 'error';
+/** `retry`: the attempt failed but the upload goes back in the queue, so it is not terminal. */
+export type CadUploadOutcome = Outcome | 'retry';
 
 const SCOPE = 'emithran.backend';
+
+// Explicit bucket bounds (seconds), sized to what each path really takes: an API call is milliseconds to seconds, a
+// costing run up to minutes, a CAD upload up to the 10-minute engine timeout plus item creation.
+const HTTP_BUCKETS = [0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30];
+const COSTING_BUCKETS = [0.1, 0.5, 1, 2.5, 5, 10, 30, 60, 120, 300];
+const JOB_BUCKETS = [1, 5, 10, 30, 60, 120, 300, 600, 1800];
 
 // Instruments are created on first use, after the SDK has installed its MeterProvider
 // (before that, metrics.getMeter() returns a no-op that would never be replaced).
@@ -38,14 +46,26 @@ function createInstruments() {
     httpServerDuration: meter.createHistogram('emithran.http.server.duration', {
       unit: 's',
       description: 'Inbound HTTP request duration by route template, method and status class',
+      advice: { explicitBucketBoundaries: HTTP_BUCKETS },
+    }),
+    httpActive: meter.createUpDownCounter('emithran.http.server.active_requests', {
+      unit: '{request}',
+      description: 'Inbound HTTP requests currently being handled',
     }),
     costingDuration: meter.createHistogram('emithran.costing.duration', {
       unit: 's',
       description: 'Duration of the costing paths (cost summary, route comparison)',
+      advice: { explicitBucketBoundaries: COSTING_BUCKETS },
     }),
     jobDuration: meter.createHistogram('emithran.job.duration', {
       unit: 's',
       description: 'Duration of one background job attempt by queue and outcome',
+      advice: { explicitBucketBoundaries: JOB_BUCKETS },
+    }),
+    cadUploadDuration: meter.createHistogram('emithran.cad_upload.duration', {
+      unit: 's',
+      description: 'Duration of one CAD upload processing attempt (STEP/ZIP to BOM items) by outcome',
+      advice: { explicitBucketBoundaries: JOB_BUCKETS },
     }),
   };
 }
@@ -85,11 +105,20 @@ export function recordJobDuration(seconds: number, queue: string, outcome: Outco
   get().jobDuration.record(seconds, { 'emithran.queue': queue, 'emithran.outcome': outcome });
 }
 
+/** +1 when a request starts, -1 when it closes; no labels, so it cannot carry request data. */
+export function addActiveHttpRequests(delta: 1 | -1): void {
+  get().httpActive.add(delta);
+}
+
+export function recordCadUploadDuration(seconds: number, outcome: CadUploadOutcome): void {
+  get().cadUploadDuration.record(seconds, { 'emithran.outcome': outcome });
+}
+
 const DEPTH_READ_TIMEOUT_MS = 2_000;
 
-// The gauge and its callback are registered once per process; the callback reads whatever source was given last.
-// (Registering a callback per call would leave the earlier ones reporting too.)
-let depthSource: { queues: readonly string[]; read: (queue: string) => Promise<number | null> } | undefined;
+// The gauge and its callback are registered once per process. Each queue name has one reader (the last registered wins for
+// that name), so several producers (electronics jobs, CAD uploads) can report through the same gauge.
+const depthReaders = new Map<string, (queue: string) => Promise<number | null>>();
 
 /**
  * Reports the number of jobs waiting per queue, read when metrics are collected (every export interval), not per job.
@@ -97,19 +126,17 @@ let depthSource: { queues: readonly string[]; read: (queue: string) => Promise<n
  * slow is skipped for that interval: collection never waits long, never throws, and never blocks a request.
  */
 export function observeQueueDepth(queues: readonly string[], read: (queue: string) => Promise<number | null>): void {
-  depthSource = { queues, read };
+  for (const queue of queues) depthReaders.set(queue, read);
   if (queueDepthRegistered) return;
   queueDepthRegistered = true;
   const gauge = metrics.getMeter(SCOPE).createObservableGauge('emithran.job.queue.depth', {
     description: 'Background jobs waiting to run, by queue',
   });
   gauge.addCallback(async (result) => {
-    const source = depthSource;
-    if (!source) return;
     await Promise.all(
-      source.queues.map(async (queue) => {
+      [...depthReaders].map(async ([queue, read]) => {
         try {
-          const depth = await withTimeout(source.read(queue), DEPTH_READ_TIMEOUT_MS, 'queue depth');
+          const depth = await withTimeout(read(queue), DEPTH_READ_TIMEOUT_MS, 'queue depth');
           if (depth !== null) result.observe(depth, { 'emithran.queue': queue });
         } catch {
           // skip this queue for this interval
