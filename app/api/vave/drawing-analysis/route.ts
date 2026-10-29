@@ -7,7 +7,7 @@ import {
   resolveBomItemFileUrl,
 } from '@/lib/utils/storage-file-url';
 
-const CAD_ENGINE_URL = process.env.CAD_ENGINE_URL ?? process.env.NEXT_PUBLIC_CAD_ENGINE_URL ?? 'http://localhost:5000';
+const CAD_ENGINE_URL = process.env.CAD_ENGINE_URL ?? process.env.NEXT_PUBLIC_CAD_ENGINE_URL ?? 'http://localhost:5055';
 const CAD_ENGINE_API_KEY = process.env.CAD_ENGINE_API_KEY ?? '';
 
 /**

@@ -1,5 +1,7 @@
 import { Injectable, NestInterceptor, ExecutionContext, CallHandler } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { Observable } from 'rxjs';
+import { clientIp } from '../client-ip';
 import { runWithRequestAuth } from '../request-context/request-auth-context';
 
 /**
@@ -24,8 +26,16 @@ export class RequestAuthInterceptor implements NestInterceptor {
       return next.handle();
     }
 
-    return new Observable((subscriber) =>
-      runWithRequestAuth({ accessToken, userId }, () => next.handle().subscribe(subscriber)),
-    );
+    const organizationId: unknown = request?.organizationId;
+    const incomingId: unknown = request?.headers?.['x-request-id'];
+    const auth = {
+      accessToken,
+      userId,
+      ...(typeof organizationId === 'string' && organizationId ? { organizationId } : {}),
+      ip: clientIp(request),
+      requestId: typeof incomingId === 'string' && incomingId ? incomingId.slice(0, 64) : randomUUID(),
+    };
+
+    return new Observable((subscriber) => runWithRequestAuth(auth, () => next.handle().subscribe(subscriber)));
   }
 }

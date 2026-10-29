@@ -1,114 +1,209 @@
+# Stage and production. One file, two environments; the env file decides which:
+#
+#   docker compose -p emithran-stage -f docker-compose.prod.yml --env-file env/stage.env up -d --build
+#   docker compose -p emithran-prd   -f docker-compose.prod.yml --env-file env/prd.env   up -d --build
+#
+# Shape of the deployment (docs/DEPLOYMENT_SECURITY.md explains each choice):
+#
+#   internet -> Cloudflare (WAF, rate limiting, Access on stage) -> cloudflared tunnel -> frontend, backend
+#   the host publishes NO ports: nothing can reach a container except through the tunnel
+#   engines (cad, ecad) live on a private network with no internet access and are reached only by the backend/frontend
+#
+# Every container is read-only, runs without Linux capabilities, cannot gain privileges, and has memory/CPU/process limits
+# (the process cap lives in deploy.resources.limits.pids, where Compose expects it next to the other limits).
+# test/deploy/compose-hardening.test.ts fails the build if any of that is weakened.
 
-# Production Docker Compose for Mithran Platform
-version: '3.8'
+x-hardened: &hardened
+  restart: unless-stopped
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
 
 services:
-  ecad-engine:
-    build:
-      context: ./ecad-engine
-      dockerfile: Dockerfile
-    container_name: mithran-ecad-engine-prod
+  # --- Ingress: the only way in. The tunnel is outbound-only; routes are set in the Cloudflare dashboard. ---
+  cloudflared:
+    <<: *hardened
+    image: cloudflare/cloudflared:2026.10.5@sha256:1b1d34d0a9c0bfca9de72db8460d328db3f19edd2b96169114e3e893a97bbe53
+    command: tunnel --no-autoupdate --metrics 0.0.0.0:2000 run
     environment:
-      PORT: 5100
-      ECAD_ENGINE_API_KEY: ${ECAD_ENGINE_API_KEY:?set ECAD_ENGINE_API_KEY in the deploy environment}
-      LOG_LEVEL: info
-    restart: unless-stopped
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?set TUNNEL_TOKEN (from the Cloudflare tunnel) in the env file}
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:5100/health')"]
+      test: ["CMD", "cloudflared", "tunnel", "--metrics", "127.0.0.1:2000", "ready"]
       interval: 30s
       timeout: 10s
       retries: 3
-
-  cad-engine:
-    build:
-      context: ./cad-engine
-      dockerfile: Dockerfile
-    container_name: mithran-cad-engine-prod
-    environment:
-      PORT: 5000
-      NODE_ENV: production
-      PYTHONUNBUFFERED: 1
-      CORS_ORIGINS: http://localhost:3000,http://localhost:4000
-      MAX_FILE_SIZE_MB: 50
-      RATE_LIMIT_PER_MINUTE: 10
-      LINEAR_DEFLECTION: 0.1
-      ANGULAR_DEFLECTION: 0.5
-      LOG_LEVEL: info
-    ports:
-      - "5000:5000"
-    volumes:
-      - cad-temp:/tmp/cad-files
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+    networks: [edge]
+    depends_on:
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
     deploy:
       resources:
-        limits:
-          cpus: '2'
-          memory: 2G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
+        limits: { cpus: '0.5', memory: 256M, pids: 256 }
 
   frontend:
+    <<: *hardened
     build:
       context: .
       dockerfile: Dockerfile.frontend
       args:
-        NEXT_PUBLIC_API_GATEWAY_URL: http://localhost:4000
-        NEXT_PUBLIC_SUPABASE_URL: https://iuvtsvjpmovfymvnmqys.supabase.co
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:?set NEXT_PUBLIC_SUPABASE_ANON_KEY in the deploy environment}
-        NEXT_PUBLIC_CAD_ENGINE_URL: http://localhost:5000
-    container_name: mithran-frontend-prod
+        # NEXT_PUBLIC_* values are compiled into the browser bundle at build time, so each environment builds its own image
+        # from its own env file. Only public values go here: the publishable key is safe in a browser, the secret key never is.
+        NEXT_PUBLIC_API_GATEWAY_URL: ${NEXT_PUBLIC_API_GATEWAY_URL:?set NEXT_PUBLIC_API_GATEWAY_URL (the public URL, which also serves /v1/*) in the env file}
+        # What the browser's HTTP client calls. Without this build arg the bundle falls back to http://localhost:4000/v1/api.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_GATEWAY_URL}/v1/api
+        # The one upload limit, shown in the upload card. The backend and the engine take the same MAX_UPLOAD_MB.
+        NEXT_PUBLIC_MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-50}
+        NEXT_PUBLIC_SUPABASE_URL: ${SUPABASE_URL:?set SUPABASE_URL in the env file}
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:?set SUPABASE_PUBLISHABLE_KEY in the env file}
     environment:
       NODE_ENV: production
-      NEXT_PUBLIC_CAD_ENGINE_URL: http://localhost:5000
-    ports:
-      - "3000:3000"
-    restart: unless-stopped
+      # Server-side calls stay on the private network: the backend, and the engine through the /api/cad proxy.
+      API_URL: http://backend:4000/v1/api
+      CAD_ENGINE_URL: http://cad-engine:5055
+      CAD_ENGINE_API_KEY: ${CAD_ENGINE_API_KEY:?set CAD_ENGINE_API_KEY in the env file}
+    tmpfs:
+      - /tmp
+      - /app/.next/cache:uid=1001,gid=1001
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
+    networks: [edge, internal]
+    depends_on:
+      backend:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits: { cpus: '1', memory: 1G, pids: 512 }
 
   backend:
+    <<: *hardened
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: mithran-backend-prod
     environment:
       NODE_ENV: production
       PORT: 4000
-      SUPABASE_URL: https://iuvtsvjpmovfymvnmqys.supabase.co
-      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY:?set SUPABASE_SERVICE_KEY in the deploy environment}
-      JWT_SECRET: production_jwt_secret_key_here
-      CORS_ORIGIN: http://localhost:3000
-      CAD_ENGINE_URL: http://cad-engine:5000
+      # Which deployment this is (stage or prd); the backend refuses to boot in production without it.
+      APP_ENV: ${APP_ENV:?set APP_ENV to stage or prd in the env file}
+      SUPABASE_URL: ${SUPABASE_URL:?set SUPABASE_URL in the env file}
+      SUPABASE_ANON_KEY: ${SUPABASE_PUBLISHABLE_KEY:?set SUPABASE_PUBLISHABLE_KEY in the env file}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SECRET_KEY:?set SUPABASE_SECRET_KEY in the env file}
+      # The browser's origin; production validation rejects localhost and *.
+      CORS_ORIGIN: ${CORS_ORIGIN:?set CORS_ORIGIN (the public frontend URL) in the env file}
+      # The only way to reach this container is the Cloudflare tunnel, so the client address comes from CF-Connecting-IP.
+      TRUST_CLOUDFLARE_HEADERS: "true"
+      # 50 MB is the Supabase free tier's cap on one stored object; set 100 here on a paid plan (frontend and engine follow).
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-50}
+      CAD_ENGINE_URL: http://cad-engine:5055
+      # Shared secret between the backend and the engine; the engine refuses protected routes in production without it.
+      CAD_ENGINE_API_KEY: ${CAD_ENGINE_API_KEY:?set CAD_ENGINE_API_KEY in the env file}
       ECAD_ENGINE_URL: http://ecad-engine:5100
-      ECAD_ENGINE_API_KEY: ${ECAD_ENGINE_API_KEY:?set ECAD_ENGINE_API_KEY in the deploy environment}
-    ports:
-      - "4000:4000"
-    restart: unless-stopped
+      ECAD_ENGINE_API_KEY: ${ECAD_ENGINE_API_KEY:?set ECAD_ENGINE_API_KEY in the env file}
+    volumes:
+      - backend-logs:/app/logs
+    tmpfs:
+      - /tmp
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4000/api/health"]
+      # Liveness only: a database or engine outage must not make Docker restart a healthy process.
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/api/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
+    networks: [edge, internal]
     depends_on:
-      - cad-engine
-      - ecad-engine
+      cad-engine:
+        condition: service_healthy
+      ecad-engine:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits: { cpus: '2', memory: 2G, pids: 512 }
+
+  # --- Engines: private. They parse untrusted uploaded files, so they get no internet and no published port. ---
+  cad-engine:
+    <<: *hardened
+    # pythonocc-core 7.7.2 is not published for linux/aarch64, so the image is amd64 everywhere (emulated on ARM dev machines).
+    platform: linux/amd64
+    build:
+      context: ./cad-engine
+      dockerfile: Dockerfile
+    environment:
+      PORT: 5055
+      NODE_ENV: production
+      PYTHONUNBUFFERED: 1
+      TEMP_DIR: /tmp/cad-files
+      TMPDIR: /tmp/cad-files
+      CORS_ORIGINS: ${CORS_ORIGIN:?set CORS_ORIGIN in the env file}
+      MAX_FILE_SIZE_MB: ${MAX_UPLOAD_MB:-50}
+      RATE_LIMIT_PER_MINUTE: 10
+      # Heavy requests at once. Measured peak memory is ~16 MB of RAM per MB of STEP (a 50 MB, 150-part assembly peaks at
+      # ~800 MB), so a 100 MB assembly can need ~1.6 GB alone: raise this only together with the memory limit below.
+      MAX_CONCURRENT_ANALYSES: 1
+      # A request running longer than this ends the process so the restart policy replaces it (0 = off).
+      ANALYSIS_HARD_LIMIT_SECONDS: 900
+      CAD_ENGINE_API_KEY: ${CAD_ENGINE_API_KEY:?set CAD_ENGINE_API_KEY in the env file}
+      LINEAR_DEFLECTION: 0.1
+      ANGULAR_DEFLECTION: 0.5
+      LOG_LEVEL: info
+    volumes:
+      - cad-temp:/tmp/cad-files
+      - cad-logs:/app/logs
+    tmpfs:
+      - /tmp
+      - /home/cad:uid=10002,gid=10002
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:5055/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    networks: [internal]
+    deploy:
+      resources:
+        limits: { cpus: '2', memory: 2G, pids: 512 }
+        reservations: { cpus: '0.5', memory: 512M }
+
+  ecad-engine:
+    <<: *hardened
+    build:
+      context: ./ecad-engine
+      dockerfile: Dockerfile
+    environment:
+      PORT: 5100
+      ECAD_ENGINE_API_KEY: ${ECAD_ENGINE_API_KEY:?set ECAD_ENGINE_API_KEY in the env file}
+      LOG_LEVEL: info
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:5100/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks: [internal]
+    deploy:
+      resources:
+        limits: { cpus: '1', memory: 1G, pids: 512 }
 
 volumes:
   cad-temp:
-    driver: local
+  cad-logs:
+  backend-logs:
 
 networks:
-  default:
-    driver: bridge
+  # Has a route to the internet (the tunnel dials out; the backend and frontend call Supabase).
+  edge: {}
+  # No route out and none in: engines can neither phone home nor be reached from outside.
+  internal:
+    internal: true

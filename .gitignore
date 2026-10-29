@@ -40,6 +40,7 @@ lerna-debug.log*
 .env*.local
 .env.test.local
 /backend/.env
+/env/*.env
 /backend/.env.local
 /backend/.env.development
 /backend/.env.production
@@ -76,3 +77,6 @@ heena.env
 e2e/.auth/
 e2e/report/
 test-results/
+
+# Reference project, not part of this repo
+petrus-demo/

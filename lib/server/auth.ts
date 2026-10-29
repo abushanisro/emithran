@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { SESSION_IDLE_TIMEOUT_CODE } from '@/lib/auth/session-idle/policy';
-import { createServerSupabaseClient } from '@/lib/database/supabase-server';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/server/rate-limit';
 import { checkSessionActive } from '@/lib/server/session-idle-check';
 import { verifiedSession } from '@/lib/server/verified-session';

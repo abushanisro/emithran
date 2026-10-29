@@ -60,7 +60,7 @@ function CallbackContent() {
                 throw new Error(authErrorMsg)
               }
               
-              if (!(authData?.length > 0 && authData[0].is_active === true)) {
+              if (authData?.[0]?.is_active !== true) {
                  throw new Error('User not authorized (fallback check)')
               }
             } else if (!isAuthorized) {

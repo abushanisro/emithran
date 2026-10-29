@@ -25,7 +25,6 @@ import {
   ApiBody,
 } from '@nestjs/swagger';
 import { SupabaseAuthGuard } from '../../../common/guards/supabase-auth.guard';
-import { RateLimit } from '../../../common/decorators/rate-limit.decorator';
 import { RemarkService } from '../services/remark.service';
 import {
   CreateRemarkDto,
@@ -58,7 +57,6 @@ export class RemarkController {
   @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid input data' })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized access' })
   @ApiBody({ type: CreateRemarkDto })
-  @RateLimit({ max: 50, windowMs: 60 * 60 * 1000 })
   async createRemark(
     @Body(ValidationPipe) createRemarkDto: CreateRemarkDto,
     @Request() req: any,
@@ -86,7 +84,6 @@ export class RemarkController {
   @ApiQuery({ name: 'search', required: false, description: 'Search in title and description' })
   @ApiQuery({ name: 'page', required: false, description: 'Page number (default: 1)' })
   @ApiQuery({ name: 'limit', required: false, description: 'Items per page (default: 20, max: 100)' })
-  @RateLimit({ max: 100, windowMs: 60 * 60 * 1000 })
   async getRemarks(
     @Query(ValidationPipe) filterDto: RemarkFilterDto,
   ): Promise<PaginatedRemarksResponseDto> {
@@ -107,7 +104,6 @@ export class RemarkController {
   @ApiQuery({ name: 'status', required: false, description: 'Filter by status' })
   @ApiQuery({ name: 'remarkType', required: false, description: 'Filter by remark type' })
   @ApiQuery({ name: 'priority', required: false, description: 'Filter by priority' })
-  @RateLimit({ max: 200, windowMs: 60 * 60 * 1000 })
   async getRemarksByLot(
     @Param('lotId', ParseUUIDPipe) lotId: string,
     @Query() filterDto?: Partial<RemarkFilterDto>,
@@ -125,7 +121,6 @@ export class RemarkController {
     description: 'Statistics retrieved successfully'
   })
   @ApiParam({ name: 'lotId', description: 'Production lot ID' })
-  @RateLimit({ max: 100, windowMs: 60 * 60 * 1000 })
   async getRemarkStats(
     @Param('lotId', ParseUUIDPipe) lotId: string,
   ): Promise<{
@@ -149,7 +144,6 @@ export class RemarkController {
   })
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Remark not found' })
   @ApiParam({ name: 'id', description: 'Remark ID' })
-  @RateLimit({ max: 200, windowMs: 60 * 60 * 1000 })
   async getRemarkById(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<RemarkResponseDto> {
@@ -170,7 +164,6 @@ export class RemarkController {
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Not authorized to update this remark' })
   @ApiParam({ name: 'id', description: 'Remark ID' })
   @ApiBody({ type: UpdateRemarkDto })
-  @RateLimit({ max: 30, windowMs: 60 * 60 * 1000 })
   async updateRemark(
     @Param('id', ParseUUIDPipe) id: string,
     @Body(ValidationPipe) updateRemarkDto: UpdateRemarkDto,
@@ -190,7 +183,6 @@ export class RemarkController {
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Not authorized to delete this remark' })
   @ApiParam({ name: 'id', description: 'Remark ID' })
   @HttpCode(HttpStatus.NO_CONTENT)
-  @RateLimit({ max: 20, windowMs: 60 * 60 * 1000 })
   async deleteRemark(
     @Param('id', ParseUUIDPipe) id: string,
     @Request() req: any,
@@ -212,7 +204,6 @@ export class RemarkController {
   })
   @ApiParam({ name: 'remarkId', description: 'Remark ID' })
   @ApiBody({ type: CreateCommentDto })
-  @RateLimit({ max: 100, windowMs: 60 * 60 * 1000 })
   async createComment(
     @Param('remarkId', ParseUUIDPipe) remarkId: string,
     @Body(ValidationPipe) createCommentDto: CreateCommentDto,
@@ -238,7 +229,6 @@ export class RemarkController {
     schema: { type: 'array' }
   })
   @ApiParam({ name: 'remarkId', description: 'Remark ID' })
-  @RateLimit({ max: 200, windowMs: 60 * 60 * 1000 })
   async getCommentsByRemark(
     @Param('remarkId', ParseUUIDPipe) remarkId: string,
   ): Promise<CommentResponseDto[]> {
@@ -259,7 +249,6 @@ export class RemarkController {
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Not authorized to update this comment' })
   @ApiParam({ name: 'commentId', description: 'Comment ID' })
   @ApiBody({ type: UpdateCommentDto })
-  @RateLimit({ max: 50, windowMs: 60 * 60 * 1000 })
   async updateComment(
     @Param('commentId', ParseUUIDPipe) commentId: string,
     @Body(ValidationPipe) updateCommentDto: UpdateCommentDto,
@@ -279,7 +268,6 @@ export class RemarkController {
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Not authorized to delete this comment' })
   @ApiParam({ name: 'commentId', description: 'Comment ID' })
   @HttpCode(HttpStatus.NO_CONTENT)
-  @RateLimit({ max: 30, windowMs: 60 * 60 * 1000 })
   async deleteComment(
     @Param('commentId', ParseUUIDPipe) commentId: string,
     @Request() req: any,

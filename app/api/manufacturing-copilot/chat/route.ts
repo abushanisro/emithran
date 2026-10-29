@@ -2,8 +2,9 @@ import { type NextRequest } from "next/server";
 
 import { requireUserForAi } from "@/lib/server/auth";
 
-// NEXT_PUBLIC_API_URL already ends in /v1/api (the NestJS global prefix).
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/v1/api";
+// Server-side: the private backend address (API_URL, which already ends in /v1/api, the NestJS global prefix), so this call
+// never leaves the host through the public hostname (where Cloudflare Access would stop it).
+const BACKEND_URL = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/v1/api";
 const MAX_BODY_BYTES = 64 * 1024;
 
 export const runtime = "nodejs";

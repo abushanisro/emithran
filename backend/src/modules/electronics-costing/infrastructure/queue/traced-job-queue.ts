@@ -2,7 +2,7 @@ import { observeQueueDepth } from '../../../../telemetry/metrics';
 import { runJob, withTraceparent } from '../../../../telemetry/job-trace';
 import { ELECTRONICS_QUEUES, type ElectronicsQueueName, type JobHandler, type JobQueue, type JobStatus, type QueueHealth } from './job-queue.port';
 
-// Telemetry around any JobQueue (pg-boss today, BullMQ tomorrow) without touching the adapter or the use cases:
+// Telemetry around any JobQueue (the job_queue table today, BullMQ tomorrow) without touching the adapter or the use cases:
 // the producer's trace travels in the payload, each worker attempt is a span and a duration, and the number of
 // waiting jobs is a gauge. Only built when telemetry is on (queue.provider.ts); otherwise the adapter is used as is.
 export class TracedJobQueue implements JobQueue {

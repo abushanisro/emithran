@@ -65,7 +65,7 @@ describe('HealthController: liveness and readiness', () => {
         ConfigModule.forRoot({
           ignoreEnvFile: true,
           isGlobal: true,
-          load: [() => ({ CAD_ENGINE_URL: cad.url, ECAD_ENGINE_URL: ecadConfigured ? ecad.url : '' })],
+          load: [() => ({ CAD_ENGINE_URL: cad.url, ECAD_ENGINE_URL: ecadConfigured ? ecad.url : '', APP_ENV: 'stage' })],
         }),
       ],
       controllers: [HealthController],
@@ -108,7 +108,7 @@ describe('HealthController: liveness and readiness', () => {
     it('is 200 and depends on nothing', async () => {
       await boot();
       const res = await request(server()).get('/api/health/live').expect(200);
-      expect(res.body).toEqual({ status: 'ok' });
+      expect(res.body).toEqual({ status: 'ok', env: 'stage' }); // says which deployment answered
     });
 
     it('stays 200 while readiness is failing (an outage must not restart a healthy process)', async () => {

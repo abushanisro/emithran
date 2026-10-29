@@ -1,15 +1,41 @@
-node_modules
-npm-debug.log
+# Secrets and environment: nothing named .env* or in env/ ever enters a build context (they hold service keys).
+.env
+.env.*
+env/
+*.pem
+*.key
+
+# Version control, editors, OS
 .git
 .gitignore
-.env
-.env.local
-.env.*.local
+.vscode
+.idea
+.DS_Store
+.claude
+
+# Dependencies and build output (rebuilt inside the image)
+node_modules
+npm-debug.log
 dist
 build
 .next
 coverage
-*.log
-.DS_Store
-.vscode
-.idea
+logs
+**/*.log
+
+# Other services have their own images and contexts; the frontend build needs none of them
+backend
+cad-engine
+ecad-engine
+petrus-demo
+memory
+database
+supabase
+docs
+
+# Tests, reports and local artifacts
+e2e
+test
+test-results
+playwright-report
+*.zip

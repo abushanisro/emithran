@@ -109,7 +109,7 @@ export const config = {
 
   // CAD Engine Configuration
   cadEngine: {
-    baseUrl: process.env.NEXT_PUBLIC_CAD_ENGINE_URL || 'http://localhost:5000',
+    baseUrl: process.env.NEXT_PUBLIC_CAD_ENGINE_URL || 'http://localhost:5055',
     maxFileSize: 50 * 1024 * 1024, // 50MB
     supportedFormats: ['.step', '.stp', '.iges', '.igs'],
     rateLimit: {

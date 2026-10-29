@@ -133,7 +133,7 @@ Engine plus the Compose plugin from Docker's official apt repository.
 ```bash
 # inside the distro, from the cad-engine directory
 docker compose -f docker-compose.dev.yml up --build
-# http://localhost:5000/health - also reachable from Windows
+# http://localhost:5055/health - also reachable from Windows
 ```
 
 The source tree is bind-mounted and uvicorn runs with `--reload`, so edits made
@@ -173,7 +173,7 @@ docker build -t mithran-cad-engine .
 ### Run
 
 ```bash
-docker run -p 5000:5000 mithran-cad-engine
+docker run -p 5055:5055 mithran-cad-engine
 ```
 
 ### Full platform stack

@@ -1,8 +1,8 @@
 // Electronics costing over HTTP: the real app (AppModule), real auth guard, real
 // organization guard, multipart upload, validation pipe, response envelope and RLS, with a
 // real sign-in. Only the queue driver is the in-process one (ELECTRONICS_QUEUE_DRIVER=memory);
-// the pg-boss adapter has its own e2e (electronics-pgboss.e2e-spec.ts).
-process.env.ELECTRONICS_QUEUE_DRIVER ??= 'memory'; // set to pg-boss (with ELECTRONICS_QUEUE_DATABASE_URL) to run this suite through the real queue
+// the table queue has its own e2e (electronics-queue.e2e-spec.ts).
+process.env.ELECTRONICS_QUEUE_DRIVER ??= 'memory'; // set to table to run this suite through the real queue
 
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';

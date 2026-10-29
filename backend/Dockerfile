@@ -1,74 +1,29 @@
-# Simplified single-stage build for Railway
-FROM node:20-alpine
+# Backend API. Two stages: the build stage has the full toolchain and every dependency; the runtime stage carries only
+# compiled output and production dependencies, runs as a non-root user and has no compiler or package manager cache.
+# Base images are pinned by digest so a rebuild gets the same bytes; Dependabot proposes digest bumps.
 
-# Install system dependencies for native modules
-RUN apk add --no-cache \
-    dumb-init \
-    cairo-dev \
-    jpeg-dev \
-    pango-dev \
-    musl-dev \
-    giflib-dev \
-    pixman-dev \
-    pangomm-dev \
-    libjpeg-turbo-dev \
-    freetype-dev \
-    python3 \
-    make \
-    g++ \
-    vips-dev \
-    pkgconfig
-
-# Set working directory
+FROM node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85 AS build
+# No native module here needs a compiler (sharp ships prebuilt binaries for x86 and ARM, glibc and musl).
 WORKDIR /app
-
-# Install node-gyp globally for native modules
-RUN npm install -g node-gyp
-
-# Copy package files
-COPY package*.json ./
-
-# Set environment variables to use pre-built Sharp binaries
-ENV SHARP_IGNORE_GLOBAL_LIBVIPS=1 \
-    npm_config_sharp_binary_host="https://github.com/lovell/sharp-libvips/releases/download" \
-    npm_config_sharp_libvips_binary_host="https://github.com/lovell/sharp-libvips/releases/download"
-
-# First try to install without Sharp to identify if it's the only issue
-RUN npm ci --legacy-peer-deps --no-audit --no-fund --ignore-scripts || \
-    (rm -rf node_modules package-lock.json && \
-     npm install --legacy-peer-deps --no-audit --no-fund --ignore-scripts)
-
-# Then install Sharp specifically with Alpine-compatible version
-RUN npm install sharp@^0.33.0 --legacy-peer-deps --no-audit --platform=linux --arch=x64 || \
-    npm install --save-optional sharp@^0.32.0 --legacy-peer-deps --no-audit || \
-    echo "Sharp installation failed - application may work without image processing"
-
-# Run scripts for all packages except Sharp
-RUN npm rebuild --legacy-peer-deps || echo "Some packages failed to rebuild"
-
-# Copy source code
+COPY package.json package-lock.json ./
+# Strict and reproducible: the lock file is the truth, and a mismatch fails the build instead of installing something else.
+RUN npm ci --legacy-peer-deps --no-audit --no-fund
 COPY . .
+RUN npm run build && npm prune --omit=dev --legacy-peer-deps
 
-# Build application with error handling
-RUN npm run build || (echo "Build failed - checking for common issues..." && \
-    ls -la dist/ && \
-    npm run typecheck && \
-    npm run build)
-
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nestjs -u 1001 -G nodejs && \
-    chown -R nestjs:nodejs /app
-
-# Switch to non-root user
-USER nestjs
-
-# Expose port (Railway will override with dynamic port)
-EXPOSE $PORT
-
-# Set environment
+FROM node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85 AS runtime
+# A runtime image runs `node` and nothing else: no npm or corepack (a package manager is attack surface, and ships its own
+# vulnerable copies of libraries). Patched OS packages are applied at build time.
+RUN apk upgrade --no-cache && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
+RUN apk add --no-cache dumb-init
 ENV NODE_ENV=production
-
-# Use dumb-init for signal handling
+WORKDIR /app
+COPY --from=build --chown=node:node /app/dist ./dist
+COPY --from=build --chown=node:node /app/node_modules ./node_modules
+COPY --from=build --chown=node:node /app/package.json ./
+# The only writable path (error log files); everything else runs read-only.
+RUN mkdir -p /app/logs && chown node:node /app/logs
+USER node
+EXPOSE 4000
 ENTRYPOINT ["dumb-init", "--"]
 CMD ["node", "dist/main.js"]

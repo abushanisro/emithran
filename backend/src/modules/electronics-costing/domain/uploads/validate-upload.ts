@@ -11,6 +11,13 @@ export const MAX_ARCHIVE_ENTRIES = 5000;
 export const MAX_ARCHIVE_UNCOMPRESSED_BYTES = 1024 * 1024 * 1024;
 export const MAX_ARCHIVE_RATIO = 100;
 
+/** What the shared archive expander (common/archive) is allowed to unpack for an electronics design pack. */
+export const ELECTRONICS_ARCHIVE_LIMITS = {
+  maxEntries: MAX_ARCHIVE_ENTRIES,
+  maxEntryBytes: MAX_UPLOAD_BYTES,
+  maxTotalBytes: MAX_ARCHIVE_UNCOMPRESSED_BYTES,
+} as const;
+
 import { FILE_ROLES, type FileRole } from '../lookups/file-roles.generated';
 
 export type UploadFormat = 'zip' | 'xlsx' | 'pdf' | 'png' | 'jpeg' | 'text';

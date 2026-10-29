@@ -1,4 +1,5 @@
 interface User { id: string; email: string; [key: string]: any; }
+import { AuditService } from '../../common/audit/audit.service';
 import { 
   Controller, 
   Get, 
@@ -47,7 +48,8 @@ export class RfqController {
 
   constructor(
     private readonly rfqService: RfqService,
-    private readonly rfqTrackingService: RfqTrackingService
+    private readonly rfqTrackingService: RfqTrackingService,
+    private readonly audit: AuditService,
   ) {}
 
   @Post()
@@ -340,7 +342,10 @@ export class RfqController {
   ): Promise<{ message: string }> {
     try {
       this.logger.log(`Sending RFQ ${id} to vendors`);
-      await this.rfqService.sendRfq(id, user.id, token, organizationId);
+      await this.audit.audited(
+        { action: 'rfq.sent', targetType: 'rfq', targetId: id, organizationId },
+        () => this.rfqService.sendRfq(id, user.id, token, organizationId),
+      );
       return { message: 'RFQ sent successfully to vendors' };
     } catch (error) {
       this.logger.error(`Failed to send RFQ ${id}: ${error.message}`, error.stack);

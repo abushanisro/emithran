@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { cadEngineHttp } from '../../../common/resilience/engine-http';
 import FormData from 'form-data';
+import { DEFAULT_CAD_ENGINE_URL } from '../../../common/engine-urls';
 
 /**
  * STEP to STL Converter Service
@@ -26,7 +27,7 @@ export class StepConverterService {
   private readonly AVAILABILITY_CACHE_TTL = 60000;
 
   constructor(private configService: ConfigService) {
-    this.cadEngineUrl = this.configService.get<string>('CAD_ENGINE_URL', 'http://localhost:5000');
+    this.cadEngineUrl = this.configService.get<string>('CAD_ENGINE_URL', DEFAULT_CAD_ENGINE_URL);
     this.cadEngineApiKey = this.configService.get<string>('CAD_ENGINE_API_KEY', '');
     this.logger.log(`CAD Engine configured at: ${this.cadEngineUrl}`);
   }

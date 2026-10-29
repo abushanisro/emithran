@@ -1,5 +1,6 @@
 import type { NextConfig } from 'next'
 
+
 const nextConfig: NextConfig = {
   // Enable strict mode for better development experience
   reactStrictMode: true,
@@ -98,72 +99,8 @@ const nextConfig: NextConfig = {
       { source: '/developer/portal',   destination: '/settings?tab=portal',   permanent: false },
     ];
   },
+  // The Content-Security-Policy is set per request in proxy.ts (one definition, every environment).
 
-  async headers() {
-    // Development: permissive CSP — explicitly covers worker-src because
-    // Chrome does NOT inherit default-src wildcards into worker-src.
-    // @react-three/fiber (Three.js) creates blob: workers for WebGL shader
-    // compilation, which Chrome blocks without an explicit worker-src blob:.
-    const devCSP = [
-      "default-src *",
-      "script-src * 'unsafe-inline' 'unsafe-eval'",
-      "style-src * 'unsafe-inline'",
-      "connect-src * blob:",
-      "font-src *",
-      "img-src * data: blob:",
-      "object-src * data: blob:",
-      "frame-src * data: blob:",
-      "media-src * data: blob:",
-      // Critical: wildcard does NOT cover worker-src in Chrome — must be explicit
-      "worker-src * blob: 'self'",
-      "child-src * blob: 'self'",
-      "base-uri 'self'",
-    ].join('; ');
-
-    // Production: strict CSP — covers all Three.js/R3F/WebGL requirements
-    const prodConnectSrc = [
-      "'self'",
-      "blob:",
-      "ws://localhost:*", "http://localhost:*", "http://localhost:4000", "http://localhost:5000",
-      "https://*.supabase.co", "wss://*.supabase.co",
-      "https://oukuetgeuuviyncsjxrk.supabase.co", "wss://oukuetgeuuviyncsjxrk.supabase.co",
-      "https://vercel.live", "wss://ws-us3.pusher.app",
-      "https://*.railway.app",
-      "https://backend.emithran.com",
-      "https://cad.emithran.com",
-      "https://router.project-osrm.org",
-      "https://maps.googleapis.com", "https://maps.gstatic.com",
-      "https://*.googleapis.com",
-    ].join(' ');
-
-    const prodCSP = [
-      "default-src 'self'",
-      `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com https://vercel.live https://maps.googleapis.com https://maps.gstatic.com`,
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      `connect-src ${prodConnectSrc}`,
-      "font-src 'self' 'unsafe-inline' data: blob: https://fonts.gstatic.com https://r2cdn.perplexity.ai",
-      "img-src 'self' data: blob: https: https://*.supabase.co https://oukuetgeuuviyncsjxrk.supabase.co https://maps.gstatic.com https://*.googleapis.com",
-      "object-src 'self' blob: data: https://*.supabase.co https://oukuetgeuuviyncsjxrk.supabase.co",
-      "frame-src 'self' https://vercel.live https://*.vercel.live https://*.supabase.co https://oukuetgeuuviyncsjxrk.supabase.co data: blob:",
-      "media-src 'self' blob: data: https://*.supabase.co https://oukuetgeuuviyncsjxrk.supabase.co",
-      // Three.js/R3F WebGL: shader workers are spawned as blob: URLs
-      "worker-src 'self' blob:",
-      "child-src 'self' blob: https://*.supabase.co https://oukuetgeuuviyncsjxrk.supabase.co",
-      "base-uri 'self'",
-    ].join('; ');
-
-    return [
-      {
-        source: '/(.*)',
-        headers: [
-          {
-            key: 'Content-Security-Policy',
-            value: process.env.VERCEL === '1' ? prodCSP : devCSP,
-          },
-        ],
-      },
-    ];
-  },
 }
 
 export default nextConfig

@@ -19,16 +19,21 @@ build/
 .DS_Store
 Thumbs.db
 
-# Logs and temp files
-*.log
+# Logs and temp files. A bare "*.log" only matches at the top level, so logs/error.log (which can name customer files)
+# used to ship inside the image.
+logs/
+**/*.log
 tmp/
 temp/
 *.tmp
 
+# Tests, their sample files and caches are not part of the runtime image
+test/
+.pytest_cache/
+
 # Local env files — secrets are injected via Railway env vars, not baked in
 .env
-.env.development
-.env.production
+.env.*
 
 # Docs and dev-only files (reduce image size)
 README.md

@@ -1,4 +1,5 @@
 interface User { id: string; email: string; [key: string]: any; }
+import { AuditService } from '../../common/audit/audit.service';
 import {
   Controller,
   Get,
@@ -34,6 +35,7 @@ export class BOMsController {
     private readonly bomItemCostService: BomItemCostService,
     private readonly bomItemsService: BOMItemsService,
     private readonly cadAnalysisService: CADAnalysisService,
+    private readonly audit: AuditService,
   ) {}
 
   @Get()
@@ -83,7 +85,9 @@ export class BOMsController {
   @ApiOperation({ summary: 'Delete BOM' })
   @ApiResponse({ status: 200, description: 'BOM deleted successfully' })
   async remove(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string) {
+    return this.audit.auditedRowChange('boms', id, 'bom.deleted', async () => {
     return this.bomsService.remove(id, user.id, token);
+  });
   }
 
   // Cost-related endpoints

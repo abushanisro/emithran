@@ -1,0 +1,19 @@
+# Reviewed exceptions to the Trivy scans in .github/workflows/security.yml. Every entry says why, and expires so it is
+# looked at again instead of being forgotten.
+vulnerabilities:
+  - id: CVE-2026-116587
+    paths:
+      - "usr/local/bin/cloudflared"
+    statement: >-
+      go-jose in the cloudflared binary (cloudflare/cloudflared 2026.10.5). Vendor binary: there is no fixed release yet. The
+      tunnel only dials out with a token and parses no untrusted JOSE input from visitors. Re-check when cloudflared ships a
+      build with go-jose >= 4.1.6 (Dependabot will propose it).
+    expired_at: 2026-12-15
+  - id: CVE-2026-115905
+    paths:
+      - "opt/conda/lib/python3.14/site-packages/rattler/rattler.abi3.so"
+    statement: >-
+      The `zip` Rust crate compiled into rattler, part of conda's own base environment (continuumio/miniconda3). conda is only
+      used while the image is built; the running service executes in cad-env and never calls it, and the container has no
+      internet. No fixed conda release yet. Re-check when miniconda3 ships a rattler built with zip >= 9.0.5.
+    expired_at: 2026-12-15

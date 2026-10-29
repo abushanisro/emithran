@@ -1,0 +1,5 @@
+{
+  "note": "Everything listed here is part of the baseline the QA and PRD databases are created from, so the runner never applies it. Only files after the baseline are tracked in schema_migrations.",
+  "upToNumber": 917,
+  "alsoIncluded": ["999_fix_currency_code_trigger.sql"]
+}

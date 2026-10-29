@@ -4,7 +4,7 @@ import { recordJobDuration } from './metrics';
 import { isTelemetryActive } from './telemetry-state';
 
 // Carries a trace across a queue. The producer's `traceparent` rides in the job payload (a trace id and a span id:
-// no customer data, in keeping with "payloads carry ids only") and the worker continues that trace. pg-boss has no
+// no customer data, in keeping with "payloads carry ids only") and the worker continues that trace. a queue row has no
 // header field, so the payload is the only transport; the field is stripped before any handler sees the payload.
 export const TRACE_FIELD = '__traceparent';
 

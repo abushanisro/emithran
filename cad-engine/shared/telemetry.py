@@ -27,7 +27,7 @@ from typing import Any, ContextManager, Mapping, Optional
 log = logging.getLogger("telemetry")
 
 # The only stage names that may become a span name or a metric label. Closed so a label can never carry request data.
-STAGES = frozenset({"step_load", "geometry_analysis", "component_features", "extract_board", "render_board"})
+STAGES = frozenset({"step_load", "geometry_analysis", "component_features", "assembly_analysis", "extract_board", "render_board"})
 
 _ALLOWED_SPAN_ATTRIBUTES = frozenset(
     {

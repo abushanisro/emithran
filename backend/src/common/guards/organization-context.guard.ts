@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
+import { AuditService } from '../audit/audit.service';
 import { SupabaseService } from '../supabase/supabase.service';
 
 /**
@@ -24,7 +25,10 @@ import { SupabaseService } from '../supabase/supabase.service';
  */
 @Injectable()
 export class OrganizationContextGuard implements CanActivate {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly audit: AuditService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
@@ -48,6 +52,7 @@ export class OrganizationContextGuard implements CanActivate {
     const orgIds = [...new Set((data ?? []).map((row: any) => row.organization_id as string))];
 
     if (orgIds.length === 0) {
+      await this.denied('no_membership', userId);
       throw new ForbiddenException('This account is not a member of any organization.');
     }
 
@@ -59,6 +64,7 @@ export class OrganizationContextGuard implements CanActivate {
         throw new BadRequestException('X-Organization-Id must be a non-empty string.');
       }
       if (!orgIds.includes(requestedOrgId)) {
+        await this.denied('not_a_member', userId, requestedOrgId);
         throw new ForbiddenException('You are not a member of the requested organization.');
       }
       request.organizationId = requestedOrgId;
@@ -74,5 +80,10 @@ export class OrganizationContextGuard implements CanActivate {
     throw new BadRequestException(
       'This account belongs to multiple organizations — specify which one via the X-Organization-Id header.',
     );
+  }
+
+  // The request interceptor has not run yet, so the actor is named here. De-duplicated per user and reason by the audit service.
+  private denied(reason: string, userId: string, organizationId?: string): Promise<void> {
+    return this.audit.recordDenied(reason, userId, { organizationId, actor: { kind: 'user', userId } });
   }
 }

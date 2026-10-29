@@ -1,11 +1,12 @@
 # Python CAD Engine - Production Dockerfile with Conda
 # Uses OpenCascade Technology (OCCT) for STEP file processing
 
-FROM continuumio/miniconda3:24.9.2-0
+FROM continuumio/miniconda3:26.7.1-1@sha256:eca594d684f495c1a02beff33a9fab53aec8c5830eaf431bb149912dc6c9e4c1
 
 # Install system dependencies
 # libmagic1 provides the native shared library required by python-magic
-RUN apt-get update && apt-get install -y \
+# This container parses untrusted uploaded CAD files, so OS packages are brought to their patched versions at build time.
+RUN apt-get update && apt-get upgrade -y --no-install-recommends && apt-get install -y --no-install-recommends \
     curl \
     libgomp1 \
     libmagic1 \
@@ -18,6 +19,10 @@ WORKDIR /app
 RUN conda create -n cad-env python=3.11 -y && \
     conda install -n cad-env -c conda-forge pythonocc-core=7.7.2 -y && \
     conda clean -afy
+
+# conda's own base environment is never used to run the service (that is cad-env), but it ships in the image, so it is brought to
+# its patched versions too.
+RUN conda update -y -n base -c conda-forge --all && conda clean -afy
 
 # Activate conda environment and install additional packages
 SHELL ["conda", "run", "-n", "cad-env", "/bin/bash", "-c"]
@@ -38,7 +43,7 @@ COPY . .
 # Create default .env configuration (can be overridden by environment variables)
 RUN echo "# CAD Engine Configuration" > .env && \
     echo "HOST=0.0.0.0" >> .env && \
-    echo "PORT=5000" >> .env && \
+    echo "PORT=5055" >> .env && \
     echo "LOG_LEVEL=INFO" >> .env && \
     echo "ENVIRONMENT=production" >> .env && \
     echo "NODE_ENV=production" >> .env && \
@@ -52,14 +57,23 @@ RUN echo "# CAD Engine Configuration" > .env && \
     echo "BYPASS_CAD_FORMAT_CHECK=false" >> .env
 
 # Create temp directory for CAD conversions
-RUN mkdir -p /tmp/cad-files
+RUN mkdir -p /tmp/cad-files /app/logs
+
+# The running service needs no package installer. Removing pip from both environments also removes the copies of urllib3 and
+# msgpack that pip vendors (they are scanned and reported even though nothing at runtime uses them).
+RUN conda remove -y --force -n cad-env pip setuptools wheel; conda remove -y --force -n base pip setuptools wheel; conda clean -afy; true
+
+# Run as an unprivileged user: this process parses untrusted uploaded CAD files.
+RUN useradd --system --uid 10002 --create-home --home-dir /home/cad cad && chown -R cad:cad /app /tmp/cad-files /home/cad
+USER cad
+ENV HOME=/home/cad
 
 # Expose port
-EXPOSE 5000
+EXPOSE 5055
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:5000/health || exit 1
+    CMD curl -f http://localhost:5055/health || exit 1
 
 # Run with conda environment
 CMD ["conda", "run", "--no-capture-output", "-n", "cad-env", "python", "main.py"]

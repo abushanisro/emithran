@@ -1,3 +1,5 @@
+import { AuditService } from '../../common/audit/audit.service';
+import { MAX_CAD_FILE_BYTES } from '../../common/upload-limits';
 import { breakerFor, CAD_ENGINE, isServiceUnavailable } from '../../common/resilience/circuit-breaker';
 import { catalogRowForLine, identityRows, type CatalogRow } from './process-catalog/catalog-row-for-line';
 import {
@@ -67,6 +69,7 @@ import { COST_ENGINE_CONTRACT_VERSION } from './costing/shared/core/persisted-pr
 import axios from 'axios';
 import { CalculatorInputsRequestDto, MachiningCalculatorInputsRequestDto } from './dto/machining-calculator-inputs.dto';
 import { SIGNED_URL_TTL_SEC, getReusableSignedUrl, rememberSignedUrl } from './services/signed-url-cache';
+import { DEFAULT_CAD_ENGINE_URL } from '../../common/engine-urls';
 
 // Define User type if not available
 interface User {
@@ -102,6 +105,7 @@ export class BOMItemsController {
     private readonly featureToleranceService: FeatureToleranceService,
     private readonly pmiReviewService: PmiReviewService,
     private readonly materialResolutionService: MaterialResolutionService,
+    private readonly audit: AuditService,
   ) {}
 
   // ── Stateless CAD auto-fill (no DB writes) ──────────────────────────────────
@@ -112,7 +116,7 @@ export class BOMItemsController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
-      limits: { fileSize: 100 * 1024 * 1024 },
+      limits: { fileSize: MAX_CAD_FILE_BYTES },
     }),
   )
   async analyzeForAutoFill(
@@ -149,7 +153,7 @@ export class BOMItemsController {
   @Post('measure-for-autofill')
   @ApiOperation({ summary: 'Measure a 3D file (volume, surface, bounding box) before its process is known' })
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } }))
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: MAX_CAD_FILE_BYTES } }))
   async measureForAutoFill(@UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('file is required');
     if (!this.stepConverterService.isStepFile(file.originalname ?? '')) {
@@ -168,7 +172,7 @@ export class BOMItemsController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
-      limits: { fileSize: 100 * 1024 * 1024 },
+      limits: { fileSize: MAX_CAD_FILE_BYTES },
     }),
   )
   async startAnalyzeForAutoFill(
@@ -537,7 +541,7 @@ export class BOMItemsController {
       const response = await axios.get(signedUrl, {
         responseType: 'arraybuffer',
         timeout: 60000,
-        maxContentLength: 100 * 1024 * 1024,
+        maxContentLength: MAX_CAD_FILE_BYTES,
       });
       fileBuffer = Buffer.from(response.data);
     } catch (err) {
@@ -636,7 +640,7 @@ export class BOMItemsController {
       const response = await axios.get(signedUrl, {
         responseType: 'arraybuffer',
         timeout: 60000,
-        maxContentLength: 100 * 1024 * 1024,
+        maxContentLength: MAX_CAD_FILE_BYTES,
       });
       fileBuffer = Buffer.from(response.data);
     } catch (err: any) {
@@ -665,8 +669,10 @@ export class BOMItemsController {
   @ApiOperation({ summary: 'Force delete BOM item with cascade cleanup' })
   @ApiResponse({ status: 200, description: 'BOM item force deleted successfully' })
   async forceRemove(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string) {
+    return this.audit.auditedRowChange('bom_items', id, 'bom_item.deleted', async () => {
     // This calls the same cascade delete but with explicit force intent
     return this.bomItemsService.remove(id, user.id, token);
+  });
   }
 
   @Delete(':id')
@@ -674,7 +680,9 @@ export class BOMItemsController {
   @ApiResponse({ status: 200, description: 'BOM item deleted successfully' })
   @ApiResponse({ status: 400, description: 'Cannot delete - item has dependencies' })
   async remove(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string) {
+    return this.audit.auditedRowChange('bom_items', id, 'bom_item.deleted', async () => {
     return this.bomItemsService.remove(id, user.id, token);
+  });
   }
 
   @Patch(':id/thumbnail')
@@ -752,7 +760,7 @@ export class BOMItemsController {
       ],
       {
         storage: memoryStorage(),
-        limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB
+        limits: { fileSize: MAX_CAD_FILE_BYTES }, // 100 MB
       },
     ),
   )
@@ -1021,7 +1029,7 @@ export class BOMItemsController {
       const stepResponse = await axios.get(stepUrl, {
         responseType: 'arraybuffer',
         timeout: 60000, // 60 second timeout for large CAD files
-        maxContentLength: 100 * 1024 * 1024, // 100MB max file size
+        maxContentLength: MAX_CAD_FILE_BYTES,
       });
       stepBuffer = Buffer.from(stepResponse.data);
     } catch (error) {
@@ -1314,7 +1322,7 @@ export class BOMItemsController {
   // STEP FILE PROCESSING
   // ============================================================================
 
-  private readonly cadEngineUrl    = process.env.CAD_ENGINE_URL     || 'http://localhost:5000';
+  private readonly cadEngineUrl    = process.env.CAD_ENGINE_URL     || DEFAULT_CAD_ENGINE_URL;
   private readonly cadEngineApiKey = process.env.CAD_ENGINE_API_KEY || '';
 
   @Post('process-step-file')
@@ -1341,8 +1349,8 @@ export class BOMItemsController {
       );
     }
 
-    if (stepFile.size > 100 * 1024 * 1024) {
-      throw new BadRequestException('File exceeds 100 MB limit');
+    if (stepFile.size > MAX_CAD_FILE_BYTES) {
+      throw new BadRequestException(`File exceeds the ${MAX_CAD_FILE_BYTES / 1024 / 1024} MB limit`);
     }
 
     if (!body.bomId) {
@@ -1733,6 +1741,7 @@ export class BOMItemsController {
     @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<ApplyRouteResult> {
+    return this.audit.auditedRowChange('bom_items', id, 'cost.applied', async () => {
     // Required and validated by the DTO — no substitution here. This was
     // `dto.location ?? 'USA'`, which priced and PERSISTED an apply at USA
     // rates whenever the caller stated no location.
@@ -1828,6 +1837,7 @@ export class BOMItemsController {
       routeLabel: route.routeLabel,
       routeId:    routeId,
     };
+  }, { route: dto.routeId, custom: false });
   }
 
   // ── Apply a dynamically-assembled Workflow Builder route → write real process_cost_records ─
@@ -1854,6 +1864,7 @@ export class BOMItemsController {
     @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<ApplyCustomRouteResult> {
+    return this.audit.auditedRowChange('bom_items', id, 'cost.applied', async () => {
     // Required and validated by the DTO — no substitution here. This was
     // `dto.location ?? 'USA'`, which priced and PERSISTED an apply at USA
     // rates whenever the caller stated no location.
@@ -1965,6 +1976,7 @@ export class BOMItemsController {
       routeLabel,
       needsManualCycleTime,
     };
+  }, { custom: true });
   }
 
   // Real machine rate for a machine class with no geometric trigger on this

@@ -13,7 +13,8 @@ import { isTrustedStorageUrl } from '@/lib/server/safe-fetch';
 // credentials. A generic "*.supabase.co" allowlist would accept any project.
 export { isTrustedStorageUrl };
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/v1/api';
+// On the server this is the private backend (API_URL); in the browser API_URL is undefined and the public URL is used.
+const BACKEND_URL = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/v1/api';
 
 // Matches FileStorageService.generateStoragePath:
 // `${userId}/${projectId}/bom-items/${bomItemId}/${fileType}/${timestamp}_${filename}`

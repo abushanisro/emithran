@@ -10,6 +10,7 @@
  */
 
 import { Controller, Get, Post, VERSION_NEUTRAL } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { HealthCheckService, HealthCheck, HealthCheckResult } from '@nestjs/terminus';
 import { SupabaseHealthIndicator } from './indicators/supabase.health';
@@ -28,6 +29,7 @@ export class HealthController {
     private readonly supabaseService: SupabaseService,
     private readonly engineIndicator: EngineHealthIndicator,
     private readonly queueIndicator: ElectronicsQueueHealthIndicator,
+    private readonly config: ConfigService,
   ) { }
 
   /**
@@ -37,8 +39,9 @@ export class HealthController {
   @Get('live')
   @ApiOperation({ summary: 'Liveness (process only, no dependencies)' })
   @ApiResponse({ status: 200, description: 'Process is alive' })
-  live(): { status: 'ok' } {
-    return { status: 'ok' };
+  live(): { status: 'ok'; env: string } {
+    // `env` says which deployment answered (local, stage or prd), so a mixed-up URL is visible at a glance.
+    return { status: 'ok', env: this.config.get<string>('APP_ENV', 'local') };
   }
 
   /**
