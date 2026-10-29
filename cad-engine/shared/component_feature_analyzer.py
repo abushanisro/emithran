@@ -1135,7 +1135,7 @@ class ComponentFeatureAnalyzer:
             # bend (face_ids absent or an unusual STEP topology variant):
             # assume every bend ends on blank_1, which is topologically true
             # for the common single-blank case but does NOT model real
-            # bend-to-bend/bend-to-flange chains (CLAUDE.md tracks that as a
+            # bend-to-bend/bend-to-flange chains (docs/ENGINEERING.md tracks that as a
             # separate, in-progress capability). Tagged "domain_rule_fallback"
             # so a consumer can tell this apart from a real OCC-measured
             # relation instead of treating it as equally precise.

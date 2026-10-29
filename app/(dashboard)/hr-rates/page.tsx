@@ -126,7 +126,7 @@ export default function HRRatesPage() {
   const [mhrLocation, setMhrLocation] = useState('USA');
   const [mhrCurrency, setMhrCurrency] = useState('');
   // Defaults to Sheet Metal — this repo's current domain focus (see
-  // CLAUDE.md: Machining/Injection Molding haven't started as domains yet).
+  // docs/ENGINEERING.md: Machining/Injection Molding haven't started as domains yet).
   // The real CNC Machining/Injection Molding/Turning/Inspection rows stay in
   // the DB (the live cost engine reads them) but don't clutter this page's
   // default view — "All Process Groups" still reaches them on request.

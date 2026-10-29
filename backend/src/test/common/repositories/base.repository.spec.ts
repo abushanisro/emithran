@@ -1,4 +1,4 @@
-// Org-scoped tenancy Phase 4 (.claude/plans/delegated-gliding-swan.md):
+// Org-scoped tenancy Phase 4 (the internal plan):
 // BaseRepository.create() is the sole insert path for its one live subclass
 // (ProjectsRepository). Proves organization_id is written when resolved,
 // and omitted (not written as null) when the caller doesn't pass one —

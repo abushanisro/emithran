@@ -15,7 +15,7 @@ type MachiningRouteRole = 'primary_milling' | 'primary_turning' | 'secondary_ope
  * Discovers the real, DB-backed set of Machining machine classes eligible
  * for a given role and location — the literal replacement for every
  * hardcoded CNC machine-class array/union this service's callers used to
- * read from (Section G.1, C:\Users\singi\.claude\plans\
+ * read from (Section G.1, (an internal plan document)
  * logical-noodling-lampson.md).
  *
  * Phase 0: built and unit-tested, not yet called from any production code

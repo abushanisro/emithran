@@ -166,7 +166,7 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      {/* ── Profile footer with Claude-style dropdown ── */}
+      {/* ── Profile footer with account dropdown ── */}
       <SidebarFooter className="border-t border-sidebar-border p-3">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

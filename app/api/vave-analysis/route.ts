@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
       return NextResponse.json(
-        { error: `Claude API error: ${response.status}`, details: errorData },
+        { error: `AI service error: ${response.status}`, details: errorData },
         { status: response.status }
       );
     }

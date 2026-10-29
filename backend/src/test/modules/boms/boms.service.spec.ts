@@ -1,4 +1,4 @@
-// Org-scoped tenancy Phase 2 (.claude/plans/delegated-gliding-swan.md):
+// Org-scoped tenancy Phase 2 (the internal plan):
 // proves create() writes organization_id from the resolved org context
 // instead of leaving it unset, mirroring the established mocked-dependency
 // pattern from mhr.service.spec.ts / bom-items.currency.spec.ts.

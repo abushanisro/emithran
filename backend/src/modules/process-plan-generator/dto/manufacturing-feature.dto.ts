@@ -7,7 +7,7 @@
  * — operations that must always appear in the plan regardless of AI judgment.
  *
  * Confidence scoring:
- *   0.95+ drawing-extracted (Claude vision on 2D PDF)
+ *   0.95+ drawing-extracted (model vision on 2D PDF)
  *   0.70  geometry-detected (3D STEP scan)
  *   0.50  bom-inferred     (BOM metadata only)
  *   0.99  always-present   (SAW_CUT, DEBURR, INSPECT — manufacturing constants)

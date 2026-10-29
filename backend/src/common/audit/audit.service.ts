@@ -8,7 +8,7 @@ import { buildAuditRow, type AuditEventInput } from './audit-row';
 // Where an audit event is written. Two ways, chosen per call site:
 //   record()            awaited, and a write failure fails the request. For actions someone must be able to answer for (deletes,
 //                       applying a cost, exports). The failure is also logged loudly with the target, so it can be reconciled.
-//   recordBestEffort()  a failure is caught and logged, never thrown (CLAUDE.md: no unguarded fire-and-forget writes). For
+//   recordBestEffort()  a failure is caught and logged, never thrown (docs/ENGINEERING.md: no unguarded fire-and-forget writes). For
 //                       low-risk events, and for the outcome of an action that already failed.
 // Rows are written through the record_audit_event() database function with the service role: nothing else can add one.
 @Injectable()
