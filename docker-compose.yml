@@ -99,6 +99,8 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      additional_contexts:
+        core: ./core
     container_name: mithran-backend
     environment:
       # Application

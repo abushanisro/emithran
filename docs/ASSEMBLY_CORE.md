@@ -40,3 +40,33 @@ Every analysis step is checked against hand-worked answers on synthetic STEP (D1
 ## Licensing
 Open CASCADE (LGPL-2.1 with exception) is linked **dynamically** into `geometry-worker`; the runtime image ships its shared libraries and
 the library's licence text. The Rust crates and NestJS code do not link OCCT.
+
+## True-shape nesting (`core/crates/nesting`, binary `nester`)
+The Rust port of `cad-engine/sheet_metal/nesting.py`: extreme-point bottom-left-fill with exact polygon collision, one part type per sheet.
+Its answer feeds material cost (`true-nest-costing.engine.ts`), so the port keeps the algorithm and its rules exactly: the same anchors and
+order, rotation order, kerf-offset anchors, dead-anchor rule, `max_evaluations` cap (150 000) and `capped` flag, shapely's rotation
+arithmetic and Python's `round`. What changed is the cost of a step: the collision test compares only the edges inside the overlap
+window of two parts, stops at the first conflicting pair and never builds grown (buffered) shapes (two parts conflict at clearance
+`kerf` exactly when they are closer than `kerf`).
+
+- **Contract:** the body of cad-engine's `POST /nest` on stdin (plus optional `max_evaluations`); stdout is `{"ok":true,"result":{...}}`
+  or `{"ok":false,"reason":"..."}` (the Python 422, same wording). `--deadline-ms` makes it stop and answer `capped:true` with what it
+  placed. Exit 0 answered, 64 bad arguments, 65 bad request.
+- **NestJS:** `common/nesting/nester.ts` runs it as a child process: empty environment, deadline, SIGKILL backstop, a process-wide
+  concurrency limit (`NESTER_CONCURRENCY`, default half the cores), output capped. `CADAnalysisService.computeTrueNest` uses it when
+  `NESTING_ENGINE=rust`; a refusal about the part is final, an *unavailable* nester (missing binary, crash, timeout) falls back to the
+  Python endpoint. Settings: `NESTING_ENGINE` (`python` default), `NESTER_BIN` (`/usr/local/bin/nester`), `NESTER_TIMEOUT_MS` (60 000).
+  The backend image builds the binary in a Rust Alpine stage (`--build-context core=core`).
+- **Parity (the gate for removing Python):** `core/crates/nesting/tests/differential.py` runs seeded random cases (rectangles, L, T,
+  trapezoids, stars, wavy and 24-gon outlines; four sheets, kerfs 0-3 mm, margins 0-5 mm, five rotation sets) through both nesters and
+  compares refusal vs result, `parts_per_sheet`, every placement, utilization, `sheets_required` and `capped`. 600/600 identical, plus the
+  heavy cases (53x123 mm on 2500x5000 mm: 1900 and 1793 parts; an L: 3880 parts; 240-480-vertex gears). CI runs 300 cases + heavy.
+  Two bugs this found and fixed: a circle's vertices differ by 1e-15 from their twin's (so containment must only be trusted when the
+  boundaries are clearly apart), and the 32-bit overlay engine's rounding exceeds the 1e-6 mm2 overlap threshold (the area path uses the
+  64-bit one).
+- **Speed** (same machine, one request, process start included): 15x-166x faster on the simple heavy cases; 96x-127x on 240-300-vertex
+  outlines; 4x on a 480-vertex outline at zero kerf (touching neighbours go through an exact overlap area; a known follow-up).
+- **Rollout:** stage `NESTING_ENGINE=rust`, compare costs on real parts, then production; remove `nesting.py`, the `/nest` endpoint and
+  the fallback only after production benchmarks. Known differences from Python, all at the edge: a self-intersecting outline is repaired
+  with an exact union (shapely's `buffer(0)`) and holes in the repaired outline are ignored; the collision distance tolerance is 1e-6 mm
+  where shapely's grown polygons approximate arcs to about 0.005 mm.

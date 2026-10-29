@@ -1,4 +1,5 @@
 import { Injectable, Logger, InternalServerErrorException, BadRequestException } from '@nestjs/common';
+import { nesterEnabled, runNester, type NestBody } from '../../../common/nesting/nester';
 import { SupabaseService } from '../../../common/supabase/supabase.service';
 import { FileStorageService } from './file-storage.service';
 import axios from 'axios';
@@ -1283,18 +1284,34 @@ export class CADAnalysisService {
    * not collapse it into a generic message.
    */
   async computeTrueNest(request: TrueNestRequest): Promise<{ result: TrueNestCadEngineResult | null; reason: string }> {
+    const body: NestBody = {
+      outline_points_mm: request.outlinePointsMm,
+      holes_mm: request.holesMm.map((h) => ({ cx_mm: h.cxMm, cy_mm: h.cyMm, diameter_mm: h.diameterMm })),
+      sheet_width_mm: request.sheetWidthMm,
+      sheet_length_mm: request.sheetLengthMm,
+      quantity: request.quantity,
+      kerf_mm: request.kerfMm ?? 0,
+      edge_margin_mm: request.edgeMarginMm ?? 2,
+    };
+
+    // NESTING_ENGINE=rust: the Rust nester (same algorithm and request, differentially tested placement for placement against the
+    // Python one below). Temporary: while it has not run in production, a nester that is unavailable (missing binary, crash,
+    // timeout) falls back to the Python engine; a refusal about the part itself is final, exactly like the Python 422.
+    if (nesterEnabled()) {
+      try {
+        const answer = await runNester(body);
+        if (answer.ok) return { result: toTrueNestResult(answer.result), reason: '' };
+        this.logger.warn(`True-nest could not be computed (rust nester): ${answer.reason}`);
+        return { result: null, reason: `Could not compute a true nest: ${answer.reason}` };
+      } catch (error) {
+        this.logger.warn(`Rust nester unavailable (${error instanceof Error ? error.message : String(error)}); using the Python engine`);
+      }
+    }
+
     try {
       const response = await cadEngineHttp.post(
         `${this.cadEngineUrl}/nest`,
-        {
-          outline_points_mm: request.outlinePointsMm,
-          holes_mm: request.holesMm.map((h) => ({ cx_mm: h.cxMm, cy_mm: h.cyMm, diameter_mm: h.diameterMm })),
-          sheet_width_mm: request.sheetWidthMm,
-          sheet_length_mm: request.sheetLengthMm,
-          quantity: request.quantity,
-          kerf_mm: request.kerfMm ?? 0,
-          edge_margin_mm: request.edgeMarginMm ?? 2,
-        },
+        body,
         {
           // 30s was too tight for parts small relative to the sheet -- a
           // ~53x123mm part on a 2500x5000mm sheet needs ~1,800 placements,
@@ -1308,22 +1325,7 @@ export class CADAnalysisService {
           },
         },
       );
-      return {
-        result: {
-          sheetWidthMm: response.data.sheet_width_mm,
-          sheetLengthMm: response.data.sheet_length_mm,
-          partsPerSheet: response.data.parts_per_sheet,
-          placements: (response.data.placements || []).map((p: any) => ({
-            xMm: p.x_mm,
-            yMm: p.y_mm,
-            rotationDeg: p.rotation_deg,
-          })),
-          utilizationPct: response.data.utilization_pct,
-          sheetsRequired: response.data.sheets_required ?? null,
-          capped: !!response.data.capped,
-        },
-        reason: '',
-      };
+      return { result: toTrueNestResult(response.data), reason: '' };
     } catch (error: any) {
       if (error?.response?.status === 422) {
         // FastAPI returns 422 `detail` as an ARRAY of structured validation
@@ -1343,6 +1345,19 @@ export class CADAnalysisService {
       return { result: null, reason };
     }
   }
+}
+
+/** The nester's (or the engine's) snake_case answer in the camelCase shape the costing code reads. */
+function toTrueNestResult(data: any): TrueNestCadEngineResult {
+  return {
+    sheetWidthMm: data.sheet_width_mm,
+    sheetLengthMm: data.sheet_length_mm,
+    partsPerSheet: data.parts_per_sheet,
+    placements: (data.placements || []).map((p: any) => ({ xMm: p.x_mm, yMm: p.y_mm, rotationDeg: p.rotation_deg })),
+    utilizationPct: data.utilization_pct,
+    sheetsRequired: data.sheets_required ?? null,
+    capped: !!data.capped,
+  };
 }
 
 interface TrueNestRequest {
