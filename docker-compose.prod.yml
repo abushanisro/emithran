@@ -248,7 +248,7 @@ services:
         limits: { cpus: '2', memory: 2G, pids: 256 }
         reservations: { cpus: '0.5', memory: 256M }
 
-  # --- PostgREST: the data API in front of the managed Postgres (docs: CLAUDE.md "Leaving Supabase"). Runs only with
+  # --- PostgREST: the data API in front of the managed Postgres (docs: docs/ENGINEERING.md "Leaving Supabase"). Runs only with
   # `--profile postgrest` (DB_BACKEND=postgrest). Reachable ONLY from the backend: it is on the private `db` network with it and nothing
   # else, never published, and it accepts only tokens the backend signs with DB_JWT_SECRET. It needs outbound access to the database,
   # which is why it is not on the no-internet `internal` network. Connects as the `authenticator` role, which can only switch to

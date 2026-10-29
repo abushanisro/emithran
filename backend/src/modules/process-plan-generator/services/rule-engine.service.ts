@@ -235,7 +235,7 @@ export class RuleEngineService {
 
     // ── Drawing-intelligence-driven rules (from bom_items promoted columns) ──────
     // These fire independently of the feature graph — they use Gemini-extracted
-    // fields persisted on the BOM item, not Claude DrawingBrief features.
+    // fields persisted on the BOM item, not model-extracted DrawingBrief features.
 
     // Tight tolerance → CMM Inspection (skip when the feature graph already produced one)
     const alreadyHasCmm = mandatory.some((op) => op.machineCategoryHint === 'cmm');

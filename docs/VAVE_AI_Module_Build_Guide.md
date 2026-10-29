@@ -67,7 +67,7 @@ Automate the collection of product data, cost data, and supplier data from enter
   - PLM REST API / SOAP connectors
   - File storage: S3/MinIO for drawing blobs
   - Vector embedding of drawing metadata for semantic search
-- **AI Layer:** Use a vision model (Claude claude-sonnet-4-20250514 with vision or GPT-4V) to extract:
+- **AI Layer:** Use a vision model (a vision-capable LLM such as GPT-4V) to extract:
   - Material callouts
   - Tolerance specifications
   - Manufacturing process indicators (turned, cast, stamped, etc.)
@@ -194,13 +194,13 @@ def should_cost(part):
     return material_cost + process_cost + overhead + margin
 ```
 
-**AI Enhancement:** Use Claude API to extract manufacturing process from 2D drawings:
+**AI Enhancement:** Use LLM API to extract manufacturing process from 2D drawings:
 ```javascript
 const response = await fetch("https://api.anthropic.com/v1/messages", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({
-    model: "claude-sonnet-4-20250514",
+    model: "<vision-model-id>",
     max_tokens: 1000,
     messages: [{
       role: "user",
@@ -467,7 +467,7 @@ CREATE TABLE vave_should_costs (
 │  │        AI Orchestration Layer        │  │
 │  │                                      │  │
 │  │  ┌──────────┐  ┌──────────────────┐  │  │
-│  │  │ Claude   │  │  GPT Agent       │  │  │
+│  │  │ LLM      │  │  GPT Agent       │  │  │
 │  │  │ Vision   │  │  (Data Analysis  │  │  │
 │  │  │ API      │  │   & Ideation)    │  │  │
 │  │  │          │  │                  │  │  │
@@ -485,7 +485,7 @@ CREATE TABLE vave_should_costs (
 └─────────────────────────────────────────────┘
 ```
 
-**Claude API call for drawing spec extraction:**
+**LLM API call for drawing spec extraction:**
 ```javascript
 // services/ai/drawing-analyzer.js
 export async function extractSpecFromDrawing(drawingBase64, mediaType = "image/png") {
@@ -493,7 +493,7 @@ export async function extractSpecFromDrawing(drawingBase64, mediaType = "image/p
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
+      model: "<vision-model-id>",
       max_tokens: 1000,
       messages: [{
         role: "user",
@@ -532,7 +532,7 @@ export async function extractSpecFromDrawing(drawingBase64, mediaType = "image/p
 }
 ```
 
-**Claude API call for VAVE ideation:**
+**LLM API call for VAVE ideation:**
 ```javascript
 // services/ai/ideation-engine.js
 export async function generateVAVEIdeas(focusAreaReport, shouldCostGaps, supplierData) {
@@ -540,7 +540,7 @@ export async function generateVAVEIdeas(focusAreaReport, shouldCostGaps, supplie
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
+      model: "<vision-model-id>",
       max_tokens: 1000,
       messages: [{
         role: "user",
@@ -588,7 +588,7 @@ Return ONLY a JSON array (no preamble, no markdown):
 |---|---|
 | Backend | Node.js / Express OR Python FastAPI (match existing Mithran stack) |
 | Database | PostgreSQL (extend existing Mithran DB) |
-| AI | Anthropic Claude API (vision + text), OpenAI GPT-4o (GPT Agent tasks) |
+| AI | LLM API (vision + text), OpenAI GPT-4o (GPT Agent tasks) |
 | ETL / Scheduling | Apache Airflow or Node-cron for ERP/PLM sync |
 | File Storage | AWS S3 / MinIO for drawings, reports |
 | Report Generation | Puppeteer (PDF), ExcelJS (XLSX), pptxgenjs (PPTX) |
@@ -629,7 +629,7 @@ Key selling points for enterprise pitch:
 ### Sprint 3–4 (Weeks 5–8): Phase 1 Complete
 - [ ] PLM connector (drawing fetch + S3 storage)
 - [ ] Wayfinder supplier spend connector
-- [ ] Drawing analysis AI endpoint (Claude Vision)
+- [ ] Drawing analysis AI endpoint (LLM vision)
 - [ ] Phase 1 dashboard with data sync status
 
 ### Sprint 5–7 (Weeks 9–14): Phase 2 AI Engine
@@ -670,7 +670,7 @@ mithran/
         │   │   ├── plm-connector.js
         │   │   ├── supplier-connector.js
         │   │   ├── ai/
-        │   │   │   ├── drawing-analyzer.js   Claude Vision
+        │   │   │   ├── drawing-analyzer.js   LLM vision
         │   │   │   ├── cost-analyzer.js      GPT Agent
         │   │   │   └── ideation-engine.js    SCAMPER/TRIZ AI
         │   │   ├── should-cost.js

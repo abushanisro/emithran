@@ -257,7 +257,7 @@ interface InjectionMoldingRequirement {
 // account for a combined bend+blank hit's true tonnage, or differentiate
 // in-die bending capability from blank-only — no real per-machine die-
 // station/bending-capability data exists anywhere in the sourced reference
-// data to build that distinction from (see CLAUDE.md's Cost checklist,
+// data to build that distinction from (see docs/ENGINEERING.md's Cost checklist,
 // "Press-family... double-charge bending" entry — a separate, disclosed,
 // NOT-fixed gap this requirement does not touch).
 export interface PressRequirement {

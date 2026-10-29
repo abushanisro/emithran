@@ -1,4 +1,4 @@
-// Org-scoped tenancy Phase 2b (.claude/plans/delegated-gliding-swan.md):
+// Org-scoped tenancy Phase 2b (the internal plan):
 // bom_item_costs and its cost-record siblings converted from strict
 // per-user_id filtering to organization-scoped RLS. These tests prove the
 // specific bug this closes: recalculateCost's cost lookups must NOT filter

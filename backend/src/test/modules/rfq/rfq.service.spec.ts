@@ -1,4 +1,4 @@
-// Org-scoped tenancy Phase 3 (.claude/plans/delegated-gliding-swan.md): the
+// Org-scoped tenancy Phase 3 (the internal plan): the
 // RFQ module previously ran entirely through the service-role client
 // (this.supabaseService.client, RLS bypassed) with manual user_id filtering
 // as the ONLY enforcement. These tests prove the fix: create()/findOne()

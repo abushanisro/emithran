@@ -59,7 +59,7 @@ The reported Dependabot baseline of 89 (3 critical / 39 high) is not independent
 
 **Restore real regression evidence without changing physical or business assumptions.**
 
-- BOM orchestration and shared costing/process engines live under `backend/src/modules/bom-items/`; Sheet Metal is the priority but machining/molding also use shared contracts, per `CLAUDE.md`.
+- BOM orchestration and shared costing/process engines live under `backend/src/modules/bom-items/`; Sheet Metal is the priority but machining/molding also use shared contracts, per `docs/ENGINEERING.md`.
 - CAD vocabulary is generated from reference operation catalogs. Generated JSON/TypeScript must not be hand-edited; missing capability/material data must not be fabricated.
 - Passing baseline tests cover shared kernel, currency persistence, routing, machine capability and DFM. Case-broken real-data suites cannot establish manufacturing correctness until restored.
 - Large BOM orchestration, legacy feature representations and duplicate migration trees are architectural coupling risks, not justification for an untested rewrite.

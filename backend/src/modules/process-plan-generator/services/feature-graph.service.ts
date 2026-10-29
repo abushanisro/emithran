@@ -11,7 +11,7 @@ import type {
 
 /**
  * Builds a ManufacturingFeatureGraph from existing extraction data:
- *   - DrawingBrief (Claude vision on 2D PDF — highest confidence)
+ *   - DrawingBrief (model vision on 2D PDF — highest confidence)
  *   - BriefDfm     (3D STEP geometry analysis — medium confidence)
  *   - BriefBomItem (BOM metadata — lowest confidence)
  *

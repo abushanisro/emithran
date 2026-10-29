@@ -1,5 +1,5 @@
 // Machine Economics provenance resolver — Phase 1 of the "Machine Economics"
-// architecture initiative (see CLAUDE.md, 2026-08-22). Mirrors this file's
+// architecture initiative (see docs/ENGINEERING.md, 2026-08-22). Mirrors this file's
 // own hydrateCapability() (selector.ts): DB row (real) -> reference/industry
 // benchmark (machine_library.json, promoted via migration 537) -> one
 // conservative generic fallback, never a per-location fabricated JS constant.

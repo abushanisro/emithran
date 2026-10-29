@@ -16,7 +16,7 @@ import { SupabaseService } from '../supabase/supabase.service';
  * per-controller as the org-scoping conversion reaches each module, so a
  * module that hasn't been converted yet is unaffected. See
  * memory/sheetmetal (project_manufacturing_intelligence_data_reconciliation)
- * and .claude/plans/delegated-gliding-swan.md for the phased rollout this
+ * and the internal plan for the phased rollout this
  * guard is Phase 1 of.
  *
  * Never silently defaults: zero memberships or an ambiguous multi-org
