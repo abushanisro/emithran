@@ -11,6 +11,8 @@ CREATE SCHEMA auth;
 CREATE TABLE auth.users (id uuid PRIMARY KEY DEFAULT gen_random_uuid());
 -- auth.uid() reads the user the test says it is
 CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('test.uid', true), '')::uuid $$;
+-- auth.jwt() reads the claims the test says the caller has
+CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $$ SELECT coalesce(nullif(current_setting('test.jwt', true), '')::jsonb, '{}'::jsonb) $$;
 -- the organizations the current test user belongs to
 CREATE FUNCTION public.current_user_org_ids() RETURNS SETOF uuid LANGUAGE sql STABLE AS
   $$ SELECT unnest(string_to_array(nullif(current_setting('test.org_ids', true), ''), ',')::uuid[]) $$;
