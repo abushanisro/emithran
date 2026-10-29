@@ -150,6 +150,19 @@ jobs:
       - run: cargo clippy --locked --all-targets -- -D warnings
       - run: cargo test --locked
 
+  geometry-worker:
+    name: Geometry worker (C++ build, hand-worked checks, parity with the Python engine)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The build runs the hand-worked checks (tests/unit_tests.cpp) and fails if the image would not read STEP correctly.
+      - run: docker build --platform linux/amd64 --build-context fixtures=backend/test/fixtures/cad -t gw-build:dev geometry-worker
+      - run: docker build --platform linux/amd64 -t py-occt:dev -f geometry-worker/tests/Dockerfile.pyocct geometry-worker/tests
+      # Same fixtures through the Python engine and the C++ worker; the two reports must agree.
+      - run: python3 geometry-worker/tests/parity.py
+
   cad-engine:
     name: CAD Engine (Docker build)
     runs-on: ubuntu-latest
