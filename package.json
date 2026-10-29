@@ -82,7 +82,7 @@
     "react-hook-form": "^7.61.1",
     "react-leaflet": "^5.0.0",
     "react-resizable-panels": "^2.1.9",
-    "recharts": "^2.15.4",
+    "recharts": "^3.10.1",
     "shiki": "4.1.0",
     "sonner": "^1.7.4",
     "tailwind-merge": "^2.6.0",
