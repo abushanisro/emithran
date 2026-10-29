@@ -50,7 +50,7 @@ class AppConfig:
         cors_origins = [origin.strip() for origin in cors_origins_str.split(",")]
         
         # Parse file size (convert MB to bytes)
-        max_file_size_mb = int(os.getenv("MAX_FILE_SIZE_MB", "50"))
+        max_file_size_mb = int(os.getenv("MAX_FILE_SIZE_MB", os.getenv("MAX_UPLOAD_MB", "50")))  # MAX_UPLOAD_MB is the one shared upload limit
         max_file_size_bytes = max_file_size_mb * 1024 * 1024
         
         # Parse conversion settings
@@ -65,7 +65,7 @@ class AppConfig:
             raise ValueError(f"ANGULAR_DEFLECTION must be between 0.1 and 1.0, got {angular_deflection}")
         
         return cls(
-            port=int(os.getenv("PORT", "5055")),
+            port=int(os.getenv("CAD_ENGINE_PORT", os.getenv("PORT", "5055"))),  # CAD_ENGINE_PORT in the shared local .env; PORT in containers
             host=os.getenv("HOST", "0.0.0.0"),
             environment=os.getenv("NODE_ENV", "development"),
             cors_origins=cors_origins,

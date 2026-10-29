@@ -116,12 +116,10 @@ pip install -r requirements.txt
 
 3. **Environment setup**
 ```bash
-# Copy environment templates
+# One env file for every local process (Next.js, backend, engines, tests); the template lists every setting
 cp .env.example .env
-cp backend/.env.example backend/.env
-cp cad-engine/.env.example cad-engine/.env
 
-# Configure your database and API keys in .env files
+# Fill in the REPLACE_ME values in .env (Supabase secret key, engine keys, your Anthropic key). It is git-ignored.
 ```
 
 4. **Database setup**

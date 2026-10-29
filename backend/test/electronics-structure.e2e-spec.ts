@@ -1,6 +1,6 @@
 // Electronics structure over HTTP, real app, real auth, real database: assemblies and sub-assemblies created by hand, the rules
 // that keep the tree well formed, delete of a subtree, and isolation between organizations. No files are uploaded: an assembly
-// holds none, so nothing sample-like is needed. Needs migrations 914 to 916 and both test accounts in .env.local
+// holds none, so nothing sample-like is needed. Needs migrations 914 to 916 and both test accounts in .env
 // (E2E_EMAIL / E2E_PASSWORD, E2E_EMAIL_B / E2E_PASSWORD_B, the second in another organization).
 process.env.ELECTRONICS_QUEUE_DRIVER ??= 'memory';
 
@@ -46,9 +46,9 @@ describe('[e2e] electronics assemblies, sub-assemblies and delete', () => {
     await app.init();
 
     const config = app.get(ConfigService);
-    const env = parseEnv(fs.readFileSync(path.resolve(__dirname, '../../.env.local'), 'utf8'));
+    const env = parseEnv(fs.readFileSync(path.resolve(__dirname, '../../.env'), 'utf8'));
     if (!env.E2E_EMAIL || !env.E2E_PASSWORD || !env.E2E_EMAIL_B || !env.E2E_PASSWORD_B) {
-      throw new Error('Add E2E_EMAIL / E2E_PASSWORD and E2E_EMAIL_B / E2E_PASSWORD_B to .env.local');
+      throw new Error('Add E2E_EMAIL / E2E_PASSWORD and E2E_EMAIL_B / E2E_PASSWORD_B to .env');
     }
     const anon = createClient(config.getOrThrow<string>('SUPABASE_URL'), config.getOrThrow<string>('SUPABASE_ANON_KEY'));
     const signIn = async (email: string, password: string) => {

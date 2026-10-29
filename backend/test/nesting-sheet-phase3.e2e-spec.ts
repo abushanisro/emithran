@@ -29,7 +29,7 @@ describe('[e2e] Phase 3 nesting sheet — real DB, no mocks', () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../.env') })],
+      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../../.env') })],
       providers: [SupabaseService, SheetMetalLookupService],
     }).compile();
     lookup = moduleRef.get(SheetMetalLookupService);
@@ -70,7 +70,7 @@ describe('[e2e] Phase 3 nesting sheet — real DB, no mocks', () => {
 describe('[e2e] Nest view candidate sheets — real DB', () => {
   it('library laser sheets = the distinct fiber-laser nominal sheets in machine_library.csv', async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../.env') })],
+      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../../.env') })],
       providers: [SupabaseService, SheetMetalLookupService],
     }).compile();
     const got = await moduleRef.get(SheetMetalLookupService).getLaserNominalSheetSizes();

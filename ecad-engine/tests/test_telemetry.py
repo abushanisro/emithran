@@ -123,6 +123,17 @@ def test_config_defaults_and_bounds():
     assert telemetry.read_config({}, "svc", "t") == (None, None)
 
 
+def test_metrics_endpoint_defaults_to_the_signal_path_and_can_be_split_off():
+    base = {"OTEL_EXPORTER_OTLP_ENDPOINT": "http://o2:5080/api/default/"}
+    config, _ = telemetry.read_config(base, "svc", "t")
+    assert config.metrics_endpoint == "http://o2:5080/api/default/v1/metrics"
+    split, warning = telemetry.read_config({**base, "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT": "http://prometheus:9090/api/v1/otlp/v1/metrics"}, "svc", "t")
+    assert warning is None and split.metrics_endpoint == "http://prometheus:9090/api/v1/otlp/v1/metrics"
+    assert split.endpoint == "http://o2:5080/api/default"
+    bad, warning = telemetry.read_config({**base, "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT": "prometheus:9090"}, "svc", "t")
+    assert bad is None and "disabled" in warning
+
+
 def test_continues_the_callers_trace_and_nests_the_stage_in_it(started):
     app, spans, _ = started
     response = TestClient(app).get("/work/item-aaa-111?token=QUERY-SECRET&file=bracket.step", headers={"traceparent": TRACEPARENT})

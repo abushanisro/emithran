@@ -6,7 +6,7 @@
 # Unlike the CAD engine, this service is pure Python (no OpenCascade), so it also runs natively; see RUNNING.md. Use this file
 # when you want the production image, with the source mounted and the reloader on.
 #
-# Requires ECAD_ENGINE_API_KEY in ecad-engine/.env (or the shell): the service refuses every request without one.
+# Requires ECAD_ENGINE_API_KEY in the repo-root .env (run: docker compose --env-file ../.env -f docker-compose.dev.yml up): the service refuses every request without one.
 
 services:
   ecad-engine:
@@ -27,7 +27,7 @@ services:
     environment:
       PORT: "5100"
       ENVIRONMENT: development
-      ECAD_ENGINE_API_KEY: ${ECAD_ENGINE_API_KEY:?set ECAD_ENGINE_API_KEY in ecad-engine/.env or the shell}
+      ECAD_ENGINE_API_KEY: ${ECAD_ENGINE_API_KEY:?set ECAD_ENGINE_API_KEY in the repo-root .env (docker compose --env-file ../.env ...)}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:4000}
       PYTHONUNBUFFERED: "1"
     command: ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5100", "--reload", "--reload-dir", "/app"]

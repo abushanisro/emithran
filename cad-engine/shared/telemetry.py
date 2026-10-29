@@ -50,6 +50,8 @@ _EXCLUDED_URLS = "/health,/ready"
 @dataclass(frozen=True)
 class TelemetryConfig:
     endpoint: str
+    # Full URL metrics go to when it differs from <endpoint>/v1/metrics (e.g. Prometheus' OTLP receiver).
+    metrics_endpoint: str
     service_name: str
     environment: str
     sampler_ratio: float
@@ -68,6 +70,12 @@ def read_config(env: Mapping[str, str], default_service: str, environment: str) 
         return None, None
     if not endpoint.lower().startswith(("http://", "https://")) or "://" not in endpoint or not endpoint.split("://", 1)[1]:
         return None, "OTEL_EXPORTER_OTLP_ENDPOINT is not an http(s) URL; telemetry is disabled."
+    metrics_endpoint = f"{endpoint.rstrip('/')}/v1/metrics"
+    raw_metrics = (env.get("OTEL_EXPORTER_OTLP_METRICS_ENDPOINT") or "").strip()
+    if raw_metrics:
+        if not raw_metrics.lower().startswith(("http://", "https://")) or not raw_metrics.split("://", 1)[1]:
+            return None, "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT is not an http(s) URL; telemetry is disabled."
+        metrics_endpoint = raw_metrics
     ratio = 0.1
     raw = (env.get("OTEL_TRACES_SAMPLER_ARG") or "").strip()
     if raw:
@@ -80,6 +88,7 @@ def read_config(env: Mapping[str, str], default_service: str, environment: str) 
     return (
         TelemetryConfig(
             endpoint=endpoint.rstrip("/"),
+            metrics_endpoint=metrics_endpoint,
             service_name=(env.get("OTEL_SERVICE_NAME") or "").strip() or default_service,
             environment=environment,
             sampler_ratio=ratio,
@@ -295,7 +304,7 @@ def _start(app: Any, config: TelemetryConfig, span_exporter: Any, metric_reader:
     )
 
     reader = metric_reader or PeriodicExportingMetricReader(
-        OTLPMetricExporter(endpoint=f"{config.endpoint}/v1/metrics", timeout=timeout_s),
+        OTLPMetricExporter(endpoint=config.metrics_endpoint, timeout=timeout_s),
         export_interval_millis=config.metric_interval_ms,
         export_timeout_millis=config.export_timeout_ms,
     )
@@ -318,7 +327,11 @@ def _start(app: Any, config: TelemetryConfig, span_exporter: Any, metric_reader:
 
     _state.tracer = tracer_provider.get_tracer("emithran.engine")
     _state.histogram = meter_provider.get_meter("emithran.engine").create_histogram(
-        "emithran.engine.stage.duration", unit="s", description="Duration of a heavy engine stage by stage name and outcome"
+        "emithran.engine.stage.duration",
+        unit="s",
+        description="Duration of a heavy engine stage by stage name and outcome",
+        # Stages run from under a second to the 30-70 s component walk and the 10-minute backend timeout.
+        explicit_bucket_boundaries_advisory=[0.1, 0.5, 1, 2.5, 5, 10, 30, 60, 120, 300, 600],
     )
     _state.tracer_provider = tracer_provider
     _state.meter_provider = meter_provider

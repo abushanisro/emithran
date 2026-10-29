@@ -1,5 +1,5 @@
 // The process dialog's machine pickers — REAL SupabaseService, real sign-in
-// (the test account in ../.env.local, so row-level security is the real one),
+// (the test account in ../.env, so row-level security is the real one),
 // read-only. The slim picker must offer exactly the machines and rates the
 // full list does, in a small fraction of the payload.
 import { Test } from '@nestjs/testing';
@@ -20,10 +20,10 @@ const LOCATION = 'USA';
 
 async function signIn(config: ConfigService): Promise<string> {
   // Parsed, not loaded: jest gives each test file its own process.env copy.
-  const env = parseEnv(fs.readFileSync(path.resolve(__dirname, '../../.env.local'), 'utf8'));
+  const env = parseEnv(fs.readFileSync(path.resolve(__dirname, '../../.env'), 'utf8'));
   const email = env.E2E_EMAIL;
   const password = env.E2E_PASSWORD;
-  if (!email || !password) throw new Error('Add E2E_EMAIL / E2E_PASSWORD to .env.local');
+  if (!email || !password) throw new Error('Add E2E_EMAIL / E2E_PASSWORD to .env');
   const anon = createClient(config.getOrThrow<string>('SUPABASE_URL'), config.getOrThrow<string>('SUPABASE_ANON_KEY'));
   const { data, error } = await anon.auth.signInWithPassword({ email, password });
   if (error || !data.session) throw new Error(`sign-in failed: ${error?.message}`);
@@ -36,7 +36,7 @@ describe('[e2e] MHR picker — real DB, no mocks', () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../.env') })],
+      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../../.env') })],
       providers: [SupabaseService, Logger, ExchangeRateService, LHRService, MHRService],
     }).compile();
     service = moduleRef.get(MHRService);

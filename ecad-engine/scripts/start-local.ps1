@@ -9,9 +9,9 @@ The engine needs Python 3.11 or 3.12 (the pinned pydantic-core has no wheel for 
 with the first of: -Python, the py launcher (3.12, then 3.11), or a conda environment that has 3.12 or 3.11. Later runs reuse
 .venv and only check that the pinned requirements are installed.
 
-The API key is taken, in order, from ECAD_ENGINE_API_KEY in the environment, ecad-engine/.env, or backend/.env (so the backend
-and the engine always share one key). Only when none exists is a random key generated; it is written to ecad-engine/.env and
-backend/.env needs the same value. Both files are git-ignored.
+The API key is taken, in order, from ECAD_ENGINE_API_KEY in the environment or from the repo-root .env (so the backend and the
+engine always share one key). Only when none exists is a random key generated for this run; the script writes no file, so add the
+printed value to the root .env as ECAD_ENGINE_API_KEY to keep it.
 #>
 param([int]$Port = 5100, [string]$Python = '')
 
@@ -58,17 +58,13 @@ function Read-Key([string]$file) {
     return $null
 }
 
-if (-not $env:ECAD_ENGINE_API_KEY) { $env:ECAD_ENGINE_API_KEY = Read-Key '.env' }
-if (-not $env:ECAD_ENGINE_API_KEY) {
-    $env:ECAD_ENGINE_API_KEY = Read-Key '..\backend\.env'
-    if ($env:ECAD_ENGINE_API_KEY) { "ECAD_ENGINE_API_KEY=$($env:ECAD_ENGINE_API_KEY)" | Out-File -Encoding ascii .env }
-}
+if (-not $env:ECAD_ENGINE_API_KEY) { $env:ECAD_ENGINE_API_KEY = Read-Key '..\.env' }
 if (-not $env:ECAD_ENGINE_API_KEY) {
     $bytes = New-Object byte[] 24
     [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
     $env:ECAD_ENGINE_API_KEY = [Convert]::ToBase64String($bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
-    "ECAD_ENGINE_API_KEY=$($env:ECAD_ENGINE_API_KEY)" | Out-File -Encoding ascii .env
-    Write-Host "Generated an API key and saved it to ecad-engine/.env. Put the same value in backend/.env as ECAD_ENGINE_API_KEY."
+    Write-Host "No ECAD_ENGINE_API_KEY in the root .env: generated one for this run: $($env:ECAD_ENGINE_API_KEY)"
+    Write-Host "Add it to the root .env as ECAD_ENGINE_API_KEY so the backend uses the same key."
 }
 
 $busy = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1

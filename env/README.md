@@ -1,5 +1,10 @@
 # Environment files
 
+**Local development** uses exactly one file: the repo-root `.env` (copy `.env.example`; git-ignored). Next.js, the backend, both
+engines and the tests all read it, so there is no `.env.local`, `.env.development`, `backend/.env` or `cad-engine/.env`. Per-service
+names where one name would collide (`BACKEND_PORT`, `CAD_ENGINE_PORT`, `ECAD_ENGINE_PORT`); `NODE_ENV` is never set (each tool sets
+it). **Deployed environments** below keep one file each, on the host.
+
 One env file per environment, kept **on the host that runs it**, never in git (`env/*.env` is ignored). Copy the template,
 fill in the secrets, and pass it to compose:
 
