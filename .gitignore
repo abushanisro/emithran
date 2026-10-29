@@ -85,4 +85,4 @@ petrus-demo/
 !.env.example
 
 # Supabase CLI link state (project refs); we no longer use the Supabase CLI
-supabase/
+/supabase/
