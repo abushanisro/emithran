@@ -125,6 +125,12 @@ services:
       CAD_ENGINE_API_KEY: ${CAD_ENGINE_API_KEY:?set CAD_ENGINE_API_KEY in the env file}
       ECAD_ENGINE_URL: http://ecad-engine:5100
       ECAD_ENGINE_API_KEY: ${ECAD_ENGINE_API_KEY:?set ECAD_ENGINE_API_KEY in the env file}
+      # Telemetry is off while OTEL_EXPORTER_OTLP_ENDPOINT is empty (docs/ops/observability.md, docs/ops/monitoring.md). Metrics go to
+      # Prometheus (docker-compose.monitoring.yml), e.g. http://prometheus:9090/api/v1/otlp/v1/metrics; traces to the OTLP backend
+      # named by the endpoint. For metrics only, set the endpoint to http://prometheus:9090/api/v1/otlp and OTEL_TRACES_SAMPLER_ARG=0.
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: ${OTEL_EXPORTER_OTLP_METRICS_ENDPOINT:-}
+      OTEL_TRACES_SAMPLER_ARG: ${OTEL_TRACES_SAMPLER_ARG:-0.1}
     volumes:
       - backend-logs:/app/logs
     tmpfs:
@@ -172,6 +178,12 @@ services:
       LINEAR_DEFLECTION: 0.1
       ANGULAR_DEFLECTION: 0.5
       LOG_LEVEL: info
+      # Telemetry is off while OTEL_EXPORTER_OTLP_ENDPOINT is empty (docs/ops/observability.md, docs/ops/monitoring.md). Metrics go to
+      # Prometheus (docker-compose.monitoring.yml), e.g. http://prometheus:9090/api/v1/otlp/v1/metrics; traces to the OTLP backend
+      # named by the endpoint. For metrics only, set the endpoint to http://prometheus:9090/api/v1/otlp and OTEL_TRACES_SAMPLER_ARG=0.
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: ${OTEL_EXPORTER_OTLP_METRICS_ENDPOINT:-}
+      OTEL_TRACES_SAMPLER_ARG: ${OTEL_TRACES_SAMPLER_ARG:-0.1}
     volumes:
       - cad-temp:/tmp/cad-files
       - cad-logs:/app/logs
@@ -281,6 +293,9 @@ services:
       PORT: 5100
       ECAD_ENGINE_API_KEY: ${ECAD_ENGINE_API_KEY:?set ECAD_ENGINE_API_KEY in the env file}
       LOG_LEVEL: info
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: ${OTEL_EXPORTER_OTLP_METRICS_ENDPOINT:-}
+      OTEL_TRACES_SAMPLER_ARG: ${OTEL_TRACES_SAMPLER_ARG:-0.1}
     tmpfs:
       - /tmp
     healthcheck:

@@ -1,0 +1,147 @@
+# Monitoring for the app stack: Prometheus (metrics, OTLP receiver), Grafana (dashboards), blackbox-exporter (availability
+# probes), node-exporter (host metrics, opt-in). A separate file on purpose: it starts and stops on its own, and nothing in the
+# app compose files depends on it. The app keeps running when this stack is down (telemetry export fails open).
+#
+#   docker compose -p emithran-stage-mon -f docker-compose.monitoring.yml --env-file env/stage.env up -d
+#   docker compose -p emithran-stage-mon -f docker-compose.monitoring.yml --env-file env/stage.env --profile host-metrics up -d
+#
+# It attaches to the app's networks, which are named after the app's compose project (`emithran-stage_internal`, ...):
+#   APP_INTERNAL_NETWORK  the network the backend and engines share (backend pushes metrics to prometheus over it)
+#   APP_EDGE_NETWORK      the network cloudflared is on; Grafana joins it so a tunnel route can reach http://grafana:3000
+# Docs: docs/ops/monitoring.md.
+
+x-hardened: &hardened
+  restart: unless-stopped
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  # Receives the apps' OTLP metrics (push) and scrapes the probes. Publishes no port: only containers on the app's internal
+  # network (backend, engines) and Grafana can reach it. The receiver has no authentication, so the internal network is the boundary.
+  prometheus:
+    <<: *hardened
+    image: prom/prometheus:v3.15.1@sha256:fa3302279710be2f21a8301ec17a8b4f2301fd829bd113839b3b6b02b6f191a2
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.enable-otlp-receiver
+      - --storage.tsdb.path=/prometheus
+      # Retention by time AND size, whichever comes first: a busy day cannot fill the disk.
+      - --storage.tsdb.retention.time=${PROM_RETENTION_TIME:-15d}
+      - --storage.tsdb.retention.size=${PROM_RETENTION_SIZE:-5GB}
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus-data:/prometheus
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9090/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks: [monitoring, app-internal]
+    deploy:
+      resources:
+        limits: { cpus: '1', memory: 1G, pids: 256 }
+
+  # Availability probes of the backend (live, ready, database entry) and both engines, over the app's internal network.
+  blackbox:
+    <<: *hardened
+    image: prom/blackbox-exporter@sha256:ea1c7aa3ef3f307cd03e85f34abb604478ccb90b567fc690da0cd9776da76b13
+    command: ["--config.file=/etc/blackbox/blackbox.yml"]
+    volumes:
+      - ./monitoring/blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9115/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks: [monitoring, app-internal]
+    deploy:
+      resources:
+        limits: { cpus: '0.25', memory: 128M, pids: 64 }
+
+  # Dashboards. Login required (no anonymous access, no sign-up). The only service of this file that is exposed: in stage/prd
+  # through a Cloudflare tunnel route with Access; on a workstation through the loopback port below.
+  grafana:
+    <<: *hardened
+    image: grafana/grafana:13.3.0@sha256:488984b716c0862639f91a698adbe2862677a5a07bad42da5f03f3030883b205
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in the env file}
+      GF_SECURITY_SECRET_KEY: ${GRAFANA_SECRET_KEY:?set GRAFANA_SECRET_KEY in the env file (openssl rand -hex 32)}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SECURITY_COOKIE_SECURE: ${GRAFANA_COOKIE_SECURE:-false}
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3001}
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+      # The business-KPI datasource (read-only role over aggregate views, migration 933). Empty = that datasource has no data.
+      GRAFANA_PG_HOST: ${GRAFANA_PG_HOST:-}
+      GRAFANA_PG_DATABASE: ${GRAFANA_PG_DATABASE:-postgres}
+      GRAFANA_PG_USER: ${GRAFANA_PG_USER:-grafana_reader}
+      GRAFANA_PG_PASSWORD: ${GRAFANA_PG_PASSWORD:-}
+      GRAFANA_PG_SSLMODE: ${GRAFANA_PG_SSLMODE:-require}
+    ports:
+      # Loopback only. Deployed environments reach Grafana through the tunnel (app-edge network), not through a host port.
+      - "127.0.0.1:${GRAFANA_PORT:-3001}:3000"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana-dashboards:ro
+      - grafana-data:/var/lib/grafana
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    networks: [monitoring, app-edge]
+    deploy:
+      resources:
+        limits: { cpus: '1', memory: 512M, pids: 256 }
+
+  # Host CPU, memory, disk and network. Opt-in (`--profile host-metrics`): it must see the host, so it shares the host's PID
+  # namespace and mounts / read-only. On Docker Desktop it reports the Linux VM, not the Mac/Windows host.
+  node-exporter:
+    <<: *hardened
+    profiles: [host-metrics]
+    image: prom/node-exporter:v1.12.1@sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0
+    command:
+      - --path.rootfs=/host
+      - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run|var/lib/docker/.+|var/lib/containerd/.+)($$|/)
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9100/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks: [monitoring]
+    deploy:
+      resources:
+        limits: { cpus: '0.25', memory: 128M, pids: 64 }
+
+volumes:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  # Prometheus <-> Grafana <-> exporters. Not internal: Grafana must reach the database for the business KPIs.
+  monitoring: {}
+  app-internal:
+    external: true
+    name: ${APP_INTERNAL_NETWORK:?set APP_INTERNAL_NETWORK to the app's internal network (e.g. emithran-stage_internal)}
+  app-edge:
+    external: true
+    name: ${APP_EDGE_NETWORK:?set APP_EDGE_NETWORK to the app's edge network (e.g. emithran-stage_edge)}
