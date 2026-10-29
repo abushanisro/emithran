@@ -1,4 +1,4 @@
-// Org-scoped tenancy Phase 3 (.claude/plans/delegated-gliding-swan.md):
+// Org-scoped tenancy Phase 3 (the internal plan):
 // proves createTracking() writes organization_id on all 3 inserted rows
 // (rfq_tracking + its vendor/part junction rows) instead of leaving it
 // unset, mirroring the pattern already proven for boms/mhr_records.

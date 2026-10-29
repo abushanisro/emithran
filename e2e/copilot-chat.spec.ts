@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-// Browser session -> Next proxy -> NestJS copilot -> Claude, against the running
+// Browser session -> Next proxy -> NestJS copilot -> the model, against the running
 // dev servers. The first test makes ONE tiny paid model call, so the file only
 // runs when COPILOT_E2E_ITEM_ID names a part the test account can see:
 //   COPILOT_E2E_ITEM_ID=<bom item id> npx playwright test e2e/copilot-chat.spec.ts

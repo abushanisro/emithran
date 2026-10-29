@@ -8,7 +8,7 @@
 //
 // Every rule that fires records WHY on the operation itself; every rule that
 // cannot evaluate because its signal is missing records a routingWarning
-// instead of silently guessing (CLAUDE.md: wrong zeros are worse than visible
+// instead of silently guessing (docs/ENGINEERING.md: wrong zeros are worse than visible
 // errors — the same applies to silently missing route steps).
 
 import {

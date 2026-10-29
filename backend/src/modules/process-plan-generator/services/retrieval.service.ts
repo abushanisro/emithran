@@ -84,7 +84,7 @@ export class RetrievalService {
     }
 
     // No manual tenancy re-check here: bom_items is org-scoped by RLS
-    // (.claude/plans/delegated-gliding-swan.md) — the row could only have
+    // (the internal plan) — the row could only have
     // been fetched above if the caller's organization already matched.
     // A user_id-based re-check here would incorrectly 404 a legitimate
     // org-mate who didn't personally create this bom_item.
@@ -151,7 +151,7 @@ export class RetrievalService {
     // ── Pull DFM features from cached geometry_analysis / dfm_analysis ────
     const dfm = this.extractDfm(bomRow);
 
-    // ── Extract 2D drawing data (cached or fresh from Claude vision) ──────
+    // ── Extract 2D drawing data (cached or fresh from model vision) ──────
     // Done in parallel-ish with scope classification since neither depends on
     // the other. Drawing extraction is the longest single step when fresh
     // (~5–15s), so failing fast here avoids stalling the whole pipeline.
@@ -368,7 +368,7 @@ export class RetrievalService {
     // ── Enrich process candidates with their lookup reference tables ────────
     // These tables contain shop-floor standard times the user has entered for
     // each process (e.g. "Swiss CNC Turning Time Standards"). When present,
-    // Claude reads them to use real setup/cycle times instead of fallbacks.
+    // the model reads them to use real setup/cycle times instead of fallbacks.
     await this.enrichProcessReferenceTables(client, rankedProcesses);
 
     const candidates: CandidateSet = {

@@ -566,7 +566,7 @@ export function CopilotPanel({ itemId, batchSize, productionLife, factory }: Cop
 
       {/* ── Footer attribution ─────────────────────────────────────────────── */}
       <div className="shrink-0 px-3 pb-1.5 text-[9px] text-muted-foreground/40 text-center">
-        Powered by Claude · Figures from Mithran engines · Not a substitute for engineering judgment
+        Powered by AI · Figures from Mithran engines · Not a substitute for engineering judgment
       </div>
     </div>
   );

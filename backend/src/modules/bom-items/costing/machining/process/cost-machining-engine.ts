@@ -33,7 +33,7 @@ export type MaterialClass =
  * rather than one of a fixed set of TypeScript literals.
  *
  * Replaces the former CNCMachineClass literal union (Section G.2,
- * C:\Users\singi\.claude\plans\logical-noodling-lampson.md) — every
+ * (an internal plan document)) — every
  * consumer that used to take a fixed 6-member union now takes this instead.
  * The dynamic discovery/route-comparison/registry rewrite (route builders,
  * requirement-builder, MHR_RATE_MACHINE_CLASSES, the MACHINING_CATEGORY_ALIAS

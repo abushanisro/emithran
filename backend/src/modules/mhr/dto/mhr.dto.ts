@@ -377,7 +377,7 @@ export class UpdateMHRDto {
   // never have this touched via the interactive API at all, only the one-way
   // Excel-import path. Category-specific machine_library.json fields (press
   // force, roll diameter, router RPM, etc. — no dedicated column exists or is
-  // warranted for these, see CLAUDE.md's Machine Economics entry) live here.
+  // warranted for these, see docs/ENGINEERING.md's Machine Economics entry) live here.
   @ApiPropertyOptional() @IsOptional() specs?: Record<string, any>;
 
   // Machine capability — see the identical block on CreateMHRDto for context.

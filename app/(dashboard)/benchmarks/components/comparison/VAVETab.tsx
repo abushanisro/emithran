@@ -60,7 +60,7 @@ interface AIVAVEInsights {
   confidence: number;
 }
 
-// Claude API integration for VAVE insights
+// LLM API integration for VAVE insights
 const analyzeVAVEWithAI = async (bomData: BOMMetricEntry): Promise<AIVAVEInsights> => {
   const bomAnalysis = {
     bomName: bomData.bom.name,
@@ -191,7 +191,7 @@ Be precise, data-driven, and cost-focused.`;
     
     throw new Error('No valid JSON found in response');
   } catch (error) {
-    console.error('Claude API Error:', error);
+    console.error('AI service error:', error);
     // Return fallback insights
     return {
       specificOpportunities: [{
@@ -351,7 +351,7 @@ export function VAVETab({ bomMetrics }: Props) {
                 AI-Powered VAVE Analysis
               </h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Get precise, cost-effective optimization insights using Claude AI
+                Get precise, cost-effective optimization insights using AI
               </p>
             </div>
             <Button 
@@ -519,7 +519,7 @@ export function VAVETab({ bomMetrics }: Props) {
                 {v.aiInsights && (
                   <div className="border-t pt-4">
                     <h4 className="text-sm font-semibold mb-3">
-                      Claude AI Insights ({v.aiInsights.confidence}% confidence)
+                      AI Insights ({v.aiInsights.confidence}% confidence)
                     </h4>
                     
                     {/* AI Specific Opportunities */}

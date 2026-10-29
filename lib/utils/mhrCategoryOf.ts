@@ -19,7 +19,7 @@ const VERIFIED_CLASS_CATEGORY: Record<string, string> = {
 // Everything else with no benchmark match and no verified category above
 // (deburring, cmm, cnc_lathe, cnc_3ax_vmc, cnc_5ax_mc, injection_molding —
 // legacy rows from manufacturing domains this app hasn't built yet per
-// CLAUDE.md's domain-by-domain roadmap, or a genuinely distinct process like
+// docs/ENGINEERING.md's domain-by-domain roadmap, or a genuinely distinct process like
 // a general deburring bench that isn't the same thing as "Deslag Machine")
 // still deserves a real display name instead of a raw snake_case slug.
 function humanizeMachineClass(machineClass: string): string {

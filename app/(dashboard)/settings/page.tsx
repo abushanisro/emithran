@@ -407,7 +407,7 @@ function ProfileTab() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// API Keys Tab  (Claude-platform-style table)
+// API Keys Tab  (key table)
 // ─────────────────────────────────────────────────────────────
 function ApiKeysTab() {
   const { data: keys = [], isLoading } = useApiKeys();

@@ -20,10 +20,10 @@ const MAX_PDF_BYTES = 50 * 1024 * 1024;
  *   1. If bom_items.drawing_extraction already cached, return it (no cost).
  *   2. If file_2d_path is missing, return UNAVAILABLE_DRAWING_BRIEF.
  *   3. Otherwise: download PDF from Supabase Storage → base64-encode →
- *      send directly to Claude as a PDF document (no pdf2pic / GraphicsMagick
- *      required — Claude natively understands PDFs via the document content block).
+ *      send directly to the model as a PDF document (no pdf2pic / GraphicsMagick
+ *      required — the model natively understands PDFs via the document content block).
  *
- * Using Claude's native PDF support instead of pdf2pic eliminates the
+ * Using the model's native PDF support instead of pdf2pic eliminates the
  * GraphicsMagick/ImageMagick system dependency that caused silent extraction
  * failures in cloud environments.
  */
@@ -73,7 +73,7 @@ export class DrawingExtractorService {
         return { ...UNAVAILABLE_DRAWING_BRIEF };
       }
 
-      const brief = await this.callClaudeWithPdf(pdfBase64, bomRow.file_2d_path);
+      const brief = await this.callModelWithPdf(pdfBase64, bomRow.file_2d_path);
       const finalBrief: DrawingBrief = {
         ...brief,
         source: 'fresh',
@@ -98,7 +98,7 @@ export class DrawingExtractorService {
   }
 
   // ── Storage → PDF base64 ─────────────────────────────────────────────────
-  // No rasterisation — we send the PDF bytes directly to Claude.
+  // No rasterisation — we send the PDF bytes directly to the model.
 
   private async fetchPdfBase64(storagePath: string, accessToken: string | null): Promise<string | null> {
     // Read with the service role, so the caller's right to this file is checked first (their own folder, a project they own).
@@ -119,9 +119,9 @@ export class DrawingExtractorService {
     return pdf.toString('base64');
   }
 
-  // ── Claude PDF extraction ────────────────────────────────────────────────
+  // ── Model PDF extraction ────────────────────────────────────────────────
 
-  private async callClaudeWithPdf(pdfBase64: string, sourcePath: string): Promise<DrawingBrief> {
+  private async callModelWithPdf(pdfBase64: string, sourcePath: string): Promise<DrawingBrief> {
     const systemPrompt = `You are a senior manufacturing engineer reading an Indian-shop 2D engineering drawing.
 Your job is to extract a structured JSON description of every callout that drives process planning.
 
@@ -226,7 +226,7 @@ Rules:
 
     if (!resp.ok) {
       const errText = await resp.text();
-      throw new Error(`Claude PDF API ${resp.status}: ${errText.slice(0, 300)}`);
+      throw new Error(`Model PDF API ${resp.status}: ${errText.slice(0, 300)}`);
     }
     const data = await resp.json() as any;
     const text = data.content?.[0]?.text ?? '';
@@ -249,7 +249,7 @@ Rules:
       try { return JSON.parse(m[0]); } catch {}
     }
 
-    throw new Error(`Claude response was not valid JSON. First 200 chars: ${raw.slice(0, 200)}`);
+    throw new Error(`The model response was not valid JSON. First 200 chars: ${raw.slice(0, 200)}`);
   }
 
   private normaliseBrief(raw: any): DrawingBrief {

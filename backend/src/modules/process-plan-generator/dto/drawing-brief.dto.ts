@@ -1,5 +1,5 @@
 /**
- * DrawingBrief — extracted from the BOM item's 2D drawing PDF via Claude
+ * DrawingBrief — extracted from the BOM item's 2D drawing PDF via the vision model
  * vision. Cached on bom_items.drawing_extraction (JSONB) and fed into the
  * EngineeringBrief so the LLM can choose processes informed by the actual
  * tolerance + GD&T + surface-finish callouts on the drawing, not just the

@@ -146,7 +146,7 @@ export interface IMProcessTree {
 }
 
 // ── Material behaviour tables ─────────────────────────────────────────────────
-// Data, not logic (CLAUDE.md: physics values live in named lookup tables).
+// Data, not logic (docs/ENGINEERING.md: physics values live in named lookup tables).
 // Hygroscopic resins absorb atmospheric moisture and MUST be dried before
 // molding or the part gets splay/voids/brittleness. Non-hygroscopic commodity
 // resins (PP, PE, PS) mold straight from the bag.
