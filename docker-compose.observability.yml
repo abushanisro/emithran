@@ -6,7 +6,7 @@
 services:
   openobserve:
     # Pinned. Upgrade deliberately, after reading the release notes.
-    image: public.ecr.aws/zinclabs/openobserve:v1.0.4
+    image: public.ecr.aws/zinclabs/openobserve:v1.1.2
     container_name: mithran-openobserve
     environment:
       ZO_ROOT_USER_EMAIL: ${OPENOBSERVE_ROOT_EMAIL:?set OPENOBSERVE_ROOT_EMAIL}
