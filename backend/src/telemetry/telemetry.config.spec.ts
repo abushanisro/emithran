@@ -23,6 +23,12 @@ describe('readTelemetryConfig', () => {
     });
   });
 
+  it('labels the deployment with APP_ENV (stage, prd) when set, since NODE_ENV is production for both', () => {
+    const base = { OTEL_EXPORTER_OTLP_ENDPOINT: 'http://c:4318', NODE_ENV: 'production' };
+    expect(readTelemetryConfig({ ...base, APP_ENV: 'stage' }).config?.environment).toBe('stage');
+    expect(readTelemetryConfig(base).config?.environment).toBe('production');
+  });
+
   it('sends metrics to <endpoint>/v1/metrics unless OTEL_EXPORTER_OTLP_METRICS_ENDPOINT names another URL', () => {
     const base = { OTEL_EXPORTER_OTLP_ENDPOINT: 'http://o2:5080/api/default/' };
     expect(readTelemetryConfig(base).config?.metricsEndpoint).toBe('http://o2:5080/api/default/v1/metrics');

@@ -70,7 +70,7 @@ export function readTelemetryConfig(env: NodeJS.ProcessEnv = process.env): Telem
       endpoint: endpoint.replace(/\/+$/, ''),
       metricsEndpoint,
       serviceName: env.OTEL_SERVICE_NAME?.trim() || 'mithran-backend',
-      environment: env.NODE_ENV || 'development',
+      environment: env.APP_ENV || env.NODE_ENV || 'development',
       samplerRatio,
       maxQueueSize: 2048,
       maxExportBatchSize: 512,

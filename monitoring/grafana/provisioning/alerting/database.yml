@@ -1,0 +1,43 @@
+apiVersion: 1
+# Database alerts that need the database itself (the Prometheus rules cover availability). No contact point is provisioned:
+# the alert shows in Grafana until one is set up (docs/ops/monitoring.md). No notification is sent by this file.
+groups:
+  - orgId: 1
+    name: database
+    folder: Emithran
+    interval: 1m
+    rules:
+      - uid: db-connections-high
+        title: DatabaseConnectionsHigh
+        condition: C
+        for: 10m
+        # No data or a datasource error means the KPI database is not configured or not reachable; the availability alerts
+        # (DatabaseUnavailable) own that case, so this rule stays quiet instead of firing on a missing datasource.
+        noDataState: OK
+        execErrState: OK
+        labels:
+          severity: warning
+        annotations:
+          summary: "Database sessions are above 80% of max_connections"
+          response: "Find what holds sessions (the pooler, PostgREST, a runaway job). Raise the plan's connection limit or lower pool sizes. Exhaustion makes every API call fail."
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: kpi-postgres
+            model:
+              refId: A
+              format: table
+              rawQuery: true
+              editorMode: code
+              rawSql: SELECT 100.0 * connections / max_connections AS used_pct FROM kpi.database_now
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, expression: A, reducer: last, settings: { mode: dropNN } }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [80] }
