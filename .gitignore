@@ -80,3 +80,9 @@ test-results/
 
 # Reference project, not part of this repo
 petrus-demo/
+
+# the committed template of the one local env file
+!.env.example
+
+# Supabase CLI link state (project refs); we no longer use the Supabase CLI
+/supabase/

@@ -49,8 +49,8 @@ describe('[e2e] dev auth bypass OFF — real app, real auth', () => {
 
     const config = app.get(ConfigService);
     expect(config.get('ADMIN_FALLBACK_EMAIL')).toBeTruthy();
-    const env = parseEnv(fs.readFileSync(path.resolve(__dirname, '../../.env.local'), 'utf8'));
-    if (!env.E2E_EMAIL || !env.E2E_PASSWORD) throw new Error('Add E2E_EMAIL / E2E_PASSWORD to .env.local');
+    const env = parseEnv(fs.readFileSync(path.resolve(__dirname, '../../.env'), 'utf8'));
+    if (!env.E2E_EMAIL || !env.E2E_PASSWORD) throw new Error('Add E2E_EMAIL / E2E_PASSWORD to .env');
     const anon = createClient(config.getOrThrow<string>('SUPABASE_URL'), config.getOrThrow<string>('SUPABASE_ANON_KEY'));
     const { data, error } = await anon.auth.signInWithPassword({ email: env.E2E_EMAIL, password: env.E2E_PASSWORD });
     if (error || !data.session) throw new Error(`sign-in failed: ${error?.message}`);

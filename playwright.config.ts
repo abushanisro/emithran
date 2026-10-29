@@ -1,9 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// Test-account credentials (E2E_EMAIL / E2E_PASSWORD) live in .env.local,
+// Test-account credentials (E2E_EMAIL / E2E_PASSWORD) live in .env,
 // which is git-ignored — never in this file or the repo. Node's built-in
 // loader; a missing file just leaves them unset (auth.setup.ts says so).
-try { process.loadEnvFile('.env.local'); } catch { /* no .env.local */ }
+try { process.loadEnvFile('.env'); } catch { /* no .env */ }
 // These specs sign in and create data in the running app; they never run against production. Same rule as the backend's
 // src/common/environment-guard.ts, written out here because this file is type-checked by the frontend image build, which
 // has no backend folder (test/lib/environment-guard-parity.test.ts keeps the two production hosts identical).

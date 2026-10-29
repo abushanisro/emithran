@@ -41,7 +41,7 @@ services:
       - /app/__pycache__
       - /app/.pytest_cache
     env_file:
-      - .env
+      - ../.env
     environment:
       HOST: "0.0.0.0"
       PORT: "5055"
@@ -91,7 +91,7 @@ services:
       - /app/__pycache__
       - /app/.pytest_cache
     env_file:
-      - .env
+      - ../.env
     environment:
       PYTHONUNBUFFERED: "1"
       PYTHONDONTWRITEBYTECODE: "1"

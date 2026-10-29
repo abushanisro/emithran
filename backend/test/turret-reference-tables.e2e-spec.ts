@@ -15,7 +15,7 @@ describe('[e2e] Turret Press reference tables', () => {
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
       // SessionModule is global in AppModule; the auth guard ProcessesModule wires needs it.
-      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../.env') }), SessionModule, ProcessesModule],
+      imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../../.env') }), SessionModule, ProcessesModule],
     }).compile();
     service = moduleRef.get(ProcessesService);
   });
