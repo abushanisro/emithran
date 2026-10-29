@@ -2,9 +2,10 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use archive::Limits;
-use runner::backend::Supabase;
+use runner::backend::{Backend, Platform, Supabase};
 use runner::health;
 use runner::job::{self, Config};
+use runner::s3::{S3, S3Settings};
 use runner::worker::WorkerConfig;
 
 fn setting(name: &str) -> Result<String, String> {
@@ -18,7 +19,7 @@ fn number(name: &str, default: u64) -> u64 {
         .unwrap_or(default)
 }
 
-fn config() -> Result<(Config, Supabase, Duration), String> {
+fn config() -> Result<(Config, Duration), String> {
     let max_upload_mb = number("MAX_UPLOAD_MB", 50);
     let max_entry = max_upload_mb * 1024 * 1024;
     let deadline = Duration::from_secs(number("WORKER_DEADLINE_SECONDS", 600));
@@ -57,13 +58,38 @@ fn config() -> Result<(Config, Supabase, Duration), String> {
             max_total_bytes: max_entry * 8,
         },
     };
-    let backend = Supabase::new(&setting("SUPABASE_URL")?, &setting("SUPABASE_SECRET_KEY")?)
-        .map_err(|e| e.to_string())?;
-    Ok((
-        config,
-        backend,
-        Duration::from_secs(number("POLL_SECONDS", 30)),
-    ))
+    Ok((config, Duration::from_secs(number("POLL_SECONDS", 30))))
+}
+
+/// Either Supabase (database and files), or no Supabase at all: PostgREST plus an S3-compatible bucket. Chosen like the backend does,
+/// by DB_BACKEND, so one set of environment variables configures both.
+enum Chosen {
+    Supabase(Supabase),
+    Platform(Platform),
+}
+
+fn backend_from_env() -> Result<Chosen, String> {
+    if std::env::var("DB_BACKEND").as_deref() != Ok("postgrest") {
+        return Supabase::new(&setting("SUPABASE_URL")?, &setting("SUPABASE_SECRET_KEY")?)
+            .map(Chosen::Supabase)
+            .map_err(|e| e.to_string());
+    }
+    let files = S3::new(S3Settings {
+        bucket: setting("S3_BUCKET")?,
+        region: setting("S3_REGION")?,
+        endpoint: std::env::var("S3_ENDPOINT").ok().filter(|v| !v.is_empty()),
+        access_key_id: setting("S3_ACCESS_KEY_ID")?,
+        secret_access_key: setting("S3_SECRET_ACCESS_KEY")?,
+        path_style: std::env::var("S3_FORCE_PATH_STYLE").as_deref() == Ok("true"),
+    })
+    .map_err(|e| e.to_string())?;
+    Platform::new(
+        &setting("POSTGREST_URL")?,
+        &setting("DB_JWT_SECRET")?,
+        files,
+    )
+    .map(Chosen::Platform)
+    .map_err(|e| e.to_string())
 }
 
 fn heartbeat_path() -> PathBuf {
@@ -79,13 +105,22 @@ async fn main() {
         let alive = health::is_fresh(&heartbeat_path(), health::MAX_AGE);
         std::process::exit(if alive { 0 } else { 1 });
     }
-    let (config, backend, poll) = match config() {
+    let started = config()
+        .and_then(|(config, poll)| backend_from_env().map(|backend| (config, poll, backend)));
+    let (config, poll, backend) = match started {
         Ok(parts) => parts,
         Err(message) => {
             eprintln!("cad-runner cannot start: {message}");
             std::process::exit(78);
         }
     };
+    match backend {
+        Chosen::Supabase(backend) => serve(&backend, &config, poll).await,
+        Chosen::Platform(backend) => serve(&backend, &config, poll).await,
+    }
+}
+
+async fn serve<B: Backend>(backend: &B, config: &Config, poll: Duration) {
     let beat_path = heartbeat_path();
     tokio::spawn(async move {
         loop {
@@ -102,7 +137,7 @@ async fn main() {
     );
     loop {
         // Drain the queue, then sleep; a stop signal ends the loop between uploads, never in the middle of one.
-        match job::run_once(&backend, &config).await {
+        match job::run_once(backend, config).await {
             Ok(true) => continue,
             Ok(false) => {}
             Err(error) => eprintln!("cad-runner: {error}"),
