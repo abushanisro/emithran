@@ -27,7 +27,11 @@ then production**. Each step says how to know it worked. Nothing here needs a co
    };
    ```
    Without `sid` every login is refused (the inactivity timeout needs a session id). Without a verified email nobody can be linked to an existing user.
-4. Record: domain, client id, client secret, `AUTH0_SECRET` (`openssl rand -hex 32`).
+4. **Branding, so Auth0's page matches the app's own sign-in page.** The app's `/auth` page keeps its design (logo, welcome text, image, "Sign In",
+   "Sign in with Google", "Request a demo") and its buttons lead to Auth0; the email and password boxes are on Auth0's page. In Auth0 Dashboard, Branding,
+   Universal Login: upload the M logo, set the dark theme with the app's primary colour, and set the page title to eMithran. Leave sign-ups off so the
+   "Request a demo" link remains the only way in.
+5. Record: domain, client id, client secret, `AUTH0_SECRET` (`openssl rand -hex 32`).
 
 **Postgres** (RDS, Cloud SQL, Azure, Neon...). Checklist before choosing:
 - Can you create roles and give one `BYPASSRLS`? (`service_role` needs it; migration 930 creates it and says so if it cannot.)
