@@ -1,25 +1,16 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase/client'
 import { appReadiness } from '@/lib/core/app-readiness'
 
+import { AuthContext, type AuthUser } from '@/lib/providers/auth-context'
+
 import type { User } from '@supabase/supabase-js'
 
-interface AuthContextType {
-  user: User | null
-  loading: boolean
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>
-  signUp: (email: string, password: string, fullName?: string) => Promise<{ error: Error | null }>
-  signInWithGoogle: () => Promise<{ error: Error | null }>
-  signOut: () => Promise<void>
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
-
 export function SupabaseAuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -247,17 +238,4 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
       {children}
     </AuthContext.Provider>
   )
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext)
-  if (context === undefined) {
-    throw new Error('useAuth must be used within a SupabaseAuthProvider')
-  }
-  return context
-}
-
-export function useAuthReady() {
-  const { loading } = useAuth()
-  return !loading
 }
