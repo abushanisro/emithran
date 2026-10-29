@@ -30,7 +30,9 @@
     "test:sql": "bash test/sql/run.sh",
     "test:postgrest": "bash test/postgrest/run.sh",
     "test:s3": "bash test/storage/run.sh",
-    "test:boot": "bash test/smoke/boot.sh"
+    "test:boot": "bash test/smoke/boot.sh",
+    "test:baseline": "bash test/baseline/run.sh",
+    "storage:copy": "ts-node -r tsconfig-paths/register scripts/copy-storage.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",

@@ -38,11 +38,19 @@ then production**. Each step says how to know it worked. Nothing here needs a co
 **Bucket** (S3, R2...). One bucket, one access key limited to it. No CORS needed (the browser never talks to storage; the backend signs URLs).
 The Next.js file proxy fetches signed URLs, so add the bucket host to `TRUSTED_STORAGE_HOSTS`.
 
-## 1. Load the database (the one thing not built yet)
+## 1. Load the database and the files
 
-The **baseline extraction** (schema, reference data, storage objects from the old project) does not exist (`BASELINE.json` marks 917 as the baseline). Until it
-does there is nothing to load into the new database beyond migrations 917 onward, which assume the older schema exists. **This blocks cutover.**
-Do not improvise a dump: build the extraction tool, test the restore with `backend/scripts/restore-check.sh`, then continue.
+Both tools are read-only on the old project, refuse to touch a database that already has data, and are proven by `npm run test:baseline` (a full round trip
+on two throwaway databases) and the unit tests of `copy-objects`.
+
+1. `backend/scripts/baseline-dump.sh <old-db-url> <new-dir>`: the whole `public` schema (structure and data) plus the **user directory** (id and email only,
+   no passwords or sessions). The directory is needed because 59 foreign keys point at `auth.users`; people are linked to their carried row by **verified
+   email** at first Auth0 login (migration 931), which is how they keep their old ids and their data. Use the old project's session-pooler URL.
+2. `backend/scripts/baseline-load.sh <new-dir> <new-db-url>`: checks SHA256SUMS, refuses a non-empty target, applies migration 930, loads the directory
+   and the schema, then compares **every table's row count** with the dump. Run `restore-check.sh` on the nightly backup as a second opinion.
+3. `npm run db:migrate -- --env stage`: applies the migrations newer than the baseline (918 onward, including 931 and 932).
+4. Files: `npm run storage:copy` (dry run), then `npm run storage:copy -- --apply`. Needs `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` and the `S3_*` settings.
+   Every object is read back and its hash compared; repeat until it reports 0 to copy and 0 failed (it exits non-zero while anything failed).
 
 ## 2. Apply migrations (stage), in order
 
@@ -59,7 +67,7 @@ Check: `npm run test:sql` is green locally first; on the new database `SELECT ha
 
 ## 4. People
 
-Users start fresh (stage has 2 QA users, production none). For each person, as `service_role`:
+Users start fresh (the user directory is carried by the baseline; Auth0 accounts are new). For each person, as `service_role`:
 `SELECT public.provision_user('person@company.com', 'Full Name');`, then add the email to `authorized_users` (active) and to `organization_members`.
 They sign in through Auth0; the first verified login links to that row. Check: `/auth/me` returns their internal id; an uninvited Auth0 account gets the
 "not invited" screen (403), not an error.
