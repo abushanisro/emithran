@@ -1,0 +1,128 @@
+# promtool test rules monitoring/prometheus/tests/alerts.test.yml  (run from the repo root, see docs/ops/monitoring.md)
+rule_files:
+  - ../rules/alerts.yml
+evaluation_interval: 1m
+
+tests:
+  - name: app down fires after 3 minutes, not before
+    interval: 1m
+    input_series:
+      - series: 'probe_success{job="probe-live", instance="http://backend:4000/api/health/live"}'
+        values: '1 1 0 0 0 0 0'
+    alert_rule_test:
+      - { eval_time: 3m, alertname: AppDown, exp_alerts: [] }
+      - eval_time: 6m
+        alertname: AppDown
+        exp_alerts:
+          - exp_labels: { severity: critical, job: probe-live, instance: "http://backend:4000/api/health/live" }
+            exp_annotations:
+              summary: "Backend process is not answering /api/health/live"
+              response: "Check the backend container (docker ps, docker logs). Liveness depends on nothing external, so this is the process, the container or the network, not the database."
+
+  - name: a database outage is reported only while the backend itself is up
+    interval: 1m
+    input_series:
+      - series: 'probe_success{job="probe-database"}'
+        values: '0+0x10'
+      - series: 'probe_success{job="probe-live"}'
+        values: '1+0x5 0+0x5'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: DatabaseUnavailable
+        exp_alerts:
+          - exp_labels: { severity: critical, job: probe-database }
+            exp_annotations:
+              summary: "Backend is up but its database check fails"
+              response: "Check the database provider status and the backend's SUPABASE_URL / POSTGREST_URL. Free-tier projects pause after a week idle."
+      - { eval_time: 10m, alertname: DatabaseUnavailable, exp_alerts: [] }
+
+  - name: server error rate needs both a high ratio and real traffic
+    interval: 1m
+    input_series:
+      # 20 req/min, 40% of them 5xx, for 30 minutes
+      - series: 'emithran_http_server_duration_seconds_count{emithran_status_class="5xx", http_route="/v1/x"}'
+        values: '0+8x30'
+      - series: 'emithran_http_server_duration_seconds_count{emithran_status_class="2xx", http_route="/v1/x"}'
+        values: '0+12x30'
+      # a quiet service: 1 request a minute, all failing -> below the traffic floor
+      - series: 'emithran_http_server_duration_seconds_count{emithran_status_class="5xx", http_route="/v1/quiet"}'
+        values: '0+0x30'
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: HighServerErrorRate
+        exp_alerts:
+          - exp_labels: { severity: critical }
+            exp_annotations:
+              summary: "More than 5% of API requests fail with 5xx"
+              response: "Open Application Performance, find the route with the errors, then the backend log for its trace/request id. Check the database and engine alerts first."
+
+  - name: low traffic never fires the error-rate alert
+    interval: 1m
+    input_series:
+      - series: 'emithran_http_server_duration_seconds_count{emithran_status_class="5xx", http_route="/v1/x"}'
+        values: '0+1x40 40+0x0'
+      - series: 'emithran_http_server_duration_seconds_count{emithran_status_class="2xx", http_route="/v1/x"}'
+        values: '0+0x40'
+    alert_rule_test:
+      # 1 req/min = 0.017 req/s, below the 0.05 floor
+      - { eval_time: 35m, alertname: HighServerErrorRate, exp_alerts: [] }
+
+  - name: CAD failures count terminal attempts only, and need at least 5 of them
+    interval: 1m
+    input_series:
+      - series: 'emithran_cad_upload_duration_seconds_count{emithran_outcome="error"}'
+        values: '0+0x10 0+1x50'
+      - series: 'emithran_cad_upload_duration_seconds_count{emithran_outcome="ok"}'
+        values: '0+0x10 0+0.2x50'
+      # retries pile up but are not terminal
+      - series: 'emithran_cad_upload_duration_seconds_count{emithran_outcome="retry"}'
+        values: '0+5x60'
+    alert_rule_test:
+      - eval_time: 55m
+        alertname: CadProcessingFailureSpike
+        exp_alerts:
+          - exp_labels: { severity: warning }
+            exp_annotations:
+              summary: "More than 25% of CAD uploads ended in failure in the last hour"
+              response: "Open CAD and Costing. Failed rows carry error_code in cad_uploads (a bad file is permanent, 'processing_failed' is the engine). Check the engine alert and its logs."
+
+  - name: retries alone never raise the CAD failure alert
+    interval: 1m
+    input_series:
+      - series: 'emithran_cad_upload_duration_seconds_count{emithran_outcome="retry"}'
+        values: '0+5x60'
+      - series: 'emithran_cad_upload_duration_seconds_count{emithran_outcome="ok"}'
+        values: '0+1x60'
+    alert_rule_test:
+      - { eval_time: 55m, alertname: CadProcessingFailureSpike, exp_alerts: [] }
+
+  - name: queue backlog needs the whole window above the limit
+    interval: 1m
+    input_series:
+      - series: 'emithran_job_queue_depth{emithran_queue="cad_upload"}'
+        values: '0 0 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50'
+    alert_rule_test:
+      - { eval_time: 12m, alertname: BackgroundQueueBacklog, exp_alerts: [] }
+      - eval_time: 25m
+        alertname: BackgroundQueueBacklog
+        exp_alerts:
+          - exp_labels: { severity: warning, emithran_queue: cad_upload }
+            exp_annotations:
+              summary: "cad_upload: more than 10 jobs have been waiting for 15 minutes"
+              response: "Runner stopped or too slow. CAD_UPLOAD_RUNNER=off on every replica leaves uploads queued; check the runner log and the engine."
+
+  - name: disk alert on low free space
+    interval: 1m
+    input_series:
+      - series: 'node_filesystem_avail_bytes{mountpoint="/", fstype="ext4"}'
+        values: '10+0x30'
+      - series: 'node_filesystem_size_bytes{mountpoint="/", fstype="ext4"}'
+        values: '100+0x30'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: DiskSpaceLow
+        exp_alerts:
+          - exp_labels: { severity: critical, mountpoint: "/", fstype: ext4 }
+            exp_annotations:
+              summary: "Less than 15% disk space free on /"
+              response: "docker system df; prune old images, check log volumes (backend-logs, cad-logs) and the Prometheus volume (PROM_RETENTION_SIZE)."

@@ -1,0 +1,63 @@
+# Apps PUSH their metrics over OTLP to /api/v1/otlp/v1/metrics (enabled by --web.enable-otlp-receiver); only the probes and the
+# host exporter are scraped. Metric names are the OpenTelemetry names with dots as underscores and the unit as a suffix
+# (emithran.http.server.duration, unit s -> emithran_http_server_duration_seconds_bucket).
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+otlp:
+  # service.name becomes the `job` label on its own; the environment (stage/prd) is promoted so one Grafana can show both.
+  promote_resource_attributes:
+    - deployment.environment.name
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: node
+    static_configs:
+      - targets: ["node-exporter:9100"]
+
+  # Probes: the blackbox exporter calls the target; probe_success is 1 or 0. Targets are service names on the app network.
+  - job_name: probe-live
+    metrics_path: /probe
+    params: { module: [http_2xx] }
+    static_configs:
+      - targets: ["http://backend:4000/api/health/live"]
+    relabel_configs: &probe_relabel
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox:9115
+
+  # Readiness is 503 when the database, an engine or the queue is down: "the API cannot do its job", not "the process is gone".
+  - job_name: probe-ready
+    metrics_path: /probe
+    params: { module: [http_2xx] }
+    static_configs:
+      - targets: ["http://backend:4000/api/health/ready"]
+    relabel_configs: *probe_relabel
+
+  # Same endpoint, but only the database entry decides (a body match), so a database outage is told apart from an engine outage.
+  - job_name: probe-database
+    metrics_path: /probe
+    params: { module: [database_up] }
+    static_configs:
+      - targets: ["http://backend:4000/api/health/ready"]
+    relabel_configs: *probe_relabel
+
+  - job_name: probe-engines
+    metrics_path: /probe
+    params: { module: [http_2xx] }
+    static_configs:
+      - targets: ["http://cad-engine:5055/ready"]
+        labels: { engine: cad }
+      - targets: ["http://ecad-engine:5100/ready"]
+        labels: { engine: ecad }
+    relabel_configs: *probe_relabel

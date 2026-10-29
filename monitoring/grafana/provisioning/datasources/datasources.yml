@@ -1,0 +1,30 @@
+apiVersion: 1
+datasources:
+  # Operational metrics (OTLP push + probes + host). Live.
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: 30s
+
+  # Business KPIs: daily aggregates from durable records (migration 933), read by a role that can see nothing else.
+  # Calculated from the database, not measured live. Empty GRAFANA_PG_HOST = no data in the business panels.
+  - name: Emithran KPIs
+    uid: kpi-postgres
+    type: grafana-postgresql-datasource
+    access: proxy
+    url: ${GRAFANA_PG_HOST}
+    user: ${GRAFANA_PG_USER}
+    editable: false
+    jsonData:
+      database: ${GRAFANA_PG_DATABASE}
+      sslmode: ${GRAFANA_PG_SSLMODE}
+      postgresVersion: 1700
+      maxOpenConns: 3
+      maxIdleConns: 1
+    secureJsonData:
+      password: ${GRAFANA_PG_PASSWORD}
