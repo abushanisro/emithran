@@ -8,11 +8,11 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 IMAGE="postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b"
-MIGRATIONS=(917_cad_uploads 918_free_tier_housekeeping 919_audit_events 920_job_queue)
+MIGRATIONS=(917_cad_uploads 918_free_tier_housekeeping 919_audit_events 920_job_queue 921_security_hardening)
 NAME="sqltest-$$"
 trap 'docker rm -f "$NAME" >/dev/null 2>&1 || true' EXIT
 
-docker run -d --rm --name "$NAME" -e POSTGRES_PASSWORD=test --tmpfs /var/lib/postgresql/data "$IMAGE" >/dev/null
+docker run -d --rm --name "$NAME" -e POSTGRES_PASSWORD=test --tmpfs /var/lib/postgresql/data -v "$PWD/../../migrations":/migrations:ro "$IMAGE" >/dev/null
 for _ in $(seq 1 60); do docker exec "$NAME" pg_isready -U postgres >/dev/null 2>&1 && break; sleep 1; done
 psql() { docker exec -i "$NAME" psql -U postgres -v ON_ERROR_STOP=1 -q "$@"; }
 
