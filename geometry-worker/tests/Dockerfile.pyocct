@@ -1,0 +1,4 @@
+# The Python engine's OCCT stack, only to produce the reference report for the parity test (tests/parity.py).
+FROM continuumio/miniconda3:26.7.1-1@sha256:eca594d684f495c1a02beff33a9fab53aec8c5830eaf431bb149912dc6c9e4c1
+RUN conda create -n e -y -c conda-forge python=3.11 pythonocc-core=7.7.2 && conda clean -afy
+ENV PATH=/opt/conda/envs/e/bin:$PATH
