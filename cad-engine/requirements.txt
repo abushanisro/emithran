@@ -47,7 +47,7 @@ python-magic==0.4.27
 python-magic-bin==0.4.14; sys_platform == "win32"
 
 # Environment variables
-python-dotenv==1.2.3
+python-dotenv==1.2.4
 
 # PDF rendering for drawing analysis (MuPDF bundled — no system poppler needed)
 PyMuPDF>=1.24.0
