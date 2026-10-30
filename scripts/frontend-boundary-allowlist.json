@@ -6,7 +6,6 @@
   "lib/api/delivery-tracking.ts": "server-side service-role queries for app/api/delivery; moves to NestJS in P1-04",
   "lib/api/hooks/useExchangeRates.ts": "browser query on exchange_rates; moves to the API in P1-02",
   "lib/api/hooks/useProcessPlanGenerate.ts": "reads the Supabase session to put a token in a URL; removed in P0-06",
-  "lib/api/organization.ts": "browser queries on organizations, members and workspaces; move to the API in P1-01",
   "lib/auth/session-source.ts": "Supabase session source behind AUTH_BACKEND; deleted in P1-13",
   "lib/config/env-validator.ts": "validates Supabase env settings; deleted with the Supabase branch in P1-13",
   "lib/providers/query-provider.tsx": "signs out of Supabase on auth errors; deleted with the Supabase branch in P1-13",

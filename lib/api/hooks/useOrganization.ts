@@ -80,7 +80,7 @@ export function useInviteMember(orgId: string) {
 export function useRemoveMember(orgId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (memberId: string) => organizationApi.removeMember(memberId),
+    mutationFn: (memberId: string) => organizationApi.removeMember(orgId, memberId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: orgKeys.members(orgId) });
       toast.success('Member removed');
@@ -115,7 +115,7 @@ export function useCreateWorkspace(orgId: string) {
 export function useDeleteWorkspace(orgId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => organizationApi.deleteWorkspace(id),
+    mutationFn: (id: string) => organizationApi.deleteWorkspace(orgId, id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: orgKeys.workspaces(orgId) });
       toast.success('Workspace deleted');
