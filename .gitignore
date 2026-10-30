@@ -4,6 +4,9 @@ node_modules
 /.pnp
 .pnp.js
 
+# OCR language data that tesseract.js downloads and caches in the working directory on first use
+*.traineddata
+
 # Backend build
 /backend/dist
 /backend/coverage
