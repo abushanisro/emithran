@@ -65,6 +65,20 @@ async function requireAuth0User(): Promise<AuthResult> {
   }
 }
 
+/**
+ * The API access token of this request's session, or null when signed out. Nothing is verified here: the API verifies the token and
+ * enforces invitation and the idle deadline on every call, so the BFF does not pay for a second check.
+ */
+export async function sessionAccessToken(): Promise<string | null> {
+  try {
+    if (usesAuth0) return (await getAuth0().getAccessToken()).token;
+    const { data } = await (await createServerSupabaseClient()).auth.getSession();
+    return data.session?.access_token ?? null;
+  } catch {
+    return null;
+  }
+}
+
 const AI_LIMIT_PER_MINUTE = Number(process.env.AI_ROUTE_LIMIT_PER_MINUTE ?? 20);
 
 /** requireUser plus a per-user cap on paid AI calls. */

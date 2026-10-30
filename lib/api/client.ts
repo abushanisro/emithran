@@ -15,6 +15,7 @@
  */
 
 import { config as appConfig } from '../config';
+import { bffEnabled } from './bff';
 import { apiConfig } from './config';
 import { SESSION_IDLE_TIMEOUT_CODE, SESSION_IDLE_TIMEOUT_EVENT } from '../auth/session-idle/policy';
 import { sessionSource } from '../auth/session-source';
@@ -178,6 +179,8 @@ class ApiClient {
    * @returns Current access token or null
    */
   async getAuthToken(): Promise<string | null> {
+    // Through the BFF the server attaches the session's token; the browser sends none.
+    if (bffEnabled) return null;
     return sessionSource.getAccessToken();
   }
 
@@ -650,7 +653,8 @@ class ApiClient {
 
           // Handle 401 Unauthorized - try to refresh the session ONCE
           if (response.status === 401 && attemptNumber === 1) {
-            const refreshed = await sessionSource.refresh();
+            // The BFF refreshes tokens on the server, so a 401 through it means the session is gone.
+            const refreshed = bffEnabled ? null : await sessionSource.refresh();
             if (refreshed) {
               tracker.incrementRetry();
               authTokenManager.setToken({ token: refreshed.token, expiresAt: Date.now() + refreshed.expiresInSeconds * 1000 });
