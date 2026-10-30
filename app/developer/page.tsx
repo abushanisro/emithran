@@ -77,7 +77,7 @@ const CATEGORY_MAP: Record<string, string[]> = {
   'Core Data': ['projects', 'bom', 'bom-items', 'raw-materials', 'vendors'],
   'Manufacturing': ['processes', 'process-routes', 'production-planning', 'quality-control', 'vave'],
   'Costing': ['cost-analysis', 'calculators', 'lhr', 'mhr'],
-  'Procurement': ['rfq', 'supplier-evaluation', 'supplier-nominations', 'vendor-quotes', 'delivery', 'benchmarks'],
+  'Procurement': ['rfq', 'supplier-evaluation', 'supplier-nominations', 'vendor-quotes', 'benchmarks'],
 };
 
 const QUICKSTART = [

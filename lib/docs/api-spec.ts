@@ -16,7 +16,6 @@ import { costAnalysisGroup } from './specs/cost-analysis';
 import { calculatorsGroup } from './specs/calculators';
 import { productionPlanningGroup } from './specs/production-planning';
 import { qualityControlGroup } from './specs/quality-control';
-import { deliveryGroup } from './specs/delivery';
 import { rfqGroup } from './specs/rfq';
 import { supplierEvaluationGroup } from './specs/supplier-evaluation';
 import { supplierNominationsGroup } from './specs/supplier-nominations';
@@ -59,7 +58,6 @@ export const API_SPEC: ApiSpec = {
     calculatorsGroup,
     productionPlanningGroup,
     qualityControlGroup,
-    deliveryGroup,
     rfqGroup,
     supplierEvaluationGroup,
     supplierNominationsGroup,
