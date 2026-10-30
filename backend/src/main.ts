@@ -187,18 +187,26 @@ async function bootstrap() {
   const publicDomain = process.env.RAILWAY_PUBLIC_DOMAIN;
   const baseUrl = publicDomain ? `https://${publicDomain}` : `http://0.0.0.0:${port}`;
   
-  logger.log(`Environment: ${configService.get<string>('APP_ENV', 'local')} | Supabase: ${supabaseHost(configService.get<string>('SUPABASE_URL'))}`, 'Bootstrap');
+  logger.log(`Environment: ${configService.get<string>('APP_ENV', 'local')} | ${backends((name) => configService.get<string>(name))}`, 'Bootstrap');
   logger.log(`API Gateway running on: ${baseUrl}`, 'Bootstrap');
   logger.log(`API Documentation: ${baseUrl}/docs`, 'Bootstrap');
 }
 
-/** The host of the Supabase project this process uses, for the startup log. Host only: never a key. */
-function supabaseHost(url: string | undefined): string {
-  try {
-    return url ? new URL(url).host : '(not set)';
-  } catch {
-    return '(invalid URL)';
-  }
+/** Where data, files and logins actually go, for the startup log. Hosts only: never a key. */
+function backends(setting: (name: string) => string | undefined): string {
+  const host = (url: string | undefined) => {
+    try {
+      return url ? new URL(url).host : '(not set)';
+    } catch {
+      return '(invalid URL)';
+    }
+  };
+  const supabase = `Supabase ${host(setting('SUPABASE_URL'))}`;
+  const data = setting('DB_BACKEND') === 'postgrest' ? `PostgREST ${host(setting('POSTGREST_URL'))}` : supabase;
+  const s3Endpoint = setting('S3_ENDPOINT');
+  const files = setting('STORAGE_BACKEND') === 's3' ? `S3 ${s3Endpoint ? host(s3Endpoint) : 'AWS'}` : supabase;
+  const logins = setting('AUTH_BACKEND') === 'auth0' ? `Auth0 ${setting('AUTH0_DOMAIN') ?? '(not set)'}` : supabase;
+  return `Data: ${data} | Files: ${files} | Login: ${logins}`;
 }
 
 bootstrap();
