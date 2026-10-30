@@ -1,6 +1,9 @@
 interface User { id: string; email: string; [key: string]: any; }
-import { Controller, Get, Patch, Body } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { BadRequestException, Body, Controller, Get, Patch, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiBearerAuth, ApiConsumes, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { memoryStorage } from 'multer';
+import { AVATAR_MAX_BYTES } from './avatar';
 import { ProfileService } from './profile.service';
 import { UpdateProfileDto, ProfileResponseDto } from './dto/profile.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -31,5 +34,19 @@ export class ProfileController {
     @AccessToken() token: string,
   ): Promise<ProfileResponseDto> {
     return this.profileService.updateProfile(user.id, dto, token);
+  }
+
+  @Post('avatar')
+  @ApiOperation({ summary: 'Upload a new profile photo (JPEG, PNG or WebP, at most 2 MB)' })
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({ status: 201, type: ProfileResponseDto })
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: AVATAR_MAX_BYTES, files: 1 } }))
+  async uploadAvatar(
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+  ): Promise<ProfileResponseDto> {
+    if (!file) throw new BadRequestException('Attach the photo as "file".');
+    return this.profileService.uploadAvatar(user.id, file.buffer, token);
   }
 }

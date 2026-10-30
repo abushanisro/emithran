@@ -23,7 +23,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { useProfile, useUpdateProfile } from '@/lib/api/hooks/useProfile';
+import { useProfile, useUpdateProfile, useUploadAvatar } from '@/lib/api/hooks/useProfile';
 import { useApiKeys, useCreateApiKey, useRevokeApiKey } from '@/lib/api/hooks/useDeveloper';
 import {
   useFeatureProcessMappings,
@@ -33,7 +33,6 @@ import {
 } from '@/lib/api/hooks/useManufacturingKnowledge';
 import type { FeatureProcessMapping, ProcessRoutingRule, PartFamilyRoutingTemplate, MachineCapability } from '@/lib/api/hooks/useManufacturingKnowledge';
 import { useAuth } from '@/lib/providers/auth';
-import { supabase } from '@/lib/supabase/client';
 import { useTheme } from 'next-themes';
 import { useDensity } from '@/lib/providers/density-provider';
 import { Switch } from '@/components/ui/switch';
@@ -277,6 +276,7 @@ function ProfileTab() {
   const { user } = useAuth();
   const { data: profile, isLoading } = useProfile();
   const updateMutation = useUpdateProfile();
+  const avatarMutation = useUploadAvatar();
 
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
@@ -300,18 +300,13 @@ function ProfileTab() {
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user || !supabase) return;
-    const ext = file.name.split('.').pop();
-    const path = `${user.id}/avatar.${ext}`;
+    if (!file) return;
     setAvatarUploading(true);
     try {
-      const { error: uploadError } = await supabase.storage
-        .from('avatars').upload(path, file, { upsert: true });
-      if (uploadError) throw uploadError;
-      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path);
-      await updateMutation.mutateAsync({ avatarUrl: `${publicUrl}?t=${Date.now()}` });
-    } catch {
-      toast.error('Avatar upload failed');
+      await avatarMutation.mutateAsync(file);
+      toast.success('Photo updated');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Avatar upload failed');
     } finally {
       setAvatarUploading(false);
       if (fileRef.current) fileRef.current.value = '';
@@ -349,7 +344,7 @@ function ProfileTab() {
                   ? <Loader2 className="h-5 w-5 text-white animate-spin" />
                   : <Camera className="h-5 w-5 text-white" />}
               </button>
-              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
+              <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleAvatarChange} />
             </div>
             <div className="space-y-0.5">
               <p className="font-medium text-sm">{profile?.displayName || user?.email}</p>
