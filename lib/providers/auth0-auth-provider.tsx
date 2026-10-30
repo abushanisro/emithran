@@ -3,6 +3,7 @@
 import { useUser } from '@auth0/nextjs-auth0'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import { browserAuthHeaders } from '@/lib/api/auth-headers'
 import { apiConfig } from '@/lib/api/config'
 import { sessionSource } from '@/lib/auth/session-source'
 import { appReadiness } from '@/lib/core/app-readiness'
@@ -12,10 +13,10 @@ type Me = { state: 'loading' } | { state: 'denied' } | { state: 'failed' } | { s
 
 /** Asks the backend who this login is. 403 means signed in with Auth0 but never invited. */
 async function fetchMe(): Promise<Me> {
-  const token = await sessionSource.getAccessToken()
-  if (!token) return { state: 'failed' }
+  const auth = await browserAuthHeaders()
+  if (!auth) return { state: 'failed' }
   try {
-    const res = await fetch(`${apiConfig.endpoints.api.v1}/auth/me`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
+    const res = await fetch(`${apiConfig.endpoints.api.v1}/auth/me`, { headers: auth, cache: 'no-store' })
     if (res.status === 403) return { state: 'denied' }
     if (!res.ok) return { state: 'failed' }
     const body = (await res.json()) as { data?: { id?: string; email?: string } }

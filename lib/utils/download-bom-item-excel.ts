@@ -1,4 +1,4 @@
-import { apiClient } from '@/lib/api/client';
+import { browserAuthHeaders } from '@/lib/api/auth-headers';
 import { apiConfig } from '@/lib/api/config';
 
 /**
@@ -18,8 +18,7 @@ export async function downloadBomItemExcel(
   fallbackFilename: string,
   scenario?: { batchSize?: number; location?: string },
 ): Promise<void> {
-  const token = apiClient.getAccessToken();
-  const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+  const headers = (await browserAuthHeaders()) ?? {};
   const params = new URLSearchParams();
   if (scenario?.batchSize != null) params.set('batchSize', String(scenario.batchSize));
   if (scenario?.location) params.set('location', scenario.location);

@@ -1,5 +1,6 @@
 import { getAccessToken as getAuth0AccessToken } from '@auth0/nextjs-auth0'
 
+import { bffEnabled } from '@/lib/api/bff'
 import { usesAuth0 } from '@/lib/auth/backend'
 import { sessionIdFromAccessToken } from '@/lib/auth/session-idle/policy'
 import { supabase } from '@/lib/supabase/client'
@@ -53,8 +54,22 @@ const supabaseSource: SessionSource = {
   },
 }
 
+/** Behind the BFF the browser has no token; the session id comes from the profile instead (lib/auth0.ts keeps it there). */
+async function auth0ProfileSessionId(): Promise<string | null> {
+  try {
+    const res = await fetch('/auth/profile', { cache: 'no-store', signal: AbortSignal.timeout(TOKEN_WAIT_MS) })
+    if (!res.ok) return null
+    const profile = (await res.json()) as { sid?: unknown }
+    return typeof profile.sid === 'string' ? profile.sid : null
+  } catch {
+    return null
+  }
+}
+
 const auth0Source: SessionSource = {
   async getAccessToken() {
+    // The server attaches the token through the BFF, and the SDK's /auth/access-token route is closed (lib/auth0.ts).
+    if (bffEnabled) return null
     try {
       // The SDK asks our own /auth/access-token route; the server refreshes the token when it is about to expire.
       return (await withTimeout(getAuth0AccessToken(), null)) || null
@@ -73,9 +88,13 @@ const auth0Source: SessionSource = {
   },
   onSessionChange(listener) {
     let last: string | null | undefined
-    const check = async () => {
+    const currentId = async () => {
+      if (bffEnabled) return auth0ProfileSessionId()
       const token = await auth0Source.getAccessToken()
-      const id = token ? sessionIdFromAccessToken(token) : null
+      return token ? sessionIdFromAccessToken(token) : null
+    }
+    const check = async () => {
+      const id = await currentId()
       if (id !== last) {
         last = id
         listener(id)

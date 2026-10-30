@@ -2,7 +2,9 @@
  * BOM (Bill of Materials) API
  */
 
+import { browserAuthHeaders } from './auth-headers';
 import { apiClient } from './client';
+import { apiConfig } from './config';
 
 export type BOMItem = {
   id: string;
@@ -200,11 +202,9 @@ export const bomApi = {
     const formData = new FormData();
     formData.append('file', file);
 
-    return fetch(`${apiClient['baseUrl']}/boms/${bomId}/upload`, {
+    return fetch(`${apiConfig.endpoints.api.v1}/boms/${bomId}/upload`, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiClient.getAccessToken()}`,
-      },
+      headers: (await browserAuthHeaders()) ?? {},
       body: formData,
     }).then((res) => res.json());
   },
