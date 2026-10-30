@@ -1,0 +1,19 @@
+{
+  "app/(dashboard)/projects/[id]/quality-control/[inspectionId]/page.tsx": "reads the Supabase session for a token; moves to the API client in P1-02",
+  "app/(dashboard)/settings/page.tsx": "avatar upload straight to Supabase Storage; moves behind the API in P1-03",
+  "app/auth/callback/page.tsx": "Supabase sign-in callback; deleted after the point of no return in P1-13",
+  "components/features/delivery/DeliveryTracking.tsx": "Supabase Realtime subscription; becomes polling in P1-04, then SSE in P2-17",
+  "lib/api/delivery-tracking.ts": "server-side service-role queries for app/api/delivery; moves to NestJS in P1-04",
+  "lib/api/hooks/useExchangeRates.ts": "browser query on exchange_rates; moves to the API in P1-02",
+  "lib/api/hooks/useProcessPlanGenerate.ts": "reads the Supabase session to put a token in a URL; removed in P0-06",
+  "lib/api/organization.ts": "browser queries on organizations, members and workspaces; move to the API in P1-01",
+  "lib/auth/session-source.ts": "Supabase session source behind AUTH_BACKEND; deleted in P1-13",
+  "lib/config/env-validator.ts": "validates Supabase env settings; deleted with the Supabase branch in P1-13",
+  "lib/providers/query-provider.tsx": "signs out of Supabase on auth errors; deleted with the Supabase branch in P1-13",
+  "lib/providers/supabase-auth-provider.tsx": "Supabase sign-in provider; deleted in P1-13",
+  "lib/server/auth.ts": "verifies the Supabase cookie session on the server; Supabase branch deleted in P1-13",
+  "lib/server/verified-session.ts": "Supabase session type; deleted in P1-13",
+  "lib/supabase/client.ts": "the browser Supabase client itself; deleted in P1-13",
+  "lib/supabase/server.ts": "the server Supabase client itself; deleted in P1-13",
+  "proxy.ts": "refreshes the Supabase cookie session; Supabase branch deleted in P1-13"
+}
