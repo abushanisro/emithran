@@ -24,8 +24,6 @@
   "src/modules/calculators/calculators.service.ts": 1,
   "src/modules/costing/cost-aggregation.service.ts": 1,
   "src/modules/costing/location-comparison.service.ts": 1,
-  "src/modules/delivery/delivery.service.ts": 22,
-  "src/modules/delivery/services/invoice.service.ts": 1,
   "src/modules/electronics-costing/infrastructure/queue/queue.provider.ts": 1,
   "src/modules/electronics-costing/infrastructure/repositories/electronics-rate-book.loader.ts": 2,
   "src/modules/electronics-costing/infrastructure/repositories/electronics-reference.repository.ts": 1,

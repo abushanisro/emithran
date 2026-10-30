@@ -210,15 +210,6 @@ export function ProjectModules({ projectId, bomCount, firstBomId: _firstBomId }:
       },
     },
     {
-      title: 'Delivery',
-      description: 'Coordinate packing and logistics for efficient delivery management',
-      borderColor: 'border-l-4 border-l-green-500',
-      status: 'available' as const,
-      onClick: () => {
-        router.push(`/projects/${projectId}/delivery`);
-      },
-    },
-    {
       title: 'Benchmark Analysis',
       description: 'Compare BOMs across projects, identify cost drivers, and discover VAVE opportunities for optimization',
       borderColor: 'border-l-4 border-l-yellow-500',
