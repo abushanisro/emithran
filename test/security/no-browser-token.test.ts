@@ -12,7 +12,6 @@ const ALLOWED: Record<string, string> = {
   'lib/api/auth-headers.ts': 'the one place browser code gets an Authorization header; empty behind the BFF',
   'lib/api/client.ts': 'asks auth-headers only while the BFF is off',
   'lib/api/hooks/useProcessPlanGenerate.ts': 'Supabase stream token in the URL while the BFF is off',
-  'app/(dashboard)/projects/[id]/quality-control/[inspectionId]/page.tsx': 'reads the Supabase session token; moves to the API client in P1-02',
 };
 
 /** Ways browser code has fetched or carried a token. */
