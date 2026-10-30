@@ -264,6 +264,8 @@ services:
       # PostgREST refuses to start (no database), and an empty secret means it rejects every token: both fail closed.
       PGRST_DB_URI: ${POSTGREST_DB_URI:-}
       PGRST_DB_SCHEMAS: public
+      # As on Supabase: extension functions (uuid-ossp, pgcrypto) live in the `extensions` schema.
+      PGRST_DB_EXTRA_SEARCH_PATH: public, extensions
       PGRST_DB_ANON_ROLE: anon
       PGRST_JWT_SECRET: ${DB_JWT_SECRET:-}
       PGRST_SERVER_HOST: 0.0.0.0
