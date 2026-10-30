@@ -1,6 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, PayloadTooLargeException } from '@nestjs/common';
+import { OBJECT_STORE, type ObjectStore } from '../../common/storage/object-store';
 import { UserDirectory } from '../../common/supabase/user-directory';
 import { SupabaseService } from '../../common/supabase/supabase.service';
+import { AVATAR_BUCKET, AVATAR_MAX_BYTES, AVATAR_URL_TTL_SECONDS, avatarKey, detectAvatarType } from './avatar';
 import type { UpdateProfileDto, ProfileResponseDto } from './dto/profile.dto';
 
 @Injectable()
@@ -8,6 +10,7 @@ export class ProfileService {
   constructor(
     private readonly supabase: SupabaseService,
     private readonly directory: UserDirectory,
+    @Inject(OBJECT_STORE) private readonly objects: ObjectStore,
   ) {}
 
   async getProfile(userId: string, accessToken: string): Promise<ProfileResponseDto> {
@@ -60,17 +63,44 @@ export class ProfileService {
     return this.mapProfile(data, await this.emailOf(userId));
   }
 
+  /** Stores a JPEG, PNG or WebP as the caller's photo (replacing the previous one) and records its key on the profile. */
+  async uploadAvatar(userId: string, bytes: Buffer, accessToken: string): Promise<ProfileResponseDto> {
+    if (bytes.length > AVATAR_MAX_BYTES) throw new PayloadTooLargeException('A profile photo can be at most 2 MB.');
+    const contentType = detectAvatarType(bytes);
+    if (!contentType) throw new BadRequestException('A profile photo must be a JPEG, PNG or WebP image.');
+
+    await this.objects.put(AVATAR_BUCKET, avatarKey(userId), bytes, { contentType, upsert: true });
+    const { data, error } = await this.supabase
+      .getClient(accessToken)
+      .from('user_profiles')
+      .upsert({ user_id: userId, avatar_url: avatarKey(userId) }, { onConflict: 'user_id' })
+      .select('*')
+      .single();
+    if (error) throw new Error(error.message);
+    return this.mapProfile(data, await this.emailOf(userId));
+  }
+
+  /**
+   * The photo link the browser can show. The caller's own stored key becomes a time-limited signed link; a full URL from before the
+   * object store is passed through; any other value (such as another user's key) is not signed.
+   */
+  private async avatarUrl(userId: string, stored: unknown): Promise<string | null> {
+    if (typeof stored !== 'string' || stored === '') return null;
+    if (stored === avatarKey(userId)) return this.objects.signedGetUrl(AVATAR_BUCKET, stored, AVATAR_URL_TTL_SECONDS);
+    return /^https?:\/\//.test(stored) ? stored : null;
+  }
+
   private async emailOf(userId: string): Promise<string | undefined> {
     const found = await this.directory.findByIds([userId]);
     return found.get(userId)?.email ?? undefined;
   }
 
-  private mapProfile(data: any, email?: string): ProfileResponseDto {
+  private async mapProfile(data: any, email?: string): Promise<ProfileResponseDto> {
     return {
       id: data.id,
       userId: data.user_id,
       displayName: data.display_name ?? null,
-      avatarUrl: data.avatar_url ?? null,
+      avatarUrl: await this.avatarUrl(data.user_id, data.avatar_url),
       bio: data.bio ?? null,
       jobTitle: data.job_title ?? null,
       phone: data.phone ?? null,
