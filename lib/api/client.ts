@@ -169,36 +169,10 @@ class ApiClient {
     }
   }
 
-  getAccessToken(): string | null {
-    // Deprecated: Use authTokenManager.getCurrentToken() directly
-    return null;
-  }
-
-  /**
-   * Get auth token from the current Supabase session.
-   * @returns Current access token or null
-   */
-  async getAuthToken(): Promise<string | null> {
-    // Through the BFF the server attaches the session's token; the browser sends none.
+  /** The session's token for a direct API call; none through the BFF, where the server attaches it. */
+  private async getAuthToken(): Promise<string | null> {
     if (bffEnabled) return null;
     return sessionSource.getAccessToken();
-  }
-
-  // Sync version for circuit breaker checks
-  private hasTokenSync(): boolean {
-    try {
-      if (typeof window === 'undefined') return false;
-
-      // Check if we have any Supabase auth data in localStorage
-      const keys = Object.keys(localStorage);
-      const hasSupabaseAuth = keys.some(key =>
-        key.startsWith('sb-iuvtsvjpmovfymvnmqys') && key.includes('auth')
-      );
-
-      return hasSupabaseAuth;
-    } catch {
-      return false;
-    }
   }
 
   /**
@@ -219,7 +193,6 @@ class ApiClient {
 
     // Check app readiness state - only use circuit breaker when app is fully ready
     const readinessState = appReadiness.getState();
-    const hasToken = this.hasTokenSync();
 
     // During auth initialization, bypass circuit breaker to prevent false failures
     // This prevents the auth-restore race condition that causes CORS-like errors
@@ -227,9 +200,9 @@ class ApiClient {
       return true;
     }
 
-    // If we're in AUTH_READY state but no token, allow bypass for one attempt
-    // This handles the case where auth finishes but token isn't available yet
-    if (readinessState === 'AUTH_READY' && !hasToken) {
+    // Right after auth is ready, bypass so a token that is not available yet does not trip the breaker. (This used to test a
+    // localStorage key of one Supabase project, which @supabase/ssr never writes, so it always bypassed here.)
+    if (readinessState === 'AUTH_READY') {
       return true;
     }
 
@@ -906,10 +879,9 @@ class ApiClient {
           if (String(error.message || '').includes('Failed to fetch')) {
             const readinessState = appReadiness.getState();
             const isLocalhost = url.includes('localhost') || url.includes('127.0.0.1');
-            // AUTH_READY (and beyond) means appReadiness.setAuthValidated() was called,
-            // i.e. Supabase confirmed a live session. Use this as the auth truth source
-            // instead of hasTokenSync() which only checks localStorage — @supabase/ssr
-            // stores sessions in cookies, so localStorage is always empty.
+            // AUTH_READY (and beyond) means appReadiness.setAuthValidated() was called, i.e. the
+            // sign-in backend confirmed a live session. The browser may hold no token at all
+            // (BFF), so readiness, not a token, is the auth truth source.
             const authConfirmed = readinessState === 'AUTH_READY'
               || readinessState === 'BACKEND_READY'
               || readinessState === 'READY';

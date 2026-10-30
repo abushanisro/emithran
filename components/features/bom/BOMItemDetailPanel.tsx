@@ -8,6 +8,7 @@ import { X, Download, FileText, Maximize2, Upload, Loader2, Box } from 'lucide-r
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import type { BOMItem } from '@/lib/api/hooks/useBOMItems';
+import { browserAuthHeaders } from '@/lib/api/auth-headers';
 import { apiClient } from '@/lib/api/client';
 import { apiConfig } from '@/lib/api/config';
 import { toast } from 'sonner';
@@ -83,9 +84,8 @@ interface ManufacturingFeature {
           const isDxf = lp.endsWith('.dxf') || lp.endsWith('.dwg') || lp.endsWith('.dxf.gz') || lp.endsWith('.dwg.gz');
           if (isDxf) {
             // Fetch decompressed DXF from backend (handles .gz transparently)
-            const token = await apiClient.getAuthToken();
             const r = await fetch(`${apiConfig.endpoints.api.v1}/bom-items/${item.id}/dxf-content-legacy`, {
-              headers: token ? { Authorization: `Bearer ${token}` } : {},
+              headers: (await browserAuthHeaders()) ?? {},
             });
             if (r.ok) setFile2dUrl(URL.createObjectURL(await r.blob()));
           } else {

@@ -13,6 +13,8 @@ import { useSupplierNominations } from '@/lib/api/hooks/useSupplierNominations';
 import { useVendors } from '@/lib/api/hooks/useVendors';
 import { useBOMItems } from '@/lib/api/hooks/useBOMItems';
 import { useBOMs } from '@/lib/api/hooks/useBOM';
+import { browserAuthHeaders } from '@/lib/api/auth-headers';
+import { apiConfig } from '@/lib/api/config';
 import { formatDistanceToNow, isAfter } from 'date-fns';
 import { useState } from 'react';
 
@@ -60,7 +62,7 @@ export default function RFQPage() {
   // File download function - industry standard approach  
   const handleFileDownload = async (bomItemId: string, fileType: '2d' | '3d', fileName: string, partNumber?: string) => {
     try {
-      const apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/bom-items/${bomItemId}/file-url/${fileType}`;
+      const apiUrl = `${apiConfig.endpoints.api.v1}/bom-items/${bomItemId}/file-url/${fileType}`;
       console.log('Attempting download:', { bomItemId, fileType, fileName, partNumber, apiUrl });
       
       // First try to get the BOM item to check if it has files
@@ -100,10 +102,7 @@ export default function RFQPage() {
       
       // Fallback to API call (which currently returns empty)
       const response = await fetch(apiUrl, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json',
-        }
+        headers: { ...(await browserAuthHeaders()), 'Content-Type': 'application/json' },
       });
       
       if (response.ok) {
