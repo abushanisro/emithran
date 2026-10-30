@@ -13,6 +13,11 @@
 
 const SUPABASE_SERVICE = 'src/common/supabase/supabase.service.ts';
 
+// The platform database layer (Design Doc 9) is the one place a Postgres driver may be imported; feature code reaches
+// data through withTenant() there, never through a driver of its own.
+const PLATFORM_DB = 'src/platform/db/';
+const PLATFORM_DRIVERS = new Set(['pg', 'kysely']);
+
 const MIN_REASON_LENGTH = 10;
 
 function lineOf(text, index) {
@@ -60,8 +65,9 @@ function scanSource(relPath, text) {
     add('getclient-optional-token', m.index, 'getClient() must not receive a possibly-missing token; use getUserClient(token)');
   }
 
-  // 5. Only one database path exists: Supabase.
-  for (const m of text.matchAll(/(?:from\s+|require\(\s*)['"](typeorm|knex|nestjs-knex|pg|@nestjs\/typeorm)['"]/g)) {
+  // 5. No database path besides SupabaseService and the platform database layer.
+  for (const m of text.matchAll(/(?:from\s+|require\(\s*)['"](typeorm|knex|nestjs-knex|pg|kysely|@nestjs\/typeorm)['"]/g)) {
+    if (path.startsWith(PLATFORM_DB) && PLATFORM_DRIVERS.has(m[1])) continue;
     add('second-db-path', m.index, `importing "${m[1]}" adds a second database path that bypasses RLS`);
   }
 
@@ -113,4 +119,45 @@ function scanRepoJwt(relPath, text) {
   return out;
 }
 
-module.exports = { scanSource, scanRepoJwt, SUPABASE_SERVICE };
+/** Privileged-client calls in one file; the CLI compares these per file with rls-bypass-baseline.json. */
+function countPrivilegedCalls(text) {
+  return [...text.matchAll(/getPrivilegedClient\s*\(/g)].length;
+}
+
+/**
+ * Files whose privileged-call count differs from the baseline. Both directions fail the check: an increase is a new
+ * RLS bypass, and a decrease must be recorded so the budget only goes down.
+ * @returns {{increased:{file:string,baseline:number,now:number}[], decreased:{file:string,baseline:number,now:number}[]}}
+ */
+function compareToBaseline(counts, baseline) {
+  const files = [...new Set([...Object.keys(counts), ...Object.keys(baseline)])].sort();
+  const rows = files.map((file) => ({ file, baseline: baseline[file] ?? 0, now: counts[file] ?? 0 }));
+  return {
+    increased: rows.filter((r) => r.now > r.baseline),
+    decreased: rows.filter((r) => r.now < r.baseline),
+  };
+}
+
+/** The baseline lowered to current counts. It never raises an entry or adds a file: that is a reviewed hand edit. */
+function lowerBaseline(counts, baseline) {
+  const lowered = {};
+  for (const file of Object.keys(baseline).sort()) {
+    const now = Math.min(baseline[file], counts[file] ?? 0);
+    if (now > 0) lowered[file] = now;
+  }
+  return lowered;
+}
+
+/** @returns {Record<string, number>} */
+function parseBaseline(text) {
+  const parsed = JSON.parse(text);
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error('baseline must be a JSON object of "file": count');
+  }
+  for (const [file, count] of Object.entries(parsed)) {
+    if (!Number.isInteger(count) || count < 1) throw new Error(`baseline entry ${file} must be a positive integer`);
+  }
+  return parsed;
+}
+
+module.exports = { scanSource, scanRepoJwt, countPrivilegedCalls, compareToBaseline, lowerBaseline, parseBaseline, SUPABASE_SERVICE };
