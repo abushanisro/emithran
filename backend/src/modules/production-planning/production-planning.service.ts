@@ -98,7 +98,7 @@ export class ProductionPlanningService {
       .single();
 
     if (error) {
-      this.logger.error(`Error creating production lot: ${error.message}`, 'ProductionPlanningService');
+      this.logger.error(`Error creating production lot: ${error.message}`);
       
       // Handle foreign key constraints
       if (error.message.includes('violates foreign key constraint')) {

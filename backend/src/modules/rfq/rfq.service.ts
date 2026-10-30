@@ -57,7 +57,7 @@ export class RfqService {
       .single();
 
     if (error) {
-      this.logger.error(`Error creating RFQ: ${error.message}`, 'RfqService');
+      this.logger.error(`Error creating RFQ: ${error.message}`);
       
       // Handle duplicate RFQ number constraint
       if (error.message.includes('duplicate key') && error.message.includes('rfq_number')) {
@@ -115,7 +115,7 @@ export class RfqService {
     const { data, error } = await query;
 
     if (error) {
-      this.logger.error(`Error fetching RFQs: ${error.message}`, 'RfqService');
+      this.logger.error(`Error fetching RFQs: ${error.message}`);
       
       // Handle access permissions
       if (error.message.includes('row-level security policy')) {
@@ -136,7 +136,7 @@ export class RfqService {
       .single();
 
     if (error) {
-      this.logger.error(`Error fetching RFQ ${id}: ${error.message}`, 'RfqService');
+      this.logger.error(`Error fetching RFQ ${id}: ${error.message}`);
       
       if (error.message.includes('row-level security policy')) {
         throw new ForbiddenException('You do not have permission to access this RFQ.');
@@ -195,7 +195,7 @@ export class RfqService {
       .rpc('send_rfq', { p_rfq_id: id, p_user_id: userId });
 
     if (error) {
-      this.logger.error(`Error sending RFQ ${id}: ${error.message}`, 'RfqService');
+      this.logger.error(`Error sending RFQ ${id}: ${error.message}`);
       
       if (error.message.includes('not found')) {
         throw new NotFoundException('The RFQ to send was not found.');
@@ -236,7 +236,7 @@ export class RfqService {
       .rpc('close_rfq', { p_rfq_id: id, p_user_id: userId });
 
     if (error) {
-      this.logger.error(`Error closing RFQ ${id}: ${error.message}`, 'RfqService');
+      this.logger.error(`Error closing RFQ ${id}: ${error.message}`);
       
       if (error.message.includes('not found')) {
         throw new NotFoundException('The RFQ to close was not found.');
@@ -271,7 +271,7 @@ export class RfqService {
       .like('rfq_number', `${prefix}%`);
 
     if (error) {
-      this.logger.error(`Error generating RFQ number: ${error.message}`, 'RfqService');
+      this.logger.error(`Error generating RFQ number: ${error.message}`);
       throw new InternalServerErrorException('Unable to generate RFQ number. Please try again later.');
     }
 
@@ -288,7 +288,7 @@ export class RfqService {
       .in('id', bomItemIds);
 
     if (error) {
-      this.logger.error(`Error validating BOM items: ${error.message}`, 'RfqService');
+      this.logger.error(`Error validating BOM items: ${error.message}`);
       
       if (error.message.includes('invalid input syntax for type uuid')) {
         throw new BadRequestException('One or more BOM item IDs have an invalid format.');
@@ -313,7 +313,7 @@ export class RfqService {
       .in('id', vendorIds);
 
     if (error) {
-      this.logger.error(`Error validating vendors: ${error.message}`, 'RfqService');
+      this.logger.error(`Error validating vendors: ${error.message}`);
       
       if (error.message.includes('invalid input syntax for type uuid')) {
         throw new BadRequestException('One or more vendor IDs have an invalid format.');

@@ -277,7 +277,7 @@ export class BOMItemsService {
     userId?: string,
     accessToken?: string,
   ): Promise<BOMItemListResponseDto> {
-    this.logger.log('Fetching BOM items', 'BOMItemsService');
+    this.logger.log('Fetching BOM items');
 
     const client = this.supabaseService.getUserClient(accessToken);
 
@@ -289,7 +289,7 @@ export class BOMItemsService {
     // Apply filters
     if (bomId) {
       query = query.eq('bom_id', bomId);
-      this.logger.log(`Filtering BOM items for BOM ID: ${bomId}`, 'BOMItemsService');
+      this.logger.log(`Filtering BOM items for BOM ID: ${bomId}`);
     }
     if (search) {
       query = query.or(`part_number.ilike.%${search}%,description.ilike.%${search}%`);
@@ -315,20 +315,20 @@ export class BOMItemsService {
 
     const { data, error } = await query;
 
-    this.logger.log(`Query results: Found ${data?.length || 0} BOM items for BOM ID: ${bomId}`, 'BOMItemsService');
+    this.logger.log(`Query results: Found ${data?.length || 0} BOM items for BOM ID: ${bomId}`);
     
     // Additional debug: Check if the BOM exists but has no items
     if (bomId && (!data || data.length === 0)) {
       const { data: bomCheck } = await client.from('boms').select('id, name').eq('id', bomId).single();
       if (bomCheck) {
-        this.logger.log(`BOM exists but has no items: ${bomCheck.name} (${bomCheck.id})`, 'BOMItemsService');
+        this.logger.log(`BOM exists but has no items: ${bomCheck.name} (${bomCheck.id})`);
       } else {
-        this.logger.log(`BOM not found with ID: ${bomId}`, 'BOMItemsService');
+        this.logger.log(`BOM not found with ID: ${bomId}`);
       }
     }
     
     if (error) {
-      this.logger.error(`Error fetching BOM items: ${error.message}`, 'BOMItemsService');
+      this.logger.error(`Error fetching BOM items: ${error.message}`);
       throw new InternalServerErrorException(`Failed to fetch BOM items: ${error.message}`);
     }
 
@@ -348,7 +348,7 @@ export class BOMItemsService {
     userId?: string,
     accessToken?: string,
   ): Promise<BOMItemResponseDto> {
-    this.logger.log(`Fetching BOM item with ID: ${id}`, 'BOMItemsService');
+    this.logger.log(`Fetching BOM item with ID: ${id}`);
 
     const client = this.supabaseService.getUserClient(accessToken);
 
@@ -359,7 +359,7 @@ export class BOMItemsService {
       .limit(1);
 
     if (error) {
-      this.logger.error(`Error fetching BOM item: ${error.message}`, 'BOMItemsService');
+      this.logger.error(`Error fetching BOM item: ${error.message}`);
       throw new InternalServerErrorException(`Failed to fetch BOM item: ${error.message}`);
     }
 
@@ -404,7 +404,7 @@ export class BOMItemsService {
       .limit(1);
 
     if (error) {
-      this.logger.error(`Error creating BOM item: ${error.message}`, 'BOMItemsService');
+      this.logger.error(`Error creating BOM item: ${error.message}`);
       throw new InternalServerErrorException(`Failed to create BOM item: ${error.message}`);
     }
 
@@ -458,7 +458,7 @@ export class BOMItemsService {
     userId?: string,
     accessToken?: string,
   ): Promise<BOMItemResponseDto> {
-    this.logger.log(`Updating BOM item with ID: ${id}`, 'BOMItemsService');
+    this.logger.log(`Updating BOM item with ID: ${id}`);
 
     const client = this.supabaseService.getUserClient(accessToken);
 
@@ -519,7 +519,7 @@ export class BOMItemsService {
       .limit(1);
 
     if (error) {
-      this.logger.error(`Error updating BOM item: ${error.message}`, 'BOMItemsService');
+      this.logger.error(`Error updating BOM item: ${error.message}`);
       throw new InternalServerErrorException(`Failed to update BOM item: ${error.message}`);
     }
 
@@ -536,14 +536,14 @@ export class BOMItemsService {
     thumbnailUrl: string,
     accessToken?: string,
   ): Promise<{ ok: boolean }> {
-    this.logger.log(`Updating thumbnail for BOM item: ${id}`, 'BOMItemsService');
+    this.logger.log(`Updating thumbnail for BOM item: ${id}`);
     const { error } = await this.supabaseService
       .getUserClient(accessToken)
       .from('bom_items')
       .update({ thumbnail_url: thumbnailUrl, updated_at: new Date().toISOString() })
       .eq('id', id);
     if (error) {
-      this.logger.error(`Error updating thumbnail: ${error.message}`, 'BOMItemsService');
+      this.logger.error(`Error updating thumbnail: ${error.message}`);
       // Not fatal — log and continue
     }
     return { ok: !error };
@@ -586,7 +586,7 @@ export class BOMItemsService {
       if (error.message?.includes('not found')) {
         throw new NotFoundException(`BOM item with ID ${id} not found`);
       }
-      this.logger.error(`Error merging scenario overrides for ${id}: ${error.message}`, 'BOMItemsService');
+      this.logger.error(`Error merging scenario overrides for ${id}: ${error.message}`);
       throw new InternalServerErrorException(`Failed to update scenario overrides: ${error.message}`);
     }
     if (!row) {
@@ -601,7 +601,7 @@ export class BOMItemsService {
     userId?: string,
     accessToken?: string,
   ): Promise<{ updated: number }> {
-    this.logger.log(`Updating sort order for ${items.length} BOM items`, 'BOMItemsService');
+    this.logger.log(`Updating sort order for ${items.length} BOM items`);
 
     const client = this.supabaseService.getUserClient(accessToken);
     
@@ -620,13 +620,13 @@ export class BOMItemsService {
       });
 
       if (error) {
-        this.logger.error(`Error batch updating sort order: ${error.message}`, 'BOMItemsService');
+        this.logger.error(`Error batch updating sort order: ${error.message}`);
         return { updated: 0 };
       }
 
       return { updated: count || items.length };
     } catch (error) {
-      this.logger.error(`Error in batch sort order update: ${error}`, 'BOMItemsService');
+      this.logger.error(`Error in batch sort order update: ${error}`);
       return { updated: 0 };
     }
   }
@@ -645,7 +645,7 @@ export class BOMItemsService {
       .eq('id', id)
       .limit(1);
     if (error) {
-      this.logger.error(`Error fetching BOM item file paths: ${error.message}`, 'BOMItemsService');
+      this.logger.error(`Error fetching BOM item file paths: ${error.message}`);
       throw new InternalServerErrorException(`Failed to fetch BOM item: ${error.message}`);
     }
     const row = (data as { file_2d_path: string | null; file_3d_path: string | null }[] | null)?.[0];
@@ -661,7 +661,7 @@ export class BOMItemsService {
     userId?: string,
     accessToken?: string,
   ): Promise<void> {
-    this.logger.log(`Removing BOM item with ID: ${id}`, 'BOMItemsService');
+    this.logger.log(`Removing BOM item with ID: ${id}`);
 
     const client = this.supabaseService.getUserClient(accessToken);
 
@@ -678,7 +678,7 @@ export class BOMItemsService {
         error.message?.includes('schema cache')
       )) {
         // Function doesn't exist, fall back to manual cascade delete
-        this.logger.warn('Cascade delete function not available, using manual cascade delete', 'BOMItemsService');
+        this.logger.warn('Cascade delete function not available, using manual cascade delete');
         return await this.manualCascadeDelete(id, userId, accessToken);
       }
 
@@ -691,11 +691,11 @@ export class BOMItemsService {
           error.message.includes('violates foreign key')
         )) {
           // Fallback to manual cascade delete if the function fails
-          this.logger.warn(`Database function cascade failed due to foreign key constraint, trying manual cascade: ${error.message}`, 'BOMItemsService');
+          this.logger.warn(`Database function cascade failed due to foreign key constraint, trying manual cascade: ${error.message}`);
           return await this.manualCascadeDelete(id, userId, accessToken);
         }
         
-        this.logger.error(`Error in safe delete function: ${error.message}`, 'BOMItemsService');
+        this.logger.error(`Error in safe delete function: ${error.message}`);
         throw new InternalServerErrorException(`Failed to delete BOM item: ${error.message}`);
       }
 
@@ -707,11 +707,11 @@ export class BOMItemsService {
       
       if (!result.success) {
         // If cascade delete failed, try manual cascade
-        this.logger.warn(`Database cascade delete failed, trying manual approach`, 'BOMItemsService');
+        this.logger.warn(`Database cascade delete failed, trying manual approach`);
         return await this.manualCascadeDelete(id, userId, accessToken);
       }
 
-      this.logger.log(`Successfully removed BOM item with cascade cleanup: ${result.message}`, 'BOMItemsService');
+      this.logger.log(`Successfully removed BOM item with cascade cleanup: ${result.message}`);
     } catch (error) {
       if (error instanceof NotFoundException || 
           error instanceof BadRequestException || 
@@ -719,7 +719,7 @@ export class BOMItemsService {
         throw error;
       }
       
-      this.logger.error(`Unexpected error removing BOM item ${id}: ${error}`, 'BOMItemsService');
+      this.logger.error(`Unexpected error removing BOM item ${id}: ${error}`);
       throw new InternalServerErrorException('An unexpected error occurred while removing the BOM item');
     }
   }
@@ -746,7 +746,7 @@ export class BOMItemsService {
     }
 
     if (fetchError) {
-      this.logger.error(`Error fetching BOM item: ${fetchError.message}`, 'BOMItemsService');
+      this.logger.error(`Error fetching BOM item: ${fetchError.message}`);
       throw new InternalServerErrorException(`Failed to fetch BOM item: ${fetchError.message}`);
     }
 
@@ -778,7 +778,7 @@ export class BOMItemsService {
         throw new ForbiddenException('Insufficient permissions to delete this BOM item');
       }
 
-      this.logger.error(`Error removing BOM item: ${deleteError.message}`, 'BOMItemsService');
+      this.logger.error(`Error removing BOM item: ${deleteError.message}`);
       throw new InternalServerErrorException(`Failed to remove BOM item: ${deleteError.message}`);
     }
   }
@@ -791,7 +791,7 @@ export class BOMItemsService {
     userId?: string,
     accessToken?: string,
   ): Promise<void> {
-    this.logger.log(`Performing manual cascade delete for BOM item: ${id}`, 'BOMItemsService');
+    this.logger.log(`Performing manual cascade delete for BOM item: ${id}`);
     
     const client = this.supabaseService.getUserClient(accessToken);
     
@@ -812,7 +812,7 @@ export class BOMItemsService {
 
       // 1. Remove from production lot materials
       // First check if there are any to delete (with detailed diagnostics)
-      this.logger.log(`Checking for production materials with user context`, 'BOMItemsService');
+      this.logger.log(`Checking for production materials with user context`);
       
       const { data: prodMaterials, error: prodCheckError } = await client
         .from('production_lot_materials')
@@ -829,18 +829,18 @@ export class BOMItemsService {
           .select('id, production_lot_id')
           .eq('bom_item_id', id);
         adminProdMaterials = adminData;
-        this.logger.log(`Admin client sees ${adminData?.length || 0} production materials`, 'BOMItemsService');
+        this.logger.log(`Admin client sees ${adminData?.length || 0} production materials`);
       }
       
-      this.logger.log(`User client sees ${prodMaterials?.length || 0} production materials`, 'BOMItemsService');
+      this.logger.log(`User client sees ${prodMaterials?.length || 0} production materials`);
 
       if (prodCheckError) {
-        this.logger.warn(`Could not check production materials: ${prodCheckError.message}`, 'BOMItemsService');
+        this.logger.warn(`Could not check production materials: ${prodCheckError.message}`);
       }
       
       // Try to delete with admin client if available and user client found nothing
       if (adminClient && adminProdMaterials && adminProdMaterials.length > 0 && (!prodMaterials || prodMaterials.length === 0)) {
-        this.logger.log(`Using admin client to delete ${adminProdMaterials.length} production materials (RLS bypass)`, 'BOMItemsService');
+        this.logger.log(`Using admin client to delete ${adminProdMaterials.length} production materials (RLS bypass)`);
         
         const { error: adminProdError, count: adminProdCount } = await adminClient
           .from('production_lot_materials')
@@ -848,14 +848,14 @@ export class BOMItemsService {
           .eq('bom_item_id', id);
         
         if (adminProdError) {
-          this.logger.error(`Admin delete failed: ${adminProdError.message}`, 'BOMItemsService');
+          this.logger.error(`Admin delete failed: ${adminProdError.message}`);
         } else {
           const actualCount = adminProdCount || adminProdMaterials.length;
           cleanupCount += actualCount;
-          this.logger.log(`Admin client successfully removed ${actualCount} production material references`, 'BOMItemsService');
+          this.logger.log(`Admin client successfully removed ${actualCount} production material references`);
         }
       } else if (prodMaterials && prodMaterials.length > 0) {
-        this.logger.log(`Found ${prodMaterials.length} production material references to clean up`, 'BOMItemsService');
+        this.logger.log(`Found ${prodMaterials.length} production material references to clean up`);
         
         const { error: prodError, count: prodCount } = await client
           .from('production_lot_materials')
@@ -863,19 +863,19 @@ export class BOMItemsService {
           .eq('bom_item_id', id);
 
         if (prodError) {
-          this.logger.error(`Failed to clean up production materials: ${prodError.message}`, 'BOMItemsService');
+          this.logger.error(`Failed to clean up production materials: ${prodError.message}`);
           throw new InternalServerErrorException(`Failed to clean up production planning references: ${prodError.message}`);
         } else {
           const actualCount = prodCount || prodMaterials.length;
           cleanupCount += actualCount;
-          this.logger.log(`Successfully removed ${actualCount} production material references`, 'BOMItemsService');
+          this.logger.log(`Successfully removed ${actualCount} production material references`);
         }
       } else {
-        this.logger.log('No production material references found with current user permissions', 'BOMItemsService');
+        this.logger.log('No production material references found with current user permissions');
         
         // If admin client shows materials but user client doesn't, it's an RLS issue
         if (adminProdMaterials && adminProdMaterials.length > 0) {
-          this.logger.warn(`RLS Policy Issue: Admin sees ${adminProdMaterials.length} materials but user sees 0`, 'BOMItemsService');
+          this.logger.warn(`RLS Policy Issue: Admin sees ${adminProdMaterials.length} materials but user sees 0`);
         }
       }
 
@@ -901,10 +901,10 @@ export class BOMItemsService {
       }
 
       if (stepsError) {
-        this.logger.warn(`Could not clean up process steps: ${stepsError.message}`, 'BOMItemsService');
+        this.logger.warn(`Could not clean up process steps: ${stepsError.message}`);
       } else if (stepsCount) {
         cleanupCount += stepsCount;
-        this.logger.log(`Removed ${stepsCount} process route steps`, 'BOMItemsService');
+        this.logger.log(`Removed ${stepsCount} process route steps`);
       }
 
       // 3. Remove process routes
@@ -914,10 +914,10 @@ export class BOMItemsService {
         .eq('bom_item_id', id);
 
       if (routesError) {
-        this.logger.warn(`Could not clean up process routes: ${routesError.message}`, 'BOMItemsService');
+        this.logger.warn(`Could not clean up process routes: ${routesError.message}`);
       } else if (routesCount) {
         cleanupCount += routesCount;
-        this.logger.log(`Removed ${routesCount} process routes`, 'BOMItemsService');
+        this.logger.log(`Removed ${routesCount} process routes`);
       }
 
       // 4. Remove from delivery items
@@ -927,10 +927,10 @@ export class BOMItemsService {
         .eq('bom_item_id', id);
 
       if (deliveryError) {
-        this.logger.warn(`Could not clean up delivery items: ${deliveryError.message}`, 'BOMItemsService');
+        this.logger.warn(`Could not clean up delivery items: ${deliveryError.message}`);
       } else if (deliveryCount) {
         cleanupCount += deliveryCount;
-        this.logger.log(`Removed ${deliveryCount} delivery item references`, 'BOMItemsService');
+        this.logger.log(`Removed ${deliveryCount} delivery item references`);
       }
 
       // 5. Update child items to remove parent reference
@@ -940,14 +940,14 @@ export class BOMItemsService {
         .eq('parent_item_id', id);
 
       if (childError) {
-        this.logger.warn(`Could not orphan child items: ${childError.message}`, 'BOMItemsService');
+        this.logger.warn(`Could not orphan child items: ${childError.message}`);
       } else if (childCount) {
         cleanupCount += childCount;
-        this.logger.log(`Orphaned ${childCount} child items`, 'BOMItemsService');
+        this.logger.log(`Orphaned ${childCount} child items`);
       }
 
       // 6. Finally delete the BOM item
-      this.logger.log(`Attempting to delete BOM item after cleaning up ${cleanupCount} references`, 'BOMItemsService');
+      this.logger.log(`Attempting to delete BOM item after cleaning up ${cleanupCount} references`);
       
       // Double-check that production materials are really gone
       const { data: remainingProd, error: checkError } = await client
@@ -956,7 +956,7 @@ export class BOMItemsService {
         .eq('bom_item_id', id);
       
       if (!checkError && remainingProd && remainingProd.length > 0) {
-        this.logger.error(`Still ${remainingProd.length} production material references exist!`, 'BOMItemsService');
+        this.logger.error(`Still ${remainingProd.length} production material references exist!`);
         // Try one more time to delete them
         await client.from('production_lot_materials').delete().eq('bom_item_id', id);
       }
@@ -967,7 +967,7 @@ export class BOMItemsService {
         .eq('id', id);
 
       if (deleteError) {
-        this.logger.error(`Failed to delete BOM item after cleanup: ${deleteError.message}`, 'BOMItemsService');
+        this.logger.error(`Failed to delete BOM item after cleanup: ${deleteError.message}`);
         
         // If it's still a constraint error, the cleanup didn't work
         if (deleteError.message.includes('production_lot_materials_bom_item_id_fkey')) {
@@ -990,9 +990,7 @@ export class BOMItemsService {
       }
 
       this.logger.log(
-        `Successfully deleted BOM item "${itemName}" with cascade cleanup (${cleanupCount} references removed)`, 
-        'BOMItemsService'
-      );
+        `Successfully deleted BOM item "${itemName}" with cascade cleanup (${cleanupCount} references removed)`);
       
     } catch (error) {
       if (error instanceof NotFoundException || 
@@ -1002,7 +1000,7 @@ export class BOMItemsService {
         throw error;
       }
       
-      this.logger.error(`Unexpected error in manual cascade delete: ${error}`, 'BOMItemsService');
+      this.logger.error(`Unexpected error in manual cascade delete: ${error}`);
       throw new InternalServerErrorException('Failed to delete BOM item with cascade cleanup');
     }
   }
@@ -1012,7 +1010,7 @@ export class BOMItemsService {
     userId?: string,
     accessToken?: string,
   ): Promise<string> {
-    this.logger.log(`Getting BOM ID for item: ${itemId}`, 'BOMItemsService');
+    this.logger.log(`Getting BOM ID for item: ${itemId}`);
 
     const client = this.supabaseService.getUserClient(accessToken);
 
@@ -1023,7 +1021,7 @@ export class BOMItemsService {
       .single();
 
     if (error) {
-      this.logger.error(`Error fetching BOM ID for item: ${error.message}`, 'BOMItemsService');
+      this.logger.error(`Error fetching BOM ID for item: ${error.message}`);
       throw new InternalServerErrorException(`Failed to fetch BOM ID: ${error.message}`);
     }
 
@@ -1039,7 +1037,7 @@ export class BOMItemsService {
     userId?: string,
     accessToken?: string,
   ): Promise<{ canDelete: boolean; blockers: string[]; itemName: string }> {
-    this.logger.log(`Checking delete dependencies for BOM item: ${id}`, 'BOMItemsService');
+    this.logger.log(`Checking delete dependencies for BOM item: ${id}`);
 
     const client = this.supabaseService.getUserClient(accessToken);
     const blockers: string[] = [];
@@ -1108,7 +1106,7 @@ export class BOMItemsService {
       .single();
 
     if (error) {
-      this.logger.error(`Error fetching project ID for BOM: ${error.message}`, 'BOMItemsService');
+      this.logger.error(`Error fetching project ID for BOM: ${error.message}`);
       throw new InternalServerErrorException(`Failed to fetch project ID: ${error.message}`);
     }
 
@@ -2166,7 +2164,7 @@ export class BOMItemsService {
         return { data: res.data, error: res.error };
       });
       if (error) {
-        this.logger.warn(`resolveCutFeatureCoverage: ${error.message}`, 'BOMItemsService');
+        this.logger.warn(`resolveCutFeatureCoverage: ${error.message}`);
         return null;
       }
 
@@ -2182,7 +2180,7 @@ export class BOMItemsService {
       // seeded, so it is reported as unknown rather than as "nothing blanks".
       return coverage.size > 0 ? coverage : null;
     } catch (err: any) {
-      this.logger.warn(`resolveCutFeatureCoverage failed: ${err.message}`, 'BOMItemsService');
+      this.logger.warn(`resolveCutFeatureCoverage failed: ${err.message}`);
       return null;
     }
   }
@@ -2238,7 +2236,7 @@ export class BOMItemsService {
         .select('machine_class, process_taxonomy_operations(operation_category)')
         .in('machine_class', classes);
       if (error || !data) {
-        this.logger.warn(`resolveMachiningOperationCategories: ${error?.message ?? 'no data'}`, 'BOMItemsService');
+        this.logger.warn(`resolveMachiningOperationCategories: ${error?.message ?? 'no data'}`);
         return {};
       }
       const result: Record<string, string[]> = {};
@@ -2254,7 +2252,7 @@ export class BOMItemsService {
       }
       return result;
     } catch (err: any) {
-      this.logger.warn(`resolveMachiningOperationCategories failed: ${err.message}`, 'BOMItemsService');
+      this.logger.warn(`resolveMachiningOperationCategories failed: ${err.message}`);
       return {};
     }
   }
@@ -6993,7 +6991,7 @@ export class BOMItemsService {
         );
       }
     } catch (err: any) {
-      this.logger.warn(`Disclosed cutting-gap check failed: ${err.message}`, 'BOMItemsService');
+      this.logger.warn(`Disclosed cutting-gap check failed: ${err.message}`);
     }
 
     if (cutLengthMm > 0) {
@@ -9766,7 +9764,7 @@ export class BOMItemsService {
     ]);
     if (!this.recentCoverageGaps.firstSeen(gapKey)) return;
     const what = gap.gapType === 'missing_lookup' ? `missing lookup ${gap.lookupResolution.table}` : gap.reason;
-    this.logger.warn(`coverage gap [${gap.process} / ${gap.machineClass ?? '-'}]: ${what}`, 'BOMItemsService');
+    this.logger.warn(`coverage gap [${gap.process} / ${gap.machineClass ?? '-'}]: ${what}`);
   }
 
   /**
