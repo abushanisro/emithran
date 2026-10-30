@@ -8,7 +8,8 @@ try { process.loadEnvFile('.env'); } catch { /* no .env */ }
 // src/common/environment-guard.ts, written out here because this file is type-checked by the frontend image build, which
 // has no backend folder (test/lib/environment-guard-parity.test.ts keeps the two production hosts identical).
 const PRD_SUPABASE_HOST = 'udvcydhvlgjfsohueryv.supabase.co';
-const supabaseHost = (() => { try { return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').hostname.toLowerCase(); } catch { return ''; } })();
+// SUPABASE_URL is the backend's setting: the web app no longer has one, but the backend may still point at the production project.
+const supabaseHost = (() => { try { return new URL(process.env.SUPABASE_URL ?? '').hostname.toLowerCase(); } catch { return ''; } })();
 if (process.env.APP_ENV === 'prd' || supabaseHost === PRD_SUPABASE_HOST) {
   throw new Error('Refusing to run the data-creating e2e suites against production. Point them at local or stage (APP_ENV=local|stage and the stage Supabase URL).');
 }

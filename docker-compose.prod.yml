@@ -54,14 +54,12 @@ services:
       dockerfile: Dockerfile.frontend
       args:
         # NEXT_PUBLIC_* values are compiled into the browser bundle at build time, so each environment builds its own image
-        # from its own env file. Only public values go here: the publishable key is safe in a browser, the secret key never is.
+        # from its own env file. Only public values go here: never a secret.
         NEXT_PUBLIC_API_GATEWAY_URL: ${NEXT_PUBLIC_API_GATEWAY_URL:?set NEXT_PUBLIC_API_GATEWAY_URL (the public URL, which also serves /v1/*) in the env file}
         # What the browser's HTTP client calls. Without this build arg the bundle falls back to http://localhost:4000/v1/api.
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_GATEWAY_URL}/v1/api
         # The one upload limit, shown in the upload card. The backend and the engine take the same MAX_UPLOAD_MB.
         NEXT_PUBLIC_MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-50}
-        NEXT_PUBLIC_SUPABASE_URL: ${SUPABASE_URL:?set SUPABASE_URL in the env file}
-        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:?set SUPABASE_PUBLISHABLE_KEY in the env file}
     environment:
       NODE_ENV: production
       # Server-side calls stay on the private network: the backend, and the engine through the /api/cad proxy.

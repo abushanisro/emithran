@@ -19,7 +19,6 @@ const call = (handler: typeof GET, path: string[], init: { method?: string; head
   handler(new NextRequest(`${APP}/api/v1/${path.join('/')}`, init), { params: Promise.resolve({ path }) });
 
 beforeEach(() => {
-  vi.stubEnv('NEXT_PUBLIC_BFF', 'on');
   vi.stubEnv('NEXT_PUBLIC_APP_URL', APP);
   vi.stubEnv('API_URL', 'http://api.internal:4000/v1/api');
   vi.stubGlobal('fetch', upstream);
@@ -71,11 +70,5 @@ describe('/api/v1/[...path]', () => {
   it('answers 502 when the API cannot be reached', async () => {
     upstream.mockRejectedValue(new TypeError('fetch failed'));
     expect((await call(GET, ['projects'])).status).toBe(502);
-  });
-
-  it('does not exist while the flag is off', async () => {
-    vi.stubEnv('NEXT_PUBLIC_BFF', '');
-    expect((await call(GET, ['projects'])).status).toBe(404);
-    expect(upstream).not.toHaveBeenCalled();
   });
 });

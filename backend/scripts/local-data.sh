@@ -7,7 +7,7 @@
 #   npm run local:status | local:down | local:reset -- --yes
 #
 # A baseline comes from the stage (or old) project:  backend/scripts/baseline-dump.sh "<read-only connection url>" ~/baseline-stage
-# Login: until an Auth0 tenant exists, `local:use` turns on the development bypass (an automatic dev account, no login page).
+# Login is Auth0 (the web app has no other sign-in).
 # Once it exists:  npm run auth0:check  and then follow docs/CUTOVER_AUTH0_POSTGRES.md.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -79,7 +79,6 @@ cmd_use() {
   env_set S3_SECRET_ACCESS_KEY testtesttest
   env_set TRUSTED_STORAGE_HOSTS 127.0.0.1
   env_set ALLOW_DEV_AUTH_BYPASS true
-  env_set NEXT_PUBLIC_DISABLE_AUTH true
   [ -n "$(env_get ADMIN_FALLBACK_EMAIL)" ] || echo "NOTE: set ADMIN_FALLBACK_EMAIL in .env to a user that exists in the loaded baseline (the dev account)."
   echo "root .env now uses local Postgres and local files. Restart the backend and the frontend."
 }

@@ -1,7 +1,5 @@
 import { Auth0Client, filterDefaultIdTokenClaims } from '@auth0/nextjs-auth0/server';
 
-import { bffEnabled } from '@/lib/api/bff';
-
 let client: Auth0Client | undefined;
 
 /**
@@ -19,8 +17,8 @@ export function getAuth0(): Auth0Client {
     },
     // Auth0 never offers sign-up here: people are invited (the backend allow-list decides who gets in).
     signInReturnToPath: '/',
-    // Behind the BFF the server attaches the token to API calls, so the route that hands tokens to browser JavaScript is closed.
-    enableAccessTokenEndpoint: !bffEnabled,
+    // The BFF attaches the token to API calls on the server, so the route that would hand tokens to browser JavaScript is closed.
+    enableAccessTokenEndpoint: false,
     // The browser's idle timer keys its shared state by session; with no token in the browser it reads the session id from the profile.
     beforeSessionSaved: (session) =>
       Promise.resolve({ ...session, user: { ...filterDefaultIdTokenClaims(session.user), sid: session.internal.sid } }),

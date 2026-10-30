@@ -9,9 +9,9 @@ interface Viewer2DProps {
 }
 
 /**
- * Build a same-origin proxy URL for a given Supabase signed URL.
+ * Build a same-origin proxy URL for a given file-store signed URL.
  *
- * Why: Chrome blocks cross-site iframes that load Supabase signed URLs
+ * Why: Chrome blocks cross-site iframes that load the file store's signed URLs
  * (sec-fetch-site: cross-site + sec-fetch-dest: iframe → browser blocks it).
  *
  * Fix: Route the PDF through /api/file-proxy so the iframe src is

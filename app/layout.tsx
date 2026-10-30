@@ -57,7 +57,6 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link rel="dns-prefetch" href={process.env.NEXT_PUBLIC_SUPABASE_URL || ""} />
       </head>
       <body className="antialiased font-sans">
         <script
@@ -76,7 +75,7 @@ export default function RootLayout({
                   
                   // Never suppress these critical application errors
                   const criticalPatterns = [
-                    'supabase.co', 'fetch failed', 'network error', 'Failed to load',
+                    'fetch failed', 'network error', 'Failed to load',
                     'refused to connect', 'CORS', 'TypeError:', 'ReferenceError:',
                     'SyntaxError:', 'RangeError:', 'URIError:'
                   ];

@@ -13,7 +13,6 @@ import { useSupplierNominations } from '@/lib/api/hooks/useSupplierNominations';
 import { useVendors } from '@/lib/api/hooks/useVendors';
 import { useBOMItems } from '@/lib/api/hooks/useBOMItems';
 import { useBOMs } from '@/lib/api/hooks/useBOM';
-import { browserAuthHeaders } from '@/lib/api/auth-headers';
 import { apiConfig } from '@/lib/api/config';
 import { formatDistanceToNow, isAfter } from 'date-fns';
 import { useState } from 'react';
@@ -65,44 +64,9 @@ export default function RFQPage() {
       const apiUrl = `${apiConfig.endpoints.api.v1}/bom-items/${bomItemId}/file-url/${fileType}`;
       console.log('Attempting download:', { bomItemId, fileType, fileName, partNumber, apiUrl });
       
-      // First try to get the BOM item to check if it has files
-      const bomItem = partNumber ? getBOMItemDetails(partNumber) : null;
-      if (bomItem) {
-        const filePath = fileType === '2d' ? bomItem.file2dPath : bomItem.file3dPath;
-        console.log('BOM item found with file path:', filePath);
-        
-        if (filePath) {
-          // Try to construct direct Supabase URL (temporary solution while backend API is being fixed)
-          const supabaseUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/bom-files/${filePath}`;
-          console.log('Trying direct file URL:', supabaseUrl);
-          
-          // Test if the direct URL works
-          try {
-            const testResponse = await fetch(supabaseUrl, { method: 'HEAD' });
-            if (testResponse.ok) {
-              console.log('✅ Direct file access successful');
-              // Direct download if file is publicly accessible
-              const link = document.createElement('a');
-              link.href = supabaseUrl;
-              link.download = fileName;
-              link.target = '_blank';
-              link.rel = 'noopener noreferrer';
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-              return;
-            } else {
-              console.log('❌ Direct file access failed:', testResponse.status);
-            }
-          } catch (directError) {
-            console.log('❌ Direct file access error:', directError);
-          }
-        }
-      }
-      
-      // Fallback to API call (which currently returns empty)
+      // The API checks access and returns a short-lived signed link.
       const response = await fetch(apiUrl, {
-        headers: { ...(await browserAuthHeaders()), 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
       });
       
       if (response.ok) {

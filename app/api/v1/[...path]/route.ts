@@ -13,9 +13,6 @@ const refuse = (status: number, code: string, message: string) =>
  * token, the organization and the idle deadline on every call; this route only decides whether to forward.
  */
 async function handle(req: NextRequest, ctx: RouteContext<'/api/v1/[...path]'>): Promise<Response> {
-  // Read per request rather than imported from lib/api/bff, so the server and its tests see the deployed value.
-  if (process.env.NEXT_PUBLIC_BFF !== 'on') return refuse(404, 'NOT_FOUND', 'Not found');
-
   const appUrl = process.env.NEXT_PUBLIC_APP_URL;
   const apiBase = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL;
   if (!appUrl || !apiBase) return refuse(500, 'BFF_NOT_CONFIGURED', 'NEXT_PUBLIC_APP_URL and API_URL must be set');

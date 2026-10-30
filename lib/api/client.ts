@@ -11,15 +11,12 @@
  * - Token refresh mechanism
  * - Request deduplication
  * - Comprehensive error handling and diagnostics
- * - Supabase authentication integration
+ * - Same-origin calls through the BFF (the server attaches the token)
  */
 
 import { config as appConfig } from '../config';
-import { bffEnabled } from './bff';
 import { apiConfig } from './config';
 import { SESSION_IDLE_TIMEOUT_CODE, SESSION_IDLE_TIMEOUT_EVENT } from '../auth/session-idle/policy';
-import { sessionSource } from '../auth/session-source';
-import { authTokenManager } from '../auth/token-manager';
 
 import { CircuitBreaker, CircuitBreakerError } from './circuit-breaker';
 import { requestMetrics } from './request-metrics';
@@ -89,7 +86,6 @@ class ApiClient {
 
   constructor() {
     this.baseUrl = apiConfig.endpoints.api.v1;
-    this.loadTokens();
 
     // Initialize circuit breaker
     this.circuitBreaker = new CircuitBreaker({
@@ -150,31 +146,6 @@ class ApiClient {
     }
   }
 
-  // Legacy methods - deprecated, use authTokenManager instead
-  private loadTokens() {
-    // No-op: Use authTokenManager.getCurrentToken() instead
-  }
-
-  setAccessToken(_token: string | null) {
-    // Deprecated: Use authTokenManager.setToken() instead
-  }
-
-  setRefreshToken(token: string | null) {
-    if (typeof window !== 'undefined') {
-      if (token) {
-        localStorage.setItem('refreshToken', token);
-      } else {
-        localStorage.removeItem('refreshToken');
-      }
-    }
-  }
-
-  /** The session's token for a direct API call; none through the BFF, where the server attaches it. */
-  private async getAuthToken(): Promise<string | null> {
-    if (bffEnabled) return null;
-    return sessionSource.getAccessToken();
-  }
-
   /**
    * Determine if circuit breaker should be bypassed
    * Enhanced to work with auth coordination system
@@ -200,8 +171,7 @@ class ApiClient {
       return true;
     }
 
-    // Right after auth is ready, bypass so a token that is not available yet does not trip the breaker. (This used to test a
-    // localStorage key of one Supabase project, which @supabase/ssr never writes, so it always bypassed here.)
+    // Right after auth is ready, bypass once so a request racing the first session check does not trip the breaker.
     if (readinessState === 'AUTH_READY') {
       return true;
     }
@@ -484,13 +454,7 @@ class ApiClient {
         }, requestTrace.traceId);
       }
 
-      // Get token from single source of truth
-      let token = await this.getAuthToken();
-
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
+      // No Authorization header: calls go through the BFF, which attaches the session's token on the server.
       if (body && !headers['Content-Type']) {
         headers['Content-Type'] = 'application/json';
       }
@@ -608,11 +572,10 @@ class ApiClient {
 
         if (!response.ok) {
           // The backend ended this session for inactivity and has already
-          // revoked it, so a token refresh cannot help. The session idle
+          // revoked it, so signing in again is the only way on. The session idle
           // controller signs out (this session only) and returns the user here
           // after login.
           if (response.status === 401 && data.error?.code === SESSION_IDLE_TIMEOUT_CODE) {
-            authTokenManager.clearToken();
             tracker.recordError(401, SESSION_IDLE_TIMEOUT_CODE);
             if (typeof window !== 'undefined') window.dispatchEvent(new Event(SESSION_IDLE_TIMEOUT_EVENT));
             if (silent) return null;
@@ -624,20 +587,8 @@ class ApiClient {
             );
           }
 
-          // Handle 401 Unauthorized - try to refresh the session ONCE
-          if (response.status === 401 && attemptNumber === 1) {
-            // The BFF refreshes tokens on the server, so a 401 through it means the session is gone.
-            const refreshed = bffEnabled ? null : await sessionSource.refresh();
-            if (refreshed) {
-              tracker.incrementRetry();
-              authTokenManager.setToken({ token: refreshed.token, expiresAt: Date.now() + refreshed.expiresInSeconds * 1000 });
-              return executeRequest(attemptNumber + 1);
-            }
-
-            // Clear token manager - user needs to authenticate
-            authTokenManager.clearToken();
-
-            // Don't retry 401 - fail immediately with clear message
+          // 401: the BFF already refreshes tokens on the server, so the session is gone and the person must sign in again.
+          if (response.status === 401) {
             tracker.recordError(401, 'UNAUTHORIZED');
             if (silent) return null;
 
@@ -722,8 +673,8 @@ class ApiClient {
         // Record success metric
         tracker.recordSuccess(response.status);
 
-        // If this was an authenticated request that succeeded, mark auth as validated
-        if (token && !appReadiness.isReady() && appReadiness.getState() === AppReadinessState.AUTH_INITIALIZING) {
+        // A request that succeeded through the BFF proves the session, so auth is validated.
+        if (!appReadiness.isReady() && appReadiness.getState() === AppReadinessState.AUTH_INITIALIZING) {
           appReadiness.setAuthValidated();
         }
 
@@ -1111,13 +1062,7 @@ class ApiClient {
     // Initialize metrics tracker
     const tracker = requestMetrics.startRequest(endpoint, method);
 
-    // Get token from single source of truth
-    const token = await this.getAuthToken();
-
     const headers: Record<string, string> = {};
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
 
     // Create abort controller for timeout and cancellation
     const abortController = new AbortController();

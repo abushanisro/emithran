@@ -46,18 +46,11 @@ import {
   XCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { browserAuthHeaders } from '@/lib/api/auth-headers';
 import { apiConfig } from '@/lib/api/config';
 
-// Headers for this page's raw API fetches: the session cookie through the BFF, otherwise the session's bearer token.
-const getAuthHeaders = async (): Promise<Record<string, string>> => {
-  const json = { 'Content-Type': 'application/json' };
-  // Development mode with disabled auth - no session needed
-  if (process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true') return json;
-  const auth = await browserAuthHeaders();
-  if (!auth) throw new Error('No authentication token available. Please log in again.');
-  return { ...auth, ...json };
-};
+// This page's raw API fetches go same-origin through the BFF, which attaches the session's token.
+const JSON_HEADERS = { 'Content-Type': 'application/json' };
+
 // InteractiveBalloonAnnotator unused - commented out
 // import InteractiveBalloonAnnotator from '@/components/features/quality-control/InteractiveBalloonAnnotator';
 
@@ -647,7 +640,7 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
     setError(null);
 
     try {
-      const headers = await getAuthHeaders();
+      const headers = JSON_HEADERS;
       const response = await fetch(`${apiConfig.endpoints.api.v1}/bom-items/${bomItem.id}/file-url/2d`, {
         headers,
       });
@@ -659,7 +652,7 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
         const signedUrl = data.url || data.signedUrl || data.downloadUrl || data.fileUrl || data.data?.url;
 
         if (signedUrl) {
-          // ⚡ CRITICAL: Never embed the Supabase signed URL directly in an iframe.
+          // ⚡ CRITICAL: Never embed the file store's signed URL directly in an iframe.
           // Chrome blocks cross-site iframes (sec-fetch-site: cross-site + sec-fetch-dest: iframe).
           // Route through the same-origin proxy so the iframe src is localhost:3000.
           const proxyUrl = `/api/file-proxy?url=${encodeURIComponent(signedUrl)}`;
@@ -1169,7 +1162,7 @@ export default function QualityInspectionPage() {
   const bomsQuery = useQuery({
     queryKey: ['bom', 'list', { projectId }],
     queryFn: async () => {
-      const headers = await getAuthHeaders();
+      const headers = JSON_HEADERS;
       const params = new URLSearchParams();
       if (projectId) params.append('projectId', projectId);
       const queryString = params.toString();
@@ -1205,7 +1198,7 @@ export default function QualityInspectionPage() {
     queryFn: async () => {
       if (!inspection?.bomId) return { items: [] };
 
-      const headers = await getAuthHeaders();
+      const headers = JSON_HEADERS;
       const response = await fetch(`${apiConfig.endpoints.api.v1}/bom-items?bomId=${inspection.bomId}`, {
         headers,
       });

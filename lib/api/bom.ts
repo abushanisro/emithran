@@ -2,7 +2,6 @@
  * BOM (Bill of Materials) API
  */
 
-import { browserAuthHeaders } from './auth-headers';
 import { apiClient } from './client';
 import { apiConfig } from './config';
 
@@ -204,7 +203,6 @@ export const bomApi = {
 
     return fetch(`${apiConfig.endpoints.api.v1}/boms/${bomId}/upload`, {
       method: 'POST',
-      headers: (await browserAuthHeaders()) ?? {},
       body: formData,
     }).then((res) => res.json());
   },
