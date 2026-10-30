@@ -37,6 +37,9 @@ jobs:
       - name: Type-check
         run: npm run type-check
 
+      - name: No database clients in frontend code
+        run: npm run check:boundary
+
       - name: Unit tests
         run: npm test
 
