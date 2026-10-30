@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { scanSource, scanRepoJwt } = require('../../../scripts/rls-bypass-rules');
+const { scanSource, scanRepoJwt, countPrivilegedCalls, compareToBaseline, lowerBaseline, parseBaseline } = require('../../../scripts/rls-bypass-rules');
 
 const rulesFor = (path: string, text: string) =>
   scanSource(path, text).filter((v: any) => v.severity === 'error').map((v: any) => v.rule);
@@ -61,10 +61,17 @@ describe('RLS boundary CI rules', () => {
     expect(rulesFor('src/modules/y/y.service.ts', 'SUPABASE_SERVICE_KEY: string;')).toContain('service-key-outside-boundary');
   });
 
-  it("allows no database driver anywhere in src (the backend holds no Postgres connection)", () => {
-    for (const file of ['src/common/events/event-bus.ts', 'src/modules/z/z.service.ts']) {
-      for (const driver of ['pg', 'knex', 'nestjs-knex', 'typeorm']) expect(rulesFor(file, `import x from '${driver}';`)).toContain('second-db-path');
+  it('allows no database driver in src outside the platform database layer', () => {
+    for (const file of ['src/common/events/event-bus.ts', 'src/modules/z/z.service.ts', 'src/platform/tenancy/x.ts']) {
+      for (const driver of ['pg', 'kysely', 'knex', 'nestjs-knex', 'typeorm']) expect(rulesFor(file, `import x from '${driver}';`)).toContain('second-db-path');
     }
+  });
+
+  it('allows pg and kysely in src/platform/db only, and still no other driver there', () => {
+    const file = 'src/platform/db/pools.ts';
+    expect(rulesFor(file, "import { Pool } from 'pg';")).toEqual([]);
+    expect(rulesFor(file, "import { Kysely } from 'kysely';")).toEqual([]);
+    expect(rulesFor(file, "import knex from 'knex';")).toContain('second-db-path');
   });
 
   it('treats a reintroduced getAdminClient() as an error everywhere, with no allowlist', () => {
@@ -98,6 +105,47 @@ describe('RLS boundary CI rules', () => {
 
     it('ignores text that is not a JWT', () => {
       expect(scanRepoJwt('a.md', 'SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY:?set it}')).toEqual([]);
+    });
+  });
+
+  describe('privileged-call budget', () => {
+    it('counts every privileged accessor call in a file', () => {
+      const text = "a.getPrivilegedClient('reference-data: x');\nb.getPrivilegedClient (\n  'system-job: y z w');";
+      expect(countPrivilegedCalls(text)).toBe(2);
+      expect(countPrivilegedCalls('const c = this.supabase.getUserClient();')).toBe(0);
+    });
+
+    it('reports a file above its baseline, including a file with no entry', () => {
+      const { increased } = compareToBaseline({ 'src/a.ts': 3, 'src/new.ts': 1 }, { 'src/a.ts': 2 });
+      expect(increased).toEqual([
+        { file: 'src/a.ts', baseline: 2, now: 3 },
+        { file: 'src/new.ts', baseline: 0, now: 1 },
+      ]);
+    });
+
+    it('reports a file below its baseline, including one with no calls left', () => {
+      const { decreased } = compareToBaseline({ 'src/a.ts': 1 }, { 'src/a.ts': 2, 'src/gone.ts': 4 });
+      expect(decreased).toEqual([
+        { file: 'src/a.ts', baseline: 2, now: 1 },
+        { file: 'src/gone.ts', baseline: 4, now: 0 },
+      ]);
+    });
+
+    it('passes when every file matches its baseline', () => {
+      expect(compareToBaseline({ 'src/a.ts': 2 }, { 'src/a.ts': 2 })).toEqual({ increased: [], decreased: [] });
+    });
+
+    it('lowers the baseline to current counts but never raises or adds an entry', () => {
+      const lowered = lowerBaseline({ 'src/a.ts': 1, 'src/b.ts': 5, 'src/new.ts': 2 }, { 'src/a.ts': 2, 'src/b.ts': 4, 'src/gone.ts': 3 });
+      expect(lowered).toEqual({ 'src/a.ts': 1, 'src/b.ts': 4 });
+    });
+
+    it('accepts a baseline of file paths to positive integer counts', () => {
+      expect(parseBaseline('{"src/a.ts": 2}')).toEqual({ 'src/a.ts': 2 });
+    });
+
+    it.each([['[]'], ['{"src/a.ts": 0}'], ['{"src/a.ts": 1.5}'], ['{"src/a.ts": "2"}'], ['not json']])('rejects baseline %s', (text) => {
+      expect(() => parseBaseline(text)).toThrow();
     });
   });
 });

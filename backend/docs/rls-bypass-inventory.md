@@ -14,14 +14,14 @@ Authoritative as of 2026-10-01. `npm run check:rls` (scripts/rls-bypass-rules.js
 
 **Dev auth bypass is opt-in (2026-10-16).** A missing or invalid bearer token is a 401 unless `ALLOW_DEV_AUTH_BYPASS=true` AND `NODE_ENV` is not `production` (`SupabaseService.isDevAuthBypassEnabled()`; default `false`). `ADMIN_FALLBACK_EMAIL` alone enables nothing, and env validation refuses to boot in production with either variable set. Local development needs `ALLOW_DEV_AUTH_BYPASS=true` in `backend/.env`. Covered by `test/auth-bypass-off.e2e-spec.ts` (401s), `test/auth-bypass-on.e2e-spec.ts` and `src/config/env.validation.spec.ts`.
 
-There is no second database path (2026-10-29): `typeorm`, `knex`, `nestjs-knex` and `pg` are not imported anywhere in `src` (CI rule `second-db-path`, no allowlist), and the backend holds no Postgres connection or database password. The electronics job queue is the `job_queue` table (migration 920), the live-progress event bus is in-process, and invoices use the Supabase client like the rest of the delivery module. `pg` remains a dependency only for `scripts/migrate.ts`, which runs from CI or an operator.
+There is no second database path (2026-10-29): `typeorm`, `knex`, `nestjs-knex`, `pg` and `kysely` are not imported anywhere in `src` (CI rule `second-db-path`). The one exception, from 2026-10-30, is the platform database layer `src/platform/db/`, which may import `pg` and `kysely` (Design Doc 9; no such files exist yet), and the backend holds no Postgres connection or database password. The electronics job queue is the `job_queue` table (migration 920), the live-progress event bus is in-process, and invoices use the Supabase client like the rest of the delivery module. `pg` remains a dependency only for `scripts/migrate.ts`, which runs from CI or an operator.
 
 The deprecated `getAdminClient()` and `.client` accessors have been removed from `SupabaseService`; CI rule `get-admin-client` / `dot-client` rejects their reintroduction.
 
 ## Counts (production code, excluding specs)
 
 - `getUserClient(...)`: 195 call sites (all tenant-data access)
-- `getPrivilegedClient(...)`: 128 call sites, all with a named reason (table below)
+- `getPrivilegedClient(...)`: 156 call sites outside `SupabaseService` on 2026-10-30, all with a named reason (table below, last reconciled at 128). The per-file budget is `scripts/rls-bypass-baseline.json`: `npm run check:rls` fails when a file's count differs from it, so the count can only go down (`npm run check:rls -- --update-baseline` records a decrease). Raising an entry is a hand edit that review must approve.
 - `getAdminClient()` / `.client`: **removed** (0 callers, aliases deleted)
 - zero-argument `getClient()`: **0**
 - `createClient(` outside `SupabaseService`: **0** (two were found and routed through the service, see below)
