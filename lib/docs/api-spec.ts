@@ -32,7 +32,7 @@ export const API_SPEC: ApiSpec = {
   authenticationMethods: {
     jwt: {
       description:
-        'Pass a Supabase JWT in the Authorization header. Obtain the token by authenticating via Supabase Auth.',
+        'Pass an Auth0 access token for the eMithran API (audience https://api.emithran.com, RS256) in the Authorization header.',
       header: 'Authorization: Bearer <jwt_token>',
     },
     apiKey: {

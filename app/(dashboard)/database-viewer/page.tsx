@@ -51,7 +51,7 @@ export default function DatabaseViewerPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Database Viewer"
-        description="View and verify all data stored in your Supabase database"
+        description="View and verify the data stored in your database"
       >
         <Button onClick={handleRefreshAll} className="gap-2">
           <RefreshCw className="h-4 w-4" />
@@ -299,11 +299,10 @@ export default function DatabaseViewerPage() {
           <p><strong>3. Verify BOM Items:</strong> Go to BOMs tab → Click &quot;View Items&quot; → Check Items tab</p>
           <p><strong>4. Refresh Data:</strong> Click &quot;Refresh All&quot; button to reload all data from database</p>
           <p className="text-muted-foreground pt-2">
-            This page directly queries your Supabase database. If you don&apos;t see data here but
+            This page reads your data through the API. If you don&apos;t see data here but
             you created it, check:
             <br />• Browser console for errors
-            <br />• Supabase dashboard for RLS policy issues
-            <br />• Backend logs for API errors
+            <br />• Backend logs for API errors and access-policy (RLS) refusals
           </p>
         </CardContent>
       </Card>

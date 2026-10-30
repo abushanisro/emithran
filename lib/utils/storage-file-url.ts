@@ -10,7 +10,7 @@ import { isTrustedStorageUrl } from '@/lib/server/safe-fetch';
 
 // One trusted-storage rule for every server route (lib/server/safe-fetch): the
 // project's own storage host (plus TRUSTED_STORAGE_HOSTS), https, no
-// credentials. A generic "*.supabase.co" allowlist would accept any project.
+// credentials. A generic wildcard allowlist would accept any bucket.
 export { isTrustedStorageUrl };
 
 // On the server this is the private backend (API_URL); in the browser API_URL is undefined and the public URL is used.

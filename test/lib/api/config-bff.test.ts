@@ -2,9 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const API = 'http://localhost:4000/v1/api';
 
-async function apiBase({ bff, browser }: { bff: string; browser: boolean }) {
+async function apiBase({ browser }: { browser: boolean }) {
   vi.resetModules();
-  vi.stubEnv('NEXT_PUBLIC_BFF', bff);
   vi.stubEnv('NEXT_PUBLIC_API_URL', API);
   if (browser) vi.stubGlobal('window', {});
   const { apiConfig } = await import('@/lib/api/config');
@@ -17,15 +16,11 @@ afterEach(() => {
 });
 
 describe('API base URL', () => {
-  it('is the same-origin BFF in the browser when the flag is on', async () => {
-    expect(await apiBase({ bff: 'on', browser: true })).toBe('/api/v1');
+  it('is the same-origin BFF in the browser', async () => {
+    expect(await apiBase({ browser: true })).toBe('/api/v1');
   });
 
-  it('stays the API URL on the server, which calls the API itself', async () => {
-    expect(await apiBase({ bff: 'on', browser: false })).toBe(API);
-  });
-
-  it('is unchanged while the flag is off', async () => {
-    expect(await apiBase({ bff: '', browser: true })).toBe(API);
+  it('is the API itself on the server, which attaches the token', async () => {
+    expect(await apiBase({ browser: false })).toBe(API);
   });
 });

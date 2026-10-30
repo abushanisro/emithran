@@ -54,13 +54,12 @@ export function formatRemaining(ms: number): string {
  * signs out at the deadline. The backend enforces the same deadline itself.
  */
 export function SessionIdleProvider({ children }: { children: ReactNode }) {
-  const disabled = process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true';
   const sessionId = useSessionId();
   const controllerRef = useRef<SessionIdleController | null>(null);
   const [snapshot, setSnapshot] = useState<IdleSnapshot | null>(null);
 
   useEffect(() => {
-    if (disabled || !sessionId) return;
+    if (!sessionId) return;
     const controller = new SessionIdleController(sessionId, {
       now: Date.now,
       storage: browserIdleStorage(),
@@ -104,7 +103,7 @@ export function SessionIdleProvider({ children }: { children: ReactNode }) {
       controller.stop();
       controllerRef.current = null;
     };
-  }, [disabled, sessionId]);
+  }, [sessionId]);
 
   const warning = snapshot?.phase === 'warning';
   const stay = () => controllerRef.current?.staySignedIn();

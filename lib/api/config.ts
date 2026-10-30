@@ -3,7 +3,7 @@
  * Enterprise-grade configuration with environment separation
  */
 
-import { BFF_PATH, bffEnabled } from './bff';
+import { BFF_PATH } from './bff';
 
 export interface ApiEndpoints {
   base: string;
@@ -35,8 +35,8 @@ export interface ApiConfig {
  */
 function createApiConfig(): ApiConfig {
   const baseUrl = process.env.NEXT_PUBLIC_API_GATEWAY_URL || 'http://localhost:4000';
-  // In the browser with the BFF on, calls go same-origin and the server attaches the token; server code always calls the API itself.
-  const apiUrl = bffEnabled && typeof window !== 'undefined'
+  // The browser calls the BFF on its own origin and the server attaches the token; server code always calls the API itself.
+  const apiUrl = typeof window !== 'undefined'
     ? BFF_PATH
     : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/v1/api';
   const cadUrl = process.env.NEXT_PUBLIC_CAD_ENGINE_URL || 'http://localhost:5055';

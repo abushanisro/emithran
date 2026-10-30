@@ -1,4 +1,3 @@
-import { isSupabaseKeyFormat, supabasePublishableKey } from '@/lib/supabase/env';
 /**
  * Environment Configuration Validator
  * Production-grade validation | 2026 Best Practices
@@ -15,11 +14,6 @@ interface EnvironmentConfig {
   api: {
     baseUrl: string;
     isReachable: boolean;
-  };
-  supabase: {
-    url: string;
-    anonKey: string;
-    isConfigured: boolean;
   };
   app: {
     url: string;
@@ -53,24 +47,11 @@ class EnvironmentValidator {
       errors.push('Invalid API_URL format');
     }
 
-    // Supabase Configuration
-    const supabaseUrl = this.getEnvVar('NEXT_PUBLIC_SUPABASE_URL');
-    const supabaseKey = supabasePublishableKey();
-    const hasSupabase = !!(supabaseUrl && supabaseKey && isSupabaseKeyFormat(supabaseKey));
-
 
     // Production-specific validations
     if (process.env.NODE_ENV === 'production') {
       if (apiUrl?.includes('localhost')) {
         errors.push('Production cannot use localhost API');
-      }
-      // Only validate Supabase on client-side after page load (not during SSR/build)
-      // Skip validation during build/SSR phase or if DOM not ready
-      if (typeof window !== 'undefined' && 
-          document?.readyState === 'complete' && 
-          !hasSupabase && 
-          !process.env.SKIP_ENV_VALIDATION) {
-        warnings.push('Supabase configuration recommended for production');
       }
     }
 
@@ -81,11 +62,6 @@ class EnvironmentValidator {
       api: {
         baseUrl: apiUrl || '',
         isReachable: false,
-      },
-      supabase: {
-        url: supabaseUrl || '',
-        anonKey: supabaseKey || '',
-        isConfigured: hasSupabase,
       },
       app: {
         url: this.getEnvVar('NEXT_PUBLIC_APP_URL') || '',

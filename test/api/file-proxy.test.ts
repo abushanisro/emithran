@@ -10,15 +10,15 @@ vi.mock('@/lib/server/auth', () => ({
 }));
 
 const fetchMock = vi.fn<typeof fetch>();
-const storageUrl = 'https://files.supabase.co/storage/v1/object/sign/drawings/part.pdf';
+const storageUrl = 'https://files.example.com/storage/v1/object/sign/drawings/part.pdf';
 const request = (params: Record<string, string>) =>
   new NextRequest(`http://localhost/api/file-proxy?${new URLSearchParams(params)}`);
 
 beforeEach(() => {
   fetchMock.mockReset();
   vi.stubGlobal('fetch', fetchMock);
-  // The project storage host (lib/server/safe-fetch reads it per call).
-  vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://files.supabase.co');
+  // The file store's host (lib/server/safe-fetch reads TRUSTED_STORAGE_HOSTS per call).
+  vi.stubEnv('TRUSTED_STORAGE_HOSTS', 'files.example.com');
 });
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -29,9 +29,9 @@ describe('file proxy destination boundary', () => {
   it.each([
     'https://untrusted.example/part.pdf',
     'https://supabase.co.untrusted.example/part.pdf',
-    'http://files.supabase.co/part.pdf',
-    'ftp://files.supabase.co/part.pdf',
-    'https://user@files.supabase.co/part.pdf',
+    'http://files.example.com/part.pdf',
+    'ftp://files.example.com/part.pdf',
+    'https://user@files.example.com/part.pdf',
   ])('rejects an unsafe direct URL without fetching: %s', async (url) => {
     const response = await GET(request({ url }));
     expect(response.status).toBe(400);
@@ -65,8 +65,8 @@ describe('file proxy destination boundary', () => {
 
   it.each([
     'http://127.0.0.1/private',
-    'http://files.supabase.co/part.pdf',
-    'https://user@files.supabase.co/part.pdf',
+    'http://files.example.com/part.pdf',
+    'https://user@files.example.com/part.pdf',
   ])('rejects an unsafe backend-provided URL without fetching storage: %s', async (url) => {
     fetchMock.mockResolvedValue(Response.json({ url }));
     const response = await GET(request({ itemId: 'item-1', fileType: '2d' }));

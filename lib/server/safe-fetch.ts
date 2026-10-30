@@ -1,15 +1,12 @@
 /**
  * Server-side download of a caller-supplied storage URL, safe against SSRF and
- * resource abuse: the host must be the project's own storage (plus any hosts
- * named in TRUSTED_STORAGE_HOSTS), redirects are followed by hand and re-checked,
+ * resource abuse: the host must be one of the file store's hosts named in
+ * TRUSTED_STORAGE_HOSTS, redirects are followed by hand and re-checked,
  * and size and time are capped. Pure checks are exported for tests.
  */
 
 function configuredHosts(): string[] {
   const hosts: string[] = [];
-  try {
-    if (process.env.NEXT_PUBLIC_SUPABASE_URL) hosts.push(new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname);
-  } catch { /* unset or malformed: no project host */ }
   for (const h of (process.env.TRUSTED_STORAGE_HOSTS ?? '').split(',')) if (h.trim()) hosts.push(h.trim().toLowerCase());
   return hosts;
 }
@@ -23,7 +20,7 @@ export function isTrustedStorageUrl(raw: string, hosts: readonly string[] = conf
   const host = url.hostname.toLowerCase();
   const trusted = hosts.some((h) => host === h || host.endsWith(`.${h}`));
   if (!trusted) return false;
-  // https everywhere; plain http only for the project's own host (local Supabase).
+  // https everywhere; plain http only for the project's own host (a local file store).
   if (url.protocol === 'https:') return true;
   return url.protocol === 'http:' && (IPV4.test(host) || host === 'localhost') && hosts.includes(host);
 }

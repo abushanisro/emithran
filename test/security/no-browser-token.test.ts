@@ -4,15 +4,10 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 /**
- * ADR-003: browser JavaScript does not handle access tokens. Only the modules below may still touch one, and only while the BFF is off
- * or Supabase is still the sign-in backend; each is removed with the Supabase code after the point of no return (P1-13).
+ * ADR-003: browser JavaScript never handles an access token. API calls go same-origin through the BFF, which attaches the token on the
+ * server. No exceptions remain; add one only with the PR that removes it.
  */
-const ALLOWED: Record<string, string> = {
-  'lib/auth/session-source.ts': 'the session source itself; returns no token behind the BFF',
-  'lib/api/auth-headers.ts': 'the one place browser code gets an Authorization header; empty behind the BFF',
-  'lib/api/client.ts': 'asks auth-headers only while the BFF is off',
-  'lib/api/hooks/useProcessPlanGenerate.ts': 'Supabase stream token in the URL while the BFF is off',
-};
+const ALLOWED: Record<string, string> = {};
 
 /** Ways browser code has fetched or carried a token. */
 const TOKEN_PATTERNS = [

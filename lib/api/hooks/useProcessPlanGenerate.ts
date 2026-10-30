@@ -14,10 +14,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { bffEnabled } from '../bff';
 import { apiClient } from '../client';
 import { apiConfig } from '../config';
-import { supabase } from '../../supabase/client';
 
 // ─── Types (mirror backend DTOs) ────────────────────────────────────────────
 
@@ -301,11 +299,8 @@ export type StreamEvent =
  * Subscribes to /process-plan-generator/:bomItemId/stream as long as
  * `enabled` is true. Returns an in-memory array of events received.
  *
- * Behind the BFF the stream is same-origin (/api/v1): the session cookie
- * authenticates it and the BFF route streams it through with the token
- * attached server-side. Without the BFF it hits the API directly, and since
- * EventSource cannot send headers, the Supabase token goes in the query
- * string (the backend's guard accepts ?token=). That path ends with P1-13.
+ * The stream is same-origin (/api/v1): the session cookie authenticates it
+ * and the BFF route streams it through with the token attached server-side.
  */
 export function useGenerationStream(bomItemId: string, enabled: boolean): StreamEvent[] {
   const [events, setEvents] = useState<StreamEvent[]>([]);
@@ -320,14 +315,9 @@ export function useGenerationStream(bomItemId: string, enabled: boolean): Stream
 
     let cancelled = false;
     (async () => {
-      let query = '';
-      if (!bffEnabled) {
-        const { data: sess } = await supabase.auth.getSession();
-        query = `?token=${encodeURIComponent(sess.session?.access_token ?? '')}`;
-      }
       if (cancelled) return;
 
-      const url = `${apiConfig.endpoints.api.v1}${BASE}/${bomItemId}/stream${query}`;
+      const url = `${apiConfig.endpoints.api.v1}${BASE}/${bomItemId}/stream`;
       const src = new EventSource(url);
       sourceRef.current = src;
 

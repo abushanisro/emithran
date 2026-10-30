@@ -11,7 +11,7 @@ import { describeFailure, summarize, visibleRows } from '@/lib/cad-uploads/uploa
 import { cn } from '@/lib/utils';
 
 // The one upload limit (MAX_UPLOAD_MB in the env file: the backend and the engine read the same value). Written as a literal
-// process.env reference so Next.js compiles it into the bundle; 50 is the Supabase free tier's per-object cap.
+// process.env reference so Next.js compiles it into the bundle; 50 matches the backend's MAX_UPLOAD_MB default.
 const MAX_UPLOAD_MB = Number(process.env.NEXT_PUBLIC_MAX_UPLOAD_MB) || 50;
 const MAX_FILE_SIZE_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
 const ACCEPT = { 'application/zip': ['.zip'], 'application/octet-stream': ['.step', '.stp'], 'application/step': ['.step', '.stp'] };

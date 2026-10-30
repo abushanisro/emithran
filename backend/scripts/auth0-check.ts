@@ -44,7 +44,7 @@ async function main(): Promise<void> {
       bad(`could not reach https://${domain}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
-  console.log(failed ? '\nNot ready. Fix the FAIL lines, then run this again.' : '\nReady. Set AUTH_BACKEND=auth0 and NEXT_PUBLIC_AUTH_BACKEND=auth0 and restart.');
+  console.log(failed ? '\nNot ready. Fix the FAIL lines, then run this again.' : '\nReady. Set AUTH_BACKEND=auth0 and restart.');
   process.exit(failed ? 1 : 0);
 }
 
