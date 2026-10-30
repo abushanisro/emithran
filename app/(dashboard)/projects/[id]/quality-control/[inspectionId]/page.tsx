@@ -46,33 +46,17 @@ import {
   XCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/lib/supabase/client';
+import { browserAuthHeaders } from '@/lib/api/auth-headers';
+import { apiConfig } from '@/lib/api/config';
 
-// Utility function to handle authentication for API requests
+// Headers for this page's raw API fetches: the session cookie through the BFF, otherwise the session's bearer token.
 const getAuthHeaders = async (): Promise<Record<string, string>> => {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-
-  if (process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true') {
-    // Development mode with disabled auth - no token needed
-    return headers;
-  }
-
-  // Production mode - get real Supabase token
-  if (!supabase) {
-    throw new Error('Supabase client not configured');
-  }
-
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token;
-
-  if (!token) {
-    throw new Error('No authentication token available. Please log in again.');
-  }
-
-  headers['Authorization'] = `Bearer ${token}`;
-  return headers;
+  const json = { 'Content-Type': 'application/json' };
+  // Development mode with disabled auth - no session needed
+  if (process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true') return json;
+  const auth = await browserAuthHeaders();
+  if (!auth) throw new Error('No authentication token available. Please log in again.');
+  return { ...auth, ...json };
 };
 // InteractiveBalloonAnnotator unused - commented out
 // import InteractiveBalloonAnnotator from '@/components/features/quality-control/InteractiveBalloonAnnotator';
@@ -664,7 +648,7 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
 
     try {
       const headers = await getAuthHeaders();
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/bom-items/${bomItem.id}/file-url/2d`, {
+      const response = await fetch(`${apiConfig.endpoints.api.v1}/bom-items/${bomItem.id}/file-url/2d`, {
         headers,
       });
 
@@ -1190,7 +1174,7 @@ export default function QualityInspectionPage() {
       if (projectId) params.append('projectId', projectId);
       const queryString = params.toString();
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/boms${queryString ? `?${queryString}` : ''}`, {
+      const response = await fetch(`${apiConfig.endpoints.api.v1}/boms${queryString ? `?${queryString}` : ''}`, {
         headers,
       });
 
@@ -1222,7 +1206,7 @@ export default function QualityInspectionPage() {
       if (!inspection?.bomId) return { items: [] };
 
       const headers = await getAuthHeaders();
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/bom-items?bomId=${inspection.bomId}`, {
+      const response = await fetch(`${apiConfig.endpoints.api.v1}/bom-items?bomId=${inspection.bomId}`, {
         headers,
       });
 
