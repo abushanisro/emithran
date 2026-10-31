@@ -65,3 +65,27 @@ vulnerabilities:
       used while the image is built; the running service executes in cad-env and never calls it, and the container has no
       internet. No fixed conda release yet. Re-check when miniconda3 ships a rattler built with zip >= 9.0.5.
     expired_at: 2026-12-15
+  - id: CVE-2026-115907
+    paths:
+      - "opt/conda/lib/python3.14/site-packages/rattler/rattler.abi3.so"
+    statement: >-
+      The `zip` Rust crate compiled into rattler, part of conda's own base environment (continuumio/miniconda3). conda is only
+      used while the image is built; the running service executes in cad-env and never calls it, and the container has no
+      internet. No fixed conda release yet. Re-check when miniconda3 ships a rattler built with zip >= 9.0.5.
+    expired_at: 2026-12-15
+  - id: CVE-2026-115908
+    paths:
+      - "opt/conda/lib/python3.14/site-packages/rattler/rattler.abi3.so"
+    statement: >-
+      The `zip` Rust crate compiled into rattler, part of conda's own base environment (continuumio/miniconda3). conda is only
+      used while the image is built; the running service executes in cad-env and never calls it, and the container has no
+      internet. No fixed conda release yet. Re-check when miniconda3 ships a rattler built with zip >= 9.0.5.
+    expired_at: 2026-12-15
+  - id: CVE-2026-115909
+    paths:
+      - "opt/conda/lib/python3.14/site-packages/rattler/rattler.abi3.so"
+    statement: >-
+      The `zip` Rust crate compiled into rattler, part of conda's own base environment (continuumio/miniconda3). conda is only
+      used while the image is built; the running service executes in cad-env and never calls it, and the container has no
+      internet. No fixed conda release yet. Re-check when miniconda3 ships a rattler built with zip >= 9.0.5.
+    expired_at: 2026-12-15
