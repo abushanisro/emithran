@@ -1,10 +1,10 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
-import { SupabaseService } from '@/common/supabase/supabase.service';
+import { DatabaseService } from '@/common/database/database.service';
 import { CreateVendorQuoteDto, UpdateVendorQuoteDto, VendorQuoteLineItemDto, VendorAssignmentDto } from './dto/vendor-quotes.dto';
 
 @Injectable()
 export class VendorQuotesService {
-  constructor(private readonly supabaseService: SupabaseService) { }
+  constructor(private readonly databaseService: DatabaseService) { }
 
   private throwDisabledError() {
     throw new BadRequestException('VendorQuotes service temporarily disabled - needs Supabase migration');

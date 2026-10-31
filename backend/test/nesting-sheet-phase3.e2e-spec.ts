@@ -1,5 +1,5 @@
 // Phase 3 (Nest sheet / kerf / edge margin) integration tests — REAL
-// SupabaseService against the dev project (`.env`), read-only, no mocks.
+// DatabaseService against the dev project (`.env`), read-only, no mocks.
 // Expected values come from memory/Sheetmetal (machine_library.csv,
 // sheet_metal_variables.csv), never typed in here.
 //
@@ -11,7 +11,7 @@ import { Test } from '@nestjs/testing';
 import { ConfigModule } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
-import { SupabaseService } from '../src/common/supabase/supabase.service';
+import { DatabaseService } from '../src/common/database/database.service';
 import { SheetMetalLookupService } from '../src/modules/bom-items/costing/sheet-metal/lookup/sheet-metal-lookup.service';
 import { computePartAllowanceMm } from '../src/modules/bom-items/costing/sheet-metal/machine/sheet-metal-nesting.engine';
 
@@ -30,7 +30,7 @@ describe('[e2e] Phase 3 nesting sheet — real DB, no mocks', () => {
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
       imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../../.env') })],
-      providers: [SupabaseService, SheetMetalLookupService],
+      providers: [DatabaseService, SheetMetalLookupService],
     }).compile();
     lookup = moduleRef.get(SheetMetalLookupService);
   });
@@ -71,7 +71,7 @@ describe('[e2e] Nest view candidate sheets — real DB', () => {
   it('library laser sheets = the distinct fiber-laser nominal sheets in machine_library.csv', async () => {
     const moduleRef = await Test.createTestingModule({
       imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../../.env') })],
-      providers: [SupabaseService, SheetMetalLookupService],
+      providers: [DatabaseService, SheetMetalLookupService],
     }).compile();
     const got = await moduleRef.get(SheetMetalLookupService).getLaserNominalSheetSizes();
     const expected = [...new Set(csvRows(memory('machine/machine_library.csv'))

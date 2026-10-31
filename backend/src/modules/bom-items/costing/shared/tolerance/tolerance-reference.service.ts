@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { SupabaseService } from '../../../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../../../common/database/database.service';
 import MANIFEST from '../../../../processes/memory-reference-domains.json';
 import { MACHINING_REFERENCE_SOURCE_VERSION } from '../../machining/lookup/machining-lookup-tables';
 import { resolveOperationLinks, type OperationLink } from './machining-need';
@@ -22,13 +22,13 @@ interface ToleranceReference {
  */
 @Injectable()
 export class ToleranceReferenceService {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   private cached: { reference: ToleranceReference | null; missing: string[] } | null = null;
 
   async get(): Promise<{ reference: ToleranceReference | null; missing: string[] }> {
     if (this.cached) return this.cached;
-    const db = this.supabase.getPrivilegedClient('reference-data: machining_reference_data, public-read');
+    const db = this.database.getPrivilegedClient('reference-data: machining_reference_data, public-read');
     const table = async (sourceVersion: string, key: string) => {
       const { data, error } = await db.from('machining_reference_data').select('raw')
         .eq('category', 'lookup_table').eq('source_version', sourceVersion).eq('key', key).maybeSingle();

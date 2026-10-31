@@ -41,3 +41,21 @@ END $$;
 CREATE TABLE public.organization_members (
   organization_id uuid NOT NULL, user_id uuid NOT NULL, status text NOT NULL DEFAULT 'active', role text NOT NULL DEFAULT 'member'
 );
+
+-- what migration 935 builds on: organizations, and api_keys as migration 200 created it (with its row-level security)
+CREATE TABLE public.organizations (id uuid PRIMARY KEY DEFAULT gen_random_uuid());
+CREATE TABLE public.api_keys (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name varchar(100) NOT NULL,
+  key_hash varchar(64) NOT NULL UNIQUE,
+  key_prefix varchar(12) NOT NULL,
+  scopes text[] NOT NULL DEFAULT '{"read"}',
+  last_used_at timestamptz, expires_at timestamptz, revoked_at timestamptz,
+  created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now()
+);
+ALTER TABLE public.api_keys ENABLE ROW LEVEL SECURITY;
+CREATE POLICY api_keys_user_select ON public.api_keys FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY api_keys_user_insert ON public.api_keys FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY api_keys_user_update ON public.api_keys FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY api_keys_user_delete ON public.api_keys FOR DELETE USING (auth.uid() = user_id);

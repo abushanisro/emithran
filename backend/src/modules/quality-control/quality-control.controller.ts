@@ -14,7 +14,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { SupabaseAuthGuard } from '@/common/guards/supabase-auth.guard';
+import { RequestAuthGuard } from '@/common/guards/request-auth.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { createResponse, ApiResponse as CustomApiResponse } from '@/common/dto/api-response.dto';
 import { QualityControlService } from './quality-control.service';
@@ -33,7 +33,7 @@ import {
 @ApiTags('Quality Control')
 @ApiBearerAuth()
 @Controller('api/quality-control')
-@UseGuards(SupabaseAuthGuard)
+@UseGuards(RequestAuthGuard)
 export class QualityControlController {
   private readonly logger = new Logger(QualityControlController.name);
 

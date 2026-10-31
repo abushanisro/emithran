@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException, InternalServerErrorException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
-import { UserDirectory } from '../../common/supabase/user-directory';
-import { SupabaseService } from '@/common/supabase/supabase.service';
+import { UserDirectory } from '../../common/database/user-directory';
+import { DatabaseService } from '@/common/database/database.service';
 import { CreateProjectDto, UpdateProjectDto, QueryProjectsDto } from './dto/projects.dto';
 import { ProjectResponseDto, ProjectListResponseDto } from './dto/project-response.dto';
 import { AddTeamMemberDto, UpdateTeamMemberDto, TeamMemberResponseDto, TeamMembersListResponseDto, TeamMemberRole } from './dto/project-team-member.dto';
@@ -15,7 +15,7 @@ export class ProjectsService {
   private readonly logger = new Logger(ProjectsService.name);
 
   constructor(
-    private readonly supabase: SupabaseService,
+    private readonly database: DatabaseService,
     private readonly projectsRepository: ProjectsRepository,
     private readonly customLogger: CustomLogger,
     private readonly exchangeRates: ExchangeRateService,
@@ -30,7 +30,7 @@ export class ProjectsService {
     try {
       this.logger.log(`Fetching projects for user: ${userId}`);
       
-      const client = this.supabase.getUserClient(accessToken);
+      const client = this.database.getUserClient(accessToken);
       const options = {
         page: query.page || 1,
         limit: query.limit || 10,
@@ -107,7 +107,7 @@ export class ProjectsService {
     try {
       this.logger.log(`Fetching project: ${id} for user: ${userId}`);
       
-      const client = this.supabase.getUserClient(accessToken);
+      const client = this.database.getUserClient(accessToken);
       const project = await this.projectsRepository.findById(client, id);
       const dto = ProjectResponseDto.fromDatabase(project);
       const stats = (await this.computeProjectsAggregates(client, [id], accessToken)).get(id);
@@ -140,7 +140,7 @@ export class ProjectsService {
     try {
       this.logger.log(`Creating project for user: ${userId}`);
 
-      const client = this.supabase.getUserClient(accessToken);
+      const client = this.database.getUserClient(accessToken);
 
       // Check if project name already exists
       const nameExists = await this.projectsRepository.isNameExists(client, createProjectDto.name);
@@ -210,7 +210,7 @@ export class ProjectsService {
     try {
       this.logger.log(`Updating project: ${id} for user: ${userId}`);
 
-      const client = this.supabase.getUserClient(accessToken);
+      const client = this.database.getUserClient(accessToken);
 
       // Check if updating name and it conflicts with existing project
       if (updateProjectDto.name) {
@@ -290,7 +290,7 @@ export class ProjectsService {
     try {
       this.logger.log(`Deleting project: ${id} for user: ${userId}`);
 
-      const client = this.supabase.getUserClient(accessToken);
+      const client = this.database.getUserClient(accessToken);
       await this.projectsRepository.delete(client, id);
 
       return { message: 'Project and all associated data have been permanently deleted.' };
@@ -321,7 +321,7 @@ export class ProjectsService {
     try {
       this.logger.log(`Fetching cost analysis for project: ${id} for user: ${userId}`);
 
-      const client = this.supabase.getUserClient(accessToken);
+      const client = this.database.getUserClient(accessToken);
       const project = await this.projectsRepository.findById(client, id);
 
       // Get BOM data for the project
@@ -374,7 +374,7 @@ export class ProjectsService {
     }
   }
 
-  private async computeProjectsAggregates(client: ReturnType<SupabaseService['getUserClient']>, projectIds: string[], accessToken?: string,
+  private async computeProjectsAggregates(client: ReturnType<DatabaseService['getUserClient']>, projectIds: string[], accessToken?: string,
     reportingCurrency = ROLLUP_REPORTING_CURRENCY): Promise<Map<string, { bomCount: number; bomItemCount: number; actualCost: number | null }>> {
     const resultMap = new Map(projectIds.map(id => [id, { bomCount: 0, bomItemCount: 0, actualCost: 0 as number | null }]));
     if (!projectIds.length) return resultMap;
@@ -409,7 +409,7 @@ export class ProjectsService {
     try {
       this.logger.log(`Fetching team members for project: ${id} for user: ${userId}`);
 
-      const client = this.supabase.getUserClient(accessToken);
+      const client = this.database.getUserClient(accessToken);
       
       // Verify project exists and user has access
       await this.projectsRepository.findById(client, id);
@@ -514,7 +514,7 @@ export class ProjectsService {
     try {
       this.logger.log(`Adding team member to project: ${id} for user: ${userId}`);
 
-      const client = this.supabase.getUserClient(accessToken);
+      const client = this.database.getUserClient(accessToken);
       
       // Verify project exists and user has access
       await this.projectsRepository.findById(client, id);
@@ -524,7 +524,7 @@ export class ProjectsService {
       // If email provided, try to find user in auth system, otherwise create placeholder
       if (dto.email && !targetUserId) {
         try {
-          // Try to find user in Supabase auth
+          // Look the user up in the user directory
           const existingId = await this.directory.findIdByEmail(dto.email);
           if (existingId) {
             targetUserId = existingId;
@@ -649,7 +649,7 @@ export class ProjectsService {
     try {
       this.logger.log(`Updating team member ${memberId} for project: ${id} for user: ${userId}`);
 
-      const client = this.supabase.getUserClient(accessToken);
+      const client = this.database.getUserClient(accessToken);
       
       // Verify project exists and user has access
       await this.projectsRepository.findById(client, id);
@@ -730,7 +730,7 @@ export class ProjectsService {
     try {
       this.logger.log(`Removing team member ${memberId} from project: ${id} for user: ${userId}`);
 
-      const client = this.supabase.getUserClient(accessToken);
+      const client = this.database.getUserClient(accessToken);
       
       // Verify project exists and user has access
       await this.projectsRepository.findById(client, id);

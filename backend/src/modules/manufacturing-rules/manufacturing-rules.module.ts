@@ -11,11 +11,11 @@ import { TappingCalculator } from "./calculators/tapping.calculator";
 import { LaserCuttingCalculator } from "./calculators/laser-cutting.calculator";
 import { PressBrakeCalculator } from "./calculators/press-brake.calculator";
 import { InjectionMoldingCalculator } from "./calculators/injection-molding.calculator";
-import { SupabaseModule } from "../../common/supabase/supabase.module";
+import { DatabaseModule } from "../../common/database/database.module";
 import { LoggerModule } from "../../common/logger/logger.module";
 
 @Module({
-  imports: [SupabaseModule, LoggerModule],
+  imports: [DatabaseModule, LoggerModule],
   controllers: [ManufacturingRulesController],
   providers: [
     ManufacturingRulesService,

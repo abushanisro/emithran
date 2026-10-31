@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { SupabaseService } from "../../common/supabase/supabase.service";
+import { DatabaseService } from "../../common/database/database.service";
 import { MaterialGroupResolver } from "./resolvers/material-group.resolver";
 import { ParameterResolver } from "./resolvers/parameter.resolver";
 import { CalculatorRegistry } from "./calculators/calculator.registry";
@@ -27,7 +27,7 @@ export class ManufacturingRulesService {
   private readonly logger = new Logger(ManufacturingRulesService.name);
 
   constructor(
-    private readonly supabase: SupabaseService,
+    private readonly database: DatabaseService,
     private readonly materialGroupResolver: MaterialGroupResolver,
     private readonly parameterResolver: ParameterResolver,
     private readonly calculatorRegistry: CalculatorRegistry,
@@ -175,7 +175,7 @@ export class ManufacturingRulesService {
     validation: unknown;
   }): Promise<void> {
     try {
-      const db = this.supabase.getUserClient();
+      const db = this.database.getUserClient();
       await db.from("machining_rule_results").insert({
         bom_item_id: data.bomItemId,
         generation_id: data.generationId ?? null,

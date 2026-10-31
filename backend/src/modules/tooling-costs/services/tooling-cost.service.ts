@@ -9,7 +9,7 @@
  */
 
 import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException, Logger } from '@nestjs/common';
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../common/database/database.service';
 import { declareCostRecordCurrency } from '../../bom-items/costing/shared/core/persisted-currency-contract';
 import {
   CreateToolingCostDto,
@@ -23,7 +23,7 @@ import {
 export class ToolingCostService {
   private readonly logger = new Logger(ToolingCostService.name);
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(private readonly databaseService: DatabaseService) {}
 
   /**
    * Calculate tooling cost per part
@@ -66,7 +66,7 @@ export class ToolingCostService {
       } = query;
 
       const offset = (page - 1) * limit;
-      const client = this.supabaseService.getClient(accessToken);
+      const client = this.databaseService.getClient(accessToken);
 
       // Build query
       let queryBuilder = client
@@ -126,7 +126,7 @@ export class ToolingCostService {
     accessToken: string,
   ): Promise<ToolingCostResponseDto> {
     try {
-      const client = this.supabaseService.getClient(accessToken);
+      const client = this.databaseService.getClient(accessToken);
 
       const { data, error } = await client
         .from('tooling_cost_records')
@@ -155,7 +155,7 @@ export class ToolingCostService {
     organizationId?: string,
   ): Promise<ToolingCostResponseDto> {
     try {
-      const client = this.supabaseService.getClient(accessToken);
+      const client = this.databaseService.getClient(accessToken);
 
       // Calculate costs
       const calculatedCosts = this.calculateToolingCosts(
@@ -221,7 +221,7 @@ export class ToolingCostService {
     accessToken: string,
   ): Promise<ToolingCostResponseDto> {
     try {
-      const client = this.supabaseService.getClient(accessToken);
+      const client = this.databaseService.getClient(accessToken);
 
       // First, get the existing record to calculate costs properly
       const { data: existing, error: fetchError } = await client
@@ -308,7 +308,7 @@ export class ToolingCostService {
     accessToken: string,
   ): Promise<void> {
     try {
-      const client = this.supabaseService.getClient(accessToken);
+      const client = this.databaseService.getClient(accessToken);
 
       const { error } = await client
         .from('tooling_cost_records')
@@ -334,7 +334,7 @@ export class ToolingCostService {
     accessToken: string,
   ): Promise<number> {
     try {
-      const client = this.supabaseService.getClient(accessToken);
+      const client = this.databaseService.getClient(accessToken);
 
       const { data, error } = await client
         .from('tooling_cost_records')
@@ -364,7 +364,7 @@ export class ToolingCostService {
   ): Promise<Record<string, number>> {
     if (bomItemIds.length === 0) return {};
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getUserClient(accessToken)
       .from('tooling_cost_records')
       .select('bom_item_id, total_cost')

@@ -139,7 +139,8 @@ describe('Dockerfiles', () => {
   it.each(files)('%s: pinned base by digest, non-root, no env files copied in', (file) => {
     const text = read(file);
     const froms = [...text.matchAll(/^FROM\s+(\S+)(?:\s+AS\s+\S+)?/gm)].map((m) => m[1] as string);
-    for (const from of froms.filter((f) => !['base', 'deps', 'builder', 'runner', 'build', 'runtime'].includes(f))) {
+    // Stage names refer to earlier stages; `scratch` is Docker's reserved empty base (nothing is pulled, so nothing to pin).
+    for (const from of froms.filter((f) => !['base', 'deps', 'builder', 'runner', 'build', 'runtime', 'scratch'].includes(f))) {
       expect(from, `${file}: ${from}`).toMatch(/@sha256:[0-9a-f]{64}$/);
     }
     const lastUser = [...text.matchAll(/^USER\s+(\S+)/gm)].pop()?.[1];

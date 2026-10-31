@@ -10,7 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { SupabaseAuthGuard } from '@/common/guards/supabase-auth.guard';
+import { RequestAuthGuard } from '@/common/guards/request-auth.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { ProductionProcessService } from '../services/production-process.service';
 import {
@@ -24,7 +24,7 @@ import {
 
 @ApiTags('Production Processes')
 @Controller('api/production-planning/processes')
-@UseGuards(SupabaseAuthGuard)
+@UseGuards(RequestAuthGuard)
 export class ProductionProcessController {
   constructor(private readonly productionProcessService: ProductionProcessService) { }
 

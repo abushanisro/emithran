@@ -1,7 +1,7 @@
 /**
  * The claims of a JWT, decoded WITHOUT verifying it, or null if it is not one.
  *
- * Only for tokens Supabase Auth has already verified (the guard's
+ * Only for tokens the auth guard has already verified (the guard's
  * verifyToken), or to read a claim like exp where a forged value can only
  * shorten a cache entry, never grant access.
  */

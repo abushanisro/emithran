@@ -4,7 +4,7 @@
 // pattern from mhr.service.spec.ts / bom-items.currency.spec.ts.
 import { BOMsService } from '../../../modules/boms/boms.service';
 import { type Logger } from '../../../common/logger/logger.service';
-import { type SupabaseService } from '../../../common/supabase/supabase.service';
+import { type DatabaseService } from '../../../common/database/database.service';
 import { type ExchangeRateService } from '../../../common/exchange-rate/exchange-rate.service';
 
 describe('BOMsService.create', () => {
@@ -24,11 +24,11 @@ describe('BOMsService.create', () => {
     const from = jest.fn().mockReturnValue({ insert });
     const client = { from };
 
-    const supabaseService = {
+    const databaseService = {
       getClient: jest.fn().mockReturnValue(client),
-    } as unknown as SupabaseService;
+    } as unknown as DatabaseService;
 
-    const service = new BOMsService(supabaseService, { log: jest.fn(), error: jest.fn() } as unknown as Logger, {} as unknown as ExchangeRateService);
+    const service = new BOMsService(databaseService, { log: jest.fn(), error: jest.fn() } as unknown as Logger, {} as unknown as ExchangeRateService);
 
     await service.create({ name: 'Test BOM' } as any, 'user-456', 'token', 'org-789');
 
@@ -53,11 +53,11 @@ describe('BOMsService.create', () => {
     const from = jest.fn().mockReturnValue({ insert });
     const client = { from };
 
-    const supabaseService = {
+    const databaseService = {
       getClient: jest.fn().mockReturnValue(client),
-    } as unknown as SupabaseService;
+    } as unknown as DatabaseService;
 
-    const service = new BOMsService(supabaseService, { log: jest.fn(), error: jest.fn() } as unknown as Logger, {} as unknown as ExchangeRateService);
+    const service = new BOMsService(databaseService, { log: jest.fn(), error: jest.fn() } as unknown as Logger, {} as unknown as ExchangeRateService);
 
     await service.create({ name: 'Test BOM' } as any, 'user-456', 'token');
 

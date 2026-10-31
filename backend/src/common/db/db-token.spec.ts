@@ -25,6 +25,12 @@ describe('DbTokenMinter', () => {
     expect(() => verifyDbToken('abc.def', SECRET)).toThrow('not a JWT');
   });
 
+  it('carries no issued-at time, so a database clock behind the backend clock does not reject it ("JWT issued at future")', () => {
+    const claims = verifyDbToken(new DbTokenMinter(SECRET).forUser(USER), SECRET);
+    expect(claims).not.toHaveProperty('iat');
+    expect(claims.exp).toEqual(expect.any(Number));
+  });
+
   it('expires: a token is rejected after its lifetime', () => {
     let now = 1_800_000_000_000;
     const minter = new DbTokenMinter(SECRET, 300, () => now);

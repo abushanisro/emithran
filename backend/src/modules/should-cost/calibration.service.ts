@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { DatabaseService } from '../../common/database/database.service';
 
 const MIN_SAMPLES = 5;       // minimum matched pairs before calibrating a cell
 const RIDGE_ALPHA = 1.0;     // L2 regularisation strength (pulls multiplier toward 1.0)
@@ -31,11 +31,11 @@ export interface CalibrationResult {
 export class CalibrationService {
   private readonly logger = new Logger(CalibrationService.name);
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(private readonly databaseService: DatabaseService) {}
 
   // Admin client — bypasses RLS for rate updates
   private get admin() {
-    return this.supabaseService.getPrivilegedClient('system-job: should-cost calibration updates global correction rates');
+    return this.databaseService.getPrivilegedClient('system-job: should-cost calibration updates global correction rates');
   }
 
   /**
@@ -180,7 +180,7 @@ export class CalibrationService {
     location: string,
     multiplier: number,
   ): Promise<number> {
-    // Fetch matching rows first (Supabase JS client can't do UPDATE ... SET x = x * n directly)
+    // Fetch matching rows first (the PostgREST client can't do UPDATE ... SET x = x * n directly)
     const { data: rows, error: fetchErr } = await this.admin
       .from('mhr_records')
       .select('id, total_machine_hour_rate, mhr_usd_per_hour')

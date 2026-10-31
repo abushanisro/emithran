@@ -1,4 +1,4 @@
-// Phase 4 (Deslag / Manual Deburr) integration tests — REAL SupabaseService
+// Phase 4 (Deslag / Manual Deburr) integration tests — REAL DatabaseService
 // against the dev project (`.env`), read-only, no mocks. Expected values come
 // from memory/ (machine_library.csv, Machining variables.csv), never typed in.
 //
@@ -10,7 +10,7 @@ import { Test } from '@nestjs/testing';
 import { ConfigModule } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
-import { SupabaseService } from '../src/common/supabase/supabase.service';
+import { DatabaseService } from '../src/common/database/database.service';
 import { SheetMetalLookupService } from '../src/modules/bom-items/costing/sheet-metal/lookup/sheet-metal-lookup.service';
 import { MachiningLookupService } from '../src/modules/bom-items/costing/machining/lookup/machining-lookup.service';
 
@@ -24,7 +24,7 @@ describe('[e2e] Phase 4 deburr — real DB, no mocks', () => {
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
       imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../../.env') })],
-      providers: [SupabaseService, SheetMetalLookupService, MachiningLookupService],
+      providers: [DatabaseService, SheetMetalLookupService, MachiningLookupService],
     }).compile();
     sm = moduleRef.get(SheetMetalLookupService);
     mc = moduleRef.get(MachiningLookupService);

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { SupabaseService } from '../supabase/supabase.service';
+import { DatabaseService } from '../database/database.service';
 import { FrankfurterFxProvider } from './frankfurter-fx.provider';
 
 interface CachedFxRate {
@@ -35,7 +35,7 @@ export class FxRateCacheService {
   private readonly logger = new Logger(FxRateCacheService.name);
 
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly provider: FrankfurterFxProvider,
   ) {}
 
@@ -43,7 +43,7 @@ export class FxRateCacheService {
     const from = base.toUpperCase();
     const to = quote.toUpperCase();
     const today = todayIso();
-    const client = this.supabaseService.getPrivilegedClient('system-cache: fx_rate_snapshots, no user context');
+    const client = this.databaseService.getPrivilegedClient('system-cache: fx_rate_snapshots, no user context');
 
     const { data: cached, error: cacheError } = await client
       .from('fx_rate_snapshots')
@@ -103,7 +103,7 @@ export class FxRateCacheService {
   private async fetchAndCache(from: string, to: string): Promise<CachedFxRate> {
     const result = await this.provider.getRate(from, to);
     const retrievedAt = new Date().toISOString();
-    const client = this.supabaseService.getPrivilegedClient('system-cache: fx_rate_snapshots, no user context');
+    const client = this.databaseService.getPrivilegedClient('system-cache: fx_rate_snapshots, no user context');
 
     const { error } = await client
       .from('fx_rate_snapshots')

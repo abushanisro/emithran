@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import type { SupabaseClient } from '@supabase/supabase-js';
-import { SupabaseService } from '../../../../common/supabase/supabase.service';
+import type { DbClient } from '../../../../common/db/postgrest-client';
+import { DatabaseService } from '../../../../common/database/database.service';
 import {
   CASTING_LOOKUP_KEYS,
   CASTING_MATERIAL_PROPERTY_KEYS,
@@ -38,13 +38,13 @@ const DIE_CASTING_MATERIAL_GROUP = 'Die Casting';
  */
 @Injectable()
 export class CastingReferenceService {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   private cached: { reference: CastingReference | null; missing: string[] } | null = null;
 
   async getReference(): Promise<{ reference: CastingReference | null; missing: string[] }> {
     if (this.cached) return this.cached;
-    const db = this.supabase.getPrivilegedClient('reference-data: machining_reference_data, public-read');
+    const db = this.database.getPrivilegedClient('reference-data: machining_reference_data, public-read');
     const [vars, lookups] = await Promise.all([
       db.from('machining_reference_data').select('key, value')
         .eq('category', 'variable').eq('source_version', CASTING_REFERENCE_SOURCE_VERSION)
@@ -68,7 +68,7 @@ export class CastingReferenceService {
   /** The sand-core reference (coremaking.ts): memory/Die Casting variables and lookups. */
   async getCoreReference(): Promise<{ reference: CoreReference | null; missing: string[] }> {
     if (this.cachedCores) return this.cachedCores;
-    const db = this.supabase.getPrivilegedClient('reference-data: machining_reference_data, public-read');
+    const db = this.database.getPrivilegedClient('reference-data: machining_reference_data, public-read');
     const [vars, lookups] = await Promise.all([
       db.from('machining_reference_data').select('key, value')
         .eq('category', 'variable').eq('source_version', CASTING_REFERENCE_SOURCE_VERSION)
@@ -94,7 +94,7 @@ export class CastingReferenceService {
    */
   async getDieToolingReference(): Promise<{ reference: DieToolingReference | null; missing: string[] }> {
     if (this.cachedTooling) return this.cachedTooling;
-    const db = this.supabase.getPrivilegedClient('reference-data: machining_reference_data, public-read');
+    const db = this.database.getPrivilegedClient('reference-data: machining_reference_data, public-read');
     const [vars, lookups, shop] = await Promise.all([
       db.from('machining_reference_data').select('key, value')
         .eq('category', 'variable').eq('source_version', CASTING_REFERENCE_SOURCE_VERSION)
@@ -123,7 +123,7 @@ export class CastingReferenceService {
    * equals the BOM item's material grade, case-insensitively. null when the
    * grade is not a die-casting alloy; the engine then reports it as missing.
    */
-  async getMaterial(client: SupabaseClient, grade: string | null): Promise<CastingMaterial | null> {
+  async getMaterial(client: DbClient, grade: string | null): Promise<CastingMaterial | null> {
     const g = (grade ?? '').trim();
     if (!g) return null;
     const { data: rows, error } = await client.from('raw_materials')
@@ -147,7 +147,7 @@ export class CastingReferenceService {
 
   /** The die-casting machines of one class and location, from their HR Rates rows
    *  (rates in USD): HPDC_MACHINE_CLASS, or the gravity class (gdc-engine.ts). */
-  async getDieCastingMachines(client: SupabaseClient, location: string, machineClass: string = HPDC_MACHINE_CLASS): Promise<HpdcMachine[]> {
+  async getDieCastingMachines(client: DbClient, location: string, machineClass: string = HPDC_MACHINE_CLASS): Promise<HpdcMachine[]> {
     const { data, error } = await client.from('mhr_records')
       .select('id, machine_name, mhr_usd_per_hour, usd_labor_rate_per_hr, operators, setup_time_hr, specs')
       .eq('machine_class', machineClass)
@@ -173,7 +173,7 @@ export class CastingReferenceService {
 }
 
 /** Any casting machine class of a location, with its rates (USD) and specs. */
-export async function readFinishingMachines(client: SupabaseClient, machineClass: string, location: string): Promise<FinishingMachine[]> {
+export async function readFinishingMachines(client: DbClient, machineClass: string, location: string): Promise<FinishingMachine[]> {
   const { data, error } = await client.from('mhr_records')
     .select('id, machine_name, mhr_usd_per_hour, usd_labor_rate_per_hr, operators, setup_time_hr, specs')
     .eq('machine_class', machineClass).eq('location', location).order('id');

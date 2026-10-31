@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { Logger } from '../../common/logger/logger.service';
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { DatabaseService } from '../../common/database/database.service';
 import {
   CreateVaveProjectDto,
   UpdateVaveProjectDto,
@@ -20,7 +20,7 @@ import {
 @Injectable()
 export class VaveService {
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly logger: Logger,
   ) {}
 
@@ -29,7 +29,7 @@ export class VaveService {
   async findAllProjects(userId: string, accessToken: string): Promise<VaveProjectResponseDto[]> {
     this.logger.log('Fetching VAVE projects', 'VaveService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('vave_projects')
       .select('*')
@@ -47,7 +47,7 @@ export class VaveService {
   async findOneProject(id: string, userId: string, accessToken: string): Promise<VaveProjectDetailResponseDto> {
     this.logger.log(`Fetching VAVE project ${id}`, 'VaveService');
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     const [projectResult, bomCountResult, ideaCountResult, savingsResult] = await Promise.all([
       client.from('vave_projects').select('*').eq('id', id).eq('owner_id', userId).single(),
@@ -76,7 +76,7 @@ export class VaveService {
   async createProject(dto: CreateVaveProjectDto, userId: string, accessToken: string): Promise<VaveProjectResponseDto> {
     this.logger.log('Creating VAVE project', 'VaveService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('vave_projects')
       .insert({
@@ -103,7 +103,7 @@ export class VaveService {
     if (dto.description !== undefined) updates.description = dto.description;
     if (dto.status !== undefined) updates.status = dto.status;
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('vave_projects')
       .update(updates)
@@ -120,7 +120,7 @@ export class VaveService {
   }
 
   async deleteProject(id: string, userId: string, accessToken: string): Promise<void> {
-    const { error } = await this.supabaseService
+    const { error } = await this.databaseService
       .getClient(accessToken)
       .from('vave_projects')
       .delete()
@@ -135,7 +135,7 @@ export class VaveService {
   // ─── BOM Items ────────────────────────────────────────────────────────────
 
   async findBomItems(projectId: string, accessToken: string): Promise<VaveBomItemResponseDto[]> {
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('vave_bom')
       .select('*')
@@ -151,7 +151,7 @@ export class VaveService {
   }
 
   async createBomItem(projectId: string, dto: CreateVaveBomItemDto, accessToken: string): Promise<VaveBomItemResponseDto> {
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('vave_bom')
       .insert({
@@ -200,7 +200,7 @@ export class VaveService {
       drawing_analysis: item.drawingAnalysis ?? null,
     }));
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('vave_bom')
       .insert(rows)
@@ -214,7 +214,7 @@ export class VaveService {
   }
 
   async deleteBomItem(projectId: string, itemId: string, accessToken: string): Promise<void> {
-    const { error } = await this.supabaseService
+    const { error } = await this.databaseService
       .getClient(accessToken)
       .from('vave_bom')
       .delete()
@@ -229,7 +229,7 @@ export class VaveService {
   // ─── Ideas ────────────────────────────────────────────────────────────────
 
   async findIdeas(projectId: string, accessToken: string): Promise<VaveIdeaResponseDto[]> {
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('vave_ideas')
       .select('*')
@@ -244,7 +244,7 @@ export class VaveService {
   }
 
   async createIdea(projectId: string, dto: CreateVaveIdeaDto, accessToken: string): Promise<VaveIdeaResponseDto> {
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('vave_ideas')
       .insert(this.ideaDtoToRow(projectId, dto))
@@ -263,7 +263,7 @@ export class VaveService {
 
     const rows = dto.ideas.map(idea => this.ideaDtoToRow(projectId, idea));
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('vave_ideas')
       .insert(rows)
@@ -292,7 +292,7 @@ export class VaveService {
     if (dto.status !== undefined) updates.status = dto.status;
     if (dto.timeToImplementMonths !== undefined) updates.time_to_implement_months = dto.timeToImplementMonths;
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('vave_ideas')
       .update(updates)
@@ -309,7 +309,7 @@ export class VaveService {
   }
 
   async deleteIdea(projectId: string, ideaId: string, accessToken: string): Promise<void> {
-    const { error } = await this.supabaseService
+    const { error } = await this.databaseService
       .getClient(accessToken)
       .from('vave_ideas')
       .delete()
@@ -324,7 +324,7 @@ export class VaveService {
   // ─── Should Costs ─────────────────────────────────────────────────────────
 
   async findShouldCosts(projectId: string, accessToken: string): Promise<VaveShouldCostResponseDto[]> {
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('vave_should_costs')
       .select('*')
@@ -343,7 +343,7 @@ export class VaveService {
       ? ((dto.actualCost - dto.shouldCost) / dto.actualCost) * 100
       : null;
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('vave_should_costs')
       .upsert(
@@ -373,7 +373,7 @@ export class VaveService {
   }
 
   async deleteShouldCost(projectId: string, costId: string, accessToken: string): Promise<void> {
-    const { error } = await this.supabaseService
+    const { error } = await this.databaseService
       .getClient(accessToken)
       .from('vave_should_costs')
       .delete()

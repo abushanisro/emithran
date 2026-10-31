@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Logger } from '../../common/logger/logger.service';
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { DatabaseService } from '../../common/database/database.service';
 import { PERSISTED_PROCESS_COST_COLUMNS, resolvePersistedProcessCost } from '../bom-items/costing/shared/core/persisted-process-cost';
 
 export interface CostDriver {
@@ -91,14 +91,14 @@ export interface BomItemCostDto {
 @Injectable()
 export class CostAggregationService {
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly logger: Logger,
   ) {}
 
   async computeBomItemCost(bomItemId: string, accessToken?: string): Promise<BomItemCostDto> {
     this.logger.log(`Computing aggregated cost for BOM item: ${bomItemId}`, 'CostAggregationService');
-    const client  = this.supabaseService.getUserClient(accessToken);
-    const adminDb = this.supabaseService.getPrivilegedClient('reference-data: costing_settings, global sga_pct/profit_pct');
+    const client  = this.databaseService.getUserClient(accessToken);
+    const adminDb = this.databaseService.getPrivilegedClient('reference-data: costing_settings, global sga_pct/profit_pct');
 
     // Load SGA and profit from costing_settings (no hardcoded percentages)
     const { data: settingsRows } = await adminDb.from('costing_settings').select('key, value');

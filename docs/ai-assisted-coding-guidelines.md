@@ -111,15 +111,15 @@ Before pushing any AI-generated code, verify:
 ### For This Codebase Specifically
 
 **Current Architecture Patterns:**
-- Supabase authentication with JWT tokens
+- Auth0 sign-in; the backend verifies the access token and mints a database token for PostgREST
 - Row Level Security (RLS) for authorization
 - NestJS backend with proper guards
 - React context for state management
 - TypeScript for type safety
 
 **Key Files to Understand:**
-- `lib/providers/supabase-auth-provider.tsx:21` - Auth implementation
-- `backend/src/common/guards/supabase-auth.guard.ts` - Backend security
+- `lib/providers/auth0-auth-provider.tsx` - Auth implementation
+- `backend/src/common/guards/request-auth.guard.ts` - Backend security (verifies Auth0 tokens and API keys)
 - Database RLS policies in PostgreSQL
 
 **Security Requirements:**

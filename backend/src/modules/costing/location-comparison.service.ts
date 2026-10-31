@@ -1,5 +1,5 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { DatabaseService } from '../../common/database/database.service';
 import { ExchangeRateService } from '../../common/exchange-rate/exchange-rate.service';
 import {
   LOCATION_INFO,
@@ -57,7 +57,7 @@ const ALL_LOCATIONS = [
 @Injectable()
 export class LocationComparisonService {
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly exchangeRateService: ExchangeRateService,
   ) {}
 
@@ -65,8 +65,8 @@ export class LocationComparisonService {
     bomItemId: string,
     token: string,
   ): Promise<LocationComparisonDto> {
-    const db      = this.supabaseService.getClient(token);
-    const adminDb = this.supabaseService.getPrivilegedClient('reference-data: costing_settings and rate benchmarks, global');
+    const db      = this.databaseService.getClient(token);
+    const adminDb = this.databaseService.getPrivilegedClient('reference-data: costing_settings and rate benchmarks, global');
     const serviceWarnings: string[] = [];
 
     // 0. Load exchange rates (one snapshot for this whole comparison — every

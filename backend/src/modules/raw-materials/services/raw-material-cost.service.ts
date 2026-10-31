@@ -10,7 +10,7 @@
 
 import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { Logger } from '../../../common/logger/logger.service';
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../common/database/database.service';
 import { ExchangeRateService } from '../../../common/exchange-rate/exchange-rate.service';
 import { declareCostRecordCurrency } from '../../bom-items/costing/shared/core/persisted-currency-contract';
 import {
@@ -31,7 +31,7 @@ export class RawMaterialCostService {
   private readonly calculationEngine: RawMaterialCostCalculationEngine;
 
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly logger: Logger,
     private readonly exchangeRateService: ExchangeRateService,
   ) {
@@ -53,7 +53,7 @@ export class RawMaterialCostService {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    let queryBuilder = this.supabaseService
+    let queryBuilder = this.databaseService
       .getUserClient(accessToken)
       .from('raw_material_cost_records')
       .select('*', { count: 'exact' })
@@ -101,7 +101,7 @@ export class RawMaterialCostService {
     )];
     const materialMap = new Map<string, string>();
     if (missingIds.length > 0) {
-      const { data: mats } = await this.supabaseService
+      const { data: mats } = await this.databaseService
         .getUserClient(accessToken)
         .from('raw_materials')
         .select('id, grade')
@@ -134,7 +134,7 @@ export class RawMaterialCostService {
   async findOne(id: string, userId: string, accessToken: string): Promise<RawMaterialCostResponseDto> {
     this.logger.log(`Fetching raw material cost: ${id}`, 'RawMaterialCostService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('raw_material_cost_records')
       .select('*')
@@ -149,7 +149,7 @@ export class RawMaterialCostService {
     // Back-fill material_name from master if missing
     let row = data;
     if (!row.material_name && row.material_id) {
-      const { data: mat } = await this.supabaseService
+      const { data: mat } = await this.databaseService
         .getClient(accessToken)
         .from('raw_materials')
         .select('grade')
@@ -318,7 +318,7 @@ export class RawMaterialCostService {
     // Debug log the data being inserted
     this.logger.log(`Inserting data: ${JSON.stringify(recordData, null, 2)}`, 'RawMaterialCostService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('raw_material_cost_records')
       .insert(recordData)
@@ -346,7 +346,7 @@ export class RawMaterialCostService {
     this.logger.log(`Updating raw material cost: ${id}`, 'RawMaterialCostService');
 
     // Get existing record
-    const { data: existing, error: fetchError } = await this.supabaseService
+    const { data: existing, error: fetchError } = await this.databaseService
       .getClient(accessToken)
       .from('raw_material_cost_records')
       .select('*')
@@ -424,7 +424,7 @@ export class RawMaterialCostService {
     updateData.scrap_rate = calculationResult.scrapRate;
     updateData.calculation_breakdown = calculationResult;
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('raw_material_cost_records')
       .update(updateData)
@@ -446,7 +446,7 @@ export class RawMaterialCostService {
   async remove(id: string, userId: string, accessToken: string): Promise<{ message: string }> {
     this.logger.log(`Deleting raw material cost: ${id}`, 'RawMaterialCostService');
 
-    const { error } = await this.supabaseService
+    const { error } = await this.databaseService
       .getClient(accessToken)
       .from('raw_material_cost_records')
       .delete()
@@ -525,7 +525,7 @@ export class RawMaterialCostService {
   ): Promise<number> {
     this.logger.log(`Calculating total raw material cost for BOM item: ${bomItemId}`, 'RawMaterialCostService');
 
-    const client = this.supabaseService.getUserClient(accessToken);
+    const client = this.databaseService.getUserClient(accessToken);
 
     // Get all active raw material costs for this BOM item — compute from source fields
     // Formula: gross_usage × unit_cost × (1 + overhead/100)
@@ -556,7 +556,7 @@ export class RawMaterialCostService {
   ): Promise<Record<string, number>> {
     if (bomItemIds.length === 0) return {};
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getUserClient(accessToken)
       .from('raw_material_cost_records')
       .select('bom_item_id, gross_usage, unit_cost, overhead')
@@ -622,7 +622,7 @@ export class RawMaterialCostService {
       const orClause = (tokens.length > 1 ? tokens : [g])
         .flatMap((t) => [`name.ilike.${q(t)}`, `grade.ilike.${q(t)}`])
         .join(',');
-      const { data } = await this.supabaseService
+      const { data } = await this.databaseService
         .getClient(accessToken)
         .from('raw_materials')
         .select(`${priceCol}, cost_india, density`)

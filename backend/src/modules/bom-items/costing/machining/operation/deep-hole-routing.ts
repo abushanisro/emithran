@@ -1,6 +1,6 @@
 // Pure, framework-free deep-hole routing — no NestJS/DB dependency, so this
-// is directly unit-testable without mocking Supabase (this project's
-// standing rule against mocked-Supabase spec files).
+// is directly unit-testable without mocking the database (this project's
+// standing rule against mocked-database spec files).
 //
 // Root cause this closes (2026-09-18): the Machining Process page lists ~40
 // real machine categories, but only Milling/Turning (cost-machining-engine.ts) had

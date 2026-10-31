@@ -1,5 +1,5 @@
 /**
- * PostgREST returns at most this many rows per request (Supabase `max_rows`),
+ * PostgREST returns at most this many rows per request (its `db-max-rows` setting),
  * whatever `.limit()` or `.range()` asks for. A single request for more is
  * silently truncated: no error, just fewer rows. Confirmed live on this
  * project: 1734 USA machines came back as the newest 1000, dropping whole

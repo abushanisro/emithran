@@ -6,7 +6,7 @@ import { ExchangeRateService } from '../../../common/exchange-rate/exchange-rate
 
 // The real reference exchange rate table (memory/exchange_rate_table.csv) --
 // the same rows migration 803 stores -- served to the REAL ExchangeRateService
-// through a stand-in for the one Supabase query it makes, so these tests
+// through a stand-in for the one database query it makes, so these tests
 // exercise the production USD-anchor arithmetic and name mapping, not a copy.
 const REFERENCE_CSV = join(__dirname, '../../../../../memory/exchange_rate_table.csv');
 
@@ -31,8 +31,8 @@ function makeExchangeRateService(rows: ReferenceRow[] = REFERENCE): ExchangeRate
     eq: () => query,
     then: (resolve: (v: { data: ReferenceRow[]; error: null }) => unknown) => resolve({ data: rows, error: null }),
   };
-  const supabaseService = { getUserClient: () => ({ from: () => query }) } as any;
-  return new ExchangeRateService(supabaseService, {} as any);
+  const databaseService = { getUserClient: () => ({ from: () => query }) } as any;
+  return new ExchangeRateService(databaseService, {} as any);
 }
 
 function makeFakeFxRateCacheService() {

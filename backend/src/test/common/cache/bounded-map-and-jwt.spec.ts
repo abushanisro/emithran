@@ -1,5 +1,5 @@
 import { evictOldestIfFull } from '../../../common/cache/bounded-map';
-import { decodeJwtPayload, jwtExpiryMs } from '../../../common/supabase/jwt-payload';
+import { decodeJwtPayload, jwtExpiryMs } from '../../../common/database/jwt-payload';
 
 describe('evictOldestIfFull', () => {
   it('drops only the oldest entry when the map is full', () => {

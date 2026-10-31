@@ -13,11 +13,11 @@
 import { Module } from '@nestjs/common';
 import { PackagingLogisticsCostController } from './packaging-logistics-cost.controller';
 import { PackagingLogisticsCostService } from './packaging-logistics-cost.service';
-import { SupabaseModule } from '../../common/supabase/supabase.module';
+import { DatabaseModule } from '../../common/database/database.module';
 import { LoggerModule } from '../../common/logger/logger.module';
 
 @Module({
-  imports: [SupabaseModule, LoggerModule],
+  imports: [DatabaseModule, LoggerModule],
   controllers: [PackagingLogisticsCostController],
   providers: [PackagingLogisticsCostService],
   exports: [PackagingLogisticsCostService],

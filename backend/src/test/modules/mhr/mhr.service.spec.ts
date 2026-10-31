@@ -6,7 +6,7 @@
 // bom-items.currency.spec.ts's established convention.
 import { MHRService } from '../../../modules/mhr/mhr.service';
 import { type Logger } from '../../../common/logger/logger.service';
-import { type SupabaseService } from '../../../common/supabase/supabase.service';
+import { type DatabaseService } from '../../../common/database/database.service';
 import { type ExchangeRateService } from '../../../common/exchange-rate/exchange-rate.service';
 import { type LHRService } from '../../../modules/lhr/lhr.service';
 
@@ -17,14 +17,14 @@ function makeLhrService(
 }
 
 // ── Canonical MHR (2026-08-27): MHR = Total OH = Direct OH + Indirect OH ──
-// A chainable Supabase mock covering the three query shapes create()/update()
+// A chainable PostgREST client mock covering the three query shapes create()/update()
 // issue against mhr_records: insert().select().single(), select('*').eq().
 // single() (findOne), and update().eq().select().single(). `mode` latches on
 // whichever of insert/update fires first per .from() call so a fresh chain
 // (one per .from() invocation) always resolves .single() with the right
 // canned response, and two chains within the same update() (findOne's read,
 // then the write) never interfere with each other.
-function makeChainableSupabase(responses: { onSelect?: any; onInsert?: any; onUpdate?: any; onLookup?: any }) {
+function makeChainableDatabase(responses: { onSelect?: any; onInsert?: any; onUpdate?: any; onLookup?: any }) {
   let mode: 'select' | 'insert' | 'update' | null = null;
   const chain: any = {};
   chain.select = jest.fn(() => { if (mode === null) mode = 'select'; return chain; });
@@ -44,16 +44,16 @@ function makeChainableSupabase(responses: { onSelect?: any; onInsert?: any; onUp
   return chain;
 }
 
-function makeSupabaseService(responses: { onSelect?: any; onInsert?: any; onUpdate?: any; onLookup?: any }) {
+function makeDatabaseService(responses: { onSelect?: any; onInsert?: any; onUpdate?: any; onLookup?: any }) {
   const chains: any[] = [];
   const fromMock = jest.fn(() => {
-    const c = makeChainableSupabase(responses);
+    const c = makeChainableDatabase(responses);
     chains.push(c);
     return c;
   });
   const client = { from: fromMock };
   return {
-    service: { getClient: jest.fn().mockReturnValue(client) } as unknown as SupabaseService,
+    service: { getClient: jest.fn().mockReturnValue(client) } as unknown as DatabaseService,
     chains,
   };
 }
@@ -70,10 +70,10 @@ const testLogger = { log: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: j
 
 describe('MHRService canonical MHR (Direct OH + Indirect OH)', () => {
   it('create(): total_machine_hour_rate = direct + indirect for a USD location, ignoring a submitted manualMHRValue', async () => {
-    const { service: supabaseService, chains } = makeSupabaseService({
+    const { service: databaseService, chains } = makeDatabaseService({
       onInsert: { data: { id: 'new-id', location: 'USA', currency: 'USD' }, error: null },
     });
-    const service = new MHRService(supabaseService, testLogger, makeExchangeRateService({ USD: 1 }), makeLhrService());
+    const service = new MHRService(databaseService, testLogger, makeExchangeRateService({ USD: 1 }), makeLhrService());
 
     await service.create(
       {
@@ -91,11 +91,11 @@ describe('MHRService canonical MHR (Direct OH + Indirect OH)', () => {
   });
 
   it('create(): FX-converts the USD Direct+Indirect sum into the record\'s local currency (India/INR)', async () => {
-    const { service: supabaseService, chains } = makeSupabaseService({
+    const { service: databaseService, chains } = makeDatabaseService({
       onInsert: { data: { id: 'new-id', location: 'India', currency: 'INR' }, error: null },
     });
     // convertStrict('INR', 'USD') = 0.012 => 1 INR = $0.012 => $1 = ~83.33 INR
-    const service = new MHRService(supabaseService, testLogger, makeExchangeRateService({ INR: 0.012 }), makeLhrService());
+    const service = new MHRService(databaseService, testLogger, makeExchangeRateService({ INR: 0.012 }), makeLhrService());
 
     await service.create(
       {
@@ -122,11 +122,11 @@ describe('MHRService canonical MHR (Direct OH + Indirect OH)', () => {
       total_machine_hour_rate: 20.95, manual_mhr_value: 20.95, is_manual_entry: true,
       calculations: JSON.stringify({ totalMachineHourRate: 20.95 }),
     };
-    const { service: supabaseService, chains } = makeSupabaseService({
+    const { service: databaseService, chains } = makeDatabaseService({
       onSelect: { data: existingRow, error: null },
       onUpdate: { data: { ...existingRow, location: 'USA' }, error: null },
     });
-    const service = new MHRService(supabaseService, testLogger, makeExchangeRateService({ USD: 1 }), makeLhrService());
+    const service = new MHRService(databaseService, testLogger, makeExchangeRateService({ USD: 1 }), makeLhrService());
 
     // Only Indirect OH changes; Direct OH is untouched by this PATCH.
     await service.update(
@@ -150,11 +150,11 @@ describe('MHRService canonical MHR (Direct OH + Indirect OH)', () => {
       total_machine_hour_rate: 1500, manual_mhr_value: null, is_manual_entry: false,
       calculations: JSON.stringify({ totalMachineHourRate: 1500 }),
     };
-    const { service: supabaseService, chains } = makeSupabaseService({
+    const { service: databaseService, chains } = makeDatabaseService({
       onSelect: { data: existingRow, error: null },
       onUpdate: { data: { ...existingRow }, error: null },
     });
-    const service = new MHRService(supabaseService, testLogger, makeExchangeRateService({ USD: 1 }), makeLhrService());
+    const service = new MHRService(databaseService, testLogger, makeExchangeRateService({ USD: 1 }), makeLhrService());
 
     // Unrelated edit — e.g. correcting the machine's operator count — touches neither overhead field.
     await service.update(
@@ -180,11 +180,11 @@ describe('MHRService canonical MHR (Direct OH + Indirect OH)', () => {
 // zero-fallback only when neither has anything.
 describe('MHRService labor rate resolution (LHR wiring completion)', () => {
   it('create(): resolves labor rate via LHRService.getEffectiveRate (shop average) when usdLhrTotal is not explicitly provided', async () => {
-    const { service: supabaseService, chains } = makeSupabaseService({
+    const { service: databaseService, chains } = makeDatabaseService({
       onInsert: { data: { id: 'new-id', location: 'USA', currency: 'USD' }, error: null },
     });
     const getEffectiveRate = jest.fn().mockResolvedValue({ rateUsdPerHr: 28.5, source: 'shop_average', sampleSize: 4 });
-    const service = new MHRService(supabaseService, testLogger, makeExchangeRateService({ USD: 1 }), makeLhrService(getEffectiveRate));
+    const service = new MHRService(databaseService, testLogger, makeExchangeRateService({ USD: 1 }), makeLhrService(getEffectiveRate));
 
     await service.create(
       {
@@ -203,7 +203,7 @@ describe('MHRService labor rate resolution (LHR wiring completion)', () => {
   });
 
   it('create(): falls back to the generic per-machine-name catalog benchmark for labor rate only when LHRService has nothing on file', async () => {
-    const { service: supabaseService, chains } = makeSupabaseService({
+    const { service: databaseService, chains } = makeDatabaseService({
       onInsert: { data: { id: 'new-id', location: 'USA', currency: 'USD' }, error: null },
       onLookup: {
         data: [{ key: 'sm-1', raw: { name: 'Test Laser', direct_overhead_rate_usd_hr: 5, indirect_overhead_rate_usd_hr: 10, labor_rate_usd_hr: 42 } }],
@@ -211,7 +211,7 @@ describe('MHRService labor rate resolution (LHR wiring completion)', () => {
       },
     });
     const getEffectiveRate = jest.fn().mockResolvedValue({ rateUsdPerHr: null, source: 'none', sampleSize: 0 });
-    const service = new MHRService(supabaseService, testLogger, makeExchangeRateService({ USD: 1 }), makeLhrService(getEffectiveRate));
+    const service = new MHRService(databaseService, testLogger, makeExchangeRateService({ USD: 1 }), makeLhrService(getEffectiveRate));
 
     await service.create(
       {
@@ -230,13 +230,13 @@ describe('MHRService labor rate resolution (LHR wiring completion)', () => {
   });
 
   it('create(): labor rate resolves to null/no_rate — never a fabricated $0 — when neither LHRService nor the catalog have anything on file (direct/indirect overhead are unaffected, since they were explicitly provided)', async () => {
-    const { service: supabaseService, chains } = makeSupabaseService({
+    const { service: databaseService, chains } = makeDatabaseService({
       onInsert: { data: { id: 'new-id', location: 'USA', currency: 'USD' }, error: null },
       // No matching sm_reference_data row for this machine name.
       onLookup: { data: [], error: null },
     });
     const getEffectiveRate = jest.fn().mockResolvedValue({ rateUsdPerHr: null, source: 'none', sampleSize: 0 });
-    const service = new MHRService(supabaseService, testLogger, makeExchangeRateService({ USD: 1 }), makeLhrService(getEffectiveRate));
+    const service = new MHRService(databaseService, testLogger, makeExchangeRateService({ USD: 1 }), makeLhrService(getEffectiveRate));
 
     await service.create(
       {
@@ -254,12 +254,12 @@ describe('MHRService labor rate resolution (LHR wiring completion)', () => {
   });
 
   it('create(): refuses to persist a fabricated total_machine_hour_rate when neither direct nor indirect overhead has any real or benchmark value on file', async () => {
-    const { service: supabaseService } = makeSupabaseService({
+    const { service: databaseService } = makeDatabaseService({
       onInsert: { data: { id: 'new-id', location: 'USA', currency: 'USD' }, error: null },
       // No matching sm_reference_data row for this machine name — no benchmark for direct/indirect either.
       onLookup: { data: [], error: null },
     });
-    const service = new MHRService(supabaseService, testLogger, makeExchangeRateService({ USD: 1 }), makeLhrService());
+    const service = new MHRService(databaseService, testLogger, makeExchangeRateService({ USD: 1 }), makeLhrService());
 
     await expect(
       service.create(
@@ -283,12 +283,12 @@ describe('MHRService.removeAll', () => {
     const fromMock = jest.fn().mockReturnValue({ delete: deleteMock });
     const adminClient = { from: fromMock };
 
-    const supabaseService = {
+    const databaseService = {
       getUserClient: jest.fn().mockReturnValue(adminClient),
-    } as unknown as SupabaseService;
+    } as unknown as DatabaseService;
 
     const service = new MHRService(
-      supabaseService,
+      databaseService,
       { log: jest.fn(), error: jest.fn() } as unknown as Logger,
       {} as unknown as ExchangeRateService,
       makeLhrService(),
@@ -308,24 +308,24 @@ describe('MHRService.removeAll', () => {
 // MHRFormDialog saved a NEW record under that category with the literal
 // string "Inspection" as machine_class — a value the rate resolvers'
 // `.eq('machine_class', 'cmm')` filter can never match.
-function makeCategoriesSupabase(rows: any[]) {
+function makeCategoriesDatabase(rows: any[]) {
   // Serves `.order().range(from, to)` like PostgREST: the requested slice.
   const range = (from: number, to: number) => Promise.resolve({ data: rows.slice(from, to + 1), error: null });
   const selectMock = jest.fn().mockReturnValue({ order: () => ({ range }) });
   const fromMock = jest.fn().mockReturnValue({ select: selectMock });
   return {
-    service: { getClient: jest.fn().mockReturnValue({ from: fromMock }) } as unknown as SupabaseService,
+    service: { getClient: jest.fn().mockReturnValue({ from: fromMock }) } as unknown as DatabaseService,
     fromMock,
   };
 }
 
 describe('MHRService.getDistinctCategoriesWithClass', () => {
   it('pairs a benchmark_source_key-derived category with its real machine_class, closing the "Inspection" bug', async () => {
-    const { service: supabaseService } = makeCategoriesSupabase([
+    const { service: databaseService } = makeCategoriesDatabase([
       { benchmark_source_key: 'Inspection:CMM Machine', machine_class: 'cmm', process_group: 'Machining' },
       { benchmark_source_key: 'Inspection:Manual Inspection Bench', machine_class: 'cmm', process_group: 'Machining' },
     ]);
-    const service = new MHRService(supabaseService, testLogger, makeExchangeRateService({ USD: 1 }), makeLhrService());
+    const service = new MHRService(databaseService, testLogger, makeExchangeRateService({ USD: 1 }), makeLhrService());
 
     const result = await service.getDistinctCategoriesWithClass('token');
 
@@ -333,10 +333,10 @@ describe('MHRService.getDistinctCategoriesWithClass', () => {
   });
 
   it('pairs a machine_class-fallback category (no benchmark key) with that same real machine_class', async () => {
-    const { service: supabaseService } = makeCategoriesSupabase([
+    const { service: databaseService } = makeCategoriesDatabase([
       { benchmark_source_key: null, machine_class: 'gun_drill', process_group: 'Machining' },
     ]);
-    const service = new MHRService(supabaseService, testLogger, makeExchangeRateService({ USD: 1 }), makeLhrService());
+    const service = new MHRService(databaseService, testLogger, makeExchangeRateService({ USD: 1 }), makeLhrService());
 
     const result = await service.getDistinctCategoriesWithClass('token');
 
@@ -344,11 +344,11 @@ describe('MHRService.getDistinctCategoriesWithClass', () => {
   });
 
   it('scopes to the given process group exactly like getDistinctCategories already did', async () => {
-    const { service: supabaseService } = makeCategoriesSupabase([
+    const { service: databaseService } = makeCategoriesDatabase([
       { benchmark_source_key: 'Inspection:CMM Machine', machine_class: 'cmm', process_group: 'Machining' },
       { benchmark_source_key: null, machine_class: 'fiber_laser', process_group: 'Sheet Metal' },
     ]);
-    const service = new MHRService(supabaseService, testLogger, makeExchangeRateService({ USD: 1 }), makeLhrService());
+    const service = new MHRService(databaseService, testLogger, makeExchangeRateService({ USD: 1 }), makeLhrService());
 
     const result = await service.getDistinctCategoriesWithClass('token', 'Machining');
 
@@ -356,11 +356,11 @@ describe('MHRService.getDistinctCategoriesWithClass', () => {
   });
 
   it('getDistinctCategories (legacy string[] shape) is unchanged by the refactor', async () => {
-    const { service: supabaseService } = makeCategoriesSupabase([
+    const { service: databaseService } = makeCategoriesDatabase([
       { benchmark_source_key: 'Inspection:CMM Machine', machine_class: 'cmm', process_group: 'Machining' },
       { benchmark_source_key: null, machine_class: 'gun_drill', process_group: 'Machining' },
     ]);
-    const service = new MHRService(supabaseService, testLogger, makeExchangeRateService({ USD: 1 }), makeLhrService());
+    const service = new MHRService(databaseService, testLogger, makeExchangeRateService({ USD: 1 }), makeLhrService());
 
     const result = await service.getDistinctCategories('token', 'Machining');
 

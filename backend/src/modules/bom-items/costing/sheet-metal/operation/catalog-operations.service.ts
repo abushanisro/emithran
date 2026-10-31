@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { SupabaseService } from '../../../../../common/supabase/supabase.service';
-import { readAllRows, type RowPage } from '../../../../../common/supabase/read-all-rows';
+import { DatabaseService } from '../../../../../common/database/database.service';
+import { readAllRows, type RowPage } from '../../../../../common/database/read-all-rows';
 import { RateResolutionService } from '../../../services/rate-resolution.service';
 import { SheetMetalLookupService } from '../lookup/sheet-metal-lookup.service';
 import { cachedBatch, cachedRead } from '../../shared/core/request-cache';
@@ -28,7 +28,7 @@ export class SheetMetalCatalogOperationsService {
   private readonly logger = new Logger(SheetMetalCatalogOperationsService.name);
 
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly rateResolutionService: RateResolutionService,
     private readonly smLookup: SheetMetalLookupService,
   ) {}
@@ -56,7 +56,7 @@ export class SheetMetalCatalogOperationsService {
       })),
     ];
     if (features.length === 0 || lines.length === 0) return [];
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
     const classOf = (l: ProcessLineCost) => l.hostMachineClass ?? l.machineClass;
 
     const identities = await this.rateResolutionService.resolveProcessIdentities(
@@ -107,7 +107,7 @@ export class SheetMetalCatalogOperationsService {
    * in the request-scoped cache, never in a cross-request one.
    */
   private async catalogRowsByProcess(
-    client: ReturnType<SupabaseService['getClient']>,
+    client: ReturnType<DatabaseService['getClient']>,
     canonicalIds: readonly string[],
   ): Promise<Map<string, string[]> | { error: string }> {
     try {
@@ -138,7 +138,7 @@ export class SheetMetalCatalogOperationsService {
   private async loadKinds(): Promise<
     { operationKinds: Map<string, string>; variantKinds: Map<string, Set<string>> } | { error: string }
   > {
-    const client = this.supabaseService.getPrivilegedClient('reference-data: sm_operation_kinds and sm_feature_variant_kinds, global shared (migration 842)');
+    const client = this.databaseService.getPrivilegedClient('reference-data: sm_operation_kinds and sm_feature_variant_kinds, global shared (migration 842)');
     const [ops, variants] = await Promise.all([
       client.from('sm_operation_kinds').select('operation_category, kind'),
       client.from('sm_feature_variant_kinds').select('feature_type, variant, kind'),
@@ -159,7 +159,7 @@ export class SheetMetalCatalogOperationsService {
 
   /** The selected machine own largest punch tool, where its specs carry one. */
   private async maxPunchSizes(
-    client: ReturnType<SupabaseService['getClient']>,
+    client: ReturnType<DatabaseService['getClient']>,
     lines: readonly ProcessLineCost[],
   ): Promise<Map<string, number>> {
     const ids = [...new Set(lines

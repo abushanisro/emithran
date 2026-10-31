@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SupplierNominationsService } from './supplier-nominations.service';
-import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
+import { RequestAuthGuard } from '../../common/guards/request-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
 import {
@@ -49,7 +49,7 @@ import {
 
 @ApiTags('supplier-nominations')
 @ApiBearerAuth()
-@UseGuards(SupabaseAuthGuard)
+@UseGuards(RequestAuthGuard)
 @Controller('api/supplier-nominations')
 export class SupplierNominationsController {
   constructor(

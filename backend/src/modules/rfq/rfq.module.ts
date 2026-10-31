@@ -5,10 +5,10 @@ import { RfqEmailService } from './services/rfq-email.service';
 import { RfqTrackingService } from './services/rfq-tracking.service';
 import { VendorsModule } from '../vendors/vendors.module';
 import { BOMItemsModule } from '../bom-items/bom-items.module';
-import { SupabaseModule } from '../../common/supabase/supabase.module';
+import { DatabaseModule } from '../../common/database/database.module';
 
 @Module({
-  imports: [SupabaseModule, VendorsModule, BOMItemsModule],
+  imports: [DatabaseModule, VendorsModule, BOMItemsModule],
   controllers: [RfqController],
   providers: [RfqService, RfqEmailService, RfqTrackingService],
   exports: [RfqService],

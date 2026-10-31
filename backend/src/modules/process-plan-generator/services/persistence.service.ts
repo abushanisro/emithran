@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../common/database/database.service';
 
 import type { DraftLine, DraftPackage, ProposedMaster } from '../dto/draft-line.dto';
 import type {
@@ -25,7 +25,7 @@ import { ProcessCostCalculationEngine } from '../../processes/engines/process-co
  *
  * We sequence inserts and track inserted IDs so we can compensate (delete)
  * on a downstream failure. This is not true ACID across tables, but it's
- * the cleanest pattern given Supabase's JS-client constraint: we control
+ * the cleanest pattern given the PostgREST client's constraint: we control
  * cleanup if the apply fails midway. For Phase 1 the failure surface is
  * narrow (FK violations from a master being deleted between draft and
  * apply); we accept this trade-off and note it. A follow-up can move the
@@ -37,7 +37,7 @@ export class PersistenceService {
   private readonly costEngine = new ProcessCostCalculationEngine();
 
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly creditMeter: CreditMeterService,
   ) {}
 
@@ -48,7 +48,7 @@ export class PersistenceService {
     accessToken: string | null,
     organizationId?: string,
   ): Promise<ApplyResultDto> {
-    const client = this.supabaseService.getUserClient(accessToken ?? undefined);
+    const client = this.databaseService.getUserClient(accessToken ?? undefined);
 
     // ── Load the generation ────────────────────────────────────────────────
     const { data: gen, error: genErr } = await client
@@ -366,7 +366,7 @@ export class PersistenceService {
     userId: string,
     accessToken: string | null,
   ): Promise<void> {
-    const client = this.supabaseService.getUserClient(accessToken ?? undefined);
+    const client = this.databaseService.getUserClient(accessToken ?? undefined);
 
     const { data: gen, error: genErr } = await client
       .from('process_plan_generations')
@@ -408,7 +408,7 @@ export class PersistenceService {
     accessToken: string | null,
     organizationId?: string,
   ): Promise<{ id: string }> {
-    const client = this.supabaseService.getUserClient(accessToken ?? undefined);
+    const client = this.databaseService.getUserClient(accessToken ?? undefined);
 
     // RLS scopes visibility to the caller's organization — no manual check needed.
     const { data: gen, error: genErr } = await client

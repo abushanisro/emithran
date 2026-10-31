@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { SupabaseService } from "../../../common/supabase/supabase.service";
+import { DatabaseService } from "../../../common/database/database.service";
 import type {
   IsoGroup,
   MachiningParams,
@@ -30,10 +30,10 @@ const FALLBACK_PARAMS: Record<IsoGroup, Omit<MachiningParams, "isoGroup" | "para
 export class ParameterResolver {
   private readonly logger = new Logger(ParameterResolver.name);
 
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   async resolve(query: ParameterQuery): Promise<MachiningParams> {
-    const db = this.supabase.getPrivilegedClient("reference-data: machining_parameters");
+    const db = this.database.getPrivilegedClient("reference-data: machining_parameters");
     const {
       operation,
       isoGroup,

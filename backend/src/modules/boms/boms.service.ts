@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { Logger } from '../../common/logger/logger.service';
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { DatabaseService } from '../../common/database/database.service';
 import { CreateBOMDto, UpdateBOMDto, QueryBOMsDto } from './dto/boms.dto';
 import { BOMResponseDto, BOMListResponseDto } from './dto/bom-response.dto';
 import { validate as isValidUUID } from 'uuid';
@@ -10,7 +10,7 @@ import { loadBomTotals } from './bom-totals';
 @Injectable()
 export class BOMsService {
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly logger: Logger,
     private readonly exchangeRates: ExchangeRateService,
   ) {}
@@ -24,7 +24,7 @@ export class BOMsService {
     const to = from + limit - 1;
 
     // Fetch BOMs with embedded bom_items count for live item totals
-    let queryBuilder = this.supabaseService
+    let queryBuilder = this.databaseService
       .getClient(accessToken)
       .from('boms')
       .select('id, name, description, project_id, version, status, user_id, created_at, updated_at, bom_items(count)', { count: 'exact' })
@@ -80,7 +80,7 @@ export class BOMsService {
       throw new BadRequestException('Please provide a valid BOM ID.');
     }
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('boms')
       .select('id, name, description, project_id, version, status, user_id, created_at, updated_at, bom_items(count)')
@@ -119,7 +119,7 @@ export class BOMsService {
    * they declare, never summed as if they shared one.
    */
   private async computeBomsCosts(accessToken: string, bomIds: string[]): Promise<Map<string, number | null>> {
-    const totals = await loadBomTotals(this.supabaseService.getClient(accessToken), bomIds,
+    const totals = await loadBomTotals(this.databaseService.getClient(accessToken), bomIds,
       () => this.exchangeRates.getSnapshot(accessToken),
       message => this.logger.warn(message, 'BOMsService'));
     return new Map([...totals].map(([id, value]) => [id, value.totalCost]));
@@ -139,7 +139,7 @@ export class BOMsService {
   async create(createBOMDto: CreateBOMDto, userId: string, accessToken: string, organizationId?: string): Promise<BOMResponseDto> {
     this.logger.log('Creating BOM', 'BOMsService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('boms')
       .insert({
@@ -191,7 +191,7 @@ export class BOMsService {
     if (updateBOMDto.version !== undefined) updateData.version = updateBOMDto.version;
     if (updateBOMDto.status !== undefined) updateData.status = updateBOMDto.status;
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('boms')
       .update(updateData)
@@ -223,7 +223,7 @@ export class BOMsService {
     // Verify BOM exists and belongs to user
     await this.findOne(id, userId, accessToken);
 
-    const { error } = await this.supabaseService
+    const { error } = await this.databaseService
       .getClient(accessToken)
       .from('boms')
       .delete()

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { SupabaseService } from './supabase.service';
+import { DatabaseService } from './database.service';
 
 export interface DirectoryUser {
   id: string;
@@ -14,7 +14,7 @@ export interface DirectoryUser {
  */
 @Injectable()
 export class UserDirectory {
-  constructor(private readonly db: SupabaseService) {}
+  constructor(private readonly db: DatabaseService) {}
 
   async findByIds(ids: string[]): Promise<Map<string, DirectoryUser>> {
     const unique = [...new Set(ids.filter(Boolean))];

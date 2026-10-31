@@ -4,7 +4,7 @@ import { Type } from 'class-transformer';
 import { IsInt, IsISO8601, IsOptional, IsUUID, Matches, Max, Min } from 'class-validator';
 
 import { AccessToken } from '../decorators/access-token.decorator';
-import { SupabaseService } from '../supabase/supabase.service';
+import { DatabaseService } from '../database/database.service';
 
 export class QueryAuditEventsDto {
   /** An exact action such as bom_item.deleted. */
@@ -26,13 +26,13 @@ const DEFAULT_LIMIT = 50;
 @ApiBearerAuth()
 @Controller({ path: 'api/audit-events', version: '1' })
 export class AuditController {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   @Get()
   @ApiOperation({ summary: 'Audit events of the organizations you administer, newest first' })
   async list(@Query() filters: QueryAuditEventsDto, @AccessToken() token: string) {
     const limit = filters.limit ?? DEFAULT_LIMIT;
-    let query = this.supabase
+    let query = this.database
       .getUserClient(token)
       .from('audit_events')
       .select('id, at, org_id, actor_id, actor_kind, action, target_type, target_id, outcome, ip, request_id, meta')

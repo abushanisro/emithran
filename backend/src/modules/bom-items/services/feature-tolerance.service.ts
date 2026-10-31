@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../common/database/database.service';
 import { resolveGdtCallouts } from '../costing/shared/physics/gdt-callouts';
 import { CastingReferenceService } from '../costing/casting/casting-reference.service';
 import { holeCastability, holeProximityCastability, type HoleCastability } from '../costing/casting/casting-reference';
@@ -36,13 +36,13 @@ const isCategory = (c: string): c is GtolCategory => (GTOL_CATEGORIES as readonl
 @Injectable()
 export class FeatureToleranceService {
   constructor(
-    private readonly supabase: SupabaseService,
+    private readonly database: DatabaseService,
     private readonly toleranceReference: ToleranceReferenceService,
     private readonly castingReference: CastingReferenceService,
   ) {}
 
   private async loadItem(id: string, accessToken: string) {
-    const { data, error } = await this.supabase.getUserClient(accessToken)
+    const { data, error } = await this.database.getUserClient(accessToken)
       .from('bom_items')
       .select('id, organization_id, feature_graph, drawing_intelligence, scenario_overrides, family_classification, material_grade, material')
       .eq('id', id)
@@ -63,7 +63,7 @@ export class FeatureToleranceService {
 
   async get(id: string, accessToken: string): Promise<FeatureTolerancesView> {
     const item = await this.loadItem(id, accessToken);
-    const { data: rows, error } = await this.supabase.getUserClient(accessToken)
+    const { data: rows, error } = await this.database.getUserClient(accessToken)
       .from('feature_tolerances')
       .select('feature_key, category, value')
       .eq('bom_item_id', id);
@@ -106,7 +106,7 @@ export class FeatureToleranceService {
     }
     if (errors.length) throw new BadRequestException(errors.join('; '));
 
-    const client = this.supabase.getUserClient(accessToken);
+    const client = this.database.getUserClient(accessToken);
     if (upserts.length) {
       const { error } = await client.from('feature_tolerances').upsert(
         upserts.map((u) => ({
@@ -129,7 +129,7 @@ export class FeatureToleranceService {
   async setPolicy(id: string, raw: unknown, accessToken: string): Promise<FeatureTolerancesView> {
     const { policy, errors } = parseTolerancePolicy(raw);
     if (!policy) throw new BadRequestException(`Invalid tolerance policy: ${errors.join('; ')}`);
-    const { error } = await this.supabase.getUserClient(accessToken)
+    const { error } = await this.database.getUserClient(accessToken)
       .rpc('merge_scenario_overrides', { p_id: id, p_patch: { tolerancePolicy: policy } })
       .single();
     if (error) {
@@ -170,7 +170,7 @@ export class FeatureToleranceService {
     const grade = item.material_grade ?? item.material ?? null;
     const [{ reference: castRef, missing: castMissing }, alloy] = await Promise.all([
       this.castingReference.getReference(),
-      this.castingReference.getMaterial(this.supabase.getUserClient(accessToken), grade),
+      this.castingReference.getMaterial(this.database.getUserClient(accessToken), grade),
     ]);
     const formabilityNote = !castRef
       ? `hole castability not assessed: ${castMissing.join(', ')}`

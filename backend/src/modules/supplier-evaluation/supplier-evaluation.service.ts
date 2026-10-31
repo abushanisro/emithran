@@ -7,7 +7,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { Logger } from '../../common/logger/logger.service';
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { DatabaseService } from '../../common/database/database.service';
 import {
   CreateSupplierEvaluationDto,
   UpdateSupplierEvaluationDto,
@@ -19,7 +19,7 @@ import {
 @Injectable()
 export class SupplierEvaluationService {
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly logger: Logger,
   ) {}
 
@@ -64,7 +64,7 @@ export class SupplierEvaluationService {
       status: 'draft',
     };
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('supplier_evaluation_records')
       .insert(record)
@@ -138,7 +138,7 @@ export class SupplierEvaluationService {
   ): Promise<SupplierEvaluationResponseDto[]> {
     this.logger.log('Fetching supplier evaluations', 'SupplierEvaluationService');
 
-    let queryBuilder = this.supabaseService
+    let queryBuilder = this.databaseService
       .getClient(accessToken)
       .from('supplier_evaluation_summary')
       .select('*')
@@ -199,7 +199,7 @@ export class SupplierEvaluationService {
   ): Promise<SupplierEvaluationResponseDto> {
     this.logger.log(`Fetching evaluation ${id}`, 'SupplierEvaluationService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('supplier_evaluation_summary')
       .select('*')
@@ -292,7 +292,7 @@ export class SupplierEvaluationService {
     if (dto.evaluatorNotes !== undefined) updates.evaluator_notes = dto.evaluatorNotes;
     if (dto.recommendationStatus !== undefined) updates.recommendation_status = dto.recommendationStatus;
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('supplier_evaluation_records')
       .update(updates)
@@ -346,7 +346,7 @@ export class SupplierEvaluationService {
       );
     }
 
-    const { error } = await this.supabaseService
+    const { error } = await this.databaseService
       .getClient(accessToken)
       .from('supplier_evaluation_records')
       .delete()
@@ -412,7 +412,7 @@ export class SupplierEvaluationService {
       );
     }
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('supplier_evaluation_records')
       .update({
@@ -461,7 +461,7 @@ export class SupplierEvaluationService {
     }
 
     // Call freeze_evaluation function
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .rpc('freeze_evaluation', {
         p_evaluation_id: id,
@@ -510,7 +510,7 @@ export class SupplierEvaluationService {
     );
 
     // Query vendor_process_capabilities table
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('vendor_process_capabilities')
       .select('id')
@@ -567,7 +567,7 @@ export class SupplierEvaluationService {
     accessToken: string,
   ): Promise<any> {
     // Get weights for this user/project
-    let queryBuilder = this.supabaseService
+    let queryBuilder = this.databaseService
       .getClient(accessToken)
       .from('evaluation_criteria_weights')
       .select('*')
@@ -599,7 +599,7 @@ export class SupplierEvaluationService {
       (technicalPercentage * (technicalWeight / 100));
 
     // Update the evaluation record
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('supplier_evaluation_records')
       .update({

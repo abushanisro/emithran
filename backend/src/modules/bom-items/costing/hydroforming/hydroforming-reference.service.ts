@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { SupabaseService } from '../../../../common/supabase/supabase.service';
-import { readAllRows, type RowPage } from '../../../../common/supabase/read-all-rows';
+import { DatabaseService } from '../../../../common/database/database.service';
+import { readAllRows, type RowPage } from '../../../../common/database/read-all-rows';
 import { cachedRead } from '../shared/core/request-cache';
 import type { BlankPress, HydroformPress, HydroformingReference, StepTable } from './hydroforming-engine';
 
@@ -31,11 +31,11 @@ function num(v: unknown): number | null {
  */
 @Injectable()
 export class HydroformingReferenceService {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(private readonly databaseService: DatabaseService) {}
 
   getReference(accessToken: string): Promise<{ reference: HydroformingReference; missing: string[] }> {
     return cachedRead('hydroforming-reference', async () => {
-      const client = this.supabaseService.getClient(accessToken);
+      const client = this.databaseService.getClient(accessToken);
       const [vars, tables] = await Promise.all([
         client.from('machining_reference_data').select('key, value')
           .eq('source_version', SOURCE_VERSION).eq('category', 'variable').in('key', [...VARIABLES]),
@@ -77,7 +77,7 @@ export class HydroformingReferenceService {
 
   /** The Hydroform and Offline Blank presses at a location, from HR Rates. */
   async getPresses(accessToken: string, location: string): Promise<{ hydroform: HydroformPress[]; blank: BlankPress[] }> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
     type Row = {
       id: string; machine_name: string; machine_class: string; operators: number | null; setup_time_hr: number | null;
       total_machine_hour_rate: number | null; usd_labor_rate_per_hr: number | null; specs: Record<string, unknown> | null;

@@ -593,7 +593,7 @@ describe('P0.4 — turret punch / waterjet get their own real MachineRequirement
 // body confirms it touches no injected dependency (no `this.xxxService` call
 // anywhere in it) — it is a pure geometry+material → requirements mapper, only
 // calling physics.ts builders + getEnginesForFamily/classifyLaserMaterial.
-// Object.create bypasses the constructor (so no Supabase/other DI wiring is
+// Object.create bypasses the constructor (so no database/other DI wiring is
 // needed) while still invoking the ACTUAL production method — not a
 // hand-rebuilt PunchingRequirement/WaterjetRequirement standing in for it —
 // so this proves the real production code path, not just physics.ts/selector.ts

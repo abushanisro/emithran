@@ -4,7 +4,7 @@ import {
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { SupabaseService } from '../supabase/supabase.service';
+import { DatabaseService } from '../database/database.service';
 import { evictOldestIfFull } from '../cache/bounded-map';
 import { SESSION_IDLE_POLICY, sessionDeadline, type SessionActivityTimes } from './session-idle-policy';
 
@@ -34,7 +34,7 @@ export class SessionActivityService {
   private readonly logger = new Logger(SessionActivityService.name);
   private readonly cache = new Map<string, SessionActivityTimes>();
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(private readonly databaseService: DatabaseService) {}
 
   /** Throws 401 if the session is past its deadline. */
   async assertActive(sessionId: string, userId: string, now = Date.now()): Promise<SessionActivityTimes> {
@@ -73,7 +73,7 @@ export class SessionActivityService {
   }
 
   private get db() {
-    return this.supabaseService.getPrivilegedClient(
+    return this.databaseService.getPrivilegedClient(
       'session-idle: user_session_activity is service-only, no user RLS policies exist',
     );
   }

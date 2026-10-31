@@ -58,7 +58,7 @@ import { resolveCostingInputs } from './costing/shared/physics/costing-inputs';
 import { DFMScoringService } from './services/dfm-scoring.service';
 import { MaterialIntelligenceService, type MaterialCandidate } from './services/material-intelligence.service';
 import { MaterialResolutionService } from './services/material-resolution.service';
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { DatabaseService } from '../../common/database/database.service';
 import { findRouteDataGaps, formatNearestRowsDisclosure, isPerPartCharge } from './costing/shared/core/engine-kernel';
 import { RouteResultDto } from './dto/route-comparison.dto';
 import {
@@ -101,7 +101,7 @@ export class BOMItemsController {
     private readonly nreService: NreService,
     private readonly dfmScoringService: DFMScoringService,
     private readonly materialIntelligenceService: MaterialIntelligenceService,
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly exchangeRateService: ExchangeRateService,
     private readonly featureToleranceService: FeatureToleranceService,
     private readonly pmiReviewService: PmiReviewService,
@@ -240,7 +240,7 @@ export class BOMItemsController {
       return { density_g_cm3: null, material_name: null, material_grade: null };
     }
     try {
-      const client = this.supabaseService.getPrivilegedClient('reference-data: material_density_lookup, global shared');
+      const client = this.databaseService.getPrivilegedClient('reference-data: material_density_lookup, global shared');
       const g = grade.trim();
       // Same real AmE/BrE spelling variants the Material search already
       // reconciles (material-search-spelling.ts, root-caused 2026-09-18) —
@@ -276,7 +276,7 @@ export class BOMItemsController {
       // 3. Fallback to raw_materials (user's own data, density in g/cm³)
       if (!data) {
         // raw_materials is org-scoped: read it as the caller, never with the service role.
-        const rm = await this.supabaseService.getUserClient(token)
+        const rm = await this.databaseService.getUserClient(token)
           .from('raw_materials')
           .select('grade, name, density')
           .or(orClause(['name', 'grade'], true))
@@ -735,7 +735,7 @@ export class BOMItemsController {
 
     // The same link is handed out again while it has plenty of life left, so
     // the browser's HTTP cache serves repeat views instead of downloading the
-    // file from Supabase each time (see signed-url-cache.ts). Keyed by user:
+    // file from the object store each time (see signed-url-cache.ts). Keyed by user:
     // a link only ever goes back to someone whose access was checked above.
     const cacheKey = `${user.id}:${filePath}`;
     const reused = getReusableSignedUrl(cacheKey);
@@ -1021,7 +1021,7 @@ export class BOMItemsController {
     // Get project ID from BOM
     const projectId = await this.bomItemsService.getProjectIdForBOM(bomItem.bomId, token);
 
-    // Download the STEP file from Supabase
+    // Download the STEP file from the object store
     const stepUrl = await this.fileStorageService.getSignedUrl(bomItem.file3dPath, 3600);
 
     let stepBuffer: Buffer;
@@ -1063,9 +1063,10 @@ export class BOMItemsController {
       id,
     );
 
-    // Update BOM item with STL path
+    // STL for browser viewing; the STEP stays the analysis source (the CAD engine cannot analyse a mesh), as on upload
     const updateData: UpdateBOMItemDto = {
       file3dPath: stlUploadResult.storagePath,
+      fileStepPath: bomItem.fileStepPath ?? bomItem.file3dPath,
     };
 
     return this.bomItemsService.update(id, updateData, user.id, token);
@@ -1900,7 +1901,7 @@ export class BOMItemsController {
     //      cycleTimeMin honestly 0 — no real geometry to derive it from, and
     //      this endpoint never fabricates one.
     const availableByName = new Map(baseRoute.processLines.map((l) => [l.process, l]));
-    const db = this.supabaseService.getClient(token);
+    const db = this.databaseService.getClient(token);
     const orderedLines: Array<{
       process: string; machineClass: string; machineName: string | null; hourlyRate: number;
       labourRate?: number | null;
@@ -2004,7 +2005,7 @@ export class BOMItemsController {
     if (!locInfo) {
       throw new BadRequestException(`Unknown Digital Factory location '${location}' — cannot resolve its machine rates.`);
     }
-    const db = this.supabaseService.getClient(token);
+    const db = this.databaseService.getClient(token);
     const { data: ownRows } = await db
       .from('mhr_records')
       .select('machine_name, total_machine_hour_rate, usd_lhr_total')
@@ -2159,7 +2160,7 @@ export class BOMItemsController {
     // intended state rather than a hazard, and the database agrees --
     // migration 712 dropped ck_process_cost_records_rollup_usd_until_p1b.
 
-    const db = this.supabaseService.getClient(token);
+    const db = this.databaseService.getClient(token);
 
     // -- Atomicity ------------------------------------------------------------
     // The whole replacement happens inside one database transaction, in

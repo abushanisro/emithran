@@ -2,7 +2,7 @@
 // proves create() writes organization_id on all 3 inserted rows (the group
 // itself, plus its bom_items and processes rows).
 import { SupplierEvaluationGroupsService } from '../../../modules/supplier-evaluation-groups/supplier-evaluation-groups.service';
-import { type SupabaseService } from '../../../common/supabase/supabase.service';
+import { type DatabaseService } from '../../../common/database/database.service';
 import { type Logger } from '../../../common/logger/logger.service';
 
 function makeChain(result: { data: any; error: any }) {
@@ -32,12 +32,12 @@ describe('SupplierEvaluationGroupsService.create', () => {
       throw new Error(`unexpected table: ${table}`);
     });
 
-    const supabaseService = {
+    const databaseService = {
       getClient: jest.fn().mockReturnValue({ from: fromMock, rpc: jest.fn().mockReturnValue(rpcChain) }),
-    } as unknown as SupabaseService;
+    } as unknown as DatabaseService;
 
     const service = new SupplierEvaluationGroupsService(
-      supabaseService,
+      databaseService,
       { log: jest.fn(), error: jest.fn() } as unknown as Logger,
     );
 

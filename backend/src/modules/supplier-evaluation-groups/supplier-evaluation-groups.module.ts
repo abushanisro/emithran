@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { SupplierEvaluationGroupsController } from './supplier-evaluation-groups.controller';
 import { SupplierEvaluationGroupsService } from './supplier-evaluation-groups.service';
-import { SupabaseModule } from '../../common/supabase/supabase.module';
+import { DatabaseModule } from '../../common/database/database.module';
 import { LoggerModule } from '../../common/logger/logger.module';
 
 @Module({
-  imports: [SupabaseModule, LoggerModule],
+  imports: [DatabaseModule, LoggerModule],
   controllers: [SupplierEvaluationGroupsController],
   providers: [SupplierEvaluationGroupsService],
   exports: [SupplierEvaluationGroupsService],

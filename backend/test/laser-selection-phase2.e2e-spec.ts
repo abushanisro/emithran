@@ -1,4 +1,4 @@
-// Phase 2 (fiber laser selection) integration tests — REAL SupabaseService
+// Phase 2 (fiber laser selection) integration tests — REAL DatabaseService
 // against the dev project (`.env`), read-only, no mocks. Expected values are
 // derived at test time from the live sm_lookup_laser_cut rows and from
 // memory/Sheetmetal/machine/machine_library.csv, never typed in.
@@ -15,7 +15,7 @@ import { Test } from '@nestjs/testing';
 import { ConfigModule } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
-import { SupabaseService } from '../src/common/supabase/supabase.service';
+import { DatabaseService } from '../src/common/database/database.service';
 import { SheetMetalLookupService } from '../src/modules/bom-items/costing/sheet-metal/lookup/sheet-metal-lookup.service';
 
 const REASON = 'e2e test: read-only reference data check';
@@ -23,18 +23,18 @@ jest.setTimeout(30_000);
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 describe('[e2e] Phase 2 laser selection — real DB, no mocks', () => {
-  let supabase: SupabaseService;
+  let database: DatabaseService;
   let lookup: SheetMetalLookupService;
   let table: { material: string; t: number; w: number }[];
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
       imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../../.env') })],
-      providers: [SupabaseService, SheetMetalLookupService],
+      providers: [DatabaseService, SheetMetalLookupService],
     }).compile();
-    supabase = moduleRef.get(SupabaseService);
+    database = moduleRef.get(DatabaseService);
     lookup = moduleRef.get(SheetMetalLookupService);
-    const { data, error } = await supabase.getPrivilegedClient(REASON).from('sm_lookup_laser_cut')
+    const { data, error } = await database.getPrivilegedClient(REASON).from('sm_lookup_laser_cut')
       .select('material, thickness_mm, laser_power_w, cutting_speed_m_per_min')
       .eq('laser_technology', 'fiber').not('cutting_speed_m_per_min', 'is', null);
     expect(error).toBeNull();
@@ -71,7 +71,7 @@ describe('[e2e] Phase 2 laser selection — real DB, no mocks', () => {
   });
 
   it('power on file: every fiber/CO2 laser row has a source power', async () => {
-    const { data, error } = await supabase.getPrivilegedClient(REASON).from('mhr_records')
+    const { data, error } = await database.getPrivilegedClient(REASON).from('mhr_records')
       .select('machine_name, power_kw').in('machine_class', ['fiber_laser', 'co2_laser']);
     expect(error).toBeNull();
     expect(data!.filter((r) => !(Number(r.power_kw) > 0)).map((r) => r.machine_name)).toEqual([]);
@@ -88,7 +88,7 @@ describe('[e2e] Phase 2 laser selection — real DB, no mocks', () => {
       if (cat !== 'Fiber Laser Cutting Machine' && cat !== 'Laser Cutting Machine') continue;
       lib.set(norm(c[cols.indexOf('name')]), { len: Number(c[cols.indexOf('bed_length_mm')]), wid: Number(c[cols.indexOf('bed_width_mm')]) });
     }
-    const { data, error } = await supabase.getPrivilegedClient(REASON).from('mhr_records')
+    const { data, error } = await database.getPrivilegedClient(REASON).from('mhr_records')
       .select('machine_name, max_x_mm, max_y_mm').in('machine_class', ['fiber_laser', 'co2_laser']);
     expect(error).toBeNull();
     const wrong = data!.filter((r) => {

@@ -59,7 +59,7 @@ describe('S3ObjectStore', () => {
     expect(await s.exists('b', 'nope')).toBe(false);
   });
 
-  it('refuses to overwrite unless asked (the same rule Supabase enforced), and overwrites when asked', async () => {
+  it('refuses to overwrite unless asked (never replace a file silently), and overwrites when asked', async () => {
     const { store: s } = store();
     await s.put('b', 'k', Buffer.from('1'));
     await expect(s.put('b', 'k', Buffer.from('2'))).rejects.toBeInstanceOf(ObjectExistsError);

@@ -57,10 +57,11 @@ export class DbTokenMinter {
     const cached = this.cache.get(cacheKey);
     if (cached && cached.expiresAtMs - REFRESH_BEFORE_EXPIRY_MS > nowMs) return cached.token;
 
-    const iat = Math.floor(nowMs / 1000);
-    const exp = iat + this.ttlSeconds;
+    // No `iat`: PostgREST rejects a token issued "in the future", which happens whenever the database's clock trails the backend's
+    // (a laptop's Docker VM after sleep). The lifetime is bounded by `exp` alone.
+    const exp = Math.floor(nowMs / 1000) + this.ttlSeconds;
     const head = encode({ alg: 'HS256', typ: 'JWT' });
-    const body = encode({ ...claims, iss: ISSUER, iat, exp });
+    const body = encode({ ...claims, iss: ISSUER, exp });
     const token = `${head}.${body}.${sign(this.secret, `${head}.${body}`)}`;
 
     if (this.cache.size >= MAX_CACHED) this.cache.delete(this.cache.keys().next().value as string); // oldest first

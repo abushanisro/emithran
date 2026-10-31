@@ -3,11 +3,11 @@ import { ManufacturingKnowledgeController } from './manufacturing-knowledge.cont
 import { ManufacturingKnowledgeService } from './manufacturing-knowledge.service';
 import { ProcessValidationService } from './services/process-validation.service';
 import { InspectionKnowledgeService } from './services/inspection-knowledge.service';
-import { SupabaseModule } from '../../common/supabase/supabase.module';
+import { DatabaseModule } from '../../common/database/database.module';
 import { LoggerModule } from '../../common/logger/logger.module';
 
 @Module({
-  imports: [SupabaseModule, LoggerModule],
+  imports: [DatabaseModule, LoggerModule],
   controllers: [ManufacturingKnowledgeController],
   providers: [ManufacturingKnowledgeService, ProcessValidationService, InspectionKnowledgeService],
   exports: [ManufacturingKnowledgeService, ProcessValidationService, InspectionKnowledgeService],

@@ -5,10 +5,10 @@ import { CostingModule } from '../costing/costing.module';
 import { CopilotController } from './copilot.controller';
 import { CopilotMemoryService } from './copilot-memory.service';
 import { CopilotService } from './copilot.service';
-import { SupabaseModule } from '../../common/supabase/supabase.module';
+import { DatabaseModule } from '../../common/database/database.module';
 
 @Module({
-  imports: [ConfigModule, BOMItemsModule, CostingModule, SupabaseModule],
+  imports: [ConfigModule, BOMItemsModule, CostingModule, DatabaseModule],
   controllers: [CopilotController],
   providers: [CopilotService, CopilotMemoryService],
 })

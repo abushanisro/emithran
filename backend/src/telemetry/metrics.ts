@@ -13,7 +13,7 @@ export const METRIC_LABEL_KEYS = [
   'emithran.operation',
   'emithran.outcome',
   'emithran.queue',
-  // Set by the HTTP client instrumentation (outbound calls to Supabase, the engines, FX).
+  // Set by the HTTP client instrumentation (outbound calls to PostgREST, the engines, FX).
   'server.address',
   'http.response.status_code',
   'error.type',

@@ -10,14 +10,14 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { SupabaseAuthGuard } from '@/common/guards/supabase-auth.guard';
+import { RequestAuthGuard } from '@/common/guards/request-auth.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { SubtaskService } from '../services/subtask.service';
 import { CreateSubtaskDto, UpdateSubtaskDto, SubtaskResponseDto } from '../dto/subtask.dto';
 
 @ApiTags('Production Subtasks')
 @Controller('api/production-planning/processes/subtasks')
-@UseGuards(SupabaseAuthGuard)
+@UseGuards(RequestAuthGuard)
 export class SubtaskController {
   constructor(private readonly subtaskService: SubtaskService) {}
 

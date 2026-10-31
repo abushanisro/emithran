@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { SupabaseService } from "../../../common/supabase/supabase.service";
+import { DatabaseService } from "../../../common/database/database.service";
 import type {
   IOperationCalculator,
   MachiningParams,
@@ -51,7 +51,7 @@ export class LaserCuttingCalculator implements IOperationCalculator {
   readonly operationKey = "laser_cutting";
   private readonly logger = new Logger(LaserCuttingCalculator.name);
 
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   validate(_params: MachiningParams, geo: FeatureGeometry): ValidationResult {
     const g = geo as LaserGeometry;
@@ -159,7 +159,7 @@ export class LaserCuttingCalculator implements IOperationCalculator {
     thicknessMm: number,
     targetPowerKw: number,
   ): Promise<{ speedMmMin: number; pierceSec: number; actualPowerKw: number }> {
-    const db = this.supabase.getPrivilegedClient("reference-data: laser_cutting_parameters");
+    const db = this.database.getPrivilegedClient("reference-data: laser_cutting_parameters");
 
     // Find closest matching thickness (DB has discrete steps: 1,2,3,4,5,6,8,10,12,16,20)
     const closestThickness = this.closestValue(

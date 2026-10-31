@@ -1,12 +1,12 @@
 import { ConfigService } from '@nestjs/config';
 
 import { verifyDbToken } from '../db/db-token';
-import { SupabaseService } from './supabase.service';
+import { DatabaseService } from './database.service';
 
 const SECRET = 's'.repeat(40);
 const USER = '11111111-1111-1111-1111-111111111111';
 
-const service = (values: Record<string, string>) => new SupabaseService(new ConfigService(values));
+const service = (values: Record<string, string>) => new DatabaseService(new ConfigService(values));
 const postgrest = { POSTGREST_URL: 'http://rest.internal:3000/', DB_JWT_SECRET: SECRET };
 
 /** What actually goes over the wire: the URL, the Authorization header, and a canned answer. */
@@ -22,7 +22,7 @@ function captureRequests() {
 
 afterEach(() => jest.restoreAllMocks());
 
-describe('SupabaseService (PostgREST on plain Postgres)', () => {
+describe('DatabaseService (PostgREST on plain Postgres)', () => {
   it('sends a privileged query to the PostgREST root (no /rest/v1) with a service_role token this backend signed', async () => {
     const calls = captureRequests();
     await service(postgrest).getPrivilegedClient('test: reference read').from('materials').select('id');
@@ -45,12 +45,7 @@ describe('SupabaseService (PostgREST on plain Postgres)', () => {
     expect(() => service(postgrest).getClient('  ')).toThrow('Access token is required');
   });
 
-  it.each(['auth', 'storage', 'functions', 'channel'])('says what replaces supabase.%s instead of returning undefined', (name) => {
-    const client = service(postgrest).getPrivilegedClient('test') as unknown as Record<string, unknown>;
-    expect(() => client[name]).toThrow(new RegExp(`supabase\\.${name} is not available \\(there is no Supabase\\)`));
-  });
-
-  it('needs no Supabase URL or keys', () => {
+  it('needs only the PostgREST address and the signing secret', () => {
     expect(() => service(postgrest).getPrivilegedClient('test')).not.toThrow();
   });
 

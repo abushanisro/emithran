@@ -6,10 +6,10 @@ import { QualityChecklistService } from './services/quality-checklist.service';
 import { PDFProcessorService } from './services/pdf-processor.service';
 import { DimensionExtractionService } from './services/dimension-extraction.service';
 import { PDFProcessingController } from './controllers/pdf-processing.controller';
-import { SupabaseModule } from '@/common/supabase/supabase.module';
+import { DatabaseModule } from '@/common/database/database.module';
 
 @Module({
-  imports: [SupabaseModule],
+  imports: [DatabaseModule],
   controllers: [
     QualityControlController,
     PDFProcessingController,

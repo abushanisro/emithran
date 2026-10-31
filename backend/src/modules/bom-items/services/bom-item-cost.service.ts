@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Logger } from '../../../common/logger/logger.service';
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../common/database/database.service';
 import { ExchangeRateService } from '../../../common/exchange-rate/exchange-rate.service';
 import { ROLLUP_REPORTING_CURRENCY } from '../costing/shared/core/persisted-currency-contract';
 import {
@@ -15,7 +15,7 @@ import { camelCase } from 'camel-case';
 @Injectable()
 export class BomItemCostService {
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly logger: Logger,
     // One FX snapshot per rollup comes from here. ExchangeRateModule is already
     // imported by BomItemsModule, so this needs no module change.
@@ -51,7 +51,7 @@ export class BomItemCostService {
    */
   async getOrCreateCost(bomItemId: string, userId: string, accessToken: string, organizationId?: string): Promise<BomItemCostDto> {
     // Try to get existing record
-    const { data: existing, error: fetchError } = await this.supabaseService
+    const { data: existing, error: fetchError } = await this.databaseService
       .getClient(accessToken)
       .from('bom_item_costs')
       .select('*')
@@ -63,7 +63,7 @@ export class BomItemCostService {
     }
 
     // Create new record if doesn't exist
-    const { data: newRecord, error: createError } = await this.supabaseService
+    const { data: newRecord, error: createError } = await this.databaseService
       .getClient(accessToken)
       .from('bom_item_costs')
       .insert({ bom_item_id: bomItemId, user_id: userId, organization_id: organizationId ?? null })
@@ -92,7 +92,7 @@ export class BomItemCostService {
     // Calculate own_cost and selling_price
     const updateData: any = { ...snakeData };
 
-    const { data: updated, error } = await this.supabaseService
+    const { data: updated, error } = await this.databaseService
       .getClient(accessToken)
       .from('bom_item_costs')
       .update({
@@ -120,7 +120,7 @@ export class BomItemCostService {
    */
   async getChildrenCosts(bomItemId: string, userId: string, accessToken: string): Promise<BomItemCostDto[]> {
     // First get all child items
-    const { data: childItems, error: itemsError } = await this.supabaseService
+    const { data: childItems, error: itemsError } = await this.databaseService
       .getClient(accessToken)
       .from('bom_items')
       .select('id')
@@ -139,7 +139,7 @@ export class BomItemCostService {
     const childIds = childItems.map(item => item.id);
 
     // Get costs for all children
-    const { data: costs, error: costsError } = await this.supabaseService
+    const { data: costs, error: costsError } = await this.databaseService
       .getClient(accessToken)
       .from('bom_item_costs')
       .select('*')
@@ -158,7 +158,7 @@ export class BomItemCostService {
    */
   async recalculateCost(bomItemId: string, userId: string, accessToken: string, organizationId?: string): Promise<BomItemCostDto> {
     // Get item details
-    const { data: item, error: itemError } = await this.supabaseService
+    const { data: item, error: itemError } = await this.databaseService
       .getClient(accessToken)
       .from('bom_items')
       .select('id, quantity, parent_item_id')
@@ -174,7 +174,7 @@ export class BomItemCostService {
     const costRecord = await this.getOrCreateCost(bomItemId, userId, accessToken, organizationId);
 
     // Get all children and their costs
-    const { data: children, error: childrenError} = await this.supabaseService
+    const { data: children, error: childrenError} = await this.databaseService
       .getClient(accessToken)
       .from('bom_items')
       .select('id, quantity')
@@ -197,7 +197,7 @@ export class BomItemCostService {
     //     never checked, and BOTH categories silently rolled up as 0;
     //   * summed amounts of unknown denomination and then declared the result
     //     final by clearing is_stale.
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
     const amounts: RollupSourceAmount[] = [];
 
     // Children: a child total is denominated in that child reporting currency
@@ -344,7 +344,7 @@ export class BomItemCostService {
    */
   async recalculateParentCosts(bomItemId: string, userId: string, accessToken: string, organizationId?: string): Promise<void> {
     // Get parent item
-    const { data: item, error } = await this.supabaseService
+    const { data: item, error } = await this.databaseService
       .getClient(accessToken)
       .from('bom_items')
       .select('parent_item_id')
@@ -371,7 +371,7 @@ export class BomItemCostService {
     this.logger.log(`Starting full cost recalculation for BOM ${bomId}`, 'BomItemCostService');
 
     // Get all items in the BOM
-    const { data: allItems, error: itemsError } = await this.supabaseService
+    const { data: allItems, error: itemsError } = await this.databaseService
       .getClient(accessToken)
       .from('bom_items')
       .select('id, parent_item_id')
@@ -433,7 +433,7 @@ export class BomItemCostService {
    */
   async getCostHierarchy(bomItemId: string, userId: string, accessToken: string): Promise<BomItemCostSummaryDto> {
     // Get item details
-    const { data: item, error: itemError } = await this.supabaseService
+    const { data: item, error: itemError } = await this.databaseService
       .getClient(accessToken)
       .from('bom_items')
       .select('id, name, item_type')
@@ -446,7 +446,7 @@ export class BomItemCostService {
     }
 
     // Get cost with full breakdown
-    const { data: cost } = await this.supabaseService
+    const { data: cost } = await this.databaseService
       .getClient(accessToken)
       .from('bom_item_costs')
       .select('total_cost, raw_material_cost, process_cost, tooling_cost, packaging_logistics_cost, procured_parts_cost, direct_children_cost, is_stale')
@@ -454,7 +454,7 @@ export class BomItemCostService {
       .single();
 
     // Get children count
-    const { data: children } = await this.supabaseService
+    const { data: children } = await this.databaseService
       .getClient(accessToken)
       .from('bom_items')
       .select('id')
@@ -489,7 +489,7 @@ export class BomItemCostService {
    * Get all stale costs that need recalculation
    */
   async getStaleCosts(userId: string, accessToken: string): Promise<BomItemCostDto[]> {
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('bom_item_costs')
       .select('*')
@@ -512,7 +512,7 @@ export class BomItemCostService {
     accessToken: string,
   ): Promise<BomItemCostSummaryDto[]> {
     // Get children with cost data
-    const { data: childCosts, error } = await this.supabaseService
+    const { data: childCosts, error } = await this.databaseService
       .getClient(accessToken)
       .from('bom_item_costs')
       .select(`
@@ -569,7 +569,7 @@ export class BomItemCostService {
    */
   async getBomCostSummary(bomId: string, userId: string, accessToken: string): Promise<BomItemCostSummaryDto[]> {
     // Get all root items (no parent) that have cost data
-    const { data: costsWithItems, error: costsError } = await this.supabaseService
+    const { data: costsWithItems, error: costsError } = await this.databaseService
       .getClient(accessToken)
       .from('bom_item_costs')
       .select(`
@@ -630,7 +630,7 @@ export class BomItemCostService {
     this.logger.log(`Generating cost report for BOM ${bomId}`, 'BomItemCostService');
 
     // Get BOM details
-    const { data: bom, error: bomError } = await this.supabaseService
+    const { data: bom, error: bomError } = await this.databaseService
       .getClient(accessToken)
       .from('boms')
       .select('id, name')
@@ -643,7 +643,7 @@ export class BomItemCostService {
     }
 
     // Get all items in the BOM
-    const { data: allItems, error: itemsError } = await this.supabaseService
+    const { data: allItems, error: itemsError } = await this.databaseService
       .getClient(accessToken)
       .from('bom_items')
       .select('id, name, item_type, parent_item_id')
@@ -658,7 +658,7 @@ export class BomItemCostService {
     const itemIds = allItems.map(item => item.id);
 
     // Get all cost records for these items
-    const { data: costs, error: costsError } = await this.supabaseService
+    const { data: costs, error: costsError } = await this.databaseService
       .getClient(accessToken)
       .from('bom_item_costs')
       .select('*')
