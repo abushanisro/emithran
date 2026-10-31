@@ -1,4 +1,4 @@
--- Migration 936: update a nomination's cost competency analysis in one transaction.
+-- Migration 937: update a nomination's cost competency analysis in one transaction.
 --
 -- The API used to update each cost row and each vendor value with its own request, so a failure part way left the analysis
 -- half-updated, and a vendor value that failed (or matched no row) was only logged. This function applies the whole payload or

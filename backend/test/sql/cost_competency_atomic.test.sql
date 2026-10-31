@@ -1,4 +1,4 @@
--- 936: a cost competency update applies all of its rows or none of them.
+-- 937: a cost competency update applies all of its rows or none of them.
 -- The two tables as migration 306 creates them (without the foreign key to the nomination, which this test does not need).
 CREATE TABLE public.cost_competency_analysis (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), nomination_evaluation_id uuid NOT NULL, cost_component varchar(255) NOT NULL,

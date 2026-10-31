@@ -8,7 +8,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 IMAGE="postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b"
-MIGRATIONS=(917_cad_uploads 918_free_tier_housekeeping 919_audit_events 920_job_queue 921_security_hardening 922_revoke_anon_table_access 923_cad_upload_analysed 930_postgres_compat 931_identity_functions 933_kpi_views 935_api_keys_auth 936_update_cost_competency_atomic)
+MIGRATIONS=(917_cad_uploads 918_free_tier_housekeeping 919_audit_events 920_job_queue 921_security_hardening 922_revoke_anon_table_access 923_cad_upload_analysed 930_postgres_compat 931_identity_functions 933_kpi_views 935_api_keys_auth 937_update_cost_competency_atomic)
 NAME="sqltest-$$"
 trap 'docker rm -f "$NAME" "$NAME-compat" >/dev/null 2>&1 || true' EXIT
 
