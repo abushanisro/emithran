@@ -20,7 +20,7 @@ Baseline: `7ea13f68895b6bcb3249c431d49cb61fc8619f8c`, 2026-10-11. No secret valu
 | EA-012 | High | Confirmed code; live exploit unverified | FIXED / unit-verified | unauthenticated server-side fetch of caller-supplied URL in VAVE drawing proxy |
 | EA-013 | Low | Confirmed | FIXED / runtime-verified | CAD image's baked `ENVIRONMENT=production` is not read by `AppConfig` |
 | EA-014 | High | Confirmed code | FIXED / unit-verified | copilot engineering memory shared across all users and tenants |
-| EA-015 | Medium | Confirmed code; runtime unverified | Open | RFQ email attaches BOM files by storage path |
+| EA-015 | Medium | Confirmed code; runtime unverified | FIXED / unit-verified | RFQ email attaches BOM files by storage path |
 
 ## EA-001 — historical privileged credential
 
@@ -152,3 +152,6 @@ Baseline: `7ea13f68895b6bcb3249c431d49cb61fc8619f8c`, 2026-10-11. No secret valu
 **`rfq-email.service.ts:prepareFileAttachments` passes `file2dPath`/`file3dPath` (storage object paths) to nodemailer as `path`, which nodemailer reads from the local filesystem or over HTTP.**
 
 - Impact: attachments resolve against the backend container's filesystem instead of storage, so RFQ sends with files likely fail. Not changed: requires choosing signed-URL vs downloaded-buffer attachments and size limits for multi-file RFQs.
+- Fix (`5b23ad00`, `05683e21`): attachments are downloaded buffers. Each path comes from the BOM item row read with the caller's own client, must pass `BomFileAccess.canRead` (the caller's own folder of a project they own; another user's path is refused without a database call) and is read from the object store; files over the size limit are skipped with a warning. The transport is created with `disableFileAccess` and `disableUrlAccess`, so a server path or URL in a path column is never attached.
+- Verification: `src/test/modules/rfq/services/rfq-email.service.spec.ts` (bytes attached after the check, another tenant's object never read, server file and URL never attached, transport locked) and `src/common/storage/bom-file-access.spec.ts`; 8 tests pass. Not verified: a real RFQ send with files against a mail server.
+- Next: Design 7.5 removes CAD from RFQ emails altogether (plan P1-15: link only).
