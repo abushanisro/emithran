@@ -1063,9 +1063,10 @@ export class BOMItemsController {
       id,
     );
 
-    // Update BOM item with STL path
+    // STL for browser viewing; the STEP stays the analysis source (the CAD engine cannot analyse a mesh), as on upload
     const updateData: UpdateBOMItemDto = {
       file3dPath: stlUploadResult.storagePath,
+      fileStepPath: bomItem.fileStepPath ?? bomItem.file3dPath,
     };
 
     return this.bomItemsService.update(id, updateData, user.id, token);
