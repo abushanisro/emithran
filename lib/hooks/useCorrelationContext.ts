@@ -91,7 +91,7 @@ function generateSessionId(): string {
 
   // Generate new session ID
   const timestamp = Date.now().toString(36);
-  const random = Math.random().toString(36).substring(2, 8);
+  const random = crypto.randomUUID().slice(0, 8);
   return `ses_${timestamp}_${random}`;
 }
 

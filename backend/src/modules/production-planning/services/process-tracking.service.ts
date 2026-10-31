@@ -13,6 +13,7 @@ import {
   QueryTrackingDto,
   ChangeType,
   EntityType,
+  BulkProgressItemDto,
 } from '../dto/process-tracking.dto';
 
 @Injectable()
@@ -564,7 +565,7 @@ export class ProcessTrackingService {
     }
   }
 
-  async bulkUpdateProgress(progressData: any[], userId: string, accessToken: string) {
+  async bulkUpdateProgress(progressData: BulkProgressItemDto[], userId: string, accessToken: string) {
     this.logger.log(`Bulk updating progress for ${progressData.length} items`, 'ProcessTrackingService');
 
     const results = [];

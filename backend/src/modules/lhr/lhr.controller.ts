@@ -13,6 +13,7 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  ParseArrayPipe,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
@@ -141,7 +142,7 @@ export class LHRController {
   @ApiOperation({ summary: 'Bulk create LHR records' })
   @ApiResponse({ status: 201, description: 'LHR records created successfully' })
   async bulkCreate(
-    @Body() data: CreateLHRDto[],
+    @Body(new ParseArrayPipe({ items: CreateLHRDto, whitelist: true })) data: CreateLHRDto[],
     @CurrentUser() user: User,
     @AccessToken() token: string,
   ) {

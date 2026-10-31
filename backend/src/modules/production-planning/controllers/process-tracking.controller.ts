@@ -10,6 +10,7 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  ParseArrayPipe,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ProcessTrackingService } from '../services/process-tracking.service';
@@ -23,6 +24,7 @@ import {
   CreateBomTrackingDto,
   UpdateBomTrackingDto,
   QueryTrackingDto,
+  BulkProgressItemDto,
 } from '../dto/process-tracking.dto';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../../common/decorators/access-token.decorator';
@@ -201,7 +203,7 @@ export class ProcessTrackingController {
   @ApiOperation({ summary: 'Bulk update progress for multiple items' })
   @ApiResponse({ status: 200, description: 'Bulk progress update completed successfully' })
   async bulkUpdateProgress(
-    @Body() progressData: any[],
+    @Body(new ParseArrayPipe({ items: BulkProgressItemDto, whitelist: true })) progressData: BulkProgressItemDto[],
     @CurrentUser('id') userId: string,
     @AccessToken() token: string,
   ) {
