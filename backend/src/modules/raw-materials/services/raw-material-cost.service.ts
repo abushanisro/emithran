@@ -24,6 +24,7 @@ import {
   RawMaterialCostCalculationEngine,
   RawMaterialCostInput,
 } from '../engines/raw-material-cost-calculation.engine';
+import { quoteFilterValue } from '../../../common/db/postgrest-filter';
 
 @Injectable()
 export class RawMaterialCostService {
@@ -615,12 +616,11 @@ export class RawMaterialCostService {
     try {
       const g = materialName.trim();
       const tokens = g.split(/[\s\-\/]+/).filter((t) => t.length >= 3);
-      // Double-quote each token value so PostgREST treats commas and parens inside
-      // the value as literals, not OR separators / grouping operators.
-      // e.g. "Steel," in a token would break .or() without quoting.
-      const q = (t: string) => `"${t.replace(/"/g, '\\"')}"`;
+      // Each value is quoted whole, wildcards included, so PostgREST treats commas and parens inside it as literals, not OR
+      // separators or grouping ("Steel," would break .or() otherwise). Quoting only the token (%"Steel"%) made the quotes literal.
+      const q = (t: string) => quoteFilterValue(`%${t}%`);
       const orClause = (tokens.length > 1 ? tokens : [g])
-        .flatMap((t) => [`name.ilike.%${q(t)}%`, `grade.ilike.%${q(t)}%`])
+        .flatMap((t) => [`name.ilike.${q(t)}`, `grade.ilike.${q(t)}`])
         .join(',');
       const { data } = await this.supabaseService
         .getClient(accessToken)

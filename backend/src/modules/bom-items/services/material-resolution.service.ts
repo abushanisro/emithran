@@ -15,6 +15,7 @@ import {
   type RankedMaterial,
 } from '../../raw-materials/material-search-ranking';
 import { expandSearchTermSpellingVariants } from '../../raw-materials/material-search-spelling';
+import { quoteFilterValue } from '../../../common/db/postgrest-filter';
 
 interface MatchedMaterialRow {
   id: string;
@@ -328,9 +329,9 @@ export class MaterialResolutionService {
       const orClause = terms
         .flatMap((t) => expandSearchTermSpellingVariants(t))
         .flatMap((v) => {
-          const safe = escapeLikePattern(v).replace(/"/g, '\\"');
+          const pattern = quoteFilterValue(`%${escapeLikePattern(v)}%`);
           return ['name', 'grade', 'astm_standard', 'din_standard', 'en_standard', 'jis_standard']
-            .map((col) => `${col}.ilike."%${safe}%"`);
+            .map((col) => `${col}.ilike.${pattern}`);
         })
         .join(',');
       ({ data } = await client

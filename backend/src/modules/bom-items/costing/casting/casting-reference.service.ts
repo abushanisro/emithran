@@ -23,6 +23,7 @@ import {
 import { PLASTIC_REFERENCE_SOURCE_VERSION } from '../plastic-molding/plastic-reference';
 import { CORE_LOOKUP_KEYS, CORE_TEXT_VARIABLE_KEYS, CORE_VARIABLE_KEYS, resolveCoreReference, type CoreReference } from './coremaking';
 import type { FinishingMachine } from './casting-finishing';
+import { quoteFilterValue } from '../../../../common/db/postgrest-filter';
 
 /** HR Rates machine class of the High Pressure Die Casting machines (migration 845). */
 const HPDC_MACHINE_CLASS = 'die_casting_high_pressure_die_casting';
@@ -187,5 +188,5 @@ export async function readFinishingMachines(client: SupabaseClient, machineClass
 
 /** PostgREST or-filter value: escape the ilike wildcards and the filter delimiters. */
 function escapeIlike(s: string): string {
-  return `"${s.replace(/[\\%_]/g, (c) => `\\${c}`).replace(/"/g, '\\"')}"`;
+  return quoteFilterValue(s.replace(/[\\%_]/g, (c) => `\\${c}`));
 }
