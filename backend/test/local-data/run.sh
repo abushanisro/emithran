@@ -11,7 +11,7 @@ trap cleanup EXIT
 IMAGE="postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b"
 docker network create "$ID" >/dev/null
 docker run -d --rm --name "$ID-src" --network "$ID" -e POSTGRES_PASSWORD=pw -v "$PWD/migrations":/migrations:ro -v "$PWD/test/sql":/sqltest:ro "$IMAGE" >/dev/null
-for _ in $(seq 1 60); do docker exec "$ID-src" pg_isready -U postgres >/dev/null 2>&1 && break; sleep 1; done
+for _ in $(seq 1 60); do docker exec "$ID-src" pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1 && break; sleep 1; done
 # The source looks like the real one just before the baseline: the shared stubs + migration 917 (everything up to the baseline number), plus tenant data.
 docker exec -i "$ID-src" psql -U postgres -v ON_ERROR_STOP=1 -q <<'SQL' >/dev/null
 \i /sqltest/00_stubs.sql

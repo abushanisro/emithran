@@ -47,14 +47,17 @@ psql_local() { docker exec -i "$(compose ps -q postgres)" psql -U postgres -v ON
 cmd_up() {
   ensure_secret
   compose up -d postgres storage
-  wait_for "Postgres" docker exec "$(compose ps -q postgres)" pg_isready -U postgres
+  wait_for "Postgres" docker exec "$(compose ps -q postgres)" pg_isready -h 127.0.0.1 -U postgres
   echo "Postgres on 127.0.0.1:$pg_port, files on 127.0.0.1:$s3_port"
 }
 
 cmd_load() {
   local dir="${1:?usage: local:load -- <baseline-dir>}"
   cmd_up
-  bash "$here/baseline-load.sh" "$dir" "postgres://postgres:postgres@host.docker.internal:$pg_port/postgres"
+  # Load over the stack's own Docker network: the host port is bound to 127.0.0.1, which Linux containers cannot reach.
+  local pg_container net; pg_container="$(compose ps -q postgres)"
+  net="$(docker inspect -f '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}}{{end}}' "$pg_container")"
+  DOCKER_NETWORK="$net" bash "$here/baseline-load.sh" "$dir" "postgres://postgres:postgres@postgres:5432/postgres"
   psql_local -c "ALTER ROLE authenticator WITH LOGIN PASSWORD 'authpw'" >/dev/null
   echo "applying migrations newer than the baseline..."
   (cd "$here/.." && MIGRATE_DATABASE_URL="postgres://postgres:postgres@127.0.0.1:$pg_port/postgres" npm run -s db:migrate -- --env local)

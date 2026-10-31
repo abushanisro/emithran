@@ -14,7 +14,7 @@ trap 'docker rm -f "$name" >/dev/null 2>&1 || true; rm -rf "$work"' EXIT
 
 age --decrypt --identity "$identity" < "$archive" | tar -C "$work" -xf -
 docker run -d --rm --name "$name" -e POSTGRES_PASSWORD=test --tmpfs /var/lib/postgresql/data -v "$work":/backup:ro "$IMAGE" >/dev/null
-for _ in $(seq 1 60); do docker exec "$name" pg_isready -U postgres >/dev/null 2>&1 && break; sleep 1; done
+for _ in $(seq 1 60); do docker exec "$name" pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1 && break; sleep 1; done
 
 # Roles that policies and grants mention must exist, or pg_restore reports errors for them.
 docker exec "$name" psql -U postgres -q -c "create role anon nologin; create role authenticated nologin; create role service_role nologin; create schema if not exists auth; create schema if not exists storage;" >/dev/null
