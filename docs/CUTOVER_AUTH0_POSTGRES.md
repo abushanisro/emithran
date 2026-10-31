@@ -17,6 +17,12 @@ then production**. Each step says how to know it worked. Nothing here needs a co
 1. Tenant. Create an **API**: identifier = `AUTH0_AUDIENCE` (e.g. `https://api.emithran.com`), signing algorithm **RS256** (the backend accepts nothing else).
 2. Create a **Regular Web Application**. Allowed Callback URL `<APP_BASE_URL>/auth/callback`, Allowed Logout URL `<APP_BASE_URL>`. Enable the
    Google social connection and the database connection; **turn off sign-ups** on the database connection (people are invited).
+   **Company SSO (Google Workspace)** instead of the Google social connection: in Google Cloud (project under the company's organisation),
+   OAuth consent screen **Internal**, then a Web OAuth client with redirect URI `https://<AUTH0_DOMAIN>/login/callback`. In Auth0,
+   Authentication → Enterprise → Google Workspace: purpose Authentication, the company domain, that client id and secret, Admin Directory
+   API and extended attributes off, "Use ID instead of Email" on; enable it for the application. Set
+   `NEXT_PUBLIC_AUTH0_GOOGLE_CONNECTION` to the connection's name so "Sign in with Google" goes to it. The Free plan includes one
+   enterprise connection; Home Realm Discovery is not in Free.
 3. Add a **post-login Action** so the access token carries what the backend reads (replace the namespace with your `AUTH0_CLAIM_NAMESPACE`):
    ```js
    exports.onExecutePostLogin = async (event, api) => {
