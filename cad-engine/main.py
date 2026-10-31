@@ -14,6 +14,7 @@ import logging
 import tempfile
 import hashlib
 import hmac
+import uuid
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from contextlib import asynccontextmanager
@@ -176,16 +177,23 @@ _CAD_API_KEY = os.getenv("CAD_ENGINE_API_KEY", "")
 _api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 async def require_api_key(api_key: str = Security(_api_key_header)):
+    # Fail closed in every environment, as the ecad-engine does: an unset key refuses every protected route instead of opening
+    # them. Local runs set CAD_ENGINE_API_KEY like any other deployment (docker-compose.yml requires it).
     if not _CAD_API_KEY:
-        if config.environment == "production":
-            # Fail closed: an unset key must never silently open every route in production.
-            raise HTTPException(
-                status_code=503,
-                detail="Service misconfigured: CAD_ENGINE_API_KEY is not set",
-            )
-        return  # key not configured — open only outside production (dev mode)
+        raise HTTPException(
+            status_code=503,
+            detail="Service misconfigured: CAD_ENGINE_API_KEY is not set",
+        )
     if not api_key or not hmac.compare_digest(api_key, _CAD_API_KEY):
         raise HTTPException(status_code=403, detail="Invalid or missing API key")
+
+def _internal_error(operation: str) -> HTTPException:
+    """A 500 for the exception being handled: the traceback goes to the log under a fresh error id, the caller gets only the
+    id. Exception text can carry file paths, library internals or customer content, so it never goes into the response."""
+    error_id = uuid.uuid4().hex
+    logger.error("%s failed (error %s)", operation, error_id, exc_info=True)
+    return HTTPException(status_code=500, detail=f"{operation} failed (error {error_id}).")
+
 
 # 2D Drawing analysis (Groq vision + PyMuPDF PDF rendering)
 app.include_router(drawing_router, prefix="/drawing", tags=["drawing"], dependencies=[Security(require_api_key)])
@@ -251,11 +259,11 @@ MAX_ASSEMBLY_FILES = 500
 async def ready() -> JSONResponse:
     """Readiness: can this instance take work? 200, or 503 with reason codes only (the response is unauthenticated).
 
-    /health stays a plain capability report. Backend readiness probes this route, so a production instance
-    with no API key, or with an unwritable temp directory, is reported before it fails a real upload.
+    /health stays a plain capability report. Backend readiness probes this route, so an instance with no API key
+    (which refuses every protected route), or with an unwritable temp directory, is reported before it fails a real upload.
     """
     problems = []
-    if config.environment == "production" and not _CAD_API_KEY:
+    if not _CAD_API_KEY:
         problems.append("api_key_not_configured")
     if not (os.path.isdir(config.temp_dir) and os.access(config.temp_dir, os.W_OK)):
         problems.append("temp_dir_not_writable")
@@ -611,10 +619,9 @@ def analyze_geometry_advanced(
             logger.info(f"Advanced analysis completed for {file.filename}")
             return response
 
-        except Exception as e:
+        except Exception:
             cleanup_files(step_path)
-            logger.error(f"Advanced analysis failed: {str(e)}", exc_info=True)
-            raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+            raise _internal_error("Analysis")
 
     finally:
         cleanup_files(step_path)
@@ -927,10 +934,9 @@ async def optimize_memory_only(
     except FileValidationError as e:
         cleanup_files(step_path)
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
+    except Exception:
         cleanup_files(step_path)
-        logger.error(f"Memory optimization failed: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Memory optimization failed: {str(e)}")
+        raise _internal_error("Memory optimization")
     finally:
         cleanup_files(step_path)
 

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException, Logger, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException, Logger, ConflictException, UnauthorizedException } from '@nestjs/common';
 import { UuidValidator } from '@/common/validators/uuid.validator';
 import { DatabaseService } from '@/common/database/database.service';
 import {
@@ -147,15 +147,15 @@ export class ProductionPlanningService {
         .insert(lotBomItems);
 
       if (itemsError) {
-        // If table doesn't exist, just log warning and continue
+        // A lot without its selected items is not the lot the user asked for: remove it and report the failure.
+        this.logger.error(`Failed to insert selected BOM items: ${itemsError.message}`, itemsError);
+        await database.from('production_lots').delete().eq('id', lotData.id);
         if (itemsError.message.includes('schema cache') || itemsError.message.includes('does not exist')) {
-          this.logger.warn('production_lot_bom_items table not available, skipping BOM item association');
-        } else {
-          // If inserting lot items fails for other reasons, we should clean up the lot
-          this.logger.error(`Failed to insert selected BOM items: ${itemsError.message}`, itemsError);
-          await database.from('production_lots').delete().eq('id', lotData.id);
-          throw new BadRequestException(`Failed to associate BOM items: ${itemsError.message}`);
+          throw new InternalServerErrorException(
+            'Production lot BOM item selection is unavailable: the production_lot_bom_items table is missing. The lot was not created.'
+          );
         }
+        throw new BadRequestException(`Failed to associate BOM items: ${itemsError.message}`);
       } else {
         this.logger.log(`Successfully associated ${createDto.selectedBomItemIds.length} BOM items with lot ${lotData.id}`);
       }
@@ -1139,18 +1139,7 @@ export class ProductionPlanningService {
   ): Promise<any> {
     const database = this.databaseService.getUserClient();
 
-    // TODO: Re-enable ownership verification once auth system is stable
-    // const { data: process } = await database
-    //   .from('production_processes')
-    //   .select('production_lot_id')
-    //   .eq('id', id)
-    //   .single();
-    //
-    // if (!process) {
-    //   throw new NotFoundException('Production process not found');
-    // }
-    //
-    // await this.verifyLotOwnership(process.production_lot_id, userId);
+    await this.verifyProcessOwnership(id, userId);
 
     let updateData: any = { ...updateDto };
     if (updateDto.machineAllocation) {
@@ -1195,7 +1184,8 @@ export class ProductionPlanningService {
   ): Promise<void> {
     const database = this.databaseService.getUserClient();
 
-    // Simple delete without ownership verification for now
+    await this.verifyProcessOwnership(id, userId);
+
     const { error } = await database
       .from('production_processes')
       .delete()
@@ -1700,15 +1690,23 @@ export class ProductionPlanningService {
   // ============================================================================
 
   private async verifyLotOwnership(lotId: string, userId: string): Promise<void> {
+    // Fail closed: without a user there is no owner to match.
+    if (!userId) {
+      throw new UnauthorizedException('User ID not found in authenticated request');
+    }
+
     const database = this.databaseService.getUserClient();
 
-    const { data } = await database
+    const { data, error } = await database
       .from('production_lots')
       .select('id, boms!inner(user_id)')
       .eq('id', lotId)
       .eq('boms.user_id', userId)
-      .single();
+      .maybeSingle();
 
+    if (error) {
+      throw new InternalServerErrorException(`Failed to verify production lot access: ${error.message}`);
+    }
     if (!data) {
       throw new NotFoundException('Production lot not found or you do not have permission to access it');
     }
@@ -1717,54 +1715,21 @@ export class ProductionPlanningService {
   private async verifyProcessOwnership(processId: string, userId: string): Promise<void> {
     const database = this.databaseService.getUserClient();
 
-    // Step 1: Get the production process
-    const { data: process, error: processError } = await database
+    const { data: process, error } = await database
       .from('production_processes')
       .select('id, production_lot_id')
       .eq('id', processId)
-      .single();
+      .maybeSingle();
 
-    if (processError) {
-      throw new NotFoundException(`Production process query failed: ${processError.message}`);
+    if (error) {
+      throw new InternalServerErrorException(`Failed to verify production process access: ${error.message}`);
     }
-
     if (!process) {
       throw new NotFoundException(`Production process with ID ${processId} not found`);
     }
 
-    // Step 2: Get the production lot and verify BOM ownership
-    const { data: lot, error: lotError } = await database
-      .from('production_lots')
-      .select(`
-        id,
-        bom_id,
-        boms!inner(
-          id,
-          user_id
-        )
-      `)
-      .eq('id', process.production_lot_id)
-      .single();
-
-    if (lotError) {
-      throw new NotFoundException(`Production lot query failed: ${lotError.message}`);
-    }
-
-    if (!lot) {
-      throw new NotFoundException(`Production lot with ID ${process.production_lot_id} not found`);
-    }
-
-    // BOM check is optional - some production lots may not have BOMs yet
-    if (lot.boms && lot.boms.length > 0) {
-      const firstBom = lot.boms[0];
-      if (firstBom) {
-        // Skip user permission check if user_id is not available (for dev/legacy auth)
-        if (userId && firstBom.user_id && firstBom.user_id !== userId) {
-          throw new NotFoundException('You do not have permission to access this production process');
-        }
-      }
-    }
-    // If no BOM exists, we still allow the operation to proceed
+    // A process belongs to whoever owns its lot's BOM; a lot without an owned BOM is not accessible.
+    await this.verifyLotOwnership(process.production_lot_id, userId);
   }
 
   private async calculateEstimatedLotCost(bomId: string, quantity: number): Promise<number> {
@@ -1949,63 +1914,18 @@ export class ProductionPlanningService {
     // Verify lot ownership
     await this.verifyLotOwnership(lotId, userId);
 
-    // Debug: Check what's in the production_processes table for this lot
     const { data: processes, error: processError } = await database
       .from('production_processes')
-      .select('*')
+      .select('id')
       .eq('production_lot_id', lotId);
 
-    this.logger.log('🔍 DEBUG: Processes found for lot', { lotId, processCount: processes?.length || 0, processes, processError });
-
-    // Also check if there are any subtasks at all in the database (regardless of lot)
-    const { data: allSubtasks, error: allSubtasksError } = await database
-      .from('process_subtasks')
-      .select('id, production_process_id, task_name')
-      .limit(10);
-
-    this.logger.log('🔍 DEBUG: Sample subtasks in database', { 
-      totalSubtasks: allSubtasks?.length || 0, 
-      sampleSubtasks: allSubtasks,
-      allSubtasksError 
-    });
-
-    if (processError || !processes || processes.length === 0) {
-      this.logger.warn('No processes found for lot, checking for orphaned subtasks', { lotId, processError });
-      
-      // Try to find subtasks that might exist without proper processes
-      const { data: orphanedSubtasks, error: orphanedError } = await database
-        .from('process_subtasks')
-        .select(`
-          id,
-          production_process_id,
-          task_name,
-          description,
-          task_sequence,
-          planned_start_date,
-          planned_end_date,
-          actual_start_date,
-          actual_end_date,
-          estimated_duration_hours,
-          assigned_operator,
-          operator_name,
-          status,
-          notes,
-          created_at,
-          updated_at
-        `);
-
-      this.logger.log('🔍 DEBUG: Orphaned subtasks check', { 
-        orphanedCount: orphanedSubtasks?.length || 0, 
-        orphanedSubtasks,
-        orphanedError 
-      });
-
-      return orphanedSubtasks || [];
+    if (processError) {
+      throw new InternalServerErrorException(`Failed to fetch production processes: ${processError.message}`);
+    }
+    if (!processes || processes.length === 0) {
+      return [];
     }
 
-    const processIds = processes.map(p => p.id);
-
-    // Fetch subtasks directly using process IDs
     const { data: subtasks, error } = await database
       .from('process_subtasks')
       .select(`
@@ -2024,20 +1944,25 @@ export class ProductionPlanningService {
         status,
         notes,
         created_at,
-        updated_at
+        updated_at,
+        bom_requirements:subtask_bom_requirements(
+          id,
+          bom_item_id,
+          required_quantity,
+          unit,
+          requirement_status,
+          bom_item:bom_items(
+            id,
+            part_number,
+            name,
+            description
+          )
+        )
       `)
-      .in('production_process_id', processIds)
+      .in('production_process_id', processes.map(p => p.id))
       .order('task_sequence', { ascending: true });
 
-    this.logger.log('🔍 DEBUG: Subtasks found for processes', { 
-      processIds, 
-      subtaskCount: subtasks?.length || 0, 
-      subtasks,
-      error 
-    });
-
     if (error) {
-      this.logger.error('Failed to fetch subtasks directly for lot', { error: error.message, lotId });
       throw new InternalServerErrorException(`Failed to fetch subtasks: ${error.message}`);
     }
 
@@ -2058,7 +1983,17 @@ export class ProductionPlanningService {
       notes: subtask.notes || '',
       createdAt: subtask.created_at,
       updatedAt: subtask.updated_at,
-      bomRequirements: [] // Simplified for now - BOM requirements can be fetched separately if needed
+      // Same shape as SubtaskService returns for one subtask.
+      bomRequirements: (subtask.bom_requirements || []).map((req: any) => ({
+        id: req.id,
+        bomItemId: req.bom_item_id,
+        partNumber: req.bom_item?.part_number,
+        partName: req.bom_item?.name || req.bom_item?.part_number,
+        description: req.bom_item?.description,
+        requiredQuantity: req.required_quantity,
+        unit: req.unit,
+        status: req.requirement_status
+      }))
     }));
   }
 

@@ -11,6 +11,7 @@ import {
   UseGuards,
   ParseUUIDPipe,
   Logger,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { RequestAuthGuard } from '@/common/guards/request-auth.guard';
@@ -35,7 +36,10 @@ export class ProjectReportsController {
   constructor(private readonly projectReportsService: ProjectReportsService) {}
 
   private getUserId(user: any): string {
-    return user?.id || '';
+    if (!user?.id) {
+      throw new UnauthorizedException('User ID not found in authenticated request');
+    }
+    return user.id;
   }
 
   // ============================================================================

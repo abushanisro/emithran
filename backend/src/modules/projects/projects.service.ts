@@ -521,107 +521,66 @@ export class ProjectsService {
 
       let targetUserId = dto.userId;
 
-      // If email provided, try to find user in auth system, otherwise create placeholder
+      // Only people who already have an account can be added; there are no placeholder members for unknown emails.
       if (dto.email && !targetUserId) {
-        try {
-          // Look the user up in the user directory
-          const existingId = await this.directory.findIdByEmail(dto.email);
-          if (existingId) {
-            targetUserId = existingId;
-          } else {
-            // For MVP: Create a placeholder UUID for pending user
-            targetUserId = crypto.randomUUID();
-            this.logger.log(`Creating placeholder team member for ${dto.email}`);
-          }
-        } catch (authError) {
-          this.logger.warn(`Could not check auth users: ${authError.message}`);
-          // Fallback: create placeholder UUID
-          targetUserId = crypto.randomUUID();
+        const existingId = await this.directory.findIdByEmail(dto.email);
+        if (!existingId) {
+          throw new NotFoundException(`No user with the email ${dto.email}. Invite them to the organization first.`);
         }
+        targetUserId = existingId;
       }
 
-      // Check if user is already a team member (skip for MVP as table may not exist)
-      try {
-        const { data: existingMember, error: existingError } = await client
-          .from('project_team_members')
-          .select('id')
-          .eq('project_id', id)
-          .eq('user_id', targetUserId)
-          .maybeSingle();
+      const { data: existingMember, error: existingError } = await client
+        .from('project_team_members')
+        .select('id')
+        .eq('project_id', id)
+        .eq('user_id', targetUserId)
+        .maybeSingle();
 
-        if (existingError) {
-          this.logger.warn(`Error checking existing team member (table may not exist): ${existingError.message}`);
-        } else if (existingMember) {
+      if (existingError) {
+        throw new Error(`Could not check existing team members: ${existingError.message}`);
+      }
+      if (existingMember) {
+        throw new ConflictException('This person is already a member of this project.');
+      }
+
+      const { data: newMember, error: insertError } = await client
+        .from('project_team_members')
+        .insert({
+          project_id: id,
+          user_id: targetUserId,
+          role: dto.role || TeamMemberRole.VIEWER,
+          email: dto.email,
+        })
+        .select(`
+          id,
+          user_id,
+          role,
+          created_at,
+          email
+        `)
+        .single();
+
+      if (insertError) {
+        // The unique index on (project_id, user_id) catches a concurrent add of the same person.
+        if (insertError.code === '23505') {
           throw new ConflictException('This person is already a member of this project.');
         }
-      } catch (tableError) {
-        this.logger.warn(`project_team_members table may not exist: ${tableError.message}`);
-        // Continue with MVP flow
+        throw new Error(`Could not insert team member: ${insertError.message}`);
       }
 
-      // Add team member (MVP: handle missing table gracefully)
-      try {
-        // Try to insert with email, fallback without email if column doesn't exist
-        let newMember, insertError;
-        try {
-          const result = await client
-            .from('project_team_members')
-            .insert({
-              project_id: id,
-              user_id: targetUserId,
-              role: dto.role || TeamMemberRole.VIEWER,
-              email: dto.email,
-            })
-            .select(`
-              id,
-              user_id,
-              role,
-              created_at,
-              email
-            `)
-            .single();
-          newMember = result.data;
-          insertError = result.error;
-        } catch (emailColumnError) {
-          this.logger.warn('Email column not found during insert, inserting without email');
-          const result = await client
-            .from('project_team_members')
-            .insert({
-              project_id: id,
-              user_id: targetUserId,
-              role: dto.role || TeamMemberRole.VIEWER,
-            })
-            .select(`
-              id,
-              user_id,
-              role,
-              created_at
-            `)
-            .single();
-          newMember = result.data;
-          insertError = result.error;
-        }
-
-        if (insertError) {
-          this.logger.error(`Error adding team member: ${insertError.message}`);
-          throw new InternalServerErrorException('Unable to add team member.');
-        }
-
-        return {
-          teamMember: {
-            id: newMember?.id,
-            userId: newMember?.user_id,
-            email: (newMember as any)?.email || dto.email,
-            name: ((newMember as any)?.email || dto.email)?.split('@')[0] || 'Team Member',
-            role: newMember?.role,
-            addedAt: newMember?.created_at,
-          },
-          message: 'Team member added successfully'
-        };
-      } catch (tableError) {
-        this.logger.error(`Error adding team member: ${tableError.message}`);
-        throw new InternalServerErrorException('Unable to add team member. Please ensure the project team members table exists.');
-      }
+      const email = newMember.email || dto.email;
+      return {
+        teamMember: {
+          id: newMember.id,
+          userId: newMember.user_id,
+          email,
+          name: email?.split('@')[0] || 'Team Member',
+          role: newMember.role,
+          addedAt: newMember.created_at,
+        },
+        message: 'Team member added successfully'
+      };
     } catch (error) {
       this.logger.error(`Error adding team member to project ${id}:`, error.message);
       

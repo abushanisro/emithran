@@ -26,7 +26,6 @@ import { SupplierEvaluationModule } from './modules/supplier-evaluation/supplier
 import { SupplierEvaluationGroupsModule } from './modules/supplier-evaluation-groups/supplier-evaluation-groups.module';
 import { RfqModule } from './modules/rfq/rfq.module';
 import { SupplierNominationsModule } from './modules/supplier-nominations/supplier-nominations.module';
-import { VendorQuotesModule } from './modules/vendor-quotes/vendor-quotes.module';
 import { ProductionPlanningModule } from './modules/production-planning/production-planning.module';
 import { ProcessPlanningModule } from './modules/process-planning/process-planning.module';
 import { QualityControlModule } from './modules/quality-control/quality-control.module';
@@ -104,7 +103,6 @@ import { AppController } from './app.controller';
     SupplierEvaluationGroupsModule,
     RfqModule,
     SupplierNominationsModule,
-    VendorQuotesModule,
     ProductionPlanningModule,
     ProcessPlanningModule,
     QualityControlModule,

@@ -111,3 +111,41 @@ def test_an_unexpected_failure_is_a_500_with_a_code_and_no_leak(monkeypatch):
     assert response.status_code == 500
     body = response.json()
     assert body["code"] == "internal_error" and body["requestId"] and "secret" not in json.dumps(body)
+
+
+@pytest.mark.parametrize(
+    ("raised", "code"),
+    [(main.ExtractionError("secret: /srv/acme/board.gtl line 7"), "extraction_failed"), (ValueError("secret: GBK bytes 0xff"), "unreadable_file")],
+)
+def test_a_refused_set_answers_with_an_error_id_and_logs_the_reason(client, monkeypatch, caplog, raised, code):
+    def refuse(*args, **kwargs):
+        raise raised
+
+    monkeypatch.setattr(main, "extract_board", refuse)
+    with caplog.at_level("WARNING", logger="ecad-engine"):
+        response = post(client)
+    body = response.json()
+    assert response.status_code == 422 and body["code"] == code
+    assert "secret" not in json.dumps(body) and len(body["errorId"]) == 32 and body["errorId"] in body["message"]
+    logged = [r for r in caplog.records if body["errorId"] in r.getMessage()]
+    assert logged and logged[0].exc_info[1] is raised
+
+
+def test_a_drawing_failure_does_not_echo_the_reason(client):
+    body = post(client, "/render/board").json()
+    assert body["code"] == "render_failed" and "outline" not in body["message"] and body["errorId"] in body["message"]
+
+
+def test_an_unreadable_pick_place_file_is_reported_by_id_only(monkeypatch, caplog):
+    from extraction import render
+
+    monkeypatch.setattr(render, "read_tabular", lambda f: ("placement", object()))
+
+    def refuse(table, layers):
+        raise render.PlacementError("Pick Place layer 'secret-customer-layer' is not in the placement layer table")
+
+    monkeypatch.setattr(render, "read_components", refuse)
+    with caplog.at_level("WARNING", logger="extraction.render"):
+        components, reason = render._scene_components([render.InputFile("pp.csv", b"x")], {})
+    assert components == [] and "secret" not in reason
+    assert any(r.exc_info and "secret" in str(r.exc_info[1]) for r in caplog.records)
