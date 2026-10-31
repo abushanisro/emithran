@@ -23,6 +23,14 @@ async function fetchMe(): Promise<Me> {
   }
 }
 
+/**
+ * "Sign in with Google" goes straight to one Auth0 connection: the company's Google Workspace connection when
+ * NEXT_PUBLIC_AUTH0_GOOGLE_CONNECTION names it (build time), otherwise Auth0's Google social connection.
+ */
+export function googleSignInPath(connection = process.env.NEXT_PUBLIC_AUTH0_GOOGLE_CONNECTION): string {
+  return `/auth/login?connection=${encodeURIComponent(connection ?? 'google-oauth2')}`
+}
+
 const go = (path: string) => {
   window.location.assign(path)
   return new Promise<never>(() => undefined)
@@ -59,7 +67,7 @@ export function Auth0AuthProvider({ children }: { children: React.ReactNode }) {
   )
 
   const signIn = useCallback(async () => go('/auth/login'), [])
-  const signInWithGoogle = useCallback(async () => go('/auth/login?connection=google-oauth2'), [])
+  const signInWithGoogle = useCallback(async () => go(googleSignInPath()), [])
   const signOut = useCallback(async () => { await sessionSource.signOutThisDevice() }, [])
 
   const value: AuthContextType = {
