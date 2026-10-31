@@ -9,6 +9,7 @@ status exactly; measurements within 0.1% (the same OCCT version computes both, s
   python3 geometry-worker/tests/parity.py
 """
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -45,11 +46,13 @@ def run_cpp(names):
     with tempfile.TemporaryDirectory() as out:
         # copy each fixture under its wire name inside the container, as the runner does, then run the worker
         shell = " && ".join(
-            [f"mkdir -p /in /out/parts"]
-            + [f"cp /fixtures/{n} /in/{w}" for n, w in zip(names, wire(names))]
-            + [f"/src/build/geometry-worker --deadline-ms 120000 /out {' '.join('/in/' + w for w in wire(names))}"]
+            [f"mkdir -p /tmp/in /out/parts"]
+            + [f"cp /fixtures/{n} /tmp/in/{w}" for n, w in zip(names, wire(names))]
+            + [f"/src/build/geometry-worker --deadline-ms 120000 /out {' '.join('/tmp/in/' + w for w in wire(names))}"]
         )
-        cmd = ["docker", "run", "--rm", "--platform", "linux/amd64", "-v", f"{FIXTURES}:/fixtures:ro", "-v", f"{out}:/out", "gw-build:dev", "sh", "-c", shell]
+        # as the calling user, so the files it writes into the temp folder can be cleaned up afterwards
+        cmd = ["docker", "run", "--rm", "--platform", "linux/amd64", "--user", f"{os.getuid()}:{os.getgid()}",
+               "-v", f"{FIXTURES}:/fixtures:ro", "-v", f"{out}:/out", "gw-build:dev", "sh", "-c", shell]
         subprocess.run(cmd, check=True, capture_output=True, text=True)
         return json.loads((Path(out) / "result.json").read_text())
 
