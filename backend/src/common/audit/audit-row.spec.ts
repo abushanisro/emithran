@@ -49,7 +49,7 @@ describe('sanitizeMeta', () => {
 
   it.each([
     ['a JWT', ['eyJhbGciOiJIUzI1NiJ9', 'eyJyb2xlIjoic2VydmljZV9yb2xlIn0', 'signature'].join('.')], // built at run time: no token-shaped literal in source
-    ['a Supabase secret key', 'sb_secret_abcdef123456'],
+    ['a Supabase secret key', ['sb', 'secret', 'abcdef123456'].join('_')], // built at run time, like the JWT above
     ['a bearer header', 'Bearer abcdefghijklmnop'],
     ['an Anthropic key', 'sk-ant-api03-xxxxxxxxxxxx'],
   ])('drops %s even under an allowed key', (_label, value) => {

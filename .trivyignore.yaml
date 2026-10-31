@@ -1,6 +1,54 @@
 # Reviewed exceptions to the Trivy scans in .github/workflows/security.yml. Every entry says why, and expires so it is
 # looked at again instead of being forgotten.
 vulnerabilities:
+  - id: CVE-2026-102276
+    paths:
+      - "usr/local/lib/node_modules/npm/node_modules/brace-expansion/package.json"
+    statement: >-
+      brace-expansion bundled inside npm in node:24-alpine (node 24.22.2, npm 11.19.1; the pinned digest is the latest tag). npm is only
+      used in the build stages; both runtime images (backend/Dockerfile, Dockerfile.frontend) delete npm before they ship.
+      Re-check when node:24-alpine ships an npm with the fixed brace-expansion (Dependabot will propose it).
+    expired_at: 2026-12-15
+  - id: CVE-2026-102278
+    paths:
+      - "usr/local/lib/node_modules/npm/node_modules/brace-expansion/package.json"
+    statement: >-
+      brace-expansion bundled inside npm in node:24-alpine (node 24.22.2, npm 11.19.1; the pinned digest is the latest tag). npm is only
+      used in the build stages; both runtime images (backend/Dockerfile, Dockerfile.frontend) delete npm before they ship.
+      Re-check when node:24-alpine ships an npm with the fixed brace-expansion (Dependabot will propose it).
+    expired_at: 2026-12-15
+  - id: CVE-2026-19534
+    paths:
+      - "usr/local/lib/node_modules/npm/node_modules/undici/package.json"
+    statement: >-
+      undici bundled inside npm in node:24-alpine (node 24.22.2, npm 11.19.1; the pinned digest is the latest tag). npm is only
+      used in the build stages; both runtime images (backend/Dockerfile, Dockerfile.frontend) delete npm before they ship.
+      Re-check when node:24-alpine ships an npm with the fixed undici (Dependabot will propose it).
+    expired_at: 2026-12-15
+  - id: CVE-2026-87018
+    paths:
+      - "usr/local/lib/node_modules/npm/node_modules/undici/package.json"
+    statement: >-
+      undici bundled inside npm in node:24-alpine (node 24.22.2, npm 11.19.1; the pinned digest is the latest tag). npm is only
+      used in the build stages; both runtime images (backend/Dockerfile, Dockerfile.frontend) delete npm before they ship.
+      Re-check when node:24-alpine ships an npm with the fixed undici (Dependabot will propose it).
+    expired_at: 2026-12-15
+  - id: CVE-2026-109383
+    paths:
+      - "usr/local/lib/node_modules/npm/node_modules/undici/package.json"
+    statement: >-
+      undici bundled inside npm in node:24-alpine (node 24.22.2, npm 11.19.1; the pinned digest is the latest tag). npm is only
+      used in the build stages; both runtime images (backend/Dockerfile, Dockerfile.frontend) delete npm before they ship.
+      Re-check when node:24-alpine ships an npm with the fixed undici (Dependabot will propose it).
+    expired_at: 2026-12-15
+  - id: CVE-2026-109869
+    paths:
+      - "usr/local/lib/node_modules/npm/node_modules/undici/package.json"
+    statement: >-
+      undici bundled inside npm in node:24-alpine (node 24.22.2, npm 11.19.1; the pinned digest is the latest tag). npm is only
+      used in the build stages; both runtime images (backend/Dockerfile, Dockerfile.frontend) delete npm before they ship.
+      Re-check when node:24-alpine ships an npm with the fixed undici (Dependabot will propose it).
+    expired_at: 2026-12-15
   - id: CVE-2026-116587
     paths:
       - "usr/local/bin/cloudflared"
