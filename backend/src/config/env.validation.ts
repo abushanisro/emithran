@@ -1,6 +1,6 @@
 import { DEFAULT_CAD_ENGINE_URL } from '../common/engine-urls';
 import { plainToClass } from 'class-transformer';
-import { IsString, IsNumber, IsOptional, validateSync, IsUrl, IsEnum, MinLength, IsIn, Min, Max, ValidateIf } from 'class-validator';
+import { IsString, IsNumber, IsOptional, validateSync, IsEnum, MinLength, IsIn, Min, Max } from 'class-validator';
 
 enum Environment {
   Development = 'development',
@@ -32,60 +32,29 @@ class EnvironmentVariables {
   @IsOptional()
   PORT: number = 4000;
 
-  // Backend uses server-side environment variables (not NEXT_PUBLIC_ prefix)
-  @ValidateIf((o: { DB_BACKEND?: string }) => o.DB_BACKEND !== 'postgrest')
-  @IsUrl()
-  SUPABASE_URL: string;
-
-  @ValidateIf((o: { DB_BACKEND?: string }) => o.DB_BACKEND !== 'postgrest')
+  // Data: a PostgREST in front of plain Postgres, with tokens this backend signs itself.
   @IsString()
-  @MinLength(20)
-  SUPABASE_ANON_KEY: string;
-
-  @ValidateIf((o: { DB_BACKEND?: string }) => o.DB_BACKEND !== 'postgrest')
-  @IsString()
-  @MinLength(20)
-  SUPABASE_SERVICE_KEY: string;
-
-  // Where data lives: 'supabase' (today) or 'postgrest' (a PostgREST in front of plain Postgres, signed by this backend).
-  @IsString()
-  @IsOptional()
-  @IsIn(['supabase', 'postgrest'])
-  DB_BACKEND: string = 'supabase';
-
-  @ValidateIf((o: { DB_BACKEND?: string }) => o.DB_BACKEND === 'postgrest')
-  @IsString()
-  POSTGREST_URL?: string;
+  POSTGREST_URL!: string;
 
   // The ONE secret PostgREST trusts (its jwt-secret); at least 32 characters. Never shared with the browser.
-  @ValidateIf((o: { DB_BACKEND?: string }) => o.DB_BACKEND === 'postgrest')
   @IsString()
   @MinLength(32)
-  DB_JWT_SECRET?: string;
+  DB_JWT_SECRET!: string;
 
-  // Where uploaded files live: 'supabase' (today) or 's3' (S3, Cloudflare R2 or MinIO).
+  // Files: an S3-compatible bucket (AWS S3, Cloudflare R2, MinIO, SeaweedFS).
   @IsString()
-  @IsOptional()
-  @IsIn(['supabase', 's3'])
-  STORAGE_BACKEND: string = 'supabase';
+  S3_BUCKET!: string;
 
-  @ValidateIf((o: { STORAGE_BACKEND?: string }) => o.STORAGE_BACKEND === 's3')
   @IsString()
-  S3_BUCKET?: string;
+  S3_REGION!: string;
 
-  @ValidateIf((o: { STORAGE_BACKEND?: string }) => o.STORAGE_BACKEND === 's3')
   @IsString()
-  S3_REGION?: string;
+  S3_ACCESS_KEY_ID!: string;
 
-  @ValidateIf((o: { STORAGE_BACKEND?: string }) => o.STORAGE_BACKEND === 's3')
   @IsString()
-  S3_ACCESS_KEY_ID?: string;
+  S3_SECRET_ACCESS_KEY!: string;
 
-  @ValidateIf((o: { STORAGE_BACKEND?: string }) => o.STORAGE_BACKEND === 's3')
-  @IsString()
-  S3_SECRET_ACCESS_KEY?: string;
-
-  // Only for S3-compatible services (R2, MinIO); empty for AWS.
+  // Only for S3-compatible services (R2, MinIO, SeaweedFS); empty for AWS.
   @IsString()
   @IsOptional()
   S3_ENDPOINT?: string;
@@ -94,24 +63,16 @@ class EnvironmentVariables {
   @IsOptional()
   S3_FORCE_PATH_STYLE?: string;
 
-  // Who signs people in: 'supabase' (today) or 'auth0' (the backend verifies Auth0 tokens itself; needs DB_BACKEND=postgrest).
+  // Sign-in: Auth0. The backend verifies Auth0 access tokens itself (RS256, issuer, audience).
   @IsString()
-  @IsOptional()
-  @IsIn(['supabase', 'auth0'])
-  AUTH_BACKEND: string = 'supabase';
+  AUTH0_DOMAIN!: string;
 
-  @ValidateIf((o: { AUTH_BACKEND?: string }) => o.AUTH_BACKEND === 'auth0')
   @IsString()
-  AUTH0_DOMAIN?: string;
-
-  @ValidateIf((o: { AUTH_BACKEND?: string }) => o.AUTH_BACKEND === 'auth0')
-  @IsString()
-  AUTH0_AUDIENCE?: string;
+  AUTH0_AUDIENCE!: string;
 
   // Namespace of the custom claims the post-login Action adds (email, email_verified, sid), e.g. https://emithran.com/
-  @ValidateIf((o: { AUTH_BACKEND?: string }) => o.AUTH_BACKEND === 'auth0')
   @IsString()
-  AUTH0_CLAIM_NAMESPACE?: string;
+  AUTH0_CLAIM_NAMESPACE!: string;
 
   @IsString()
   @IsOptional()

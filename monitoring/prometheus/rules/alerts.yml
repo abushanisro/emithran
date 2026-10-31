@@ -21,7 +21,7 @@ groups:
         labels: { severity: critical }
         annotations:
           summary: "Backend is up but its database check fails"
-          response: "Check the database provider status and the backend's SUPABASE_URL / POSTGREST_URL. Free-tier projects pause after a week idle."
+          response: "Check the database provider status, the postgrest service and the backend's POSTGREST_URL."
 
       - alert: EngineUnavailable
         expr: probe_success{job="probe-engines"} == 0

@@ -68,9 +68,7 @@ cmd_use() {
   ensure_secret
   local backup="${LOCAL_BACKUP_DIR:-$HOME}/emithran-env-backup-local-data-$(date +%Y%m%d-%H%M%S)"
   [ -f "$envfile" ] && cp "$envfile" "$backup" && chmod 600 "$backup" && echo "saved the current .env to $backup (restore: npm run local:restore)"
-  env_set DB_BACKEND postgrest
   env_set POSTGREST_URL "http://127.0.0.1:$api_port"
-  env_set STORAGE_BACKEND s3
   env_set S3_BUCKET emithran
   env_set S3_REGION us-east-1
   env_set S3_ENDPOINT "http://127.0.0.1:$s3_port"

@@ -30,14 +30,15 @@ printf 'ADMIN_FALLBACK_EMAIL=alice@example.com\nKEEP_ME=1\n' > "$TMP/.env"
 bash scripts/local-data.sh load "$TMP/baseline" 2>&1 | tail -4
 LOCAL_ENV_FILE="$TMP/.env" bash scripts/local-data.sh use >/dev/null
 fail=0
-for k in DB_BACKEND=postgrest STORAGE_BACKEND=s3 ALLOW_DEV_AUTH_BYPASS=true KEEP_ME=1; do grep -q "^$k$" "$TMP/.env" && echo "ok   .env has $k" || { echo "FAIL .env lacks $k"; fail=1; }; done
+for k in ALLOW_DEV_AUTH_BYPASS=true S3_FORCE_PATH_STYLE=true KEEP_ME=1; do grep -q "^$k$" "$TMP/.env" && echo "ok   .env has $k" || { echo "FAIL .env lacks $k"; fail=1; }; done
 npx ts-node -r tsconfig-paths/register -r reflect-metadata test/local-data/smoke.ts || fail=1
 # The real backend, built from source, in development mode against this stack, with NO Supabase setting at all (a clean copy of dist/, so the repo's .env cannot leak in).
 npx nest build >/dev/null 2>&1
 APP="$TMP/app/backend"; mkdir -p "$APP"; cp -r dist "$APP/dist"; cp package.json "$APP/"; ln -s "$PWD/node_modules" "$APP/node_modules"
 ( cd "$APP" && env -i PATH="$PATH" HOME="$HOME" NODE_ENV=development APP_ENV=local BACKEND_PORT=4529 CAD_UPLOAD_RUNNER=off ELECTRONICS_QUEUE_DRIVER=memory \
-    DB_BACKEND=postgrest POSTGREST_URL="http://127.0.0.1:$LOCAL_API_PORT" DB_JWT_SECRET="$(grep '^DB_JWT_SECRET=' "$TMP/.env" | cut -d= -f2-)" \
-    STORAGE_BACKEND=s3 S3_BUCKET=emithran S3_REGION=us-east-1 S3_ENDPOINT="http://127.0.0.1:$LOCAL_S3_PORT" S3_FORCE_PATH_STYLE=true S3_ACCESS_KEY_ID=test S3_SECRET_ACCESS_KEY=testtesttest \
+    POSTGREST_URL="http://127.0.0.1:$LOCAL_API_PORT" DB_JWT_SECRET="$(grep '^DB_JWT_SECRET=' "$TMP/.env" | cut -d= -f2-)" \
+    S3_BUCKET=emithran S3_REGION=us-east-1 S3_ENDPOINT="http://127.0.0.1:$LOCAL_S3_PORT" S3_FORCE_PATH_STYLE=true S3_ACCESS_KEY_ID=test S3_SECRET_ACCESS_KEY=testtesttest \
+    AUTH0_DOMAIN=t.eu.auth0.com AUTH0_AUDIENCE=https://api.example.com AUTH0_CLAIM_NAMESPACE=https://example.com/ \
     ALLOW_DEV_AUTH_BYPASS=true ADMIN_FALLBACK_EMAIL=alice@example.com node dist/main > "$TMP/backend.log" 2>&1 & echo $! > "$TMP/backend.pid" )
 for _ in $(seq 1 90); do curl -s -o /dev/null http://127.0.0.1:4529/api/health/live && break; sleep 1; done
 me="$(curl -s -m 10 http://127.0.0.1:4529/v1/api/auth/me)"
@@ -45,7 +46,7 @@ kill "$(cat "$TMP/backend.pid")" 2>/dev/null || true
 if echo "$me" | grep -q '11111111-1111-4111-8111-111111111111'; then echo "ok   the backend runs in development on local Postgres with no Supabase and acts as the dev account (Alice)"; else echo "FAIL backend /auth/me: $me"; tail -5 "$TMP/backend.log"; fail=1; fi
 bash scripts/local-data.sh restore >/dev/null
 # `load` stores the generated DB_JWT_SECRET, so the saved copy legitimately has it. What matters: the person's own lines return and the switch is undone.
-if grep -q '^KEEP_ME=1$' "$TMP/.env" && grep -q '^ADMIN_FALLBACK_EMAIL=alice@example.com$' "$TMP/.env" && ! grep -q '^DB_BACKEND=' "$TMP/.env" && ! grep -q '^ALLOW_DEV_AUTH_BYPASS=' "$TMP/.env"; then
+if grep -q '^KEEP_ME=1$' "$TMP/.env" && grep -q '^ADMIN_FALLBACK_EMAIL=alice@example.com$' "$TMP/.env" && ! grep -q '^POSTGREST_URL=' "$TMP/.env" && ! grep -q '^ALLOW_DEV_AUTH_BYPASS=' "$TMP/.env"; then
   echo "ok   local:restore brings the saved .env back and undoes the switch"
 else echo "FAIL local:restore did not restore the saved .env"; fail=1; fi
 exit $fail

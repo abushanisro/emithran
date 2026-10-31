@@ -9,14 +9,13 @@
  * Following industry best practices for health checks
  */
 
-import { Controller, Get, Post, VERSION_NEUTRAL } from '@nestjs/common';
+import { Controller, Get, VERSION_NEUTRAL } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { HealthCheckService, HealthCheck, HealthCheckResult } from '@nestjs/terminus';
 import { SupabaseHealthIndicator } from './indicators/supabase.health';
 import { EngineHealthIndicator } from './indicators/engine.health';
 import { ElectronicsQueueHealthIndicator } from '../electronics-costing/infrastructure/queue/queue.health';
-import { SupabaseService } from '../../common/supabase/supabase.service';
 import { Public } from '../../common/decorators/public.decorator';
 
 @ApiTags('Health')
@@ -26,7 +25,6 @@ export class HealthController {
   constructor(
     private readonly health: HealthCheckService,
     private readonly supabaseIndicator: SupabaseHealthIndicator,
-    private readonly supabaseService: SupabaseService,
     private readonly engineIndicator: EngineHealthIndicator,
     private readonly queueIndicator: ElectronicsQueueHealthIndicator,
     private readonly config: ConfigService,
@@ -86,27 +84,4 @@ export class HealthController {
       () => this.supabaseIndicator.checkDatabase('database'),
     ]);
   }
-
-  @Post('/reload-schema')
-  @ApiOperation({ summary: 'Reload Supabase schema cache' })
-  @ApiResponse({ status: 200, description: 'Schema cache reloaded successfully' })
-  @ApiResponse({ status: 500, description: 'Failed to reload schema cache' })
-  async reloadSchema() {
-    const success = await this.supabaseService.reloadSchemaCache();
-    
-    if (success) {
-      return {
-        success: true,
-        message: 'Schema cache reload triggered successfully',
-        timestamp: new Date().toISOString()
-      };
-    } else {
-      return {
-        success: false,
-        message: 'Failed to reload schema cache',
-        timestamp: new Date().toISOString()
-      };
-    }
-  }
-
 }

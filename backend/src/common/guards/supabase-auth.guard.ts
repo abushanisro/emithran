@@ -1,6 +1,5 @@
 import {
   Injectable,
-  Optional,
   CanActivate,
   ExecutionContext,
   UnauthorizedException,
@@ -10,7 +9,6 @@ import { IdentityService } from '../../modules/auth/identity.service';
 import { SupabaseService } from '../supabase/supabase.service';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { SessionActivityService } from '../session/session-activity.service';
-import { sessionIdFromAccessToken } from '../session/session-idle-policy';
 
 @Injectable()
 export class SupabaseAuthGuard implements CanActivate {
@@ -26,8 +24,7 @@ export class SupabaseAuthGuard implements CanActivate {
     private reflector: Reflector,
     private supabaseService: SupabaseService,
     private sessionActivity: SessionActivityService,
-    // Present only when AUTH_BACKEND=auth0 (see AuthModule); then it replaces the Supabase token check below.
-    @Optional() private identity?: IdentityService,
+    private identity: IdentityService,
   ) {}
 
   /**
@@ -83,7 +80,7 @@ export class SupabaseAuthGuard implements CanActivate {
    *
    * Failing here is strictly earlier than any database mutation, and names the
    * one setting that fixes it. Production is unaffected: a real bearer token
-   * resolves through verifyToken and never reaches this path.
+   * goes through IdentityService and never reaches this path.
    */
   private async getAdminFallbackUser() {
     const id = await this.resolveAdminUserId();
@@ -107,78 +104,27 @@ export class SupabaseAuthGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest();
-    const authHeader = request.headers.authorization;
+    const authHeader: unknown = request.headers.authorization;
+    const token = typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : null;
 
-    // Extract token from either Authorization header (normal case) OR ?token=
-    // query string (used by EventSource SSE, which can't send custom headers).
-    let token: string | null = null;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      token = authHeader.substring(7);
-    } else if (typeof request.query?.token === 'string' && request.query.token) {
-      token = request.query.token as string;
-    }
-
-    // Development fallback: no token at all → use cached admin user.
-    // Never applies in production — see `bypassAllowed`.
+    // Development fallback: no token at all → the configured bypass account. Never applies in production — see `bypassAllowed`.
     if (!token) {
       if (!this.bypassAllowed) {
         throw new UnauthorizedException('Authentication required');
       }
-      request.user = await this.getAdminFallbackUser();
-      request.accessToken = await this.getBypassAccessToken();
+      const user = await this.getAdminFallbackUser();
+      request.user = user;
+      request.accessToken = this.supabaseService.mintDbUserToken(user.id, { email: user.email });
       return true;
     }
 
-    if (this.identity) {
-      // Auth0: an invalid token, an uninvited person or an unreachable key set is rejected outright; the dev bypass above only
-      // covers a request with no token at all. The inactivity timeout applies exactly as for Supabase sessions.
-      const who = await this.identity.authenticate(token);
-      await this.sessionActivity.assertActive(who.sessionId, who.user.id, token);
-      request.user = who.user;
-      request.accessToken = who.dbToken;
-      request.sessionId = who.sessionId;
-      return true;
-    }
-
-    let user;
-    try {
-      user = await this.supabaseService.verifyToken(token);
-    } catch (err) {
-      // Token invalid → development fallback, no network call.
-      // Never applies in production — a bad token is rejected outright.
-      if (!this.bypassAllowed) {
-        throw err instanceof UnauthorizedException
-          ? err
-          : new UnauthorizedException('Invalid or expired token');
-      }
-      request.user = await this.getAdminFallbackUser();
-      request.accessToken = await this.getBypassAccessToken();
-      return true;
-    }
-
-    // Inactivity timeout, enforced here so no client can skip it. Outside the
-    // try above on purpose: an idle session must be rejected in every
-    // environment, never handed to the development fallback.
-    // verifyToken has already confirmed the token with Supabase, so its
-    // session_id claim can be trusted.
-    const sessionId = sessionIdFromAccessToken(token);
-    if (!sessionId) {
-      throw new UnauthorizedException('Invalid or expired token');
-    }
-    await this.sessionActivity.assertActive(sessionId, user.id, token);
-
-    request.user = user;
-    request.accessToken = token;
-    request.sessionId = sessionId;
+    // Auth0: an invalid token, an uninvited person or an unreachable key set is rejected outright (the bypass above only covers a
+    // request with no token at all). The inactivity timeout is enforced here so no client can skip it.
+    const who = await this.identity.authenticate(token);
+    await this.sessionActivity.assertActive(who.sessionId, who.user.id);
+    request.user = who.user;
+    request.accessToken = who.dbToken;
+    request.sessionId = who.sessionId;
     return true;
-  }
-
-  /**
-   * A real session token for the bypass account, so bypass requests are subject to
-   * RLS like any user. Null only if minting fails, in which case any user-scoped
-   * DB access fails closed rather than falling back to the service-role client.
-   */
-  private async getBypassAccessToken(): Promise<string | null> {
-    return this.supabaseService.mintUserAccessToken(this.adminUserEmail);
   }
 }

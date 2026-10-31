@@ -29,7 +29,6 @@ async function main(): Promise<void> {
   check(!!settings.AUTH0_CLIENT_ID, 'AUTH0_CLIENT_ID is set', 'AUTH0_CLIENT_ID is missing (from the Regular Web Application)');
   check(!!settings.AUTH0_CLIENT_SECRET, 'AUTH0_CLIENT_SECRET is set', 'AUTH0_CLIENT_SECRET is missing (from the Regular Web Application)');
   check(/^https?:\/\/\S+$/.test(settings.APP_BASE_URL ?? ''), `APP_BASE_URL is ${settings.APP_BASE_URL}`, 'APP_BASE_URL is missing (http://localhost:3000 in development)');
-  check(settings.DB_BACKEND === 'postgrest', 'DB_BACKEND=postgrest (Auth0 logins need the database token the backend signs)', 'AUTH_BACKEND=auth0 needs DB_BACKEND=postgrest first (npm run local:use, or the cloud database)');
 
   if (domain) {
     try {
@@ -44,7 +43,7 @@ async function main(): Promise<void> {
       bad(`could not reach https://${domain}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
-  console.log(failed ? '\nNot ready. Fix the FAIL lines, then run this again.' : '\nReady. Set AUTH_BACKEND=auth0 and restart.');
+  console.log(failed ? '\nNot ready. Fix the FAIL lines, then run this again.' : '\nReady. Restart the backend and the web app.');
   process.exit(failed ? 1 : 0);
 }
 

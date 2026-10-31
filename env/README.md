@@ -20,10 +20,13 @@ Build the frontend image **per environment**: `NEXT_PUBLIC_*` values are compile
 | Variable | What it is | Where it comes from |
 |---|---|---|
 | `APP_ENV` | `stage` or `prd`; the backend refuses to boot in production without it | you |
-| `SUPABASE_URL` | the project URL | Supabase, Project Settings, API |
-| `SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_...`, safe for the browser; becomes the frontend's key and the backend's `SUPABASE_ANON_KEY` | API Keys |
-| `SUPABASE_SECRET_KEY` | `sb_secret_...`, **server only, never in the frontend**; becomes the backend's `SUPABASE_SERVICE_KEY` | API Keys |
-| `MIGRATE_DATABASE_URL` | Postgres connection string for the migration runner only (the app holds no database connection); use the **session-mode pooler, port 5432** (not 6543, not the IPv6-only direct host) | Connect, Session pooler |
+| `MIGRATE_DATABASE_URL` | Postgres connection string for the migration runner and the nightly backup only (the app reaches the database through PostgREST) | your managed Postgres |
+| `POSTGREST_DB_URI` | connection string of the `authenticator` role, used by the PostgREST service | your managed Postgres (password set outside git) |
+| `DB_JWT_SECRET` | the one secret the backend signs database tokens with and PostgREST verifies; **server only** | generate: `openssl rand -hex 32` |
+| `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | the file bucket and a key limited to it; `S3_ENDPOINT` only for R2 or MinIO | your S3-compatible provider |
+| `TRUSTED_STORAGE_HOSTS` | the bucket's download host, which the file proxy and the browser's 3D viewer may fetch from | your S3-compatible provider |
+| `AUTH0_DOMAIN`, `AUTH0_AUDIENCE`, `AUTH0_CLAIM_NAMESPACE` | the tenant, the API identifier and the post-login Action's claim namespace | Auth0 (docs/CUTOVER_AUTH0_POSTGRES.md) |
+| `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_SECRET`, `APP_BASE_URL` | the web app's Auth0 application, its session secret and the public app URL; **server only** | Auth0; `AUTH0_SECRET`: `openssl rand -hex 32` |
 | `CAD_ENGINE_API_KEY`, `ECAD_ENGINE_API_KEY` | shared secrets between the backend and the engines | generate: `openssl rand -hex 32` |
 | `TUNNEL_TOKEN` | the Cloudflare Tunnel token; the tunnel is the only way into the host (no published ports) | Cloudflare Zero Trust, Tunnels |
 | `NEXT_PUBLIC_API_GATEWAY_URL`, `CORS_ORIGIN` | the public URL of the app, the same value for both: Cloudflare serves the frontend there and routes `/v1/*` to the backend, so the API is same-origin. The engines have no public URL | your DNS |

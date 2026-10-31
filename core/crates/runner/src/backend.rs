@@ -1,6 +1,6 @@
-//! What the runner needs from the database and file storage, and its two implementations: `Supabase` (database and files through
-//! Supabase) and `Platform` (PostgREST on plain Postgres with a token signed here, files in an S3-compatible bucket). Over HTTPS
-//! only: the runner holds no Postgres connection, like the rest of the backend.
+//! What the runner needs from the database and file storage, and its implementation `Platform`: PostgREST on plain Postgres with a
+//! token signed here, and files in an S3-compatible bucket. Over HTTPS only: the runner holds no Postgres connection, like the rest of
+//! the backend.
 
 use std::sync::Mutex;
 use std::time::Duration;
@@ -66,80 +66,61 @@ pub trait Backend {
     ) -> impl Future<Output = Result<(), BackendError>>;
 }
 
-enum Auth {
-    /// Supabase: one long-lived secret key, sent as `apikey` and bearer.
-    Key(String),
-    /// PostgREST: a short-lived service-role token signed with the shared secret (what the backend's own client uses).
-    Signed {
-        secret: String,
-        cached: Mutex<Option<(String, u64)>>,
-    },
+/// A short-lived service-role token signed with the shared secret (what the backend's own client uses), cached until near expiry.
+struct Auth {
+    secret: String,
+    cached: Mutex<Option<(String, u64)>>,
 }
 
 const TOKEN_LIFETIME: Duration = Duration::from_secs(300);
 const REFRESH_BEFORE_SECONDS: u64 = 30;
 
-/// The database half: the three calls on `cad_uploads`, over PostgREST (directly, or behind Supabase's `/rest/v1`).
+/// The database half: the three calls on `cad_uploads`, over PostgREST.
 struct Rest {
     http: reqwest::Client,
     url: String,
-    /// `/rest/v1` behind Supabase, empty on a bare PostgREST.
-    prefix: &'static str,
     auth: Auth,
 }
 
 impl Rest {
-    fn new(url: &str, prefix: &'static str, auth: Auth) -> Result<Self, BackendError> {
+    fn new(url: &str, auth: Auth) -> Result<Self, BackendError> {
         let http = reqwest::Client::builder()
             .timeout(Duration::from_secs(300))
             .build()?;
         Ok(Self {
             http,
             url: url.trim_end_matches('/').to_string(),
-            prefix,
             auth,
         })
     }
 
     fn bearer(&self) -> Result<String, BackendError> {
-        match &self.auth {
-            Auth::Key(key) => Ok(key.clone()),
-            Auth::Signed { secret, cached } => {
-                let now = now_seconds();
-                if let Ok(guard) = cached.lock()
-                    && let Some((token, expires)) = guard.as_ref()
-                    && *expires > now + REFRESH_BEFORE_SECONDS
-                {
-                    return Ok(token.clone());
-                }
-                let token = service_token(secret, now, TOKEN_LIFETIME).map_err(BackendError)?;
-                if let Ok(mut guard) = cached.lock() {
-                    *guard = Some((token.clone(), now + TOKEN_LIFETIME.as_secs()));
-                }
-                Ok(token)
-            }
+        let Auth { secret, cached } = &self.auth;
+        let now = now_seconds();
+        if let Ok(guard) = cached.lock()
+            && let Some((token, expires)) = guard.as_ref()
+            && *expires > now + REFRESH_BEFORE_SECONDS
+        {
+            return Ok(token.clone());
         }
+        let token = service_token(secret, now, TOKEN_LIFETIME).map_err(BackendError)?;
+        if let Ok(mut guard) = cached.lock() {
+            *guard = Some((token.clone(), now + TOKEN_LIFETIME.as_secs()));
+        }
+        Ok(token)
     }
 
-    /// `path` is relative to the service root (`/rest/v1/...` or `/storage/v1/...` on Supabase, `/...` on PostgREST).
+    /// `path` is relative to the PostgREST root.
     fn request(
         &self,
         method: reqwest::Method,
         path: &str,
     ) -> Result<reqwest::RequestBuilder, BackendError> {
         let bearer = self.bearer()?;
-        let mut request = self
+        Ok(self
             .http
             .request(method, format!("{}{path}", self.url))
-            .bearer_auth(&bearer);
-        if matches!(self.auth, Auth::Key(_)) {
-            request = request.header("apikey", bearer);
-        }
-        Ok(request)
-    }
-
-    fn table(&self, path: &str) -> String {
-        format!("{}{path}", self.prefix)
+            .bearer_auth(&bearer))
     }
 
     async fn ok(response: reqwest::Response) -> Result<reqwest::Response, BackendError> {
@@ -170,7 +151,7 @@ impl Rest {
         let response = Self::ok(
             self.request(
                 reqwest::Method::POST,
-                &self.table("/rpc/claim_next_cad_upload"),
+                "/rpc/claim_next_cad_upload",
             )?
             .json(&body)
             .send()
@@ -190,7 +171,7 @@ impl Rest {
         Self::ok(
             self.request(
                 reqwest::Method::PATCH,
-                &self.table(&format!("/cad_uploads?id=eq.{id}")),
+                &format!("/cad_uploads?id=eq.{id}"),
             )?
             .json(&body)
             .send()
@@ -215,7 +196,7 @@ impl Rest {
         Self::ok(
             self.request(
                 reqwest::Method::PATCH,
-                &self.table(&format!("/cad_uploads?id=eq.{id}")),
+                &format!("/cad_uploads?id=eq.{id}"),
             )?
             .json(&body)
             .send()
@@ -226,98 +207,7 @@ impl Rest {
     }
 }
 
-/// Database and files both through Supabase (what runs today).
-pub struct Supabase {
-    rest: Rest,
-}
-
-impl Supabase {
-    pub fn new(url: &str, secret_key: &str) -> Result<Self, BackendError> {
-        Ok(Self {
-            rest: Rest::new(url, "/rest/v1", Auth::Key(secret_key.to_string()))?,
-        })
-    }
-}
-
-impl Backend for Supabase {
-    async fn claim(
-        &self,
-        stale_seconds: u32,
-        max_attempts: u32,
-    ) -> Result<Option<Row>, BackendError> {
-        self.rest.claim(stale_seconds, max_attempts).await
-    }
-
-    async fn download(&self, path: &str) -> Result<Vec<u8>, BackendError> {
-        let response = Rest::ok(
-            self.rest
-                .request(
-                    reqwest::Method::GET,
-                    &format!("/storage/v1/object/{BUCKET}/{path}"),
-                )?
-                .send()
-                .await?,
-        )
-        .await?;
-        Ok(response.bytes().await?.to_vec())
-    }
-
-    async fn upload(&self, path: &str, bytes: Vec<u8>) -> Result<(), BackendError> {
-        let request = self.rest.request(
-            reqwest::Method::POST,
-            &format!("/storage/v1/object/{BUCKET}/{path}"),
-        )?;
-        Rest::ok(
-            request
-                .header("x-upsert", "true")
-                .header("content-type", "application/octet-stream")
-                .body(bytes)
-                .send()
-                .await?,
-        )
-        .await?;
-        Ok(())
-    }
-
-    async fn remove(&self, paths: &[String]) -> Result<(), BackendError> {
-        if paths.is_empty() {
-            return Ok(());
-        }
-        let body = serde_json::json!({ "prefixes": paths });
-        Rest::ok(
-            self.rest
-                .request(
-                    reqwest::Method::DELETE,
-                    &format!("/storage/v1/object/{BUCKET}"),
-                )?
-                .json(&body)
-                .send()
-                .await?,
-        )
-        .await?;
-        Ok(())
-    }
-
-    async fn mark_analysed(
-        &self,
-        id: &str,
-        result: &serde_json::Value,
-    ) -> Result<(), BackendError> {
-        self.rest.mark_analysed(id, result).await
-    }
-
-    async fn mark_failed(
-        &self,
-        id: &str,
-        retry: bool,
-        code: &str,
-        detail: &str,
-    ) -> Result<(), BackendError> {
-        self.rest.mark_failed(id, retry, code, detail).await
-    }
-}
-
-/// No Supabase at all: PostgREST on plain Postgres (token signed here) and an S3-compatible bucket.
+/// PostgREST on plain Postgres (token signed here) and an S3-compatible bucket.
 pub struct Platform {
     rest: Rest,
     files: S3,
@@ -330,8 +220,7 @@ impl Platform {
         Ok(Self {
             rest: Rest::new(
                 postgrest_url,
-                "",
-                Auth::Signed {
+                Auth {
                     secret: jwt_secret.to_string(),
                     cached: Mutex::new(None),
                 },

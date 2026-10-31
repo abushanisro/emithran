@@ -3,7 +3,6 @@
 // wrong environment's database. Pure (no database, no files): scripts/migrate.ts supplies the facts.
 import { createHash } from 'crypto';
 
-import { PRD_SUPABASE_HOST } from '../environment-guard';
 
 export interface MigrationFile {
   name: string;
@@ -76,35 +75,20 @@ export function planMigrations(files: MigrationFile[], applied: AppliedMigration
 export interface Target {
   env: string;
   appEnv: string | undefined;
-  supabaseUrl: string | undefined;
   databaseUrl: string | undefined;
   confirm: boolean;
   dryRun: boolean;
 }
 
 /**
- * Refuses a run whose pieces disagree: the env file must name the environment asked for, the database must belong to the
- * Supabase project that file names, production needs an explicit --confirm, and no other environment may use production's
- * project. Returns the list of reasons; empty means go.
+ * Refuses a run whose pieces disagree: the env file must name the environment asked for, and production needs an explicit --confirm
+ * (or --dry-run to see the plan). Returns the list of reasons; empty means go.
  */
 export function targetProblems(t: Target): string[] {
   const problems: string[] = [];
   if (!['local', 'stage', 'prd'].includes(t.env)) problems.push(`--env must be local, stage or prd (got "${t.env}")`);
   if (!t.databaseUrl) problems.push('MIGRATE_DATABASE_URL is not set');
-  if (t.env !== 'local') {
-    if (t.appEnv !== t.env) problems.push(`the env file says APP_ENV=${t.appEnv ?? '(unset)'} but --env is ${t.env}`);
-    let host = '';
-    try {
-      host = new URL(t.supabaseUrl ?? '').hostname;
-    } catch {
-      problems.push('SUPABASE_URL is not set or not a URL');
-    }
-    const ref = host.split('.')[0] ?? '';
-    if (host && !(t.databaseUrl ?? '').includes(ref)) problems.push(`MIGRATE_DATABASE_URL does not belong to the Supabase project ${ref} named by SUPABASE_URL`);
-    const isPrdProject = host === PRD_SUPABASE_HOST;
-    if (t.env === 'prd' && host && !isPrdProject) problems.push('--env prd, but SUPABASE_URL is not the production project');
-    if (t.env !== 'prd' && isPrdProject) problems.push(`--env ${t.env}, but SUPABASE_URL is the production project`);
-  }
+  if (t.env !== 'local' && t.appEnv !== t.env) problems.push(`the env file says APP_ENV=${t.appEnv ?? '(unset)'} but --env is ${t.env}`);
   if (t.env === 'prd' && !t.dryRun && !t.confirm) problems.push('production needs --confirm (or use --dry-run to see the plan)');
   return problems;
 }
