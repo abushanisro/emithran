@@ -10,9 +10,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { useBomItemCostAnalysis } from '@/lib/api/hooks/useCostAnalysis';
-import { useCostData } from '@/lib/providers/cost-data-provider';
 import { LocationComparisonPanel } from './LocationComparisonPanel';
-import { useEffect } from 'react';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -65,7 +63,6 @@ const MiniPie = ({ data }: { data: Array<{ label: string; value: number; color: 
 interface CostAnalysisEngineProps {
   bomId: string;
   bomName?: string;
-  itemCount?: number;
   bomItemId?: string;
   thumbnailUrl?: string;
   partNumber?: string;
@@ -79,7 +76,6 @@ interface CostAnalysisEngineProps {
 export const CostAnalysisEngine: React.FC<CostAnalysisEngineProps> = ({
   bomId,
   bomName = 'Assembly',
-  itemCount = 0,
   bomItemId,
   thumbnailUrl,
   partNumber,
@@ -87,15 +83,6 @@ export const CostAnalysisEngine: React.FC<CostAnalysisEngineProps> = ({
   material,
   location,
 }) => {
-  const { calculateBomCosts, getCostData, isCalculating } = useCostData();
-  const costData = getCostData(bomId);
-
-  useEffect(() => {
-    if (bomId && !costData && !isCalculating) {
-      calculateBomCosts(bomId, itemCount);
-    }
-  }, [bomId, costData, isCalculating, calculateBomCosts, itemCount]);
-
   const { data: analysis, isLoading, error, refetch } = useBomItemCostAnalysis(bomItemId);
 
   // ── No item selected ──────────────────────────────────────────────────────

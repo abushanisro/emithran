@@ -7,6 +7,7 @@
  */
 
 import { isTrustedStorageUrl } from '@/lib/server/safe-fetch';
+import { settingWithDevDefault } from '@/lib/utils/required-setting';
 
 // One trusted-storage rule for every server route (lib/server/safe-fetch): the
 // project's own storage host (plus TRUSTED_STORAGE_HOSTS), https, no
@@ -14,7 +15,12 @@ import { isTrustedStorageUrl } from '@/lib/server/safe-fetch';
 export { isTrustedStorageUrl };
 
 // On the server this is the private backend (API_URL); in the browser API_URL is undefined and the public URL is used.
-const BACKEND_URL = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/v1/api';
+// Resolved per request: localhost only outside production; a missing setting
+// in production throws naming the variable.
+const backendUrl = () =>
+  settingWithDevDefault(process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL, 'API_URL', 'http://localhost:4000/v1/api');
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Matches FileStorageService.generateStoragePath:
 // `${userId}/${projectId}/bom-items/${bomItemId}/${fileType}/${timestamp}_${filename}`
@@ -51,13 +57,22 @@ export async function resolveBomItemFileUrl(
   fileType: '2d' | '3d',
   authorization: string,
 ): Promise<BomItemFileUrlResult> {
+  // bomItemId comes from the request. The host is fixed by configuration, but
+  // an id such as ".." would still move the request to another backend path
+  // (encodeURIComponent leaves dots alone), carrying the caller's token, so
+  // only a UUID goes into the URL (fileType is already "2d" | "3d").
+  if (!UUID.test(bomItemId)) {
+    return { ok: false, status: 400, error: 'itemId must be a UUID' };
+  }
   const res = await fetch(
-    `${BACKEND_URL}/bom-items/${encodeURIComponent(bomItemId)}/file-url/${fileType}`,
+    `${backendUrl()}/bom-items/${bomItemId}/file-url/${fileType}`,
     {
       headers: {
         Authorization: authorization,
         'Content-Type': 'application/json',
       },
+      // The backend answers directly; never follow a redirect with the caller's token.
+      redirect: 'error',
     },
   );
 

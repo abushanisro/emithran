@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUser } from '@/lib/server/auth';
 import { fetchTrustedFile, PayloadTooLargeError, readLimited, UntrustedUrlError } from '@/lib/server/safe-fetch';
+import { settingWithDevDefault } from '@/lib/utils/required-setting';
 
 export async function POST(request: NextRequest) {
   const auth = await requireUser();
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Forward to backend PDF processing service
-    const backendResponse = await fetch(`${process.env.NEXT_PUBLIC_API_GATEWAY_URL || 'http://localhost:4000'}/v1/pdf-processing/validate-pdf`, {
+    const backendResponse = await fetch(`${settingWithDevDefault(process.env.NEXT_PUBLIC_API_GATEWAY_URL, 'NEXT_PUBLIC_API_GATEWAY_URL', 'http://localhost:4000')}/v1/pdf-processing/validate-pdf`, {
       method: 'POST',
       headers: {
         'Authorization': request.headers.get('Authorization') || '',

@@ -212,14 +212,15 @@ export interface CostAnalysisResult {
   qfdMatrix?: QFDMatrix;
 }
 
+// A component the AI did not return is null, never estimated.
 export interface ShouldCostResult {
   shouldCost: number;
-  materialCost: number;
-  processCost: number;
-  overhead: number;
-  margin: number;
+  materialCost: number | null;
+  processCost: number | null;
+  overhead: number | null;
+  margin: number | null;
   delta: number;
-  deltaPct: number;
+  deltaPct: number | null;
   benchmarkSource: string;
 }
 

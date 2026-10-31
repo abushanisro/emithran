@@ -742,23 +742,33 @@ export default function RFQPage() {
                 <div className="space-y-4">
                   <div className="border rounded-lg p-4">
                     <h4 className="font-medium mb-4">Email Communication History</h4>
+                    {/* Sent RFQs from /rfq/tracking — the only record of RFQ emails the backend keeps. */}
                     <div className="space-y-3">
-                      {/* Mock email history */}
-                      <div className="flex items-start gap-3 p-3 border rounded">
-                        <Mail className="h-4 w-4 mt-1 text-blue-600" />
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium">RFQ Invitation Sent</p>
-                            <span className="text-xs text-muted-foreground">2 hours ago</span>
+                      {trackingLoading ? (
+                        <p className="text-sm text-muted-foreground">Loading…</p>
+                      ) : trackingRecords && trackingRecords.length > 0 ? (
+                        trackingRecords.map(record => (
+                          <div key={record.id} className="flex items-start gap-3 p-3 border rounded">
+                            <Mail className="h-4 w-4 mt-1 text-blue-600" />
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between">
+                                <p className="text-sm font-medium">RFQ sent: {record.rfqName} ({record.rfqNumber})</p>
+                                <span className="text-xs text-muted-foreground">
+                                  {formatDistanceToNow(new Date(record.sentAt), { addSuffix: true })}
+                                </span>
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                To: {record.vendors.length ? record.vendors.map(v => v.name || 'Unknown vendor').join(', ') : '—'}
+                              </p>
+                            </div>
                           </div>
-                          <p className="text-xs text-muted-foreground">To: Chaitanya Hi-Tech, Yashoda Iron Industries, DABIR PRECITECH</p>
-                          <p className="text-xs mt-1">Subject: RFQ Request - Manufacturing Parts Quote</p>
+                        ))
+                      ) : (
+                        <div className="text-center py-4 text-muted-foreground">
+                          <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                          <p className="text-sm">No communications recorded yet</p>
                         </div>
-                      </div>
-                      <div className="text-center py-4 text-muted-foreground">
-                        <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                        <p className="text-sm">More communication history will appear here</p>
-                      </div>
+                      )}
                     </div>
                   </div>
                 </div>

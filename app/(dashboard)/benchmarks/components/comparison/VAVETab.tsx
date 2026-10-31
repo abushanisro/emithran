@@ -181,7 +181,7 @@ Be precise, data-driven, and cost-focused.`;
     }
 
     const data = await response.json();
-    const content = data.content?.[0]?.text || '';
+    const content: string = typeof data.text === 'string' ? data.text : '';
     
     // Extract JSON from response
     const jsonMatch = content.match(/\{[\s\S]*\}/);

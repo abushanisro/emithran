@@ -420,15 +420,16 @@ export function IdeaRepository({ projectId }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bomItems: items, focusAreas, shouldCostGaps: costs }),
       });
-      if (!res.ok) throw new Error('Ideation API failed');
-      const generated: CreateVaveIdea[] = await res.json();
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      if (!res.ok) throw new Error(body?.error ?? `Ideation failed (${res.status})`);
+      const generated = body as unknown as CreateVaveIdea[];
       if (!generated.length) {
         toast.error('AI returned no ideas — try adding more BOM data');
         return;
       }
       await bulkCreate.mutateAsync(generated);
-    } catch {
-      toast.error('Failed to generate ideas. Check AI configuration.');
+    } catch (error) {
+      toast.error(`Failed to generate ideas: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setGenerating(false);
     }

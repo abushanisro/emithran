@@ -9,20 +9,18 @@ import { useCostData } from '@/lib/providers/cost-data-provider';
 import { exportService } from '@/lib/services/export-service';
 import { apiClient } from '@/lib/api/client';
 import type { BOMItem } from '@/lib/api/hooks/useBOMItems';
-import type { CostCalculationResult } from '@/lib/services/cost-engine';
+import type { CostBreakdown } from '@/lib/services/cost-engine';
 
-const EMPTY_COST_BREAKDOWN: CostCalculationResult['breakdown'] = {
-  rawMaterialCost: 0,
-  processCost: 0,
-  toolingCost: 0,
-  packagingLogisticsCost: 0,
-  procuredPartsCost: 0,
-  overheadCost: 0,
-  directCost: 0,
-  sgaCost: 0,
-  profitAmount: 0,
-  totalCost: 0,
-  sellingPrice: 0,
+const UNKNOWN_COST_BREAKDOWN: CostBreakdown = {
+  rawMaterialCost: null,
+  processCost: null,
+  toolingCost: null,
+  packagingLogisticsCost: null,
+  procuredPartsCost: null,
+  sgaCost: null,
+  profitAmount: null,
+  totalCost: null,
+  sellingPrice: null,
 };
 
 interface BomCostReportWrapperProps {
@@ -31,11 +29,11 @@ interface BomCostReportWrapperProps {
 }
 
 const formatCurrency = (value: number | undefined | null) => {
-  if (value === undefined || value === null || isNaN(value)) return '$0.00';
+  if (value === undefined || value === null || isNaN(value)) return '—';
   return `$${value.toFixed(2)}`;
 };
 const formatPercentage = (value: number | undefined | null) => {
-  if (value === undefined || value === null || isNaN(value)) return '0.0%';
+  if (value === undefined || value === null || isNaN(value)) return '—';
   return `${value.toFixed(1)}%`;
 };
 
@@ -44,11 +42,12 @@ export const BomCostReportWrapper: React.FC<BomCostReportWrapperProps> = ({
   bomName = "Assembly" 
 }) => {
   // Use the cost data provider to get aggregated cost data
-  const { getCostData, getAggregatedData, calculateBomCosts, isCalculating } = useCostData();
+  const { getCostData, getAggregatedData, getError, calculateBomCosts, isCalculating } = useCostData();
   const [bomItems, setBomItems] = useState<BOMItem[]>([]);
   
   const costData = getCostData(bomId);
   const aggregated = getAggregatedData(bomId);
+  const costError = getError(bomId);
 
   // Fetch BOM items for detailed part information
   useEffect(() => {
@@ -68,12 +67,13 @@ export const BomCostReportWrapper: React.FC<BomCostReportWrapperProps> = ({
     }
   }, [bomId]);
 
-  // Trigger calculation only once when BOM is first loaded and no data exists
+  // Trigger calculation once when the BOM is first loaded. After a failure the
+  // error is shown with a retry button instead of retrying in a loop.
   useEffect(() => {
-    if (bomId && !costData && !isCalculating) {
+    if (bomId && !costData && !costError && !isCalculating) {
       calculateBomCosts(bomId);
     }
-  }, [bomId, costData, isCalculating, calculateBomCosts]);
+  }, [bomId, costData, costError, isCalculating, calculateBomCosts]);
 
   // Loading state
   if (isCalculating) {
@@ -83,6 +83,23 @@ export const BomCostReportWrapper: React.FC<BomCostReportWrapperProps> = ({
           <div className="flex items-center justify-center gap-3">
             <RefreshCw className="w-5 h-5 animate-spin text-primary" />
             <span className="text-muted-foreground">Calculating cost report...</span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (costError) {
+    return (
+      <Card>
+        <CardContent className="py-8">
+          <div className="text-center">
+            <p className="text-destructive font-medium mb-1">Cost report could not be loaded.</p>
+            <p className="text-xs text-muted-foreground mb-3">{costError}</p>
+            <Button variant="outline" size="sm" onClick={() => calculateBomCosts(bomId)}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Retry
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -179,7 +196,7 @@ export const BomCostReportWrapper: React.FC<BomCostReportWrapperProps> = ({
               <span className="text-xs font-medium text-muted-foreground">Tooling & Fixtures</span>
             </div>
             <div className="text-lg font-mono font-semibold">
-              {formatCurrency(aggregated.totalToolingCosts || 0)}
+              {formatCurrency(aggregated.totalToolingCosts)}
             </div>
           </div>
           
@@ -244,7 +261,7 @@ export const BomCostReportWrapper: React.FC<BomCostReportWrapperProps> = ({
                 {bomItems.length > 0 ? bomItems.map((bomItem, index) => {
                   // Find corresponding cost data for this BOM item
                   const costItem = costData.find(ci => ci.itemId === bomItem.id);
-                  const breakdown = costItem?.breakdown || EMPTY_COST_BREAKDOWN;
+                  const breakdown = costItem?.breakdown ?? UNKNOWN_COST_BREAKDOWN;
                   
                   const getItemTypeColor = (type: string) => {
                     switch (type) {
@@ -294,35 +311,35 @@ export const BomCostReportWrapper: React.FC<BomCostReportWrapperProps> = ({
                         {bomItem.quantity || 1} {bomItem.unit ? bomItem.unit : 'pcs'}
                       </td>
                       <td className="p-2 text-sm text-right font-mono border-r border-border">
-                        {formatCurrency(breakdown.rawMaterialCost || 0)}
+                        {formatCurrency(breakdown.rawMaterialCost)}
                       </td>
                       <td className="p-2 text-sm text-right font-mono border-r border-border">
-                        {formatCurrency(breakdown.processCost || 0)}
+                        {formatCurrency(breakdown.processCost)}
                       </td>
                       <td className="p-2 text-sm text-right font-mono border-r border-border">
-                        {formatCurrency(breakdown.toolingCost || 0)}
+                        {formatCurrency(breakdown.toolingCost)}
                       </td>
                       <td className="p-2 text-sm text-right font-mono border-r border-border">
-                        {formatCurrency(breakdown.packagingLogisticsCost || 0)}
+                        {formatCurrency(breakdown.packagingLogisticsCost)}
                       </td>
                       <td className="p-2 text-sm text-right font-mono border-r border-border">
-                        {formatCurrency(breakdown.procuredPartsCost || 0)}
+                        {formatCurrency(breakdown.procuredPartsCost)}
                       </td>
                       <td className="p-2 text-sm text-right font-mono border-r border-border">
-                        {formatCurrency(breakdown.sgaCost || 0)}
+                        {formatCurrency(breakdown.sgaCost)}
                       </td>
                       <td className="p-2 text-sm text-right font-mono border-r border-border">
-                        {formatCurrency(breakdown.profitAmount || 0)}
+                        {formatCurrency(breakdown.profitAmount)}
                       </td>
                       <td className="p-2 text-sm text-right font-mono font-semibold">
-                        {formatCurrency(breakdown.totalCost || 0)}
+                        {formatCurrency(breakdown.totalCost)}
                       </td>
                     </tr>
                   );
                 }) : 
                 // Fallback: show cost data items if BOM items are not loaded yet
                 costData.map((item, index) => {
-                  const breakdown = item.breakdown || {};
+                  const breakdown = item.breakdown;
                   
                   return (
                     <tr key={index} className="hover:bg-muted/30">
@@ -344,28 +361,28 @@ export const BomCostReportWrapper: React.FC<BomCostReportWrapperProps> = ({
                       </td>
                       <td className="p-2 text-sm text-right font-mono border-r border-border">1 pcs</td>
                       <td className="p-2 text-sm text-right font-mono border-r border-border">
-                        {formatCurrency(breakdown.rawMaterialCost || 0)}
+                        {formatCurrency(breakdown.rawMaterialCost)}
                       </td>
                       <td className="p-2 text-sm text-right font-mono border-r border-border">
-                        {formatCurrency(breakdown.processCost || 0)}
+                        {formatCurrency(breakdown.processCost)}
                       </td>
                       <td className="p-2 text-sm text-right font-mono border-r border-border">
-                        {formatCurrency(breakdown.toolingCost || 0)}
+                        {formatCurrency(breakdown.toolingCost)}
                       </td>
                       <td className="p-2 text-sm text-right font-mono border-r border-border">
-                        {formatCurrency(breakdown.packagingLogisticsCost || 0)}
+                        {formatCurrency(breakdown.packagingLogisticsCost)}
                       </td>
                       <td className="p-2 text-sm text-right font-mono border-r border-border">
-                        {formatCurrency(breakdown.procuredPartsCost || 0)}
+                        {formatCurrency(breakdown.procuredPartsCost)}
                       </td>
                       <td className="p-2 text-sm text-right font-mono border-r border-border">
-                        {formatCurrency(breakdown.sgaCost || 0)}
+                        {formatCurrency(breakdown.sgaCost)}
                       </td>
                       <td className="p-2 text-sm text-right font-mono border-r border-border">
-                        {formatCurrency(breakdown.profitAmount || 0)}
+                        {formatCurrency(breakdown.profitAmount)}
                       </td>
                       <td className="p-2 text-sm text-right font-mono font-semibold">
-                        {formatCurrency(breakdown.totalCost || 0)}
+                        {formatCurrency(breakdown.totalCost)}
                       </td>
                     </tr>
                   );
@@ -382,7 +399,7 @@ export const BomCostReportWrapper: React.FC<BomCostReportWrapperProps> = ({
                     {formatCurrency(aggregated.totalProcessCosts)}
                   </td>
                   <td className="p-2 text-sm text-right font-mono border-r border-border">
-                    {formatCurrency(aggregated.totalToolingCosts || 0)}
+                    {formatCurrency(aggregated.totalToolingCosts)}
                   </td>
                   <td className="p-2 text-sm text-right font-mono border-r border-border">
                     {formatCurrency(aggregated.totalPackagingLogistics)}
@@ -418,16 +435,25 @@ export const BomCostReportWrapper: React.FC<BomCostReportWrapperProps> = ({
 
               // Calculate totals for each type
               const calculateTypeTotal = (items: typeof bomItems) => {
-                return items.reduce((total, item) => {
-                  const costItem = costData.find(ci => ci.itemId === item.id);
-                  const cost = costItem?.breakdown?.totalCost || 0;
-                  return total + (isNaN(cost) ? 0 : cost);
-                }, 0);
+                // null when any item's cost is unknown: a total with a missing term is not a total.
+                let total = 0;
+                for (const item of items) {
+                  const cost = costData.find(ci => ci.itemId === item.id)?.breakdown.totalCost ?? null;
+                  if (cost === null) return null;
+                  total += cost;
+                }
+                return total;
               };
 
               const assemblyCost = calculateTypeTotal(assemblies);
               const subAssemblyCost = calculateTypeTotal(subAssemblies);
               const childPartCost = calculateTypeTotal(childParts);
+              const grandTotal =
+                assemblyCost === null || subAssemblyCost === null || childPartCost === null
+                  ? null
+                  : assemblyCost + subAssemblyCost + childPartCost;
+              const shareOf = (v: number | null) =>
+                v === null || grandTotal === null || grandTotal === 0 ? null : (v / grandTotal) * 100;
 
               return (
                 <div className="space-y-3">
@@ -450,7 +476,7 @@ export const BomCostReportWrapper: React.FC<BomCostReportWrapperProps> = ({
                       <div className="space-y-2">
                         {assemblies.map((item, index) => {
                           const costItem = costData.find(ci => ci.itemId === item.id);
-                          const itemCost = isNaN(costItem?.breakdown?.totalCost ?? 0) ? 0 : (costItem?.breakdown?.totalCost || 0);
+                          const itemCost = costItem?.breakdown.totalCost ?? null;
                           return (
                             <div key={index} className="flex items-center justify-between p-2 bg-background/50 rounded border border-border/50">
                               <div className="flex flex-col">
@@ -490,7 +516,7 @@ export const BomCostReportWrapper: React.FC<BomCostReportWrapperProps> = ({
                       <div className="space-y-2">
                         {subAssemblies.map((item, index) => {
                           const costItem = costData.find(ci => ci.itemId === item.id);
-                          const itemCost = isNaN(costItem?.breakdown?.totalCost ?? 0) ? 0 : (costItem?.breakdown?.totalCost || 0);
+                          const itemCost = costItem?.breakdown.totalCost ?? null;
                           return (
                             <div key={index} className="flex items-center justify-between p-2 bg-background/50 rounded border border-border/50">
                               <div className="flex flex-col">
@@ -530,7 +556,7 @@ export const BomCostReportWrapper: React.FC<BomCostReportWrapperProps> = ({
                       <div className="space-y-2">
                         {childParts.map((item, index) => {
                           const costItem = costData.find(ci => ci.itemId === item.id);
-                          const itemCost = isNaN(costItem?.breakdown?.totalCost ?? 0) ? 0 : (costItem?.breakdown?.totalCost || 0);
+                          const itemCost = costItem?.breakdown.totalCost ?? null;
                           return (
                             <div key={index} className="flex items-center justify-between p-2 bg-primary/10 rounded border border-primary/20">
                               <div className="flex flex-col">
@@ -562,13 +588,14 @@ export const BomCostReportWrapper: React.FC<BomCostReportWrapperProps> = ({
                       </div>
                       <div className="text-right">
                         <div className="text-2xl font-bold">
-                          {formatCurrency(assemblyCost + subAssemblyCost + childPartCost)}
+                          {formatCurrency(grandTotal)}
                         </div>
                         <div className="text-sm text-muted-foreground">
-                          {((assemblyCost + subAssemblyCost + childPartCost) === (aggregated?.totalCost || 0)) 
-                            ? '✓ Matches aggregated total' 
-                            : `⚠ Difference: ${formatCurrency(Math.abs((assemblyCost + subAssemblyCost + childPartCost) - (aggregated?.totalCost || 0)))}`
-                          }
+                          {grandTotal === null || aggregated.totalCost === null
+                            ? 'Total unknown: some items have no cost'
+                            : grandTotal === aggregated.totalCost
+                              ? '✓ Matches aggregated total'
+                              : `⚠ Difference: ${formatCurrency(Math.abs(grandTotal - aggregated.totalCost))}`}
                         </div>
                       </div>
                     </div>
@@ -578,21 +605,21 @@ export const BomCostReportWrapper: React.FC<BomCostReportWrapperProps> = ({
                       <div className="p-3 bg-primary/15 border border-primary/30 rounded-lg">
                         <div className="text-sm font-medium text-primary">Assembly</div>
                         <div className="text-lg font-bold text-primary">
-                          {formatPercentage((assemblyCost / (assemblyCost + subAssemblyCost + childPartCost || 1)) * 100)}
+                          {formatPercentage(shareOf(assemblyCost))}
                         </div>
                         <div className="text-xs text-primary/90">{formatCurrency(assemblyCost)}</div>
                       </div>
                       <div className="p-3 bg-primary/15 border border-primary/30 rounded-lg">
                         <div className="text-sm font-medium text-primary">Sub-Assembly</div>
                         <div className="text-lg font-bold text-primary">
-                          {formatPercentage((subAssemblyCost / (assemblyCost + subAssemblyCost + childPartCost || 1)) * 100)}
+                          {formatPercentage(shareOf(subAssemblyCost))}
                         </div>
                         <div className="text-xs text-primary/90">{formatCurrency(subAssemblyCost)}</div>
                       </div>
                       <div className="p-3 bg-primary/15 border border-primary/30 rounded-lg">
                         <div className="text-sm font-medium text-primary">Child Parts</div>
                         <div className="text-lg font-bold text-primary">
-                          {formatPercentage((childPartCost / (assemblyCost + subAssemblyCost + childPartCost || 1)) * 100)}
+                          {formatPercentage(shareOf(childPartCost))}
                         </div>
                         <div className="text-xs text-primary/90">{formatCurrency(childPartCost)}</div>
                       </div>

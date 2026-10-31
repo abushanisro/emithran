@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { requireUser } from '@/lib/server/auth';
+import { settingWithDevDefault } from '@/lib/utils/required-setting';
 
-const CAD_ENGINE_URL = process.env.CAD_ENGINE_URL ?? 'http://localhost:5055';
+// Resolved per request: localhost only outside production.
+const cadEngineUrl = () => settingWithDevDefault(process.env.CAD_ENGINE_URL, 'CAD_ENGINE_URL', 'http://localhost:5055');
 const CAD_ENGINE_API_KEY = process.env.CAD_ENGINE_API_KEY ?? '';
 
 /**
@@ -25,7 +27,7 @@ export async function POST(req: NextRequest) {
     }
 
     const cadResponse = await fetch(
-      `${CAD_ENGINE_URL}/convert/step-to-stl-base64`,
+      `${cadEngineUrl()}/convert/step-to-stl-base64`,
       { method: 'POST', body: formData, headers },
     );
 

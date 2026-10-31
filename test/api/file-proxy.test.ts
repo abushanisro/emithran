@@ -11,6 +11,7 @@ vi.mock('@/lib/server/auth', () => ({
 
 const fetchMock = vi.fn<typeof fetch>();
 const storageUrl = 'https://files.example.com/storage/v1/object/sign/drawings/part.pdf';
+const ITEM_ID = '0b5e8a3c-6f1d-4c2a-9e7b-1a2b3c4d5e6f';
 const request = (params: Record<string, string>) =>
   new NextRequest(`http://localhost/api/file-proxy?${new URLSearchParams(params)}`);
 
@@ -69,15 +70,35 @@ describe('file proxy destination boundary', () => {
     'https://user@files.example.com/part.pdf',
   ])('rejects an unsafe backend-provided URL without fetching storage: %s', async (url) => {
     fetchMock.mockResolvedValue(Response.json({ url }));
-    const response = await GET(request({ itemId: 'item-1', fileType: '2d' }));
+    const response = await GET(request({ itemId: ITEM_ID, fileType: '2d' }));
     expect(response.status).toBe(502);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['..', '.', '../../admin', 'item-1', `${ITEM_ID}/../x`])(
+    'rejects an item id that is not a UUID without calling the backend: %s',
+    async (itemId) => {
+      const response = await GET(request({ itemId, fileType: '2d' }));
+      expect(response.status).toBe(400);
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it('asks the backend without following redirects', async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ url: storageUrl }))
+      .mockResolvedValueOnce(new Response('file-bytes'));
+    await GET(request({ itemId: ITEM_ID, fileType: '2d' }));
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      expect.stringMatching(new RegExp(`/bom-items/${ITEM_ID}/file-url/2d$`)),
+      expect.objectContaining({ redirect: 'error' }),
+    );
   });
 
   it('streams a trusted backend-provided file URL', async () => {
     fetchMock.mockResolvedValueOnce(Response.json({ url: storageUrl }))
       .mockResolvedValueOnce(new Response('file-bytes'));
-    const response = await GET(request({ itemId: 'item-1', fileType: '3d' }));
+    const response = await GET(request({ itemId: ITEM_ID, fileType: '3d' }));
     expect(response.status).toBe(200);
     expect(fetchMock).toHaveBeenNthCalledWith(2, storageUrl, expect.objectContaining({ redirect: 'manual' }));
     expect(await response.text()).toBe('file-bytes');
