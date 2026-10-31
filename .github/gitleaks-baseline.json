@@ -10,15 +10,15 @@
   "Secret": "REDACTED",
   "File": "backend/src/test/modules/bom-items/costing/machining/setup-axis-rule.spec.ts",
   "SymlinkFile": "",
-  "Commit": "b26428c01c8455c846723f8ef2c2d25e1b5c05c6",
-  "Link": "https://github.com/abushanisro/emithran/blob/b26428c01c8455c846723f8ef2c2d25e1b5c05c6/backend/src/test/modules/bom-items/costing/machining/setup-axis-rule.spec.ts#L12",
+  "Commit": "8fa733ed8e6455528d261c7ff4b0d71fc0b6d5d6",
+  "Link": "https://github.com/abushanisro/emithran/blob/8fa733ed8e6455528d261c7ff4b0d71fc0b6d5d6/backend/src/test/modules/bom-items/costing/machining/setup-axis-rule.spec.ts#L12",
   "Entropy": 3.9701755,
   "Author": "abushanisro",
   "Email": "khanabushan09876@gmail.com",
   "Date": "2026-09-29T13:25:13Z",
   "Message": "feat: memory-driven machining ops, HR Rates process groups, one operation identity\n\n- Machining: tapping, keyway broaching, surface/internal grinding, hobbing,\n  shaving, gear routing, rotary broaching, chemical milling engines driven by\n  memory/ lookup tables (DB calculators, migration 804 regenerated)\n- Process group of a line = its machine's HR Rates group; hardcoded\n  machine_class -\u003e group maps removed; migrations 839-841 clean stored data\n  (Post Processing, legacy zero-cycle lines, duplicate molding presses)\n- mhr findAll paginates past the 1000-row PostgREST cap\n- Generators read memory/ CSVs (lib/memory-csv.js); retired JSON generators\n- Saved operation = engine line name everywhere (apply-route no longer writes\n  the class catalog name); Edit Process Cost opens with Process/Category/\n  Operation selected, incl. lines with no linked machine\n- HR Rates selection index (buildHrRatesIndex): one pass, O(1) picker lookups,\n  shared by HR Rates page and Edit Process Cost\n- cad-engine: polygon ring candidates, gear/chem-milling/polygon drawing callouts",
   "Tags": [],
-  "Fingerprint": "b26428c01c8455c846723f8ef2c2d25e1b5c05c6:backend/src/test/modules/bom-items/costing/machining/setup-axis-rule.spec.ts:generic-api-key:12"
+  "Fingerprint": "8fa733ed8e6455528d261c7ff4b0d71fc0b6d5d6:backend/src/test/modules/bom-items/costing/machining/setup-axis-rule.spec.ts:generic-api-key:12"
  },
  {
   "RuleID": "generic-api-key",
@@ -31,15 +31,15 @@
   "Secret": "REDACTED",
   "File": "cad-engine/.env.development",
   "SymlinkFile": "",
-  "Commit": "76525a5e44f445abab89ed005f32afd90778ac64",
-  "Link": "https://github.com/abushanisro/emithran/blob/76525a5e44f445abab89ed005f32afd90778ac64/cad-engine/.env.development#L26",
+  "Commit": "3e902231b3034c7f5e288baf8fa76e58e8bc3416",
+  "Link": "https://github.com/abushanisro/emithran/blob/3e902231b3034c7f5e288baf8fa76e58e8bc3416/cad-engine/.env.development#L26",
   "Entropy": 3.784942,
   "Author": "abushanisro",
   "Email": "khanabushan09876@gmail.com",
   "Date": "2026-06-29T23:17:04Z",
   "Message": "robot chase",
   "Tags": [],
-  "Fingerprint": "76525a5e44f445abab89ed005f32afd90778ac64:cad-engine/.env.development:generic-api-key:26"
+  "Fingerprint": "3e902231b3034c7f5e288baf8fa76e58e8bc3416:cad-engine/.env.development:generic-api-key:26"
  },
  {
   "RuleID": "generic-api-key",
@@ -52,15 +52,15 @@
   "Secret": "REDACTED",
   "File": "cad-engine/.env.production",
   "SymlinkFile": "",
-  "Commit": "76525a5e44f445abab89ed005f32afd90778ac64",
-  "Link": "https://github.com/abushanisro/emithran/blob/76525a5e44f445abab89ed005f32afd90778ac64/cad-engine/.env.production#L25",
+  "Commit": "3e902231b3034c7f5e288baf8fa76e58e8bc3416",
+  "Link": "https://github.com/abushanisro/emithran/blob/3e902231b3034c7f5e288baf8fa76e58e8bc3416/cad-engine/.env.production#L25",
   "Entropy": 3.784942,
   "Author": "abushanisro",
   "Email": "khanabushan09876@gmail.com",
   "Date": "2026-06-29T23:17:04Z",
   "Message": "robot chase",
   "Tags": [],
-  "Fingerprint": "76525a5e44f445abab89ed005f32afd90778ac64:cad-engine/.env.production:generic-api-key:25"
+  "Fingerprint": "3e902231b3034c7f5e288baf8fa76e58e8bc3416:cad-engine/.env.production:generic-api-key:25"
  },
  {
   "RuleID": "generic-api-key",
@@ -73,15 +73,15 @@
   "Secret": "REDACTED",
   "File": ".env.development",
   "SymlinkFile": "",
-  "Commit": "6f722f81310f43fdf075871cbf7afa248efac983",
-  "Link": "https://github.com/abushanisro/emithran/blob/6f722f81310f43fdf075871cbf7afa248efac983/.env.development#L37",
+  "Commit": "adfb84c384bd91c1488ae5be9ddaf4c6a405d765",
+  "Link": "https://github.com/abushanisro/emithran/blob/adfb84c384bd91c1488ae5be9ddaf4c6a405d765/.env.development#L37",
   "Entropy": 4.8481245,
   "Author": "abushanisro",
   "Email": "khanabushan09876@gmail.com",
   "Date": "2026-06-22T12:29:31Z",
   "Message": "98% fixed homepage",
   "Tags": [],
-  "Fingerprint": "6f722f81310f43fdf075871cbf7afa248efac983:.env.development:generic-api-key:37"
+  "Fingerprint": "adfb84c384bd91c1488ae5be9ddaf4c6a405d765:.env.development:generic-api-key:37"
  },
  {
   "RuleID": "generic-api-key",
@@ -94,15 +94,15 @@
   "Secret": "REDACTED",
   "File": ".env.production",
   "SymlinkFile": "",
-  "Commit": "6f722f81310f43fdf075871cbf7afa248efac983",
-  "Link": "https://github.com/abushanisro/emithran/blob/6f722f81310f43fdf075871cbf7afa248efac983/.env.production#L42",
+  "Commit": "adfb84c384bd91c1488ae5be9ddaf4c6a405d765",
+  "Link": "https://github.com/abushanisro/emithran/blob/adfb84c384bd91c1488ae5be9ddaf4c6a405d765/.env.production#L42",
   "Entropy": 4.8481245,
   "Author": "abushanisro",
   "Email": "khanabushan09876@gmail.com",
   "Date": "2026-06-22T12:29:31Z",
   "Message": "98% fixed homepage",
   "Tags": [],
-  "Fingerprint": "6f722f81310f43fdf075871cbf7afa248efac983:.env.production:generic-api-key:42"
+  "Fingerprint": "adfb84c384bd91c1488ae5be9ddaf4c6a405d765:.env.production:generic-api-key:42"
  },
  {
   "RuleID": "anthropic-api-key",
@@ -115,15 +115,15 @@
   "Secret": "REDACTED",
   "File": ".env.development",
   "SymlinkFile": "",
-  "Commit": "1792768aca99890a7425737ebb9e5910bf869499",
-  "Link": "https://github.com/abushanisro/emithran/blob/1792768aca99890a7425737ebb9e5910bf869499/.env.development#L36",
+  "Commit": "6bd7bb92256c7f7839f1508d71e39cd585676e11",
+  "Link": "https://github.com/abushanisro/emithran/blob/6bd7bb92256c7f7839f1508d71e39cd585676e11/.env.development#L36",
   "Entropy": 5.43995,
   "Author": "abushanisro",
   "Email": "khanabushan09876@gmail.com",
   "Date": "2026-06-13T08:33:15Z",
   "Message": "98% fixed homepage",
   "Tags": [],
-  "Fingerprint": "1792768aca99890a7425737ebb9e5910bf869499:.env.development:anthropic-api-key:36"
+  "Fingerprint": "6bd7bb92256c7f7839f1508d71e39cd585676e11:.env.development:anthropic-api-key:36"
  },
  {
   "RuleID": "anthropic-api-key",
@@ -136,15 +136,15 @@
   "Secret": "REDACTED",
   "File": ".env.production",
   "SymlinkFile": "",
-  "Commit": "1792768aca99890a7425737ebb9e5910bf869499",
-  "Link": "https://github.com/abushanisro/emithran/blob/1792768aca99890a7425737ebb9e5910bf869499/.env.production#L41",
+  "Commit": "6bd7bb92256c7f7839f1508d71e39cd585676e11",
+  "Link": "https://github.com/abushanisro/emithran/blob/6bd7bb92256c7f7839f1508d71e39cd585676e11/.env.production#L41",
   "Entropy": 5.43995,
   "Author": "abushanisro",
   "Email": "khanabushan09876@gmail.com",
   "Date": "2026-06-13T08:33:15Z",
   "Message": "98% fixed homepage",
   "Tags": [],
-  "Fingerprint": "1792768aca99890a7425737ebb9e5910bf869499:.env.production:anthropic-api-key:41"
+  "Fingerprint": "6bd7bb92256c7f7839f1508d71e39cd585676e11:.env.production:anthropic-api-key:41"
  },
  {
   "RuleID": "gcp-api-key",
@@ -157,15 +157,15 @@
   "Secret": "REDACTED",
   "File": ".env.production",
   "SymlinkFile": "",
-  "Commit": "ca47219ca7fc3b0779510c754ae1aabc8abc3392",
-  "Link": "https://github.com/abushanisro/emithran/blob/ca47219ca7fc3b0779510c754ae1aabc8abc3392/.env.production#L31",
+  "Commit": "f95f033c51b0dfaf20572c410061f7b2539b8aa8",
+  "Link": "https://github.com/abushanisro/emithran/blob/f95f033c51b0dfaf20572c410061f7b2539b8aa8/.env.production#L31",
   "Entropy": 4.8045077,
   "Author": "abushanisro",
   "Email": "khanabushan09876@gmail.com",
   "Date": "2026-06-12T10:58:59Z",
   "Message": "feat: add Google Maps API key and update CSP for delivery module",
   "Tags": [],
-  "Fingerprint": "ca47219ca7fc3b0779510c754ae1aabc8abc3392:.env.production:gcp-api-key:31"
+  "Fingerprint": "f95f033c51b0dfaf20572c410061f7b2539b8aa8:.env.production:gcp-api-key:31"
  },
  {
   "RuleID": "jwt",
@@ -178,15 +178,15 @@
   "Secret": "REDACTED",
   "File": ".env.development",
   "SymlinkFile": "",
-  "Commit": "5115a55d073a6f242f02788d4c45bbd6a71b73ed",
-  "Link": "https://github.com/abushanisro/emithran/blob/5115a55d073a6f242f02788d4c45bbd6a71b73ed/.env.development#L20",
+  "Commit": "f53a28ed7fc7d5fb14c18e71d788d2a07fa19a6e",
+  "Link": "https://github.com/abushanisro/emithran/blob/f53a28ed7fc7d5fb14c18e71d788d2a07fa19a6e/.env.development#L20",
   "Entropy": 5.575413,
   "Author": "abushanisro",
   "Email": "khanabushan09876@gmail.com",
   "Date": "2026-05-28T13:31:38Z",
   "Message": "balance",
   "Tags": [],
-  "Fingerprint": "5115a55d073a6f242f02788d4c45bbd6a71b73ed:.env.development:jwt:20"
+  "Fingerprint": "f53a28ed7fc7d5fb14c18e71d788d2a07fa19a6e:.env.development:jwt:20"
  },
  {
   "RuleID": "jwt",
@@ -199,15 +199,15 @@
   "Secret": "REDACTED",
   "File": ".env.production",
   "SymlinkFile": "",
-  "Commit": "5115a55d073a6f242f02788d4c45bbd6a71b73ed",
-  "Link": "https://github.com/abushanisro/emithran/blob/5115a55d073a6f242f02788d4c45bbd6a71b73ed/.env.production#L20",
+  "Commit": "f53a28ed7fc7d5fb14c18e71d788d2a07fa19a6e",
+  "Link": "https://github.com/abushanisro/emithran/blob/f53a28ed7fc7d5fb14c18e71d788d2a07fa19a6e/.env.production#L20",
   "Entropy": 5.575413,
   "Author": "abushanisro",
   "Email": "khanabushan09876@gmail.com",
   "Date": "2026-05-28T13:31:38Z",
   "Message": "balance",
   "Tags": [],
-  "Fingerprint": "5115a55d073a6f242f02788d4c45bbd6a71b73ed:.env.production:jwt:20"
+  "Fingerprint": "f53a28ed7fc7d5fb14c18e71d788d2a07fa19a6e:.env.production:jwt:20"
  },
  {
   "RuleID": "jwt",
@@ -220,15 +220,15 @@
   "Secret": "REDACTED",
   "File": ".env.development",
   "SymlinkFile": "",
-  "Commit": "5115a55d073a6f242f02788d4c45bbd6a71b73ed",
-  "Link": "https://github.com/abushanisro/emithran/blob/5115a55d073a6f242f02788d4c45bbd6a71b73ed/.env.development#L24",
+  "Commit": "f53a28ed7fc7d5fb14c18e71d788d2a07fa19a6e",
+  "Link": "https://github.com/abushanisro/emithran/blob/f53a28ed7fc7d5fb14c18e71d788d2a07fa19a6e/.env.development#L24",
   "Entropy": 5.575413,
   "Author": "abushanisro",
   "Email": "khanabushan09876@gmail.com",
   "Date": "2026-05-28T13:31:38Z",
   "Message": "balance",
   "Tags": [],
-  "Fingerprint": "5115a55d073a6f242f02788d4c45bbd6a71b73ed:.env.development:jwt:24"
+  "Fingerprint": "f53a28ed7fc7d5fb14c18e71d788d2a07fa19a6e:.env.development:jwt:24"
  },
  {
   "RuleID": "jwt",
@@ -241,15 +241,15 @@
   "Secret": "REDACTED",
   "File": ".env.production",
   "SymlinkFile": "",
-  "Commit": "5115a55d073a6f242f02788d4c45bbd6a71b73ed",
-  "Link": "https://github.com/abushanisro/emithran/blob/5115a55d073a6f242f02788d4c45bbd6a71b73ed/.env.production#L24",
+  "Commit": "f53a28ed7fc7d5fb14c18e71d788d2a07fa19a6e",
+  "Link": "https://github.com/abushanisro/emithran/blob/f53a28ed7fc7d5fb14c18e71d788d2a07fa19a6e/.env.production#L24",
   "Entropy": 5.575413,
   "Author": "abushanisro",
   "Email": "khanabushan09876@gmail.com",
   "Date": "2026-05-28T13:31:38Z",
   "Message": "balance",
   "Tags": [],
-  "Fingerprint": "5115a55d073a6f242f02788d4c45bbd6a71b73ed:.env.production:jwt:24"
+  "Fingerprint": "f53a28ed7fc7d5fb14c18e71d788d2a07fa19a6e:.env.production:jwt:24"
  },
  {
   "RuleID": "generic-api-key",
@@ -262,15 +262,15 @@
   "Secret": "REDACTED",
   "File": "lib/docs/specs/authentication.ts",
   "SymlinkFile": "",
-  "Commit": "5115a55d073a6f242f02788d4c45bbd6a71b73ed",
-  "Link": "https://github.com/abushanisro/emithran/blob/5115a55d073a6f242f02788d4c45bbd6a71b73ed/lib/docs/specs/authentication.ts#L36",
+  "Commit": "f53a28ed7fc7d5fb14c18e71d788d2a07fa19a6e",
+  "Link": "https://github.com/abushanisro/emithran/blob/f53a28ed7fc7d5fb14c18e71d788d2a07fa19a6e/lib/docs/specs/authentication.ts#L36",
   "Entropy": 4.419391,
   "Author": "abushanisro",
   "Email": "khanabushan09876@gmail.com",
   "Date": "2026-05-28T13:31:38Z",
   "Message": "balance",
   "Tags": [],
-  "Fingerprint": "5115a55d073a6f242f02788d4c45bbd6a71b73ed:lib/docs/specs/authentication.ts:generic-api-key:36"
+  "Fingerprint": "f53a28ed7fc7d5fb14c18e71d788d2a07fa19a6e:lib/docs/specs/authentication.ts:generic-api-key:36"
  },
  {
   "RuleID": "generic-api-key",
@@ -283,15 +283,15 @@
   "Secret": "REDACTED",
   "File": "lib/docs/specs/authentication.ts",
   "SymlinkFile": "",
-  "Commit": "5115a55d073a6f242f02788d4c45bbd6a71b73ed",
-  "Link": "https://github.com/abushanisro/emithran/blob/5115a55d073a6f242f02788d4c45bbd6a71b73ed/lib/docs/specs/authentication.ts#L114",
+  "Commit": "f53a28ed7fc7d5fb14c18e71d788d2a07fa19a6e",
+  "Link": "https://github.com/abushanisro/emithran/blob/f53a28ed7fc7d5fb14c18e71d788d2a07fa19a6e/lib/docs/specs/authentication.ts#L114",
   "Entropy": 4.419391,
   "Author": "abushanisro",
   "Email": "khanabushan09876@gmail.com",
   "Date": "2026-05-28T13:31:38Z",
   "Message": "balance",
   "Tags": [],
-  "Fingerprint": "5115a55d073a6f242f02788d4c45bbd6a71b73ed:lib/docs/specs/authentication.ts:generic-api-key:114"
+  "Fingerprint": "f53a28ed7fc7d5fb14c18e71d788d2a07fa19a6e:lib/docs/specs/authentication.ts:generic-api-key:114"
  },
  {
   "RuleID": "anthropic-api-key",
@@ -304,15 +304,15 @@
   "Secret": "REDACTED",
   "File": "cad-engine/.env.example",
   "SymlinkFile": "",
-  "Commit": "e3af0fe55db9dd0ad3528fee45d5c43bd29c0c4c",
-  "Link": "https://github.com/abushanisro/emithran/blob/e3af0fe55db9dd0ad3528fee45d5c43bd29c0c4c/cad-engine/.env.example#L26",
+  "Commit": "e38b4b1021d4fb17b62325e3d6d948454fd0707f",
+  "Link": "https://github.com/abushanisro/emithran/blob/e38b4b1021d4fb17b62325e3d6d948454fd0707f/cad-engine/.env.example#L26",
   "Entropy": 5.4454136,
   "Author": "abushanisro",
   "Email": "khanabushan09876@gmail.com",
   "Date": "2026-03-21T12:21:19Z",
   "Message": "typescript error",
   "Tags": [],
-  "Fingerprint": "e3af0fe55db9dd0ad3528fee45d5c43bd29c0c4c:cad-engine/.env.example:anthropic-api-key:26"
+  "Fingerprint": "e38b4b1021d4fb17b62325e3d6d948454fd0707f:cad-engine/.env.example:anthropic-api-key:26"
  },
  {
   "RuleID": "jwt",
@@ -325,15 +325,15 @@
   "Secret": "REDACTED",
   "File": ".env.production",
   "SymlinkFile": "",
-  "Commit": "f7efa4471e5c7904825e310b73d892de12bd6a48",
-  "Link": "https://github.com/abushanisro/emithran/blob/f7efa4471e5c7904825e310b73d892de12bd6a48/.env.production#L24",
+  "Commit": "42f0d34e0b31dd62e7369e5b4a24f8e25ffedc50",
+  "Link": "https://github.com/abushanisro/emithran/blob/42f0d34e0b31dd62e7369e5b4a24f8e25ffedc50/.env.production#L24",
   "Entropy": 5.508384,
   "Author": "abushanisro",
   "Email": "khanabushan09876@gmail.com",
   "Date": "2026-02-20T22:30:42Z",
   "Message": "code  optimization",
   "Tags": [],
-  "Fingerprint": "f7efa4471e5c7904825e310b73d892de12bd6a48:.env.production:jwt:24"
+  "Fingerprint": "42f0d34e0b31dd62e7369e5b4a24f8e25ffedc50:.env.production:jwt:24"
  },
  {
   "RuleID": "jwt",
@@ -346,15 +346,15 @@
   "Secret": "REDACTED",
   "File": ".env.production",
   "SymlinkFile": "",
-  "Commit": "f7efa4471e5c7904825e310b73d892de12bd6a48",
-  "Link": "https://github.com/abushanisro/emithran/blob/f7efa4471e5c7904825e310b73d892de12bd6a48/.env.production#L25",
+  "Commit": "42f0d34e0b31dd62e7369e5b4a24f8e25ffedc50",
+  "Link": "https://github.com/abushanisro/emithran/blob/42f0d34e0b31dd62e7369e5b4a24f8e25ffedc50/.env.production#L25",
   "Entropy": 5.5373197,
   "Author": "abushanisro",
   "Email": "khanabushan09876@gmail.com",
   "Date": "2026-02-20T22:30:42Z",
   "Message": "code  optimization",
   "Tags": [],
-  "Fingerprint": "f7efa4471e5c7904825e310b73d892de12bd6a48:.env.production:jwt:25"
+  "Fingerprint": "42f0d34e0b31dd62e7369e5b4a24f8e25ffedc50:.env.production:jwt:25"
  },
  {
   "RuleID": "jwt",
@@ -367,15 +367,15 @@
   "Secret": "REDACTED",
   "File": ".env.development",
   "SymlinkFile": "",
-  "Commit": "f7efa4471e5c7904825e310b73d892de12bd6a48",
-  "Link": "https://github.com/abushanisro/emithran/blob/f7efa4471e5c7904825e310b73d892de12bd6a48/.env.development#L20",
+  "Commit": "42f0d34e0b31dd62e7369e5b4a24f8e25ffedc50",
+  "Link": "https://github.com/abushanisro/emithran/blob/42f0d34e0b31dd62e7369e5b4a24f8e25ffedc50/.env.development#L20",
   "Entropy": 5.508384,
   "Author": "abushanisro",
   "Email": "khanabushan09876@gmail.com",
   "Date": "2026-02-20T22:30:42Z",
   "Message": "code  optimization",
   "Tags": [],
-  "Fingerprint": "f7efa4471e5c7904825e310b73d892de12bd6a48:.env.development:jwt:20"
+  "Fingerprint": "42f0d34e0b31dd62e7369e5b4a24f8e25ffedc50:.env.development:jwt:20"
  },
  {
   "RuleID": "jwt",
@@ -388,15 +388,15 @@
   "Secret": "REDACTED",
   "File": ".env.development",
   "SymlinkFile": "",
-  "Commit": "f7efa4471e5c7904825e310b73d892de12bd6a48",
-  "Link": "https://github.com/abushanisro/emithran/blob/f7efa4471e5c7904825e310b73d892de12bd6a48/.env.development#L24",
+  "Commit": "42f0d34e0b31dd62e7369e5b4a24f8e25ffedc50",
+  "Link": "https://github.com/abushanisro/emithran/blob/42f0d34e0b31dd62e7369e5b4a24f8e25ffedc50/.env.development#L24",
   "Entropy": 5.508384,
   "Author": "abushanisro",
   "Email": "khanabushan09876@gmail.com",
   "Date": "2026-02-20T22:30:42Z",
   "Message": "code  optimization",
   "Tags": [],
-  "Fingerprint": "f7efa4471e5c7904825e310b73d892de12bd6a48:.env.development:jwt:24"
+  "Fingerprint": "42f0d34e0b31dd62e7369e5b4a24f8e25ffedc50:.env.development:jwt:24"
  },
  {
   "RuleID": "jwt",
@@ -409,15 +409,15 @@
   "Secret": "REDACTED",
   "File": ".env.development",
   "SymlinkFile": "",
-  "Commit": "f7efa4471e5c7904825e310b73d892de12bd6a48",
-  "Link": "https://github.com/abushanisro/emithran/blob/f7efa4471e5c7904825e310b73d892de12bd6a48/.env.development#L25",
+  "Commit": "42f0d34e0b31dd62e7369e5b4a24f8e25ffedc50",
+  "Link": "https://github.com/abushanisro/emithran/blob/42f0d34e0b31dd62e7369e5b4a24f8e25ffedc50/.env.development#L25",
   "Entropy": 5.5373197,
   "Author": "abushanisro",
   "Email": "khanabushan09876@gmail.com",
   "Date": "2026-02-20T22:30:42Z",
   "Message": "code  optimization",
   "Tags": [],
-  "Fingerprint": "f7efa4471e5c7904825e310b73d892de12bd6a48:.env.development:jwt:25"
+  "Fingerprint": "42f0d34e0b31dd62e7369e5b4a24f8e25ffedc50:.env.development:jwt:25"
  },
  {
   "RuleID": "jwt",
@@ -430,15 +430,15 @@
   "Secret": "REDACTED",
   "File": "backend/src/app.controller.ts",
   "SymlinkFile": "",
-  "Commit": "f7efa4471e5c7904825e310b73d892de12bd6a48",
-  "Link": "https://github.com/abushanisro/emithran/blob/f7efa4471e5c7904825e310b73d892de12bd6a48/backend/src/app.controller.ts#L78",
+  "Commit": "42f0d34e0b31dd62e7369e5b4a24f8e25ffedc50",
+  "Link": "https://github.com/abushanisro/emithran/blob/42f0d34e0b31dd62e7369e5b4a24f8e25ffedc50/backend/src/app.controller.ts#L78",
   "Entropy": 5.546452,
   "Author": "abushanisro",
   "Email": "khanabushan09876@gmail.com",
   "Date": "2026-02-20T22:30:42Z",
   "Message": "code  optimization",
   "Tags": [],
-  "Fingerprint": "f7efa4471e5c7904825e310b73d892de12bd6a48:backend/src/app.controller.ts:jwt:78"
+  "Fingerprint": "42f0d34e0b31dd62e7369e5b4a24f8e25ffedc50:backend/src/app.controller.ts:jwt:78"
  },
  {
   "RuleID": "jwt",
@@ -451,15 +451,15 @@
   "Secret": "REDACTED",
   "File": "backend/src/app.controller.ts",
   "SymlinkFile": "",
-  "Commit": "f7efa4471e5c7904825e310b73d892de12bd6a48",
-  "Link": "https://github.com/abushanisro/emithran/blob/f7efa4471e5c7904825e310b73d892de12bd6a48/backend/src/app.controller.ts#L79",
+  "Commit": "42f0d34e0b31dd62e7369e5b4a24f8e25ffedc50",
+  "Link": "https://github.com/abushanisro/emithran/blob/42f0d34e0b31dd62e7369e5b4a24f8e25ffedc50/backend/src/app.controller.ts#L79",
   "Entropy": 5.5373197,
   "Author": "abushanisro",
   "Email": "khanabushan09876@gmail.com",
   "Date": "2026-02-20T22:30:42Z",
   "Message": "code  optimization",
   "Tags": [],
-  "Fingerprint": "f7efa4471e5c7904825e310b73d892de12bd6a48:backend/src/app.controller.ts:jwt:79"
+  "Fingerprint": "42f0d34e0b31dd62e7369e5b4a24f8e25ffedc50:backend/src/app.controller.ts:jwt:79"
  },
  {
   "RuleID": "jwt",
@@ -472,15 +472,15 @@
   "Secret": "REDACTED",
   "File": ".env.prod",
   "SymlinkFile": "",
-  "Commit": "4658a87e8e71ffc1afddec608136269f00ee5f2c",
-  "Link": "https://github.com/abushanisro/emithran/blob/4658a87e8e71ffc1afddec608136269f00ee5f2c/.env.prod#L16",
+  "Commit": "3f21ecaaf712cd1c926f303024c47d1b266cb7a4",
+  "Link": "https://github.com/abushanisro/emithran/blob/3f21ecaaf712cd1c926f303024c47d1b266cb7a4/.env.prod#L16",
   "Entropy": 5.546452,
   "Author": "abushanisro",
   "Email": "khanabushan09876@gmail.com",
   "Date": "2026-02-19T09:08:24Z",
   "Message": "fix: add",
   "Tags": [],
-  "Fingerprint": "4658a87e8e71ffc1afddec608136269f00ee5f2c:.env.prod:jwt:16"
+  "Fingerprint": "3f21ecaaf712cd1c926f303024c47d1b266cb7a4:.env.prod:jwt:16"
  },
  {
   "RuleID": "jwt",
@@ -493,15 +493,15 @@
   "Secret": "REDACTED",
   "File": ".env.prod",
   "SymlinkFile": "",
-  "Commit": "2208550198681777760f59bebc57d577151635d6",
-  "Link": "https://github.com/abushanisro/emithran/blob/2208550198681777760f59bebc57d577151635d6/.env.prod#L15",
+  "Commit": "a61255bf0c5823968a3d57d2c9a1f2d4a739c54d",
+  "Link": "https://github.com/abushanisro/emithran/blob/a61255bf0c5823968a3d57d2c9a1f2d4a739c54d/.env.prod#L15",
   "Entropy": 5.508384,
   "Author": "abushanisro",
   "Email": "khanabushan09876@gmail.com",
   "Date": "2026-02-19T08:28:53Z",
   "Message": "fix: add",
   "Tags": [],
-  "Fingerprint": "2208550198681777760f59bebc57d577151635d6:.env.prod:jwt:15"
+  "Fingerprint": "a61255bf0c5823968a3d57d2c9a1f2d4a739c54d:.env.prod:jwt:15"
  },
  {
   "RuleID": "jwt",
