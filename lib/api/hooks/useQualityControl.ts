@@ -26,6 +26,9 @@ export interface QualityInspection {
   rejection_reason?: string;
   created_at: string;
   updated_at: string;
+  // as the backend returns them (QualityInspectionResponseDto is camelCase)
+  bomId?: string;
+  selectedItems?: string[];
 }
 
 export interface CreateQualityInspectionRequest {
@@ -81,11 +84,12 @@ export interface DetailedInspectionReport {
       id: string;
       slNo: number;
       specification: string;
-      nominal: number;
-      plusTolerance: number;
-      minusTolerance: number;
+      // null: not entered (never stored as 0)
+      nominal: number | null;
+      plusTolerance: number | null;
+      minusTolerance: number | null;
       method: string;
-      sampleValues: number[]; // Array of sample values (1-5)
+      sampleValues: Array<number | null>; // Array of sample values (1-5)
       remarks?: string;
     }>;
   };

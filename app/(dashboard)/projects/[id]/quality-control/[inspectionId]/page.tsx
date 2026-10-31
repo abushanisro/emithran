@@ -51,6 +51,25 @@ import { apiConfig } from '@/lib/api/config';
 // This page's raw API fetches go same-origin through the BFF, which attaches the session's token.
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
+/** Shown for a value that is genuinely missing. */
+const MISSING = '—';
+
+/** The number the user entered, or null when the field is blank or not a number. A missing value is never 0. */
+function enteredNumber(value: unknown): number | null {
+  if (value === null || value === undefined || String(value).trim() === '') return null;
+  const n = parseFloat(String(value));
+  return Number.isFinite(n) ? n : null;
+}
+
+/** A row's tolerance band, or null when its nominal or either tolerance is missing: no OK/NG verdict without them. */
+function toleranceLimits(row: { nominal?: unknown; plusTol?: unknown; minusTol?: unknown }): { lower: number; upper: number } | null {
+  const nominal = enteredNumber(row.nominal);
+  const plusTol = enteredNumber(row.plusTol);
+  const minusTol = enteredNumber(row.minusTol);
+  if (nominal === null || plusTol === null || minusTol === null) return null;
+  return { lower: nominal + minusTol, upper: nominal + plusTol };
+}
+
 // InteractiveBalloonAnnotator unused - commented out
 // import InteractiveBalloonAnnotator from '@/components/features/quality-control/InteractiveBalloonAnnotator';
 
@@ -1158,49 +1177,16 @@ export default function QualityInspectionPage() {
   // Debug auth state
   const { user } = useAuth();
 
-  // Fetch BOMs for the project - bypass readiness check temporarily
-  const bomsQuery = useQuery({
-    queryKey: ['bom', 'list', { projectId }],
-    queryFn: async () => {
-      const headers = JSON_HEADERS;
-      const params = new URLSearchParams();
-      if (projectId) params.append('projectId', projectId);
-      const queryString = params.toString();
+  // The inspection itself: its name, its BOM and the BOM items it covers
+  const inspectionQuery = useQualityInspection(inspectionId);
+  const { data: inspection, isLoading: inspectionLoading, error: inspectionError } = inspectionQuery;
 
-      const response = await fetch(`${apiConfig.endpoints.api.v1}/boms${queryString ? `?${queryString}` : ''}`, {
-        headers,
-      });
-
-      if (!response.ok) throw new Error(`Failed to fetch BOMs: ${response.status}`);
-      return await response.json();
-    },
-    enabled: !!user && !!projectId,
-    staleTime: 1000 * 60 * 5,
-  });
-  const { data: bomsData, isLoading: bomsLoading, error: bomsError } = bomsQuery;
-
-  // Get the first BOM for this project (or the most recent one)
-  const projectBOM = bomsData?.data?.boms?.[0] || bomsData?.boms?.[0] || bomsData?.data?.[0] || bomsData?.[0];
-
-
-  // Mock inspection data - replace with actual API call
-  const inspection = {
-    id: inspectionId,
-    name: 'quality report emuski',
-    bomId: projectBOM?.id,
-    selectedItems: []
-  };
-
-  // Fetch BOM items for the inspection - bypass readiness check temporarily
-
+  // The BOM items of the inspection's BOM
   const bomItemsQuery = useQuery({
     queryKey: ['bom-items', 'list', inspection?.bomId],
     queryFn: async () => {
-      if (!inspection?.bomId) return { items: [] };
-
-      const headers = JSON_HEADERS;
-      const response = await fetch(`${apiConfig.endpoints.api.v1}/bom-items?bomId=${inspection.bomId}`, {
-        headers,
+      const response = await fetch(`${apiConfig.endpoints.api.v1}/bom-items?bomId=${inspection?.bomId}`, {
+        headers: JSON_HEADERS,
       });
 
       if (!response.ok) throw new Error(`Failed to fetch BOM items: ${response.status}`);
@@ -1214,31 +1200,12 @@ export default function QualityInspectionPage() {
 
   const { data: bomItemsData, isLoading: bomItemsLoading, error: bomItemsError } = bomItemsQuery;
 
-
-  // Get BOM items for inspection
-  const getBOMItemsForInspection = () => {
-    if (bomItemsLoading) {
-      return [];
-    }
-
-    if (bomItemsError) {
-      return [];
-    }
-
-    // Extract items from the API response structure
-    const items = bomItemsData?.data?.items || bomItemsData?.items || [];
-
-    if (!items || items.length === 0) {
-      return [];
-    }
-
-
-    // Return all items for this project's BOM for now
-    // TODO: Filter based on actual inspection selection
-    return items;
-  };
-
-  const bomItems = getBOMItemsForInspection();
+  // Only the items selected for this inspection
+  const bomItems = useMemo(() => {
+    const items: any[] = bomItemsData?.data?.items || bomItemsData?.items || [];
+    const selected = new Set(inspection?.selectedItems ?? []);
+    return items.filter((item: any) => selected.has(item.id));
+  }, [bomItemsData, inspection?.selectedItems]);
 
 
   // Database hooks for saving/loading inspection reports
@@ -1246,8 +1213,6 @@ export default function QualityInspectionPage() {
   const updateInspection = useUpdateQualityInspection();
   // Load existing report - now properly handles 404 errors
   const { data: existingReport, isLoading: reportLoading } = useDetailedInspectionReport(inspectionId);
-  // Load current inspection data to check status
-  const { data: currentInspection, isLoading: inspectionLoading } = useQualityInspection(inspectionId);
 
   // Edit mode states for each section
   const [balloonDrawingEditMode, setBalloonDrawingEditMode] = useState(false);
@@ -1328,8 +1293,8 @@ export default function QualityInspectionPage() {
   }>>([]);
 
   // 1.4 FINAL INSPECTION REPORT fields
-  const [companyName, setCompanyName] = useState('EMUSKI');
-  const [revisionNumber, setRevisionNumber] = useState('—');
+  const [companyName, setCompanyName] = useState('');
+  const [revisionNumber, setRevisionNumber] = useState('');
   const [inspectionDate, setInspectionDate] = useState<string>(new Date().toISOString().split('T')[0] ?? '');
   const [rawMaterial, setRawMaterial] = useState('');
   const [inspectionBy, setInspectionBy] = useState('');
@@ -1474,8 +1439,8 @@ export default function QualityInspectionPage() {
         const { finalInspectionReport } = existingReport;
         if (finalInspectionReport) {
           const todayStr: string = new Date().toISOString().slice(0, 10);
-          setCompanyName(finalInspectionReport.companyName || 'EMUSKI');
-          setRevisionNumber(finalInspectionReport.revisionNumber || '—');
+          setCompanyName(finalInspectionReport.companyName || '');
+          setRevisionNumber(finalInspectionReport.revisionNumber || '');
           setInspectionDate(finalInspectionReport.inspectionDate || todayStr);
           setRawMaterial(finalInspectionReport.rawMaterial || '');
           setInspectionBy(finalInspectionReport.inspectionBy || '');
@@ -1613,11 +1578,11 @@ export default function QualityInspectionPage() {
         balloonAnnotations: balloons
       },
       finalInspectionReport: {
-        companyName: companyName || 'Auto-saved',
+        companyName,
         ...(revisionNumber ? { revisionNumber } : {}),
         inspectionDate: inspectionDate || new Date().toISOString().slice(0, 10),
-        rawMaterial: rawMaterial || material,
-        inspectionBy: inspectionBy || 'Auto-saved',
+        rawMaterial,
+        inspectionBy,
         ...(approvedBy ? { approvedBy } : {}),
         ...(generalRemarks ? { generalRemarks } : {}),
         status: 'draft'
@@ -1630,11 +1595,11 @@ export default function QualityInspectionPage() {
             ? parseInt(row.id.replace('row-', ''), 10) || (index + 1)
             : typeof row.id === 'number' ? row.id : (index + 1),
           specification: row.specification || '',
-          nominal: parseFloat(row.nominal) || 0,
-          plusTolerance: parseFloat(row.plusTol) || 0,
-          minusTolerance: parseFloat(row.minusTol) || 0,
+          nominal: enteredNumber(row.nominal),
+          plusTolerance: enteredNumber(row.plusTol),
+          minusTolerance: enteredNumber(row.minusTol),
           method: row.method || '',
-          sampleValues: row.samples ? row.samples.map((s: string) => parseFloat(s) || 0) : Array(sampleCount).fill(0),
+          sampleValues: row.samples ? row.samples.map(enteredNumber) : Array(sampleCount).fill(null),
           remarks: row.remarks || ''
         }))
       }
@@ -1710,11 +1675,11 @@ export default function QualityInspectionPage() {
             ? parseInt(row.id.replace('row-', ''), 10) || (index + 1)
             : typeof row.id === 'number' ? row.id : (index + 1),
           specification: row.specification || '',
-          nominal: parseFloat(row.nominal) || 0,
-          plusTolerance: parseFloat(row.plusTol) || 0,
-          minusTolerance: parseFloat(row.minusTol) || 0,
+          nominal: enteredNumber(row.nominal),
+          plusTolerance: enteredNumber(row.plusTol),
+          minusTolerance: enteredNumber(row.minusTol),
           method: row.method || '',
-          sampleValues: row.samples ? row.samples.map((s: string) => parseFloat(s) || 0) : Array(sampleCount).fill(0),
+          sampleValues: row.samples ? row.samples.map(enteredNumber) : Array(sampleCount).fill(null),
           remarks: row.remarks || undefined
         }))
       }
@@ -1805,10 +1770,10 @@ export default function QualityInspectionPage() {
 
       // Title and header
       doc.setFontSize(18);
-      doc.text(`QC INSPECTION REPORT — PART: ${activeBomItem?.partNumber || activeBomItem?.name || partName || 'N/A'}`, pageWidth / 2, 20, { align: 'center' });
+      doc.text(`QC INSPECTION REPORT — PART: ${activeBomItem?.partNumber || activeBomItem?.name || partName || MISSING}`, pageWidth / 2, 20, { align: 'center' });
 
       doc.setFontSize(11);
-      doc.text(`Part Name: ${partName || activeBomItem?.name || 'N/A'} | Inspection ID: ${inspectionId}`, 20, 32);
+      doc.text(`Part Name: ${partName || activeBomItem?.name || MISSING} | Inspection ID: ${inspectionId}`, 20, 32);
       doc.text(`Generated: ${new Date().toLocaleString()} | Single-Part Report Mode`, 20, 40);
 
       let yPos = 60;
@@ -1820,8 +1785,8 @@ export default function QualityInspectionPage() {
 
       doc.setFontSize(10);
       const balloonData: [string, string][] = [
-        [`Part Name: ${partName || 'N/A'}`, `Material: ${material || 'N/A'}`],
-        [`Surface Treatment: ${surfaceTreatment || 'N/A'}`, `Drawing Title: ${drawingTitle || 'N/A'}`],
+        [`Part Name: ${partName || MISSING}`, `Material: ${material || MISSING}`],
+        [`Surface Treatment: ${surfaceTreatment || MISSING}`, `Drawing Title: ${drawingTitle || MISSING}`],
         [`Drawing Size: ${drawingSize || 'A4'}`, `Balloons: ${balloons.length} annotations`]
       ];
 
@@ -1840,9 +1805,9 @@ export default function QualityInspectionPage() {
 
       doc.setFontSize(10);
       const inspectionData: [string, string][] = [
-        [`Company Name: ${companyName || 'N/A'}`, `Revision Number: ${revisionNumber || 'N/A'}`],
-        [`Inspection Date: ${inspectionDate || 'N/A'}`, `Raw Material: ${rawMaterial || 'N/A'}`],
-        [`Inspection By: ${inspectionBy || 'N/A'}`, `Approved By: ${approvedBy || 'N/A'}`]
+        [`Company Name: ${companyName || MISSING}`, `Revision Number: ${revisionNumber || MISSING}`],
+        [`Inspection Date: ${inspectionDate || MISSING}`, `Raw Material: ${rawMaterial || MISSING}`],
+        [`Inspection By: ${inspectionBy || MISSING}`, `Approved By: ${approvedBy || MISSING}`]
       ];
 
       inspectionData.forEach(row => {
@@ -1903,12 +1868,8 @@ export default function QualityInspectionPage() {
           yPos = 20;
         }
 
-        // Calculate validation parameters
-        const nominal = parseFloat(row.nominal) || 0;
-        const plusTol = parseFloat(row.plusTol) || 0;
-        const minusTol = parseFloat(row.minusTol) || 0;
-        const upperLimit = nominal + plusTol;
-        const lowerLimit = nominal + minusTol;
+        // Tolerance band; null when nominal or a tolerance is missing (then no OK/NG verdict)
+        const limits = toleranceLimits(row);
 
         // Alternate row colors
         if (index % 2 === 0) {
@@ -1938,11 +1899,11 @@ export default function QualityInspectionPage() {
 
         // Draw sample values with color coding
         row.samples.forEach((sample: string, sampleIndex: number) => {
-          if (sample && sample.trim() !== '' && row.nominal) {
+          if (sample && sample.trim() !== '' && limits) {
             const sampleValue = parseFloat(sample);
             if (!isNaN(sampleValue)) {
               // Check if sample is within tolerance
-              const isInTolerance = sampleValue >= lowerLimit && sampleValue <= upperLimit;
+              const isInTolerance = sampleValue >= limits.lower && sampleValue <= limits.upper;
 
               // Set color based on tolerance
               if (isInTolerance) {
@@ -1963,15 +1924,15 @@ export default function QualityInspectionPage() {
         });
 
         // Calculate and draw result with color
-        const allSamplesValid = row.samples.every((sample: string) => {
+        const allSamplesValid = limits !== null && row.samples.every((sample: string) => {
           const value = parseFloat(sample);
-          return !isNaN(value) && value >= lowerLimit && value <= upperLimit;
+          return !isNaN(value) && value >= limits.lower && value <= limits.upper;
         });
 
         const hasValues = row.samples.some((sample: string) => sample.trim() !== '');
         let resultText = '';
 
-        if (hasValues && row.nominal) {
+        if (hasValues && limits) {
           resultText = allSamplesValid ? 'OK' : 'NG';
 
           // Set result color
@@ -2097,6 +2058,25 @@ export default function QualityInspectionPage() {
     }
   };
 
+  // The inspection could not be loaded (not found, no access, or a server error): say so instead of showing a report.
+  if (inspectionError) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 p-8 border-2 border-dashed border-border rounded-lg">
+        <FileText className="h-12 w-12 text-destructive" />
+        <p className="text-sm text-destructive">Failed to load the inspection</p>
+        <p className="text-xs text-muted-foreground">{inspectionError instanceof Error ? inspectionError.message : String(inspectionError)}</p>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => inspectionQuery.refetch()}>
+            Try Again
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => router.push(`/projects/${projectId}/quality-control`)}>
+            Back to inspections
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4 sm:gap-6 w-full min-w-0 max-w-full">
       {/* Page Header */}
@@ -2111,7 +2091,7 @@ export default function QualityInspectionPage() {
               Create Quality Report
             </button>
             <span>›</span>
-            <span className="truncate">{inspection?.name || 'Inspection Report'}</span>
+            <span className="truncate">{inspection?.name ?? MISSING}</span>
           </div>
 
           {/* Main Header */}
@@ -2132,7 +2112,7 @@ export default function QualityInspectionPage() {
                 <span className="truncate">QC Inspection Report</span>
               </h1>
               <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                {inspection?.name || 'Unknown'}
+                {inspection?.name ?? MISSING}
               </p>
             </div>
           </div>
@@ -2145,12 +2125,20 @@ export default function QualityInspectionPage() {
               <CardTitle className="text-base sm:text-lg">2D Technical Drawings</CardTitle>
             </CardHeader>
             <CardContent className="p-0 overflow-hidden">
-              {bomsLoading || bomItemsLoading ? (
+              {inspectionLoading || bomItemsLoading ? (
                 <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-border rounded-lg">
                   <div className="animate-spin h-8 w-8 mb-3 text-muted-foreground">⟳</div>
                   <p className="text-sm text-muted-foreground">Loading BOM items...</p>
                 </div>
-              ) : bomItems?.length > 0 ? (
+              ) : bomItemsError ? (
+                <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-border rounded-lg">
+                  <FileText className="h-12 w-12 mb-3 text-destructive" />
+                  <p className="text-sm text-destructive mb-2">Failed to load BOM data</p>
+                  <Button variant="outline" size="sm" onClick={() => bomItemsQuery.refetch()}>
+                    Try Again
+                  </Button>
+                </div>
+              ) : bomItems.length > 0 ? (
                 <div className="space-y-4 p-3 sm:p-4">
                   {/* Sleek Part Selector Bar & Tabs */}
                   {bomItems.length > 1 && (
@@ -2197,7 +2185,7 @@ export default function QualityInspectionPage() {
                                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${
                                   isSelected ? 'bg-primary-foreground/15 text-primary-foreground' : 'bg-muted text-muted-foreground'
                                 }`}>
-                                  {item.quantity} {item.unitOfMeasure || item.unit || 'pcs'}
+                                  {item.quantity} {item.unitOfMeasure || item.unit || ''}
                                 </span>
                               )}
                             </button>
@@ -2243,7 +2231,7 @@ export default function QualityInspectionPage() {
                         </div>
                         <div>
                           <p className="text-xs font-medium text-muted-foreground">Quantity</p>
-                          <p className="text-sm font-mono">{activeBomItem.quantity || 'N/A'} {activeBomItem.unitOfMeasure || activeBomItem.unit || 'pcs'}</p>
+                          <p className="text-sm font-mono">{activeBomItem.quantity ?? MISSING} {activeBomItem.unitOfMeasure || activeBomItem.unit || ''}</p>
                         </div>
                         <div>
                           <p className="text-xs font-medium text-muted-foreground">Drawing Type</p>
@@ -2251,38 +2239,21 @@ export default function QualityInspectionPage() {
                         </div>
                         <div>
                           <p className="text-xs font-medium text-muted-foreground">Description</p>
-                          <p className="text-sm font-mono truncate">{activeBomItem.description || 'N/A'}</p>
+                          <p className="text-sm font-mono truncate">{activeBomItem.description || MISSING}</p>
                         </div>
                       </div>
                     </div>
                   )}
                 </div>
-              ) : bomsError || bomItemsError ? (
-                <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-border rounded-lg">
-                  <FileText className="h-12 w-12 mb-3 text-destructive" />
-                  <p className="text-sm text-destructive mb-2">Failed to load BOM data</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      bomsQuery.refetch();
-                      bomItemsQuery.refetch();
-                    }}
-                  >
-                    Try Again
-                  </Button>
-                </div>
-              ) : !projectBOM ? (
+              ) : !inspection?.bomId ? (
                 <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-border rounded-lg">
                   <FileText className="h-12 w-12 mb-3 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">No BOM found for this project</p>
-                  <p className="text-xs text-muted-foreground mt-1">Make sure the project has a BOM created</p>
+                  <p className="text-sm text-muted-foreground">This inspection has no BOM</p>
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-border rounded-lg">
                   <FileText className="h-12 w-12 mb-3 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">No BOM items found for this inspection</p>
-                  <p className="text-xs text-muted-foreground mt-1">The BOM may be empty or still loading</p>
+                  <p className="text-sm text-muted-foreground">None of the BOM items selected for this inspection were found in its BOM</p>
                 </div>
               )}
             </CardContent>
@@ -2594,18 +2565,14 @@ export default function QualityInspectionPage() {
                           ) : (
                             <div className="text-xs py-1">
                               {sample ? (() => {
-                                const nominal = parseFloat(row.nominal) || 0;
-                                const plusTol = parseFloat(row.plusTol) || 0;
-                                const minusTol = parseFloat(row.minusTol) || 0;
-                                const upperLimit = nominal + plusTol;
-                                const lowerLimit = nominal + minusTol;
+                                const limits = toleranceLimits(row);
                                 const sampleValue = parseFloat(sample);
 
-                                if (isNaN(sampleValue) || !row.nominal) {
+                                if (isNaN(sampleValue) || !limits) {
                                   return <span>{sample}</span>;
                                 }
 
-                                const isInTolerance = sampleValue >= lowerLimit && sampleValue <= upperLimit;
+                                const isInTolerance = sampleValue >= limits.lower && sampleValue <= limits.upper;
                                 const colorClass = isInTolerance
                                   ? 'text-green-600 font-semibold'
                                   : 'text-red-600 font-semibold';
@@ -2621,20 +2588,15 @@ export default function QualityInspectionPage() {
                       <div className="flex gap-1">
                         <div className="text-xs py-1 flex items-center flex-1">
                           {(() => {
-                            const nominal = parseFloat(row.nominal) || 0;
-                            const plusTol = parseFloat(row.plusTol) || 0;
-                            const minusTol = parseFloat(row.minusTol) || 0;
-                            const upperLimit = nominal + plusTol;
-                            const lowerLimit = nominal + minusTol;
+                            const limits = toleranceLimits(row);
+                            const hasValues = row.samples.some((sample: string) => sample.trim() !== '');
+
+                            if (!hasValues || !limits) return '';
 
                             const allSamplesValid = row.samples.every((sample: string) => {
                               const value = parseFloat(sample);
-                              return !isNaN(value) && value >= lowerLimit && value <= upperLimit;
+                              return !isNaN(value) && value >= limits.lower && value <= limits.upper;
                             });
-
-                            const hasValues = row.samples.some((sample: string) => sample.trim() !== '');
-
-                            if (!hasValues || !row.nominal) return '';
 
                             const result = allSamplesValid ? 'OK' : 'NG';
                             const colorClass = result === 'OK' ? 'text-green-600 font-semibold' :
@@ -2781,7 +2743,7 @@ export default function QualityInspectionPage() {
                 <span className="hidden sm:inline">Save Draft</span>
                 <span className="sm:hidden">Draft</span>
               </Button>
-              {!inspectionLoading && currentInspection?.status !== 'completed' && currentInspection?.status !== 'approved' && currentInspection?.status !== 'rejected' && (
+              {!inspectionLoading && inspection?.status !== 'completed' && inspection?.status !== 'approved' && inspection?.status !== 'rejected' && (
                 <Button
                   size="sm"
                   className="flex items-center gap-2 text-xs sm:text-sm"
