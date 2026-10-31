@@ -1,3 +1,5 @@
 # Test fixtures that look like secrets but are not. One fingerprint per line (commit:file:rule:line), from `gitleaks git --redact`.
 # Fake Supabase key in the audit sanitiser test, committed before the value was built at run time.
 e1552b03f15081823fb51f12fa84c2ef68132f97:backend/src/common/audit/audit-row.spec.ts:generic-api-key:52
+# The same test, in this fix's first commit: the value was split but still read as a key. It is now low-entropy filler.
+2d6b463c9069253481ef1c0ddba55b6f55f6eb67:backend/src/common/audit/audit-row.spec.ts:generic-api-key:52
