@@ -26,6 +26,19 @@ jobs:
         with:
           persist-credentials: false
 
+      - # The costing reference data (machine and labour rates, material prices) is proprietary, so it lives in a
+        # private repository and is checked out into memory/ here; the tests compare the engines against it.
+        name: Reference data (private)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: abushanisro/emithran-reference-data
+          ssh-key: ${{ secrets.REFERENCE_DATA_DEPLOY_KEY }}
+          path: reference-data
+          persist-credentials: false
+      - name: Link the reference data to memory/
+        working-directory: .
+        run: ln -s reference-data/memory memory
+      
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
@@ -72,6 +85,19 @@ jobs:
         with:
           persist-credentials: false
 
+      - # The costing reference data (machine and labour rates, material prices) is proprietary, so it lives in a
+        # private repository and is checked out into memory/ here; the tests compare the engines against it.
+        name: Reference data (private)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: abushanisro/emithran-reference-data
+          ssh-key: ${{ secrets.REFERENCE_DATA_DEPLOY_KEY }}
+          path: reference-data
+          persist-credentials: false
+      - name: Link the reference data to memory/
+        working-directory: .
+        run: ln -s reference-data/memory memory
+      
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
