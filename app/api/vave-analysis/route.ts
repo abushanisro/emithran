@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUserForAi } from '@/lib/server/auth';
+import { requestAiText } from '@/lib/server/anthropic';
 
 export async function POST(request: NextRequest) {
   const auth = await requireUserForAi('vave-analysis');
@@ -7,35 +8,17 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY!,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-3-sonnet-20240229',
-        max_tokens: 4000,
-        messages: [{
-          role: 'user',
-          content: body.prompt
-        }]
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-      return NextResponse.json(
-        { error: `AI service error: ${response.status}`, details: errorData },
-        { status: response.status }
-      );
+    if (typeof body?.prompt !== 'string' || !body.prompt.trim()) {
+      return NextResponse.json({ error: 'prompt is required' }, { status: 400 });
     }
 
-    const data = await response.json();
-    return NextResponse.json(data);
+    const ai = await requestAiText(body.prompt);
+    if (!ai.ok) {
+      return NextResponse.json({ error: ai.error, details: ai.details }, { status: ai.status });
+    }
+    return NextResponse.json({ text: ai.text });
   } catch (error) {
+    console.error('VAVE analysis error:', error);
     return NextResponse.json(
       { error: 'Failed to analyze BOM data' },
       { status: 500 }

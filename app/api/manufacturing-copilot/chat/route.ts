@@ -1,10 +1,14 @@
 import { type NextRequest } from "next/server";
 
 import { requireUserForAi } from "@/lib/server/auth";
+import { settingWithDevDefault } from '@/lib/utils/required-setting';
 
 // Server-side: the private backend address (API_URL, which already ends in /v1/api, the NestJS global prefix), so this call
 // never leaves the host through the public hostname (where Cloudflare Access would stop it).
-const BACKEND_URL = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/v1/api";
+// Resolved per request: localhost only outside production; a missing setting
+// in production throws naming the variable.
+const backendUrl = () =>
+  settingWithDevDefault(process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL, 'API_URL', 'http://localhost:4000/v1/api');
 const MAX_BODY_BYTES = 64 * 1024;
 
 export const runtime = "nodejs";
@@ -27,7 +31,7 @@ export async function POST(request: NextRequest) {
 
   let upstream: Response;
   try {
-    upstream = await fetch(`${BACKEND_URL}/copilot/chat`, {
+    upstream = await fetch(`${backendUrl()}/copilot/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${gate.accessToken}` },
       body: raw,

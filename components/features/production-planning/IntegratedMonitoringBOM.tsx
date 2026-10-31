@@ -220,38 +220,19 @@ export const IntegratedMonitoringBOM = ({ lotId }: IntegratedMonitoringBOMProps)
     staleTime: 3 * 60 * 1000,
   });
 
-  // Get BOM items directly if lot has a BOM but no items
   const bomId = lotData?.data?.bomId || lotData?.bomId;
-  const { data: bomData, isLoading: bomLoading } = useQuery<any>({
-    queryKey: ['bom-items', bomId, lotId],
+
+  // The lot's BOM items from the production-planning endpoint
+  // (GET /production-planning/lots/:id/bom-items). A failure is shown, not
+  // swallowed into an empty list.
+  const { data: bomData, isLoading: bomLoading, error: bomError } = useQuery<any>({
+    queryKey: ['production-lot-bom-items', lotId],
     queryFn: async () => {
-      if (!bomId) {
-        return null;
-      }
-      try {
-        // Try multiple endpoints to get BOM items
-
-        let response: any;
-        // First try: the endpoint we see in the logs that's working
-        try {
-          response = await apiClient.get(`/bom-items?bomId=${bomId}`);
-        } catch (err1) {
-          try {
-            // Second try: the production planning specific endpoint  
-            response = await apiClient.get(`/production-planning/lots/${lotId}/bom-items`);
-          } catch (err2) {
-            // Third try: direct BOM endpoint
-            response = await apiClient.get(`/boms/${bomId}/items`);
-          }
-        }
-
-        // The response might be wrapped in data property
-        return response?.data || response;
-      } catch (error) {
-        return null;
-      }
+      const response: any = await apiClient.get(`/production-planning/lots/${lotId}/bom-items`);
+      // createResponse wraps the rows in { data }
+      return response?.data ?? response;
     },
-    enabled: !!bomId || !!lotId,
+    enabled: !!lotId,
     retry: 1,
   });
 
@@ -578,6 +559,12 @@ export const IntegratedMonitoringBOM = ({ lotId }: IntegratedMonitoringBOMProps)
           </Button>
         </div>
       </div>
+
+      {bomError && (
+        <div className="rounded border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+          Could not load this lot&apos;s BOM items: {bomError instanceof Error ? bomError.message : String(bomError)}
+        </div>
+      )}
 
       {/* Integrated Key Metrics Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">

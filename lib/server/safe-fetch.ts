@@ -1,8 +1,17 @@
 /**
  * Server-side download of a caller-supplied storage URL, safe against SSRF and
- * resource abuse: the host must be one of the file store's hosts named in
- * TRUSTED_STORAGE_HOSTS, redirects are followed by hand and re-checked,
- * and size and time are capped. Pure checks are exported for tests.
+ * resource abuse. The URL is attacker-influenced (the file proxy and the PDF
+ * routes take it from the request), so:
+ * - its host must be exactly one of the file store's hosts named in
+ *   TRUSTED_STORAGE_HOSTS (no subdomain wildcard: on a shared provider host a
+ *   wildcard would accept any other customer's bucket); an entry without a
+ *   port allows only the scheme's default port, `host:port` allows that port;
+ * - it must be https; plain http is accepted only outside production, for a
+ *   configured local file store (localhost or an IPv4 address);
+ * - credentials in the URL are refused;
+ * - redirects are followed by hand and only within the same origin;
+ * - size and time are capped.
+ * Pure checks are exported for tests.
  */
 
 function configuredHosts(): string[] {
@@ -13,16 +22,21 @@ function configuredHosts(): string[] {
 
 const IPV4 = /^\d{1,3}(\.\d{1,3}){3}$/;
 
-export function isTrustedStorageUrl(raw: string, hosts: readonly string[] = configuredHosts()): boolean {
+export function isTrustedStorageUrl(
+  raw: string,
+  hosts: readonly string[] = configuredHosts(),
+  nodeEnv: string | undefined = process.env.NODE_ENV,
+): boolean {
   let url: URL;
   try { url = new URL(raw); } catch { return false; }
   if (url.username || url.password) return false;
-  const host = url.hostname.toLowerCase();
-  const trusted = hosts.some((h) => host === h || host.endsWith(`.${h}`));
-  if (!trusted) return false;
-  // https everywhere; plain http only for the project's own host (a local file store).
+  // url.host is hostname[:port], with the scheme's default port dropped.
+  const host = url.host.toLowerCase();
+  if (!hosts.includes(host)) return false;
   if (url.protocol === 'https:') return true;
-  return url.protocol === 'http:' && (IPV4.test(host) || host === 'localhost') && hosts.includes(host);
+  return url.protocol === 'http:'
+    && nodeEnv !== 'production'
+    && (IPV4.test(url.hostname) || url.hostname === 'localhost');
 }
 
 export class UntrustedUrlError extends Error {}
@@ -33,14 +47,21 @@ export async function fetchTrustedFile(
   opts: { timeoutMs?: number; maxRedirects?: number; headers?: Record<string, string> } = {},
 ): Promise<Response> {
   const { timeoutMs = 30_000, maxRedirects = 3, headers } = opts;
+  if (!isTrustedStorageUrl(rawUrl)) throw new UntrustedUrlError('URL is not on the trusted storage host');
+  const origin = new URL(rawUrl).origin;
   let url = rawUrl;
   for (let hop = 0; hop <= maxRedirects; hop++) {
-    if (!isTrustedStorageUrl(url)) throw new UntrustedUrlError('URL is not on the trusted storage host');
     const res = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(timeoutMs), ...(headers ? { headers } : {}) });
     if (res.status >= 300 && res.status < 400) {
       const location = res.headers.get('location');
       if (!location) throw new UntrustedUrlError('Redirect without a location');
-      url = new URL(location, url).toString();
+      const next = new URL(location, url);
+      // Same origin only: a storage host must not send us to another host,
+      // even another trusted one.
+      if (next.origin !== origin || !isTrustedStorageUrl(next.toString())) {
+        throw new UntrustedUrlError('Redirect leaves the storage host');
+      }
+      url = next.toString();
       continue;
     }
     return res;

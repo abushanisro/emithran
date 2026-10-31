@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUserForAi } from '@/lib/server/auth';
 import { fetchTrustedFile, PayloadTooLargeError, readLimited, UntrustedUrlError } from '@/lib/server/safe-fetch';
+import { settingWithDevDefault } from '@/lib/utils/required-setting';
 import {
   isTrustedStorageUrl,
   parseBomItemStoragePath,
   resolveBomItemFileUrl,
 } from '@/lib/utils/storage-file-url';
 
-const CAD_ENGINE_URL = process.env.CAD_ENGINE_URL ?? process.env.NEXT_PUBLIC_CAD_ENGINE_URL ?? 'http://localhost:5055';
+// Resolved per request: localhost only outside production.
+const cadEngineUrl = () =>
+  settingWithDevDefault(process.env.CAD_ENGINE_URL ?? process.env.NEXT_PUBLIC_CAD_ENGINE_URL, 'CAD_ENGINE_URL', 'http://localhost:5055');
 const CAD_ENGINE_API_KEY = process.env.CAD_ENGINE_API_KEY ?? '';
 
 /**
@@ -88,7 +91,7 @@ export async function POST(request: NextRequest) {
       headers['X-API-Key'] = CAD_ENGINE_API_KEY;
     }
 
-    const cadRes = await fetch(`${CAD_ENGINE_URL}/drawing/analyze`, {
+    const cadRes = await fetch(`${cadEngineUrl()}/drawing/analyze`, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),

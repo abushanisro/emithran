@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUser } from '@/lib/server/auth';
 import { fetchTrustedFile, PayloadTooLargeError, readLimited, UntrustedUrlError } from '@/lib/server/safe-fetch';
+import { settingWithDevDefault } from '@/lib/utils/required-setting';
 
 interface BackendDimensionEntry {
   balloonId: string;
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Forward to backend PDF processing service for full dimension extraction
-    const backendResponse = await fetch(`${process.env.NEXT_PUBLIC_API_GATEWAY_URL || 'http://localhost:4000'}/v1/pdf-processing/extract-dimensions`, {
+    const backendResponse = await fetch(`${settingWithDevDefault(process.env.NEXT_PUBLIC_API_GATEWAY_URL, 'NEXT_PUBLIC_API_GATEWAY_URL', 'http://localhost:4000')}/v1/pdf-processing/extract-dimensions`, {
       method: 'POST',
       headers: {
         'Authorization': request.headers.get('Authorization') || '',
