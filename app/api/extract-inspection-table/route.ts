@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import { requireUser } from '@/lib/server/auth';
+
 export async function POST(request: NextRequest) {
+  // Parses an uploaded PDF on the server: signed-in users only.
+  const auth = await requireUser();
+  if (!auth.ok) return auth.response;
+
   try {
     const body = await request.json();
     const { pdfBuffer, fileName, balloonCoordinates } = body;
