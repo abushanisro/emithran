@@ -23,6 +23,7 @@
     "prebuild": "rimraf dist tsconfig.tsbuildinfo",
     "prestart:dev": "rimraf dist tsconfig.tsbuildinfo",
     "db:migrate": "ts-node -r tsconfig-paths/register scripts/migrate.ts",
+    "migrations:inventory": "ts-node -r tsconfig-paths/register scripts/migration-inventory.ts",
     "electronics:sync-contract": "node scripts/sync-electronics-contract.js",
     "cad:sync-contract": "node scripts/sync-cad-contract.js",
     "lint:electronics-boundary": "node scripts/lint-electronics-boundary.js",

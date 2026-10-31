@@ -8,12 +8,12 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 IMAGE="postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b"
 ID="baseline-$$"; WORK="$(mktemp -d)"
-cleanup() { docker rm -f "$ID-src" "$ID-dst" "$ID-dst2" >/dev/null 2>&1 || true; docker network rm "$ID" >/dev/null 2>&1 || true; rm -rf "$WORK"; }
+cleanup() { docker rm -f "$ID-src" "$ID-dst" "$ID-dst2" "$ID-dst3" >/dev/null 2>&1 || true; docker network rm "$ID" >/dev/null 2>&1 || true; rm -rf "$WORK"; }
 trap cleanup EXIT
 docker network create "$ID" >/dev/null
 start() { docker run -d --rm --name "$ID-$1" --network "$ID" -e POSTGRES_PASSWORD=pw -v "$PWD/migrations":/migrations:ro "$IMAGE" >/dev/null; }
-for n in src dst dst2; do start $n; done
-for n in src dst dst2; do for _ in $(seq 1 60); do docker exec "$ID-$n" pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1 && break; sleep 1; done; done
+for n in src dst dst2 dst3; do start $n; done
+for n in src dst dst2 dst3; do for _ in $(seq 1 60); do docker exec "$ID-$n" pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1 && break; sleep 1; done; done
 sql() { docker exec -i "$ID-$1" psql -U postgres -v ON_ERROR_STOP=1 -At -q "${@:2}"; }
 url() { echo "postgres://postgres:pw@$ID-$1:5432/postgres"; }
 fail=0
@@ -73,4 +73,11 @@ cp -r "$WORK/baseline" "$WORK/tampered"; echo "tampered" >> "$WORK/tampered/coun
 if bash scripts/baseline-load.sh "$WORK/tampered" "$(url dst2)" >/dev/null 2>&1; then echo "FAIL the loader accepted a baseline that does not match its checksums"; fail=1; else echo "ok   the loader refuses a tampered baseline"; fi
 check "a refused load changed nothing" "0" "$(sql dst2 -c "select count(*) from information_schema.tables where table_schema='public'")"
 if bash scripts/baseline-dump.sh "$(url src)" "$WORK/baseline" >/dev/null 2>&1; then echo "FAIL the dump overwrote an existing directory"; fail=1; else echo "ok   the dump refuses to overwrite an existing directory"; fi
+
+# --- schema only: what a new installation starts from (structure and row-level security, no rows, no users) -------------------------
+bash scripts/baseline-dump.sh --schema-only "$(url src)" "$WORK/schema" | tail -1
+bash scripts/baseline-load.sh "$WORK/schema" "$(url dst3)" | tail -1
+check "a schema-only baseline carries every table" "$(sql src -c "select count(*) from information_schema.tables where table_schema='public' and table_name<>'schema_migrations'")" "$(sql dst3 -c "select count(*) from information_schema.tables where table_schema='public'")"
+check "and no rows and no users" "0|0|0" "$(sql dst3 -c "select (select count(*) from public.projects), (select count(*) from public.big), (select count(*) from auth.users)")"
+check "row-level security comes with the structure" "t|1" "$(sql dst3 -c "select relrowsecurity, (select count(*) from pg_policies where tablename='projects') from pg_class where relname='projects'")"
 exit $fail
