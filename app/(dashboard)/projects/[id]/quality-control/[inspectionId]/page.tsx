@@ -46,34 +46,11 @@ import {
   XCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/lib/supabase/client';
+import { apiConfig } from '@/lib/api/config';
 
-// Utility function to handle authentication for API requests
-const getAuthHeaders = async (): Promise<Record<string, string>> => {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
+// This page's raw API fetches go same-origin through the BFF, which attaches the session's token.
+const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
-  if (process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true') {
-    // Development mode with disabled auth - no token needed
-    return headers;
-  }
-
-  // Production mode - get real Supabase token
-  if (!supabase) {
-    throw new Error('Supabase client not configured');
-  }
-
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token;
-
-  if (!token) {
-    throw new Error('No authentication token available. Please log in again.');
-  }
-
-  headers['Authorization'] = `Bearer ${token}`;
-  return headers;
-};
 // InteractiveBalloonAnnotator unused - commented out
 // import InteractiveBalloonAnnotator from '@/components/features/quality-control/InteractiveBalloonAnnotator';
 
@@ -663,8 +640,8 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
     setError(null);
 
     try {
-      const headers = await getAuthHeaders();
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/bom-items/${bomItem.id}/file-url/2d`, {
+      const headers = JSON_HEADERS;
+      const response = await fetch(`${apiConfig.endpoints.api.v1}/bom-items/${bomItem.id}/file-url/2d`, {
         headers,
       });
 
@@ -675,7 +652,7 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
         const signedUrl = data.url || data.signedUrl || data.downloadUrl || data.fileUrl || data.data?.url;
 
         if (signedUrl) {
-          // ⚡ CRITICAL: Never embed the Supabase signed URL directly in an iframe.
+          // ⚡ CRITICAL: Never embed the file store's signed URL directly in an iframe.
           // Chrome blocks cross-site iframes (sec-fetch-site: cross-site + sec-fetch-dest: iframe).
           // Route through the same-origin proxy so the iframe src is localhost:3000.
           const proxyUrl = `/api/file-proxy?url=${encodeURIComponent(signedUrl)}`;
@@ -1185,12 +1162,12 @@ export default function QualityInspectionPage() {
   const bomsQuery = useQuery({
     queryKey: ['bom', 'list', { projectId }],
     queryFn: async () => {
-      const headers = await getAuthHeaders();
+      const headers = JSON_HEADERS;
       const params = new URLSearchParams();
       if (projectId) params.append('projectId', projectId);
       const queryString = params.toString();
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/boms${queryString ? `?${queryString}` : ''}`, {
+      const response = await fetch(`${apiConfig.endpoints.api.v1}/boms${queryString ? `?${queryString}` : ''}`, {
         headers,
       });
 
@@ -1221,8 +1198,8 @@ export default function QualityInspectionPage() {
     queryFn: async () => {
       if (!inspection?.bomId) return { items: [] };
 
-      const headers = await getAuthHeaders();
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/bom-items?bomId=${inspection.bomId}`, {
+      const headers = JSON_HEADERS;
+      const response = await fetch(`${apiConfig.endpoints.api.v1}/bom-items?bomId=${inspection.bomId}`, {
         headers,
       });
 

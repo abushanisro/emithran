@@ -16,7 +16,6 @@ import { costAnalysisGroup } from './specs/cost-analysis';
 import { calculatorsGroup } from './specs/calculators';
 import { productionPlanningGroup } from './specs/production-planning';
 import { qualityControlGroup } from './specs/quality-control';
-import { deliveryGroup } from './specs/delivery';
 import { rfqGroup } from './specs/rfq';
 import { supplierEvaluationGroup } from './specs/supplier-evaluation';
 import { supplierNominationsGroup } from './specs/supplier-nominations';
@@ -33,7 +32,7 @@ export const API_SPEC: ApiSpec = {
   authenticationMethods: {
     jwt: {
       description:
-        'Pass a Supabase JWT in the Authorization header. Obtain the token by authenticating via Supabase Auth.',
+        'Pass an Auth0 access token for the eMithran API (audience https://api.emithran.com, RS256) in the Authorization header.',
       header: 'Authorization: Bearer <jwt_token>',
     },
     apiKey: {
@@ -59,7 +58,6 @@ export const API_SPEC: ApiSpec = {
     calculatorsGroup,
     productionPlanningGroup,
     qualityControlGroup,
-    deliveryGroup,
     rfqGroup,
     supplierEvaluationGroup,
     supplierNominationsGroup,

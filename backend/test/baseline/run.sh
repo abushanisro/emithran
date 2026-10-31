@@ -13,7 +13,7 @@ trap cleanup EXIT
 docker network create "$ID" >/dev/null
 start() { docker run -d --rm --name "$ID-$1" --network "$ID" -e POSTGRES_PASSWORD=pw -v "$PWD/migrations":/migrations:ro "$IMAGE" >/dev/null; }
 for n in src dst dst2; do start $n; done
-for n in src dst dst2; do for _ in $(seq 1 60); do docker exec "$ID-$n" pg_isready -U postgres >/dev/null 2>&1 && break; sleep 1; done; done
+for n in src dst dst2; do for _ in $(seq 1 60); do docker exec "$ID-$n" pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1 && break; sleep 1; done; done
 sql() { docker exec -i "$ID-$1" psql -U postgres -v ON_ERROR_STOP=1 -At -q "${@:2}"; }
 url() { echo "postgres://postgres:pw@$ID-$1:5432/postgres"; }
 fail=0

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-End to end, with nothing faked except Supabase: the real `cad-runner` and the real C++ `geometry-worker` inside the cad-core image,
-on a real zip of the repo's STEP fixtures, against a small stand-in for the Supabase REST + Storage endpoints the runner uses.
+End to end, with nothing faked except the data API and the bucket: the real `cad-runner` and the real C++ `geometry-worker` inside
+the cad-core image, on a real zip of the repo's STEP fixtures, against a small stand-in for the PostgREST calls and the path-style S3
+requests the runner makes.
 Checks that the runner claims the upload, unzips it, runs the worker (under prlimit, empty environment), stores one STEP file per
 distinct part (the customer's own bytes for a single-part file), and ends the upload `analysed` with a report that equals the tree.
 
@@ -19,6 +20,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 FIXTURES = Path(__file__).resolve().parents[2] / "backend/test/fixtures/cad"
+S3_BUCKET = "emithran"
+FILES = f"/{S3_BUCKET}/bom-files/"
 ROW = {"id": "up1", "organization_id": "org1", "file_name": "Pack.zip", "storage_path": "cad-uploads/org1/x", "attempts": 1}
 
 
@@ -52,29 +55,35 @@ class Fake(BaseHTTPRequestHandler):
         return self.rfile.read(int(self.headers.get("content-length", 0)))
 
     def do_POST(self):
-        body = self._body()
-        if self.path.endswith("/rpc/claim_next_cad_upload"):
+        self._body()
+        if self.path == "/rpc/claim_next_cad_upload" and self.headers.get("authorization", "").startswith("Bearer "):
             rows = [] if Fake.claimed else [ROW]
             Fake.claimed = True
             return self._send(200, json.dumps(rows).encode())
-        if self.path.startswith("/storage/v1/object/bom-files/"):
-            Fake.uploads[self.path.removeprefix("/storage/v1/object/bom-files/")] = body
-            return self._send(200, b"{}")
+        self._send(404)
+
+    def do_PUT(self):
+        body = self._body()
+        if self.path.startswith(FILES):
+            Fake.uploads[self.path.removeprefix(FILES)] = body
+            return self._send(200)
         self._send(404)
 
     def do_GET(self):
-        if self.path == "/storage/v1/object/bom-files/" + ROW["storage_path"]:
+        if self.path == FILES + ROW["storage_path"]:
             return self._send(200, Fake.zip_bytes, "application/zip")
         self._send(404)
 
     def do_PATCH(self):
+        if not self.path.startswith("/cad_uploads?"):
+            return self._send(404)
         Fake.patches.append(json.loads(self._body()))
         Fake.done.set()
         self._send(200, b"[]")
 
     def do_DELETE(self):
         self._body()
-        self._send(200, b"{}")
+        self._send(204)
 
 
 def main() -> int:
@@ -83,7 +92,9 @@ def main() -> int:
     threading.Thread(target=server.serve_forever, daemon=True).start()
     container = subprocess.run(
         ["docker", "run", "-d", "--rm", "--platform", "linux/amd64", "--add-host", "host.docker.internal:host-gateway",
-         "-e", f"SUPABASE_URL=http://host.docker.internal:{port}", "-e", "SUPABASE_SECRET_KEY=test-key", "-e", "POLL_SECONDS=1",
+         "-e", f"POSTGREST_URL=http://host.docker.internal:{port}", "-e", "DB_JWT_SECRET=" + "s" * 40,
+         "-e", f"S3_ENDPOINT=http://host.docker.internal:{port}", "-e", f"S3_BUCKET={S3_BUCKET}", "-e", "S3_REGION=us-east-1",
+         "-e", "S3_FORCE_PATH_STYLE=true", "-e", "S3_ACCESS_KEY_ID=test", "-e", "S3_SECRET_ACCESS_KEY=test", "-e", "POLL_SECONDS=1",
          "cad-core:dev"], check=True, capture_output=True, text=True).stdout.strip()
     try:
         finished = Fake.done.wait(timeout=120)

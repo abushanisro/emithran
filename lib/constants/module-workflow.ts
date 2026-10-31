@@ -124,16 +124,6 @@ export const WORKFLOW_MODULES: WorkflowModule[] = [
     estimatedTime: '30 min',
     dependencies: ['quality-control'],
   },
-  {
-    id: 'delivery',
-    name: 'Delivery & Logistics',
-    description: 'Final delivery and logistics coordination',
-    route: '/projects/[id]/delivery',
-    icon: 'Truck',
-    status: 'pending',
-    estimatedTime: '1-2 days',
-    dependencies: ['reports'],
-  },
 ];
 
 export const getNextModule = (currentModuleId: string): WorkflowModule | null => {

@@ -4,7 +4,6 @@ import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from '@ta
 import { useState, type ReactNode } from 'react'
 import { ApiError } from '@/lib/api/client'
 import { SESSION_IDLE_TIMEOUT_CODE } from '@/lib/auth/session-idle/policy'
-import { supabase } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 
 let hasShownAuthError = false;
@@ -88,17 +87,9 @@ function handleQueryError(error: unknown): void {
       }
     }
 
-    // Sign out then hard redirect — await ensures session is cleared before reload
-    const doRedirect = () => {
-      if (typeof window !== 'undefined') {
-        window.location.replace('/auth');
-      }
-    };
-
-    if (supabase) {
-      supabase.auth.signOut().finally(doRedirect);
-    } else {
-      doRedirect();
+    // The session is already gone on the server (the API answered 401), so a hard redirect to sign in again is all that is left.
+    if (typeof window !== 'undefined') {
+      window.location.replace('/auth');
     }
   }
 }

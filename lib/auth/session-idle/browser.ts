@@ -1,4 +1,3 @@
-import { apiClient } from '@/lib/api/client';
 import { apiConfig } from '@/lib/api/config';
 import { sessionSource } from '@/lib/auth/session-source';
 
@@ -20,12 +19,10 @@ const NOTICE_KEY = 'emithran.sessionIdle.signedOutNotice';
  * turned into a global sign-out by the generic 401 handling.
  */
 async function call(method: 'GET' | 'POST', path: string, body?: unknown): Promise<ServerResult> {
-  const token = await apiClient.getAuthToken();
-  if (!token) return { ok: false, idle: false };
   try {
     const res = await fetch(`${apiConfig.endpoints.api.v1}/auth/session${path}`, {
       method,
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' },
       body: body === undefined ? null : JSON.stringify(body),
       cache: 'no-store',
     });

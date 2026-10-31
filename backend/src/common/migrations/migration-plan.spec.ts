@@ -1,4 +1,3 @@
-import { PRD_SUPABASE_HOST } from '../environment-guard';
 
 import { checksumOf, migrationNumber, planMigrations, targetProblems, type Baseline, type Target } from './migration-plan';
 
@@ -48,10 +47,8 @@ describe('planMigrations', () => {
 });
 
 describe('targetProblems', () => {
-  const STAGE_REF = 'mhhyilxeoxzlbiytwdcm';
   const stage: Target = {
-    env: 'stage', appEnv: 'stage', supabaseUrl: `https://${STAGE_REF}.supabase.co`, confirm: false, dryRun: false,
-    databaseUrl: `postgresql://postgres.${STAGE_REF}:pw@pooler.example:5432/postgres`,
+    env: 'stage', appEnv: 'stage', confirm: false, dryRun: false, databaseUrl: 'postgresql://migrator:pw@db.example:5432/emithran',
   };
 
   it('accepts a consistent stage target', () => {
@@ -59,27 +56,18 @@ describe('targetProblems', () => {
   });
 
   it('accepts local with just a database URL', () => {
-    expect(targetProblems({ env: 'local', appEnv: undefined, supabaseUrl: undefined, databaseUrl: 'postgresql://localhost/db', confirm: false, dryRun: false })).toEqual([]);
+    expect(targetProblems({ env: 'local', appEnv: undefined, databaseUrl: 'postgresql://localhost/db', confirm: false, dryRun: false })).toEqual([]);
   });
 
   it('refuses an env file that names a different environment than --env', () => {
     expect(targetProblems({ ...stage, appEnv: 'prd' })).toEqual(['the env file says APP_ENV=prd but --env is stage']);
   });
 
-  it('refuses a database that belongs to another Supabase project than the env file names', () => {
-    const problems = targetProblems({ ...stage, databaseUrl: 'postgresql://postgres.someotherprojectref:pw@pooler.example:5432/postgres' });
-    expect(problems.join()).toMatch(/does not belong to the Supabase project mhhyilxeoxzlbiytwdcm/);
-  });
-
-  it('keeps stage away from the production project and production on it', () => {
-    const prdUrl = `https://${PRD_SUPABASE_HOST}`;
-    const prdRef = PRD_SUPABASE_HOST.split('.')[0];
-    const onPrd = { ...stage, supabaseUrl: prdUrl, databaseUrl: `postgresql://postgres.${prdRef}:pw@pooler.example:5432/postgres` };
-    expect(targetProblems(onPrd).join()).toMatch(/--env stage, but SUPABASE_URL is the production project/);
-    expect(targetProblems({ ...onPrd, env: 'prd', appEnv: 'prd' }).join()).toMatch(/production needs --confirm/);
-    expect(targetProblems({ ...onPrd, env: 'prd', appEnv: 'prd', confirm: true })).toEqual([]);
-    expect(targetProblems({ ...onPrd, env: 'prd', appEnv: 'prd', dryRun: true })).toEqual([]);
-    expect(targetProblems({ ...stage, env: 'prd', appEnv: 'prd', confirm: true }).join()).toMatch(/not the production project/);
+  it('needs --confirm for production, or --dry-run to see the plan', () => {
+    const prd = { ...stage, env: 'prd', appEnv: 'prd' };
+    expect(targetProblems(prd).join()).toMatch(/production needs --confirm/);
+    expect(targetProblems({ ...prd, confirm: true })).toEqual([]);
+    expect(targetProblems({ ...prd, dryRun: true })).toEqual([]);
   });
 
   it('refuses an unknown environment name and a missing database URL', () => {

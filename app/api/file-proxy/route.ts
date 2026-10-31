@@ -7,11 +7,11 @@ import { resolveBomItemFileUrl } from '@/lib/utils/storage-file-url';
 /**
  * File Proxy API Route
  *
- * Solves: Chrome blocks cross-site iframe embeds of Supabase signed URLs.
+ * Solves: Chrome blocks cross-site iframe embeds of the file store's signed URLs.
  * (sec-fetch-dest: iframe + sec-fetch-site: cross-site → blocked by browser)
  *
  * How it works:
- *   1. The frontend calls this route instead of embedding the Supabase URL directly.
+ *   1. The frontend calls this route instead of embedding the file-store URL directly.
  *   2. This server-side route fetches the file (no CORS restrictions server-side).
  *   3. Streams the bytes back to the browser from localhost:3000 → same-origin.
  *   4. The iframe src is now localhost:3000/api/file-proxy?... → no Chrome block.

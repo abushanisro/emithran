@@ -2,9 +2,15 @@ import 'reflect-metadata';
 import { validate } from './env.validation';
 
 const base = {
-  SUPABASE_URL: 'https://project.supabase.co',
-  SUPABASE_ANON_KEY: 'a'.repeat(30),
-  SUPABASE_SERVICE_KEY: 's'.repeat(30),
+  POSTGREST_URL: 'http://rest.invalid:3000',
+  DB_JWT_SECRET: 'j'.repeat(40),
+  S3_BUCKET: 'emithran',
+  S3_REGION: 'us-east-1',
+  S3_ACCESS_KEY_ID: 'key',
+  S3_SECRET_ACCESS_KEY: 'secret',
+  AUTH0_DOMAIN: 'tenant.example.auth0.com',
+  AUTH0_AUDIENCE: 'https://api.example.com',
+  AUTH0_CLAIM_NAMESPACE: 'https://example.com/',
 };
 const production = { ...base, NODE_ENV: 'production', CORS_ORIGIN: 'https://app.example.com', APP_ENV: 'prd' };
 
@@ -67,5 +73,17 @@ describe('env validation: APP_ENV', () => {
     expect(validate({ ...production, APP_ENV: 'stage' }).APP_ENV).toBe('stage');
     expect(validate(production).APP_ENV).toBe('prd');
     expect(() => validate({ ...production, APP_ENV: 'staging' })).toThrow(/Configuration validation error/);
+  });
+});
+
+describe('required runtime settings', () => {
+  it.each(['POSTGREST_URL', 'DB_JWT_SECRET', 'S3_BUCKET', 'AUTH0_DOMAIN', 'AUTH0_AUDIENCE'])('refuses to boot without %s', (name) => {
+    const config: Record<string, unknown> = { ...base };
+    delete config[name];
+    expect(() => validate(config)).toThrow(new RegExp(name));
+  });
+
+  it('needs no Supabase settings', () => {
+    expect(() => validate(base)).not.toThrow();
   });
 });

@@ -1,4 +1,4 @@
-// The design check for moving off Supabase (see docs/ENGINEERING.md, "Leaving Supabase"): the REAL SupabaseService in DB_BACKEND=postgrest mode, with tokens the
+// The design check for moving off Supabase (see docs/ENGINEERING.md, "Leaving Supabase"): the REAL SupabaseService (PostgREST on plain Postgres), with tokens the
 // REAL DbTokenMinter signs, against a real PostgREST on a real Postgres that only has migration 930. Policies are written exactly as the Supabase
 // migrations write them. Started by run.sh, which brings up both in Docker.
 import { createHmac } from 'node:crypto';
@@ -13,7 +13,7 @@ const URL_ = process.env.PGRST_URL ?? '';
 const A = '11111111-1111-1111-1111-111111111111';
 const B = '22222222-2222-2222-2222-222222222222';
 
-const service = new SupabaseService(new ConfigService({ DB_BACKEND: 'postgrest', POSTGREST_URL: URL_, DB_JWT_SECRET: SECRET }));
+const service = new SupabaseService(new ConfigService({ POSTGREST_URL: URL_, DB_JWT_SECRET: SECRET }));
 const minter = new DbTokenMinter(SECRET);
 const as = (user: string, email?: string) => service.getClient(minter.forUser(user, { email }));
 

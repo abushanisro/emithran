@@ -4,7 +4,7 @@
 #   backend/scripts/baseline-load.sh <baseline-dir> <target-connection-url>
 #   DOCKER_NETWORK=<net> ...     only when the target is another container (tests)
 #
-# Order: checksums, target must hold no tables, migration 930 (roles, auth schema, auth.uid()), the user directory, the public schema,
+# Order: checksums, target must hold no tables, migration 930 (roles, auth schema, auth.uid()), the extensions schema, the user directory, the public schema,
 # then every table's row count against counts.txt. Afterwards run `npm run db:migrate` for the migrations newer than the baseline.
 # It never wipes anything: a target that already has tables is refused, not emptied.
 set -euo pipefail
@@ -22,11 +22,25 @@ existing="$(pg sh -c 'psql "$TARGET" -At -c "select count(*) from information_sc
 
 echo "migration 930 (roles, auth schema)..."
 pg sh -c 'psql "$TARGET" -v ON_ERROR_STOP=1 -q -f /migrations/930_postgres_compat.sql' >/dev/null
+# A Supabase dump expects Supabase's extensions to exist, but a public-schema dump does not carry them: uuid-ossp and pgcrypto in an
+# `extensions` schema on the search path (tables default to extensions.uuid_generate_v4(), some functions call digest() unqualified),
+# and pg_trgm in public (a GIN index uses public.gin_trgm_ops). Give a plain Postgres the same.
+echo "extensions schema (Supabase layout)..."
+pg sh -c 'psql "$TARGET" -v ON_ERROR_STOP=1 -q' <<'SQL' >/dev/null
+CREATE SCHEMA IF NOT EXISTS extensions;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
+-- pg_trgm was created in public on Supabase, so the dump names its operator class public.gin_trgm_ops.
+CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
+DO $$ BEGIN EXECUTE format('ALTER DATABASE %I SET search_path = "$user", public, extensions', current_database()); END $$;
+SQL
 echo "user directory..."
 pg sh -c 'psql "$TARGET" -v ON_ERROR_STOP=1 -q -c "\copy auth.users (id, email, raw_user_meta_data, created_at) from /baseline/auth_users.csv with (format csv)"'
 echo "public schema..."
-# Every database already has a `public` schema, so its CREATE/COMMENT entries are left out of the restore; anything else that fails stops the load.
-pg sh -c 'pg_restore -l /baseline/db.dump | grep -v " SCHEMA - public " > /tmp/restore.list; pg_restore --dbname="$TARGET" --use-list=/tmp/restore.list --no-owner --no-privileges --exit-on-error /baseline/db.dump'
+# Every database already has a `public` schema, so its CREATE/COMMENT entries are left out of the restore. So is the one foreign key into
+# Supabase's own auth.sessions, which a plain Postgres does not have (migration 901 skips it the same way; sessions are not carried).
+# Anything else that fails stops the load.
+pg sh -c 'pg_restore -l /baseline/db.dump | grep -v -e " SCHEMA - public " -e " FK CONSTRAINT public user_session_activity user_session_activity_session_id_fkey " > /tmp/restore.list; pg_restore --dbname="$TARGET" --use-list=/tmp/restore.list --no-owner --no-privileges --exit-on-error /baseline/db.dump'
 
 echo "checking row counts..."
 pg sh -c 'psql "$TARGET" -At -F" " -c "select table_name, (xpath('"'"'/row/c/text()'"'"', query_to_xml(format('"'"'select count(*) as c from %I.%I'"'"', table_schema, table_name), false, true, '"'"''"'"')))[1]::text::bigint from information_schema.tables where table_schema = '"'"'public'"'"' and table_type = '"'"'BASE TABLE'"'"' and table_name <> '"'"'schema_migrations'"'"' order by 1"' > "$dir/.restored.txt"

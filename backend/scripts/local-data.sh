@@ -7,7 +7,7 @@
 #   npm run local:status | local:down | local:reset -- --yes
 #
 # A baseline comes from the stage (or old) project:  backend/scripts/baseline-dump.sh "<read-only connection url>" ~/baseline-stage
-# Login: until an Auth0 tenant exists, `local:use` turns on the development bypass (an automatic dev account, no login page).
+# Login is Auth0 (the web app has no other sign-in).
 # Once it exists:  npm run auth0:check  and then follow docs/CUTOVER_AUTH0_POSTGRES.md.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -47,14 +47,17 @@ psql_local() { docker exec -i "$(compose ps -q postgres)" psql -U postgres -v ON
 cmd_up() {
   ensure_secret
   compose up -d postgres storage
-  wait_for "Postgres" docker exec "$(compose ps -q postgres)" pg_isready -U postgres
+  wait_for "Postgres" docker exec "$(compose ps -q postgres)" pg_isready -h 127.0.0.1 -U postgres
   echo "Postgres on 127.0.0.1:$pg_port, files on 127.0.0.1:$s3_port"
 }
 
 cmd_load() {
   local dir="${1:?usage: local:load -- <baseline-dir>}"
   cmd_up
-  bash "$here/baseline-load.sh" "$dir" "postgres://postgres:postgres@host.docker.internal:$pg_port/postgres"
+  # Load over the stack's own Docker network: the host port is bound to 127.0.0.1, which Linux containers cannot reach.
+  local pg_container net; pg_container="$(compose ps -q postgres)"
+  net="$(docker inspect -f '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}}{{end}}' "$pg_container")"
+  DOCKER_NETWORK="$net" bash "$here/baseline-load.sh" "$dir" "postgres://postgres:postgres@postgres:5432/postgres"
   psql_local -c "ALTER ROLE authenticator WITH LOGIN PASSWORD 'authpw'" >/dev/null
   echo "applying migrations newer than the baseline..."
   (cd "$here/.." && MIGRATE_DATABASE_URL="postgres://postgres:postgres@127.0.0.1:$pg_port/postgres" npm run -s db:migrate -- --env local)
@@ -68,9 +71,7 @@ cmd_use() {
   ensure_secret
   local backup="${LOCAL_BACKUP_DIR:-$HOME}/emithran-env-backup-local-data-$(date +%Y%m%d-%H%M%S)"
   [ -f "$envfile" ] && cp "$envfile" "$backup" && chmod 600 "$backup" && echo "saved the current .env to $backup (restore: npm run local:restore)"
-  env_set DB_BACKEND postgrest
   env_set POSTGREST_URL "http://127.0.0.1:$api_port"
-  env_set STORAGE_BACKEND s3
   env_set S3_BUCKET emithran
   env_set S3_REGION us-east-1
   env_set S3_ENDPOINT "http://127.0.0.1:$s3_port"
@@ -79,7 +80,6 @@ cmd_use() {
   env_set S3_SECRET_ACCESS_KEY testtesttest
   env_set TRUSTED_STORAGE_HOSTS 127.0.0.1
   env_set ALLOW_DEV_AUTH_BYPASS true
-  env_set NEXT_PUBLIC_DISABLE_AUTH true
   [ -n "$(env_get ADMIN_FALLBACK_EMAIL)" ] || echo "NOTE: set ADMIN_FALLBACK_EMAIL in .env to a user that exists in the loaded baseline (the dev account)."
   echo "root .env now uses local Postgres and local files. Restart the backend and the frontend."
 }

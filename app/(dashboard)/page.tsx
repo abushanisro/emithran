@@ -118,17 +118,6 @@ const getManufacturingModules = (projects: any[]) => [
       value: summarizeProjectCosts(projects.filter(p => p.status === 'completed')).actual,
     },
   },
-  {
-    id: 'delivery',
-    title: 'Delivery Management',
-    description: 'Packing, logistics and delivery tracking coordination',
-    path: '/delivery',
-    stats: {
-      active: projects.filter(p => p.status === 'completed').length,
-      total: projects.length,
-      value: projects.filter(p => p.status === 'completed').reduce((sum, p) => sum + (Number(p.targetBomCost) || 0), 0),
-    },
-  },
 ];
 
 const STATUS_LABELS: Record<string, string> = {
