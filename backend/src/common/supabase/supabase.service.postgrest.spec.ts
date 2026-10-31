@@ -7,7 +7,7 @@ const SECRET = 's'.repeat(40);
 const USER = '11111111-1111-1111-1111-111111111111';
 
 const service = (values: Record<string, string>) => new SupabaseService(new ConfigService(values));
-const postgrest = { DB_BACKEND: 'postgrest', POSTGREST_URL: 'http://rest.internal:3000/', DB_JWT_SECRET: SECRET };
+const postgrest = { POSTGREST_URL: 'http://rest.internal:3000/', DB_JWT_SECRET: SECRET };
 
 /** What actually goes over the wire: the URL, the Authorization header, and a canned answer. */
 function captureRequests() {
@@ -22,7 +22,7 @@ function captureRequests() {
 
 afterEach(() => jest.restoreAllMocks());
 
-describe('SupabaseService with DB_BACKEND=postgrest', () => {
+describe('SupabaseService (PostgREST on plain Postgres)', () => {
   it('sends a privileged query to the PostgREST root (no /rest/v1) with a service_role token this backend signed', async () => {
     const calls = captureRequests();
     await service(postgrest).getPrivilegedClient('test: reference read').from('materials').select('id');
@@ -47,15 +47,16 @@ describe('SupabaseService with DB_BACKEND=postgrest', () => {
 
   it.each(['auth', 'storage', 'functions', 'channel'])('says what replaces supabase.%s instead of returning undefined', (name) => {
     const client = service(postgrest).getPrivilegedClient('test') as unknown as Record<string, unknown>;
-    expect(() => client[name]).toThrow(new RegExp(`supabase\\.${name} is not available with DB_BACKEND=postgrest`));
+    expect(() => client[name]).toThrow(new RegExp(`supabase\\.${name} is not available \\(there is no Supabase\\)`));
   });
 
-  it('does not need Supabase URL or keys in this mode', () => {
+  it('needs no Supabase URL or keys', () => {
     expect(() => service(postgrest).getPrivilegedClient('test')).not.toThrow();
   });
 
-  it('is not enabled by default: without DB_BACKEND the Supabase path is unchanged', () => {
-    expect(() => service({}).getPrivilegedClient('test')).toThrow('Supabase not configured');
+  it('refuses to start without the PostgREST address or the signing secret', () => {
+    expect(() => service({ DB_JWT_SECRET: SECRET })).toThrow(/POSTGREST_URL/);
+    expect(() => service({ POSTGREST_URL: 'http://rest.internal:3000/' })).toThrow(/DB_JWT_SECRET/);
   });
 
   it('refuses a weak signing secret at construction', () => {

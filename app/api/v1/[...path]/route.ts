@@ -13,9 +13,10 @@ const refuse = (status: number, code: string, message: string) =>
  * token, the organization and the idle deadline on every call; this route only decides whether to forward.
  */
 async function handle(req: NextRequest, ctx: RouteContext<'/api/v1/[...path]'>): Promise<Response> {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  // Runtime settings, not NEXT_PUBLIC_ ones: those are baked into the build, so one image could not serve two environments.
+  const appUrl = process.env.APP_BASE_URL;
   const apiBase = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL;
-  if (!appUrl || !apiBase) return refuse(500, 'BFF_NOT_CONFIGURED', 'NEXT_PUBLIC_APP_URL and API_URL must be set');
+  if (!appUrl || !apiBase) return refuse(500, 'BFF_NOT_CONFIGURED', 'APP_BASE_URL and API_URL must be set');
 
   if (!isAllowedOrigin(req, appUrl)) return refuse(403, 'ORIGIN_NOT_ALLOWED', 'Request origin not allowed');
 

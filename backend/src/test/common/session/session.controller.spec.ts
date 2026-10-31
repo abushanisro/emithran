@@ -15,9 +15,9 @@ function makeService() {
 describe('SessionController', () => {
   it('returns the enforced policy and the session deadline without recording activity', async () => {
     const service = makeService();
-    const res = await new SessionController(service).status('s1', 'u1', 'tok');
+    const res = await new SessionController(service).status('s1', 'u1');
     expect(res).toEqual({ policy: SESSION_IDLE_POLICY, enforced: true, deadline: T0 + 30 * MIN });
-    expect(service.assertActive).toHaveBeenCalledWith('s1', 'u1', 'tok');
+    expect(service.assertActive).toHaveBeenCalledWith('s1', 'u1');
     expect(service.recordActivity).not.toHaveBeenCalled();
   });
 
@@ -28,10 +28,10 @@ describe('SessionController', () => {
     expect(res.deadline).toBe(T0 + 35 * MIN);
   });
 
-  it('reports the development bypass (no Supabase session) as not enforced, and stores nothing', async () => {
+  it('reports the development bypass (no session) as not enforced, and stores nothing', async () => {
     const service = makeService();
     const controller = new SessionController(service);
-    await expect(controller.status(undefined, 'dev', 'minted')).resolves.toMatchObject({ enforced: false, deadline: null });
+    await expect(controller.status(undefined, 'dev')).resolves.toMatchObject({ enforced: false, deadline: null });
     await expect(controller.activity({ kind: 'user' }, undefined, 'dev')).resolves.toMatchObject({ enforced: false });
     expect(service.assertActive).not.toHaveBeenCalled();
     expect(service.recordActivity).not.toHaveBeenCalled();

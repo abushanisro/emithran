@@ -19,7 +19,7 @@ const call = (handler: typeof GET, path: string[], init: { method?: string; head
   handler(new NextRequest(`${APP}/api/v1/${path.join('/')}`, init), { params: Promise.resolve({ path }) });
 
 beforeEach(() => {
-  vi.stubEnv('NEXT_PUBLIC_APP_URL', APP);
+  vi.stubEnv('APP_BASE_URL', APP);
   vi.stubEnv('API_URL', 'http://api.internal:4000/v1/api');
   vi.stubGlobal('fetch', upstream);
   sessionAccessToken.mockResolvedValue('server-token');

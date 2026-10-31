@@ -2,7 +2,7 @@ import { PostgrestClient } from '@supabase/postgrest-js';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 // What a plain PostgREST cannot do: the rest of supabase-js (auth, file storage, realtime, edge functions) is Supabase's own service.
-// Code that still reaches for them while DB_BACKEND=postgrest gets a clear error naming the replacement, instead of an undefined
+// Code that still reaches for them gets a clear error naming the replacement, instead of an undefined
 // property deep inside a handler.
 const REPLACED: Record<string, string> = {
   auth: 'IdentityService (login is Auth0; user lookups are the auth.users table)',
@@ -21,7 +21,7 @@ export function createDbClient(baseUrl: string, token: string): SupabaseClient {
   return new Proxy(rest, {
     get(target, property, receiver) {
       if (typeof property === 'string' && property in REPLACED && !(property in target)) {
-        throw new Error(`supabase.${property} is not available with DB_BACKEND=postgrest: use ${REPLACED[property]}`);
+        throw new Error(`supabase.${property} is not available (there is no Supabase): use ${REPLACED[property]}`);
       }
       return Reflect.get(target, property, receiver) as unknown;
     },

@@ -201,12 +201,8 @@ function backends(setting: (name: string) => string | undefined): string {
       return '(invalid URL)';
     }
   };
-  const supabase = `Supabase ${host(setting('SUPABASE_URL'))}`;
-  const data = setting('DB_BACKEND') === 'postgrest' ? `PostgREST ${host(setting('POSTGREST_URL'))}` : supabase;
   const s3Endpoint = setting('S3_ENDPOINT');
-  const files = setting('STORAGE_BACKEND') === 's3' ? `S3 ${s3Endpoint ? host(s3Endpoint) : 'AWS'}` : supabase;
-  const logins = setting('AUTH_BACKEND') === 'auth0' ? `Auth0 ${setting('AUTH0_DOMAIN') ?? '(not set)'}` : supabase;
-  return `Data: ${data} | Files: ${files} | Login: ${logins}`;
+  return `Data: PostgREST ${host(setting('POSTGREST_URL'))} | Files: S3 ${s3Endpoint ? host(s3Endpoint) : 'AWS'} | Login: Auth0 ${setting('AUTH0_DOMAIN') ?? '(not set)'}`;
 }
 
 bootstrap();

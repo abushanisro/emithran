@@ -6,7 +6,6 @@ import {
 } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { evictOldestIfFull } from '../cache/bounded-map';
-import { forgetVerified } from '../supabase/token-verification-cache';
 import { SESSION_IDLE_POLICY, sessionDeadline, type SessionActivityTimes } from './session-idle-policy';
 
 export type ActivityKind = 'user' | 'job';
@@ -14,8 +13,6 @@ export type ActivityKind = 'user' | 'job';
 const TABLE = 'user_session_activity';
 /** PostgREST / Postgres codes for "the table does not exist" (migration 901 not applied). */
 const MISSING_TABLE_CODES = new Set(['PGRST205', '42P01']);
-/** The session row's foreign key: the Supabase session was deleted under us. */
-const FK_VIOLATION = '23503';
 const MAX_CACHED_SESSIONS = 10_000;
 
 export const SESSION_IDLE_TIMEOUT_CODE = 'SESSION_IDLE_TIMEOUT';
@@ -24,8 +21,8 @@ export const SESSION_IDLE_TIMEOUT_CODE = 'SESSION_IDLE_TIMEOUT';
  * Server-side enforcement of the inactivity timeout (migration 901).
  *
  * The browser countdown is only a convenience: this is what actually ends an
- * idle session. A session past its deadline is rejected AND revoked in
- * Supabase, so its refresh token stops working too.
+ * idle session. A session past its deadline is rejected, and keeps being
+ * rejected: its stored deadline does not move, and the browser signs out.
  *
  * Times are cached per instance. Every stored time only moves forward, so a
  * cached deadline can only be earlier than the real one: trusting it while it
@@ -39,8 +36,8 @@ export class SessionActivityService {
 
   constructor(private readonly supabaseService: SupabaseService) {}
 
-  /** Throws 401 (and revokes the session) if it is past its deadline. */
-  async assertActive(sessionId: string, userId: string, accessToken: string, now = Date.now()): Promise<SessionActivityTimes> {
+  /** Throws 401 if the session is past its deadline. */
+  async assertActive(sessionId: string, userId: string, now = Date.now()): Promise<SessionActivityTimes> {
     const cached = this.cache.get(sessionId);
     if (cached && sessionDeadline(cached) > now) return cached;
 
@@ -53,7 +50,7 @@ export class SessionActivityService {
       return this.unenforcedOrThrow(error, now);
     }
     if (sessionDeadline(times) <= now) {
-      await this.expire(sessionId, accessToken);
+      this.cache.delete(sessionId);
       throw new UnauthorizedException({
         message: 'Your session ended after 30 minutes of inactivity. Please sign in again.',
         code: SESSION_IDLE_TIMEOUT_CODE,
@@ -97,29 +94,8 @@ export class SessionActivityService {
       .upsert({ session_id: sessionId, user_id: userId, ...columns }, { onConflict: 'session_id' })
       .select('last_activity_at, last_job_at')
       .single();
-    if (error) {
-      if (error.code === FK_VIOLATION) {
-        throw new UnauthorizedException('Your session has ended. Please sign in again.');
-      }
-      throw storageError(error);
-    }
+    if (error) throw storageError(error);
     return toTimes(data);
-  }
-
-  /** Supabase: revokes the session (its row goes with it, ON DELETE CASCADE). Plain Postgres: only forgets it; the row stays and keeps rejecting. */
-  private async expire(sessionId: string, accessToken: string): Promise<void> {
-    this.cache.delete(sessionId);
-    // The guard's verified-token cache must not keep accepting this token.
-    forgetVerified(accessToken);
-    // Auth0 sessions have nothing to revoke here: the stored deadline keeps rejecting this session, and the browser signs out.
-    if (this.supabaseService.usesPostgrest()) return;
-    const { error } = await this.supabaseService
-      .getPrivilegedClient('session-idle: revoke a Supabase session that passed its inactivity deadline')
-      .auth.admin.signOut(accessToken, 'local');
-    if (error) {
-      // The request is still rejected; the next one re-checks and retries the revoke.
-      this.logger.warn(`Could not revoke idle session ${sessionId}: ${error.message}`);
-    }
   }
 
   private remember(sessionId: string, times: SessionActivityTimes): void {

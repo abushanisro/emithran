@@ -18,7 +18,7 @@ describe('OrganizationsService', () => {
     db = new FakePostgrest();
     await db.start();
     const supabase = new SupabaseService(
-      new ConfigService({ DB_BACKEND: 'postgrest', POSTGREST_URL: db.url, DB_JWT_SECRET: 'x'.repeat(32) }),
+      new ConfigService({ POSTGREST_URL: db.url, DB_JWT_SECRET: 'x'.repeat(32) }),
     );
     service = new OrganizationsService(supabase, new UserDirectory(supabase));
   });
