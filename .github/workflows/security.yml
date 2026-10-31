@@ -50,8 +50,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # Needs GitHub Advanced Security, which a private repository on a personal account cannot have; the lock-file scan below
+      # covers vulnerable dependencies there. Runs by itself again if the repository becomes public or moves to an organization.
       - name: Review dependency changes in this pull request
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && !github.event.repository.private
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: high
@@ -134,6 +136,24 @@ jobs:
       - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           languages: ${{ matrix.language }}
+      # Code scanning (the upload and the Security tab) needs GitHub Advanced Security, which a private repository on a personal
+      # account cannot have. There the results are kept as a run artifact and any finding fails the job instead.
       - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           category: /language:${{ matrix.language }}
+          upload: ${{ github.event.repository.private && 'never' || 'always' }}
+          output: ${{ runner.temp }}/codeql
+      - name: Keep the results
+        if: always() && github.event.repository.private
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: codeql-${{ matrix.language }}
+          path: ${{ runner.temp }}/codeql
+          if-no-files-found: ignore
+      - name: Fail on findings
+        if: github.event.repository.private
+        run: |
+          count=$(jq '[.runs[].results[]] | length' "$RUNNER_TEMP"/codeql/*.sarif)
+          jq -r '.runs[].results[] | "\(.level // "warning") \(.ruleId): \(.locations[0].physicalLocation.artifactLocation.uri):\(.locations[0].physicalLocation.region.startLine) \(.message.text | split("\n")[0])"' "$RUNNER_TEMP"/codeql/*.sarif
+          echo "$count finding(s)"
+          test "$count" -eq 0
