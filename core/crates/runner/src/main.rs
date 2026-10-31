@@ -72,7 +72,12 @@ fn backend_from_env() -> Result<Platform, String> {
         path_style: std::env::var("S3_FORCE_PATH_STYLE").as_deref() == Ok("true"),
     })
     .map_err(|e| e.to_string())?;
-    Platform::new(&setting("POSTGREST_URL")?, &setting("DB_JWT_SECRET")?, files).map_err(|e| e.to_string())
+    Platform::new(
+        &setting("POSTGREST_URL")?,
+        &setting("DB_JWT_SECRET")?,
+        files,
+    )
+    .map_err(|e| e.to_string())
 }
 
 fn heartbeat_path() -> PathBuf {
