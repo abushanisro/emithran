@@ -14,7 +14,7 @@ trap 'docker rm -f "$NAME" "$NAME-compat" >/dev/null 2>&1 || true' EXIT
 
 start() { # a throwaway Postgres; roles are shared by every database in one, so the tests that need roles of their own get their own
   docker run -d --rm --name "$1" -e POSTGRES_PASSWORD=test --tmpfs /var/lib/postgresql/data -v "$PWD/../../migrations":/migrations:ro "$IMAGE" >/dev/null
-  for _ in $(seq 1 60); do docker exec "$1" pg_isready -U postgres >/dev/null 2>&1 && break; sleep 1; done
+  for _ in $(seq 1 60); do docker exec "$1" pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1 && break; sleep 1; done
 }
 start "$NAME"
 CT="$NAME"

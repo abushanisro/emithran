@@ -10,7 +10,7 @@
     "start:production": "NODE_ENV=production node .next/standalone/server.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "type-check": "tsc --noEmit",
+    "type-check": "next typegen && tsc --noEmit",
     "check:boundary": "node scripts/check-frontend-boundary.ts",
     "test": "vitest run",
     "test:e2e": "playwright test"
