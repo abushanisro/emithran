@@ -10,3 +10,5 @@ COPY src ./src
 COPY tests ./tests
 COPY --from=fixtures . /fixtures
 RUN ./build.sh
+# Build and test image only (CI and the parity test); it runs nothing as root after the build.
+USER 65534:65534
