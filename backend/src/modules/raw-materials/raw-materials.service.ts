@@ -11,6 +11,7 @@ import {
   expandSearchTermSpellingVariants,
 } from './material-search-spelling';
 import { orderByRelevance, rankableFromDbRow } from './material-search-ranking';
+import { quoteFilterValue } from '../../common/db/postgrest-filter';
 
 // Re-exported so existing importers (and the spelling spec) keep working;
 // the definitions live in material-search-spelling.ts so the search ranker
@@ -29,12 +30,8 @@ export { MATERIAL_SEARCH_SPELLING_VARIANTS, expandSearchTermSpellingVariants };
 export function buildMaterialSearchOrClause(searchTerm: string): string {
   const variants = expandSearchTermSpellingVariants(searchTerm);
   const clauses = variants.flatMap((v) => {
-    const safe = v.replace(/"/g, '\\"');
-    return [
-      `grade.ilike."%${safe}%"`,
-      `material_group.ilike."%${safe}%"`,
-      `name.ilike."%${safe}%"`,
-    ];
+    const pattern = quoteFilterValue(`%${v}%`);
+    return [`grade.ilike.${pattern}`, `material_group.ilike.${pattern}`, `name.ilike.${pattern}`];
   });
   return clauses.join(',');
 }

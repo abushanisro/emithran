@@ -70,6 +70,7 @@ import axios from 'axios';
 import { CalculatorInputsRequestDto, MachiningCalculatorInputsRequestDto } from './dto/machining-calculator-inputs.dto';
 import { SIGNED_URL_TTL_SEC, getReusableSignedUrl, rememberSignedUrl } from './services/signed-url-cache';
 import { DEFAULT_CAD_ENGINE_URL } from '../../common/engine-urls';
+import { quoteFilterValue } from '../../common/db/postgrest-filter';
 
 // Define User type if not available
 interface User {
@@ -250,9 +251,8 @@ export class BOMItemsController {
       const variants = expandSearchTermSpellingVariants(g);
       const orClause = (columns: string[], wildcard: boolean) =>
         variants.flatMap((v) => {
-          const safe = v.replace(/"/g, '\\"');
-          const pattern = wildcard ? `%${safe}%` : safe;
-          return columns.map((col) => `${col}.ilike."${pattern}"`);
+          const pattern = wildcard ? `%${v}%` : v;
+          return columns.map((col) => `${col}.ilike.${quoteFilterValue(pattern)}`);
         }).join(',');
 
       // 1. Exact match in curated lookup table (any real spelling variant)
