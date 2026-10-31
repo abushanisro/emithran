@@ -1,15 +1,15 @@
 import { UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../common/database/database.service';
 import { runWithRequestAuth } from '../../../common/request-context/request-auth-context';
 
-// Real SupabaseService and real PostgREST clients: creating one makes no network call, so the trust-boundary rules can be checked
+// Real DatabaseService and real PostgREST clients: creating one makes no network call, so the trust-boundary rules can be checked
 // without any mock of the client itself.
 const makeService = () =>
-  new SupabaseService(new ConfigService({ POSTGREST_URL: 'http://127.0.0.1:1', DB_JWT_SECRET: 's'.repeat(40) }));
+  new DatabaseService(new ConfigService({ POSTGREST_URL: 'http://127.0.0.1:1', DB_JWT_SECRET: 's'.repeat(40) }));
 
-describe('SupabaseService trust boundary', () => {
+describe('DatabaseService trust boundary', () => {
   describe('getClient(accessToken)', () => {
     it.each([['empty string', ''], ['blank string', '   '], ['undefined', undefined], ['null', null]])(
       'rejects a %s token instead of returning the service-role client',

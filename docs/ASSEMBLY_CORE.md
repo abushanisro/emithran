@@ -11,7 +11,7 @@ core/crates/runner  `cad-runner`   queued -> running -> analysed
 NestJS materializer                analysed -> materializing -> done
     claim_next_analysed_upload() RPC (migration 923) -> planItems -> createItems (BOM rules, audit, file paths) -> remove work files
 ```
-The runner talks to Supabase over HTTPS only (PostgREST + Storage, secret key): no Postgres connection, like the rest of the backend.
+The runner talks to PostgREST and the S3-compatible bucket over HTTP(S) only (a backend-minted database token, `DB_JWT_SECRET`): no Postgres connection, like the rest of the backend.
 `CAD_CORE=python` (default) keeps the old path (NestJS calls the Python `cad-engine`); `CAD_CORE=rust` makes NestJS materialize only and
 `cad-runner` analyse. Exactly one analyser may run for a deployment.
 

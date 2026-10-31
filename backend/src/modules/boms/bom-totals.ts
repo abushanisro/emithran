@@ -1,4 +1,4 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { DbClient } from '../../common/db/postgrest-client';
 import type { RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
 import { ROLLUP_REPORTING_CURRENCY } from '../bom-items/costing/shared/core/persisted-currency-contract';
 import { computeBomTotal, type BomCostRow, type BomTotalItem } from './bom-total';
@@ -43,7 +43,7 @@ export interface PersistedBomTotal {
 
 /** Shared read/decision boundary for both BOM and project totals; never writes or recalculates. */
 export async function loadBomTotals(
-  client: SupabaseClient,
+  client: DbClient,
   bomIds: readonly string[],
   getSnapshot: () => Promise<RateSnapshot>,
   onError: (message: string) => void,

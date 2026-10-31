@@ -1,6 +1,6 @@
 import { Injectable, Logger, ServiceUnavailableException, UnprocessableEntityException } from '@nestjs/common';
-import { UserDirectory } from '../supabase/user-directory';
-import { SupabaseService } from '../supabase/supabase.service';
+import { UserDirectory } from '../database/user-directory';
+import { DatabaseService } from '../database/database.service';
 
 /** One active budget rate with its provenance (see listRates). */
 export interface ExchangeRateRow {
@@ -111,7 +111,7 @@ export class ExchangeRateService {
   private static readonly CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly directory: UserDirectory,
   ) {}
 
@@ -127,7 +127,7 @@ export class ExchangeRateService {
       return;
     }
 
-    const client = this.supabaseService.getUserClient(accessToken ?? undefined);
+    const client = this.databaseService.getUserClient(accessToken ?? undefined);
     const { data, error } = await client
       .from('exchange_rates')
       .select('to_currency, rate')
@@ -193,7 +193,7 @@ export class ExchangeRateService {
     await this.loadRates(accessToken);
     // Names are display-only, so they are read here and never by loadRates:
     // costing conversions must not depend on a label column.
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getUserClient(accessToken ?? undefined)
       .from('exchange_rates')
       .select('to_currency, currency_name')
@@ -225,7 +225,7 @@ export class ExchangeRateService {
    * Backs the Process page Exchange Rates panel.
    */
   async listRates(accessToken: string | null): Promise<ExchangeRateRow[]> {
-    const client = this.supabaseService.getUserClient(accessToken ?? undefined);
+    const client = this.databaseService.getUserClient(accessToken ?? undefined);
     const { data, error } = await client
       .from('exchange_rates')
       .select('to_currency, currency_name, rate, effective_date, set_by, notes, source_active, source_modified_by, source_modified_at, updated_at')
@@ -260,7 +260,7 @@ export class ExchangeRateService {
    * is the authenticated user the controller resolved.
    */
   async setRate(currency: string, rate: number, reason: string, userId: string): Promise<void> {
-    const { error } = await this.supabaseService.getPrivilegedClient('system-write: exchange_rates writes are service-role-only (migration 803), caller authenticated by controller').rpc('set_budget_exchange_rate', {
+    const { error } = await this.databaseService.getPrivilegedClient('system-write: exchange_rates writes are service-role-only (migration 803), caller authenticated by controller').rpc('set_budget_exchange_rate', {
       p_currency: currency,
       p_rate: rate,
       p_set_by: userId,

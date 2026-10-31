@@ -1,7 +1,7 @@
 import { splitWireEdmOccurrences, isRealHeatTreatmentCallout } from '../../../../../../modules/bom-items/costing/machining/operation/wire-edm-routing';
 
 // Pure functions, zero DB dependency — no mocking needed or used, per this
-// project's standing rule against mocked-Supabase spec files.
+// project's standing rule against mocked-database spec files.
 //
 // Root-caused 2026-09-18: "Wire EDM" is a real, staged machine category
 // (migrations 737/738/753, 6 real machines) with real material cutting

@@ -5,7 +5,7 @@ import {
   sessionIdFromAccessToken,
 } from '../../../common/session/session-idle-policy';
 import { SessionActivityService, SESSION_IDLE_TIMEOUT_CODE } from '../../../common/session/session-activity.service';
-import { type SupabaseService } from '../../../common/supabase/supabase.service';
+import { type DatabaseService } from '../../../common/database/database.service';
 
 const MIN = 60_000;
 const T0 = Date.parse('2026-10-15T09:00:00Z');
@@ -14,7 +14,7 @@ const iso = (ms: number) => new Date(ms).toISOString();
 type Row = { last_activity_at: string; last_job_at: string | null };
 
 /** In-memory stand-in for user_session_activity behind the privileged client. */
-function fakeSupabase(opts: { readError?: object; writeError?: object } = {}) {
+function fakeDatabase(opts: { readError?: object; writeError?: object } = {}) {
   const rows = new Map<string, Row>();
   const reads = jest.fn();
   const client = {
@@ -40,7 +40,7 @@ function fakeSupabase(opts: { readError?: object; writeError?: object } = {}) {
       return q;
     },
   };
-  const service = { getPrivilegedClient: jest.fn().mockReturnValue(client) } as unknown as SupabaseService;
+  const service = { getPrivilegedClient: jest.fn().mockReturnValue(client) } as unknown as DatabaseService;
   return { service, rows, reads };
 }
 
@@ -89,14 +89,14 @@ describe('SessionActivityService', () => {
   });
 
   it('starts the idle clock on the first request of a session', async () => {
-    const db = fakeSupabase();
+    const db = fakeDatabase();
     const svc = new SessionActivityService(db.service);
     await expect(svc.assertActive('s1', 'u1', T0)).resolves.toEqual({ lastActivityAt: T0, lastJobAt: null });
     expect(db.rows.get('s1')?.last_activity_at).toBe(iso(T0));
   });
 
   it('allows requests until the deadline without moving it (API traffic is not activity)', async () => {
-    const db = fakeSupabase();
+    const db = fakeDatabase();
     const svc = new SessionActivityService(db.service);
     await svc.assertActive('s1', 'u1', T0);
     await svc.assertActive('s1', 'u1', T0 + 29 * MIN);
@@ -104,7 +104,7 @@ describe('SessionActivityService', () => {
   });
 
   it('rejects a session idle for 30 minutes', async () => {
-    const db = fakeSupabase();
+    const db = fakeDatabase();
     const svc = new SessionActivityService(db.service);
     await svc.assertActive('s1', 'u1', T0);
     const err = await svc.assertActive('s1', 'u1', T0 + 30 * MIN).catch((e) => e);
@@ -113,7 +113,7 @@ describe('SessionActivityService', () => {
   });
 
   it('serves a still-valid cached deadline without a database read', async () => {
-    const db = fakeSupabase();
+    const db = fakeDatabase();
     const svc = new SessionActivityService(db.service);
     await svc.assertActive('s1', 'u1', T0);
     db.reads.mockClear();
@@ -122,7 +122,7 @@ describe('SessionActivityService', () => {
   });
 
   it('re-reads the database before rejecting, so activity recorded by another instance counts', async () => {
-    const db = fakeSupabase();
+    const db = fakeDatabase();
     const svc = new SessionActivityService(db.service);
     await svc.assertActive('s1', 'u1', T0);
     db.rows.set('s1', { last_activity_at: iso(T0 + 20 * MIN), last_job_at: null });
@@ -130,7 +130,7 @@ describe('SessionActivityService', () => {
   });
 
   it('moves the idle clock only on a user heartbeat', async () => {
-    const db = fakeSupabase();
+    const db = fakeDatabase();
     const svc = new SessionActivityService(db.service);
     await svc.assertActive('s1', 'u1', T0);
     await svc.recordActivity('s1', 'u1', 'user', T0 + 25 * MIN);
@@ -139,7 +139,7 @@ describe('SessionActivityService', () => {
   });
 
   it('lets a running job extend the session, but never past 15 minutes beyond the idle deadline', async () => {
-    const db = fakeSupabase();
+    const db = fakeDatabase();
     const svc = new SessionActivityService(db.service);
     await svc.assertActive('s1', 'u1', T0);
     for (let m = 29; m <= 50; m++) {
@@ -153,7 +153,7 @@ describe('SessionActivityService', () => {
   });
 
   it('ends the session 2 minutes after the job finishes, once past the idle deadline', async () => {
-    const db = fakeSupabase();
+    const db = fakeDatabase();
     const svc = new SessionActivityService(db.service);
     await svc.assertActive('s1', 'u1', T0);
     await svc.recordActivity('s1', 'u1', 'job', T0 + 33 * MIN - 1);
@@ -162,21 +162,21 @@ describe('SessionActivityService', () => {
   });
 
   it('fails closed with 503 (not 401) in production when the check cannot be made', async () => {
-    const db = fakeSupabase({ readError: { code: 'PGRST205', message: 'missing table' } });
+    const db = fakeDatabase({ readError: { code: 'PGRST205', message: 'missing table' } });
     const svc = new SessionActivityService(db.service);
     await expect(svc.assertActive('s1', 'u1', T0)).rejects.toThrow(ServiceUnavailableException);
   });
 
   it('lets requests through outside production while migration 901 is not applied', async () => {
     process.env.NODE_ENV = 'development';
-    const db = fakeSupabase({ readError: { code: 'PGRST205', message: 'missing table' } });
+    const db = fakeDatabase({ readError: { code: 'PGRST205', message: 'missing table' } });
     const svc = new SessionActivityService(db.service);
     await expect(svc.assertActive('s1', 'u1', T0)).resolves.toEqual({ lastActivityAt: T0, lastJobAt: null });
   });
 
   it('still fails closed outside production for any other storage error', async () => {
     process.env.NODE_ENV = 'development';
-    const db = fakeSupabase({ readError: { code: '08006', message: 'connection failure' } });
+    const db = fakeDatabase({ readError: { code: '08006', message: 'connection failure' } });
     const svc = new SessionActivityService(db.service);
     await expect(svc.assertActive('s1', 'u1', T0)).rejects.toThrow(ServiceUnavailableException);
   });

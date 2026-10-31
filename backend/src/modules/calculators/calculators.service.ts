@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { Logger } from '../../common/logger/logger.service';
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { DatabaseService } from '../../common/database/database.service';
 import { evaluateCalculatorFormulas } from './calculator-formula-evaluator';
 import { PHYSICS_REGISTRY } from './physics-registry';
 import { SheetMetalLookupService, normaliseLaserMaterial } from '../bom-items/costing/sheet-metal/lookup/sheet-metal-lookup.service';
@@ -30,7 +30,7 @@ import {
 @Injectable()
 export class CalculatorsServiceV2 {
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly logger: Logger,
     private readonly sheetMetalLookup: SheetMetalLookupService,
     private readonly bomItemsService: BOMItemsService,
@@ -49,7 +49,7 @@ export class CalculatorsServiceV2 {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     // Org-scoped via RLS (migrations 622/627) — returns every calculator
     // visible to the caller: global rows (organization_id IS NULL — the
@@ -121,7 +121,7 @@ export class CalculatorsServiceV2 {
   async findOne(id: string, userId: string, accessToken: string) {
     this.logger.log(`Fetching calculator: ${id} for user: ${userId}`, 'CalculatorsServiceV2');
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     const { data, error } = await client
       .from('calculators')
@@ -159,7 +159,7 @@ export class CalculatorsServiceV2 {
   async create(dto: CreateCalculatorDto, userId: string, accessToken: string, organizationId: string) {
     this.logger.log(`Creating calculator: ${dto.name}`, 'CalculatorsServiceV2');
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     // STEP 1: Create calculator
     const { data: calculator, error: calcError } = await client
@@ -281,7 +281,7 @@ export class CalculatorsServiceV2 {
   async update(id: string, dto: UpdateCalculatorDto, userId: string, accessToken: string) {
     this.logger.log(`Updating calculator: ${id}`, 'CalculatorsServiceV2');
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     // Verify calculator exists and user owns it
     const existing = await this.findOne(id, userId, accessToken);
@@ -425,7 +425,7 @@ export class CalculatorsServiceV2 {
     // Verify ownership
     await this.findOne(id, userId, accessToken);
 
-    const { error } = await this.supabaseService
+    const { error } = await this.databaseService
       .getClient(accessToken)
       .from('calculators')
       .delete()
@@ -503,7 +503,7 @@ export class CalculatorsServiceV2 {
 
   /**
    * Resolves a parameterized lookup from one of the 6 sheet metal lookup tables.
-   * Uses the Supabase anon client (public read, no auth required).
+   * Reads the shared reference tables with the privileged client (global reference data).
    *
    * Supported tables:
    *   stroke_rate    → params: { tonnage, complexity }
@@ -517,7 +517,7 @@ export class CalculatorsServiceV2 {
    *   roll_bending   → params: { machine_name, developed_length_mm, thickness_mm, target_diameter_mm }
    */
   async resolveSheetMetalLookup(tableName: string, params: Record<string, any>) {
-    const client = this.supabaseService.getPrivilegedClient('reference-data: sm_lookup_stroke_rate, global shared');
+    const client = this.databaseService.getPrivilegedClient('reference-data: sm_lookup_stroke_rate, global shared');
 
     switch (tableName) {
       case 'stroke_rate': {
@@ -776,7 +776,7 @@ export class CalculatorsServiceV2 {
   }
 
   async createField(calculatorId: string, dto: CreateFieldDto, userId: string, accessToken: string) {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
     await this.findOne(calculatorId, userId, accessToken); // Verify ownership
 
     const { data, error } = await client
@@ -808,7 +808,7 @@ export class CalculatorsServiceV2 {
   }
 
   async updateField(calculatorId: string, fieldId: string, dto: UpdateFieldDto, userId: string, accessToken: string) {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
     await this.findOne(calculatorId, userId, accessToken); // Verify ownership
 
     const { data, error } = await client
@@ -841,7 +841,7 @@ export class CalculatorsServiceV2 {
   }
 
   async removeField(calculatorId: string, fieldId: string, userId: string, accessToken: string) {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
     await this.findOne(calculatorId, userId, accessToken); // Verify ownership
 
     const { error } = await client
@@ -864,7 +864,7 @@ export class CalculatorsServiceV2 {
   }
 
   async createFormula(calculatorId: string, dto: CreateFormulaDto, userId: string, accessToken: string) {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
     await this.findOne(calculatorId, userId, accessToken); // Verify ownership
 
     const { data, error } = await client
@@ -895,7 +895,7 @@ export class CalculatorsServiceV2 {
   }
 
   async updateFormula(calculatorId: string, formulaId: string, dto: UpdateFormulaDto, userId: string, accessToken: string) {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
     await this.findOne(calculatorId, userId, accessToken); // Verify ownership
 
     const { data, error } = await client
@@ -927,7 +927,7 @@ export class CalculatorsServiceV2 {
   }
 
   async removeFormula(calculatorId: string, formulaId: string, userId: string, accessToken: string) {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
     await this.findOne(calculatorId, userId, accessToken); // Verify ownership
 
     const { error } = await client

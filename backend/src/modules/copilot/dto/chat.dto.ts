@@ -35,7 +35,7 @@ export class CopilotMessageDto {
 /**
  * Identity, URLs and tokens are never accepted from the body: the user comes
  * from the verified JWT and every data read goes through that user's own
- * Supabase client (RLS). batchSize / location / productionLifeYears are the
+ * user's database client (RLS). batchSize / location / productionLifeYears are the
  * values the UI is currently showing, passed straight to the same costing
  * resolver the cost-summary endpoint uses (an absent batchSize is resolved
  * there, never defaulted here).

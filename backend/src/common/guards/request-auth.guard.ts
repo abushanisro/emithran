@@ -2,29 +2,34 @@ import {
   Injectable,
   CanActivate,
   ExecutionContext,
+  ForbiddenException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { ApiKeyAuthService } from '../../modules/auth/api-key-auth.service';
 import { IdentityService } from '../../modules/auth/identity.service';
-import { SupabaseService } from '../supabase/supabase.service';
+import { API_KEY_PREFIX, type ApiKeyScope } from '../api-keys/api-key-scopes';
+import { DatabaseService } from '../database/database.service';
+import { API_KEY_SCOPES_KEY } from '../decorators/api-key-scopes.decorator';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { SessionActivityService } from '../session/session-activity.service';
 
 @Injectable()
-export class SupabaseAuthGuard implements CanActivate {
+export class RequestAuthGuard implements CanActivate {
   private adminUserId: string | null = null;
   /** In-flight lookup, so concurrent requests share one round trip. */
   private adminUserIdLookup: Promise<string | null> | null = null;
   /** The configured bypass account, for the identity this guard reports. */
   private get adminUserEmail(): string {
-    return this.supabaseService.getAdminFallbackEmail() ?? '';
+    return this.databaseService.getAdminFallbackEmail() ?? '';
   }
 
   constructor(
     private reflector: Reflector,
-    private supabaseService: SupabaseService,
+    private databaseService: DatabaseService,
     private sessionActivity: SessionActivityService,
     private identity: IdentityService,
+    private apiKeys: ApiKeyAuthService,
   ) {}
 
   /**
@@ -36,7 +41,7 @@ export class SupabaseAuthGuard implements CanActivate {
    * at startup, so a request never authenticates as admin in production for any reason.
    */
   private get bypassAllowed(): boolean {
-    return this.supabaseService.isDevAuthBypassEnabled();
+    return this.databaseService.isDevAuthBypassEnabled();
   }
 
   /**
@@ -57,10 +62,10 @@ export class SupabaseAuthGuard implements CanActivate {
   private async resolveAdminUserId(): Promise<string | null> {
     if (this.adminUserId !== null) return this.adminUserId;
     // Concurrent requests share one in-flight lookup.
-    this.adminUserIdLookup ??= this.supabaseService.getAdminUserId();
+    this.adminUserIdLookup ??= this.databaseService.getAdminUserId();
     this.adminUserId = await this.adminUserIdLookup;
     // Only a resolved id is kept. A failed lookup (e.g. a transient DNS or
-    // network error reaching Supabase) returns null; keeping that promise
+    // network error reaching the database) returns null; keeping that promise
     // would reject every later bypass request until the process restarted,
     // so it is dropped and the next request looks the account up again.
     if (this.adminUserId === null) this.adminUserIdLookup = null;
@@ -114,7 +119,30 @@ export class SupabaseAuthGuard implements CanActivate {
       }
       const user = await this.getAdminFallbackUser();
       request.user = user;
-      request.accessToken = this.supabaseService.mintDbUserToken(user.id, { email: user.email });
+      request.accessToken = this.databaseService.mintDbUserToken(user.id, { email: user.email });
+      return true;
+    }
+
+    // API key: acts as its owner, but only on endpoints that declare @ApiKeyScopes, and only with every scope listed there. Keys
+    // have their own expiry instead of the people-only inactivity timeout, so no session clock runs for them.
+    if (token.startsWith(API_KEY_PREFIX)) {
+      const login = await this.apiKeys.authenticate(token);
+      const required = this.reflector.getAllAndOverride<ApiKeyScope[] | undefined>(API_KEY_SCOPES_KEY, [
+        context.getHandler(),
+        context.getClass(),
+      ]);
+      if (!required || required.length === 0) {
+        await this.apiKeys.refuseScope(login.apiKey, login.user.id, 'api_key_endpoint_not_allowed');
+        throw new ForbiddenException('This endpoint does not accept API keys');
+      }
+      const missing = required.filter((scope) => !login.apiKey.scopes.includes(scope));
+      if (missing.length > 0) {
+        await this.apiKeys.refuseScope(login.apiKey, login.user.id, 'api_key_scope_missing');
+        throw new ForbiddenException(`This API key lacks the scope ${missing.join(', ')}`);
+      }
+      request.user = login.user;
+      request.accessToken = login.dbToken;
+      request.apiKey = login.apiKey;
       return true;
     }
 

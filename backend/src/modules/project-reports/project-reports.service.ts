@@ -1,5 +1,5 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
-import { SupabaseService } from '@/common/supabase/supabase.service';
+import { DatabaseService } from '@/common/database/database.service';
 import {
   CreateBalloonDiagramDto,
   UpdateBalloonDiagramDto,
@@ -13,16 +13,16 @@ import {
 export class ProjectReportsService {
   private readonly logger = new Logger(ProjectReportsService.name);
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(private readonly databaseService: DatabaseService) {}
 
   async createBalloonDiagram(
     createDto: CreateBalloonDiagramDto,
     userId: string,
   ): Promise<BalloonDiagramResponseDto> {
     try {
-      const supabase = this.supabaseService.getClient(userId);
+      const database = this.databaseService.getClient(userId);
 
-      const { data, error } = await supabase
+      const { data, error } = await database
         .from('balloon_diagrams')
         .insert({
           ...createDto,
@@ -56,9 +56,9 @@ export class ProjectReportsService {
     userId: string,
   ): Promise<BalloonDiagramResponseDto[]> {
     try {
-      const supabase = this.supabaseService.getClient(userId);
+      const database = this.databaseService.getClient(userId);
 
-      const { data, error } = await supabase
+      const { data, error } = await database
         .from('balloon_diagrams')
         .select(`
           *,
@@ -89,9 +89,9 @@ export class ProjectReportsService {
     userId: string,
   ): Promise<BalloonDiagramResponseDto> {
     try {
-      const supabase = this.supabaseService.getClient(userId);
+      const database = this.databaseService.getClient(userId);
 
-      const { data, error } = await supabase
+      const { data, error } = await database
         .from('balloon_diagrams')
         .select(`
           *,
@@ -125,9 +125,9 @@ export class ProjectReportsService {
     userId: string,
   ): Promise<BalloonDiagramResponseDto> {
     try {
-      const supabase = this.supabaseService.getClient(userId);
+      const database = this.databaseService.getClient(userId);
 
-      const { data, error } = await supabase
+      const { data, error } = await database
         .from('balloon_diagrams')
         .update({
           ...updateDto,
@@ -161,9 +161,9 @@ export class ProjectReportsService {
 
   async deleteBalloonDiagram(id: string, userId: string): Promise<void> {
     try {
-      const supabase = this.supabaseService.getClient(userId);
+      const database = this.databaseService.getClient(userId);
 
-      const { error } = await supabase
+      const { error } = await database
         .from('balloon_diagrams')
         .delete()
         .eq('id', id);
@@ -181,9 +181,9 @@ export class ProjectReportsService {
     userId: string,
   ): Promise<any> {
     try {
-      const supabase = this.supabaseService.getClient(userId);
+      const database = this.databaseService.getClient(userId);
 
-      const { data, error } = await supabase
+      const { data, error } = await database
         .from('diagram_annotations')
         .insert({
           balloon_diagram_id: diagramId,
@@ -216,9 +216,9 @@ export class ProjectReportsService {
     userId: string,
   ): Promise<any> {
     try {
-      const supabase = this.supabaseService.getClient(userId);
+      const database = this.databaseService.getClient(userId);
 
-      const { data, error } = await supabase
+      const { data, error } = await database
         .from('diagram_annotations')
         .update({
           ...annotationDto,
@@ -251,9 +251,9 @@ export class ProjectReportsService {
     userId: string,
   ): Promise<void> {
     try {
-      const supabase = this.supabaseService.getClient(userId);
+      const database = this.databaseService.getClient(userId);
 
-      const { error } = await supabase
+      const { error } = await database
         .from('diagram_annotations')
         .delete()
         .eq('id', annotationId)
@@ -272,9 +272,9 @@ export class ProjectReportsService {
     options: { partName?: string; drawingNumber?: string } = {},
   ): Promise<InspectionReportDto> {
     try {
-      const supabase = this.supabaseService.getClient(userId);
+      const database = this.databaseService.getClient(userId);
 
-      const { data: projectData, error: projectError } = await supabase
+      const { data: projectData, error: projectError } = await database
         .from('projects')
         .select('*')
         .eq('id', projectId)
@@ -283,7 +283,7 @@ export class ProjectReportsService {
       if (projectError) throw projectError;
       if (!projectData) throw new NotFoundException('Project not found');
 
-      const { data: inspectionData, error: inspectionError } = await supabase
+      const { data: inspectionData, error: inspectionError } = await database
         .from('quality_inspections')
         .select(`
           *,
@@ -302,7 +302,7 @@ export class ProjectReportsService {
 
       if (inspectionError) throw inspectionError;
 
-      const { data: balloonDiagram } = await supabase
+      const { data: balloonDiagram } = await database
         .from('balloon_diagrams')
         .select(`
           *,

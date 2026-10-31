@@ -1,12 +1,12 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
-import type { SupabaseService } from '../../../common/supabase/supabase.service';
+import type { DbClient } from '../../../common/db/postgrest-client';
+import type { DatabaseService } from '../../../common/database/database.service';
 import type { ExchangeRateService } from '../../../common/exchange-rate/exchange-rate.service';
 import type { Logger } from '../../../common/logger/logger.service';
 import { BOMsService } from '../../../modules/boms/boms.service';
 import { ProjectsService } from '../../../modules/projects/projects.service';
 import { loadBomTotals, readAllRows } from '../../../modules/boms/bom-totals';
 
-jest.mock('@/common/supabase/supabase.service', () => ({ SupabaseService: class {} }), { virtual: true });
+jest.mock('@/common/database/database.service', () => ({ DatabaseService: class {} }), { virtual: true });
 jest.mock('@/common/logger/logger.service', () => ({ Logger: class {} }), { virtual: true });
 jest.mock('../../../modules/projects/projects.repository', () => ({ ProjectsRepository: class {} }));
 
@@ -40,7 +40,7 @@ function database(tables: Record<string, any[]>, failure?: string, cap = 500) {
       },
     };
     return q;
-  } } as unknown as SupabaseClient;
+  } } as unknown as DbClient;
   return { client, requests };
 }
 const rates = () => ({ getSnapshot: jest.fn().mockResolvedValue({
@@ -48,12 +48,12 @@ const rates = () => ({ getSnapshot: jest.fn().mockResolvedValue({
 }) });
 const logger = { log: jest.fn(), warn: jest.fn(), error: jest.fn() } as unknown as Logger;
 
-function services(client: SupabaseClient) {
-  const supabase = { getClient: () => client, getUserClient: () => client } as unknown as SupabaseService;
+function services(client: DbClient) {
+  const database = { getClient: () => client, getUserClient: () => client } as unknown as DatabaseService;
   const fx = rates();
-  const boms = new BOMsService(supabase, logger, fx as unknown as ExchangeRateService);
+  const boms = new BOMsService(database, logger, fx as unknown as ExchangeRateService);
   const projectRepository = { findById: async () => ({ target_bom_cost: 100, target_bom_cost_currency: 'INR' }) };
-  const projects = new ProjectsService(supabase, projectRepository as any, logger, fx as unknown as ExchangeRateService, {} as any);
+  const projects = new ProjectsService(database, projectRepository as any, logger, fx as unknown as ExchangeRateService, {} as any);
   return { boms, projects, fx };
 }
 

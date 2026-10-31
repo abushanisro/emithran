@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { ElectronicsReferenceRepository } from './electronics-reference.repository';
-import { SupabaseService } from '../../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../../common/database/database.service';
 
 import type { MachineCandidate, RateBook, RateEntry } from '../../domain/rates/rate-book';
 
@@ -42,7 +42,7 @@ const positive = (v: unknown): v is number => typeof v === 'number' && Number.is
 @Injectable()
 export class ElectronicsRateBookLoader {
   constructor(
-    private readonly supabase: SupabaseService,
+    private readonly database: DatabaseService,
     private readonly reference: ElectronicsReferenceRepository,
   ) {}
 
@@ -62,7 +62,7 @@ export class ElectronicsRateBookLoader {
   // that is not found is simply absent; the step that wanted it reports the gap.
   async machinesById(organizationId: string, ids: string[]): Promise<MachineCandidate[]> {
     if (ids.length === 0) return [];
-    const { data, error } = await this.supabase
+    const { data, error } = await this.database
       .getPrivilegedClient('reference-data: the HR Rates machines an electronics scenario chose, benchmark rows and the quoting organization rows only')
       .from('mhr_records')
       .select('id, machine_name, machine_class, location, mhr_usd_per_hour, usd_labor_rate_per_hr, operators, setup_time_hr, currency_code, specs, economics_version, updated_at')
@@ -86,7 +86,7 @@ export class ElectronicsRateBookLoader {
   }
 
   private async machineRates(organizationId: string, names: string[], location: string): Promise<RateEntry[]> {
-    const { data, error } = await this.supabase
+    const { data, error } = await this.database
       .getPrivilegedClient('reference-data: machine and labour hour rates for electronics quotes, benchmark rows and the quoting organization rows only')
       .from('mhr_records')
       .select('id, machine_name, location, mhr_usd_per_hour, usd_labor_rate_per_hr, currency_code, economics_version, updated_at')

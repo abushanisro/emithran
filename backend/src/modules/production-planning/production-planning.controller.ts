@@ -17,7 +17,7 @@ import {
   UnauthorizedException,
   BadRequestException,
 } from '@nestjs/common';
-import { SupabaseAuthGuard } from '@/common/guards/supabase-auth.guard';
+import { RequestAuthGuard } from '@/common/guards/request-auth.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { Throttle } from '@nestjs/throttler';
 import { createResponse, ApiResponse } from '@/common/dto/api-response.dto';
@@ -44,7 +44,7 @@ import {
 } from './dto/daily-production.dto';
 
 @Controller({ path: 'api/production-planning', version: '1' })
-@UseGuards(SupabaseAuthGuard)
+@UseGuards(RequestAuthGuard)
 export class ProductionPlanningController {
   private readonly logger = new Logger(ProductionPlanningController.name);
 

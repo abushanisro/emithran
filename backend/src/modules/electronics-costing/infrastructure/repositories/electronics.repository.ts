@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 
-import { SupabaseService } from '../../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../../common/database/database.service';
 
 import type { ElectronicsFeatureGraph } from '../../domain/feature-graph/contract';
 import type { ElectronicsQuoteResult } from '../../domain/quote/build-quote';
@@ -90,43 +90,43 @@ export interface CostResultRow {
   created_at: string;
 }
 
-// The only place in the module that touches Supabase. Request-side methods run as the
+// The only place in the module that touches the database. Request-side methods run as the
 // caller (RLS decides what is visible). Worker-side methods have no user in scope, so
 // they run as the service role and filter by the organization id carried in the job
 // payload on every statement.
 @Injectable()
 export class ElectronicsRepository {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   // ---- request side (RLS) -------------------------------------------------
 
   async insertUpload(row: Omit<UploadRow, 'status' | 'failure' | 'created_at' | 'params' | 'extraction'> & Partial<Pick<UploadRow, 'params'>>, token: string): Promise<UploadRow> {
-    const { data, error } = await this.supabase.getUserClient(token).from('ecad_uploads').insert(row).select().single();
+    const { data, error } = await this.database.getUserClient(token).from('ecad_uploads').insert(row).select().single();
     if (error) throw new Error(`ecad_uploads insert failed: ${error.message}`);
     return data as UploadRow;
   }
 
   async getUpload(id: string, token: string): Promise<UploadRow> {
-    const { data, error } = await this.supabase.getUserClient(token).from('ecad_uploads').select('*').eq('id', id).maybeSingle();
+    const { data, error } = await this.database.getUserClient(token).from('ecad_uploads').select('*').eq('id', id).maybeSingle();
     if (error) throw new Error(`ecad_uploads read failed: ${error.message}`);
     if (!data) throw new NotFoundException('Upload not found');
     return data as UploadRow;
   }
 
   async insertJob(row: Omit<JobRow, 'id'> & { created_by: string }, token: string): Promise<JobRow> {
-    const { data, error } = await this.supabase.getUserClient(token).from('electronics_jobs').insert(row).select().single();
+    const { data, error } = await this.database.getUserClient(token).from('electronics_jobs').insert(row).select().single();
     if (error) throw new Error(`electronics_jobs insert failed: ${error.message}`);
     return data as JobRow;
   }
 
   async insertDesign(row: Omit<DesignRow, 'id' | 'created_at'> & { created_by: string }, token: string): Promise<DesignRow> {
-    const { data, error } = await this.supabase.getUserClient(token).from('electronics_designs').insert(row).select().single();
+    const { data, error } = await this.database.getUserClient(token).from('electronics_designs').insert(row).select().single();
     if (error) throw new Error(`electronics_designs insert failed: ${error.message}`);
     return data as DesignRow;
   }
 
   async getDesign(id: string, token: string): Promise<DesignRow> {
-    const { data, error } = await this.supabase.getUserClient(token).from('electronics_designs').select('*').eq('id', id).maybeSingle();
+    const { data, error } = await this.database.getUserClient(token).from('electronics_designs').select('*').eq('id', id).maybeSingle();
     if (error) throw new Error(`electronics_designs read failed: ${error.message}`);
     if (!data) throw new NotFoundException('Design not found');
     return data as DesignRow;
@@ -137,7 +137,7 @@ export class ElectronicsRepository {
     filter: { projectId: string; parentId: string | null; name: string; container: boolean },
     token: string,
   ): Promise<DesignRow | null> {
-    let query = this.supabase
+    let query = this.database
       .getUserClient(token)
       .from('electronics_designs')
       .select('*')
@@ -152,7 +152,7 @@ export class ElectronicsRepository {
 
   /** Designs of the caller's organization (RLS), newest first, optionally only those of one project. */
   async listDesigns(filter: { projectId?: string }, token: string): Promise<DesignRow[]> {
-    let query = this.supabase.getUserClient(token).from('electronics_designs').select('*').order('created_at', { ascending: false });
+    let query = this.database.getUserClient(token).from('electronics_designs').select('*').order('created_at', { ascending: false });
     if (filter.projectId) query = query.eq('project_id', filter.projectId);
     const { data, error } = await query;
     if (error) throw new Error(`electronics_designs list failed: ${error.message}`);
@@ -162,7 +162,7 @@ export class ElectronicsRepository {
   /** The uploads of the given revisions (one per revision), RLS-scoped. */
   async listUploadsByRevisions(revisionIds: string[], token: string): Promise<UploadRow[]> {
     if (revisionIds.length === 0) return [];
-    const { data, error } = await this.supabase.getUserClient(token).from('ecad_uploads').select('*').in('revision_id', revisionIds);
+    const { data, error } = await this.database.getUserClient(token).from('ecad_uploads').select('*').in('revision_id', revisionIds);
     if (error) throw new Error(`ecad_uploads list failed: ${error.message}`);
     return (data ?? []) as UploadRow[];
   }
@@ -170,14 +170,14 @@ export class ElectronicsRepository {
   /** Every revision of the given designs, RLS-scoped. */
   async listRevisionsForDesigns(designIds: string[], token: string): Promise<RevisionRow[]> {
     if (designIds.length === 0) return [];
-    const { data, error } = await this.supabase.getUserClient(token).from('electronics_design_revisions').select('*').in('design_id', designIds);
+    const { data, error } = await this.database.getUserClient(token).from('electronics_design_revisions').select('*').in('design_id', designIds);
     if (error) throw new Error(`electronics_design_revisions list failed: ${error.message}`);
     return (data ?? []) as RevisionRow[];
   }
 
   /** True when the project is visible to the caller (RLS) and belongs to the organization. */
   async projectVisible(projectId: string, organizationId: string, token: string): Promise<boolean> {
-    const { data, error } = await this.supabase
+    const { data, error } = await this.database
       .getUserClient(token)
       .from('projects')
       .select('id')
@@ -189,27 +189,27 @@ export class ElectronicsRepository {
   }
 
   async listRevisions(designId: string, token: string): Promise<RevisionRow[]> {
-    const { data, error } = await this.supabase.getUserClient(token).from('electronics_design_revisions').select('*').eq('design_id', designId);
+    const { data, error } = await this.database.getUserClient(token).from('electronics_design_revisions').select('*').eq('design_id', designId);
     if (error) throw new Error(`electronics_design_revisions read failed: ${error.message}`);
     return (data ?? []) as RevisionRow[];
   }
 
   /** Returns null when the insert lost a race on (design, revision) or (design, input hash). */
   async insertRevision(row: Omit<RevisionRow, 'id' | 'created_at'> & { created_by: string }, token: string): Promise<RevisionRow | null> {
-    const { data, error } = await this.supabase.getUserClient(token).from('electronics_design_revisions').insert(row).select().single();
+    const { data, error } = await this.database.getUserClient(token).from('electronics_design_revisions').insert(row).select().single();
     if (error?.code === '23505') return null;
     if (error) throw new Error(`electronics_design_revisions insert failed: ${error.message}`);
     return data as RevisionRow;
   }
 
   async getUploadByRevision(revisionId: string, token: string): Promise<UploadRow | null> {
-    const { data, error } = await this.supabase.getUserClient(token).from('ecad_uploads').select('*').eq('revision_id', revisionId).maybeSingle();
+    const { data, error } = await this.database.getUserClient(token).from('ecad_uploads').select('*').eq('revision_id', revisionId).maybeSingle();
     if (error) throw new Error(`ecad_uploads read failed: ${error.message}`);
     return (data as UploadRow | null) ?? null;
   }
 
   async latestParseJob(uploadId: string, token: string): Promise<JobRow | null> {
-    const { data, error } = await this.supabase
+    const { data, error } = await this.database
       .getUserClient(token)
       .from('electronics_jobs')
       .select('*')
@@ -223,14 +223,14 @@ export class ElectronicsRepository {
   }
 
   async getJob(id: string, token: string): Promise<JobRow> {
-    const { data, error } = await this.supabase.getUserClient(token).from('electronics_jobs').select('*').eq('id', id).maybeSingle();
+    const { data, error } = await this.database.getUserClient(token).from('electronics_jobs').select('*').eq('id', id).maybeSingle();
     if (error) throw new Error(`electronics_jobs read failed: ${error.message}`);
     if (!data) throw new NotFoundException('Job not found');
     return data as JobRow;
   }
 
   async getLatestCostResult(uploadId: string, token: string): Promise<CostResultRow | null> {
-    const { data, error } = await this.supabase
+    const { data, error } = await this.database
       .getUserClient(token)
       .from('electronics_cost_results')
       .select('*')
@@ -243,7 +243,7 @@ export class ElectronicsRepository {
   }
 
   async getCostResult(id: string, token: string): Promise<CostResultRow> {
-    const { data, error } = await this.supabase.getUserClient(token).from('electronics_cost_results').select('*').eq('id', id).maybeSingle();
+    const { data, error } = await this.database.getUserClient(token).from('electronics_cost_results').select('*').eq('id', id).maybeSingle();
     if (error) throw new Error(`electronics_cost_results read failed: ${error.message}`);
     if (!data) throw new NotFoundException('Result not found');
     return data as CostResultRow;
@@ -254,7 +254,7 @@ export class ElectronicsRepository {
   // of these run, and every statement filters by the organization id.
 
   private eraser() {
-    return this.supabase.getPrivilegedClient(
+    return this.database.getPrivilegedClient(
       'user-delete: electronics designs and uploads have no end-user DELETE policy; the caller is proven to see the design first and every statement filters by organization id',
     );
   }
@@ -278,7 +278,7 @@ export class ElectronicsRepository {
   // ---- worker side (service role, organization-filtered) -----------------
 
   private worker() {
-    return this.supabase.getPrivilegedClient(
+    return this.database.getPrivilegedClient(
       'system-job: electronics pipeline worker has no user context and filters every statement by the organization id in the job payload',
     );
   }
@@ -313,7 +313,7 @@ export class ElectronicsRepository {
   /** The newest feature graph of each given upload (uploads without one are absent), RLS-scoped. */
   async listLatestFeatureGraphs(uploadIds: string[], token: string): Promise<FeatureGraphRow[]> {
     if (uploadIds.length === 0) return [];
-    const { data, error } = await this.supabase
+    const { data, error } = await this.database
       .getUserClient(token)
       .from('electronics_feature_graphs')
       .select('*')
@@ -326,7 +326,7 @@ export class ElectronicsRepository {
   }
 
   async getLatestFeatureGraph(uploadId: string, token: string): Promise<FeatureGraphRow | null> {
-    const { data, error } = await this.supabase
+    const { data, error } = await this.database
       .getUserClient(token)
       .from('electronics_feature_graphs')
       .select('*')

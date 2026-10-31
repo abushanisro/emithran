@@ -10,7 +10,7 @@
 
 import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { Logger } from '../../../common/logger/logger.service';
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../common/database/database.service';
 import {
   CreateChildPartCostDto,
   UpdateChildPartCostDto,
@@ -29,7 +29,7 @@ export class ChildPartCostService {
   private readonly calculationEngine: ChildPartCostCalculationEngine;
 
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly logger: Logger,
   ) {
     this.calculationEngine = new ChildPartCostCalculationEngine();
@@ -50,7 +50,7 @@ export class ChildPartCostService {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    let queryBuilder = this.supabaseService
+    let queryBuilder = this.databaseService
       .getUserClient(accessToken)
       .from('child_part_cost_records')
       .select('*', { count: 'exact' })
@@ -100,7 +100,7 @@ export class ChildPartCostService {
   async findOne(id: string, userId: string, accessToken: string): Promise<ChildPartCostResponseDto> {
     this.logger.log(`Fetching child part cost: ${id}`, 'ChildPartCostService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('child_part_cost_records')
       .select('*')
@@ -128,7 +128,7 @@ export class ChildPartCostService {
   ): Promise<ChildPartCostResponseDto | null> {
     this.logger.log(`Fetching child part cost for BOM item: ${bomItemId}`, 'ChildPartCostService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('child_part_cost_records')
       .select('*')
@@ -247,7 +247,7 @@ export class ChildPartCostService {
 
     // Use UPSERT to handle cases where a record already exists for this bom_item_id
     // This follows the unique constraint: one cost record per BOM item per user
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('child_part_cost_records')
       .upsert(recordData, {
@@ -282,7 +282,7 @@ export class ChildPartCostService {
     this.logger.log(`Updating child part cost: ${id}`, 'ChildPartCostService');
 
     // Get existing record
-    const { data: existing, error: fetchError } = await this.supabaseService
+    const { data: existing, error: fetchError } = await this.databaseService
       .getClient(accessToken)
       .from('child_part_cost_records')
       .select('*')
@@ -361,7 +361,7 @@ export class ChildPartCostService {
     updateData.moq_extended_cost = calculationResult.moqExtendedCost;
     updateData.calculation_breakdown = calculationResult;
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('child_part_cost_records')
       .update(updateData)
@@ -387,14 +387,14 @@ export class ChildPartCostService {
     this.logger.log(`Deleting child part cost: ${id}`, 'ChildPartCostService');
 
     // Get record to get bom_item_id
-    const { data: existing } = await this.supabaseService
+    const { data: existing } = await this.databaseService
       .getClient(accessToken)
       .from('child_part_cost_records')
       .select('bom_item_id')
       .eq('id', id)
       .single();
 
-    const { error } = await this.supabaseService
+    const { error } = await this.databaseService
       .getClient(accessToken)
       .from('child_part_cost_records')
       .delete()
@@ -507,7 +507,7 @@ export class ChildPartCostService {
   ): Promise<void> {
     try {
       // Update or insert bom_item_costs record
-      const { error } = await this.supabaseService
+      const { error } = await this.databaseService
         .getClient(accessToken)
         .from('bom_item_costs')
         .upsert(

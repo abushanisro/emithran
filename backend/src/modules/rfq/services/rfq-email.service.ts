@@ -1,5 +1,5 @@
 import { Injectable, BadRequestException, Inject, Logger } from '@nestjs/common';
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../common/database/database.service';
 import { BomFileAccess } from '../../../common/storage/bom-file-access';
 import { OBJECT_STORE, type ObjectStore } from '../../../common/storage/object-store';
 import { createTransport, Transporter, SendMailOptions } from 'nodemailer';
@@ -51,7 +51,7 @@ export class RfqEmailService {
   private transporter: Transporter;
 
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly fileAccess: BomFileAccess,
     @Inject(OBJECT_STORE) private readonly objects: ObjectStore,
   ) {
@@ -163,7 +163,7 @@ export class RfqEmailService {
   }
 
   private async fetchBomItemDetails(bomItemIds: string[], accessToken?: string): Promise<BomItemDetails[]> {
-    const { data, error } = await this.supabaseService.getUserClient(accessToken)
+    const { data, error } = await this.databaseService.getUserClient(accessToken)
       .from('bom_items')
       .select(`
         id,
@@ -205,7 +205,7 @@ export class RfqEmailService {
   }
 
   private async fetchVendorDetails(vendorIds: string[], accessToken?: string): Promise<VendorDetails[]> {
-    const { data, error } = await this.supabaseService.getUserClient(accessToken)
+    const { data, error } = await this.databaseService.getUserClient(accessToken)
       .from('vendors')
       .select(`
         id,
@@ -518,7 +518,7 @@ ${templateData.companyName}
     errorMessage?: string
   ): Promise<void> {
     try {
-      await this.supabaseService.getUserClient()
+      await this.databaseService.getUserClient()
         .from('rfq_email_logs')
         .insert({
           rfq_id: rfqId,

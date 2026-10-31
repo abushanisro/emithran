@@ -5,8 +5,8 @@ import { evictOldestIfFull } from '../../../common/cache/bounded-map';
  *
  * Every createSignedUrl() returns a new token, so the browser could never
  * cache a file it had already downloaded: each view of a model or drawing was
- * a fresh download, billed as Supabase egress. Handing out the same link again
- * lets the browser's HTTP cache (Supabase serves objects with max-age=3600)
+ * a fresh download, billed as storage egress. Handing out the same link again
+ * lets the browser's HTTP cache (signed object links are cacheable)
  * answer repeat views.
  *
  * A link is reused only until REUSE_MARGIN_SEC before it expires, so whoever

@@ -1,5 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../common/database/database.service';
 
 import {
   EngineeringBrief,
@@ -49,7 +49,7 @@ export class RetrievalService {
   static readonly TOP_N_TOOLING = 8;
 
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly scopeClassifier: ScopeClassifierService,
     private readonly drawingExtractor: DrawingExtractorService,
     private readonly fx: ExchangeRateService,
@@ -70,7 +70,7 @@ export class RetrievalService {
     // uses the exact same rates, even if the shared cache reloads meanwhile.
     const rates = await this.fx.getSnapshot(accessToken);
 
-    const client = this.supabaseService.getUserClient(accessToken ?? undefined);
+    const client = this.databaseService.getUserClient(accessToken ?? undefined);
 
     // ── Load BOM item ──────────────────────────────────────────────────────
     const { data: bomRow, error: bomErr } = await client

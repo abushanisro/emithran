@@ -1,9 +1,8 @@
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { DbTokenMinter } from '../db/db-token';
-import { createDbClient } from '../db/postgrest-client';
+import { createDbClient, type DbClient } from '../db/postgrest-client';
 import { currentRequestAuth } from '../request-context/request-auth-context';
 
 /**
@@ -12,8 +11,8 @@ import { currentRequestAuth } from '../request-context/request-auth-context';
  * name and the `.from()` / `.rpc()` client surface, so the modules that still use it are unchanged until they move to Kysely.
  */
 @Injectable()
-export class SupabaseService {
-  private readonly logger = new Logger(SupabaseService.name);
+export class DatabaseService {
+  private readonly logger = new Logger(DatabaseService.name);
   private readonly postgrestUrl: string;
   private readonly minter: DbTokenMinter;
 
@@ -23,7 +22,7 @@ export class SupabaseService {
   }
 
   /** A client that acts as the user behind `accessToken` (a database token this backend signed), so RLS applies. */
-  getClient(accessToken: string): SupabaseClient {
+  getClient(accessToken: string): DbClient {
     // Never fall back to the privileged client: a lost or missing token must fail closed, not silently bypass RLS.
     if (typeof accessToken !== 'string' || accessToken.trim() === '') {
       throw new UnauthorizedException('Access token is required for a user-scoped database client');
@@ -36,7 +35,7 @@ export class SupabaseService {
    * (RequestAuthInterceptor). Throws when there is no authenticated request in scope (public route, background job, lost async
    * context) instead of degrading to the privileged client.
    */
-  getUserClient(explicitAccessToken?: string | null): SupabaseClient {
+  getUserClient(explicitAccessToken?: string | null): DbClient {
     if (typeof explicitAccessToken === 'string' && explicitAccessToken.trim() !== '') {
       return this.getClient(explicitAccessToken);
     }
@@ -53,7 +52,7 @@ export class SupabaseService {
    * The ONLY sanctioned way to get the privileged client (bypasses RLS). `reason` is mandatory and logged at debug level so every
    * privileged access is searchable and reviewable, e.g. 'reference-data: sm_reference_data'.
    */
-  getPrivilegedClient(reason: string): SupabaseClient {
+  getPrivilegedClient(reason: string): DbClient {
     if (!reason || !reason.trim()) {
       throw new Error('getPrivilegedClient requires a non-empty reason');
     }

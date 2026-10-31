@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 
 /**
  * The authenticated caller of the current HTTP request, as established by
- * SupabaseAuthGuard. Held in AsyncLocalStorage so deep service code can obtain a
+ * RequestAuthGuard. Held in AsyncLocalStorage so deep service code can obtain a
  * user-scoped (RLS-enforced) database client without every method threading a
  * token parameter, and without any path that can fall back to the service-role
  * client when the token is missing: no context means no client.

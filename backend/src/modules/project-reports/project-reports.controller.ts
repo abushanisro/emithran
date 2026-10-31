@@ -13,7 +13,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { SupabaseAuthGuard } from '@/common/guards/supabase-auth.guard';
+import { RequestAuthGuard } from '@/common/guards/request-auth.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { createResponse, ApiResponse as CustomApiResponse } from '@/common/dto/api-response.dto';
 import { ProjectReportsService } from './project-reports.service';
@@ -28,7 +28,7 @@ import {
 @ApiTags('Project Reports')
 @ApiBearerAuth()
 @Controller({ path: 'api/project-reports', version: '1' })
-@UseGuards(SupabaseAuthGuard)
+@UseGuards(RequestAuthGuard)
 export class ProjectReportsController {
   private readonly logger = new Logger(ProjectReportsController.name);
 

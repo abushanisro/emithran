@@ -126,7 +126,7 @@ class EnvironmentVariables {
   @IsIn(['table', 'memory'])
   ELECTRONICS_QUEUE_DRIVER: string = 'table';
 
-  // The one upload limit in megabytes (see common/upload-limits.ts). 50 is the Supabase free tier's cap on one stored object.
+  // The one upload limit in megabytes (see common/upload-limits.ts).
   @IsNumber()
   @IsOptional()
   @Min(1)

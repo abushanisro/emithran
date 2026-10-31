@@ -19,7 +19,7 @@ describe('AllowListSpanProcessor: nothing outside the allow-list leaves the proc
       'emithran.operation': 'route_comparison',
       'nestjs.controller': 'BOMItemsController',
       // unsafe, all of which an instrumentation could plausibly record
-      'url.full': 'https://x.supabase.co/rest/v1/bom_items?name=eq.ACME-bracket',
+      'url.full': 'https://x.database.co/rest/v1/bom_items?name=eq.ACME-bracket',
       'http.url': 'https://x/y?token=SECRET',
       'http.target': '/bom-items/9c1f?file=bracket.step',
       'url.path': '/storage/v1/object/cad/bracket.step',

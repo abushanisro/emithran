@@ -210,8 +210,8 @@ services:
         limits: { cpus: '2', memory: 2G, pids: 512 }
         reservations: { cpus: '0.5', memory: 512M }
 
-  # --- Assembly core: claims queued CAD uploads and analyses them with the C++ geometry worker (docs/ASSEMBLY_CORE.md). It talks to Supabase
-  # over HTTPS only (no Postgres connection) and parses untrusted files in a child process that runs with an empty environment under
+  # --- Assembly core: claims queued CAD uploads and analyses them with the C++ geometry worker (docs/ASSEMBLY_CORE.md). It talks to PostgREST and the
+  # S3 bucket over HTTP(S) only (no Postgres connection) and parses untrusted files in a child process that runs with an empty environment under
   # prlimit and a deadline. Runs only when CAD_CORE=rust (`docker compose --profile rust-core up`); with CAD_CORE=python the backend does it itself. ---
   cad-core:
     <<: *hardened

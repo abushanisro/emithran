@@ -14,8 +14,8 @@
 # mount, the reloader and the port map are development-specific.
 #
 # Relationship to the root ../docker-compose.yml: that file is the full
-# platform stack (postgres/redis/rabbitmq/minio/backend/frontend) and its
-# interpolation hard-requires POSTGRES_PASSWORD, SUPABASE_URL and friends, so
+# platform stack (engines, backend, frontend) and its
+# interpolation hard-requires POSTGREST_URL, the S3_* and AUTH0_* settings, so
 # it cannot bring up cad-engine on its own. This file is the single-service
 # dev loop only - it is not a fork of that stack, and runtime settings that
 # matter in production still live in the Dockerfile and the root stack.

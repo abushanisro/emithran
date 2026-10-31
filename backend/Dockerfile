@@ -19,7 +19,20 @@ COPY package.json package-lock.json ./
 # Strict and reproducible: the lock file is the truth, and a mismatch fails the build instead of installing something else.
 RUN npm ci --legacy-peer-deps --no-audit --no-fund
 COPY . .
-RUN npm run build && npm prune --omit=dev --legacy-peer-deps
+# Delivered images carry no source maps and no type declarations (tsconfig.release.json): maps would hand out the TypeScript.
+RUN npm run build:release && npm prune --omit=dev --legacy-peer-deps
+
+# Private source maps for a release, built only on request and never shipped. tsc emits the same JavaScript with or without
+# maps (apart from the trailing sourceMappingURL comment), so these maps match the delivered code line for line:
+#   docker build --build-context core=core --target sourcemaps --output type=local,dest=release-maps backend
+FROM build AS sourcemaps-build
+RUN npm ci --legacy-peer-deps --no-audit --no-fund && npx @nestjs/cli build -p tsconfig.build.json \
+    && cd dist && find . -name '*.js.map' -exec sh -c 'mkdir -p "/maps/$(dirname "$1")" && cp "$1" "/maps/$1"' _ {} \;
+
+FROM scratch AS sourcemaps
+COPY --from=sourcemaps-build /maps /
+
+# The runtime stage stays last, so a plain `docker build` produces it.
 
 FROM node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85 AS runtime
 # A runtime image runs `node` and nothing else: no npm or corepack (a package manager is attack surface, and ships its own

@@ -6,7 +6,7 @@
 // secrets. Attachments are now storage downloads made with the caller's client,
 // sent as bytes, and the transport refuses file and URL attachments.
 import { RfqEmailService } from '../../../../modules/rfq/services/rfq-email.service';
-import { type SupabaseService } from '../../../../common/supabase/supabase.service';
+import { type DatabaseService } from '../../../../common/database/database.service';
 
 describe('RfqEmailService attachments', () => {
   const env = { ...process.env };
@@ -19,12 +19,12 @@ describe('RfqEmailService attachments', () => {
   function setup(objects: Record<string, string>, readable = true) {
     const get = jest.fn(async (_bucket: string, p: string) => (p in objects ? Buffer.from(objects[p]) : null));
     const canRead = jest.fn(async () => readable);
-    const supabaseService = {
+    const databaseService = {
       getUserClient: jest.fn(),
       getPrivilegedClient: jest.fn(() => { throw new Error('attachments must not use the privileged client'); }),
-    } as unknown as SupabaseService;
-    const service = new RfqEmailService(supabaseService, { canRead } as never, { get } as never);
-    return { service, supabaseService, get, canRead };
+    } as unknown as DatabaseService;
+    const service = new RfqEmailService(databaseService, { canRead } as never, { get } as never);
+    return { service, databaseService, get, canRead };
   }
 
   it('locks the transport against file and URL attachments', () => {

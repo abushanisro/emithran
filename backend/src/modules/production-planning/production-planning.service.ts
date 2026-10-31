@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException, Logger, ConflictException } from '@nestjs/common';
 import { UuidValidator } from '@/common/validators/uuid.validator';
-import { SupabaseService } from '@/common/supabase/supabase.service';
+import { DatabaseService } from '@/common/database/database.service';
 import {
   CreateProductionLotDto,
   UpdateProductionLotDto,
@@ -36,7 +36,7 @@ interface ProcessTemplate {
 export class ProductionPlanningService {
   private readonly logger = new Logger(ProductionPlanningService.name);
 
-  constructor(private readonly supabaseService: SupabaseService) { }
+  constructor(private readonly databaseService: DatabaseService) { }
 
   // ============================================================================
   // PRODUCTION LOTS METHODS
@@ -46,10 +46,10 @@ export class ProductionPlanningService {
     createDto: CreateProductionLotDto,
     userId: string,
   ): Promise<ProductionLotResponseDto> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Verify user owns the BOM
-    const { data: bomCheck } = await supabase
+    const { data: bomCheck } = await database
       .from('boms')
       .select('id, user_id')
       .eq('id', createDto.bomId)
@@ -61,7 +61,7 @@ export class ProductionPlanningService {
     }
 
     // Check if lot number is unique
-    const { data: existingLot } = await supabase
+    const { data: existingLot } = await database
       .from('production_lots')
       .select('id')
       .eq('lot_number', createDto.lotNumber)
@@ -80,7 +80,7 @@ export class ProductionPlanningService {
     );
 
     // Create production lot
-    const { data: lotData, error } = await supabase
+    const { data: lotData, error } = await database
       .from('production_lots')
       .insert({
         bom_id: createDto.bomId,
@@ -142,7 +142,7 @@ export class ProductionPlanningService {
         bom_item_id: itemId,
       }));
 
-      const { error: itemsError } = await supabase
+      const { error: itemsError } = await database
         .from('production_lot_bom_items')
         .insert(lotBomItems);
 
@@ -153,7 +153,7 @@ export class ProductionPlanningService {
         } else {
           // If inserting lot items fails for other reasons, we should clean up the lot
           this.logger.error(`Failed to insert selected BOM items: ${itemsError.message}`, itemsError);
-          await supabase.from('production_lots').delete().eq('id', lotData.id);
+          await database.from('production_lots').delete().eq('id', lotData.id);
           throw new BadRequestException(`Failed to associate BOM items: ${itemsError.message}`);
         }
       } else {
@@ -169,7 +169,7 @@ export class ProductionPlanningService {
     // Try to fetch the complete lot data with BOM info and selected items
     let data, fetchError;
     try {
-      const result = await supabase
+      const result = await database
         .from('production_lots')
         .select(`
           *,
@@ -202,7 +202,7 @@ export class ProductionPlanningService {
       // Fallback: fetch without relationships if they don't exist
       this.logger.warn('Failed to fetch with relationships, falling back to basic query', relationshipError);
       
-      const fallbackResult = await supabase
+      const fallbackResult = await database
         .from('production_lots')
         .select(`
           *,
@@ -220,7 +220,7 @@ export class ProductionPlanningService {
 
       // Fetch BOM items separately
       if (data && data.bom) {
-        const { data: bomItems } = await supabase
+        const { data: bomItems } = await database
           .from('bom_items')
           .select(`
             id,
@@ -256,12 +256,12 @@ export class ProductionPlanningService {
     userId: string,
     filters: { status?: string; bomId?: string; priority?: string; projectId?: string },
   ): Promise<ProductionLotResponseDto[]> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Try to fetch with relationships first
     let data, error;
     try {
-      let query = supabase
+      let query = database
         .from('production_lots')
         .select(`
           *,
@@ -308,7 +308,7 @@ export class ProductionPlanningService {
       // Fallback to basic query without relationships
       this.logger.warn('Failed to fetch lots with relationships, using fallback', relationshipError);
 
-      let fallbackQuery = supabase
+      let fallbackQuery = database
         .from('production_lots')
         .select(`
           *,
@@ -342,7 +342,7 @@ export class ProductionPlanningService {
       if (data && data.length > 0) {
         for (const lot of data) {
           if (lot.bom) {
-            const { data: bomItems } = await supabase
+            const { data: bomItems } = await database
               .from('bom_items')
               .select(`
                 id,
@@ -380,11 +380,11 @@ export class ProductionPlanningService {
     UuidValidator.validateUuid(id, 'Production lot ID');
     UuidValidator.validateUuid(userId, 'User ID');
 
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Industry Best Practice: Use explicit queries instead of complex nested relationships
     // Step 1: Get production lot basic data
-    const { data: lotData, error: lotError } = await supabase
+    const { data: lotData, error: lotError } = await database
       .from('production_lots')
       .select('*')
       .eq('id', id)
@@ -406,7 +406,7 @@ export class ProductionPlanningService {
     }
 
     // Step 2: Get BOM data separately
-    const { data: bomData } = await supabase
+    const { data: bomData } = await database
       .from('boms')
       .select(`
         id, 
@@ -419,7 +419,7 @@ export class ProductionPlanningService {
     // Step 3: Get selected BOM items separately (with error handling)
     let selectedBomItems: any[] = [];
     try {
-      const { data: selectedBomItemsRaw, error: bomItemsError } = await supabase
+      const { data: selectedBomItemsRaw, error: bomItemsError } = await database
         .from('production_lot_bom_items')
         .select('bom_item_id')
         .eq('production_lot_id', id);
@@ -429,7 +429,7 @@ export class ProductionPlanningService {
       } else if (selectedBomItemsRaw && selectedBomItemsRaw.length > 0) {
         // Get full BOM item details for selected items
         const bomItemIds = selectedBomItemsRaw.map(item => item.bom_item_id);
-        const { data: bomItemDetails } = await supabase
+        const { data: bomItemDetails } = await database
           .from('bom_items')
           .select(`
             id,
@@ -494,10 +494,10 @@ export class ProductionPlanningService {
     UuidValidator.validateUuid(id, 'Production lot ID');
     UuidValidator.validateUuid(userId, 'User ID');
 
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // First get the production lot basic info
-    const { data: lot, error: lotError } = await supabase
+    const { data: lot, error: lotError } = await database
       .from('production_lots')
       .select('bom_id, created_by')
       .eq('id', id)
@@ -524,7 +524,7 @@ export class ProductionPlanningService {
     let data: any[] | null = null;
 
     // Priority 1: approved quality inspection for this lot → return only quality-approved items
-    const { data: approvedInspection } = await supabase
+    const { data: approvedInspection } = await database
       .from('quality_inspections')
       .select('id')
       .eq('lot_id', id)
@@ -533,7 +533,7 @@ export class ProductionPlanningService {
       .single();
 
     if (approvedInspection) {
-      const { data: approvedItems } = await supabase
+      const { data: approvedItems } = await database
         .from('quality_approved_items')
         .select('bom_item_id')
         .eq('inspection_id', approvedInspection.id)
@@ -541,7 +541,7 @@ export class ProductionPlanningService {
 
       const approvedIds = (approvedItems || []).map((r: any) => r.bom_item_id);
       if (approvedIds.length > 0) {
-        const { data: approvedBomData, error: appError } = await supabase
+        const { data: approvedBomData, error: appError } = await database
           .from('bom_items')
           .select(bomItemSelect)
           .in('id', approvedIds);
@@ -553,7 +553,7 @@ export class ProductionPlanningService {
 
     // Priority 2: lot-specific BOM item selection
     if (!data || data.length === 0) {
-      const { data: selectedRaw, error: selError } = await supabase
+      const { data: selectedRaw, error: selError } = await database
         .from('production_lot_bom_items')
         .select('*')
         .eq('production_lot_id', id);
@@ -561,7 +561,7 @@ export class ProductionPlanningService {
       if (!selError && selectedRaw && selectedRaw.length > 0) {
         const ids = selectedRaw.map((r: any) => r.bom_item_id).filter(Boolean);
         if (ids.length > 0) {
-          const { data: selBomData, error: selBomError } = await supabase
+          const { data: selBomData, error: selBomError } = await database
             .from('bom_items')
             .select(bomItemSelect)
             .in('id', ids);
@@ -591,7 +591,7 @@ export class ProductionPlanningService {
     // Priority 3: all BOM items from bom_items table matching lot.bom_id
     if (!data || data.length === 0) {
       if (lot.bom_id) {
-        const { data: allBomData, error: allBomError } = await supabase
+        const { data: allBomData, error: allBomError } = await database
           .from('bom_items')
           .select(bomItemSelect)
           .eq('bom_id', lot.bom_id)
@@ -604,7 +604,7 @@ export class ProductionPlanningService {
 
     // Priority 4: check lot_vendor_assignments for this lot
     if (!data || data.length === 0) {
-      const { data: lvaRaw } = await supabase
+      const { data: lvaRaw } = await database
         .from('lot_vendor_assignments')
         .select('bom_item_id')
         .eq('production_lot_id', id);
@@ -612,7 +612,7 @@ export class ProductionPlanningService {
       if (lvaRaw && lvaRaw.length > 0) {
         const ids = lvaRaw.map((r: any) => r.bom_item_id).filter(Boolean);
         if (ids.length > 0) {
-          const { data: lvaBomData } = await supabase
+          const { data: lvaBomData } = await database
             .from('bom_items')
             .select(bomItemSelect)
             .in('id', ids);
@@ -625,7 +625,7 @@ export class ProductionPlanningService {
 
     // Priority 5: fallback to available BOM items if lot has no items attached yet
     if (!data || data.length === 0) {
-      const { data: fallbackBomItems } = await supabase
+      const { data: fallbackBomItems } = await database
         .from('bom_items')
         .select(bomItemSelect)
         .limit(20);
@@ -641,10 +641,10 @@ export class ProductionPlanningService {
     UuidValidator.validateUuid(lotId, 'Production lot ID');
     UuidValidator.validateUuid(userId, 'User ID');
 
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // First verify the production lot exists and user has access
-    const { data: lot, error: lotError } = await supabase
+    const { data: lot, error: lotError } = await database
       .from('production_lots')
       .select('id')
       .eq('id', lotId)
@@ -656,7 +656,7 @@ export class ProductionPlanningService {
     }
 
     // Get vendor assignments for this lot
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from('lot_vendor_assignments')
       .select(`
         id,
@@ -688,14 +688,14 @@ export class ProductionPlanningService {
     for (const assignment of data || []) {
       try {
         // Get vendor details
-        const { data: vendor } = await supabase
+        const { data: vendor } = await database
           .from('vendors')
           .select('id, name, company_email, contact_person')
           .eq('id', assignment.vendor_id)
           .single();
 
         // Get BOM item details  
-        const { data: bomItem } = await supabase
+        const { data: bomItem } = await database
           .from('bom_items')
           .select('id, name, part_number, description')
           .eq('id', assignment.bom_item_id)
@@ -726,10 +726,10 @@ export class ProductionPlanningService {
     updateDto: UpdateProductionLotDto,
     userId: string,
   ): Promise<ProductionLotResponseDto> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Get existing lot to check current status for validation
-    const { data: existingLot } = await supabase
+    const { data: existingLot } = await database
       .from('production_lots')
       .select('id, status, boms!inner(user_id)')
       .eq('id', id)
@@ -757,7 +757,7 @@ export class ProductionPlanningService {
     if (updateDto.actualStartDate !== undefined) updateData.actual_start_date = updateDto.actualStartDate;
     if (updateDto.actualEndDate !== undefined) updateData.actual_end_date = updateDto.actualEndDate;
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from('production_lots')
       .update(updateData)
       .eq('id', id)
@@ -775,10 +775,10 @@ export class ProductionPlanningService {
   }
 
   async deleteProductionLot(id: string, userId: string): Promise<void> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Verify ownership through BOM
-    const { data: existingLot } = await supabase
+    const { data: existingLot } = await database
       .from('production_lots')
       .select('id, boms!inner(user_id)')
       .eq('id', id)
@@ -789,7 +789,7 @@ export class ProductionPlanningService {
       throw new NotFoundException('Production lot not found');
     }
 
-    const { error } = await supabase.from('production_lots').delete().eq('id', id);
+    const { error } = await database.from('production_lots').delete().eq('id', id);
 
     if (error) {
       throw new BadRequestException(`Failed to delete production lot: ${error.message}`);
@@ -800,14 +800,14 @@ export class ProductionPlanningService {
   // VENDOR ASSIGNMENT METHODS
   // ============================================================================
 
-  private async enrichVendorAssignment(assignment: any, supabase: any): Promise<any> {
+  private async enrichVendorAssignment(assignment: any, database: any): Promise<any> {
     if (!assignment) return assignment;
     let vendor = null;
     let bomItem = null;
 
     if (assignment.vendor_id) {
       try {
-        const { data: v } = await supabase
+        const { data: v } = await database
           .from('vendors')
           .select('id, name, company_email, contact_person')
           .eq('id', assignment.vendor_id)
@@ -818,13 +818,13 @@ export class ProductionPlanningService {
 
     if (assignment.bom_item_id) {
       try {
-        let { data: b } = await supabase
+        let { data: b } = await database
           .from('bom_items')
           .select('id, name, part_number, description')
           .eq('id', assignment.bom_item_id)
           .single();
         if (!b) {
-          const { data: plb } = await supabase
+          const { data: plb } = await database
             .from('production_lot_bom_items')
             .select('id, name, part_number, description')
             .eq('id', assignment.bom_item_id)
@@ -849,16 +849,16 @@ export class ProductionPlanningService {
     };
   }
 
-  private async enrichVendorAssignmentsList(assignments: any[], supabase: any): Promise<any[]> {
+  private async enrichVendorAssignmentsList(assignments: any[], database: any): Promise<any[]> {
     if (!assignments || !Array.isArray(assignments)) return [];
-    return Promise.all(assignments.map(a => this.enrichVendorAssignment(a, supabase)));
+    return Promise.all(assignments.map(a => this.enrichVendorAssignment(a, database)));
   }
 
   async createVendorAssignment(
     createDto: CreateLotVendorAssignmentDto,
     userId: string,
   ): Promise<any> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Verify lot ownership
     await this.verifyLotOwnership(createDto.productionLotId, userId);
@@ -866,7 +866,7 @@ export class ProductionPlanningService {
     const totalCost = createDto.unitCost ? createDto.requiredQuantity * createDto.unitCost : 0;
 
     // Check if assignment already exists for this vendor and BOM item
-    const { data: existingAssignment } = await supabase
+    const { data: existingAssignment } = await database
       .from('lot_vendor_assignments')
       .select('id')
       .eq('production_lot_id', createDto.productionLotId)
@@ -879,7 +879,7 @@ export class ProductionPlanningService {
     }
 
     // Create new assignment (allowing multiple vendors per BOM item)
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from('lot_vendor_assignments')
       .insert({
         production_lot_id: createDto.productionLotId,
@@ -898,14 +898,14 @@ export class ProductionPlanningService {
       throw new BadRequestException(`Failed to create vendor assignment: ${error.message}`);
     }
 
-    return this.enrichVendorAssignment(data, supabase);
+    return this.enrichVendorAssignment(data, database);
   }
 
   async bulkCreateVendorAssignments(
     bulkDto: BulkVendorAssignmentDto,
     userId: string,
   ): Promise<any[]> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Verify lot ownership
     await this.verifyLotOwnership(bulkDto.productionLotId, userId);
@@ -923,7 +923,7 @@ export class ProductionPlanningService {
       remarks: assignment.remarks,
     }));
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from('lot_vendor_assignments')
       .insert(assignments)
       .select('*');
@@ -932,16 +932,16 @@ export class ProductionPlanningService {
       throw new BadRequestException(`Failed to create vendor assignments: ${error.message}`);
     }
 
-    return this.enrichVendorAssignmentsList(data || [], supabase);
+    return this.enrichVendorAssignmentsList(data || [], database);
   }
 
   async getVendorAssignments(lotId: string, userId: string): Promise<any[]> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Verify lot ownership
     await this.verifyLotOwnership(lotId, userId);
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from('lot_vendor_assignments')
       .select('*')
       .eq('production_lot_id', lotId)
@@ -951,7 +951,7 @@ export class ProductionPlanningService {
       throw new BadRequestException(`Failed to get vendor assignments: ${error.message}`);
     }
 
-    return this.enrichVendorAssignmentsList(data || [], supabase);
+    return this.enrichVendorAssignmentsList(data || [], database);
   }
 
   async updateVendorAssignment(
@@ -959,10 +959,10 @@ export class ProductionPlanningService {
     updateDto: UpdateLotVendorAssignmentDto,
     userId: string,
   ): Promise<any> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Verify ownership
-    const { data: assignment } = await supabase
+    const { data: assignment } = await database
       .from('lot_vendor_assignments')
       .select('production_lot_id')
       .eq('id', id)
@@ -986,7 +986,7 @@ export class ProductionPlanningService {
 
     // Calculate total cost if unit cost or quantity is updated
     if (updateDto.unitCost !== undefined || updateDto.requiredQuantity !== undefined) {
-      const { data: currentAssignment } = await supabase
+      const { data: currentAssignment } = await database
         .from('lot_vendor_assignments')
         .select('unit_cost, required_quantity')
         .eq('id', id)
@@ -997,7 +997,7 @@ export class ProductionPlanningService {
       updateData.total_cost = unitCost * quantity;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from('lot_vendor_assignments')
       .update(updateData)
       .eq('id', id)
@@ -1008,14 +1008,14 @@ export class ProductionPlanningService {
       throw new BadRequestException(`Failed to update vendor assignment: ${error.message}`);
     }
 
-    return this.enrichVendorAssignment(data, supabase);
+    return this.enrichVendorAssignment(data, database);
   }
 
   async deleteVendorAssignment(id: string, userId: string): Promise<void> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Verify ownership
-    const { data: assignment } = await supabase
+    const { data: assignment } = await database
       .from('lot_vendor_assignments')
       .select('production_lot_id')
       .eq('id', id)
@@ -1027,7 +1027,7 @@ export class ProductionPlanningService {
 
     await this.verifyLotOwnership(assignment.production_lot_id, userId);
 
-    const { error } = await supabase.from('lot_vendor_assignments').delete().eq('id', id);
+    const { error } = await database.from('lot_vendor_assignments').delete().eq('id', id);
 
     if (error) {
       throw new BadRequestException(`Failed to delete vendor assignment: ${error.message}`);
@@ -1042,13 +1042,13 @@ export class ProductionPlanningService {
     createDto: CreateProductionProcessDto,
     userId: string,
   ): Promise<any> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Verify lot ownership
     await this.verifyLotOwnership(createDto.production_lot_id, userId);
 
     // Get the next sequence number for this production lot
-    const { data: existingProcesses } = await supabase
+    const { data: existingProcesses } = await database
       .from('production_processes')
       .select('process_sequence')
       .eq('production_lot_id', createDto.production_lot_id)
@@ -1059,7 +1059,7 @@ export class ProductionPlanningService {
       ? (existingProcesses[0].process_sequence || 0) + 1
       : 1;
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from('production_processes')
       .insert({
         production_lot_id: createDto.production_lot_id,
@@ -1089,12 +1089,12 @@ export class ProductionPlanningService {
     userId: string,
     filters: { status?: string },
   ): Promise<any[]> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Verify lot ownership
     await this.verifyLotOwnership(lotId, userId);
 
-    let query = supabase
+    let query = database
       .from('production_processes')
       .select(`
         *,
@@ -1137,10 +1137,10 @@ export class ProductionPlanningService {
     updateDto: UpdateProductionProcessDto,
     userId: string,
   ): Promise<any> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // TODO: Re-enable ownership verification once auth system is stable
-    // const { data: process } = await supabase
+    // const { data: process } = await database
     //   .from('production_processes')
     //   .select('production_lot_id')
     //   .eq('id', id)
@@ -1175,7 +1175,7 @@ export class ProductionPlanningService {
       delete updateData.actualEndDate;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from('production_processes')
       .update(updateData)
       .eq('id', id)
@@ -1193,10 +1193,10 @@ export class ProductionPlanningService {
     id: string,
     userId: string,
   ): Promise<void> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Simple delete without ownership verification for now
-    const { error } = await supabase
+    const { error } = await database
       .from('production_processes')
       .delete()
       .eq('id', id);
@@ -1211,7 +1211,7 @@ export class ProductionPlanningService {
   // ============================================================================
 
   async createProcessSubtask(createDto: CreateProcessSubtaskDto, userId: string): Promise<any> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Verify process ownership
     await this.verifyProcessOwnership(createDto.productionProcessId, userId);
@@ -1219,7 +1219,7 @@ export class ProductionPlanningService {
     // Calculate next sequence number if not provided
     let taskSequence = createDto.taskSequence;
     if (!taskSequence) {
-      const { data: existing } = await supabase
+      const { data: existing } = await database
         .from('process_subtasks')
         .select('task_sequence')
         .eq('production_process_id', createDto.productionProcessId)
@@ -1229,7 +1229,7 @@ export class ProductionPlanningService {
     }
 
     // Insert subtask directly (avoids RPC status case mismatch)
-    const { data: subtask, error } = await supabase
+    const { data: subtask, error } = await database
       .from('process_subtasks')
       .insert({
         production_process_id: createDto.productionProcessId,
@@ -1257,7 +1257,7 @@ export class ProductionPlanningService {
     );
 
     if (bomParts.length > 0) {
-      const { error: bomError } = await supabase
+      const { error: bomError } = await database
         .from('subtask_bom_requirements')
         .insert(
           bomParts.map(part => ({
@@ -1279,12 +1279,12 @@ export class ProductionPlanningService {
   }
 
   async getProcessSubtasks(processId: string, userId: string): Promise<any[]> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Verify process ownership
     await this.verifyProcessOwnership(processId, userId);
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from('process_subtasks')
       .select('*')
       .eq('production_process_id', processId)
@@ -1302,10 +1302,10 @@ export class ProductionPlanningService {
     updateDto: UpdateProcessSubtaskDto,
     userId: string,
   ): Promise<any> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Verify ownership
-    const { data: subtask } = await supabase
+    const { data: subtask } = await database
       .from('process_subtasks')
       .select('production_process_id')
       .eq('id', id)
@@ -1328,7 +1328,7 @@ export class ProductionPlanningService {
     if (updateDto.status !== undefined)          updateData.status = updateDto.status;
     if (updateDto.remarks !== undefined)         updateData.notes = updateDto.remarks;
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from('process_subtasks')
       .update(updateData)
       .eq('id', id)
@@ -1343,10 +1343,10 @@ export class ProductionPlanningService {
   }
 
   async deleteProcessSubtask(id: string, userId: string): Promise<void> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Verify ownership
-    const { data: subtask } = await supabase
+    const { data: subtask } = await database
       .from('process_subtasks')
       .select('production_process_id')
       .eq('id', id)
@@ -1358,7 +1358,7 @@ export class ProductionPlanningService {
 
     await this.verifyProcessOwnership(subtask.production_process_id, userId);
 
-    const { error } = await supabase
+    const { error } = await database
       .from('process_subtasks')
       .delete()
       .eq('id', id);
@@ -1376,7 +1376,7 @@ export class ProductionPlanningService {
     createDto: CreateDailyProductionEntryDto,
     userId: string,
   ): Promise<DailyProductionEntryResponseDto> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Verify lot ownership
     await this.verifyLotOwnership(createDto.productionLotId, userId);
@@ -1386,7 +1386,7 @@ export class ProductionPlanningService {
       ? Math.round((createDto.actualQuantity / createDto.plannedQuantity) * 100)
       : 0;
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from('daily_production_entries')
       .insert({
         production_lot_id: createDto.productionLotId,
@@ -1426,12 +1426,12 @@ export class ProductionPlanningService {
     userId: string,
     filters: { startDate?: string; endDate?: string; entryType?: string },
   ): Promise<DailyProductionEntryResponseDto[]> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Verify lot ownership
     await this.verifyLotOwnership(lotId, userId);
 
-    let query = supabase
+    let query = database
       .from('daily_production_entries')
       .select(`
         *,
@@ -1465,10 +1465,10 @@ export class ProductionPlanningService {
     updateDto: UpdateDailyProductionEntryDto,
     userId: string,
   ): Promise<DailyProductionEntryResponseDto> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Verify ownership
-    const { data: entry } = await supabase
+    const { data: entry } = await database
       .from('daily_production_entries')
       .select('production_lot_id')
       .eq('id', id)
@@ -1483,7 +1483,7 @@ export class ProductionPlanningService {
     // Recalculate efficiency if quantities are updated
     let updateData: any = { ...updateDto };
     if (updateDto.actualQuantity !== undefined || updateDto.plannedQuantity !== undefined) {
-      const { data: currentEntry } = await supabase
+      const { data: currentEntry } = await database
         .from('daily_production_entries')
         .select('planned_quantity, actual_quantity')
         .eq('id', id)
@@ -1497,7 +1497,7 @@ export class ProductionPlanningService {
         : 0;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from('daily_production_entries')
       .update(updateData)
       .eq('id', id)
@@ -1520,19 +1520,19 @@ export class ProductionPlanningService {
   // ============================================================================
 
   async getProductionSummary(lotId: string, userId: string): Promise<ProductionSummaryDto> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Verify lot ownership
     await this.verifyLotOwnership(lotId, userId);
 
     // Get production entries data
-    const { data: entries } = await supabase
+    const { data: entries } = await database
       .from('daily_production_entries')
       .select('*')
       .eq('production_lot_id', lotId);
 
     // Get process data
-    const { data: processes } = await supabase
+    const { data: processes } = await database
       .from('production_processes')
       .select('status')
       .eq('production_lot_id', lotId);
@@ -1590,10 +1590,10 @@ export class ProductionPlanningService {
     userId: string,
     filters: { startDate?: string; endDate?: string },
   ): Promise<any> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Get lots with basic stats
-    let query = supabase
+    let query = database
       .from('production_lots')
       .select(`
         *,
@@ -1653,12 +1653,12 @@ export class ProductionPlanningService {
   }
 
   async getGanttData(lotId: string, userId: string): Promise<any> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Verify lot ownership
     await this.verifyLotOwnership(lotId, userId);
 
-    const { data: processes } = await supabase
+    const { data: processes } = await database
       .from('production_processes')
       .select(`
         *,
@@ -1700,9 +1700,9 @@ export class ProductionPlanningService {
   // ============================================================================
 
   private async verifyLotOwnership(lotId: string, userId: string): Promise<void> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
-    const { data } = await supabase
+    const { data } = await database
       .from('production_lots')
       .select('id, boms!inner(user_id)')
       .eq('id', lotId)
@@ -1715,10 +1715,10 @@ export class ProductionPlanningService {
   }
 
   private async verifyProcessOwnership(processId: string, userId: string): Promise<void> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Step 1: Get the production process
-    const { data: process, error: processError } = await supabase
+    const { data: process, error: processError } = await database
       .from('production_processes')
       .select('id, production_lot_id')
       .eq('id', processId)
@@ -1733,7 +1733,7 @@ export class ProductionPlanningService {
     }
 
     // Step 2: Get the production lot and verify BOM ownership
-    const { data: lot, error: lotError } = await supabase
+    const { data: lot, error: lotError } = await database
       .from('production_lots')
       .select(`
         id,
@@ -1768,10 +1768,10 @@ export class ProductionPlanningService {
   }
 
   private async calculateEstimatedLotCost(bomId: string, quantity: number): Promise<number> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Get BOM items total cost
-    const { data: bomCost } = await supabase
+    const { data: bomCost } = await database
       .rpc('calculate_bom_total_cost', { bom_id: bomId })
       .single();
 
@@ -1785,10 +1785,10 @@ export class ProductionPlanningService {
     // Once the migration is applied, you can uncomment the code below
 
     try {
-      const supabase = this.supabaseService.getUserClient();
+      const database = this.databaseService.getUserClient();
 
       // Try a simple query first to check if the relationship works
-      const { data, error } = await supabase
+      const { data, error } = await database
         .from('production_processes')
         .select(`
           id,
@@ -1830,9 +1830,9 @@ export class ProductionPlanningService {
   }
 
   private async getLotVendorAssignments(lotId: string): Promise<any[]> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from('lot_vendor_assignments')
       .select(`
         id,
@@ -1859,7 +1859,7 @@ export class ProductionPlanningService {
       for (const assignment of data) {
         try {
           // Fetch vendor data
-          const { data: vendorData } = await supabase
+          const { data: vendorData } = await database
             .from('vendors')
             .select('id, name, company_email, contact_person')
             .eq('id', assignment.vendor_id)
@@ -1868,7 +1868,7 @@ export class ProductionPlanningService {
           (assignment as any).vendor = vendorData;
 
           // Fetch BOM item data
-          const { data: bomItemData } = await supabase
+          const { data: bomItemData } = await database
             .from('bom_items')
             .select('id, name, part_number, description')
             .eq('id', assignment.bom_item_id)
@@ -1944,13 +1944,13 @@ export class ProductionPlanningService {
   }
 
   async getSubtasksDirectByLot(lotId: string, userId: string): Promise<any[]> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Verify lot ownership
     await this.verifyLotOwnership(lotId, userId);
 
     // Debug: Check what's in the production_processes table for this lot
-    const { data: processes, error: processError } = await supabase
+    const { data: processes, error: processError } = await database
       .from('production_processes')
       .select('*')
       .eq('production_lot_id', lotId);
@@ -1958,7 +1958,7 @@ export class ProductionPlanningService {
     this.logger.log('🔍 DEBUG: Processes found for lot', { lotId, processCount: processes?.length || 0, processes, processError });
 
     // Also check if there are any subtasks at all in the database (regardless of lot)
-    const { data: allSubtasks, error: allSubtasksError } = await supabase
+    const { data: allSubtasks, error: allSubtasksError } = await database
       .from('process_subtasks')
       .select('id, production_process_id, task_name')
       .limit(10);
@@ -1973,7 +1973,7 @@ export class ProductionPlanningService {
       this.logger.warn('No processes found for lot, checking for orphaned subtasks', { lotId, processError });
       
       // Try to find subtasks that might exist without proper processes
-      const { data: orphanedSubtasks, error: orphanedError } = await supabase
+      const { data: orphanedSubtasks, error: orphanedError } = await database
         .from('process_subtasks')
         .select(`
           id,
@@ -2006,7 +2006,7 @@ export class ProductionPlanningService {
     const processIds = processes.map(p => p.id);
 
     // Fetch subtasks directly using process IDs
-    const { data: subtasks, error } = await supabase
+    const { data: subtasks, error } = await database
       .from('process_subtasks')
       .select(`
         id,
@@ -2077,7 +2077,7 @@ export class ProductionPlanningService {
     plannedStartDate: string, 
     plannedEndDate: string
   ): Promise<void> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Define the 4 standard processes with correct names
     const standardProcesses = [
@@ -2141,7 +2141,7 @@ export class ProductionPlanningService {
       };
     });
 
-    const { error } = await supabase
+    const { error } = await database
       .from('production_processes')
       .insert(processesToCreate);
 
@@ -2154,10 +2154,10 @@ export class ProductionPlanningService {
   }
 
   async getDefaultProcessTemplates(userId: string): Promise<ProcessTemplate[]> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Try to get user's custom templates first
-    const { data: userTemplates, error: userError } = await supabase
+    const { data: userTemplates, error: userError } = await database
       .from('process_templates')
       .select('id, name, description, category, created_at')
       .eq('user_id', userId)
@@ -2219,9 +2219,9 @@ export class ProductionPlanningService {
     description?: string;
     category?: string;
   }): Promise<ProcessTemplate> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from('process_templates')
       .insert({
         name: templateData.name,
@@ -2272,10 +2272,10 @@ export class ProductionPlanningService {
    * Auto-update lot status based on progress
    */
   async updateLotStatusByProgress(lotId: string, userId: string): Promise<void> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Get current lot status and processes
-    const { data: lot } = await supabase
+    const { data: lot } = await database
       .from('production_lots')
       .select('id, status')
       .eq('id', lotId)
@@ -2285,7 +2285,7 @@ export class ProductionPlanningService {
     if (!lot) return;
 
     // Get processes and their completion status
-    const { data: processes } = await supabase
+    const { data: processes } = await database
       .from('production_processes')
       .select('id, status')
       .eq('production_lot_id', lotId);
@@ -2316,10 +2316,10 @@ export class ProductionPlanningService {
    * Clean up production lot materials to only include selected BOM items
    */
   async cleanupProductionLotMaterials(lotId: string, userId: string): Promise<void> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Get the selected BOM items for this lot
-    const { data: selectedBomItems } = await supabase
+    const { data: selectedBomItems } = await database
       .from('production_lot_bom_items')
       .select('bom_item_id')
       .eq('production_lot_id', lotId);
@@ -2328,7 +2328,7 @@ export class ProductionPlanningService {
       const selectedBomItemIds = selectedBomItems.map(item => item.bom_item_id);
       
       // Delete materials that are not in the selected BOM items
-      const { error } = await supabase
+      const { error } = await database
         .from('production_lot_materials')
         .delete()
         .eq('production_lot_id', lotId)

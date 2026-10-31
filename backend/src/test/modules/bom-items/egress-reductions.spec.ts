@@ -1,4 +1,4 @@
-// Supabase egress / request-count reductions (Phase 1–3): the signed-link
+// Storage egress / request-count reductions (Phase 1–3): the signed-link
 // reuse, the path-only file lookup, clearing a stale thumbnail, and the
 // memoised reference lookups. Mocked-dependency pattern as in
 // bom-items.currency.spec.ts.
@@ -17,12 +17,12 @@ import {
   getReusableSignedUrl,
   rememberSignedUrl,
 } from '../../../modules/bom-items/services/signed-url-cache';
-import { type SupabaseService } from '../../../common/supabase/supabase.service';
+import { type DatabaseService } from '../../../common/database/database.service';
 
-function buildService(supabase: unknown = {}) {
+function buildService(database: unknown = {}) {
   const none = {} as never;
   return new BOMItemsService(
-    supabase as SupabaseService,
+    database as DatabaseService,
     none, none, none, none, none, none, none, none, none, none,
     {} as SecondaryProcessService,
     {} as PlasticReferenceService,
@@ -42,7 +42,7 @@ function userClientReturning(rows: unknown[] | null, error: { message: string } 
     limit: () => Promise.resolve({ data: rows, error }),
   };
   const client = { from: jest.fn(() => chain) };
-  return { supabase: { getUserClient: jest.fn(() => client) }, select };
+  return { database: { getUserClient: jest.fn(() => client) }, select };
 }
 
 describe('signed link reuse', () => {
@@ -67,22 +67,22 @@ describe('signed link reuse', () => {
 
 describe('BOMItemsService.findFilePath', () => {
   it('reads only the two path columns, as the caller', async () => {
-    const { supabase, select } = userClientReturning([{ file_2d_path: 'd.pdf', file_3d_path: 'm.stl' }]);
-    const service = buildService(supabase);
+    const { database, select } = userClientReturning([{ file_2d_path: 'd.pdf', file_3d_path: 'm.stl' }]);
+    const service = buildService(database);
     await expect(service.findFilePath('i1', '3d', 'tok')).resolves.toBe('m.stl');
     await expect(service.findFilePath('i1', '2d', 'tok')).resolves.toBe('d.pdf');
     expect(select).toHaveBeenCalledWith('file_2d_path, file_3d_path');
-    expect(supabase.getUserClient).toHaveBeenCalledWith('tok');
+    expect(database.getUserClient).toHaveBeenCalledWith('tok');
   });
 
   it('returns null when the item has no file of that kind', async () => {
-    const { supabase } = userClientReturning([{ file_2d_path: null, file_3d_path: 'm.stl' }]);
-    await expect(buildService(supabase).findFilePath('i1', '2d', 'tok')).resolves.toBeNull();
+    const { database } = userClientReturning([{ file_2d_path: null, file_3d_path: 'm.stl' }]);
+    await expect(buildService(database).findFilePath('i1', '2d', 'tok')).resolves.toBeNull();
   });
 
   it('is not found when RLS hides the item or it does not exist', async () => {
-    const { supabase } = userClientReturning([]);
-    await expect(buildService(supabase).findFilePath('i1', '3d', 'tok')).rejects.toThrow(NotFoundException);
+    const { database } = userClientReturning([]);
+    await expect(buildService(database).findFilePath('i1', '3d', 'tok')).rejects.toThrow(NotFoundException);
   });
 });
 
@@ -114,8 +114,8 @@ describe('memoised machining reference lookups', () => {
       eq: () => chain,
       maybeSingle: () => Promise.resolve(variableRead()),
     };
-    const supabase = { getPrivilegedClient: () => ({ from: () => chain }) } as unknown as SupabaseService;
-    const service = new MachiningLookupService(supabase);
+    const database = { getPrivilegedClient: () => ({ from: () => chain }) } as unknown as DatabaseService;
+    const service = new MachiningLookupService(database);
     jest.spyOn(service as any, 'loadTable').mockResolvedValue([{ row: 1 }]);
     return { service, variableRead };
   }

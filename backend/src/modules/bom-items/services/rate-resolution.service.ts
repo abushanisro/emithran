@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../common/database/database.service';
 import { CalculatorCatalogService } from './calculator-catalog.service';
 import type { MHRRateInput } from '../costing/shared/core/cost-engine';
 import {
@@ -59,7 +59,7 @@ export class RateResolutionService {
   private readonly logger = new Logger(RateResolutionService.name);
 
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly calculatorCatalogService: CalculatorCatalogService,
   ) {}
 
@@ -210,7 +210,7 @@ export class RateResolutionService {
     // wage-grade average. A class with no real machine here resolves to rate 0
     // with source 'no_db_rate', which every engine treats as "not costed" and
     // names in a warning; it is never shown or charged as a price.
-    const pool = await fetchMachinePool(this.supabaseService.getClient(accessToken), location);
+    const pool = await fetchMachinePool(this.databaseService.getClient(accessToken), location);
     const requirements = physics?.requirements ?? {};
     const overrides = physics?.overrides ?? new Map<string, string>();
     const localCurrencyCode = (LOCATION_INFO[location] ?? LOCATION_INFO['Other']).code;
@@ -425,7 +425,7 @@ export class RateResolutionService {
     location: string,
   ): Promise<Map<string, string>> {
     const overrides = new Map<string, string>();
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
     try {
       let { data, error } = await client
         .from('bom_item_machine_overrides')
@@ -463,7 +463,7 @@ export class RateResolutionService {
   ): Promise<Map<string, number>> {
     const overrides = new Map<string, number>();
     try {
-      const { data, error } = await this.supabaseService
+      const { data, error } = await this.databaseService
         .getClient(accessToken)
         .from('bom_item_cost_overrides')
         .select('field_key, value')
@@ -501,7 +501,7 @@ export class RateResolutionService {
     rates: RateSnapshot,
     warnings: string[],
   ): Promise<MHRRateInput> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       // Shared with the sibling inspection-rate resolver, which reads the same
@@ -583,7 +583,7 @@ export class RateResolutionService {
     rates: RateSnapshot,
     warnings: string[],
   ): Promise<MHRRateInput> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
     const gap: MHRRateInput = { rate: 0, source: 'no_db_rate', machineClass: 'cmm', machineName: null, commodityCode: null };
 
     try {

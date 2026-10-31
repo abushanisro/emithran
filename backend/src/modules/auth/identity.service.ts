@@ -1,13 +1,13 @@
 import { ForbiddenException, Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { DatabaseService } from '../../common/database/database.service';
 import { Auth0TokenVerifier, TokenRejected } from './auth0-token-verifier';
 import { sessionKeyFromAuth0Sid } from './session-key';
 
 /** Who a request is, in the terms the rest of the backend already uses. */
 export interface AuthenticatedRequestUser {
   user: { id: string; email: string; role: 'authenticated' };
-  /** The token PostgREST trusts for this user: it replaces the Supabase access token in `request.accessToken`. */
+  /** The token PostgREST trusts for this user: it is what `request.accessToken` carries. */
   dbToken: string;
   /** The key of this login's inactivity clock (a uuid derived from Auth0's `sid`). Missing sid means no clock can run: rejected. */
   sessionId: string;
@@ -27,7 +27,7 @@ export class IdentityService {
 
   constructor(
     private readonly verifier: Auth0TokenVerifier,
-    private readonly db: SupabaseService,
+    private readonly db: DatabaseService,
     private readonly now: () => number = Date.now,
   ) {}
 

@@ -1,5 +1,5 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../common/database/database.service';
 import { 
   RfqTrackingResponseDto, 
   RfqTrackingStatsDto,
@@ -38,7 +38,7 @@ interface UpdateVendorResponseData {
 export class RfqTrackingService {
   private readonly logger = new Logger(RfqTrackingService.name);
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(private readonly databaseService: DatabaseService) {}
 
   /**
    * Create RFQ tracking record when RFQ is sent
@@ -55,7 +55,7 @@ export class RfqTrackingService {
       throw new BadRequestException('Project ID is required for RFQ tracking creation');
     }
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       // Create main tracking record
@@ -137,7 +137,7 @@ export class RfqTrackingService {
     userId: string,
     accessToken: string
   ): Promise<RfqTrackingResponseDto> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     const { data, error } = await client
       .from('rfq_tracking_summary')
@@ -168,7 +168,7 @@ export class RfqTrackingService {
 
     this.logger.log(`Getting RFQ tracking for userId=${userId}, projectId=${projectId}`);
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     // Filter by project_id — RLS already scopes visibility to the caller's org
     let query = client
@@ -203,7 +203,7 @@ export class RfqTrackingService {
     accessToken: string,
     responseData: UpdateVendorResponseData
   ): Promise<void> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     // Verify this RFQ tracking record is accessible (RLS enforces org scope)
     const { data: tracking, error: trackingError } = await client
@@ -255,7 +255,7 @@ export class RfqTrackingService {
     accessToken: string,
     status: 'sent' | 'responded' | 'evaluated' | 'completed' | 'cancelled'
   ): Promise<void> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     const updateData: any = {
       status,
@@ -284,7 +284,7 @@ export class RfqTrackingService {
     userId: string,
     accessToken: string
   ): Promise<void> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     // First verify this tracking record is accessible (RLS enforces org scope)
     const { data: tracking, error: findError } = await client
@@ -338,7 +338,7 @@ export class RfqTrackingService {
       throw new BadRequestException('Project ID is required for data isolation');
     }
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     // Filter by project_id — RLS already scopes visibility to the caller's org
     let query = client
@@ -385,7 +385,7 @@ export class RfqTrackingService {
    * Private helper to update tracking statistics
    */
   private async updateTrackingStats(trackingId: string, accessToken: string): Promise<void> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     // Get response statistics
     const { data: responseStats } = await client

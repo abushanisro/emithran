@@ -1,5 +1,5 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { DatabaseService } from '../../common/database/database.service';
 import {
   QueryScrapRatesDto,
   QueryCountryFactorsDto,
@@ -23,7 +23,7 @@ import { quoteFilterValue } from '../../common/db/postgrest-filter';
 export class CostEngineeringService {
   private readonly logger = new Logger(CostEngineeringService.name);
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(private readonly databaseService: DatabaseService) {}
 
   private paginate(query: { page?: number; limit?: number }) {
     const page = query.page || 1;
@@ -37,7 +37,7 @@ export class CostEngineeringService {
     filters: (q: any) => any,
     { page, limit, from, to }: ReturnType<typeof this.paginate>,
   ) {
-    let q = this.supabaseService.getClient(token).from(table).select('*', { count: 'exact' }).range(from, to);
+    let q = this.databaseService.getClient(token).from(table).select('*', { count: 'exact' }).range(from, to);
     q = filters(q);
 
     const { data, error, count } = await q;

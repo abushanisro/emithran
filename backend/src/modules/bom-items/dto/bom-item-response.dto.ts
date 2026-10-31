@@ -11,7 +11,7 @@ import { BOMItemType } from './bom-items.dto';
  * that only builds this DTO selects these instead of '*': the other columns
  * (drawing_extraction, geometry_analysis, dfm_analysis, ...) are large JSONB
  * that no caller of the DTO ever sees, yet every row of them was billed as
- * Supabase egress. Kept in step with fromDatabase by bom-item-dto-columns.spec.ts.
+ * storage egress. Kept in step with fromDatabase by bom-item-dto-columns.spec.ts.
  */
 export const BOM_ITEM_DTO_COLUMNS =
   'annual_volume,bend_count,bom_id,coating,coating_confidence,complexity,created_at,' +
@@ -108,7 +108,7 @@ export class BOMItemResponseDto {
   @ApiPropertyOptional({ example: 'file-path-drawing.dxf.gz' })
   fileDxfPath?: string;
 
-  @ApiPropertyOptional({ example: 'https://cdn.supabase.io/storage/v1/...' })
+  @ApiPropertyOptional({ example: 'https://cdn.database.io/storage/v1/...' })
   thumbnailUrl?: string;
 
   @ApiPropertyOptional({ example: 'sheet_metal', description: 'User-set manufacturing family override; null means auto-detect' })

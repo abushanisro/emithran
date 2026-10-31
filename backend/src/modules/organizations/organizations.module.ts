@@ -3,7 +3,7 @@ import { Module } from '@nestjs/common';
 import { OrganizationsController } from './organizations.controller';
 import { OrganizationsService } from './organizations.service';
 
-/** SupabaseService and UserDirectory come from the global SupabaseModule. */
+/** DatabaseService and UserDirectory come from the global DatabaseModule. */
 @Module({
   controllers: [OrganizationsController],
   providers: [OrganizationsService],

@@ -1,4 +1,4 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { DbClient } from '../../common/db/postgrest-client';
 import { HydroformingReferenceService } from './costing/hydroforming/hydroforming-reference.service';
 import { isMachiningFamily, isTurnedFamily, type MachiningFamily } from '../../domain/part-family';
 import { computeHydroforming } from './costing/hydroforming/hydroforming-engine';
@@ -6,7 +6,7 @@ import { buildHydroformRoute, drawnShellFromFeatures } from './costing/hydroform
 import { SheetMetalCatalogOperationsService } from './costing/sheet-metal/operation/catalog-operations.service';
 import type { SheetMetalFeature } from './costing/sheet-metal/operation/catalog-operation-resolver';
 import { Injectable, Logger, NotFoundException, InternalServerErrorException, BadRequestException, ForbiddenException } from '@nestjs/common';
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { DatabaseService } from '../../common/database/database.service';
 import { CreateBOMItemDto, UpdateBOMItemDto } from './dto/bom-items.dto';
 import { BOM_ITEM_DTO_COLUMNS, BOMItemResponseDto, BOMItemListResponseDto } from './dto/bom-item-response.dto';
 import { RecentKeys } from '../../common/cache/recent-keys';
@@ -214,7 +214,7 @@ export class BOMItemsService {
   });
 
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly inspectionKnowledge: InspectionKnowledgeService,
     private readonly blankOptimizer: BlankOptimizerService,
     private readonly smLookup: SheetMetalLookupService,
@@ -279,7 +279,7 @@ export class BOMItemsService {
   ): Promise<BOMItemListResponseDto> {
     this.logger.log('Fetching BOM items');
 
-    const client = this.supabaseService.getUserClient(accessToken);
+    const client = this.databaseService.getUserClient(accessToken);
 
     let query = client
       .from('bom_items')
@@ -350,7 +350,7 @@ export class BOMItemsService {
   ): Promise<BOMItemResponseDto> {
     this.logger.log(`Fetching BOM item with ID: ${id}`);
 
-    const client = this.supabaseService.getUserClient(accessToken);
+    const client = this.databaseService.getUserClient(accessToken);
 
     const { data, error } = await client
       .from('bom_items')
@@ -381,11 +381,11 @@ export class BOMItemsService {
       `Creating BOM item: ${createBOMItemDto.partNumber}`,
       'BOMItemsService',
     );
-    return this.insertItem(this.supabaseService.getUserClient(accessToken), createBOMItemDto, userId, organizationId);
+    return this.insertItem(this.databaseService.getUserClient(accessToken), createBOMItemDto, userId, organizationId);
   }
 
   private async insertItem(
-    client: SupabaseClient,
+    client: DbClient,
     createBOMItemDto: CreateBOMItemDto,
     userId?: string,
     organizationId?: string | null,
@@ -420,7 +420,7 @@ export class BOMItemsService {
    */
   async createForUpload(dto: CreateBOMItemDto, userId: string, organizationId: string | null): Promise<BOMItemResponseDto> {
     return this.insertItem(
-      this.supabaseService.getPrivilegedClient('cad-upload runner: create BOM items for a checked upload'),
+      this.databaseService.getPrivilegedClient('cad-upload runner: create BOM items for a checked upload'),
       dto,
       userId,
       organizationId,
@@ -428,7 +428,7 @@ export class BOMItemsService {
   }
 
   async setFile3dPathForUpload(itemId: string, file3dPath: string): Promise<void> {
-    const { error } = await this.supabaseService
+    const { error } = await this.databaseService
       .getPrivilegedClient('cad-upload runner: attach the uploaded 3D file to its item')
       .from('bom_items')
       .update({ file_3d_path: file3dPath, thumbnail_url: null }) // a new model invalidates any stored thumbnail, as update() does
@@ -442,7 +442,7 @@ export class BOMItemsService {
    * points at it.
    */
   async deleteItemsForUpload(itemIds: string[]): Promise<string[]> {
-    const client = this.supabaseService.getPrivilegedClient('cad-upload runner: remove the items of a failed or retried upload');
+    const client = this.databaseService.getPrivilegedClient('cad-upload runner: remove the items of a failed or retried upload');
     const { data } = await client.from('bom_items').select('file_3d_path').in('id', itemIds);
     const paths = (data ?? []).map((row: { file_3d_path: string | null }) => row.file_3d_path).filter((p): p is string => !!p);
     for (const id of [...itemIds].reverse()) {
@@ -460,7 +460,7 @@ export class BOMItemsService {
   ): Promise<BOMItemResponseDto> {
     this.logger.log(`Updating BOM item with ID: ${id}`);
 
-    const client = this.supabaseService.getUserClient(accessToken);
+    const client = this.databaseService.getUserClient(accessToken);
 
     // Transform camelCase DTO to snake_case database columns
     const dbData = this.transformDtoToDb(updateBOMItemDto);
@@ -537,7 +537,7 @@ export class BOMItemsService {
     accessToken?: string,
   ): Promise<{ ok: boolean }> {
     this.logger.log(`Updating thumbnail for BOM item: ${id}`);
-    const { error } = await this.supabaseService
+    const { error } = await this.databaseService
       .getUserClient(accessToken)
       .from('bom_items')
       .update({ thumbnail_url: thumbnailUrl, updated_at: new Date().toISOString() })
@@ -572,7 +572,7 @@ export class BOMItemsService {
     patch: Record<string, unknown>,
     accessToken?: string,
   ): Promise<BOMItemResponseDto> {
-    const client = this.supabaseService.getUserClient(accessToken);
+    const client = this.databaseService.getUserClient(accessToken);
 
     const { data: row, error } = await client
       .rpc('merge_scenario_overrides', { p_id: id, p_patch: patch })
@@ -603,7 +603,7 @@ export class BOMItemsService {
   ): Promise<{ updated: number }> {
     this.logger.log(`Updating sort order for ${items.length} BOM items`);
 
-    const client = this.supabaseService.getUserClient(accessToken);
+    const client = this.databaseService.getUserClient(accessToken);
     
     // Use batch update with single query instead of N+1 pattern
     try {
@@ -638,7 +638,7 @@ export class BOMItemsService {
    * thumbnail) is many KB per call, and this runs for every thumbnail.
    */
   async findFilePath(id: string, fileType: '2d' | '3d', accessToken?: string): Promise<string | null> {
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getUserClient(accessToken)
       .from('bom_items')
       .select('file_2d_path, file_3d_path')
@@ -663,7 +663,7 @@ export class BOMItemsService {
   ): Promise<void> {
     this.logger.log(`Removing BOM item with ID: ${id}`);
 
-    const client = this.supabaseService.getUserClient(accessToken);
+    const client = this.databaseService.getUserClient(accessToken);
 
     try {
       // Use cascade delete to automatically clean up all references
@@ -731,7 +731,7 @@ export class BOMItemsService {
     userId?: string,
     accessToken?: string,
   ): Promise<void> {
-    const client = this.supabaseService.getUserClient(accessToken);
+    const client = this.databaseService.getUserClient(accessToken);
 
     // First, check if the item exists
     const { data: existingItem, error: fetchError } = await client
@@ -792,7 +792,7 @@ export class BOMItemsService {
   ): Promise<void> {
     this.logger.log(`Performing manual cascade delete for BOM item: ${id}`);
     
-    const client = this.supabaseService.getUserClient(accessToken);
+    const client = this.databaseService.getUserClient(accessToken);
     
     try {
       // Get item info first
@@ -819,7 +819,7 @@ export class BOMItemsService {
         .eq('bom_item_id', id);
       
       // Also try with admin client to see if RLS is the issue
-      const adminClient = this.supabaseService.getPrivilegedClient('bom-item cascade delete: production_lot_materials rows RLS hides from the caller, bounded to a BOM item already verified visible to the caller');
+      const adminClient = this.databaseService.getPrivilegedClient('bom-item cascade delete: production_lot_materials rows RLS hides from the caller, bounded to a BOM item already verified visible to the caller');
       let adminProdMaterials = null;
       
       if (adminClient) {
@@ -992,7 +992,7 @@ export class BOMItemsService {
   ): Promise<string> {
     this.logger.log(`Getting BOM ID for item: ${itemId}`);
 
-    const client = this.supabaseService.getUserClient(accessToken);
+    const client = this.databaseService.getUserClient(accessToken);
 
     const { data, error } = await client
       .from('bom_items')
@@ -1019,7 +1019,7 @@ export class BOMItemsService {
   ): Promise<{ canDelete: boolean; blockers: string[]; itemName: string }> {
     this.logger.log(`Checking delete dependencies for BOM item: ${id}`);
 
-    const client = this.supabaseService.getUserClient(accessToken);
+    const client = this.databaseService.getUserClient(accessToken);
     const blockers: string[] = [];
     
     // Get item info
@@ -1077,7 +1077,7 @@ export class BOMItemsService {
     userId?: string,
     accessToken?: string,
   ): Promise<string> {
-    const client = this.supabaseService.getUserClient(accessToken);
+    const client = this.databaseService.getUserClient(accessToken);
 
     const { data, error } = await client
       .from('boms')
@@ -1692,7 +1692,7 @@ export class BOMItemsService {
     location: string,
   ): Promise<void> {
     try {
-      const client = this.supabaseService.getClient(accessToken);
+      const client = this.databaseService.getClient(accessToken);
       const { data: savedRows } = await client
         .from('process_cost_records')
         .select('mhr_id, machine_class')
@@ -1764,7 +1764,7 @@ export class BOMItemsService {
     location: string,
   ): Promise<void> {
     try {
-      const client = this.supabaseService.getClient(accessToken);
+      const client = this.databaseService.getClient(accessToken);
       const selections = (Object.values(mhrRates) as MHRRateInput[])
         .filter((r) => r && typeof r.machineClass === 'string' && r.selection && r.selection.requirement.kind !== 'generic')
         .map((r) => ({ processKey: r.machineClass, selection: r.selection! }));
@@ -1821,7 +1821,7 @@ export class BOMItemsService {
   ): Promise<{ processKey: string; mhrRecordId: string | null; location: string }> {
     // findOne enforces the caller can access this BOM item
     await this.findOne(bomItemId, userId, accessToken);
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     if (mhrRecordId === null) {
       const { error } = await client
@@ -1939,7 +1939,7 @@ export class BOMItemsService {
   ): Promise<{ fieldKey: string; value: number | null; location: string }> {
     // findOne enforces the caller can access this BOM item
     await this.findOne(bomItemId, userId, accessToken);
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     if (value === null) {
       const { error } = await client
@@ -2134,7 +2134,7 @@ export class BOMItemsService {
       const canonicalIds = [...classByCanonicalId.keys()];
       if (canonicalIds.length === 0) return null;
 
-      const client = this.supabaseService.getClient(accessToken);
+      const client = this.databaseService.getClient(accessToken);
       const { data, error } = await cachedRead(`taxonomy-cut-features:${[...canonicalIds].sort().join(',')}`, async () => {
         const res = await client
           .from('process_taxonomy_operations')
@@ -2210,7 +2210,7 @@ export class BOMItemsService {
     const classes = [...new Set(machineClasses.filter(Boolean))];
     if (classes.length === 0) return {};
     try {
-      const db = this.supabaseService.getClient(accessToken);
+      const db = this.databaseService.getClient(accessToken);
       const { data, error } = await db
         .from('process_taxonomy')
         .select('machine_class, process_taxonomy_operations(operation_category)')
@@ -2247,11 +2247,11 @@ export class BOMItemsService {
     const id = (machine.selection?.balanced?.candidate as { machineId?: string } | undefined)?.machineId ?? machine.mhrRecordId ?? null;
     if (!id) return null;
     const { data: row } = await cachedRead(`mhr:benchmark-key:${id}`, async () =>
-      await this.supabaseService.getUserClient(accessToken).from('mhr_records').select('benchmark_source_key').eq('id', id).maybeSingle());
+      await this.databaseService.getUserClient(accessToken).from('mhr_records').select('benchmark_source_key').eq('id', id).maybeSingle());
     const key = (row as { benchmark_source_key?: string | null } | null)?.benchmark_source_key;
     if (!key) return null;
     const { data } = await cachedRead(`machining-reference-machine:${key}`, async () =>
-      await this.supabaseService.getPrivilegedClient('reference-data: machining_reference_data, public-read')
+      await this.databaseService.getPrivilegedClient('reference-data: machining_reference_data, public-read')
         .from('machining_reference_data').select('raw')
         .eq('category', 'machine').eq('key', key).limit(1));
     const v = (data?.[0] as { raw?: { time?: { setupTimeHr?: unknown } } } | undefined)?.raw?.time?.setupTimeHr;
@@ -2268,7 +2268,7 @@ export class BOMItemsService {
   @ReferenceMemo({ cacheable: (v) => (v as Array<{ sec: number | null }>).every((s) => s.sec != null) })
   private async resolveBenchSteps(): Promise<Array<{ operation: string; sec: number | null; source: string }>> {
     const keys = { Identing: 'defaultIdentingTime', 'Spark Testing': 'defaultSparkTestTime' } as const;
-    const { data } = await this.supabaseService.getPrivilegedClient('reference-data: machining variables, public-read')
+    const { data } = await this.databaseService.getPrivilegedClient('reference-data: machining variables, public-read')
       .from('machining_reference_data').select('key, value, unit_type')
       .eq('category', 'variable').eq('source_version', MACHINING_REFERENCE_SOURCE_VERSION)
       .in('key', Object.values(keys));
@@ -3189,7 +3189,7 @@ export class BOMItemsService {
     // the condition the Cost Guide already used, now decided in one place.
     // Geometry stays: cycle times, machine selection and warnings are real
     // regardless. Only money is withheld.
-    const { data: committedMaterialRows, error: committedMaterialError } = await this.supabaseService
+    const { data: committedMaterialRows, error: committedMaterialError } = await this.databaseService
       .getClient(accessToken)
       .from('raw_material_cost_records')
       .select('id')
@@ -3737,7 +3737,7 @@ export class BOMItemsService {
           const partVolMm3 = (item.volume ?? 0) as number;
           if (partVolMm3 > 0) {
             blankNetKg = Math.round((partVolMm3 / 1e9) * materialDensityKgM3 * 1000) / 1000;
-            void this.supabaseService.getClient(accessToken)
+            void this.databaseService.getClient(accessToken)
               .from('bom_items')
               .update({ weight: blankNetKg })
               .eq('id', item.id)
@@ -3782,7 +3782,7 @@ export class BOMItemsService {
     const castingProcess = castingProcessOfFamily(family);
     if (castingProcess) {
       const castingWarnings = [...materialWarnings];
-      const client = this.supabaseService.getClient(accessToken);
+      const client = this.databaseService.getClient(accessToken);
       const zeroCtx = { qairPerHr: 0, inspTimeMin: 0, samplingRate: 0, yieldPct: 1, netMatCost: 0, netWeightKg: 0, scrapPricePerKg: 0 };
       // HR Rates holds USD; every Cost Summary line is in the location's currency.
       const usdToLocal = locInfo.code === 'USD' ? 1 : rates.convertStrict('USD', locInfo.code);
@@ -4242,7 +4242,7 @@ export class BOMItemsService {
       const machineShotCapacityG = selectedImCandidate?.capability?.shotCapacityGrams ?? null;
       // The press's own HR Rates row: injection rate, dry cycle, good-part yield.
       const pressRecord = selectedImCandidate?.machineId
-        ? (await this.plasticReferenceService.getPressRecords(this.supabaseService.getClient(accessToken), [selectedImCandidate.machineId])).get(selectedImCandidate.machineId) ?? null
+        ? (await this.plasticReferenceService.getPressRecords(this.databaseService.getClient(accessToken), [selectedImCandidate.machineId])).get(selectedImCandidate.machineId) ?? null
         : null;
 
       // Wall thickness: the CAD nominal wall only. Without it the cycle time is
@@ -4362,7 +4362,7 @@ export class BOMItemsService {
     // never be found, reported as a missing-lookup gap that isn't real.
     let smLaserTechnology: 'fiber' | 'co2' = mhrRates.laser.machineClass === 'co2_laser' ? 'co2' : 'fiber';
     try {
-      const client = this.supabaseService.getClient(accessToken);
+      const client = this.databaseService.getClient(accessToken);
       const { data: savedLaserRow } = await client
         .from('process_cost_records')
         .select('machine_name, mhr_id')
@@ -4418,7 +4418,7 @@ export class BOMItemsService {
     // expose cost_india.
     let smScrapPricePerKg = 0;
     try {
-      const adminDb = this.supabaseService.getUserClient();
+      const adminDb = this.databaseService.getUserClient();
       const g = (grade ?? '').trim();
       let rmRow: any[] | null = null;
       if (g) {
@@ -5209,7 +5209,7 @@ export class BOMItemsService {
     // getRouteComparison(), so no divergence risk exists there -- not touched.
     const routeCoreProcessClasses = getRouteCoreProcessClasses();
     try {
-      const client = this.supabaseService.getClient(accessToken);
+      const client = this.databaseService.getClient(accessToken);
       const { data: appliedRows, error: appliedRowsError } = await client
         .from('process_cost_records')
         // The COMPLETE active generation. op_nbr/batch_size/location/notes are
@@ -5234,7 +5234,7 @@ export class BOMItemsService {
       // getRouteCoreProcessClasses() itself is unchanged and still used for
       // route assembly and selection -- it is simply not what decides which
       // persisted operations are authoritative.
-      // P0.6: the Supabase client returns errors on the {error} field rather than
+      // P0.6: the PostgREST client returns errors on the {error} field rather than
       // throwing -- this was previously never checked, so a real DB failure (not
       // "no applied route yet", a genuine query error) fell through indistinguishable
       // from the honest empty-result case, silently reverting to the live
@@ -5923,7 +5923,7 @@ export class BOMItemsService {
     // expose cost_india).
     let rcScrapPricePerKg = 0;
     try {
-      const adminDb = this.supabaseService.getUserClient();
+      const adminDb = this.databaseService.getUserClient();
       const g = (grade ?? '').trim();
       let rmRow: any[] | null = null;
       if (g) {
@@ -6405,7 +6405,7 @@ export class BOMItemsService {
       // real HR Rates press in range. A tier with no real press — or whose press
       // has no real clamp/shot capacity on file — is NOT offered: there is no
       // synthetic press, rate multiplier or stand-in clamp/shot spec.
-      const pool = await fetchMachinePool(this.supabaseService.getClient(accessToken), location);
+      const pool = await fetchMachinePool(this.databaseService.getClient(accessToken), location);
       if (!plasticRef) {
         comparisonWarnings.push(`Injection presses not evaluated: Plastic reference data missing (${plasticRefSet.missing.join('; ')}).`);
       }
@@ -6415,7 +6415,7 @@ export class BOMItemsService {
       }) : []);
       const sfmCandidate = mhrRates.structuralFoamMolding.selection?.balanced?.candidate;
       const pressRecordsRC = await this.plasticReferenceService.getPressRecords(
-        this.supabaseService.getClient(accessToken),
+        this.databaseService.getClient(accessToken),
         [...tiers.flatMap((t) => t.candidates.map((e) => e.candidate.machineId ?? '')), sfmCandidate?.machineId ?? ''],
       );
       const imCommon: Omit<InjectionMoldingCostInput, 'mhrRate' | 'machineClampTonnes' | 'machineShotCapacityG' | 'pressTiming'> = {
@@ -6952,7 +6952,7 @@ export class BOMItemsService {
     // comparisonWarnings entry so the gap is visible, not fabricated into a cost.
     try {
       const registeredCuttingClasses = new Set(getEnginesForFamily('sheet_metal_cutting').map((e) => e.machineClass));
-      const { data: cuttingCatalogRows } = await this.supabaseService
+      const { data: cuttingCatalogRows } = await this.databaseService
         .getClient(accessToken)
         .from('process_calculator_mappings')
         .select('machine_class, operation')
@@ -8041,7 +8041,7 @@ export class BOMItemsService {
   }
 
   async getGdtAnalysis(id: string, accessToken: string): Promise<GdtAnalysisDto> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
     const { data: rows, error } = await client
       .from("bom_items")
       .select("id, drawing_intelligence, feature_graph")
@@ -9229,7 +9229,7 @@ export class BOMItemsService {
       const locInfo = LOCATION_INFO[location] ?? LOCATION_INFO['USA']!;
       const usdToLocal = rates.convertStrict('USD', locInfo.code);
       for (const loc of [location, '__default__']) {
-        const { data } = await this.supabaseService
+        const { data } = await this.databaseService
           .getClient(accessToken)
           .from('consumable_prices')
           .select('price_per_unit')

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { SupabaseService } from "../../../common/supabase/supabase.service";
+import { DatabaseService } from "../../../common/database/database.service";
 import type {
   IOperationCalculator,
   MachiningParams,
@@ -35,7 +35,7 @@ export class InjectionMoldingCalculator implements IOperationCalculator {
   readonly operationKey = "injection_molding";
   private readonly logger = new Logger(InjectionMoldingCalculator.name);
 
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   validate(_params: MachiningParams, geo: FeatureGeometry): ValidationResult {
     const g = geo as InjectionMoldingGeometry;
@@ -157,7 +157,7 @@ export class InjectionMoldingCalculator implements IOperationCalculator {
     moldTemp: number;
     cavityPressure: number;
   }> {
-    const db = this.supabase.getPrivilegedClient("reference-data: injection_molding_materials");
+    const db = this.database.getPrivilegedClient("reference-data: injection_molding_materials");
     const { data } = await db
       .from("injection_molding_materials")
       .select("thermal_diffusivity_mm2_s, melt_temp_c, ejection_temp_c, recommended_mold_temp_c, cavity_pressure_mpa")

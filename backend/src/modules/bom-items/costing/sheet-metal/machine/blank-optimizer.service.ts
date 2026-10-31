@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { SupabaseService } from '../../../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../../../common/database/database.service';
 import { isTurnedFamily } from '../../../../../domain/part-family';
 import {
   type BoundingBox, type BlankResult, type StockForm, type StockProfile,
@@ -18,7 +18,7 @@ export type { BoundingBox, BlankResult, StockForm } from './blank-stock-candidat
 export class BlankOptimizerService {
   private readonly logger = new Logger(BlankOptimizerService.name);
 
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   async selectOptimalBlank(
     bbox: BoundingBox,
@@ -99,7 +99,7 @@ export class BlankOptimizerService {
 
   private async loadStockAllowanceRule(): Promise<{ rule: StockAllowanceRule | null; missing: string[] }> {
     if (this.allowanceRule) return this.allowanceRule;
-    const { data, error } = await this.supabase
+    const { data, error } = await this.database
       .getPrivilegedClient('reference-data: machining_reference_data and stock_profiles, global shared')
       .from('machining_reference_data')
       .select('key, value')
@@ -120,7 +120,7 @@ export class BlankOptimizerService {
   }
 
   private async loadStockProfiles(accessToken: string): Promise<StockProfile[]> {
-    const client = this.supabase.getClient(accessToken);
+    const client = this.database.getClient(accessToken);
     const { data, error } = await client
       .from("stock_profiles")
       .select("form, size_a_mm, size_b_mm")

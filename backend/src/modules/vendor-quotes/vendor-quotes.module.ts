@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
-import { SupabaseModule } from '@/common/supabase/supabase.module';
+import { DatabaseModule } from '@/common/database/database.module';
 import { VendorQuotesController } from './vendor-quotes.controller';
 import { VendorQuotesService } from './vendor-quotes.service';
 
 @Module({
   imports: [
-    SupabaseModule,
+    DatabaseModule,
   ],
   controllers: [VendorQuotesController],
   providers: [VendorQuotesService],

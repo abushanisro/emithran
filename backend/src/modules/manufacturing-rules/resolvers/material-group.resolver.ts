@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { SupabaseService } from "../../../common/supabase/supabase.service";
+import { DatabaseService } from "../../../common/database/database.service";
 import type { IsoGroup } from "../interfaces/operation-calculator.interface";
 
 interface MaterialGroupRecord {
@@ -49,10 +49,10 @@ interface MaterialGroupRow {
 export class MaterialGroupResolver {
   private readonly logger = new Logger(MaterialGroupResolver.name);
 
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   async resolve(materialGrade: string): Promise<MaterialGroupRecord> {
-    const db = this.supabase.getPrivilegedClient("reference-data: machining_material_groups");
+    const db = this.database.getPrivilegedClient("reference-data: machining_material_groups");
     const grade = materialGrade.trim();
 
     // 1. Exact match on primary material_grade (case-insensitive)

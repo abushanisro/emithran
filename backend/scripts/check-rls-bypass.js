@@ -3,7 +3,7 @@
 
 /**
  * Fails the build when code can reach the service-role database client, or a
- * second DB path, outside the audited SupabaseService boundary, or when a file's
+ * second DB path, outside the audited DatabaseService boundary, or when a file's
  * privileged-call count differs from scripts/rls-bypass-baseline.json.
  * Run from backend/:  npm run check:rls
  * After removing privileged calls:  npm run check:rls -- --update-baseline
@@ -12,7 +12,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { scanSource, scanRepoJwt, countPrivilegedCalls, compareToBaseline, lowerBaseline, parseBaseline, SUPABASE_SERVICE } = require('./rls-bypass-rules');
+const { scanSource, scanRepoJwt, countPrivilegedCalls, compareToBaseline, lowerBaseline, parseBaseline, DATABASE_SERVICE } = require('./rls-bypass-rules');
 
 const backendRoot = path.resolve(__dirname, '..');
 const srcRoot = path.join(backendRoot, 'src');
@@ -38,7 +38,7 @@ for (const file of walk(srcRoot)) {
   for (const v of scanSource(rel, text)) {
     (v.severity === 'error' ? errors : warnings).push(`${rel}:${v.line}  [${v.rule}] ${v.message}`);
   }
-  const privileged = rel === SUPABASE_SERVICE ? 0 : countPrivilegedCalls(text);
+  const privileged = rel === DATABASE_SERVICE ? 0 : countPrivilegedCalls(text);
   if (privileged > 0) privilegedCounts[rel] = privileged;
 }
 

@@ -1,20 +1,20 @@
 import { BadRequestException, Inject, Injectable, PayloadTooLargeException } from '@nestjs/common';
 import { OBJECT_STORE, type ObjectStore } from '../../common/storage/object-store';
-import { UserDirectory } from '../../common/supabase/user-directory';
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { UserDirectory } from '../../common/database/user-directory';
+import { DatabaseService } from '../../common/database/database.service';
 import { AVATAR_BUCKET, AVATAR_MAX_BYTES, AVATAR_URL_TTL_SECONDS, avatarKey, detectAvatarType } from './avatar';
 import type { UpdateProfileDto, ProfileResponseDto } from './dto/profile.dto';
 
 @Injectable()
 export class ProfileService {
   constructor(
-    private readonly supabase: SupabaseService,
+    private readonly database: DatabaseService,
     private readonly directory: UserDirectory,
     @Inject(OBJECT_STORE) private readonly objects: ObjectStore,
   ) {}
 
   async getProfile(userId: string, accessToken: string): Promise<ProfileResponseDto> {
-    const client = this.supabase.getClient(accessToken);
+    const client = this.database.getClient(accessToken);
 
     let { data, error } = await client
       .from('user_profiles')
@@ -37,7 +37,7 @@ export class ProfileService {
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto, accessToken: string): Promise<ProfileResponseDto> {
-    const client = this.supabase.getClient(accessToken);
+    const client = this.database.getClient(accessToken);
 
     const updateData: Record<string, any> = {};
     if (dto.displayName !== undefined) updateData.display_name = dto.displayName;
@@ -55,7 +55,7 @@ export class ProfileService {
 
     if (error) throw new Error(error.message);
 
-    // Keep Supabase auth user_metadata in sync so the sidebar shows the correct name
+    // Keep the user directory name in sync so the sidebar shows the correct name
     if (dto.displayName !== undefined) {
       await this.directory.setFullName(userId, dto.displayName);
     }
@@ -70,7 +70,7 @@ export class ProfileService {
     if (!contentType) throw new BadRequestException('A profile photo must be a JPEG, PNG or WebP image.');
 
     await this.objects.put(AVATAR_BUCKET, avatarKey(userId), bytes, { contentType, upsert: true });
-    const { data, error } = await this.supabase
+    const { data, error } = await this.database
       .getClient(accessToken)
       .from('user_profiles')
       .upsert({ user_id: userId, avatar_url: avatarKey(userId) }, { onConflict: 'user_id' })

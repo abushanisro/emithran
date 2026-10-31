@@ -142,7 +142,7 @@ export function trueNestInputFingerprint(input: {
 // wins and is stored) -- there is no external "which sheet" input to
 // validate against here, unlike the old single-candidate design. Pulled out
 // as a pure function so this correctness gate has real unit test coverage
-// without mocking Supabase/cad-engine.
+// without mocking the database or the cad-engine.
 export function isTrueNestCostingCacheValid(
   cache: unknown,
   kerfMm: number,

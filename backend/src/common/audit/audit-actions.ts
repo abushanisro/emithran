@@ -3,7 +3,7 @@
 // listed is dropped, so a token, an email address or a file's contents cannot end up in a row by accident.
 //
 // What is audited: state changes and security decisions. Not per request (the request log has that), and not sign-ins
-// (Supabase Auth keeps those in auth.audit_log_entries).
+// (Auth0 keeps those in its tenant logs). Refused API keys are security decisions: they are recorded as auth.forbidden.
 export const AUDIT_ACTIONS = {
   'upload.created': ['fileName', 'sizeBytes', 'duplicate'],
   'upload.completed': ['fileName', 'parts', 'items', 'durationMs'],
@@ -18,6 +18,8 @@ export const AUDIT_ACTIONS = {
   'member.removed': ['role'],
   'member.role_changed': ['role', 'previousRole'],
   'auth.forbidden': ['reason'],
+  'api_key.created': ['name', 'scopes', 'expiresAt'],
+  'api_key.revoked': ['name'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS;

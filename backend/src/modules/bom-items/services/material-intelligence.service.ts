@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../common/database/database.service';
 import { rankMaterials } from '../../process-plan-generator/ranking/material-ranker';
 import type { GeometrySignals } from '../../process-plan-generator/ranking/material-ranker';
 
@@ -18,7 +18,7 @@ export interface MaterialCandidate {
 export class MaterialIntelligenceService {
   private readonly logger = new Logger(MaterialIntelligenceService.name);
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(private readonly databaseService: DatabaseService) {}
 
   async getCandidates(
     accessToken: string,
@@ -29,7 +29,7 @@ export class MaterialIntelligenceService {
     coating: string | null,
     materialHint: string | null,
   ): Promise<MaterialCandidate[]> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
     const safeFamily = ['sheet_metal', 'turned', 'milled'].includes(family)
       ? (family as 'sheet_metal' | 'turned' | 'milled')
       : 'sheet_metal';

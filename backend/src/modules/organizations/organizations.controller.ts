@@ -7,7 +7,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreateOrganizationDto, InviteMemberDto, UpdateOrganizationDto, WorkspaceDto } from './dto/organization.dto';
 import { OrganizationsService, type MemberView, type OrganizationRow, type WorkspaceRow } from './organizations.service';
 
-/** The browser's organization settings, which used to query these tables straight from Supabase. */
+/** The browser's organization settings, which used to query these tables straight from the browser. */
 @ApiTags('Organizations')
 @ApiBearerAuth()
 @Controller({ path: 'api/organizations', version: '1' })

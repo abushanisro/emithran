@@ -50,3 +50,22 @@ describe('ClientIpThrottlerGuard behind a Cloudflare tunnel', () => {
     expect([await ping('203.0.113.1'), await ping('203.0.113.2'), await ping('203.0.113.3')]).toEqual([200, 200, 429]);
   });
 });
+
+describe('ClientIpThrottlerGuard with API keys', () => {
+  // getTracker is protected; this exposes it without booting the throttler.
+  class Probe extends ClientIpThrottlerGuard {
+    track(req: Record<string, unknown>) {
+      return this.getTracker(req);
+    }
+  }
+  const probe = Object.create(Probe.prototype) as Probe;
+
+  it('counts a request made with an API key against the key, whatever address it comes from', async () => {
+    await expect(probe.track({ apiKey: { id: 'key-1' }, headers: {}, ip: '10.0.0.1' })).resolves.toBe('api-key:key-1');
+    await expect(probe.track({ apiKey: { id: 'key-1' }, headers: {}, ip: '10.0.0.2' })).resolves.toBe('api-key:key-1');
+  });
+
+  it('counts everything else by client address', async () => {
+    await expect(probe.track({ headers: {}, ip: '10.0.0.1' })).resolves.not.toMatch(/^api-key:/);
+  });
+});

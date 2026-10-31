@@ -188,7 +188,7 @@ jobs:
         with:
           persist-credentials: false
       # Builds the Rust runner and the C++ worker (its hand-worked checks run in the build), then runs the real runner on a real zip
-      # of the STEP fixtures against a stand-in for the Supabase endpoints it uses.
+      # of the STEP fixtures against a stand-in for the PostgREST and S3 endpoints it uses.
       - run: docker build --platform linux/amd64 --build-context geometry=geometry-worker --build-context fixtures=backend/test/fixtures/cad -t cad-core:dev core
       - run: python3 core/tests/e2e.py
 
@@ -276,3 +276,14 @@ jobs:
           context: cad-engine
           push: false
           tags: cad-engine:ci
+
+  backend-image:
+    name: Backend image (no source maps shipped)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The delivered image must not carry our source maps or TypeScript (on-premises edition, step 1).
+      - run: docker build --build-context core=core -t backend:ci backend
+      - run: scripts/check-image-no-sourcemaps.sh backend:ci

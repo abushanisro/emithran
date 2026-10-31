@@ -7,6 +7,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "build": "npx @nestjs/cli build",
+    "build:release": "npx @nestjs/cli build -p tsconfig.release.json",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "npx nest start",
     "start:dev": "npx nest start --watch",
@@ -32,7 +33,6 @@
     "test:s3": "bash test/storage/run.sh",
     "test:boot": "bash test/smoke/boot.sh",
     "test:baseline": "bash test/baseline/run.sh",
-    "storage:copy": "ts-node -r tsconfig-paths/register scripts/copy-storage.ts",
     "local:up": "bash scripts/local-data.sh up",
     "local:load": "bash scripts/local-data.sh load",
     "local:use": "bash scripts/local-data.sh use",
@@ -67,7 +67,6 @@
     "@opentelemetry/sdk-node": "0.223.0",
     "@opentelemetry/sdk-trace": "2.12.0",
     "@supabase/postgrest-js": "^2.118.0",
-    "@supabase/supabase-js": "^2.118.0",
     "@types/multer": "^2.0.0",
     "@types/nodemailer": "^7.0.5",
     "ajv8": "npm:ajv@^8.17.1",

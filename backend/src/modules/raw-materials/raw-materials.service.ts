@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { Logger } from '../../common/logger/logger.service';
-import { readAllRows } from '../../common/supabase/read-all-rows';
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { readAllRows } from '../../common/database/read-all-rows';
+import { DatabaseService } from '../../common/database/database.service';
 import { CreateRawMaterialDto, UpdateRawMaterialDto, QueryRawMaterialsDto } from './dto/raw-materials.dto';
 import { RawMaterialResponseDto, RawMaterialListResponseDto } from './dto/raw-material-response.dto';
 import { shapeRankForFamily } from './constants/material-shape-ranking';
@@ -39,7 +39,7 @@ export function buildMaterialSearchOrClause(searchTerm: string): string {
 @Injectable()
 export class RawMaterialsService {
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly logger: Logger,
   ) {}
 
@@ -51,7 +51,7 @@ export class RawMaterialsService {
     referenceMaterial: string; rawMaterialName: string | null; stockForm: string; location: string;
     pricePerKg: number; currencyCode: string; source: string;
   }>> {
-    let q = this.supabaseService.getClient(accessToken).from('material_stock_prices')
+    let q = this.databaseService.getClient(accessToken).from('material_stock_prices')
       .select('reference_material, raw_material_name, stock_form, location, price_per_kg, currency_code, source')
       .order('reference_material').order('stock_form');
     if (location) q = q.eq('location', location);
@@ -67,7 +67,7 @@ export class RawMaterialsService {
   }
 
   async getAliases(accessToken?: string): Promise<Array<{ aliasNormalized: string; rawMaterialId: string }>> {
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getUserClient(accessToken)
       .from('material_aliases')
       .select('alias_normalized, raw_material_id');
@@ -86,7 +86,7 @@ export class RawMaterialsService {
   private async resolveAliasId(searchTerm: string, accessToken?: string): Promise<string | null> {
     const normalized = searchTerm.toUpperCase().replace(/[\s-]/g, '');
     if (!normalized) return null;
-    const { data } = await this.supabaseService
+    const { data } = await this.databaseService
       .getUserClient(accessToken)
       .from('material_aliases')
       .select('raw_material_id')
@@ -98,7 +98,7 @@ export class RawMaterialsService {
   async findAll(query: QueryRawMaterialsDto, userId?: string, accessToken?: string): Promise<RawMaterialListResponseDto> {
     this.logger.log('Fetching all raw materials', 'RawMaterialsService');
 
-    let queryBuilder = this.supabaseService
+    let queryBuilder = this.databaseService
       .getUserClient(accessToken)
       .from('raw_materials')
       .select('*', { count: 'exact' });
@@ -195,7 +195,7 @@ export class RawMaterialsService {
 
   /** Every process group <-> material group link (process_material_groups, migration 879). */
   async processMaterialGroups(accessToken?: string): Promise<Array<{ processGroup: string; materialGroup: string }>> {
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getUserClient(accessToken)
       .from('process_material_groups')
       .select('process_group, material_group')
@@ -206,7 +206,7 @@ export class RawMaterialsService {
 
   /** The material groups linked to a process group (process_material_groups, migration 879). */
   private async materialGroupsForProcess(processGroup: string, accessToken?: string): Promise<string[]> {
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getUserClient(accessToken)
       .from('process_material_groups')
       .select('material_group')
@@ -223,7 +223,7 @@ export class RawMaterialsService {
   ): Promise<T[]> {
     const keys = [...new Set(items.map((i) => i.materialGrade || i.material))];
     if (keys.length === 0) return items;
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getUserClient(accessToken)
       .rpc('material_stock_coverage', { p_keys: keys, p_location: 'USA' });
     if (error) throw new InternalServerErrorException(`Failed to read stock coverage: ${error.message}`);
@@ -241,7 +241,7 @@ export class RawMaterialsService {
     const wanted = [...new Set(names.map((n) => n.trim()).filter(Boolean))];
     const out: Record<string, string | null> = Object.fromEntries(wanted.map((n) => [n, null]));
     if (wanted.length === 0) return out;
-    const client = this.supabaseService.getUserClient(accessToken);
+    const client = this.databaseService.getUserClient(accessToken);
     const classesOf = new Map<string, Set<string | null>>();
     for (const column of ['grade', 'name'] as const) {
       const { data, error } = await readAllRows<{ grade: string | null; name: string | null; material_class: string | null }>(
@@ -270,7 +270,7 @@ export class RawMaterialsService {
 
     // Every row: one request is capped at 1000 rows and the table is larger.
     const { data, error } = await readAllRows<{ material_group: string | null; material_class: string | null; grade: string | null; name: string | null }>(
-      (from, to) => this.supabaseService
+      (from, to) => this.databaseService
         .getUserClient(accessToken)
         .from('raw_materials')
         .select('material_group, material_class, grade, name')
@@ -303,7 +303,7 @@ export class RawMaterialsService {
   async getProperties(id: string, accessToken: string): Promise<Array<{
     propertyKey: string; valueNum: number | null; valueText: string | null; unit: string | null; sourceVersion: string;
   }>> {
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getUserClient(accessToken)
       .from('raw_material_properties')
       .select('property_key, value_num, value_text, unit, source_version')
@@ -323,7 +323,7 @@ export class RawMaterialsService {
   async findOne(id: string, userId: string, accessToken: string): Promise<RawMaterialResponseDto> {
     this.logger.log(`Fetching raw material: ${id}`, 'RawMaterialsService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('raw_materials')
       .select('*')
@@ -341,7 +341,7 @@ export class RawMaterialsService {
   async create(createRawMaterialDto: CreateRawMaterialDto, userId: string, accessToken: string, organizationId: string): Promise<RawMaterialResponseDto> {
     this.logger.log('Creating raw material', 'RawMaterialsService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('raw_materials')
       .insert({
@@ -399,7 +399,7 @@ export class RawMaterialsService {
         'RawMaterialsService',
       );
       this.logger.error(
-        `Supabase error details: ${JSON.stringify(error)}`,
+        `Database error details: ${JSON.stringify(error)}`,
         'RawMaterialsService',
       );
       throw new InternalServerErrorException(
@@ -463,7 +463,7 @@ export class RawMaterialsService {
       organization_id: organizationId,
     }));
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('raw_materials')
       .insert(records)
@@ -541,7 +541,7 @@ export class RawMaterialsService {
 
     this.logger.debug(`Update data to be sent to database: ${JSON.stringify(updateData, null, 2)}`, 'RawMaterialsService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('raw_materials')
       .update(updateData)
@@ -562,7 +562,7 @@ export class RawMaterialsService {
 
     await this.findOne(id, userId, accessToken);
 
-    const { error } = await this.supabaseService
+    const { error } = await this.databaseService
       .getClient(accessToken)
       .from('raw_materials')
       .delete()
@@ -583,7 +583,7 @@ export class RawMaterialsService {
     // IS NULL) is never matched by the UPDATE/DELETE policy, so this can only
     // ever delete rows the caller's own organization created, never the
     // shared reference catalog or another org's rows.
-    const { count } = await this.supabaseService
+    const { count } = await this.databaseService
       .getClient(accessToken)
       .from('raw_materials')
       .select('*', { count: 'exact', head: true })
@@ -593,7 +593,7 @@ export class RawMaterialsService {
       return { message: 'No materials to delete', deleted: 0 };
     }
 
-    const { error } = await this.supabaseService
+    const { error } = await this.databaseService
       .getClient(accessToken)
       .from('raw_materials')
       .delete()
@@ -611,7 +611,7 @@ export class RawMaterialsService {
   async getGroupedByMaterialGroup(userId: string, accessToken: string): Promise<any> {
     this.logger.log('Fetching raw materials grouped by material group', 'RawMaterialsService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('raw_materials')
       .select('material_group, grade')
@@ -665,7 +665,7 @@ export class RawMaterialsService {
     // Use the reliable fallback approach directly
     this.logger.log('Using raw_materials table for enhanced materials', 'RawMaterialsService');
     
-    let queryBuilder = this.supabaseService
+    let queryBuilder = this.databaseService
       .getUserClient(accessToken)
       .from('raw_materials')
       .select('*', { count: 'exact' });

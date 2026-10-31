@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 
 import { BomFileAccess } from '../../../common/storage/bom-file-access';
 import { OBJECT_STORE, type ObjectStore } from '../../../common/storage/object-store';
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../common/database/database.service';
 import type { DrawingBrief } from '../dto/drawing-brief.dto';
 import { UNAVAILABLE_DRAWING_BRIEF } from '../dto/drawing-brief.dto';
 
@@ -19,7 +19,7 @@ const MAX_PDF_BYTES = 50 * 1024 * 1024;
  * Strategy:
  *   1. If bom_items.drawing_extraction already cached, return it (no cost).
  *   2. If file_2d_path is missing, return UNAVAILABLE_DRAWING_BRIEF.
- *   3. Otherwise: download PDF from Supabase Storage → base64-encode →
+ *   3. Otherwise: download PDF from the object store → base64-encode →
  *      send directly to the model as a PDF document (no pdf2pic / GraphicsMagick
  *      required — the model natively understands PDFs via the document content block).
  *
@@ -34,7 +34,7 @@ export class DrawingExtractorService {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly fileAccess: BomFileAccess,
     @Inject(OBJECT_STORE) private readonly objects: ObjectStore,
   ) {
@@ -332,7 +332,7 @@ Rules:
   // ── Cache ───────────────────────────────────────────────────────────────
 
   private async cacheOnBomItem(bomItemId: string, brief: DrawingBrief, accessToken: string | null): Promise<void> {
-    const client = this.supabaseService.getUserClient(accessToken ?? undefined);
+    const client = this.databaseService.getUserClient(accessToken ?? undefined);
     const { error } = await client
       .from('bom_items')
       .update({ drawing_extraction: brief })

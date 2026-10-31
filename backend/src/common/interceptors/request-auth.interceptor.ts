@@ -5,10 +5,10 @@ import { clientIp } from '../client-ip';
 import { runWithRequestAuth } from '../request-context/request-auth-context';
 
 /**
- * Opens the per-request auth scope read by SupabaseService.getUserClient().
+ * Opens the per-request auth scope read by DatabaseService.getUserClient().
  *
  * Interceptors run after guards, so request.accessToken / request.user are
- * already set by SupabaseAuthGuard. A request with no token (public route) simply
+ * already set by RequestAuthGuard. A request with no token (public route) simply
  * gets no scope, and getUserClient() then rejects: it never degrades to the
  * service-role client.
  *

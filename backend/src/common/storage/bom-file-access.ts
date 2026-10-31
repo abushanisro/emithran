@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { SupabaseService } from '../supabase/supabase.service';
+import { DatabaseService } from '../database/database.service';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -21,13 +21,13 @@ export function userIdFromVerifiedToken(accessToken: string | undefined): string
  */
 @Injectable()
 export class BomFileAccess {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   async canRead(key: string, accessToken: string | undefined): Promise<boolean> {
     const userId = userIdFromVerifiedToken(accessToken);
     const [owner, projectId, ...rest] = key.split('/');
     if (!userId || owner !== userId || !projectId || !UUID.test(projectId) || rest.length === 0 || key.includes('..')) return false;
-    const { data, error } = await this.supabase.getUserClient(accessToken).from('projects').select('id').eq('id', projectId).eq('user_id', userId).maybeSingle();
+    const { data, error } = await this.database.getUserClient(accessToken).from('projects').select('id').eq('id', projectId).eq('user_id', userId).maybeSingle();
     return !error && !!data;
   }
 }

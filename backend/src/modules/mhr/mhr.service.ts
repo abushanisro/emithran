@@ -1,7 +1,7 @@
-import { readAllRows, readAllRowsConcurrent } from '../../common/supabase/read-all-rows';
+import { readAllRows, readAllRowsConcurrent } from '../../common/database/read-all-rows';
 import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { Logger } from '../../common/logger/logger.service';
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { DatabaseService } from '../../common/database/database.service';
 import { CreateMHRDto, UpdateMHRDto, QueryMHRDto } from './dto/mhr.dto';
 import { MHRResponseDto, MHRListResponseDto, MHRCalculationResult, MHRReferenceDetailDto, MHRPickerRowDto, MHR_PICKER_COLUMNS, pickerRateUsdPerHour, type MHRPickerDbRow } from './dto/mhr-response.dto';
 import { validate as isValidUUID } from 'uuid';
@@ -39,7 +39,7 @@ export class MHRService {
   private readonly validator: MHRInputValidator;
 
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly logger: Logger,
     private readonly exchangeRateService: ExchangeRateService,
     private readonly lhrService: LHRService,
@@ -172,7 +172,7 @@ export class MHRService {
    * Response shape mirrors the subset of MHRRecord that the Process Cost dialog needs.
    */
   async getBenchmarkRates(location?: string, processGroup?: string, machineClass?: string) {
-    let query = this.supabaseService
+    let query = this.databaseService
       .getPrivilegedClient('reference-data: mhr_benchmark_rates, global shared, no user_id')
       .from('mhr_benchmark_rates')
       .select('id, machine_name, process_group, machine_class, location, mhr_usd, machine_ref')
@@ -229,7 +229,7 @@ export class MHRService {
    */
   async findPickerRows(location: string | undefined, accessToken?: string): Promise<MHRPickerRowDto[]> {
     const { data, error } = await readAllRowsConcurrent<MHRPickerDbRow>((from, to) => {
-      let q = this.supabaseService
+      let q = this.databaseService
         .getUserClient(accessToken)
         .from('mhr_records')
         // The total comes with the first page; the other pages are then read together.
@@ -251,7 +251,7 @@ export class MHRService {
     const batches: string[][] = [];
     for (let i = 0; i < unpriced.length; i += PICKER_ENGINE_BATCH) batches.push(unpriced.slice(i, i + PICKER_ENGINE_BATCH));
     // The batches are independent reads: together, not one after another.
-    const priced = await Promise.all(batches.map((ids) => this.supabaseService
+    const priced = await Promise.all(batches.map((ids) => this.databaseService
       .getUserClient(accessToken)
       .from('mhr_records')
       .select('*')
@@ -281,7 +281,7 @@ export class MHRService {
     // range is asked for (see POSTGREST_MAX_ROWS). Ordered by created_at then
     // id so pages never overlap or skip rows that share a created_at.
     const { data, error, count } = await readAllRows((rangeFrom, rangeTo) => {
-      let q = this.supabaseService
+      let q = this.databaseService
         .getUserClient(accessToken)
         .from('mhr_records')
         .select('*', { count: 'exact' })
@@ -350,7 +350,7 @@ export class MHRService {
       throw new BadRequestException('Invalid MHR record ID format');
     }
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('mhr_records')
       .select('*')
@@ -404,7 +404,7 @@ export class MHRService {
   ): Promise<{ direct: number | null; indirect: number | null; labor: number | null; sourceKey: string | null }> {
     const empty = { direct: null, indirect: null, labor: null, sourceKey: null };
     if (!machineName?.trim()) return empty;
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('sm_reference_data')
       .select('key, raw')
@@ -444,7 +444,7 @@ export class MHRService {
     if (!this.isValidUUID(id)) {
       throw new BadRequestException('Invalid MHR record ID format provided.');
     }
-    const { data: row, error: rowError } = await this.supabaseService
+    const { data: row, error: rowError } = await this.databaseService
       .getClient(accessToken)
       .from('mhr_records')
       .select('benchmark_source_key, machine_name, specs, location')
@@ -455,7 +455,7 @@ export class MHRService {
     }
 
     const empty: MHRReferenceDetailDto = { found: false, sourceKey: null, raw: null };
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     // One key is staged once per region (USA machine_library + 836's
     // India/China/Mexico/France rate rows), so this reads every row of the key
@@ -703,7 +703,7 @@ export class MHRService {
     };
     const hasCapability = Object.values(capability).some((v) => v != null);
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('mhr_records')
       .insert({
@@ -1073,7 +1073,7 @@ export class MHRService {
     updateData.total_variable_cost_per_hour = calculations.totalVariableCostPerHour;
     updateData.total_annual_cost = calculations.totalAnnualCost;
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('mhr_records')
       .update(updateData)
@@ -1125,7 +1125,7 @@ export class MHRService {
 
     await this.findOne(id, userId, accessToken);
 
-    const { error } = await this.supabaseService
+    const { error } = await this.databaseService
       .getClient(accessToken)
       .from('mhr_records')
       .delete()
@@ -1714,7 +1714,7 @@ export class MHRService {
 
     // Dedup by composite (machine_name, location, machine_class)
     // machine_class is needed for Combined format where same machine name exists at same location across process sequences
-    const client = this.supabaseService.getUserClient();
+    const client = this.databaseService.getUserClient();
     const { data: existing } = await readAllRows((from, to) => client
       .from('mhr_records')
       .select('machine_name, location, machine_class')
@@ -1820,7 +1820,7 @@ export class MHRService {
   async removeAll(userId: string, accessToken: string): Promise<{ deleted: number }> {
     this.logger.log(`Deleting all MHR records for user ${userId}`, 'MHRService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getUserClient()
       .from('mhr_records')
       .delete()
@@ -1955,7 +1955,7 @@ export class MHRService {
     accessToken: string,
     processGroup?: string,
   ): Promise<Array<{ category: string; machineClass: string | null }>> {
-    const { data, error } = await readAllRows((from, to) => this.supabaseService
+    const { data, error } = await readAllRows((from, to) => this.databaseService
       .getClient(accessToken)
       .from('mhr_records')
       .select('benchmark_source_key, machine_class, process_group, commodity_code')
@@ -2011,7 +2011,7 @@ export class MHRService {
    */
   /** Every process group with machines on file (process_group, set on every row). */
   async getDistinctProcessGroups(accessToken: string): Promise<string[]> {
-    const { data, error } = await readAllRows((from, to) => this.supabaseService
+    const { data, error } = await readAllRows((from, to) => this.databaseService
       .getClient(accessToken)
       .from('mhr_records')
       .select('process_group')
@@ -2029,7 +2029,7 @@ export class MHRService {
   }
 
   async getDistinctManufacturerCountries(accessToken: string): Promise<string[]> {
-    const { data, error } = await readAllRows((from, to) => this.supabaseService
+    const { data, error } = await readAllRows((from, to) => this.databaseService
       .getClient(accessToken)
       .from('mhr_records')
       .select('manufacturer_country')
@@ -2054,7 +2054,7 @@ export class MHRService {
   // let a user overwrite a real value with a fabricated one by picking the
   // only options offered.
   async getDistinctWageGrades(accessToken: string): Promise<string[]> {
-    const { data, error } = await readAllRows((from, to) => this.supabaseService
+    const { data, error } = await readAllRows((from, to) => this.databaseService
       .getClient(accessToken)
       .from('mhr_records')
       .select('wage_grade')
@@ -2077,7 +2077,7 @@ export class MHRService {
   // behavior) silently excluded every global location/currency from the filter
   // dropdown, even though findAll's own table happily returns those same rows.
   async getDistinctCurrencies(accessToken: string): Promise<string[]> {
-    const { data, error } = await readAllRows((from, to) => this.supabaseService
+    const { data, error } = await readAllRows((from, to) => this.databaseService
       .getClient(accessToken)
       .from('mhr_records')
       .select('currency')
@@ -2094,7 +2094,7 @@ export class MHRService {
   }
 
   async getDistinctLocations(accessToken: string): Promise<string[]> {
-    const { data, error } = await readAllRows((from, to) => this.supabaseService
+    const { data, error } = await readAllRows((from, to) => this.databaseService
       .getClient(accessToken)
       .from('mhr_records')
       .select('location')

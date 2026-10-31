@@ -8,7 +8,7 @@ import {
   ForbiddenException
 } from '@nestjs/common';
 import { FieldMappingService } from './services/field-mapping.service';
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { DatabaseService } from '../../common/database/database.service';
 import { Logger } from '../../common/logger/logger.service';
 import {
   CreateSupplierNominationDto,
@@ -53,7 +53,7 @@ import {
 @Injectable()
 export class SupplierNominationsService {
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly logger: Logger,
     private readonly fieldMapping: FieldMappingService,
     private readonly partWiseCostAnalysisService: PartWiseCostAnalysisService,
@@ -64,7 +64,7 @@ export class SupplierNominationsService {
     createDto: CreateSupplierNominationDto,
     accessToken: string
   ): Promise<SupplierNominationDto> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       // Create the nomination
@@ -148,7 +148,7 @@ export class SupplierNominationsService {
     projectId: string,
     accessToken: string
   ): Promise<SupplierNominationSummaryDto[]> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       const { data, error } = await client
@@ -195,7 +195,7 @@ export class SupplierNominationsService {
     nominationId: string,
     accessToken: string
   ): Promise<SupplierNominationDto> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       // Debug logging removed for production security
@@ -318,7 +318,7 @@ export class SupplierNominationsService {
     criteria: CreateCriteriaDto[],
     accessToken: string
   ): Promise<NominationCriteriaDto[]> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       // Verify ownership
@@ -363,7 +363,7 @@ export class SupplierNominationsService {
     updateDto: UpdateVendorEvaluationDto,
     accessToken: string
   ): Promise<VendorEvaluationDto> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       // Verify ownership through nomination
@@ -426,7 +426,7 @@ export class SupplierNominationsService {
     scores: CreateEvaluationScoreDto[],
     accessToken: string
   ): Promise<EvaluationScoreDto[]> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       // Verify ownership
@@ -513,7 +513,7 @@ export class SupplierNominationsService {
     nominationId: string,
     accessToken: string
   ): Promise<SupplierNominationDto> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       await this.verifyNominationOwnership(userId, nominationId, accessToken);
@@ -544,7 +544,7 @@ export class SupplierNominationsService {
     updateDto: Partial<CreateSupplierNominationDto>,
     accessToken: string
   ): Promise<SupplierNominationDto> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       await this.verifyNominationOwnership(userId, nominationId, accessToken);
@@ -584,7 +584,7 @@ export class SupplierNominationsService {
     nominationId: string,
     accessToken: string
   ): Promise<void> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       await this.verifyNominationOwnership(userId, nominationId, accessToken);
@@ -650,7 +650,7 @@ export class SupplierNominationsService {
     vendorIds: string[],
     accessToken: string
   ): Promise<VendorEvaluationDto[]> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     const evaluationData = vendorIds.map(vendorId => ({
       nomination_evaluation_id: nominationId,
@@ -694,7 +694,7 @@ export class SupplierNominationsService {
     nominationId: string,
     accessToken: string
   ): Promise<void> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     const { data } = await client
       .from('supplier_nomination_evaluations')
@@ -811,7 +811,7 @@ export class SupplierNominationsService {
     },
     accessToken: string
   ): Promise<any> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       // Get evaluation details
@@ -911,7 +911,7 @@ export class SupplierNominationsService {
     section: string,
     accessToken: string
   ): Promise<any> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       // Get evaluation details
@@ -953,7 +953,7 @@ export class SupplierNominationsService {
     sectionData: any,
     accessToken: string
   ): Promise<any> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       // Get evaluation details
@@ -1002,7 +1002,7 @@ export class SupplierNominationsService {
     vendorEvaluationId: string,
     accessToken: string
   ): Promise<any> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       // Get evaluation details
@@ -1047,7 +1047,7 @@ export class SupplierNominationsService {
     bomParts: any[],
     accessToken: string
   ): Promise<void> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     for (const bomPart of bomParts) {
       // Create BOM part record
@@ -1092,7 +1092,7 @@ export class SupplierNominationsService {
     nominationId: string,
     accessToken: string
   ): Promise<{ costFactor: number; developmentCostFactor: number; leadTimeFactor: number }> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       await this.verifyNominationOwnership(userId, nominationId, accessToken);
@@ -1124,7 +1124,7 @@ export class SupplierNominationsService {
     weights: { costFactor: number; developmentCostFactor: number; leadTimeFactor: number },
     accessToken: string
   ): Promise<boolean> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       await this.verifyNominationOwnership(userId, nominationId, accessToken);
@@ -1168,7 +1168,7 @@ export class SupplierNominationsService {
     totalScore: number;
     overallRank: number;
   }>> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       await this.verifyNominationOwnership(userId, nominationId, accessToken);
@@ -1202,7 +1202,7 @@ export class SupplierNominationsService {
     nominationId: string,
     accessToken: string
   ): Promise<boolean> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       await this.verifyNominationOwnership(userId, nominationId, accessToken);
@@ -1237,7 +1237,7 @@ export class SupplierNominationsService {
     overallRank: number;
     calculatedAt: string;
   }>> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       await this.verifyNominationOwnership(userId, nominationId, accessToken);
@@ -1296,7 +1296,7 @@ export class SupplierNominationsService {
     recommendation: string;
     approvalDate?: string;
   }>> {
-    const client = this.supabaseService.getUserClient(accessToken);
+    const client = this.databaseService.getUserClient(accessToken);
 
     try {
       // Build query to find approved vendors for this BOM part using the new relationship structure
@@ -1380,7 +1380,7 @@ export class SupplierNominationsService {
     nominationId: string,
     accessToken: string
   ): Promise<CostCompetencyAnalysisDto[]> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       await this.verifyNominationOwnership(userId, nominationId, accessToken);
@@ -1437,7 +1437,7 @@ export class SupplierNominationsService {
     nominationId: string,
     accessToken: string
   ): Promise<void> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       await this.verifyNominationOwnership(userId, nominationId, accessToken);
@@ -1477,7 +1477,7 @@ export class SupplierNominationsService {
     updateDto: BulkUpdateCostDataDto,
     accessToken: string
   ): Promise<CostCompetencyAnalysisDto[]> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       await this.verifyNominationOwnership(userId, nominationId, accessToken);
@@ -1552,7 +1552,7 @@ export class SupplierNominationsService {
     updateDto: UpdateCostValueDto,
     accessToken: string
   ): Promise<void> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       await this.verifyNominationOwnership(userId, nominationId, accessToken);
@@ -1590,7 +1590,7 @@ export class SupplierNominationsService {
     updateDto: { numericValue?: number; textValue?: string },
     accessToken: string
   ): Promise<void> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       await this.verifyNominationOwnership(userId, nominationId, accessToken);
@@ -1635,7 +1635,7 @@ export class SupplierNominationsService {
     nominationId: string,
     accessToken: string
   ): Promise<any> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       await this.verifyNominationOwnership(userId, nominationId, accessToken);
@@ -1672,7 +1672,7 @@ export class SupplierNominationsService {
     nominationId: string,
     accessToken: string
   ): Promise<void> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       await this.verifyNominationOwnership(userId, nominationId, accessToken);
@@ -1719,7 +1719,7 @@ export class SupplierNominationsService {
     score: number,
     accessToken: string
   ): Promise<void> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       await this.verifyNominationOwnership(userId, nominationId, accessToken);
@@ -1754,7 +1754,7 @@ export class SupplierNominationsService {
     }>,
     accessToken: string
   ): Promise<void> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       await this.verifyNominationOwnership(userId, nominationId, accessToken);
@@ -1790,7 +1790,7 @@ export class SupplierNominationsService {
     criteriaName: string,
     accessToken: string
   ): Promise<void> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       await this.verifyNominationOwnership(userId, nominationId, accessToken);
@@ -1828,7 +1828,7 @@ export class SupplierNominationsService {
     vendorId: string,
     accessToken: string
   ): Promise<VendorAssessmentCriteriaDto[]> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       await this.verifyNominationOwnership(userId, nominationId, accessToken);
@@ -1860,7 +1860,7 @@ export class SupplierNominationsService {
     vendorId: string,
     accessToken: string
   ): Promise<void> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       await this.verifyNominationOwnership(userId, nominationId, accessToken);
@@ -1901,7 +1901,7 @@ export class SupplierNominationsService {
     }>,
     accessToken: string
   ): Promise<void> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       await this.verifyNominationOwnership(userId, nominationId, accessToken);
@@ -1943,7 +1943,7 @@ export class SupplierNominationsService {
     updates: BatchAssessmentUpdateItemDto[],
     accessToken: string
   ): Promise<VendorAssessmentCriteriaDto[]> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       await this.verifyNominationOwnership(userId, nominationId, accessToken);
@@ -1990,7 +1990,7 @@ export class SupplierNominationsService {
     vendorId: string,
     accessToken: string
   ): Promise<VendorAssessmentMetricsDto> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       await this.verifyNominationOwnership(userId, nominationId, accessToken);
@@ -2035,7 +2035,7 @@ export class SupplierNominationsService {
     vendorId: string,
     accessToken: string
   ): Promise<VendorRatingMatrixDto[]> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       await this.verifyNominationOwnership(userId, nominationId, accessToken);
@@ -2084,7 +2084,7 @@ export class SupplierNominationsService {
     vendorId: string,
     accessToken: string
   ): Promise<VendorRatingMatrixDto[]> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       await this.verifyNominationOwnership(userId, nominationId, accessToken);
@@ -2132,7 +2132,7 @@ export class SupplierNominationsService {
     updateData: UpdateVendorRatingDto,
     accessToken: string
   ): Promise<void> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       await this.verifyNominationOwnership(userId, nominationId, accessToken);
@@ -2178,7 +2178,7 @@ export class SupplierNominationsService {
     updates: BatchVendorRatingUpdateItemDto[],
     accessToken: string
   ): Promise<VendorRatingMatrixDto[]> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
 
     try {
@@ -2336,7 +2336,7 @@ export class SupplierNominationsService {
     vendorId: string,
     accessToken: string
   ): Promise<VendorRatingOverallScoresDto> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       await this.verifyNominationOwnership(userId, nominationId, accessToken);

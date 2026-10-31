@@ -9,13 +9,13 @@
  */
 
 import { Module } from '@nestjs/common';
-import { SupabaseModule } from '../../common/supabase/supabase.module';
+import { DatabaseModule } from '../../common/database/database.module';
 import { ToolingCostController } from './controllers/tooling-cost.controller';
 import { ToolingCostService } from './services/tooling-cost.service';
 
 @Module({
   imports: [
-    SupabaseModule, // For database access
+    DatabaseModule, // For database access
   ],
   controllers: [
     ToolingCostController,

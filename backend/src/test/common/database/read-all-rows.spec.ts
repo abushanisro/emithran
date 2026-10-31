@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { readAllRows, readAllRowsConcurrent, POSTGREST_MAX_ROWS, type RowPage } from '../../../common/supabase/read-all-rows';
+import { readAllRows, readAllRowsConcurrent, POSTGREST_MAX_ROWS, type RowPage } from '../../../common/database/read-all-rows';
 
 // A table read the way PostgREST serves it: `.range(from, to)` honoured, but
 // never more than POSTGREST_MAX_ROWS rows in one response.

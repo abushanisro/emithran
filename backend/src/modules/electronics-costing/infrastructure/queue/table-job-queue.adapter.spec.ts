@@ -3,7 +3,7 @@ import { ELECTRONICS_QUEUES } from './job-queue.port';
 
 type Rpc = { data?: unknown; error?: { message: string } | null };
 
-// A fake of the Supabase client: rpc() answers from a script, from() serves one canned row. The real SQL is covered by
+// A fake of the PostgREST client: rpc() answers from a script, from() serves one canned row. The real SQL is covered by
 // test/sql/job_queue.test.sql; these cover what the adapter does around it.
 function fake(rpcAnswers: Record<string, Rpc[]>, row: { data: unknown; error?: unknown } = { data: null }) {
   const calls: Array<[string, unknown]> = [];

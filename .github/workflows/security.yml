@@ -116,7 +116,7 @@ jobs:
           cache: npm
       - run: npm ci
       # Fails if a later edit weakens the compose hardening, un-pins an image, or lets an env file into a build context.
-      - run: npx vitest run test/deploy test/lib/supabase
+      - run: npx vitest run test/deploy
 
   codeql:
     name: CodeQL (${{ matrix.language }})

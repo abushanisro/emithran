@@ -1,7 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import { SupabaseModule } from '../supabase/supabase.module';
+import { DatabaseModule } from '../database/database.module';
 import { BomFileAccess } from './bom-file-access';
 import { OBJECT_STORE, type ObjectStore } from './object-store';
 import { S3ObjectStore } from './s3-object-store';
@@ -9,7 +9,7 @@ import { S3ObjectStore } from './s3-object-store';
 /** The one ObjectStore for the app: an S3-compatible bucket (AWS S3, Cloudflare R2, MinIO, SeaweedFS). */
 @Global()
 @Module({
-  imports: [SupabaseModule],
+  imports: [DatabaseModule],
   providers: [
     BomFileAccess,
     {

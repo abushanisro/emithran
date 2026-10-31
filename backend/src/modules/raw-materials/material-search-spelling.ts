@@ -24,8 +24,8 @@
 //     of the identical root cause.
 //
 // Module-level, pure, exported functions (not private class methods) so
-// they are independently unit-testable with zero Supabase/DB mocking —
-// this project's standing rule against new mocked-Supabase test files
+// they are independently unit-testable with zero database mocking —
+// this project's standing rule against new mocked-database test files
 // means logic like this must live outside the injectable class to get real
 // test coverage at all.
 export const MATERIAL_SEARCH_SPELLING_VARIANTS: ReadonlyArray<readonly [string, string]> = [

@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../common/database/database.service';
 import {
   LASER_SPEED_MM_PER_MIN,
   LASER_PIERCE_SEC,
@@ -33,7 +33,7 @@ export class CycleTimeLibraryService implements OnModuleInit {
 
   private loaded = false;
 
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   async onModuleInit(): Promise<void> {
     try {
@@ -48,7 +48,7 @@ export class CycleTimeLibraryService implements OnModuleInit {
 
   private async load(): Promise<void> {
     // RLS on process_cycle_time_library is FOR SELECT USING (true) — safe with admin client.
-    const client = this.supabase.getPrivilegedClient('reference-data: process_cycle_time_library');
+    const client = this.database.getPrivilegedClient('reference-data: process_cycle_time_library');
     const { data, error } = await client
       .from('process_cycle_time_library')
       .select(
@@ -62,7 +62,7 @@ export class CycleTimeLibraryService implements OnModuleInit {
 
     let laserRows = 0, brakeRows = 0, mrrRows = 0;
     for (const raw of data ?? []) {
-      // Supabase JS client returns loosely-typed rows; cast to any for property access.
+      // The PostgREST client returns loosely-typed rows; cast to any for property access.
       const row = raw as any;
       const base = parseFloat(row.cycle_time_base);
       if (!Number.isFinite(base) || base <= 0) continue;

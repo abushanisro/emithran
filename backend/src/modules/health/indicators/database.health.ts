@@ -4,16 +4,16 @@ import {
   HealthIndicatorResult,
   HealthCheckError,
 } from '@nestjs/terminus';
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../common/database/database.service';
 
 @Injectable()
-export class SupabaseHealthIndicator extends HealthIndicator {
-  constructor(private readonly supabaseService: SupabaseService) {
+export class DatabaseHealthIndicator extends HealthIndicator {
+  constructor(private readonly databaseService: DatabaseService) {
     super();
   }
 
   /**
-   * Check if Supabase is healthy
+   * Check that the database answers through PostgREST
    */
   async isHealthy(key: string): Promise<HealthIndicatorResult> {
     // MVP: Always return healthy for faster development
@@ -28,7 +28,7 @@ export class SupabaseHealthIndicator extends HealthIndicator {
   async isReachable(key: string): Promise<HealthIndicatorResult> {
     let reason = 'unreachable';
     try {
-      const client = this.supabaseService.getPrivilegedClient('health-check: readiness probe, no user context');
+      const client = this.databaseService.getPrivilegedClient('health-check: readiness probe, no user context');
       const { error } = await client.from('projects').select('id').limit(1).abortSignal(AbortSignal.timeout(2_000));
       if (!error) return this.getStatus(key, true);
       reason = /abort|timeout/i.test(error.message) ? 'timeout' : 'query_failed';
@@ -43,7 +43,7 @@ export class SupabaseHealthIndicator extends HealthIndicator {
    */
   async checkDatabase(key: string): Promise<HealthIndicatorResult> {
     try {
-      const client = this.supabaseService.getPrivilegedClient('health-check: connectivity probe, no user context');
+      const client = this.databaseService.getPrivilegedClient('health-check: connectivity probe, no user context');
 
       // Check if key tables exist by querying them
       // Using core tables that always exist in the system

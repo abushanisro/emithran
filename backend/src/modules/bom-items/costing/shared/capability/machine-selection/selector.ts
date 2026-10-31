@@ -10,8 +10,8 @@
 //
 // No Euclidean distance anywhere — all fit ratios are normalized and dimensionless.
 
-import { readAllRows, type RowPage } from '../../../../../../common/supabase/read-all-rows';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import { readAllRows, type RowPage } from '../../../../../../common/database/read-all-rows';
+import type { DbClient } from '../../../../../../common/db/postgrest-client';
 import {
   MACHINE_REGISTRY,
   type MachineClass,
@@ -379,7 +379,7 @@ function parseTonnageFromName(name: string | null | undefined): number | null {
 // ── Pool fetch ────────────────────────────────────────────────────────────────
 
 export async function fetchMachinePool(
-  client: SupabaseClient,
+  client: DbClient,
   location: string,
 ): Promise<MachineCandidate[]> {
   const cached = getCachedMachinePool(location);

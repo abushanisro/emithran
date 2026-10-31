@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ExchangeRateService } from './exchange-rate.service';
-import { SupabaseModule } from '../supabase/supabase.module';
+import { DatabaseModule } from '../database/database.module';
 
 @Module({
-  imports: [SupabaseModule],
+  imports: [DatabaseModule],
   providers: [ExchangeRateService],
   exports: [ExchangeRateService],
 })
