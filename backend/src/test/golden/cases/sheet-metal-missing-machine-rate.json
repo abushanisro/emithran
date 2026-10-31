@@ -1,0 +1,83 @@
+{
+  "engine": "computeCostSummary",
+  "description": "Counterbores on a part whose drill press has no HR Rates row: the operation is not costed and is named in a warning.",
+  "input": {
+    "sheetThicknessMm": 2,
+    "cutLengthMm": 400,
+    "pierceCount": 3,
+    "bendCount": 1,
+    "flatPatternAreaMm2": 10000,
+    "holeCount": 2,
+    "materialGrade": "CRCA",
+    "materialCostPerKg": 60,
+    "materialDensityKgM3": 7850,
+    "materialSource": "db",
+    "threads": [],
+    "batchSize": 100,
+    "family": "sheet_metal",
+    "directLaborRatePerHr": 300,
+    "qaInspectorRatePerHr": 350,
+    "laserCycleTimeSecFromCalculator": 45,
+    "laserCalculatorId": "test-laser-calculator-id",
+    "laserCalculatorVersion": 1,
+    "pressBrakeCycleTimeSecFromCalculator": 20,
+    "pressBrakeCalculatorId": "test-press-brake-calculator-id",
+    "pressBrakeCalculatorVersion": 1,
+    "deburrCycleTimeSecFromCalculator": 30,
+    "deburrCalculatorId": "test-deburr-calculator-id",
+    "deburrCalculatorVersion": 1,
+    "mhrRates": {
+      "laser": {
+        "rate": 1200,
+        "source": "mhr_database",
+        "machineClass": "fiber_laser",
+        "machineName": "Test fiber_laser",
+        "commodityCode": null
+      },
+      "pressBrake": {
+        "rate": 800,
+        "source": "mhr_database",
+        "machineClass": "press_brake",
+        "machineName": "Test press_brake",
+        "commodityCode": null
+      },
+      "deburring": {
+        "rate": 300,
+        "source": "mhr_database",
+        "machineClass": "deburring",
+        "machineName": "Test deburring",
+        "commodityCode": null
+      },
+      "tapping": {
+        "rate": 900,
+        "source": "mhr_database",
+        "machineClass": "tapping",
+        "machineName": "Test tapping",
+        "commodityCode": null
+      },
+      "pemPress": {
+        "rate": 500,
+        "source": "mhr_database",
+        "machineClass": "pem_press",
+        "machineName": "Test pem_press",
+        "commodityCode": null
+      },
+      "holeForming": {
+        "rate": 500,
+        "source": "mhr_database",
+        "machineClass": "hole_forming",
+        "machineName": "Test hole_forming",
+        "commodityCode": null
+      },
+      "inspection": {
+        "rate": 450,
+        "source": "mhr_database",
+        "machineClass": "cmm",
+        "machineName": "Test cmm",
+        "commodityCode": null
+      }
+    },
+    "counterboreCount": 2,
+    "counterboreCycleTimeSecFromCalculator": 20
+  }
+}

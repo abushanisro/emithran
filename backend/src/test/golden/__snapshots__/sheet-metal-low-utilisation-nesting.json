@@ -1,0 +1,145 @@
+{
+  "materialCost": 0.09,
+  "materialGrade": "CRCA",
+  "grossWeightKg": 0.079,
+  "materialCostPerKg": 60,
+  "materialSource": "db",
+  "processLines": [
+    {
+      "process": "Laser Cutting",
+      "setupCost": 0.06,
+      "runCost": 18.75,
+      "totalCost": 19.19,
+      "cycleTimeMin": 0.75,
+      "setupTimeMin": 0.25,
+      "setupTimeSource": "operation_lookup",
+      "hourlyRate": 1200,
+      "rateSource": "mhr_database",
+      "machineClass": "fiber_laser",
+      "machineName": "Test fiber_laser",
+      "commodityCode": null,
+      "labourRate": null,
+      "calculatorId": "test-laser-calculator-id",
+      "calculatorVersion": 1
+    },
+    {
+      "process": "Press Brake",
+      "setupTimeMin": 0,
+      "setupTimeSource": "none",
+      "setupCost": 0,
+      "runCost": 6.11,
+      "totalCost": 6.24,
+      "cycleTimeMin": 0.333,
+      "hourlyRate": 800,
+      "rateSource": "mhr_database",
+      "machineClass": "press_brake",
+      "machineName": "Test press_brake",
+      "commodityCode": null,
+      "labourRate": null,
+      "labourRateSource": null,
+      "calculatorId": "test-press-brake-calculator-id",
+      "calculatorVersion": 1
+    },
+    {
+      "process": "Deburring",
+      "setupTimeMin": 0,
+      "setupCost": 0,
+      "runCost": 5,
+      "totalCost": 5.1,
+      "cycleTimeMin": 0.5,
+      "hourlyRate": 300,
+      "rateSource": "mhr_database",
+      "machineClass": "deburring",
+      "machineName": "Test deburring",
+      "commodityCode": null,
+      "labourRate": null,
+      "labourRateSource": null,
+      "calculatorId": "test-deburr-calculator-id",
+      "calculatorVersion": 1
+    }
+  ],
+  "totalProcessCost": 30.53,
+  "totalCost": 30.62,
+  "cycleTimes": {
+    "laserMin": 0.75,
+    "pressBrakeMin": 0.333,
+    "tappingMin": 0,
+    "deburrMin": 0.5,
+    "totalMin": 1.583
+  },
+  "batchSize": 100,
+  "family": "sheet_metal",
+  "warnings": [
+    "No factory location set — rates cannot be location-adjusted; configure your digital factory location in Settings",
+    "Material utilisation 48.5% (672 parts/sheet on 1500×3000mm, true-shape nest) -- below the 75% guideline. This can be normal for an irregular flat pattern and is already reflected in the material cost; panel nesting may improve yield if the geometry allows it.",
+    "Press Brake: setup not costed — no calculator setup time, no real per-machine setup_time_hr for Test press_brake in HR Rates, and no sm_lookup_op_setup_time row."
+  ],
+  "ratesSource": "Location benchmark rates v2 (2026)",
+  "sustainability": {
+    "netWeightKg": 0.157,
+    "scrapKg": -0.078,
+    "wasteCostInr": -4.68,
+    "materialUtilizationPct": 198.73,
+    "materialCo2Kg": 0.146,
+    "materialCo2PerKg": 1.85,
+    "materialCo2Source": "lookup",
+    "processCo2Breakdown": [
+      {
+        "process": "Laser Cutting",
+        "machineClass": "fiber_laser",
+        "energyKwh": 0.15,
+        "co2Kg": 0.107
+      },
+      {
+        "process": "Press Brake",
+        "machineClass": "press_brake",
+        "energyKwh": 0.025,
+        "co2Kg": 0.018
+      },
+      {
+        "process": "Deburring",
+        "machineClass": "deburring",
+        "energyKwh": 0.006,
+        "co2Kg": 0.004
+      }
+    ],
+    "totalProcessEnergyKwh": 0.181,
+    "totalProcessCo2Kg": 0.129,
+    "totalCo2Kg": 0.275,
+    "co2PerKgPart": 1.752,
+    "co2Contributors": [
+      {
+        "label": "Material Production",
+        "co2Kg": 0.146,
+        "pct": 53.09
+      },
+      {
+        "label": "Laser Cutting",
+        "co2Kg": 0.107,
+        "pct": 38.91
+      },
+      {
+        "label": "Press Brake",
+        "co2Kg": 0.018,
+        "pct": 6.55
+      },
+      {
+        "label": "Deburring",
+        "co2Kg": 0.004,
+        "pct": 1.45
+      }
+    ],
+    "recyclabilityPct": 95,
+    "sustainabilityScore": 100,
+    "scoreBreakdown": {
+      "materialEfficiency": 59.6,
+      "carbonIntensity": 24.7,
+      "recyclability": 19,
+      "processEnergy": 19.3
+    },
+    "opportunities": [
+      "No significant improvement opportunities identified at current parameters"
+    ],
+    "factorsSource": "Sustainability factors v1 (India 2026, CEA 2023)"
+  }
+}
