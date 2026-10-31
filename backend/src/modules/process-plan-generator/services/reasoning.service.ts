@@ -175,7 +175,7 @@ export class ReasoningService {
             userId: input.userId,
             accessToken: input.accessToken,
             family: input.brief.scope.family as Exclude<typeof input.brief.scope.family, 'out_of_scope'>,
-            orgLocation: input.brief.context.organizationLocation,
+            orgLocation: input.brief.context.organizationLocation ?? '', // unknown location: no location preference (disclosed in brief.context.warnings)
             currentCandidates: out.candidatesAfterExpansion,
             dfm: input.brief.dfm,
           });

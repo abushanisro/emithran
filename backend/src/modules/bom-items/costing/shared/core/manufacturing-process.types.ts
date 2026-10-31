@@ -136,7 +136,7 @@ export interface CuttingProcessContext {
   // never hardcoded by an engine. Absent means the caller couldn't resolve
   // one; engines must not fabricate processGroup/processRoute/operation.
   processIdentity?: { processGroup: string; processRoute: string; operation: string };
-  abrasivePricePerKg?: number;
+  abrasivePricePerKg?: number | null; // null: no consumable_prices row — the engine warns, never prices it silently at 0
   oxyfuelParams?: OxyfuelParams | null;
   routerParams?: RouterParams | null;
   laserPunchParams?: LaserPunchParams | null;

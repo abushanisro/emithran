@@ -23,7 +23,7 @@ describe('computePressStrokeCost — Shearing (real shear_speed-derived cycle ti
   it('computes cycle time as SHEARING_CUTS_PER_BLANK real strokes, no fabricated single-cut assumption', () => {
     const result = computePressStrokeCost('Shearing', 'shear', {
       numberOfStrokes: SHEARING_CUTS_PER_BLANK,
-      batchSize: 100,
+      batchSize: 100, yieldPct: 0.98, // every input on file, yield included: no warnings
       pressRate: realShearRate(),
       setupMin: 22.8,
     });

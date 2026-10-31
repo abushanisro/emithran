@@ -134,7 +134,9 @@
   "batchSize": 100,
   "family": "sheet_metal",
   "warnings": [
+    "Yield: no process yield on file — 98% yield assumed (DEFAULT_YIELD_PCT) for the yield-loss cost",
     "No factory location set — rates cannot be location-adjusted; configure your digital factory location in Settings",
+    "Laser setup: nesting has not run — 4 parts per sheet ASSUMED for sheet-handling setup time; run nesting for the real count",
     "Counterboring: setup not costed — no calculator setup time, no real per-machine setup_time_hr for Test drill_press in HR Rates, and no sm_lookup_op_setup_time row.",
     "Countersinking: setup not costed — no calculator setup time, no real per-machine setup_time_hr for Test drill_press in HR Rates, and no sm_lookup_op_setup_time row.",
     "PEM Insertion: setup not costed — no calculator setup time, no real per-machine setup_time_hr for Test pem_press in HR Rates, and no sm_lookup_op_setup_time row.",
@@ -157,43 +159,50 @@
         "process": "Laser Cutting",
         "machineClass": "fiber_laser",
         "energyKwh": 0.15,
-        "co2Kg": 0.107
+        "co2Kg": 0.107,
+        "energySource": "lookup"
       },
       {
         "process": "Press Brake",
         "machineClass": "press_brake",
         "energyKwh": 0.025,
-        "co2Kg": 0.018
+        "co2Kg": 0.018,
+        "energySource": "lookup"
       },
       {
         "process": "Deburring",
         "machineClass": "deburring",
         "energyKwh": 0.006,
-        "co2Kg": 0.004
+        "co2Kg": 0.004,
+        "energySource": "lookup"
       },
       {
         "process": "Counterboring",
         "machineClass": "drill_press",
         "energyKwh": 0.044,
-        "co2Kg": 0.032
+        "co2Kg": 0.032,
+        "energySource": "default"
       },
       {
         "process": "Countersinking",
         "machineClass": "drill_press",
         "energyKwh": 0.047,
-        "co2Kg": 0.034
+        "co2Kg": 0.034,
+        "energySource": "default"
       },
       {
         "process": "PEM Insertion",
         "machineClass": "pem_press",
         "energyKwh": 0.011,
-        "co2Kg": 0.008
+        "co2Kg": 0.008,
+        "energySource": "default"
       },
       {
         "process": "Reaming",
         "machineClass": "drill_press",
         "energyKwh": 0,
-        "co2Kg": 0
+        "co2Kg": 0,
+        "energySource": "default"
       }
     ],
     "totalProcessEnergyKwh": 0.283,

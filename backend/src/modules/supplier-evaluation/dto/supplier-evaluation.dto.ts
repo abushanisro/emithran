@@ -391,6 +391,12 @@ export class SupplierEvaluationResponseDto {
   @ApiPropertyOptional({ description: 'Overall weighted score' })
   overallWeightedScore?: number;
 
+  @ApiPropertyOptional({
+    description: 'Defaults the weighted score used (no weights row on file, no technical max score); absent when every input was stored',
+    type: [String],
+  })
+  weightedScoreAssumptions?: string[];
+
   // Status
   @ApiProperty({ description: 'Evaluation status', enum: EvaluationStatus })
   status: EvaluationStatus;

@@ -43,7 +43,34 @@ interface User {
   id: string;
 }
 
-const MAX_FILES_PER_UPLOAD = 30;
+export const MAX_FILES_PER_UPLOAD = 30;
+// Same bound as StartUploadDto.paths' @MaxLength — re-checked here, where it is used.
+const MAX_PATHS_LENGTH = 60000;
+
+/**
+ * The uploaded files, checked as what they must be: an array of 1 to
+ * MAX_FILES_PER_UPLOAD multer files. Explicit here (not only trusted to multer)
+ * because the count bounds the loops below and a tampered request must not be
+ * able to change its type.
+ */
+export function checkedUploadFiles(files: unknown): Express.Multer.File[] {
+  if (!Array.isArray(files) || files.length === 0) throw new BadRequestException('files is required');
+  if (files.length > MAX_FILES_PER_UPLOAD) throw new BadRequestException(`at most ${MAX_FILES_PER_UPLOAD} files per upload`);
+  for (const f of files) {
+    if (typeof f !== 'object' || f === null || typeof (f as { originalname?: unknown }).originalname !== 'string' || !Buffer.isBuffer((f as { buffer?: unknown }).buffer)) {
+      throw new BadRequestException('files must be uploaded files');
+    }
+  }
+  return files as Express.Multer.File[];
+}
+
+/** The `paths` form field: absent, or one string of bounded length — never an array or object from a tampered form. */
+export function checkedUploadPaths(paths: unknown): string | undefined {
+  if (paths === undefined) return undefined;
+  if (typeof paths !== 'string') throw new BadRequestException('paths must be a JSON string');
+  if (paths.length > MAX_PATHS_LENGTH) throw new BadRequestException(`paths must be at most ${MAX_PATHS_LENGTH} characters`);
+  return paths;
+}
 
 // A stored cost result as the screen reads it. Column names are mapped here, once; numeric columns arrive as strings
 // from PostgREST when they are numeric, so the per-unit cost is turned back into a number.
@@ -107,7 +134,8 @@ export class ElectronicsController {
     @AccessToken() token: string,
     @CurrentOrganization() organizationId: string,
   ): Promise<StartUploadResult | StartAssemblyResult> {
-    if (!files || files.length === 0) throw new BadRequestException('files is required');
+    files = checkedUploadFiles(files);
+    const paths = checkedUploadPaths(body.paths);
     const archive = files.length === 1 && files[0] && isArchiveName(files[0].originalname) ? files[0] : null;
     if (archive) {
       // A design pack: unpacked and read as the folder it was made from (one board, or an assembly of several).
@@ -122,8 +150,8 @@ export class ElectronicsController {
         token,
       });
     }
-    if (body.paths !== undefined) {
-      const parsed = parseUploadPaths(body.paths, files.length, files.map((f) => f.originalname));
+    if (paths !== undefined) {
+      const parsed = parseUploadPaths(paths, files.length, files.map((f) => f.originalname));
       if (!parsed.ok) throw new BadRequestException(parsed.message);
       if (isFolderUpload(parsed.paths)) {
         return this.startAssembly.execute({

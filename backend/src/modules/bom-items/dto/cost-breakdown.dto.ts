@@ -18,6 +18,9 @@ export interface ProcessCO2 {
   machineClass: string;  // "fiber_laser"
   energyKwh: number;
   co2Kg: number;
+  // lookup: ENERGY_KWH_PER_HR has this machine class; default: it does not, and
+  // DEFAULT_ENERGY_KWH_PER_HR was assumed (same convention as materialCo2Source).
+  energySource: 'lookup' | 'default';
 }
 
 interface CO2Contributor {

@@ -34,7 +34,7 @@ describe('computeRollBendingCost — real rolling-speed-derived cycle time', () 
   it('computes cycle time as rollFeedLengthMm / real rollingSpeedMmPerSec for a 2-Roll machine (no prebend step)', () => {
     const result = computeRollBendingCost('2 Roll Bending', 'roll_bending_2', {
       rollFeedLengthMm: 2200,
-      batchSize: 5,
+      batchSize: 5, yieldPct: 0.98, // every input on file, yield included: no warnings
       rollBendingRate: realRoll2Rate(),
       rollingSpeedMmPerSec: 110,
       setupMin: 30,
@@ -76,7 +76,7 @@ describe('computeRollBendingCost — real rolling-speed-derived cycle time', () 
   it('does not warn about missing rolling-speed data when there is no real feed length at all', () => {
     const result = computeRollBendingCost('2 Roll Bending', 'roll_bending_2', {
       rollFeedLengthMm: 0,
-      batchSize: 5,
+      batchSize: 5, yieldPct: 0.98,
       rollBendingRate: realRoll2Rate(),
       setupMin: 30,
     });
