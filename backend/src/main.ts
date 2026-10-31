@@ -25,6 +25,7 @@ import { RequestAuthInterceptor } from './common/interceptors/request-auth.inter
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { Logger } from './common/logger/logger.service';
 import { DatabaseService } from './common/database/database.service';
+import { isAllowedCorsOrigin } from './common/cors-origins';
 import { CorrelatedConsoleLogger } from './telemetry/correlated-console-logger';
 import { FileErrorConsoleLogger } from './common/logger/file-error-console-logger';
 import { startErrorLogCleanup } from './common/logger/error-log-file';
@@ -89,22 +90,14 @@ async function bootstrap() {
 
   app.enableCors({
     origin: (requestOrigin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-      const allowedOrigins = [
-        configService.get('CORS_ORIGIN', 'http://localhost:3000'),
-        'http://localhost:3000',
-        'http://127.0.0.1:3000',
-        // Railway public domain (automatically available in production)
-        process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : null,
-      ].filter(Boolean);
-      const isVercelApp = requestOrigin?.match(/^https:\/\/mithran(-[a-z0-9]+)?\.vercel\.app$/);
-      const isEmithranApp = requestOrigin?.match(/^https:\/\/([a-z0-9-]+\.)?emithran\.com$/);
-      // Exact match only — a prefix match (e.g. via startsWith) would also let through
-      // an origin like "http://localhost:3000.attacker.example".
-      if (!requestOrigin || isVercelApp || isEmithranApp || allowedOrigins.includes(requestOrigin)) {
-        callback(null, true);
-      } else {
-        callback(null, false);
-      }
+      callback(
+        null,
+        isAllowedCorsOrigin(requestOrigin, {
+          nodeEnv: process.env.NODE_ENV,
+          corsOrigin: configService.get<string>('CORS_ORIGIN'),
+          railwayPublicDomain: process.env.RAILWAY_PUBLIC_DOMAIN,
+        }),
+      );
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],

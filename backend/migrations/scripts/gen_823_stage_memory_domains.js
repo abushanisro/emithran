@@ -235,7 +235,7 @@ for (const st of statements) {
 }
 if (cur.length) parts.push(cur);
 
-for (const old of fs.readdirSync(path.dirname(OUT_PREFIX)).filter((n) => new RegExp(`^${STAGED_BY}_stage_memory_domains.*\\.sql$`).test(n))) {
+for (const old of fs.readdirSync(path.dirname(OUT_PREFIX)).filter((n) => n.startsWith(`${STAGED_BY}_stage_memory_domains`) && n.endsWith('.sql'))) {
   fs.unlinkSync(path.join(path.dirname(OUT_PREFIX), old));
 }
 parts.forEach((p, i) => {

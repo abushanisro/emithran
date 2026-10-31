@@ -1,5 +1,11 @@
 """STEP fixtures built with OpenCascade XDE, so assembly tests run against real files."""
+import os
+
 import pytest
+
+# The engine refuses every protected route without a key (main.require_api_key), and reads it once at import: set it before
+# any test module imports main.
+os.environ.setdefault("CAD_ENGINE_API_KEY", "test-key-for-the-cad-engine-tests")
 from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeCylinder
 from OCC.Core.gp import gp_Trsf, gp_Vec
 from OCC.Core.IFSelect import IFSelect_RetDone
