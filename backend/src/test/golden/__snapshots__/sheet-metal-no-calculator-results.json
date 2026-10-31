@@ -1,0 +1,141 @@
+{
+  "materialCost": 9.89,
+  "materialGrade": "CRCA",
+  "grossWeightKg": 0.165,
+  "materialCostPerKg": 60,
+  "materialSource": "db",
+  "processLines": [
+    {
+      "process": "Laser Cutting",
+      "setupCost": 1.56,
+      "runCost": 0,
+      "totalCost": 1.79,
+      "cycleTimeMin": 0,
+      "setupTimeMin": 6.25,
+      "setupTimeSource": "operation_lookup",
+      "hourlyRate": 1200,
+      "rateSource": "mhr_database",
+      "machineClass": "fiber_laser",
+      "machineName": "Test fiber_laser",
+      "commodityCode": null,
+      "labourRate": null
+    },
+    {
+      "process": "Press Brake",
+      "setupTimeMin": 0,
+      "setupTimeSource": "none",
+      "setupCost": 0,
+      "runCost": 0,
+      "totalCost": 0.2,
+      "cycleTimeMin": 0,
+      "hourlyRate": 800,
+      "rateSource": "mhr_database",
+      "machineClass": "press_brake",
+      "machineName": "Test press_brake",
+      "commodityCode": null,
+      "labourRate": null,
+      "labourRateSource": null
+    },
+    {
+      "process": "Deburring",
+      "setupTimeMin": 0,
+      "setupCost": 0,
+      "runCost": 0,
+      "totalCost": 0.2,
+      "cycleTimeMin": 0,
+      "hourlyRate": 300,
+      "rateSource": "mhr_database",
+      "machineClass": "deburring",
+      "machineName": "Test deburring",
+      "commodityCode": null,
+      "labourRate": null,
+      "labourRateSource": null
+    }
+  ],
+  "totalProcessCost": 2.19,
+  "totalCost": 12.08,
+  "cycleTimes": {
+    "laserMin": 0,
+    "pressBrakeMin": 0,
+    "tappingMin": 0,
+    "deburrMin": 0,
+    "totalMin": 0
+  },
+  "batchSize": 100,
+  "family": "sheet_metal",
+  "warnings": [
+    "No factory location set — rates cannot be location-adjusted; configure your digital factory location in Settings",
+    "Laser cutting cycle time unavailable — no calculator result and no reported gap (unexpected; check resolvePhysicsQuantity).",
+    "Deburring cycle time unavailable — no calculator result and no reported gap (unexpected; check resolvePhysicsQuantity).",
+    "Press brake cycle time unavailable — no calculator result and no reported gap (unexpected; check resolvePhysicsQuantity).",
+    "Press Brake: setup not costed — no calculator setup time, no real per-machine setup_time_hr for Test press_brake in HR Rates, and no sm_lookup_op_setup_time row."
+  ],
+  "ratesSource": "Location benchmark rates v2 (2026)",
+  "sustainability": {
+    "netWeightKg": 0.157,
+    "scrapKg": 0.008,
+    "wasteCostInr": 0.48,
+    "materialUtilizationPct": 95.24,
+    "materialCo2Kg": 0.305,
+    "materialCo2PerKg": 1.85,
+    "materialCo2Source": "lookup",
+    "processCo2Breakdown": [
+      {
+        "process": "Laser Cutting",
+        "machineClass": "fiber_laser",
+        "energyKwh": 0,
+        "co2Kg": 0
+      },
+      {
+        "process": "Press Brake",
+        "machineClass": "press_brake",
+        "energyKwh": 0,
+        "co2Kg": 0
+      },
+      {
+        "process": "Deburring",
+        "machineClass": "deburring",
+        "energyKwh": 0,
+        "co2Kg": 0
+      }
+    ],
+    "totalProcessEnergyKwh": 0,
+    "totalProcessCo2Kg": 0,
+    "totalCo2Kg": 0.305,
+    "co2PerKgPart": 1.943,
+    "co2Contributors": [
+      {
+        "label": "Material Production",
+        "co2Kg": 0.305,
+        "pct": 100
+      },
+      {
+        "label": "Laser Cutting",
+        "co2Kg": 0,
+        "pct": 0
+      },
+      {
+        "label": "Press Brake",
+        "co2Kg": 0,
+        "pct": 0
+      },
+      {
+        "label": "Deburring",
+        "co2Kg": 0,
+        "pct": 0
+      }
+    ],
+    "recyclabilityPct": 95,
+    "sustainabilityScore": 92,
+    "scoreBreakdown": {
+      "materialEfficiency": 28.6,
+      "carbonIntensity": 24.2,
+      "recyclability": 19,
+      "processEnergy": 20
+    },
+    "opportunities": [
+      "Material production is 100% of total CO₂ — consider recycled-content steel"
+    ],
+    "factorsSource": "Sustainability factors v1 (India 2026, CEA 2023)"
+  }
+}
