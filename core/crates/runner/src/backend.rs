@@ -149,13 +149,10 @@ impl Rest {
         let body =
             serde_json::json!({ "p_stale_seconds": stale_seconds, "p_max_attempts": max_attempts });
         let response = Self::ok(
-            self.request(
-                reqwest::Method::POST,
-                "/rpc/claim_next_cad_upload",
-            )?
-            .json(&body)
-            .send()
-            .await?,
+            self.request(reqwest::Method::POST, "/rpc/claim_next_cad_upload")?
+                .json(&body)
+                .send()
+                .await?,
         )
         .await?;
         let rows: Vec<Row> = response.json().await?;
@@ -169,13 +166,10 @@ impl Rest {
     ) -> Result<(), BackendError> {
         let body = serde_json::json!({ "status": "analysed", "result": result, "error_code": null, "error_detail": null });
         Self::ok(
-            self.request(
-                reqwest::Method::PATCH,
-                &format!("/cad_uploads?id=eq.{id}"),
-            )?
-            .json(&body)
-            .send()
-            .await?,
+            self.request(reqwest::Method::PATCH, &format!("/cad_uploads?id=eq.{id}"))?
+                .json(&body)
+                .send()
+                .await?,
         )
         .await?;
         Ok(())
@@ -194,13 +188,10 @@ impl Rest {
             serde_json::json!({ "status": "failed", "error_code": code, "error_detail": detail, "finished_at": "now" })
         };
         Self::ok(
-            self.request(
-                reqwest::Method::PATCH,
-                &format!("/cad_uploads?id=eq.{id}"),
-            )?
-            .json(&body)
-            .send()
-            .await?,
+            self.request(reqwest::Method::PATCH, &format!("/cad_uploads?id=eq.{id}"))?
+                .json(&body)
+                .send()
+                .await?,
         )
         .await?;
         Ok(())
