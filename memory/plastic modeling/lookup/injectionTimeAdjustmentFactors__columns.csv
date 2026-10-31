@@ -1,4 +1,0 @@
-name,file_path,value
-injectionTimeAdjustmentFactors,lookupTables/Component/injectionTimeAdjustmentFactors.csv,Attribute
-injectionTimeAdjustmentFactors,lookupTables/Component/injectionTimeAdjustmentFactors.csv,Number
-injectionTimeAdjustmentFactors,lookupTables/Component/injectionTimeAdjustmentFactors.csv,Adjustment Factor

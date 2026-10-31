@@ -1,3 +1,0 @@
-name,sourceFilePath,digitalFactory,value
-plasticizingRateByClampForce,lookupTables/Component/plasticizingRateByClampForce.csv,aPriori USA,Clamp Force (kN)
-plasticizingRateByClampForce,lookupTables/Component/plasticizingRateByClampForce.csv,aPriori USA,Plasticizing Rate (g / s)

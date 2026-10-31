@@ -1,3 +1,0 @@
-name,file_path,value
-tblMinHoleDiameterRatio,lookupTables/Component/tblMinHoleDiameterRatio.csv,Material Ultimate Tensile Strength (MPa)
-tblMinHoleDiameterRatio,lookupTables/Component/tblMinHoleDiameterRatio.csv,Min Diameter To Thickness Ratio

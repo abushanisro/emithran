@@ -1,3 +1,0 @@
-name,sourceFilePath,digitalFactory,value
-tblToolLife,lookupTables/Component/tblToolLife.csv,aPriori USA,Material Type
-tblToolLife,lookupTables/Component/tblToolLife.csv,aPriori USA,Num Shots Per Tool

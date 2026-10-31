@@ -1,5 +1,0 @@
-layer_name,side,source_url,source_date,source_note
-toplayer,top,https://e2e.ti.com/support/tools/simulation-hardware-system-design-tools-group/sim-hw-system-design/f/simulation-hardware-system-design-tools-forum/1203000/pmp8688-pick-and-place-files,2026-10-15,"Altium Pick and Place export, Layer column. Matched case-insensitively. Also the value in both sample boards."
-bottomlayer,bottom,https://e2e.ti.com/support/tools/simulation-hardware-system-design-tools-group/sim-hw-system-design/f/simulation-hardware-system-design-tools-forum/1203000/pmp8688-pick-and-place-files,2026-10-15,"Altium Pick and Place export, Layer column. Matched case-insensitively. Also the value in the LI15020 sample board."
-top,top,https://fedevel.com/forum/altium-designer/20364-pick-place-file-custom-names-for-top-and-bottom,2026-10-15,A forum report that Altium writes Top rather than TopLayer for some output types.
-bottom,bottom,https://fedevel.com/forum/altium-designer/20364-pick-place-file-custom-names-for-top-and-bottom,2026-10-15,A forum report that Altium writes Bottom rather than BottomLayer for some output types.

@@ -1,3 +1,0 @@
-name,sourceFilePath,digitalFactory,value
-tblTolerances,lookupTables/Component/tblTolerances.csv,aPriori USA,Tolerance Factor
-tblTolerances,lookupTables/Component/tblTolerances.csv,aPriori USA,Tolerance Name

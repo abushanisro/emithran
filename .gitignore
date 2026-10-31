@@ -89,3 +89,7 @@ petrus-demo/
 
 # Supabase CLI link state (project refs); we no longer use the Supabase CLI
 /supabase/
+
+# Proprietary costing reference data (machine and labour rates, material prices). Kept locally for the
+# backend/migrations/scripts/gen_*.js generators; never committed.
+/memory/

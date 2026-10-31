@@ -1,4 +1,0 @@
-name,sourceFilePath,digitalFactory,value
-SPIFinishes,lookupTables/Component/SPIFinishes.csv,aPriori USA,Finish Name
-SPIFinishes,lookupTables/Component/SPIFinishes.csv,aPriori USA,Standard
-SPIFinishes,lookupTables/Component/SPIFinishes.csv,aPriori USA,Hrs Per Sq Meter (hr / m^2)
