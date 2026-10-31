@@ -1,4 +1,5 @@
 import { Auth0Client, filterDefaultIdTokenClaims } from '@auth0/nextjs-auth0/server';
+import { NextResponse } from 'next/server';
 
 let client: Auth0Client | undefined;
 
@@ -22,6 +23,18 @@ export function getAuth0(): Auth0Client {
     // The browser's idle timer keys its shared state by session; with no token in the browser it reads the session id from the profile.
     beforeSessionSaved: (session) =>
       Promise.resolve({ ...session, user: { ...filterDefaultIdTokenClaims(session.user), sid: session.internal.sid } }),
+    // A failed sign-in returns to the sign-in page with the SDK's short error code. Auth0's own message is logged here, not shown:
+    // it names the client and the API, and the SDK's default would render it as a bare 500 page.
+    // On success it goes back where sign-in started, and never off the app's origin (as the SDK's own default guards).
+    onCallback: (error, ctx) => {
+      const base = ctx.appBaseUrl ?? process.env.APP_BASE_URL;
+      if (!error) {
+        const target = new URL(ctx.returnTo ?? '/', base);
+        return Promise.resolve(NextResponse.redirect(target.origin === new URL('/', base).origin ? target : new URL('/', base)));
+      }
+      console.error(`Auth0 sign-in failed (${error.code}): ${error.cause instanceof Error ? error.cause.message : error.message}`);
+      return Promise.resolve(NextResponse.redirect(new URL(`/auth?error=${encodeURIComponent(error.code)}`, base)));
+    },
   });
   return client;
 }

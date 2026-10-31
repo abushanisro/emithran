@@ -17,6 +17,8 @@ then production**. Each step says how to know it worked. Nothing here needs a co
 1. Tenant. Create an **API**: identifier = `AUTH0_AUDIENCE` (e.g. `https://api.emithran.com`), signing algorithm **RS256** (the backend accepts nothing else).
 2. Create a **Regular Web Application**. Allowed Callback URL `<APP_BASE_URL>/auth/callback`, Allowed Logout URL `<APP_BASE_URL>`. Enable the
    Google social connection and the database connection; **turn off sign-ups** on the database connection (people are invited).
+   Then authorize it for the API: **Applications → APIs → (the API) → Application Access**, set the web application's **User Access**
+   to **Authorized**. Without this every sign-in is refused with `Client "…" is not authorized to access resource server "<AUTH0_AUDIENCE>"`.
 3. Add a **post-login Action** so the access token carries what the backend reads (replace the namespace with your `AUTH0_CLAIM_NAMESPACE`):
    ```js
    exports.onExecutePostLogin = async (event, api) => {
