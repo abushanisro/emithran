@@ -579,24 +579,19 @@ export class SupplierEvaluationService {
 
     queryBuilder = queryBuilder.order('project_id', { ascending: false, nullsFirst: false }).limit(1);
 
-    const { data: weights } = await queryBuilder.single();
+    // maybeSingle: no weights row is a normal case (schema defaults apply, and
+    // are reported); a failed read is an error, not "no weights".
+    const { data: weights, error: weightsError } = await queryBuilder.maybeSingle();
+    if (weightsError) {
+      this.logger.error(`Error reading evaluation weights: ${weightsError.message}`, 'SupplierEvaluationService');
+      throw new InternalServerErrorException(`Failed to read evaluation criteria weights: ${weightsError.message}`);
+    }
 
-    // Use defaults if no weights found
-    const costWeight = weights?.cost_competency_weight || 30.0;
-    const vendorWeight = weights?.vendor_rating_weight || 30.0;
-    const technicalWeight = weights?.technical_capability_weight || 40.0;
-
-    // Calculate component scores (0-100 scale)
-    const technicalPercentage =
-      (evaluation.technical_total_score / (evaluation.technical_max_score || 700)) * 100;
-    const costScore = evaluation.cost_competitiveness_score || 0;
-    const vendorScore = evaluation.vendor_rating_score || 0;
-
-    // Calculate weighted score
-    const weightedScore =
-      (costScore * (costWeight / 100)) +
-      (vendorScore * (vendorWeight / 100)) +
-      (technicalPercentage * (technicalWeight / 100));
+    const scoring = computeWeightedScore(evaluation, weights);
+    if (scoring.assumptions.length > 0) {
+      this.logger.warn(`Evaluation ${evaluation.id}: ${scoring.assumptions.join('; ')}`, 'SupplierEvaluationService');
+    }
+    const weightedScore = scoring.weightedScore;
 
     // Update the evaluation record
     const { data, error } = await this.databaseService
@@ -616,7 +611,7 @@ export class SupplierEvaluationService {
       return evaluation;
     }
 
-    return data;
+    return { ...data, weighted_score_assumptions: scoring.assumptions };
   }
 
   // ============================================================================
@@ -647,7 +642,8 @@ export class SupplierEvaluationService {
       marketAverageCost: record.market_average_cost ? Number(record.market_average_cost) : undefined,
       costCompetitivenessScore: record.cost_competitiveness_score ? Number(record.cost_competitiveness_score) : undefined,
       vendorRatingScore: record.vendor_rating_score ? Number(record.vendor_rating_score) : undefined,
-      overallWeightedScore: record.overall_weighted_score ? Number(record.overall_weighted_score) : undefined,
+      overallWeightedScore: record.overall_weighted_score != null ? Number(record.overall_weighted_score) : undefined,
+      ...(record.weighted_score_assumptions?.length ? { weightedScoreAssumptions: record.weighted_score_assumptions } : {}),
       status: record.status as EvaluationStatus,
       evaluationRound: record.evaluation_round,
       evaluatorNotes: record.evaluator_notes,
@@ -659,4 +655,68 @@ export class SupplierEvaluationService {
       updatedAt: new Date(record.updated_at),
     };
   }
+}
+
+// The column defaults of evaluation_criteria_weights and
+// supplier_evaluation_records.technical_max_score (migration 042): what a row
+// created without these values holds. One definition, used only when the value
+// is genuinely absent, and reported when used.
+export const EVALUATION_SCHEMA_DEFAULTS = {
+  costWeight: 30,
+  vendorWeight: 30,
+  technicalWeight: 40,
+  technicalMaxScore: 700,
+} as const;
+
+/**
+ * Weighted score (0–100) of an evaluation. A stored 0 weight or score is used
+ * as stored; only an absent value takes the schema default, and each default
+ * used is listed in `assumptions`. A non-positive technical max score cannot
+ * yield a percentage, so the score is null (the same NULLIF the summary view applies).
+ */
+export function computeWeightedScore(
+  evaluation: {
+    technical_total_score?: unknown;
+    technical_max_score?: unknown;
+    cost_competitiveness_score?: unknown;
+    vendor_rating_score?: unknown;
+  },
+  weights: { cost_competency_weight?: unknown; vendor_rating_weight?: unknown; technical_capability_weight?: unknown } | null,
+): { weightedScore: number | null; assumptions: string[] } {
+  const assumptions: string[] = [];
+  const num = (v: unknown): number | undefined => {
+    if (v === null || v === undefined || v === '') return undefined;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : undefined;
+  };
+  const D = EVALUATION_SCHEMA_DEFAULTS;
+  if (!weights) assumptions.push(`no evaluation_criteria_weights row — default weights cost ${D.costWeight}/vendor ${D.vendorWeight}/technical ${D.technicalWeight} used`);
+  const weight = (v: unknown, fallback: number, label: string): number => {
+    const n = num(v);
+    if (n !== undefined) return n;
+    if (weights) assumptions.push(`${label} weight not set — default ${fallback} used`);
+    return fallback;
+  };
+  const costWeight = weight(weights?.cost_competency_weight, D.costWeight, 'cost');
+  const vendorWeight = weight(weights?.vendor_rating_weight, D.vendorWeight, 'vendor');
+  const technicalWeight = weight(weights?.technical_capability_weight, D.technicalWeight, 'technical');
+
+  let maxScore = num(evaluation.technical_max_score);
+  if (maxScore === undefined) {
+    assumptions.push(`technical max score not set — default ${D.technicalMaxScore} used`);
+    maxScore = D.technicalMaxScore;
+  }
+  if (maxScore <= 0) {
+    assumptions.push(`technical max score is ${maxScore} — no technical percentage, so no weighted score`);
+    return { weightedScore: null, assumptions };
+  }
+
+  const technicalPercentage = ((num(evaluation.technical_total_score) ?? 0) / maxScore) * 100;
+  const costScore = num(evaluation.cost_competitiveness_score) ?? 0;
+  const vendorScore = num(evaluation.vendor_rating_score) ?? 0;
+  const weightedScore =
+    costScore * (costWeight / 100) +
+    vendorScore * (vendorWeight / 100) +
+    technicalPercentage * (technicalWeight / 100);
+  return { weightedScore, assumptions };
 }

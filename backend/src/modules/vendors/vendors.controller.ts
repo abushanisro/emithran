@@ -16,7 +16,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
-import { VendorsService } from './vendors.service';
+import { VendorsService, VENDOR_IMPORT_MAX_BYTES } from './vendors.service';
 import {
   CreateVendorDto,
   UpdateVendorDto,
@@ -60,7 +60,7 @@ export class VendorsController {
   @ApiOperation({ summary: 'Upload vendors from CSV file' })
   @ApiConsumes('multipart/form-data')
   @ApiResponse({ status: 201, description: 'Vendors imported successfully' })
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: VENDOR_IMPORT_MAX_BYTES, files: 1 } }))
   async uploadCsv(
     @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: User,

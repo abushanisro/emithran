@@ -15,6 +15,11 @@ import {
 import { MatchVendorsDto, RankedVendor, RankedProcessGroup } from './dto/match-vendors.dto';
 import { validate as isValidUUID } from 'uuid';
 
+/** Upload bounds for the vendor import (file size, CSV rows, CSV line length). */
+export const VENDOR_IMPORT_MAX_BYTES = 10 * 1024 * 1024;
+export const VENDOR_IMPORT_MAX_ROWS = 20000;
+export const VENDOR_CSV_MAX_LINE_LENGTH = 20000;
+
 @Injectable()
 export class VendorsService {
   constructor(
@@ -725,6 +730,9 @@ export class VendorsService {
     if (!file) {
       throw new InternalServerErrorException('No file provided');
     }
+    if (!Buffer.isBuffer(file.buffer) || file.buffer.length > VENDOR_IMPORT_MAX_BYTES) {
+      throw new BadRequestException(`The vendor file must be at most ${VENDOR_IMPORT_MAX_BYTES / (1024 * 1024)} MB`);
+    }
 
     try {
       let rows: string[][];
@@ -884,6 +892,7 @@ export class VendorsService {
         ...results,
       };
     } catch (error: any) {
+      if (error instanceof BadRequestException) throw error; // a rejected file is the caller's error, not a server error
       this.logger.error(`File import failed: ${error.message}`, 'VendorsService');
       throw new InternalServerErrorException(`Failed to import file: ${error.message}`);
     }
@@ -919,10 +928,11 @@ export class VendorsService {
   }
 
   private parseCsvRows(csvContent: string): string[][] {
-    return csvContent
-      .split('\n')
-      .filter(line => line.trim())
-      .map(line => this.parseCSVLine(line));
+    const lines = csvContent.split('\n').filter(line => line.trim());
+    if (lines.length > VENDOR_IMPORT_MAX_ROWS) {
+      throw new BadRequestException(`The vendor file has ${lines.length} rows; at most ${VENDOR_IMPORT_MAX_ROWS} are accepted`);
+    }
+    return lines.map(line => this.parseCSVLine(line));
   }
 
   // ============================================================================
@@ -930,6 +940,11 @@ export class VendorsService {
   // ============================================================================
 
   private parseCSVLine(line: string): string[] {
+    // The line comes from an uploaded file and bounds the loop below: checked
+    // to be a string of bounded length before it is walked character by character.
+    if (typeof line !== 'string' || line.length > VENDOR_CSV_MAX_LINE_LENGTH) {
+      throw new BadRequestException(`A vendor file line exceeds ${VENDOR_CSV_MAX_LINE_LENGTH} characters`);
+    }
     const result: string[] = [];
     let current = '';
     let inQuotes = false;

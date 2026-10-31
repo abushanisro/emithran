@@ -99,7 +99,7 @@ const ctLibStub = {
   getLaserSpeed: () => 3000,
   getLaserPierceSec: () => 0.5,
   getBrakeSecPerBend: () => 15,
-  getCncMrr: () => null,
+  getCncMrr: () => ({ mrrMm3PerMin: 8000, source: 'fallback_hardcoded', warning: 'CNC mill MRR: hard-coded baseline 8000 mm³/min ASSUMED.' }),
 } as any;
 
 describe('DeterministicPlannerService — mandatoryOps merge', () => {
@@ -221,5 +221,18 @@ describe('DeterministicPlannerService — template order preservation', () => {
     expect(reasons.findIndex((r) => /check/i.test(r))).toBeLessThan(
       reasons.findIndex((r) => /deburr/i.test(r)),
     );
+  });
+});
+
+describe('DeterministicPlannerService — assumed CNC removal rate is disclosed', () => {
+  it('names the assumed MRR on the milling line it timed', () => {
+    const svc = new DeterministicPlannerService(ctLibStub);
+    const brief = makeBrief();
+    (brief.dfm as any).boundingBox = { lengthMm: 100, widthMm: 50, heightMm: 20 };
+    (brief.dfm as any).volumeMm3 = 50000;
+    const plan = svc.plan(brief, candidates);
+    const mill = plan.processes.find((l) => l.timingSource === 'planner_physics' && l.machineCategoryHint === 'cnc_mill');
+    expect(mill).toBeDefined();
+    expect(mill!.reason).toContain('[ASSUMED: CNC mill MRR');
   });
 });

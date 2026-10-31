@@ -1,6 +1,6 @@
 import {
   WATERJET_ABRASIVE_KG_PER_MIN,
-  DEFAULT_YIELD_PCT,
+  resolveYieldPct,
 } from '../../shared/core/default-rates.constants';
 import type { MHRRateInput } from '../../shared/core/cost-engine';
 import type { ConfidenceLevel, PhysicsGap, ProcessLineCost } from '../../../dto/cost-breakdown.dto';
@@ -16,8 +16,9 @@ export interface WaterjetInput {
   waterjetRate?: MHRRateInput;
   // Garnet price in the SAME currency as waterjetRate.rate.
   // Resolved from consumable_prices DB table (migration 362) by the service.
-  // When null/absent, abrasive cost is 0 — user must add data to consumable_prices.
-  abrasivePricePerKg?: number;
+  // When null/absent there is no price on file: abrasive cost is 0 AND the
+  // result carries a warning saying so (never a silent 0).
+  abrasivePricePerKg?: number | null;
   // Real process_calculator_mappings identity for the resolved machine class,
   // resolved by the caller (BomItemsService.resolveProcessIdentities()) — never
   // hardcoded here. Absent means the caller couldn't resolve one; consumers must
@@ -132,6 +133,9 @@ export function computeWaterjetCost(input: WaterjetInput): WaterjetResult {
   const cuttingMin = totalSec / 60;
 
   // Abrasive charged only for active cutting time, not piercing
+  if (input.abrasivePricePerKg == null && cuttingSec > 0) {
+    warnings.push("Waterjet: no garnet abrasive price in consumable_prices for this location — abrasive cost excluded from quote; add a consumable_prices row to price it");
+  }
   const abrasivePricePerKg = input.abrasivePricePerKg ?? 0;
   if (input.abrasiveKgPerMin == null && cuttingSec > 0) {
     warnings.push("Waterjet: abrasive consumption rate from fallback — seed sm_lookup_waterjet_abrasive_rate for this pump tier");
@@ -163,7 +167,7 @@ export function computeWaterjetCost(input: WaterjetInput): WaterjetResult {
     setupTimeMin: setupMin / Math.max(input.batchSize, 1),
     inspTimeMin: input.inspTimeMin ?? 0,
     samplingRate: input.samplingRate ?? 0,
-    yieldPct: input.yieldPct ?? DEFAULT_YIELD_PCT,
+    yieldPct: resolveYieldPct(input.yieldPct, 'Waterjet', warnings),
     netMatCost: input.netMatCost ?? 0,
     netWeightKg: input.netWeightKg ?? 0,
     scrapPricePerKg: input.scrapPricePerKg ?? 0,

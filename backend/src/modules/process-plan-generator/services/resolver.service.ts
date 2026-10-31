@@ -535,8 +535,12 @@ export class ResolverService {
             const newEstCost = (machineRatePerSec + labourRatePerSec * heads) * newCycleSec
               * (1 + ((data as any).scrapPercentage ?? 0) / 100) / batchSize;
 
+            // The rules engine's assumptions (material group not from the DB,
+            // a hard-coded speed table, ...) travel with the line it re-timed.
+            const ruleWarnings = result.validation?.warnings ?? [];
             return {
               ...line,
+              ...(ruleWarnings.length > 0 ? { reason: `${line.reason} [rules engine: ${ruleWarnings.join('; ')}]` } : {}),
               data: {
                 ...data,
                 cycleTimeSeconds: newCycleSec,

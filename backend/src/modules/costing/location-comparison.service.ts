@@ -1,6 +1,7 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { DatabaseService } from '../../common/database/database.service';
 import { ExchangeRateService } from '../../common/exchange-rate/exchange-rate.service';
+import { readSellingPriceSettings } from './cost-aggregation.service';
 import {
   LOCATION_INFO,
 } from '../bom-items/costing/shared/core/default-rates.constants';
@@ -81,23 +82,13 @@ export class LocationComparisonService {
         .select('key, value'),
     ]);
 
-    // Load SGA and profit from costing_settings table
-    const settingsMap = new Map<string, number>();
-    for (const s of settingsResult.data ?? []) settingsMap.set(s.key as string, Number(s.value));
-
-    const sgaPct = settingsMap.has('sga_pct') ? settingsMap.get('sga_pct')! : null;
-    const profitPct = settingsMap.has('profit_pct') ? settingsMap.get('profit_pct')! : null;
-
-    if (sgaPct == null) {
-      serviceWarnings.push(
-        'sga_pct not found in costing_settings — SG&A excluded from selling price; deploy migration 364 and set the row',
-      );
+    // Load SGA and profit from costing_settings table. A failed read is an
+    // error: comparing selling prices without SG&A and profit would understate them.
+    if (settingsResult.error) {
+      throw new InternalServerErrorException(`Unable to read costing_settings (SG&A and profit): ${settingsResult.error.message}`);
     }
-    if (profitPct == null) {
-      serviceWarnings.push(
-        'profit_pct not found in costing_settings — profit margin excluded from selling price; deploy migration 364 and set the row',
-      );
-    }
+    const { sgaPct, profitPct, pricingGaps } = readSellingPriceSettings(settingsResult.data ?? []);
+    serviceWarnings.push(...pricingGaps);
 
     // 1. Fetch active process cost records for this BOM item
     const { data: processRows, error: pcErr } = await db

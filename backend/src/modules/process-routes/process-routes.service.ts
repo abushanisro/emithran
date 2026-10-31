@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   InternalServerErrorException,
+  BadRequestException,
 } from '@nestjs/common';
 import { Logger } from '../../common/logger/logger.service';
 import { DatabaseService } from '../../common/database/database.service';
@@ -13,6 +14,7 @@ import {
   CreateProcessRouteStepDto,
   UpdateProcessRouteStepDto,
   ReorderProcessRouteStepsDto,
+  MAX_ROUTE_STEPS_PER_REORDER,
   ExecuteCalculatorDto,
   SaveSessionDto,
   AssignRoleDto,
@@ -535,14 +537,29 @@ export class ProcessRoutesService {
   ): Promise<ProcessRouteStepResponseDto[]> {
     this.logger.log(`Reordering steps for route: ${routeId}`, 'ProcessRoutesService');
 
+    // Checked here as well as by the DTO: the id list bounds the loop below,
+    // so it must be a real, bounded array of strings whatever reaches us.
+    const stepIds: unknown = dto?.stepIds;
+    if (
+      !Array.isArray(stepIds) ||
+      stepIds.length > MAX_ROUTE_STEPS_PER_REORDER ||
+      stepIds.some((id) => typeof id !== 'string')
+    ) {
+      throw new BadRequestException(`stepIds must be an array of at most ${MAX_ROUTE_STEPS_PER_REORDER} step ids`);
+    }
+
     // Update step numbers based on the order in the array
-    for (let i = 0; i < dto.stepIds.length; i++) {
-      const stepId = dto.stepIds[i];
-      await this.databaseService
+    const ids = stepIds as string[];
+    for (const [i, stepId] of ids.entries()) {
+      const { error } = await this.databaseService
         .getClient(accessToken)
         .from('process_route_steps')
         .update({ step_number: i + 1 })
         .eq('id', stepId);
+      if (error) {
+        this.logger.error(`Error reordering route step ${stepId}: ${error.message}`, 'ProcessRoutesService');
+        throw new InternalServerErrorException(`Failed to reorder route steps: ${error.message}`);
+      }
     }
 
     // Fetch updated steps

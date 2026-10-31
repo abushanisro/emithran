@@ -35,6 +35,8 @@ export interface CalculationResult {
   perFeatureCycleTimeSec: number;
   featureCount: number;
   steps: CalculationStep[];
+  /** Assumptions the calculator made (e.g. a hard-coded table instead of DB data); surfaced in OperationResult.validation.warnings. */
+  warnings?: string[];
 }
 
 // ── Validation ────────────────────────────────────────────────────────────────

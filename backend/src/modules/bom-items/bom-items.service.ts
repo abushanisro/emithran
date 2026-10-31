@@ -66,7 +66,7 @@ import {
 } from './costing/plastic-molding/machine/machine-selector-im';
 import { requiredClampForce, type MaterialClampProperties } from './costing/plastic-molding/clamp-force';
 import { shotGppsGramsPerCavity, shotWeightKgPerPart } from './costing/plastic-molding/shot-size';
-import { MATERIAL_OVERHEAD_PCT, RATES_SOURCE_LABEL, computeTapCycleSec, resolveTapPhysicsInputs, TAP_UNLOAD_SEC, isoCoarsePitchMm, resolveDrillingSpeedFeed, COUNTERSINK_SPEED_FACTOR, HOLE_OP_UNLOAD_SEC, resolveReamPhysicsInputs, TIGHT_TOLERANCE_REAM_THRESHOLD_MM, MACHINE_REGISTRY, LOCATION_INFO, CURRENCY_SYMBOLS, recommendedBendTonnage, bendShoulderWidthMm, estimateBurlTonnage, estimateBurlDiameterMm, type SurfaceTreatmentDbRate, DEFAULT_YIELD_PCT } from './costing/shared/core/default-rates.constants';
+import { MATERIAL_OVERHEAD_PCT, RATES_SOURCE_LABEL, computeTapCycleSec, resolveTapPhysicsInputs, TAP_UNLOAD_SEC, isoCoarsePitchMm, resolveDrillingSpeedFeed, COUNTERSINK_SPEED_FACTOR, HOLE_OP_UNLOAD_SEC, resolveReamPhysicsInputs, TIGHT_TOLERANCE_REAM_THRESHOLD_MM, MACHINE_REGISTRY, LOCATION_INFO, CURRENCY_SYMBOLS, recommendedBendTonnage, bendShoulderWidthMm, estimateBurlTonnage, estimateBurlDiameterMm, type SurfaceTreatmentDbRate, resolveYieldPct } from './costing/shared/core/default-rates.constants';
 import type { MachineClass } from './costing/shared/core/default-rates.constants';
 import { checkMachineCapability } from './costing/shared/capability/machine-capability';
 import type { CapabilityCheck as MachineCapabilityCheck, PartGeometryForCapability } from './costing/shared/capability/machine-capability';
@@ -5939,7 +5939,8 @@ export class BOMItemsService {
       qairPerHr: mhrRates.qaInspectorRate ?? 0,
       inspTimeMin: rcInspectionTimeMin,
       samplingRate: rcSamplingRate,
-      yieldPct: DEFAULT_YIELD_PCT,
+      // No per-part yield source exists yet: the default is used and disclosed once.
+      yieldPct: resolveYieldPct(null, 'Yield', comparisonWarnings),
       netMatCost: materialCost,
       netWeightKg,
       scrapPricePerKg: rcScrapPricePerKg,
@@ -6276,7 +6277,7 @@ export class BOMItemsService {
     // Both are non-blocking: null / 0 triggers warnings in the cost engine, not crashes.
     // Surface treatment is a shared secondary operation (appendSecondaryOperations), not an engine line.
     const cncSurfaceTreatmentDbRate = null;
-    const waterjetAbrasivePricePerKg = await this.resolveConsumablePrice(accessToken, 'garnet_abrasive', location, rates);
+    const waterjetAbrasivePricePerKg = await this.resolveConsumablePrice(accessToken, 'garnet_abrasive', location, locInfo.code, rates);
 
     if (isMachiningFamily(family)) {
       // Same rules + sampling policy as getCostSummary — totals must match line for line
@@ -9215,31 +9216,34 @@ export class BOMItemsService {
     };
   }
 
-  // Resolves a consumable price from the consumable_prices DB table (migration 362).
-  // Table stores prices in USD; result is converted to local currency via the
-  // caller's RateSnapshot (real FX, one read per request) — never a hardcoded pivot.
-  // Returns 0 when the DB has no row — the caller treats 0 as "add data to get this costed."
+  // Resolves a consumable price from the consumable_prices DB table (migration 362):
+  // the location's own row, else the table's '__default__' row. The table stores
+  // USD; the result is converted into `currencyCode` (the caller's costing
+  // currency) via the caller's RateSnapshot — never a hardcoded pivot, never a
+  // guessed location. Returns null when no row exists, so the caller can say the
+  // price is unknown instead of pricing the consumable at 0. A failed query or a
+  // missing FX rate throws: those are errors, not "no price on file".
   private async resolveConsumablePrice(
     accessToken: string,
     consumableType: string,
     location: string,
+    currencyCode: string,
     rates: RateSnapshot,
-  ): Promise<number> {
-    try {
-      const locInfo = LOCATION_INFO[location] ?? LOCATION_INFO['USA']!;
-      const usdToLocal = rates.convertStrict('USD', locInfo.code);
-      for (const loc of [location, '__default__']) {
-        const { data } = await this.databaseService
-          .getClient(accessToken)
-          .from('consumable_prices')
-          .select('price_per_unit')
-          .eq('consumable_type', consumableType)
-          .eq('location', loc)
-          .maybeSingle();
-        if (data?.price_per_unit) return Number(data.price_per_unit) * usdToLocal;
+  ): Promise<number | null> {
+    for (const loc of [location, '__default__']) {
+      const { data, error } = await this.databaseService
+        .getClient(accessToken)
+        .from('consumable_prices')
+        .select('price_per_unit')
+        .eq('consumable_type', consumableType)
+        .eq('location', loc)
+        .maybeSingle();
+      if (error) {
+        throw new InternalServerErrorException(`consumable_prices lookup failed for ${consumableType} at ${loc}: ${error.message}`);
       }
-    } catch { /* non-critical */ }
-    return 0;
+      if (data?.price_per_unit != null) return Number(data.price_per_unit) * rates.convertStrict('USD', currencyCode);
+    }
+    return null;
   }
 
   // Evaluates one or more `calculated`-type fields on a real DB calculator

@@ -3,7 +3,7 @@ import type { MHRRateInput } from '../../../../../../modules/bom-items/costing/s
 
 function baseInput(overrides: Partial<CutToLengthInput> = {}): CutToLengthInput {
   return {
-    batchSize: 10,
+    batchSize: 10, yieldPct: 0.98, // a stated yield: an omitted one is disclosed as a warning
     netWeightKg: 5,
     ...overrides,
   };

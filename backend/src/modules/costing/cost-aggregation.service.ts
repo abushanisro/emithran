@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { Logger } from '../../common/logger/logger.service';
 import { DatabaseService } from '../../common/database/database.service';
 import { PERSISTED_PROCESS_COST_COLUMNS, resolvePersistedProcessCost } from '../bom-items/costing/shared/core/persisted-process-cost';
@@ -86,6 +86,8 @@ export interface BomItemCostDto {
   confidence: CostConfidence;
   processLines: ProcessLine[];
   materialLines: MaterialLine[];
+  /** What sellingPrice leaves out because its setting is missing (empty when SG&A and profit are both included). */
+  pricingGaps: string[];
 }
 
 @Injectable()
@@ -100,19 +102,16 @@ export class CostAggregationService {
     const client  = this.databaseService.getUserClient(accessToken);
     const adminDb = this.databaseService.getPrivilegedClient('reference-data: costing_settings, global sga_pct/profit_pct');
 
-    // Load SGA and profit from costing_settings (no hardcoded percentages)
-    const { data: settingsRows } = await adminDb.from('costing_settings').select('key, value');
-    const settingsMap = new Map<string, number>();
-    for (const s of settingsRows ?? []) settingsMap.set(s.key as string, Number(s.value));
-    const sgaPct    = settingsMap.get('sga_pct')    ?? null;
-    const profitPct = settingsMap.get('profit_pct') ?? null;
-
-    if (sgaPct == null) {
-      this.logger.warn('sga_pct not in costing_settings — SG&A excluded from selling price; deploy migration 364', 'CostAggregationService');
+    // Load SGA and profit from costing_settings (no hardcoded percentages).
+    // A failed read is an error, not "no settings": answering with a selling
+    // price that silently lacks SG&A and profit would understate it.
+    const { data: settingsRows, error: settingsErr } = await adminDb.from('costing_settings').select('key, value');
+    if (settingsErr) {
+      this.logger.error(`costing_settings read failed: ${settingsErr.message}`, 'CostAggregationService');
+      throw new InternalServerErrorException(`Unable to read costing_settings (SG&A and profit): ${settingsErr.message}`);
     }
-    if (profitPct == null) {
-      this.logger.warn('profit_pct not in costing_settings — profit margin excluded from selling price; deploy migration 364', 'CostAggregationService');
-    }
+    const { sgaPct, profitPct, pricingGaps } = readSellingPriceSettings(settingsRows ?? []);
+    for (const gap of pricingGaps) this.logger.warn(gap, 'CostAggregationService');
 
     const [
       { data: rawMatRows, error: rmErr },
@@ -149,11 +148,19 @@ export class CostAggregationService {
         .eq('is_active', true),
     ]);
 
-    if (rmErr) this.logger.warn(`raw_material_cost_records: ${rmErr.message}`, 'CostAggregationService');
-    if (pcErr) this.logger.warn(`process_cost_records: ${pcErr.message}`, 'CostAggregationService');
-    if (tcErr) this.logger.warn(`tooling_cost_records: ${tcErr.message}`, 'CostAggregationService');
-    if (pkErr) this.logger.warn(`packaging_logistics_cost_records: ${pkErr.message}`, 'CostAggregationService');
-    if (ppErr) this.logger.warn(`procured_parts_cost_records: ${ppErr.message}`, 'CostAggregationService');
+    // A failed read of any cost table is an error: summing the tables that did
+    // load would return a cost that silently leaves a whole category out.
+    const readErrors = [
+      ['raw_material_cost_records', rmErr],
+      ['process_cost_records', pcErr],
+      ['tooling_cost_records', tcErr],
+      ['packaging_logistics_cost_records', pkErr],
+      ['procured_parts_cost_records', ppErr],
+    ].filter(([, err]) => err != null).map(([table, err]) => `${table}: ${(err as { message: string }).message}`);
+    if (readErrors.length > 0) {
+      this.logger.error(`Cost aggregation read failed — ${readErrors.join('; ')}`, 'CostAggregationService');
+      throw new InternalServerErrorException(`Unable to read cost records for BOM item ${bomItemId}: ${readErrors.join('; ')}`);
+    }
 
     // ── Material lines — real 8-step formula (matches raw_material_cost_records'
     // own stored columns, i.e. the same numbers RawMaterialsSection.tsx shows
@@ -359,6 +366,31 @@ export class CostAggregationService {
       confidence,
       processLines,
       materialLines,
+      pricingGaps,
     };
   }
+}
+
+/**
+ * SG&A and profit percentages from costing_settings rows. A key that is absent
+ * (or not a number) is null, never a guessed percentage, and is named in
+ * pricingGaps so the response says its selling price excludes it.
+ */
+export function readSellingPriceSettings(rows: { key: unknown; value: unknown }[]): {
+  sgaPct: number | null;
+  profitPct: number | null;
+  pricingGaps: string[];
+} {
+  const settings = new Map<string, number>();
+  for (const s of rows) {
+    if (s.value === null || s.value === undefined || s.value === '') continue;
+    const n = Number(s.value);
+    if (Number.isFinite(n)) settings.set(String(s.key), n);
+  }
+  const sgaPct = settings.get('sga_pct') ?? null;
+  const profitPct = settings.get('profit_pct') ?? null;
+  const pricingGaps: string[] = [];
+  if (sgaPct == null) pricingGaps.push('sga_pct is not set in costing_settings — SG&A is excluded from the selling price (deploy migration 364 or set it).');
+  if (profitPct == null) pricingGaps.push('profit_pct is not set in costing_settings — profit is excluded from the selling price (deploy migration 364 or set it).');
+  return { sgaPct, profitPct, pricingGaps };
 }

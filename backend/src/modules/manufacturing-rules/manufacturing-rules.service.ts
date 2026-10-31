@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { DatabaseService } from "../../common/database/database.service";
-import { MaterialGroupResolver } from "./resolvers/material-group.resolver";
+import { MaterialGroupResolver, type MaterialGroupSource } from "./resolvers/material-group.resolver";
 import { ParameterResolver } from "./resolvers/parameter.resolver";
 import { CalculatorRegistry } from "./calculators/calculator.registry";
 import type { OperationResult } from "./dto/operation-result.dto";
@@ -46,6 +46,10 @@ export class ManufacturingRulesService {
 
     const materialRecord = await this.materialGroupResolver.resolve(materialGrade);
     const isoGroup = materialRecord.isoGroup;
+    const materialGroupSource = materialRecord.materialGroupSource;
+    // Assumptions made along the way (material group not from the DB, a
+    // hard-coded speed table, ...) — carried on the result, never only logged.
+    const assumptionWarnings: string[] = materialRecord.warning ? [materialRecord.warning] : [];
 
     const params: MachiningParams = await this.parameterResolver.resolve({
       operation,
@@ -59,7 +63,7 @@ export class ManufacturingRulesService {
 
     if (!calculator) {
       this.logger.warn(`[rules-engine] No calculator for operation "${operation}" — returning geometry_estimate default`);
-      return this.defaultResult(operation, isoGroup, params);
+      return this.defaultResult(operation, isoGroup, params, materialGroupSource, assumptionWarnings);
     }
 
     const validation = calculator.validate(params, featureGeometry);
@@ -76,7 +80,7 @@ export class ManufacturingRulesService {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       this.logger.error(`[rules-engine] Calculator error for ${operation}: ${msg}`);
-      return this.defaultResult(operation, isoGroup, params);
+      return this.defaultResult(operation, isoGroup, params, materialGroupSource, assumptionWarnings, `Calculator for operation "${operation}" failed: ${msg} — cycle time is 0 and this operation is NOT costed`);
     }
 
     const machineReqs = calculator.machineRequirements(params, calcResult);
@@ -102,6 +106,7 @@ export class ManufacturingRulesService {
       operation,
       timingSource,
       isoGroup,
+      materialGroupSource,
       totalCycleTimeSec: calcResult.totalCycleTimeSec,
       perFeatureCycleTimeSec: calcResult.perFeatureCycleTimeSec,
       featureCount: calcResult.featureCount,
@@ -109,7 +114,10 @@ export class ManufacturingRulesService {
       parameterSource: params.parameterSource,
       machineRequirements: machineReqs,
       toolRequirements: toolReqs,
-      validation,
+      validation: {
+        ...validation,
+        warnings: [...validation.warnings, ...assumptionWarnings, ...(calcResult.warnings ?? [])],
+      },
     };
   }
 
@@ -122,11 +130,15 @@ export class ManufacturingRulesService {
     operation: string,
     isoGroup: IsoGroup,
     params: MachiningParams,
+    materialGroupSource: MaterialGroupSource,
+    assumptionWarnings: string[],
+    error = `No calculator registered for operation "${operation}" — cycle time is 0 and this operation is NOT costed; register a calculator or add a manual cycle time`,
   ): OperationResult {
     return {
       operation,
       timingSource: "default",
       isoGroup,
+      materialGroupSource,
       totalCycleTimeSec: 0,
       perFeatureCycleTimeSec: 0,
       featureCount: 0,
@@ -144,8 +156,8 @@ export class ManufacturingRulesService {
       },
       validation: {
         valid: false,
-        errors: [`No calculator registered for operation "${operation}" — cycle time is 0 and this operation is NOT costed; register a calculator or add a manual cycle time`],
-        warnings: [`Operation "${operation}" has no calculator — excluded from cost calculation`],
+        errors: [error],
+        warnings: [`Operation "${operation}" has no cycle time — excluded from cost calculation`, ...assumptionWarnings],
       },
     };
   }

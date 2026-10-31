@@ -6,6 +6,18 @@
 // could silently drift apart.
 export const DEFAULT_YIELD_PCT = 0.98;
 
+/**
+ * The yield fraction an engine prices with: the caller's real one, else
+ * DEFAULT_YIELD_PCT — and then a warning naming the assumption is pushed onto
+ * `warnings`, so the yield-loss term is never presented as measured. The one
+ * place every sheet-metal engine resolves its yield (not one copy per engine).
+ */
+export function resolveYieldPct(yieldPct: number | null | undefined, process: string, warnings: string[]): number {
+  if (yieldPct != null) return yieldPct;
+  warnings.push(`${process}: no process yield on file — ${DEFAULT_YIELD_PCT * 100}% yield assumed (DEFAULT_YIELD_PCT) for the yield-loss cost`);
+  return DEFAULT_YIELD_PCT;
+}
+
 // Batch inspection sampling — three stages (eMithran-style):
 //   FAI:        first article, full measurement, once per batch
 //   in-process: 1 of every N parts, full per-piece measurement
