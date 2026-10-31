@@ -1,17 +1,13 @@
 import { UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+
 import { SupabaseService } from '../../../common/supabase/supabase.service';
 import { runWithRequestAuth } from '../../../common/request-context/request-auth-context';
 
-// Real SupabaseService and real supabase-js clients: createClient() makes no
-// network call, so the trust-boundary rules can be checked without any mock of
-// the client itself. The URL points at a closed local port so the one test that
-// does reach for the network (minting) fails fast and offline.
-const config: Record<string, string> = {
-  SUPABASE_URL: 'http://127.0.0.1:1',
-  SUPABASE_ANON_KEY: 'anon-key',
-  SUPABASE_SERVICE_KEY: 'service-key',
-};
-const makeService = () => new SupabaseService({ get: (k: string) => config[k] } as any);
+// Real SupabaseService and real PostgREST clients: creating one makes no network call, so the trust-boundary rules can be checked
+// without any mock of the client itself.
+const makeService = () =>
+  new SupabaseService(new ConfigService({ POSTGREST_URL: 'http://127.0.0.1:1', DB_JWT_SECRET: 's'.repeat(40) }));
 
 describe('SupabaseService trust boundary', () => {
   describe('getClient(accessToken)', () => {
@@ -33,9 +29,8 @@ describe('SupabaseService trust boundary', () => {
       expect(() => makeService().getPrivilegedClient(reason)).toThrow(/non-empty reason/);
     });
 
-    it('returns the one service-role client when given a reason', () => {
-      const svc = makeService();
-      expect(svc.getPrivilegedClient('test: a')).toBe(svc.getPrivilegedClient('test: b'));
+    it('returns a client when given a reason', () => {
+      expect(makeService().getPrivilegedClient('test: a')).toBeDefined();
     });
   });
 
@@ -58,12 +53,6 @@ describe('SupabaseService trust boundary', () => {
       const svc = makeService();
       const client = runWithRequestAuth({ accessToken: 'req.jwt', userId: 'u1' }, () => svc.getUserClient('explicit.jwt'));
       expect(client).not.toBe(svc.getPrivilegedClient('test: identity check'));
-    });
-  });
-
-  describe('mintUserAccessToken (dev auth bypass)', () => {
-    it('fails closed with null, not an exception or an admin token, when Supabase is unreachable', async () => {
-      await expect(makeService().mintUserAccessToken('dev@example.com')).resolves.toBeNull();
     });
   });
 });

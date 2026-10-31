@@ -43,7 +43,7 @@ function loadSettings(env: string): Record<string, string | undefined> {
 function sslFor(databaseUrl: string): false | { rejectUnauthorized: boolean; ca?: string } {
   const host = new URL(databaseUrl).hostname;
   if (['localhost', '127.0.0.1', '::1'].includes(host) || /sslmode=disable/.test(databaseUrl)) return false;
-  // Supabase's certificates are signed by its own CA, which Node does not ship. Give the CA file to verify the server;
+  // Some managed providers sign their certificates with their own CA, which Node does not ship. Give the CA file to verify the server;
   // without it the connection is encrypted but the server is not authenticated.
   const caFile = process.env.MIGRATE_DATABASE_SSL_CA;
   return caFile ? { rejectUnauthorized: true, ca: fs.readFileSync(caFile, 'utf8') } : { rejectUnauthorized: false };
@@ -56,7 +56,6 @@ async function main(): Promise<void> {
   const problems = targetProblems({
     env,
     appEnv: settings.APP_ENV,
-    supabaseUrl: settings.SUPABASE_URL,
     databaseUrl: settings.MIGRATE_DATABASE_URL,
     confirm: flag('confirm'),
     dryRun,

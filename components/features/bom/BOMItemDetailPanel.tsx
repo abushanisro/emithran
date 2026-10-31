@@ -83,10 +83,7 @@ interface ManufacturingFeature {
           const isDxf = lp.endsWith('.dxf') || lp.endsWith('.dwg') || lp.endsWith('.dxf.gz') || lp.endsWith('.dwg.gz');
           if (isDxf) {
             // Fetch decompressed DXF from backend (handles .gz transparently)
-            const token = await apiClient.getAuthToken();
-            const r = await fetch(`${apiConfig.endpoints.api.v1}/bom-items/${item.id}/dxf-content-legacy`, {
-              headers: token ? { Authorization: `Bearer ${token}` } : {},
-            });
+            const r = await fetch(`${apiConfig.endpoints.api.v1}/bom-items/${item.id}/dxf-content-legacy`);
             if (r.ok) setFile2dUrl(URL.createObjectURL(await r.blob()));
           } else {
             const response = await apiClient.get<{ url: string }>(`/bom-items/${item.id}/file-url/2d`);

@@ -1,219 +1,112 @@
-import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
+import { type ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { type Reflector } from '@nestjs/core';
+
 import { SupabaseAuthGuard } from '../../../common/guards/supabase-auth.guard';
-import { SupabaseService } from '../../../common/supabase/supabase.service';
 import { type SessionActivityService } from '../../../common/session/session-activity.service';
+import { type SupabaseService } from '../../../common/supabase/supabase.service';
+import { type AuthenticatedRequestUser, type IdentityService } from '../../../modules/auth/identity.service';
 
-/** A token shaped like a Supabase access token, carrying a session_id claim. */
-const jwtFor = (sessionId: string) =>
-  ['eyJhbGciOiJFUzI1NiJ9', Buffer.from(JSON.stringify({ sub: 'u', session_id: sessionId })).toString('base64url'), 'sig'].join('.');
-const REAL_JWT = jwtFor('session-1');
+/** The guard only calls these few methods; the fakes implement exactly them. */
+const fake = <T>(impl: Partial<T>): T => impl as T;
 
-function makeSessionActivity(assertActive: jest.Mock = jest.fn().mockResolvedValue({ lastActivityAt: 0, lastJobAt: null })) {
-  return { assertActive } as unknown as SessionActivityService & { assertActive: jest.Mock };
+interface Request {
+  headers: Record<string, string | undefined>;
+  query?: Record<string, string>;
+  user?: unknown;
+  accessToken?: string;
+  sessionId?: string;
 }
 
-const newGuard = (reflector: Reflector, svc: SupabaseService, sessionActivity = makeSessionActivity()) =>
-  new SupabaseAuthGuard(reflector, svc, sessionActivity);
+const AUTH0_USER: AuthenticatedRequestUser = {
+  user: { id: 'user-1', email: 'a@acme.com', role: 'authenticated' },
+  dbToken: 'db-token-for-user-1',
+  sessionId: 'sid-1',
+};
 
-function makeContext(request: any): ExecutionContext {
-  return {
-    getHandler: () => ({}),
-    getClass: () => ({}),
-    switchToHttp: () => ({ getRequest: () => request }),
-  } as unknown as ExecutionContext;
-}
-
-function makeReflector(isPublic = false): Reflector {
-  return { getAllAndOverride: jest.fn().mockReturnValue(isPublic) } as unknown as Reflector;
-}
-
-function makeSupabaseService(opts: {
-  verifyToken?: jest.Mock;
-  adminFallbackEmail?: string | null;
-  adminUserId?: string | null;
-  bypassFlag?: string;
-}): SupabaseService {
-  const adminFallbackEmail = 'adminFallbackEmail' in opts ? opts.adminFallbackEmail : 'admin@example.com';
-  const adminUserId = 'adminUserId' in opts ? opts.adminUserId : 'admin-uuid-1';
-  return {
-    verifyToken: opts.verifyToken ?? jest.fn().mockRejectedValue(new Error('invalid token')),
-    // The real predicate (not production AND flag 'true'), fed the flag the test wants.
-    isDevAuthBypassEnabled: () => SupabaseService.prototype.isDevAuthBypassEnabled.call({ configService: { get: () => opts.bypassFlag ?? 'true' } }),
-    getAdminFallbackEmail: jest.fn().mockReturnValue(adminFallbackEmail),
-    getAdminUserId: jest.fn().mockResolvedValue(adminUserId),
-    mintUserAccessToken: jest.fn().mockResolvedValue('minted-jwt'),
-  } as unknown as SupabaseService;
-}
-
-describe('SupabaseAuthGuard', () => {
-  const originalNodeEnv = process.env.NODE_ENV;
-
-  afterEach(() => {
-    process.env.NODE_ENV = originalNodeEnv;
-  });
-
-  it('with ALLOW_DEV_AUTH_BYPASS off, rejects a missing and an invalid token even outside production', async () => {
-    process.env.NODE_ENV = 'development';
-    const noToken = { headers: {} };
-    await expect(newGuard(makeReflector(false), makeSupabaseService({ bypassFlag: 'false' })).canActivate(makeContext(noToken))).rejects.toThrow(UnauthorizedException);
-    expect(noToken).not.toHaveProperty('user');
-    const forged = { headers: { authorization: `Bearer ${REAL_JWT}` } };
-    await expect(newGuard(makeReflector(false), makeSupabaseService({ bypassFlag: 'false' })).canActivate(makeContext(forged))).rejects.toThrow(UnauthorizedException);
-    expect(forged).not.toHaveProperty('user');
-  });
-
-  it('lets public routes through without a token, in any environment', async () => {
-    process.env.NODE_ENV = 'production';
-    const guard = newGuard(makeReflector(true), makeSupabaseService({}));
-    const request = { headers: {} };
-    await expect(guard.canActivate(makeContext(request))).resolves.toBe(true);
-  });
-
-  it('authenticates a request carrying a valid bearer token, in production', async () => {
-    process.env.NODE_ENV = 'production';
-    const realUser = { id: 'user-1', email: 'real@customer.com', role: 'user' };
-    const verifyToken = jest.fn().mockResolvedValue(realUser);
-    const guard = newGuard(makeReflector(false), makeSupabaseService({ verifyToken }));
-    const request = { headers: { authorization: `Bearer ${REAL_JWT}` } };
-    await expect(guard.canActivate(makeContext(request))).resolves.toBe(true);
-    expect(request).toHaveProperty('user', realUser);
-  });
-
-  it('rejects a request with no token in production, instead of falling back to an admin identity', async () => {
-    process.env.NODE_ENV = 'production';
-    const guard = newGuard(makeReflector(false), makeSupabaseService({}));
-    const request = { headers: {} };
-    await expect(guard.canActivate(makeContext(request))).rejects.toThrow(UnauthorizedException);
-    expect(request).not.toHaveProperty('user');
-  });
-
-  it('rejects a request with an invalid/expired token in production, instead of falling back to an admin identity', async () => {
-    process.env.NODE_ENV = 'production';
-    const guard = newGuard(makeReflector(false), makeSupabaseService({}));
-    const request = { headers: { authorization: 'Bearer garbage' } };
-    await expect(guard.canActivate(makeContext(request))).rejects.toThrow(UnauthorizedException);
-    expect(request).not.toHaveProperty('user');
-  });
-
-  it('rejects a request with no token in production even if ADMIN_FALLBACK_EMAIL resolves to a real account', async () => {
-    process.env.NODE_ENV = 'production';
-    const guard = newGuard(
-      makeReflector(false),
-      makeSupabaseService({ adminFallbackEmail: 'admin@example.com', adminUserId: 'admin-uuid-1' }),
+function setup(opts: { isPublic?: boolean; bypass?: boolean; adminUserId?: jest.Mock; authenticate?: jest.Mock; assertActive?: jest.Mock } = {}) {
+  const authenticate = opts.authenticate ?? jest.fn().mockResolvedValue(AUTH0_USER);
+  const assertActive = opts.assertActive ?? jest.fn().mockResolvedValue({ lastActivityAt: 0, lastJobAt: null });
+  const getAdminUserId = opts.adminUserId ?? jest.fn().mockResolvedValue('admin-1');
+  const mintDbUserToken = jest.fn((id: string) => `db-token-for-${id}`);
+  const guard = new SupabaseAuthGuard(
+    fake<Reflector>({ getAllAndOverride: jest.fn().mockReturnValue(opts.isPublic ?? false) }),
+    fake<SupabaseService>({
+      isDevAuthBypassEnabled: () => opts.bypass ?? false,
+      getAdminFallbackEmail: () => 'dev@acme.com',
+      getAdminUserId,
+      mintDbUserToken,
+    }),
+    fake<SessionActivityService>({ assertActive }),
+    fake<IdentityService>({ authenticate }),
+  );
+  const run = (request: Request) =>
+    guard.canActivate(
+      fake<ExecutionContext>({
+        getHandler: () => () => undefined,
+        getClass: <T>() => class {} as T,
+        switchToHttp: () => fake<ReturnType<ExecutionContext['switchToHttp']>>({ getRequest: <T>() => request as T }),
+      }),
     );
-    const request = { headers: {} };
-    await expect(guard.canActivate(makeContext(request))).rejects.toThrow(UnauthorizedException);
+  return { run, authenticate, assertActive, getAdminUserId, mintDbUserToken };
+}
+
+describe('SupabaseAuthGuard (Auth0)', () => {
+  it('lets public routes through without a token', async () => {
+    const { run, authenticate } = setup({ isPublic: true });
+    await expect(run({ headers: {} })).resolves.toBe(true);
+    expect(authenticate).not.toHaveBeenCalled();
   });
 
-  it('falls back to the configured admin identity when no token is sent outside production', async () => {
-    process.env.NODE_ENV = 'development';
-    const guard = newGuard(
-      makeReflector(false),
-      makeSupabaseService({ adminFallbackEmail: 'admin@example.com', adminUserId: 'admin-uuid-1' }),
-    );
-    const request = { headers: {} };
-    await expect(guard.canActivate(makeContext(request))).resolves.toBe(true);
-    expect(request).toHaveProperty('user', {
-      id: 'admin-uuid-1',
-      email: 'admin@example.com',
-      role: 'admin',
-    });
+  it('authenticates a bearer token through Auth0, checks the idle deadline, and attaches the database token', async () => {
+    const { run, authenticate, assertActive } = setup();
+    const request: Request = { headers: { authorization: 'Bearer auth0-token' } };
+
+    await expect(run(request)).resolves.toBe(true);
+
+    expect(authenticate).toHaveBeenCalledWith('auth0-token');
+    expect(assertActive).toHaveBeenCalledWith('sid-1', 'user-1');
+    expect(request).toMatchObject({ user: AUTH0_USER.user, accessToken: 'db-token-for-user-1', sessionId: 'sid-1' });
   });
 
-  it('rejects outright when the development bypass has no admin account to resolve, even outside production', async () => {
-    process.env.NODE_ENV = 'development';
-    const guard = newGuard(
-      makeReflector(false),
-      makeSupabaseService({ adminFallbackEmail: null, adminUserId: null }),
-    );
-    const request = { headers: {} };
-    await expect(guard.canActivate(makeContext(request))).rejects.toThrow(UnauthorizedException);
+  it('rejects an invalid token even with the development bypass on: the bypass never rescues a bad token', async () => {
+    const { run, getAdminUserId } = setup({ bypass: true, authenticate: jest.fn().mockRejectedValue(new UnauthorizedException()) });
+    await expect(run({ headers: { authorization: 'Bearer forged' } })).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(getAdminUserId).not.toHaveBeenCalled();
   });
 
-  it('retries the admin lookup after a failed one instead of rejecting every later request', async () => {
-    // A transient outage (confirmed live: getaddrinfo ENOTFOUND for the
-    // Supabase host) makes the first lookup return null; once the network is
-    // back, the next request must resolve the account again.
-    process.env.NODE_ENV = 'development';
-    const supabaseService = makeSupabaseService({ adminFallbackEmail: 'admin@example.com' });
-    (supabaseService.getAdminUserId as jest.Mock)
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce('admin-uuid-1');
-    const guard = newGuard(makeReflector(false), supabaseService);
-
-    await expect(guard.canActivate(makeContext({ headers: {} }))).rejects.toThrow(UnauthorizedException);
-
-    const request = { headers: {} };
-    await expect(guard.canActivate(makeContext(request))).resolves.toBe(true);
-    expect(request).toHaveProperty('user.id', 'admin-uuid-1');
-
-    // A resolved id is kept: no further lookups.
-    await guard.canActivate(makeContext({ headers: {} }));
-    expect(supabaseService.getAdminUserId).toHaveBeenCalledTimes(2);
+  it('rejects an idle session', async () => {
+    const { run } = setup({ assertActive: jest.fn().mockRejectedValue(new UnauthorizedException('idle')) });
+    await expect(run({ headers: { authorization: 'Bearer auth0-token' } })).rejects.toThrow('idle');
   });
 
-  describe('inactivity timeout', () => {
-    const realUser = { id: 'user-1', email: 'real@customer.com', role: 'user' };
+  it('no longer accepts a token in the query string', async () => {
+    const { run, authenticate } = setup();
+    await expect(run({ headers: {}, query: { token: 'auth0-token' } })).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(authenticate).not.toHaveBeenCalled();
+  });
 
-    it('checks the session idle deadline for a verified token and records the session id', async () => {
-      process.env.NODE_ENV = 'production';
-      const sessionActivity = makeSessionActivity();
-      const guard = newGuard(
-        makeReflector(false),
-        makeSupabaseService({ verifyToken: jest.fn().mockResolvedValue(realUser) }),
-        sessionActivity,
-      );
-      const request: any = { headers: { authorization: `Bearer ${REAL_JWT}` } };
-      await expect(guard.canActivate(makeContext(request))).resolves.toBe(true);
-      expect(sessionActivity.assertActive).toHaveBeenCalledWith('session-1', 'user-1', REAL_JWT);
-      expect(request.sessionId).toBe('session-1');
-    });
+  it('rejects a request without a token when the development bypass is off (always so in production)', async () => {
+    const { run, getAdminUserId } = setup({ bypass: false });
+    await expect(run({ headers: {} })).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(getAdminUserId).not.toHaveBeenCalled();
+  });
 
-    it('rejects an idle session and never attaches the user', async () => {
-      process.env.NODE_ENV = 'production';
-      const idle = new UnauthorizedException({ message: 'idle', code: 'SESSION_IDLE_TIMEOUT' });
-      const guard = newGuard(
-        makeReflector(false),
-        makeSupabaseService({ verifyToken: jest.fn().mockResolvedValue(realUser) }),
-        makeSessionActivity(jest.fn().mockRejectedValue(idle)),
-      );
-      const request: any = { headers: { authorization: `Bearer ${REAL_JWT}` } };
-      await expect(guard.canActivate(makeContext(request))).rejects.toBe(idle);
-      expect(request).not.toHaveProperty('user');
-    });
+  it('with the bypass on, acts as the configured account through RLS with a database token for that account', async () => {
+    const { run, mintDbUserToken } = setup({ bypass: true });
+    const request: Request = { headers: {} };
 
-    it('rejects an idle session outside production too, instead of falling back to the admin identity', async () => {
-      process.env.NODE_ENV = 'development';
-      const idle = new UnauthorizedException({ message: 'idle', code: 'SESSION_IDLE_TIMEOUT' });
-      const supabaseService = makeSupabaseService({ verifyToken: jest.fn().mockResolvedValue(realUser) });
-      const guard = newGuard(makeReflector(false), supabaseService, makeSessionActivity(jest.fn().mockRejectedValue(idle)));
-      const request: any = { headers: { authorization: `Bearer ${REAL_JWT}` } };
-      await expect(guard.canActivate(makeContext(request))).rejects.toBe(idle);
-      expect(supabaseService.mintUserAccessToken).not.toHaveBeenCalled();
-    });
+    await expect(run(request)).resolves.toBe(true);
 
-    it('rejects a verified token that carries no session id', async () => {
-      process.env.NODE_ENV = 'production';
-      const sessionActivity = makeSessionActivity();
-      const guard = newGuard(
-        makeReflector(false),
-        makeSupabaseService({ verifyToken: jest.fn().mockResolvedValue(realUser) }),
-        sessionActivity,
-      );
-      const noSession = ['eyJhbGciOiJFUzI1NiJ9', Buffer.from('{"sub":"u"}').toString('base64url'), 'sig'].join('.');
-      await expect(
-        guard.canActivate(makeContext({ headers: { authorization: `Bearer ${noSession}` } })),
-      ).rejects.toThrow(UnauthorizedException);
-      expect(sessionActivity.assertActive).not.toHaveBeenCalled();
-    });
+    expect(request).toMatchObject({ user: { id: 'admin-1', email: 'dev@acme.com' }, accessToken: 'db-token-for-admin-1' });
+    expect(mintDbUserToken).toHaveBeenCalledWith('admin-1', { email: 'dev@acme.com' });
+  });
 
-    it('does not apply the idle check to the development bypass, which has no Supabase session', async () => {
-      process.env.NODE_ENV = 'development';
-      const sessionActivity = makeSessionActivity();
-      const guard = newGuard(makeReflector(false), makeSupabaseService({}), sessionActivity);
-      await expect(guard.canActivate(makeContext({ headers: {} }))).resolves.toBe(true);
-      expect(sessionActivity.assertActive).not.toHaveBeenCalled();
-    });
+  it('rejects when the bypass account cannot be found, and looks it up again on the next request', async () => {
+    const getAdminUserId = jest.fn().mockResolvedValueOnce(null).mockResolvedValueOnce('admin-1');
+    const { run } = setup({ bypass: true, adminUserId: getAdminUserId });
+
+    await expect(run({ headers: {} })).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(run({ headers: {} })).resolves.toBe(true);
+    expect(getAdminUserId).toHaveBeenCalledTimes(2);
   });
 });

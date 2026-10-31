@@ -54,20 +54,27 @@ services:
       dockerfile: Dockerfile.frontend
       args:
         # NEXT_PUBLIC_* values are compiled into the browser bundle at build time, so each environment builds its own image
-        # from its own env file. Only public values go here: the publishable key is safe in a browser, the secret key never is.
+        # from its own env file. Only public values go here: never a secret.
         NEXT_PUBLIC_API_GATEWAY_URL: ${NEXT_PUBLIC_API_GATEWAY_URL:?set NEXT_PUBLIC_API_GATEWAY_URL (the public URL, which also serves /v1/*) in the env file}
         # What the browser's HTTP client calls. Without this build arg the bundle falls back to http://localhost:4000/v1/api.
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_GATEWAY_URL}/v1/api
         # The one upload limit, shown in the upload card. The backend and the engine take the same MAX_UPLOAD_MB.
         NEXT_PUBLIC_MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-50}
-        NEXT_PUBLIC_SUPABASE_URL: ${SUPABASE_URL:?set SUPABASE_URL in the env file}
-        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:?set SUPABASE_PUBLISHABLE_KEY in the env file}
     environment:
       NODE_ENV: production
       # Server-side calls stay on the private network: the backend, and the engine through the /api/cad proxy.
       API_URL: http://backend:4000/v1/api
       CAD_ENGINE_URL: http://cad-engine:5055
       CAD_ENGINE_API_KEY: ${CAD_ENGINE_API_KEY:?set CAD_ENGINE_API_KEY in the env file}
+      # Auth0 sign-in runs on this server (the browser never holds a token). APP_BASE_URL is also the origin the BFF accepts.
+      APP_BASE_URL: ${APP_BASE_URL:?set APP_BASE_URL (the public app URL) in the env file}
+      AUTH0_DOMAIN: ${AUTH0_DOMAIN:?set AUTH0_DOMAIN in the env file}
+      AUTH0_AUDIENCE: ${AUTH0_AUDIENCE:?set AUTH0_AUDIENCE in the env file}
+      AUTH0_CLIENT_ID: ${AUTH0_CLIENT_ID:?set AUTH0_CLIENT_ID in the env file}
+      AUTH0_CLIENT_SECRET: ${AUTH0_CLIENT_SECRET:?set AUTH0_CLIENT_SECRET in the env file}
+      AUTH0_SECRET: ${AUTH0_SECRET:?set AUTH0_SECRET in the env file}
+      # Hosts of the file bucket that the file proxy and the browser's 3D viewer may fetch signed links from.
+      TRUSTED_STORAGE_HOSTS: ${TRUSTED_STORAGE_HOSTS:?set TRUSTED_STORAGE_HOSTS (the bucket's download host) in the env file}
     tmpfs:
       - /tmp
       - /app/.next/cache:uid=1001,gid=1001
@@ -77,7 +84,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
-    networks: [edge, internal, db]
+    networks: [edge, internal]
     depends_on:
       backend:
         condition: service_healthy
@@ -97,29 +104,28 @@ services:
       PORT: 4000
       # Which deployment this is (stage or prd); the backend refuses to boot in production without it.
       APP_ENV: ${APP_ENV:?set APP_ENV to stage or prd in the env file}
-      SUPABASE_URL: ${SUPABASE_URL:?set SUPABASE_URL in the env file}
-      SUPABASE_ANON_KEY: ${SUPABASE_PUBLISHABLE_KEY:?set SUPABASE_PUBLISHABLE_KEY in the env file}
-      SUPABASE_SERVICE_KEY: ${SUPABASE_SECRET_KEY:?set SUPABASE_SECRET_KEY in the env file}
+      # Sign-in: the backend verifies Auth0 access tokens itself (docs/CUTOVER_AUTH0_POSTGRES.md).
+      AUTH0_DOMAIN: ${AUTH0_DOMAIN:?set AUTH0_DOMAIN in the env file}
+      AUTH0_AUDIENCE: ${AUTH0_AUDIENCE:?set AUTH0_AUDIENCE in the env file}
+      AUTH0_CLAIM_NAMESPACE: ${AUTH0_CLAIM_NAMESPACE:?set AUTH0_CLAIM_NAMESPACE in the env file}
       # The browser's origin; production validation rejects localhost and *.
       CORS_ORIGIN: ${CORS_ORIGIN:?set CORS_ORIGIN (the public frontend URL) in the env file}
       # The only way to reach this container is the Cloudflare tunnel, so the client address comes from CF-Connecting-IP.
       TRUST_CLOUDFLARE_HEADERS: "true"
-      # 50 MB is the Supabase free tier's cap on one stored object; set 100 here on a paid plan (frontend and engine follow).
+      # The largest upload accepted (frontend and engine follow).
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-50}
       # python: this backend analyses uploads with the Python cad-engine. rust: the cad-core service does, and this backend only creates the BOM items.
       CAD_CORE: ${CAD_CORE:-python}
       # python: cad-engine /nest. rust: the nester binary shipped in this image (falls back to python if it is unavailable).
       NESTING_ENGINE: ${NESTING_ENGINE:-python}
-      # supabase (default) or postgrest: with `postgrest` the backend talks to the postgrest service below and signs its own tokens.
-      DB_BACKEND: ${DB_BACKEND:-supabase}
-      STORAGE_BACKEND: ${STORAGE_BACKEND:-supabase}
-      S3_BUCKET: ${S3_BUCKET:-}
-      S3_REGION: ${S3_REGION:-}
-      S3_ENDPOINT: ${S3_ENDPOINT:-}
-      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
-      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      # Data: the postgrest service below, with tokens this backend signs. Files: an S3-compatible bucket.
       POSTGREST_URL: http://postgrest:3000
-      DB_JWT_SECRET: ${DB_JWT_SECRET:-}
+      DB_JWT_SECRET: ${DB_JWT_SECRET:?set DB_JWT_SECRET in the env file}
+      S3_BUCKET: ${S3_BUCKET:?set S3_BUCKET in the env file}
+      S3_REGION: ${S3_REGION:?set S3_REGION in the env file}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?set S3_ACCESS_KEY_ID in the env file}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?set S3_SECRET_ACCESS_KEY in the env file}
       CAD_ENGINE_URL: http://cad-engine:5055
       # Shared secret between the backend and the engine; the engine refuses protected routes in production without it.
       CAD_ENGINE_API_KEY: ${CAD_ENGINE_API_KEY:?set CAD_ENGINE_API_KEY in the env file}
@@ -142,8 +148,10 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
-    networks: [edge, internal]
+    networks: [edge, internal, db]
     depends_on:
+      postgrest:
+        condition: service_healthy
       cad-engine:
         condition: service_healthy
       ecad-engine:
@@ -216,11 +224,7 @@ services:
         geometry: ./geometry-worker
         fixtures: ./backend/test/fixtures/cad
     environment:
-      # Same switch as the backend: DB_BACKEND=postgrest needs POSTGREST_URL, DB_JWT_SECRET and S3_*; otherwise Supabase (the runner
-      # refuses to start, naming the missing setting, when the ones its mode needs are empty).
-      DB_BACKEND: ${DB_BACKEND:-supabase}
-      SUPABASE_URL: ${SUPABASE_URL:-}
-      SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY:-}
+      # The same data API and bucket as the backend (the runner refuses to start, naming the missing setting, when one is empty).
       POSTGREST_URL: http://postgrest:3000
       DB_JWT_SECRET: ${DB_JWT_SECRET:-}
       S3_BUCKET: ${S3_BUCKET:-}
@@ -248,24 +252,23 @@ services:
         limits: { cpus: '2', memory: 2G, pids: 256 }
         reservations: { cpus: '0.5', memory: 256M }
 
-  # --- PostgREST: the data API in front of the managed Postgres (docs: docs/ENGINEERING.md "Leaving Supabase"). Runs only with
-  # `--profile postgrest` (DB_BACKEND=postgrest). Reachable ONLY from the backend: it is on the private `db` network with it and nothing
+  # --- PostgREST: the data API in front of the managed Postgres (docs: docs/ENGINEERING.md "Leaving Supabase"). Reachable ONLY from
+  # the backend: it is on the private `db` network with it and nothing
   # else, never published, and it accepts only tokens the backend signs with DB_JWT_SECRET. It needs outbound access to the database,
   # which is why it is not on the no-internet `internal` network. Connects as the `authenticator` role, which can only switch to
   # anon/authenticated/service_role. ---
   postgrest:
     <<: *hardened
-    profiles: [postgrest]
     image: postgrest/postgrest@sha256:1347d7552b88f17832912c06afbf7c43209af6eeeb60834b04aae12c9bd9d5cc
     platform: linux/amd64
     user: "10004:10004"
     environment:
-      # No `:?` here: Compose checks it for every service, even one in an inactive profile, and would stop the default stack. Empty means
-      # PostgREST refuses to start (no database), and an empty secret means it rejects every token: both fail closed.
-      PGRST_DB_URI: ${POSTGREST_DB_URI:-}
+      PGRST_DB_URI: ${POSTGREST_DB_URI:?set POSTGREST_DB_URI in the env file}
       PGRST_DB_SCHEMAS: public
+      # As on Supabase: extension functions (uuid-ossp, pgcrypto) live in the `extensions` schema.
+      PGRST_DB_EXTRA_SEARCH_PATH: public, extensions
       PGRST_DB_ANON_ROLE: anon
-      PGRST_JWT_SECRET: ${DB_JWT_SECRET:-}
+      PGRST_JWT_SECRET: ${DB_JWT_SECRET:?set DB_JWT_SECRET in the env file}
       PGRST_SERVER_HOST: 0.0.0.0
       PGRST_SERVER_PORT: 3000
       PGRST_ADMIN_SERVER_PORT: 3001
@@ -318,7 +321,7 @@ networks:
   # The backend and PostgREST only: PostgREST needs a route out to the database, so it cannot live on `internal`, and it must not share
   # `edge` with the tunnel and the frontend.
   db: {}
-  # Has a route to the internet (the tunnel dials out; the backend and frontend call Supabase).
+  # Has a route to the internet (the tunnel dials out; the backend calls Auth0, the bucket and the model providers).
   edge: {}
   # No route out and none in: engines can neither phone home nor be reached from outside.
   internal:

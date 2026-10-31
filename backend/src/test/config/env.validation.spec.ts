@@ -3,9 +3,15 @@ import { validate } from '../../config/env.validation';
 
 function baseConfig(overrides: Record<string, unknown> = {}) {
   return {
-    SUPABASE_URL: 'https://project.supabase.co',
-    SUPABASE_ANON_KEY: 'a'.repeat(32),
-    SUPABASE_SERVICE_KEY: 'b'.repeat(32),
+    POSTGREST_URL: 'http://rest.invalid:3000',
+    DB_JWT_SECRET: 'j'.repeat(40),
+    S3_BUCKET: 'emithran',
+    S3_REGION: 'us-east-1',
+    S3_ACCESS_KEY_ID: 'key',
+    S3_SECRET_ACCESS_KEY: 'secret',
+    AUTH0_DOMAIN: 'tenant.example.auth0.com',
+    AUTH0_AUDIENCE: 'https://api.example.com',
+    AUTH0_CLAIM_NAMESPACE: 'https://example.com/',
     ...overrides,
   };
 }

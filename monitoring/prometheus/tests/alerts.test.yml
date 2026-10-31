@@ -33,7 +33,7 @@ tests:
           - exp_labels: { severity: critical, job: probe-database }
             exp_annotations:
               summary: "Backend is up but its database check fails"
-              response: "Check the database provider status and the backend's SUPABASE_URL / POSTGREST_URL. Free-tier projects pause after a week idle."
+              response: "Check the database provider status, the postgrest service and the backend's POSTGREST_URL."
       - { eval_time: 10m, alertname: DatabaseUnavailable, exp_alerts: [] }
 
   - name: server error rate needs both a high ratio and real traffic

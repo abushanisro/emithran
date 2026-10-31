@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'PDF URL is required' }, { status: 400 });
     }
 
-    // Fetch the PDF from the provided URL (Supabase storage)
+    // Fetch the PDF from the provided URL (a signed file-store link)
     let pdfBuffer: Buffer;
     try {
       const pdfResponse = await fetchTrustedFile(String(pdfUrl), { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PDF-Processor/1.0)' } });

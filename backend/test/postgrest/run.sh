@@ -11,7 +11,7 @@ trap cleanup EXIT
 
 docker network create "$ID" >/dev/null
 docker run -d --rm --name "$ID-pg" --network "$ID" -e POSTGRES_PASSWORD=pw -v "$PWD/../../migrations":/migrations:ro "$PG_IMAGE" >/dev/null
-for _ in $(seq 1 60); do docker exec "$ID-pg" pg_isready -U postgres >/dev/null 2>&1 && break; sleep 1; done
+for _ in $(seq 1 60); do docker exec "$ID-pg" pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1 && break; sleep 1; done
 docker exec -i "$ID-pg" psql -U postgres -v ON_ERROR_STOP=1 -q <<'SQL'
 \i /migrations/930_postgres_compat.sql
 ALTER ROLE authenticator PASSWORD 'authpw';

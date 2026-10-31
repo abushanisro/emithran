@@ -10264,7 +10264,7 @@ export default function ManufacturingIntelligencePage() {
     apiClient.get<{ url: string }>(`/bom-items/${itemId}/file-url/2d`, { timeout: 45_000, priority: 'high', signal })
       .then(async (r) => {
         if (!r?.url) return;
-        // Fetch as blob to bypass Supabase X-Frame-Options header
+        // Fetch as blob to bypass the file store's X-Frame-Options header
         const resp = await fetch(r.url, { signal });
         const blob = await resp.blob();
         // Cancelled while reading: the catch below ignores it.

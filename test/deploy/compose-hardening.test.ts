@@ -83,11 +83,24 @@ describe('docker-compose.prod.yml', () => {
     expect(compose.services.cloudflared?.networks).toEqual(['edge']);
   });
 
-  it('gives the browser-facing frontend no secret key and no database credential', () => {
+  it("gives the frontend only the Auth0 server secrets it needs as the BFF, never a database credential, never in the browser bundle", () => {
     const frontend = compose.services.frontend;
-    const names = [...Object.keys(frontend?.environment ?? {}), ...Object.keys(frontend?.build?.args ?? {})];
-    expect(names.filter((n) => /SECRET|SERVICE_KEY|DATABASE_URL|PASSWORD|TOKEN/i.test(n))).toEqual([]);
-    for (const arg of Object.keys(frontend?.build?.args ?? {})) expect(arg.startsWith('NEXT_PUBLIC_')).toBe(true);
+    const runtime = Object.keys(frontend?.environment ?? {});
+    const buildArgs = Object.keys(frontend?.build?.args ?? {});
+    // The Next.js server is the confidential Auth0 client: its client secret and session secret are runtime settings on the server.
+    expect(runtime.filter((n) => /SECRET|SERVICE_KEY|DATABASE_URL|PASSWORD|TOKEN/i.test(n)).sort()).toEqual(['AUTH0_CLIENT_SECRET', 'AUTH0_SECRET']);
+    expect(buildArgs.filter((n) => /SECRET|SERVICE_KEY|DATABASE_URL|PASSWORD|TOKEN/i.test(n))).toEqual([]);
+    for (const arg of buildArgs) expect(arg.startsWith('NEXT_PUBLIC_')).toBe(true);
+  });
+
+  it('keeps the frontend off the database network: only the backend reaches PostgREST', () => {
+    const networksOf = (name: string) => {
+      const networks = compose.services[name]?.networks ?? [];
+      return Array.isArray(networks) ? networks : Object.keys(networks);
+    };
+    expect(networksOf('frontend')).not.toContain('db');
+    expect(networksOf('backend')).toContain('db');
+    expect(networksOf('postgrest')).toEqual(['db']);
   });
 
   it('hands the browser bundle the real API address, not the localhost default it would otherwise compile in', () => {

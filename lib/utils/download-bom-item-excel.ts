@@ -1,4 +1,3 @@
-import { apiClient } from '@/lib/api/client';
 import { apiConfig } from '@/lib/api/config';
 
 /**
@@ -18,13 +17,11 @@ export async function downloadBomItemExcel(
   fallbackFilename: string,
   scenario?: { batchSize?: number; location?: string },
 ): Promise<void> {
-  const token = apiClient.getAccessToken();
-  const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
   const params = new URLSearchParams();
   if (scenario?.batchSize != null) params.set('batchSize', String(scenario.batchSize));
   if (scenario?.location) params.set('location', scenario.location);
   const qs = params.toString();
-  const res = await fetch(`${apiConfig.endpoints.api.v1}/cost-analysis/bom-item/${bomItemId}/excel${qs ? `?${qs}` : ''}`, { headers });
+  const res = await fetch(`${apiConfig.endpoints.api.v1}/cost-analysis/bom-item/${bomItemId}/excel${qs ? `?${qs}` : ''}`);
 
   if (!res.ok) {
     throw new Error(`Excel export failed (${res.status})`);

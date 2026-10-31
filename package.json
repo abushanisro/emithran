@@ -10,7 +10,8 @@
     "start:production": "NODE_ENV=production node .next/standalone/server.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "type-check": "tsc --noEmit",
+    "type-check": "next typegen && tsc --noEmit",
+    "check:boundary": "node scripts/check-frontend-boundary.ts",
     "test": "vitest run",
     "test:e2e": "playwright test"
   },
@@ -35,8 +36,6 @@
     "@radix-ui/react-visually-hidden": "1.2.13",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.4.2",
-    "@supabase/ssr": "0.12.7",
-    "@supabase/supabase-js": "2.118.0",
     "@tanstack/react-query": "^5.83.0",
     "@types/node": "^22.19.13",
     "@types/react": "^19.2.14",

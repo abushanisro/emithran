@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use archive::Limits;
-use runner::backend::{Backend, Platform, Supabase};
+use runner::backend::{Backend, Platform};
 use runner::health;
 use runner::job::{self, Config};
 use runner::s3::{S3, S3Settings};
@@ -61,19 +61,8 @@ fn config() -> Result<(Config, Duration), String> {
     Ok((config, Duration::from_secs(number("POLL_SECONDS", 30))))
 }
 
-/// Either Supabase (database and files), or no Supabase at all: PostgREST plus an S3-compatible bucket. Chosen like the backend does,
-/// by DB_BACKEND, so one set of environment variables configures both.
-enum Chosen {
-    Supabase(Supabase),
-    Platform(Platform),
-}
-
-fn backend_from_env() -> Result<Chosen, String> {
-    if std::env::var("DB_BACKEND").as_deref() != Ok("postgrest") {
-        return Supabase::new(&setting("SUPABASE_URL")?, &setting("SUPABASE_SECRET_KEY")?)
-            .map(Chosen::Supabase)
-            .map_err(|e| e.to_string());
-    }
+/// The database (PostgREST on plain Postgres) and the S3-compatible file store, from the same settings the backend reads.
+fn backend_from_env() -> Result<Platform, String> {
     let files = S3::new(S3Settings {
         bucket: setting("S3_BUCKET")?,
         region: setting("S3_REGION")?,
@@ -88,7 +77,6 @@ fn backend_from_env() -> Result<Chosen, String> {
         &setting("DB_JWT_SECRET")?,
         files,
     )
-    .map(Chosen::Platform)
     .map_err(|e| e.to_string())
 }
 
@@ -114,10 +102,7 @@ async fn main() {
             std::process::exit(78);
         }
     };
-    match backend {
-        Chosen::Supabase(backend) => serve(&backend, &config, poll).await,
-        Chosen::Platform(backend) => serve(&backend, &config, poll).await,
-    }
+    serve(&backend, &config, poll).await;
 }
 
 async fn serve<B: Backend>(backend: &B, config: &Config, poll: Duration) {

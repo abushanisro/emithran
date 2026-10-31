@@ -2,7 +2,7 @@
 
 import { createContext, useContext } from 'react'
 
-/** What the app knows about the signed-in person, whichever service signed them in. `id` is always the internal user uuid. */
+/** What the app knows about the signed-in person. `id` is always the internal user uuid. */
 export interface AuthUser {
   id: string
   email?: string
@@ -14,9 +14,9 @@ export interface AuthContextType {
   loading: boolean
   /** Signed in with the identity service but not invited to eMithran (backend answered 403). */
   accessDenied?: boolean
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>
-  signUp: (email: string, password: string, fullName?: string) => Promise<{ error: Error | null }>
-  signInWithGoogle: () => Promise<{ error: Error | null }>
+  /** Leaves for Auth0's login page; credentials are never typed into this app. */
+  signIn: () => Promise<never>
+  signInWithGoogle: () => Promise<never>
   signOut: () => Promise<void>
 }
 

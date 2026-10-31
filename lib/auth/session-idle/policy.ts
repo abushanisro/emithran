@@ -1,5 +1,3 @@
-import { decodeJwtPayload } from '../jwt-payload';
-
 /**
  * Inactivity-timeout rule, browser side.
  *
@@ -24,7 +22,7 @@ export const DEFAULT_SESSION_IDLE_POLICY: SessionIdlePolicy = {
 
 /**
  * How often user activity is reported to the server, at most. Every report is
- * a request against the Supabase log quota, and the server deadline is 30
+ * a request to the API, and the server deadline is 30
  * minutes away, so once per 5 minutes is plenty: the report that follows any
  * activity always arrives long before that deadline, and "Stay signed in" is
  * reported at once.
@@ -57,18 +55,6 @@ export function sessionDeadline(
   if (lastJobAt === null) return idleDeadline;
   const jobDeadline = Math.min(lastJobAt + policy.jobGraceMs, idleDeadline + policy.jobExtensionMaxMs);
   return Math.max(idleDeadline, jobDeadline);
-}
-
-/**
- * The session id in an access token's claims, or null: Supabase's `session_id`, or Auth0's `sid` (as a namespaced claim such as
- * https://emithran.com/sid, which is how a post-login Action must add it to an access token).
- */
-export function sessionIdFromAccessToken(token: string): string | null {
-  const claims = decodeJwtPayload(token);
-  if (!claims) return null;
-  const key = 'session_id' in claims ? 'session_id' : Object.keys(claims).find((k) => k === 'sid' || k.endsWith('/sid'));
-  const sessionId = key ? claims[key] : undefined;
-  return typeof sessionId === 'string' && sessionId ? sessionId : null;
 }
 
 export function isValidPolicy(value: unknown): value is SessionIdlePolicy {

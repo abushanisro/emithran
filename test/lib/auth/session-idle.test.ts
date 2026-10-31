@@ -4,7 +4,6 @@ import { SessionIdleController, type IdleControllerDeps, type ServerResult } fro
 import {
   DEFAULT_SESSION_IDLE_POLICY,
   sessionDeadline,
-  sessionIdFromAccessToken,
 } from '@/lib/auth/session-idle/policy';
 import {
   beginProtectedJob,
@@ -85,12 +84,6 @@ describe('session idle policy (browser copy)', () => {
     expect(sessionDeadline({ lastActivityAt: T0, lastJobAt: T0 + 35 * MIN }, p)).toBe(T0 + 37 * MIN);
     expect(sessionDeadline({ lastActivityAt: T0, lastJobAt: T0 + 90 * MIN }, p)).toBe(T0 + 45 * MIN);
     expect(sessionDeadline({ lastActivityAt: T0, lastJobAt: T0 + 5 * MIN }, p)).toBe(T0 + 30 * MIN);
-  });
-
-  it('reads the session id from a base64url access token', () => {
-    const payload = Buffer.from(JSON.stringify({ session_id: 'a-b?c>' })).toString('base64url');
-    expect(sessionIdFromAccessToken(`h.${payload}.s`)).toBe('a-b?c>');
-    expect(sessionIdFromAccessToken('garbage')).toBeNull();
   });
 });
 

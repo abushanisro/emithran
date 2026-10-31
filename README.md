@@ -303,9 +303,8 @@ Auth0. Run these from `backend/`; nothing leaves your laptop.
 
 1. `baseline-dump.sh "<read-only connection url of stage>" ~/baseline-stage` takes the schema, the data and the user directory.
 2. `npm run local:load -- ~/baseline-stage` starts the stack, loads it, applies the migrations newer than the baseline, creates the bucket and starts the data API.
-3. `npm run local:use` points the root `.env` at it (the old `.env` is saved outside the repo; `npm run local:restore` undoes it) and turns on the
-   development account, so there is no login page until Auth0 exists. Set `ADMIN_FALLBACK_EMAIL` to a user in the baseline. Restart backend and frontend.
-4. When the Auth0 tenant exists (steps in `docs/CUTOVER_AUTH0_POSTGRES.md`): fill the `AUTH0_*` settings, run `npm run auth0:check`, then set
-   `AUTH_BACKEND=auth0` and `NEXT_PUBLIC_AUTH_BACKEND=auth0` and restart.
+3. `npm run local:use` points the root `.env` at it (the old `.env` is saved outside the repo; `npm run local:restore` undoes it). Restart backend and frontend.
+4. Sign-in is Auth0 (steps in `docs/CUTOVER_AUTH0_POSTGRES.md`): fill the `AUTH0_*` settings, run `npm run auth0:check`, and restart.
+   There is no other sign-in.
 
 `npm run test:local` proves the whole chain on a throwaway copy. `npm run local:status`, `local:down` and `local:reset -- --yes` manage the stack.

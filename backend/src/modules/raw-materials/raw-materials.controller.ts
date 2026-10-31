@@ -216,7 +216,7 @@ export class RawMaterialsController {
     @AccessToken() token: string,
     @CurrentOrganization() organizationId: string,
   ): Promise<{ message: string; created: number; failed: number; errors?: any[]; dataWarnings?: string[] }> {
-    this.logger.log(`Upload request received: ${file?.originalname || 'No file'}`, 'RawMaterialsController');
+    this.logger.log(`Upload request received: ${file?.originalname || 'No file'}`);
 
     if (!file) {
       throw new BadRequestException('No file provided');
@@ -299,8 +299,8 @@ export class RawMaterialsController {
 
       // Log first row for debugging column names
       if (jsonData.length > 0) {
-        this.logger.debug('Excel columns found:', Object.keys(jsonData[0]), 'RawMaterialsController');
-        this.logger.debug('First row sample data:', JSON.stringify(jsonData[0], null, 2), 'RawMaterialsController');
+        this.logger.debug('Excel columns found:', Object.keys(jsonData[0]));
+        this.logger.debug('First row sample data:', JSON.stringify(jsonData[0], null, 2));
       }
 
       // Helper function to safely get column value with multiple possible names
@@ -442,11 +442,11 @@ export class RawMaterialsController {
 
           // Log for first row to debug
           if (index === 0) {
-            this.logger.debug('Row 1 extracted values:', 'RawMaterialsController');
-            this.logger.debug(`  Specific Heat raw: ${specificHeatRaw}`, 'RawMaterialsController');
-            this.logger.debug(`  Thermal Cond raw: ${thermalCondRaw}`, 'RawMaterialsController');
-            this.logger.debug(`  Specific Heat parsed: ${parseNumeric(specificHeatRaw)}`, 'RawMaterialsController');
-            this.logger.debug(`  Thermal Cond parsed: ${parseNumeric(thermalCondRaw)}`, 'RawMaterialsController');
+            this.logger.debug('Row 1 extracted values:');
+            this.logger.debug(`  Specific Heat raw: ${specificHeatRaw}`);
+            this.logger.debug(`  Thermal Cond raw: ${thermalCondRaw}`);
+            this.logger.debug(`  Specific Heat parsed: ${parseNumeric(specificHeatRaw)}`);
+            this.logger.debug(`  Thermal Cond parsed: ${parseNumeric(thermalCondRaw)}`);
           }
 
           const createDto: CreateRawMaterialDto = {
@@ -512,7 +512,7 @@ export class RawMaterialsController {
 
           // Log progress every 50 rows
           if ((index + 1) % 50 === 0) {
-            this.logger.debug(`Processed ${index + 1} rows...`, 'RawMaterialsController');
+            this.logger.debug(`Processed ${index + 1} rows...`);
           }
         } catch (error) {
           // Properly serialize error with all details
@@ -538,7 +538,7 @@ export class RawMaterialsController {
         }
       }
 
-      this.logger.log(`Validation complete: ${validMaterials.length} valid, ${errors.length} failed`, 'RawMaterialsController');
+      this.logger.log(`Validation complete: ${validMaterials.length} valid, ${errors.length} failed`);
 
       // Identify rows with incomplete physical properties — these import successfully
       // but will render as '-' in the UI. Surface them as data quality warnings so
@@ -556,25 +556,25 @@ export class RawMaterialsController {
       // Batch insert all valid materials
       let created = 0;
       if (validMaterials.length > 0) {
-        this.logger.log(`Starting batch insert of ${validMaterials.length} materials...`, 'RawMaterialsController');
+        this.logger.log(`Starting batch insert of ${validMaterials.length} materials...`);
         try {
           created = await this.rawMaterialsService.createBatch(validMaterials, user.id, token, organizationId);
-          this.logger.log(`Batch insert complete: ${created} materials created`, 'RawMaterialsController');
+          this.logger.log(`Batch insert complete: ${created} materials created`);
         } catch (error) {
-          this.logger.error(`Batch insert failed: ${error.message}`, 'RawMaterialsController');
+          this.logger.error(`Batch insert failed: ${error.message}`);
           throw new BadRequestException(`Batch insert failed: ${error.message}`);
         }
       }
 
       const failed = errors.length;
 
-      this.logger.log(`Upload complete: ${created} created, ${failed} failed out of ${jsonData.length} total rows`, 'RawMaterialsController');
+      this.logger.log(`Upload complete: ${created} created, ${failed} failed out of ${jsonData.length} total rows`);
 
       if (failed > 0) {
-        this.logger.debug(`Failed rows: ${errors.map(e => e.row).join(', ')}`, 'RawMaterialsController');
+        this.logger.debug(`Failed rows: ${errors.map(e => e.row).join(', ')}`);
       }
       if (dataWarnings.length > 0) {
-        this.logger.warn(`${dataWarnings.length} rows imported with missing physical properties`, 'RawMaterialsController');
+        this.logger.warn(`${dataWarnings.length} rows imported with missing physical properties`);
       }
 
       return {

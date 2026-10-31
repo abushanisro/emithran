@@ -16,7 +16,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '../client';
 import { apiConfig } from '../config';
-import { supabase } from '../../supabase/client';
 
 // ─── Types (mirror backend DTOs) ────────────────────────────────────────────
 
@@ -300,14 +299,8 @@ export type StreamEvent =
  * Subscribes to /process-plan-generator/:bomItemId/stream as long as
  * `enabled` is true. Returns an in-memory array of events received.
  *
- * The backend gates the stream by the user's auth token, but the browser
- * EventSource API doesn't allow custom headers, so we pass the token as
- * a query-string parameter and the backend's SupabaseAuthGuard accepts
- * either Authorization header OR ?token=.
- *
- * Hits the API gateway directly (apiConfig.endpoints.api.v1, e.g.
- * http://localhost:4000/v1/api). Going through Next.js doesn't work for
- * SSE because Next dev-server doesn't proxy long-lived connections.
+ * The stream is same-origin (/api/v1): the session cookie authenticates it
+ * and the BFF route streams it through with the token attached server-side.
  */
 export function useGenerationStream(bomItemId: string, enabled: boolean): StreamEvent[] {
   const [events, setEvents] = useState<StreamEvent[]>([]);
@@ -322,12 +315,9 @@ export function useGenerationStream(bomItemId: string, enabled: boolean): Stream
 
     let cancelled = false;
     (async () => {
-      const { data: sess } = await supabase.auth.getSession();
-      const token = sess.session?.access_token ?? '';
       if (cancelled) return;
 
-      const base = apiConfig.endpoints.api.v1;
-      const url = `${base}${BASE}/${bomItemId}/stream?token=${encodeURIComponent(token)}`;
+      const url = `${apiConfig.endpoints.api.v1}${BASE}/${bomItemId}/stream`;
       const src = new EventSource(url);
       sourceRef.current = src;
 

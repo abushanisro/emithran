@@ -1,25 +1,17 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { consumeInactivitySignOutNotice } from '@/lib/auth/session-idle/browser'
-import { usesAuth0 } from '@/lib/auth/backend'
 import { useAuth } from '@/lib/providers/auth'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
-import { Loader2, Eye, EyeOff } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 
 export default function AuthPage() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const { signIn, signInWithGoogle, signOut, accessDenied } = useAuth()
-  const router = useRouter()
 
   useEffect(() => {
     if (consumeInactivitySignOutNotice()) {
@@ -27,73 +19,16 @@ export default function AuthPage() {
     }
   }, [])
 
+  // The page keeps its look; credentials are typed on Auth0's own (branded) page, so both buttons simply leave for it.
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    // Auth0: this page keeps its look, but the credentials are typed on Auth0's own (branded) page, so there is nothing to validate here.
-    if (usesAuth0) {
-      setLoading(true)
-      await signIn('', '')
-      return
-    }
-    
-    // Client-side validation
-    if (!email.trim()) {
-      toast.error('Please enter your email address to sign in.')
-      return
-    }
-    
-    if (!email.includes('@')) {
-      toast.error('Please enter a valid email address.')
-      return
-    }
-    
-    if (!password.trim()) {
-      toast.error('Please enter your password to sign in.')
-      return
-    }
-    
-    if (password.length < 6) {
-      toast.error('Password must be at least 6 characters long.')
-      return
-    }
-    
     setLoading(true)
-
-    try {
-      const { error } = await signIn(email, password)
-      if (!error) {
-        toast.success('Successfully signed in! Redirecting to dashboard...')
-        router.push('/')
-      }
-    } catch (error: any) {
-      toast.error('An unexpected error occurred during sign in. Please try again.')
-    } finally {
-      setLoading(false)
-    }
+    await signIn()
   }
 
   const handleGoogleSignIn = async () => {
     setLoading(true)
-    try {
-      await signInWithGoogle()
-      // The user will be redirected to Google for authentication
-      // After successful auth, they'll be redirected back to /auth/callback
-    } catch (error: any) {
-      let errorMessage = 'Failed to sign in with Google. Please try again.'
-      if (error?.message) {
-        if (error.message.includes('popup')) {
-          errorMessage = 'Google sign in popup was blocked or closed. Please allow popups and try again.'
-        } else if (error.message.includes('network')) {
-          errorMessage = 'Network error during Google sign in. Please check your connection and try again.'
-        } else if (error.message.includes('unauthorized')) {
-          errorMessage = 'Google sign in failed: Account not authorized. Please use your company email or request access.'
-        }
-      }
-      toast.error(errorMessage, { duration: 6000 })
-    } finally {
-      setLoading(false)
-    }
+    await signInWithGoogle()
   }
 
   return (
@@ -190,56 +125,6 @@ export default function AuthPage() {
                 </div>
               )}
 
-              {/* Supabase signs in with the fields below; with Auth0 the same two buttons lead to Auth0's login page. */}
-              {!usesAuth0 && (
-                <>
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-semibold text-foreground">
-                  Email
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="Type Your Email Address"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  disabled={loading}
-                  className="h-14 bg-secondary/50 border-border text-foreground placeholder:text-muted-foreground focus-visible:ring-primary/50 focus-visible:border-primary rounded-xl"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-semibold text-foreground">
-                  Password
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Type Your Password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    minLength={6}
-                    disabled={loading}
-                    className="h-14 bg-secondary/50 border-border text-foreground placeholder:text-muted-foreground focus-visible:ring-primary/50 focus-visible:border-primary rounded-xl pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-5 w-5" />
-                    ) : (
-                      <Eye className="h-5 w-5" />
-                    )}
-                  </button>
-                </div>
-              </div>
-                </>
-              )}
 
               <Button
                 type="submit"

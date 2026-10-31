@@ -2,7 +2,6 @@ import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import { IsIn } from 'class-validator';
-import { AccessToken } from '../decorators/access-token.decorator';
 import { CurrentUser } from '../decorators/current-user.decorator';
 import { SessionId } from './session-id.decorator';
 import { SessionActivityService, type ActivityKind } from './session-activity.service';
@@ -39,10 +38,9 @@ export class SessionController {
   async status(
     @SessionId() sessionId: string | undefined,
     @CurrentUser('id') userId: string,
-    @AccessToken() token: string,
   ): Promise<SessionStatusDto> {
     if (!sessionId) return this.dto(null);
-    return this.dto(await this.sessionActivity.assertActive(sessionId, userId, token));
+    return this.dto(await this.sessionActivity.assertActive(sessionId, userId));
   }
 
   @Post('activity')
