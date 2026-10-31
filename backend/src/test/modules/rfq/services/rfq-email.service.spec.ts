@@ -68,3 +68,20 @@ describe('RfqEmailService attachments', () => {
     expect(attachments).toEqual([]);
   });
 });
+
+describe('RfqEmailService email content', () => {
+  it('links only to the reply address: the vendor portal route does not exist', async () => {
+    process.env.SMTP_USER = 'rfq@example.com';
+    process.env.SMTP_PASS = 'x';
+    process.env.FRONTEND_URL = 'https://app.example.com';
+    const service = new RfqEmailService({} as never, {} as never, {} as never);
+    const rfq = { id: 'r1', rfqNumber: 'RFQ-1', rfqName: 'Brackets', selectionType: 'single', bomItemIds: [], vendorIds: [] };
+    const items = [{ id: 'i1', name: 'Bracket', partNumber: 'P-1', itemType: 'part', quantity: 2, file2dPath: 'u/p/a.pdf' }];
+    const vendor = { id: 'v1', name: 'Vendor', companyEmail: 'v@example.com' };
+    const { html, text } = await (service as any).generateEmailTemplate(rfq, items, vendor);
+    expect(html).not.toContain('vendor-portal');
+    expect(text).not.toContain('vendor-portal');
+    expect(html).toContain('mailto:rfq@example.com?subject=Re: RFQ-1');
+    expect(html).toContain('drawings and 3D models are attached');
+  });
+});

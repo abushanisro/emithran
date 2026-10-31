@@ -282,7 +282,6 @@ export class RfqEmailService {
       customMessage: rfq.emailBody || '',
       contactEmail: process.env.BUYER_EMAIL || process.env.SMTP_USER,
       contactPhone: process.env.COMPANY_PHONE || '+91-XXXXXXXXXX',
-      portalLink: `${process.env.FRONTEND_URL}/vendor-portal/rfq/${rfq.id}`,
       currentDate: new Date().toLocaleDateString('en-IN', { 
         year: 'numeric', 
         month: 'long', 
@@ -393,7 +392,6 @@ export class RfqEmailService {
                     <li>Validity period of the quote</li>
                 </ul>
                 <br>
-                <a href="${templateData.portalLink}" class="cta-button">Submit Quote Online</a>
                 <a href="mailto:${templateData.contactEmail}?subject=Re: ${templateData.rfqNumber}" class="cta-button">Reply via Email</a>
             </div>
             
@@ -454,8 +452,6 @@ Please provide your detailed quotation including unit prices, lead times, and te
 
 Contact: ${templateData.contactEmail}
 Phone: ${templateData.contactPhone}
-
-Submit online: ${templateData.portalLink}
 
 Best regards,
 ${templateData.buyerName}
