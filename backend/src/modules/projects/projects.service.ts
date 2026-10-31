@@ -529,30 +529,14 @@ export class ProjectsService {
           if (existingId) {
             targetUserId = existingId;
           } else {
-            // For MVP: Create a placeholder UUID for pending user (using crypto.randomUUID if available)
-            if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-              targetUserId = crypto.randomUUID();
-            } else {
-              // Fallback UUID v4 format
-              targetUserId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-                const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-                return v.toString(16);
-              });
-            }
+            // For MVP: Create a placeholder UUID for pending user
+            targetUserId = crypto.randomUUID();
             this.logger.log(`Creating placeholder team member for ${dto.email}`);
           }
         } catch (authError) {
           this.logger.warn(`Could not check auth users: ${authError.message}`);
           // Fallback: create placeholder UUID
-          if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-            targetUserId = crypto.randomUUID();
-          } else {
-            // Fallback UUID v4 format
-            targetUserId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-              const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-              return v.toString(16);
-            });
-          }
+          targetUserId = crypto.randomUUID();
         }
       }
 

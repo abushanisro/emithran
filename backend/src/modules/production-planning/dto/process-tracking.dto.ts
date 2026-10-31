@@ -476,6 +476,35 @@ export class UpdateBomTrackingDto {
   opacity?: number;
 }
 
+/** One item of a bulk progress update: which tracked entity, and its new progress. */
+export class BulkProgressItemDto {
+  @ApiProperty({ enum: [EntityType.PROCESS, EntityType.SUBTASK, EntityType.BOM_ITEM] })
+  @IsEnum([EntityType.PROCESS, EntityType.SUBTASK, EntityType.BOM_ITEM])
+  entity_type: EntityType.PROCESS | EntityType.SUBTASK | EntityType.BOM_ITEM;
+
+  @ApiProperty({ description: 'ID of the process, subtask or BOM item being tracked' })
+  @IsUUID()
+  entity_id: string;
+
+  @ApiPropertyOptional({ description: 'Completion percentage' })
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  @Max(100)
+  completion_percentage?: number;
+
+  @ApiPropertyOptional({ enum: TrackingStatus })
+  @IsEnum(TrackingStatus)
+  @IsOptional()
+  status?: TrackingStatus;
+
+  @ApiPropertyOptional({ description: 'Completed quantity (BOM items only)' })
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  completed_quantity?: number;
+}
+
 // =====================================================
 // QUERY DTOs
 // =====================================================
