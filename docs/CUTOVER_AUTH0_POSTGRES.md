@@ -13,6 +13,8 @@ environment that still has data in an old Supabase project.
 1. Tenant. Create an **API**: identifier = `AUTH0_AUDIENCE` (e.g. `https://api.emithran.com`), signing algorithm **RS256** (the backend accepts nothing else).
 2. Create a **Regular Web Application**. Allowed Callback URL `<APP_BASE_URL>/auth/callback`, Allowed Logout URL `<APP_BASE_URL>`. Enable the
    Google social connection and the database connection; **turn off sign-ups** on the database connection (people are invited).
+   Then authorize it for the API: **Applications → APIs → (the API) → Application Access**, set the web application's **User Access**
+   to **Authorized**. Without this every sign-in is refused with `Client "…" is not authorized to access resource server "<AUTH0_AUDIENCE>"`.
    **Company SSO (Google Workspace)** instead of the Google social connection: in Google Cloud (project under the company's organisation),
    OAuth consent screen **Internal**, then a Web OAuth client with redirect URI `https://<AUTH0_DOMAIN>/login/callback`. In Auth0,
    Authentication → Enterprise → Google Workspace: purpose Authentication, the company domain, that client id and secret, Admin Directory

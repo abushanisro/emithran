@@ -17,6 +17,17 @@ export default function AuthPage() {
     if (consumeInactivitySignOutNotice()) {
       toast.info('You were signed out after 30 minutes of inactivity. Sign in to continue where you left off.', { duration: 8000 })
     }
+    // A failed sign-in comes back here as ?error=<code> (lib/auth0.ts); the reason itself is in the server log.
+    const error = new URLSearchParams(window.location.search).get('error')
+    if (error) {
+      toast.error(
+        error === 'invalid_state'
+          ? 'That sign-in link has expired or was already used. Please sign in again.'
+          : 'Sign-in did not complete. Please try again, and contact your administrator if it keeps failing.',
+        { duration: 8000 },
+      )
+      window.history.replaceState(null, '', window.location.pathname)
+    }
   }, [])
 
   // The page keeps its look; credentials are typed on Auth0's own (branded) page, so both buttons simply leave for it.
