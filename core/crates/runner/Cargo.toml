@@ -22,5 +22,9 @@ sha2 = "=0.11.1"
 base64 = "=0.23.1"
 hex = "=0.4.3"
 
+# PR_SET_DUMPABLE for the runner (src/isolation.rs). Already in the tree through tempfile; Apache-2.0 OR MIT, Bytecode Alliance.
+[target.'cfg(target_os = "linux")'.dependencies]
+rustix = { version = "=1.1.6", features = ["process"] }
+
 [lints]
 workspace = true

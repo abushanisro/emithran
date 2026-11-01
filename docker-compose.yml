@@ -1,5 +1,6 @@
-# mithran Platform - Complete Production Stack
-# All services with proper networking, health checks, and security
+# Local development stack only: NOT for stage or production (that is docker-compose.prod.yml, with its hardening and the tunnel).
+# Ports are published on 127.0.0.1 only, and the engines sit on an internal network with no route in from the host or out to
+# the internet; the backend reaches them over that network.
 
 
 services:
@@ -35,8 +36,6 @@ services:
 
       # Logging
       LOG_LEVEL: ${LOG_LEVEL:-info}
-    ports:
-      - "${CAD_ENGINE_PORT:-5055}:5055"
     volumes:
       - cad-temp:/tmp/cad-files
     networks:
@@ -104,7 +103,7 @@ services:
     container_name: mithran-backend
     environment:
       # Application
-      NODE_ENV: ${NODE_ENV:-production}
+      NODE_ENV: ${NODE_ENV:-development}
       PORT: ${BACKEND_PORT:-4000}
 
       # CAD Engine
@@ -141,7 +140,7 @@ services:
       # Logging
       LOG_LEVEL: ${LOG_LEVEL:-info}
     ports:
-      - "${BACKEND_PORT:-4000}:4000"
+      - "127.0.0.1:${BACKEND_PORT:-4000}:4000"
     volumes:
       - ./backend/logs:/app/logs
     networks:
@@ -197,7 +196,7 @@ services:
       AUTH0_SECRET: ${AUTH0_SECRET:?AUTH0_SECRET is required}
       TRUSTED_STORAGE_HOSTS: ${TRUSTED_STORAGE_HOSTS:-}
     ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:3000"
     networks:
       - frontend-network
     depends_on:
@@ -236,10 +235,11 @@ networks:
       config:
         - subnet: 172.20.0.0/16
 
-  # Internal backend services network
+  # Engines network (backend <-> cad-engine, ecad-engine)
   backend-network:
     driver: bridge
-    internal: false # Set to true in production for isolation
+    # No route out, none in: the engines are reachable only from the backend (which also sits on frontend-network for egress).
+    internal: true
     ipam:
       config:
         - subnet: 172.21.0.0/16
