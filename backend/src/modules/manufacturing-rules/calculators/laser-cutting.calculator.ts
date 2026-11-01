@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { SupabaseService } from "../../../common/supabase/supabase.service";
+import { DatabaseService } from "../../../common/database/database.service";
 import type {
   IOperationCalculator,
   MachiningParams,
@@ -46,12 +46,51 @@ const FALLBACK_SPEEDS: Partial<Record<IsoGroup, Record<number, { speed: number; 
   },
 };
 
+interface LaserParams {
+  speedMmMin: number;
+  pierceSec: number;
+  /** The laser power the row is for; null when the hard-coded table was used (it does not record one). */
+  actualPowerKw: number | null;
+  source: "laser_cutting_parameters" | "fallback_hardcoded";
+  warning?: string;
+}
+
+function closestValue(target: number, candidates: number[]): number {
+  return candidates.reduce((prev, curr) => (Math.abs(curr - target) < Math.abs(prev - target) ? curr : prev));
+}
+
+/**
+ * The hard-coded FALLBACK_SPEEDS row for this group and thickness, always with
+ * a warning naming what was substituted: the table itself (no DB row), another
+ * ISO group's rows (the table has only P, M and N), and the nearest tabulated
+ * thickness. Its laser power is not recorded, so none is claimed.
+ */
+export function hardcodedLaserParams(isoGroup: IsoGroup, thicknessMm: number, dbThicknessStep: number): LaserParams {
+  const own = FALLBACK_SPEEDS[isoGroup];
+  const usedGroup: IsoGroup = own ? isoGroup : "P";
+  const group = own ?? FALLBACK_SPEEDS.P!;
+  const closestKey = closestValue(thicknessMm, Object.keys(group).map(Number));
+  const fb = group[closestKey]!;
+  const parts = [
+    `Laser: no laser_cutting_parameters row for ISO ${isoGroup} at ${dbThicknessStep} mm — cut speed ${fb.speed} mm/min and pierce ${fb.pierce} s come from the hard-coded fallback table (old machine data, laser power not recorded)`,
+  ];
+  if (!own) parts.push(`the table has no ISO ${isoGroup} rows, so ISO P (carbon steel) rows were substituted`);
+  if (closestKey !== thicknessMm) parts.push(`nearest tabulated thickness ${closestKey} mm used for ${thicknessMm} mm`);
+  return {
+    speedMmMin: fb.speed,
+    pierceSec: fb.pierce,
+    actualPowerKw: null,
+    source: "fallback_hardcoded",
+    warning: `${parts.join("; ")} — seed laser_cutting_parameters for real data.`,
+  };
+}
+
 @Injectable()
 export class LaserCuttingCalculator implements IOperationCalculator {
   readonly operationKey = "laser_cutting";
   private readonly logger = new Logger(LaserCuttingCalculator.name);
 
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   validate(_params: MachiningParams, geo: FeatureGeometry): ValidationResult {
     const g = geo as LaserGeometry;
@@ -79,16 +118,19 @@ export class LaserCuttingCalculator implements IOperationCalculator {
     const steps: CalculationStep[] = [];
     const targetPower = g.laserPowerKw ?? 6.0;
 
-    const { speedMmMin, pierceSec, actualPowerKw } = await this.lookupLaserParams(
+    const { speedMmMin, pierceSec, actualPowerKw, source, warning } = await this.lookupLaserParams(
       params.isoGroup,
       g.thicknessMm,
       targetPower,
     );
+    if (warning) this.logger.warn(`[laser] ${warning}`);
 
     steps.push({
       stepName: "laser_parameters_lookup",
-      expression: "DB lookup: iso_group × thickness_mm × laser_power_kw → cutting_speed + pierce_time",
-      inputs: { thickness_mm: g.thicknessMm, laser_power_kw: actualPowerKw },
+      expression: source === "fallback_hardcoded"
+        ? "HARD-CODED FALLBACK table (no laser_cutting_parameters row): iso_group × thickness_mm → cutting_speed + pierce_time"
+        : "DB lookup: iso_group × thickness_mm × laser_power_kw → cutting_speed + pierce_time",
+      inputs: actualPowerKw != null ? { thickness_mm: g.thicknessMm, laser_power_kw: actualPowerKw } : { thickness_mm: g.thicknessMm },
       result: speedMmMin,
       units: "mm/min",
     });
@@ -135,6 +177,7 @@ export class LaserCuttingCalculator implements IOperationCalculator {
       perFeatureCycleTimeSec: totalSec,
       featureCount: 1,
       steps,
+      ...(warning ? { warnings: [warning] } : {}),
     };
   }
 
@@ -158,23 +201,25 @@ export class LaserCuttingCalculator implements IOperationCalculator {
     isoGroup: IsoGroup,
     thicknessMm: number,
     targetPowerKw: number,
-  ): Promise<{ speedMmMin: number; pierceSec: number; actualPowerKw: number }> {
-    const db = this.supabase.getPrivilegedClient("reference-data: laser_cutting_parameters");
+  ): Promise<LaserParams> {
+    const db = this.database.getPrivilegedClient("reference-data: laser_cutting_parameters");
 
     // Find closest matching thickness (DB has discrete steps: 1,2,3,4,5,6,8,10,12,16,20)
-    const closestThickness = this.closestValue(
+    const closestThickness = closestValue(
       thicknessMm,
       [1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20],
     );
 
     // Try exact power match first, then closest available
-    const { data } = await db
+    const { data, error } = await db
       .from("laser_cutting_parameters")
       .select("cutting_speed_mm_min, pierce_time_sec, laser_power_kw")
       .eq("iso_material_group", isoGroup)
       .eq("thickness_mm", closestThickness)
       .order("laser_power_kw", { ascending: false })
       .limit(5);
+    // A failed read is an error, not a reason to use the hard-coded table.
+    if (error) throw new Error(`laser_cutting_parameters lookup failed: ${error.message}`);
 
     if (data && data.length > 0) {
       const rows = data as { cutting_speed_mm_min: number; pierce_time_sec: number; laser_power_kw: number }[];
@@ -189,22 +234,13 @@ export class LaserCuttingCalculator implements IOperationCalculator {
           speedMmMin: best.cutting_speed_mm_min,
           pierceSec: best.pierce_time_sec,
           actualPowerKw: best.laser_power_kw,
+          source: "laser_cutting_parameters",
         };
       }
     }
 
-    // Fallback to hardcoded lookup
-    this.logger.warn(`[laser] No DB row for ${isoGroup}/t=${thicknessMm}mm — using hardcoded fallback`);
-    const group = FALLBACK_SPEEDS[isoGroup] ?? FALLBACK_SPEEDS["P"] ?? {};
-    const thickKeys = Object.keys(group).map(Number);
-    const closestKey = this.closestValue(thicknessMm, thickKeys);
-    const fb = group[closestKey] ?? { speed: 3000, pierce: 1.0 };
-    return { speedMmMin: fb.speed, pierceSec: fb.pierce, actualPowerKw: 6.0 };
+    // Fallback to the hard-coded table — used, but never silently.
+    return hardcodedLaserParams(isoGroup, thicknessMm, closestThickness);
   }
 
-  private closestValue(target: number, candidates: number[]): number {
-    return candidates.reduce((prev, curr) =>
-      Math.abs(curr - target) < Math.abs(prev - target) ? curr : prev,
-    );
-  }
 }

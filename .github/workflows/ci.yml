@@ -60,19 +60,21 @@ jobs:
         run: npm run build
         env:
           NODE_ENV: production
-          NEXT_PUBLIC_API_GATEWAY_URL: ${{ secrets.NEXT_PUBLIC_API_GATEWAY_URL }}
-          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+          # This build only proves the app compiles; it is never deployed. Production builds refuse to start without these URLs
+          # (no localhost fallback), so a missing secret gets a reserved, unresolvable placeholder here (.invalid, RFC 2606).
+          NEXT_PUBLIC_API_GATEWAY_URL: ${{ secrets.NEXT_PUBLIC_API_GATEWAY_URL || 'https://api.build-check.invalid' }}
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL || 'https://api.build-check.invalid/v1/api' }}
           NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL }}
           NEXT_PUBLIC_APP_VERSION: ${{ secrets.NEXT_PUBLIC_APP_VERSION }}
-          NEXT_PUBLIC_CAD_ENGINE_URL: ${{ secrets.NEXT_PUBLIC_CAD_ENGINE_URL }}
+          NEXT_PUBLIC_CAD_ENGINE_URL: ${{ secrets.NEXT_PUBLIC_CAD_ENGINE_URL || 'https://cad.build-check.invalid' }}
           NEXT_PUBLIC_DEBUG_MODE: ${{ secrets.NEXT_PUBLIC_DEBUG_MODE }}
           NEXT_PUBLIC_ENABLE_ANALYTICS: ${{ secrets.NEXT_PUBLIC_ENABLE_ANALYTICS }}
           NEXT_PUBLIC_ENABLE_DEVTOOLS: ${{ secrets.NEXT_PUBLIC_ENABLE_DEVTOOLS }}
           NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}
-          CAD_ENGINE_URL: ${{ secrets.CAD_ENGINE_URL }}
-          CAD_ENGINE_API_KEY: ${{ secrets.CAD_ENGINE_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          CAD_ENGINE_URL: ${{ secrets.CAD_ENGINE_URL || 'https://cad.build-check.invalid' }}
+          API_URL: ${{ secrets.API_URL || 'https://api.build-check.invalid/v1/api' }}
+          # No server API keys (Anthropic, Gemini, CAD engine): Next reads them at request time only, and this step runs every
+          # dependency's build script on pull requests. test/deploy/ci-workflow.test.ts keeps them out.
 
   backend:
     name: Backend (NestJS)
@@ -188,7 +190,7 @@ jobs:
         with:
           persist-credentials: false
       # Builds the Rust runner and the C++ worker (its hand-worked checks run in the build), then runs the real runner on a real zip
-      # of the STEP fixtures against a stand-in for the Supabase endpoints it uses.
+      # of the STEP fixtures against a stand-in for the PostgREST and S3 endpoints it uses.
       - run: docker build --platform linux/amd64 --build-context geometry=geometry-worker --build-context fixtures=backend/test/fixtures/cad -t cad-core:dev core
       - run: python3 core/tests/e2e.py
 
@@ -276,3 +278,14 @@ jobs:
           context: cad-engine
           push: false
           tags: cad-engine:ci
+
+  backend-image:
+    name: Backend image (no source maps shipped)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The delivered image must not carry our source maps or TypeScript (on-premises edition, step 1).
+      - run: docker build --build-context core=core -t backend:ci backend
+      - run: scripts/check-image-no-sourcemaps.sh backend:ci

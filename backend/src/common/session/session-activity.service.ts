@@ -4,7 +4,7 @@ import {
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { SupabaseService } from '../supabase/supabase.service';
+import { DatabaseService } from '../database/database.service';
 import { evictOldestIfFull } from '../cache/bounded-map';
 import { SESSION_IDLE_POLICY, sessionDeadline, type SessionActivityTimes } from './session-idle-policy';
 
@@ -13,6 +13,8 @@ export type ActivityKind = 'user' | 'job';
 const TABLE = 'user_session_activity';
 /** PostgREST / Postgres codes for "the table does not exist" (migration 901 not applied). */
 const MISSING_TABLE_CODES = new Set(['PGRST205', '42P01']);
+// The only environments where a missing table may be passed over; everything else (production, staging, unset) fails closed.
+const LOCAL_ENVS = new Set(['development', 'test']);
 const MAX_CACHED_SESSIONS = 10_000;
 
 export const SESSION_IDLE_TIMEOUT_CODE = 'SESSION_IDLE_TIMEOUT';
@@ -34,7 +36,7 @@ export class SessionActivityService {
   private readonly logger = new Logger(SessionActivityService.name);
   private readonly cache = new Map<string, SessionActivityTimes>();
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(private readonly databaseService: DatabaseService) {}
 
   /** Throws 401 if the session is past its deadline. */
   async assertActive(sessionId: string, userId: string, now = Date.now()): Promise<SessionActivityTimes> {
@@ -73,7 +75,7 @@ export class SessionActivityService {
   }
 
   private get db() {
-    return this.supabaseService.getPrivilegedClient(
+    return this.databaseService.getPrivilegedClient(
       'session-idle: user_session_activity is service-only, no user RLS policies exist',
     );
   }
@@ -106,13 +108,13 @@ export class SessionActivityService {
   /**
    * Production fails closed: no request is allowed when the deadline cannot be checked.
    * 503, not 401, so the browser does not treat a storage outage as a sign-out.
-   * Outside production a missing table (migration 901 not applied yet) is let
-   * through with a warning, so local work keeps going before the migration runs.
+   * Only when NODE_ENV is explicitly 'development' or 'test' is a missing table (migration 901 not applied yet) let
+   * through with a warning, so local work keeps going before the migration runs. Any other value (staging, unset) fails closed.
    */
   private unenforcedOrThrow(error: unknown, now: number): SessionActivityTimes {
     if (!(error instanceof SessionStorageError)) throw error;
-    if (process.env.NODE_ENV !== 'production' && error.code && MISSING_TABLE_CODES.has(error.code)) {
-      this.logger.warn(`${TABLE} is missing (run migration 901); inactivity timeout NOT enforced outside production`);
+    if (LOCAL_ENVS.has(process.env.NODE_ENV ?? '') && error.code && MISSING_TABLE_CODES.has(error.code)) {
+      this.logger.warn(`${TABLE} is missing (run migration 901); inactivity timeout NOT enforced in ${process.env.NODE_ENV}`);
       return { lastActivityAt: now, lastJobAt: null };
     }
     this.logger.error(`Session activity check failed: ${error.code ?? ''} ${error.message}`);

@@ -6,7 +6,7 @@ Provides security-focused file validation including magic number checking
 
 import os
 from pathlib import Path
-from typing import Tuple
+from typing import BinaryIO, Tuple
 
 from shared.exceptions import FileSizeExceededError, InvalidFileTypeError
 
@@ -38,7 +38,29 @@ class FileValidator:
             max_file_size_bytes: Maximum allowed file size in bytes
         """
         self.max_file_size_bytes = max_file_size_bytes
-    
+
+    def read_upload(self, stream: BinaryIO, filename: str | None) -> Tuple[str, bytes]:
+        """
+        Check an upload's extension and size before anything is written to disk.
+
+        The extension is checked first, so a temp file is only ever created with an allowed suffix, and at most one byte past
+        the limit is read, so an oversized upload is refused without being buffered whole. The content (magic number) is
+        still checked afterwards by validate_file on the written file.
+
+        Returns:
+            (lowercase allowed extension, content)
+
+        Raises:
+            InvalidFileTypeError: extension not allowed
+            FileSizeExceededError: content larger than the limit
+        """
+        file_ext = self.validate_file_extension(filename or '')
+        content = stream.read(self.max_file_size_bytes + 1)
+        if len(content) > self.max_file_size_bytes:
+            max_mb = self.max_file_size_bytes / (1024 * 1024)
+            raise FileSizeExceededError(f"File exceeds maximum allowed size {max_mb:.2f}MB")
+        return file_ext, content
+
     def validate_file_size(self, file_path: str) -> None:
         """
         Validate file size

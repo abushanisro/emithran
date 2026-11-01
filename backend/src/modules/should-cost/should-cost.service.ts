@@ -4,7 +4,7 @@ import {
   NotFoundException,
   Logger,
 } from '@nestjs/common';
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { DatabaseService } from '../../common/database/database.service';
 import {
   QueryRfqHistoryDto,
   CreateRfqHistoryDto,
@@ -26,7 +26,7 @@ import {
 export class ShouldCostService {
   private readonly logger = new Logger(ShouldCostService.name);
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(private readonly databaseService: DatabaseService) {}
 
   private paginate(query: { page?: number; limit?: number }) {
     const page = query.page || 1;
@@ -35,7 +35,7 @@ export class ShouldCostService {
   }
 
   private client(token: string) {
-    return this.supabaseService.getClient(token);
+    return this.databaseService.getClient(token);
   }
 
   // ── RFQ History ─────────────────────────────────────────────────────────────

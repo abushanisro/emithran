@@ -8,10 +8,11 @@ import {
 import { dieCastingLookupTableNames } from '../bom-items/costing/casting/calculators/die-casting-calculator-spec';
 import { castingMaterialsAsTable, castingTableQuery, castingVariablesAsTable, type CastingFlatTable } from '../bom-items/costing/casting/casting-lookup-tables';
 import * as ExcelJS from 'exceljs';
+import { assertXlsxWithinLimits } from '../../common/archive/xlsx-limits';
 import { REFERENCE_DOMAINS, REFERENCE_GROUP_DOMAIN, type ReferenceDomain } from './reference-domains';
 import { strokeRateFactorTable, turretMachinesTable, waterjetMachinesTable, type ReferenceTablePayload } from '../bom-items/costing/sheet-metal/lookup/turret-reference-tables';
 import { Logger } from '../../common/logger/logger.service';
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { DatabaseService } from '../../common/database/database.service';
 import {
   CreateProcessDto,
   UpdateProcessDto,
@@ -36,7 +37,7 @@ import {
 @Injectable()
 export class ProcessesService {
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly logger: Logger,
   ) {}
 
@@ -95,7 +96,7 @@ export class ProcessesService {
     const entries = getSmLookupBridgeEntries(group, route);
     if (entries.length === 0) return [];
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
     const results = await Promise.all(
       entries.map((entry, idx) => this.buildLiveSmLookupTablePayload(
         client, entry.table, entry.displayName, entry.description, idx, entry.filter, entry.orderBy, entry.keyPattern,
@@ -113,7 +114,7 @@ export class ProcessesService {
   private async getStagedReferenceTables(domain: ReferenceDomain, accessToken: string): Promise<any[]> {
     const { table, versions } = REFERENCE_DOMAINS[domain];
     if (!versions) return [];
-    const { data, error } = await this.supabaseService.getClient(accessToken)
+    const { data, error } = await this.databaseService.getClient(accessToken)
       .from(table)
       .select('key, source_version, notes, raw')
       .eq('category', 'lookup_table')
@@ -151,7 +152,7 @@ export class ProcessesService {
    * need its own rendering path for.
    */
   private async buildLiveSmLookupTablePayload(
-    client: ReturnType<SupabaseService['getClient']>,
+    client: ReturnType<DatabaseService['getClient']>,
     table: string,
     displayName: string,
     description: string,
@@ -241,7 +242,7 @@ export class ProcessesService {
    * dialog's reference panel renders. Deburr Time Per mm is one of these values.
    */
   async getDeslagAllowanceTable(): Promise<any> {
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared')
       .from('sm_reference_data')
       .select('raw')
@@ -265,7 +266,7 @@ export class ProcessesService {
 
   /** Every Turret Press machine with the values the TPP calculator reads from it (Punch Rate, Tool Change Time, Nibble Speed). */
   async getTurretMachinesTable(): Promise<ReferenceTablePayload> {
-    const db = this.supabaseService.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const db = this.databaseService.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const [machines, library] = await Promise.all([
       db.from('sm_reference_data').select('key, raw').eq('category', 'machine').like('key', 'turretPunchMachine:%'),
       db.from('sm_reference_data').select('key, raw').eq('category', 'machine').like('key', 'Turret Press (Punch Press):%'),
@@ -276,7 +277,7 @@ export class ProcessesService {
 
   /** Every waterjet machine with its nozzle delay (the waterjet calculator pierce time) and jet data. */
   async getWaterjetMachinesTable(): Promise<ReferenceTablePayload> {
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared')
       .from('sm_reference_data')
       .select('key, raw')
@@ -288,7 +289,7 @@ export class ProcessesService {
 
   /** Lookup Table 1: stroke rate factor by machine tonnage and part complexity. */
   async getStrokeRateFactorTable(): Promise<ReferenceTablePayload> {
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared')
       .from('sm_reference_data')
       .select('raw')
@@ -302,7 +303,7 @@ export class ProcessesService {
     if (!getAllSmLookupTableNames().has(table)) {
       throw new BadRequestException(`"${table}" is not a recognized cost-engine lookup table`);
     }
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
     const payload = await this.buildLiveSmLookupTablePayload(client, table, table, `Live ${table} data`, 0);
     if (!payload) throw new InternalServerErrorException(`Failed to read ${table}`);
     return payload;
@@ -328,7 +329,7 @@ export class ProcessesService {
       throw new BadRequestException(`"${table}" is not a die-casting calculator lookup table`);
     }
     const q = castingTableQuery(table);
-    const db = this.supabaseService.getPrivilegedClient('reference-data: machining_reference_data, public-read');
+    const db = this.databaseService.getPrivilegedClient('reference-data: machining_reference_data, public-read');
     let flat: CastingFlatTable | { columns: string[]; rows: Array<Record<string, unknown>> };
     if (q.category === 'variable') {
       const { data, error } = await db.from('machining_reference_data').select('key, value, unit_type, notes')
@@ -362,7 +363,7 @@ export class ProcessesService {
     if (!machiningLookupTableNames().includes(table)) {
       throw new BadRequestException(`"${table}" is not a machining calculator lookup table`);
     }
-    const db = this.supabaseService.getPrivilegedClient('reference-data: machining_reference_data, public-read');
+    const db = this.databaseService.getPrivilegedClient('reference-data: machining_reference_data, public-read');
     let flat;
     if (table === 'variables') {
       const { data, error } = await db
@@ -419,7 +420,7 @@ export class ProcessesService {
       throw new BadRequestException(`"${table}" is read-only staged reference data and cannot be edited here`);
     }
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     const { data: existingRow, error: fetchError } = await client
       .from(table)
@@ -469,7 +470,7 @@ export class ProcessesService {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    let queryBuilder = this.supabaseService
+    let queryBuilder = this.databaseService
       .getUserClient(accessToken)
       .from('processes')
       .select('*', { count: 'exact' })
@@ -512,7 +513,7 @@ export class ProcessesService {
   async findOne(id: string, userId: string, accessToken: string): Promise<ProcessResponseDto> {
     this.logger.log(`Fetching process: ${id}`, 'ProcessesService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('processes')
       .select('*')
@@ -530,7 +531,7 @@ export class ProcessesService {
   async create(createProcessDto: CreateProcessDto, userId: string, accessToken: string): Promise<ProcessResponseDto> {
     this.logger.log('Creating process', 'ProcessesService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('processes')
       .insert({
@@ -573,7 +574,7 @@ export class ProcessesService {
     if (updateProcessDto.laborRequired !== undefined) updateData.labor_required = updateProcessDto.laborRequired;
     if (updateProcessDto.skillLevelRequired !== undefined) updateData.skill_level_required = updateProcessDto.skillLevelRequired;
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('processes')
       .update(updateData)
@@ -592,7 +593,7 @@ export class ProcessesService {
   async remove(id: string, userId: string, accessToken: string): Promise<{ message: string }> {
     this.logger.log(`Deleting process: ${id}`, 'ProcessesService');
 
-    const { error } = await this.supabaseService
+    const { error } = await this.databaseService
       .getClient(accessToken)
       .from('processes')
       .delete()
@@ -615,7 +616,7 @@ export class ProcessesService {
    */
   async getReferenceTables(processId: string, accessToken: string): Promise<any[]> {
     this.logger.log(`Fetching reference tables for process: ${processId}`, 'ProcessesService');
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     const { data: tables, error: tablesError } = await client
       .from('process_reference_tables')
@@ -691,7 +692,7 @@ export class ProcessesService {
   async getReferenceTable(tableId: string, accessToken: string): Promise<any> {
     this.logger.log(`Fetching reference table: ${tableId}`, 'ProcessesService');
 
-    const { data: table, error: tableError } = await this.supabaseService
+    const { data: table, error: tableError } = await this.databaseService
       .getClient(accessToken)
       .from('process_reference_tables')
       .select('*')
@@ -704,7 +705,7 @@ export class ProcessesService {
     }
 
     // Get rows for this table
-    const { data: rows, error: rowsError } = await this.supabaseService
+    const { data: rows, error: rowsError } = await this.databaseService
       .getClient(accessToken)
       .from('process_table_rows')
       .select('*')
@@ -725,7 +726,7 @@ export class ProcessesService {
   async createReferenceTable(dto: CreateReferenceTableDto, accessToken: string): Promise<any> {
     this.logger.log('Creating reference table', 'ProcessesService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('process_reference_tables')
       .insert({
@@ -760,7 +761,7 @@ export class ProcessesService {
     if (dto.displayOrder !== undefined) updateData.display_order = dto.displayOrder;
     if (dto.isEditable !== undefined) updateData.is_editable = dto.isEditable;
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('process_reference_tables')
       .update(updateData)
@@ -782,7 +783,7 @@ export class ProcessesService {
   async deleteReferenceTable(tableId: string, accessToken: string): Promise<{ message: string }> {
     this.logger.log(`Deleting reference table: ${tableId}`, 'ProcessesService');
 
-    const { error } = await this.supabaseService
+    const { error } = await this.databaseService
       .getClient(accessToken)
       .from('process_reference_tables')
       .delete()
@@ -802,7 +803,7 @@ export class ProcessesService {
   async createTableRow(dto: CreateTableRowDto, accessToken: string): Promise<any> {
     this.logger.log('Creating table row', 'ProcessesService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('process_table_rows')
       .insert({
@@ -831,7 +832,7 @@ export class ProcessesService {
     if (dto.rowData !== undefined) updateData.row_data = dto.rowData;
     if (dto.rowOrder !== undefined) updateData.row_order = dto.rowOrder;
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('process_table_rows')
       .update(updateData)
@@ -853,7 +854,7 @@ export class ProcessesService {
   async deleteTableRow(rowId: string, accessToken: string): Promise<{ message: string }> {
     this.logger.log(`Deleting table row: ${rowId}`, 'ProcessesService');
 
-    const { error } = await this.supabaseService
+    const { error } = await this.databaseService
       .getClient(accessToken)
       .from('process_table_rows')
       .delete()
@@ -874,7 +875,7 @@ export class ProcessesService {
     this.logger.log(`Bulk updating rows for table: ${dto.tableId}`, 'ProcessesService');
 
     // Delete all existing rows for this table
-    const { error: deleteError } = await this.supabaseService
+    const { error: deleteError } = await this.databaseService
       .getClient(accessToken)
       .from('process_table_rows')
       .delete()
@@ -892,7 +893,7 @@ export class ProcessesService {
       row_order: row.row_order,
     }));
 
-    const { data, error: insertError } = await this.supabaseService
+    const { data, error: insertError } = await this.databaseService
       .getClient(accessToken)
       .from('process_table_rows')
       .insert(rowsToInsert)
@@ -924,7 +925,7 @@ export class ProcessesService {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
     let queryBuilder = client
       .from('process_calculator_mappings')
       .select('*', { count: 'exact' })
@@ -991,7 +992,7 @@ export class ProcessesService {
    * through with `.range()` until a page returns fewer than PAGE_SIZE rows.
    */
   private async fetchAllRows(
-    client: ReturnType<SupabaseService['getClient']>,
+    client: ReturnType<DatabaseService['getClient']>,
     table: string,
     select: string,
     canonicalIds: string[],
@@ -1044,7 +1045,7 @@ export class ProcessesService {
    * process_taxonomy (migration 609).
    */
   private async getTaxonomyForMappings(
-    client: ReturnType<SupabaseService['getClient']>,
+    client: ReturnType<DatabaseService['getClient']>,
     rows: any[],
   ): Promise<Map<string, ProcessTaxonomyHint>> {
     const result = new Map<string, ProcessTaxonomyHint>();
@@ -1095,7 +1096,7 @@ export class ProcessesService {
    */
   async getProcessCalculatorMapping(id: string, accessToken: string): Promise<ProcessCalculatorMappingResponseDto> {
     this.logger.log(`Fetching process calculator mapping: ${id}`, 'ProcessesService');
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     const { data, error } = await client
       .from('process_calculator_mappings')
@@ -1122,7 +1123,7 @@ export class ProcessesService {
   ): Promise<ProcessCalculatorMappingResponseDto> {
     this.logger.log('Creating process calculator mapping', 'ProcessesService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('process_calculator_mappings')
       .insert({
@@ -1165,7 +1166,7 @@ export class ProcessesService {
     if (dto.isActive !== undefined) updateData.is_active = dto.isActive;
     if (dto.displayOrder !== undefined) updateData.display_order = dto.displayOrder;
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('process_calculator_mappings')
       .update(updateData)
@@ -1187,7 +1188,7 @@ export class ProcessesService {
   async deleteProcessCalculatorMapping(id: string, accessToken: string): Promise<{ message: string }> {
     this.logger.log(`Deleting process calculator mapping: ${id}`, 'ProcessesService');
 
-    const { error } = await this.supabaseService
+    const { error } = await this.databaseService
       .getClient(accessToken)
       .from('process_calculator_mappings')
       .delete()
@@ -1221,7 +1222,7 @@ export class ProcessesService {
     category?: string,
   ): Promise<{ domain: string; total: number; categories: string[]; variables: any[] }> {
     const { table, versions, excludeVersions } = REFERENCE_DOMAINS[domain];
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     // Every staged category of the domain except 'machine' (machines are the
     // HR Rates page, mhr_records). Each lookup row listed is a whole table,
@@ -1306,7 +1307,7 @@ export class ProcessesService {
     accessToken: string,
   ): Promise<{ key: string; sourceVersion: string; columns: string[]; rows: Record<string, unknown>[] }> {
     const { table, versions, excludeVersions } = REFERENCE_DOMAINS[domain];
-    let q = this.supabaseService.getClient(accessToken)
+    let q = this.databaseService.getClient(accessToken)
       .from(table)
       .select('key, source_version, raw')
       .eq('category', 'lookup_table')
@@ -1337,7 +1338,7 @@ export class ProcessesService {
   async getVendorsByProcess(processId: string, userId: string, accessToken: string) {
     this.logger.log(`Fetching vendors for process ${processId}`, 'ProcessesService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .rpc('get_vendors_by_process', {
         p_process_id: processId,
@@ -1359,7 +1360,7 @@ export class ProcessesService {
   async getProcessesByVendor(vendorId: string, userId: string, accessToken: string) {
     this.logger.log(`Fetching processes for vendor ${vendorId}`, 'ProcessesService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .rpc('get_processes_by_vendor', {
         p_vendor_id: vendorId,
@@ -1385,6 +1386,7 @@ export class ProcessesService {
     accessToken: string,
     organizationId: string,
   ): Promise<{ imported: number; skipped: number }> {
+    assertXlsxWithinLimits(fileBuffer); // measured before ExcelJS inflates anything
     const workbook = new ExcelJS.Workbook();
     const arrayBuffer = fileBuffer.buffer.slice(
       fileBuffer.byteOffset,
@@ -1458,7 +1460,7 @@ export class ProcessesService {
 
     if (rows.length === 0) throw new BadRequestException('No valid rows found in Excel file');
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     if (replaceExisting) {
       const { error: delError } = await client
@@ -1546,7 +1548,7 @@ export class ProcessesService {
   async clearAllCalculatorMappings(accessToken: string): Promise<{ deleted: number }> {
     this.logger.log('Clearing all process calculator mappings', 'ProcessesService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('process_calculator_mappings')
       .delete()

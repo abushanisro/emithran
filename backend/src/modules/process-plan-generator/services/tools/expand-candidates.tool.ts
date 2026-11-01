@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { SupabaseService } from '../../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../../common/database/database.service';
 import type { CandidateSet, MaterialCandidate, MachineCandidate, LabourCandidate, ProcessCandidate, CalculatorCandidate } from '../../dto/candidate-set.dto';
 import type { PartFamily } from '../../dto/engineering-brief.dto';
 
@@ -25,7 +25,7 @@ import { rankCalculators } from '../../ranking/calculator-ranker';
 export class ExpandCandidatesTool {
   private readonly logger = new Logger(ExpandCandidatesTool.name);
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(private readonly databaseService: DatabaseService) {}
 
   async execute(args: {
     kind: 'rawMaterial' | 'machine' | 'labour' | 'process' | 'calculator';
@@ -41,7 +41,7 @@ export class ExpandCandidatesTool {
     if (!safeQuery) {
       return { added: [], kind: args.kind, nextStartId: 0 };
     }
-    const client = this.supabaseService.getUserClient(args.accessToken ?? undefined);
+    const client = this.databaseService.getUserClient(args.accessToken ?? undefined);
 
     switch (args.kind) {
       case 'rawMaterial': return this.expandMaterials(client, safeQuery, args);

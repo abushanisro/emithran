@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 /**
  * Auth0's `sid` is an opaque string; the inactivity table (migration 901) keys on a uuid. The same sid always gives the same uuid
- * (a version-5-style hash, namespaced so it can never equal a Supabase session id), so no table change is needed.
+ * (a version-5-style hash, namespaced by provider), so no table change is needed.
  */
 export function sessionKeyFromAuth0Sid(sid: string): string {
   const h = createHash('sha256').update(`emithran:auth0:${sid}`).digest();

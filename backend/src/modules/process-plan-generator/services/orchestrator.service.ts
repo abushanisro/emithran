@@ -9,7 +9,7 @@ import {
 import { Observable } from 'rxjs';
 import { createHash } from 'crypto';
 
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../common/database/database.service';
 import { EVENT_BUS, EventBus } from '../../../common/events/event-bus';
 
 import type { EngineeringBrief } from '../dto/engineering-brief.dto';
@@ -59,7 +59,7 @@ export class OrchestratorService {
   // don't cross-leak events, and the POST that generates and the GET that streams may run on different instances.
 
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly retrieval: RetrievalService,
     private readonly reasoning: ReasoningService,
     private readonly resolver: ResolverService,
@@ -72,7 +72,7 @@ export class OrchestratorService {
 
   async generate(args: GenerateArgs): Promise<GenerationResponse> {
     const { bomItemId, userId, accessToken, organizationId } = args;
-    const client = this.supabaseService.getUserClient(accessToken ?? undefined);
+    const client = this.databaseService.getUserClient(accessToken ?? undefined);
     const stream = this.streamKey(bomItemId, userId);
 
     // ── Stage 1 — retrieval + scope gate ──────────────────────────────────
@@ -361,13 +361,13 @@ export class OrchestratorService {
   }
 
   async getGeneration(id: string, userId: string, accessToken: string | null): Promise<GenerationResponse | null> {
-    const client = this.supabaseService.getUserClient(accessToken ?? undefined);
+    const client = this.databaseService.getUserClient(accessToken ?? undefined);
     const row = await this.loadById(client, id).catch(() => null);
     return row ? this.rowToResponse(row) : null;
   }
 
   async getLatestDraft(bomItemId: string, userId: string, accessToken: string | null): Promise<GenerationResponse | null> {
-    const client = this.supabaseService.getUserClient(accessToken ?? undefined);
+    const client = this.databaseService.getUserClient(accessToken ?? undefined);
     // No manual user_id filter — RLS scopes this to the caller's organization.
     const { data, error } = await client
       .from('process_plan_generations')
@@ -382,7 +382,7 @@ export class OrchestratorService {
   }
 
   async discard(id: string, userId: string, accessToken: string | null): Promise<void> {
-    const client = this.supabaseService.getUserClient(accessToken ?? undefined);
+    const client = this.databaseService.getUserClient(accessToken ?? undefined);
     // No manual ownership check — RLS scopes visibility to the caller's organization.
     const { data: row, error } = await client
       .from('process_plan_generations')

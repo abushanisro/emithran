@@ -1,8 +1,8 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import type { PostgrestError } from '@supabase/supabase-js';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import type { PostgrestError } from '@supabase/postgrest-js';
 
-import { SupabaseService } from '../../common/supabase/supabase.service';
-import { UserDirectory } from '../../common/supabase/user-directory';
+import { DatabaseService } from '../../common/database/database.service';
+import { UserDirectory } from '../../common/database/user-directory';
 
 import type { CreateOrganizationDto, InviteMemberDto, UpdateOrganizationDto, WorkspaceDto } from './dto/organization.dto';
 
@@ -43,6 +43,8 @@ function columnsOf(dto: UpdateOrganizationDto): Record<string, unknown> {
 function fail(error: PostgrestError): never {
   if (error.code === '42501') throw new ForbiddenException('Not allowed for this organization');
   if (error.code === '23505') throw new ConflictException(error.message);
+  if (error.code === 'P0002') throw new NotFoundException(error.message);
+  if (error.code === '22023') throw new BadRequestException(error.message);
   throw new Error(error.message);
 }
 
@@ -59,12 +61,12 @@ function exactlyOne<T>(rows: T[] | null, what: string): T {
 @Injectable()
 export class OrganizationsService {
   constructor(
-    private readonly supabase: SupabaseService,
+    private readonly database: DatabaseService,
     private readonly directory: UserDirectory,
   ) {}
 
   async mine(userId: string, token: string): Promise<OrganizationRow | null> {
-    const { data, error } = await this.supabase
+    const { data, error } = await this.database
       .getClient(token)
       .from('organizations')
       .select('*')
@@ -79,7 +81,7 @@ export class OrganizationsService {
    * error and the owner can still reach (and delete) an organization whose later steps failed; the Kysely port makes it atomic.
    */
   async create(userId: string, dto: CreateOrganizationDto, token: string): Promise<OrganizationRow> {
-    const client = this.supabase.getClient(token);
+    const client = this.database.getClient(token);
     const { data, error } = await client
       .from('organizations')
       .insert({ ...columnsOf(dto), owner_id: userId })
@@ -88,9 +90,8 @@ export class OrganizationsService {
     if (error) fail(error);
     const organization = exactlyOne(data, 'Organization');
 
-    const member = await client
-      .from('organization_members')
-      .insert({ organization_id: organization.id, user_id: userId, role: 'owner', status: 'active' });
+    // Membership writes go through functions that check the caller (migration 942); 921 closed the table to signed-in users.
+    const member = await client.rpc('add_organization_owner_membership', { p_organization_id: organization.id });
     if (member.error) fail(member.error);
 
     const workspace = await client.from('workspaces').insert({
@@ -106,7 +107,7 @@ export class OrganizationsService {
   }
 
   async update(id: string, dto: UpdateOrganizationDto, token: string): Promise<OrganizationRow> {
-    const { data, error } = await this.supabase
+    const { data, error } = await this.database
       .getClient(token)
       .from('organizations')
       .update(columnsOf(dto))
@@ -118,13 +119,13 @@ export class OrganizationsService {
   }
 
   async remove(id: string, token: string): Promise<void> {
-    const { data, error } = await this.supabase.getClient(token).from('organizations').delete().eq('id', id).select('id');
+    const { data, error } = await this.database.getClient(token).from('organizations').delete().eq('id', id).select('id');
     if (error) fail(error);
     exactlyOne(data, 'Organization');
   }
 
   async members(organizationId: string, token: string): Promise<MemberView[]> {
-    const client = this.supabase.getClient(token);
+    const client = this.database.getClient(token);
     const { data, error } = await client
       .from('organization_members')
       .select('*')
@@ -144,31 +145,27 @@ export class OrganizationsService {
     }));
   }
 
-  async invite(organizationId: string, invitedBy: string, dto: InviteMemberDto, token: string): Promise<void> {
-    const { error } = await this.supabase.getClient(token).from('organization_members').insert({
-      organization_id: organizationId,
-      invited_email: dto.email.trim().toLowerCase(),
-      role: dto.role,
-      status: 'invited',
-      invited_by: invitedBy,
+  async invite(organizationId: string, dto: InviteMemberDto, token: string): Promise<void> {
+    // invite_organization_member (migration 942) refuses a caller who is not an owner or admin of the organization and records
+    // the caller as invited_by.
+    const { error } = await this.database.getClient(token).rpc('invite_organization_member', {
+      p_organization_id: organizationId,
+      p_email: dto.email.trim().toLowerCase(),
+      p_role: dto.role,
     });
     if (error) fail(error);
   }
 
   async removeMember(organizationId: string, memberId: string, token: string): Promise<void> {
-    const { data, error } = await this.supabase
+    // remove_organization_member (migration 942): owner/admin only, never the owner row, 404 for a row of another organization.
+    const { error } = await this.database
       .getClient(token)
-      .from('organization_members')
-      .delete()
-      .eq('id', memberId)
-      .eq('organization_id', organizationId)
-      .select('id');
+      .rpc('remove_organization_member', { p_organization_id: organizationId, p_member_id: memberId });
     if (error) fail(error);
-    exactlyOne(data, 'Member');
   }
 
   async workspaces(organizationId: string, token: string): Promise<WorkspaceRow[]> {
-    const { data, error } = await this.supabase
+    const { data, error } = await this.database
       .getClient(token)
       .from('workspaces')
       .select('*')
@@ -181,7 +178,7 @@ export class OrganizationsService {
   }
 
   async createWorkspace(organizationId: string, createdBy: string, dto: WorkspaceDto, token: string): Promise<WorkspaceRow> {
-    const { data, error } = await this.supabase
+    const { data, error } = await this.database
       .getClient(token)
       .from('workspaces')
       .insert({ organization_id: organizationId, name: dto.name, description: dto.description ?? null, is_default: false, created_by: createdBy })
@@ -192,7 +189,7 @@ export class OrganizationsService {
   }
 
   async updateWorkspace(organizationId: string, workspaceId: string, dto: WorkspaceDto, token: string): Promise<WorkspaceRow> {
-    const { data, error } = await this.supabase
+    const { data, error } = await this.database
       .getClient(token)
       .from('workspaces')
       .update({ name: dto.name, description: dto.description ?? null })
@@ -205,7 +202,7 @@ export class OrganizationsService {
   }
 
   async removeWorkspace(organizationId: string, workspaceId: string, token: string): Promise<void> {
-    const { data, error } = await this.supabase
+    const { data, error } = await this.database
       .getClient(token)
       .from('workspaces')
       .delete()
@@ -216,7 +213,7 @@ export class OrganizationsService {
     exactlyOne(data, 'Workspace');
   }
 
-  private async displayNames(client: ReturnType<SupabaseService['getClient']>, userIds: string[]): Promise<Map<string, string>> {
+  private async displayNames(client: ReturnType<DatabaseService['getClient']>, userIds: string[]): Promise<Map<string, string>> {
     if (userIds.length === 0) return new Map();
     const { data, error } = await client
       .from('user_profiles')

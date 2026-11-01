@@ -13,7 +13,7 @@ import { Controller, Get, VERSION_NEUTRAL } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { HealthCheckService, HealthCheck, HealthCheckResult } from '@nestjs/terminus';
-import { SupabaseHealthIndicator } from './indicators/supabase.health';
+import { DatabaseHealthIndicator } from './indicators/database.health';
 import { EngineHealthIndicator } from './indicators/engine.health';
 import { ElectronicsQueueHealthIndicator } from '../electronics-costing/infrastructure/queue/queue.health';
 import { Public } from '../../common/decorators/public.decorator';
@@ -24,7 +24,7 @@ import { Public } from '../../common/decorators/public.decorator';
 export class HealthController {
   constructor(
     private readonly health: HealthCheckService,
-    private readonly supabaseIndicator: SupabaseHealthIndicator,
+    private readonly databaseIndicator: DatabaseHealthIndicator,
     private readonly engineIndicator: EngineHealthIndicator,
     private readonly queueIndicator: ElectronicsQueueHealthIndicator,
     private readonly config: ConfigService,
@@ -56,7 +56,7 @@ export class HealthController {
   @HealthCheck()
   ready(): Promise<HealthCheckResult> {
     return this.health.check([
-      () => this.supabaseIndicator.isReachable('database'),
+      () => this.databaseIndicator.isReachable('database'),
       () => this.engineIndicator.check('cad_engine', 'CAD_ENGINE_URL', '/ready'),
       () => this.engineIndicator.check('ecad_engine', 'ECAD_ENGINE_URL', '/ready'),
       () => this.queueIndicator.check('electronics_queue'),
@@ -70,7 +70,7 @@ export class HealthController {
   @HealthCheck()
   check(): Promise<HealthCheckResult> {
     return this.health.check([
-      () => this.supabaseIndicator.isHealthy('supabase'),
+      () => this.databaseIndicator.isHealthy('database'),
     ]);
   }
 
@@ -81,7 +81,7 @@ export class HealthController {
   @HealthCheck()
   checkDatabase(): Promise<HealthCheckResult> {
     return this.health.check([
-      () => this.supabaseIndicator.checkDatabase('database'),
+      () => this.databaseIndicator.checkDatabase('database'),
     ]);
   }
 }

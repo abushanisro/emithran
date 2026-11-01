@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { CommentService } from '../services/comment.service';
-import { SupabaseAuthGuard } from '@/common/guards/supabase-auth.guard';
+import { RequestAuthGuard } from '@/common/guards/request-auth.guard';
 import { 
   CreateCommentDto, 
   UpdateCommentDto, 
@@ -23,7 +23,7 @@ import {
 
 @ApiTags('Comments')
 @Controller('api/comments')
-@UseGuards(SupabaseAuthGuard)
+@UseGuards(RequestAuthGuard)
 @ApiBearerAuth()
 export class CommentController {
   constructor(private readonly commentService: CommentService) {}

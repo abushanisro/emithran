@@ -1,17 +1,28 @@
-import { IsString, IsOptional, IsArray, MinLength, MaxLength } from 'class-validator';
+import { ArrayNotEmpty, ArrayUnique, IsArray, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
+import { API_KEY_DEFAULT_DAYS, API_KEY_MAX_DAYS, API_KEY_SCOPES, type ApiKeyScope } from '../../../common/api-keys/api-key-scopes';
+
 export class CreateApiKeyDto {
-  @ApiProperty({ description: 'Human-readable label for the API key', example: 'Production Integration' })
+  @ApiProperty({ description: 'Human-readable label for the API key', example: 'ERP integration' })
   @IsString()
   @MinLength(1)
   @MaxLength(100)
   name: string;
 
-  @ApiPropertyOptional({ description: 'Permission scopes', example: ['read', 'write'] })
+  @ApiProperty({ description: 'What the key may do', enum: API_KEY_SCOPES, isArray: true, example: ['projects:read'] })
   @IsArray()
+  @ArrayNotEmpty()
+  @ArrayUnique()
+  @IsIn(API_KEY_SCOPES, { each: true })
+  scopes: ApiKeyScope[];
+
+  @ApiPropertyOptional({ description: `Days until the key expires (1-${API_KEY_MAX_DAYS})`, default: API_KEY_DEFAULT_DAYS })
   @IsOptional()
-  scopes?: string[];
+  @IsInt()
+  @Min(1)
+  @Max(API_KEY_MAX_DAYS)
+  expiresInDays?: number;
 }
 
 export class ApiKeyResponseDto {
@@ -19,8 +30,9 @@ export class ApiKeyResponseDto {
   @ApiProperty() name: string;
   @ApiProperty() keyPrefix: string;
   @ApiProperty() scopes: string[];
+  @ApiProperty() organizationId: string;
   @ApiPropertyOptional() lastUsedAt: string | null;
-  @ApiPropertyOptional() expiresAt: string | null;
+  @ApiProperty() expiresAt: string;
   @ApiProperty() createdAt: string;
-  @ApiPropertyOptional() rawKey?: string;
+  @ApiPropertyOptional({ description: 'The key itself: returned once, at creation, and never stored' }) rawKey?: string;
 }

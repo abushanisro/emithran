@@ -4,7 +4,7 @@ interface User { id: string; email: string; [key: string]: any; }
  *
  * Production-grade REST API controller
  * - RESTful endpoints with proper HTTP methods
- * - Authentication with Supabase
+ * - Authentication by the global RequestAuthGuard
  * - Request validation with DTOs
  * - Swagger API documentation
  *
@@ -26,7 +26,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
+import { RequestAuthGuard } from '../../common/guards/request-auth.guard';
 import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
@@ -43,7 +43,7 @@ import {
 @ApiTags('Packaging & Logistics Costs')
 @ApiBearerAuth()
 @Controller('api/packaging-logistics-costs')
-@UseGuards(SupabaseAuthGuard)
+@UseGuards(RequestAuthGuard)
 export class PackagingLogisticsCostController {
   constructor(
     private readonly packagingLogisticsCostService: PackagingLogisticsCostService,

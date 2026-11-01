@@ -1,6 +1,6 @@
 import { Injectable, Logger, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { nesterEnabled, runNester, type NestBody } from '../../../common/nesting/nester';
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../common/database/database.service';
 import { FileStorageService } from './file-storage.service';
 import axios from 'axios';
 import { cadEngineHttp } from '../../../common/resilience/engine-http';
@@ -83,7 +83,7 @@ export class CADAnalysisService {
   private readonly cadEngineApiKey: string;
 
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly fileStorageService: FileStorageService,
   ) {
     this.cadEngineUrl = process.env.CAD_ENGINE_URL || DEFAULT_CAD_ENGINE_URL;
@@ -194,7 +194,7 @@ export class CADAnalysisService {
     try {
       this.logger.log(`Getting CAD analysis summary for BOM: ${bomId}`);
 
-      const client = this.supabaseService.getClient(accessToken);
+      const client = this.databaseService.getClient(accessToken);
 
       const { data, error } = await client
         .from('manufacturing_insights_summary')
@@ -232,7 +232,7 @@ export class CADAnalysisService {
    */
   async getBOMItemAnalysis(bomItemId: string, accessToken: string): Promise<any> {
     try {
-      const client = this.supabaseService.getClient(accessToken);
+      const client = this.databaseService.getClient(accessToken);
 
       const { data, error } = await client
         .from('bom_items_with_cad_analysis')
@@ -257,7 +257,7 @@ export class CADAnalysisService {
    */
   async getAnalysisHistory(bomItemId: string, accessToken: string, limit = 10): Promise<any[]> {
     try {
-      const client = this.supabaseService.getClient(accessToken);
+      const client = this.databaseService.getClient(accessToken);
 
       const { data, error } = await client
         .from('cad_analysis_history')
@@ -344,7 +344,7 @@ export class CADAnalysisService {
    */
   async cleanupAnalysisCache(accessToken: string): Promise<number> {
     try {
-      const client = this.supabaseService.getClient(accessToken);
+      const client = this.databaseService.getClient(accessToken);
 
       const { data, error } = await client.rpc('cleanup_cad_analysis_cache');
 
@@ -365,7 +365,7 @@ export class CADAnalysisService {
   // Private helper methods
 
   private async validateBOMItem(bomItemId: string, userId: string, accessToken: string): Promise<void> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     const { data, error } = await client
       .from('bom_items')
@@ -379,7 +379,7 @@ export class CADAnalysisService {
   }
 
   private async getExistingAnalysis(bomItemId: string, accessToken: string): Promise<any> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     const { data, error } = await client
       .from('bom_items')
@@ -416,7 +416,7 @@ export class CADAnalysisService {
 
   private async getOriginalCadFilePath(bomItemId: string, accessToken: string): Promise<string | null> {
     try {
-      const client = this.supabaseService.getClient(accessToken);
+      const client = this.databaseService.getClient(accessToken);
 
       const { data, error } = await client
         .from('bom_items')
@@ -495,7 +495,7 @@ export class CADAnalysisService {
     // Signing fails for a missing object, so it is the existence check. The
     // connection test, two-bucket search, directory listing and exists probe
     // that used to run first were five extra Storage requests per analysis,
-    // each billed against the Supabase log quota.
+    // each billed against the log quota.
     try {
       return await this.fileStorageService.getSignedUrl(filePath, 3600);
     } catch (error) {
@@ -738,7 +738,7 @@ export class CADAnalysisService {
    * Returns a lightweight array used to enrich the AI DFM prompt.
    */
   private async fetchUserProcesses(accessToken: string): Promise<any[]> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
     const { data, error } = await client
       .from('processes')
       .select('process_name, process_category, machine_type, cycle_time_minutes, setup_time_minutes, skill_level_required, machine_required, description')
@@ -1174,7 +1174,7 @@ export class CADAnalysisService {
   }
 
   private async storeAnalysisResults(request: CADAnalysisRequest, analysisResponse: GeometryAnalysisResponse): Promise<void> {
-    const client = this.supabaseService.getClient(request.accessToken);
+    const client = this.databaseService.getClient(request.accessToken);
 
     try {
       // Sanitize data to prevent numeric overflow

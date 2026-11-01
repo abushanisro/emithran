@@ -1,5 +1,4 @@
-// The one upload limit, for every layer. It comes from MAX_UPLOAD_MB (default 50, which is the Supabase free tier's cap
-// on a single stored object; set 100 on a paid plan). The engine's MAX_FILE_SIZE_MB and the browser's
+// The one upload limit, for every layer. It comes from MAX_UPLOAD_MB (default 50). The engine's MAX_FILE_SIZE_MB and the browser's
 // NEXT_PUBLIC_MAX_UPLOAD_MB are filled from the same value in the env file, so there is nothing to keep in step by hand.
 const configured = Number(process.env.MAX_UPLOAD_MB ?? 50);
 

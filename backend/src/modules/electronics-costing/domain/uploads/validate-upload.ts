@@ -8,7 +8,9 @@
 // or a board photo is well under this.
 export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 export const MAX_ARCHIVE_ENTRIES = 5000;
-export const MAX_ARCHIVE_UNCOMPRESSED_BYTES = 1024 * 1024 * 1024;
+// What a design pack may expand to. Expanded entries are all held in memory for the request (common/archive/expand-archive.ts) in
+// a backend process every tenant shares, so this is a small budget, not a gigabyte: a Gerber pack is a few MB.
+export const MAX_ARCHIVE_UNCOMPRESSED_BYTES = 200 * 1024 * 1024;
 export const MAX_ARCHIVE_RATIO = 100;
 
 /** What the shared archive expander (common/archive) is allowed to unpack for an electronics design pack. */
@@ -122,6 +124,11 @@ function checkArchive(buf: Buffer): UploadVerdict | null {
     cursor += 46 + nameLen + extraLen + commentLen;
   }
 
+  // Declared compressed sizes larger than the file itself mean entries share their data: the ratio below would be computed from
+  // bytes that are not there. expandArchive also refuses overlapping entries before inflating anything.
+  if (compressed > buf.length) {
+    return { ok: false, code: 'archive_ratio', message: 'Archive entries share or overlap their data.' };
+  }
   if (uncompressed > MAX_ARCHIVE_UNCOMPRESSED_BYTES) {
     return { ok: false, code: 'archive_too_large', message: 'Archive expands beyond the allowed size.' };
   }

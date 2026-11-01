@@ -6,13 +6,13 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
-import { SupabaseService } from '../supabase/supabase.service';
+import { DatabaseService } from '../database/database.service';
 
 /**
  * Resolves which organization the current request is acting on behalf of,
- * given the user already attached to the request by SupabaseAuthGuard.
+ * given the user already attached to the request by RequestAuthGuard.
  *
- * Deliberately not registered globally (unlike SupabaseAuthGuard) — apply it
+ * Deliberately not registered globally (unlike RequestAuthGuard) — apply it
  * per-controller as the org-scoping conversion reaches each module, so a
  * module that hasn't been converted yet is unaffected. See
  * memory/sheetmetal (project_manufacturing_intelligence_data_reconciliation)
@@ -26,7 +26,7 @@ import { SupabaseService } from '../supabase/supabase.service';
 @Injectable()
 export class OrganizationContextGuard implements CanActivate {
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly audit: AuditService,
   ) {}
 
@@ -38,7 +38,7 @@ export class OrganizationContextGuard implements CanActivate {
       throw new ForbiddenException('No authenticated user on request.');
     }
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getPrivilegedClient('auth: resolve organization membership before an org context exists')
       .from('organization_members')
       .select('organization_id')

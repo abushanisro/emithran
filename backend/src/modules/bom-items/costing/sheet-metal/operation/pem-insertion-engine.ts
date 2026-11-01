@@ -1,3 +1,4 @@
+import { resolveYieldPct } from '../../shared/core/default-rates.constants';
 import type { MHRRateInput } from '../../shared/core/cost-engine';
 import type { ProcessLineCost, PhysicsGap, ConfidenceLevel } from '../../../dto/cost-breakdown.dto';
 import type { CapabilityCheck, PartGeometryForCapability } from '../../shared/capability/machine-capability';
@@ -75,7 +76,7 @@ export function computePemInsertionCost(input: PemInsertionInput): PemInsertionR
     setupTimeMin,
     inspTimeMin: input.inspTimeMin ?? 0,
     samplingRate: input.samplingRate ?? 0,
-    yieldPct: input.yieldPct ?? 0.98,
+    yieldPct: resolveYieldPct(input.yieldPct, 'PEM Insertion', warnings),
     netMatCost: input.netMatCost ?? 0,
     netWeightKg: input.netWeightKg ?? 0,
     scrapPricePerKg: input.scrapPricePerKg ?? 0,

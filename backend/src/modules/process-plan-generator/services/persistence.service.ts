@@ -5,7 +5,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../common/database/database.service';
+import { PLAN_WORKING_CURRENCY } from '../dto/engineering-brief.dto';
 
 import type { DraftLine, DraftPackage, ProposedMaster } from '../dto/draft-line.dto';
 import type {
@@ -25,7 +26,7 @@ import { ProcessCostCalculationEngine } from '../../processes/engines/process-co
  *
  * We sequence inserts and track inserted IDs so we can compensate (delete)
  * on a downstream failure. This is not true ACID across tables, but it's
- * the cleanest pattern given Supabase's JS-client constraint: we control
+ * the cleanest pattern given the PostgREST client's constraint: we control
  * cleanup if the apply fails midway. For Phase 1 the failure surface is
  * narrow (FK violations from a master being deleted between draft and
  * apply); we accept this trade-off and note it. A follow-up can move the
@@ -37,7 +38,7 @@ export class PersistenceService {
   private readonly costEngine = new ProcessCostCalculationEngine();
 
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly creditMeter: CreditMeterService,
   ) {}
 
@@ -48,7 +49,7 @@ export class PersistenceService {
     accessToken: string | null,
     organizationId?: string,
   ): Promise<ApplyResultDto> {
-    const client = this.supabaseService.getUserClient(accessToken ?? undefined);
+    const client = this.databaseService.getUserClient(accessToken ?? undefined);
 
     // ── Load the generation ────────────────────────────────────────────────
     const { data: gen, error: genErr } = await client
@@ -102,12 +103,11 @@ export class PersistenceService {
 
     const bomItemId = gen.bom_item_id as string;
 
-    // Extract location from the stored brief (available at generation time from Digital Factory selection)
-    const storedBriefForLocation = gen.brief as any;
-    const appliedLocation: string | null =
-      storedBriefForLocation?.context?.location ??
-      storedBriefForLocation?.scope?.location ??
-      null;
+    // The location the plan was generated for, from the stored brief. Only a
+    // brief that records where its location came from is trusted (older
+    // briefs carry a hard-coded 'India-Bangalore'); unknown stays null —
+    // never a guessed city.
+    const appliedLocation = appliedPlanLocation(gen.brief);
 
     try {
       for (const pm of approvedMasters.filter((m) => m.approved)) {
@@ -120,8 +120,8 @@ export class PersistenceService {
             name: (pm.data as any).grade,
             density_kg_m3: (pm.data as any).densityKgPerM3,
             cost: (pm.data as any).unitCostInrPerKg,
-            currency: 'INR',
-            location: (pm.data as any).location ?? 'India-Bangalore',
+            currency: PLAN_WORKING_CURRENCY,
+            location: (pm.data as any).location ?? appliedLocation,
           };
           const { data, error } = await client.from('raw_materials').insert(insertPayload).select('id').single();
           if (error) throw new Error(`raw_materials insert failed: ${error.message}`);
@@ -218,7 +218,7 @@ export class PersistenceService {
               cycle_time: line.data.cycleTimeSeconds,
               parts_per_cycle: line.data.partsPerCycle,
               scrap: line.data.scrapPercentage,
-              currency: 'INR',
+              currency: PLAN_WORKING_CURRENCY,
               is_active: true,
               process_group: line.data.processGroup ?? null,
               process_route: line.data.processRoute ?? null,
@@ -339,7 +339,7 @@ export class PersistenceService {
           applied_line_ids: appliedLineIds,
           credit_cost: creditCost,
           exchange_rate_snapshot: exchangeRateSnapshot,
-          costing_currency: 'INR',
+          costing_currency: PLAN_WORKING_CURRENCY,
         })
         .eq('id', generationId);
 
@@ -366,7 +366,7 @@ export class PersistenceService {
     userId: string,
     accessToken: string | null,
   ): Promise<void> {
-    const client = this.supabaseService.getUserClient(accessToken ?? undefined);
+    const client = this.databaseService.getUserClient(accessToken ?? undefined);
 
     const { data: gen, error: genErr } = await client
       .from('process_plan_generations')
@@ -408,7 +408,7 @@ export class PersistenceService {
     accessToken: string | null,
     organizationId?: string,
   ): Promise<{ id: string }> {
-    const client = this.supabaseService.getUserClient(accessToken ?? undefined);
+    const client = this.databaseService.getUserClient(accessToken ?? undefined);
 
     // RLS scopes visibility to the caller's organization — no manual check needed.
     const { data: gen, error: genErr } = await client
@@ -471,6 +471,17 @@ export class PersistenceService {
       deleteIn('processes', masters.processes),
     ]);
   }
+}
+
+/**
+ * The Digital Factory location a stored brief was generated for, or null.
+ * Trusted only when the brief records a real source (scenario_override or
+ * organization); briefs from before that field carry a hard-coded city.
+ */
+export function appliedPlanLocation(brief: unknown): string | null {
+  const ctx = (brief as { context?: { organizationLocation?: unknown; locationSource?: unknown } } | null)?.context;
+  if (ctx?.locationSource !== 'scenario_override' && ctx?.locationSource !== 'organization') return null;
+  return typeof ctx.organizationLocation === 'string' && ctx.organizationLocation ? ctx.organizationLocation : null;
 }
 
 function keyOf(kind: LineRemovalDto['kind'] | LineOverrideDto['kind'], index: number): string {

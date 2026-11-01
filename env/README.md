@@ -20,7 +20,7 @@ Build the frontend image **per environment**: `NEXT_PUBLIC_*` values are compile
 | Variable | What it is | Where it comes from |
 |---|---|---|
 | `APP_ENV` | `stage` or `prd`; the backend refuses to boot in production without it | you |
-| `MIGRATE_DATABASE_URL` | Postgres connection string for the migration runner and the nightly backup only (the app reaches the database through PostgREST) | your managed Postgres |
+| `MIGRATE_DATABASE_URL` | Postgres connection string for the migration runner, the nightly backup and the operator-run should-cost calibration (`npm run should-cost:calibrate`) only (the app reaches the database through PostgREST) | your managed Postgres |
 | `POSTGREST_DB_URI` | connection string of the `authenticator` role, used by the PostgREST service | your managed Postgres (password set outside git) |
 | `DB_JWT_SECRET` | the one secret the backend signs database tokens with and PostgREST verifies; **server only** | generate: `openssl rand -hex 32` |
 | `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | the file bucket and a key limited to it; `S3_ENDPOINT` only for R2 or MinIO | your S3-compatible provider |

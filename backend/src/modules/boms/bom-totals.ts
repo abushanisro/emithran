@@ -1,4 +1,4 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { DbClient } from '../../common/db/postgrest-client';
 import type { RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
 import { ROLLUP_REPORTING_CURRENCY } from '../bom-items/costing/shared/core/persisted-currency-contract';
 import { computeBomTotal, type BomCostRow, type BomTotalItem } from './bom-total';
@@ -27,7 +27,7 @@ export async function readAllRows<T>(query: (from: number, to: number) => Promis
   }
 }
 
-interface CostedItem extends BomTotalItem { bom_id: string }
+interface CostedItem extends BomTotalItem { bom_id: string; organization_id?: string | null }
 interface SnapshotRow {
   bom_item_id: string;
   own_cost: unknown;
@@ -43,9 +43,10 @@ export interface PersistedBomTotal {
 
 /** Shared read/decision boundary for both BOM and project totals; never writes or recalculates. */
 export async function loadBomTotals(
-  client: SupabaseClient,
+  client: DbClient,
   bomIds: readonly string[],
-  getSnapshot: () => Promise<RateSnapshot>,
+  /** The budget rates of one organization (null: no organization, the global defaults). */
+  getSnapshot: (organizationId: string | null) => Promise<RateSnapshot>,
   onError: (message: string) => void,
   reportingCurrency = ROLLUP_REPORTING_CURRENCY,
 ): Promise<Map<string, PersistedBomTotal>> {
@@ -56,7 +57,7 @@ export async function loadBomTotals(
     const uniqueBomIds = [...result.keys()];
     for (let start = 0; start < uniqueBomIds.length; start += ID_BATCH_SIZE) {
       items.push(...await readAllRows<CostedItem>((from, to) => client.from('bom_items')
-        .select('id, bom_id, parent_item_id, quantity', { count: 'exact' })
+        .select('id, bom_id, parent_item_id, quantity, organization_id', { count: 'exact' })
         .in('bom_id', uniqueBomIds.slice(start, start + ID_BATCH_SIZE)).order('id').range(from, to)));
     }
     const itemsByBom = new Map<string, CostedItem[]>();
@@ -82,10 +83,27 @@ export async function loadBomTotals(
         trusted: row.currency_integrity === 'consistent', isStale: row.is_stale });
       costsByItem.set(row.bom_item_id, group);
     }
-    let rates: RateSnapshot | null = null;
-    try { rates = await getSnapshot(); }
-    catch { onError('FX snapshot unavailable; foreign-denominated nonzero costs remain unresolved'); }
+    // Each BOM is converted with its own organization's budget rates (one snapshot per organization).
+    const snapshotsByOrganization = new Map<string | null, Promise<RateSnapshot | null>>();
+    const ratesFor = (organizationId: string | null) => {
+      let pending = snapshotsByOrganization.get(organizationId);
+      if (!pending) {
+        pending = getSnapshot(organizationId).catch(() => {
+          onError('FX snapshot unavailable; foreign-denominated nonzero costs remain unresolved');
+          return null;
+        });
+        snapshotsByOrganization.set(organizationId, pending);
+      }
+      return pending;
+    };
     for (const [bomId, group] of itemsByBom) {
+      const organizations = new Set(group.map(item => item.organization_id ?? null));
+      if (organizations.size > 1) {
+        onError(`BOM ${bomId} has items of more than one organization; its total is unresolved`);
+        result.get(bomId)!.totalCost = null;
+        continue;
+      }
+      const rates = await ratesFor([...organizations][0]);
       const calculated = computeBomTotal({ items: group,
         rows: group.flatMap(item => costsByItem.get(item.id) ?? []), reportingCurrency,
         rateToReporting: from => rates?.convertOptional(from, reportingCurrency) ?? null });

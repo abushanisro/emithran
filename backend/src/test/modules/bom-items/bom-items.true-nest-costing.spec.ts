@@ -5,7 +5,7 @@
 // own scale), this instantiates the service with mocked DI and calls the
 // private method directly (a standard, acceptable pattern for testing one
 // method of a very large service class), spying on the public
-// findOne/update methods instead of mocking Supabase's query builder chain.
+// findOne/update methods instead of mocking the PostgREST query builder chain.
 import type { SecondaryProcessService } from '../../../modules/bom-items/services/secondary-process.service';
 import type { PlasticReferenceService } from '../../../modules/bom-items/costing/plastic-molding/lookup/plastic-reference.service';
 import type { CastingReferenceService } from '../../../modules/bom-items/costing/casting/casting-reference.service';
@@ -23,7 +23,7 @@ import { type MaterialResolutionService } from '../../../modules/bom-items/servi
 import { type CalculatorCatalogService } from '../../../modules/bom-items/services/calculator-catalog.service';
 import { type MachineDiscoveryService } from '../../../modules/bom-items/services/machine-discovery.service';
 import { type ExchangeRateService } from '../../../common/exchange-rate/exchange-rate.service';
-import { type SupabaseService } from '../../../common/supabase/supabase.service';
+import { type DatabaseService } from '../../../common/database/database.service';
 import { type InspectionKnowledgeService } from '../../../modules/manufacturing-knowledge/services/inspection-knowledge.service';
 
 import type { TrueNestCostingSelection } from '../../../modules/bom-items/costing/sheet-metal/machine/true-nest-costing.engine';
@@ -64,7 +64,7 @@ const fingerprintFor = (summary: { flatPatternHolesMm: unknown }) =>
 function buildService(computeTrueNest: jest.Mock) {
   const cadAnalysisService = { computeTrueNest } as unknown as CADAnalysisService;
   const service = new BOMItemsService(
-    {} as unknown as SupabaseService,
+    {} as unknown as DatabaseService,
     {} as unknown as InspectionKnowledgeService,
     {} as unknown as BlankOptimizerService,
     {} as unknown as SheetMetalLookupService,

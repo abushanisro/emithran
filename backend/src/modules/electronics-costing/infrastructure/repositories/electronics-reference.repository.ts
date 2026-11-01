@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { ReferenceMemo } from '../../../../common/cache/reference-memo';
-import { SupabaseService } from '../../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../../common/database/database.service';
 
 import type { ReferenceRowLike } from '../../domain/reference/coverage';
 
@@ -63,11 +63,11 @@ interface MachineSpecRow {
 // short memo is safe. A miss or an empty result is never remembered.
 @Injectable()
 export class ElectronicsReferenceRepository {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   @ReferenceMemo()
   async listRows(): Promise<ElectronicsReferenceRow[]> {
-    const db = this.supabase.getPrivilegedClient('reference-data: electronics inputs read in place from PCB machine specs and electronics_reference_data, global shared rows');
+    const db = this.database.getPrivilegedClient('reference-data: electronics inputs read in place from PCB machine specs and electronics_reference_data, global shared rows');
     const [machines, partner] = await Promise.all([
       db
         .from('mhr_records')

@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException, InternalServerErrorException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
-import { UserDirectory } from '../../common/supabase/user-directory';
-import { SupabaseService } from '@/common/supabase/supabase.service';
+import { UserDirectory } from '../../common/database/user-directory';
+import { DatabaseService } from '@/common/database/database.service';
 import { CreateProjectDto, UpdateProjectDto, QueryProjectsDto } from './dto/projects.dto';
 import { ProjectResponseDto, ProjectListResponseDto } from './dto/project-response.dto';
 import { AddTeamMemberDto, UpdateTeamMemberDto, TeamMemberResponseDto, TeamMembersListResponseDto, TeamMemberRole } from './dto/project-team-member.dto';
@@ -10,12 +10,15 @@ import { ExchangeRateService } from '../../common/exchange-rate/exchange-rate.se
 import { ROLLUP_REPORTING_CURRENCY } from '../bom-items/costing/shared/core/persisted-currency-contract';
 import { loadBomTotals, readAllRows } from '../boms/bom-totals';
 
+// One answer for an unknown account and for an account of another organization, so adding a member reveals nobody's account.
+const NOT_AN_ORG_MEMBER = 'No member of this organization with that email or user id. Invite them to the organization first.';
+
 @Injectable()
 export class ProjectsService {
   private readonly logger = new Logger(ProjectsService.name);
 
   constructor(
-    private readonly supabase: SupabaseService,
+    private readonly database: DatabaseService,
     private readonly projectsRepository: ProjectsRepository,
     private readonly customLogger: CustomLogger,
     private readonly exchangeRates: ExchangeRateService,
@@ -30,7 +33,7 @@ export class ProjectsService {
     try {
       this.logger.log(`Fetching projects for user: ${userId}`);
       
-      const client = this.supabase.getUserClient(accessToken);
+      const client = this.database.getUserClient(accessToken);
       const options = {
         page: query.page || 1,
         limit: query.limit || 10,
@@ -107,7 +110,7 @@ export class ProjectsService {
     try {
       this.logger.log(`Fetching project: ${id} for user: ${userId}`);
       
-      const client = this.supabase.getUserClient(accessToken);
+      const client = this.database.getUserClient(accessToken);
       const project = await this.projectsRepository.findById(client, id);
       const dto = ProjectResponseDto.fromDatabase(project);
       const stats = (await this.computeProjectsAggregates(client, [id], accessToken)).get(id);
@@ -140,7 +143,7 @@ export class ProjectsService {
     try {
       this.logger.log(`Creating project for user: ${userId}`);
 
-      const client = this.supabase.getUserClient(accessToken);
+      const client = this.database.getUserClient(accessToken);
 
       // Check if project name already exists
       const nameExists = await this.projectsRepository.isNameExists(client, createProjectDto.name);
@@ -210,7 +213,7 @@ export class ProjectsService {
     try {
       this.logger.log(`Updating project: ${id} for user: ${userId}`);
 
-      const client = this.supabase.getUserClient(accessToken);
+      const client = this.database.getUserClient(accessToken);
 
       // Check if updating name and it conflicts with existing project
       if (updateProjectDto.name) {
@@ -290,7 +293,7 @@ export class ProjectsService {
     try {
       this.logger.log(`Deleting project: ${id} for user: ${userId}`);
 
-      const client = this.supabase.getUserClient(accessToken);
+      const client = this.database.getUserClient(accessToken);
       await this.projectsRepository.delete(client, id);
 
       return { message: 'Project and all associated data have been permanently deleted.' };
@@ -321,7 +324,7 @@ export class ProjectsService {
     try {
       this.logger.log(`Fetching cost analysis for project: ${id} for user: ${userId}`);
 
-      const client = this.supabase.getUserClient(accessToken);
+      const client = this.database.getUserClient(accessToken);
       const project = await this.projectsRepository.findById(client, id);
 
       // Get BOM data for the project
@@ -374,7 +377,7 @@ export class ProjectsService {
     }
   }
 
-  private async computeProjectsAggregates(client: ReturnType<SupabaseService['getUserClient']>, projectIds: string[], accessToken?: string,
+  private async computeProjectsAggregates(client: ReturnType<DatabaseService['getUserClient']>, projectIds: string[], accessToken?: string,
     reportingCurrency = ROLLUP_REPORTING_CURRENCY): Promise<Map<string, { bomCount: number; bomItemCount: number; actualCost: number | null }>> {
     const resultMap = new Map(projectIds.map(id => [id, { bomCount: 0, bomItemCount: 0, actualCost: 0 as number | null }]));
     if (!projectIds.length) return resultMap;
@@ -382,7 +385,7 @@ export class ProjectsService {
       const bomRows = await readAllRows<{ id: string; project_id: string }>((from, to) => client.from('boms')
         .select('id, project_id', { count: 'exact' }).in('project_id', projectIds).order('id').range(from, to));
       const totals = await loadBomTotals(client, bomRows.map(bom => bom.id),
-        () => this.exchangeRates.getSnapshot(accessToken ?? null), message => this.logger.warn(message), reportingCurrency);
+        organizationId => this.exchangeRates.getSnapshot(accessToken ?? null, organizationId), message => this.logger.warn(message), reportingCurrency);
       for (const bom of bomRows) {
         const stats = resultMap.get(bom.project_id)!;
         const total = totals.get(bom.id)!;
@@ -397,6 +400,23 @@ export class ProjectsService {
     return resultMap;
   }
 
+  /**
+   * The ids among `userIds` that are active members of the organization, read with the caller's own client (organization_members
+   * RLS shows a member the rows of their own organizations). No organization or no visible row means no one: fails closed.
+   */
+  private async activeOrgMemberIds(client: ReturnType<DatabaseService['getUserClient']>, organizationId: string | null | undefined, userIds: string[]): Promise<Set<string>> {
+    const unique = [...new Set(userIds.filter(Boolean))];
+    if (!organizationId || unique.length === 0) return new Set();
+    const { data, error } = await client
+      .from('organization_members')
+      .select('user_id')
+      .eq('organization_id', organizationId)
+      .eq('status', 'active')
+      .in('user_id', unique);
+    if (error) throw new Error(`Could not check organization membership: ${error.message}`);
+    return new Set(((data ?? []) as Array<{ user_id: string }>).map((row) => row.user_id));
+  }
+
   async getTeamMembers(id: string, userId: string, accessToken?: string): Promise<TeamMembersListResponseDto> {
     if (!this.isValidUUID(id)) {
       throw new BadRequestException('Please provide a valid project ID.');
@@ -409,10 +429,10 @@ export class ProjectsService {
     try {
       this.logger.log(`Fetching team members for project: ${id} for user: ${userId}`);
 
-      const client = this.supabase.getUserClient(accessToken);
+      const client = this.database.getUserClient(accessToken);
       
       // Verify project exists and user has access
-      await this.projectsRepository.findById(client, id);
+      const project = await this.projectsRepository.findById(client, id);
 
       // Check if project_team_members table exists, if not return empty team
       let teamMembers: any[] = [];
@@ -460,12 +480,15 @@ export class ProjectsService {
       }
 
       // Get user details separately to avoid relationship issues
+      // Directory data (account email, name) only for active members of the project's organization; a leftover row of
+      // anyone else shows just what the row itself holds.
       const userIds = (teamMembers || []).map(m => m.user_id).filter(Boolean);
-      const userDetails = await this.directory.findByIds(userIds);
+      const orgMemberIds = await this.activeOrgMemberIds(client, project.organization_id, userIds);
+      const userDetails = await this.directory.findByIds([...orgMemberIds]);
 
       const formattedMembers = (teamMembers || []).map(member => {
         const user = userDetails.get(member.user_id);
-        const email = user?.email || (member as any).email || 'unknown@example.com';
+        const email = user?.email || (member as any).email || undefined;
         const name = user?.fullName || email?.split('@')[0] || 'Team Member';
         
         return {
@@ -514,114 +537,73 @@ export class ProjectsService {
     try {
       this.logger.log(`Adding team member to project: ${id} for user: ${userId}`);
 
-      const client = this.supabase.getUserClient(accessToken);
+      const client = this.database.getUserClient(accessToken);
       
       // Verify project exists and user has access
-      await this.projectsRepository.findById(client, id);
+      const project = await this.projectsRepository.findById(client, id);
 
-      let targetUserId = dto.userId;
+      // Only active members of the project's organization can be added. An unknown account and an account of another
+      // organization get the same answer, so this endpoint cannot be used to learn who has an account.
+      const candidateId = dto.userId ?? (dto.email ? await this.directory.findIdByEmail(dto.email) : null);
+      const members = candidateId ? await this.activeOrgMemberIds(client, project.organization_id, [candidateId]) : new Set<string>();
+      if (!candidateId || !members.has(candidateId)) {
+        throw new NotFoundException(NOT_AN_ORG_MEMBER);
+      }
+      const targetUserId = candidateId;
+      // The stored and returned email is the account's own, never the text the caller typed.
+      const account = (await this.directory.findByIds([targetUserId])).get(targetUserId);
 
-      // If email provided, try to find user in auth system, otherwise create placeholder
-      if (dto.email && !targetUserId) {
-        try {
-          // Try to find user in Supabase auth
-          const existingId = await this.directory.findIdByEmail(dto.email);
-          if (existingId) {
-            targetUserId = existingId;
-          } else {
-            // For MVP: Create a placeholder UUID for pending user
-            targetUserId = crypto.randomUUID();
-            this.logger.log(`Creating placeholder team member for ${dto.email}`);
-          }
-        } catch (authError) {
-          this.logger.warn(`Could not check auth users: ${authError.message}`);
-          // Fallback: create placeholder UUID
-          targetUserId = crypto.randomUUID();
-        }
+      const { data: existingMember, error: existingError } = await client
+        .from('project_team_members')
+        .select('id')
+        .eq('project_id', id)
+        .eq('user_id', targetUserId)
+        .maybeSingle();
+
+      if (existingError) {
+        throw new Error(`Could not check existing team members: ${existingError.message}`);
+      }
+      if (existingMember) {
+        throw new ConflictException('This person is already a member of this project.');
       }
 
-      // Check if user is already a team member (skip for MVP as table may not exist)
-      try {
-        const { data: existingMember, error: existingError } = await client
-          .from('project_team_members')
-          .select('id')
-          .eq('project_id', id)
-          .eq('user_id', targetUserId)
-          .maybeSingle();
+      const { data: newMember, error: insertError } = await client
+        .from('project_team_members')
+        .insert({
+          project_id: id,
+          user_id: targetUserId,
+          role: dto.role || TeamMemberRole.VIEWER,
+          email: account?.email ?? null,
+        })
+        .select(`
+          id,
+          user_id,
+          role,
+          created_at,
+          email
+        `)
+        .single();
 
-        if (existingError) {
-          this.logger.warn(`Error checking existing team member (table may not exist): ${existingError.message}`);
-        } else if (existingMember) {
+      if (insertError) {
+        // The unique index on (project_id, user_id) catches a concurrent add of the same person.
+        if (insertError.code === '23505') {
           throw new ConflictException('This person is already a member of this project.');
         }
-      } catch (tableError) {
-        this.logger.warn(`project_team_members table may not exist: ${tableError.message}`);
-        // Continue with MVP flow
+        throw new Error(`Could not insert team member: ${insertError.message}`);
       }
 
-      // Add team member (MVP: handle missing table gracefully)
-      try {
-        // Try to insert with email, fallback without email if column doesn't exist
-        let newMember, insertError;
-        try {
-          const result = await client
-            .from('project_team_members')
-            .insert({
-              project_id: id,
-              user_id: targetUserId,
-              role: dto.role || TeamMemberRole.VIEWER,
-              email: dto.email,
-            })
-            .select(`
-              id,
-              user_id,
-              role,
-              created_at,
-              email
-            `)
-            .single();
-          newMember = result.data;
-          insertError = result.error;
-        } catch (emailColumnError) {
-          this.logger.warn('Email column not found during insert, inserting without email');
-          const result = await client
-            .from('project_team_members')
-            .insert({
-              project_id: id,
-              user_id: targetUserId,
-              role: dto.role || TeamMemberRole.VIEWER,
-            })
-            .select(`
-              id,
-              user_id,
-              role,
-              created_at
-            `)
-            .single();
-          newMember = result.data;
-          insertError = result.error;
-        }
-
-        if (insertError) {
-          this.logger.error(`Error adding team member: ${insertError.message}`);
-          throw new InternalServerErrorException('Unable to add team member.');
-        }
-
-        return {
-          teamMember: {
-            id: newMember?.id,
-            userId: newMember?.user_id,
-            email: (newMember as any)?.email || dto.email,
-            name: ((newMember as any)?.email || dto.email)?.split('@')[0] || 'Team Member',
-            role: newMember?.role,
-            addedAt: newMember?.created_at,
-          },
-          message: 'Team member added successfully'
-        };
-      } catch (tableError) {
-        this.logger.error(`Error adding team member: ${tableError.message}`);
-        throw new InternalServerErrorException('Unable to add team member. Please ensure the project team members table exists.');
-      }
+      const email = account?.email ?? undefined;
+      return {
+        teamMember: {
+          id: newMember.id,
+          userId: newMember.user_id,
+          email,
+          name: account?.fullName || email?.split('@')[0] || 'Team Member',
+          role: newMember.role,
+          addedAt: newMember.created_at,
+        },
+        message: 'Team member added successfully'
+      };
     } catch (error) {
       this.logger.error(`Error adding team member to project ${id}:`, error.message);
       
@@ -649,10 +631,10 @@ export class ProjectsService {
     try {
       this.logger.log(`Updating team member ${memberId} for project: ${id} for user: ${userId}`);
 
-      const client = this.supabase.getUserClient(accessToken);
+      const client = this.database.getUserClient(accessToken);
       
       // Verify project exists and user has access
-      await this.projectsRepository.findById(client, id);
+      const project = await this.projectsRepository.findById(client, id);
 
       // Update team member
       const { data: updatedMember, error } = await client
@@ -681,7 +663,11 @@ export class ProjectsService {
       let userName = '';
       
       try {
-        if (updatedMember.user_id && !updatedMember.user_id.startsWith('pending-')) {
+        // Directory data only for an active member of the project's organization.
+        const orgMembers = updatedMember.user_id
+          ? await this.activeOrgMemberIds(client, project.organization_id, [updatedMember.user_id])
+          : new Set<string>();
+        if (orgMembers.has(updatedMember.user_id)) {
           const authUser = (await this.directory.findByIds([updatedMember.user_id])).get(updatedMember.user_id);
           if (authUser) {
             userEmail = authUser.email || '';
@@ -730,7 +716,7 @@ export class ProjectsService {
     try {
       this.logger.log(`Removing team member ${memberId} from project: ${id} for user: ${userId}`);
 
-      const client = this.supabase.getUserClient(accessToken);
+      const client = this.database.getUserClient(accessToken);
       
       // Verify project exists and user has access
       await this.projectsRepository.findById(client, id);

@@ -24,7 +24,7 @@ RUN mkdir /deps && ldd build/geometry-worker | awk '/=> \/opt\/conda/ {print $3}
 
 # Same Debian release as the conda image the worker is compiled in (glibc must not be older than the build's).
 FROM debian:trixie-slim@sha256:f6b08b09a05725f9431502d3b5714f5c4576e82c1a84fa1debe0c24a7e0c3ec4
-# util-linux provides prlimit; ca-certificates lets the runner verify Supabase's TLS certificate. Nothing else.
+# util-linux provides prlimit; ca-certificates lets the runner verify the data API's and bucket's TLS certificates. Nothing else.
 RUN apt-get update && apt-get upgrade -y --no-install-recommends && apt-get install -y --no-install-recommends util-linux ca-certificates \
  && rm -rf /var/lib/apt/lists/* && useradd --system --uid 10003 --no-create-home core
 COPY --from=gw /deps /opt/occt/lib

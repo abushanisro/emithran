@@ -1,6 +1,6 @@
 /**
- * Where uploaded files live. One small interface so the services do not know whether the bytes are in Supabase Storage or in an
- * S3-compatible bucket (S3, Cloudflare R2, MinIO). A `bucket` here is a logical name (`bom-files`); keys are the same paths the
+ * Where uploaded files live. One small interface so the services do not know which S3-compatible bucket holds the bytes
+ *  (S3, Cloudflare R2, MinIO). A `bucket` here is a logical name (`bom-files`); keys are the same paths the
  * database already stores, so moving the bytes between backends never touches a row.
  */
 export interface ObjectStore {

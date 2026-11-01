@@ -1,10 +1,16 @@
 import { type NextRequest } from "next/server";
 
 import { requireUserForAi } from "@/lib/server/auth";
+import { refuseCrossOrigin } from "@/lib/server/bff/origin";
+import { readBodyBytes } from "@/lib/server/read-body";
+import { settingWithDevDefault } from '@/lib/utils/required-setting';
 
 // Server-side: the private backend address (API_URL, which already ends in /v1/api, the NestJS global prefix), so this call
 // never leaves the host through the public hostname (where Cloudflare Access would stop it).
-const BACKEND_URL = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/v1/api";
+// Resolved per request: localhost only outside production; a missing setting
+// in production throws naming the variable.
+const backendUrl = () =>
+  settingWithDevDefault(process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL, 'API_URL', 'http://localhost:4000/v1/api');
 const MAX_BODY_BYTES = 64 * 1024;
 
 export const runtime = "nodejs";
@@ -19,15 +25,19 @@ const json = (body: unknown, status: number, headers?: Record<string, string>) =
  * data read as that user. Nothing identity-related is read from the body.
  */
 export async function POST(request: NextRequest) {
+  const refused = refuseCrossOrigin(request);
+  if (refused) return refused;
   const gate = await requireUserForAi("manufacturing-copilot");
   if (!gate.ok) return gate.response;
 
-  const raw = await request.text();
-  if (raw.length > MAX_BODY_BYTES) return json({ error: "Request too large" }, 413);
+  // Capped while reading, not after: the body is never buffered past the limit.
+  const body = await readBodyBytes(request, MAX_BODY_BYTES);
+  if (!body.ok) return body.response;
+  const raw = body.value;
 
   let upstream: Response;
   try {
-    upstream = await fetch(`${BACKEND_URL}/copilot/chat`, {
+    upstream = await fetch(`${backendUrl()}/copilot/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${gate.accessToken}` },
       body: raw,

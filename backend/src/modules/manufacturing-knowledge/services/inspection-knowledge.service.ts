@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../common/database/database.service';
 import type { InspectionRuleRow } from '../../bom-items/costing/shared/physics/gdt-severity';
 import type { InspectionStagePolicy } from '../../bom-items/costing/shared/core/default-rates.constants';
 
@@ -24,7 +24,7 @@ export class InspectionKnowledgeService {
   private readonly cache = new Map<string, { at: number; data: unknown }>();
   private static readonly TTL_MS = 5 * 60 * 1000;
 
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   private cached<T>(key: string): T | undefined {
     const hit = this.cache.get(key);
@@ -40,7 +40,7 @@ export class InspectionKnowledgeService {
     const hit = this.cached<InspectionRuleRow[]>('inspection_rules');
     if (hit) return hit;
     try {
-      const { data, error } = await this.supabase
+      const { data, error } = await this.database
         .getClient(token)
         .from('inspection_rules')
         .select(
@@ -52,7 +52,7 @@ export class InspectionKnowledgeService {
         this.logger.warn(`inspection_rules read failed — using code fallback: ${error.message}`);
         return [];
       }
-      // Supabase's typed client can't infer the row shape from a joined select string
+      // The PostgREST client can't infer the row shape from a joined select string
       const rows = (data ?? []) as unknown as InspectionRuleRow[];
       this.store('inspection_rules', rows);
       return rows;
@@ -67,7 +67,7 @@ export class InspectionKnowledgeService {
     const hit = this.cached<InspectionStagePolicy | null>(key);
     if (hit !== undefined) return hit;
     try {
-      const { data, error } = await this.supabase
+      const { data, error } = await this.database
         .getClient(token)
         .from('quality_plans')
         .select('fai, in_process_per_n, final_per_n, final_check_min')

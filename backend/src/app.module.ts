@@ -4,6 +4,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { HttpModule } from '@nestjs/axios';
 import { APP_GUARD } from '@nestjs/core';
 import { ClientIpThrottlerGuard } from './common/guards/client-ip-throttler.guard';
+import { throttlerOptions } from './common/throttling/throttlers';
 
 import { ProjectsModule } from './modules/projects/projects.module'; 862 
 import { VendorsModule } from './modules/vendors/vendors.module';
@@ -26,7 +27,6 @@ import { SupplierEvaluationModule } from './modules/supplier-evaluation/supplier
 import { SupplierEvaluationGroupsModule } from './modules/supplier-evaluation-groups/supplier-evaluation-groups.module';
 import { RfqModule } from './modules/rfq/rfq.module';
 import { SupplierNominationsModule } from './modules/supplier-nominations/supplier-nominations.module';
-import { VendorQuotesModule } from './modules/vendor-quotes/vendor-quotes.module';
 import { ProductionPlanningModule } from './modules/production-planning/production-planning.module';
 import { ProcessPlanningModule } from './modules/process-planning/process-planning.module';
 import { QualityControlModule } from './modules/quality-control/quality-control.module';
@@ -47,12 +47,12 @@ import { ManufacturingRulesModule } from './modules/manufacturing-rules/manufact
 import { ElectronicsCostingModule } from './modules/electronics-costing/electronics-costing.module';
 import { FxModule } from './common/fx/fx.module';
 import { LoggerModule } from './common/logger/logger.module';
-import { SupabaseService } from './common/supabase/supabase.service';
-import { SupabaseAuthGuard } from './common/guards/supabase-auth.guard';
+import { DatabaseService } from './common/database/database.service';
+import { RequestAuthGuard } from './common/guards/request-auth.guard';
 import { SessionModule } from './common/session/session.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { StorageModule } from './common/storage/storage.module';
-import { SupabaseModule } from './common/supabase/supabase.module';
+import { DatabaseModule } from './common/database/database.module';
 import { validate } from './config/env.validation';
 import { AppController } from './app.controller';
 
@@ -67,14 +67,7 @@ import { AppController } from './app.controller';
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        throttlers: [
-          {
-            ttl: config.get('THROTTLE_TTL', 60000),
-            limit: config.get('THROTTLE_LIMIT', 100),
-          },
-        ],
-      }),
+      useFactory: (config: ConfigService) => throttlerOptions((name, fallback) => config.get<number>(name, fallback)),
     }),
 
     HttpModule.register({
@@ -104,7 +97,6 @@ import { AppController } from './app.controller';
     SupplierEvaluationGroupsModule,
     RfqModule,
     SupplierNominationsModule,
-    VendorQuotesModule,
     ProductionPlanningModule,
     ProcessPlanningModule,
     QualityControlModule,
@@ -126,15 +118,15 @@ import { AppController } from './app.controller';
     FxModule,
     SessionModule,
     AuthModule,
-    SupabaseModule,
+    DatabaseModule,
     StorageModule,
   ],
   controllers: [AppController],
   providers: [
-    SupabaseService,
+    DatabaseService,
     {
       provide: APP_GUARD,
-      useClass: SupabaseAuthGuard,
+      useClass: RequestAuthGuard,
     },
     // Global so rate limiting can never be missed by a controller that forgot to opt in.
     // The one controller that previously applied @UseGuards(ThrottlerGuard) locally

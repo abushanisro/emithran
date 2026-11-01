@@ -410,18 +410,19 @@ export function CostAnalysis({ projectId }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bomItems: items }),
       });
-      if (!res.ok) throw new Error();
-      const result: CostAnalysisResult = await res.json();
-      setAiResult(result);
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      if (!res.ok) throw new Error(body?.error ?? `AI analysis failed (${res.status})`);
+      setAiResult(body as unknown as CostAnalysisResult);
       toast.success('AI analysis complete');
-    } catch {
-      toast.error('AI analysis failed — check API configuration');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'AI analysis failed');
     } finally {
       setAiLoading(false);
     }
   };
 
-  const calculateShouldCost = async (item: VaveBomItem) => {
+  // Returns whether the should-cost was calculated and saved.
+  const calculateShouldCost = async (item: VaveBomItem): Promise<boolean> => {
     setCalculatingId(item.id);
     try {
       const res = await fetch('/api/vave/should-cost', {
@@ -429,22 +430,26 @@ export function CostAnalysis({ projectId }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ part: item }),
       });
-      if (!res.ok) throw new Error();
-      const result: ShouldCostResult = await res.json();
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status}`);
+      const result = body as unknown as ShouldCostResult;
+      // Components the AI did not estimate are left out, not saved as 0.
       await upsertShouldCost.mutateAsync({
         partNumber: item.partNumber,
         ...(item.description ? { description: item.description } : {}),
         actualCost: item.unitCost,
         shouldCost: result.shouldCost,
-        deltaPct: result.deltaPct,
-        materialCost: result.materialCost,
-        processCost: result.processCost,
-        overhead: result.overhead,
-        margin: result.margin,
+        ...(result.deltaPct !== null ? { deltaPct: result.deltaPct } : {}),
+        ...(result.materialCost !== null ? { materialCost: result.materialCost } : {}),
+        ...(result.processCost !== null ? { processCost: result.processCost } : {}),
+        ...(result.overhead !== null ? { overhead: result.overhead } : {}),
+        ...(result.margin !== null ? { margin: result.margin } : {}),
         benchmarkSource: result.benchmarkSource,
       });
-    } catch {
-      toast.error(`Failed for ${item.partNumber}`);
+      return true;
+    } catch (error) {
+      toast.error(`Should cost failed for ${item.partNumber}: ${error instanceof Error ? error.message : String(error)}`);
+      return false;
     } finally {
       setCalculatingId(null);
     }
@@ -453,9 +458,11 @@ export function CostAnalysis({ projectId }: Props) {
   const handleCalculateAll = async () => {
     if (!items.length) return;
     setCalculatingAll(true);
-    for (const item of items) await calculateShouldCost(item);
+    let failed = 0;
+    for (const item of items) if (!(await calculateShouldCost(item))) failed += 1;
     setCalculatingAll(false);
-    toast.success('Should cost calculated for all parts');
+    if (failed === 0) toast.success('Should cost calculated for all parts');
+    else toast.error(`Should cost failed for ${failed} of ${items.length} parts`);
   };
 
   return (

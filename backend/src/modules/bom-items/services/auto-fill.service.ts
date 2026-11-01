@@ -1,5 +1,5 @@
 import { Injectable, Logger, ServiceUnavailableException, UnprocessableEntityException } from '@nestjs/common';
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../common/database/database.service';
 import { StepConverterService } from './step-converter.service';
 import axios from 'axios';
 import { cadEngineHttp } from '../../../common/resilience/engine-http';
@@ -156,7 +156,7 @@ export class AutoFillService {
   private readonly cadEngineApiKey: string;
 
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly stepConverterService: StepConverterService,
     private readonly machiningLookup: MachiningLookupService,
   ) {
@@ -1281,7 +1281,7 @@ export class AutoFillService {
     const processGroup = AutoFillService.CAD_FAMILY_TO_PROCESS_GROUP[cadFamily];
     if (!processGroup) return null;
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
     const { data, error } = await client
       .from('process_taxonomy')
       .select('process_group')
@@ -1331,7 +1331,7 @@ export class AutoFillService {
     }
     if (!processName) return null;
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
     const { data, error } = await client
       .from('process_taxonomy')
       .select('process_name')

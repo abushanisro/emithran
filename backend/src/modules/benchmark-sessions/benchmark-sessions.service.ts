@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { Logger } from '../../common/logger/logger.service';
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { DatabaseService } from '../../common/database/database.service';
 import {
   CreateBenchmarkSessionDto,
   UpdateBenchmarkSessionDto,
@@ -10,14 +10,14 @@ import {
 @Injectable()
 export class BenchmarkSessionsService {
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly logger: Logger,
   ) {}
 
   async findAll(userId: string, accessToken: string): Promise<BenchmarkSessionResponseDto[]> {
     this.logger.log('Fetching benchmark sessions', 'BenchmarkSessionsService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('benchmark_sessions')
       .select('*')
@@ -35,7 +35,7 @@ export class BenchmarkSessionsService {
   async findOne(id: string, userId: string, accessToken: string): Promise<BenchmarkSessionResponseDto> {
     this.logger.log(`Fetching benchmark session ${id}`, 'BenchmarkSessionsService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('benchmark_sessions')
       .select('*')
@@ -53,7 +53,7 @@ export class BenchmarkSessionsService {
   async create(dto: CreateBenchmarkSessionDto, userId: string, accessToken: string): Promise<BenchmarkSessionResponseDto> {
     this.logger.log('Creating benchmark session', 'BenchmarkSessionsService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('benchmark_sessions')
       .insert({
@@ -82,7 +82,7 @@ export class BenchmarkSessionsService {
     if (dto.bomCount !== undefined)         updates.bom_count          = dto.bomCount;
     if (dto.savedInsights !== undefined)    updates.saved_insights     = dto.savedInsights;
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('benchmark_sessions')
       .update(updates)
@@ -99,7 +99,7 @@ export class BenchmarkSessionsService {
   }
 
   async remove(id: string, userId: string, accessToken: string): Promise<void> {
-    const { error } = await this.supabaseService
+    const { error } = await this.databaseService
       .getClient(accessToken)
       .from('benchmark_sessions')
       .delete()

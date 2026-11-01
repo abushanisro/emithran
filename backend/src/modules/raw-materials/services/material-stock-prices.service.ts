@@ -1,5 +1,5 @@
 import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../common/database/database.service';
 import { Logger } from '../../../common/logger/logger.service';
 import { STOCK_FORMS } from '../dto/material-stock-price.dto';
 
@@ -17,7 +17,7 @@ export interface MaterialStockPrice {
 @Injectable()
 export class MaterialStockPricesService {
   constructor(
-    private readonly supabase: SupabaseService,
+    private readonly database: DatabaseService,
     private readonly logger: Logger,
   ) {}
 
@@ -26,7 +26,7 @@ export class MaterialStockPricesService {
   }
 
   private async referenceOf(materialId: string, accessToken: string): Promise<string> {
-    const { data, error } = await this.supabase
+    const { data, error } = await this.database
       .getUserClient(accessToken)
       .from('raw_materials')
       .select('grade, name')
@@ -39,7 +39,7 @@ export class MaterialStockPricesService {
 
   async listForMaterial(materialId: string, accessToken: string): Promise<MaterialStockPrice[]> {
     const reference = await this.referenceOf(materialId, accessToken);
-    const { data, error } = await this.supabase
+    const { data, error } = await this.database
       .getUserClient(accessToken)
       .from('material_stock_prices')
       .select('stock_form, location, price_per_kg, currency_code, source')

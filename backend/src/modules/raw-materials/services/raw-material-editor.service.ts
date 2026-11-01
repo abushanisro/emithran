@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../common/database/database.service';
 import { Logger } from '../../../common/logger/logger.service';
 import { RawMaterialsService } from '../raw-materials.service';
 import { MaterialStockPricesService } from './material-stock-prices.service';
@@ -11,7 +11,7 @@ import { SaveRawMaterialEditorDto } from '../dto/raw-material-editor.dto';
 @Injectable()
 export class RawMaterialEditorService {
   constructor(
-    private readonly supabase: SupabaseService,
+    private readonly database: DatabaseService,
     private readonly logger: Logger,
     private readonly rawMaterials: RawMaterialsService,
     private readonly stockPrices: MaterialStockPricesService,
@@ -33,7 +33,7 @@ export class RawMaterialEditorService {
     // Seeing a material is not the right to change it: the save below runs with the
     // service role and bypasses RLS, so the ownership rule RLS applies to a plain
     // update (migration 621) is enforced here instead.
-    const { data: owner, error: ownerError } = await this.supabase
+    const { data: owner, error: ownerError } = await this.database
       .getClient(accessToken)
       .from('raw_materials')
       .select('organization_id')
@@ -56,7 +56,7 @@ export class RawMaterialEditorService {
     if (unknown.length > 0) throw new BadRequestException(`Material has no property: ${unknown.join(', ')}`);
 
     // Writes need the service role: the tables are read-only for signed-in users (RLS).
-    const db = this.supabase.getPrivilegedClient('raw-material-editor: transactional save after organization ownership check');
+    const db = this.database.getPrivilegedClient('raw-material-editor: transactional save after organization ownership check');
     const { error } = await db.rpc('save_raw_material_editor', {
       p_material_id: id,
       p_core: dto.core,

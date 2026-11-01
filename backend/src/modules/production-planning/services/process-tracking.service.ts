@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../common/database/database.service';
 import { Logger } from '../../../common/logger/logger.service';
 import {
   CreateTimelineDto,
@@ -19,7 +19,7 @@ import {
 @Injectable()
 export class ProcessTrackingService {
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly logger: Logger,
   ) {}
 
@@ -30,7 +30,7 @@ export class ProcessTrackingService {
   async createTimeline(createDto: CreateTimelineDto, userId: string, accessToken: string) {
     this.logger.log(`Creating timeline for lot ${createDto.production_lot_id}`, 'ProcessTrackingService');
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     // Validate that the production lot exists and user has access
     const { data: lot, error: lotError } = await client
@@ -85,7 +85,7 @@ export class ProcessTrackingService {
   async getTimelineByLot(lotId: string, accessToken: string) {
     this.logger.log(`Fetching timeline for lot ${lotId}`, 'ProcessTrackingService');
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     const { data: timeline, error } = await client
       .from('process_tracking_timelines')
@@ -114,7 +114,7 @@ export class ProcessTrackingService {
   async updateTimeline(timelineId: string, updateDto: UpdateTimelineDto, userId: string, accessToken: string) {
     this.logger.log(`Updating timeline ${timelineId}`, 'ProcessTrackingService');
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     // Get current timeline for audit
     const { data: currentTimeline } = await client
@@ -165,7 +165,7 @@ export class ProcessTrackingService {
   async createProcessTracking(createDto: CreateProcessTrackingDto, userId: string, accessToken: string) {
     this.logger.log(`Creating process tracking for process ${createDto.production_process_id}`, 'ProcessTrackingService');
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     const { data: tracking, error } = await client
       .from('process_schedule_tracking')
@@ -203,7 +203,7 @@ export class ProcessTrackingService {
   async getProcessTracking(timelineId: string, query: QueryTrackingDto, accessToken: string) {
     this.logger.log(`Fetching process tracking for timeline ${timelineId}`, 'ProcessTrackingService');
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     let queryBuilder = client
       .from('process_schedule_tracking')
@@ -238,7 +238,7 @@ export class ProcessTrackingService {
   async updateProcessTracking(trackingId: string, updateDto: UpdateProcessTrackingDto, userId: string, accessToken: string) {
     this.logger.log(`Updating process tracking ${trackingId}`, 'ProcessTrackingService');
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     // Get current tracking for audit
     const { data: currentTracking } = await client
@@ -296,7 +296,7 @@ export class ProcessTrackingService {
   async createSubtaskTracking(createDto: CreateSubtaskTrackingDto, userId: string, accessToken: string) {
     this.logger.log(`Creating subtask tracking for subtask ${createDto.subtask_id}`, 'ProcessTrackingService');
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     const { data: tracking, error } = await client
       .from('subtask_schedule_tracking')
@@ -334,7 +334,7 @@ export class ProcessTrackingService {
   async getSubtaskTracking(processTrackingId: string, accessToken: string) {
     this.logger.log(`Fetching subtask tracking for process ${processTrackingId}`, 'ProcessTrackingService');
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     const { data: subtaskTracking, error } = await client
       .from('subtask_schedule_tracking')
@@ -364,7 +364,7 @@ export class ProcessTrackingService {
   async updateSubtaskTracking(trackingId: string, updateDto: UpdateSubtaskTrackingDto, userId: string, accessToken: string) {
     this.logger.log(`Updating subtask tracking ${trackingId}`, 'ProcessTrackingService');
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     // Get current tracking for audit
     const { data: currentTracking } = await client
@@ -422,7 +422,7 @@ export class ProcessTrackingService {
   async createBomTracking(createDto: CreateBomTrackingDto, userId: string, accessToken: string) {
     this.logger.log(`Creating BOM tracking for BOM item ${createDto.bom_item_id}`, 'ProcessTrackingService');
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     const { data: tracking, error } = await client
       .from('bom_item_schedule_tracking')
@@ -460,7 +460,7 @@ export class ProcessTrackingService {
   async getBomTracking(subtaskTrackingId: string, accessToken: string) {
     this.logger.log(`Fetching BOM tracking for subtask ${subtaskTrackingId}`, 'ProcessTrackingService');
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     const { data: bomTracking, error } = await client
       .from('bom_item_schedule_tracking')
@@ -482,7 +482,7 @@ export class ProcessTrackingService {
   async updateBomTracking(trackingId: string, updateDto: UpdateBomTrackingDto, userId: string, accessToken: string) {
     this.logger.log(`Updating BOM tracking ${trackingId}`, 'ProcessTrackingService');
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     // Get current tracking for audit
     const { data: currentTracking } = await client
@@ -540,7 +540,7 @@ export class ProcessTrackingService {
   async setupCompleteTimeline(setupData: any, userId: string, accessToken: string) {
     this.logger.log(`Setting up complete timeline for lot ${setupData.lotId}`, 'ProcessTrackingService');
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       // Start transaction
@@ -640,7 +640,7 @@ export class ProcessTrackingService {
   async getCompleteGanttData(lotId: string, includeHistory: boolean, accessToken: string) {
     this.logger.log(`Fetching complete Gantt data for lot ${lotId}`, 'ProcessTrackingService');
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     // Get timeline
     const { data: timeline } = await client
@@ -728,7 +728,7 @@ export class ProcessTrackingService {
   async getTrackingHistory(timelineId: string, query: QueryTrackingDto, accessToken: string) {
     this.logger.log(`Fetching tracking history for timeline ${timelineId}`, 'ProcessTrackingService');
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     let queryBuilder = client
       .from('tracking_updates_log')
@@ -776,36 +776,10 @@ export class ProcessTrackingService {
   // UTILITY METHODS
   // =====================================================
 
-  async calculateOptimalTimeline(calculationData: any, accessToken: string) {
-    this.logger.log(`Calculating optimal timeline for lot ${calculationData.lotId}`, 'ProcessTrackingService');
-
-    // This would implement smart timeline calculation based on:
-    // - Process dependencies
-    // - Resource availability
-    // - Material lead times
-    // - Historical performance data
-
-    // For now, return a basic calculation
-    return {
-      data: {
-        suggested_start_date: calculationData.constraints.earliest_start || new Date().toISOString().split('T')[0],
-        suggested_end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days from now
-        total_weeks: 4,
-        critical_path: [],
-        recommendations: [
-          'Consider parallel execution of independent processes',
-          'Review material lead times for early procurement',
-          'Allocate additional resources to critical path items'
-        ]
-      },
-      timestamp: new Date().toISOString(),
-    };
-  }
-
   async deleteTimeline(timelineId: string, userId: string, accessToken: string) {
     this.logger.log(`Deleting timeline ${timelineId}`, 'ProcessTrackingService');
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     // Delete timeline (cascade will handle related data)
     const { error } = await client
@@ -840,7 +814,7 @@ export class ProcessTrackingService {
     accessToken: string,
   ) {
     try {
-      const client = this.supabaseService.getClient(accessToken);
+      const client = this.databaseService.getClient(accessToken);
       
       await client.from('tracking_updates_log').insert({
         timeline_id: timelineId,

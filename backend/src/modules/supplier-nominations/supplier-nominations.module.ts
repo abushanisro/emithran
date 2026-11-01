@@ -3,11 +3,11 @@ import { SupplierNominationsController } from './supplier-nominations.controller
 import { SupplierNominationsService } from './supplier-nominations.service';
 import { FieldMappingService } from './services/field-mapping.service';
 import { PartWiseCostAnalysisService } from './services/part-wise-cost-analysis.service';
-import { SupabaseModule } from '../../common/supabase/supabase.module';
+import { DatabaseModule } from '../../common/database/database.module';
 import { LoggerModule } from '../../common/logger/logger.module';
 
 @Module({
-  imports: [SupabaseModule, LoggerModule],
+  imports: [DatabaseModule, LoggerModule],
   controllers: [SupplierNominationsController],
   providers: [SupplierNominationsService, FieldMappingService, PartWiseCostAnalysisService],
   exports: [SupplierNominationsService, FieldMappingService, PartWiseCostAnalysisService]

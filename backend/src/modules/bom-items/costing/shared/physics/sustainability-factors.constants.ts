@@ -23,6 +23,11 @@ export const ENERGY_KWH_PER_HR: Record<string, number> = {
   cleaning:      1.0,   // wash / degrease station: pump + heater share
 };
 
+// Assumed draw (kWh/hr) for a machine class missing from ENERGY_KWH_PER_HR —
+// the value computeSustainability always used; the line it applies to is
+// marked energySource 'default' (like materialCo2Source) so it is not read as looked up.
+export const DEFAULT_ENERGY_KWH_PER_HR = 4.0;
+
 // India grid CO₂ intensity — CEA 2023 Annual Report (kg CO₂e per kWh consumed)
 export const GRID_CO2_KG_PER_KWH = 0.716;
 

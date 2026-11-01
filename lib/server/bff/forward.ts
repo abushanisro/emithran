@@ -1,3 +1,5 @@
+import { MAX_REQUEST_BODY_BYTES } from '@/lib/server/body-limits';
+
 /**
  * Browser headers the API may see. An allow-list, so cookies, the browser's own Authorization and any identity-looking header never
  * reach the API; the API learns who is calling only from the token the BFF attaches.
@@ -32,6 +34,9 @@ const DROPPED_RESPONSE_HEADERS = new Set([
 
 const NULL_BODY_STATUSES = new Set([101, 204, 205, 304]);
 
+const bodyTooLarge = () =>
+  Response.json({ success: false, error: { code: 'PAYLOAD_TOO_LARGE', message: 'Request body too large' } }, { status: 413 });
+
 /**
  * The API URL for a BFF path, or null when a segment could step outside the API base. Next.js hands over decoded segments, so an
  * encoded slash or dot-segment shows up here as "a/b" or "..".
@@ -44,7 +49,13 @@ export function upstreamUrl(path: readonly string[], search: string, apiBase: st
 }
 
 /** Sends the browser's request to the API with the session's token and streams the answer back unchanged. */
-export async function forwardRequest(req: Request, url: URL, token: string, fetcher: typeof fetch = fetch): Promise<Response> {
+export async function forwardRequest(
+  req: Request,
+  url: URL,
+  token: string,
+  fetcher: typeof fetch = fetch,
+  maxBodyBytes: number = MAX_REQUEST_BODY_BYTES,
+): Promise<Response> {
   const headers = new Headers({ authorization: `Bearer ${token}` });
   for (const name of FORWARDED_REQUEST_HEADERS) {
     const value = req.headers.get(name);
@@ -52,17 +63,41 @@ export async function forwardRequest(req: Request, url: URL, token: string, fetc
   }
 
   const hasBody = req.method !== 'GET' && req.method !== 'HEAD';
+  // Bodies are capped below Next's proxy body limit (lib/server/body-limits), so an oversized upload is refused, never truncated.
+  const declared = req.headers.get('content-length');
+  if (hasBody && declared !== null && !(/^\d+$/.test(declared) && Number(declared) <= maxBodyBytes)) return bodyTooLarge();
+  let received = 0;
+  const cap = { exceeded: false };
+  const body = hasBody && req.body
+    ? req.body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        received += chunk.byteLength;
+        if (received > maxBodyBytes) {
+          cap.exceeded = true;
+          controller.error(new Error('Request body too large'));
+          return;
+        }
+        controller.enqueue(chunk);
+      },
+    }))
+    : null;
   // duplex is required by Node's fetch to stream a request body (uploads are not buffered); the DOM typings do not declare it yet.
   const init: RequestInit & { duplex?: 'half' } = {
     method: req.method,
     headers,
-    ...(hasBody && { body: req.body, duplex: 'half' }),
+    ...(body && { body, duplex: 'half' }),
     // A redirect from the API goes back to the browser instead of being followed with the token attached.
     redirect: 'manual',
     signal: req.signal,
     cache: 'no-store',
   };
-  const upstream = await fetcher(url, init);
+  let upstream: Response;
+  try {
+    upstream = await fetcher(url, init);
+  } catch (error) {
+    if (cap.exceeded) return bodyTooLarge();
+    throw error;
+  }
 
   const responseHeaders = new Headers();
   upstream.headers.forEach((value, name) => {

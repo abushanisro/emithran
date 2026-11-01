@@ -27,11 +27,38 @@ export async function proxy(request: NextRequest) {
 
   // Auth0's handler serves /auth/login, /auth/callback, /auth/logout and /auth/profile, and keeps the session cookie rolling on every
   // other request. Our headers are then added to whatever it returns.
-  const response = await getAuth0().middleware(request)
-  if (pathname.startsWith('/auth/') && !pathname.startsWith('/auth/callback/')) return response
+  const authResponse = await getAuth0().middleware(request)
+  if (pathname.startsWith('/auth/') && !pathname.startsWith('/auth/callback/')) return authResponse
 
-  addSecurityHeaders(response, request)
+  const nonce = createNonce()
+  const csp = contentSecurityPolicy(nonce)
+  const response = withRenderHeaders(authResponse, request, nonce, csp)
+  addSecurityHeaders(response, request, csp)
   addMonitoringHeaders(response, request, startTime)
+  return response
+}
+
+/** A fresh, unguessable nonce per request: 128 random bits, base64. */
+function createNonce(): string {
+  return btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))))
+}
+
+/**
+ * Next.js reads the nonce from the Content-Security-Policy *request* header while rendering and puts it on its own scripts; the root
+ * layout reads x-nonce for its inline script. When Auth0's handler lets the request through (x-middleware-next), the same response is
+ * rebuilt with those request headers, keeping every header and cookie Auth0 set. Redirects and other answers are returned unchanged.
+ */
+function withRenderHeaders(authResponse: NextResponse, request: NextRequest, nonce: string, csp: string): NextResponse {
+  if (authResponse.headers.get('x-middleware-next') !== '1') return authResponse
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-nonce', nonce)
+  requestHeaders.set('content-security-policy', csp)
+  const response = NextResponse.next({ request: { headers: requestHeaders } })
+  authResponse.headers.forEach((value, name) => {
+    if (name === 'set-cookie' || name === 'x-middleware-next' || name === 'x-middleware-override-headers' || name.startsWith('x-middleware-request-')) return
+    response.headers.set(name, value)
+  })
+  for (const cookie of authResponse.headers.getSetCookie()) response.headers.append('set-cookie', cookie)
   return response
 }
 
@@ -48,22 +75,20 @@ function fileStoreSources(isProduction: boolean): string {
     .join(' ')
 }
 
-function addSecurityHeaders(response: NextResponse, request: NextRequest) {
+function contentSecurityPolicy(nonce: string): string {
   const isProduction = process.env.NODE_ENV === 'production'
-
-  // Generate nonce for CSP
-  const nonce = Buffer.from(crypto.randomUUID()).toString('base64').slice(0, 16)
-  response.headers.set('x-nonce', nonce)
 
   // CSP with QC module support for PDF viewing, iframes, and file uploads
   // NOTE: PDFs are served from same-origin (/api/file-proxy), not from the file store directly.
   // object-src / frame-src / child-src must include 'self' blob: data: for Chrome's
   // built-in PDF plugin to work when the PDF is loaded through the proxy route.
   const fileStore = fileStoreSources(isProduction)
-  const csp = isProduction
+  return isProduction
     ? [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' https://vercel.live https://va.vercel-scripts.com",
+      // No 'unsafe-inline': only scripts carrying this request's nonce run, and 'strict-dynamic' trusts the scripts they load
+      // (Next.js chunks, analytics). Browsers that understand 'strict-dynamic' ignore 'self' and the hosts; older ones use them.
+      `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://vercel.live https://va.vercel-scripts.com`,
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' 'unsafe-inline' data: blob: https://fonts.gstatic.com https://r2cdn.perplexity.ai",
       "img-src 'self' data: blob: https:",
@@ -93,6 +118,10 @@ function addSecurityHeaders(response: NextResponse, request: NextRequest) {
       // child-src is the fallback for frame-src/worker-src in older Chrome
       "child-src 'self' blob: data:",
     ].join('; ')
+}
+
+function addSecurityHeaders(response: NextResponse, request: NextRequest, csp: string) {
+  const isProduction = process.env.NODE_ENV === 'production'
 
   response.headers.set('Content-Security-Policy', csp)
 

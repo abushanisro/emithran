@@ -1,7 +1,7 @@
 import { machiningStockPriceForm, resolveStockPrice, type StockPriceRow } from '../costing/machining/stock-price';
 import type { MaterialClampProperties } from '../costing/plastic-molding/clamp-force';
 import { Injectable } from '@nestjs/common';
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../common/database/database.service';
 import type { RateSnapshot } from '../../../common/exchange-rate/exchange-rate.service';
 import { resolveUtsMpa, isSheetFormableMaterial } from '../costing/shared/core/default-rates.constants';
 import { CAD_FAMILY_TO_PROCESS_GROUP } from '../costing/shared/core/part-family-process-group';
@@ -81,13 +81,13 @@ export class MaterialResolutionService {
   // before this session, unlike cure_time_min.
   private materialCureTimeColumnAvailable: boolean | null = null;
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(private readonly databaseService: DatabaseService) {}
 
   // Migration 831's reference clamp properties (im_*). Requested only once the
   // columns exist, so material resolution keeps working before 831 runs; the
   // clamp model then reports the missing properties instead of sizing a press.
   private materialImColumnsAvailable: boolean | null = null;
-  private async checkMaterialImColumnsAvailable(client: ReturnType<SupabaseService['getClient']>): Promise<boolean> {
+  private async checkMaterialImColumnsAvailable(client: ReturnType<DatabaseService['getClient']>): Promise<boolean> {
     if (this.materialImColumnsAvailable != null) return this.materialImColumnsAvailable;
     const { error } = await client.from('raw_materials').select('im_flow_length_ratio').limit(1);
     this.materialImColumnsAvailable = !(error && /column|schema cache/i.test(error.message));
@@ -98,7 +98,7 @@ export class MaterialResolutionService {
   // Reference data, cached per location; a read error (e.g. before 833 runs)
   // is not cached and leaves no stock price.
   private stockPrices = new Map<string, StockPriceRow[]>();
-  private async loadStockPrices(client: ReturnType<SupabaseService['getClient']>, location: string): Promise<StockPriceRow[]> {
+  private async loadStockPrices(client: ReturnType<DatabaseService['getClient']>, location: string): Promise<StockPriceRow[]> {
     const hit = this.stockPrices.get(location);
     if (hit) return hit;
     const { data, error } = await client.from('material_stock_prices')
@@ -110,7 +110,7 @@ export class MaterialResolutionService {
     return rows;
   }
 
-  private async checkMaterialCureTimeColumnAvailable(client: ReturnType<SupabaseService['getClient']>): Promise<boolean> {
+  private async checkMaterialCureTimeColumnAvailable(client: ReturnType<DatabaseService['getClient']>): Promise<boolean> {
     if (this.materialCureTimeColumnAvailable != null) return this.materialCureTimeColumnAvailable;
     const { error } = await client.from('raw_materials').select('cure_time_min').limit(1);
     this.materialCureTimeColumnAvailable = !(error && /column|schema cache/i.test(error.message));
@@ -193,7 +193,7 @@ export class MaterialResolutionService {
   // materially different materials apart (a bare "ALUMINUM").
   /** Material groups a part family draws from (process_material_groups, migration 879); empty when unlinked. */
   private async materialGroupsForFamily(
-    client: ReturnType<SupabaseService['getClient']>,
+    client: ReturnType<DatabaseService['getClient']>,
     family: string,
   ): Promise<Set<string>> {
     const processGroup = CAD_FAMILY_TO_PROCESS_GROUP[family];
@@ -207,7 +207,7 @@ export class MaterialResolutionService {
   }
 
   private async matchBestRawMaterialRow(
-    client: ReturnType<SupabaseService['getClient']>,
+    client: ReturnType<DatabaseService['getClient']>,
     grade: string,
     family: string,
     materialCol: string,
@@ -343,7 +343,7 @@ export class MaterialResolutionService {
     }
 
     // Cast via unknown: the select() column list is dynamic (location column),
-    // which Supabase's literal-type parser cannot statically resolve.
+    // which the PostgREST client's literal-type parser cannot statically resolve.
     const rows: MatchedMaterialRow[] = ((data ?? []) as unknown as Array<Record<string, unknown>>).map((row) => {
       const locCost = row[materialCol] as number | null;
       const indiaCost = (row.cost_india ?? row.cost) as number | null;
@@ -461,7 +461,7 @@ export class MaterialResolutionService {
   async resolveCutCode(accessToken: string, grade: string, family: string = 'unknown'): Promise<{ cutCode: number | null; materialName: string | null; materialGroup: string | null }> {
     const g = grade?.trim();
     if (!g) return { cutCode: null, materialName: null, materialGroup: null };
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
     const { row } = await this.matchBestRawMaterialRow(client, g, family, 'cost');
     if (!row) return { cutCode: null, materialName: null, materialGroup: null };
     const { data } = await client.from('raw_materials').select('cut_code').eq('id', row.id).maybeSingle();
@@ -477,7 +477,7 @@ export class MaterialResolutionService {
   async resolveMaterialStrengths(accessToken: string, grade: string | null, family: string): Promise<MaterialStrengths> {
     const g = grade?.trim();
     if (!g) return materialStrengthsFromRow(undefined, null);
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
     const { row } = await this.matchBestRawMaterialRow(client, g, family, 'cost');
     return materialStrengthsFromRow(row, g);
   }
@@ -486,7 +486,7 @@ export class MaterialResolutionService {
     const g = grade?.trim();
     if (!g) return null;
     try {
-      const client = this.supabaseService.getClient(accessToken);
+      const client = this.databaseService.getClient(accessToken);
       const { row } = await this.matchBestRawMaterialRow(client, g, family, 'cost');
       return row?.densityKgM3 ?? null;
     } catch {
@@ -539,7 +539,7 @@ export class MaterialResolutionService {
     let ambiguityNote: string | null = null;
     if (grade) {
       try {
-        const client = this.supabaseService.getClient(accessToken);
+        const client = this.databaseService.getClient(accessToken);
         const match = await this.matchBestRawMaterialRow(client, grade, family, materialCol);
         const best = match.row;
         ambiguityNote = match.ambiguityNote;

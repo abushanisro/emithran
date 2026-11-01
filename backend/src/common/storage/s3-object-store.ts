@@ -55,7 +55,7 @@ export class S3ObjectStore implements ObjectStore {
         Key: this.key(bucket, key),
         Body: body,
         ContentType: options.contentType ?? 'application/octet-stream',
-        // Without upsert the write must not replace an existing object (the same rule Supabase enforced).
+        // Without upsert the write must not replace an existing object (never replace a file silently).
         ...(!options.upsert && { IfNoneMatch: '*' }),
       }));
     } catch (error) {

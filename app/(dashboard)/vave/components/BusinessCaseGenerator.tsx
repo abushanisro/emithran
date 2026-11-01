@@ -27,7 +27,8 @@ function formatUSD(n: number) {
   return `$${n.toFixed(0)}`;
 }
 
-function calcNPV(annualSavings: number, investment: number, years: number, rate = 0.08) {
+// rate is a fraction (0.08 = 8%); the caller passes the user's rate, there is no built-in default.
+function calcNPV(annualSavings: number, investment: number, years: number, rate: number) {
   let npv = -investment;
   for (let t = 1; t <= years; t++) {
     npv += annualSavings / Math.pow(1 + rate, t);
@@ -89,11 +90,12 @@ interface A3Props {
   roi: number | null;
   paybackMonths: number | null;
   years: number;
+  discountRatePct: number;
   totalSpend: number;
 }
 
 function A3Report({
-  ideas, annualSavings, investment, npv, irr, roi, paybackMonths, years, totalSpend,
+  ideas, annualSavings, investment, npv, irr, roi, paybackMonths, years, discountRatePct, totalSpend,
 }: A3Props) {
   const today = new Date().toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
   const maxTimeline = Math.max(...ideas.map((i) => i.timeToImplementMonths ?? 3), 1);
@@ -147,7 +149,7 @@ function A3Report({
             <p>Achieve <span className="text-emerald-400 font-semibold">{formatUSD(annualSavings)}</span>/yr savings</p>
             <p>Payback in <span className="text-foreground font-semibold">{paybackMonths != null ? `${paybackMonths.toFixed(1)} months` : 'N/A'}</span></p>
             <p>Implementation span: <span className="text-foreground font-semibold">{maxTimeline} months</span></p>
-            <p>NPV ({years}yr @ 8%): <span className={`font-semibold ${npv >= 0 ? 'text-emerald-400' : 'text-destructive'}`}>{formatUSD(npv)}</span></p>
+            <p>NPV ({years}yr @ {discountRatePct}%): <span className={`font-semibold ${npv >= 0 ? 'text-emerald-400' : 'text-destructive'}`}>{formatUSD(npv)}</span></p>
           </div>
         </div>
         <div className="px-4 py-3">
@@ -229,7 +231,7 @@ function A3Report({
               { label: 'IRR', value: irr != null ? `${irr.toFixed(1)}%` : 'N/A', color: 'text-primary' },
               { label: 'Payback', value: paybackMonths != null ? `${paybackMonths.toFixed(1)} months` : 'N/A', color: 'text-amber-400' },
               { label: `ROI (${years}yr)`, value: roi != null ? `${roi.toFixed(1)}%` : 'N/A', color: 'text-foreground' },
-              { label: 'Discount Rate', value: '8%', color: 'text-muted-foreground' },
+              { label: 'Discount Rate', value: `${discountRatePct}%`, color: 'text-muted-foreground' },
               { label: 'Analysis Period', value: `${years} years`, color: 'text-muted-foreground' },
             ].map(({ label, value, color }) => (
               <div key={label} className="flex justify-between items-center">
@@ -410,6 +412,8 @@ export function BusinessCaseGenerator({ projectId }: Props) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [investmentOverride, setInvestmentOverride] = useState('');
   const [years, setYears] = useState(3);
+  // NPV discount rate in percent, shown and editable next to the analysis period.
+  const [discountRatePct, setDiscountRatePct] = useState(8);
 
   const { data: ideas } = useVaveIdeas(projectId);
   const { data: shouldCosts } = useVaveShouldCosts(projectId);
@@ -425,7 +429,7 @@ export function BusinessCaseGenerator({ projectId }: Props) {
   const autoInvestment = selectedIdeas.reduce((s, i) => s + i.estInvestmentUsd, 0);
   const investment = parseFloat(investmentOverride) || autoInvestment;
   const paybackMonths = investment > 0 && annualSavings > 0 ? (investment / annualSavings) * 12 : null;
-  const npv = calcNPV(annualSavings, investment, years);
+  const npv = calcNPV(annualSavings, investment, years, discountRatePct / 100);
   const irr = calcIRR(annualSavings, investment, years);
   const roi = investment > 0 ? ((annualSavings * years - investment) / investment) * 100 : null;
 
@@ -470,7 +474,8 @@ export function BusinessCaseGenerator({ projectId }: Props) {
         ['Total Investment', investment],
         ['Analysis Period (years)', years],
         ['Payback Period (months)', paybackMonths?.toFixed(1) ?? 'N/A'],
-        [`NPV (${years}yr @ 8%)`, npv.toFixed(0)],
+        [`NPV (${years}yr @ ${discountRatePct}%)`, npv.toFixed(0)],
+        ['Discount Rate (%)', discountRatePct],
         ['IRR (%)', irr?.toFixed(1) ?? 'N/A'],
         ['ROI (%)', roi?.toFixed(1) ?? 'N/A'],
       ];
@@ -542,14 +547,14 @@ export function BusinessCaseGenerator({ projectId }: Props) {
     <div class="meta-item"><label>Date</label><p>${today}</p></div>
     <div class="meta-item"><label>Initiatives</label><p>${selectedIdeas.length}</p></div>
     <div class="meta-item"><label>Analysis Period</label><p>${years} Years</p></div>
-    <div class="meta-item"><label>Discount Rate</label><p>8%</p></div>
+    <div class="meta-item"><label>Discount Rate</label><p>${discountRatePct}%</p></div>
   </div>
 
   <div class="financials">
     <div class="fin-card"><div class="val green">$${annualSavings.toLocaleString()}</div><div class="lbl">Annual Savings</div></div>
     <div class="fin-card"><div class="val blue">$${investment.toLocaleString()}</div><div class="lbl">Required Investment</div></div>
     <div class="fin-card"><div class="val amber">${paybackMonths != null ? paybackMonths.toFixed(1) + ' mo' : 'N/A'}</div><div class="lbl">Payback Period</div></div>
-    <div class="fin-card"><div class="val ${npv >= 0 ? 'green' : ''}" style="${npv < 0 ? 'color:#dc2626' : ''}">$${Math.round(npv).toLocaleString()}</div><div class="lbl">NPV (${years}yr @ 8%)</div></div>
+    <div class="fin-card"><div class="val ${npv >= 0 ? 'green' : ''}" style="${npv < 0 ? 'color:#dc2626' : ''}">$${Math.round(npv).toLocaleString()}</div><div class="lbl">NPV (${years}yr @ ${discountRatePct}%)</div></div>
   </div>
 
   <div class="section">
@@ -688,6 +693,22 @@ export function BusinessCaseGenerator({ projectId }: Props) {
                 className="h-8 text-sm"
               />
             </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="npv-discount-rate" className="text-xs">NPV Discount Rate (%)</Label>
+              <Input
+                id="npv-discount-rate"
+                type="number"
+                min={0}
+                max={100}
+                step={0.5}
+                value={discountRatePct}
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value);
+                  if (Number.isFinite(v)) setDiscountRatePct(Math.max(0, Math.min(100, v)));
+                }}
+                className="h-8 text-sm"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -724,7 +745,7 @@ export function BusinessCaseGenerator({ projectId }: Props) {
               <CardContent className="pt-3 pb-3">
                 <div className="flex items-center gap-2 mb-1">
                   <BarChart2 className="h-4 w-4 text-primary" />
-                  <span className="text-xs text-muted-foreground">NPV ({years}yr @ 8%)</span>
+                  <span className="text-xs text-muted-foreground">NPV ({years}yr @ {discountRatePct}%)</span>
                 </div>
                 <p className={`text-xl font-bold ${npv >= 0 ? 'text-emerald-400' : 'text-destructive'}`}>
                   {formatUSD(npv)}
@@ -785,6 +806,7 @@ export function BusinessCaseGenerator({ projectId }: Props) {
             roi={roi}
             paybackMonths={paybackMonths}
             years={years}
+            discountRatePct={discountRatePct}
             totalSpend={totalSpend}
           />
         </div>

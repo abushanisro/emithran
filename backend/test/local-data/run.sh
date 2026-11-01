@@ -19,7 +19,12 @@ docker exec -i "$ID-src" psql -U postgres -v ON_ERROR_STOP=1 -q <<'SQL' >/dev/nu
 ALTER TABLE auth.users ADD COLUMN email text UNIQUE, ADD COLUMN raw_user_meta_data jsonb NOT NULL DEFAULT '{}', ADD COLUMN created_at timestamptz NOT NULL DEFAULT now();
 INSERT INTO auth.users (id, email) VALUES ('11111111-1111-4111-8111-111111111111','alice@example.com'),('22222222-2222-4222-8222-222222222222','bob@example.com');
 DROP TABLE public.projects CASCADE;
-CREATE TABLE public.projects (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES auth.users(id), name text);
+CREATE TABLE public.projects (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES auth.users(id), name text, organization_id uuid REFERENCES public.organizations(id));
+-- what migrations after the baseline build on, as the real database has them (939 reads the team table)
+CREATE TABLE public.project_team_members (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), project_id uuid NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL, role text NOT NULL DEFAULT 'member', email text
+);
 INSERT INTO public.projects (user_id, name) VALUES ('11111111-1111-4111-8111-111111111111','Alice project');
 ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
 CREATE POLICY own ON public.projects FOR SELECT TO authenticated USING (user_id = auth.uid());

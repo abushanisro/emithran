@@ -22,7 +22,7 @@ import { type MaterialResolutionService } from '../../../modules/bom-items/servi
 import { type CalculatorCatalogService } from '../../../modules/bom-items/services/calculator-catalog.service';
 import { type MachineDiscoveryService } from '../../../modules/bom-items/services/machine-discovery.service';
 import { type ExchangeRateService } from '../../../common/exchange-rate/exchange-rate.service';
-import { type SupabaseService } from '../../../common/supabase/supabase.service';
+import { type DatabaseService } from '../../../common/database/database.service';
 import { type InspectionKnowledgeService } from '../../../modules/manufacturing-knowledge/services/inspection-knowledge.service';
 
 import type { BOMItemResponseDto } from '../../../modules/bom-items/dto/bom-item-response.dto';
@@ -37,7 +37,7 @@ const AREA_MM2 = (NET_WEIGHT_KG * 1e9) / (THICKNESS_MM * DENSITY_KG_M3);
 function buildService(computeTrueNest: jest.Mock, summary: Record<string, unknown> = {}) {
   const cadAnalysisService = { computeTrueNest } as unknown as CADAnalysisService;
   const service = new BOMItemsService(
-    {} as unknown as SupabaseService,
+    {} as unknown as DatabaseService,
     {} as unknown as InspectionKnowledgeService,
     {} as unknown as BlankOptimizerService,
     {

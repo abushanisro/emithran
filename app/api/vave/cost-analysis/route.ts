@@ -1,13 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import type { VaveBomItem, CostAnalysisResult, QFDMatrix } from '@/lib/api/vave';
+import type { VaveBomItem, CostAnalysisResult } from '@/lib/api/vave';
 import { requireUserForAi } from '@/lib/server/auth';
+import { refuseCrossOrigin } from '@/lib/server/bff/origin';
+import { readJsonBody } from '@/lib/server/read-body';
+import { parseAiJson, requestAiText } from '@/lib/server/anthropic';
+import { AiResultError, costAnalysisFromAi } from '@/lib/vave/ai-results';
+
+// A BOM summary: generous for thousands of items, far below anything that strains the server.
+const MAX_BODY_BYTES = 2 * 1024 * 1024;
 
 export async function POST(request: NextRequest) {
+  const refused = refuseCrossOrigin(request);
+  if (refused) return refused;
   const auth = await requireUserForAi('vave-cost-analysis');
   if (!auth.ok) return auth.response;
 
   try {
-    const { bomItems }: { bomItems: VaveBomItem[] } = await request.json();
+    const parsed = await readJsonBody<{ bomItems?: VaveBomItem[] } | null>(request, MAX_BODY_BYTES);
+    if (!parsed.ok) return parsed.response;
+    const { bomItems } = parsed.value ?? {};
 
     if (!bomItems?.length) {
       return NextResponse.json({ error: 'No BOM items provided' }, { status: 400 });
@@ -53,32 +64,19 @@ Return this exact JSON structure:
   }
 }`;
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY!,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 3000,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      return NextResponse.json({ error: 'AI analysis failed', details: err }, { status: response.status });
+    const ai = await requestAiText(prompt);
+    if (!ai.ok) {
+      return NextResponse.json({ error: ai.error, details: ai.details }, { status: ai.status });
     }
 
-    const aiData = await response.json();
-    const rawText = aiData.content?.[0]?.text ?? '{}';
-    let aiResult: { affinityGroups?: any[]; focusAreas?: string[]; qfdMatrix?: QFDMatrix } = {};
+    // An unreadable answer is an error, not an analysis with no groups.
+    const spendMap = new Map(bomItems.map((i) => [i.partNumber, i.annualSpend]));
+    let aiResult;
     try {
-      aiResult = JSON.parse(rawText.replace(/```json|```/g, '').trim());
-    } catch {
-      aiResult = { affinityGroups: [], focusAreas: [] };
+      aiResult = costAnalysisFromAi(parseAiJson(ai.text), spendMap);
+    } catch (error) {
+      const message = error instanceof AiResultError ? error.message : 'AI cost analysis answer is not valid JSON.';
+      return NextResponse.json({ error: message }, { status: 502 });
     }
 
     // Build Pareto items with cumulative percentage (computed locally — no AI needed)
@@ -96,20 +94,9 @@ Return this exact JSON structure:
       };
     });
 
-    // Enrich affinity groups with computed totalCost
-    const spendMap = new Map(bomItems.map((i) => [i.partNumber, i.annualSpend]));
-    const enrichedGroups = (aiResult.affinityGroups ?? []).map((g: any) => ({
-      name: g.name,
-      parts: g.parts ?? [],
-      totalCost: (g.parts ?? []).reduce((s: number, pn: string) => s + (spendMap.get(pn) ?? 0), 0),
-      description: g.description ?? '',
-    }));
-
     const result: CostAnalysisResult = {
       paretoItems,
-      affinityGroups: enrichedGroups,
-      focusAreas: aiResult.focusAreas ?? [],
-      ...(aiResult.qfdMatrix !== undefined ? { qfdMatrix: aiResult.qfdMatrix } : {}),
+      ...aiResult,
     };
 
     return NextResponse.json(result);

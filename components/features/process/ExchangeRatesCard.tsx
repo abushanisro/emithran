@@ -12,11 +12,14 @@ import { ApiError } from '@/lib/api/client';
 import { useExchangeRates, useSetExchangeRate, type ExchangeRateRow } from '@/lib/api/hooks/useFx';
 
 /**
- * Budget exchange rates (exchange_rates, migration 803): the rates the
- * "Budget" rate type converts with. Each row is "1 USD = rate CCY". Editing a
- * rate requires a reason; the server keeps the replaced rate as history and
- * records who changed it. The reference provenance (source date/author and
- * its active flag) stays visible next to any edit.
+ * Your organization's budget exchange rates: the rates the "Budget" rate type
+ * converts with for your organization's costing. Each row is "1 USD = rate
+ * CCY": your organization's own rate where one was set, else the global
+ * default (migration 803). Editing sets your organization's rate only (other
+ * organizations and the default are unaffected); it requires a reason, and the
+ * server keeps the replaced rate as history and records who changed it. The
+ * reference provenance (source date/author and its active flag) stays visible
+ * next to any edit.
  */
 export function ExchangeRatesCard() {
   const [expanded, setExpanded] = useState(false);
@@ -68,11 +71,11 @@ export function ExchangeRatesCard() {
             <CardTitle className="flex items-center gap-2">
               {expanded ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
               <Coins className="h-5 w-5" />
-              Exchange Rates
+              Your organization&apos;s budget rates
               {rates && <Badge variant="secondary" className="ml-1">{rates.length}</Badge>}
             </CardTitle>
             <CardDescription>
-              Budget FX rates (1 USD = rate) used by the Budget rate type in costing — edit a rate with a reason; every change is kept as history
+              Your organization&apos;s budget rates (1 USD = rate) used by the Budget rate type in your costing — editing changes your organization&apos;s rate only, needs a reason, and every change is kept as history
             </CardDescription>
           </div>
         </button>
@@ -124,7 +127,12 @@ export function ExchangeRatesCard() {
                               autoFocus
                             />
                           ) : (
-                            <>{row.rate} {row.currency}</>
+                            <>
+                              {row.rate} {row.currency}
+                              {row.source === 'organization' && (
+                                <div className="text-[10px] text-muted-foreground">default {row.defaultRate}</div>
+                              )}
+                            </>
                           )}
                         </TableCell>
                         <TableCell className="text-xs">{row.effectiveDate}</TableCell>
@@ -143,7 +151,7 @@ export function ExchangeRatesCard() {
                               {row.editReason && <div className="text-muted-foreground">{row.editReason}</div>}
                             </>
                           ) : (
-                            <span className="text-muted-foreground">Reference value</span>
+                            <span className="text-muted-foreground">Global default</span>
                           )}
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">

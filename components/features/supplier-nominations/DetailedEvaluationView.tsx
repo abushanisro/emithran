@@ -5,13 +5,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 
 import {
   ArrowLeft,
@@ -449,22 +442,8 @@ export function DetailedEvaluationView({
 
     return (
       <div className="space-y-6">
-        {/* Header with Evaluation Method and Actions */}
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <label className="text-white font-medium">Select the Evaluation Method</label>
-            <Select defaultValue="emuski-audit">
-              <SelectTrigger className="w-48 bg-gray-800 border-gray-700 text-white">
-                <SelectValue placeholder="Select method" />
-              </SelectTrigger>
-              <SelectContent className="bg-gray-800 border-gray-700">
-                <SelectItem value="emuski-audit" className="text-white focus:bg-gray-700">EMuski Audit</SelectItem>
-                <SelectItem value="standard-audit" className="text-white focus:bg-gray-700">Standard Audit</SelectItem>
-                <SelectItem value="custom-audit" className="text-white focus:bg-gray-700">Custom Audit</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
+        {/* Header with Actions */}
+        <div className="flex items-center justify-end gap-4">
           {/* Action Buttons */}
           <div className="flex items-center gap-2">
             {isEditingCapability ? (

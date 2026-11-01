@@ -9,7 +9,7 @@ const MANUAL_STROKE_ROWS_80T_SIMPLE = [
   { thickness_mm: 3, tonnage: 80, complexity: 'simple', stroke_time_sec: 1.46 },
 ];
 
-function fakeSupabaseService(rows: typeof MANUAL_STROKE_ROWS_80T_SIMPLE) {
+function fakeDatabaseService(rows: typeof MANUAL_STROKE_ROWS_80T_SIMPLE) {
   const builder: any = {
     from: (_table: string) => builder,
     select: (_cols: string) => builder,
@@ -25,7 +25,7 @@ function fakeSupabaseService(rows: typeof MANUAL_STROKE_ROWS_80T_SIMPLE) {
 
 describe('SheetMetalLookupService.getManualStrokeTime', () => {
   it('still resolves an exact seeded row unchanged', async () => {
-    const svc = new SheetMetalLookupService(fakeSupabaseService(MANUAL_STROKE_ROWS_80T_SIMPLE));
+    const svc = new SheetMetalLookupService(fakeDatabaseService(MANUAL_STROKE_ROWS_80T_SIMPLE));
     const result = await svc.getManualStrokeTime(1, 80, 'simple');
     expect(result.dataFound).toBe(true);
     expect(result.secondsPerBend).toBeCloseTo(1.18, 2);
@@ -33,7 +33,7 @@ describe('SheetMetalLookupService.getManualStrokeTime', () => {
   });
 
   it('still interpolates between two real bracketing rows unchanged', async () => {
-    const svc = new SheetMetalLookupService(fakeSupabaseService(MANUAL_STROKE_ROWS_80T_SIMPLE));
+    const svc = new SheetMetalLookupService(fakeDatabaseService(MANUAL_STROKE_ROWS_80T_SIMPLE));
     const result = await svc.getManualStrokeTime(1.5, 80, 'simple');
     expect(result.dataFound).toBe(true);
     // Linear midpoint of 1.18 and 1.30.
@@ -42,7 +42,7 @@ describe('SheetMetalLookupService.getManualStrokeTime', () => {
   });
 
   it('extrapolates below the smallest real row instead of reporting a bare gap (0.5mm/80T/simple)', async () => {
-    const svc = new SheetMetalLookupService(fakeSupabaseService(MANUAL_STROKE_ROWS_80T_SIMPLE));
+    const svc = new SheetMetalLookupService(fakeDatabaseService(MANUAL_STROKE_ROWS_80T_SIMPLE));
     const result = await svc.getManualStrokeTime(0.5, 80, 'simple');
     expect(result.dataFound).toBe(true);
     // Local slope between the two nearest real rows (1mm->1.18s, 2mm->1.30s)
@@ -53,7 +53,7 @@ describe('SheetMetalLookupService.getManualStrokeTime', () => {
   });
 
   it('still reports a real gap when fewer than two real rows exist on the near side', async () => {
-    const svc = new SheetMetalLookupService(fakeSupabaseService([MANUAL_STROKE_ROWS_80T_SIMPLE[0]]));
+    const svc = new SheetMetalLookupService(fakeDatabaseService([MANUAL_STROKE_ROWS_80T_SIMPLE[0]]));
     const result = await svc.getManualStrokeTime(0.5, 80, 'simple');
     expect(result.dataFound).toBe(false);
     expect(result.resolution.matchedRow).toBeNull();
@@ -142,7 +142,7 @@ describe('SheetMetalLookupService.getBendCycleTimeForMachine', () => {
 
 describe('SheetMetalLookupService.getManualStrokeTimeForPressBrake', () => {
   it('prefers the real per-machine cycle time outright over the generic curve, keeping resolution/roundedFromTonnage from the curve', async () => {
-    const svc = new SheetMetalLookupService(fakeSupabaseService(MANUAL_STROKE_ROWS_80T_SIMPLE));
+    const svc = new SheetMetalLookupService(fakeDatabaseService(MANUAL_STROKE_ROWS_80T_SIMPLE));
     // Stub the real-machine lookup independently of the generic-curve fake DB.
     (svc as any).getBendCycleTimeForMachine = async () => ({ secondsPerBend: 0.9, dataFound: true });
 
@@ -154,7 +154,7 @@ describe('SheetMetalLookupService.getManualStrokeTimeForPressBrake', () => {
   });
 
   it('falls back to the generic curve untouched when no real per-machine data exists', async () => {
-    const svc = new SheetMetalLookupService(fakeSupabaseService(MANUAL_STROKE_ROWS_80T_SIMPLE));
+    const svc = new SheetMetalLookupService(fakeDatabaseService(MANUAL_STROKE_ROWS_80T_SIMPLE));
     (svc as any).getBendCycleTimeForMachine = async () => ({ secondsPerBend: null, dataFound: false });
 
     const result = await svc.getManualStrokeTimeForPressBrake(1, 80, 'simple', 'Unknown Machine');

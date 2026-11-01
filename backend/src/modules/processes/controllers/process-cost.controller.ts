@@ -4,7 +4,7 @@ interface User { id: string; email: string; [key: string]: any; }
  *
  * Production-grade REST API controller for process costs
  * - RESTful endpoints with proper HTTP methods
- * - Authentication with Supabase
+ * - Authentication by the global RequestAuthGuard
  * - Request validation with DTOs
  * - Swagger API documentation
  *
@@ -27,7 +27,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { SupabaseAuthGuard } from '../../../common/guards/supabase-auth.guard';
+import { RequestAuthGuard } from '../../../common/guards/request-auth.guard';
 import { OrganizationContextGuard } from '../../../common/guards/organization-context.guard';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../../common/decorators/access-token.decorator';
@@ -44,7 +44,7 @@ import { ProcessCostInput } from '../engines/process-cost-calculation.engine';
 
 @ApiTags('Process Costs')
 @ApiBearerAuth()
-@UseGuards(SupabaseAuthGuard)
+@UseGuards(RequestAuthGuard)
 @Controller('api/process-costs')
 export class ProcessCostController {
   private readonly logger = new Logger(ProcessCostController.name);

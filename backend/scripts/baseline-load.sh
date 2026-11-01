@@ -30,6 +30,10 @@ pg sh -c 'psql "$TARGET" -v ON_ERROR_STOP=1 -q' <<'SQL' >/dev/null
 CREATE SCHEMA IF NOT EXISTS extensions;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
+-- Migration 930 stopped PUBLIC executing new functions, so the API roles get these the way Supabase grants them; without it, every
+-- insert that relies on a uuid_generate_v4() default fails for a signed-in user.
+GRANT USAGE ON SCHEMA extensions TO anon, authenticated, service_role;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA extensions TO anon, authenticated, service_role;
 -- pg_trgm was created in public on Supabase, so the dump names its operator class public.gin_trgm_ops.
 CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
 DO $$ BEGIN EXECUTE format('ALTER DATABASE %I SET search_path = "$user", public, extensions', current_database()); END $$;

@@ -30,6 +30,19 @@ describe('computeWaterjetCost — prices the calculator cycle time', () => {
     expect(result.abrasiveCost).toBeCloseTo((138 / 60) * 0.46 * 0.7275, 2);
   });
 
+  it('warns, instead of silently charging 0, when no abrasive price is on file', () => {
+    for (const abrasivePricePerKg of [null, undefined]) {
+      const result = computeWaterjetCost(baseInput({ abrasivePricePerKg, abrasiveKgPerMin: 0.46 }));
+      expect(result.abrasiveCost).toBe(0);
+      expect(result.warnings.some((w) => w.includes('no garnet abrasive price'))).toBe(true);
+    }
+  });
+
+  it('does not warn about the abrasive price when one is on file', () => {
+    const result = computeWaterjetCost(baseInput({ abrasivePricePerKg: 0.7275, abrasiveKgPerMin: 0.46 }));
+    expect(result.warnings.some((w) => w.includes('no garnet abrasive price'))).toBe(false);
+  });
+
   it('adds no gap and no time when there is nothing to cut', () => {
     const result = computeWaterjetCost(baseInput({ cutLengthMm: 0, pierceCount: 0, cuttingSecFromCalculator: undefined }));
     expect(result.cuttingMin).toBe(0);

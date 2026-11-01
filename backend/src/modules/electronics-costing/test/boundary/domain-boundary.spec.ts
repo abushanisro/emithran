@@ -23,7 +23,7 @@ describe('electronics domain import boundary', () => {
     ["import { x } from '../../infrastructure/repositories/electronics.repository';"],
     ["import { x } from '../../application/start-upload.use-case';"],
     ["import { x } from '../../api/electronics.controller';"],
-    ["import { SupabaseService } from '../../../../common/supabase/supabase.service';"],
+    ["import { DatabaseService } from '../../../../common/database/database.service';"],
     ["import { MACHINE_REGISTRY } from '../../../bom-items/costing/shared/core/default-rates.constants';"],
   ])('rejects: %s', async (source) => {
     expect(await violations(`${source}\nexport const used = 1;\n`)).toContain('@typescript-eslint/no-restricted-imports');

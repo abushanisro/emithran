@@ -1,5 +1,5 @@
 import { Injectable, Logger, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
-import { SupabaseService } from '@/common/supabase/supabase.service';
+import { DatabaseService } from '@/common/database/database.service';
 import { 
   CreateRemarkDto, 
   UpdateRemarkDto, 
@@ -16,10 +16,10 @@ import {
 export class RemarkService {
   private readonly logger = new Logger(RemarkService.name);
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(private readonly databaseService: DatabaseService) {}
 
   async createRemark(createDto: CreateRemarkDto, createdBy: string): Promise<RemarkResponseDto> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     try {
       // Validate scope-specific constraints
@@ -48,7 +48,7 @@ export class RemarkService {
         attachments: []
       };
 
-      const { data, error } = await supabase
+      const { data, error } = await database
         .from('remarks_and_issues')
         .insert([remarkData])
         .select()
@@ -70,10 +70,10 @@ export class RemarkService {
   }
 
   async updateRemark(id: string, updateDto: UpdateRemarkDto, userId: string): Promise<RemarkResponseDto> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // First, get the remark to check permissions
-    const { data: remark, error: fetchError } = await supabase
+    const { data: remark, error: fetchError } = await database
       .from('remarks_and_issues')
       .select('*')
       .eq('id', id)
@@ -115,7 +115,7 @@ export class RemarkService {
     if (updateData.actualDelayHours !== undefined) dbUpdateData.actual_delay_hours = updateData.actualDelayHours;
     if (updateData.tags !== undefined) dbUpdateData.tags = updateData.tags;
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from('remarks_and_issues')
       .update(dbUpdateData)
       .eq('id', id)
@@ -131,10 +131,10 @@ export class RemarkService {
   }
 
   async deleteRemark(id: string, userId: string): Promise<void> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // First, get the remark to check permissions
-    const { data: remark, error: fetchError } = await supabase
+    const { data: remark, error: fetchError } = await database
       .from('remarks_and_issues')
       .select('id, created_by')
       .eq('id', id)
@@ -149,7 +149,7 @@ export class RemarkService {
       throw new BadRequestException('You can only delete remarks you created');
     }
 
-    const { error } = await supabase
+    const { error } = await database
       .from('remarks_and_issues')
       .delete()
       .eq('id', id);
@@ -161,9 +161,9 @@ export class RemarkService {
   }
 
   async getRemarkById(id: string): Promise<RemarkResponseDto> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from('remarks_and_issues')
       .select('*')
       .eq('id', id)
@@ -177,9 +177,9 @@ export class RemarkService {
   }
 
   async getRemarks(filterDto: RemarkFilterDto): Promise<PaginatedRemarksResponseDto> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
-    let query = supabase
+    let query = database
       .from('remarks_and_issues')
       .select('*', { count: 'exact' });
 
@@ -245,9 +245,9 @@ export class RemarkService {
   }
 
   async getRemarksByLot(lotId: string, filterDto?: Partial<RemarkFilterDto>): Promise<RemarkResponseDto[]> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
-    let query = supabase
+    let query = database
       .from('remarks_and_issues')
       .select('*')
       .eq('lot_id', lotId);
@@ -280,10 +280,10 @@ export class RemarkService {
 
   // Comment methods
   async createComment(createDto: CreateCommentDto, authorId: string, authorName?: string): Promise<CommentResponseDto> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Verify remark exists
-    const { data: remark, error: remarkError } = await supabase
+    const { data: remark, error: remarkError } = await database
       .from('remarks_and_issues')
       .select('id')
       .eq('id', createDto.remarkId)
@@ -296,7 +296,7 @@ export class RemarkService {
     // Calculate thread level if it's a reply
     let threadLevel = 0;
     if (createDto.parentCommentId) {
-      const { data: parentComment, error: parentError } = await supabase
+      const { data: parentComment, error: parentError } = await database
         .from('remarks_comments')
         .select('thread_level')
         .eq('id', createDto.parentCommentId)
@@ -318,7 +318,7 @@ export class RemarkService {
       thread_level: threadLevel,
     };
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from('remarks_comments')
       .insert([commentData])
       .select()
@@ -333,10 +333,10 @@ export class RemarkService {
   }
 
   async updateComment(id: string, updateDto: UpdateCommentDto, userId: string): Promise<CommentResponseDto> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Check permissions
-    const { data: comment, error: fetchError } = await supabase
+    const { data: comment, error: fetchError } = await database
       .from('remarks_comments')
       .select('*')
       .eq('id', id)
@@ -350,7 +350,7 @@ export class RemarkService {
       throw new BadRequestException('You can only update your own comments');
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from('remarks_comments')
       .update({ comment_text: updateDto.commentText })
       .eq('id', id)
@@ -366,10 +366,10 @@ export class RemarkService {
   }
 
   async deleteComment(id: string, userId: string): Promise<void> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Check permissions
-    const { data: comment, error: fetchError } = await supabase
+    const { data: comment, error: fetchError } = await database
       .from('remarks_comments')
       .select('id, author_id')
       .eq('id', id)
@@ -383,7 +383,7 @@ export class RemarkService {
       throw new BadRequestException('You can only delete your own comments');
     }
 
-    const { error } = await supabase
+    const { error } = await database
       .from('remarks_comments')
       .delete()
       .eq('id', id);
@@ -395,9 +395,9 @@ export class RemarkService {
   }
 
   async getCommentsByRemark(remarkId: string): Promise<CommentResponseDto[]> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from('remarks_comments')
       .select('*')
       .eq('remark_id', remarkId)
@@ -418,9 +418,9 @@ export class RemarkService {
     byPriority: Record<string, number>;
     byType: Record<string, number>;
   }> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from('remarks_and_issues')
       .select('status, priority, remark_type')
       .eq('lot_id', lotId);
@@ -449,10 +449,10 @@ export class RemarkService {
 
   // Private helper methods
   private async validateRemarkScope(createDto: CreateRemarkDto): Promise<void> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Validate that lot exists
-    const { data: lot, error: lotError } = await supabase
+    const { data: lot, error: lotError } = await database
       .from('production_lots')
       .select('id')
       .eq('id', createDto.lotId)

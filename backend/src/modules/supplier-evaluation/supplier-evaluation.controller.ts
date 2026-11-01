@@ -20,14 +20,14 @@ import {
   QuerySupplierEvaluationDto,
   SupplierEvaluationResponseDto,
 } from './dto/supplier-evaluation.dto';
-import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
+import { RequestAuthGuard } from '../../common/guards/request-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
 
 @ApiTags('Supplier Evaluation')
 @ApiBearerAuth()
 @Controller({ path: 'api/supplier-evaluations', version: '1' })
-@UseGuards(SupabaseAuthGuard)
+@UseGuards(RequestAuthGuard)
 export class SupplierEvaluationController {
   private readonly logger = new Logger(SupplierEvaluationController.name);
 

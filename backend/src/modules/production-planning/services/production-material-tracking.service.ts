@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { SupabaseService } from '@/common/supabase/supabase.service';
+import { DatabaseService } from '@/common/database/database.service';
 
 interface MaterialStatusUpdate {
   materialId: string;
@@ -57,17 +57,17 @@ interface MonitoringMetrics {
 
 @Injectable()
 export class ProductionMaterialTrackingService {
-  constructor(private readonly supabaseService: SupabaseService) { }
+  constructor(private readonly databaseService: DatabaseService) { }
 
   // ============================================================================
   // MATERIAL TRACKING METHODS
   // ============================================================================
 
   async initializeProductionLotMaterials(lotId: string, userId: string): Promise<any[]> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Get production lot with selected BOM items
-    const { data: lotData } = await supabase
+    const { data: lotData } = await database
       .from('production_lots')
       .select(`
         id,
@@ -95,7 +95,7 @@ export class ProductionMaterialTrackingService {
       bomItems = lotData.selected_bom_items.map((item: any) => item.bom_item);
     } else {
       // No specific items selected, get all BOM items (fallback for legacy lots)
-      const { data: allBomItems } = await supabase
+      const { data: allBomItems } = await database
         .from('bom_items')
         .select('*')
         .eq('bom_id', lotData.bom_id);
@@ -118,7 +118,7 @@ export class ProductionMaterialTrackingService {
       lead_time_days: 7, // Default lead time
     }));
 
-    const { data: materials, error } = await supabase
+    const { data: materials, error } = await database
       .from('production_lot_materials')
       .upsert(materialInserts, { onConflict: 'production_lot_id,bom_item_id' })
       .select(`
@@ -142,16 +142,16 @@ export class ProductionMaterialTrackingService {
   }
 
   async getProductionLotMaterials(lotId: string, userId: string): Promise<any[]> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // First check if there are specific BOM items selected for this lot
-    const { data: selectedBomItems } = await supabase
+    const { data: selectedBomItems } = await database
       .from('production_lot_bom_items')
       .select('bom_item_id')
       .eq('production_lot_id', lotId);
 
     // Build the query
-    let query = supabase
+    let query = database
       .from('production_lot_materials')
       .select(`
         *,
@@ -188,7 +188,7 @@ export class ProductionMaterialTrackingService {
     // Get tracking history for each material
     const materialsWithHistory = await Promise.all(
       materials.map(async (material) => {
-        const { data: history } = await supabase
+        const { data: history } = await database
           .from('material_tracking_history')
           .select('*')
           .eq('production_lot_material_id', material.id)
@@ -212,10 +212,10 @@ export class ProductionMaterialTrackingService {
     updates: MaterialStatusUpdate,
     userId: string,
   ): Promise<any> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Verify user has access
-    const { data: material } = await supabase
+    const { data: material } = await database
       .from('production_lot_materials')
       .select(`
         *,
@@ -231,7 +231,7 @@ export class ProductionMaterialTrackingService {
       throw new NotFoundException('Material not found');
     }
 
-    const { data: updatedMaterial, error } = await supabase
+    const { data: updatedMaterial, error } = await database
       .from('production_lot_materials')
       .update({
         ...updates,
@@ -249,9 +249,9 @@ export class ProductionMaterialTrackingService {
   }
 
   async getMaterialTrackingHistory(materialId: string, userId: string): Promise<MaterialTrackingHistoryEntry[]> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
-    const { data: history, error } = await supabase
+    const { data: history, error } = await database
       .from('material_tracking_history')
       .select('*')
       .eq('production_lot_material_id', materialId)
@@ -269,13 +269,13 @@ export class ProductionMaterialTrackingService {
   // ============================================================================
 
   async getProductionMonitoringData(lotId: string, userId: string): Promise<any> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Verify access
     await this.verifyLotAccess(lotId, userId);
 
     // Get production processes with progress
-    const { data: processes } = await supabase
+    const { data: processes } = await database
       .from('production_processes')
       .select(`
         *,
@@ -379,11 +379,11 @@ export class ProductionMaterialTrackingService {
     metricsData: MonitoringMetrics,
     userId: string,
   ): Promise<any> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     await this.verifyLotAccess(lotId, userId);
 
-    const { data: metrics, error } = await supabase
+    const { data: metrics, error } = await database
       .from('production_monitoring_metrics')
       .upsert({
         production_lot_id: lotId,
@@ -417,11 +417,11 @@ export class ProductionMaterialTrackingService {
   // ============================================================================
 
   async getProductionAlerts(lotId: string, userId: string): Promise<ProductionAlert[]> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     await this.verifyLotAccess(lotId, userId);
 
-    const { data: alerts, error } = await supabase
+    const { data: alerts, error } = await database
       .from('production_material_alerts')
       .select('*')
       .eq('production_lot_id', lotId)
@@ -448,11 +448,11 @@ export class ProductionMaterialTrackingService {
     },
     userId: string,
   ): Promise<any> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     await this.verifyLotAccess(lotId, userId);
 
-    const { data: alert, error } = await supabase
+    const { data: alert, error } = await database
       .from('production_material_alerts')
       .insert({
         production_lot_id: lotId,
@@ -476,9 +476,9 @@ export class ProductionMaterialTrackingService {
   }
 
   async resolveAlert(alertId: string, resolutionNotes: string, userId: string): Promise<any> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
-    const { data: alert, error } = await supabase
+    const { data: alert, error } = await database
       .from('production_material_alerts')
       .update({
         status: 'resolved',
@@ -507,9 +507,9 @@ export class ProductionMaterialTrackingService {
       return;
     }
 
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
-    const { data } = await supabase
+    const { data } = await database
       .from('production_lots')
       .select('boms!inner(user_id)')
       .eq('id', lotId)
@@ -530,10 +530,10 @@ export class ProductionMaterialTrackingService {
   }
 
   private async calculateProcessMaterialReadiness(lotId: string, processId: string): Promise<number> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Get materials required for this process (simplified - all materials for now)
-    const { data: materials } = await supabase
+    const { data: materials } = await database
       .from('production_lot_materials')
       .select('required_quantity, approved_quantity')
       .eq('production_lot_id', lotId);
@@ -547,10 +547,10 @@ export class ProductionMaterialTrackingService {
   }
 
   private async getProcessRequiredMaterials(lotId: string, processId: string): Promise<string[]> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Simplified - return all material part numbers for this lot
-    const { data: materials } = await supabase
+    const { data: materials } = await database
       .from('production_lot_materials')
       .select('bom_items!inner(part_number)')
       .eq('production_lot_id', lotId);
@@ -567,10 +567,10 @@ export class ProductionMaterialTrackingService {
   }
 
   private async calculateOverallMetrics(lotId: string): Promise<any> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Get recent production metrics
-    const { data: metrics } = await supabase
+    const { data: metrics } = await database
       .from('production_monitoring_metrics')
       .select('*')
       .eq('production_lot_id', lotId)
@@ -600,9 +600,9 @@ export class ProductionMaterialTrackingService {
   }
 
   private async getMaterialSummary(lotId: string): Promise<any> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
-    const { data: materials } = await supabase
+    const { data: materials } = await database
       .from('production_lot_materials')
       .select('material_status, criticality, required_quantity, approved_quantity')
       .eq('production_lot_id', lotId);
@@ -619,10 +619,10 @@ export class ProductionMaterialTrackingService {
   }
 
   private async getAffectedProcesses(lotId: string, bomItemId: string): Promise<string[]> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
     
     // Get processes for this lot
-    const { data: processes } = await supabase
+    const { data: processes } = await database
       .from('production_processes')
       .select('process_name')
       .eq('production_lot_id', lotId);
@@ -632,9 +632,9 @@ export class ProductionMaterialTrackingService {
   }
 
   private async getMaterialAlerts(materialId: string): Promise<any[]> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
-    const { data: alerts } = await supabase
+    const { data: alerts } = await database
       .from('production_material_alerts')
       .select('*')
       .eq('production_lot_material_id', materialId)
@@ -644,9 +644,9 @@ export class ProductionMaterialTrackingService {
   }
 
   private async getProductionLotDetails(lotId: string, userId: string): Promise<any> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
-    const { data: lot } = await supabase
+    const { data: lot } = await database
       .from('production_lots')
       .select(`
         *,
@@ -665,11 +665,11 @@ export class ProductionMaterialTrackingService {
   }
 
   private async getProductionProcesses(lotId: string, userId: string): Promise<any[]> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     await this.verifyLotAccess(lotId, userId);
 
-    const { data: processes } = await supabase
+    const { data: processes } = await database
       .from('production_processes')
       .select('*')
       .eq('production_lot_id', lotId)
@@ -679,11 +679,11 @@ export class ProductionMaterialTrackingService {
   }
 
   private async getProductionMetrics(lotId: string, userId: string): Promise<any> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     await this.verifyLotAccess(lotId, userId);
 
-    const { data: metrics } = await supabase
+    const { data: metrics } = await database
       .from('production_monitoring_metrics')
       .select('*')
       .eq('production_lot_id', lotId)

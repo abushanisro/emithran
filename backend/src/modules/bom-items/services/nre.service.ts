@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../common/database/database.service';
 import { ReferenceMemo } from '../../../common/cache/reference-memo';
 import { BOMItemsService } from '../bom-items.service';
 import { MachineDiscoveryService } from './machine-discovery.service';
@@ -59,7 +59,7 @@ const num = (v: unknown): number | null => {
 @Injectable()
 export class NreService {
   constructor(
-    private readonly supabase: SupabaseService,
+    private readonly database: DatabaseService,
     private readonly bomItems: BOMItemsService,
     private readonly discovery: MachineDiscoveryService,
     private readonly secondary: SecondaryProcessService,
@@ -69,7 +69,7 @@ export class NreService {
   // e.g. after a failed read, is never kept).
   @ReferenceMemo()
   private async machiningVariables(keys: string[]): Promise<Map<string, string>> {
-    const { data } = await this.supabase.getPrivilegedClient('reference-data: machining_reference_data, public-read')
+    const { data } = await this.database.getPrivilegedClient('reference-data: machining_reference_data, public-read')
       .from('machining_reference_data')
       .select('key, value')
       .eq('category', 'variable')
@@ -80,13 +80,13 @@ export class NreService {
 
   /** A selected machine's reference record (accounting block), by its mhr row. */
   private async machineAccounting(mhrId: string, accessToken: string): Promise<{ key: string; accounting: Record<string, unknown> } | null> {
-    const db = this.supabase.getClient(accessToken);
+    const db = this.database.getClient(accessToken);
     const { data: m } = await cachedRead(`mhr:benchmark-key:${mhrId}`, async () =>
       await db.from('mhr_records').select('benchmark_source_key').eq('id', mhrId).maybeSingle());
     const key = (m as any)?.benchmark_source_key as string | undefined;
     if (!key) return null;
     const { data } = await cachedRead(`machining-reference-machine:${key}`, async () =>
-      await this.supabase.getPrivilegedClient('reference-data: machining_reference_data, public-read')
+      await this.database.getPrivilegedClient('reference-data: machining_reference_data, public-read')
         .from('machining_reference_data')
         .select('raw')
         .eq('category', 'machine')
@@ -149,7 +149,7 @@ export class NreService {
     }
 
     // ── CMM programming (from the secondary-process CMM line) ──────────────
-    const sec = await this.secondary.compute({ item, location, batchSize: inputs.batchSize, accessToken });
+    const sec = await this.secondary.compute({ item, location, batchSize: inputs.batchSize, accessToken, organizationId: await this.bomItems.organizationOfItem(itemId, accessToken) });
     const cmm = sec.lines.find((l) => l.process === 'CMM Inspection');
     const progStep = cmm?.trace.find((t) => t.label.startsWith('Programming'));
     if (cmm?.status === 'costed' && cmm.machine && progStep && typeof progStep.value === 'number') {

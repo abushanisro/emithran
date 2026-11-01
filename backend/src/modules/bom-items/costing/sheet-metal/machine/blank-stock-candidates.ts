@@ -1,6 +1,6 @@
-// Pure, framework-free blank-stock candidate geometry — no NestJS/Supabase
-// dependency, so this is directly unit-testable without mocking a Supabase
-// client (this project's standing rule against mocked-Supabase spec files).
+// Pure, framework-free blank-stock candidate geometry — no NestJS/database
+// dependency, so this is directly unit-testable without mocking a database
+// client (this project's standing rule against mocked-database spec files).
 // BlankOptimizerService (blank-optimizer.service.ts) is the thin DB-fetching
 // wrapper around these functions; it owns no geometry of its own.
 

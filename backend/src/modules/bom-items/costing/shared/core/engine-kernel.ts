@@ -52,7 +52,7 @@ export function preferRealRate(specific: MHRRateInput, generic: MHRRateInput): M
 // confirms all 6 of these classes perform bending as part of their own
 // process, not as a downstream operation. A 'cutting' route still needs the
 // separate Press Brake line — none of those machines can bend. Pure boolean
-// so it's directly unit-testable without mocking the Supabase-backed
+// so it's directly unit-testable without mocking the database-backed
 // getRouteComparison() call site that consumes it.
 export function shouldAddSeparatePressBrakeLine(processFamily: 'cutting' | 'forming'): boolean {
   return processFamily !== 'forming';

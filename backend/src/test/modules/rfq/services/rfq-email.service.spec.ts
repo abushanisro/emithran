@@ -6,7 +6,7 @@
 // secrets. Attachments are now storage downloads made with the caller's client,
 // sent as bytes, and the transport refuses file and URL attachments.
 import { RfqEmailService } from '../../../../modules/rfq/services/rfq-email.service';
-import { type SupabaseService } from '../../../../common/supabase/supabase.service';
+import { type DatabaseService } from '../../../../common/database/database.service';
 
 describe('RfqEmailService attachments', () => {
   const env = { ...process.env };
@@ -19,12 +19,12 @@ describe('RfqEmailService attachments', () => {
   function setup(objects: Record<string, string>, readable = true) {
     const get = jest.fn(async (_bucket: string, p: string) => (p in objects ? Buffer.from(objects[p]) : null));
     const canRead = jest.fn(async () => readable);
-    const supabaseService = {
+    const databaseService = {
       getUserClient: jest.fn(),
       getPrivilegedClient: jest.fn(() => { throw new Error('attachments must not use the privileged client'); }),
-    } as unknown as SupabaseService;
-    const service = new RfqEmailService(supabaseService, { canRead } as never, { get } as never);
-    return { service, supabaseService, get, canRead };
+    } as unknown as DatabaseService;
+    const service = new RfqEmailService(databaseService, { canRead } as never, { get } as never);
+    return { service, databaseService, get, canRead };
   }
 
   it('locks the transport against file and URL attachments', () => {
@@ -81,7 +81,47 @@ describe('RfqEmailService email content', () => {
     const { html, text } = await (service as any).generateEmailTemplate(rfq, items, vendor);
     expect(html).not.toContain('vendor-portal');
     expect(text).not.toContain('vendor-portal');
-    expect(html).toContain('mailto:rfq@example.com?subject=Re: RFQ-1');
+    expect(html).toContain('href="mailto:rfq@example.com?subject=Re%3A%20RFQ-1"');
     expect(html).toContain('drawings and 3D models are attached');
+  });
+
+  it('escapes every user-supplied field in the HTML and keeps the plain text readable', async () => {
+    process.env.SMTP_USER = 'rfq@example.com';
+    process.env.SMTP_PASS = 'x';
+    process.env.BUYER_EMAIL = 'buyer"><script>x</script>@example.com';
+    const service = new RfqEmailService({} as never, {} as never, {} as never);
+    const evil = '<img src=x onerror=alert(1)>';
+    const rfq = {
+      id: 'r1', rfqNumber: 'RFQ-1', rfqName: `Name${evil}`, emailSubject: `</title>${evil}`, emailBody: `Body${evil}\nline 2`,
+      buyerName: `Buyer${evil}`, selectionType: 'single', bomItemIds: [], vendorIds: [],
+    };
+    const items = [{
+      id: 'i1', name: `Item${evil}`, partNumber: `P${evil}`, description: `D${evil}`, material: `M${evil}`, itemType: 'child_part', quantity: 2,
+      processes: [`Proc${evil}`],
+    }];
+    const vendor = { id: 'v1', name: `Vendor${evil}`, companyEmail: 'v@example.com' };
+    const { html, text } = await (service as any).generateEmailTemplate(rfq, items, vendor);
+    expect(html).not.toContain('<img');
+    expect(html).not.toContain('<script');
+    expect(html).not.toContain('</title><');
+    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
+    expect(html).toContain('Body&lt;img src=x onerror=alert(1)&gt;<br>line 2');
+    // The address is URL-encoded inside the link, so it cannot close the attribute.
+    expect(html).toContain('href="mailto:buyer%22%3E%3Cscript%3Ex%3C%2Fscript%3E@example.com"');
+    expect(text).toContain(`Vendor${evil} Team`);
+  });
+
+  it('sends the buyer copy as a structured address, so the buyer name cannot add recipients', async () => {
+    process.env.SMTP_USER = 'rfq@example.com';
+    process.env.SMTP_PASS = 'x';
+    process.env.BUYER_EMAIL = 'buyer@example.com';
+    const service = new RfqEmailService({ getUserClient: () => ({ from: () => ({ insert: async () => ({}) }) }) } as never, {} as never, {} as never);
+    const sendMail = jest.fn(async () => ({}));
+    (service as any).transporter = { sendMail };
+    const rfq = { id: 'r1', rfqNumber: 'RFQ-1', rfqName: 'R', buyerName: 'Eve <attacker@evil.example>, x', selectionType: 'single', bomItemIds: [], vendorIds: [] };
+    await (service as any).sendIndividualRfqEmail(rfq, [], { id: 'v1', name: 'V', companyEmail: 'v@example.com' }, []);
+    expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({
+      cc: { name: 'Eve <attacker@evil.example>, x', address: 'buyer@example.com' },
+    }));
   });
 });

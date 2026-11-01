@@ -10,7 +10,8 @@ import { AuthProvider } from '@/lib/providers/auth-provider'
 import { initializeApiClient } from '@/lib/api/init'
 import { useCorrelationContext } from '@/lib/hooks/useCorrelationContext'
 
-export function Providers({ children }: { children: React.ReactNode }) {
+// nonce: the per-request CSP nonce (app/layout.tsx), for the theme script next-themes inlines before hydration.
+export function Providers({ children, nonce }: { children: React.ReactNode; nonce?: string | undefined }) {
   // Initialize correlation context for request tracing (without auth dependency)
   useCorrelationContext();
 
@@ -20,7 +21,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   }, [])
 
   return (
-    <ThemeProvider>
+    <ThemeProvider {...(nonce && { nonce })}>
       <DensityProvider>
         <AuthProvider>
           <QueryProvider>

@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { DatabaseService } from '../../common/database/database.service';
 
 export const MAX_PREFERENCES = 20;
 export const MAX_PREFERENCE_CHARS = 200;
@@ -18,10 +18,10 @@ const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 export class CopilotMemoryService {
   private readonly logger = new Logger(CopilotMemoryService.name);
 
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   async load(userId: string, accessToken: string): Promise<string[]> {
-    const { data, error } = await this.supabase
+    const { data, error } = await this.database
       .getUserClient(accessToken)
       .from('copilot_user_memory')
       .select('preferences')
@@ -32,6 +32,19 @@ export class CopilotMemoryService {
       throw new InternalServerErrorException('Failed to read copilot memory');
     }
     return (data?.preferences as string[] | undefined) ?? [];
+  }
+
+  /** Forget everything this user asked the copilot to remember (RLS: own row only). */
+  async clear(userId: string, accessToken: string): Promise<void> {
+    const { error } = await this.database
+      .getUserClient(accessToken)
+      .from('copilot_user_memory')
+      .delete()
+      .eq('user_id', userId);
+    if (error) {
+      this.logger.error(`copilot memory delete failed user=${userId}: ${error.message}`);
+      throw new InternalServerErrorException('Failed to clear copilot memory');
+    }
   }
 
   async change(userId: string, accessToken: string, add: string[], remove: string[]): Promise<PreferenceChange> {
@@ -50,7 +63,7 @@ export class CopilotMemoryService {
       throw new BadRequestException(`at most ${MAX_PREFERENCES} preferences can be saved; remove some first`);
     }
 
-    const { error } = await this.supabase
+    const { error } = await this.database
       .getUserClient(accessToken)
       .from('copilot_user_memory')
       .upsert({ user_id: userId, preferences: next, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });

@@ -15,8 +15,8 @@ const STOCK_RULE = resolveStockAllowanceRule([
   { key: 'maxStockAllowance', value: '3.175' },
 ]).rule!;
 
-// Pure functions, zero Supabase/DB dependency — no mocking needed or used,
-// per this project's standing rule against mocked-Supabase spec files.
+// Pure functions, zero database dependency — no mocking needed or used,
+// per this project's standing rule against mocked-database spec files.
 // BlankOptimizerService (blank-optimizer.service.ts) is a thin wrapper that
 // fetches real stock_profiles rows and delegates all geometry here.
 

@@ -36,17 +36,28 @@ import {
   Package
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { rankAscending, weightedRankScore } from '@/lib/utils/rank';
 
 export interface CostCompetencyData {
   id: number;
   costComponent: string;
-  baseValue?: number;
-  supplierValues: number[]; // Dynamic array for supplier values
+  // null = not entered. Never 0: a missing price must not rank as the cheapest.
+  baseValue?: number | null;
+  supplierValues: Array<number | null>; // Dynamic array for supplier values
   isRanking?: boolean;
+  // Display unit. Money rows carry none: the data records no currency.
   unit?: string;
   paymentTerms?: string[]; // Dynamic array for payment terms
   basePaymentTerm?: string; // Base payment term for reference
 }
+
+// An empty cell is not 0: it shows as "—" and is left out of rankings and saves.
+const formatCostValue = (v: number | null) => (v === null ? '—' : v.toFixed(2));
+const parseCostInput = (raw: string): number | null => {
+  if (raw.trim() === '') return null;
+  const n = parseFloat(raw);
+  return Number.isFinite(n) ? Math.max(0, n) : null;
+};
 
 // Helper function to calculate summary for part-wise overview
 function calculatePartSummary(
@@ -55,7 +66,7 @@ function calculatePartSummary(
 ) {
   if (!costAnalysis || costAnalysis.length === 0) {
     return {
-      topVendor: vendors.length > 0 ? vendors[0] : null,
+      topVendor: null,
       bestScore: 0,
       lowestCost: 0,
       vendorCount: vendors.length
@@ -69,7 +80,7 @@ function calculatePartSummary(
 
   const topVendor = bestRankedVendor
     ? vendors.find(v => v.id === bestRankedVendor.vendorId) || null
-    : (vendors.length > 0 ? vendors[0] : null);
+    : null;
 
   // Get best total score (highest score)
   const bestScore = Math.max(...costAnalysis.map(ca => ca.totalScore || 0));
@@ -103,42 +114,38 @@ function transformPartWiseCostToComponentData(
     {
       id: 1,
       costComponent: "Raw Material Cost",
-      baseValue: baseData?.baseRawMaterialCost || 0,
+      baseValue: baseData?.baseRawMaterialCost ?? null,
       supplierValues: vendorOrder.map(vendorId => {
         const analysis = costAnalysis.find(ca => ca.vendorId === vendorId);
-        return analysis?.rawMaterialCost || 0;
-      }),
-      unit: "$"
+        return analysis?.rawMaterialCost ?? null;
+      })
     },
     {
       id: 2,
       costComponent: "Process Cost",
-      baseValue: baseData?.baseProcessCost || 0,
+      baseValue: baseData?.baseProcessCost ?? null,
       supplierValues: vendorOrder.map(vendorId => {
         const analysis = costAnalysis.find(ca => ca.vendorId === vendorId);
-        return analysis?.processCost || 0;
-      }),
-      unit: "$"
+        return analysis?.processCost ?? null;
+      })
     },
     {
       id: 3,
       costComponent: "Overheads & Profit",
-      baseValue: baseData?.baseOverheadsProfit || 0,
+      baseValue: baseData?.baseOverheadsProfit ?? null,
       supplierValues: vendorOrder.map(vendorId => {
         const analysis = costAnalysis.find(ca => ca.vendorId === vendorId);
-        return analysis?.overheadsProfit || 0;
-      }),
-      unit: "$"
+        return analysis?.overheadsProfit ?? null;
+      })
     },
     {
       id: 4,
       costComponent: "Packing & Forwarding Cost",
-      baseValue: baseData?.basePackingForwardingCost || 0,
+      baseValue: baseData?.basePackingForwardingCost ?? null,
       supplierValues: vendorOrder.map(vendorId => {
         const analysis = costAnalysis.find(ca => ca.vendorId === vendorId);
-        return analysis?.packingForwardingCost || 0;
-      }),
-      unit: "$"
+        return analysis?.packingForwardingCost ?? null;
+      })
     },
     {
       id: 5,
@@ -153,50 +160,49 @@ function transformPartWiseCostToComponentData(
     {
       id: 6,
       costComponent: "Net Price/unit",
-      baseValue: baseData?.baseNetPriceUnit || 0,
+      baseValue: baseData?.baseNetPriceUnit ?? null,
       supplierValues: vendorOrder.map(vendorId => {
         const analysis = costAnalysis.find(ca => ca.vendorId === vendorId);
-        return analysis?.netPriceUnit || 0;
-      }),
-      unit: "$"
+        return analysis?.netPriceUnit ?? null;
+      })
     },
     {
       id: 7,
       costComponent: "Development cost",
-      baseValue: baseData?.baseDevelopmentCost || 0,
+      baseValue: baseData?.baseDevelopmentCost ?? null,
       supplierValues: vendorOrder.map(vendorId => {
         const analysis = costAnalysis.find(ca => ca.vendorId === vendorId);
-        return analysis?.developmentCost || 0;
+        return analysis?.developmentCost ?? null;
       }),
       unit: "Lakhs"
     },
     {
       id: 8,
       costComponent: "Financial Risk",
-      baseValue: baseData?.baseFinancialRisk || 0,
+      baseValue: baseData?.baseFinancialRisk ?? null,
       supplierValues: vendorOrder.map(vendorId => {
         const analysis = costAnalysis.find(ca => ca.vendorId === vendorId);
-        return analysis?.financialRisk || 0;
+        return analysis?.financialRisk ?? null;
       }),
       unit: "%"
     },
     {
       id: 9,
       costComponent: "Cost Competency Score",
-      baseValue: baseData?.baseCostCompetencyScore || 0,
+      baseValue: baseData?.baseCostCompetencyScore ?? null,
       supplierValues: vendorOrder.map(vendorId => {
         const analysis = costAnalysis.find(ca => ca.vendorId === vendorId);
-        return analysis?.costCompetencyScore || 0;
+        return analysis?.costCompetencyScore ?? null;
       }),
       unit: "Score"
     },
     {
       id: 10,
       costComponent: "Lead Time Days",
-      baseValue: baseData?.baseLeadTimeDays || 0,
+      baseValue: baseData?.baseLeadTimeDays ?? null,
       supplierValues: vendorOrder.map(vendorId => {
         const analysis = costAnalysis.find(ca => ca.vendorId === vendorId);
-        return analysis?.leadTimeDays || 0;
+        return analysis?.leadTimeDays ?? null;
       }),
       unit: "Days"
     },
@@ -269,34 +275,34 @@ function transformComponentDataToPartWise(
   costData.forEach(item => {
     switch (item.costComponent) {
       case "Raw Material Cost":
-        baseData.baseRawMaterialCost = item.baseValue;
+        baseData.baseRawMaterialCost = item.baseValue ?? undefined;
         break;
       case "Process Cost":
-        baseData.baseProcessCost = item.baseValue;
+        baseData.baseProcessCost = item.baseValue ?? undefined;
         break;
       case "Overheads & Profit":
-        baseData.baseOverheadsProfit = item.baseValue;
+        baseData.baseOverheadsProfit = item.baseValue ?? undefined;
         break;
       case "Packing & Forwarding Cost":
-        baseData.basePackingForwardingCost = item.baseValue;
+        baseData.basePackingForwardingCost = item.baseValue ?? undefined;
         break;
       case "Payment Terms":
         baseData.basePaymentTerms = item.basePaymentTerm;
         break;
       case "Net Price/unit":
-        baseData.baseNetPriceUnit = item.baseValue;
+        baseData.baseNetPriceUnit = item.baseValue ?? undefined;
         break;
       case "Development cost":
-        baseData.baseDevelopmentCost = item.baseValue;
+        baseData.baseDevelopmentCost = item.baseValue ?? undefined;
         break;
       case "Financial Risk":
-        baseData.baseFinancialRisk = item.baseValue;
+        baseData.baseFinancialRisk = item.baseValue ?? undefined;
         break;
       case "Cost Competency Score":
-        baseData.baseCostCompetencyScore = item.baseValue;
+        baseData.baseCostCompetencyScore = item.baseValue ?? undefined;
         break;
       case "Lead Time Days":
-        baseData.baseLeadTimeDays = item.baseValue;
+        baseData.baseLeadTimeDays = item.baseValue ?? undefined;
         break;
     }
   });
@@ -312,8 +318,9 @@ function transformComponentDataToPartWise(
     costData.forEach(item => {
       if (item.isRanking) return; // Skip ranking rows
 
-      const clamp = (v: number | undefined, min = 0, max = Infinity) =>
-        Math.min(max, Math.max(min, Math.round((v ?? 0) * 100) / 100));
+      // An empty cell is left out of the update, not saved as 0.
+      const clamp = (v: number | null | undefined, min = 0, max = Infinity) =>
+        v == null ? undefined : Math.min(max, Math.max(min, Math.round(v * 100) / 100));
 
       switch (item.costComponent) {
         case "Raw Material Cost":
@@ -382,30 +389,26 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
       {
         id: 1,
         costComponent: "Raw Material Cost",
-        baseValue: 0,
-        supplierValues: new Array(numVendors).fill(0),
-        unit: "$"
+        baseValue: null,
+        supplierValues: new Array(numVendors).fill(null)
       },
       {
         id: 2,
         costComponent: "Process Cost",
-        baseValue: 0,
-        supplierValues: new Array(numVendors).fill(0),
-        unit: "$"
+        baseValue: null,
+        supplierValues: new Array(numVendors).fill(null)
       },
       {
         id: 3,
         costComponent: "Overheads & Profit",
-        baseValue: 0,
-        supplierValues: new Array(numVendors).fill(0),
-        unit: "$"
+        baseValue: null,
+        supplierValues: new Array(numVendors).fill(null)
       },
       {
         id: 4,
         costComponent: "Packing & Forwarding Cost",
-        baseValue: 0,
-        supplierValues: new Array(numVendors).fill(0),
-        unit: "$"
+        baseValue: null,
+        supplierValues: new Array(numVendors).fill(null)
       },
       {
         id: 5,
@@ -417,36 +420,35 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
       {
         id: 6,
         costComponent: "Net Price/unit",
-        baseValue: 0,
-        supplierValues: new Array(numVendors).fill(0),
-        unit: "$"
+        baseValue: null,
+        supplierValues: new Array(numVendors).fill(null)
       },
       {
         id: 7,
         costComponent: "Development cost",
-        baseValue: 0,
-        supplierValues: new Array(numVendors).fill(0),
+        baseValue: null,
+        supplierValues: new Array(numVendors).fill(null),
         unit: "Lakhs"
       },
       {
         id: 8,
         costComponent: "Financial Risk",
-        baseValue: 0,
-        supplierValues: new Array(numVendors).fill(0),
+        baseValue: null,
+        supplierValues: new Array(numVendors).fill(null),
         unit: "%"
       },
       {
         id: 9,
         costComponent: "Cost Competency Score",
-        baseValue: 0,
-        supplierValues: new Array(numVendors).fill(0),
+        baseValue: null,
+        supplierValues: new Array(numVendors).fill(null),
         unit: "Score"
       },
       {
         id: 10,
         costComponent: "Lead Time Days",
-        baseValue: 0,
-        supplierValues: new Array(numVendors).fill(0),
+        baseValue: null,
+        supplierValues: new Array(numVendors).fill(null),
         unit: "Days"
       },
       // Ranking rows
@@ -633,12 +635,13 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
     }
   }, [vendors.length]); // Only depend on vendor count, not vendor objects
 
-  // Calculate rankings based on cost data - REAL-TIME WITH EDITING VALUES
+  // Calculate rankings from the current (including edited) values. Only
+  // vendors with a value are ranked; a missing value is unranked (0), never
+  // treated as the cheapest or fastest.
   React.useEffect(() => {
     setCostData(prev => {
       const newData = [...prev];
 
-      // Find relevant rows
       const netPriceRow = newData.find(item => item.costComponent === "Net Price/unit");
       const devCostRow = newData.find(item => item.costComponent === "Development cost");
       const leadTimeDaysRow = newData.find(item => item.costComponent === "Lead Time Days");
@@ -649,106 +652,24 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
       const totalScoreRow = newData.find(item => item.costComponent === "Total Score");
       const overallRankRow = newData.find(item => item.costComponent === "Overall Rank");
 
-      // Get current values (including edited ones)
-      const getCurrentNetPriceValues = () =>
-        netPriceRow ? netPriceRow.supplierValues.map((_, index) =>
-          getCurrentSupplierValue(netPriceRow.id, index)
-        ) : [];
+      const currentValues = (row: CostCompetencyData) =>
+        row.supplierValues.map((_, index) => getCurrentSupplierValue(row.id, index));
 
-      const getCurrentDevCostValues = () =>
-        devCostRow ? devCostRow.supplierValues.map((_, index) =>
-          getCurrentSupplierValue(devCostRow.id, index)
-        ) : [];
+      if (netPriceRow && rankCostRow) rankCostRow.supplierValues = rankAscending(currentValues(netPriceRow));
+      if (devCostRow && rankDevRow) rankDevRow.supplierValues = rankAscending(currentValues(devCostRow));
+      if (leadTimeDaysRow && rankLeadRow) rankLeadRow.supplierValues = rankAscending(currentValues(leadTimeDaysRow));
 
-      const getCurrentLeadTimeValues = () =>
-        leadTimeDaysRow ? leadTimeDaysRow.supplierValues.map((_, index) =>
-          getCurrentSupplierValue(leadTimeDaysRow.id, index)
-        ) : [];
-
-      if (netPriceRow && rankCostRow) {
-        // Calculate Cost Rankings using current values (including edited ones)
-        const currentNetPrices = getCurrentNetPriceValues();
-        const hasNetPriceData = currentNetPrices.some(val => val > 0);
-
-        if (hasNetPriceData) {
-          const sortedIndices = [...Array(currentNetPrices.length).keys()]
-            .sort((a, b) => (currentNetPrices[a] ?? 0) - (currentNetPrices[b] ?? 0));
-          rankCostRow.supplierValues = rankCostRow.supplierValues.map((_, index) =>
-            sortedIndices.indexOf(index) + 1
-          );
-        } else {
-          rankCostRow.supplierValues = new Array(rankCostRow.supplierValues.length).fill(0);
-        }
-      }
-
-      if (devCostRow && rankDevRow) {
-        // Calculate Development Cost Rankings using current values (including edited ones)
-        const currentDevCosts = getCurrentDevCostValues();
-        const hasDevCostData = currentDevCosts.some(val => val > 0);
-
-        if (hasDevCostData) {
-          const sortedIndices = [...Array(currentDevCosts.length).keys()]
-            .sort((a, b) => (currentDevCosts[a] ?? 0) - (currentDevCosts[b] ?? 0));
-          rankDevRow.supplierValues = rankDevRow.supplierValues.map((_, index) =>
-            sortedIndices.indexOf(index) + 1
-          );
-        } else {
-          rankDevRow.supplierValues = new Array(rankDevRow.supplierValues.length).fill(0);
-        }
-      }
-
-      if (leadTimeDaysRow && rankLeadRow) {
-        // Calculate Lead Time Rankings using current values (including edited ones)
-        const currentLeadTimes = getCurrentLeadTimeValues();
-        const hasLeadTimeData = currentLeadTimes.some(val => val > 0);
-
-        if (hasLeadTimeData) {
-          const sortedIndices = [...Array(currentLeadTimes.length).keys()]
-            .sort((a, b) => (currentLeadTimes[a] ?? 0) - (currentLeadTimes[b] ?? 0));
-          rankLeadRow.supplierValues = rankLeadRow.supplierValues.map((_, index) =>
-            sortedIndices.indexOf(index) + 1
-          );
-        } else {
-          rankLeadRow.supplierValues = new Array(rankLeadRow.supplierValues.length).fill(0);
-        }
-      }
-
-      if (rankCostRow && rankDevRow && rankLeadRow && totalScoreRow && netPriceRow && devCostRow && leadTimeDaysRow) {
-        // Calculate Total Score using current values (including edited ones)
-        const currentNetPrices = getCurrentNetPriceValues();
-        const currentDevCosts = getCurrentDevCostValues();
-        const currentLeadTimes = getCurrentLeadTimeValues();
-
-        const hasRealData = currentNetPrices.some(val => val > 0) ||
-          currentDevCosts.some(val => val > 0) ||
-          currentLeadTimes.some(val => val > 0);
-
-        if (hasRealData) {
-          totalScoreRow.supplierValues = totalScoreRow.supplierValues.map((_, index) =>
-            Math.round((((rankCostRow.supplierValues[index] ?? 0) * factorWeights.cost / 100) +
-              ((rankDevRow.supplierValues[index] ?? 0) * factorWeights.developmentCost / 100) +
-              ((rankLeadRow.supplierValues[index] ?? 0) * factorWeights.leadTime / 100)) * 100) / 100
-          );
-        } else {
-          // Reset to 0 if no real data
-          totalScoreRow.supplierValues = new Array(totalScoreRow.supplierValues.length).fill(0);
-        }
+      if (rankCostRow && rankDevRow && rankLeadRow && totalScoreRow) {
+        totalScoreRow.supplierValues = totalScoreRow.supplierValues.map((_, index) =>
+          weightedRankScore(
+            [rankCostRow.supplierValues[index] ?? 0, rankDevRow.supplierValues[index] ?? 0, rankLeadRow.supplierValues[index] ?? 0],
+            [factorWeights.cost, factorWeights.developmentCost, factorWeights.leadTime],
+          )
+        );
       }
 
       if (totalScoreRow && overallRankRow) {
-        // Only calculate Overall Rankings if there are actual total scores
-        const hasTotalScores = totalScoreRow.supplierValues.some(val => val > 0);
-
-        if (hasTotalScores) {
-          const sortedIndices = [...Array(totalScoreRow.supplierValues.length).keys()]
-            .sort((a, b) => (totalScoreRow.supplierValues[a] ?? 0) - (totalScoreRow.supplierValues[b] ?? 0));
-          overallRankRow.supplierValues = overallRankRow.supplierValues.map((_, index) =>
-            sortedIndices.indexOf(index) + 1
-          );
-        } else {
-          // Reset to 0 if no total scores
-          overallRankRow.supplierValues = new Array(overallRankRow.supplierValues.length).fill(0);
-        }
+        overallRankRow.supplierValues = rankAscending(totalScoreRow.supplierValues);
       }
 
       return newData;
@@ -775,7 +696,7 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
   }, [costData, memoizedOnDataUpdate]);
 
   // ENTERPRISE BEST PRACTICE: Local updates without API calls
-  const updateSupplierValueLocal = (rowId: number, supplierIndex: number, value: number) => {
+  const updateSupplierValueLocal = (rowId: number, supplierIndex: number, value: number | null) => {
     // Only update local editing state
     const key = `${rowId}_${supplierIndex}`;
     setEditingCostValues(prev => ({
@@ -784,7 +705,7 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
     }));
   };
 
-  const updateBaseValueLocal = (rowId: number, value: number) => {
+  const updateBaseValueLocal = (rowId: number, value: number | null) => {
     const key = `base_${rowId}`;
     setEditingCostValues(prev => ({
       ...prev,
@@ -809,24 +730,24 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
   };
 
   // Get current value (edited or original)
-  const getCurrentSupplierValue = (rowId: number, supplierIndex: number): number => {
+  const getCurrentSupplierValue = (rowId: number, supplierIndex: number): number | null => {
     const key = `${rowId}_${supplierIndex}`;
     const editedValue = editingCostValues[key];
     if (editedValue?.type === 'supplier') {
       return editedValue.value;
     }
     const row = costData.find(item => item.id === rowId);
-    return row?.supplierValues[supplierIndex] || 0;
+    return row?.supplierValues[supplierIndex] ?? null;
   };
 
-  const getCurrentBaseValue = (rowId: number): number => {
+  const getCurrentBaseValue = (rowId: number): number | null => {
     const key = `base_${rowId}`;
     const editedValue = editingCostValues[key];
     if (editedValue?.type === 'base') {
       return editedValue.value;
     }
     const row = costData.find(item => item.id === rowId);
-    return row?.baseValue || 0;
+    return row?.baseValue ?? null;
   };
 
   const getCurrentPaymentTerm = (rowId: number, index: number): string => {
@@ -1016,7 +937,7 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
               {availableBomParts.map((part) => {
                 // Get real part-wise summary data
                 const partSummary = partWiseSummary[part.bomItemId] || {
-                  topVendor: vendors.length > 0 ? vendors[0] : null,
+                  topVendor: null,
                   bestScore: 0,
                   lowestCost: 0,
                   vendorCount: vendors.length
@@ -1068,7 +989,7 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
                         <div className="flex items-center justify-between">
                           <span className="text-gray-400 text-xs">Best Price:</span>
                           <span className="text-green-400 text-xs font-medium">
-                            ${partSummary.lowestCost.toFixed(2)}
+                            {partSummary.lowestCost.toFixed(2)}
                           </span>
                         </div>
                       )}
@@ -1296,14 +1217,14 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
                           type="number"
                           step="0.01"
                           min={0}
-                          value={getCurrentBaseValue(row.id)}
-                          onChange={(e) => updateBaseValueLocal(row.id, Math.max(0, parseFloat(e.target.value) || 0))}
+                          value={getCurrentBaseValue(row.id) ?? ''}
+                          onChange={(e) => updateBaseValueLocal(row.id, parseCostInput(e.target.value))}
                           className="w-24 h-8 bg-gray-700 border-gray-600 text-white text-sm text-center"
                           placeholder="0.00"
                         />
                       ) : (
                         <span className="text-white font-medium text-sm">
-                          {getCurrentBaseValue(row.id).toFixed(2)}
+                          {formatCostValue(getCurrentBaseValue(row.id))}
                         </span>
                       )}
                     </TableCell>
@@ -1352,8 +1273,8 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
                         return (
                           <TableCell key={index} className="text-center">
                             {row.isRanking ? (
-                              <Badge className={`${getRankingColor(currentValue)} flex items-center gap-1 justify-center w-12`}>
-                                {getRankingIcon(currentValue)}
+                              <Badge className={`${getRankingColor(currentValue ?? 0)} flex items-center gap-1 justify-center w-12`}>
+                                {getRankingIcon(currentValue ?? 0)}
                                 {currentValue || '-'}
                               </Badge>
                             ) : isEditingCost ? (
@@ -1361,14 +1282,14 @@ export function CostCompetencyAnalysis({ nominationId, projectId, vendors = [], 
                                 type="number"
                                 step="0.01"
                                 min={0}
-                                value={currentValue}
-                                onChange={(e) => updateSupplierValueLocal(row.id, index, Math.max(0, parseFloat(e.target.value) || 0))}
+                                value={currentValue ?? ''}
+                                onChange={(e) => updateSupplierValueLocal(row.id, index, parseCostInput(e.target.value))}
                                 className={`w-20 h-8 bg-gray-700 border-gray-600 text-white text-sm text-center ${colorClass} font-medium`}
                                 placeholder="0.00"
                               />
                             ) : (
                               <span className={`${colorClass} font-medium text-sm`}>
-                                {currentValue.toFixed(2)}
+                                {formatCostValue(currentValue)}
                               </span>
                             )}
                           </TableCell>

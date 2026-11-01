@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { SupabaseService } from '../../../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../../../common/database/database.service';
 import type { MaterialClass } from '../process/cost-machining-engine';
 import type { DrillingTable } from './drilling-table';
 import type { HobbingReference, KeywayBroachReference, RotaryBroachReference, SurfaceGrindingParams } from '../calculators/machining-lookup-seeds';
@@ -23,7 +23,7 @@ import {
 
 // The real hardness-bridge constants/matchers this service uses live in
 // machining-material-hardness.ts — a plain, framework-free module (no
-// NestJS @Injectable, no SupabaseService) so operation-sequencer.ts and
+// NestJS @Injectable, no DatabaseService) so operation-sequencer.ts and
 // cost-machining-engine.ts (pure, no-DB-calls sync engines) can import the same
 // real logic directly without depending on this injectable service class.
 // Re-exported here for any existing caller of this file expecting them
@@ -111,7 +111,7 @@ interface TurningParams {
 
 @Injectable()
 export class MachiningLookupService {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   // In-process cache: these 4 tables are large (up to ~380KB) whole-file
   // JSONB blobs staged once per table, not per-row — never change within a
@@ -123,7 +123,7 @@ export class MachiningLookupService {
 
   private async loadTable(key: string): Promise<any[] | null> {
     if (this.tableCache.has(key)) return this.tableCache.get(key) as any[] | null;
-    const db = this.supabase.getPrivilegedClient('reference-data: machining lookup tables, global shared');
+    const db = this.database.getPrivilegedClient('reference-data: machining lookup tables, global shared');
     const { data, error } = await db
       .from('machining_reference_data')
       .select('raw')
@@ -152,7 +152,7 @@ export class MachiningLookupService {
   // key is ever fetched through both loaders).
   private async loadObjectTable(key: string): Promise<any | null> {
     if (this.tableCache.has(key)) return this.tableCache.get(key);
-    const db = this.supabase.getPrivilegedClient('reference-data: machining lookup tables, global shared');
+    const db = this.database.getPrivilegedClient('reference-data: machining lookup tables, global shared');
     const { data, error } = await db
       .from('machining_reference_data')
       .select('raw')
@@ -182,7 +182,7 @@ export class MachiningLookupService {
    *  read error is not cached; a genuinely missing variable is named. */
   async getSetupAxisRule(): Promise<{ rule: SetupAxisRule | null; missing: string[] }> {
     if (this.setupAxisRule) return this.setupAxisRule;
-    const { data, error } = await this.supabase
+    const { data, error } = await this.database
       .getPrivilegedClient('reference-data: machining lookup tables, global shared')
       .from('machining_reference_data')
       .select('key, value')
@@ -199,7 +199,7 @@ export class MachiningLookupService {
   private deburrPassesPerEdge: number | null = null;
   async getDeburrPassesPerEdge(): Promise<number | null> {
     if (this.deburrPassesPerEdge != null) return this.deburrPassesPerEdge;
-    const { data, error } = await this.supabase
+    const { data, error } = await this.database
       .getPrivilegedClient('reference-data: machining lookup tables, global shared')
       .from('machining_reference_data')
       .select('value')
@@ -219,7 +219,7 @@ export class MachiningLookupService {
    *  variables plus tblGtolProcessCapabilities. A read error is not cached. */
   async getCapabilityRules(): Promise<{ rules: MachiningCapabilityRules | null; missing: string[] }> {
     if (this.capabilityRules) return this.capabilityRules;
-    const { data, error } = await this.supabase
+    const { data, error } = await this.database
       .getPrivilegedClient('reference-data: machining lookup tables, global shared')
       .from('machining_reference_data')
       .select('key, value')
@@ -320,7 +320,7 @@ export class MachiningLookupService {
   async getHobbingReference(): Promise<HobbingReference | null> {
     const [hobRows, ansiRows] = await Promise.all([this.loadTable('tblHobbing'), this.loadTable('tblAnsiHobbing')]);
     if (!hobRows?.length && !ansiRows?.length) return null;
-    const { data } = await this.supabase
+    const { data } = await this.database
       .getPrivilegedClient('reference-data: machining lookup tables, global shared')
       .from('machining_reference_data')
       .select('value')
@@ -343,7 +343,7 @@ export class MachiningLookupService {
   })
   async getGearReference(): Promise<{ qualityRows: GearQualityRow[]; defaultQuality: string | null; shaving: { rows: any[]; maxWorkpieceRpm: number | null } }> {
     const [quality, shavingRows] = await Promise.all([this.loadObjectTable('tblGearQuality'), this.loadTable('tblShaving')]);
-    const { data } = await this.supabase
+    const { data } = await this.database
       .getPrivilegedClient('reference-data: machining lookup tables, global shared')
       .from('machining_reference_data')
       .select('key, value')
@@ -371,7 +371,7 @@ export class MachiningLookupService {
     const rows = await this.loadTable('tblRotaryBroaching');
     if (!rows?.length) return null;
     const keys = ['rotaryBroachFeedAdjustment', 'pilotRotaryBroachHoleDiamPercentIncreaseHex', 'pilotRotaryBroachHoleDiamPercentIncreaseSquare', 'pilotRotaryBroachHoleLengthPercentIncrease'];
-    const { data } = await this.supabase
+    const { data } = await this.database
       .getPrivilegedClient('reference-data: machining lookup tables, global shared')
       .from('machining_reference_data')
       .select('key, value')
@@ -605,7 +605,7 @@ export class MachiningLookupService {
       this.loadTable('tblShimTypeKeywayBroach'),
     ]);
     if (!pullRows?.length && !shimRows?.length) return null;
-    const { data } = await this.supabase
+    const { data } = await this.database
       .getPrivilegedClient('reference-data: machining lookup tables, global shared')
       .from('machining_reference_data')
       .select('key, value')

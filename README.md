@@ -17,9 +17,11 @@ Mithran is a comprehensive manufacturing platform that integrates Bill of Materi
 ### System Components
 
 - **Frontend**: Next.js 16+ with React 19, TypeScript, and Tailwind CSS
-- **Backend API**: NestJS with TypeScript, PostgreSQL, and Supabase
+- **Backend API**: NestJS with TypeScript; reads and writes data through PostgREST
 - **CAD Engine**: Python FastAPI with OpenCascade for STEP/STL conversion
-- **Database**: PostgreSQL with Supabase for authentication and real-time features
+- **Database**: PostgreSQL with row-level security, behind PostgREST
+- **Sign-in**: Auth0 (the backend verifies Auth0 access tokens itself)
+- **Files**: any S3-compatible bucket (SeaweedFS locally)
 - **Infrastructure**: Docker containerization with production deployment support
 
 ### Performance Characteristics
@@ -66,7 +68,7 @@ Mithran is a comprehensive manufacturing platform that integrates Bill of Materi
 ### Technical Features
 
 #### 🔒 Security & Authentication
-- Supabase-based authentication with JWT tokens
+- Auth0 sign-in; the backend verifies the access token and mints a short-lived database token per request
 - Row-level security (RLS) for multi-tenant data isolation
 - Rate limiting and file validation for CAD processing
 - Comprehensive input validation and sanitization
@@ -119,15 +121,11 @@ pip install -r requirements.txt
 # One env file for every local process (Next.js, backend, engines, tests); the template lists every setting
 cp .env.example .env
 
-# Fill in the REPLACE_ME values in .env (Supabase secret key, engine keys, your Anthropic key). It is git-ignored.
+# Fill in the REPLACE_ME values in .env (Auth0 settings, engine keys, your Anthropic key). It is git-ignored.
 ```
 
-4. **Database setup**
-```bash
-# Run migrations
-cd backend
-npm run db:migrate
-```
+4. **Database, data API and file store**: see [Local development stack](#local-development-stack) below. A new, empty
+   database cannot yet be built from migrations alone; it is loaded from a baseline dump, then `npm run db:migrate` applies the newer migrations.
 
 5. **Start development servers**
 ```bash
@@ -197,6 +195,18 @@ cd backend && npm run build
 # Docker deployment
 docker-compose -f docker-compose.prod.yml up -d
 ```
+
+**Production images carry no source maps.** The backend image is built with `npm run build:release` (`backend/tsconfig.release.json`:
+no source maps, no type declarations), and `scripts/check-image-no-sourcemaps.sh <image>` fails if any reach `/app/dist` (CI runs it).
+To debug a production stack trace, build the private maps for the same commit; they match the shipped JavaScript line for line and
+are never shipped:
+
+```bash
+docker build --build-context core=core --target sourcemaps --output type=local,dest=release-maps backend
+# Podman: podman build --build-context core=core --target sourcemaps --output type=local,dest=release-maps backend
+```
+
+Keep `release-maps/` with the release (it is your TypeScript); do not commit it or put it in an image.
 
 ## Performance Optimization
 
@@ -287,7 +297,7 @@ This software is proprietary and confidential. All rights reserved.
 
 - **OpenCascade Technology**: CAD kernel for geometric processing
 - **NestJS Framework**: Enterprise Node.js framework
-- **Supabase**: Backend-as-a-Service platform
+- **PostgreSQL and PostgREST**: database and data API
 - **Radix UI**: Accessible UI component primitives
 
 ---
@@ -296,15 +306,15 @@ This software is proprietary and confidential. All rights reserved.
 # Updated Wed, Feb 18, 2026  4:12:07 PM
 
 
-## Development without Supabase
+## Local development stack
 
-Development data can live on this machine instead of Supabase (Postgres, the data API and file storage in Docker), and the login can be
-Auth0. Run these from `backend/`; nothing leaves your laptop.
+Development data lives on this machine (Postgres, the PostgREST data API and SeaweedFS file storage in Docker); sign-in is Auth0.
+Run these from `backend/`; apart from sign-in, nothing leaves your laptop.
 
 1. `baseline-dump.sh "<read-only connection url of stage>" ~/baseline-stage` takes the schema, the data and the user directory.
 2. `npm run local:load -- ~/baseline-stage` starts the stack, loads it, applies the migrations newer than the baseline, creates the bucket and starts the data API.
 3. `npm run local:use` points the root `.env` at it (the old `.env` is saved outside the repo; `npm run local:restore` undoes it). Restart backend and frontend.
-4. Sign-in is Auth0 (steps in `docs/CUTOVER_AUTH0_POSTGRES.md`): fill the `AUTH0_*` settings, run `npm run auth0:check`, and restart.
+4. Sign-in is Auth0 (setup in `docs/CUTOVER_AUTH0_POSTGRES.md`, section 0): fill the `AUTH0_*` settings, run `npm run auth0:check`, and restart.
    There is no other sign-in.
 
 `npm run test:local` proves the whole chain on a throwaway copy. `npm run local:status`, `local:down` and `local:reset -- --yes` manage the stack.

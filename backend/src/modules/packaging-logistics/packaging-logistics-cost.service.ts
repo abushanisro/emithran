@@ -2,7 +2,7 @@
  * Packaging & Logistics Cost Service
  *
  * Production-grade business logic layer
- * - Database operations with Supabase
+ * - Database operations through PostgREST
  * - Error handling and logging
  * - Type-safe operations
  *
@@ -12,7 +12,7 @@
 
 import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { Logger } from '../../common/logger/logger.service';
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { DatabaseService } from '../../common/database/database.service';
 import { declareCostRecordCurrency } from '../bom-items/costing/shared/core/persisted-currency-contract';
 import {
   CreatePackagingLogisticsCostDto,
@@ -25,7 +25,7 @@ import {
 @Injectable()
 export class PackagingLogisticsCostService {
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly logger: Logger,
   ) {}
 
@@ -45,7 +45,7 @@ export class PackagingLogisticsCostService {
       const from = (page - 1) * limit;
       const to = from + limit - 1;
 
-let queryBuilder = this.supabaseService
+let queryBuilder = this.databaseService
         .getUserClient(accessToken)
         .from('packaging_logistics_cost_records')
         .select('*', { count: 'exact' })
@@ -98,7 +98,7 @@ let queryBuilder = this.supabaseService
   ): Promise<PackagingLogisticsCostResponseDto> {
     this.logger.log(`Fetching packaging/logistics cost: ${id}`, 'PackagingLogisticsCostService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getUserClient(accessToken)
       .from('packaging_logistics_cost_records')
       .select('*')
@@ -153,7 +153,7 @@ let queryBuilder = this.supabaseService
         ...declareCostRecordCurrency({}),
       };
 
-      const { data, error } = await this.supabaseService
+      const { data, error } = await this.databaseService
         .getUserClient(accessToken)
         .from('packaging_logistics_cost_records')
         .insert(record)
@@ -202,7 +202,7 @@ let queryBuilder = this.supabaseService
     if (dto.notes !== undefined) updateData.notes = dto.notes;
     if (dto.isActive !== undefined) updateData.is_active = dto.isActive;
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getUserClient(accessToken)
       .from('packaging_logistics_cost_records')
       .update(updateData)
@@ -227,7 +227,7 @@ let queryBuilder = this.supabaseService
     // Verify existence
     await this.findOne(id, userId, accessToken);
 
-    const { error } = await this.supabaseService
+    const { error } = await this.databaseService
       .getUserClient(accessToken)
       .from('packaging_logistics_cost_records')
       .delete()
@@ -251,7 +251,7 @@ let queryBuilder = this.supabaseService
   ): Promise<number> {
     this.logger.log(`Calculating total packaging/logistics cost for BOM item: ${bomItemId}`, 'PackagingLogisticsCostService');
 
-    const client = this.supabaseService.getUserClient(accessToken);
+    const client = this.databaseService.getUserClient(accessToken);
 
     // Get all active packaging/logistics costs for this BOM item
     const { data: costs, error } = await client
@@ -281,7 +281,7 @@ let queryBuilder = this.supabaseService
   ): Promise<Record<string, number>> {
     if (bomItemIds.length === 0) return {};
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getUserClient(accessToken)
       .from('packaging_logistics_cost_records')
       .select('bom_item_id, total_cost')
@@ -309,7 +309,7 @@ let queryBuilder = this.supabaseService
   async getFreightRateBenchmarks(
     accessToken?: string,
   ): Promise<Array<{ rateType: string; rateUsdPerKg: number }>> {
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getUserClient(accessToken)
       .from('freight_rate_benchmarks')
       .select('rate_type, rate_usd_per_kg')

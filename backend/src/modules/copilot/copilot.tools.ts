@@ -1,7 +1,7 @@
 import { HttpException } from '@nestjs/common';
 import type Anthropic from '@anthropic-ai/sdk';
 import type { BOMItemsService } from '../bom-items/bom-items.service';
-import { MAX_PREFERENCE_CHARS, type CopilotMemoryService } from './copilot-memory.service';
+import { MAX_PREFERENCE_CHARS, type CopilotMemoryService, type PreferenceChange } from './copilot-memory.service';
 import type { BOMItemResponseDto } from '../bom-items/dto/bom-item-response.dto';
 import type { CostSummaryResponseDto, ProcessLineCost } from '../bom-items/dto/cost-breakdown.dto';
 import type { RouteComparisonResponseDto } from '../bom-items/dto/route-comparison.dto';
@@ -104,11 +104,24 @@ export interface ToolContext {
   location: string;
   batchSize?: number;
   productionLifeYears?: number;
+  /** True only when the user's own latest message asked to remember or forget something (copilot-intent.ts). */
+  memoryWritesAllowed: boolean;
 }
 
 export interface ToolOutcome {
   content: string;
   isError: boolean;
+  /** Set when update_preferences changed saved memory, so the caller can show the user exactly what changed. */
+  memoryChange?: PreferenceChange;
+}
+
+/**
+ * The tools offered for one request. update_preferences (the only write) is
+ * offered only when the user's latest message asked for it; otherwise the
+ * model never sees it. Its position last keeps the read tools' prefix stable.
+ */
+export function copilotTools(memoryWritesAllowed: boolean): Anthropic.Tool[] {
+  return memoryWritesAllowed ? COPILOT_TOOLS : COPILOT_TOOLS.filter((t) => t.name !== 'update_preferences');
 }
 
 const clipText = (s: string, n: number): string => (s.length > n ? `${s.slice(0, n)}…` : s);
@@ -416,6 +429,7 @@ export class CopilotToolRunner {
   ) {}
 
   async run(name: string, input: unknown): Promise<ToolOutcome> {
+    if (name === 'update_preferences') return this.updatePreferences(input);
     try {
       return { content: await this.dispatch(name, input), isError: false };
     } catch (err) {
@@ -452,25 +466,32 @@ export class CopilotToolRunner {
         return fitToBudget(compactFeatures(this.ctx.item));
       case 'run_what_if':
         return this.runWhatIf(input);
-      case 'update_preferences':
-        return this.updatePreferences(input);
       default:
         return JSON.stringify({ error: `unknown tool ${name}` });
     }
   }
 
-  private async updatePreferences(input: unknown): Promise<string> {
+  /**
+   * The only write. Refused unless the user's own latest message asked to
+   * remember or forget something: the tool is not even offered otherwise, and
+   * this check holds if a model emits it anyway.
+   */
+  private async updatePreferences(input: unknown): Promise<ToolOutcome> {
+    const error = (message: string): ToolOutcome => ({ content: JSON.stringify({ error: message }), isError: true });
+    if (!this.ctx.memoryWritesAllowed) {
+      return error('update_preferences is only available when the user asks to remember or forget something');
+    }
     const { add = [], remove = [] } = (input ?? {}) as { add?: unknown; remove?: unknown };
     const strings = (v: unknown) => Array.isArray(v) && v.length <= 5 && v.every((s) => typeof s === 'string');
     if (!strings(add) || !strings(remove) || (add as string[]).length + (remove as string[]).length === 0) {
-      return JSON.stringify({ error: 'add and remove must each be up to 5 strings, and at least one is required' });
+      return error('add and remove must each be up to 5 strings, and at least one is required');
     }
     try {
       const change = await this.memory.change(this.ctx.userId, this.ctx.accessToken, add as string[], remove as string[]);
-      return JSON.stringify(change);
+      return { content: JSON.stringify(change), isError: false, memoryChange: change };
     } catch (err) {
-      if (err instanceof HttpException && err.getStatus() < 500) return JSON.stringify({ error: err.message });
-      return JSON.stringify({ error: 'Saved preferences are unavailable right now.' });
+      if (err instanceof HttpException && err.getStatus() < 500) return error(err.message);
+      return error('Saved preferences are unavailable right now.');
     }
   }
 

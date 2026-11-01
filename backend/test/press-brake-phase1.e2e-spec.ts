@@ -1,4 +1,4 @@
-// Phase 1 (Press Brake) integration tests — REAL SupabaseService against the
+// Phase 1 (Press Brake) integration tests — REAL DatabaseService against the
 // dev project (`.env`), read-only, no mocks. Every expected value is read at
 // test time from the live tables or from memory/Sheetmetal/machine/
 // machine_library.csv (the roadmap source), never typed in here.
@@ -15,7 +15,7 @@ import { Test } from '@nestjs/testing';
 import { ConfigModule } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
-import { SupabaseService } from '../src/common/supabase/supabase.service';
+import { DatabaseService } from '../src/common/database/database.service';
 import { SheetMetalLookupService } from '../src/modules/bom-items/costing/sheet-metal/lookup/sheet-metal-lookup.service';
 
 const REASON = 'e2e test: read-only reference data check';
@@ -44,20 +44,20 @@ function readPressBrakeLibrary(): { name: string; bendLengthMm: number; minThick
 }
 
 describe('[e2e] Phase 1 press brake — real DB, no mocks', () => {
-  let supabase: SupabaseService;
+  let database: DatabaseService;
   let lookup: SheetMetalLookupService;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
       imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../../.env') })],
-      providers: [SupabaseService, SheetMetalLookupService],
+      providers: [DatabaseService, SheetMetalLookupService],
     }).compile();
-    supabase = moduleRef.get(SupabaseService);
+    database = moduleRef.get(DatabaseService);
     lookup = moduleRef.get(SheetMetalLookupService);
   });
 
   it('manual stroke table: a thickness between two real rows interpolates and returns both rows', async () => {
-    const db = supabase.getPrivilegedClient(REASON);
+    const db = database.getPrivilegedClient(REASON);
     const { data, error } = await db.from('sm_lookup_manual_stroke')
       .select('thickness_mm, tonnage, complexity, stroke_time_sec').eq('complexity', 'simple');
     expect(error).toBeNull(); // a failure names the real database error, not "undefined"
@@ -93,7 +93,7 @@ describe('[e2e] Phase 1 press brake — real DB, no mocks', () => {
   });
 
   it('SECC UTS: the raw_materials row carries a real UTS for the bending calculator', async () => {
-    const db = supabase.getPrivilegedClient(REASON);
+    const db = database.getPrivilegedClient(REASON);
     const { data, error } = await db.from('raw_materials')
       .select('name, uts_mpa, ultimate_tensile_strength').ilike('name', 'SECC');
     expect(error).toBeNull();
@@ -103,7 +103,7 @@ describe('[e2e] Phase 1 press brake — real DB, no mocks', () => {
 
   // Fails until migration 894 has been run against this database.
   it('machine library backfill: every matched press_brake row carries the library bend length and thickness', async () => {
-    const db = supabase.getPrivilegedClient(REASON);
+    const db = database.getPrivilegedClient(REASON);
     const { data, error } = await db.from('mhr_records')
       .select('machine_name, max_length_mm, max_thickness_mm').eq('machine_class', 'press_brake');
     expect(error).toBeNull();

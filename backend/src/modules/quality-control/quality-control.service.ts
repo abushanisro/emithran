@@ -1,11 +1,21 @@
-import { Injectable, Logger, NotFoundException, BadRequestException, InternalServerErrorException, ForbiddenException } from '@nestjs/common';
-import { SupabaseService } from '@/common/supabase/supabase.service';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { DatabaseService } from '@/common/database/database.service';
+import type { DbClient } from '@/common/db/postgrest-client';
+import { qualityDbError } from './quality-db-error';
 
+/**
+ * Project-level quality metrics, reports and dashboard. Every query runs as the signed-in user, so row-level security
+ * (migration 936) limits it to the caller's organizations. A failed query is an error, never an empty or zero result.
+ */
 @Injectable()
 export class QualityControlService {
   private readonly logger = new Logger(QualityControlService.name);
 
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(private readonly database: DatabaseService) {}
+
+  private db(): DbClient {
+    return this.database.getUserClient();
+  }
 
   async getQualityMetrics(
     projectId: string,
@@ -15,125 +25,82 @@ export class QualityControlService {
       endDate?: string;
     } = {},
   ): Promise<any> {
-    try {
-      // Get all inspections for the project
-      let query = this.supabase.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
-        .from('quality_inspections')
-        .select(`
-          *,
-          quality_inspection_results (*)
-        `)
-        .eq('project_id', projectId);
+    // Get all inspections for the project
+    let query = this.db()
+      .from('quality_inspections')
+      .select(`
+        *,
+        quality_inspection_results (*)
+      `)
+      .eq('project_id', projectId);
 
-      if (filters.startDate) {
-        query = query.gte('created_at', filters.startDate);
-      }
-
-      if (filters.endDate) {
-        query = query.lte('created_at', filters.endDate);
-      }
-
-      const { data: inspections, error } = await query;
-
-      if (error) {
-        this.logger.error(`Error fetching quality inspections for project ${projectId}: ${error.message}`);
-        
-        // Handle case where tables don't exist yet
-        if (error.message?.includes('does not exist') || 
-            error.message?.includes('relation') || 
-            error.message?.includes('relationship') ||
-            error.code === 'PGRST200') {
-          this.logger.warn('Quality inspections table does not exist yet. Returning empty metrics.');
-          // Return empty metrics when tables don't exist
-          return {
-            totalInspections: 0,
-            completedInspections: 0,
-            passRate: 0,
-            nonConformances: 0,
-            avgInspectionTime: 0,
-            inspectionsThisMonth: 0,
-            failedInspections: 0,
-            completionRate: 0,
-            openNonConformances: 0,
-            lastInspectionDate: null,
-          };
-        }
-        
-        if (error.message.includes('row-level security policy')) {
-          throw new ForbiddenException('You do not have permission to access quality data for this project.');
-        }
-        
-        if (error.message.includes('invalid input syntax for type uuid')) {
-          throw new BadRequestException('Invalid project ID format provided.');
-        }
-        
-        throw new InternalServerErrorException('Unable to retrieve quality metrics. Please try again later.');
-      }
-      
-      if (!inspections || inspections.length === 0) {
-        this.logger.log(`No quality inspections found for project ${projectId}`);
-      }
-
-      // Calculate metrics
-      const totalInspections = inspections?.length || 0;
-      const completedInspections = inspections?.filter(i => i.status === 'completed' || i.status === 'approved').length || 0;
-      const passedInspections = inspections?.filter(i => i.overall_result === 'pass').length || 0;
-      const failedInspections = inspections?.filter(i => i.overall_result === 'fail').length || 0;
-      
-      const passRate = totalInspections > 0 ? ((passedInspections / totalInspections) * 100).toFixed(1) : '0';
-      const completionRate = totalInspections > 0 ? ((completedInspections / totalInspections) * 100).toFixed(1) : '0';
-
-      // Get non-conformances
-      const { data: nonConformances, error: nonConformancesError } = await this.supabase.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
-        .from('quality_non_conformances')
-        .select('*, quality_inspections!inspection_id(project_id)')
-        .eq('quality_inspections.project_id', projectId);
-      
-      if (nonConformancesError) {
-        this.logger.warn(`Error fetching non-conformances for project ${projectId}: ${nonConformancesError.message}`);
-        // Don't throw here, continue with empty non-conformances data
-      }
-
-      const totalNonConformances = nonConformances?.length || 0;
-      const openNonConformances = nonConformances?.filter(nc => nc.status !== 'closed').length || 0;
-
-      // Calculate average inspection time
-      const inspectionsWithTime = inspections?.filter(i => 
-        i.actual_start_date && i.actual_end_date
-      ) || [];
-      
-      let avgInspectionTime = 0;
-      if (inspectionsWithTime.length > 0) {
-        const totalTime = inspectionsWithTime.reduce((sum, inspection) => {
-          const start = new Date(inspection.actual_start_date);
-          const end = new Date(inspection.actual_end_date);
-          return sum + (end.getTime() - start.getTime());
-        }, 0);
-        avgInspectionTime = totalTime / inspectionsWithTime.length / (1000 * 60 * 60); // Convert to hours
-      }
-
-      return {
-        totalInspections,
-        completedInspections,
-        passedInspections,
-        failedInspections,
-        passRate: parseFloat(passRate),
-        completionRate: parseFloat(completionRate),
-        totalNonConformances,
-        openNonConformances,
-        avgInspectionTime: Math.round(avgInspectionTime * 10) / 10, // Round to 1 decimal
-        inspectionsByStatus: this.groupByStatus(inspections || []),
-        inspectionsByType: this.groupByType(inspections || []),
-        monthlyTrends: await this.getMonthlyTrends(projectId, userId),
-      };
-    } catch (error) {
-      if (error instanceof BadRequestException || error instanceof ForbiddenException || error instanceof NotFoundException) {
-        throw error;
-      }
-      
-      this.logger.error(`Unexpected error getting quality metrics for project ${projectId}:`, error);
-      throw new InternalServerErrorException('An unexpected error occurred while retrieving quality metrics. Please try again later.');
+    if (filters.startDate) {
+      query = query.gte('created_at', filters.startDate);
     }
+
+    if (filters.endDate) {
+      query = query.lte('created_at', filters.endDate);
+    }
+
+    const { data: inspections, error } = await query;
+
+    if (error) {
+      this.logger.error(`Error fetching quality inspections for project ${projectId}: ${error.code} ${error.message}`);
+      throw qualityDbError(error, 'retrieve quality metrics');
+    }
+
+    // Calculate metrics
+    const totalInspections = inspections.length;
+    const completedInspections = inspections.filter(i => i.status === 'completed' || i.status === 'approved').length;
+    const passedInspections = inspections.filter(i => i.overall_result === 'pass').length;
+    const failedInspections = inspections.filter(i => i.overall_result === 'fail').length;
+
+    const passRate = totalInspections > 0 ? ((passedInspections / totalInspections) * 100).toFixed(1) : '0';
+    const completionRate = totalInspections > 0 ? ((completedInspections / totalInspections) * 100).toFixed(1) : '0';
+
+    // Non-conformances of this project's inspections (!inner drops those of other projects)
+    const { data: nonConformances, error: nonConformancesError } = await this.db()
+      .from('quality_non_conformances')
+      .select('*, quality_inspections!inspection_id!inner(project_id)')
+      .eq('quality_inspections.project_id', projectId);
+
+    if (nonConformancesError) {
+      this.logger.error(`Error fetching non-conformances for project ${projectId}: ${nonConformancesError.code} ${nonConformancesError.message}`);
+      throw qualityDbError(nonConformancesError, 'retrieve non-conformances');
+    }
+
+    const totalNonConformances = nonConformances.length;
+    const openNonConformances = nonConformances.filter(nc => nc.status !== 'closed').length;
+
+    // Calculate average inspection time
+    const inspectionsWithTime = inspections.filter(i =>
+      i.actual_start_date && i.actual_end_date
+    );
+
+    let avgInspectionTime = 0;
+    if (inspectionsWithTime.length > 0) {
+      const totalTime = inspectionsWithTime.reduce((sum, inspection) => {
+        const start = new Date(inspection.actual_start_date);
+        const end = new Date(inspection.actual_end_date);
+        return sum + (end.getTime() - start.getTime());
+      }, 0);
+      avgInspectionTime = totalTime / inspectionsWithTime.length / (1000 * 60 * 60); // Convert to hours
+    }
+
+    return {
+      totalInspections,
+      completedInspections,
+      passedInspections,
+      failedInspections,
+      passRate: parseFloat(passRate),
+      completionRate: parseFloat(completionRate),
+      totalNonConformances,
+      openNonConformances,
+      avgInspectionTime: Math.round(avgInspectionTime * 10) / 10, // Round to 1 decimal
+      inspectionsByStatus: this.groupByStatus(inspections),
+      inspectionsByType: this.groupByType(inspections),
+      monthlyTrends: await this.getMonthlyTrends(projectId, userId),
+    };
   }
 
   async generateQualityReport(
@@ -144,67 +111,49 @@ export class QualityControlService {
     if (!projectId) {
       throw new BadRequestException('Project ID is required to generate a quality report.');
     }
-    
-    if (!userId) {
-      throw new BadRequestException('User authentication is required to generate reports.');
-    }
-    
-    try {
-      const metrics = await this.getQualityMetrics(projectId, userId);
-      
-      // Get detailed inspection data
-      const { data: inspections, error: inspectionsError } = await this.supabase.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
-        .from('quality_inspections')
-        .select(`
-          *,
-          quality_inspection_results (*),
-          projects (name),
-          boms (name, version)
-        `)
-        .eq('project_id', projectId)
-        .order('created_at', { ascending: false });
-        
-      if (inspectionsError) {
-        this.logger.error(`Error fetching detailed inspection data for report: ${inspectionsError.message}`);
-        
-        if (inspectionsError.message.includes('row-level security policy')) {
-          throw new ForbiddenException('You do not have permission to access inspection data for this project.');
-        }
-        
-        throw new InternalServerErrorException('Unable to retrieve detailed inspection data for the report.');
-      }
 
-      // Get non-conformances with details
-      const { data: nonConformances, error: nonConformancesError } = await this.supabase.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
-        .from('quality_non_conformances')
-        .select(`
-          *,
-          quality_inspections!inspection_id (name, type)
-        `)
-        .eq('quality_inspections.project_id', projectId);
-        
-      if (nonConformancesError) {
-        this.logger.warn(`Error fetching non-conformances for report: ${nonConformancesError.message}`);
-        // Continue with empty non-conformances data rather than failing the entire report
-      }
+    const metrics = await this.getQualityMetrics(projectId, userId);
 
-      return {
-        reportType: reportType || 'comprehensive',
-        generatedAt: new Date().toISOString(),
-        projectId,
-        summary: metrics,
-        inspections: inspections || [],
-        nonConformances: nonConformances || [],
-        recommendations: this.generateRecommendations(metrics),
-      };
-    } catch (error) {
-      if (error instanceof BadRequestException || error instanceof ForbiddenException || error instanceof NotFoundException) {
-        throw error;
-      }
-      
-      this.logger.error(`Unexpected error generating quality report for project ${projectId}:`, error);
-      throw new InternalServerErrorException('Failed to generate quality report. Please try again later.');
+    // Get detailed inspection data
+    const { data: inspections, error: inspectionsError } = await this.db()
+      .from('quality_inspections')
+      .select(`
+        *,
+        quality_inspection_results (*),
+        projects (name),
+        boms (name, version)
+      `)
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: false });
+
+    if (inspectionsError) {
+      this.logger.error(`Error fetching detailed inspection data for report: ${inspectionsError.code} ${inspectionsError.message}`);
+      throw qualityDbError(inspectionsError, 'retrieve inspection data for the report');
     }
+
+    // Get non-conformances with details
+    const { data: nonConformances, error: nonConformancesError } = await this.db()
+      .from('quality_non_conformances')
+      .select(`
+        *,
+        quality_inspections!inspection_id!inner (name, type, project_id)
+      `)
+      .eq('quality_inspections.project_id', projectId);
+
+    if (nonConformancesError) {
+      this.logger.error(`Error fetching non-conformances for report: ${nonConformancesError.code} ${nonConformancesError.message}`);
+      throw qualityDbError(nonConformancesError, 'retrieve non-conformances for the report');
+    }
+
+    return {
+      reportType: reportType || 'comprehensive',
+      generatedAt: new Date().toISOString(),
+      projectId,
+      summary: metrics,
+      inspections,
+      nonConformances,
+      recommendations: this.generateRecommendations(metrics),
+    };
   }
 
   async getQualityDashboard(
@@ -214,57 +163,45 @@ export class QualityControlService {
     if (!projectId) {
       throw new BadRequestException('Project ID is required to access the quality dashboard.');
     }
-    
-    if (!userId) {
-      throw new BadRequestException('User authentication is required to access the dashboard.');
-    }
-    
-    try {
-      const metrics = await this.getQualityMetrics(projectId, userId);
-      
-      // Get recent activities
-      const { data: recentInspections, error: inspectionsError } = await this.supabase.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
-        .from('quality_inspections')
-        .select('*')
-        .eq('project_id', projectId)
-        .order('updated_at', { ascending: false })
-        .limit(10);
-        
-      if (inspectionsError) {
-        this.logger.warn(`Error fetching recent inspections for dashboard: ${inspectionsError.message}`);
-        // Continue with empty inspections data
-      }
 
-      const { data: recentNonConformances, error: nonConformancesError } = await this.supabase.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
-        .from('quality_non_conformances')
-        .select(`
-          *,
-          quality_inspections!inspection_id (name)
-        `)
-        .eq('quality_inspections.project_id', projectId)
-        .order('created_at', { ascending: false })
-        .limit(5);
-        
-      if (nonConformancesError) {
-        this.logger.warn(`Error fetching recent non-conformances for dashboard: ${nonConformancesError.message}`);
-        // Continue with empty non-conformances data
-      }
+    const metrics = await this.getQualityMetrics(projectId, userId);
 
-      return {
-        metrics,
-        recentInspections: recentInspections || [],
-        recentNonConformances: recentNonConformances || [],
-        alerts: this.generateQualityAlerts(metrics),
-      };
-    } catch (error) {
-      if (error instanceof BadRequestException || error instanceof ForbiddenException || error instanceof NotFoundException) {
-        throw error;
-      }
-      
-      this.logger.error(`Unexpected error getting quality dashboard for project ${projectId}:`, error);
-      throw new InternalServerErrorException('Failed to retrieve quality dashboard data. Please try again later.');
+    // Get recent activities
+    const { data: recentInspections, error: inspectionsError } = await this.db()
+      .from('quality_inspections')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('updated_at', { ascending: false })
+      .limit(10);
+
+    if (inspectionsError) {
+      this.logger.error(`Error fetching recent inspections for dashboard: ${inspectionsError.code} ${inspectionsError.message}`);
+      throw qualityDbError(inspectionsError, 'retrieve recent inspections');
     }
+
+    const { data: recentNonConformances, error: nonConformancesError } = await this.db()
+      .from('quality_non_conformances')
+      .select(`
+        *,
+        quality_inspections!inspection_id!inner (name, project_id)
+      `)
+      .eq('quality_inspections.project_id', projectId)
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (nonConformancesError) {
+      this.logger.error(`Error fetching recent non-conformances for dashboard: ${nonConformancesError.code} ${nonConformancesError.message}`);
+      throw qualityDbError(nonConformancesError, 'retrieve recent non-conformances');
+    }
+
+    return {
+      metrics,
+      recentInspections,
+      recentNonConformances,
+      alerts: this.generateQualityAlerts(metrics),
+    };
   }
+
 
   private groupByStatus(inspections: any[]): Record<string, number> {
     return inspections.reduce((acc, inspection) => {

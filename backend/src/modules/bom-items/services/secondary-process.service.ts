@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../common/database/database.service';
 import { ExchangeRateService } from '../../../common/exchange-rate/exchange-rate.service';
 import { isMachiningFamily } from '../../../domain/part-family';
 import { getCurrencyForLocation } from '../../mhr/constants/mhr-calculation.constants';
@@ -66,7 +66,7 @@ export class SecondaryProcessService {
   private readonly references = new Map<string, SecondaryReference>();
 
   constructor(
-    private readonly supabase: SupabaseService,
+    private readonly database: DatabaseService,
     private readonly exchangeRates: ExchangeRateService,
     private readonly materials: MaterialResolutionService,
     private readonly calculatorCatalog: CalculatorCatalogService,
@@ -77,7 +77,7 @@ export class SecondaryProcessService {
   private async loadReference(version: string): Promise<SecondaryReference | null> {
     const cached = this.references.get(version);
     if (cached) return cached;
-    const { data, error } = await this.supabase
+    const { data, error } = await this.database
       .getPrivilegedClient('reference-data: machining_reference_data, public-read')
       .from('machining_reference_data')
       .select('category, key, value, raw')
@@ -104,7 +104,7 @@ export class SecondaryProcessService {
     const cached = this.references.get(key);
     if (cached) return cached;
     const keys = [...CHEMICAL_MILLING_VARIABLES, ...CHEMICAL_MILLING_TABLES, ...CHEMICAL_MILLING_PROCESSES.map((p) => p.process)];
-    const { data, error } = await this.supabase
+    const { data, error } = await this.database
       .getPrivilegedClient('reference-data: machining_reference_data, public-read')
       .from('machining_reference_data')
       .select('category, key, value, raw')
@@ -147,7 +147,7 @@ export class SecondaryProcessService {
   /** The location's real machines for these classes (migrations 806/818/820). */
   private async loadMachines(location: string, classes: string[], accessToken: string): Promise<SecondaryMachine[]> {
     const { data, error } = await cachedRead(`mhr:secondary:${location}:${[...classes].sort().join(',')}`, async () =>
-      await this.supabase
+      await this.database
         .getClient(accessToken)
         .from('mhr_records')
         .select('id, machine_name, machine_class, mhr_usd_per_hour, usd_lhr_total, operators, labor_time_standard, setup_time_hr, good_part_yield, max_x_mm, max_y_mm, max_z_mm, max_length_mm, max_workpiece_weight_kg, specs')
@@ -206,6 +206,8 @@ export class SecondaryProcessService {
     location: string;
     batchSize: number | null;
     accessToken: string;
+    /** The part's organization: its budget exchange rates convert the lines (null: none, the global defaults). */
+    organizationId: string | null;
     /** The machine the engineer picked per machine class (bom_item_machine_overrides). */
     machineOverrides?: ReadonlyMap<string, string>;
   }): Promise<SecondaryProcessesResponse> {
@@ -273,7 +275,7 @@ export class SecondaryProcessService {
     }
 
     const { currency } = getCurrencyForLocation(location);
-    const fx = await this.exchangeRates.getSnapshot(accessToken);
+    const fx = await this.exchangeRates.getSnapshot(accessToken, input.organizationId);
     const usdToLocal = fx.convertStrict('USD', currency);
     const toLocal = (v: number | null | undefined) => (v == null ? null : Number((v * usdToLocal).toFixed(4)));
 

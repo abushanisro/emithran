@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { BaseRepository } from '@/common/repositories/base.repository';
 import { Logger } from '@/common/logger/logger.service';
-import { SupabaseClient } from '@supabase/supabase-js';
+import type { DbClient } from '../../common/db/postgrest-client';
 
 interface ProjectEntity {
   id: string;
@@ -17,6 +17,7 @@ interface ProjectEntity {
   target_bom_cost?: number;
   target_bom_cost_currency?: string;
   user_id: string;
+  organization_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -31,7 +32,7 @@ export class ProjectsRepository extends BaseRepository<ProjectEntity> {
    * Find projects by search term
    */
   async findBySearch(
-    client: SupabaseClient,
+    client: DbClient,
     searchTerm: string,
     options: any = {}
   ) {
@@ -76,7 +77,7 @@ export class ProjectsRepository extends BaseRepository<ProjectEntity> {
    * Find projects by status
    */
   async findByStatus(
-    client: SupabaseClient,
+    client: DbClient,
     status: string,
     options: any = {}
   ) {
@@ -121,7 +122,7 @@ export class ProjectsRepository extends BaseRepository<ProjectEntity> {
    * Check if project name exists (excluding current project)
    */
   async isNameExists(
-    client: SupabaseClient,
+    client: DbClient,
     name: string,
     excludeId?: string
   ): Promise<boolean> {

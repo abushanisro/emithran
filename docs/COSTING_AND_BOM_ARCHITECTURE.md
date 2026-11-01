@@ -65,7 +65,7 @@ The costing and BOM management system is a **Domain-Driven Design (DDD)** microm
         └──────────────┬──────────────┘
                        │
         ┌──────────────▼────────────────┐
-        │    Supabase Database (RLS)    │
+        │  PostgreSQL + PostgREST (RLS) │
         │  ─────────────────────────    │
         │  • bom_items                  │
         │  • cost_records_{type}        │
@@ -683,7 +683,7 @@ BomItemsService detects change
   ├─ Recalculate BomItemCostService.calculateCost(Item1)
   ├─ INSERT new cost records
   ├─ Update bom_items.updated_at (triggers BOM roll-up refresh)
-  └─ Broadcast via Supabase Realtime → Frontend shows updated cost
+  └─ Frontend refetches → shows updated cost (there is no realtime server)
 
 Full chain: 50-200ms (fast enough for UI responsiveness)
 ```

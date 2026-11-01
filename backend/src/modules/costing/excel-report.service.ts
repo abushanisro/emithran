@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { DatabaseService } from '../../common/database/database.service';
 import { CostAggregationService, BomItemCostDto, ProcessLine, MaterialLine } from './cost-aggregation.service';
 import { BOMItemsService } from '../bom-items/bom-items.service';
 import type { CostSummaryDto, CalculationTraceStep, FeatureOp } from '../bom-items/dto/cost-breakdown.dto';
@@ -55,7 +55,7 @@ const THIN_BORDER: Partial<ExcelJS.Borders> = {
 @Injectable()
 export class ExcelReportService {
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly costAggregation: CostAggregationService,
     private readonly bomItemsService: BOMItemsService,
   ) {}
@@ -110,7 +110,7 @@ export class ExcelReportService {
   }
 
   private async fetchItemHeaderFields(bomItemId: string, accessToken?: string): Promise<BomItemHeaderFields> {
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getUserClient(accessToken)
       .from('bom_items')
       .select(

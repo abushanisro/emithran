@@ -297,7 +297,7 @@ All DTOs use `class-validator` decorators:
 ```typescript
 @UseGuards(ThrottlerGuard)  // Rate limiting
 @CurrentUser()               // JWT validation + user extraction
-@AccessToken()               // Token extraction for Supabase
+@AccessToken()               // Token extraction (database token for PostgREST)
 ```
 
 ### 5. Error Handling Strategy

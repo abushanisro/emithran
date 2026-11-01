@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
-import { SupabaseService } from '@/common/supabase/supabase.service';
+import { DatabaseService } from '@/common/database/database.service';
 import {
   CreateProductionEntryDto,
   UpdateProductionEntryDto,
@@ -10,16 +10,16 @@ import {
 
 @Injectable()
 export class ProductionEntryService {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(private readonly databaseService: DatabaseService) {}
 
   async createProductionEntry(
     createDto: CreateProductionEntryDto,
     userId: string
   ): Promise<ProductionEntryResponseDto> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Check if entry already exists for this lot, process, date, and shift
-    const { data: existing } = await supabase
+    const { data: existing } = await database
       .from('production_entries')
       .select('id')
       .eq('lot_id', createDto.lotId)
@@ -34,7 +34,7 @@ export class ProductionEntryService {
       );
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from('production_entries')
       .insert([
         {
@@ -65,9 +65,9 @@ export class ProductionEntryService {
   }
 
   async getProductionEntries(queryDto: ProductionEntriesQueryDto): Promise<ProductionEntryResponseDto[]> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
     
-    let query = supabase
+    let query = database
       .from('production_entries')
       .select(`*`)
       .eq('lot_id', queryDto.lotId)
@@ -107,9 +107,9 @@ export class ProductionEntryService {
   }
 
   async getProductionEntryById(id: string): Promise<ProductionEntryResponseDto> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
     
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from('production_entries')
       .select(`*`)
       .eq('id', id)
@@ -126,14 +126,14 @@ export class ProductionEntryService {
     id: string,
     updateDto: UpdateProductionEntryDto
   ): Promise<ProductionEntryResponseDto> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Check if entry exists
     const existing = await this.getProductionEntryById(id);
 
     // Check for conflicts if changing key fields
     if (updateDto.processId || updateDto.entryDate || updateDto.shift) {
-      const { data: conflicting } = await supabase
+      const { data: conflicting } = await database
         .from('production_entries')
         .select('id')
         .eq('lot_id', existing.lotId)
@@ -166,7 +166,7 @@ export class ProductionEntryService {
     if (updateDto.qualityIssues !== undefined) updateData.quality_issues = updateDto.qualityIssues;
     if (updateDto.operatorNotes !== undefined) updateData.operator_notes = updateDto.operatorNotes;
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from('production_entries')
       .update(updateData)
       .eq('id', id)
@@ -181,12 +181,12 @@ export class ProductionEntryService {
   }
 
   async deleteProductionEntry(id: string): Promise<void> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Check if entry exists
     await this.getProductionEntryById(id);
 
-    const { error } = await supabase
+    const { error } = await database
       .from('production_entries')
       .delete()
       .eq('id', id);
@@ -197,10 +197,10 @@ export class ProductionEntryService {
   }
 
   async getWeeklySummary(lotId: string): Promise<WeeklySummaryDto[]> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Get production entries for the lot and group them manually
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from('production_entries')
       .select('*')
       .eq('lot_id', lotId)

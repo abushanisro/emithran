@@ -2,7 +2,7 @@ import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 
 import { RecentKeys } from '../cache/recent-keys';
 import { currentRequestAuth } from '../request-context/request-auth-context';
-import { SupabaseService } from '../supabase/supabase.service';
+import { DatabaseService } from '../database/database.service';
 import { buildAuditRow, type AuditEventInput } from './audit-row';
 
 // Where an audit event is written. Two ways, chosen per call site:
@@ -16,11 +16,11 @@ export class AuditService {
   private readonly logger = new Logger(AuditService.name);
   private readonly recentDenials = new RecentKeys(60_000, 500);
 
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   async record(event: AuditEventInput): Promise<void> {
     const row = buildAuditRow(event, currentRequestAuth());
-    const { error } = await this.supabase
+    const { error } = await this.database
       .getPrivilegedClient('audit: write an audit event through record_audit_event')
       .rpc('record_audit_event', row);
     if (error) {
@@ -89,7 +89,7 @@ export class AuditService {
 
   /** What the audit trail needs to know about a row before it is changed or deleted: its organization and its name. Empty when unreadable. */
   async describe(table: 'bom_items' | 'boms', id: string): Promise<{ organizationId?: string; name?: string }> {
-    const { data, error } = await this.supabase
+    const { data, error } = await this.database
       .getPrivilegedClient('audit: find the organization and name of the row being changed')
       .from(table)
       .select('organization_id, name')
