@@ -1544,6 +1544,7 @@ export class BOMItemsController {
       location: inputs.location ?? location,
       batchSize: inputs.batchSize,
       accessToken: token,
+      organizationId: await this.bomItemsService.organizationOfItem(id, token),
     });
   }
 
@@ -1878,7 +1879,7 @@ export class BOMItemsController {
     const batchSize = comparison.resolvedInputs.batchSize;
     // Own snapshot for resolveRealMachineRate below — getRouteComparison already
     // took its own internally; both read the same short-TTL cache in practice.
-    const rates = await this.exchangeRateService.getSnapshot(token);
+    const rates = await this.exchangeRateService.getSnapshot(token, await this.bomItemsService.organizationOfItem(id, token));
     const baseRoute = comparison.routes.find((r) => r.routeId === dto.baseCuttingRouteId);
     if (!baseRoute) {
       throw new NotFoundException(

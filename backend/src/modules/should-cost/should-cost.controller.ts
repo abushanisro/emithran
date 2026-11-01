@@ -35,19 +35,8 @@ export class ShouldCostController {
   ) {}
 
   // ── Calibration ──────────────────────────────────────────────────────────────
-
-  @Post('calibration/run')
-  @ApiOperation({
-    summary: 'Run a ridge-regression calibration pass over all (process_family, location) cells',
-    description:
-      'Reads matched prediction/actual pairs, computes a correction multiplier per cell ' +
-      '(minimum 5 samples), updates BENCHMARK MHR rates, and logs results to rate_calibration_history. ' +
-      'Returns one result object per calibrated cell.',
-  })
-  @ApiResponse({ status: 201, description: 'Calibration results per cell' })
-  runCalibration() {
-    return this.calibration.runCalibration();
-  }
+  // Read-only. Running a calibration and recording actuals are operator work (scripts/should-cost-calibrate.ts), never an HTTP
+  // request: a run changes the global BENCHMARK machine-hour rates every organization uses.
 
   @Get('calibration/history')
   @ApiOperation({ summary: 'Return past calibration run history, most recent first' })
@@ -55,18 +44,6 @@ export class ShouldCostController {
   @ApiResponse({ status: 200, description: 'Calibration history rows from rate_calibration_history' })
   getCalibrationHistory(@Query('limit') limit?: string) {
     return this.calibration.getHistory(limit ? parseInt(limit, 10) : 50);
-  }
-
-  @Post('calibration/actuals')
-  @ApiOperation({
-    summary: 'Record a supplier actual cost against a should-cost prediction',
-    description:
-      'Inserts a row into should_cost_actuals. ' +
-      'Link to a prediction via predictionId to enable calibration pairing.',
-  })
-  @ApiResponse({ status: 201, description: 'Created should_cost_actuals row' })
-  recordActual(@Body() dto: any) {
-    return this.calibration.recordActual(dto);
   }
 
   // ── Analytics views (before parameterised routes to prevent routing conflict) ─

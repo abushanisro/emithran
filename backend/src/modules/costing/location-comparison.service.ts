@@ -1,6 +1,6 @@
-import { Injectable, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, BadRequestException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../../common/database/database.service';
-import { ExchangeRateService } from '../../common/exchange-rate/exchange-rate.service';
+import { ExchangeRateService, organizationIdOf } from '../../common/exchange-rate/exchange-rate.service';
 import { readSellingPriceSettings } from './cost-aggregation.service';
 import {
   LOCATION_INFO,
@@ -70,13 +70,18 @@ export class LocationComparisonService {
     const adminDb = this.databaseService.getPrivilegedClient('reference-data: costing_settings and rate benchmarks, global');
     const serviceWarnings: string[] = [];
 
+    // The part's organization decides which budget exchange rates apply (read as the caller, so RLS decides visibility).
+    const { data: item, error: itemError } = await db.from('bom_items').select('organization_id').eq('id', bomItemId).maybeSingle();
+    if (itemError) throw new InternalServerErrorException(`Unable to read the BOM item: ${itemError.message}`);
+    if (!item) throw new NotFoundException('BOM item not found');
+
     // 0. Load exchange rates (one snapshot for this whole comparison — every
     // location below converts through the exact same rates) and costing
     // settings. ExchangeRateService is the single FX source of truth for the
     // whole app — throws if exchange_rates has no active rates, rather than
     // silently comparing locations at a stale/guessed rate.
     const [rates, settingsResult] = await Promise.all([
-      this.exchangeRateService.getSnapshot(token),
+      this.exchangeRateService.getSnapshot(token, organizationIdOf(item)),
       adminDb
         .from('costing_settings')
         .select('key, value'),

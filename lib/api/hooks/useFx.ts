@@ -65,14 +65,18 @@ export function useCurrencies() {
   });
 }
 
-/** One active budget rate with its provenance — GET /fx/exchange-rates. */
+/** One of your organization's effective budget rates with its provenance — GET /fx/exchange-rates. */
 export interface ExchangeRateRow {
   currency: string;
   name: string | null;
-  /** 1 USD = rate `currency`. */
+  /** 1 USD = rate `currency`: your organization's own rate where it set one, else the global default. */
   rate: number;
+  /** Where `rate` comes from: your organization's own budget rate, or the global default. */
+  source: 'organization' | 'default';
+  /** The global default (1 USD = defaultRate `currency`). */
+  defaultRate: number;
   effectiveDate: string;
-  /** Email of the user who last edited the rate; null while it is the reference value. */
+  /** Email of the member who set your organization's rate; null while the global default applies. */
   editedBy: string | null;
   editReason: string | null;
   sourceActive: boolean | null;

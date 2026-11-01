@@ -382,7 +382,7 @@ export class ProjectsService {
       const bomRows = await readAllRows<{ id: string; project_id: string }>((from, to) => client.from('boms')
         .select('id, project_id', { count: 'exact' }).in('project_id', projectIds).order('id').range(from, to));
       const totals = await loadBomTotals(client, bomRows.map(bom => bom.id),
-        () => this.exchangeRates.getSnapshot(accessToken ?? null), message => this.logger.warn(message), reportingCurrency);
+        organizationId => this.exchangeRates.getSnapshot(accessToken ?? null, organizationId), message => this.logger.warn(message), reportingCurrency);
       for (const bom of bomRows) {
         const stats = resultMap.get(bom.project_id)!;
         const total = totals.get(bom.id)!;

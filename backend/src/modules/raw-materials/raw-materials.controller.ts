@@ -150,13 +150,14 @@ export class RawMaterialsController {
   }
 
   @Put(':id/editor')
+  @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: 'Save the edit form (core fields, property values, stock prices) in one transaction' })
   async saveEditor(
     @Param('id') id: string,
     @Body() body: SaveRawMaterialEditorDto,
     @CurrentUser() user: User,
     @AccessToken() token: string,
-    @CurrentOrganization() organizationId: string | undefined,
+    @CurrentOrganization() organizationId: string,
   ) {
     return this.editorService.save(id, body, user.id, token, organizationId);
   }

@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { DatabaseService } from '@/common/database/database.service';
 import type { DbClient } from '@/common/db/postgrest-client';
 import {
@@ -145,6 +145,11 @@ export class QualityInspectionService {
     updateDto: UpdateQualityInspectionDto,
     userId: string,
   ): Promise<QualityInspectionResponseDto> {
+    // Approval and rejection carry who decided and (for approval) record the approved items: they happen only through
+    // approveInspection / rejectInspection, never as a plain status edit.
+    if (updateDto.status === InspectionStatus.APPROVED || updateDto.status === InspectionStatus.REJECTED) {
+      throw new BadRequestException(`An inspection is ${updateDto.status} through its approve or reject action, not by editing its status.`);
+    }
     // Transform camelCase DTO fields to snake_case database columns
     const updateData: any = {
       updated_at: new Date().toISOString(),
@@ -233,8 +238,15 @@ export class QualityInspectionService {
     if (inspectionError) {
       throw qualityDbError(inspectionError, 'read the inspection');
     }
+    if (inspection.status !== InspectionStatus.COMPLETED) {
+      throw new ConflictException(
+        inspection.status === InspectionStatus.APPROVED
+          ? 'This inspection is already approved.'
+          : `Only a completed inspection can be approved (this one is ${inspection.status}).`,
+      );
+    }
 
-    // Update the inspection status
+    // Update the inspection status — only while it is still completed, so two approvals racing each other approve it once
     const updateData = {
       status: InspectionStatus.APPROVED,
       approved_by: userId,
@@ -245,16 +257,20 @@ export class QualityInspectionService {
 
     this.logger.log(`Approving inspection ${id} (user ${userId})`);
 
-    const { data: updatedInspection, error: updateError } = await this.db()
+    const { data: updatedRows, error: updateError } = await this.db()
       .from('quality_inspections')
       .update(updateData)
       .eq('id', id)
-      .select('*')
-      .single();
+      .eq('status', InspectionStatus.COMPLETED)
+      .select('*');
 
     if (updateError) {
       this.logger.error(`Failed to approve inspection ${id}: ${updateError.code} ${updateError.message}`);
       throw qualityDbError(updateError, 'approve the inspection');
+    }
+    const updatedInspection = updatedRows?.[0];
+    if (!updatedInspection) {
+      throw new ConflictException('This inspection was approved or changed by someone else meanwhile.');
     }
 
     // Create quality approved items for each selected item

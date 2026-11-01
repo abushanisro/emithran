@@ -1,7 +1,6 @@
 {
   "src/common/audit/audit.service.ts": 2,
   "src/common/database/user-directory.ts": 3,
-  "src/common/exchange-rate/exchange-rate.service.ts": 1,
   "src/common/fx/fx-rate-cache.service.ts": 2,
   "src/common/guards/organization-context.guard.ts": 1,
   "src/common/session/session-activity.service.ts": 1,
@@ -39,6 +38,5 @@
   "src/modules/processes/processes.service.ts": 6,
   "src/modules/processes/services/process-cost.service.ts": 2,
   "src/modules/raw-materials/services/raw-material-editor.service.ts": 1,
-  "src/modules/rfq/rfq.service.ts": 1,
   "src/modules/should-cost/calibration.service.ts": 1
 }

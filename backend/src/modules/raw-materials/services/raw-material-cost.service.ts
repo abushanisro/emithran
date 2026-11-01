@@ -209,7 +209,8 @@ export class RawMaterialCostService {
       // guessing the currency from country alone would then convert an INR
       // price as if it were CNY.
       if (lookup.found && lookup.price > 0) {
-        const rates = await this.exchangeRateService.getSnapshot(accessToken);
+        // The new record's organization's budget rates (global defaults when it has none).
+        const rates = await this.exchangeRateService.getSnapshot(accessToken, organizationId ?? null);
         resolvedUnitCost = rates.toUsd(lookup.price, lookup.currency);
         // Migration 708: record the conversion this path just performed, so the
         // stored row can prove it is USD instead of relying on a convention.
