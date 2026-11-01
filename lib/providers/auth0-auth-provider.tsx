@@ -24,11 +24,18 @@ async function fetchMe(): Promise<Me> {
 }
 
 /**
- * "Sign in with Google" goes straight to one Auth0 connection: the company's Google Workspace connection when
- * NEXT_PUBLIC_AUTH0_GOOGLE_CONNECTION names it (build time), otherwise Auth0's Google social connection.
+ * The company single sign-on connection (an Auth0 enterprise connection: Google Workspace, Microsoft Entra ID, SAML, ...), named at build
+ * time by NEXT_PUBLIC_AUTH0_SSO_CONNECTION. Unset means no SSO button: there is no fallback to a public social login, so only the
+ * company directory can sign people in this way.
  */
-export function googleSignInPath(connection = process.env.NEXT_PUBLIC_AUTH0_GOOGLE_CONNECTION): string {
-  return `/auth/login?connection=${encodeURIComponent(connection ?? 'google-oauth2')}`
+export function ssoConnection(value = process.env.NEXT_PUBLIC_AUTH0_SSO_CONNECTION): string | null {
+  const name = value?.trim()
+  return name ? name : null
+}
+
+/** Auth0 login sent straight to the company SSO connection, skipping the Auth0 login form. */
+export function ssoSignInPath(connection: string): string {
+  return `/auth/login?connection=${encodeURIComponent(connection)}`
 }
 
 const go = (path: string) => {
@@ -37,7 +44,7 @@ const go = (path: string) => {
 }
 
 /**
- * Auth0 sign-in (Universal Login: password, Google, MFA and password reset live there). The Auth0 session proves who the person is;
+ * Auth0 sign-in (Universal Login: password, company SSO, MFA and password reset live there). The Auth0 session proves who the person is;
  * the backend decides whether they are invited and tells us their internal id, which is what the rest of the app uses.
  */
 export function Auth0AuthProvider({ children }: { children: React.ReactNode }) {
@@ -67,7 +74,11 @@ export function Auth0AuthProvider({ children }: { children: React.ReactNode }) {
   )
 
   const signIn = useCallback(async () => go('/auth/login'), [])
-  const signInWithGoogle = useCallback(async () => go(googleSignInPath()), [])
+  const sso = ssoConnection()
+  const signInWithSso = useCallback(async () => {
+    if (!sso) throw new Error('Single sign-on is not configured (NEXT_PUBLIC_AUTH0_SSO_CONNECTION)')
+    return go(ssoSignInPath(sso))
+  }, [sso])
   const signOut = useCallback(async () => { await sessionSource.signOutThisDevice() }, [])
 
   const value: AuthContextType = {
@@ -75,7 +86,8 @@ export function Auth0AuthProvider({ children }: { children: React.ReactNode }) {
     loading: isLoading || (!!auth0User && me.state === 'loading'),
     accessDenied: me.state === 'denied',
     signIn,
-    signInWithGoogle,
+    ssoAvailable: sso !== null,
+    signInWithSso,
     signOut,
   }
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

@@ -16,7 +16,10 @@ export interface AuthContextType {
   accessDenied?: boolean
   /** Leaves for Auth0's login page; credentials are never typed into this app. */
   signIn: () => Promise<never>
-  signInWithGoogle: () => Promise<never>
+  /** Whether a company SSO connection is configured; the SSO button shows only then. */
+  ssoAvailable: boolean
+  /** Leaves for the company SSO connection (through Auth0). */
+  signInWithSso: () => Promise<never>
   signOut: () => Promise<void>
 }
 
