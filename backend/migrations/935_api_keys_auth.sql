@@ -57,7 +57,7 @@ CREATE POLICY api_keys_user_insert ON public.api_keys
 
 -- The only change a person can make to a key is revoking it: no new scopes, no longer expiry, no un-revoking.
 REVOKE UPDATE ON public.api_keys FROM authenticated;
-GRANT UPDATE (revoked_at, updated_at) ON public.api_keys TO authenticated;
+GRANT UPDATE (revoked_at) ON public.api_keys TO authenticated;
 DROP POLICY IF EXISTS api_keys_user_update ON public.api_keys;
 CREATE POLICY api_keys_user_update ON public.api_keys
   FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id AND revoked_at IS NOT NULL);
