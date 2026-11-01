@@ -2,28 +2,11 @@
   "name": "main",
   "target": "branch",
   "enforcement": "active",
-  "conditions": {
-    "ref_name": {
-      "include": [
-        "~DEFAULT_BRANCH"
-      ],
-      "exclude": []
-    }
-  },
-  "bypass_actors": [
-    {
-      "actor_type": "RepositoryRole",
-      "actor_id": 5,
-      "bypass_mode": "pull_request"
-    }
-  ],
+  "conditions": { "ref_name": { "include": ["~DEFAULT_BRANCH"], "exclude": [] } },
+  "bypass_actors": [{ "actor_type": "RepositoryRole", "actor_id": 5, "bypass_mode": "pull_request" }],
   "rules": [
-    {
-      "type": "deletion"
-    },
-    {
-      "type": "non_fast_forward"
-    },
+    { "type": "deletion" },
+    { "type": "non_fast_forward" },
     {
       "type": "pull_request",
       "parameters": {
@@ -32,9 +15,7 @@
         "require_code_owner_review": false,
         "require_last_push_approval": false,
         "required_review_thread_resolution": true,
-        "allowed_merge_methods": [
-          "squash"
-        ]
+        "allowed_merge_methods": ["squash"]
       }
     },
     {
@@ -42,73 +23,31 @@
       "parameters": {
         "strict_required_status_checks_policy": true,
         "required_status_checks": [
-          {
-            "context": "Frontend (Next.js)"
-          },
-          {
-            "context": "Backend (NestJS)"
-          },
-          {
-            "context": "Database migrations (SQL tests)"
-          },
-          {
-            "context": "Plain Postgres + PostgREST (Supabase-free data layer)"
-          },
-          {
-            "context": "Local development stack without Supabase (Postgres, data API, files, backend)"
-          },
-          {
-            "context": "S3-compatible object store (real server)"
-          },
-          {
-            "context": "Electronics extraction engine (Python)"
-          },
-          {
-            "context": "CAD Engine (Docker build)"
-          },
-          {
-            "context": "Backend image (no source maps shipped)"
-          },
-          {
-            "context": "Assembly core (Rust)"
-          },
-          {
-            "context": "Assembly core image (runner + worker, end to end)"
-          },
-          {
-            "context": "Geometry worker (C++ build, hand-worked checks, parity with the Python engine)"
-          },
-          {
-            "context": "Secret scan (gitleaks)"
-          },
-          {
-            "context": "Dependency vulnerabilities"
-          },
-          {
-            "context": "Containers and deployment config (Trivy)"
-          },
-          {
-            "context": "Deployment policy tests"
-          },
-          {
-            "context": "CodeQL (javascript-typescript)"
-          },
-          {
-            "context": "CodeQL (python)"
-          }
+          { "context": "Frontend (Next.js)" },
+          { "context": "Backend (NestJS)" },
+          { "context": "Database migrations (SQL tests)" },
+          { "context": "Plain Postgres + PostgREST (Supabase-free data layer)" },
+          { "context": "Local development stack without Supabase (Postgres, data API, files, backend)" },
+          { "context": "S3-compatible object store (real server)" },
+          { "context": "Electronics extraction engine (Python)" },
+          { "context": "CAD Engine (Docker build)" },
+          { "context": "Backend image (no source maps shipped)" },
+          { "context": "Assembly core (Rust)" },
+          { "context": "Assembly core image (runner + worker, end to end)" },
+          { "context": "Geometry worker (C++ build, hand-worked checks, parity with the Python engine)" },
+          { "context": "Secret scan (gitleaks)" },
+          { "context": "Dependency vulnerabilities" },
+          { "context": "Containers and deployment config (Trivy)" },
+          { "context": "Deployment policy tests" },
+          { "context": "CodeQL (javascript-typescript)" },
+          { "context": "CodeQL (python)" }
         ]
       }
     },
     {
       "type": "code_scanning",
       "parameters": {
-        "code_scanning_tools": [
-          {
-            "tool": "CodeQL",
-            "alerts_threshold": "errors",
-            "security_alerts_threshold": "high_or_higher"
-          }
-        ]
+        "code_scanning_tools": [{ "tool": "CodeQL", "alerts_threshold": "errors", "security_alerts_threshold": "high_or_higher" }]
       }
     }
   ]
