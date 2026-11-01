@@ -52,7 +52,7 @@ bad migration is fixed by a new migration.
 | Non-root users; pinned base images (digest); supported Node (24); no compilers or package manager at runtime | Dockerfiles, same test | CIS Docker 4.x, SLSA |
 | No env file or log ever enters an image | `.dockerignore` files, same test | ASVS V14 |
 | Engines isolated on a network with no internet | compose `internal` network, same test | defence in depth |
-| A secret key can never reach the browser | `lib/supabase/env.ts` stops the app if `sb_secret_` or a service-role JWT is in a `NEXT_PUBLIC_` variable | ASVS V14.3 |
+| A secret key can never reach the browser | No database or storage client in browser code (`npm run check:boundary`); only `NEXT_PUBLIC_*` build arguments reach the frontend image (`test/deploy/compose-hardening.test.ts`); the Auth0 token endpoint is closed (`lib/auth0.ts`) | ASVS V14.3 |
 | Production refuses to boot without `APP_ENV` and with the dev auth bypass | `backend/src/config/env.validation.ts` | ASVS V14.1 |
 | Data-creating tests refuse to run against production | `backend/src/common/environment-guard.ts`, `playwright.config.ts` | change control |
 | Real client IP behind the tunnel for rate limiting | `backend/src/common/client-ip.ts` (`TRUST_CLOUDFLARE_HEADERS`) | ASVS V13 |
@@ -140,7 +140,7 @@ and compares every table's row count with the count taken at dump time; it exits
 
 ## GitHub settings (cannot be set from the repo)
 
-Branch protection on `main` (required reviews and the `ci.yml` and `security.yml` checks, no force pushes); GitHub Environments
+Branch protection on `main`: the ruleset in `.github/rulesets/main.json`, applied as described in [GOVERNANCE.md](GOVERNANCE.md#branch-protection); GitHub Environments
 `stage` and `production` (production with required reviewers); secret scanning with push protection; Dependabot alerts; two-factor
 authentication for all members.
 
