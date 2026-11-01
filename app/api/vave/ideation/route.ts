@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { VaveBomItem, VaveShouldCost } from '@/lib/api/vave';
 import { requireUserForAi } from '@/lib/server/auth';
+import { refuseCrossOrigin } from '@/lib/server/bff/origin';
+import { readJsonBody } from '@/lib/server/read-body';
+
+// A BOM summary with gaps and focus areas: generous for thousands of items.
+const MAX_BODY_BYTES = 2 * 1024 * 1024;
 import { parseAiJson, requestAiText } from '@/lib/server/anthropic';
 import { AiResultError, ideasFromAi } from '@/lib/vave/ai-results';
 
@@ -11,11 +16,15 @@ interface IdeationRequest {
 }
 
 export async function POST(request: NextRequest) {
+  const refused = refuseCrossOrigin(request);
+  if (refused) return refused;
   const auth = await requireUserForAi('vave-ideation');
   if (!auth.ok) return auth.response;
 
   try {
-    const { bomItems, focusAreas, shouldCostGaps }: IdeationRequest = await request.json();
+    const parsed = await readJsonBody<Partial<IdeationRequest> | null>(request, MAX_BODY_BYTES);
+    if (!parsed.ok) return parsed.response;
+    const { bomItems, focusAreas, shouldCostGaps } = parsed.value ?? {};
 
     const topGaps = [...(shouldCostGaps ?? [])]
       .sort((a, b) => (b.delta ?? 0) - (a.delta ?? 0))
@@ -43,7 +52,7 @@ export async function POST(request: NextRequest) {
     const prompt = `You are a senior Value Engineering expert with 20 years of manufacturing experience.
 
 Focus Areas identified for VAVE:
-${JSON.stringify(focusAreas)}
+${JSON.stringify((Array.isArray(focusAreas) ? focusAreas : []).slice(0, 10).map((area) => String(area).slice(0, 300)))}
 
 Top Cost-Driving Parts:
 ${JSON.stringify(topParts, null, 2)}

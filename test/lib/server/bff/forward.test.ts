@@ -125,4 +125,29 @@ describe('forwardRequest', () => {
     const res = await forwardRequest(browserRequest({ method: 'DELETE' }), url, 't', fetcher);
     expect(res.status).toBe(204);
   });
+
+  it('refuses a body declared larger than the limit with 413, without calling the API', async () => {
+    const { fetcher } = capture(new Response('{}'));
+    const req = new Request('https://app.example.com/api/v1/files', { method: 'POST', body: 'x', headers: { 'content-length': '100' } });
+    const res = await forwardRequest(req, url, 't', fetcher, 10);
+    expect(res.status).toBe(413);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('answers 413 when a chunked body passes the limit while streaming, instead of sending it truncated', async () => {
+    // The fetcher reads the body as the API would; the cap errors the stream once it passes the limit.
+    const fetcher = vi.fn<typeof fetch>(async (_url, init) => {
+      await new Response(init?.body).arrayBuffer();
+      return new Response('{}');
+    });
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (let i = 0; i < 5; i++) controller.enqueue(new Uint8Array(10));
+        controller.close();
+      },
+    });
+    const req = new Request('https://app.example.com/api/v1/files', { method: 'POST', body: stream, duplex: 'half' } as RequestInit & { duplex: 'half' });
+    const res = await forwardRequest(req, url, 't', fetcher, 25);
+    expect(res.status).toBe(413);
+  });
 });

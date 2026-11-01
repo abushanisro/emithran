@@ -251,17 +251,16 @@ function InlinePDFViewer({ bomItem, onBalloonsChanged, inspectionId, onSaveToDat
 
 
       // Send to backend for processing with balloon coordinates
-      const extractResponse = await fetch('/api/extract-inspection-table', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          pdfBuffer: Array.from(new Uint8Array(arrayBuffer)),
-          fileName: bomItem.partNumber || bomItem.name || 'drawing',
-          balloonCoordinates: balloonCoordinates.length > 0 ? balloonCoordinates : undefined
-        })
-      });
+      // The PDF goes as a binary file, not a JSON number array (about 8x larger).
+      const form = new FormData();
+      form.append('pdf', new Blob([arrayBuffer], { type: 'application/pdf' }), 'drawing.pdf');
+      form.append('fileName', bomItem.partNumber || bomItem.name || 'drawing');
+      if (balloonCoordinates.length > 0) {
+        form.append('balloonCoordinates', JSON.stringify(
+          balloonCoordinates.map((b: { number: number; x: number; y: number }) => ({ number: b.number, x: b.x, y: b.y })),
+        ));
+      }
+      const extractResponse = await fetch('/api/extract-inspection-table', { method: 'POST', body: form });
 
       if (!extractResponse.ok) {
         throw new Error('Failed to extract table data from PDF');

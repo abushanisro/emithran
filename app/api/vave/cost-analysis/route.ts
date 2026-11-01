@@ -1,15 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { VaveBomItem, CostAnalysisResult } from '@/lib/api/vave';
 import { requireUserForAi } from '@/lib/server/auth';
+import { refuseCrossOrigin } from '@/lib/server/bff/origin';
+import { readJsonBody } from '@/lib/server/read-body';
 import { parseAiJson, requestAiText } from '@/lib/server/anthropic';
 import { AiResultError, costAnalysisFromAi } from '@/lib/vave/ai-results';
 
+// A BOM summary: generous for thousands of items, far below anything that strains the server.
+const MAX_BODY_BYTES = 2 * 1024 * 1024;
+
 export async function POST(request: NextRequest) {
+  const refused = refuseCrossOrigin(request);
+  if (refused) return refused;
   const auth = await requireUserForAi('vave-cost-analysis');
   if (!auth.ok) return auth.response;
 
   try {
-    const { bomItems }: { bomItems: VaveBomItem[] } = await request.json();
+    const parsed = await readJsonBody<{ bomItems?: VaveBomItem[] } | null>(request, MAX_BODY_BYTES);
+    if (!parsed.ok) return parsed.response;
+    const { bomItems } = parsed.value ?? {};
 
     if (!bomItems?.length) {
       return NextResponse.json({ error: 'No BOM items provided' }, { status: 400 });

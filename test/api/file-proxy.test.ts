@@ -6,7 +6,7 @@ import { GET } from '@/app/api/file-proxy/route';
 // The route requires a signed-in user (lib/server/auth); these tests are about
 // the destination boundary, so the caller is signed in.
 vi.mock('@/lib/server/auth', () => ({
-  requireUser: () => Promise.resolve({ ok: true, userId: 'user-1' }),
+  requireUser: () => Promise.resolve({ ok: true, userId: 'user-1', accessToken: 'session-token' }),
 }));
 
 const fetchMock = vi.fn<typeof fetch>();
@@ -93,6 +93,32 @@ describe('file proxy destination boundary', () => {
       expect.stringMatching(new RegExp(`/bom-items/${ITEM_ID}/file-url/2d$`)),
       expect.objectContaining({ redirect: 'error' }),
     );
+  });
+
+  it("asks the backend with the session's token, never a header the browser sent", async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ url: storageUrl }))
+      .mockResolvedValueOnce(new Response('file-bytes'));
+    const req = new NextRequest(`http://localhost/api/file-proxy?itemId=${ITEM_ID}&fileType=2d`, {
+      headers: { authorization: 'Bearer browser-token' },
+    });
+    await GET(req);
+    const init = fetchMock.mock.calls[0][1];
+    expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer session-token');
+  });
+
+  it('serves a PDF inline inside a CSP sandbox, so it is not active content of the app origin', async () => {
+    fetchMock.mockResolvedValue(new Response('%PDF', { headers: { 'Content-Type': 'application/pdf' } }));
+    const response = await GET(request({ url: storageUrl }));
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-security-policy')).toBe('sandbox');
+    expect(response.headers.get('content-disposition')).toBe('inline');
+  });
+
+  it('serves images without a sandbox and other data with a strict one', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('png', { headers: { 'Content-Type': 'image/png' } }));
+    expect((await GET(request({ url: storageUrl }))).headers.get('content-security-policy')).toBeNull();
+    fetchMock.mockResolvedValueOnce(new Response('step', { headers: { 'Content-Type': 'application/step' } }));
+    expect((await GET(request({ url: storageUrl }))).headers.get('content-security-policy')).toBe("sandbox; default-src 'none'");
   });
 
   it('streams a trusted backend-provided file URL', async () => {
