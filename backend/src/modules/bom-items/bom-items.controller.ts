@@ -1331,7 +1331,7 @@ export class BOMItemsController {
   @ApiConsumes('multipart/form-data')
   @ApiResponse({ status: 201, description: 'Assembly BOM item created' })
   @ApiResponse({ status: 400, description: 'Invalid file or CAD engine error' })
-  @UseInterceptors(FileFieldsInterceptor([{ name: 'stepFile', maxCount: 1 }]))
+  @UseInterceptors(FileFieldsInterceptor([{ name: 'stepFile', maxCount: 1 }], { limits: { fileSize: MAX_CAD_FILE_BYTES, files: 1 } }))
   async processStepFile(
     @UploadedFiles() files: { stepFile?: any[] },
     @Body() body: { bomId: string; projectId?: string },

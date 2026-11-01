@@ -17,6 +17,7 @@ import { NestFactory } from '@nestjs/core';
 import { VersioningType, type LogLevel } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
@@ -32,13 +33,16 @@ import { CorrelatedConsoleLogger } from './telemetry/correlated-console-logger';
 import { FileErrorConsoleLogger } from './common/logger/file-error-console-logger';
 import { startErrorLogCleanup } from './common/logger/error-log-file';
 import { httpMetricsMiddleware } from './telemetry/http-metrics.middleware';
+import { configureBodyParsers } from './common/http/body-limits';
 
 async function bootstrap() {
   startErrorLogCleanup();
   // Debug lines (one per privileged-client call, hundreds per page load) only with LOG_LEVEL=debug.
   const logLevels: LogLevel[] = process.env.LOG_LEVEL === 'debug' ? ['log', 'warn', 'error', 'debug'] : ['log', 'warn', 'error'];
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: true,
+    // Nest's own parsers are off: configureBodyParsers installs the only ones, with a small limit (common/http/body-limits.ts).
+    bodyParser: false,
     // Same levels either way; with telemetry on, each line also carries the active trace and span id.
     // Errors from every logger are also kept in the rotating error file (common/logger/error-log-file.ts).
     logger: telemetry ? new CorrelatedConsoleLogger({ logLevels }) : new FileErrorConsoleLogger({ logLevels }),
@@ -53,11 +57,9 @@ async function bootstrap() {
   // No global prefix - all controllers use explicit prefixes
   // AppController uses no prefix for root routes
   
-  // Set body parser limits
-  const express = require('express');
-  app.use(express.json({ limit: '50mb' }));
-  app.use(express.urlencoded({ limit: '50mb', extended: true }));
-  
+  // Bodies are parsed before any guard runs, so the limit is small for every route; a larger body gets 413 unread.
+  configureBodyParsers(app);
+
   app.enableVersioning({
     type: VersioningType.URI,
     defaultVersion: '1',

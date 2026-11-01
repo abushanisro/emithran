@@ -231,6 +231,15 @@ def cleanup_files(*file_paths):
         except Exception as e:
             logger.warning(f"Cleanup error for {file_path}: {str(e)}")
 
+
+def read_checked_upload(file: UploadFile, file_validator: FileValidator) -> tuple:
+    """The upload's allowed extension and content, refused with 400 before any temp file exists (wrong extension, too large).
+    The temp file is then named with the checked extension, never the client's own suffix."""
+    try:
+        return file_validator.read_upload(file.file, file.filename)
+    except FileValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 # ============================================================================
 # HEALTH & STATUS ENDPOINTS
 # ============================================================================
@@ -352,15 +361,14 @@ async def convert_step_to_stl(
     
     step_path = None
     stl_path = None
-    
+    file_ext, content = read_checked_upload(file, file_validator)
+
     try:
         # Create temporary file for uploaded content
-        file_ext = Path(file.filename).suffix.lower()
         with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext, dir=config.temp_dir, mode="wb") as temp_step:
             step_path = temp_step.name
-            
+
             # Write uploaded file to temp location
-            content = file.file.read()
             temp_step.write(content)  # type: ignore
             temp_step.flush()
         
@@ -459,13 +467,12 @@ async def convert_step_to_stl_base64(
     
     step_path = None
     stl_path = None
-    
+    file_ext, content = read_checked_upload(file, file_validator)
+
     try:
         # Create temporary file
-        file_ext = Path(file.filename).suffix.lower()
         with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext, dir=config.temp_dir, mode="wb") as temp_step:
             step_path = temp_step.name
-            content = file.file.read()
             temp_step.write(content)  # type: ignore
             temp_step.flush()
         
@@ -571,12 +578,11 @@ def analyze_geometry_advanced(
             logger.warning(f"Failed to parse user_processes JSON: {e}")
 
     step_path = None
+    file_ext, content = read_checked_upload(file, file_validator)
 
     try:
-        file_ext = Path(file.filename).suffix.lower()
         with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext, dir=config.temp_dir, mode="wb") as temp_step:
             step_path = temp_step.name
-            content = file.file.read()
             file_hash = hashlib.sha256(content).hexdigest()
             temp_step.write(content)
             temp_step.flush()
@@ -667,11 +673,11 @@ def measure_geometry(
 
     file_validator: FileValidator = request.app.state.file_validator
     step_path = None
+    file_ext, content = read_checked_upload(file, file_validator)
     try:
-        file_ext = Path(file.filename).suffix.lower()
         with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext, dir=config.temp_dir, mode="wb") as temp_step:
             step_path = temp_step.name
-            temp_step.write(file.file.read())
+            temp_step.write(content)
             temp_step.flush()
         try:
             file_validator.validate_file(step_path, file.filename)
@@ -708,9 +714,10 @@ def _stage_step_uploads(request: Request, files: List[UploadFile], paths: List[s
     for upload in files:
         if Path(upload.filename).suffix.lower() not in (".step", ".stp"):
             raise HTTPException(status_code=400, detail=f"{upload.filename}: only STEP files are supported (export as STEP AP242)")
+        _, content = read_checked_upload(upload, file_validator)
         with tempfile.NamedTemporaryFile(delete=False, suffix=".step", dir=config.temp_dir, mode="wb") as tmp:
             paths.append(tmp.name)
-            tmp.write(upload.file.read())
+            tmp.write(content)
         try:
             file_validator.validate_file(tmp.name, upload.filename)
         except FileValidationError as e:
@@ -887,13 +894,12 @@ async def optimize_memory_only(
     logger.info(f"Received memory optimization request: {file.filename}")
     
     step_path = None
-    
+    file_ext, content = read_checked_upload(file, file_validator)
+
     try:
         # Process file similar to analysis endpoint but focus on memory optimization
-        file_ext = Path(file.filename).suffix.lower()
         with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext, dir=config.temp_dir, mode="wb") as temp_step:
             step_path = temp_step.name
-            content = file.file.read()
             file_hash = hashlib.sha256(content).hexdigest()
             temp_step.write(content)
             temp_step.flush()

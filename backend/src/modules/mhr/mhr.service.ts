@@ -15,6 +15,7 @@ import { LHRService } from '../lhr/lhr.service';
 import { mapMhrRowToDto, storedNumber } from './mhr-row-mapping';
 import { pickRegionalReferenceRow, specsReferenceDetail } from './specs-reference-detail';
 import * as ExcelJS from 'exceljs';
+import { assertXlsxWithinLimits } from '../../common/archive/xlsx-limits';
 
 /**
  * MHR Service
@@ -1160,6 +1161,7 @@ export class MHRService {
     accessToken: string,
   ): Promise<{ imported: number; skipped: number; errors: string[] }> {
     this.logger.log(`Importing MHR records from Excel for user ${userId}`, 'MHRService');
+    assertXlsxWithinLimits(fileBuffer); // measured before ExcelJS inflates anything
 
     // Loaded once for the whole import — every row's USD→local conversion below
     // reads from this live DB-backed rate map, never a hardcoded FX table.

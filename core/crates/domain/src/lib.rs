@@ -116,6 +116,15 @@ pub fn part_totals(roots: &[Node]) -> HashMap<&str, u64> {
 
 /// Every way the report disagrees with itself. Empty means it can be trusted. (A wrong number is worse than a missing one:
 /// the worker writes `null` and a problem code for what it could not measure, and this refuses anything that is neither.)
+/// An OCAF entry id as the worker writes it: `^[0-9]+(:[0-9]+)*$`. The runner puts part ids into file names
+/// (`parts/<id>.step`) and storage keys, so anything else (a `/`, `..`, an empty segment) is refused here.
+pub fn is_entry_id(id: &str) -> bool {
+    !id.is_empty()
+        && id
+            .split(':')
+            .all(|segment| !segment.is_empty() && segment.bytes().all(|b| b.is_ascii_digit()))
+}
+
 pub fn verify(report: &Report) -> Vec<String> {
     let mut found = Vec::new();
     if report.schema_version != 1 {
@@ -129,6 +138,12 @@ pub fn verify(report: &Report) -> Vec<String> {
     }
 
     fn walk(node: &Node, depth: usize, found: &mut Vec<String>) {
+        if !is_entry_id(&node.definition) {
+            found.push(format!(
+                "{:?}: a definition id must be digits separated by ':'",
+                node.definition
+            ));
+        }
         if node.quantity == 0 {
             found.push(format!("{}: quantity is 0", node.definition));
         }
@@ -160,6 +175,12 @@ pub fn verify(report: &Report) -> Vec<String> {
 
     let mut ids = HashSet::new();
     for part in &report.parts {
+        if !is_entry_id(&part.id) {
+            found.push(format!(
+                "{:?}: a part id must be digits separated by ':'",
+                part.id
+            ));
+        }
         if !ids.insert(part.id.as_str()) {
             found.push(format!("{}: listed twice in parts", part.id));
         }
@@ -416,6 +437,33 @@ mod tests {
             verify(&report)
                 .iter()
                 .any(|f| f.contains("nested deeper than 64 levels"))
+        );
+    }
+
+    #[test]
+    fn an_id_that_could_become_a_path_is_refused() {
+        for bad in ["../../x", "0:1/../2", "", "0::1", ":1", "1:", "0:1:a", "1 "] {
+            assert!(!is_entry_id(bad), "{bad:?} must be refused");
+        }
+        for good in ["0", "0:1", "0:1:1:12"] {
+            assert!(is_entry_id(good), "{good:?} must be accepted");
+        }
+
+        let mut report = nested();
+        report.parts[0].id = "../../x".into();
+        let found = verify(&report);
+        assert!(
+            found.contains(&"\"../../x\": a part id must be digits separated by ':'".to_string())
+        );
+
+        let mut report = nested();
+        if let Some(root) = report.assembly.first_mut() {
+            root.definition = "../../x".into();
+        }
+        assert!(
+            verify(&report)
+                .iter()
+                .any(|f| f.starts_with("\"../../x\": a definition id"))
         );
     }
 
