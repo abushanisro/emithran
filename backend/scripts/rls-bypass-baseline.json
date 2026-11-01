@@ -1,10 +1,9 @@
 {
   "src/common/audit/audit.service.ts": 2,
-  "src/common/exchange-rate/exchange-rate.service.ts": 1,
+  "src/common/database/user-directory.ts": 3,
   "src/common/fx/fx-rate-cache.service.ts": 2,
   "src/common/guards/organization-context.guard.ts": 1,
   "src/common/session/session-activity.service.ts": 1,
-  "src/common/database/user-directory.ts": 3,
   "src/modules/auth/api-key-auth.service.ts": 1,
   "src/modules/auth/identity.service.ts": 1,
   "src/modules/bom-items/bom-items.controller.ts": 1,
@@ -38,9 +37,6 @@
   "src/modules/process-plan-generator/services/cycle-time-library.service.ts": 1,
   "src/modules/processes/processes.service.ts": 6,
   "src/modules/processes/services/process-cost.service.ts": 2,
-  "src/modules/quality-control/quality-control.service.ts": 6,
-  "src/modules/quality-control/services/quality-inspection.service.ts": 16,
   "src/modules/raw-materials/services/raw-material-editor.service.ts": 1,
-  "src/modules/rfq/rfq.service.ts": 1,
   "src/modules/should-cost/calibration.service.ts": 1
 }

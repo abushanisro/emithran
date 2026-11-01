@@ -11,7 +11,7 @@
 import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { Logger } from '../../../common/logger/logger.service';
 import { DatabaseService } from '../../../common/database/database.service';
-import { ExchangeRateService } from '../../../common/exchange-rate/exchange-rate.service';
+import { ExchangeRateService, organizationIdOf } from '../../../common/exchange-rate/exchange-rate.service';
 import { getCurrencyForLocation } from '../../mhr/constants/mhr-calculation.constants';
 import { PERSISTED_PROCESS_COST_COLUMNS, PersistedProcessCostRow, resolvePersistedProcessCost, sumPersistedProcessCost } from '../../bom-items/costing/shared/core/persisted-process-cost';
 import {
@@ -414,7 +414,8 @@ export class ProcessCostService {
     // conversion (previously: any non-USA location silently stored wrong-
     // magnitude numbers mislabeled 'USD'). No location on the DTO defaults to
     // 'USD' (a no-op conversion), matching this service's existing currency default.
-    const rates = await this.exchangeRateService.getSnapshot(accessToken);
+    // The new record's organization's budget rates (global defaults when it has none).
+    const rates = await this.exchangeRateService.getSnapshot(accessToken, organizationId ?? null);
     const { currency: createLocalCurrency } = getCurrencyForLocation(createDto.location ?? '');
     const toUsdCreate = (v: number | undefined): number | undefined => v != null ? rates.toUsd(v, createLocalCurrency) : v;
 
@@ -649,7 +650,7 @@ export class ProcessCostService {
     // here — but `existing.*` fallbacks are already USD (create() above and
     // the applyRoute/applyCustomRoute write path both store USD), so only the
     // newly-supplied value gets converted, never the already-USD fallback.
-    const rates = await this.exchangeRateService.getSnapshot(accessToken);
+    const rates = await this.exchangeRateService.getSnapshot(accessToken, organizationIdOf(existing));
     const { currency: updateLocalCurrency } = getCurrencyForLocation(updateDto.location ?? existing.location ?? '');
     const toUsdIfProvided = (v: number | undefined): number | undefined =>
       v !== undefined ? rates.toUsd(v, updateLocalCurrency) : undefined;

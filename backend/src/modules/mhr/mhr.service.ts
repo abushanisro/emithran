@@ -10,10 +10,12 @@ import { MHRInputValidator } from './validators/mhr-input.validator';
 import { getCurrencyForLocation, MHR_CALCULATION_CONSTANTS } from './constants/mhr-calculation.constants';
 import { invalidateMachinePools } from '../bom-items/costing/shared/capability/machine-selection/pool-cache';
 import { resolveMachineEconomics } from '../bom-items/costing/shared/capability/machine-selection/economics-resolver';
-import { ExchangeRateService, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
+import { ExchangeRateService, organizationIdOf, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
 import { LHRService } from '../lhr/lhr.service';
+import { mapMhrRowToDto, storedNumber } from './mhr-row-mapping';
 import { pickRegionalReferenceRow, specsReferenceDetail } from './specs-reference-detail';
 import * as ExcelJS from 'exceljs';
+import { assertXlsxWithinLimits } from '../../common/archive/xlsx-limits';
 
 /**
  * MHR Service
@@ -57,23 +59,27 @@ export class MHRService {
     row?: any,
   ): MHRCalculationResult {
     const { DEFAULTS } = MHR_CALCULATION_CONSTANTS;
-    const workingDays   = parseFloat(row?.working_days_per_year ?? 0)            || DEFAULTS.WORKING_DAYS_PER_YEAR;
-    const shiftsPerDay  = parseFloat(row?.shifts_per_day ?? 0)                   || DEFAULTS.SHIFTS_PER_DAY;
-    const hoursPerShift = parseFloat(row?.hours_per_shift ?? 0)                  || DEFAULTS.HOURS_PER_SHIFT;
-    const maintHrs      = parseFloat(row?.planned_maintenance_hours_per_year ?? 0) || 0;
-    const utilPct       = parseFloat(row?.capacity_utilization_rate ?? 0)        || DEFAULTS.CAPACITY_UTILIZATION_RATE;
     // Disclosed, not silent: effectiveHoursPerYear/totalAnnualCost below are
-    // DERIVED from these operational assumptions (the manually-entered rate
-    // itself is unaffected) — a caller that omits real shift/hours/utilization
-    // data gets a real warning in the logs, not a number that looks measured.
+    // DERIVED from these operational values (the manually-entered rate itself
+    // is unaffected). A stored value is used as stored, a real 0 included;
+    // only an absent one takes the single default from DEFAULTS, and each
+    // default used is listed on the result as assumedDefaults.
+    const fields = row ?? {};
     const usedDefaults: string[] = [];
-    if (!(parseFloat(row?.working_days_per_year ?? 0) > 0)) usedDefaults.push(`working days/yr=${DEFAULTS.WORKING_DAYS_PER_YEAR}`);
-    if (!(parseFloat(row?.shifts_per_day ?? 0) > 0)) usedDefaults.push(`shifts/day=${DEFAULTS.SHIFTS_PER_DAY}`);
-    if (!(parseFloat(row?.hours_per_shift ?? 0) > 0)) usedDefaults.push(`hours/shift=${DEFAULTS.HOURS_PER_SHIFT}`);
-    if (!(parseFloat(row?.capacity_utilization_rate ?? 0) > 0)) usedDefaults.push(`utilization=${DEFAULTS.CAPACITY_UTILIZATION_RATE}%`);
+    const orDefault = (snake: string, label: string, fallback: number): number => {
+      const v = storedNumber(fields, snake, snake);
+      if (v !== undefined) return v;
+      usedDefaults.push(`${label}=${fallback} (default)`);
+      return fallback;
+    };
+    const workingDays   = orDefault('working_days_per_year', 'workingDaysPerYear', DEFAULTS.WORKING_DAYS_PER_YEAR);
+    const shiftsPerDay  = orDefault('shifts_per_day', 'shiftsPerDay', DEFAULTS.SHIFTS_PER_DAY);
+    const hoursPerShift = orDefault('hours_per_shift', 'hoursPerShift', DEFAULTS.HOURS_PER_SHIFT);
+    const maintHrs      = storedNumber(fields, 'planned_maintenance_hours_per_year', 'planned_maintenance_hours_per_year') ?? 0;
+    const utilPct       = orDefault('capacity_utilization_rate', 'capacityUtilizationRate', DEFAULTS.CAPACITY_UTILIZATION_RATE);
     if (usedDefaults.length > 0) {
       this.logger.warn(
-        `Manual MHR entry: no real operational data for ${usedDefaults.join(', ')} — effectiveHoursPerYear/totalAnnualCost use assumed defaults, not measured values.`,
+        `Manual MHR entry: no stored value for ${usedDefaults.join(', ')} — effectiveHoursPerYear/totalAnnualCost use these defaults, not measured values.`,
         'MHRService',
       );
     }
@@ -120,6 +126,7 @@ export class MHRService {
       accessoriesCost:           0,
       installationCost:          0,
       totalCapitalInvestment:    0,
+      ...(usedDefaults.length > 0 ? { assumedDefaults: usedDefaults } : {}),
     };
   }
 
@@ -263,7 +270,7 @@ export class MHRService {
         throw new InternalServerErrorException('Unable to retrieve machines. Please try again later.');
       }
       for (const row of full) {
-        engineRate.set(row.id, this.calculateMHR(this.mapRowToDto(row), true).totalMachineHourRate);
+        engineRate.set(row.id, this.calculateFromRow(row).totalMachineHourRate);
       }
     }
     return data.map((row) => MHRPickerRowDto.fromDatabase(row, engineRate.get(row.id)));
@@ -328,7 +335,7 @@ export class MHRService {
         calculations = this.createManualEntryCalculation(Number(row.total_machine_hour_rate), row);
       } else {
         // Fallback: legacy record with no stored total — run engine once to populate it.
-        calculations = this.calculateMHR(this.mapRowToDto(row), true);
+        calculations = this.calculateFromRow(row);
       }
 
       return MHRResponseDto.fromDatabase({ ...row, calculations: JSON.stringify(calculations) });
@@ -383,7 +390,7 @@ export class MHRService {
       // Import/eMithran record: use stored total directly (same logic as findAll).
       calculations = this.createManualEntryCalculation(Number(data.total_machine_hour_rate), data);
     } else {
-      calculations = this.calculateMHR(this.mapRowToDto(data), true);
+      calculations = this.calculateFromRow(data);
     }
 
     return MHRResponseDto.fromDatabase({ ...data, calculations: JSON.stringify(calculations) });
@@ -654,7 +661,9 @@ export class MHRService {
       );
     }
 
-    const rates = await this.exchangeRateService.getSnapshot(accessToken);
+    // A new MHR record is written without an organization (mhr_records rows are
+    // user-owned until they carry one), so the global default rates apply.
+    const rates = await this.exchangeRateService.getSnapshot(accessToken, null);
 
     // Canonical MHR (2026-08-27 decision): Machine Hour Rate = Total Overhead
     // = Direct OH + Indirect OH, always. Direct/indirect are the sole
@@ -839,7 +848,7 @@ export class MHRService {
     const existing = await this.findOne(id, userId, accessToken);
 
     // Merge existing data with updates for calculation
-    const mergedData = { ...this.mapRowToDto(existing), ...updateMHRDto };
+    const mergedData = { ...mapMhrRowToDto(existing as unknown as Record<string, unknown>).dto, ...updateMHRDto };
     
     // Handle manual entry mode
     let calculations: MHRCalculationResult;
@@ -971,7 +980,8 @@ export class MHRService {
     const effectiveLocation = updateMHRDto.location ?? existing.location;
     const effectiveLhrInr   = updateMHRDto.lhrInrPerHr ?? (existing as any).lhrInrPerHr ?? null;
     const effectiveUsdLhr   = updateMHRDto.usdLhrTotal ?? (existing as any).usdLhrTotal ?? null;
-    const rates = await this.exchangeRateService.getSnapshot(accessToken);
+    // The record's own organization's budget rates (global defaults for a record without one).
+    const rates = await this.exchangeRateService.getSnapshot(accessToken, organizationIdOf(existing));
 
     // Canonical MHR (2026-08-27 decision): Machine Hour Rate = Total Overhead
     // = Direct OH + Indirect OH, always — mirrors create()'s override above.
@@ -1154,10 +1164,12 @@ export class MHRService {
     accessToken: string,
   ): Promise<{ imported: number; skipped: number; errors: string[] }> {
     this.logger.log(`Importing MHR records from Excel for user ${userId}`, 'MHRService');
+    assertXlsxWithinLimits(fileBuffer); // measured before ExcelJS inflates anything
 
     // Loaded once for the whole import — every row's USD→local conversion below
     // reads from this live DB-backed rate map, never a hardcoded FX table.
-    const importRates = await this.exchangeRateService.getSnapshot(accessToken);
+    // Imported rows are written without an organization, so the global default rates apply.
+    const importRates = await this.exchangeRateService.getSnapshot(accessToken, null);
     const missingRateCurrencies = new Set<string>();
     // Populated per-sheet below (shiftsCol etc. are scoped inside the sheet
     // loop) — aggregated here so one disclosure covers every sheet processed.
@@ -1697,7 +1709,7 @@ export class MHRService {
           record.total_variable_cost_per_hour = calcResult.totalVariableCostPerHour;
           record.total_annual_cost            = calcResult.totalAnnualCost;
         } else {
-          calcResult = this.calculateMHR(this.mapRowToDto(record), true);
+          calcResult = this.calculateFromRow(record);
           record.total_machine_hour_rate      = calcResult.totalMachineHourRate;
           record.total_fixed_cost_per_hour    = calcResult.totalFixedCostPerHour;
           record.total_variable_cost_per_hour = calcResult.totalVariableCostPerHour;
@@ -1844,36 +1856,20 @@ export class MHRService {
     }
   }
 
-  private mapRowToDto(row: any): CreateMHRDto {
-    return {
-      location: row.location,
-      commodityCode: row.commodityCode || row.commodity_code,
-      machineDescription: row.machineDescription || row.machine_description,
-      manufacturer: row.manufacturer,
-      model: row.model,
-      machineName: row.machineName || row.machine_name,
-      specification: row.specification,
-      shiftsPerDay: parseFloat(row.shiftsPerDay || row.shifts_per_day || 3),
-      hoursPerShift: parseFloat(row.hoursPerShift || row.hours_per_shift || 8),
-      workingDaysPerYear: parseFloat(row.workingDaysPerYear || row.working_days_per_year || 260),
-      plannedMaintenanceHoursPerYear: parseFloat(row.plannedMaintenanceHoursPerYear || row.planned_maintenance_hours_per_year || 0),
-      capacityUtilizationRate: parseFloat(row.capacityUtilizationRate || row.capacity_utilization_rate || 95),
-      landedMachineCost: parseFloat(row.landedMachineCost || row.landed_machine_cost || 0),
-      accessoriesCostPercentage: parseFloat(row.accessoriesCostPercentage || row.accessories_cost_percentage || MHR_CALCULATION_CONSTANTS.DEFAULTS.ACCESSORIES_COST_PERCENTAGE),
-      installationCostPercentage: parseFloat(row.installationCostPercentage || row.installation_cost_percentage || MHR_CALCULATION_CONSTANTS.DEFAULTS.INSTALLATION_COST_PERCENTAGE),
-      paybackPeriodYears: parseFloat(row.paybackPeriodYears || row.payback_period_years || MHR_CALCULATION_CONSTANTS.DEFAULTS.PAYBACK_PERIOD_YEARS),
-      interestRatePercentage: parseFloat(row.interestRatePercentage || row.interest_rate_percentage || MHR_CALCULATION_CONSTANTS.DEFAULTS.INTEREST_RATE),
-      insuranceRatePercentage: parseFloat(row.insuranceRatePercentage || row.insurance_rate_percentage || MHR_CALCULATION_CONSTANTS.DEFAULTS.INSURANCE_RATE),
-      machineFootprintSqm: parseFloat(row.machineFootprintSqm || row.machine_footprint_sqm || 0),
-      rentPerSqmPerMonth: parseFloat(row.rentPerSqmPerMonth || row.rent_per_sqm_per_month || 0),
-      maintenanceCostPercentage: parseFloat(row.maintenanceCostPercentage || row.maintenance_cost_percentage || MHR_CALCULATION_CONSTANTS.DEFAULTS.MAINTENANCE_COST_PERCENTAGE),
-      powerKwhPerHour: parseFloat(row.powerKwhPerHour || row.power_kwh_per_hour || 0),
-      electricityCostPerKwh: parseFloat(row.electricityCostPerKwh || row.electricity_cost_per_kwh || 0),
-      adminOverheadPercentage: parseFloat(row.adminOverheadPercentage || row.admin_overhead_percentage || 0),
-      profitMarginPercentage: parseFloat(row.profitMarginPercentage || row.profit_margin_percentage || 0),
-      isManualEntry: row.isManualEntry || row.is_manual_entry || false,
-      manualMHRValue: row.manualMHRValue || (row.manual_mhr_value ? parseFloat(row.manual_mhr_value) : 0),
-    };
+  /**
+   * Engine rate for a stored row. Any field the row lacks is filled from
+   * MHR_CALCULATION_CONSTANTS.DEFAULTS by mapMhrRowToDto and listed on the
+   * result as assumedDefaults, so the rate never looks measured when it is not.
+   */
+  private calculateFromRow(row: Record<string, any>): MHRCalculationResult {
+    const { dto, assumedDefaults } = mapMhrRowToDto(row);
+    const calculations = this.calculateMHR(dto, true);
+    if (assumedDefaults.length === 0) return calculations;
+    this.logger.warn(
+      `MHR record ${row.id ?? '(unsaved)'}: no stored value for ${assumedDefaults.join(', ')}; the rate uses these defaults.`,
+      'MHRService',
+    );
+    return { ...calculations, assumedDefaults };
   }
 
   /**

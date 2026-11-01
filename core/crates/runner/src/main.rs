@@ -4,6 +4,7 @@ use std::time::Duration;
 use archive::Limits;
 use runner::backend::{Backend, Platform};
 use runner::health;
+use runner::isolation;
 use runner::job::{self, Config};
 use runner::s3::{S3, S3Settings};
 use runner::worker::WorkerConfig;
@@ -92,6 +93,12 @@ async fn main() {
     if std::env::args().nth(1).as_deref() == Some("health") {
         let alive = health::is_fresh(&heartbeat_path(), health::MAX_AGE);
         std::process::exit(if alive { 0 } else { 1 });
+    }
+    // Before any credential is read or any worker started: a compromised worker (same UID) must not be able to read this
+    // process's environment (DB_JWT_SECRET, S3 keys) through /proc. Refuse to run without it.
+    if let Err(error) = isolation::make_non_dumpable() {
+        eprintln!("cad-runner cannot start: cannot mark the process non-dumpable: {error}");
+        std::process::exit(78);
     }
     let started = config()
         .and_then(|(config, poll)| backend_from_env().map(|backend| (config, poll, backend)));

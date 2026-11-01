@@ -244,17 +244,6 @@ export class ProcessTrackingController {
   // UTILITY ENDPOINTS
   // =====================================================
 
-  @Post('calculate-timeline')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Calculate optimal timeline based on dependencies' })
-  @ApiResponse({ status: 200, description: 'Timeline calculation completed successfully' })
-  async calculateTimeline(
-    @Body() calculationData: { lotId: string; constraints: any },
-    @AccessToken() token: string,
-  ) {
-    return this.processTrackingService.calculateOptimalTimeline(calculationData, token);
-  }
-
   @Delete(':timelineId')
   @ApiOperation({ summary: 'Delete complete timeline and all tracking data' })
   @ApiResponse({ status: 200, description: 'Timeline deleted successfully' })

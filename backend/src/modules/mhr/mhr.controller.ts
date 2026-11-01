@@ -14,6 +14,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { MAX_XLSX_UPLOAD_BYTES } from '../../common/archive/xlsx-limits';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { MHRService } from './mhr.service';
 import { CreateMHRDto, UpdateMHRDto, QueryMHRDto } from './dto/mhr.dto';
@@ -174,7 +175,7 @@ export class MHRController {
   }
 
   @Post('import-excel')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_XLSX_UPLOAD_BYTES, files: 1 } }))
   @ApiOperation({ summary: 'Import MHR records from Excel (.xlsx)' })
   @ApiResponse({ status: 201, description: 'MHR records imported successfully' })
   async importFromExcel(

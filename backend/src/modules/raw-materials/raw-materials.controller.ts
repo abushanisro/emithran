@@ -29,6 +29,7 @@ import { AccessToken } from '../../common/decorators/access-token.decorator';
 import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
 import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
 import * as ExcelJS from 'exceljs';
+import { assertXlsxWithinLimits } from '../../common/archive/xlsx-limits';
 
 @ApiTags('Raw Materials')
 @ApiBearerAuth()
@@ -150,13 +151,14 @@ export class RawMaterialsController {
   }
 
   @Put(':id/editor')
+  @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: 'Save the edit form (core fields, property values, stock prices) in one transaction' })
   async saveEditor(
     @Param('id') id: string,
     @Body() body: SaveRawMaterialEditorDto,
     @CurrentUser() user: User,
     @AccessToken() token: string,
-    @CurrentOrganization() organizationId: string | undefined,
+    @CurrentOrganization() organizationId: string,
   ) {
     return this.editorService.save(id, body, user.id, token, organizationId);
   }
@@ -235,6 +237,7 @@ export class RawMaterialsController {
 
     try {
       // Parse Excel file using ExcelJS
+      assertXlsxWithinLimits(file.buffer); // measured before ExcelJS inflates anything
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(file.buffer as any);
       

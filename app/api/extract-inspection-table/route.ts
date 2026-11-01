@@ -1,34 +1,65 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { requireUser } from '@/lib/server/auth';
+import { refuseCrossOrigin } from '@/lib/server/bff/origin';
+import { readFormDataBody } from '@/lib/server/read-body';
+
+// The PDF arrives as a binary multipart file (field "pdf"), not a JSON number array, and the whole body is capped.
+const MAX_PDF_BYTES = 25 * 1024 * 1024;
+const MAX_BODY_BYTES = MAX_PDF_BYTES + 1024 * 1024;
+const MAX_BALLOONS = 500;
+
+interface BalloonCoordinate { number: number; x: number; y: number }
+
+/** The optional "balloonCoordinates" field: a JSON array of {number, x, y}; null when absent, 'invalid' when malformed. */
+function parseBalloons(raw: FormDataEntryValue | null): BalloonCoordinate[] | null | 'invalid' {
+  if (raw === null || raw === '') return null;
+  if (typeof raw !== 'string') return 'invalid';
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); } catch { return 'invalid'; }
+  if (!Array.isArray(parsed) || parsed.length > MAX_BALLOONS) return 'invalid';
+  const balloons: BalloonCoordinate[] = [];
+  for (const b of parsed) {
+    const { number, x, y } = (b ?? {}) as Record<string, unknown>;
+    if (![number, x, y].every((v) => typeof v === 'number' && Number.isFinite(v))) return 'invalid';
+    balloons.push({ number: number as number, x: x as number, y: y as number });
+  }
+  return balloons.length > 0 ? balloons : null;
+}
 
 export async function POST(request: NextRequest) {
   // Parses an uploaded PDF on the server: signed-in users only.
+  const refused = refuseCrossOrigin(request);
+  if (refused) return refused;
   const auth = await requireUser();
   if (!auth.ok) return auth.response;
 
   try {
-    const body = await request.json();
-    const { pdfBuffer, fileName, balloonCoordinates } = body;
+    const form = await readFormDataBody(request, MAX_BODY_BYTES);
+    if (!form.ok) return form.response;
+    const pdf = form.value.get('pdf');
+    if (!(pdf instanceof Blob)) {
+      return NextResponse.json({ error: 'A PDF file is required in the "pdf" field' }, { status: 400 });
+    }
+    if (pdf.size > MAX_PDF_BYTES) {
+      return NextResponse.json({ error: 'PDF is too large' }, { status: 413 });
+    }
+    const rawFileName = form.value.get('fileName');
+    const fileName = (typeof rawFileName === 'string' && rawFileName ? rawFileName : 'drawing').slice(0, 255);
+    const balloonCoordinates = parseBalloons(form.value.get('balloonCoordinates'));
+    if (balloonCoordinates === 'invalid') {
+      return NextResponse.json({ error: `balloonCoordinates must be a JSON array of at most ${MAX_BALLOONS} {number, x, y}` }, { status: 400 });
+    }
+    const buffer = Buffer.from(await pdf.arrayBuffer());
 
     // If balloon coordinates are provided, extract dimensions at those exact locations
-    if (balloonCoordinates && Array.isArray(balloonCoordinates)) {
-      
-      const buffer = Buffer.from(pdfBuffer);
+    if (balloonCoordinates) {
       const dimensionData = await extractDimensionsAtCoordinates(buffer, balloonCoordinates, fileName);
       return NextResponse.json(dimensionData);
     }
 
     // Otherwise, extract text for potential manual selection (but don't auto-extract dimensions)
-    if (!pdfBuffer || !Array.isArray(pdfBuffer)) {
-      return NextResponse.json(
-        { error: 'Invalid PDF buffer provided' },
-        { status: 400 }
-      );
-    }
 
-    const buffer = Buffer.from(pdfBuffer);
-    
     if (buffer.length < 100) {
       return NextResponse.json(
         { error: 'PDF buffer too small, likely corrupted', size: buffer.length },
@@ -132,8 +163,7 @@ async function extractDimensionsAtCoordinates(buffer: Buffer, balloonCoordinates
   const inspectionRows = [];
   
   // Process each balloon coordinate
-  for (let i = 0; i < balloonCoordinates.length; i++) {
-    const balloon = balloonCoordinates[i];
+  for (const balloon of balloonCoordinates) {
     
     // Try multiple coordinate mapping approaches for better accuracy
     let dimensionText = '';

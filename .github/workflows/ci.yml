@@ -60,19 +60,21 @@ jobs:
         run: npm run build
         env:
           NODE_ENV: production
-          NEXT_PUBLIC_API_GATEWAY_URL: ${{ secrets.NEXT_PUBLIC_API_GATEWAY_URL }}
-          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+          # This build only proves the app compiles; it is never deployed. Production builds refuse to start without these URLs
+          # (no localhost fallback), so a missing secret gets a reserved, unresolvable placeholder here (.invalid, RFC 2606).
+          NEXT_PUBLIC_API_GATEWAY_URL: ${{ secrets.NEXT_PUBLIC_API_GATEWAY_URL || 'https://api.build-check.invalid' }}
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL || 'https://api.build-check.invalid/v1/api' }}
           NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL }}
           NEXT_PUBLIC_APP_VERSION: ${{ secrets.NEXT_PUBLIC_APP_VERSION }}
-          NEXT_PUBLIC_CAD_ENGINE_URL: ${{ secrets.NEXT_PUBLIC_CAD_ENGINE_URL }}
+          NEXT_PUBLIC_CAD_ENGINE_URL: ${{ secrets.NEXT_PUBLIC_CAD_ENGINE_URL || 'https://cad.build-check.invalid' }}
           NEXT_PUBLIC_DEBUG_MODE: ${{ secrets.NEXT_PUBLIC_DEBUG_MODE }}
           NEXT_PUBLIC_ENABLE_ANALYTICS: ${{ secrets.NEXT_PUBLIC_ENABLE_ANALYTICS }}
           NEXT_PUBLIC_ENABLE_DEVTOOLS: ${{ secrets.NEXT_PUBLIC_ENABLE_DEVTOOLS }}
           NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}
-          CAD_ENGINE_URL: ${{ secrets.CAD_ENGINE_URL }}
-          CAD_ENGINE_API_KEY: ${{ secrets.CAD_ENGINE_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          CAD_ENGINE_URL: ${{ secrets.CAD_ENGINE_URL || 'https://cad.build-check.invalid' }}
+          API_URL: ${{ secrets.API_URL || 'https://api.build-check.invalid/v1/api' }}
+          # No server API keys (Anthropic, Gemini, CAD engine): Next reads them at request time only, and this step runs every
+          # dependency's build script on pull requests. test/deploy/ci-workflow.test.ts keeps them out.
 
   backend:
     name: Backend (NestJS)

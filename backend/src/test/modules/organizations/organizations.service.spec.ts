@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import { OrganizationsService } from '../../../modules/organizations/organizations.service';
@@ -43,18 +43,20 @@ describe('OrganizationsService', () => {
 
   it('creates the organization owned by the caller, then the owner membership and the default workspace', async () => {
     db.reply('POST', '/organizations', [{ id: ORG, name: 'Acme', owner_id: USER }])
-      .reply('POST', '/organization_members', [])
+      .reply('POST', '/rpc/add_organization_owner_membership', null)
       .reply('POST', '/workspaces', []);
 
     expect(await service.create(USER, { name: 'Acme', country: 'IN' }, TOKEN)).toMatchObject({ id: ORG });
     expect(calls('POST', '/organizations')[0]?.body).toMatchObject({ name: 'Acme', country: 'IN', owner_id: USER });
-    expect(calls('POST', '/organization_members')[0]?.body).toEqual({ organization_id: ORG, user_id: USER, role: 'owner', status: 'active' });
+    // the owner membership goes through the checked function (migration 942), never a direct table write
+    expect(calls('POST', '/rpc/add_organization_owner_membership')[0]?.body).toEqual({ p_organization_id: ORG });
+    expect(calls('POST', '/organization_members')).toHaveLength(0);
     expect(calls('POST', '/workspaces')[0]?.body).toMatchObject({ organization_id: ORG, name: 'Default', is_default: true, created_by: USER });
   });
 
   it('fails instead of leaving an organization without its owner membership', async () => {
     db.reply('POST', '/organizations', [{ id: ORG, name: 'Acme', owner_id: USER }])
-      .reply('POST', '/organization_members', { message: 'duplicate key' }, 409);
+      .reply('POST', '/rpc/add_organization_owner_membership', { message: 'duplicate key', code: '23505' }, 409);
 
     await expect(service.create(USER, { name: 'Acme' }, TOKEN)).rejects.toThrow('duplicate key');
     expect(calls('POST', '/workspaces')).toHaveLength(0);
@@ -99,16 +101,19 @@ describe('OrganizationsService', () => {
     expect(calls('POST', '/rpc/directory_users')[0]?.body).toEqual({ p_ids: [USER, OTHER] });
   });
 
-  it('invites by normalised email, recording who invited', async () => {
-    db.reply('POST', '/organization_members', []);
-    await service.invite(ORG, USER, { email: '  New@Acme.COM ', role: 'admin' }, TOKEN);
-    expect(calls('POST', '/organization_members')[0]?.body).toEqual({
-      organization_id: ORG,
-      invited_email: 'new@acme.com',
-      role: 'admin',
-      status: 'invited',
-      invited_by: USER,
-    });
+  it('invites by normalised email through the checked function (the database records the caller as inviter)', async () => {
+    db.reply('POST', '/rpc/invite_organization_member', 'new-id');
+    await service.invite(ORG, { email: '  New@Acme.COM ', role: 'admin' }, TOKEN);
+    expect(calls('POST', '/rpc/invite_organization_member')[0]?.body).toEqual({ p_organization_id: ORG, p_email: 'new@acme.com', p_role: 'admin' });
+    expect(calls('POST', '/rpc/invite_organization_member')[0]?.auth).toBe(`Bearer ${TOKEN}`);
+  });
+
+  it('refuses an invite or removal by a caller who is not an owner or admin (403), and a member of another organization (404)', async () => {
+    db.reply('POST', '/rpc/invite_organization_member', { message: 'not an owner or admin', code: '42501' }, 403)
+      .reply('POST', '/rpc/remove_organization_member', { message: 'Member not found', code: 'P0002' }, 404);
+    await expect(service.invite(ORG, { email: 'x@acme.com', role: 'member' }, TOKEN)).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.removeMember(ORG, 'm9', TOKEN)).rejects.toBeInstanceOf(NotFoundException);
+    expect(calls('POST', '/rpc/remove_organization_member')[0]?.body).toEqual({ p_organization_id: ORG, p_member_id: 'm9' });
   });
 
   it('lists workspaces default first, then oldest first', async () => {

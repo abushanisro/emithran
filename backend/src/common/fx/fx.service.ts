@@ -65,6 +65,8 @@ export class FxService {
     quote: string;
     rateType: FxRateType;
     accessToken: string | null;
+    /** The organization whose budget rates apply (its own rate, else the global default). */
+    organizationId: string;
     customRate?: number;
     customReason?: string;
   }): Promise<FxRateResult> {
@@ -101,8 +103,8 @@ export class FxService {
       // does NOT do is silently substitute another rate type when a currency
       // has no budget row on file — it fails, and we check per-currency here
       // so the failure names the specific missing side rather than the pair.
-      const rates = await this.exchangeRateService.getSnapshot(params.accessToken);
-      const missing = [base, quote].filter((c) => c !== ANCHOR_CURRENCY && !this.exchangeRateService.hasRate(c));
+      const rates = await this.exchangeRateService.getSnapshot(params.accessToken, params.organizationId);
+      const missing = [base, quote].filter((c) => c !== ANCHOR_CURRENCY && !rates.has(c));
       if (missing.length > 0) {
         throw new UnprocessableEntityException(
           `Budget FX rate unavailable: no exchange_rates row for ${ANCHOR_CURRENCY} → ${missing.join(' and ')}. ` +

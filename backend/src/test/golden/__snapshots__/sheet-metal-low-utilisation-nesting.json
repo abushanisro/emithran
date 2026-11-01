@@ -70,6 +70,7 @@
   "batchSize": 100,
   "family": "sheet_metal",
   "warnings": [
+    "Yield: no process yield on file — 98% yield assumed (DEFAULT_YIELD_PCT) for the yield-loss cost",
     "No factory location set — rates cannot be location-adjusted; configure your digital factory location in Settings",
     "Material utilisation 48.5% (672 parts/sheet on 1500×3000mm, true-shape nest) -- below the 75% guideline. This can be normal for an irregular flat pattern and is already reflected in the material cost; panel nesting may improve yield if the geometry allows it.",
     "Press Brake: setup not costed — no calculator setup time, no real per-machine setup_time_hr for Test press_brake in HR Rates, and no sm_lookup_op_setup_time row."
@@ -88,19 +89,22 @@
         "process": "Laser Cutting",
         "machineClass": "fiber_laser",
         "energyKwh": 0.15,
-        "co2Kg": 0.107
+        "co2Kg": 0.107,
+        "energySource": "lookup"
       },
       {
         "process": "Press Brake",
         "machineClass": "press_brake",
         "energyKwh": 0.025,
-        "co2Kg": 0.018
+        "co2Kg": 0.018,
+        "energySource": "lookup"
       },
       {
         "process": "Deburring",
         "machineClass": "deburring",
         "energyKwh": 0.006,
-        "co2Kg": 0.004
+        "co2Kg": 0.004,
+        "energySource": "lookup"
       }
     ],
     "totalProcessEnergyKwh": 0.181,

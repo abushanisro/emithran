@@ -20,6 +20,13 @@ import {
  *   getBrakeSecPerBend() → seconds per bend
  *   getCncMrr()          → mm³/min  (DB stores cm³/min → ×1000 on load)
  */
+/** A CNC material removal rate and its provenance; `warning` is set for every source but 'db'. */
+export interface CncMrr {
+  mrrMm3PerMin: number;
+  source: 'db' | 'db_carbon_steel_substitute' | 'fallback_hardcoded';
+  warning?: string;
+}
+
 @Injectable()
 export class CycleTimeLibraryService implements OnModuleInit {
   private readonly logger = new Logger(CycleTimeLibraryService.name);
@@ -189,26 +196,37 @@ export class CycleTimeLibraryService implements OnModuleInit {
   }
 
   /**
-   * Material removal rate in mm³/min for CNC milling or turning.
-   * Returns null when neither DB nor default-rates can resolve the combination —
-   * caller should then skip physics and let the resolver use its geometry heuristic.
+   * Material removal rate in mm³/min for CNC milling or turning, with where it
+   * came from. Anything but the material's own process_cycle_time_library row
+   * (a carbon-steel row standing in, or the hard-coded baseline) carries a
+   * warning, so a time built on it is never presented as measured.
    */
-  getCncMrr(operation: 'mill' | 'turn', materialFamily: string | null | undefined): number | null {
+  getCncMrr(operation: 'mill' | 'turn', materialFamily: string | null | undefined): CncMrr {
+    const mat = this.toCncTag(materialFamily);
     if (this.loaded) {
-      const mat = this.toCncTag(materialFamily);
       const hit = this.mrrValues.get(`${operation}:${mat}`);
-      if (hit) return hit;
-      // Fall back to carbon_steel if specific material absent
+      if (hit) return { mrrMm3PerMin: hit, source: 'db' };
       const cs = this.mrrValues.get(`${operation}:carbon_steel`);
-      if (cs) return cs;
+      if (cs) {
+        return {
+          mrrMm3PerMin: cs,
+          source: 'db_carbon_steel_substitute',
+          warning: `CNC ${operation} MRR: no process_cycle_time_library row for ${mat}; the carbon-steel rate ${cs} mm³/min was used instead.`,
+        };
+      }
     }
-    // Fallback: hardcoded baseline (same as planner was using before)
-    const defaults: Record<string, Record<string, number>> = {
+    // Hard-coded baseline (same values the planner used before the library existed).
+    const defaults: Record<'mill' | 'turn', Record<string, number>> = {
       mill: { aluminum: 50_000, stainless: 5_000, carbon_steel: 12_000, unknown: 8_000 },
       turn: { aluminum: 70_000, stainless: 7_000, carbon_steel: 18_000, unknown: 12_000 },
     };
-    const mat = this.toCncTag(materialFamily);
-    return defaults[operation]?.[mat] ?? defaults[operation]?.['unknown'] ?? null;
+    const key = defaults[operation][mat] != null ? mat : 'unknown';
+    const mrr = defaults[operation][key]!;
+    return {
+      mrrMm3PerMin: mrr,
+      source: 'fallback_hardcoded',
+      warning: `CNC ${operation} MRR: no process_cycle_time_library data${this.loaded ? '' : ' loaded'}; hard-coded baseline ${mrr} mm³/min (${key}) ASSUMED — seed the library for a real rate.`,
+    };
   }
 
   // ── Internal tag helpers ──────────────────────────────────────────────────

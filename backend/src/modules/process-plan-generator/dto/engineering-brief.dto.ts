@@ -70,11 +70,26 @@ export interface BriefDfm {
   cadDetectedFamily?: string;
 }
 
+/**
+ * The process-plan generator's single working currency: retrieval converts
+ * every candidate rate into it (queryMhr/queryLhr/queryRawMaterials), so the
+ * draft's amounts and the rows persisted from it are in this currency.
+ */
+export const PLAN_WORKING_CURRENCY = 'INR' as const;
+
 interface BriefContext {
-  organizationLocation: string;
+  /** Digital Factory location the plan is for; null when neither the item nor its organization names one (see warnings). */
+  organizationLocation: string | null;
+  /** Where organizationLocation came from. */
+  locationSource?: 'scenario_override' | 'organization' | 'unknown';
+  // The generator's working currency: every candidate rate is converted INTO
+  // INR during retrieval (queryMhr/queryLhr/queryRawMaterials), so persisted
+  // amounts are INR and are labelled INR — a label, not an assumed location.
   currency: 'INR';
   language: 'en';
   exchangeRateSnapshot?: Record<string, number>; // e.g. { USD: 83.5, EUR: 89.0 }
+  /** Assumptions made while assembling the brief (unknown location, assumed density, ...). */
+  warnings?: string[];
 }
 
 import type { DrawingBrief } from './drawing-brief.dto';

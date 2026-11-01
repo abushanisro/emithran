@@ -1331,7 +1331,7 @@ export class BOMItemsController {
   @ApiConsumes('multipart/form-data')
   @ApiResponse({ status: 201, description: 'Assembly BOM item created' })
   @ApiResponse({ status: 400, description: 'Invalid file or CAD engine error' })
-  @UseInterceptors(FileFieldsInterceptor([{ name: 'stepFile', maxCount: 1 }]))
+  @UseInterceptors(FileFieldsInterceptor([{ name: 'stepFile', maxCount: 1 }], { limits: { fileSize: MAX_CAD_FILE_BYTES, files: 1 } }))
   async processStepFile(
     @UploadedFiles() files: { stepFile?: any[] },
     @Body() body: { bomId: string; projectId?: string },
@@ -1544,6 +1544,7 @@ export class BOMItemsController {
       location: inputs.location ?? location,
       batchSize: inputs.batchSize,
       accessToken: token,
+      organizationId: await this.bomItemsService.organizationOfItem(id, token),
     });
   }
 
@@ -1878,7 +1879,7 @@ export class BOMItemsController {
     const batchSize = comparison.resolvedInputs.batchSize;
     // Own snapshot for resolveRealMachineRate below — getRouteComparison already
     // took its own internally; both read the same short-TTL cache in practice.
-    const rates = await this.exchangeRateService.getSnapshot(token);
+    const rates = await this.exchangeRateService.getSnapshot(token, await this.bomItemsService.organizationOfItem(id, token));
     const baseRoute = comparison.routes.find((r) => r.routeId === dto.baseCuttingRouteId);
     if (!baseRoute) {
       throw new NotFoundException(

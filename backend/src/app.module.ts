@@ -4,6 +4,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { HttpModule } from '@nestjs/axios';
 import { APP_GUARD } from '@nestjs/core';
 import { ClientIpThrottlerGuard } from './common/guards/client-ip-throttler.guard';
+import { throttlerOptions } from './common/throttling/throttlers';
 
 import { ProjectsModule } from './modules/projects/projects.module'; 862 
 import { VendorsModule } from './modules/vendors/vendors.module';
@@ -26,7 +27,6 @@ import { SupplierEvaluationModule } from './modules/supplier-evaluation/supplier
 import { SupplierEvaluationGroupsModule } from './modules/supplier-evaluation-groups/supplier-evaluation-groups.module';
 import { RfqModule } from './modules/rfq/rfq.module';
 import { SupplierNominationsModule } from './modules/supplier-nominations/supplier-nominations.module';
-import { VendorQuotesModule } from './modules/vendor-quotes/vendor-quotes.module';
 import { ProductionPlanningModule } from './modules/production-planning/production-planning.module';
 import { ProcessPlanningModule } from './modules/process-planning/process-planning.module';
 import { QualityControlModule } from './modules/quality-control/quality-control.module';
@@ -67,14 +67,7 @@ import { AppController } from './app.controller';
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        throttlers: [
-          {
-            ttl: config.get('THROTTLE_TTL', 60000),
-            limit: config.get('THROTTLE_LIMIT', 100),
-          },
-        ],
-      }),
+      useFactory: (config: ConfigService) => throttlerOptions((name, fallback) => config.get<number>(name, fallback)),
     }),
 
     HttpModule.register({
@@ -104,7 +97,6 @@ import { AppController } from './app.controller';
     SupplierEvaluationGroupsModule,
     RfqModule,
     SupplierNominationsModule,
-    VendorQuotesModule,
     ProductionPlanningModule,
     ProcessPlanningModule,
     QualityControlModule,

@@ -86,6 +86,11 @@ class EnvironmentVariables {
   @IsOptional()
   THROTTLE_LIMIT: number = 100;
 
+  /** Calls per minute one caller may make, across every endpoint that spends the AI key (common/throttling/throttlers.ts). */
+  @IsNumber()
+  @IsOptional()
+  AI_LIMIT_PER_MINUTE: number = 20;
+
   @IsString()
   @IsOptional()
   @IsIn(['error', 'warn', 'info', 'debug', 'verbose'])

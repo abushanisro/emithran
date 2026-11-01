@@ -551,6 +551,22 @@ export class SupplierNominationsController {
     return this.supplierNominationsService.updateCostAnalysis(userId, nominationId, updateDto, token);
   }
 
+  // Declared before ':id/cost-analysis/:component', which would otherwise take 'batch' as a component name.
+  @Put(':id/cost-analysis/batch')
+  @ApiOperation({ summary: 'Batch update cost competency analysis data in one transaction' })
+  @ApiResponse({
+    status: 200,
+    description: 'Cost analysis data updated successfully in batch'
+  })
+  batchUpdateCostAnalysis(
+    @CurrentUser('id') userId: string,
+    @AccessToken() token: string,
+    @Param('id') nominationId: string,
+    @Body() updateDto: BulkUpdateCostDataDto
+  ): Promise<CostCompetencyAnalysisDto[]> {
+    return this.supplierNominationsService.batchUpdateCostAnalysis(userId, nominationId, updateDto, token);
+  }
+
   @Put(':id/cost-analysis/:component')
   @ApiOperation({ summary: 'Update specific cost component' })
   @ApiResponse({
@@ -582,21 +598,6 @@ export class SupplierNominationsController {
     @Body() updateDto: { numericValue?: number; textValue?: string }
   ): Promise<void> {
     return this.supplierNominationsService.updateVendorCostValue(userId, nominationId, costComponent, vendorId, updateDto, token);
-  }
-
-  @Put(':id/cost-analysis/batch')
-  @ApiOperation({ summary: 'Batch update cost competency analysis data - ENTERPRISE BEST PRACTICE' })
-  @ApiResponse({
-    status: 200,
-    description: 'Cost analysis data updated successfully in batch'
-  })
-  batchUpdateCostAnalysis(
-    @CurrentUser('id') userId: string,
-    @AccessToken() token: string,
-    @Param('id') nominationId: string,
-    @Body() updateDto: BulkUpdateCostDataDto
-  ): Promise<CostCompetencyAnalysisDto[]> {
-    return this.supplierNominationsService.batchUpdateCostAnalysis(userId, nominationId, updateDto, token);
   }
 
   // Capability Scoring Endpoints

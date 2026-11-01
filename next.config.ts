@@ -1,5 +1,7 @@
 import type { NextConfig } from 'next'
 
+import { PROXY_CLIENT_MAX_BODY_BYTES } from './lib/server/body-limits'
+
 
 const nextConfig: NextConfig = {
   // Enable strict mode for better development experience
@@ -31,6 +33,10 @@ const nextConfig: NextConfig = {
 
   // Experimental features for better performance
   experimental: {
+    // Next.js buffers a copy of every body that passes through proxy.ts and truncates it, silently, at this size; it has no
+    // "refuse" mode. The limit is therefore set above every route's own limit (lib/server/body-limits.ts): a body a route would
+    // accept is never truncated, and a larger one is refused with 413 by the route or the BFF (lib/server/read-body.ts).
+    proxyClientMaxBodySize: PROXY_CLIENT_MAX_BODY_BYTES,
     // Enable optimizePackageImports for better bundle size
     optimizePackageImports: [
       'lucide-react',

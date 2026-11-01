@@ -18,7 +18,7 @@ const MAX_DECISIONS = 5_000;
 
 /**
  * Turns an Auth0 access token into the internal user: verify locally, map `sub` to our uuid (linking by VERIFIED email only),
- * confirm the person is still authorised (invite-only), mint the database token. Unknown or unauthorised people get 403, a bad
+ * confirm the person is still authorised (invite-only) and read their account email, mint the database token. Unknown or unauthorised people get 403, a bad
  * token 401, an unreachable key set 503.
  */
 @Injectable()
@@ -72,9 +72,12 @@ export class IdentityService {
     const userId = linked.data as string | null;
     if (!userId) throw new ForbiddenException('This account has not been invited to eMithran');
 
-    const allowed = await admin.rpc('identity_is_authorized', { p_user_id: userId });
-    if (allowed.error) throw new ServiceUnavailableException('Sign-in is temporarily unavailable');
-    if (allowed.data !== true) throw new ForbiddenException('This account has not been invited to eMithran');
-    return { userId, email: login.email ?? '' };
+    // The allow-list check and the account's own email in one step (migration 938): the email bound into the request and the
+    // database token is auth.users.email, never the token's claim, which an upstream change could make differ for a known sub.
+    const account = await admin.rpc('identity_user_email', { p_user_id: userId });
+    if (account.error) throw new ServiceUnavailableException('Sign-in is temporarily unavailable');
+    const email = account.data;
+    if (typeof email !== 'string' || email === '') throw new ForbiddenException('This account has not been invited to eMithran');
+    return { userId, email };
   }
 }

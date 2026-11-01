@@ -11,6 +11,7 @@
 )]
 pub mod backend;
 pub mod health;
+pub mod isolation;
 pub mod job;
 pub mod names;
 pub mod s3;

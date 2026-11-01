@@ -190,6 +190,10 @@ export default function VendorDetailPage() {
     );
   }
 
+  // Document links are rendered only as http(s) URLs (normalizeWebsiteUrl), never as javascript: or relative links.
+  const companyProfileHref = normalizeWebsiteUrl(vendor.companyProfileUrl);
+  const machineListHref = normalizeWebsiteUrl(vendor.machineListUrl);
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -584,27 +588,27 @@ export default function VendorDetailPage() {
                 <CardTitle>Documents</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {vendor.companyProfileUrl && (
+                {companyProfileHref && (
                   <div>
                     <Label className="text-sm font-medium text-muted-foreground">Company Profile</Label>
                     <p className="mt-1">
-                      <a href={vendor.companyProfileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                      <a href={companyProfileHref} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                         View Company Profile
                       </a>
                     </p>
                   </div>
                 )}
-                {vendor.machineListUrl && (
+                {machineListHref && (
                   <div>
                     <Label className="text-sm font-medium text-muted-foreground">Machine List</Label>
                     <p className="mt-1">
-                      <a href={vendor.machineListUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                      <a href={machineListHref} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                         View Machine List
                       </a>
                     </p>
                   </div>
                 )}
-                {!vendor.companyProfileUrl && !vendor.machineListUrl && (
+                {!companyProfileHref && !machineListHref && (
                   <p className="text-sm text-muted-foreground">No documents available</p>
                 )}
               </CardContent>

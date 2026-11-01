@@ -12,10 +12,13 @@ import {
   ParseUUIDPipe,
   Logger,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { RequestAuthGuard } from '@/common/guards/request-auth.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
+import { CurrentOrganization } from '@/common/decorators/current-organization.decorator';
+import { OrganizationContextGuard } from '@/common/guards/organization-context.guard';
 import { createResponse, ApiResponse as CustomApiResponse } from '@/common/dto/api-response.dto';
 import { QualityControlService } from './quality-control.service';
 import { QualityInspectionService } from './services/quality-inspection.service';
@@ -42,30 +45,37 @@ export class QualityControlController {
     private readonly qualityInspectionService: QualityInspectionService,
   ) {}
 
-  private getUserId(user: any): string {
-    return user?.id || '';
+  // RequestAuthGuard puts the user on every request; a request without one is refused, never served as an anonymous user.
+  private getUserId(user: User | undefined): string {
+    if (!user?.id) throw new UnauthorizedException('Authentication required');
+    return user.id;
   }
 
-  private getUserEmail(user: any): string {
-    return user?.email || user?.id || '';
+  private getUserEmail(user: User | undefined): string {
+    return user?.email || this.getUserId(user);
   }
 
   // ============================================================================
   // QUALITY INSPECTIONS ENDPOINTS
   // ============================================================================
 
+  // A new inspection belongs to the request's organization; every other write acts on an existing row, whose organization
+  // row-level security (migration 936) already fixes.
   @Post('inspections')
+  @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: 'Create new quality inspection' })
   @ApiResponse({ status: 201, description: 'Inspection created successfully' })
   async createInspection(
     @Body() createDto: CreateQualityInspectionDto,
     @CurrentUser() user: User,
+    @CurrentOrganization() organizationId: string,
   ): Promise<CustomApiResponse<QualityInspectionResponseDto>> {
     try {
-      this.logger.log(`Creating quality inspection: ${createDto.name}`);
+      this.logger.log(`Creating quality inspection for project ${createDto.projectId}`);
       const result = await this.qualityInspectionService.createInspection(
         createDto,
         this.getUserId(user),
+        organizationId,
       );
       return createResponse(result);
     } catch (error) {

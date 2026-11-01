@@ -19,7 +19,6 @@ import { qualityControlGroup } from './specs/quality-control';
 import { rfqGroup } from './specs/rfq';
 import { supplierEvaluationGroup } from './specs/supplier-evaluation';
 import { supplierNominationsGroup } from './specs/supplier-nominations';
-import { vendorQuotesGroup } from './specs/vendor-quotes';
 import { vaveGroup } from './specs/vave';
 import { benchmarksGroup } from './specs/benchmarks';
 
@@ -61,7 +60,6 @@ export const API_SPEC: ApiSpec = {
     rfqGroup,
     supplierEvaluationGroup,
     supplierNominationsGroup,
-    vendorQuotesGroup,
     vaveGroup,
     benchmarksGroup,
   ],

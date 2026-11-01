@@ -1,6 +1,8 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { IsString, IsOptional, IsEmail, IsEnum, IsArray, IsNumber, IsBoolean, IsUUID } from 'class-validator';
+import { IsString, IsOptional, IsEmail, IsEnum, IsArray, IsNumber, IsBoolean, IsUUID, IsUrl, MaxLength, ValidateIf } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
+
+const DOCUMENT_URL_OPTIONS = { protocols: ['http', 'https'], require_protocol: true };
 
 enum VendorStatus {
   ACTIVE = 'active',
@@ -183,15 +185,17 @@ export class CreateVendorDto {
   @IsString()
   country?: string;
 
-  // Documents
+  // Documents: rendered as links, so only http(s) URLs (never javascript: or data:); an empty string clears the value.
   @ApiPropertyOptional({ example: 'https://...' })
-  @IsOptional()
-  @IsString()
+  @ValidateIf((_dto, value) => value !== '' && value != null)
+  @IsUrl(DOCUMENT_URL_OPTIONS)
+  @MaxLength(2048)
   companyProfileUrl?: string;
 
   @ApiPropertyOptional({ example: 'https://...' })
-  @IsOptional()
-  @IsString()
+  @ValidateIf((_dto, value) => value !== '' && value != null)
+  @IsUrl(DOCUMENT_URL_OPTIONS)
+  @MaxLength(2048)
   machineListUrl?: string;
 
   // Status

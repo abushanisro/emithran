@@ -103,19 +103,27 @@ export class SupplierNominationsService {
         // Continue without criteria initialization
       }
 
-      // Create BOM parts if provided
-      if (createDto.bomParts && createDto.bomParts.length > 0) {
-        try {
+      // BOM parts and vendor evaluations are part of the nomination: if either fails, remove the half-created nomination
+      // (its child rows cascade) and report the failure instead of returning a nomination without them.
+      try {
+        if (createDto.bomParts && createDto.bomParts.length > 0) {
           await this.createBomParts(nomination.id, createDto.bomParts, accessToken);
-        } catch (bomError) {
-          this.logger.warn(`Failed to create BOM parts: ${bomError.message}`);
-          // Continue without BOM parts for now
         }
-      }
-
-      // Create vendor evaluations if vendor IDs provided
-      if (createDto.vendorIds && createDto.vendorIds.length > 0) {
-        await this.createVendorEvaluations(nomination.id, createDto.vendorIds, accessToken);
+        if (createDto.vendorIds && createDto.vendorIds.length > 0) {
+          await this.createVendorEvaluations(nomination.id, createDto.vendorIds, accessToken);
+        }
+      } catch (childError) {
+        const { error: rollbackError } = await client
+          .from('supplier_nomination_evaluations')
+          .delete()
+          .eq('id', nomination.id);
+        if (rollbackError) {
+          this.logger.error(`Failed to roll back nomination ${nomination.id}: ${rollbackError.message}`);
+          throw new InternalServerErrorException(
+            `Failed to create nomination: ${childError.message}; the partly created nomination ${nomination.id} could not be removed`
+          );
+        }
+        throw childError;
       }
 
       // Return the created nomination with basic data
@@ -198,60 +206,18 @@ export class SupplierNominationsService {
     const client = this.databaseService.getClient(accessToken);
 
     try {
-      // Debug logging removed for production security
-
-      // TEMPORARY: Get nomination without user check to debug
       const { data: basicNomination, error: basicError } = await client
         .from('supplier_nomination_evaluations')
         .select('*')
         .eq('id', nominationId)
-        .single();
+        .eq('user_id', userId)
+        .maybeSingle();
 
       if (basicError) {
-        // Check what nominations actually exist in the table
-        const { data: allNominations } = await client
-          .from('supplier_nomination_evaluations')
-          .select('id, nomination_name, user_id, status')
-          .limit(10);
-
-
-        // Return a fake response with debug info for now
-        return {
-          id: nominationId,
-          nominationName: 'Nomination not found',
-          description: `Error: ${basicError.message}. Available nominations: ${JSON.stringify(allNominations)}`,
-          nominationType: 'manufacturer',
-          projectId: 'debug',
-          status: 'draft',
-          criteria: [],
-          vendorEvaluations: [],
-          bomParts: [],
-          createdAt: new Date(),
-          updatedAt: new Date()
-        } as any;
+        throw new InternalServerErrorException(`Failed to fetch nomination: ${basicError.message}`);
       }
-
       if (!basicNomination) {
-        // Check what nominations actually exist in the table
-        const { data: allNominations } = await client
-          .from('supplier_nomination_evaluations')
-          .select('id, nomination_name, user_id, status')
-          .limit(10);
-
-        // Return a fake response with debug info for now
-        return {
-          id: nominationId,
-          nominationName: 'No data returned',
-          description: `Available nominations: ${JSON.stringify(allNominations)}`,
-          nominationType: 'manufacturer',
-          projectId: 'debug',
-          status: 'draft',
-          criteria: [],
-          vendorEvaluations: [],
-          bomParts: [],
-          createdAt: new Date(),
-          updatedAt: new Date()
-        } as any;
+        throw new NotFoundException('Supplier nomination not found');
       }
 
       // Use the basic nomination data and fetch related data separately
@@ -1104,13 +1070,13 @@ export class SupplierNominationsService {
         throw new BadRequestException(`Failed to get factor weights: ${error.message}`);
       }
 
-      // data is now a JSON object returned directly from the function
-      const weights = data || { costFactor: 33.33, developmentCostFactor: 33.33, leadTimeFactor: 33.34 };
+      // data is now a JSON object returned directly from the function. `??`, not `||`: a weight of 0 is a real setting.
+      const weights = data ?? { costFactor: 33.33, developmentCostFactor: 33.33, leadTimeFactor: 33.34 };
 
       return {
-        costFactor: parseFloat(weights.costFactor || weights.cost_factor || 33.33),
-        developmentCostFactor: parseFloat(weights.developmentCostFactor || weights.development_cost_factor || 33.33),
-        leadTimeFactor: parseFloat(weights.leadTimeFactor || weights.lead_time_factor || 33.34)
+        costFactor: parseFloat(weights.costFactor ?? weights.cost_factor ?? 33.33),
+        developmentCostFactor: parseFloat(weights.developmentCostFactor ?? weights.development_cost_factor ?? 33.33),
+        leadTimeFactor: parseFloat(weights.leadTimeFactor ?? weights.lead_time_factor ?? 33.34)
       };
     } catch (error) {
       this.logger.error('Failed to get factor weights:', error);
@@ -1482,46 +1448,14 @@ export class SupplierNominationsService {
     try {
       await this.verifyNominationOwnership(userId, nominationId, accessToken);
 
-      // Update each cost component
-      for (const component of updateDto.components) {
-        // Update base values
-        const { error: updateError } = await client
-          .from('cost_competency_analysis')
-          .update({
-            base_value: component.baseValue,
-            base_payment_term: component.basePaymentTerm,
-            updated_at: new Date().toISOString()
-          })
-          .eq('nomination_evaluation_id', nominationId)
-          .eq('cost_component', component.costComponent);
+      // One database call, one transaction: every row is updated or none is (migration 936).
+      const { error } = await client.rpc('update_cost_competency_analysis', {
+        p_nomination_evaluation_id: nominationId,
+        p_components: updateDto.components,
+      });
 
-        if (updateError) {
-          throw new BadRequestException(`Failed to update component ${component.costComponent}: ${updateError.message}`);
-        }
-
-        // Update vendor values
-        for (const vendorValue of component.vendorValues) {
-          const { error: vendorError } = await client
-            .from('cost_competency_vendor_values')
-            .update({
-              numeric_value: vendorValue.numericValue,
-              text_value: vendorValue.textValue,
-              updated_at: new Date().toISOString()
-            })
-            .eq('cost_analysis_id', (
-              await client
-                .from('cost_competency_analysis')
-                .select('id')
-                .eq('nomination_evaluation_id', nominationId)
-                .eq('cost_component', component.costComponent)
-                .single()
-            ).data?.id)
-            .eq('vendor_id', vendorValue.vendorId);
-
-          if (vendorError) {
-            this.logger.warn(`Failed to update vendor value: ${vendorError.message}`);
-          }
-        }
+      if (error) {
+        throw new BadRequestException(`Failed to update cost analysis: ${error.message}`);
       }
 
       // Return updated data
@@ -1538,10 +1472,7 @@ export class SupplierNominationsService {
     updateDto: BulkUpdateCostDataDto,
     accessToken: string
   ): Promise<CostCompetencyAnalysisDto[]> {
-    // For now, use the same implementation as regular updateCostAnalysis
-    // In the future, this can be optimized with database transactions
-    this.logger.log(`Batch updating cost analysis for nomination ${nominationId} - ENTERPRISE BEST PRACTICE`);
-
+    // The same atomic update as updateCostAnalysis: the whole batch is applied in one transaction or not at all.
     return this.updateCostAnalysis(userId, nominationId, updateDto, accessToken);
   }
 

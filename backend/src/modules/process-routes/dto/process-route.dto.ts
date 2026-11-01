@@ -10,8 +10,12 @@ import {
   Min,
   Max,
   IsArray,
+  ArrayMaxSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+
+/** Most step ids one reorder request may carry (bounds the update loop). */
+export const MAX_ROUTE_STEPS_PER_REORDER = 500;
 import { IsOptionalBoolean } from '../../../common/decorators/validation.decorators';
 
 export enum WorkflowState {
@@ -263,6 +267,7 @@ export class ReorderProcessRouteStepsDto {
     description: 'Array of step IDs in the desired order',
   })
   @IsArray()
+  @ArrayMaxSize(MAX_ROUTE_STEPS_PER_REORDER)
   @IsUUID(4, { each: true })
   stepIds: string[];
 }

@@ -125,12 +125,17 @@ function resolveRegionalUnitCostUsd(
   else if (cl.includes('w. europe') || cl.includes('western europe')) { localAmount = material.costWEurope ?? 0; localCurrency = 'EUR'; }
   else if (cl.includes('e. europe') || cl.includes('eastern europe')) { localAmount = material.costEEurope ?? 0; localCurrency = 'EUR'; }
   else if (cl.includes('china')) { localAmount = material.costChina ?? 0; localCurrency = 'CNY'; }
-  else { localAmount = (material as any).unitCost || (material as any).cost || (material as any).costPerUnit || (material as any).price || 0; localCurrency = (material as any).currency || 'USD'; }
-
-  if (!localAmount) {
-    if (material.costIndia) { localAmount = material.costIndia; localCurrency = 'INR'; }
-    else { localAmount = (material as any).unitCost || (material as any).cost || 0; localCurrency = (material as any).currency || 'USD'; }
+  else {
+    // A price with no recorded currency cannot be converted; assuming USD
+    // would misprice it, so it counts as no price on file.
+    const currency = (material as any).currency;
+    if (!currency) return 0;
+    localAmount = (material as any).unitCost ?? (material as any).cost ?? (material as any).costPerUnit ?? (material as any).price ?? 0;
+    localCurrency = currency;
   }
+
+  // No price for the selected country is "not available" (0, which callers
+  // treat as no price on file) — never another country's price, such as India's.
   if (!localAmount) return 0;
 
   const pricedActiveFactory = !costSummaryFx?.factoryCountry

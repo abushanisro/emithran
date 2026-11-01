@@ -9,6 +9,7 @@
  */
 
 import { envValidator } from './config/env-validator';
+import { settingWithDevDefault } from './utils/required-setting';
 
 // Validate environment on module load
 if (typeof window !== 'undefined') {
@@ -25,10 +26,14 @@ if (typeof window !== 'undefined') {
 export const config = {
   // API Configuration
   api: {
-    // Use server-side URL when running on server (Docker network), client-side URL in browser
-    baseUrl: (typeof window === 'undefined'
-      ? process.env.API_URL
-      : process.env.NEXT_PUBLIC_API_URL) || 'http://localhost:4000/v1/api',
+    // Use server-side URL when running on server (Docker network), client-side URL in browser.
+    // Resolved on access: the localhost default is for development only, and a
+    // missing setting in production throws naming the variable.
+    get baseUrl(): string {
+      return typeof window === 'undefined'
+        ? settingWithDevDefault(process.env.API_URL, 'API_URL', 'http://localhost:4000/v1/api')
+        : settingWithDevDefault(process.env.NEXT_PUBLIC_API_URL, 'NEXT_PUBLIC_API_URL', 'http://localhost:4000/v1/api');
+    },
 
     // Timeout Configuration - 2026 Best Practice: Balance between fast fail and database operations
     timeout: process.env.NODE_ENV === 'development' ? 15000 : 30000,
@@ -109,7 +114,9 @@ export const config = {
 
   // CAD Engine Configuration
   cadEngine: {
-    baseUrl: process.env.NEXT_PUBLIC_CAD_ENGINE_URL || 'http://localhost:5055',
+    get baseUrl(): string {
+      return settingWithDevDefault(process.env.NEXT_PUBLIC_CAD_ENGINE_URL, 'NEXT_PUBLIC_CAD_ENGINE_URL', 'http://localhost:5055');
+    },
     maxFileSize: 50 * 1024 * 1024, // 50MB
     supportedFormats: ['.step', '.stp', '.iges', '.igs'],
     rateLimit: {

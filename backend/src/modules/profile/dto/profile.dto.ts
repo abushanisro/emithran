@@ -1,4 +1,4 @@
-import { IsString, IsOptional, MaxLength } from 'class-validator';
+import { IsString, IsOptional, IsUrl, MaxLength, ValidateIf } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateProfileDto {
@@ -8,10 +8,12 @@ export class UpdateProfileDto {
   @MaxLength(100)
   displayName?: string;
 
-  @ApiPropertyOptional({ description: 'Public URL of avatar image' })
-  @IsString()
-  @IsOptional()
-  avatarUrl?: string;
+  // Uploads record the stored key server-side (POST /profile/avatar); here only clearing (null or '') or an https image URL is accepted.
+  @ApiPropertyOptional({ description: 'https URL of an avatar image, or null/empty to clear it', nullable: true })
+  @ValidateIf((_dto, value) => value !== '' && value != null)
+  @IsUrl({ protocols: ['https'], require_protocol: true })
+  @MaxLength(2048)
+  avatarUrl?: string | null;
 
   @ApiPropertyOptional({ description: 'Short bio', example: 'Senior Manufacturing Engineer' })
   @IsString()

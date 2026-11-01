@@ -10,3 +10,13 @@ export function isAllowedOrigin(req: Request, appOrigin: string): boolean {
   const origin = req.headers.get('origin');
   return origin !== null && origin === new URL(appOrigin).origin;
 }
+
+/**
+ * The same check for the app's own route handlers outside the BFF (AI, CAD and PDF routes): null when the request may proceed,
+ * otherwise the refusal to return. APP_BASE_URL is the app's public origin, as for the BFF.
+ */
+export function refuseCrossOrigin(req: Request): Response | null {
+  const appUrl = process.env.APP_BASE_URL;
+  if (!appUrl) return Response.json({ error: 'APP_BASE_URL must be set' }, { status: 500 });
+  return isAllowedOrigin(req, appUrl) ? null : Response.json({ error: 'Request origin not allowed' }, { status: 403 });
+}

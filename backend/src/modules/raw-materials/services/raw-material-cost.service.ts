@@ -180,6 +180,7 @@ export class RawMaterialCostService {
     // Looks up the location-specific price column so India materials (cost_india) aren't silently zeroed.
     let resolvedUnitCost = createDto.unitCost ?? 0;
     let priceLookupFailed = false;
+    let priceFallbackWarning: string | undefined;
     // Migration 708 (P1b-i). Default: undeclared. A unitCost supplied by the
     // caller is stored VERBATIM -- the conversion below sits behind the
     // `resolvedUnitCost === 0` branch -- and the create DTO has no currency
@@ -208,7 +209,8 @@ export class RawMaterialCostService {
       // guessing the currency from country alone would then convert an INR
       // price as if it were CNY.
       if (lookup.found && lookup.price > 0) {
-        const rates = await this.exchangeRateService.getSnapshot(accessToken);
+        // The new record's organization's budget rates (global defaults when it has none).
+        const rates = await this.exchangeRateService.getSnapshot(accessToken, organizationId ?? null);
         resolvedUnitCost = rates.toUsd(lookup.price, lookup.currency);
         // Migration 708: record the conversion this path just performed, so the
         // stored row can prove it is USD instead of relying on a convention.
@@ -222,6 +224,7 @@ export class RawMaterialCostService {
         resolvedUnitCost = lookup.price;
       }
       priceLookupFailed = !lookup.found;
+      priceFallbackWarning = lookup.warning;
     }
 
     // Prepare input for calculation engine
@@ -301,7 +304,11 @@ export class RawMaterialCostService {
       // of why. Prepended so it survives even if the caller also sent notes.
       notes: priceLookupFailed
         ? `⚠ No price found in raw_materials for "${createDto.materialName}" at ${createDto.country || 'this location'} — unit cost defaulted to $0. Add pricing data or enter unit cost manually.${createDto.notes ? ` ${createDto.notes}` : ''}`
-        : createDto.notes,
+        : priceFallbackWarning
+          // Same disclosure for a price that IS found but is not this location's
+          // own (the India column substituted): usable, never presented as local.
+          ? `⚠ ${priceFallbackWarning}${createDto.notes ? ` ${createDto.notes}` : ''}`
+          : createDto.notes,
       user_id: userId,
       organization_id: organizationId ?? null,
 
@@ -580,64 +587,101 @@ export class RawMaterialCostService {
    * Look up the location-specific unit cost (local currency/kg) for a material grade string.
    * Uses tokenized ILIKE search so compound grades like "IS2062 E250 CRCA" find
    * "Mild Steel IS2062" and "CRCA Steel" even when no row stores the full compound string.
-   * Returns { price: 0, found: false } on no match or any error — the caller MUST disclose
-   * this (see create()'s notes field), since a genuinely-missing price is otherwise
-   * indistinguishable from a real $0 unit cost.
-   *
-   * Also returns which currency the returned `price` is actually denominated
-   * in — NOT simply "whatever getCurrencyForLocation(country) says", since
-   * this can fall back to the cost_india column (INR) either because
-   * `country` itself matched no known column, or because the requested
-   * country's own column was empty for this specific material. Callers must
-   * convert using THIS currency, not a guess derived from `country`, or an
-   * India-fallback price silently gets treated as if it were already in the
-   * requesting country's currency.
+   * A failed query throws: a database error is not the same thing as "no price on file".
+   * The returned `currency` is what `price` is actually denominated in (INR for an India
+   * fallback), so callers convert with it, never with a guess derived from `country`.
    */
   private async lookupMaterialPrice(
     accessToken: string,
     materialName: string,
     country: string,
-  ): Promise<{ price: number; found: boolean; currency: string }> {
-    // Maps digital-factory country strings to raw_materials price columns
-    // (and the real currency each column is denominated in).
-    const PRICE_COL: Record<string, { col: string; currency: string }> = {
-      India: { col: 'cost_india', currency: 'INR' },
-      USA: { col: 'cost_usa', currency: 'USD' },
-      Germany: { col: 'cost_germany', currency: 'EUR' },
-      France: { col: 'cost_france', currency: 'EUR' },
-      'W. Europe': { col: 'cost_europe', currency: 'EUR' },
-      'E. Europe': { col: 'cost_e_europe', currency: 'EUR' },
-      UK: { col: 'cost_uk', currency: 'GBP' },
-      China: { col: 'cost_china', currency: 'CNY' },
-      Vietnam: { col: 'cost_vietnam', currency: 'VND' },
-      Mexico: { col: 'cost_mexico', currency: 'MXN' },
-    };
-    const { col: priceCol, currency: priceCurrency } = PRICE_COL[country] ?? PRICE_COL['India']!;
-    try {
-      const g = materialName.trim();
-      const tokens = g.split(/[\s\-\/]+/).filter((t) => t.length >= 3);
-      // Each value is quoted whole, wildcards included, so PostgREST treats commas and parens inside it as literals, not OR
-      // separators or grouping ("Steel," would break .or() otherwise). Quoting only the token (%"Steel"%) made the quotes literal.
-      const q = (t: string) => quoteFilterValue(`%${t}%`);
-      const orClause = (tokens.length > 1 ? tokens : [g])
-        .flatMap((t) => [`name.ilike.${q(t)}`, `grade.ilike.${q(t)}`])
-        .join(',');
-      const { data } = await this.databaseService
-        .getClient(accessToken)
-        .from('raw_materials')
-        .select(`${priceCol}, cost_india, density`)
-        .or(orClause)
-        .not('density', 'is', null)
-        .limit(5);
-      for (const row of (data ?? []) as any[]) {
-        const locPrice = parseFloat(row[priceCol]);
-        if (isFinite(locPrice) && locPrice > 0) return { price: locPrice, found: true, currency: priceCurrency };
-        const indiaPrice = parseFloat(row.cost_india);
-        if (isFinite(indiaPrice) && indiaPrice > 0) return { price: indiaPrice, found: true, currency: 'INR' };
-      }
-    } catch (err: any) {
-      this.logger.warn(`Material price lookup failed for "${materialName}" (${country}): ${err?.message}`, 'RawMaterialCostService');
+  ): Promise<MaterialPriceLookup> {
+    const g = materialName.trim();
+    const tokens = g.split(/[\s\-\/]+/).filter((t) => t.length >= 3);
+    // Each value is quoted whole, wildcards included, so PostgREST treats commas and parens inside it as literals, not OR
+    // separators or grouping ("Steel," would break .or() otherwise). Quoting only the token (%"Steel"%) made the quotes literal.
+    const q = (t: string) => quoteFilterValue(`%${t}%`);
+    const orClause = (tokens.length > 1 ? tokens : [g])
+      .flatMap((t) => [`name.ilike.${q(t)}`, `grade.ilike.${q(t)}`])
+      .join(',');
+    const local = MATERIAL_PRICE_COLUMNS[country];
+    const columns = local && local.col !== 'cost_india' ? `${local.col}, cost_india, density` : 'cost_india, density';
+    const { data, error } = await this.databaseService
+      .getClient(accessToken)
+      .from('raw_materials')
+      .select(columns)
+      .or(orClause)
+      .not('density', 'is', null)
+      .limit(5);
+    if (error) {
+      this.logger.error(`Material price lookup failed for "${materialName}" (${country}): ${error.message}`, 'RawMaterialCostService');
+      throw new InternalServerErrorException(`Failed to look up a price for "${materialName}": ${error.message}`);
     }
-    return { price: 0, found: false, currency: priceCurrency };
+    return pickRegionalMaterialPrice((data ?? []) as unknown as Record<string, unknown>[], country);
   }
+}
+
+/** raw_materials price column per Digital Factory country, and the currency that column is denominated in. */
+const MATERIAL_PRICE_COLUMNS: Readonly<Record<string, { col: string; currency: string }>> = {
+  India: { col: 'cost_india', currency: 'INR' },
+  USA: { col: 'cost_usa', currency: 'USD' },
+  Germany: { col: 'cost_germany', currency: 'EUR' },
+  France: { col: 'cost_france', currency: 'EUR' },
+  'W. Europe': { col: 'cost_europe', currency: 'EUR' },
+  'E. Europe': { col: 'cost_e_europe', currency: 'EUR' },
+  UK: { col: 'cost_uk', currency: 'GBP' },
+  China: { col: 'cost_china', currency: 'CNY' },
+  Vietnam: { col: 'cost_vietnam', currency: 'VND' },
+  Mexico: { col: 'cost_mexico', currency: 'MXN' },
+};
+
+/**
+ * Where an auto-looked-up material price came from.
+ *  - 'local':          the requested country's own price column.
+ *  - 'fallback_india': the India price (INR), because the country has no price
+ *                      column or its column is empty for this material. Usable,
+ *                      but not this location's price, so it always carries a warning.
+ *  - 'none':           no price on file (found:false, price 0).
+ */
+export type MaterialPriceSource = 'local' | 'fallback_india' | 'none';
+
+export interface MaterialPriceLookup {
+  price: number;
+  found: boolean;
+  /** The currency `price` is denominated in (INR for an India fallback). */
+  currency: string;
+  priceSource: MaterialPriceSource;
+  /** Present when priceSource is 'fallback_india': what was used instead, for the record's notes. */
+  warning?: string;
+}
+
+/** Picks the price for `country` from candidate raw_materials rows, flagging any India substitution. */
+export function pickRegionalMaterialPrice(rows: Record<string, unknown>[], country: string): MaterialPriceLookup {
+  const local = MATERIAL_PRICE_COLUMNS[country];
+  const positive = (v: unknown): number | null => {
+    const n = parseFloat(String(v));
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  if (local) {
+    for (const row of rows) {
+      const p = positive(row[local.col]);
+      if (p !== null) return { price: p, found: true, currency: local.currency, priceSource: 'local' };
+    }
+  }
+  if (local?.col !== 'cost_india') {
+    for (const row of rows) {
+      const p = positive(row.cost_india);
+      if (p === null) continue;
+      const where = country || '(no location given)';
+      const why = local ? `has no ${where} price for this material` : `has no price column for location "${where}"`;
+      return {
+        price: p,
+        found: true,
+        currency: 'INR',
+        priceSource: 'fallback_india',
+        warning: `raw_materials ${why}; the India price (INR) was used and converted, so this is not a ${where} price.`,
+      };
+    }
+  }
+  return { price: 0, found: false, currency: local?.currency ?? 'INR', priceSource: 'none' };
 }

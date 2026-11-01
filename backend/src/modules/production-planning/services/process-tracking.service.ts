@@ -776,32 +776,6 @@ export class ProcessTrackingService {
   // UTILITY METHODS
   // =====================================================
 
-  async calculateOptimalTimeline(calculationData: any, accessToken: string) {
-    this.logger.log(`Calculating optimal timeline for lot ${calculationData.lotId}`, 'ProcessTrackingService');
-
-    // This would implement smart timeline calculation based on:
-    // - Process dependencies
-    // - Resource availability
-    // - Material lead times
-    // - Historical performance data
-
-    // For now, return a basic calculation
-    return {
-      data: {
-        suggested_start_date: calculationData.constraints.earliest_start || new Date().toISOString().split('T')[0],
-        suggested_end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days from now
-        total_weeks: 4,
-        critical_path: [],
-        recommendations: [
-          'Consider parallel execution of independent processes',
-          'Review material lead times for early procurement',
-          'Allocate additional resources to critical path items'
-        ]
-      },
-      timestamp: new Date().toISOString(),
-    };
-  }
-
   async deleteTimeline(timelineId: string, userId: string, accessToken: string) {
     this.logger.log(`Deleting timeline ${timelineId}`, 'ProcessTrackingService');
 

@@ -4,6 +4,7 @@
  */
 
 import jsPDF from 'jspdf';
+import type { AggregatedBomCosts } from '@/lib/services/cost-engine';
 // Using native browser APIs for Excel export
 // Alternative to xlsx for security reasons
 
@@ -12,16 +13,15 @@ export interface ExportData {
   bomId: string;
   projectName?: string;
   summary: {
-    totalCost: number;
-    sellingPrice: number;
-    totalMargin: number;
-    averageSga: number;
-    averageProfit: number;
-    rawMaterials: number;
-    processCosts: number;
-    packagingLogistics: number;
-    procuredParts: number;
-    overheadCosts: number;
+    totalCost: number | null;
+    sellingPrice: number | null;
+    totalMargin: number | null;
+    averageSga: number | null;
+    averageProfit: number | null;
+    rawMaterials: number | null;
+    processCosts: number | null;
+    packagingLogistics: number | null;
+    procuredParts: number | null;
   };
   costBreakdown?: any[];
   assemblies?: any[];
@@ -109,11 +109,10 @@ export class ExportService {
 
     doc.setFontSize(10);
     const breakdownItems = [
-      ['Raw Materials:', this.formatCurrencyForPDF(data.summary.rawMaterials), this.formatPercentage((data.summary.rawMaterials / data.summary.totalCost) * 100)],
-      ['Process Costs:', this.formatCurrencyForPDF(data.summary.processCosts), this.formatPercentage((data.summary.processCosts / data.summary.totalCost) * 100)],
-      ['Packaging & Logistics:', this.formatCurrencyForPDF(data.summary.packagingLogistics), this.formatPercentage((data.summary.packagingLogistics / data.summary.totalCost) * 100)],
-      ['Procured Parts:', this.formatCurrencyForPDF(data.summary.procuredParts), this.formatPercentage((data.summary.procuredParts / data.summary.totalCost) * 100)],
-      ['Overhead Costs:', this.formatCurrencyForPDF(data.summary.overheadCosts), this.formatPercentage((data.summary.overheadCosts / data.summary.totalCost) * 100)],
+      ['Raw Materials:', this.formatCurrencyForPDF(data.summary.rawMaterials), this.shareOfTotal(data.summary.rawMaterials, data.summary.totalCost)],
+      ['Process Costs:', this.formatCurrencyForPDF(data.summary.processCosts), this.shareOfTotal(data.summary.processCosts, data.summary.totalCost)],
+      ['Packaging & Logistics:', this.formatCurrencyForPDF(data.summary.packagingLogistics), this.shareOfTotal(data.summary.packagingLogistics, data.summary.totalCost)],
+      ['Procured Parts:', this.formatCurrencyForPDF(data.summary.procuredParts), this.shareOfTotal(data.summary.procuredParts, data.summary.totalCost)],
     ];
 
     breakdownItems.forEach(([label, value, percentage]) => {
@@ -174,11 +173,10 @@ export class ExportService {
       [''],
       ['Cost Breakdown'],
       ['Category', 'Amount', 'Percentage'],
-      ['Raw Materials', this.formatCurrency(data.summary.rawMaterials), this.formatPercentage((data.summary.rawMaterials / data.summary.totalCost) * 100)],
-      ['Process Costs', this.formatCurrency(data.summary.processCosts), this.formatPercentage((data.summary.processCosts / data.summary.totalCost) * 100)],
-      ['Packaging & Logistics', this.formatCurrency(data.summary.packagingLogistics), this.formatPercentage((data.summary.packagingLogistics / data.summary.totalCost) * 100)],
-      ['Procured Parts', this.formatCurrency(data.summary.procuredParts), this.formatPercentage((data.summary.procuredParts / data.summary.totalCost) * 100)],
-      ['Overhead Costs', this.formatCurrency(data.summary.overheadCosts), this.formatPercentage((data.summary.overheadCosts / data.summary.totalCost) * 100)]
+      ['Raw Materials', this.formatCurrency(data.summary.rawMaterials), this.shareOfTotal(data.summary.rawMaterials, data.summary.totalCost)],
+      ['Process Costs', this.formatCurrency(data.summary.processCosts), this.shareOfTotal(data.summary.processCosts, data.summary.totalCost)],
+      ['Packaging & Logistics', this.formatCurrency(data.summary.packagingLogistics), this.shareOfTotal(data.summary.packagingLogistics, data.summary.totalCost)],
+      ['Procured Parts', this.formatCurrency(data.summary.procuredParts), this.shareOfTotal(data.summary.procuredParts, data.summary.totalCost)]
     ];
 
     return rows.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
@@ -206,7 +204,7 @@ export class ExportService {
   public prepareExportData(
     bomId: string,
     bomName: string,
-    aggregated: any,
+    aggregated: AggregatedBomCosts,
     costData?: any[],
     projectName?: string
   ): ExportData {
@@ -215,16 +213,15 @@ export class ExportService {
       bomName,
       ...(projectName !== undefined ? { projectName } : {}),
       summary: {
-        totalCost: aggregated.totalCost || 0,
-        sellingPrice: aggregated.totalSellingPrice || 0,
-        totalMargin: aggregated.totalMargin || 0,
-        averageSga: aggregated.averageSgaPercentage || 0,
-        averageProfit: aggregated.averageProfitPercentage || 0,
-        rawMaterials: aggregated.totalRawMaterials || 0,
-        processCosts: aggregated.totalProcessCosts || 0,
-        packagingLogistics: aggregated.totalPackagingLogistics || 0,
-        procuredParts: aggregated.totalProcuredParts || 0,
-        overheadCosts: ((aggregated.totalRawMaterials || 0) + (aggregated.totalProcessCosts || 0) + (aggregated.totalPackagingLogistics || 0) + (aggregated.totalProcuredParts || 0)) * 0.15, // Calculate 15% overhead from direct costs
+        totalCost: aggregated.totalCost,
+        sellingPrice: aggregated.totalSellingPrice,
+        totalMargin: aggregated.totalMargin,
+        averageSga: aggregated.averageSgaPercentage,
+        averageProfit: aggregated.averageProfitPercentage,
+        rawMaterials: aggregated.totalRawMaterials,
+        processCosts: aggregated.totalProcessCosts,
+        packagingLogistics: aggregated.totalPackagingLogistics,
+        procuredParts: aggregated.totalProcuredParts,
       },
       costBreakdown: costData || [],
       timestamp: new Date().toLocaleString(),
@@ -356,16 +353,25 @@ export class ExportService {
     });
   }
 
-  private formatCurrency(value: number): string {
+  // An unknown value prints as "—", never as 0.
+  private formatCurrency(value: number | null): string {
+    if (value === null) return '—';
     return `$ ${value.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
   }
 
-  private formatCurrencyForPDF(value: number): string {
+  private formatCurrencyForPDF(value: number | null): string {
+    if (value === null) return '—';
     return `USD ${value.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
   }
 
-  private formatPercentage(value: number): string {
+  private formatPercentage(value: number | null): string {
+    if (value === null) return '—';
     return `${value.toFixed(1)}%`;
+  }
+
+  private shareOfTotal(part: number | null, total: number | null): string {
+    if (part === null || total === null || total === 0) return '—';
+    return this.formatPercentage((part / total) * 100);
   }
 }
 

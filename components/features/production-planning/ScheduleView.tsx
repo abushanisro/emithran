@@ -706,7 +706,7 @@ return {
                   <div style="width: 12px; height: 12px; background: #f59e0b; border-radius: 50%;"></div>
                   <div>
                     <div style="font-size: 12px; font-weight: 500;">${escapeHtml(subTask.name)}</div>
-                    <div style="font-size: 10px; color: #6b7280;">${subTask.operatorName || 'Unassigned'} • ${subTask.bomRequirements?.length || 0} BOM parts</div>
+                    <div style="font-size: 10px; color: #6b7280;">${escapeHtml(subTask.operatorName || 'Unassigned')} • ${escapeHtml(subTask.bomRequirements?.length || 0)} BOM parts</div>
                   </div>
                   <span style="background: #f3f4f6; border: 1px solid #d1d5db; padding: 2px 6px; border-radius: 4px; font-size: 10px;">${escapeHtml(subTask.status || 'PENDING')}</span>
                 </div>
@@ -733,7 +733,7 @@ return {
                 };
                 
                 bomTimelineCells += `
-                  <td class="${isConsumed ? statusClasses[bomItem.status] || 'bom-available' : ''}" style="border: 1px solid #374151; padding: 4px; text-align: center; ${isConsumed ? '' : 'background: #f3f4f6; color: #6b7280;'} font-size: 9px;">
+                  <td class="${isConsumed ? escapeHtml(Object.hasOwn(statusClasses, bomItem.status) ? statusClasses[bomItem.status] : 'bom-available') : ''}" style="border: 1px solid #374151; padding: 4px; text-align: center; ${isConsumed ? '' : 'background: #f3f4f6; color: #6b7280;'} font-size: 9px;">
                     ${escapeHtml(cellContent)}
                   </td>
                 `;
@@ -749,7 +749,7 @@ return {
                       <div style="width: 8px; height: 8px; background: #3b82f6; border-radius: 50%;"></div>
                       <div>
                         <div style="font-size: 11px; font-weight: 500;">${escapeHtml(bomItem.partNumber || 'N/A')}</div>
-                        <div style="font-size: 9px; color: #6b7280;">${escapeHtml(bomItem.partName || 'Unknown Part')} • Qty: ${bomItem.requiredQuantity || 0}</div>
+                        <div style="font-size: 9px; color: #6b7280;">${escapeHtml(bomItem.partName || 'Unknown Part')} • Qty: ${escapeHtml(bomItem.requiredQuantity || 0)}</div>
                       </div>
                       <span style="background: #f3f4f6; border: 1px solid #d1d5db; padding: 2px 4px; border-radius: 4px; font-size: 9px;">${escapeHtml(bomItem.unit || 'pcs')}</span>
                     </div>

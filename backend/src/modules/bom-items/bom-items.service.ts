@@ -5,7 +5,7 @@ import { computeHydroforming } from './costing/hydroforming/hydroforming-engine'
 import { buildHydroformRoute, drawnShellFromFeatures } from './costing/hydroforming/hydroforming-route';
 import { SheetMetalCatalogOperationsService } from './costing/sheet-metal/operation/catalog-operations.service';
 import type { SheetMetalFeature } from './costing/sheet-metal/operation/catalog-operation-resolver';
-import { Injectable, Logger, NotFoundException, InternalServerErrorException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, InternalServerErrorException, BadRequestException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { DatabaseService } from '../../common/database/database.service';
 import { CreateBOMItemDto, UpdateBOMItemDto } from './dto/bom-items.dto';
 import { BOM_ITEM_DTO_COLUMNS, BOMItemResponseDto, BOMItemListResponseDto } from './dto/bom-item-response.dto';
@@ -66,7 +66,7 @@ import {
 } from './costing/plastic-molding/machine/machine-selector-im';
 import { requiredClampForce, type MaterialClampProperties } from './costing/plastic-molding/clamp-force';
 import { shotGppsGramsPerCavity, shotWeightKgPerPart } from './costing/plastic-molding/shot-size';
-import { MATERIAL_OVERHEAD_PCT, RATES_SOURCE_LABEL, computeTapCycleSec, resolveTapPhysicsInputs, TAP_UNLOAD_SEC, isoCoarsePitchMm, resolveDrillingSpeedFeed, COUNTERSINK_SPEED_FACTOR, HOLE_OP_UNLOAD_SEC, resolveReamPhysicsInputs, TIGHT_TOLERANCE_REAM_THRESHOLD_MM, MACHINE_REGISTRY, LOCATION_INFO, CURRENCY_SYMBOLS, recommendedBendTonnage, bendShoulderWidthMm, estimateBurlTonnage, estimateBurlDiameterMm, type SurfaceTreatmentDbRate, DEFAULT_YIELD_PCT } from './costing/shared/core/default-rates.constants';
+import { MATERIAL_OVERHEAD_PCT, RATES_SOURCE_LABEL, computeTapCycleSec, resolveTapPhysicsInputs, TAP_UNLOAD_SEC, isoCoarsePitchMm, resolveDrillingSpeedFeed, COUNTERSINK_SPEED_FACTOR, HOLE_OP_UNLOAD_SEC, resolveReamPhysicsInputs, TIGHT_TOLERANCE_REAM_THRESHOLD_MM, MACHINE_REGISTRY, LOCATION_INFO, CURRENCY_SYMBOLS, recommendedBendTonnage, bendShoulderWidthMm, estimateBurlTonnage, estimateBurlDiameterMm, type SurfaceTreatmentDbRate, resolveYieldPct } from './costing/shared/core/default-rates.constants';
 import type { MachineClass } from './costing/shared/core/default-rates.constants';
 import { checkMachineCapability } from './costing/shared/capability/machine-capability';
 import type { CapabilityCheck as MachineCapabilityCheck, PartGeometryForCapability } from './costing/shared/capability/machine-capability';
@@ -107,7 +107,7 @@ import {
 import type { MachineRequirement } from './costing/shared/capability/machine-selection/physics';
 import { explainCandidate, fetchMachinePool } from './costing/shared/capability/machine-selection/selector';
 import type { CapabilityCheck, MachineCandidate, MachineRecommendation, MachineSelectionResult } from './dto/machine-selection.dto';
-import { ExchangeRateService, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
+import { ExchangeRateService, organizationIdOf, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
 import { CADAnalysisService } from './services/cad-analysis.service';
 import { RateResolutionService } from './services/rate-resolution.service';
 import { CalculatorCatalogService } from './services/calculator-catalog.service';
@@ -162,6 +162,10 @@ function appendLines<T extends CostSummaryDto>(dto: T, lines: ProcessLineCost[])
     ...(incomplete.length ? { incompleteProcesses: incomplete, costStatus: 'incomplete' as const } : {}),
   };
 }
+
+/** Refusal when a BOM item is still used by a production lot the caller does not own (BOMItemsService.remove). */
+export const IN_ANOTHER_MEMBERS_LOT =
+  'This part is used in a production lot owned by another member; remove it from that lot first';
 
 @Injectable()
 export class BOMItemsService {
@@ -369,6 +373,22 @@ export class BOMItemsService {
     }
 
     return BOMItemResponseDto.fromDatabase(row);
+  }
+
+  /**
+   * The organization a BOM item belongs to (null when it has none), read as the caller: the costing of a part converts with
+   * that organization's budget exchange rates (ExchangeRateService.getSnapshot).
+   */
+  async organizationOfItem(id: string, accessToken?: string | null): Promise<string | null> {
+    const { data, error } = await this.databaseService
+      .getUserClient(accessToken ?? undefined)
+      .from('bom_items')
+      .select('organization_id')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) throw new InternalServerErrorException(`Failed to read the BOM item's organization: ${error.message}`);
+    if (!data) throw new NotFoundException(`BOM item with ID ${id} not found`);
+    return organizationIdOf(data);
   }
 
   async create(
@@ -656,333 +676,73 @@ export class BOMItemsService {
   }
 
 
+  /**
+   * Deletes a BOM item and the references the caller may remove: their production lot materials, the item's process routes
+   * (and steps), and the parent link of its children. Everything is written as the caller (RLS). Production lot materials are
+   * readable and writable only by the owner of the lot's BOM (migration 067) and reference the item ON DELETE RESTRICT, so when
+   * another member's lot uses the part the delete is refused before anything is changed, never forced through with the
+   * privileged client.
+   */
   async remove(
     id: string,
-    userId?: string,
+    _userId?: string,
     accessToken?: string,
   ): Promise<void> {
     this.logger.log(`Removing BOM item with ID: ${id}`);
-
     const client = this.databaseService.getUserClient(accessToken);
+    const fail = (what: string, error: { message: string }): never => {
+      this.logger.error(`BOM item ${id}: ${what}: ${error.message}`);
+      throw new InternalServerErrorException(`Failed to delete BOM item: ${what}: ${error.message}`);
+    };
 
-    try {
-      // Use cascade delete to automatically clean up all references
-      const { data, error } = await client.rpc('cascade_delete_bom_item', {
-        item_id: id
-      });
+    const { data: items, error: fetchError } = await client.from('bom_items').select('id, part_number').eq('id', id).limit(1);
+    if (fetchError) fail('could not read the item', fetchError);
+    const item = (items as Array<{ id: string; part_number: string | null }> | null)?.[0];
+    if (!item) throw new NotFoundException(`BOM item with ID ${id} not found`);
 
-      if (error && (
-        error.code === '42883' ||      // PostgreSQL: undefined_function
-        error.code === 'PGRST202' ||   // PostgREST: function not in schema cache
-        error.message?.includes('Could not find the function') ||
-        error.message?.includes('schema cache')
-      )) {
-        // Function doesn't exist, fall back to manual cascade delete
-        this.logger.warn('Cascade delete function not available, using manual cascade delete');
-        return await this.manualCascadeDelete(id, userId, accessToken);
-      }
+    // Production lot materials: the caller's own (visible under RLS) are removed below; any the caller cannot see belong to a
+    // lot owned by another member, and the item must not be deleted from under them. Counting all of them is the only
+    // privileged step, and it only reads.
+    const { data: visible, error: visibleError } = await client.from('production_lot_materials').select('id').eq('bom_item_id', id);
+    if (visibleError) fail('could not check production lot materials', visibleError);
+    const { count: total, error: totalError } = await this.databaseService
+      .getPrivilegedClient('bom-item delete: count production_lot_materials referencing a BOM item the caller can see, to refuse when another member\'s lot uses it (read only)')
+      .from('production_lot_materials')
+      .select('id', { count: 'exact', head: true })
+      .eq('bom_item_id', id);
+    if (totalError || total == null) fail('could not check production lot materials', totalError ?? { message: 'no count returned' });
+    if ((total as number) > (visible?.length ?? 0)) throw new ConflictException(IN_ANOTHER_MEMBERS_LOT);
 
-      if (error) {
-        // Handle any foreign key constraint violations by falling back to manual cascade delete
-        if (error.message && (
-          error.message.includes('production_lot_materials_bom_item_id_fkey') || 
-          error.message.includes('foreign key constraint') ||
-          error.message.includes('violates foreign key')
-        )) {
-          // Fallback to manual cascade delete if the function fails
-          this.logger.warn(`Database function cascade failed due to foreign key constraint, trying manual cascade: ${error.message}`);
-          return await this.manualCascadeDelete(id, userId, accessToken);
-        }
-        
-        this.logger.error(`Error in safe delete function: ${error.message}`);
-        throw new InternalServerErrorException(`Failed to delete BOM item: ${error.message}`);
-      }
-
-      if (!data || data.length === 0) {
-        throw new NotFoundException(`BOM item with ID ${id} not found`);
-      }
-
-      const result = data[0];
-      
-      if (!result.success) {
-        // If cascade delete failed, try manual cascade
-        this.logger.warn(`Database cascade delete failed, trying manual approach`);
-        return await this.manualCascadeDelete(id, userId, accessToken);
-      }
-
-      this.logger.log(`Successfully removed BOM item with cascade cleanup: ${result.message}`);
-    } catch (error) {
-      if (error instanceof NotFoundException || 
-          error instanceof BadRequestException || 
-          error instanceof ForbiddenException) {
-        throw error;
-      }
-      
-      this.logger.error(`Unexpected error removing BOM item ${id}: ${error}`);
-      throw new InternalServerErrorException('An unexpected error occurred while removing the BOM item');
-    }
-  }
-
-  /**
-   * Fallback direct delete method with constraint handling
-   */
-  private async directDelete(
-    id: string,
-    userId?: string,
-    accessToken?: string,
-  ): Promise<void> {
-    const client = this.databaseService.getUserClient(accessToken);
-
-    // First, check if the item exists
-    const { data: existingItem, error: fetchError } = await client
-      .from('bom_items')
-      .select('id, part_number')
-      .eq('id', id)
-      .single();
-
-    if (fetchError && fetchError.code === 'PGRST116') {
-      throw new NotFoundException(`BOM item with ID ${id} not found`);
+    if (visible && visible.length > 0) {
+      const { error } = await client.from('production_lot_materials').delete().eq('bom_item_id', id);
+      if (error) fail('could not remove production lot materials', error);
     }
 
-    if (fetchError) {
-      this.logger.error(`Error fetching BOM item: ${fetchError.message}`);
-      throw new InternalServerErrorException(`Failed to fetch BOM item: ${fetchError.message}`);
+    const { data: routes, error: routesReadError } = await client.from('process_routes').select('id').eq('bom_item_id', id);
+    if (routesReadError) fail('could not read process routes', routesReadError);
+    if (routes && routes.length > 0) {
+      const { error: stepsError } = await client.from('process_route_steps').delete().in('process_route_id', routes.map((r) => r.id));
+      if (stepsError) fail('could not remove process route steps', stepsError);
+      const { error: routesError } = await client.from('process_routes').delete().eq('bom_item_id', id);
+      if (routesError) fail('could not remove process routes', routesError);
     }
 
-    // Attempt to delete
-    const { error: deleteError } = await client
-      .from('bom_items')
-      .delete()
-      .eq('id', id);
+    const { error: childError } = await client.from('bom_items').update({ parent_item_id: null }).eq('parent_item_id', id);
+    if (childError) fail('could not detach child items', childError);
 
+    const { error: deleteError } = await client.from('bom_items').delete().eq('id', id);
     if (deleteError) {
       if (deleteError.code === '23503') {
-        // Handle specific foreign key constraints
-        let errorMessage = `Cannot delete BOM item "${existingItem?.part_number || id}". `;
-        
-        if (deleteError.message.includes('production_lot_materials_bom_item_id_fkey')) {
-          errorMessage += 'This item is used in production planning materials. Please remove it from production lots first.';
-        } else if (deleteError.message.includes('process_routes')) {
-          errorMessage += 'This item has associated process routes. Please remove the process routes first.';
-        } else if (deleteError.message.includes('parent_item_id')) {
-          errorMessage += 'This item has child items. Please remove child items first.';
-        } else {
-          errorMessage += 'This item is referenced by other data. Please remove related references first.';
-        }
-        
-        throw new BadRequestException(errorMessage);
-      }
-      
-      if (deleteError.code === '42501') {
-        throw new ForbiddenException('Insufficient permissions to delete this BOM item');
-      }
-
-      this.logger.error(`Error removing BOM item: ${deleteError.message}`);
-      throw new InternalServerErrorException(`Failed to remove BOM item: ${deleteError.message}`);
-    }
-  }
-
-  /**
-   * Manual cascade delete - removes all references then deletes the item
-   */
-  private async manualCascadeDelete(
-    id: string,
-    userId?: string,
-    accessToken?: string,
-  ): Promise<void> {
-    this.logger.log(`Performing manual cascade delete for BOM item: ${id}`);
-    
-    const client = this.databaseService.getUserClient(accessToken);
-    
-    try {
-      // Get item info first
-      const { data: itemData, error: fetchError } = await client
-        .from('bom_items')
-        .select('part_number')
-        .eq('id', id)
-        .single();
-
-      if (fetchError && fetchError.code === 'PGRST116') {
-        throw new NotFoundException(`BOM item with ID ${id} not found`);
-      }
-
-      const itemName = itemData?.part_number || 'Unknown';
-      let cleanupCount = 0;
-
-      // 1. Remove from production lot materials
-      // First check if there are any to delete (with detailed diagnostics)
-      this.logger.log(`Checking for production materials with user context`);
-      
-      const { data: prodMaterials, error: prodCheckError } = await client
-        .from('production_lot_materials')
-        .select('id, production_lot_id')
-        .eq('bom_item_id', id);
-      
-      // Also try with admin client to see if RLS is the issue
-      const adminClient = this.databaseService.getPrivilegedClient('bom-item cascade delete: production_lot_materials rows RLS hides from the caller, bounded to a BOM item already verified visible to the caller');
-      let adminProdMaterials = null;
-      
-      if (adminClient) {
-        const { data: adminData } = await adminClient
-          .from('production_lot_materials')
-          .select('id, production_lot_id')
-          .eq('bom_item_id', id);
-        adminProdMaterials = adminData;
-        this.logger.log(`Admin client sees ${adminData?.length || 0} production materials`);
-      }
-      
-      this.logger.log(`User client sees ${prodMaterials?.length || 0} production materials`);
-
-      if (prodCheckError) {
-        this.logger.warn(`Could not check production materials: ${prodCheckError.message}`);
-      }
-      
-      // Try to delete with admin client if available and user client found nothing
-      if (adminClient && adminProdMaterials && adminProdMaterials.length > 0 && (!prodMaterials || prodMaterials.length === 0)) {
-        this.logger.log(`Using admin client to delete ${adminProdMaterials.length} production materials (RLS bypass)`);
-        
-        const { error: adminProdError, count: adminProdCount } = await adminClient
-          .from('production_lot_materials')
-          .delete()
-          .eq('bom_item_id', id);
-        
-        if (adminProdError) {
-          this.logger.error(`Admin delete failed: ${adminProdError.message}`);
-        } else {
-          const actualCount = adminProdCount || adminProdMaterials.length;
-          cleanupCount += actualCount;
-          this.logger.log(`Admin client successfully removed ${actualCount} production material references`);
-        }
-      } else if (prodMaterials && prodMaterials.length > 0) {
-        this.logger.log(`Found ${prodMaterials.length} production material references to clean up`);
-        
-        const { error: prodError, count: prodCount } = await client
-          .from('production_lot_materials')
-          .delete()
-          .eq('bom_item_id', id);
-
-        if (prodError) {
-          this.logger.error(`Failed to clean up production materials: ${prodError.message}`);
-          throw new InternalServerErrorException(`Failed to clean up production planning references: ${prodError.message}`);
-        } else {
-          const actualCount = prodCount || prodMaterials.length;
-          cleanupCount += actualCount;
-          this.logger.log(`Successfully removed ${actualCount} production material references`);
-        }
-      } else {
-        this.logger.log('No production material references found with current user permissions');
-        
-        // If admin client shows materials but user client doesn't, it's an RLS issue
-        if (adminProdMaterials && adminProdMaterials.length > 0) {
-          this.logger.warn(`RLS Policy Issue: Admin sees ${adminProdMaterials.length} materials but user sees 0`);
-        }
-      }
-
-      // 2. Remove from process route steps (if any process routes reference this item)
-      // First get the process route IDs
-      const { data: processRoutes } = await client
-        .from('process_routes')
-        .select('id')
-        .eq('bom_item_id', id);
-
-      let stepsCount = 0;
-      let stepsError = null;
-      
-      if (processRoutes && processRoutes.length > 0) {
-        const routeIds = processRoutes.map(route => route.id);
-        const stepsResult = await client
-          .from('process_route_steps')
-          .delete()
-          .in('process_route_id', routeIds);
-        
-        stepsError = stepsResult.error;
-        stepsCount = stepsResult.count || 0;
-      }
-
-      if (stepsError) {
-        this.logger.warn(`Could not clean up process steps: ${stepsError.message}`);
-      } else if (stepsCount) {
-        cleanupCount += stepsCount;
-        this.logger.log(`Removed ${stepsCount} process route steps`);
-      }
-
-      // 3. Remove process routes
-      const { error: routesError, count: routesCount } = await client
-        .from('process_routes')
-        .delete()
-        .eq('bom_item_id', id);
-
-      if (routesError) {
-        this.logger.warn(`Could not clean up process routes: ${routesError.message}`);
-      } else if (routesCount) {
-        cleanupCount += routesCount;
-        this.logger.log(`Removed ${routesCount} process routes`);
-      }
-
-      // 4. Update child items to remove parent reference
-      const { error: childError, count: childCount } = await client
-        .from('bom_items')
-        .update({ parent_item_id: null })
-        .eq('parent_item_id', id);
-
-      if (childError) {
-        this.logger.warn(`Could not orphan child items: ${childError.message}`);
-      } else if (childCount) {
-        cleanupCount += childCount;
-        this.logger.log(`Orphaned ${childCount} child items`);
-      }
-
-      // 5. Finally delete the BOM item
-      this.logger.log(`Attempting to delete BOM item after cleaning up ${cleanupCount} references`);
-      
-      // Double-check that production materials are really gone
-      const { data: remainingProd, error: checkError } = await client
-        .from('production_lot_materials')
-        .select('id')
-        .eq('bom_item_id', id);
-      
-      if (!checkError && remainingProd && remainingProd.length > 0) {
-        this.logger.error(`Still ${remainingProd.length} production material references exist!`);
-        // Try one more time to delete them
-        await client.from('production_lot_materials').delete().eq('bom_item_id', id);
-      }
-      
-      const { error: deleteError } = await client
-        .from('bom_items')
-        .delete()
-        .eq('id', id);
-
-      if (deleteError) {
-        this.logger.error(`Failed to delete BOM item after cleanup: ${deleteError.message}`);
-        
-        // If it's still a constraint error, the cleanup didn't work
-        if (deleteError.message.includes('production_lot_materials_bom_item_id_fkey')) {
-          throw new InternalServerErrorException(
-            `Unable to remove all production planning references for BOM item "${itemName}". ` +
-            `This may be due to database permissions or concurrent modifications. ` +
-            `Please try again or contact an administrator.`
-          );
-        }
-        
-        throw new InternalServerErrorException(
-          `Cleaned up ${cleanupCount} references but failed to delete BOM item: ${deleteError.message}`
+        // a lot material added by another member since the check above
+        if (deleteError.message.includes('production_lot_materials')) throw new ConflictException(IN_ANOTHER_MEMBERS_LOT);
+        throw new ConflictException(
+          `Cannot delete BOM item "${item.part_number || id}": it is referenced by other data. Remove those references first.`,
         );
       }
-
-      this.logger.log(
-        `Successfully deleted BOM item "${itemName}" with cascade cleanup (${cleanupCount} references removed)`);
-      
-    } catch (error) {
-      if (error instanceof NotFoundException || 
-          error instanceof BadRequestException || 
-          error instanceof ForbiddenException ||
-          error instanceof InternalServerErrorException) {
-        throw error;
-      }
-      
-      this.logger.error(`Unexpected error in manual cascade delete: ${error}`);
-      throw new InternalServerErrorException('Failed to delete BOM item with cascade cleanup');
+      if (deleteError.code === '42501') throw new ForbiddenException('Insufficient permissions to delete this BOM item');
+      fail('could not delete the item', deleteError);
     }
+    this.logger.log(`Deleted BOM item "${item.part_number || id}"`);
   }
 
   async getBOMIdForItem(
@@ -3255,7 +3015,7 @@ export class BOMItemsService {
     // these exact rates, never a re-fetched/possibly-different one mid-request.
     // (Only used as the budget-rate fallback when no scenario FX snapshot
     // applies — see resolveDisplayCurrency.)
-    const rates = await this.exchangeRateService.getSnapshot(accessToken);
+    const rates = await this.exchangeRateService.getSnapshot(accessToken, await this.organizationOfItem(id, accessToken));
     // Placeholder — the real, final currency/toUsdRate is set by
     // normalizeCostSummaryToCurrency right before each return below.
     const currencyMeta = { currency: locInfo.code, currencySymbol: locInfo.symbol, toUsdRate: 1 };
@@ -5614,7 +5374,7 @@ export class BOMItemsService {
    */
   private async resolveSecondaryOperations(item: any, location: string, batchSize: number, accessToken: string, conv: number) {
     const machineOverrides = await this.fetchMachineOverrides(item.id, accessToken, location);
-    const all = await this.secondaryProcessService.compute({ item, location, batchSize, accessToken, machineOverrides });
+    const all = await this.secondaryProcessService.compute({ item, location, batchSize, accessToken, organizationId: await this.organizationOfItem(item.id, accessToken), machineOverrides });
     const surfaceCallout = matchSurfaceTreatmentCallout(surfaceCalloutOf(item));
     const drawing: SecondarySelection = {
       heat: all.heatTreatmentCalloutProcess ? [all.heatTreatmentCalloutProcess] : [],
@@ -5773,7 +5533,7 @@ export class BOMItemsService {
     // ── Material cost — same resolver as getCostSummary, by construction ──────
     const locInfo = LOCATION_INFO[location] ?? LOCATION_INFO['Other'];
     // One FX snapshot for this whole request — see getCostSummary's identical comment.
-    const rates = await this.exchangeRateService.getSnapshot(accessToken);
+    const rates = await this.exchangeRateService.getSnapshot(accessToken, await this.organizationOfItem(id, accessToken));
 
     // Resolved ONCE here (before capabilityGeometry AND buildPartRequirements
     // below) so the tonnage capability check, machine selection, and $ cost
@@ -5939,7 +5699,8 @@ export class BOMItemsService {
       qairPerHr: mhrRates.qaInspectorRate ?? 0,
       inspTimeMin: rcInspectionTimeMin,
       samplingRate: rcSamplingRate,
-      yieldPct: DEFAULT_YIELD_PCT,
+      // No per-part yield source exists yet: the default is used and disclosed once.
+      yieldPct: resolveYieldPct(null, 'Yield', comparisonWarnings),
       netMatCost: materialCost,
       netWeightKg,
       scrapPricePerKg: rcScrapPricePerKg,
@@ -6276,7 +6037,7 @@ export class BOMItemsService {
     // Both are non-blocking: null / 0 triggers warnings in the cost engine, not crashes.
     // Surface treatment is a shared secondary operation (appendSecondaryOperations), not an engine line.
     const cncSurfaceTreatmentDbRate = null;
-    const waterjetAbrasivePricePerKg = await this.resolveConsumablePrice(accessToken, 'garnet_abrasive', location, rates);
+    const waterjetAbrasivePricePerKg = await this.resolveConsumablePrice(accessToken, 'garnet_abrasive', location, locInfo.code, rates);
 
     if (isMachiningFamily(family)) {
       // Same rules + sampling policy as getCostSummary — totals must match line for line
@@ -7761,7 +7522,7 @@ export class BOMItemsService {
 
     // Phase 2: material density + MHR rates (parallel)
     // One FX snapshot for this whole request — see getCostSummary's identical comment.
-    const rates = await this.exchangeRateService.getSnapshot(accessToken);
+    const rates = await this.exchangeRateService.getSnapshot(accessToken, await this.organizationOfItem(id, accessToken));
 
     const [{ materialDensityKgM3 }, mhrRates] = await Promise.all([
       this.resolveMaterialForFamily({
@@ -8267,7 +8028,7 @@ export class BOMItemsService {
     const inputFields = new Set(def.fields.filter((f) => f.field_type !== 'calculated').map((f) => f.field_name));
     const item = await this.findOne(id, userId, accessToken);
     const machineOverrides = await this.fetchMachineOverrides(item.id, accessToken, location);
-    const all = await this.secondaryProcessService.compute({ item: item as any, location, batchSize: batchSize ?? null, accessToken, machineOverrides });
+    const all = await this.secondaryProcessService.compute({ item: item as any, location, batchSize: batchSize ?? null, accessToken, organizationId: await this.organizationOfItem(id, accessToken), machineOverrides });
     const lines = all.heatTreatmentLines.filter((l) => operations.includes(l.process));
     const line = (runKey ? lines.find((l) => l.process === runKey) : undefined) ?? lines.find((l) => l.calculator) ?? lines[0];
     const base = { calculatorId, operation: line?.process ?? operation, processGroup: 'Heat Treatment' };
@@ -9215,31 +8976,34 @@ export class BOMItemsService {
     };
   }
 
-  // Resolves a consumable price from the consumable_prices DB table (migration 362).
-  // Table stores prices in USD; result is converted to local currency via the
-  // caller's RateSnapshot (real FX, one read per request) — never a hardcoded pivot.
-  // Returns 0 when the DB has no row — the caller treats 0 as "add data to get this costed."
+  // Resolves a consumable price from the consumable_prices DB table (migration 362):
+  // the location's own row, else the table's '__default__' row. The table stores
+  // USD; the result is converted into `currencyCode` (the caller's costing
+  // currency) via the caller's RateSnapshot — never a hardcoded pivot, never a
+  // guessed location. Returns null when no row exists, so the caller can say the
+  // price is unknown instead of pricing the consumable at 0. A failed query or a
+  // missing FX rate throws: those are errors, not "no price on file".
   private async resolveConsumablePrice(
     accessToken: string,
     consumableType: string,
     location: string,
+    currencyCode: string,
     rates: RateSnapshot,
-  ): Promise<number> {
-    try {
-      const locInfo = LOCATION_INFO[location] ?? LOCATION_INFO['USA']!;
-      const usdToLocal = rates.convertStrict('USD', locInfo.code);
-      for (const loc of [location, '__default__']) {
-        const { data } = await this.databaseService
-          .getClient(accessToken)
-          .from('consumable_prices')
-          .select('price_per_unit')
-          .eq('consumable_type', consumableType)
-          .eq('location', loc)
-          .maybeSingle();
-        if (data?.price_per_unit) return Number(data.price_per_unit) * usdToLocal;
+  ): Promise<number | null> {
+    for (const loc of [location, '__default__']) {
+      const { data, error } = await this.databaseService
+        .getClient(accessToken)
+        .from('consumable_prices')
+        .select('price_per_unit')
+        .eq('consumable_type', consumableType)
+        .eq('location', loc)
+        .maybeSingle();
+      if (error) {
+        throw new InternalServerErrorException(`consumable_prices lookup failed for ${consumableType} at ${loc}: ${error.message}`);
       }
-    } catch { /* non-critical */ }
-    return 0;
+      if (data?.price_per_unit != null) return Number(data.price_per_unit) * rates.convertStrict('USD', currencyCode);
+    }
+    return null;
   }
 
   // Evaluates one or more `calculated`-type fields on a real DB calculator

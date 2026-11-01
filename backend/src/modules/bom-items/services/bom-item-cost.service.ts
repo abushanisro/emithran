@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Logger } from '../../../common/logger/logger.service';
 import { DatabaseService } from '../../../common/database/database.service';
-import { ExchangeRateService } from '../../../common/exchange-rate/exchange-rate.service';
+import { ExchangeRateService, organizationIdOf } from '../../../common/exchange-rate/exchange-rate.service';
 import { ROLLUP_REPORTING_CURRENCY } from '../costing/shared/core/persisted-currency-contract';
 import {
   computeCurrencyAwareRollup,
@@ -161,7 +161,7 @@ export class BomItemCostService {
     const { data: item, error: itemError } = await this.databaseService
       .getClient(accessToken)
       .from('bom_items')
-      .select('id, quantity, parent_item_id')
+      .select('id, quantity, parent_item_id, organization_id')
       .eq('id', bomItemId)
       .single();
 
@@ -266,7 +266,8 @@ export class BomItemCostService {
     // ONE snapshot for this entire rollup. convertOptional returns null rather
     // than guessing when the snapshot has no rate, which is what lets the core
     // fail closed instead of inventing an FX rate.
-    const rates = await this.exchangeRateService.getSnapshot(accessToken);
+    // The item's own organization's budget rates.
+    const rates = await this.exchangeRateService.getSnapshot(accessToken, organizationIdOf(item));
     const reportingCurrency = ROLLUP_REPORTING_CURRENCY;
     const rollup = computeCurrencyAwareRollup({
       amounts,

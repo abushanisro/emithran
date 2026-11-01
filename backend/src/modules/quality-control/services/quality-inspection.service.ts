@@ -1,5 +1,6 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { DatabaseService } from '@/common/database/database.service';
+import type { DbClient } from '@/common/db/postgrest-client';
 import {
   CreateQualityInspectionDto,
   UpdateQualityInspectionDto,
@@ -11,66 +12,72 @@ import {
   CreateDetailedInspectionReportDto,
   DetailedInspectionReportResponseDto,
 } from '../dto/detailed-inspection-report.dto';
+import { qualityDbError } from '../quality-db-error';
 
+/**
+ * Quality inspections and the rows that hang off them. Every query runs as the signed-in user, so row-level security
+ * (migration 936) limits it to the caller's organizations: another organization's inspection is simply not found.
+ */
 @Injectable()
 export class QualityInspectionService {
   private readonly logger = new Logger(QualityInspectionService.name);
 
   constructor(private readonly database: DatabaseService) {}
 
+  private db(): DbClient {
+    return this.database.getUserClient();
+  }
+
+  /** The organization that owns an inspection the caller can see; 404 when they cannot see it. */
+  private async getInspectionOrganization(inspectionId: string): Promise<string> {
+    const { data, error } = await this.db()
+      .from('quality_inspections')
+      .select('organization_id')
+      .eq('id', inspectionId)
+      .single();
+    if (error) throw qualityDbError(error, 'read the inspection');
+    return data.organization_id;
+  }
+
   async createInspection(
     createDto: CreateQualityInspectionDto,
     userId: string,
+    organizationId: string,
   ): Promise<QualityInspectionResponseDto> {
-    try {
-      this.logger.log(`Creating inspection: ${createDto.name} for user: ${userId}`);
+    this.logger.log(`Creating inspection for project ${createDto.projectId} (user ${userId}, organization ${organizationId})`);
 
-      const inspectionData = {
-        name: createDto.name,
-        description: createDto.description,
-        type: createDto.type,
-        status: InspectionStatus.PLANNED,
-        project_id: createDto.projectId,
-        bom_id: createDto.bomId,
-        lot_id: createDto.lotId || null,
-        inspector: createDto.inspector,
-        planned_date: createDto.plannedDate,
-        selected_items: createDto.selectedItems,
-        quality_standards: createDto.qualityStandards || [],
-        checklist: createDto.checklist,
-        metadata: createDto.metadata || {},
-        created_by: userId,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
+    const inspectionData = {
+      name: createDto.name,
+      description: createDto.description,
+      type: createDto.type,
+      status: InspectionStatus.PLANNED,
+      project_id: createDto.projectId,
+      bom_id: createDto.bomId,
+      lot_id: createDto.lotId || null,
+      inspector: createDto.inspector,
+      planned_date: createDto.plannedDate,
+      selected_items: createDto.selectedItems,
+      quality_standards: createDto.qualityStandards || [],
+      checklist: createDto.checklist,
+      metadata: createDto.metadata || {},
+      organization_id: organizationId,
+      created_by: userId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
 
-      const { data, error } = await this.database.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
-        .from('quality_inspections')
-        .insert(inspectionData)
-        .select('*')
-        .single();
+    const { data, error } = await this.db()
+      .from('quality_inspections')
+      .insert(inspectionData)
+      .select('*')
+      .single();
 
-      if (error) {
-        this.logger.error('Failed to create inspection:', error);
-        // Handle case where tables don't exist yet - create a mock response
-        if (error.message?.includes('does not exist') || error.message?.includes('relation "quality_inspections"')) {
-          this.logger.warn('Quality inspections table does not exist yet. Creating mock inspection response.');
-          const mockInspection = {
-            id: `temp-${Date.now()}`,
-            ...inspectionData,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          };
-          return this.mapToResponseDto(mockInspection);
-        }
-        throw new BadRequestException('Failed to create inspection');
-      }
-
-      return this.mapToResponseDto(data);
-    } catch (error) {
-      this.logger.error('Error creating inspection:', error);
-      throw error;
+    if (error) {
+      this.logger.error(`Failed to create inspection: ${error.code} ${error.message}`);
+      throw qualityDbError(error, 'create the inspection');
     }
+
+    return this.mapToResponseDto(data);
   }
 
   async getInspections(
@@ -82,66 +89,55 @@ export class QualityInspectionService {
       inspector?: string;
     } = {},
   ): Promise<QualityInspectionResponseDto[]> {
-    try {
-      let query = this.database.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
-        .from('quality_inspections')
-        .select('*')
-        .order('created_at', { ascending: false });
+    let query = this.db()
+      .from('quality_inspections')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-      if (filters.projectId) {
-        query = query.eq('project_id', filters.projectId);
-      }
-
-      if (filters.status) {
-        query = query.eq('status', filters.status);
-      }
-
-      if (filters.type) {
-        query = query.eq('type', filters.type);
-      }
-
-      if (filters.inspector) {
-        query = query.ilike('inspector', `%${filters.inspector}%`);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        this.logger.error('Failed to get inspections:', error);
-        if (error.message?.includes('does not exist') || error.message?.includes('relation "quality_inspections"')) {
-          this.logger.warn('Quality inspections table does not exist yet. Returning empty results.');
-          return [];
-        }
-        throw new BadRequestException('Failed to retrieve inspections');
-      }
-
-      return (data || []).map(this.mapToResponseDto);
-    } catch (error) {
-      this.logger.error('Error getting inspections:', error);
-      throw error;
+    if (filters.projectId) {
+      query = query.eq('project_id', filters.projectId);
     }
+
+    if (filters.status) {
+      query = query.eq('status', filters.status);
+    }
+
+    if (filters.type) {
+      query = query.eq('type', filters.type);
+    }
+
+    if (filters.inspector) {
+      query = query.ilike('inspector', `%${filters.inspector}%`);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      this.logger.error(`Failed to get inspections for user ${userId}: ${error.code} ${error.message}`);
+      throw qualityDbError(error, 'retrieve inspections');
+    }
+
+    return (data || []).map(this.mapToResponseDto);
   }
 
   async getInspectionById(
     id: string,
     userId: string,
   ): Promise<QualityInspectionResponseDto> {
-    try {
-      const { data, error } = await this.database.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
-        .from('quality_inspections')
-        .select('*')
-        .eq('id', id)
-        .single();
+    const { data, error } = await this.db()
+      .from('quality_inspections')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-      if (error || !data) {
-        throw new NotFoundException('Inspection not found');
+    if (error) {
+      if (error.code !== 'PGRST116') {
+        this.logger.error(`Failed to get inspection ${id} for user ${userId}: ${error.code} ${error.message}`);
       }
-
-      return this.mapToResponseDto(data);
-    } catch (error) {
-      this.logger.error('Error getting inspection by ID:', error);
-      throw error;
+      throw qualityDbError(error, 'read the inspection');
     }
+
+    return this.mapToResponseDto(data);
   }
 
   async updateInspection(
@@ -149,61 +145,58 @@ export class QualityInspectionService {
     updateDto: UpdateQualityInspectionDto,
     userId: string,
   ): Promise<QualityInspectionResponseDto> {
-    try {
-      this.logger.log(`Updating inspection ${id} with DTO:`, JSON.stringify(updateDto));
-      
-      // Transform camelCase DTO fields to snake_case database columns
-      const updateData: any = {
-        updated_at: new Date().toISOString(),
-      };
-
-      // Map DTO fields to database column names - only fields that exist in UpdateQualityInspectionDto
-      if (updateDto.name !== undefined) updateData.name = updateDto.name;
-      if (updateDto.description !== undefined) updateData.description = updateDto.description;
-      if (updateDto.status !== undefined) updateData.status = updateDto.status;
-      if (updateDto.inspector !== undefined) updateData.inspector = updateDto.inspector;
-      if (updateDto.plannedDate !== undefined) updateData.planned_date = updateDto.plannedDate;
-      if (updateDto.actualStartDate !== undefined) updateData.actual_start_date = updateDto.actualStartDate;
-      if (updateDto.actualEndDate !== undefined) updateData.actual_end_date = updateDto.actualEndDate;
-      if (updateDto.qualityStandards !== undefined) updateData.quality_standards = updateDto.qualityStandards;
-      if (updateDto.notes !== undefined) updateData.notes = updateDto.notes;
-      if (updateDto.metadata !== undefined) updateData.metadata = updateDto.metadata;
-
-      this.logger.log(`Final updateData:`, JSON.stringify(updateData));
-
-      const { data, error } = await this.database.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
-        .from('quality_inspections')
-        .update(updateData)
-        .eq('id', id)
-        .select('*')
-        .single();
-
-      if (error) {
-        this.logger.error('Failed to update inspection:', error);
-        throw new BadRequestException('Failed to update inspection');
-      }
-
-      return this.mapToResponseDto(data);
-    } catch (error) {
-      this.logger.error('Error updating inspection:', error);
-      throw error;
+    // Approval and rejection carry who decided and (for approval) record the approved items: they happen only through
+    // approveInspection / rejectInspection, never as a plain status edit.
+    if (updateDto.status === InspectionStatus.APPROVED || updateDto.status === InspectionStatus.REJECTED) {
+      throw new BadRequestException(`An inspection is ${updateDto.status} through its approve or reject action, not by editing its status.`);
     }
+    // Transform camelCase DTO fields to snake_case database columns
+    const updateData: any = {
+      updated_at: new Date().toISOString(),
+    };
+
+    // Map DTO fields to database column names - only fields that exist in UpdateQualityInspectionDto
+    if (updateDto.name !== undefined) updateData.name = updateDto.name;
+    if (updateDto.description !== undefined) updateData.description = updateDto.description;
+    if (updateDto.status !== undefined) updateData.status = updateDto.status;
+    if (updateDto.inspector !== undefined) updateData.inspector = updateDto.inspector;
+    if (updateDto.plannedDate !== undefined) updateData.planned_date = updateDto.plannedDate;
+    if (updateDto.actualStartDate !== undefined) updateData.actual_start_date = updateDto.actualStartDate;
+    if (updateDto.actualEndDate !== undefined) updateData.actual_end_date = updateDto.actualEndDate;
+    if (updateDto.qualityStandards !== undefined) updateData.quality_standards = updateDto.qualityStandards;
+    if (updateDto.notes !== undefined) updateData.notes = updateDto.notes;
+    if (updateDto.metadata !== undefined) updateData.metadata = updateDto.metadata;
+
+    this.logger.log(`Updating inspection ${id} (user ${userId})`);
+
+    const { data, error } = await this.db()
+      .from('quality_inspections')
+      .update(updateData)
+      .eq('id', id)
+      .select('*')
+      .single();
+
+    if (error) {
+      this.logger.error(`Failed to update inspection ${id}: ${error.code} ${error.message}`);
+      throw qualityDbError(error, 'update the inspection');
+    }
+
+    return this.mapToResponseDto(data);
   }
 
   async deleteInspection(id: string, userId: string): Promise<void> {
-    try {
-      const { error } = await this.database.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
-        .from('quality_inspections')
-        .delete()
-        .eq('id', id);
+    const { data, error } = await this.db()
+      .from('quality_inspections')
+      .delete()
+      .eq('id', id)
+      .select('id');
 
-      if (error) {
-        this.logger.error('Failed to delete inspection:', error);
-        throw new BadRequestException('Failed to delete inspection');
-      }
-    } catch (error) {
-      this.logger.error('Error deleting inspection:', error);
-      throw error;
+    if (error) {
+      this.logger.error(`Failed to delete inspection ${id} (user ${userId}): ${error.code} ${error.message}`);
+      throw qualityDbError(error, 'delete the inspection');
+    }
+    if (!data || data.length === 0) {
+      throw new NotFoundException('Inspection not found');
     }
   }
 
@@ -235,92 +228,86 @@ export class QualityInspectionService {
     userId: string,
     userEmail?: string,
   ): Promise<QualityInspectionResponseDto> {
-    try {
-      // First, get the inspection details to access selected items
-      const { data: inspection, error: inspectionError } = await this.database.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
-        .from('quality_inspections')
-        .select('*')
-        .eq('id', id)
-        .single();
+    // First, get the inspection details to access selected items
+    const { data: inspection, error: inspectionError } = await this.db()
+      .from('quality_inspections')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-      if (inspectionError || !inspection) {
-        throw new NotFoundException('Inspection not found');
-      }
-
-      // Update the inspection status
-      const updateData = {
-        status: InspectionStatus.APPROVED,
-        approved_by: userId,
-        approved_by_name: userEmail || userId,
-        approved_at: new Date().toISOString(),
-        notes: approvalData.approverNotes,
-      };
-
-      this.logger.log(`Approving inspection ${id} with update data:`, JSON.stringify(updateData));
-
-      const { data: updatedInspection, error: updateError } = await this.database.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
-        .from('quality_inspections')
-        .update(updateData)
-        .eq('id', id)
-        .select('*')
-        .single();
-
-      if (updateError) {
-        this.logger.error('Failed to approve inspection - Database error:', updateError);
-        throw new BadRequestException(`Failed to approve inspection: ${updateError.message}`);
-      }
-
-      // Create quality approved items for each selected item
-      this.logger.log(`Inspection data for approval:`, JSON.stringify({
-        id: inspection.id,
-        name: inspection.name,
-        selected_items: inspection.selected_items,
-        selected_items_type: typeof inspection.selected_items,
-        selected_items_length: inspection.selected_items?.length
-      }, null, 2));
-      
-      if (inspection.selected_items && Array.isArray(inspection.selected_items)) {
-        const qualityApprovedItems = inspection.selected_items.map((item: any) => ({
-          bom_item_id: typeof item === 'string' ? item : (item.bomItemId || item.bom_item_id || item.id),
-          inspection_id: id,
-          approved_quantity: (typeof item === 'string' ? 1 : (item.quantity || item.approved_quantity || 1)),
-          approval_status: 'approved',
-          approval_notes: approvalData.approverNotes || 'Approved via quality inspection',
-          delivery_ready: true,
-          delivery_ready_date: new Date().toISOString(),
-          approved_by: userId,
-          approved_at: new Date().toISOString(),
-          qc_certificate_number: null,
-          quality_grade: 'A',
-          created_by: userId,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }));
-
-        this.logger.log(`About to create ${qualityApprovedItems.length} quality approved items:`, JSON.stringify(qualityApprovedItems, null, 2));
-
-        // Insert quality approved items
-        const { data: insertedItems, error: approvedItemsError } = await this.database.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
-          .from('quality_approved_items')
-          .insert(qualityApprovedItems)
-          .select('*');
-
-        if (approvedItemsError) {
-          this.logger.error('Failed to create quality approved items:', approvedItemsError);
-          this.logger.error('This could mean the quality_approved_items table does not exist. Please run migration 201_quality_delivery_integration.sql');
-          // Don't fail the approval if quality items creation fails - log and continue
-          this.logger.warn('Inspection approved but quality approved items could not be created. This may affect delivery availability.');
-        } else {
-          this.logger.log(`Successfully created ${qualityApprovedItems.length} quality approved items for inspection ${id}`);
-          this.logger.log(`Inserted items:`, JSON.stringify(insertedItems, null, 2));
-        }
-      }
-
-      return this.mapToResponseDto(updatedInspection);
-    } catch (error) {
-      this.logger.error('Error approving inspection:', error);
-      throw error;
+    if (inspectionError) {
+      throw qualityDbError(inspectionError, 'read the inspection');
     }
+    if (inspection.status !== InspectionStatus.COMPLETED) {
+      throw new ConflictException(
+        inspection.status === InspectionStatus.APPROVED
+          ? 'This inspection is already approved.'
+          : `Only a completed inspection can be approved (this one is ${inspection.status}).`,
+      );
+    }
+
+    // Update the inspection status — only while it is still completed, so two approvals racing each other approve it once
+    const updateData = {
+      status: InspectionStatus.APPROVED,
+      approved_by: userId,
+      approved_by_name: userEmail || userId,
+      approved_at: new Date().toISOString(),
+      notes: approvalData.approverNotes,
+    };
+
+    this.logger.log(`Approving inspection ${id} (user ${userId})`);
+
+    const { data: updatedRows, error: updateError } = await this.db()
+      .from('quality_inspections')
+      .update(updateData)
+      .eq('id', id)
+      .eq('status', InspectionStatus.COMPLETED)
+      .select('*');
+
+    if (updateError) {
+      this.logger.error(`Failed to approve inspection ${id}: ${updateError.code} ${updateError.message}`);
+      throw qualityDbError(updateError, 'approve the inspection');
+    }
+    const updatedInspection = updatedRows?.[0];
+    if (!updatedInspection) {
+      throw new ConflictException('This inspection was approved or changed by someone else meanwhile.');
+    }
+
+    // Create quality approved items for each selected item
+    if (inspection.selected_items && Array.isArray(inspection.selected_items)) {
+      const qualityApprovedItems = inspection.selected_items.map((item: any) => ({
+        bom_item_id: typeof item === 'string' ? item : (item.bomItemId || item.bom_item_id || item.id),
+        inspection_id: id,
+        organization_id: inspection.organization_id,
+        approved_quantity: (typeof item === 'string' ? 1 : (item.quantity || item.approved_quantity || 1)),
+        approval_status: 'approved',
+        approval_notes: approvalData.approverNotes || 'Approved via quality inspection',
+        delivery_ready: true,
+        delivery_ready_date: new Date().toISOString(),
+        approved_by: userId,
+        approved_at: new Date().toISOString(),
+        qc_certificate_number: null,
+        quality_grade: 'A',
+        created_by: userId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }));
+
+      const { error: approvedItemsError } = await this.db()
+        .from('quality_approved_items')
+        .insert(qualityApprovedItems);
+
+      if (approvedItemsError) {
+        // The inspection is approved but its items are not marked approved: report it, so the user can reset and approve again.
+        this.logger.error(
+          `Inspection ${id} approved but its ${qualityApprovedItems.length} approved items could not be recorded: ${approvedItemsError.code} ${approvedItemsError.message}`,
+        );
+        throw qualityDbError(approvedItemsError, 'record the approved items of the inspection');
+      }
+      this.logger.log(`Recorded ${qualityApprovedItems.length} quality approved items for inspection ${id}`);
+    }
+
+    return this.mapToResponseDto(updatedInspection);
   }
 
   async rejectInspection(
@@ -338,7 +325,7 @@ export class QualityInspectionService {
       notes: rejectionData.correctiveAction,
     };
 
-    const { data, error } = await this.database.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
+    const { data, error } = await this.db()
       .from('quality_inspections')
       .update(updateData)
       .eq('id', id)
@@ -346,7 +333,7 @@ export class QualityInspectionService {
       .single();
 
     if (error) {
-      throw new BadRequestException('Failed to reject inspection');
+      throw qualityDbError(error, 'reject the inspection');
     }
 
     return this.mapToResponseDto(data);
@@ -356,14 +343,14 @@ export class QualityInspectionService {
     id: string,
     userId: string,
   ): Promise<QualityInspectionResponseDto> {
-    const { data: inspection, error: fetchError } = await this.database.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
+    const { data: inspection, error: fetchError } = await this.db()
       .from('quality_inspections')
       .select('status')
       .eq('id', id)
       .single();
 
-    if (fetchError || !inspection) {
-      throw new NotFoundException('Inspection not found');
+    if (fetchError) {
+      throw qualityDbError(fetchError, 'read the inspection');
     }
 
     if (inspection.status !== InspectionStatus.APPROVED && inspection.status !== InspectionStatus.REJECTED) {
@@ -372,17 +359,20 @@ export class QualityInspectionService {
 
     // If undoing approval, delete the quality_approved_items that were created for this inspection
     if (inspection.status === InspectionStatus.APPROVED) {
-      const { error: deleteError } = await this.database.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
+      const { error: deleteError } = await this.db()
         .from('quality_approved_items')
         .delete()
         .eq('inspection_id', id);
 
       if (deleteError) {
-        this.logger.warn(`Could not delete quality_approved_items for inspection ${id}: ${deleteError.message}`);
+        this.logger.error(`Could not delete quality_approved_items for inspection ${id}: ${deleteError.code} ${deleteError.message}`);
+        throw qualityDbError(deleteError, 'remove the approved items of the inspection');
       }
     }
 
-    const { data, error } = await this.database.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
+    this.logger.log(`Resetting inspection ${id} (user ${userId})`);
+
+    const { data, error } = await this.db()
       .from('quality_inspections')
       .update({
         status: InspectionStatus.COMPLETED,
@@ -399,7 +389,7 @@ export class QualityInspectionService {
       .single();
 
     if (error) {
-      throw new BadRequestException('Failed to reset inspection status');
+      throw qualityDbError(error, 'reset the inspection status');
     }
 
     return this.mapToResponseDto(data);
@@ -410,53 +400,55 @@ export class QualityInspectionService {
     resultsDto: InspectionResultDto,
     userId: string,
   ): Promise<any> {
-    try {
-      const resultData = {
-        inspection_id: inspectionId,
-        checklist_results: resultsDto.checklistResults,
-        overall_result: resultsDto.overallResult,
-        notes: resultsDto.notes,
-        recommendations: resultsDto.recommendations,
-        attachments: resultsDto.attachments || [],
-        submitted_by: userId,
-        submitted_at: new Date().toISOString(),
-      };
+    const organizationId = await this.getInspectionOrganization(inspectionId);
 
-      const { data, error } = await this.database.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
-        .from('quality_inspection_results')
-        .upsert(resultData, { onConflict: 'inspection_id' })
-        .select('*')
-        .single();
+    const resultData = {
+      inspection_id: inspectionId,
+      organization_id: organizationId,
+      checklist_results: resultsDto.checklistResults,
+      overall_result: resultsDto.overallResult,
+      notes: resultsDto.notes,
+      recommendations: resultsDto.recommendations,
+      attachments: resultsDto.attachments || [],
+      submitted_by: userId,
+      submitted_at: new Date().toISOString(),
+    };
 
-      if (error) {
-        throw new BadRequestException('Failed to submit results');
-      }
+    const { data, error } = await this.db()
+      .from('quality_inspection_results')
+      .upsert(resultData, { onConflict: 'inspection_id' })
+      .select('*')
+      .single();
 
-      // Update inspection status
-      await this.updateInspection(inspectionId, {
-        status: InspectionStatus.COMPLETED,
-        actualEndDate: new Date().toISOString(),
-      }, userId);
-
-      return data;
-    } catch (error) {
-      this.logger.error('Error submitting inspection results:', error);
-      throw error;
+    if (error) {
+      throw qualityDbError(error, 'submit the inspection results');
     }
+
+    // Update inspection status
+    await this.updateInspection(inspectionId, {
+      status: InspectionStatus.COMPLETED,
+      actualEndDate: new Date().toISOString(),
+    }, userId);
+
+    return data;
   }
 
   async getInspectionResults(
     inspectionId: string,
     userId: string,
   ): Promise<any> {
-    const { data, error } = await this.database.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
+    // 404 for an inspection the caller cannot see, rather than "no results yet"
+    await this.getInspectionOrganization(inspectionId);
+
+    const { data, error } = await this.db()
       .from('quality_inspection_results')
       .select('*')
       .eq('inspection_id', inspectionId)
-      .single();
+      .maybeSingle();
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
-      throw new BadRequestException('Failed to get results');
+    if (error) {
+      this.logger.error(`Failed to get results of inspection ${inspectionId} (user ${userId}): ${error.code} ${error.message}`);
+      throw qualityDbError(error, 'read the inspection results');
     }
 
     return data;
@@ -467,21 +459,25 @@ export class QualityInspectionService {
     nonConformanceData: any,
     userId: string,
   ): Promise<any> {
+    const organizationId = await this.getInspectionOrganization(inspectionId);
+
+    // The body describes the non-conformance; which inspection and organization it belongs to, and who made it, are set here.
     const ncData = {
-      inspection_id: inspectionId,
       ...nonConformanceData,
+      inspection_id: inspectionId,
+      organization_id: organizationId,
       created_by: userId,
       created_at: new Date().toISOString(),
     };
 
-    const { data, error } = await this.database.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
+    const { data, error } = await this.db()
       .from('quality_non_conformances')
       .insert(ncData)
       .select('*')
       .single();
 
     if (error) {
-      throw new BadRequestException('Failed to create non-conformance');
+      throw qualityDbError(error, 'create the non-conformance');
     }
 
     return data;
@@ -495,11 +491,12 @@ export class QualityInspectionService {
       severity?: string;
     } = {},
   ): Promise<any[]> {
-    let query = this.database.getPrivilegedClient('quality-control: OPEN RISK no tenancy column or RLS on quality_* tables, isolation migration pending')
+    // !inner: a project filter on the embedded inspection must drop the non-conformances of other projects, not just blank the embed
+    let query = this.db()
       .from('quality_non_conformances')
       .select(`
         *,
-        quality_inspections!inspection_id (id, name, project_id)
+        quality_inspections!inspection_id!inner (id, name, project_id)
       `)
       .order('created_at', { ascending: false });
 
@@ -518,7 +515,8 @@ export class QualityInspectionService {
     const { data, error } = await query;
 
     if (error) {
-      throw new BadRequestException('Failed to get non-conformances');
+      this.logger.error(`Failed to get non-conformances for user ${userId}: ${error.code} ${error.message}`);
+      throw qualityDbError(error, 'retrieve non-conformances');
     }
 
     return data || [];
@@ -571,15 +569,13 @@ export class QualityInspectionService {
     try {
       this.logger.log(`Saving detailed report for inspection ${inspectionId}`);
 
-      // Check if inspection exists and user has access
-      const inspection = await this.getInspectionById(inspectionId, userId);
-      if (!inspection) {
-        throw new NotFoundException('Inspection not found');
-      }
+      // The inspection must be one the caller can see (404 otherwise); the report belongs to its organization.
+      const organizationId = await this.getInspectionOrganization(inspectionId);
 
       // Prepare data for database
       const reportData = {
         inspection_id: inspectionId,
+        organization_id: organizationId,
         part_name: reportDto.balloonDrawing.partName,
         material: reportDto.balloonDrawing.material,
         surface_treatment: reportDto.balloonDrawing.surfaceTreatment || null,
@@ -599,7 +595,7 @@ export class QualityInspectionService {
       };
 
       // Upsert the detailed report
-      const { data, error } = await this.database.getUserClient()
+      const { data, error } = await this.db()
         .from('detailed_inspection_reports')
         .upsert(reportData, { 
           onConflict: 'inspection_id',
@@ -633,7 +629,7 @@ export class QualityInspectionService {
         throw new NotFoundException('Inspection not found');
       }
 
-      const { data, error } = await this.database.getUserClient()
+      const { data, error } = await this.db()
         .from('detailed_inspection_reports')
         .select('*')
         .eq('inspection_id', inspectionId)
@@ -667,7 +663,7 @@ export class QualityInspectionService {
         throw new NotFoundException('Inspection not found');
       }
 
-      const { error } = await this.database.getUserClient()
+      const { error } = await this.db()
         .from('detailed_inspection_reports')
         .delete()
         .eq('inspection_id', inspectionId);

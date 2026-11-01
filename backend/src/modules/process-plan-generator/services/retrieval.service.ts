@@ -1,10 +1,13 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../../../common/database/database.service';
+import { resolveScenarioLocation } from '../../bom-items/costing/shared/physics/scenario-overrides';
+import { LOCATION_INFO } from '../../bom-items/costing/shared/core/default-rates.constants';
 
 import {
   EngineeringBrief,
   BriefBomItem,
   BriefDfm,
+  PLAN_WORKING_CURRENCY,
 } from '../dto/engineering-brief.dto';
 import { CandidateSet } from '../dto/candidate-set.dto';
 import { UNAVAILABLE_DRAWING_BRIEF } from '../dto/drawing-brief.dto';
@@ -18,7 +21,7 @@ import { rankTooling } from '../ranking/tooling-ranker';
 
 import { ScopeClassifierService } from './scope-classifier.service';
 import { DrawingExtractorService } from './drawing-extractor.service';
-import { ExchangeRateService, RateSnapshot } from '../../../common/exchange-rate/exchange-rate.service';
+import { ExchangeRateService, organizationIdOf, RateSnapshot } from '../../../common/exchange-rate/exchange-rate.service';
 import { FeatureGraphService } from './feature-graph.service';
 import { RuleEngineService } from './rule-engine.service';
 import { ManufacturingKnowledgeService } from '../../../modules/manufacturing-knowledge/manufacturing-knowledge.service';
@@ -65,11 +68,6 @@ export class RetrievalService {
     userId: string,
     accessToken: string | null,
   ): Promise<{ brief: EngineeringBrief; candidates: CandidateSet }> {
-    // ── Load budget exchange rates (must happen before candidate queries) ───
-    // One snapshot for the whole assemble() call — every row converted below
-    // uses the exact same rates, even if the shared cache reloads meanwhile.
-    const rates = await this.fx.getSnapshot(accessToken);
-
     const client = this.databaseService.getUserClient(accessToken ?? undefined);
 
     // ── Load BOM item ──────────────────────────────────────────────────────
@@ -89,8 +87,17 @@ export class RetrievalService {
     // A user_id-based re-check here would incorrectly 404 a legitimate
     // org-mate who didn't personally create this bom_item.
 
+    // ── Load budget exchange rates (must happen before candidate queries) ───
+    // The BOM item's organization's budget rates. One snapshot for the whole
+    // assemble() call — every row converted below uses the exact same rates,
+    // even if the shared cache reloads meanwhile.
+    const rates = await this.fx.getSnapshot(accessToken, organizationIdOf(bomRow));
+
     // ── Resolve organization location ──────────────────────────────────────
-    const orgLocation = await this.resolveOrgLocation(client, userId, bomRow);
+    const planLocation = await this.resolveOrgLocation(client, bomRow);
+    const orgLocation = planLocation.location;
+    // Assumptions made while assembling the brief — returned on brief.context.warnings.
+    const briefWarnings: string[] = planLocation.warning ? [planLocation.warning] : [];
 
     // ── Build BriefBomItem from row ────────────────────────────────────────
     const bomBrief: BriefBomItem = {
@@ -206,7 +213,7 @@ export class RetrievalService {
     // When DFM volume is available, compute density-based weight and override when
     // the discrepancy is > 50 % of the geometry estimate.
     if (dfm.volumeMm3 > 0) {
-      const densityKgPerM3 = estimateDensityKgPerM3(bomBrief.materialHint);
+      const densityKgPerM3 = densityWithDisclosure(bomBrief.materialHint, briefWarnings);
       const geomWeightKg = dfm.volumeMm3 * densityKgPerM3 * 1e-9;
       if (geomWeightKg > 0.0001) {
         const bomWeight = bomBrief.unitWeightKg;
@@ -289,7 +296,7 @@ export class RetrievalService {
           `[assemble] Sheet metal fill correction: ${dfm.volumeMm3.toFixed(0)}mm³ (0.45 fill) → ${revised.toFixed(0)}mm³ (0.05 fill)`,
         );
         dfm.volumeMm3 = revised;
-        const densityKgPerM3 = estimateDensityKgPerM3(bomBrief.materialHint);
+        const densityKgPerM3 = densityWithDisclosure(bomBrief.materialHint, briefWarnings);
         bomBrief.unitWeightKg = revised * densityKgPerM3 * 1e-9;
       }
     }
@@ -308,7 +315,7 @@ export class RetrievalService {
     // ── Build feature graph + mandatory ops from drawing + geometry ────────
     // Construct a partial brief first so feature-graph service can read it.
     const partialBrief = { bomItem: bomBrief, dfm, drawing, scope,
-      context: { organizationLocation: orgLocation, currency: 'INR' as const, language: 'en' as const },
+      context: { organizationLocation: orgLocation, locationSource: planLocation.source, currency: PLAN_WORKING_CURRENCY, language: 'en' as const, warnings: briefWarnings },
       featureGraph: { features: [], buildSources: [] as ('drawing' | 'geometry' | 'bom')[], overallConfidence: 1 },
       mandatoryOps: [],
     };
@@ -330,7 +337,7 @@ export class RetrievalService {
       drawing,
       featureGraph,
       mandatoryOps,
-      context: { organizationLocation: orgLocation, currency: 'INR', language: 'en', exchangeRateSnapshot: this.fx.snapshot() },
+      context: { organizationLocation: orgLocation, locationSource: planLocation.source, currency: PLAN_WORKING_CURRENCY, language: 'en', exchangeRateSnapshot: rates.rates(), warnings: briefWarnings },
       scope,
       routingTemplate,
     };
@@ -363,6 +370,9 @@ export class RetrievalService {
     ]);
 
     // ── Rank to top-N per kind ─────────────────────────────────────────────
+    // With no known location every row scores the same on location (no
+    // preference) — the brief's warnings already say so; no city is invented.
+    const rankLocation = orgLocation ?? '';
     const rankedProcesses = rankProcesses(processesRaw, family, dfm, RetrievalService.TOP_N_PROCESSES);
 
     // ── Enrich process candidates with their lookup reference tables ────────
@@ -372,14 +382,14 @@ export class RetrievalService {
     await this.enrichProcessReferenceTables(client, rankedProcesses);
 
     const candidates: CandidateSet = {
-      rawMaterials: rankMaterials(materialsRaw, family, bomBrief.materialHint, orgLocation, RetrievalService.TOP_N_MATERIALS, {
+      rawMaterials: rankMaterials(materialsRaw, family, bomBrief.materialHint, rankLocation, RetrievalService.TOP_N_MATERIALS, {
         sheetThicknessMm: dfm.sheetThicknessMm,
         holeCount: dfm.holeCount,
         bendCount: dfm.bendCount,
         coating: bomBrief.coating ?? null,
       }),
-      machines: rankMachines(mhrRaw, family, orgLocation, RetrievalService.TOP_N_MACHINES),
-      labour: rankLabour(lhrRaw, orgLocation, RetrievalService.TOP_N_LABOUR),
+      machines: rankMachines(mhrRaw, family, rankLocation, RetrievalService.TOP_N_MACHINES),
+      labour: rankLabour(lhrRaw, rankLocation, RetrievalService.TOP_N_LABOUR),
       processes: rankedProcesses,
       calculators: rankCalculators(calculatorsRaw, family, RetrievalService.TOP_N_CALCULATORS),
       tooling: rankTooling(toolingRaw, family, RetrievalService.TOP_N_TOOLING),
@@ -431,7 +441,7 @@ export class RetrievalService {
     });
   }
 
-  private async queryMhr(client: any, userId: string, orgLocation: string, rates: RateSnapshot) {
+  private async queryMhr(client: any, userId: string, orgLocation: string | null, rates: RateSnapshot) {
     // All BENCHMARK rows across all locations — the machine-ranker's locationFitScore
     // scores them: same location = 1.0, off-location = 0.4. This ensures:
     // (a) India gets routes even before India BENCHMARK rows are seeded (fallback to off-location).
@@ -464,7 +474,7 @@ export class RetrievalService {
     });
   }
 
-  private async queryLhr(client: any, userId: string, orgLocation: string, rates: RateSnapshot) {
+  private async queryLhr(client: any, userId: string, orgLocation: string | null, rates: RateSnapshot) {
     // All BENCHMARK LHR rows — ranker sorts by location fit.
     const { data: benchmark, error: benchErr } = await client
       .from('lhr_records')
@@ -732,24 +742,61 @@ export class RetrievalService {
     return null;
   }
 
-  private async resolveOrgLocation(client: any, userId: string, bomRow: any): Promise<string> {
-    // Try organizations table first (the workspace table introduced in 125)
-    try {
-      const { data } = await client
-        .from('organizations')
-        .select('country, city')
-        .eq('user_id', userId)
-        .limit(1)
-        .maybeSingle();
-      if (data?.country) {
-        return data.city ? `${data.country}-${data.city}` : data.country;
-      }
-    } catch (_) { /* ignore — table may not exist or column may differ */ }
+  /**
+   * The Digital Factory location this plan is for, from (1) the BOM item's own
+   * scenario location — the same one its costing uses — else (2) its
+   * organization's country, when that is a Digital Factory location. Never a
+   * guessed city: when neither is known, location is null and a warning says
+   * the candidates were not ranked for any location. A failed organization
+   * read throws.
+   */
+  private async resolveOrgLocation(client: any, bomRow: any): Promise<PlanLocation> {
+    const scenarioLocation = resolveScenarioLocation(bomRow.scenario_overrides ?? null);
+    if (scenarioLocation) return { location: scenarioLocation, source: 'scenario_override' };
 
-    // Fall back to project location if available
-    if (bomRow.project_location) return String(bomRow.project_location);
-    return 'India-Bangalore';
+    if (bomRow.organization_id) {
+      const { data, error } = await client
+        .from('organizations')
+        .select('country')
+        .eq('id', bomRow.organization_id)
+        .maybeSingle();
+      if (error) {
+        throw new InternalServerErrorException(`Unable to read the organization's location: ${error.message}`);
+      }
+      const country = typeof data?.country === 'string' ? data.country.trim() : '';
+      if (country && LOCATION_INFO[country]) return { location: country, source: 'organization' };
+      if (country) {
+        return {
+          location: null,
+          source: 'unknown',
+          warning: `Organization country "${country}" is not a Digital Factory location (${Object.keys(LOCATION_INFO).join(', ')}); machines, labour and materials were not ranked for a location. Set the item's factory location.`,
+        };
+      }
+    }
+    return {
+      location: null,
+      source: 'unknown',
+      warning: 'No factory location: the BOM item has no scenario location and its organization has no country; machines, labour and materials were not ranked for a location. Set the item\'s factory location.',
+    };
   }
+}
+
+interface PlanLocation {
+  location: string | null;
+  source: 'scenario_override' | 'organization' | 'unknown';
+  warning?: string;
+}
+
+/** Applied when no density rule matches a material hint — always disclosed in the brief's warnings. */
+const STEEL_DENSITY_ASSUMED_KG_M3 = 7850;
+
+/** Density for a material hint; when no rule matches, steel is assumed and a warning is recorded (once). */
+export function densityWithDisclosure(materialHint: string | null, warnings: string[]): number {
+  const known = estimateDensityKgPerM3(materialHint);
+  if (known !== null) return known;
+  const warning = `Density: no rule for material "${materialHint ?? '(none)'}"; steel ${STEEL_DENSITY_ASSUMED_KG_M3} kg/m³ ASSUMED for the geometry-based unit weight.`;
+  if (!warnings.includes(warning)) warnings.push(warning);
+  return STEEL_DENSITY_ASSUMED_KG_M3;
 }
 
 function numberOr(v: unknown, fallback: number): number;
@@ -764,7 +811,7 @@ function numberOr(v: unknown, fallback: number | null): number | null {
  * Returns approximate material density in kg/m³ based on a free-text material hint.
  * Used to convert DFM volume → estimated unit weight when BOM weight is missing or incorrect.
  */
-function estimateDensityKgPerM3(materialHint: string | null): number {
+function estimateDensityKgPerM3(materialHint: string | null): number | null {
   const h = (materialHint ?? '').toLowerCase();
   // Specific alloys FIRST — most specific patterns before broad ones to prevent mis-matches
   // (e.g. "Aluminium Bronze" must not match the "alumin" rule → would give wrong density)
@@ -780,5 +827,5 @@ function estimateDensityKgPerM3(materialHint: string | null): number {
   if (/rubber|elastomer/i.test(h)) return 1500;
   // Pure aluminium alloys — only after all copper/bronze variants are excluded above
   if (/alumin|al\s*6|al\s*7|7050|7075|6061|6082|2024|5083|5052/i.test(h)) return 2700;
-  return 7850; // default: mild/alloy steel (EN8, EN24, EN36, H13, P20, ...)
+  return null; // no rule matched: the caller applies STEEL_DENSITY_ASSUMED_KG_M3 and discloses it
 }
