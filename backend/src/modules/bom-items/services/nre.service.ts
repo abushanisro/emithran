@@ -149,7 +149,7 @@ export class NreService {
     }
 
     // ── CMM programming (from the secondary-process CMM line) ──────────────
-    const sec = await this.secondary.compute({ item, location, batchSize: inputs.batchSize, accessToken });
+    const sec = await this.secondary.compute({ item, location, batchSize: inputs.batchSize, accessToken, organizationId: await this.bomItems.organizationOfItem(itemId, accessToken) });
     const cmm = sec.lines.find((l) => l.process === 'CMM Inspection');
     const progStep = cmm?.trace.find((t) => t.label.startsWith('Programming'));
     if (cmm?.status === 'costed' && cmm.machine && progStep && typeof progStep.value === 'number') {

@@ -12,7 +12,7 @@ import { type RfqTrackingService } from '../../../modules/rfq/services/rfq-track
 
 function makeChain(result: { data: any; error: any; count?: number }) {
   const chain: any = {};
-  const methods = ['select', 'eq', 'in', 'like', 'insert', 'update', 'order'];
+  const methods = ['select', 'eq', 'is', 'in', 'like', 'insert', 'update', 'order'];
   for (const m of methods) chain[m] = jest.fn().mockReturnValue(chain);
   chain.single = jest.fn().mockResolvedValue(result);
   chain.then = (resolve: any) => resolve(result);
@@ -56,9 +56,12 @@ describe('RfqService.create', () => {
     expect(rfqInsertChain.insert).toHaveBeenCalledWith(
       expect.objectContaining({ user_id: 'user-456', organization_id: 'org-789' }),
     );
-    // generateRfqNumber() deliberately stays on the admin client (rfq_number
-    // is globally unique, not per-org) — confirm that didn't regress either.
-    expect(adminFromMock).toHaveBeenCalledWith('rfq_records');
+    // The RFQ number counts the caller's organization's RFQs as the caller (rfq_number is unique per organization since
+    // migration 942); the platform-wide count through the admin client is gone.
+    expect(databaseService.getPrivilegedClient).not.toHaveBeenCalled();
+    expect(adminFromMock).not.toHaveBeenCalled();
+    expect(rfqInsertChain.eq).toHaveBeenCalledWith('organization_id', 'org-789');
+    expect(rfqInsertChain.insert).toHaveBeenCalledWith(expect.objectContaining({ rfq_number: expect.stringMatching(/^RFQ-\d{6}-\d{3}$/) }));
   });
 });
 

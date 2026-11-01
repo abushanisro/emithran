@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import type { PostgrestError } from '@supabase/postgrest-js';
 
 import { DatabaseService } from '../../common/database/database.service';
@@ -43,6 +43,8 @@ function columnsOf(dto: UpdateOrganizationDto): Record<string, unknown> {
 function fail(error: PostgrestError): never {
   if (error.code === '42501') throw new ForbiddenException('Not allowed for this organization');
   if (error.code === '23505') throw new ConflictException(error.message);
+  if (error.code === 'P0002') throw new NotFoundException(error.message);
+  if (error.code === '22023') throw new BadRequestException(error.message);
   throw new Error(error.message);
 }
 
@@ -88,9 +90,8 @@ export class OrganizationsService {
     if (error) fail(error);
     const organization = exactlyOne(data, 'Organization');
 
-    const member = await client
-      .from('organization_members')
-      .insert({ organization_id: organization.id, user_id: userId, role: 'owner', status: 'active' });
+    // Membership writes go through functions that check the caller (migration 942); 921 closed the table to signed-in users.
+    const member = await client.rpc('add_organization_owner_membership', { p_organization_id: organization.id });
     if (member.error) fail(member.error);
 
     const workspace = await client.from('workspaces').insert({
@@ -144,27 +145,23 @@ export class OrganizationsService {
     }));
   }
 
-  async invite(organizationId: string, invitedBy: string, dto: InviteMemberDto, token: string): Promise<void> {
-    const { error } = await this.database.getClient(token).from('organization_members').insert({
-      organization_id: organizationId,
-      invited_email: dto.email.trim().toLowerCase(),
-      role: dto.role,
-      status: 'invited',
-      invited_by: invitedBy,
+  async invite(organizationId: string, dto: InviteMemberDto, token: string): Promise<void> {
+    // invite_organization_member (migration 942) refuses a caller who is not an owner or admin of the organization and records
+    // the caller as invited_by.
+    const { error } = await this.database.getClient(token).rpc('invite_organization_member', {
+      p_organization_id: organizationId,
+      p_email: dto.email.trim().toLowerCase(),
+      p_role: dto.role,
     });
     if (error) fail(error);
   }
 
   async removeMember(organizationId: string, memberId: string, token: string): Promise<void> {
-    const { data, error } = await this.database
+    // remove_organization_member (migration 942): owner/admin only, never the owner row, 404 for a row of another organization.
+    const { error } = await this.database
       .getClient(token)
-      .from('organization_members')
-      .delete()
-      .eq('id', memberId)
-      .eq('organization_id', organizationId)
-      .select('id');
+      .rpc('remove_organization_member', { p_organization_id: organizationId, p_member_id: memberId });
     if (error) fail(error);
-    exactlyOne(data, 'Member');
   }
 
   async workspaces(organizationId: string, token: string): Promise<WorkspaceRow[]> {

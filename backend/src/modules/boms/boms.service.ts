@@ -120,7 +120,7 @@ export class BOMsService {
    */
   private async computeBomsCosts(accessToken: string, bomIds: string[]): Promise<Map<string, number | null>> {
     const totals = await loadBomTotals(this.databaseService.getClient(accessToken), bomIds,
-      () => this.exchangeRates.getSnapshot(accessToken),
+      organizationId => this.exchangeRates.getSnapshot(accessToken, organizationId),
       message => this.logger.warn(message, 'BOMsService'));
     return new Map([...totals].map(([id, value]) => [id, value.totalCost]));
   }

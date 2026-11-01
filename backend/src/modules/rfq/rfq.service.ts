@@ -29,7 +29,7 @@ export class RfqService {
     } = createRfqDto;
 
     // Generate RFQ number
-    const rfqNumber = await this.generateRfqNumber();
+    const rfqNumber = await this.generateRfqNumber(organizationId ?? null, accessToken);
 
     // Validate BOM items and vendors exist
     await this.validateBomItems(bomItemIds, accessToken);
@@ -254,21 +254,23 @@ export class RfqService {
     }
   }
 
-  private async generateRfqNumber(): Promise<string> {
+  /**
+   * The next number of this month among the organization's RFQs (migration 942 makes rfq_number unique per organization),
+   * counted as the caller: RLS shows a member every RFQ of their organization and nothing of another. Two creates racing for
+   * the same number meet the unique constraint and the second gets a 409 to retry.
+   */
+  private async generateRfqNumber(organizationId: string | null, accessToken?: string): Promise<string> {
     const date = new Date();
     const year = date.getFullYear();
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
 
     const prefix = `RFQ-${year}${month}`;
-    // Deliberately stays on the service-role client: rfq_number is UNIQUE
-    // across the WHOLE table (migrations/043_rfq_system.sql), not per-org —
-    // an RLS-scoped count would only see the caller's own org's rows,
-    // letting two different orgs generate the same number in the same month
-    // and collide on insert.
-    const { count, error } = await this.databaseService.getPrivilegedClient('rfq-number: rfq_number is UNIQUE across all orgs, a count must see every org')
+    let query = this.databaseService.getUserClient(accessToken)
       .from('rfq_records')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .like('rfq_number', `${prefix}%`);
+    query = organizationId ? query.eq('organization_id', organizationId) : query.is('organization_id', null);
+    const { count, error } = await query;
 
     if (error) {
       this.logger.error(`Error generating RFQ number: ${error.message}`);
