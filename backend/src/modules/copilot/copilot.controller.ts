@@ -1,10 +1,11 @@
-import { Body, Controller, HttpCode, Post, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Post, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
 import { CopilotService, type CopilotEvent } from './copilot.service';
 import { CopilotChatDto } from './dto/chat.dto';
+import { CopilotMemoryService } from './copilot-memory.service';
 
 interface AuthUser {
   id: string;
@@ -14,7 +15,25 @@ interface AuthUser {
 @ApiBearerAuth()
 @Controller({ path: 'api/copilot', version: '1' })
 export class CopilotController {
-  constructor(private readonly copilot: CopilotService) {}
+  constructor(
+    private readonly copilot: CopilotService,
+    private readonly memory: CopilotMemoryService,
+  ) {}
+
+  /** What the copilot has saved for this user (their own row only, RLS). */
+  @Get('memory')
+  @ApiOperation({ summary: 'List the preferences the copilot has saved for the current user' })
+  async getMemory(@CurrentUser() user: AuthUser, @AccessToken() token: string): Promise<{ preferences: string[] }> {
+    return { preferences: await this.memory.load(user.id, token) };
+  }
+
+  /** Forget everything the copilot has saved for this user. */
+  @Delete('memory')
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Clear the preferences the copilot has saved for the current user' })
+  async clearMemory(@CurrentUser() user: AuthUser, @AccessToken() token: string): Promise<void> {
+    await this.memory.clear(user.id, token);
+  }
 
   /**
    * Streams the answer as server-sent events, one JSON object per frame

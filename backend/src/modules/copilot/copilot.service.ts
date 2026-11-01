@@ -6,7 +6,9 @@ import { CopilotMemoryService } from './copilot-memory.service';
 import type { BOMItemResponseDto } from '../bom-items/dto/bom-item-response.dto';
 import { COPILOT_SYSTEM_PROMPT } from './copilot.prompt';
 import { CostAggregationService } from '../costing/cost-aggregation.service';
-import { COPILOT_TOOLS, CopilotToolRunner, ResultCache, type ToolContext } from './copilot.tools';
+import { CopilotToolRunner, ResultCache, copilotTools, type ToolContext } from './copilot.tools';
+import { asksToChangeMemory, latestUserText, memoryConfirmation } from './copilot-intent';
+import type { PreferenceChange } from './copilot-memory.service';
 import { COPILOT_MAX_USER_CHARS, type CopilotChatDto } from './dto/chat.dto';
 
 const DEFAULT_MODEL = 'claude-sonnet-5-5';
@@ -83,7 +85,11 @@ export class CopilotService {
     if (!client) throw new ServiceUnavailableException('The copilot is not configured.');
 
     const startedAt = Date.now();
+    // Decided once, from the user's own latest turn as sent: tool results appended
+    // below as user-role messages, assistant turns and the part card never count.
+    const memoryWritesAllowed = asksToChangeMemory(latestUserText(dto.messages));
     const toolCtx: ToolContext = {
+      memoryWritesAllowed,
       item: prepared.item,
       bomItemId: dto.bomItemId,
       userId,
@@ -110,7 +116,7 @@ export class CopilotService {
               { type: 'text', text: COPILOT_SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } },
               { type: 'text', text: this.partCard(prepared.item, dto, prepared.preferences) },
             ],
-            tools: COPILOT_TOOLS,
+            tools: copilotTools(memoryWritesAllowed),
             messages,
           },
           { signal: requestSignal },
@@ -134,6 +140,7 @@ export class CopilotService {
             const toolStart = Date.now();
             const outcome = await tools.run(call.name, call.input);
             this.logger.log(`copilot tool user=${userId} item=${dto.bomItemId} name=${call.name} ms=${Date.now() - toolStart}${outcome.isError ? ' error=true' : ''}`);
+            if (outcome.memoryChange) this.reportMemoryChange(outcome.memoryChange, userId, emit);
             return {
               type: 'tool_result' as const,
               tool_use_id: call.id,
@@ -166,6 +173,16 @@ export class CopilotService {
     );
     if (errorCode) emit({ type: 'error', code: errorCode });
     else emit({ type: 'done', usage });
+  }
+
+  /**
+   * Durable memory changed: say exactly what, in the platform's words rather
+   * than the model's, so the user sees every saved or removed entry.
+   */
+  private reportMemoryChange(change: PreferenceChange, userId: string, emit: (event: CopilotEvent) => void): void {
+    this.logger.log(`copilot memory changed user=${userId} saved=${change.saved.length} removed=${change.removed.length}`);
+    const line = memoryConfirmation(change);
+    if (line) emit({ type: 'text', delta: `\n\n${line}\n\n` });
   }
 
   private errorCode(err: unknown): CopilotErrorCode {
