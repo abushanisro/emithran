@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { Logger } from '../../common/logger/logger.service';
 import { DatabaseService } from '../../common/database/database.service';
+import { assertXlsxWithinLimits } from '../../common/archive/xlsx-limits';
 import {
   CreateVendorDto,
   UpdateVendorDto,
@@ -899,6 +900,7 @@ export class VendorsService {
   }
 
   private async parseExcelBuffer(buffer: Buffer): Promise<string[][]> {
+    assertXlsxWithinLimits(buffer); // measured before ExcelJS inflates anything
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const ExcelJS = require('exceljs');
     const workbook = new ExcelJS.Workbook();

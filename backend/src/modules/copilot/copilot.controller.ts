@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
+import { SpendsAi } from '../../common/throttling/throttlers';
 import { CopilotService, type CopilotEvent } from './copilot.service';
 import { CopilotChatDto } from './dto/chat.dto';
 
@@ -25,6 +26,7 @@ export class CopilotController {
    */
   @Post('chat')
   @HttpCode(200)
+  @SpendsAi() // each request runs up to 5 model calls on the server's key
   @ApiOperation({ summary: 'Ask the manufacturing copilot about one part (SSE stream)' })
   async chat(
     @Body() dto: CopilotChatDto,

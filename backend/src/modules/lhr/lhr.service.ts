@@ -5,6 +5,7 @@ import { DatabaseService } from '../../common/database/database.service';
 import { CreateLHRDto, UpdateLHRDto } from './lhr.dto';
 import { validate as isValidUUID } from 'uuid';
 import * as ExcelJS from 'exceljs';
+import { assertXlsxWithinLimits } from '../../common/archive/xlsx-limits';
 import { getCurrencyForLocation } from '../mhr/constants/mhr-calculation.constants';
 import { ExchangeRateService, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
 
@@ -459,6 +460,7 @@ export class LHRService {
     accessToken: string,
   ): Promise<{ imported: number; skipped: number; errors: string[] }> {
     this.logger.log(`Importing LHR records from Excel for user ${userId}`, 'LHRService');
+    assertXlsxWithinLimits(fileBuffer); // measured before ExcelJS inflates anything
 
     const workbook = new ExcelJS.Workbook();
     const arrayBuffer = fileBuffer.buffer.slice(

@@ -9,6 +9,19 @@ import {
 import { Request, Response } from 'express';
 import { clientIp } from '../client-ip';
 
+/**
+ * A client error raised by Express middleware before Nest sees the request, such as the body parser's 413 (body over the limit,
+ * common/http/body-limits.ts) or 400 (malformed JSON). These are http-errors objects, not HttpExceptions: without this they would
+ * be reported as a 500. Only errors the library marks safe to expose, with a 4xx status, are kept as what they say.
+ */
+function clientErrorFromMiddleware(exception: unknown): HttpException | null {
+  if (exception instanceof HttpException || !(exception instanceof Error)) return null;
+  const { status, expose, type } = exception as Error & { status?: unknown; expose?: unknown; type?: unknown };
+  if (typeof status !== 'number' || status < 400 || status > 499 || expose !== true || typeof type !== 'string') return null;
+  const message = status === HttpStatus.PAYLOAD_TOO_LARGE ? 'Request body is too large.' : 'The request body could not be read.';
+  return new HttpException(message, status);
+}
+
 // Extend Request interface to include user property
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -128,7 +141,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     }
   ];
 
-  catch(exception: unknown, host: ArgumentsHost): void {
+  catch(raw: unknown, host: ArgumentsHost): void {
+    const exception = clientErrorFromMiddleware(raw) ?? raw;
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<AuthenticatedRequest>();

@@ -4,6 +4,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { HttpModule } from '@nestjs/axios';
 import { APP_GUARD } from '@nestjs/core';
 import { ClientIpThrottlerGuard } from './common/guards/client-ip-throttler.guard';
+import { throttlerOptions } from './common/throttling/throttlers';
 
 import { ProjectsModule } from './modules/projects/projects.module'; 862 
 import { VendorsModule } from './modules/vendors/vendors.module';
@@ -66,14 +67,7 @@ import { AppController } from './app.controller';
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        throttlers: [
-          {
-            ttl: config.get('THROTTLE_TTL', 60000),
-            limit: config.get('THROTTLE_LIMIT', 100),
-          },
-        ],
-      }),
+      useFactory: (config: ConfigService) => throttlerOptions((name, fallback) => config.get<number>(name, fallback)),
     }),
 
     HttpModule.register({

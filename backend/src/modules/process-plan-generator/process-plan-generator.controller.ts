@@ -19,6 +19,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
 import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
 import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
+import { SpendsAi } from '../../common/throttling/throttlers';
 
 import { OrchestratorService } from './services/orchestrator.service';
 import { PersistenceService } from './services/persistence.service';
@@ -60,6 +61,7 @@ export class ProcessPlanGeneratorController {
    */
   @Post(':bomItemId/generate')
   @HttpCode(200)
+  @SpendsAi() // drawing extraction and reasoning call the model on the server's key
   @ApiOperation({
     summary: 'Generate a process plan draft for a BOM item (AI)',
     description: 'Runs retrieval → reasoning → resolver and persists a draft. Returns the full GenerationResponse.',

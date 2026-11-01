@@ -8,6 +8,7 @@ import {
 import { dieCastingLookupTableNames } from '../bom-items/costing/casting/calculators/die-casting-calculator-spec';
 import { castingMaterialsAsTable, castingTableQuery, castingVariablesAsTable, type CastingFlatTable } from '../bom-items/costing/casting/casting-lookup-tables';
 import * as ExcelJS from 'exceljs';
+import { assertXlsxWithinLimits } from '../../common/archive/xlsx-limits';
 import { REFERENCE_DOMAINS, REFERENCE_GROUP_DOMAIN, type ReferenceDomain } from './reference-domains';
 import { strokeRateFactorTable, turretMachinesTable, waterjetMachinesTable, type ReferenceTablePayload } from '../bom-items/costing/sheet-metal/lookup/turret-reference-tables';
 import { Logger } from '../../common/logger/logger.service';
@@ -1385,6 +1386,7 @@ export class ProcessesService {
     accessToken: string,
     organizationId: string,
   ): Promise<{ imported: number; skipped: number }> {
+    assertXlsxWithinLimits(fileBuffer); // measured before ExcelJS inflates anything
     const workbook = new ExcelJS.Workbook();
     const arrayBuffer = fileBuffer.buffer.slice(
       fileBuffer.byteOffset,
