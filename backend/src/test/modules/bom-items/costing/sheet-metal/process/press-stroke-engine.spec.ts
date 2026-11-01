@@ -132,7 +132,7 @@ describe('computePressStrokeCost — Progressive Die Press (real strokes_per_min
   it('computes cycle time from the real per-machine strokes_per_min-derived press_cycle_time_s, same formula as Standard/Tandem Press', () => {
     const result = computePressStrokeCost('Progressive Die', 'progressive_die_press', {
       numberOfStrokes: 1,
-      batchSize: 500,
+      batchSize: 500, yieldPct: 0.98, // every input on file, yield included: no warnings
       partWeightKg: 1.5,
       pressRate: realProgressiveDieRate(),
       setupMin: 0.53 * 60, // setup_time_hr(0.53) -> min

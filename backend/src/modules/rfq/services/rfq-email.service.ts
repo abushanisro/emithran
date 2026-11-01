@@ -1,5 +1,5 @@
 import { Injectable, BadRequestException, Inject, Logger } from '@nestjs/common';
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../common/database/database.service';
 import { BomFileAccess } from '../../../common/storage/bom-file-access';
 import { OBJECT_STORE, type ObjectStore } from '../../../common/storage/object-store';
 import { createTransport, Transporter, SendMailOptions } from 'nodemailer';
@@ -9,6 +9,16 @@ import { RfqRecord } from '../dto/rfq-response.dto';
 const BOM_FILES_BUCKET = process.env.SUPABASE_BUCKET_BOM_FILES || 'bom-files';
 // Most mail servers refuse messages over ~25 MB.
 const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
+
+/** Text made safe for HTML element content and quoted attributes. */
+export function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 interface BomItemDetails {
   id: string;
@@ -51,7 +61,7 @@ export class RfqEmailService {
   private transporter: Transporter;
 
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly fileAccess: BomFileAccess,
     @Inject(OBJECT_STORE) private readonly objects: ObjectStore,
   ) {
@@ -141,7 +151,8 @@ export class RfqEmailService {
           address: process.env.SMTP_USER || 'noreply@mithran.com'
         },
         to: vendorEmail,
-        cc: rfq.buyerName ? `${rfq.buyerName} <${process.env.BUYER_EMAIL || process.env.SMTP_USER}>` : undefined,
+        // Structured, not "Name <address>": a buyer name containing addresses or commas cannot add recipients.
+        cc: rfq.buyerName ? { name: rfq.buyerName, address: process.env.BUYER_EMAIL || process.env.SMTP_USER || '' } : undefined,
         subject: emailTemplate.subject,
         html: emailTemplate.html,
         text: emailTemplate.text,
@@ -163,7 +174,7 @@ export class RfqEmailService {
   }
 
   private async fetchBomItemDetails(bomItemIds: string[], accessToken?: string): Promise<BomItemDetails[]> {
-    const { data, error } = await this.supabaseService.getUserClient(accessToken)
+    const { data, error } = await this.databaseService.getUserClient(accessToken)
       .from('bom_items')
       .select(`
         id,
@@ -205,7 +216,7 @@ export class RfqEmailService {
   }
 
   private async fetchVendorDetails(vendorIds: string[], accessToken?: string): Promise<VendorDetails[]> {
-    const { data, error } = await this.supabaseService.getUserClient(accessToken)
+    const { data, error } = await this.databaseService.getUserClient(accessToken)
       .from('vendors')
       .select(`
         id,
@@ -291,13 +302,20 @@ export class RfqEmailService {
 
     const subject = rfq.emailSubject || `RFQ ${rfq.rfqNumber}: Request for Quotation - ${rfq.rfqName}`;
     
+    // Every value below is user or vendor data (RFQ name, subject, message, buyer, vendor, BOM fields): escaped for HTML, and the
+    // reply links are built as URLs first, so no field can add markup, links or attributes to the email.
+    const e = escapeHtml;
+    const mailto = `mailto:${encodeURIComponent(templateData.contactEmail ?? '').replace(/%40/g, '@')}`;
+    const replyHref = `${mailto}?subject=${encodeURIComponent(`Re: ${templateData.rfqNumber}`)}`;
+    const contactHref = mailto;
+
     const html = `
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${subject}</title>
+    <title>${e(subject)}</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 20px; background-color: #f5f5f5; }
         .container { max-width: 800px; margin: 0 auto; background: white; border-radius: 10px; box-shadow: 0 0 20px rgba(0,0,0,0.1); overflow: hidden; }
@@ -325,29 +343,29 @@ export class RfqEmailService {
 <body>
     <div class="container">
         <div class="header">
-            <h1>${templateData.companyName}</h1>
+            <h1>${e(templateData.companyName)}</h1>
             <h2>Request for Quotation</h2>
-            <p>RFQ Number: <strong>${templateData.rfqNumber}</strong></p>
+            <p>RFQ Number: <strong>${e(templateData.rfqNumber)}</strong></p>
         </div>
         
         <div class="content">
-            <h3>Dear ${templateData.vendorName} Team,</h3>
+            <h3>Dear ${e(templateData.vendorName)} Team,</h3>
             
-            <p>We hope this email finds you well. ${templateData.companyName} is pleased to invite you to submit a quotation for the following requirements:</p>
+            <p>We hope this email finds you well. ${e(templateData.companyName)} is pleased to invite you to submit a quotation for the following requirements:</p>
             
             <div class="rfq-details">
                 <h4>RFQ Details</h4>
                 <table style="width: 100%; border: none;">
-                    <tr><td><strong>Project:</strong></td><td>${templateData.rfqName}</td></tr>
-                    <tr><td><strong>RFQ Number:</strong></td><td>${templateData.rfqNumber}</td></tr>
-                    <tr><td><strong>Quote Deadline:</strong></td><td class="deadline">${templateData.quoteDeadline}</td></tr>
-                    <tr><td><strong>Selection Type:</strong></td><td>${templateData.selectionType.toUpperCase()}</td></tr>
-                    <tr><td><strong>Total Items:</strong></td><td>${templateData.totalItems}</td></tr>
-                    <tr><td><strong>Buyer Contact:</strong></td><td>${templateData.buyerName}</td></tr>
+                    <tr><td><strong>Project:</strong></td><td>${e(templateData.rfqName)}</td></tr>
+                    <tr><td><strong>RFQ Number:</strong></td><td>${e(templateData.rfqNumber)}</td></tr>
+                    <tr><td><strong>Quote Deadline:</strong></td><td class="deadline">${e(templateData.quoteDeadline)}</td></tr>
+                    <tr><td><strong>Selection Type:</strong></td><td>${e(String(templateData.selectionType ?? '').toUpperCase())}</td></tr>
+                    <tr><td><strong>Total Items:</strong></td><td>${e(templateData.totalItems)}</td></tr>
+                    <tr><td><strong>Buyer Contact:</strong></td><td>${e(templateData.buyerName)}</td></tr>
                 </table>
             </div>
 
-            ${templateData.customMessage ? `<div style="background: #f0f9ff; border-left: 4px solid #0284c7; padding: 15px; margin: 20px 0;"><h4>Additional Information:</h4><p>${templateData.customMessage}</p></div>` : ''}
+            ${templateData.customMessage ? `<div style="background: #f0f9ff; border-left: 4px solid #0284c7; padding: 15px; margin: 20px 0;"><h4>Additional Information:</h4><p>${e(templateData.customMessage).replace(/\r?\n/g, '<br>')}</p></div>` : ''}
             
             <h4>Bill of Materials (BOM) Details</h4>
             <table class="bom-table">
@@ -365,14 +383,14 @@ export class RfqEmailService {
                 <tbody>
                     ${templateData.bomItems.map(item => `
                     <tr>
-                        <td><strong>${item.partNumber || item.name}</strong></td>
-                        <td>${item.description || item.name}</td>
-                        <td>${item.itemType.replace('_', ' ').toUpperCase()}</td>
-                        <td>${item.quantity} pcs</td>
-                        <td>${item.material || 'TBD'}</td>
+                        <td><strong>${e(item.partNumber || item.name)}</strong></td>
+                        <td>${e(item.description || item.name)}</td>
+                        <td>${e(String(item.itemType ?? '').replace('_', ' ').toUpperCase())}</td>
+                        <td>${e(item.quantity)} pcs</td>
+                        <td>${e(item.material || 'TBD')}</td>
                         <td>
                             <div class="process-tags">
-                                ${item.processes ? item.processes.map(p => `<span class="process-tag">${p}</span>`).join('') : '<span class="process-tag">General</span>'}
+                                ${item.processes ? item.processes.map(p => `<span class="process-tag">${e(p)}</span>`).join('') : '<span class="process-tag">General</span>'}
                             </div>
                         </td>
                         <td>${item.hasFiles ? '<span class="file-indicator">✓ Files Attached</span>' : 'Contact for files'}</td>
@@ -392,7 +410,7 @@ export class RfqEmailService {
                     <li>Validity period of the quote</li>
                 </ul>
                 <br>
-                <a href="mailto:${templateData.contactEmail}?subject=Re: ${templateData.rfqNumber}" class="cta-button">Reply via Email</a>
+                <a href="${e(replyHref)}" class="cta-button">Reply via Email</a>
             </div>
             
             <h4>Important Notes:</h4>
@@ -409,15 +427,15 @@ export class RfqEmailService {
             <p>Thank you for your time and consideration. We look forward to your competitive quotation.</p>
             
             <p>Best regards,<br>
-            <strong>${templateData.buyerName}</strong><br>
-            ${templateData.companyName}<br>
-            Email: <a href="mailto:${templateData.contactEmail}">${templateData.contactEmail}</a><br>
-            Phone: ${templateData.contactPhone}</p>
+            <strong>${e(templateData.buyerName)}</strong><br>
+            ${e(templateData.companyName)}<br>
+            Email: <a href="${e(contactHref)}">${e(templateData.contactEmail)}</a><br>
+            Phone: ${e(templateData.contactPhone)}</p>
         </div>
         
         <div class="footer">
-            <p>This email was generated automatically by ${templateData.companyName} RFQ System on ${templateData.currentDate}</p>
-            <p>© ${new Date().getFullYear()} ${templateData.companyName}. All rights reserved.</p>
+            <p>This email was generated automatically by ${e(templateData.companyName)} RFQ System on ${e(templateData.currentDate)}</p>
+            <p>© ${new Date().getFullYear()} ${e(templateData.companyName)}. All rights reserved.</p>
         </div>
     </div>
 </body>
@@ -518,7 +536,7 @@ ${templateData.companyName}
     errorMessage?: string
   ): Promise<void> {
     try {
-      await this.supabaseService.getUserClient()
+      await this.databaseService.getUserClient()
         .from('rfq_email_logs')
         .insert({
           rfq_id: rfqId,

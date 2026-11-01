@@ -86,6 +86,11 @@ class EnvironmentVariables {
   @IsOptional()
   THROTTLE_LIMIT: number = 100;
 
+  /** Calls per minute one caller may make, across every endpoint that spends the AI key (common/throttling/throttlers.ts). */
+  @IsNumber()
+  @IsOptional()
+  AI_LIMIT_PER_MINUTE: number = 20;
+
   @IsString()
   @IsOptional()
   @IsIn(['error', 'warn', 'info', 'debug', 'verbose'])
@@ -126,7 +131,7 @@ class EnvironmentVariables {
   @IsIn(['table', 'memory'])
   ELECTRONICS_QUEUE_DRIVER: string = 'table';
 
-  // The one upload limit in megabytes (see common/upload-limits.ts). 50 is the Supabase free tier's cap on one stored object.
+  // The one upload limit in megabytes (see common/upload-limits.ts).
   @IsNumber()
   @IsOptional()
   @Min(1)

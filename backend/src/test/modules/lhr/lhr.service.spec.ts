@@ -5,7 +5,7 @@
 // bom-items.currency.spec.ts's established convention.
 import { LHRService } from '../../../modules/lhr/lhr.service';
 import { type Logger } from '../../../common/logger/logger.service';
-import { type SupabaseService } from '../../../common/supabase/supabase.service';
+import { type DatabaseService } from '../../../common/database/database.service';
 import { type ExchangeRateService } from '../../../common/exchange-rate/exchange-rate.service';
 
 describe('LHRService.removeAll', () => {
@@ -16,12 +16,12 @@ describe('LHRService.removeAll', () => {
     const fromMock = jest.fn().mockReturnValue({ delete: deleteMock });
     const adminClient = { from: fromMock };
 
-    const supabaseService = {
+    const databaseService = {
       getPrivilegedClient: jest.fn().mockReturnValue(adminClient),
-    } as unknown as SupabaseService;
+    } as unknown as DatabaseService;
 
     const service = new LHRService(
-      supabaseService,
+      databaseService,
       { log: jest.fn(), error: jest.fn() } as unknown as Logger,
       {} as unknown as ExchangeRateService,
     );
@@ -60,13 +60,13 @@ describe('LHRService.getEffectiveRate', () => {
     const shopQuery = makeShopQuery(shopRows);
     const benchmarkQuery = makeBenchmarkQuery(benchmarkRows);
 
-    const supabaseService = {
+    const databaseService = {
       getClient: jest.fn().mockReturnValue({ from: jest.fn().mockReturnValue(shopQuery) }),
       getPrivilegedClient: jest.fn().mockReturnValue({ from: jest.fn().mockReturnValue(benchmarkQuery) }),
-    } as unknown as SupabaseService;
+    } as unknown as DatabaseService;
 
     return new LHRService(
-      supabaseService,
+      databaseService,
       { log: jest.fn(), error: jest.fn() } as unknown as Logger,
       {} as unknown as ExchangeRateService,
     );

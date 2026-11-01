@@ -6,12 +6,9 @@ import { defineConfig, devices } from '@playwright/test';
 try { process.loadEnvFile('.env'); } catch { /* no .env */ }
 // These specs sign in and create data in the running app; they never run against production. Same rule as the backend's
 // src/common/environment-guard.ts, written out here because this file is type-checked by the frontend image build, which
-// has no backend folder (test/lib/environment-guard-parity.test.ts keeps the two production hosts identical).
-const PRD_SUPABASE_HOST = 'udvcydhvlgjfsohueryv.supabase.co';
-// SUPABASE_URL is the backend's setting: the web app no longer has one, but the backend may still point at the production project.
-const supabaseHost = (() => { try { return new URL(process.env.SUPABASE_URL ?? '').hostname.toLowerCase(); } catch { return ''; } })();
-if (process.env.APP_ENV === 'prd' || supabaseHost === PRD_SUPABASE_HOST) {
-  throw new Error('Refusing to run the data-creating e2e suites against production. Point them at local or stage (APP_ENV=local|stage and the stage Supabase URL).');
+// has no backend folder (test/lib/environment-guard-parity.test.ts keeps the two rules identical).
+if (process.env.APP_ENV === 'prd') {
+  throw new Error('Refusing to run the data-creating e2e suites against production. Point them at local or stage (APP_ENV=local|stage).');
 }
 
 // UI end-to-end tests against the RUNNING dev servers (frontend :3000,

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import type { SupabaseClient } from '@supabase/supabase-js';
-import { SupabaseService } from '../../../../../common/supabase/supabase.service';
+import type { DbClient } from '../../../../../common/db/postgrest-client';
+import { DatabaseService } from '../../../../../common/database/database.service';
 import {
   PLASTIC_LOOKUP_KEYS,
   PLASTIC_REFERENCE_SOURCE_VERSION,
@@ -35,13 +35,13 @@ interface PressRecord {
  */
 @Injectable()
 export class PlasticReferenceService {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   private cached: { reference: PlasticReference | null; missing: string[] } | null = null;
 
   async getReference(): Promise<{ reference: PlasticReference | null; missing: string[] }> {
     if (this.cached) return this.cached;
-    const db = this.supabase.getPrivilegedClient('reference-data: machining_reference_data, public-read');
+    const db = this.database.getPrivilegedClient('reference-data: machining_reference_data, public-read');
     const [vars, lookups, gpps] = await Promise.all([
       db.from('machining_reference_data').select('key, value')
         .eq('category', 'variable').eq('source_version', PLASTIC_REFERENCE_SOURCE_VERSION)
@@ -66,7 +66,7 @@ export class PlasticReferenceService {
    * 855) and returned under the dotted header names plastic-reference.ts reads,
    * so the resolver is unchanged by the move off the staged JSON row.
    */
-  private async loadGpps(db: SupabaseClient): Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }> {
+  private async loadGpps(db: DbClient): Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }> {
     const { data, error } = await db
       .from('raw_material_properties')
       .select('property_key, value_num, raw_materials!inner(grade)')
@@ -88,7 +88,7 @@ export class PlasticReferenceService {
    * editable. A read error returns no records, and the engine then reports
    * the press timing as missing.
    */
-  async getPressRecords(client: SupabaseClient, mhrIds: string[]): Promise<Map<string, PressRecord>> {
+  async getPressRecords(client: DbClient, mhrIds: string[]): Promise<Map<string, PressRecord>> {
     const ids = [...new Set(mhrIds.filter(Boolean))];
     if (ids.length === 0) return new Map();
     const { data, error } = await client.from('mhr_records').select('id, press_cycle_time_s, good_part_yield, specs').in('id', ids);

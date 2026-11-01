@@ -8,7 +8,7 @@ import {
   type RankableMaterial,
 } from '../../../modules/raw-materials/material-search-ranking';
 
-// Pure functions over real raw_materials rows -- no Supabase, no mocks.
+// Pure functions over real raw_materials rows -- no database, no mocks.
 //
 // The two 6061 rows below are the REAL rows confirmed live on 2026-09-19
 // (material / grade / group / density), which is exactly the pair that made a

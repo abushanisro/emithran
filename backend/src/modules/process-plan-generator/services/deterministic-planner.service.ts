@@ -13,7 +13,7 @@ import {
   DEBURR_SEC_PER_METRE, DEBURR_SEC_PER_PIERCE, TAP_CYCLE_SEC,
   classifyMaterialFamily, INSPECTION_SAMPLING_DEFAULT,
 } from '../../bom-items/costing/shared/core/default-rates.constants';
-import { CycleTimeLibraryService } from './cycle-time-library.service';
+import { CycleTimeLibraryService, type CncMrr } from './cycle-time-library.service';
 
 /**
  * Builds an AbstractPlan deterministically from the routing template + candidate set.
@@ -128,7 +128,7 @@ export class DeterministicPlannerService {
         scrapPct: 3,
         cycleSec,
         timingSource,
-        reason: step.description || `${step.process} — Op ${step.step} per ${template.template_name}`,
+        reason: `${step.description || `${step.process} — Op ${step.step} per ${template.template_name}`}${physicsResult?.assumption ? ` [ASSUMED: ${physicsResult.assumption}]` : ''}`,
       });
       coverage.push({ text: `${step.process} ${step.description ?? ''}`, machineType: step.machine_type });
     }
@@ -491,12 +491,34 @@ function monthlyBatch(brief: EngineeringBrief): number {
 // Returns { sec } when physics can be computed from brief geometry, or null
 // to let the resolver fall back to its geometry heuristic / default tier.
 
+/**
+ * CNC MRR from the cycle-time library (with its provenance), or — when the
+ * planner runs without the library — the same hard-coded baseline, flagged.
+ */
+function cncMrrOrBaseline(
+  ctLib: CycleTimeLibraryService | undefined,
+  operation: 'mill' | 'turn',
+  matFamily: string,
+  mat: string | null,
+): CncMrr {
+  if (ctLib) return ctLib.getCncMrr(operation, matFamily);
+  const cls = classifyMaterialFamily(mat);
+  const baseline = operation === 'mill'
+    ? (cls === 'aluminum' ? 50000 : cls === 'stainless' ? 5000 : 12000)
+    : (cls === 'aluminum' ? 70000 : cls === 'stainless' ? 7000 : 18000);
+  return {
+    mrrMm3PerMin: baseline,
+    source: 'fallback_hardcoded',
+    warning: `CNC ${operation} MRR: no cycle-time library; hard-coded baseline ${baseline} mm³/min ASSUMED.`,
+  };
+}
+
 function computePhysicsCycleSec(
   machineType: string,
   stepProcess: string,
   brief: EngineeringBrief,
   ctLib?: CycleTimeLibraryService,
-): { sec: number } | null {
+): { sec: number; assumption?: string } | null {
   const dfm = brief.dfm;
   const mat = brief.bomItem.materialHint ?? null;
   // DB-resolved material family (set by retrieval.service.ts before plan() is called).
@@ -546,11 +568,9 @@ function computePhysicsCycleSec(
       if (bbVol <= 0 || dfm.volumeMm3 <= 0) return null;
       const fillRatio = Math.min(0.95, Math.max(0.05, dfm.volumeMm3 / bbVol));
       const removeVol = bbVol * (1 - fillRatio);
-      const mrrMm3PerMin = ctLib
-        ? (ctLib.getCncMrr('mill', matFamily) ?? 8000)
-        : (classifyMaterialFamily(mat) === 'aluminum' ? 50000 : classifyMaterialFamily(mat) === 'stainless' ? 5000 : 12000);
-      const machMin = removeVol / mrrMm3PerMin;
-      return { sec: Math.max(30, Math.round((machMin * 1.35 + 30) * 60)) }; // 35% overhead + 30min setup
+      const mrr = cncMrrOrBaseline(ctLib, 'mill', matFamily, mat);
+      const machMin = removeVol / mrr.mrrMm3PerMin;
+      return { sec: Math.max(30, Math.round((machMin * 1.35 + 30) * 60)), ...(mrr.warning ? { assumption: mrr.warning } : {}) }; // 35% overhead + 30min setup
     }
 
     // ── CNC turning — DB-backed MRR (mm³/min) ────────────────────────────────
@@ -560,11 +580,9 @@ function computePhysicsCycleSec(
       if (bbVol <= 0 || dfm.volumeMm3 <= 0) return null;
       const fillRatio = Math.min(0.95, Math.max(0.05, dfm.volumeMm3 / bbVol));
       const removeVol = bbVol * (1 - fillRatio);
-      const mrrMm3PerMin = ctLib
-        ? (ctLib.getCncMrr('turn', matFamily) ?? 12000)
-        : (classifyMaterialFamily(mat) === 'aluminum' ? 70000 : classifyMaterialFamily(mat) === 'stainless' ? 7000 : 18000);
-      const machMin = removeVol / mrrMm3PerMin;
-      return { sec: Math.max(30, Math.round((machMin * 1.25 + 20) * 60)) }; // 25% overhead + 20min setup
+      const mrr = cncMrrOrBaseline(ctLib, 'turn', matFamily, mat);
+      const machMin = removeVol / mrr.mrrMm3PerMin;
+      return { sec: Math.max(30, Math.round((machMin * 1.25 + 20) * 60)), ...(mrr.warning ? { assumption: mrr.warning } : {}) }; // 25% overhead + 20min setup
     }
 
     // ── CMM / first-article inspection ────────────────────────────────────────

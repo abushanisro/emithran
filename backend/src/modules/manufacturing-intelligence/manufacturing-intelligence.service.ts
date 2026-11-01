@@ -4,7 +4,7 @@ import {
   NotFoundException,
   Logger,
 } from '@nestjs/common';
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { DatabaseService } from '../../common/database/database.service';
 import {
   QueryCompatibilityDto,
   QueryFeatureCostRulesDto,
@@ -20,7 +20,7 @@ import {
 export class ManufacturingIntelligenceService {
   private readonly logger = new Logger(ManufacturingIntelligenceService.name);
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(private readonly databaseService: DatabaseService) {}
 
   private paginate(query: { page?: number; limit?: number }) {
     const page = query.page || 1;
@@ -32,7 +32,7 @@ export class ManufacturingIntelligenceService {
 
   async getMaterialProcessCompatibility(query: QueryCompatibilityDto, token: string) {
     const { page, limit, from, to } = this.paginate(query);
-    let q = this.supabaseService
+    let q = this.databaseService
       .getClient(token)
       .from('material_process_compatibility')
       .select('*', { count: 'exact' })
@@ -54,7 +54,7 @@ export class ManufacturingIntelligenceService {
 
   async getFeatureCostRules(query: QueryFeatureCostRulesDto, token: string) {
     const { page, limit, from, to } = this.paginate(query);
-    let q = this.supabaseService
+    let q = this.databaseService
       .getClient(token)
       .from('feature_cost_rules')
       .select('*', { count: 'exact' })
@@ -75,7 +75,7 @@ export class ManufacturingIntelligenceService {
 
   async getDfmRules(query: QueryDfmRulesDto, token: string) {
     const { page, limit, from, to } = this.paginate(query);
-    let q = this.supabaseService
+    let q = this.databaseService
       .getClient(token)
       .from('dfm_rules_library')
       .select('*', { count: 'exact' })
@@ -95,7 +95,7 @@ export class ManufacturingIntelligenceService {
       throw new InternalServerErrorException(`Failed: ${error.message}`);
     }
 
-    // Sort Critical > Warning > Advisory in-memory (Supabase doesn't do enum ordering)
+    // Sort Critical > Warning > Advisory in-memory (PostgREST doesn't do enum ordering)
     const sorted = (data ?? []).sort((a: any, b: any) => {
       const ai = severityOrder.indexOf(a.violation_severity);
       const bi = severityOrder.indexOf(b.violation_severity);
@@ -108,7 +108,7 @@ export class ManufacturingIntelligenceService {
 
   async getSupplierKpiBenchmarks(query: QuerySupplierKpiDto, token: string) {
     const { page, limit, from, to } = this.paginate(query);
-    let q = this.supabaseService
+    let q = this.databaseService
       .getClient(token)
       .from('supplier_kpi_benchmarks')
       .select('*', { count: 'exact' })
@@ -129,7 +129,7 @@ export class ManufacturingIntelligenceService {
 
   async getCommodityPrices(query: QueryCommodityPricesDto, token: string) {
     const { page, limit, from, to } = this.paginate(query);
-    let q = this.supabaseService
+    let q = this.databaseService
       .getClient(token)
       .from('commodity_price_history')
       .select('*', { count: 'exact' })
@@ -153,7 +153,7 @@ export class ManufacturingIntelligenceService {
 
   async getSupplierPerformance(query: QuerySupplierPerformanceDto, userId: string, token: string) {
     const { page, limit, from, to } = this.paginate(query);
-    let q = this.supabaseService
+    let q = this.databaseService
       .getClient(token)
       .from('supplier_performance_records')
       .select('*', { count: 'exact' })
@@ -175,7 +175,7 @@ export class ManufacturingIntelligenceService {
   }
 
   async getSupplierPerformanceById(id: string, userId: string, token: string) {
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(token)
       .from('supplier_performance_records')
       .select('*')
@@ -190,7 +190,7 @@ export class ManufacturingIntelligenceService {
   }
 
   async createSupplierPerformance(dto: CreateSupplierPerformanceDto, userId: string, token: string) {
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(token)
       .from('supplier_performance_records')
       .insert({
@@ -228,7 +228,7 @@ export class ManufacturingIntelligenceService {
     if (dto.responsivenessScore !== undefined) updateData.responsiveness_score = dto.responsivenessScore;
     if (dto.notes !== undefined) updateData.notes = dto.notes;
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(token)
       .from('supplier_performance_records')
       .update(updateData)
@@ -245,7 +245,7 @@ export class ManufacturingIntelligenceService {
   }
 
   async deleteSupplierPerformance(id: string, userId: string, token: string) {
-    const { error } = await this.supabaseService
+    const { error } = await this.databaseService
       .getClient(token)
       .from('supplier_performance_records')
       .delete()

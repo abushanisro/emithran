@@ -1,4 +1,4 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { DbClient } from '../../../../common/db/postgrest-client';
 
 import { withTimeout } from '../../../../common/async/with-timeout';
 import type { ElectronicsQueueName, JobHandler, JobQueue, JobState, JobStatus, QueueHealth } from './job-queue.port';
@@ -24,7 +24,7 @@ export interface TableJobQueueOptions {
   pollMs?: number;
 }
 
-// The job queue on the `job_queue` table (migration 920), reached over the Supabase API: no direct database connection.
+// The job queue on the `job_queue` table (migration 920), reached through PostgREST: no direct database connection.
 // Rows hold ids only. One job at a time per queue per process; more instances means more claimers (FOR UPDATE SKIP LOCKED).
 export class TableJobQueue implements JobQueue {
   private readonly pollMs: number;
@@ -33,7 +33,7 @@ export class TableJobQueue implements JobQueue {
   private running: Promise<unknown>[] = [];
 
   constructor(
-    private readonly client: SupabaseClient,
+    private readonly client: DbClient,
     private readonly options: TableJobQueueOptions,
   ) {
     this.pollMs = options.pollMs ?? POLL_MS;

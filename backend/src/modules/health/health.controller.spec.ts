@@ -7,12 +7,12 @@ import { Test } from '@nestjs/testing';
 import { TerminusModule } from '@nestjs/terminus';
 import request from 'supertest';
 
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { DatabaseService } from '../../common/database/database.service';
 import { ELECTRONICS_JOB_QUEUE, type QueueHealth } from '../electronics-costing/infrastructure/queue/job-queue.port';
 import { ElectronicsQueueHealthIndicator } from '../electronics-costing/infrastructure/queue/queue.health';
 import { HealthController } from './health.controller';
 import { EngineHealthIndicator } from './indicators/engine.health';
-import { SupabaseHealthIndicator } from './indicators/supabase.health';
+import { DatabaseHealthIndicator } from './indicators/database.health';
 
 // A stand-in engine we can switch between answering, erroring and hanging.
 type Behaviour = 'up' | 'http503' | 'hang';
@@ -73,10 +73,10 @@ describe('HealthController: liveness and readiness', () => {
       ],
       controllers: [HealthController],
       providers: [
-        SupabaseHealthIndicator,
+        DatabaseHealthIndicator,
         EngineHealthIndicator,
         ElectronicsQueueHealthIndicator,
-        { provide: SupabaseService, useValue: database },
+        { provide: DatabaseService, useValue: database },
         { provide: ELECTRONICS_JOB_QUEUE, useValue: { health: async () => queueHealth } },
       ],
     }).compile();
@@ -219,13 +219,13 @@ describe('HealthController: liveness and readiness', () => {
   });
 
   describe('GET /api/health (existing contract, unchanged)', () => {
-    it('still answers 200 with the supabase indicator and ignores dependency state', async () => {
+    it('still answers 200 with the database indicator and ignores dependency state', async () => {
       cad.behaviour = 'http503';
       queueHealth = { configured: true, ready: false };
       await boot();
       const res = await request(server()).get('/api/health').expect(200);
-      expect(res.body).toMatchObject({ status: 'ok', info: { supabase: { status: 'up' } } });
-      expect(Object.keys(res.body.info)).toEqual(['supabase']);
+      expect(res.body).toMatchObject({ status: 'ok', info: { database: { status: 'up' } } });
+      expect(Object.keys(res.body.info)).toEqual(['database']);
     });
   });
 });

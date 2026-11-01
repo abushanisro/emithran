@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../common/database/database.service';
 import { cachedRead } from '../costing/shared/core/request-cache';
 
 /**
@@ -30,7 +30,7 @@ type MachiningRouteRole = 'primary_milling' | 'primary_turning' | 'secondary_ope
  */
 @Injectable()
 export class MachineDiscoveryService {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(private readonly databaseService: DatabaseService) {}
 
   /**
    * Distinct, real mhr_records.machine_class values for Machining stations
@@ -43,7 +43,7 @@ export class MachineDiscoveryService {
    * fabricating a class.
    */
   async getEligibleClasses(role: MachiningRouteRole, location: string, accessToken: string): Promise<string[]> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     const rows = await cachedRead(`machining-eligible-classes:${role}:${location}`, async () => {
       const { data } = await client

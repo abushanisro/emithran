@@ -1,5 +1,5 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../common/database/database.service';
 import {
   PartWiseCostAnalysisDto,
   PartWiseCostBaseDataDto,
@@ -10,7 +10,7 @@ import {
 export class PartWiseCostAnalysisService {
   private readonly logger = new Logger(PartWiseCostAnalysisService.name);
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(private readonly databaseService: DatabaseService) {}
 
   /**
    * Get part-wise cost analysis data for a nomination and BOM item
@@ -24,7 +24,7 @@ export class PartWiseCostAnalysisService {
     costAnalysis: PartWiseCostAnalysisDto[];
     baseData: PartWiseCostBaseDataDto | null;
   }> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       // Get cost analysis data for all vendors for this part
@@ -72,7 +72,7 @@ export class PartWiseCostAnalysisService {
     bomItemId: string,
     accessToken: string
   ): Promise<void> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       // Get all vendors from the nomination
@@ -151,7 +151,7 @@ export class PartWiseCostAnalysisService {
     costAnalysis: PartWiseCostAnalysisDto[];
     baseData: PartWiseCostBaseDataDto | null;
   }> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       // Update base data if provided
@@ -237,7 +237,7 @@ export class PartWiseCostAnalysisService {
     bomItemId: string,
     accessToken: string
   ): Promise<void> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       const { error } = await client.rpc('calculate_part_wise_rankings', {
@@ -265,7 +265,7 @@ export class PartWiseCostAnalysisService {
     nominationId: string,
     accessToken: string
   ): Promise<any[]> {
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     try {
       const { data, error } = await client

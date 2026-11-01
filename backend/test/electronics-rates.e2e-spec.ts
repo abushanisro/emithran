@@ -4,7 +4,7 @@
 import { Test } from '@nestjs/testing';
 import { ConfigModule } from '@nestjs/config';
 import * as path from 'path';
-import { SupabaseService } from '../src/common/supabase/supabase.service';
+import { DatabaseService } from '../src/common/database/database.service';
 import { ElectronicsRateBookLoader } from '../src/modules/electronics-costing/infrastructure/repositories/electronics-rate-book.loader';
 import { ElectronicsReferenceRepository } from '../src/modules/electronics-costing/infrastructure/repositories/electronics-reference.repository';
 import { findRates, rateVersion } from '../src/modules/electronics-costing/domain/rates/rate-book';
@@ -16,23 +16,23 @@ const MACHINE = 'ATG- A5Neo Flying Probe Tester';
 
 describe('[e2e] electronics rate book — real mhr_records rows', () => {
   let loader: ElectronicsRateBookLoader;
-  let supabase: SupabaseService;
+  let database: DatabaseService;
   let organizationId: string;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
       imports: [ConfigModule.forRoot({ isGlobal: true, envFilePath: path.resolve(__dirname, '../../.env') })],
-      providers: [SupabaseService, ElectronicsReferenceRepository, ElectronicsRateBookLoader],
+      providers: [DatabaseService, ElectronicsReferenceRepository, ElectronicsRateBookLoader],
     }).compile();
     loader = moduleRef.get(ElectronicsRateBookLoader);
-    supabase = moduleRef.get(SupabaseService);
-    const org = await supabase.getPrivilegedClient('e2e check: any organization id to pass to the loader').from('organizations').select('id').limit(1).single();
+    database = moduleRef.get(DatabaseService);
+    const org = await database.getPrivilegedClient('e2e check: any organization id to pass to the loader').from('organizations').select('id').limit(1).single();
     organizationId = (org.data as { id: string }).id;
   });
 
   // The newest of the real rows stored for the machine (the import exists twice; the rates agree).
   async function realRow() {
-    const { data, error } = await supabase
+    const { data, error } = await database
       .getPrivilegedClient('e2e check: read the mhr_records row the rate book must agree with')
       .from('mhr_records')
       .select('id, mhr_usd_per_hour, usd_labor_rate_per_hr, economics_version, updated_at')
@@ -74,7 +74,7 @@ describe('[e2e] electronics rate book — real mhr_records rows', () => {
   });
 
   it('leaves reference rows that are pending confirmation out of the book', async () => {
-    const reference = await new ElectronicsReferenceRepository(supabase).listRows();
+    const reference = await new ElectronicsReferenceRepository(database).listRows();
     expect(reference.some((r) => r.status === 'sourced_pending_confirmation')).toBe(true);
     const book = await loader.load(organizationId);
     expect(book.entries.filter((e) => e.kind === 'reference')).toEqual(reference.filter((r) => r.status === 'sourced').map((r) => expect.objectContaining({ key: r.key })));

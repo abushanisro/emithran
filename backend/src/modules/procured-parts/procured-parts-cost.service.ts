@@ -12,7 +12,7 @@
 
 import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { Logger } from '../../common/logger/logger.service';
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { DatabaseService } from '../../common/database/database.service';
 import { declareCostRecordCurrency } from '../bom-items/costing/shared/core/persisted-currency-contract';
 import {
   CreateProcuredPartsCostDto,
@@ -25,7 +25,7 @@ import {
 @Injectable()
 export class ProcuredPartsCostService {
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly logger: Logger,
   ) {}
 
@@ -45,7 +45,7 @@ export class ProcuredPartsCostService {
       const from = (page - 1) * limit;
       const to = from + limit - 1;
 
-      let queryBuilder = this.supabaseService
+      let queryBuilder = this.databaseService
         .getUserClient(accessToken)
         .from('procured_parts_cost_records')
         .select('*', { count: 'exact' })
@@ -100,7 +100,7 @@ export class ProcuredPartsCostService {
   ): Promise<ProcuredPartsCostResponseDto> {
     this.logger.log(`Fetching procured part cost: ${id}`, 'ProcuredPartsCostService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getUserClient(accessToken)
       .from('procured_parts_cost_records')
       .select('*')
@@ -160,7 +160,7 @@ export class ProcuredPartsCostService {
         is_active: dto.isActive !== undefined ? dto.isActive : true,
       };
 
-      const { data, error } = await this.supabaseService
+      const { data, error } = await this.databaseService
         .getUserClient(accessToken)
         .from('procured_parts_cost_records')
         .insert(record)
@@ -224,7 +224,7 @@ export class ProcuredPartsCostService {
     if (dto.notes !== undefined) updateData.notes = dto.notes;
     if (dto.isActive !== undefined) updateData.is_active = dto.isActive;
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getUserClient(accessToken)
       .from('procured_parts_cost_records')
       .update(updateData)
@@ -249,7 +249,7 @@ export class ProcuredPartsCostService {
     // Verify existence
     await this.findOne(id, userId, accessToken);
 
-    const { error } = await this.supabaseService
+    const { error } = await this.databaseService
       .getUserClient(accessToken)
       .from('procured_parts_cost_records')
       .delete()
@@ -273,7 +273,7 @@ export class ProcuredPartsCostService {
   ): Promise<number> {
     this.logger.log(`Calculating total procured parts cost for BOM item: ${bomItemId}`, 'ProcuredPartsCostService');
 
-    const client = this.supabaseService.getUserClient(accessToken);
+    const client = this.databaseService.getUserClient(accessToken);
 
     // Get all active procured parts costs for this BOM item
     const { data: costs, error } = await client
@@ -303,7 +303,7 @@ export class ProcuredPartsCostService {
   ): Promise<Record<string, number>> {
     if (bomItemIds.length === 0) return {};
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getUserClient(accessToken)
       .from('procured_parts_cost_records')
       .select('bom_item_id, total_cost')

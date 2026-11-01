@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../common/database/database.service';
 import { cachedRead } from '../costing/shared/core/request-cache';
 import { loadDieCastingCalculatorSpec } from '../costing/casting/calculators/die-casting-calculator-spec';
 import type { ReferenceCalculators } from '../costing/shared/calculators/reference-calculator';
@@ -8,7 +8,7 @@ import { loadHeatTreatmentCalculatorSpec } from '../costing/heat/calculators/hea
 
 @Injectable()
 export class CalculatorCatalogService {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(private readonly databaseService: DatabaseService) {}
 
   /**
    * The calculator catalog for one request, in three queries instead of N.
@@ -42,7 +42,7 @@ export class CalculatorCatalogService {
     fields: any[];
   }> {
     return cachedRead('calculator-catalog', async () => {
-      const client = this.supabaseService.getClient(accessToken);
+      const client = this.databaseService.getClient(accessToken);
       const { data: mappings, error } = await client
         .from('process_calculator_mappings')
         .select('machine_class, operation, calculator_id, display_order, process_group, process_route, lhr_process_group, applicable_families, canonical_process_id')
@@ -80,7 +80,7 @@ export class CalculatorCatalogService {
   loadDieCastingCalculators(accessToken: string): Promise<ReferenceCalculators> {
     return cachedRead('die-casting-calculators', async () => {
       const spec = loadDieCastingCalculatorSpec();
-      const client = this.supabaseService.getClient(accessToken);
+      const client = this.databaseService.getClient(accessToken);
       const { data: calcs } = await client
         .from('calculators')
         .select('id, name, version')
@@ -112,7 +112,7 @@ export class CalculatorCatalogService {
    */
   loadDomainCalculators(accessToken: string, spec: DomainCalculatorSpec): Promise<ReferenceCalculators> {
     return cachedRead(`domain-calculators:${spec.domain}`, async () => {
-      const client = this.supabaseService.getClient(accessToken);
+      const client = this.databaseService.getClient(accessToken);
       const { data: calcs } = await client
         .from('calculators')
         .select('id, name, version')

@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, InternalServerErrorException, Logger } from '@nestjs/common';
-import { SupabaseService } from '@/common/supabase/supabase.service';
+import { DatabaseService } from '@/common/database/database.service';
 import { UuidValidator } from '@/common/validators/uuid.validator';
 import {
   CreateLotVendorAssignmentDto,
@@ -14,16 +14,16 @@ import {
 export class ProductionProcessService {
   private readonly logger = new Logger(ProductionProcessService.name);
 
-  constructor(private readonly supabaseService: SupabaseService) { }
+  constructor(private readonly databaseService: DatabaseService) { }
 
 
   async getProductionProcessById(id: string, userId: string): Promise<ProductionProcessResponseDto> {
     UuidValidator.validateUuid(id, 'Process ID');
     UuidValidator.validateUuid(userId, 'User ID');
 
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from('production_processes')
       .select(`
         *,
@@ -56,10 +56,10 @@ export class ProductionProcessService {
   async deleteProductionProcess(id: string, userId: string): Promise<void> {
     UuidValidator.validateUuid(id, 'Process ID');
 
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Verify ownership
-    const { data: existing } = await supabase
+    const { data: existing } = await database
       .from('production_processes')
       .select('id, production_lot:production_lots!inner(created_by)')
       .eq('id', id)
@@ -70,7 +70,7 @@ export class ProductionProcessService {
       throw new NotFoundException('Production process not found or access denied');
     }
 
-    const { error } = await supabase
+    const { error } = await database
       .from('production_processes')
       .delete()
       .eq('id', id);
@@ -84,10 +84,10 @@ export class ProductionProcessService {
   async getProcessesByLot(lotId: string, userId: string): Promise<ProductionProcessResponseDto[]> {
     UuidValidator.validateUuid(lotId, 'Lot ID');
 
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Verify the production lot exists and user has access
-    const { data: lotData, error: lotError } = await supabase
+    const { data: lotData, error: lotError } = await database
       .from('production_lots')
       .select('id, created_by')
       .eq('id', lotId)
@@ -99,7 +99,7 @@ export class ProductionProcessService {
     }
 
     // Now get processes for this lot with simplified query
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from('production_processes')
       .select(`
         *,
@@ -154,10 +154,10 @@ export class ProductionProcessService {
   ): Promise<VendorAssignmentResponseDto> {
     UuidValidator.validateUuid(processId, 'Process ID');
 
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Verify process ownership and get production lot ID
-    const { data: process } = await supabase
+    const { data: process } = await database
       .from('production_processes')
       .select('production_lot_id, production_lot:production_lots!inner(created_by)')
       .eq('id', processId)
@@ -168,7 +168,7 @@ export class ProductionProcessService {
       throw new NotFoundException('Production process not found or access denied');
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from('lot_vendor_assignments')
       .insert({
         production_lot_id: process.production_lot_id,
@@ -199,10 +199,10 @@ export class ProductionProcessService {
   async getProcessVendorAssignments(processId: string, userId: string): Promise<VendorAssignmentResponseDto[]> {
     UuidValidator.validateUuid(processId, 'Process ID');
 
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Get production lot ID from process
-    const { data: process } = await supabase
+    const { data: process } = await database
       .from('production_processes')
       .select('production_lot_id, production_lot:production_lots!inner(created_by)')
       .eq('id', processId)
@@ -213,7 +213,7 @@ export class ProductionProcessService {
       throw new NotFoundException('Production process not found or access denied');
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from('lot_vendor_assignments')
       .select(`
         *,
@@ -236,10 +236,10 @@ export class ProductionProcessService {
   ): Promise<VendorAssignmentResponseDto> {
     UuidValidator.validateUuid(assignmentId, 'Assignment ID');
 
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Verify ownership through production lot
-    const { data: existing } = await supabase
+    const { data: existing } = await database
       .from('lot_vendor_assignments')
       .select(`
         id,
@@ -256,7 +256,7 @@ export class ProductionProcessService {
     // Calculate total cost if quantity or unit cost changed
     const updateData: any = { ...updateDto };
     if (updateDto.requiredQuantity || updateDto.unitCost) {
-      const { data: current } = await supabase
+      const { data: current } = await database
         .from('lot_vendor_assignments')
         .select('required_quantity, unit_cost')
         .eq('id', assignmentId)
@@ -267,7 +267,7 @@ export class ProductionProcessService {
       updateData.total_cost = quantity * unitCost;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from('lot_vendor_assignments')
       .update({
         ...updateData,

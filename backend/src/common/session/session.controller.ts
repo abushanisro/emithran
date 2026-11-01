@@ -1,6 +1,5 @@
 import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { SkipThrottle } from '@nestjs/throttler';
 import { IsIn } from 'class-validator';
 import { CurrentUser } from '../decorators/current-user.decorator';
 import { SessionId } from './session-id.decorator';
@@ -14,13 +13,13 @@ export class SessionActivityDto {
 
 export interface SessionStatusDto {
   policy: typeof SESSION_IDLE_POLICY;
-  /** False only for the development bypass, which has no Supabase session. */
+  /** False only for the development bypass, which has no sign-in session. */
   enforced: boolean;
   deadline: number | null;
 }
 
 /**
- * The inactivity timeout's two endpoints. SupabaseAuthGuard has already run
+ * The inactivity timeout's two endpoints. RequestAuthGuard has already run
  * (and rejected an expired session) before either handler is reached.
  */
 @ApiTags('Session')
@@ -30,10 +29,6 @@ export class SessionController {
   constructor(private readonly sessionActivity: SessionActivityService) {}
 
   @Get()
-  // Next.js API routes call this for every request they serve, all from the
-  // Next server's one IP, so the per-IP limit would throttle unrelated users.
-  // Read-only and behind SupabaseAuthGuard; the heartbeat stays throttled.
-  @SkipThrottle()
   @ApiOperation({ summary: 'Inactivity-timeout policy and this session\'s deadline. Does not count as activity.' })
   async status(
     @SessionId() sessionId: string | undefined,

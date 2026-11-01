@@ -89,7 +89,7 @@ describe('resolvePersistedProcessCost (P1b-iv-b)', () => {
     expect(r.totalCostPerPart).toBe(0);
   });
 
-  it('accepts numeric strings, as Supabase returns them', () => {
+  it('accepts numeric strings, as PostgREST returns them', () => {
     const r = resolvePersistedProcessCost({ total_cost_per_part: '0.023329' } as never);
     expect(r.source).toBe('stored');
     expect(r.totalCostPerPart).toBeCloseTo(0.023329, 9);

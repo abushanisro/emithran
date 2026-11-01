@@ -2,11 +2,11 @@ import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request, Ht
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { ProcessPlanningService } from './process-planning.service';
 import { CreateProcessPlanningSpecDto, UpdateProcessPlanningSpecDto, ProcessPlanningSpecResponseDto } from './dto/process-planning.dto';
-import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
+import { RequestAuthGuard } from '../../common/guards/request-auth.guard';
 
 @ApiTags('Process Planning')
 @Controller({ path: 'api/process-planning', version: '1' })
-@UseGuards(SupabaseAuthGuard)
+@UseGuards(RequestAuthGuard)
 @ApiBearerAuth()
 export class ProcessPlanningController {
   constructor(private readonly processPlanningService: ProcessPlanningService) {}

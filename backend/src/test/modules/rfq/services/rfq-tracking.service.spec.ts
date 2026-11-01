@@ -3,7 +3,7 @@
 // (rfq_tracking + its vendor/part junction rows) instead of leaving it
 // unset, mirroring the pattern already proven for boms/mhr_records.
 import { RfqTrackingService } from '../../../../modules/rfq/services/rfq-tracking.service';
-import { type SupabaseService } from '../../../../common/supabase/supabase.service';
+import { type DatabaseService } from '../../../../common/database/database.service';
 
 function makeChain(result: { data: any; error: any }) {
   const chain: any = {};
@@ -33,11 +33,11 @@ describe('RfqTrackingService.createTracking', () => {
       throw new Error(`unexpected table: ${table}`);
     });
 
-    const supabaseService = {
+    const databaseService = {
       getClient: jest.fn().mockReturnValue({ from: fromMock }),
-    } as unknown as SupabaseService;
+    } as unknown as DatabaseService;
 
-    const service = new RfqTrackingService(supabaseService);
+    const service = new RfqTrackingService(databaseService);
 
     await service.createTracking('user-456', 'token-abc', 'org-789', {
       rfqId: 'rfq-1',

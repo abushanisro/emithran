@@ -1,19 +1,19 @@
 import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { DatabaseService } from '../../common/database/database.service';
 import { CreateProcessPlanningSpecDto, UpdateProcessPlanningSpecDto, ProcessPlanningSpecResponseDto } from './dto/process-planning.dto';
 
 @Injectable()
 export class ProcessPlanningService {
   private readonly logger = new Logger(ProcessPlanningService.name);
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(private readonly databaseService: DatabaseService) {}
 
   /**
    * Get process planning specifications for a BOM item
    */
   async getSpecificationsByBomItem(bomItemId: string, userId: string): Promise<ProcessPlanningSpecResponseDto | null> {
     try {
-      const client = this.supabaseService.getUserClient();
+      const client = this.databaseService.getUserClient();
 
       const { data, error } = await client
         .from('process_planning_with_bom_details')
@@ -44,7 +44,7 @@ export class ProcessPlanningService {
    */
   async getSpecificationsByProject(projectId: string, userId: string): Promise<ProcessPlanningSpecResponseDto[]> {
     try {
-      const client = this.supabaseService.getUserClient();
+      const client = this.databaseService.getUserClient();
 
       const { data, error } = await client
         .from('process_planning_with_bom_details')
@@ -71,7 +71,7 @@ export class ProcessPlanningService {
    */
   async upsertSpecifications(dto: CreateProcessPlanningSpecDto, userId: string): Promise<ProcessPlanningSpecResponseDto> {
     try {
-      const client = this.supabaseService.getUserClient();
+      const client = this.databaseService.getUserClient();
 
       const { data, error } = await client
         .from('process_planning_specifications')
@@ -113,7 +113,7 @@ export class ProcessPlanningService {
    */
   async createSpecifications(dto: CreateProcessPlanningSpecDto, userId: string): Promise<ProcessPlanningSpecResponseDto> {
     try {
-      const client = this.supabaseService.getUserClient();
+      const client = this.databaseService.getUserClient();
 
       // Check if specifications already exist for this BOM item
       const { data: existing } = await client
@@ -168,7 +168,7 @@ export class ProcessPlanningService {
    */
   async updateSpecifications(bomItemId: string, dto: UpdateProcessPlanningSpecDto, userId: string): Promise<ProcessPlanningSpecResponseDto> {
     try {
-      const client = this.supabaseService.getUserClient();
+      const client = this.databaseService.getUserClient();
 
       const { data, error } = await client
         .from('process_planning_specifications')
@@ -212,7 +212,7 @@ export class ProcessPlanningService {
    */
   async deleteSpecifications(bomItemId: string, userId: string): Promise<void> {
     try {
-      const client = this.supabaseService.getUserClient();
+      const client = this.databaseService.getUserClient();
 
       const { error } = await client
         .from('process_planning_specifications')

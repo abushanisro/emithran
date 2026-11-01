@@ -1,4 +1,4 @@
-/** Profile photos, kept in the object store (S3-compatible or Supabase Storage) under one key per user. */
+/** Profile photos, kept in the object store (S3-compatible) under one key per user. */
 export const AVATAR_BUCKET = 'avatars';
 export const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
 /** Signed links last as long as the longest session (12 h), so an open page never shows a broken photo. */

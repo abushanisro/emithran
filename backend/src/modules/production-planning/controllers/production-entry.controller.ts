@@ -21,11 +21,11 @@ import {
   WeeklySummaryDto,
   ProductionEntriesQueryDto
 } from '../dto/production-entry.dto';
-import { SupabaseAuthGuard } from '@/common/guards/supabase-auth.guard';
+import { RequestAuthGuard } from '@/common/guards/request-auth.guard';
 
 @ApiTags('production-entries')
 @ApiBearerAuth()
-@UseGuards(SupabaseAuthGuard)
+@UseGuards(RequestAuthGuard)
 @Controller('api/production-planning/production-entries')
 export class ProductionEntryController {
   constructor(private readonly productionEntryService: ProductionEntryService) {}

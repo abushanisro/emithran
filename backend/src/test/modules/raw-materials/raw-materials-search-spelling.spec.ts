@@ -4,8 +4,8 @@ import {
   MATERIAL_SEARCH_SPELLING_VARIANTS,
 } from '../../../modules/raw-materials/raw-materials.service';
 
-// Pure functions, zero Supabase/DB dependency — no mocking needed or used,
-// per this project's standing rule against mocked-Supabase spec files.
+// Pure functions, zero database dependency — no mocking needed or used,
+// per this project's standing rule against mocked-database spec files.
 //
 // Root-caused live (2026-09-18): searching "aluminium" (or "ALUMINIUM") in
 // the Material Database returned 0 results even though every real

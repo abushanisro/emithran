@@ -23,7 +23,7 @@ import { resolveBomItemFileUrl } from '@/lib/utils/storage-file-url';
  *
  *   Mode B – let the proxy fetch the signed URL from backend (used by BalloonDiagramViewer):
  *     GET /api/file-proxy?itemId=<bomItemId>&fileType=2d|3d
- *     Requires Authorization header to be forwarded.
+ *     The backend is asked with the caller's session token.
  *
  * Every destination passes the one trusted-storage rule (lib/server/safe-fetch:
  * the project's own storage host, https, no credentials), redirects are never
@@ -68,7 +68,8 @@ export async function GET(request: NextRequest) {
             const resolved = await resolveBomItemFileUrl(
                 itemId,
                 fileType,
-                request.headers.get('Authorization') ?? '',
+                // The session's token: under the BFF the browser holds none to forward.
+                `Bearer ${auth.accessToken}`,
             );
             if (!resolved.ok) {
                 return NextResponse.json(
@@ -126,8 +127,13 @@ export async function GET(request: NextRequest) {
             // Conservative cache — signed URLs are short-lived anyway
             'Cache-Control': 'private, max-age=3300',
         };
-        // Anything that is not a PDF or image is data: give it no script capability at all.
-        if (!/^(application\/pdf|image\/)/i.test(contentType as string)) {
+        if (/^application\/pdf/i.test(contentType as string)) {
+            // A PDF is shown inline by the browser's viewer, but in an opaque-origin sandbox: scripts or forms inside the
+            // file never run as this app's origin. The built-in viewer still renders sandboxed PDFs.
+            responseHeaders['Content-Security-Policy'] = 'sandbox';
+            responseHeaders['Content-Disposition'] = 'inline';
+        } else if (!/^image\//i.test(contentType as string)) {
+            // Anything that is not a PDF or image is data: give it no script capability at all.
             responseHeaders['Content-Security-Policy'] = "sandbox; default-src 'none'";
         }
 

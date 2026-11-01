@@ -10,8 +10,8 @@
 
 import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { Logger } from '../../../common/logger/logger.service';
-import { SupabaseService } from '../../../common/supabase/supabase.service';
-import { ExchangeRateService } from '../../../common/exchange-rate/exchange-rate.service';
+import { DatabaseService } from '../../../common/database/database.service';
+import { ExchangeRateService, organizationIdOf } from '../../../common/exchange-rate/exchange-rate.service';
 import { getCurrencyForLocation } from '../../mhr/constants/mhr-calculation.constants';
 import { PERSISTED_PROCESS_COST_COLUMNS, PersistedProcessCostRow, resolvePersistedProcessCost, sumPersistedProcessCost } from '../../bom-items/costing/shared/core/persisted-process-cost';
 import {
@@ -31,7 +31,7 @@ export class ProcessCostService {
   private readonly calculationEngine: ProcessCostCalculationEngine;
 
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly logger: Logger,
     private readonly exchangeRateService: ExchangeRateService,
   ) {
@@ -53,7 +53,7 @@ export class ProcessCostService {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    let queryBuilder = this.supabaseService
+    let queryBuilder = this.databaseService
       .getUserClient(accessToken)
       .from('process_cost_records')
       .select('*', { count: 'exact' })
@@ -102,7 +102,7 @@ export class ProcessCostService {
     const processMap = new Map<string, { process_name: string; process_category: string }>();
     if (missingIds.length > 0) {
       // Note: machine_type column is optional — only select guaranteed columns
-      const { data: procs } = await this.supabaseService
+      const { data: procs } = await this.databaseService
         .getUserClient(accessToken)
         .from('processes')
         .select('id, process_name, process_category')
@@ -141,7 +141,7 @@ export class ProcessCostService {
   async findOne(id: string, userId: string, accessToken: string): Promise<ProcessCostResponseDto> {
     this.logger.log(`Fetching process cost: ${id}`, 'ProcessCostService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('process_cost_records')
       .select('*')
@@ -170,7 +170,7 @@ export class ProcessCostService {
     // Back-fill process hierarchy from master if missing
     let row = data;
     if ((!row.process_group || !row.operation) && row.process_id) {
-      const { data: proc } = await this.supabaseService
+      const { data: proc } = await this.databaseService
         .getClient(accessToken)
         .from('processes')
         .select('process_name, process_category')
@@ -213,7 +213,7 @@ export class ProcessCostService {
     accessToken: string,
   ): Promise<{ machine_name: string | null; machine_class: string | null }> {
     if (mhrId) {
-      const { data, error } = await this.supabaseService
+      const { data, error } = await this.databaseService
         .getClient(accessToken)
         .from('mhr_records')
         .select('machine_name, machine_class')
@@ -251,7 +251,7 @@ export class ProcessCostService {
       // the admin client for that reason. Use the same client here so a
       // benchmark lookup can't fail due to RLS having no policy for a table
       // that was never meant to be user-scoped in the first place.
-      const { data, error } = await this.supabaseService
+      const { data, error } = await this.databaseService
         .getPrivilegedClient('reference-data: mhr/lhr benchmark rates, global shared')
         .from('mhr_benchmark_rates')
         .select('machine_name, machine_class')
@@ -311,7 +311,7 @@ export class ProcessCostService {
     mhrId?: string | null | undefined,
   ): Promise<{ labor_type: string | null }> {
     if (lhrId) {
-      const { data, error } = await this.supabaseService
+      const { data, error } = await this.databaseService
         .getClient(accessToken)
         .from('lhr_records')
         .select('labour_type')
@@ -338,7 +338,7 @@ export class ProcessCostService {
       // 361) — getBenchmarkRates() reads it via the admin client for that
       // reason; do the same here so this lookup can't fail due to RLS having
       // no policy for a table that was never meant to be user-scoped.
-      const { data, error } = await this.supabaseService
+      const { data, error } = await this.databaseService
         .getPrivilegedClient('reference-data: mhr/lhr benchmark rates, global shared')
         .from('lhr_benchmark_rates')
         .select('labour_type')
@@ -359,7 +359,7 @@ export class ProcessCostService {
     }
 
     if (mhrId) {
-      const { data, error } = await this.supabaseService
+      const { data, error } = await this.databaseService
         .getClient(accessToken)
         .from('mhr_records')
         .select('wage_grade, machine_name, usd_lhr_total')
@@ -414,7 +414,8 @@ export class ProcessCostService {
     // conversion (previously: any non-USA location silently stored wrong-
     // magnitude numbers mislabeled 'USD'). No location on the DTO defaults to
     // 'USD' (a no-op conversion), matching this service's existing currency default.
-    const rates = await this.exchangeRateService.getSnapshot(accessToken);
+    // The new record's organization's budget rates (global defaults when it has none).
+    const rates = await this.exchangeRateService.getSnapshot(accessToken, organizationId ?? null);
     const { currency: createLocalCurrency } = getCurrencyForLocation(createDto.location ?? '');
     const toUsdCreate = (v: number | undefined): number | undefined => v != null ? rates.toUsd(v, createLocalCurrency) : v;
 
@@ -518,7 +519,7 @@ export class ProcessCostService {
       bom_item_id: createDto.bomItemId,
     };
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('process_cost_records')
       .insert(recordData)
@@ -588,7 +589,7 @@ export class ProcessCostService {
     this.logger.log(`Updating process cost: ${id}`, 'ProcessCostService');
 
     // Get existing record
-    const { data: existing, error: fetchError } = await this.supabaseService
+    const { data: existing, error: fetchError } = await this.databaseService
       .getClient(accessToken)
       .from('process_cost_records')
       .select('*')
@@ -649,7 +650,7 @@ export class ProcessCostService {
     // here — but `existing.*` fallbacks are already USD (create() above and
     // the applyRoute/applyCustomRoute write path both store USD), so only the
     // newly-supplied value gets converted, never the already-USD fallback.
-    const rates = await this.exchangeRateService.getSnapshot(accessToken);
+    const rates = await this.exchangeRateService.getSnapshot(accessToken, organizationIdOf(existing));
     const { currency: updateLocalCurrency } = getCurrencyForLocation(updateDto.location ?? existing.location ?? '');
     const toUsdIfProvided = (v: number | undefined): number | undefined =>
       v !== undefined ? rates.toUsd(v, updateLocalCurrency) : undefined;
@@ -746,7 +747,7 @@ export class ProcessCostService {
     // Any manual update via the dialog marks the row as engineer-overridden
     updateData.is_override = true;
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('process_cost_records')
       .update(updateData)
@@ -798,7 +799,7 @@ export class ProcessCostService {
   async remove(id: string, userId: string, accessToken: string): Promise<{ message: string }> {
     this.logger.log(`Deleting process cost: ${id}`, 'ProcessCostService');
 
-    const { error } = await this.supabaseService
+    const { error } = await this.databaseService
       .getClient(accessToken)
       .from('process_cost_records')
       .delete()
@@ -944,7 +945,7 @@ export class ProcessCostService {
   ): Promise<number> {
     this.logger.log(`Calculating total process cost for BOM item: ${bomItemId}`, 'ProcessCostService');
 
-    const client = this.supabaseService.getUserClient(accessToken);
+    const client = this.databaseService.getUserClient(accessToken);
 
     // Prefer the stored total_cost_per_part — every creation path (manual create/update,
     // process-plan-generator apply) now computes and persists it via the shared
@@ -965,7 +966,7 @@ export class ProcessCostService {
     // again in the bulk path below, and a third and fourth time in
     // boms.service.ts and cost-aggregation.service.ts (those two without the
     // prefer-stored half). One implementation now.
-    // Cast at the boundary: Supabase infers no row type from a select list that
+    // Cast at the boundary: the PostgREST client infers no row type from a select list that
     // is not a string literal, and PERSISTED_PROCESS_COST_COLUMNS is shared
     // deliberately so every caller selects exactly the columns the resolver
     // reads.
@@ -986,7 +987,7 @@ export class ProcessCostService {
     // Same preference as getTotalCostForBomItem: use the stored total where the
     // shared engine already computed it, recompute from source fields only as a
     // fallback for older rows saved before that engine existed.
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getUserClient(accessToken)
       .from('process_cost_records')
       .select(`bom_item_id, ${PERSISTED_PROCESS_COST_COLUMNS}`)

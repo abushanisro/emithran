@@ -5,7 +5,7 @@ import { expandArchive, type ArchiveLimits } from '../../common/archive/expand-a
 import { AuditService } from '../../common/audit/audit.service';
 import { cadEngineHttp } from '../../common/resilience/engine-http';
 import { OBJECT_STORE, type ObjectStore } from '../../common/storage/object-store';
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { DatabaseService } from '../../common/database/database.service';
 import { MAX_ARCHIVE_EXPANDED_BYTES, MAX_CAD_FILE_BYTES } from '../../common/upload-limits';
 import { type CreateBOMItemDto } from '../bom-items/dto/bom-items.dto';
 import { BOMItemsService } from '../bom-items/bom-items.service';
@@ -95,7 +95,7 @@ export class CadUploadRunner implements OnModuleInit, OnModuleDestroy {
   private lastMaintenance = 0;
 
   constructor(
-    private readonly supabase: SupabaseService,
+    private readonly database: DatabaseService,
     private readonly bomItems: BOMItemsService,
     private readonly files: FileStorageService,
     private readonly audit: AuditService,
@@ -194,7 +194,7 @@ export class CadUploadRunner implements OnModuleInit, OnModuleDestroy {
   }
 
   private get admin() {
-    return this.supabase.getPrivilegedClient('cad-upload runner: claim and update queued CAD uploads');
+    return this.database.getPrivilegedClient('cad-upload runner: claim and update queued CAD uploads');
   }
 
   /** CAD_CORE=rust: the Rust `cad-runner` analyses (queued -> analysed) and this runner only creates the BOM items (analysed -> done). */

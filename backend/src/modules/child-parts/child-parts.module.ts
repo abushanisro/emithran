@@ -11,11 +11,11 @@
 import { Module } from '@nestjs/common';
 import { ChildPartCostController } from './controllers/child-part-cost.controller';
 import { ChildPartCostService } from './services/child-part-cost.service';
-import { SupabaseModule } from '../../common/supabase/supabase.module';
+import { DatabaseModule } from '../../common/database/database.module';
 import { LoggerModule } from '../../common/logger/logger.module';
 
 @Module({
-  imports: [SupabaseModule, LoggerModule],
+  imports: [DatabaseModule, LoggerModule],
   controllers: [ChildPartCostController],
   providers: [ChildPartCostService],
   exports: [ChildPartCostService],

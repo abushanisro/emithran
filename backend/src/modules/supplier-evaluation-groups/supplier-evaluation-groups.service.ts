@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { DatabaseService } from '../../common/database/database.service';
 import { Logger } from '../../common/logger/logger.service';
 import {
   CreateSupplierEvaluationGroupDto,
@@ -11,7 +11,7 @@ import {
 @Injectable()
 export class SupplierEvaluationGroupsService {
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly logger: Logger,
   ) {}
 
@@ -28,8 +28,8 @@ export class SupplierEvaluationGroupsService {
       const evaluationName = createDto.name || `Evaluation ${new Date().toISOString().slice(0, 16)}`;
 
       // 1. Create the main evaluation group
-      const supabase = this.supabaseService.getClient(accessToken);
-      const { data: groupData, error: groupError } = await supabase
+      const database = this.databaseService.getClient(accessToken);
+      const { data: groupData, error: groupError } = await database
         .from('supplier_evaluation_groups')
         .insert({
           user_id: userId,
@@ -62,7 +62,7 @@ export class SupplierEvaluationGroupsService {
           quantity: item.quantity,
         }));
 
-        const { error: bomError } = await supabase
+        const { error: bomError } = await database
           .from('supplier_evaluation_group_bom_items')
           .insert(bomItemsData);
 
@@ -84,7 +84,7 @@ export class SupplierEvaluationGroupsService {
           is_predefined: process.isPredefined,
         }));
 
-        const { error: processError } = await supabase
+        const { error: processError } = await database
           .from('supplier_evaluation_group_processes')
           .insert(processesData);
 
@@ -109,8 +109,8 @@ export class SupplierEvaluationGroupsService {
     this.logger.log(`Finding all evaluation groups for user ${userId}`);
 
     try {
-      const supabase = this.supabaseService.getClient(accessToken);
-      const { data, error } = await supabase
+      const database = this.databaseService.getClient(accessToken);
+      const { data, error } = await database
         .from('supplier_evaluation_groups')
         .select(`
           id,
@@ -159,8 +159,8 @@ export class SupplierEvaluationGroupsService {
     this.logger.log(`Finding evaluation groups for project ${projectId}`);
 
     try {
-      const supabase = this.supabaseService.getClient(accessToken);
-      const { data, error } = await supabase.rpc(
+      const database = this.databaseService.getClient(accessToken);
+      const { data, error } = await database.rpc(
         'get_supplier_evaluation_groups_by_project',
         {
           p_project_id: projectId,
@@ -195,8 +195,8 @@ export class SupplierEvaluationGroupsService {
     this.logger.log(`Finding evaluation group ${groupId}`);
 
     try {
-      const supabase = this.supabaseService.getClient(accessToken);
-      const { data, error } = await supabase.rpc(
+      const database = this.databaseService.getClient(accessToken);
+      const { data, error } = await database.rpc(
         'get_supplier_evaluation_group',
         {
           p_group_id: groupId,
@@ -242,8 +242,8 @@ export class SupplierEvaluationGroupsService {
     this.logger.log(`Updating evaluation group ${groupId}`);
 
     try {
-      const supabase = this.supabaseService.getClient(accessToken);
-      const { error } = await supabase
+      const database = this.databaseService.getClient(accessToken);
+      const { error } = await database
         .from('supplier_evaluation_groups')
         .update({
           name: updateDto.name,
@@ -277,10 +277,10 @@ export class SupplierEvaluationGroupsService {
     const impactSummary: Array<{ label: string; count: number }> = [];
 
     try {
-      const supabase = this.supabaseService.getClient(accessToken);
+      const database = this.databaseService.getClient(accessToken);
 
       // Get evaluation group details (RLS scopes this to the caller's organization)
-      const { data: group } = await supabase
+      const { data: group } = await database
         .from('supplier_evaluation_groups')
         .select('*')
         .eq('id', groupId)
@@ -294,7 +294,7 @@ export class SupplierEvaluationGroupsService {
       // Check for active RFQs by looking at RFQ tracking records.
       // No manual user_id filter — rfq_tracking is org-scoped by RLS
       // (a stale filter here would have under-counted an org-mate's RFQs).
-      const { count: activeRfqCount } = await supabase
+      const { count: activeRfqCount } = await database
         .from('rfq_tracking')
         .select('*', { count: 'exact' })
         .eq('project_id', group.project_id)
@@ -305,7 +305,7 @@ export class SupplierEvaluationGroupsService {
       }
 
       // Check for RFQs under evaluation
-      const { count: evaluatedCount } = await supabase
+      const { count: evaluatedCount } = await database
         .from('rfq_tracking')
         .select('*', { count: 'exact' })
         .eq('project_id', group.project_id)
@@ -317,7 +317,7 @@ export class SupplierEvaluationGroupsService {
       }
 
       // Check for completed RFQs (historical data)
-      const { count: completedCount } = await supabase
+      const { count: completedCount } = await database
         .from('rfq_tracking')
         .select('*', { count: 'exact' })
         .eq('project_id', group.project_id)
@@ -334,7 +334,7 @@ export class SupplierEvaluationGroupsService {
       // doesn't exist, so this was silently throwing (caught by the outer
       // try/catch) and impactSummary never actually included these counts.
       // Fixed here as a pre-existing bug adjacent to this same function.
-      const { count: bomItemsCount } = await supabase
+      const { count: bomItemsCount } = await database
         .from('supplier_evaluation_group_bom_items')
         .select('*', { count: 'exact' })
         .eq('evaluation_group_id', groupId);
@@ -343,7 +343,7 @@ export class SupplierEvaluationGroupsService {
         impactSummary.push({ label: 'BOM Items', count: bomItemsCount });
       }
 
-      const { count: processesCount } = await supabase
+      const { count: processesCount } = await database
         .from('supplier_evaluation_group_processes')
         .select('*', { count: 'exact' })
         .eq('evaluation_group_id', groupId);
@@ -353,7 +353,7 @@ export class SupplierEvaluationGroupsService {
       }
 
       // Check for vendor selections (from enhanced schema)
-      const { count: vendorSelectionsCount } = await supabase
+      const { count: vendorSelectionsCount } = await database
         .from('supplier_evaluation_vendor_selections')
         .select('*', { count: 'exact' })
         .eq('evaluation_group_id', groupId);
@@ -399,8 +399,8 @@ export class SupplierEvaluationGroupsService {
         throw new BadRequestException(`Cannot delete evaluation group: ${validation.blockers.join(', ')}`);
       }
 
-      const supabase = this.supabaseService.getClient(accessToken);
-      const { error } = await supabase
+      const database = this.databaseService.getClient(accessToken);
+      const { error } = await database
         .from('supplier_evaluation_groups')
         .delete()
         .eq('id', groupId);

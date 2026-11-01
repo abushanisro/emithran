@@ -1,7 +1,7 @@
-import { readAllRows, readAllRowsConcurrent } from '../../common/supabase/read-all-rows';
+import { readAllRows, readAllRowsConcurrent } from '../../common/database/read-all-rows';
 import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { Logger } from '../../common/logger/logger.service';
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { DatabaseService } from '../../common/database/database.service';
 import { CreateMHRDto, UpdateMHRDto, QueryMHRDto } from './dto/mhr.dto';
 import { MHRResponseDto, MHRListResponseDto, MHRCalculationResult, MHRReferenceDetailDto, MHRPickerRowDto, MHR_PICKER_COLUMNS, pickerRateUsdPerHour, type MHRPickerDbRow } from './dto/mhr-response.dto';
 import { validate as isValidUUID } from 'uuid';
@@ -10,10 +10,12 @@ import { MHRInputValidator } from './validators/mhr-input.validator';
 import { getCurrencyForLocation, MHR_CALCULATION_CONSTANTS } from './constants/mhr-calculation.constants';
 import { invalidateMachinePools } from '../bom-items/costing/shared/capability/machine-selection/pool-cache';
 import { resolveMachineEconomics } from '../bom-items/costing/shared/capability/machine-selection/economics-resolver';
-import { ExchangeRateService, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
+import { ExchangeRateService, organizationIdOf, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
 import { LHRService } from '../lhr/lhr.service';
+import { mapMhrRowToDto, storedNumber } from './mhr-row-mapping';
 import { pickRegionalReferenceRow, specsReferenceDetail } from './specs-reference-detail';
 import * as ExcelJS from 'exceljs';
+import { assertXlsxWithinLimits } from '../../common/archive/xlsx-limits';
 
 /**
  * MHR Service
@@ -39,7 +41,7 @@ export class MHRService {
   private readonly validator: MHRInputValidator;
 
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly logger: Logger,
     private readonly exchangeRateService: ExchangeRateService,
     private readonly lhrService: LHRService,
@@ -57,23 +59,27 @@ export class MHRService {
     row?: any,
   ): MHRCalculationResult {
     const { DEFAULTS } = MHR_CALCULATION_CONSTANTS;
-    const workingDays   = parseFloat(row?.working_days_per_year ?? 0)            || DEFAULTS.WORKING_DAYS_PER_YEAR;
-    const shiftsPerDay  = parseFloat(row?.shifts_per_day ?? 0)                   || DEFAULTS.SHIFTS_PER_DAY;
-    const hoursPerShift = parseFloat(row?.hours_per_shift ?? 0)                  || DEFAULTS.HOURS_PER_SHIFT;
-    const maintHrs      = parseFloat(row?.planned_maintenance_hours_per_year ?? 0) || 0;
-    const utilPct       = parseFloat(row?.capacity_utilization_rate ?? 0)        || DEFAULTS.CAPACITY_UTILIZATION_RATE;
     // Disclosed, not silent: effectiveHoursPerYear/totalAnnualCost below are
-    // DERIVED from these operational assumptions (the manually-entered rate
-    // itself is unaffected) — a caller that omits real shift/hours/utilization
-    // data gets a real warning in the logs, not a number that looks measured.
+    // DERIVED from these operational values (the manually-entered rate itself
+    // is unaffected). A stored value is used as stored, a real 0 included;
+    // only an absent one takes the single default from DEFAULTS, and each
+    // default used is listed on the result as assumedDefaults.
+    const fields = row ?? {};
     const usedDefaults: string[] = [];
-    if (!(parseFloat(row?.working_days_per_year ?? 0) > 0)) usedDefaults.push(`working days/yr=${DEFAULTS.WORKING_DAYS_PER_YEAR}`);
-    if (!(parseFloat(row?.shifts_per_day ?? 0) > 0)) usedDefaults.push(`shifts/day=${DEFAULTS.SHIFTS_PER_DAY}`);
-    if (!(parseFloat(row?.hours_per_shift ?? 0) > 0)) usedDefaults.push(`hours/shift=${DEFAULTS.HOURS_PER_SHIFT}`);
-    if (!(parseFloat(row?.capacity_utilization_rate ?? 0) > 0)) usedDefaults.push(`utilization=${DEFAULTS.CAPACITY_UTILIZATION_RATE}%`);
+    const orDefault = (snake: string, label: string, fallback: number): number => {
+      const v = storedNumber(fields, snake, snake);
+      if (v !== undefined) return v;
+      usedDefaults.push(`${label}=${fallback} (default)`);
+      return fallback;
+    };
+    const workingDays   = orDefault('working_days_per_year', 'workingDaysPerYear', DEFAULTS.WORKING_DAYS_PER_YEAR);
+    const shiftsPerDay  = orDefault('shifts_per_day', 'shiftsPerDay', DEFAULTS.SHIFTS_PER_DAY);
+    const hoursPerShift = orDefault('hours_per_shift', 'hoursPerShift', DEFAULTS.HOURS_PER_SHIFT);
+    const maintHrs      = storedNumber(fields, 'planned_maintenance_hours_per_year', 'planned_maintenance_hours_per_year') ?? 0;
+    const utilPct       = orDefault('capacity_utilization_rate', 'capacityUtilizationRate', DEFAULTS.CAPACITY_UTILIZATION_RATE);
     if (usedDefaults.length > 0) {
       this.logger.warn(
-        `Manual MHR entry: no real operational data for ${usedDefaults.join(', ')} — effectiveHoursPerYear/totalAnnualCost use assumed defaults, not measured values.`,
+        `Manual MHR entry: no stored value for ${usedDefaults.join(', ')} — effectiveHoursPerYear/totalAnnualCost use these defaults, not measured values.`,
         'MHRService',
       );
     }
@@ -120,6 +126,7 @@ export class MHRService {
       accessoriesCost:           0,
       installationCost:          0,
       totalCapitalInvestment:    0,
+      ...(usedDefaults.length > 0 ? { assumedDefaults: usedDefaults } : {}),
     };
   }
 
@@ -172,7 +179,7 @@ export class MHRService {
    * Response shape mirrors the subset of MHRRecord that the Process Cost dialog needs.
    */
   async getBenchmarkRates(location?: string, processGroup?: string, machineClass?: string) {
-    let query = this.supabaseService
+    let query = this.databaseService
       .getPrivilegedClient('reference-data: mhr_benchmark_rates, global shared, no user_id')
       .from('mhr_benchmark_rates')
       .select('id, machine_name, process_group, machine_class, location, mhr_usd, machine_ref')
@@ -229,7 +236,7 @@ export class MHRService {
    */
   async findPickerRows(location: string | undefined, accessToken?: string): Promise<MHRPickerRowDto[]> {
     const { data, error } = await readAllRowsConcurrent<MHRPickerDbRow>((from, to) => {
-      let q = this.supabaseService
+      let q = this.databaseService
         .getUserClient(accessToken)
         .from('mhr_records')
         // The total comes with the first page; the other pages are then read together.
@@ -251,7 +258,7 @@ export class MHRService {
     const batches: string[][] = [];
     for (let i = 0; i < unpriced.length; i += PICKER_ENGINE_BATCH) batches.push(unpriced.slice(i, i + PICKER_ENGINE_BATCH));
     // The batches are independent reads: together, not one after another.
-    const priced = await Promise.all(batches.map((ids) => this.supabaseService
+    const priced = await Promise.all(batches.map((ids) => this.databaseService
       .getUserClient(accessToken)
       .from('mhr_records')
       .select('*')
@@ -263,7 +270,7 @@ export class MHRService {
         throw new InternalServerErrorException('Unable to retrieve machines. Please try again later.');
       }
       for (const row of full) {
-        engineRate.set(row.id, this.calculateMHR(this.mapRowToDto(row), true).totalMachineHourRate);
+        engineRate.set(row.id, this.calculateFromRow(row).totalMachineHourRate);
       }
     }
     return data.map((row) => MHRPickerRowDto.fromDatabase(row, engineRate.get(row.id)));
@@ -281,7 +288,7 @@ export class MHRService {
     // range is asked for (see POSTGREST_MAX_ROWS). Ordered by created_at then
     // id so pages never overlap or skip rows that share a created_at.
     const { data, error, count } = await readAllRows((rangeFrom, rangeTo) => {
-      let q = this.supabaseService
+      let q = this.databaseService
         .getUserClient(accessToken)
         .from('mhr_records')
         .select('*', { count: 'exact' })
@@ -328,7 +335,7 @@ export class MHRService {
         calculations = this.createManualEntryCalculation(Number(row.total_machine_hour_rate), row);
       } else {
         // Fallback: legacy record with no stored total — run engine once to populate it.
-        calculations = this.calculateMHR(this.mapRowToDto(row), true);
+        calculations = this.calculateFromRow(row);
       }
 
       return MHRResponseDto.fromDatabase({ ...row, calculations: JSON.stringify(calculations) });
@@ -350,7 +357,7 @@ export class MHRService {
       throw new BadRequestException('Invalid MHR record ID format');
     }
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('mhr_records')
       .select('*')
@@ -383,7 +390,7 @@ export class MHRService {
       // Import/eMithran record: use stored total directly (same logic as findAll).
       calculations = this.createManualEntryCalculation(Number(data.total_machine_hour_rate), data);
     } else {
-      calculations = this.calculateMHR(this.mapRowToDto(data), true);
+      calculations = this.calculateFromRow(data);
     }
 
     return MHRResponseDto.fromDatabase({ ...data, calculations: JSON.stringify(calculations) });
@@ -404,7 +411,7 @@ export class MHRService {
   ): Promise<{ direct: number | null; indirect: number | null; labor: number | null; sourceKey: string | null }> {
     const empty = { direct: null, indirect: null, labor: null, sourceKey: null };
     if (!machineName?.trim()) return empty;
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('sm_reference_data')
       .select('key, raw')
@@ -444,7 +451,7 @@ export class MHRService {
     if (!this.isValidUUID(id)) {
       throw new BadRequestException('Invalid MHR record ID format provided.');
     }
-    const { data: row, error: rowError } = await this.supabaseService
+    const { data: row, error: rowError } = await this.databaseService
       .getClient(accessToken)
       .from('mhr_records')
       .select('benchmark_source_key, machine_name, specs, location')
@@ -455,7 +462,7 @@ export class MHRService {
     }
 
     const empty: MHRReferenceDetailDto = { found: false, sourceKey: null, raw: null };
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     // One key is staged once per region (USA machine_library + 836's
     // India/China/Mexico/France rate rows), so this reads every row of the key
@@ -654,7 +661,9 @@ export class MHRService {
       );
     }
 
-    const rates = await this.exchangeRateService.getSnapshot(accessToken);
+    // A new MHR record is written without an organization (mhr_records rows are
+    // user-owned until they carry one), so the global default rates apply.
+    const rates = await this.exchangeRateService.getSnapshot(accessToken, null);
 
     // Canonical MHR (2026-08-27 decision): Machine Hour Rate = Total Overhead
     // = Direct OH + Indirect OH, always. Direct/indirect are the sole
@@ -703,7 +712,7 @@ export class MHRService {
     };
     const hasCapability = Object.values(capability).some((v) => v != null);
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('mhr_records')
       .insert({
@@ -839,7 +848,7 @@ export class MHRService {
     const existing = await this.findOne(id, userId, accessToken);
 
     // Merge existing data with updates for calculation
-    const mergedData = { ...this.mapRowToDto(existing), ...updateMHRDto };
+    const mergedData = { ...mapMhrRowToDto(existing as unknown as Record<string, unknown>).dto, ...updateMHRDto };
     
     // Handle manual entry mode
     let calculations: MHRCalculationResult;
@@ -971,7 +980,8 @@ export class MHRService {
     const effectiveLocation = updateMHRDto.location ?? existing.location;
     const effectiveLhrInr   = updateMHRDto.lhrInrPerHr ?? (existing as any).lhrInrPerHr ?? null;
     const effectiveUsdLhr   = updateMHRDto.usdLhrTotal ?? (existing as any).usdLhrTotal ?? null;
-    const rates = await this.exchangeRateService.getSnapshot(accessToken);
+    // The record's own organization's budget rates (global defaults for a record without one).
+    const rates = await this.exchangeRateService.getSnapshot(accessToken, organizationIdOf(existing));
 
     // Canonical MHR (2026-08-27 decision): Machine Hour Rate = Total Overhead
     // = Direct OH + Indirect OH, always — mirrors create()'s override above.
@@ -1073,7 +1083,7 @@ export class MHRService {
     updateData.total_variable_cost_per_hour = calculations.totalVariableCostPerHour;
     updateData.total_annual_cost = calculations.totalAnnualCost;
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('mhr_records')
       .update(updateData)
@@ -1125,7 +1135,7 @@ export class MHRService {
 
     await this.findOne(id, userId, accessToken);
 
-    const { error } = await this.supabaseService
+    const { error } = await this.databaseService
       .getClient(accessToken)
       .from('mhr_records')
       .delete()
@@ -1154,10 +1164,12 @@ export class MHRService {
     accessToken: string,
   ): Promise<{ imported: number; skipped: number; errors: string[] }> {
     this.logger.log(`Importing MHR records from Excel for user ${userId}`, 'MHRService');
+    assertXlsxWithinLimits(fileBuffer); // measured before ExcelJS inflates anything
 
     // Loaded once for the whole import — every row's USD→local conversion below
     // reads from this live DB-backed rate map, never a hardcoded FX table.
-    const importRates = await this.exchangeRateService.getSnapshot(accessToken);
+    // Imported rows are written without an organization, so the global default rates apply.
+    const importRates = await this.exchangeRateService.getSnapshot(accessToken, null);
     const missingRateCurrencies = new Set<string>();
     // Populated per-sheet below (shiftsCol etc. are scoped inside the sheet
     // loop) — aggregated here so one disclosure covers every sheet processed.
@@ -1697,7 +1709,7 @@ export class MHRService {
           record.total_variable_cost_per_hour = calcResult.totalVariableCostPerHour;
           record.total_annual_cost            = calcResult.totalAnnualCost;
         } else {
-          calcResult = this.calculateMHR(this.mapRowToDto(record), true);
+          calcResult = this.calculateFromRow(record);
           record.total_machine_hour_rate      = calcResult.totalMachineHourRate;
           record.total_fixed_cost_per_hour    = calcResult.totalFixedCostPerHour;
           record.total_variable_cost_per_hour = calcResult.totalVariableCostPerHour;
@@ -1714,7 +1726,7 @@ export class MHRService {
 
     // Dedup by composite (machine_name, location, machine_class)
     // machine_class is needed for Combined format where same machine name exists at same location across process sequences
-    const client = this.supabaseService.getUserClient();
+    const client = this.databaseService.getUserClient();
     const { data: existing } = await readAllRows((from, to) => client
       .from('mhr_records')
       .select('machine_name, location, machine_class')
@@ -1820,7 +1832,7 @@ export class MHRService {
   async removeAll(userId: string, accessToken: string): Promise<{ deleted: number }> {
     this.logger.log(`Deleting all MHR records for user ${userId}`, 'MHRService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getUserClient()
       .from('mhr_records')
       .delete()
@@ -1844,36 +1856,20 @@ export class MHRService {
     }
   }
 
-  private mapRowToDto(row: any): CreateMHRDto {
-    return {
-      location: row.location,
-      commodityCode: row.commodityCode || row.commodity_code,
-      machineDescription: row.machineDescription || row.machine_description,
-      manufacturer: row.manufacturer,
-      model: row.model,
-      machineName: row.machineName || row.machine_name,
-      specification: row.specification,
-      shiftsPerDay: parseFloat(row.shiftsPerDay || row.shifts_per_day || 3),
-      hoursPerShift: parseFloat(row.hoursPerShift || row.hours_per_shift || 8),
-      workingDaysPerYear: parseFloat(row.workingDaysPerYear || row.working_days_per_year || 260),
-      plannedMaintenanceHoursPerYear: parseFloat(row.plannedMaintenanceHoursPerYear || row.planned_maintenance_hours_per_year || 0),
-      capacityUtilizationRate: parseFloat(row.capacityUtilizationRate || row.capacity_utilization_rate || 95),
-      landedMachineCost: parseFloat(row.landedMachineCost || row.landed_machine_cost || 0),
-      accessoriesCostPercentage: parseFloat(row.accessoriesCostPercentage || row.accessories_cost_percentage || MHR_CALCULATION_CONSTANTS.DEFAULTS.ACCESSORIES_COST_PERCENTAGE),
-      installationCostPercentage: parseFloat(row.installationCostPercentage || row.installation_cost_percentage || MHR_CALCULATION_CONSTANTS.DEFAULTS.INSTALLATION_COST_PERCENTAGE),
-      paybackPeriodYears: parseFloat(row.paybackPeriodYears || row.payback_period_years || MHR_CALCULATION_CONSTANTS.DEFAULTS.PAYBACK_PERIOD_YEARS),
-      interestRatePercentage: parseFloat(row.interestRatePercentage || row.interest_rate_percentage || MHR_CALCULATION_CONSTANTS.DEFAULTS.INTEREST_RATE),
-      insuranceRatePercentage: parseFloat(row.insuranceRatePercentage || row.insurance_rate_percentage || MHR_CALCULATION_CONSTANTS.DEFAULTS.INSURANCE_RATE),
-      machineFootprintSqm: parseFloat(row.machineFootprintSqm || row.machine_footprint_sqm || 0),
-      rentPerSqmPerMonth: parseFloat(row.rentPerSqmPerMonth || row.rent_per_sqm_per_month || 0),
-      maintenanceCostPercentage: parseFloat(row.maintenanceCostPercentage || row.maintenance_cost_percentage || MHR_CALCULATION_CONSTANTS.DEFAULTS.MAINTENANCE_COST_PERCENTAGE),
-      powerKwhPerHour: parseFloat(row.powerKwhPerHour || row.power_kwh_per_hour || 0),
-      electricityCostPerKwh: parseFloat(row.electricityCostPerKwh || row.electricity_cost_per_kwh || 0),
-      adminOverheadPercentage: parseFloat(row.adminOverheadPercentage || row.admin_overhead_percentage || 0),
-      profitMarginPercentage: parseFloat(row.profitMarginPercentage || row.profit_margin_percentage || 0),
-      isManualEntry: row.isManualEntry || row.is_manual_entry || false,
-      manualMHRValue: row.manualMHRValue || (row.manual_mhr_value ? parseFloat(row.manual_mhr_value) : 0),
-    };
+  /**
+   * Engine rate for a stored row. Any field the row lacks is filled from
+   * MHR_CALCULATION_CONSTANTS.DEFAULTS by mapMhrRowToDto and listed on the
+   * result as assumedDefaults, so the rate never looks measured when it is not.
+   */
+  private calculateFromRow(row: Record<string, any>): MHRCalculationResult {
+    const { dto, assumedDefaults } = mapMhrRowToDto(row);
+    const calculations = this.calculateMHR(dto, true);
+    if (assumedDefaults.length === 0) return calculations;
+    this.logger.warn(
+      `MHR record ${row.id ?? '(unsaved)'}: no stored value for ${assumedDefaults.join(', ')}; the rate uses these defaults.`,
+      'MHRService',
+    );
+    return { ...calculations, assumedDefaults };
   }
 
   /**
@@ -1955,7 +1951,7 @@ export class MHRService {
     accessToken: string,
     processGroup?: string,
   ): Promise<Array<{ category: string; machineClass: string | null }>> {
-    const { data, error } = await readAllRows((from, to) => this.supabaseService
+    const { data, error } = await readAllRows((from, to) => this.databaseService
       .getClient(accessToken)
       .from('mhr_records')
       .select('benchmark_source_key, machine_class, process_group, commodity_code')
@@ -2011,7 +2007,7 @@ export class MHRService {
    */
   /** Every process group with machines on file (process_group, set on every row). */
   async getDistinctProcessGroups(accessToken: string): Promise<string[]> {
-    const { data, error } = await readAllRows((from, to) => this.supabaseService
+    const { data, error } = await readAllRows((from, to) => this.databaseService
       .getClient(accessToken)
       .from('mhr_records')
       .select('process_group')
@@ -2029,7 +2025,7 @@ export class MHRService {
   }
 
   async getDistinctManufacturerCountries(accessToken: string): Promise<string[]> {
-    const { data, error } = await readAllRows((from, to) => this.supabaseService
+    const { data, error } = await readAllRows((from, to) => this.databaseService
       .getClient(accessToken)
       .from('mhr_records')
       .select('manufacturer_country')
@@ -2054,7 +2050,7 @@ export class MHRService {
   // let a user overwrite a real value with a fabricated one by picking the
   // only options offered.
   async getDistinctWageGrades(accessToken: string): Promise<string[]> {
-    const { data, error } = await readAllRows((from, to) => this.supabaseService
+    const { data, error } = await readAllRows((from, to) => this.databaseService
       .getClient(accessToken)
       .from('mhr_records')
       .select('wage_grade')
@@ -2077,7 +2073,7 @@ export class MHRService {
   // behavior) silently excluded every global location/currency from the filter
   // dropdown, even though findAll's own table happily returns those same rows.
   async getDistinctCurrencies(accessToken: string): Promise<string[]> {
-    const { data, error } = await readAllRows((from, to) => this.supabaseService
+    const { data, error } = await readAllRows((from, to) => this.databaseService
       .getClient(accessToken)
       .from('mhr_records')
       .select('currency')
@@ -2094,7 +2090,7 @@ export class MHRService {
   }
 
   async getDistinctLocations(accessToken: string): Promise<string[]> {
-    const { data, error } = await readAllRows((from, to) => this.supabaseService
+    const { data, error } = await readAllRows((from, to) => this.databaseService
       .getClient(accessToken)
       .from('mhr_records')
       .select('location')

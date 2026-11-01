@@ -24,7 +24,7 @@ import {
   ApiBearerAuth,
   ApiBody,
 } from '@nestjs/swagger';
-import { SupabaseAuthGuard } from '../../../common/guards/supabase-auth.guard';
+import { RequestAuthGuard } from '../../../common/guards/request-auth.guard';
 import { RemarkService } from '../services/remark.service';
 import {
   CreateRemarkDto,
@@ -40,7 +40,7 @@ import {
 @ApiTags('Remarks & Issues')
 @ApiBearerAuth()
 @Controller('api/remarks')
-@UseGuards(SupabaseAuthGuard)
+@UseGuards(RequestAuthGuard)
 export class RemarkController {
   constructor(private readonly remarkService: RemarkService) {}
 

@@ -1,23 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUser } from '@/lib/server/auth';
+import { refuseCrossOrigin } from '@/lib/server/bff/origin';
+import { readJsonBody } from '@/lib/server/read-body';
 import { fetchTrustedFile, PayloadTooLargeError, readLimited, UntrustedUrlError } from '@/lib/server/safe-fetch';
+import { settingWithDevDefault } from '@/lib/utils/required-setting';
 
 export async function POST(request: NextRequest) {
+  const refused = refuseCrossOrigin(request);
+  if (refused) return refused;
   const auth = await requireUser();
   if (!auth.ok) return auth.response;
 
   try {
-    const body = await request.json();
-    const { pdfUrl } = body;
+    // The body only names the PDF: a small JSON object.
+    const body = await readJsonBody<{ pdfUrl?: unknown } | null>(request, 16 * 1024);
+    if (!body.ok) return body.response;
+    const pdfUrl = body.value?.pdfUrl;
 
-    if (!pdfUrl) {
+    if (typeof pdfUrl !== 'string' || !pdfUrl) {
       return NextResponse.json({ error: 'PDF URL is required' }, { status: 400 });
     }
 
     // Fetch the PDF from the provided URL (a signed file-store link)
     let pdfBuffer: Buffer;
     try {
-      const pdfResponse = await fetchTrustedFile(String(pdfUrl), { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PDF-Processor/1.0)' } });
+      const pdfResponse = await fetchTrustedFile(pdfUrl, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PDF-Processor/1.0)' } });
       if (!pdfResponse.ok) {
         return NextResponse.json({ error: 'Failed to fetch PDF from storage' }, { status: 400 });
       }
@@ -35,11 +42,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Forward to backend PDF processing service
-    const backendResponse = await fetch(`${process.env.NEXT_PUBLIC_API_GATEWAY_URL || 'http://localhost:4000'}/v1/pdf-processing/validate-pdf`, {
+    const backendResponse = await fetch(`${settingWithDevDefault(process.env.NEXT_PUBLIC_API_GATEWAY_URL, 'NEXT_PUBLIC_API_GATEWAY_URL', 'http://localhost:4000')}/v1/pdf-processing/validate-pdf`, {
       method: 'POST',
       headers: {
-        'Authorization': request.headers.get('Authorization') || '',
+        // The session's token: under the BFF the browser holds none to forward.
+        Authorization: `Bearer ${auth.accessToken}`,
       },
+      // The backend answers directly; never follow a redirect with the caller's token.
+      redirect: 'error',
       body: (() => {
         const formData = new FormData();
         formData.append('pdf', new Blob([new Uint8Array(pdfBuffer)], { type: 'application/pdf' }));

@@ -2,7 +2,7 @@ import {
   BadRequestException, ConflictException, ForbiddenException, Injectable, InternalServerErrorException,
   NotFoundException, UnprocessableEntityException,
 } from '@nestjs/common';
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../common/database/database.service';
 import {
   canReviewPmi, PMI_REVIEW_BASES, pmiFileSha256, resolvePmiRecords, reviewTargetOf,
   type PmiRecord, type PmiReviewRow, type PmiReviewScope,
@@ -46,10 +46,10 @@ function toRow(r: any): PmiReviewRow {
  */
 @Injectable()
 export class PmiReviewService {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   private async loadItem(id: string, accessToken: string) {
-    const { data, error } = await this.supabase.getUserClient(accessToken)
+    const { data, error } = await this.database.getUserClient(accessToken)
       .from('bom_items')
       .select('id, organization_id, feature_graph')
       .eq('id', id)
@@ -61,7 +61,7 @@ export class PmiReviewService {
 
   private async roleOf(userId: string, organizationId: string | null, accessToken: string): Promise<string | null> {
     if (!organizationId) return null;
-    const { data, error } = await this.supabase.getUserClient(accessToken)
+    const { data, error } = await this.database.getUserClient(accessToken)
       .from('organization_members')
       .select('role')
       .eq('user_id', userId)
@@ -73,7 +73,7 @@ export class PmiReviewService {
   }
 
   private async currentRows(id: string, accessToken: string): Promise<PmiReviewRow[]> {
-    const { data, error } = await this.supabase.getUserClient(accessToken)
+    const { data, error } = await this.database.getUserClient(accessToken)
       .from('pmi_record_reviews')
       .select('*')
       .eq('bom_item_id', id)
@@ -97,7 +97,7 @@ export class PmiReviewService {
   /** Every decision ever taken on one record, newest first (the audit history). */
   async history(id: string, recordKey: string, accessToken: string): Promise<PmiReviewRow[]> {
     await this.loadItem(id, accessToken);
-    const { data, error } = await this.supabase.getUserClient(accessToken)
+    const { data, error } = await this.database.getUserClient(accessToken)
       .from('pmi_record_reviews')
       .select('*')
       .eq('bom_item_id', id)
@@ -134,7 +134,7 @@ export class PmiReviewService {
       throw new ConflictException('The record changed since you opened it (re-analysis or a new file). Reload and review the current values.');
     }
 
-    const { error } = await this.supabase.getUserClient(accessToken).rpc('review_pmi_record', {
+    const { error } = await this.database.getUserClient(accessToken).rpc('review_pmi_record', {
       p_bom_item_id: id,
       p_record_key: target.recordKey,
       p_scope: scope,

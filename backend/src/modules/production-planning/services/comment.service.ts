@@ -1,5 +1,5 @@
 import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
-import { SupabaseService } from '@/common/supabase/supabase.service';
+import { DatabaseService } from '@/common/database/database.service';
 import { 
   CreateCommentDto, 
   UpdateCommentDto, 
@@ -11,17 +11,17 @@ import {
 export class CommentService {
   private readonly logger = new Logger(CommentService.name);
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(private readonly databaseService: DatabaseService) {}
 
   /**
    * Create a new comment for a remark
    */
   async createComment(createDto: CreateCommentDto, userId: string): Promise<CommentResponseDto> {
     try {
-      const supabase = this.supabaseService.getUserClient();
+      const database = this.databaseService.getUserClient();
 
       // Verify the remark exists
-      const { data: remarkExists } = await supabase
+      const { data: remarkExists } = await database
         .from('remarks_and_issues')
         .select('id')
         .eq('id', createDto.remarkId)
@@ -37,7 +37,7 @@ export class CommentService {
         created_by: userId
       };
 
-      const { data, error } = await supabase
+      const { data, error } = await database
         .from('remark_comments')
         .insert([commentData])
         .select()
@@ -49,7 +49,7 @@ export class CommentService {
       }
 
       // Update the comments count on the remark
-      await supabase
+      await database
         .from('remarks_and_issues')
         .update({ 
           comments_count: await this.getCommentsCount(createDto.remarkId)
@@ -70,9 +70,9 @@ export class CommentService {
    */
   async getCommentsByRemark(remarkId: string, filters: CommentFilterDto = {}): Promise<CommentResponseDto[]> {
     try {
-      const supabase = this.supabaseService.getUserClient();
+      const database = this.databaseService.getUserClient();
       
-      let query = supabase
+      let query = database
         .from('remark_comments')
         .select('*')
         .eq('remark_id', remarkId)
@@ -109,10 +109,10 @@ export class CommentService {
     userId: string
   ): Promise<CommentResponseDto> {
     try {
-      const supabase = this.supabaseService.getUserClient();
+      const database = this.databaseService.getUserClient();
 
       // Check if comment exists and user owns it
-      const { data: existingComment } = await supabase
+      const { data: existingComment } = await database
         .from('remark_comments')
         .select('*')
         .eq('id', commentId)
@@ -128,7 +128,7 @@ export class CommentService {
         updated_at: new Date().toISOString()
       };
 
-      const { data, error } = await supabase
+      const { data, error } = await database
         .from('remark_comments')
         .update(updateData)
         .eq('id', commentId)
@@ -155,10 +155,10 @@ export class CommentService {
    */
   async deleteComment(commentId: string, userId: string): Promise<void> {
     try {
-      const supabase = this.supabaseService.getUserClient();
+      const database = this.databaseService.getUserClient();
 
       // Get the comment to check ownership and get remark_id
-      const { data: comment } = await supabase
+      const { data: comment } = await database
         .from('remark_comments')
         .select('remark_id, created_by')
         .eq('id', commentId)
@@ -172,7 +172,7 @@ export class CommentService {
         throw new BadRequestException('Unauthorized to delete this comment');
       }
 
-      const { error } = await supabase
+      const { error } = await database
         .from('remark_comments')
         .delete()
         .eq('id', commentId)
@@ -184,7 +184,7 @@ export class CommentService {
       }
 
       // Update the comments count on the remark
-      await supabase
+      await database
         .from('remarks_and_issues')
         .update({ 
           comments_count: await this.getCommentsCount(comment.remark_id)
@@ -203,9 +203,9 @@ export class CommentService {
    * Get comments count for a remark
    */
   private async getCommentsCount(remarkId: string): Promise<number> {
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
     
-    const { count, error } = await supabase
+    const { count, error } = await database
       .from('remark_comments')
       .select('id', { count: 'exact' })
       .eq('remark_id', remarkId);

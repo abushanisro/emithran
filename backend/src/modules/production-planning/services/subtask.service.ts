@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, InternalServerErrorException, Logger } from '@nestjs/common';
-import { SupabaseService } from '@/common/supabase/supabase.service';
+import { DatabaseService } from '@/common/database/database.service';
 import { UuidValidator } from '@/common/validators/uuid.validator';
 import { CreateSubtaskDto, UpdateSubtaskDto, SubtaskResponseDto } from '../dto/subtask.dto';
 
@@ -7,17 +7,17 @@ import { CreateSubtaskDto, UpdateSubtaskDto, SubtaskResponseDto } from '../dto/s
 export class SubtaskService {
   private readonly logger = new Logger(SubtaskService.name);
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(private readonly databaseService: DatabaseService) {}
 
   async createSubtask(createDto: CreateSubtaskDto, userId: string): Promise<SubtaskResponseDto> {
     UuidValidator.validateUuid(createDto.productionProcessId, 'Production Process ID');
     UuidValidator.validateUuid(userId, 'User ID');
 
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     try {
       // Verify the production process exists and user has access
-      const { data: processData, error: processError } = await supabase
+      const { data: processData, error: processError } = await database
         .from('production_processes')
         .select('id, production_lot:production_lots!inner(created_by)')
         .eq('id', createDto.productionProcessId)
@@ -36,7 +36,7 @@ export class SubtaskService {
       })) || [];
 
       // Call the database function to create subtask with BOM parts
-      const { data, error } = await supabase.rpc('create_subtask_with_bom_parts', {
+      const { data, error } = await database.rpc('create_subtask_with_bom_parts', {
         p_production_process_id: createDto.productionProcessId,
         p_task_name: createDto.taskName,
         p_created_by: userId,
@@ -77,9 +77,9 @@ export class SubtaskService {
   async getSubtaskById(subtaskId: string, userId: string): Promise<SubtaskResponseDto> {
     UuidValidator.validateUuid(subtaskId, 'Subtask ID');
 
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from('process_subtasks')
       .select(`
         *,
@@ -115,10 +115,10 @@ export class SubtaskService {
   async getSubtasksByProcess(processId: string, userId: string): Promise<SubtaskResponseDto[]> {
     UuidValidator.validateUuid(processId, 'Process ID');
 
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Verify process access first
-    const { data: processData } = await supabase
+    const { data: processData } = await database
       .from('production_processes')
       .select('id, production_lot:production_lots!inner(created_by)')
       .eq('id', processId)
@@ -129,7 +129,7 @@ export class SubtaskService {
       throw new NotFoundException('Production process not found or access denied');
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from('process_subtasks')
       .select(`
         *,
@@ -160,7 +160,7 @@ export class SubtaskService {
   async updateSubtask(subtaskId: string, updateDto: UpdateSubtaskDto, userId: string): Promise<SubtaskResponseDto> {
     UuidValidator.validateUuid(subtaskId, 'Subtask ID');
 
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
     // Verify access
     const existing = await this.getSubtaskById(subtaskId, userId);
@@ -168,7 +168,7 @@ export class SubtaskService {
       throw new NotFoundException('Subtask not found or access denied');
     }
 
-    const { error } = await supabase
+    const { error } = await database
       .from('process_subtasks')
       .update({
         task_name: updateDto.taskName,
@@ -201,9 +201,9 @@ export class SubtaskService {
     // Verify access first
     await this.getSubtaskById(subtaskId, userId);
 
-    const supabase = this.supabaseService.getUserClient();
+    const database = this.databaseService.getUserClient();
 
-    const { error } = await supabase
+    const { error } = await database
       .from('process_subtasks')
       .delete()
       .eq('id', subtaskId);

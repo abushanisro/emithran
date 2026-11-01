@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsOptional, IsEnum, IsArray, ValidateNested, Min, Max, IsUUID, IsDateString } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsEnum, IsArray, ValidateNested, Min, Max, IsUUID, IsDateString, ValidateBy } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -99,26 +99,37 @@ class MeasurementDto {
   @IsString()
   specification: string;
 
-  @ApiProperty({ description: 'Nominal value' })
+  // A value nobody entered is null, never 0: a stored 0 would read as a real measurement.
+  @ApiProperty({ description: 'Nominal value; null when not entered', nullable: true, type: Number })
+  @IsOptional()
   @IsNumber()
-  nominal: number;
+  nominal: number | null;
 
-  @ApiProperty({ description: 'Plus tolerance' })
+  @ApiProperty({ description: 'Plus tolerance; null when not entered', nullable: true, type: Number })
+  @IsOptional()
   @IsNumber()
-  plusTolerance: number;
+  plusTolerance: number | null;
 
-  @ApiProperty({ description: 'Minus tolerance' })
+  @ApiProperty({ description: 'Minus tolerance; null when not entered', nullable: true, type: Number })
+  @IsOptional()
   @IsNumber()
-  minusTolerance: number;
+  minusTolerance: number | null;
 
   @ApiProperty({ description: 'Measurement method' })
   @IsString()
   method: string;
 
-  @ApiProperty({ description: 'Sample values (1-5)', type: [Number] })
+  @ApiProperty({ description: 'Sample values (1-5); null for a sample not measured', type: [Number] })
   @IsArray()
-  @IsNumber({}, { each: true })
-  sampleValues: number[];
+  @ValidateBy({
+    name: 'isNumberOrNullEach',
+    validator: {
+      validate: (values: unknown) =>
+        Array.isArray(values) && values.every((v) => v === null || (typeof v === 'number' && Number.isFinite(v))),
+      defaultMessage: () => 'each sample value must be a number or null',
+    },
+  })
+  sampleValues: Array<number | null>;
 
   @ApiProperty({ description: 'Remarks', required: false })
   @IsOptional()

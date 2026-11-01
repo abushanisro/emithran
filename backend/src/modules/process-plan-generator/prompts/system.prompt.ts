@@ -288,7 +288,7 @@ export function formatBriefAndCandidates(brief: EngineeringBrief, candidates: Ca
   lines.push(`DFM source: ${brief.dfm.fromCadEngine ? 'CAD engine (exact part volume — reliable)' : 'estimated from bounding-box × 0.45 fill factor — UNCERTAIN weight, flag in notes if material differs from BOM hint'}`);
   lines.push('');
   lines.push('## Context');
-  lines.push(`Organization location: ${brief.context.organizationLocation}`);
+  lines.push(`Organization location: ${brief.context.organizationLocation ?? 'UNKNOWN (no factory location set; do not assume one)'}`);
   lines.push(`Currency: ${brief.context.currency}`);
   lines.push(`Phase-1 scope decision: family=${brief.scope.family}, confidence=${brief.scope.confidence}, reason="${brief.scope.reason}"`);
 

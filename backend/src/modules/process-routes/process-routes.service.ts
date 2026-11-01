@@ -2,9 +2,10 @@ import {
   Injectable,
   NotFoundException,
   InternalServerErrorException,
+  BadRequestException,
 } from '@nestjs/common';
 import { Logger } from '../../common/logger/logger.service';
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { DatabaseService } from '../../common/database/database.service';
 import {
   CreateProcessRouteDto,
   UpdateProcessRouteDto,
@@ -13,6 +14,7 @@ import {
   CreateProcessRouteStepDto,
   UpdateProcessRouteStepDto,
   ReorderProcessRouteStepsDto,
+  MAX_ROUTE_STEPS_PER_REORDER,
   ExecuteCalculatorDto,
   SaveSessionDto,
   AssignRoleDto,
@@ -32,7 +34,7 @@ import {
 @Injectable()
 export class ProcessRoutesService {
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly logger: Logger,
   ) {}
 
@@ -52,7 +54,7 @@ export class ProcessRoutesService {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    let queryBuilder = this.supabaseService
+    let queryBuilder = this.databaseService
       .getClient(accessToken)
       .from('process_routes')
       .select(
@@ -125,7 +127,7 @@ export class ProcessRoutesService {
   async findOne(id: string, userId: string, accessToken: string): Promise<ProcessRouteResponseDto> {
     this.logger.log(`Fetching process route: ${id}`, 'ProcessRoutesService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('process_routes')
       .select(
@@ -172,7 +174,7 @@ export class ProcessRoutesService {
       user_id: userId,
     };
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('process_routes')
       .insert(insertData)
@@ -208,7 +210,7 @@ export class ProcessRoutesService {
 
     updateData.updated_at = new Date().toISOString();
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('process_routes')
       .update(updateData)
@@ -231,7 +233,7 @@ export class ProcessRoutesService {
   async delete(id: string, userId: string, accessToken: string): Promise<void> {
     this.logger.log(`Deleting process route: ${id}`, 'ProcessRoutesService');
 
-    const { error } = await this.supabaseService
+    const { error } = await this.databaseService
       .getClient(accessToken)
       .from('process_routes')
       .delete()
@@ -262,7 +264,7 @@ export class ProcessRoutesService {
     userId: string,
     accessToken: string,
   ): Promise<ProcessRouteResponseDto> {
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('process_routes')
       .update({
@@ -328,7 +330,7 @@ export class ProcessRoutesService {
   ): Promise<ProcessRouteResponseDto> {
     this.logger.log(`Transitioning workflow state for route ${id} to ${toState}`, 'ProcessRoutesService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('process_routes')
       .update({
@@ -364,7 +366,7 @@ export class ProcessRoutesService {
     role: string | undefined,
     accessToken: string,
   ): Promise<void> {
-    await this.supabaseService.getClient(accessToken).from('process_route_workflow_history').insert({
+    await this.databaseService.getClient(accessToken).from('process_route_workflow_history').insert({
       route_id: routeId,
       to_state: toState,
       changed_by: userId,
@@ -375,7 +377,7 @@ export class ProcessRoutesService {
   async getWorkflowHistory(id: string, userId: string, accessToken: string): Promise<WorkflowHistoryResponseDto[]> {
     this.logger.log(`Fetching workflow history for route: ${id}`, 'ProcessRoutesService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('process_route_workflow_history')
       .select('*')
@@ -397,7 +399,7 @@ export class ProcessRoutesService {
   async getSteps(routeId: string, userId: string, accessToken: string): Promise<ProcessRouteStepResponseDto[]> {
     this.logger.log(`Fetching steps for route: ${routeId}`, 'ProcessRoutesService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('process_route_steps')
       .select('*')
@@ -436,7 +438,7 @@ export class ProcessRoutesService {
       notes: createDto.notes,
     };
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('process_route_steps')
       .insert(insertData)
@@ -480,7 +482,7 @@ export class ProcessRoutesService {
 
     updateData.updated_at = new Date().toISOString();
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('process_route_steps')
       .update(updateData)
@@ -507,14 +509,14 @@ export class ProcessRoutesService {
     this.logger.log(`Deleting route step: ${id}`, 'ProcessRoutesService');
 
     // Get the step to know which route to recalculate
-    const { data: step } = await this.supabaseService
+    const { data: step } = await this.databaseService
       .getClient(accessToken)
       .from('process_route_steps')
       .select('process_route_id')
       .eq('id', id)
       .single();
 
-    const { error } = await this.supabaseService.getClient(accessToken).from('process_route_steps').delete().eq('id', id);
+    const { error } = await this.databaseService.getClient(accessToken).from('process_route_steps').delete().eq('id', id);
 
     if (error) {
       this.logger.error(`Error deleting route step: ${error.message}`, 'ProcessRoutesService');
@@ -535,14 +537,29 @@ export class ProcessRoutesService {
   ): Promise<ProcessRouteStepResponseDto[]> {
     this.logger.log(`Reordering steps for route: ${routeId}`, 'ProcessRoutesService');
 
+    // Checked here as well as by the DTO: the id list bounds the loop below,
+    // so it must be a real, bounded array of strings whatever reaches us.
+    const stepIds: unknown = dto?.stepIds;
+    if (
+      !Array.isArray(stepIds) ||
+      stepIds.length > MAX_ROUTE_STEPS_PER_REORDER ||
+      stepIds.some((id) => typeof id !== 'string')
+    ) {
+      throw new BadRequestException(`stepIds must be an array of at most ${MAX_ROUTE_STEPS_PER_REORDER} step ids`);
+    }
+
     // Update step numbers based on the order in the array
-    for (let i = 0; i < dto.stepIds.length; i++) {
-      const stepId = dto.stepIds[i];
-      await this.supabaseService
+    const ids = stepIds as string[];
+    for (const [i, stepId] of ids.entries()) {
+      const { error } = await this.databaseService
         .getClient(accessToken)
         .from('process_route_steps')
         .update({ step_number: i + 1 })
         .eq('id', stepId);
+      if (error) {
+        this.logger.error(`Error reordering route step ${stepId}: ${error.message}`, 'ProcessRoutesService');
+        throw new InternalServerErrorException(`Failed to reorder route steps: ${error.message}`);
+      }
     }
 
     // Fetch updated steps
@@ -563,7 +580,7 @@ export class ProcessRoutesService {
     this.logger.log(`Executing calculator for step: ${stepId}`, 'ProcessRoutesService');
 
     // Get the step to find calculator mapping
-    const { data: step, error: stepError } = await this.supabaseService
+    const { data: step, error: stepError } = await this.databaseService
       .getClient(accessToken)
       .from('process_route_steps')
       .select('*')
@@ -576,7 +593,7 @@ export class ProcessRoutesService {
 
     // TODO: Integrate with calculator service to execute calculation
     // For now, store the input values
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('process_route_steps')
       .update({
@@ -620,7 +637,7 @@ export class ProcessRoutesService {
 
   private async recalculateRouteTotals(routeId: string, accessToken: string): Promise<void> {
     // Get all steps for this route
-    const { data: steps } = await this.supabaseService
+    const { data: steps } = await this.databaseService
       .getClient(accessToken)
       .from('process_route_steps')
       .select('setup_time_minutes, cycle_time_minutes, calculated_cost')
@@ -633,7 +650,7 @@ export class ProcessRoutesService {
     const totalCost = steps.reduce((sum, step) => sum + (step.calculated_cost || 0), 0);
 
     // Update the route with calculated totals
-    await this.supabaseService
+    await this.databaseService
       .getClient(accessToken)
       .from('process_routes')
       .update({
@@ -656,7 +673,7 @@ export class ProcessRoutesService {
   ): Promise<SessionResponseDto | null> {
     this.logger.log(`Fetching active session for user: ${userId}, BOM item: ${bomItemId}`, 'ProcessRoutesService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('user_sessions')
       .select('*')
@@ -681,7 +698,7 @@ export class ProcessRoutesService {
       filters: dto.sessionData || {},
     };
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('user_sessions')
       .upsert(sessionData, { onConflict: 'user_id' })
@@ -703,7 +720,7 @@ export class ProcessRoutesService {
   async getUserRoles(userId: string, accessToken: string): Promise<UserRoleResponseDto[]> {
     this.logger.log(`Fetching roles for user: ${userId}`, 'ProcessRoutesService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('user_roles')
       .select('*')
@@ -728,7 +745,7 @@ export class ProcessRoutesService {
       organization_id: dto.organizationId,
     };
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('user_roles')
       .insert(roleData)
@@ -754,7 +771,7 @@ export class ProcessRoutesService {
       updateData.is_primary = dto.isPrimary;
     }
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('user_roles')
       .update(updateData)

@@ -90,6 +90,12 @@ export class MHRCalculationResult {
 
   @ApiProperty()
   totalCapitalInvestment: number;
+
+  // Disclosure: each input the stored record lacked and that was filled with a
+  // default (MHR_CALCULATION_CONSTANTS.DEFAULTS), e.g. "capacityUtilizationRate=85 (default)".
+  // Absent when every input was stored, so a rate built on defaults never looks measured.
+  @ApiProperty({ required: false, type: [String] })
+  assumedDefaults?: string[];
 }
 
 export class MHRResponseDto {

@@ -27,7 +27,7 @@ import {
   ApiBearerAuth,
   ApiParam,
 } from '@nestjs/swagger';
-import { SupabaseAuthGuard } from '../../../common/guards/supabase-auth.guard';
+import { RequestAuthGuard } from '../../../common/guards/request-auth.guard';
 import { OrganizationContextGuard } from '../../../common/guards/organization-context.guard';
 import { ChildPartCostService } from '../services/child-part-cost.service';
 import {
@@ -41,7 +41,7 @@ import {
 
 @ApiTags('Child Part Costs')
 @Controller('api/child-part-costs')
-@UseGuards(SupabaseAuthGuard)
+@UseGuards(RequestAuthGuard)
 @ApiBearerAuth()
 export class ChildPartCostController {
   constructor(private readonly childPartCostService: ChildPartCostService) {}

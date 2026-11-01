@@ -1,7 +1,7 @@
 import { splitKeywayOccurrences } from '../../../../../../modules/bom-items/costing/machining/operation/keyway-routing';
 
 // Pure function, zero DB dependency — no mocking needed or used, per this
-// project's standing rule against mocked-Supabase spec files.
+// project's standing rule against mocked-database spec files.
 //
 // Root-caused 2026-09-17: cnc_feature_recognizer.py already detects "keyway"
 // as its own real, distinct feature type, but it was being deliberately

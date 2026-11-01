@@ -18,7 +18,7 @@ import { DeterministicPlannerService } from './services/deterministic-planner.se
 import { AlternativeRoutePlannerService } from './services/alternative-route-planner.service';
 import { CycleTimeLibraryService } from './services/cycle-time-library.service';
 
-import { SupabaseModule } from '../../common/supabase/supabase.module';
+import { DatabaseModule } from '../../common/database/database.module';
 import { EventsModule } from '../../common/events/events.module';
 import { LoggerModule } from '../../common/logger/logger.module';
 import { ExchangeRateModule } from '../../common/exchange-rate/exchange-rate.module';
@@ -27,7 +27,7 @@ import { ManufacturingKnowledgeModule } from '../manufacturing-knowledge/manufac
 import { ManufacturingRulesModule } from '../manufacturing-rules/manufacturing-rules.module';
 
 @Module({
-  imports: [SupabaseModule, EventsModule, LoggerModule, ConfigModule, ExchangeRateModule, BOMItemsModule, ManufacturingKnowledgeModule, ManufacturingRulesModule],
+  imports: [DatabaseModule, EventsModule, LoggerModule, ConfigModule, ExchangeRateModule, BOMItemsModule, ManufacturingKnowledgeModule, ManufacturingRulesModule],
   controllers: [ProcessPlanGeneratorController],
   providers: [
     OrchestratorService,

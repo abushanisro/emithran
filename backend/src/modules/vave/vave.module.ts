@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { VaveController } from './vave.controller';
 import { VaveService } from './vave.service';
-import { SupabaseModule } from '../../common/supabase/supabase.module';
+import { DatabaseModule } from '../../common/database/database.module';
 import { LoggerModule } from '../../common/logger/logger.module';
 
 @Module({
-  imports: [SupabaseModule, LoggerModule],
+  imports: [DatabaseModule, LoggerModule],
   controllers: [VaveController],
   providers: [VaveService],
   exports: [VaveService],

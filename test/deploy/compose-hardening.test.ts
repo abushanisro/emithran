@@ -101,6 +101,27 @@ describe('docker-compose.prod.yml', () => {
     expect(networksOf('frontend')).not.toContain('db');
     expect(networksOf('backend')).toContain('db');
     expect(networksOf('postgrest')).toEqual(['db']);
+    // Everything on `db` is named here, so adding a peer is a deliberate change (cad-core holds DB_JWT_SECRET itself).
+    expect(services.filter(([n]) => networksOf(n).includes('db')).map(([n]) => n).sort()).toEqual(['backend', 'cad-core', 'postgrest']);
+  });
+
+  it("keeps PostgREST's admin server on loopback: no db-network peer can reach it, its healthcheck runs inside the container", () => {
+    const postgrest = compose.services.postgrest;
+    expect(postgrest?.environment?.PGRST_ADMIN_SERVER_HOST).toBe('127.0.0.1');
+    expect(postgrest?.healthcheck).toEqual(expect.objectContaining({ test: ['CMD', 'postgrest', '--ready'] }));
+  });
+
+  it('serves the cloudflared metrics on loopback only, not to the other services on edge', () => {
+    const cloudflared = compose.services.cloudflared as Service & { command?: string };
+    expect(cloudflared.command).toMatch(/--metrics 127\.0\.0\.1:2000\b/);
+    expect(cloudflared.command).not.toMatch(/0\.0\.0\.0/);
+  });
+
+  it('cad-core refuses to start without its database secret and bucket settings', () => {
+    const env = compose.services['cad-core']?.environment ?? {};
+    for (const name of ['DB_JWT_SECRET', 'S3_BUCKET', 'S3_REGION', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY']) {
+      expect(String(env[name]), name).toMatch(new RegExp(`^\\$\\{${name}:\\?`));
+    }
   });
 
   it('hands the browser bundle the real API address, not the localhost default it would otherwise compile in', () => {
@@ -139,7 +160,8 @@ describe('Dockerfiles', () => {
   it.each(files)('%s: pinned base by digest, non-root, no env files copied in', (file) => {
     const text = read(file);
     const froms = [...text.matchAll(/^FROM\s+(\S+)(?:\s+AS\s+\S+)?/gm)].map((m) => m[1] as string);
-    for (const from of froms.filter((f) => !['base', 'deps', 'builder', 'runner', 'build', 'runtime'].includes(f))) {
+    // Stage names refer to earlier stages; `scratch` is Docker's reserved empty base (nothing is pulled, so nothing to pin).
+    for (const from of froms.filter((f) => !['base', 'deps', 'builder', 'runner', 'build', 'runtime', 'scratch'].includes(f))) {
       expect(from, `${file}: ${from}`).toMatch(/@sha256:[0-9a-f]{64}$/);
     }
     const lastUser = [...text.matchAll(/^USER\s+(\S+)/gm)].pop()?.[1];

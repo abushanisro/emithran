@@ -16,44 +16,44 @@ describe('RLS boundary CI rules', () => {
   const svc = 'src/modules/x/x.service.ts';
 
   it.each([
-    ['dot-client', 'const c = this.supabaseService.client.from("t");'],
-    ['dot-client', 'await this.supabase.client\n  .from("t")'],
-    ['get-admin-client', 'const c = this.supabase.getAdminClient();'],
-    ['getclient-no-token', 'const c = this.supabase.getClient();'],
-    ['getclient-optional-token', 'const c = this.supabase.getClient(accessToken ?? undefined);'],
+    ['dot-client', 'const c = this.databaseService.client.from("t");'],
+    ['dot-client', 'await this.database.client\n  .from("t")'],
+    ['get-admin-client', 'const c = this.database.getAdminClient();'],
+    ['getclient-no-token', 'const c = this.database.getClient();'],
+    ['getclient-optional-token', 'const c = this.database.getClient(accessToken ?? undefined);'],
     ['second-db-path', "import { Pool } from 'pg';"],
     ['second-db-path', "import knex from 'knex';"],
     ['second-db-path', "import { TypeOrmModule } from '@nestjs/typeorm';"],
-    ['own-supabase-client', "const c = createClient(url, key);"],
+    ['own-database-client', "const c = createClient(url, key);"],
     ['service-key-outside-boundary', "const k = process.env.SUPABASE_SERVICE_KEY;"],
     // Assembled at runtime so no JWT literal exists in source, even a synthetic one.
     ['hardcoded-jwt', `const k = '${['eyJhbGciOiJIUzI1NiJ9', 'eyJyb2xlIjoieCIsInJlZiI6InRlc3QifQ', 'abcdefghij1234'].join('.')}';`],
-    ['privileged-reason', 'const c = this.supabase.getPrivilegedClient(reason);'],
-    ['privileged-reason', 'const c = this.supabase.getPrivilegedClient(`x ${y}`);'],
-    ['privileged-reason', "const c = this.supabase.getPrivilegedClient('x');"],
-    ['privileged-reason', 'const c = this.supabase.getPrivilegedClient();'],
+    ['privileged-reason', 'const c = this.database.getPrivilegedClient(reason);'],
+    ['privileged-reason', 'const c = this.database.getPrivilegedClient(`x ${y}`);'],
+    ['privileged-reason', "const c = this.database.getPrivilegedClient('x');"],
+    ['privileged-reason', 'const c = this.database.getPrivilegedClient();'],
   ])('flags %s', (rule, code) => {
     expect(rulesFor(svc, code)).toContain(rule);
   });
 
   it.each([
-    'const c = this.supabase.getUserClient();',
-    'const c = this.supabase.getUserClient(accessToken);',
-    'const c = this.supabase.getClient(accessToken);',
-    "const c = this.supabase.getPrivilegedClient('reference-data: sm_reference_data, global shared');",
-    "const c = this.supabase\n  .getPrivilegedClient(\"system-job: should-cost calibration updates global rates\");",
+    'const c = this.database.getUserClient();',
+    'const c = this.database.getUserClient(accessToken);',
+    'const c = this.database.getClient(accessToken);',
+    "const c = this.database.getPrivilegedClient('reference-data: sm_reference_data, global shared');",
+    "const c = this.database\n  .getPrivilegedClient(\"system-job: should-cost calibration updates global rates\");",
     'const client = this.httpClient.client;',
   ])('accepts compliant code: %s', (code) => {
     expect(rulesFor(svc, code)).toEqual([]);
   });
 
-  it('allows SupabaseService itself to define and use the privileged primitives', () => {
+  it('allows DatabaseService itself to define and use the privileged primitives', () => {
     const text = [
       "import { createClient } from '@supabase/supabase-js';",
       "this.url = config.get('SUPABASE_SERVICE_KEY');",
       'this.adminClient = createClient(a, b);',
     ].join('\n');
-    expect(rulesFor('src/common/supabase/supabase.service.ts', text)).toEqual([]);
+    expect(rulesFor('src/common/database/database.service.ts', text)).toEqual([]);
   });
 
   it('allows the service key in env validation config only', () => {
@@ -81,7 +81,7 @@ describe('RLS boundary CI rules', () => {
   });
 
   it('reports the 1-based line of each violation', () => {
-    const r = scanSource(svc, 'a\nb\nconst c = this.supabase.getClient();');
+    const r = scanSource(svc, 'a\nb\nconst c = this.database.getClient();');
     expect(r[0].line).toBe(3);
   });
 
@@ -112,7 +112,7 @@ describe('RLS boundary CI rules', () => {
     it('counts every privileged accessor call in a file', () => {
       const text = "a.getPrivilegedClient('reference-data: x');\nb.getPrivilegedClient (\n  'system-job: y z w');";
       expect(countPrivilegedCalls(text)).toBe(2);
-      expect(countPrivilegedCalls('const c = this.supabase.getUserClient();')).toBe(0);
+      expect(countPrivilegedCalls('const c = this.database.getUserClient();')).toBe(0);
     });
 
     it('reports a file above its baseline, including a file with no entry', () => {

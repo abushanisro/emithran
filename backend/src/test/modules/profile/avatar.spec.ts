@@ -2,8 +2,8 @@ import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import type { ObjectStore } from '../../../common/storage/object-store';
-import { SupabaseService } from '../../../common/supabase/supabase.service';
-import { UserDirectory } from '../../../common/supabase/user-directory';
+import { DatabaseService } from '../../../common/database/database.service';
+import { UserDirectory } from '../../../common/database/user-directory';
 import { AVATAR_BUCKET, avatarKey, detectAvatarType } from '../../../modules/profile/avatar';
 import { ProfileService } from '../../../modules/profile/profile.service';
 import { FakePostgrest } from '../../support/fake-postgrest';
@@ -62,11 +62,11 @@ describe('ProfileService avatar', () => {
   beforeEach(async () => {
     db = new FakePostgrest();
     await db.start();
-    const supabase = new SupabaseService(
+    const database = new DatabaseService(
       new ConfigService({ POSTGREST_URL: db.url, DB_JWT_SECRET: 'x'.repeat(32) }),
     );
     objects = new MemoryObjects();
-    service = new ProfileService(supabase, new UserDirectory(supabase), objects);
+    service = new ProfileService(database, new UserDirectory(database), objects);
     db.reply('POST', '/rpc/directory_users', [{ id: USER, email: 'me@acme.com', full_name: null }]);
   });
 

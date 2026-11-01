@@ -1,17 +1,18 @@
-import { readAllRows } from '../../common/supabase/read-all-rows';
+import { readAllRows } from '../../common/database/read-all-rows';
 import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException, ConflictException } from '@nestjs/common';
 import { Logger } from '../../common/logger/logger.service';
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { DatabaseService } from '../../common/database/database.service';
 import { CreateLHRDto, UpdateLHRDto } from './lhr.dto';
 import { validate as isValidUUID } from 'uuid';
 import * as ExcelJS from 'exceljs';
+import { assertXlsxWithinLimits } from '../../common/archive/xlsx-limits';
 import { getCurrencyForLocation } from '../mhr/constants/mhr-calculation.constants';
-import { ExchangeRateService, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
+import { ExchangeRateService, organizationIdOf, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
 
 @Injectable()
 export class LHRService {
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly logger: Logger,
     private readonly exchangeRateService: ExchangeRateService,
   ) { }
@@ -40,7 +41,7 @@ export class LHRService {
     this.logger.log(`Creating LHR record for user: ${userId}`, 'LHRService');
 
     // Check if labour code already exists
-    const { data: existing } = await this.supabaseService
+    const { data: existing } = await this.databaseService
       .getClient(accessToken)
       .from('lhr_records')
       .select('id')
@@ -51,10 +52,11 @@ export class LHRService {
       throw new ConflictException(`Labour code ${CreateLHRDto.labourCode} already exists`);
     }
 
-    const rates = await this.exchangeRateService.getSnapshot(accessToken);
+    // lhr_records carry no organization, so the global default rates apply.
+    const rates = await this.exchangeRateService.getSnapshot(accessToken, null);
     const lhrCurrency = this.computeLhrCurrencyFields(CreateLHRDto.lhr, CreateLHRDto.location, rates);
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('lhr_records')
       .insert({
@@ -115,7 +117,7 @@ export class LHRService {
     processGroup: string,
     accessToken: string,
   ): Promise<{ rateUsdPerHr: number | null; source: 'shop_average' | 'benchmark' | 'none'; sampleSize: number }> {
-    const { data: shopRows } = await this.supabaseService
+    const { data: shopRows } = await this.databaseService
       .getClient(accessToken)
       .from('lhr_records')
       .select('lhr, lhr_usd_effective')
@@ -131,7 +133,7 @@ export class LHRService {
       return { rateUsdPerHr: average, source: 'shop_average', sampleSize: shopRates.length };
     }
 
-    const { data: benchmarkRows } = await this.supabaseService
+    const { data: benchmarkRows } = await this.databaseService
       .getPrivilegedClient('reference-data: lhr_benchmark_rates, global shared')
       .from('lhr_benchmark_rates')
       .select('lhr_usd_effective')
@@ -148,7 +150,7 @@ export class LHRService {
   }
 
   async getBenchmarkRates(location?: string) {
-    let query = this.supabaseService
+    let query = this.databaseService
       .getPrivilegedClient('reference-data: lhr_benchmark_rates, global shared')
       .from('lhr_benchmark_rates')
       .select('id, labour_code, labour_type, description, location, process_group, lhr, currency, lhr_usd_effective')
@@ -204,7 +206,7 @@ export class LHRService {
 
     // Every row, in pages: .limit() cannot lift the server's 1000-row cap.
     const { data, error, count } = await readAllRows((from, to) => {
-      let q = this.supabaseService
+      let q = this.databaseService
         .getUserClient(accessToken)
         .from('lhr_records')
         .select('*', { count: 'exact' })
@@ -228,7 +230,7 @@ export class LHRService {
 
   /** How many LHR records the caller can see. Head-only: no rows are transferred. */
   async count(accessToken?: string): Promise<{ total: number }> {
-    const { count, error } = await this.supabaseService
+    const { count, error } = await this.databaseService
       .getUserClient(accessToken)
       .from('lhr_records')
       .select('id', { count: 'exact', head: true });
@@ -246,7 +248,7 @@ export class LHRService {
       throw new BadRequestException('Invalid LHR record ID format');
     }
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('lhr_records')
       .select('*')
@@ -264,7 +266,7 @@ export class LHRService {
   async findByLabourCode(labourCode: string, userId: string, accessToken: string) {
     this.logger.log(`Fetching LHR record by code: ${labourCode}`, 'LHRService');
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('lhr_records')
       .select('*')
@@ -290,7 +292,7 @@ export class LHRService {
 
     // Check for duplicate labour code if updating
     if (UpdateLHRDto.labourCode) {
-      const { data: existing } = await this.supabaseService
+      const { data: existing } = await this.databaseService
         .getClient(accessToken)
         .from('lhr_records')
         .select('id')
@@ -333,13 +335,14 @@ export class LHRService {
     // Always recompute currency and lhr_usd_effective from the effective lhr + location
     const effectiveLhr      = UpdateLHRDto.lhr      ?? existingRecord.lhr;
     const effectiveLocation = UpdateLHRDto.location  ?? existingRecord.location;
-    const rates = await this.exchangeRateService.getSnapshot(accessToken);
+    // The record's organization's budget rates; lhr_records carry none today, so the global default rates apply.
+    const rates = await this.exchangeRateService.getSnapshot(accessToken, organizationIdOf(existingRecord));
     const lhrCurrency = this.computeLhrCurrencyFields(effectiveLhr, effectiveLocation, rates);
     updateData.currency          = lhrCurrency.currency;
     updateData.currency_symbol   = lhrCurrency.currencySymbol;
     updateData.lhr_usd_effective = lhrCurrency.lhrUsdEffective;
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('lhr_records')
       .update(updateData)
@@ -365,7 +368,7 @@ export class LHRService {
     // Verify record exists
     await this.findOne(id, userId, accessToken);
 
-    const { error } = await this.supabaseService
+    const { error } = await this.databaseService
       .getClient(accessToken)
       .from('lhr_records')
       .delete()
@@ -383,9 +386,9 @@ export class LHRService {
     this.logger.log(`Deleting all LHR records for user ${userId}`, 'LHRService');
 
     // Use the service-role admin client to bypass RLS — the endpoint is already protected
-    // by SupabaseAuthGuard, so only authenticated users can reach this method. Scoped to
+    // by RequestAuthGuard, so only authenticated users can reach this method. Scoped to
     // userId so this can't delete other users' records (was previously unscoped — bug fix).
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getPrivilegedClient('lhr bulk delete scoped by user_id: OPEN lhr_records has no RLS policies in repo migrations, verify then move to getUserClient')
       .from('lhr_records')
       .delete()
@@ -403,7 +406,8 @@ export class LHRService {
   async bulkCreate(data: CreateLHRDto[], userId: string, accessToken: string) {
     this.logger.log(`Bulk creating ${data.length} LHR records`, 'LHRService');
 
-    const rates = await this.exchangeRateService.getSnapshot(accessToken);
+    // lhr_records carry no organization, so the global default rates apply.
+    const rates = await this.exchangeRateService.getSnapshot(accessToken, null);
     const records = data.map(dto => {
       const lhrCurrency = this.computeLhrCurrencyFields(dto.lhr, dto.location, rates);
       return {
@@ -439,7 +443,7 @@ export class LHRService {
       };
     });
 
-    const { data: inserted, error } = await this.supabaseService
+    const { data: inserted, error } = await this.databaseService
       .getClient(accessToken)
       .from('lhr_records')
       .insert(records)
@@ -459,6 +463,7 @@ export class LHRService {
     accessToken: string,
   ): Promise<{ imported: number; skipped: number; errors: string[] }> {
     this.logger.log(`Importing LHR records from Excel for user ${userId}`, 'LHRService');
+    assertXlsxWithinLimits(fileBuffer); // measured before ExcelJS inflates anything
 
     const workbook = new ExcelJS.Workbook();
     const arrayBuffer = fileBuffer.buffer.slice(
@@ -499,7 +504,7 @@ export class LHRService {
     // defaulted to 30% with no warning, feeding straight into calcLHR() —
     // set for any row that hit that default (see the perksParsed check below).
     let hadMissingPerks = false;
-    const { data: wageBenchmarkRows } = await this.supabaseService
+    const { data: wageBenchmarkRows } = await this.databaseService
       .getClient(accessToken)
       .from('lhr_wage_benchmarks')
       .select('grade, labour_type, wage_per_day, wage_per_month, dearness_allowance, perks_pct')
@@ -740,7 +745,7 @@ export class LHRService {
       return { imported: 0, skipped: 0, errors: importErrors };
     }
 
-    const client = this.supabaseService.getClient(accessToken);
+    const client = this.databaseService.getClient(accessToken);
 
     // Pre-dedup: fetch existing labour codes for this user and filter them out
     const { data: existing } = await readAllRows((from, to) => client

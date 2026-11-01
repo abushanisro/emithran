@@ -1,4 +1,4 @@
-import { DEFAULT_YIELD_PCT } from '../../shared/core/default-rates.constants';
+import { DEFAULT_YIELD_PCT, resolveYieldPct } from '../../shared/core/default-rates.constants';
 import type { MHRRateInput } from '../../shared/core/cost-engine';
 import type { ProcessLineCost, PhysicsGap, ConfidenceLevel } from '../../../dto/cost-breakdown.dto';
 import type { CuttingProcessContext, CuttingProcessResult } from '../../shared/core/manufacturing-process.types';
@@ -102,7 +102,7 @@ export function computeLaserCuttingCost(input: LaserCuttingInput): LaserCuttingR
     setupTimeMin: setupMin / Math.max(input.batchSize, 1),
     inspTimeMin: input.inspTimeMin ?? 0,
     samplingRate: input.samplingRate ?? 0,
-    yieldPct: input.yieldPct ?? DEFAULT_YIELD_PCT,
+    yieldPct: resolveYieldPct(input.yieldPct, 'Laser Cutting', warnings),
     netMatCost: input.netMatCost ?? 0,
     netWeightKg: input.netWeightKg ?? 0,
     scrapPricePerKg: input.scrapPricePerKg ?? 0,

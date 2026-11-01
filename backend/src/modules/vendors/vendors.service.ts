@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { Logger } from '../../common/logger/logger.service';
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { DatabaseService } from '../../common/database/database.service';
+import { assertXlsxWithinLimits } from '../../common/archive/xlsx-limits';
 import {
   CreateVendorDto,
   UpdateVendorDto,
@@ -15,10 +16,15 @@ import {
 import { MatchVendorsDto, RankedVendor, RankedProcessGroup } from './dto/match-vendors.dto';
 import { validate as isValidUUID } from 'uuid';
 
+/** Upload bounds for the vendor import (file size, CSV rows, CSV line length). */
+export const VENDOR_IMPORT_MAX_BYTES = 10 * 1024 * 1024;
+export const VENDOR_IMPORT_MAX_ROWS = 20000;
+export const VENDOR_CSV_MAX_LINE_LENGTH = 20000;
+
 @Injectable()
 export class VendorsService {
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly logger: Logger,
   ) {}
 
@@ -36,7 +42,7 @@ export class VendorsService {
 
     // Org-scoped via RLS (migration 620) — every authenticated user in the
     // caller's organization sees the same vendor list; no manual filter here.
-    let queryBuilder = this.supabaseService
+    let queryBuilder = this.databaseService
       .getClient(accessToken)
       .from('vendor_summary')
       .select('*', { count: 'exact' })
@@ -136,7 +142,7 @@ export class VendorsService {
     },
     accessToken: string
   ): Promise<string[]> {
-    let equipmentQuery = this.supabaseService
+    let equipmentQuery = this.databaseService
       .getClient(accessToken)
       .from('vendor_equipment')
       .select('vendor_id')
@@ -186,7 +192,7 @@ export class VendorsService {
     }
 
     // Query vendors table directly to ensure we get the company_email field
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('vendors')
       .select('*')
@@ -219,7 +225,7 @@ export class VendorsService {
     // Convert camelCase to snake_case for database
     const vendorData = this.convertToSnakeCase(createVendorDto);
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('vendors')
       .insert({
@@ -254,7 +260,7 @@ export class VendorsService {
     // Convert camelCase to snake_case for database
     const vendorData = this.convertToSnakeCase(updateVendorDto);
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('vendors')
       .update(vendorData)
@@ -283,7 +289,7 @@ export class VendorsService {
     // Verify vendor exists and is visible to the caller (org-scoped via RLS)
     await this.findOne(id, userId, accessToken);
 
-    const { error } = await this.supabaseService
+    const { error } = await this.databaseService
       .getClient(accessToken)
       .from('vendors')
       .delete()
@@ -308,13 +314,13 @@ export class VendorsService {
     // delete below to the same set, but the explicit filter makes the
     // blast radius of this bulk operation legible in the query itself
     // rather than relying solely on the policy to save it from itself.
-    const { count } = await this.supabaseService
+    const { count } = await this.databaseService
       .getClient(accessToken)
       .from('vendors')
       .select('*', { count: 'exact', head: true })
       .eq('organization_id', organizationId);
 
-    const { error } = await this.supabaseService
+    const { error } = await this.databaseService
       .getClient(accessToken)
       .from('vendors')
       .delete()
@@ -341,7 +347,7 @@ export class VendorsService {
     // Verify vendor exists and is visible to the caller (org-scoped via RLS)
     await this.findOne(vendorId, userId, accessToken);
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('vendor_equipment')
       .select('*')
@@ -365,7 +371,7 @@ export class VendorsService {
 
     const equipmentData = this.convertToSnakeCase(createEquipmentDto);
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('vendor_equipment')
       .insert({ ...equipmentData, organization_id: vendor.organizationId })
@@ -384,7 +390,7 @@ export class VendorsService {
     this.logger.log(`Updating equipment: ${id}`, 'VendorsService');
 
     // Existence check only (org-scoped via RLS on the SELECT below)
-    const { data: equipment, error: getError } = await this.supabaseService
+    const { data: equipment, error: getError } = await this.databaseService
       .getClient(accessToken)
       .from('vendor_equipment')
       .select('id, vendor_id')
@@ -397,7 +403,7 @@ export class VendorsService {
 
     const equipmentData = this.convertToSnakeCase(updateEquipmentDto);
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('vendor_equipment')
       .update(equipmentData)
@@ -417,7 +423,7 @@ export class VendorsService {
     this.logger.log(`Deleting equipment: ${id}`, 'VendorsService');
 
     // Existence check only (org-scoped via RLS on the SELECT below)
-    const { data: equipment, error: getError } = await this.supabaseService
+    const { data: equipment, error: getError } = await this.databaseService
       .getClient(accessToken)
       .from('vendor_equipment')
       .select('id')
@@ -428,7 +434,7 @@ export class VendorsService {
       throw new NotFoundException(`Equipment with ID ${id} not found`);
     }
 
-    const { error } = await this.supabaseService
+    const { error } = await this.databaseService
       .getClient(accessToken)
       .from('vendor_equipment')
       .delete()
@@ -452,7 +458,7 @@ export class VendorsService {
     // Verify vendor exists and is visible to the caller (org-scoped via RLS)
     await this.findOne(vendorId, userId, accessToken);
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('vendor_services')
       .select('*')
@@ -476,7 +482,7 @@ export class VendorsService {
 
     const serviceData = this.convertToSnakeCase(createServiceDto);
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('vendor_services')
       .insert({ ...serviceData, organization_id: vendor.organizationId })
@@ -495,7 +501,7 @@ export class VendorsService {
     this.logger.log(`Updating service: ${id}`, 'VendorsService');
 
     // Existence check only (org-scoped via RLS on the SELECT below)
-    const { data: service, error: getError } = await this.supabaseService
+    const { data: service, error: getError } = await this.databaseService
       .getClient(accessToken)
       .from('vendor_services')
       .select('id, vendor_id')
@@ -508,7 +514,7 @@ export class VendorsService {
 
     const serviceData = this.convertToSnakeCase(updateServiceDto);
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('vendor_services')
       .update(serviceData)
@@ -528,7 +534,7 @@ export class VendorsService {
     this.logger.log(`Deleting service: ${id}`, 'VendorsService');
 
     // Existence check only (org-scoped via RLS on the SELECT below)
-    const { data: service, error: getError } = await this.supabaseService
+    const { data: service, error: getError } = await this.databaseService
       .getClient(accessToken)
       .from('vendor_services')
       .select('id')
@@ -539,7 +545,7 @@ export class VendorsService {
       throw new NotFoundException(`Service with ID ${id} not found`);
     }
 
-    const { error } = await this.supabaseService
+    const { error } = await this.databaseService
       .getClient(accessToken)
       .from('vendor_services')
       .delete()
@@ -563,7 +569,7 @@ export class VendorsService {
     // Verify vendor exists and is visible to the caller (org-scoped via RLS)
     await this.findOne(vendorId, userId, accessToken);
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('vendor_contacts')
       .select('*')
@@ -588,7 +594,7 @@ export class VendorsService {
 
     const contactData = this.convertToSnakeCase(createContactDto);
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('vendor_contacts')
       .insert({ ...contactData, organization_id: vendor.organizationId })
@@ -607,7 +613,7 @@ export class VendorsService {
     this.logger.log(`Updating contact: ${id}`, 'VendorsService');
 
     // Existence check only (org-scoped via RLS on the SELECT below)
-    const { data: contact, error: getError } = await this.supabaseService
+    const { data: contact, error: getError } = await this.databaseService
       .getClient(accessToken)
       .from('vendor_contacts')
       .select('id, vendor_id')
@@ -620,7 +626,7 @@ export class VendorsService {
 
     const contactData = this.convertToSnakeCase(updateContactDto);
 
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('vendor_contacts')
       .update(contactData)
@@ -640,7 +646,7 @@ export class VendorsService {
     this.logger.log(`Deleting contact: ${id}`, 'VendorsService');
 
     // Existence check only (org-scoped via RLS on the SELECT below)
-    const { data: contact, error: getError } = await this.supabaseService
+    const { data: contact, error: getError } = await this.databaseService
       .getClient(accessToken)
       .from('vendor_contacts')
       .select('id')
@@ -651,7 +657,7 @@ export class VendorsService {
       throw new NotFoundException(`Contact with ID ${id} not found`);
     }
 
-    const { error } = await this.supabaseService
+    const { error } = await this.databaseService
       .getClient(accessToken)
       .from('vendor_contacts')
       .delete()
@@ -675,7 +681,7 @@ export class VendorsService {
     // Org-scoped via RLS (migration 620) — no manual filter needed; this
     // returns every vendor visible to the caller's organization, not just
     // ones the caller personally created.
-    const { data: vendors, error: vendorsError } = await this.supabaseService
+    const { data: vendors, error: vendorsError } = await this.databaseService
       .getClient(accessToken)
       .from('vendors')
       .select('id');
@@ -687,7 +693,7 @@ export class VendorsService {
     const vendorIds = vendors.map(v => v.id);
 
     // Get distinct equipment types for those vendors
-    const { data, error } = await this.supabaseService
+    const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('vendor_equipment')
       .select('equipment_type')
@@ -725,6 +731,9 @@ export class VendorsService {
     if (!file) {
       throw new InternalServerErrorException('No file provided');
     }
+    if (!Buffer.isBuffer(file.buffer) || file.buffer.length > VENDOR_IMPORT_MAX_BYTES) {
+      throw new BadRequestException(`The vendor file must be at most ${VENDOR_IMPORT_MAX_BYTES / (1024 * 1024)} MB`);
+    }
 
     try {
       let rows: string[][];
@@ -761,7 +770,7 @@ export class VendorsService {
           if (!name) continue;
 
           // Dedup check by name (case-insensitive)
-          const { data: existingVendor, error: checkError } = await this.supabaseService
+          const { data: existingVendor, error: checkError } = await this.databaseService
             .getClient(accessToken)
             .from('vendors')
             .select('id, name')
@@ -823,7 +832,7 @@ export class VendorsService {
             vendor_type: 'supplier',
           };
 
-          const { data: vendor, error: vendorError } = await this.supabaseService
+          const { data: vendor, error: vendorError } = await this.databaseService
             .getClient(accessToken)
             .from('vendors')
             .insert(vendorPayload)
@@ -842,7 +851,7 @@ export class VendorsService {
           // Contact 1
           const c1Name = row[27]?.trim();
           if (c1Name && vendor?.id) {
-            await this.supabaseService.getClient(accessToken).from('vendor_contacts').insert({
+            await this.databaseService.getClient(accessToken).from('vendor_contacts').insert({
               vendor_id: vendor.id,
               organization_id: organizationId,
               name: c1Name,
@@ -856,7 +865,7 @@ export class VendorsService {
           // Contact 2
           const c2Name = row[31]?.trim();
           if (c2Name && vendor?.id) {
-            await this.supabaseService.getClient(accessToken).from('vendor_contacts').insert({
+            await this.databaseService.getClient(accessToken).from('vendor_contacts').insert({
               vendor_id: vendor.id,
               organization_id: organizationId,
               name: c2Name,
@@ -884,12 +893,14 @@ export class VendorsService {
         ...results,
       };
     } catch (error: any) {
+      if (error instanceof BadRequestException) throw error; // a rejected file is the caller's error, not a server error
       this.logger.error(`File import failed: ${error.message}`, 'VendorsService');
       throw new InternalServerErrorException(`Failed to import file: ${error.message}`);
     }
   }
 
   private async parseExcelBuffer(buffer: Buffer): Promise<string[][]> {
+    assertXlsxWithinLimits(buffer); // measured before ExcelJS inflates anything
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const ExcelJS = require('exceljs');
     const workbook = new ExcelJS.Workbook();
@@ -919,10 +930,11 @@ export class VendorsService {
   }
 
   private parseCsvRows(csvContent: string): string[][] {
-    return csvContent
-      .split('\n')
-      .filter(line => line.trim())
-      .map(line => this.parseCSVLine(line));
+    const lines = csvContent.split('\n').filter(line => line.trim());
+    if (lines.length > VENDOR_IMPORT_MAX_ROWS) {
+      throw new BadRequestException(`The vendor file has ${lines.length} rows; at most ${VENDOR_IMPORT_MAX_ROWS} are accepted`);
+    }
+    return lines.map(line => this.parseCSVLine(line));
   }
 
   // ============================================================================
@@ -930,6 +942,11 @@ export class VendorsService {
   // ============================================================================
 
   private parseCSVLine(line: string): string[] {
+    // The line comes from an uploaded file and bounds the loop below: checked
+    // to be a string of bounded length before it is walked character by character.
+    if (typeof line !== 'string' || line.length > VENDOR_CSV_MAX_LINE_LENGTH) {
+      throw new BadRequestException(`A vendor file line exceeds ${VENDOR_CSV_MAX_LINE_LENGTH} characters`);
+    }
     const result: string[] = [];
     let current = '';
     let inQuotes = false;
@@ -1233,7 +1250,7 @@ export class VendorsService {
 
     for (const group of groupMap.values()) {
       // 1. Fetch vendors whose process[] overlaps this group's search terms (union)
-      const { data: vendorRows, error } = await this.supabaseService
+      const { data: vendorRows, error } = await this.databaseService
         .getClient(accessToken)
         .from('vendor_summary')
         .select('id, name, supplier_code, city, state, country, certifications, process, materials, company_email, status')
@@ -1259,7 +1276,7 @@ export class VendorsService {
 
       // 2. Fetch rating aggregates for matched vendors
       const vendorIds = vendorRows.map((v: any) => v.id);
-      const { data: ratingRows } = await this.supabaseService
+      const { data: ratingRows } = await this.databaseService
         .getClient(accessToken)
         .from('vendor_rating_aggregates')
         .select('vendor_id, quality_rating, delivery_rating, cost_rating, overall_rating, vendor_classification')

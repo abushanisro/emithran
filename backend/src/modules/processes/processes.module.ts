@@ -4,13 +4,13 @@ import { ProcessesController } from './processes.controller';
 import { ProcessesService } from './processes.service';
 import { ProcessCostController } from './controllers/process-cost.controller';
 import { ProcessCostService } from './services/process-cost.service';
-import { SupabaseModule } from '../../common/supabase/supabase.module';
+import { DatabaseModule } from '../../common/database/database.module';
 import { LoggerModule } from '../../common/logger/logger.module';
 import { ExchangeRateModule } from '../../common/exchange-rate/exchange-rate.module';
 
 @Module({
   imports: [
-    SupabaseModule,
+    DatabaseModule,
     LoggerModule,
     ExchangeRateModule,
     MulterModule.register({ limits: { fileSize: 20 * 1024 * 1024 } }),

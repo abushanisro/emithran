@@ -3,8 +3,6 @@ import { PDFDocument } from 'pdf-lib';
 import sharp from 'sharp';
 import pdf2pic from 'pdf2pic';
 import Tesseract from 'tesseract.js';
-import * as fs from 'fs';
-import * as path from 'path';
 
 interface PDFTextItem {
   text: string;
@@ -63,13 +61,6 @@ export class PDFProcessorService {
     this.logger.log('Starting PDF processing with industry-standard libraries');
 
     try {
-      // Ensure tmp directory exists for pdf2pic
-      const tmpDir = path.resolve('./tmp');
-      if (!fs.existsSync(tmpDir)) {
-        fs.mkdirSync(tmpDir, { recursive: true });
-        this.logger.log('Created tmp directory for PDF processing');
-      }
-
       // Step 1: Load PDF document using pdf-lib (industry standard)
       const pdfDoc = await PDFDocument.load(pdfBuffer);
       const pageCount = pdfDoc.getPageCount();
@@ -164,10 +155,9 @@ export class PDFProcessorService {
       
       // Try pdf2pic conversion with better error handling
       try {
+        // responseType 'buffer' below: the page is rendered in memory and nothing is written to disk.
         const convertInstance = pdf2pic.fromBuffer(Buffer.from(pdfBytes), {
           density: 300,
-          saveFilename: 'page',
-          savePath: './tmp',
           format: 'png',
           width: 2480,
           height: 3508
@@ -251,17 +241,10 @@ export class PDFProcessorService {
       // Try pdf2pic with better error handling
       try {
         this.logger.log('Attempting pdf2pic conversion...');
-        
-        // Check if tmp directory exists
-        if (!fs.existsSync('./tmp')) {
-          fs.mkdirSync('./tmp', { recursive: true });
-        }
 
-        // Industry standard: pdf2pic for PDF to image conversion
+        // Industry standard: pdf2pic for PDF to image conversion, in memory (responseType 'buffer' below)
         const convertInstance = pdf2pic.fromBuffer(pdfBuffer, {
           density: 300,           // High DPI for better OCR accuracy
-          saveFilename: 'drawing',
-          savePath: './tmp',
           format: 'png',
           width: 2480,           // A4 at 300 DPI
           height: 3508

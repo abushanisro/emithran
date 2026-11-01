@@ -195,6 +195,14 @@ def _bad(code: str, message: str, status: int = 422) -> JSONResponse:
     return JSONResponse(status_code=status, content={"code": code, "message": message})
 
 
+def _refused(code: str, message: str, request: Request) -> JSONResponse:
+    """A 422 for the exception being handled. Its text (library internals, file content) goes only to the log, with the
+    traceback, under a fresh error id; the caller gets the code, a fixed message and that id."""
+    error_id = uuid.uuid4().hex
+    log.warning("%s (error %s, request %s)", code, error_id, getattr(request.state, "request_id", "-"), exc_info=True)
+    return JSONResponse(status_code=422, content={"code": code, "message": f"{message} (error {error_id})", "errorId": error_id})
+
+
 def _parse_manifest(raw: str) -> tuple[list[dict[str, Any]], Lookups, dict[str, Supplied], str]:
     manifest = json.loads(raw)
     files = manifest["files"]
@@ -239,10 +247,10 @@ async def extract(request: Request, files: list[UploadFile] = File(...), manifes
         # A refusal of the files (ExtractionError, unreadable file) is an outcome "rejected", not a failure.
         with telemetry.stage("extract_board", expected=(ExtractionError, ValueError)):
             result = extract_board(inputs, lookups, supplied, tier)
-    except ExtractionError as error:
-        return _bad("extraction_failed", str(error))
-    except ValueError as error:  # a file that cannot be read
-        return _bad("unreadable_file", str(error))
+    except ExtractionError:
+        return _refused("extraction_failed", "The board files could not be extracted.", request)
+    except ValueError:  # a file that cannot be read
+        return _refused("unreadable_file", "A board file could not be read.", request)
     log.info("extracted a board set of %d files in %.2fs (request %s)", len(inputs), time.perf_counter() - started, request.state.request_id)
     return JSONResponse(content={"graph": result.graph, "documents": result.documents, "filesReport": result.files_report})
 
@@ -262,8 +270,8 @@ async def render(request: Request, files: list[UploadFile] = File(...), manifest
     try:
         with telemetry.stage("render_board", expected=(ExtractionError, ValueError)):
             preview = render_board(inputs, lookups.placement_layers)
-    except ExtractionError as error:
-        return _bad("render_failed", str(error))
+    except ExtractionError:
+        return _refused("render_failed", "The board layers could not be drawn.", request)
     log.info("rendered %d layers in %.2fs (request %s)", len(preview["layers"]), time.perf_counter() - started, request.state.request_id)
     return JSONResponse(content=preview)
 

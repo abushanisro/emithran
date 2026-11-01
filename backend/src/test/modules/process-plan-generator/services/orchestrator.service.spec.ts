@@ -4,7 +4,7 @@
 // filter/check user_id (that would wrongly exclude an org-mate's
 // generations once RLS enforces the org boundary instead).
 import { OrchestratorService } from '../../../../modules/process-plan-generator/services/orchestrator.service';
-import { type SupabaseService } from '../../../../common/supabase/supabase.service';
+import { type DatabaseService } from '../../../../common/database/database.service';
 import { InProcessEventBus } from '../../../../common/events/event-bus';
 
 function makeChain(result: { data: any; error: any }) {
@@ -19,12 +19,12 @@ function makeChain(result: { data: any; error: any }) {
 }
 
 function makeService(fromMock: jest.Mock) {
-  const supabaseService = {
+  const databaseService = {
     getUserClient: jest.fn().mockReturnValue({ from: fromMock }),
-  } as unknown as SupabaseService;
+  } as unknown as DatabaseService;
 
   return new OrchestratorService(
-    supabaseService,
+    databaseService,
     {} as any, // retrieval
     {} as any, // reasoning
     {} as any, // resolver

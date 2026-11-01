@@ -49,9 +49,12 @@ const TIMEZONES = [
   'America/Chicago', 'America/Denver', 'America/Los_Angeles',
 ];
 
+// Must match API_KEY_SCOPES in backend/src/common/api-keys/api-key-scopes.ts. Keys expire after 90 days.
 const SCOPE_OPTIONS = [
-  { value: 'read',  label: 'Read',  description: 'Fetch data from any endpoint' },
-  { value: 'write', label: 'Write', description: 'Create, update, and delete resources' },
+  { value: 'projects:read',  label: 'Projects: read',  description: 'List and read projects' },
+  { value: 'projects:write', label: 'Projects: write', description: 'Create projects' },
+  { value: 'boms:read',      label: 'BOMs: read',      description: 'List and read BOMs and their items' },
+  { value: 'costing:read',   label: 'Costing: read',   description: 'Read BOM cost summaries and reports' },
 ] as const;
 
 // ─────────────────────────────────────────────────────────────
@@ -413,7 +416,7 @@ function ApiKeysTab() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [newKeyName, setNewKeyName] = useState('');
-  const [selectedScopes, setSelectedScopes] = useState<string[]>(['read']);
+  const [selectedScopes, setSelectedScopes] = useState<string[]>(['projects:read']);
   const [selectedWorkspace, setSelectedWorkspace] = useState('default');
   const [createdKey, setCreatedKey] = useState<ApiKey | null>(null);
   const [keyToRevoke, setKeyToRevoke] = useState<ApiKey | null>(null);
@@ -425,7 +428,7 @@ function ApiKeysTab() {
   const handleCreate = () => {
     if (!newKeyName.trim() || selectedScopes.length === 0) return;
     createMutation.mutate({ name: newKeyName.trim(), scopes: selectedScopes }, {
-      onSuccess: (key) => { setCreateOpen(false); setNewKeyName(''); setSelectedScopes(['read']); setSelectedWorkspace('default'); setCreatedKey(key); },
+      onSuccess: (key) => { setCreateOpen(false); setNewKeyName(''); setSelectedScopes(['projects:read']); setSelectedWorkspace('default'); setCreatedKey(key); },
     });
   };
 

@@ -64,7 +64,9 @@
   "batchSize": 100,
   "family": "sheet_metal",
   "warnings": [
+    "Yield: no process yield on file — 98% yield assumed (DEFAULT_YIELD_PCT) for the yield-loss cost",
     "No factory location set — rates cannot be location-adjusted; configure your digital factory location in Settings",
+    "Laser setup: nesting has not run — 4 parts per sheet ASSUMED for sheet-handling setup time; run nesting for the real count",
     "Laser cutting cycle time unavailable — no calculator result and no reported gap (unexpected; check resolvePhysicsQuantity).",
     "Deburring cycle time unavailable — no calculator result and no reported gap (unexpected; check resolvePhysicsQuantity).",
     "Press brake cycle time unavailable — no calculator result and no reported gap (unexpected; check resolvePhysicsQuantity).",
@@ -84,19 +86,22 @@
         "process": "Laser Cutting",
         "machineClass": "fiber_laser",
         "energyKwh": 0,
-        "co2Kg": 0
+        "co2Kg": 0,
+        "energySource": "lookup"
       },
       {
         "process": "Press Brake",
         "machineClass": "press_brake",
         "energyKwh": 0,
-        "co2Kg": 0
+        "co2Kg": 0,
+        "energySource": "lookup"
       },
       {
         "process": "Deburring",
         "machineClass": "deburring",
         "energyKwh": 0,
-        "co2Kg": 0
+        "co2Kg": 0,
+        "energySource": "lookup"
       }
     ],
     "totalProcessEnergyKwh": 0,

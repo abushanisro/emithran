@@ -1,4 +1,4 @@
-import { decodeJwtPayload } from '../supabase/jwt-payload';
+import { decodeJwtPayload } from '../database/jwt-payload';
 
 /**
  * The inactivity-timeout rule, in one place.
@@ -39,7 +39,7 @@ export function sessionDeadline(
   return Math.max(idleDeadline, jobDeadline);
 }
 
-/** The Supabase session id carried in an access token's claims, or null. */
+/** The session id carried in an access token's claims, or null. */
 export function sessionIdFromAccessToken(token: string): string | null {
   const sessionId = decodeJwtPayload(token)?.session_id;
   return typeof sessionId === 'string' && sessionId ? sessionId : null;

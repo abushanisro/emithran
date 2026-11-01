@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger, BadRequestException, InternalServerErrorException } from '@nestjs/common';
-import { SupabaseClient } from '@supabase/supabase-js';
-import { SupabaseService } from '../../../common/supabase/supabase.service';
+import type { DbClient } from '../../../common/db/postgrest-client';
+import { DatabaseService } from '../../../common/database/database.service';
 import { OBJECT_STORE, type ObjectStore } from '../../../common/storage/object-store';
 import * as crypto from 'crypto';
 import { gzip } from 'zlib';
@@ -24,7 +24,7 @@ interface UploadedFile {
  *
  * Responsibilities:
  * - Validate files (type, size, content)
- * - Upload files to the object store (Supabase Storage or an S3-compatible bucket)
+ * - Upload files to the object store (an S3-compatible bucket)
  * - Generate secure signed URLs
  * - Track file metadata in database
  * - Handle file versioning
@@ -33,7 +33,7 @@ interface UploadedFile {
 @Injectable()
 export class FileStorageService {
   private readonly logger = new Logger(FileStorageService.name);
-  private supabase: SupabaseClient;
+  private database: DbClient;
   private readonly BUCKET_NAME = 'bom-files';
   private readonly MAX_FILE_SIZE = MAX_CAD_FILE_BYTES;
 
@@ -56,11 +56,11 @@ export class FileStorageService {
   private readonly ALLOWED_2D_EXTENSIONS = ['.pdf', '.dwg', '.dxf', '.png', '.jpg', '.jpeg'];
 
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     @Inject(OBJECT_STORE) private readonly store: ObjectStore,
   ) {
     // Only the file-reference check (an RPC) needs the database; the bytes go through the ObjectStore.
-    this.supabase = this.supabaseService.getPrivilegedClient('storage: which stored files are still referenced');
+    this.database = this.databaseService.getPrivilegedClient('storage: which stored files are still referenced');
   }
 
   /**
@@ -140,7 +140,7 @@ export class FileStorageService {
   }
 
   /**
-   * Upload file to Supabase Storage
+   * Upload file to the object store
    * Returns storage path and file metadata
    */
   async uploadFile(
@@ -233,7 +233,7 @@ export class FileStorageService {
   async removeUnreferencedFiles(storagePaths: string[]): Promise<number> {
     const paths = [...new Set(storagePaths)];
     if (paths.length === 0) return 0;
-    const { data, error } = await this.supabase.rpc('file_paths_in_use', { p_paths: paths });
+    const { data, error } = await this.database.rpc('file_paths_in_use', { p_paths: paths });
     if (error) throw new InternalServerErrorException(`Could not check which files are still in use: ${error.message}`);
     const inUse = new Set((data ?? []) as string[]);
     const unreferenced = paths.filter((p) => !inUse.has(p));

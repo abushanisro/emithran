@@ -1,18 +1,18 @@
 // Org-scoped tenancy Phase 3 (the internal plan): the
 // RFQ module previously ran entirely through the service-role client
-// (this.supabaseService.client, RLS bypassed) with manual user_id filtering
+// (this.databaseService.client, RLS bypassed) with manual user_id filtering
 // as the ONLY enforcement. These tests prove the fix: create()/findOne()
 // now use the RLS-scoped getUserClient(accessToken) instead of the admin
 // client, and create() writes organization_id so RLS can actually enforce
 // the org boundary.
 import { RfqService } from '../../../modules/rfq/rfq.service';
-import { type SupabaseService } from '../../../common/supabase/supabase.service';
+import { type DatabaseService } from '../../../common/database/database.service';
 import { type RfqEmailService } from '../../../modules/rfq/services/rfq-email.service';
 import { type RfqTrackingService } from '../../../modules/rfq/services/rfq-tracking.service';
 
 function makeChain(result: { data: any; error: any; count?: number }) {
   const chain: any = {};
-  const methods = ['select', 'eq', 'in', 'like', 'insert', 'update', 'order'];
+  const methods = ['select', 'eq', 'is', 'in', 'like', 'insert', 'update', 'order'];
   for (const m of methods) chain[m] = jest.fn().mockReturnValue(chain);
   chain.single = jest.fn().mockResolvedValue(result);
   chain.then = (resolve: any) => resolve(result);
@@ -34,13 +34,13 @@ describe('RfqService.create', () => {
     });
     const adminFromMock = jest.fn().mockReturnValue(rfqNumberChain);
 
-    const supabaseService = {
+    const databaseService = {
       getUserClient: jest.fn().mockReturnValue({ from: rlsFromMock }),
       getPrivilegedClient: jest.fn().mockReturnValue({ from: adminFromMock }),
-    } as unknown as SupabaseService;
+    } as unknown as DatabaseService;
 
     const service = new RfqService(
-      supabaseService,
+      databaseService,
       {} as unknown as RfqEmailService,
       {} as unknown as RfqTrackingService,
     );
@@ -52,13 +52,16 @@ describe('RfqService.create', () => {
       'org-789',
     );
 
-    expect(supabaseService.getUserClient).toHaveBeenCalledWith('token-abc');
+    expect(databaseService.getUserClient).toHaveBeenCalledWith('token-abc');
     expect(rfqInsertChain.insert).toHaveBeenCalledWith(
       expect.objectContaining({ user_id: 'user-456', organization_id: 'org-789' }),
     );
-    // generateRfqNumber() deliberately stays on the admin client (rfq_number
-    // is globally unique, not per-org) — confirm that didn't regress either.
-    expect(adminFromMock).toHaveBeenCalledWith('rfq_records');
+    // The RFQ number counts the caller's organization's RFQs as the caller (rfq_number is unique per organization since
+    // migration 942); the platform-wide count through the admin client is gone.
+    expect(databaseService.getPrivilegedClient).not.toHaveBeenCalled();
+    expect(adminFromMock).not.toHaveBeenCalled();
+    expect(rfqInsertChain.eq).toHaveBeenCalledWith('organization_id', 'org-789');
+    expect(rfqInsertChain.insert).toHaveBeenCalledWith(expect.objectContaining({ rfq_number: expect.stringMatching(/^RFQ-\d{6}-\d{3}$/) }));
   });
 });
 
@@ -66,19 +69,19 @@ describe('RfqService.findOne', () => {
   it('scopes the read through the RLS client without a manual user_id filter', async () => {
     const chain = makeChain({ data: { id: 'rfq-1', user_id: 'user-456' }, error: null });
     const fromMock = jest.fn().mockReturnValue(chain);
-    const supabaseService = {
+    const databaseService = {
       getUserClient: jest.fn().mockReturnValue({ from: fromMock }),
-    } as unknown as SupabaseService;
+    } as unknown as DatabaseService;
 
     const service = new RfqService(
-      supabaseService,
+      databaseService,
       {} as unknown as RfqEmailService,
       {} as unknown as RfqTrackingService,
     );
 
     await service.findOne('rfq-1', 'user-456', 'token-abc');
 
-    expect(supabaseService.getUserClient).toHaveBeenCalledWith('token-abc');
+    expect(databaseService.getUserClient).toHaveBeenCalledWith('token-abc');
     expect(chain.eq).not.toHaveBeenCalledWith('user_id', expect.anything());
   });
 });

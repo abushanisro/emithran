@@ -1,7 +1,7 @@
-import { MATERIAL_OVERHEAD_PCT, UTILIZATION_ADVISORY_THRESHOLD_PCT, RATES_SOURCE_LABEL, DEFAULT_YIELD_PCT } from './default-rates.constants';
+import { MATERIAL_OVERHEAD_PCT, UTILIZATION_ADVISORY_THRESHOLD_PCT, RATES_SOURCE_LABEL, resolveYieldPct } from './default-rates.constants';
 import type { InspectionResult } from '../process/inspection-engine';
 import {
-  ENERGY_KWH_PER_HR, GRID_CO2_KG_PER_KWH,
+  ENERGY_KWH_PER_HR, DEFAULT_ENERGY_KWH_PER_HR, GRID_CO2_KG_PER_KWH,
   MATERIAL_CO2_KG_PER_KG, MATERIAL_RECYCLABILITY_PCT,
   SUSTAINABILITY_FACTORS_LABEL,
 } from '../physics/sustainability-factors.constants';
@@ -307,6 +307,10 @@ export interface CostEngineInput {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+// Parts per sheet assumed for laser sheet-handling setup when nesting has not
+// run (the value this engine always used); every use is disclosed in warnings.
+const ASSUMED_PARTS_PER_SHEET = 4;
+
 function r2(n: number): number { return Math.round(n * 100) / 100; }
 function r3(n: number): number { return Math.round(n * 1000) / 1000; }
 // cycleTimeMin is rounded here in MINUTES, but every UI display converts it to
@@ -344,10 +348,12 @@ export function computeSustainability(
   const materialCo2Source: 'lookup' | 'default' = MATERIAL_CO2_KG_PER_KG[grade] != null ? 'lookup' : 'default';
 
   const processCo2Breakdown: ProcessCO2[] = processLines.map((l) => {
-    const kwhPerHr = ENERGY_KWH_PER_HR[l.machineClass] ?? 4.0;
+    const looked = ENERGY_KWH_PER_HR[l.machineClass];
+    const kwhPerHr = looked ?? DEFAULT_ENERGY_KWH_PER_HR;
     const energyKwh = r3((l.cycleTimeMin / 60) * kwhPerHr);
     const co2Kg = r3(energyKwh * GRID_CO2_KG_PER_KWH);
-    return { process: l.process, machineClass: l.machineClass, energyKwh, co2Kg };
+    const energySource: 'lookup' | 'default' = looked != null ? 'lookup' : 'default';
+    return { process: l.process, machineClass: l.machineClass, energyKwh, co2Kg, energySource };
   });
 
   const totalProcessEnergyKwh = r3(processCo2Breakdown.reduce((s, p) => s + p.energyKwh, 0));
@@ -445,13 +451,14 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
     opSetupMinByOp,
     directLaborRatePerHr,
     qaInspectorRatePerHr,
-    yieldPct = DEFAULT_YIELD_PCT,
     machineOperators = 1,
     scrapPricePerKg = 0,
   } = input;
 
   const warnings: string[] = [];
   const processLines: ProcessLineCost[] = [];
+  // Resolved once for every line below; an assumed yield is disclosed once here.
+  const yieldPct = resolveYieldPct(input.yieldPct, 'Yield', warnings);
 
   const location = input.location;
   if (!location) {
@@ -520,10 +527,15 @@ export function computeCostSummary(input: CostEngineInput): CostSummaryDto {
   // still emitted (never silently omitted) with cycleTimeMin 0 and that gap
   // attached — never a guessed speed.
   // Setup: program recall time + sheet handling per lot. partsPerSheet from
-  // nesting; default 4 if nesting not run. Raw (un-amortized) per-batch
-  // minutes — computeLaserCuttingCost does its own /batchSize division
-  // internally, same convention as its opSetupMin-driven callers.
-  const partsPerSheet = nestingResult?.partsPerSheet ?? 4;
+  // nesting; when nesting has not run, ASSUMED_PARTS_PER_SHEET is used and a
+  // warning says so. Raw (un-amortized) per-batch minutes —
+  // computeLaserCuttingCost does its own /batchSize division internally, same
+  // convention as its opSetupMin-driven callers.
+  const nestedPartsPerSheet = nestingResult?.partsPerSheet;
+  const partsPerSheet = nestedPartsPerSheet ?? ASSUMED_PARTS_PER_SHEET;
+  if (nestedPartsPerSheet == null) {
+    warnings.push(`Laser setup: nesting has not run — ${ASSUMED_PARTS_PER_SHEET} parts per sheet ASSUMED for sheet-handling setup time; run nesting for the real count`);
+  }
   const sheetsPerLot = Math.ceil(batchSize / partsPerSheet);
   const laserSetupMin = handlingTimeMin * sheetsPerLot;
 

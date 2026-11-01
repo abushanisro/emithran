@@ -355,8 +355,14 @@ mod tests {
 
     // ---- a fake worker: a shell script using only builtins (the real one runs with an empty environment) ----------------
 
-    /// `body` runs with $out = the output folder; it can write result.json and parts/ and exit with a code.
+    /// `body` runs with $out = the output folder; it can write result.json and parts/ and exit with a code. The deadline is
+    /// generous: the first launch of a freshly written script can be slow (macOS scans new executables), and only the
+    /// deadline test is about the deadline.
     fn worker(dir: &std::path::Path, body: &str) -> WorkerConfig {
+        worker_with_deadline(dir, body, Duration::from_secs(10))
+    }
+
+    fn worker_with_deadline(dir: &std::path::Path, body: &str, deadline: Duration) -> WorkerConfig {
         let path = dir.join("worker.sh");
         // $1 --deadline-ms, $2 ms, $3 out folder, $4.. the input files
         std::fs::write(&path, format!("#!/bin/sh\nout=\"$3\"\n{body}\n")).unwrap();
@@ -365,7 +371,7 @@ mod tests {
             program: path,
             wrapper: vec![],
             pass_env: vec![],
-            deadline: Duration::from_millis(300),
+            deadline,
             grace: Duration::from_millis(300),
         }
     }
@@ -563,9 +569,16 @@ mod tests {
         let backend = fake("plate.step", 1, b"x");
         let started = std::time::Instant::now();
         assert!(
-            run_once(&backend, &config(worker(dir.path(), "while :; do :; done")))
-                .await
-                .unwrap()
+            run_once(
+                &backend,
+                &config(worker_with_deadline(
+                    dir.path(),
+                    "while :; do :; done",
+                    Duration::from_millis(300)
+                ))
+            )
+            .await
+            .unwrap()
         );
         assert!(started.elapsed() < Duration::from_secs(5));
         let (_, retry, code, detail) = backend.failed.borrow().clone().unwrap();

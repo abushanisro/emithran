@@ -1,5 +1,5 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { DatabaseService } from '../../common/database/database.service';
 import type {
   FeatureProcessMapping,
   MachineCapability,
@@ -17,10 +17,10 @@ import type {
 export class ManufacturingKnowledgeService {
   private readonly logger = new Logger(ManufacturingKnowledgeService.name);
 
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   async getFeatureProcessMapping(token: string, featureType?: string): Promise<FeatureProcessMapping[]> {
-    let q = this.supabase.getClient(token).from('feature_process_mapping').select('*').order('feature_type');
+    let q = this.database.getClient(token).from('feature_process_mapping').select('*').order('feature_type');
     if (featureType) q = q.eq('feature_type', featureType);
     const { data, error } = await q;
     if (error) throw new InternalServerErrorException(`feature_process_mapping: ${error.message}`);
@@ -28,7 +28,7 @@ export class ManufacturingKnowledgeService {
   }
 
   async getMachineCapabilities(token: string, machineType?: string): Promise<MachineCapability[]> {
-    let q = this.supabase.getClient(token).from('machine_capabilities').select('*').order('machine_type');
+    let q = this.database.getClient(token).from('machine_capabilities').select('*').order('machine_type');
     if (machineType) q = q.eq('machine_type', machineType);
     const { data, error } = await q;
     if (error) throw new InternalServerErrorException(`machine_capabilities: ${error.message}`);
@@ -36,7 +36,7 @@ export class ManufacturingKnowledgeService {
   }
 
   async getRoutingRules(token: string, partFamily?: string): Promise<ProcessRoutingRule[]> {
-    const { data, error } = await this.supabase.getClient(token).from('process_routing_rules').select('*').order('severity').order('rule_name');
+    const { data, error } = await this.database.getClient(token).from('process_routing_rules').select('*').order('severity').order('rule_name');
     if (error) throw new InternalServerErrorException(`process_routing_rules: ${error.message}`);
     const rows = (data ?? []) as ProcessRoutingRule[];
     if (!partFamily) return rows;
@@ -44,7 +44,7 @@ export class ManufacturingKnowledgeService {
   }
 
   async getTemplate(token: string, partFamily: string, complexity?: string): Promise<PartFamilyRoutingTemplate | null> {
-    let q = this.supabase.getClient(token).from('part_family_routing_templates').select('*').eq('part_family', partFamily);
+    let q = this.database.getClient(token).from('part_family_routing_templates').select('*').eq('part_family', partFamily);
     if (complexity) q = q.eq('complexity_level', complexity);
     else q = q.eq('complexity_level', 'standard');
     const { data, error } = await q.limit(1).maybeSingle();
@@ -56,7 +56,7 @@ export class ManufacturingKnowledgeService {
   }
 
   async getAllTemplates(token: string): Promise<PartFamilyRoutingTemplate[]> {
-    const { data, error } = await this.supabase.getClient(token)
+    const { data, error } = await this.database.getClient(token)
       .from('part_family_routing_templates')
       .select('*')
       .order('part_family');
@@ -68,7 +68,7 @@ export class ManufacturingKnowledgeService {
   }
 
   async getAlternativeTemplates(token: string, partFamily: string): Promise<PartFamilyRoutingTemplate[]> {
-    const { data, error } = await this.supabase.getClient(token)
+    const { data, error } = await this.database.getClient(token)
       .from('part_family_routing_templates')
       .select('*')
       .eq('part_family', partFamily)
@@ -81,7 +81,7 @@ export class ManufacturingKnowledgeService {
   }
 
   async getMachineProcessMapping(token: string, featureType?: string, partFamily?: string): Promise<MachineProcessMapping[]> {
-    let q = this.supabase.getClient(token).from('machine_process_mapping').select('*').order('priority');
+    let q = this.database.getClient(token).from('machine_process_mapping').select('*').order('priority');
     if (featureType) q = q.eq('feature_type', featureType);
     const { data, error } = await q;
     if (error) throw new InternalServerErrorException(`machine_process_mapping: ${error.message}`);
@@ -91,7 +91,7 @@ export class ManufacturingKnowledgeService {
   }
 
   async submitFeedback(token: string, dto: SubmitFeedbackDto, userId: string): Promise<ProcessPlanFeedback> {
-    const { data, error } = await this.supabase.getClient(token)
+    const { data, error } = await this.database.getClient(token)
       .from('process_plan_feedback')
       .insert({
         bom_item_id: dto.bomItemId,
@@ -111,13 +111,13 @@ export class ManufacturingKnowledgeService {
   }
 
   async getFeedbackForBomItem(token: string, bomItemId: string): Promise<ProcessPlanFeedback[]> {
-    const { data, error } = await this.supabase.getClient(token).from('process_plan_feedback').select('*').eq('bom_item_id', bomItemId).order('created_at', { ascending: false });
+    const { data, error } = await this.database.getClient(token).from('process_plan_feedback').select('*').eq('bom_item_id', bomItemId).order('created_at', { ascending: false });
     if (error) throw new InternalServerErrorException(`getFeedback: ${error.message}`);
     return (data ?? []) as ProcessPlanFeedback[];
   }
 
   async createFeatureProcessMapping(token: string, dto: CreateFeatureProcessMappingDto, userId: string): Promise<FeatureProcessMapping> {
-    const { data, error } = await this.supabase.getClient(token)
+    const { data, error } = await this.database.getClient(token)
       .from('feature_process_mapping')
       .insert({
         feature_type: dto.featureType,
@@ -138,7 +138,7 @@ export class ManufacturingKnowledgeService {
   }
 
   async createMachineCapability(token: string, dto: CreateMachineCapabilityDto, userId: string): Promise<MachineCapability> {
-    const { data, error } = await this.supabase.getClient(token)
+    const { data, error } = await this.database.getClient(token)
       .from('machine_capabilities')
       .insert({
         machine_name: dto.machineName,
@@ -160,7 +160,7 @@ export class ManufacturingKnowledgeService {
   }
 
   async createRoutingRule(token: string, dto: CreateProcessRoutingRuleDto, userId: string): Promise<ProcessRoutingRule> {
-    const { data, error } = await this.supabase.getClient(token)
+    const { data, error } = await this.database.getClient(token)
       .from('process_routing_rules')
       .insert({
         rule_name: dto.ruleName,

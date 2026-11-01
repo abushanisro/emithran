@@ -9,7 +9,9 @@ drilled hole. Positions are as the files state them; tests check on the real boa
 """
 from __future__ import annotations
 
+import logging
 import re
+import uuid
 
 from gerbonara import ExcellonFile
 
@@ -18,6 +20,8 @@ from extraction.outline import measure_outline
 from extraction.placements import PlacementError, read_components
 from parsers.excellon import load_holes
 from parsers.gerber_layer import UnsupportedGerber, load_gerber
+
+log = logging.getLogger(__name__)
 
 # Bump when the shape or drawing of the preview changes: the platform stores each preview with this value and re-renders a
 # stored one whose value is older than the version it expects.
@@ -52,8 +56,11 @@ def _scene_components(files: list[InputFile], placement_layers: dict[str, str]) 
             continue
         try:
             parts = read_components(table, placement_layers)
-        except PlacementError as error:
-            return [], str(error)
+        except PlacementError:
+            # The reason goes to the log only (it quotes file content); the response carries an id to find it by.
+            error_id = uuid.uuid4().hex
+            log.warning("Pick Place file %s cannot be shown (error %s)", f.name, error_id, exc_info=True)
+            return [], f"The Pick Place file could not be read (error {error_id})."
         return [
             {"designator": c.designator, "comment": c.comment, "footprint": c.footprint, "side": c.side,
              "xMm": round(c.x_mm, 4), "yMm": round(c.y_mm, 4), "rotationDeg": c.rotation_deg}

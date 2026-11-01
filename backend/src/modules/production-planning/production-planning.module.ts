@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { SupabaseModule } from '@/common/supabase/supabase.module';
+import { DatabaseModule } from '@/common/database/database.module';
 import { ProductionPlanningController } from './production-planning.controller';
 import { ProductionPlanningService } from './production-planning.service';
 import { ProductionMaterialTrackingService } from './services/production-material-tracking.service';
@@ -18,7 +18,7 @@ import { ProcessTrackingService } from './services/process-tracking.service';
 
 @Module({
   imports: [
-    SupabaseModule,
+    DatabaseModule,
   ],
   controllers: [
     ProductionPlanningController,

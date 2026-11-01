@@ -4,7 +4,7 @@ import { BadRequestException, Inject, Injectable, NotFoundException } from '@nes
 
 import { AuditService } from '../../common/audit/audit.service';
 import { OBJECT_STORE, type ObjectStore } from '../../common/storage/object-store';
-import { SupabaseService } from '../../common/supabase/supabase.service';
+import { DatabaseService } from '../../common/database/database.service';
 import { BOMItemsService } from '../bom-items/bom-items.service';
 import { CadUploadRunner } from './cad-upload-runner';
 import { CAD_BUCKET, type CadUploadRow } from './cad-upload.types';
@@ -24,7 +24,7 @@ export interface NewUpload {
 @Injectable()
 export class CadUploadsService {
   constructor(
-    private readonly supabase: SupabaseService,
+    private readonly database: DatabaseService,
     private readonly bomItems: BOMItemsService,
     private readonly runner: CadUploadRunner,
     private readonly audit: AuditService,
@@ -54,7 +54,7 @@ export class CadUploadsService {
     // Row-level security decides whether this user can see the BOM; everything after runs as the service.
     const projectId = await this.bomItems.getProjectIdForBOM(input.bomId, input.userId, input.token);
 
-    const admin = this.supabase.getPrivilegedClient('cad-upload: store the uploaded file and queue its job after an RLS check of the BOM');
+    const admin = this.database.getPrivilegedClient('cad-upload: store the uploaded file and queue its job after an RLS check of the BOM');
     const sha256 = createHash('sha256').update(input.bytes).digest('hex');
     const storagePath = `cad-uploads/${input.organizationId}/${sha256}.${check.kind === 'zip' ? 'zip' : 'step'}`;
 
@@ -95,20 +95,20 @@ export class CadUploadsService {
 
   /** Read as the user, so row-level security keeps other organizations' uploads invisible. */
   async get(id: string, token: string): Promise<CadUploadRow> {
-    const { data, error } = await this.supabase.getUserClient(token).from('cad_uploads').select('*').eq('id', id).maybeSingle();
+    const { data, error } = await this.database.getUserClient(token).from('cad_uploads').select('*').eq('id', id).maybeSingle();
     if (error) throw new Error(`Could not read the upload: ${error.message}`);
     if (!data) throw new NotFoundException(`Upload ${id} not found`);
     return data as CadUploadRow;
   }
 
-  private async find(admin: ReturnType<SupabaseService['getPrivilegedClient']>, bomId: string, sha256: string): Promise<CadUploadRow | null> {
+  private async find(admin: ReturnType<DatabaseService['getPrivilegedClient']>, bomId: string, sha256: string): Promise<CadUploadRow | null> {
     const { data, error } = await admin.from('cad_uploads').select('*').eq('bom_id', bomId).eq('sha256', sha256).maybeSingle();
     if (error) throw new Error(`Could not look up the upload: ${error.message}`);
     return (data as CadUploadRow | null) ?? null;
   }
 
   /** Uploading the same file again after a failure is a request to retry it. */
-  private async requeue(admin: ReturnType<SupabaseService['getPrivilegedClient']>, id: string): Promise<CadUploadRow> {
+  private async requeue(admin: ReturnType<DatabaseService['getPrivilegedClient']>, id: string): Promise<CadUploadRow> {
     const retried = await admin
       .from('cad_uploads')
       .update({ status: 'queued', attempts: 0, error_code: null, error_detail: null, finished_at: null, source_deleted_at: null })

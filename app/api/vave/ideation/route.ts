@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import type { VaveBomItem, VaveShouldCost, CreateVaveIdea } from '@/lib/api/vave';
+import type { VaveBomItem, VaveShouldCost } from '@/lib/api/vave';
 import { requireUserForAi } from '@/lib/server/auth';
+import { refuseCrossOrigin } from '@/lib/server/bff/origin';
+import { readJsonBody } from '@/lib/server/read-body';
+
+// A BOM summary with gaps and focus areas: generous for thousands of items.
+const MAX_BODY_BYTES = 2 * 1024 * 1024;
+import { parseAiJson, requestAiText } from '@/lib/server/anthropic';
+import { AiResultError, ideasFromAi } from '@/lib/vave/ai-results';
 
 interface IdeationRequest {
   bomItems: VaveBomItem[];
@@ -9,11 +16,15 @@ interface IdeationRequest {
 }
 
 export async function POST(request: NextRequest) {
+  const refused = refuseCrossOrigin(request);
+  if (refused) return refused;
   const auth = await requireUserForAi('vave-ideation');
   if (!auth.ok) return auth.response;
 
   try {
-    const { bomItems, focusAreas, shouldCostGaps }: IdeationRequest = await request.json();
+    const parsed = await readJsonBody<Partial<IdeationRequest> | null>(request, MAX_BODY_BYTES);
+    if (!parsed.ok) return parsed.response;
+    const { bomItems, focusAreas, shouldCostGaps } = parsed.value ?? {};
 
     const topGaps = [...(shouldCostGaps ?? [])]
       .sort((a, b) => (b.delta ?? 0) - (a.delta ?? 0))
@@ -41,7 +52,7 @@ export async function POST(request: NextRequest) {
     const prompt = `You are a senior Value Engineering expert with 20 years of manufacturing experience.
 
 Focus Areas identified for VAVE:
-${JSON.stringify(focusAreas)}
+${JSON.stringify((Array.isArray(focusAreas) ? focusAreas : []).slice(0, 10).map((area) => String(area).slice(0, 300)))}
 
 Top Cost-Driving Parts:
 ${JSON.stringify(topParts, null, 2)}
@@ -72,63 +83,19 @@ Return ONLY a valid JSON array (no markdown, no preamble):
   "timeToImplementMonths": 0
 }]`;
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY!,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 4000,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      return NextResponse.json({ error: 'AI ideation failed', details: err }, { status: response.status });
+    const ai = await requestAiText(prompt);
+    if (!ai.ok) {
+      return NextResponse.json({ error: ai.error, details: ai.details }, { status: ai.status });
     }
 
-    const aiData = await response.json();
-    const rawText = aiData.content?.[0]?.text ?? '[]';
-
-    let ideas: CreateVaveIdea[] = [];
+    // An unreadable answer is an error, not an empty idea list; ratings the
+    // model left out stay unset rather than defaulting to a middle value.
     try {
-      ideas = JSON.parse(rawText.replace(/```json|```/g, '').trim());
-      if (!Array.isArray(ideas)) ideas = [];
-    } catch {
-      ideas = [];
+      return NextResponse.json(ideasFromAi(parseAiJson(ai.text)));
+    } catch (error) {
+      const message = error instanceof AiResultError ? error.message : 'AI ideation answer is not valid JSON.';
+      return NextResponse.json({ error: message }, { status: 502 });
     }
-
-    // Sanitize and add defaults
-    const FRAMEWORKS: readonly string[] = ['SCAMPER', 'TRIZ', 'FAST', 'Manual'];
-    const FEASIBILITIES: readonly string[] = ['High', 'Medium', 'Low'];
-    const COMPLEXITIES: readonly string[] = ['L1', 'L2', 'L3'];
-    const sanitized: CreateVaveIdea[] = ideas.map((idea) => {
-      const framework = FRAMEWORKS.includes(idea.framework ?? '') && idea.framework ? idea.framework : 'SCAMPER';
-      const feasibility = FEASIBILITIES.includes(idea.feasibility ?? '') && idea.feasibility ? idea.feasibility : 'Medium';
-      const complexity = COMPLEXITIES.includes(idea.complexity ?? '') && idea.complexity ? idea.complexity : 'L2';
-      const risk = FEASIBILITIES.includes(idea.risk ?? '') && idea.risk ? idea.risk : 'Medium';
-
-      return {
-        title: String(idea.title ?? 'Untitled idea').slice(0, 255),
-        ...(idea.description !== undefined ? { description: idea.description } : {}),
-        framework,
-        ...(idea.scamperType !== undefined ? { scamperType: idea.scamperType } : {}),
-        affectedParts: Array.isArray(idea.affectedParts) ? idea.affectedParts : [],
-        estSavingsUsd: Math.max(0, Number(idea.estSavingsUsd ?? 0)),
-        estInvestmentUsd: Math.max(0, Number(idea.estInvestmentUsd ?? 0)),
-        feasibility,
-        complexity,
-        risk,
-        ...(idea.timeToImplementMonths ? { timeToImplementMonths: Number(idea.timeToImplementMonths) } : {}),
-        status: 'draft' as const,
-      };
-    });
-
-    return NextResponse.json(sanitized);
   } catch (error) {
     console.error('VAVE ideation error:', error);
     return NextResponse.json({ error: 'Ideation failed' }, { status: 500 });

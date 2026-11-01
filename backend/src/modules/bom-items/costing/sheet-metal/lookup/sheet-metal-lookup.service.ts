@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { PartSpacingRow } from '../machine/sheet-metal-nesting.engine';
-import { SupabaseService } from '../../../../../common/supabase/supabase.service';
+import { DatabaseService } from '../../../../../common/database/database.service';
 import type { LookupResolution, LookupQueryParam, LookupTableRow } from '../../../dto/cost-breakdown.dto';
 import { classifyLaserMaterial, type LaserPowerRequirement } from '../../shared/capability/machine-selection/physics';
 import { ReferenceMemo } from '../../../../../common/cache/reference-memo';
@@ -148,7 +148,7 @@ interface RollBendingMachineParams {
 
 @Injectable()
 export class SheetMetalLookupService {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(private readonly database: DatabaseService) {}
 
   // sm_reference_data machine rows whose raw name equals `machineName`
   // (case-insensitive), filtered in the database. The per-machine lookups
@@ -158,7 +158,7 @@ export class SheetMetalLookupService {
   private machineReferenceRowsNamed(machineName: string) {
     // ILIKE wildcards (% _) and the escape character itself match literally.
     const pattern = machineName.trim().replace(/[\\%_]/g, (c) => '\\' + c);
-    return this.supabase
+    return this.database
       .getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared')
       .from('sm_reference_data')
       .select('raw')
@@ -184,7 +184,7 @@ export class SheetMetalLookupService {
   ): Promise<'EXACT_MATCH' | 'INTERPOLATE' | 'RANGE' | 'FORMULA'> {
     if (this.policyCache.has(tableName)) return this.policyCache.get(tableName)!;
     try {
-      const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+      const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
       const { data } = await db.from('lookup_table_policy').select('policy').eq('table_name', tableName).maybeSingle();
       const policy = (data?.policy as any) ?? fallback;
       this.policyCache.set(tableName, policy);
@@ -204,7 +204,7 @@ export class SheetMetalLookupService {
     // row per entry (migration 518, key 'tblPartSpacing:...') and one row
     // for the whole table (migration 830, raw.rows). A database may carry
     // either — the live dev DB has only the whole-table row — so both are read.
-    const { data, error } = await this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared')
+    const { data, error } = await this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared')
       .from('sm_reference_data')
       .select('raw')
       .eq('category', 'lookup_table')
@@ -232,7 +232,7 @@ export class SheetMetalLookupService {
     const key = `${technology}|${material}`;
     const cached = this.laserPowerRowsCache.get(key);
     if (cached) return cached;
-    const { data, error } = await this.supabase
+    const { data, error } = await this.database
       .getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared')
       .from('sm_lookup_laser_cut')
       .select('thickness_mm, laser_power_w')
@@ -289,7 +289,7 @@ export class SheetMetalLookupService {
     technology: 'fiber' | 'co2',
   ): Promise<LaserCutParams> {
     const material = normaliseLaserMaterial(grade);
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
 
     // First: try exact thickness + nearest available power for this material
     const { data, error } = await db
@@ -356,7 +356,7 @@ export class SheetMetalLookupService {
     thicknessMm: number,
   ): Promise<WaterjetCutParams> {
     const material = normaliseLaserMaterial(grade);
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
 
     const { data, error } = await db
       .from('sm_lookup_waterjet_cut')
@@ -409,7 +409,7 @@ export class SheetMetalLookupService {
     // caller also depends on staying exactly as-is.
     const oxyfuelMaterial = material === 'Stainless Steel' ? 'Stainless Steel' : 'Steel';
 
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
       .from('sm_reference_data')
       .select('raw')
@@ -448,7 +448,7 @@ export class SheetMetalLookupService {
     const noData: LaserPunchMachineParams = { punchRateCyclesPerMin: 0, nibbleMmPerMin: 0, toolChangeSec: 0, dataFound: false };
     if (!machineName) return noData;
 
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
       .from('sm_reference_data')
       .select('raw')
@@ -495,7 +495,7 @@ export class SheetMetalLookupService {
   @ReferenceMemo()
   async getStrokeRateFactor(tonnageT: number, complexity: 'simple' | 'inter' | 'complex'): Promise<number | null> {
     if (!(tonnageT > 0)) return null;
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
       .from('sm_reference_data')
       .select('raw')
@@ -525,7 +525,7 @@ export class SheetMetalLookupService {
     };
     if (!machineName) return noData;
 
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
       .from('sm_reference_data')
       .select('raw')
@@ -578,7 +578,7 @@ export class SheetMetalLookupService {
   @ReferenceMemo()
   private async getPlasmaMachinePowerWatts(sourceKeyPrefix: 'plasmaCutMachine' | 'plasmaPunchMachine', machineName: string | null | undefined): Promise<number | null> {
     if (!machineName) return null;
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
       .from('sm_reference_data')
       .select('raw')
@@ -601,7 +601,7 @@ export class SheetMetalLookupService {
     const material = normaliseLaserMaterial(grade);
     const plasmaMaterial = material === 'Stainless Steel' ? 'Stainless Steel' : 'Steel';
 
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
       .from('sm_reference_data')
       .select('raw')
@@ -660,7 +660,7 @@ export class SheetMetalLookupService {
     const noData: RollBendingMachineParams = { rollingSpeedMmPerSec: 0, prebendTimeSec: 0, dataFound: false };
     if (!machineName) return noData;
 
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
       .from('sm_reference_data')
       .select('raw')
@@ -692,7 +692,7 @@ export class SheetMetalLookupService {
   @ReferenceMemo()
   async getProgressiveDieMachineSetupMin(machineName: string | null | undefined): Promise<number | null> {
     if (!machineName) return null;
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
       .from('sm_reference_data')
       .select('raw')
@@ -724,7 +724,7 @@ export class SheetMetalLookupService {
   // map: the caller decides what an unknown value means, never a default here.
   @ReferenceMemo()
   async getNumericVariables(keys: readonly string[]): Promise<Map<string, number>> {
-    const { data, error } = await this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared')
+    const { data, error } = await this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared')
       .from('sm_reference_data')
       .select('key, value')
       .eq('category', 'variable')
@@ -761,7 +761,7 @@ export class SheetMetalLookupService {
   private laserSheetSizesCache: { widthMm: number; lengthMm: number }[] | null = null;
   async getLaserNominalSheetSizes(): Promise<{ widthMm: number; lengthMm: number }[]> {
     if (this.laserSheetSizesCache) return this.laserSheetSizesCache;
-    const { data, error } = await this.supabase
+    const { data, error } = await this.database
       .getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared')
       .from('sm_reference_data')
       .select('raw')
@@ -784,7 +784,7 @@ export class SheetMetalLookupService {
   private deslagAllowanceCache: Record<string, number> | null = null;
   async getDeslagSecPerMmByMachine(): Promise<Record<string, number>> {
     if (this.deslagAllowanceCache) return this.deslagAllowanceCache;
-    const { data, error } = await this.supabase
+    const { data, error } = await this.database
       .getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared')
       .from('sm_reference_data')
       .select('raw')
@@ -806,7 +806,7 @@ export class SheetMetalLookupService {
   // available for computed utilization", migration 479).
   @ReferenceMemo()
   async getStandardSheet(): Promise<{ widthMm: number; lengthMm: number } | null> {
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
       .from('sm_reference_data')
       .select('key, value')
@@ -820,7 +820,7 @@ export class SheetMetalLookupService {
   }
 
   async getToolingAnnualVolumeThresholds(): Promise<{ progressiveDie: number | null; stageTooling: number | null }> {
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
       .from('sm_reference_data')
       .select('key, value')
@@ -880,7 +880,7 @@ export class SheetMetalLookupService {
       'orDesignPercent', 'orAssemblyPercent', 'orDebugPercent', 'orReworkPercent',
       'assyHrsCompProgDie',
     ];
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
       .from('sm_reference_data')
       .select('key, value')
@@ -943,7 +943,7 @@ export class SheetMetalLookupService {
     componentName: string; model: string | null; sizeMm: number | null;
     costUsd: number; weightKg: number | null;
   }>> {
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
       .from('sm_lookup_tooling_component_costs')
       .select('component_name, model, size_mm, cost_usd, weight_kg');
@@ -966,7 +966,7 @@ export class SheetMetalLookupService {
    */
   @ReferenceMemo()
   async getToolingCoatingCostPerKg(toolMaterial: string, coatingType: string): Promise<number | null> {
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
       .from('sm_lookup_tooling_coating_cost')
       .select('coating_cost_usd_per_kg')
@@ -988,7 +988,7 @@ export class SheetMetalLookupService {
   async getRouterMachineParams(machineName: string | null | undefined): Promise<RouterCutParams> {
     const noData: RouterCutParams = { cuttingSpeedMmPerMin: 0, dataFound: false };
     if (!machineName) return noData;
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data, error } = await db
       .from('sm_reference_data')
       .select('raw')
@@ -1003,7 +1003,7 @@ export class SheetMetalLookupService {
   // ── Table 2: Handling time (min) for given weight kg ───────────────────────
   @ReferenceMemo()
   async getHandlingTime(weightKg: number): Promise<{ minutes: number; dataFound: boolean }> {
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
       .from('sm_lookup_handling_time')
       .select('weight_max_kg, handling_min')
@@ -1030,7 +1030,7 @@ export class SheetMetalLookupService {
   // type='press' → keyValue = tonnage; type='brake' → keyValue = tool length mm
   @ReferenceMemo()
   async getToolSetupTime(type: 'press' | 'brake', keyValue: number): Promise<{ minutes: number; dataFound: boolean }> {
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
       .from('sm_lookup_tool_setup')
       .select('key_value, loading_time_min')
@@ -1091,7 +1091,7 @@ export class SheetMetalLookupService {
       { column: 'tonnage', value: tonnage, unit: 'T' },
       { column: 'complexity', value: complexity },
     ];
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
       .from('sm_lookup_manual_stroke')
       .select('thickness_mm, tonnage, complexity, stroke_time_sec')
@@ -1331,7 +1331,7 @@ export class SheetMetalLookupService {
   async getSamplingRate(lotSize: number): Promise<{ rate: number; dataFound: boolean }> {
     if (lotSize <= 0) return { rate: 0, dataFound: false };
 
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
       .from('sm_lookup_sampling_plan')
       .select('batch_size_from, batch_size_to, sample_qty_l2')
@@ -1352,7 +1352,7 @@ export class SheetMetalLookupService {
   // inspection_time.sql). Mirrors getSamplingRate's structure exactly.
   @ReferenceMemo()
   async getInspectionTime(complexity: 'simple' | 'inter' | 'complex'): Promise<{ minutes: number; dataFound: boolean }> {
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
       .from('sm_lookup_inspection_time')
       .select('inspection_min')
@@ -1376,7 +1376,7 @@ export class SheetMetalLookupService {
   // its own bulk lookup.
   @ReferenceMemo()
   async getOpSetupTimes(): Promise<{ minutes: Map<string, number>; dataFound: Set<string> }> {
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
       .from('sm_lookup_op_setup_time')
       .select('operation, setup_min');
@@ -1423,7 +1423,7 @@ export class SheetMetalLookupService {
   // feature+method lookup and disclosed fallback.
   @ReferenceMemo()
   async getInspectionOperationDefaults(): Promise<import('../../shared/process/inspection-engine').InspectionOperationDefaultRow[]> {
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
       .from('inspection_operation_defaults')
       .select('feature, method, cycle_time_sec, sampling_default, equipment');
@@ -1441,7 +1441,7 @@ export class SheetMetalLookupService {
   // live directly in default-rates.ts.
   @ReferenceMemo()
   async getWaterjetAbrasiveRate(pumpTier = '50hp_60kpsi'): Promise<{ kgPerMin: number; dataFound: boolean }> {
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
       .from('sm_lookup_waterjet_abrasive_rate')
       .select('abrasive_kg_per_min')
@@ -1622,7 +1622,7 @@ export class SheetMetalLookupService {
   // works off a compile-time table.
   @ReferenceMemo()
   async getHandlingAllowanceUsd(machineClass: string, partWeightKg: number): Promise<{ allowanceUsd: number; dataFound: boolean }> {
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
       .from('sm_handling_allowance_rates')
       .select('weight_kg_max, allowance_usd')
@@ -1644,7 +1644,7 @@ export class SheetMetalLookupService {
   // never silently substituted for a genuinely missing table.
   @ReferenceMemo()
   async getWaterjetNozzleCostPerHr(nozzleGrade = 'Mid-Life Composite Carbide'): Promise<{ costPerHr: number; dataFound: boolean }> {
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
       .from('sm_waterjet_nozzle_rates')
       .select('cost_usd, life_hours')
@@ -1666,7 +1666,7 @@ export class SheetMetalLookupService {
   // row rather than a fabricated material-keyed curve.
   @ReferenceMemo()
   async getDeburrRate(materialFamily = '__default__'): Promise<{ secPerMetre: number; secPerPierce: number; dataFound: boolean }> {
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
       .from('sm_lookup_deburr_rate')
       .select('sec_per_metre, sec_per_pierce')
@@ -1687,7 +1687,7 @@ export class SheetMetalLookupService {
     const result = new Map<number, { seconds: number; dataFound: boolean }>();
     if (diametersMm.length === 0) return result;
 
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
       .from('sm_lookup_counterbore')
       .select('diameter_mm, cycle_time_sec')
@@ -1710,7 +1710,7 @@ export class SheetMetalLookupService {
     const result = new Map<number, { seconds: number; dataFound: boolean }>();
     if (diametersMm.length === 0) return result;
 
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
       .from('sm_lookup_countersink')
       .select('diameter_mm, cycle_time_sec')
@@ -1741,7 +1741,7 @@ export class SheetMetalLookupService {
     const result = new Map<number, { partSpec: string; insertionCycleSec: number } | null>();
     if (holeDiametersMm.length === 0) return result;
 
-    const db = this.supabase.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
+    const db = this.database.getPrivilegedClient('reference-data: sheet-metal lookup tables, global shared');
     const { data } = await db
       .from('sm_lookup_pem_hardware')
       .select('hole_diameter_mm, sheet_thickness_mm, pem_part_spec, insertion_cycle_sec');

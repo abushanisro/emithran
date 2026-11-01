@@ -433,6 +433,8 @@ function ProcessPlanningPageContent() {
   const [cadDimensions, setCadDimensions] = useState<{ x: number; y: number; z: number } | null>(null);
   const [localScreenshot, setLocalScreenshot] = useState<string | null>(null);
   const [manufacturingFeatures, setManufacturingFeatures] = useState<any[]>([]);
+  // Why the feature list is empty, shown under the viewer; null when there is nothing to say.
+  const [cadFeatureNote, setCadFeatureNote] = useState<string | null>(null);
   const [selectedFeature, setSelectedFeature] = useState<any | null>(null);
 
   // Feature highlight state — hover is temporary, locked persists until toggled
@@ -593,24 +595,17 @@ function ProcessPlanningPageContent() {
     }
   }, [isExporting, exportAnalysis, selectedItem]);
 
-  // DFM features — always seed with all detectable types when a 3D file is present.
-  // DFMColorMesh detects features from geometry itself; this list just enables each type.
-  const DEFAULT_DFM_FEATURES = [
-    { id: 'hole',      type: 'hole'      as const, position: { x:0,y:0,z:0 }, dimensions: {}, manufacturingProcess: 'Drilling',        cycleTime: 0, tooling: [], warnings: [], aiRecommendations: [] },
-    { id: 'pocket',    type: 'pocket'    as const, position: { x:0,y:0,z:0 }, dimensions: {}, manufacturingProcess: 'Milling',          cycleTime: 0, tooling: [], warnings: [], aiRecommendations: [] },
-    { id: 'thin_wall', type: 'thin_wall' as const, position: { x:0,y:0,z:0 }, dimensions: {}, manufacturingProcess: 'Precision Milling', cycleTime: 0, tooling: [], warnings: [], aiRecommendations: [] },
-    { id: 'undercut',  type: 'undercut'  as const, position: { x:0,y:0,z:0 }, dimensions: {}, manufacturingProcess: 'T-Slot Milling',   cycleTime: 0, tooling: [], warnings: [], aiRecommendations: [] },
-  ];
-
   useEffect(() => {
     if (!selectedItem?.id || !selectedItem.file3dPath) {
       setManufacturingFeatures([]);
+      setCadFeatureNote(null);
       setSelectedFeature(null);
       setCadVolumeMm3(null);
       return;
     }
-    // Seed immediately so the DFM button appears while analysis loads
-    setManufacturingFeatures(DEFAULT_DFM_FEATURES);
+    // Only the features the stored CAD analysis found are shown; none are assumed.
+    setManufacturingFeatures([]);
+    setCadFeatureNote('Loading CAD analysis…');
     setSelectedFeature(null);
 
     bomItemsApi.getCADAnalysis(selectedItem.id)
@@ -621,10 +616,16 @@ function ProcessPlanningPageContent() {
           result?.features ?? [];
         if (Array.isArray(stored) && stored.length > 0) {
           setManufacturingFeatures(stored);
+          setCadFeatureNote(null);
+        } else {
+          setCadFeatureNote((result as { analysis?: unknown } | null)?.analysis
+            ? 'No manufacturing features detected in the CAD analysis.'
+            : 'CAD analysis has not been run for this part.');
         }
-        // else keep the default seed
       })
-      .catch(() => { /* keep default seed */ });
+      .catch((error: unknown) => {
+        setCadFeatureNote(`CAD analysis could not be loaded: ${error instanceof Error ? error.message : String(error)}`);
+      });
   }, [selectedItem?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load process planning specifications for the selected BOM item
@@ -1572,6 +1573,9 @@ function ProcessPlanningPageContent() {
                       </div>
                     )}
                   </div>
+                  {selectedItem.file3dPath && cadFeatureNote && (
+                    <p className="px-4 py-2 text-xs text-muted-foreground border-t border-border">{cadFeatureNote}</p>
+                  )}
                 </div>
 
                 {/* Dimension Validation Dialog — thumbnail + live measurements from the 3D viewer */}
@@ -1707,16 +1711,12 @@ function ProcessPlanningPageContent() {
                   const targetBom = selectedBomId ? (bom.id === selectedBomId ? bom : null) : (index === 0 ? bom : null);
                   if (!targetBom) return null;
 
-                  // Get items for this BOM
-                  const currentBomItems = targetBom.id === selectedBomId ? bomItems : [];
-
                   return (
                     <div key={targetBom.id} id="cost-analysis-full-report" className="space-y-6">
                       {/* Cost Analysis Engine - Cost Estimate Report */}
                       <CostAnalysisEngine
                         bomId={targetBom.id}
                         bomName={targetBom.name || "Assembly"}
-                        itemCount={currentBomItems.length || 2}
                         location={location}
                         {...(selectedItem?.id ? { bomItemId: selectedItem.id } : {})}
                         {...(selectedItem?.thumbnailUrl ? { thumbnailUrl: selectedItem.thumbnailUrl } : {})}

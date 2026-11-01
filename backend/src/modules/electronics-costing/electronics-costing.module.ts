@@ -24,10 +24,10 @@ import { ElectronicsRateBookLoader } from './infrastructure/repositories/electro
 import { ElectronicsReferenceRepository } from './infrastructure/repositories/electronics-reference.repository';
 import { ElectronicsRepository } from './infrastructure/repositories/electronics.repository';
 import { ElectronicsFileStore } from './infrastructure/storage/electronics-file-store';
-import { SupabaseModule } from '../../common/supabase/supabase.module';
+import { DatabaseModule } from '../../common/database/database.module';
 
 @Module({
-  imports: [ConfigModule, SupabaseModule],
+  imports: [ConfigModule, DatabaseModule],
   controllers: [ElectronicsController],
   providers: [
     electronicsJobQueueProvider,

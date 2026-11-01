@@ -26,7 +26,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
+import { RequestAuthGuard } from '../../common/guards/request-auth.guard';
 import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
@@ -43,7 +43,7 @@ import {
 @ApiTags('Procured Parts Costs')
 @ApiBearerAuth()
 @Controller('api/procured-parts-costs')
-@UseGuards(SupabaseAuthGuard)
+@UseGuards(RequestAuthGuard)
 export class ProcuredPartsCostController {
   constructor(
     private readonly procuredPartsCostService: ProcuredPartsCostService,

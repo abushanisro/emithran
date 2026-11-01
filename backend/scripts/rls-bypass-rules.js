@@ -6,12 +6,12 @@
  * definition. See backend/docs/rls-bypass-inventory.md.
  *
  * The one place allowed to build or hand out the service-role client is
- * SupabaseService. Everything else must go through:
+ * DatabaseService. Everything else must go through:
  *   getUserClient()/getClient(token)        RLS-enforced, tenant data
  *   getPrivilegedClient('<specific reason>') service role, named and reviewable
  */
 
-const SUPABASE_SERVICE = 'src/common/supabase/supabase.service.ts';
+const DATABASE_SERVICE = 'src/common/database/database.service.ts';
 
 // The platform database layer (Design Doc 9) is the one place a Postgres driver may be imported; feature code reaches
 // data through withTenant() there, never through a driver of its own.
@@ -30,10 +30,10 @@ function scanSource(relPath, text) {
   const out = [];
   const add = (rule, index, message, severity = 'error') =>
     out.push({ rule, line: lineOf(text, index), message, severity });
-  const isService = path === SUPABASE_SERVICE;
+  const isService = path === DATABASE_SERVICE;
 
-  // 1. The unnamed service-role getter on SupabaseService.
-  for (const m of text.matchAll(/\b\w*[sS]upabase\w*\.client\b/g)) {
+  // 1. The unnamed service-role getter on DatabaseService.
+  for (const m of text.matchAll(/\b\w*[dD]atabase\w*\.client\b/g)) {
     if (isService) continue;
     add('dot-client', m.index, `".client" returns the service-role client unnamed; use getUserClient() or getPrivilegedClient('<reason>')`);
   }
@@ -65,20 +65,20 @@ function scanSource(relPath, text) {
     add('getclient-optional-token', m.index, 'getClient() must not receive a possibly-missing token; use getUserClient(token)');
   }
 
-  // 5. No database path besides SupabaseService and the platform database layer.
+  // 5. No database path besides DatabaseService and the platform database layer.
   for (const m of text.matchAll(/(?:from\s+|require\(\s*)['"](typeorm|knex|nestjs-knex|pg|kysely|@nestjs\/typeorm)['"]/g)) {
     if (path.startsWith(PLATFORM_DB) && PLATFORM_DRIVERS.has(m[1])) continue;
     add('second-db-path', m.index, `importing "${m[1]}" adds a second database path that bypasses RLS`);
   }
 
-  // 6. Service-role clients and keys are built only inside SupabaseService.
+  // 6. Service-role clients and keys are built only inside DatabaseService.
   if (!isService) {
     for (const m of text.matchAll(/\bcreateClient\s*\(/g)) {
-      add('own-supabase-client', m.index, 'building a Supabase client outside SupabaseService; use getUserClient()/getPrivilegedClient()');
+      add('own-database-client', m.index, 'building a database client outside DatabaseService; use getUserClient()/getPrivilegedClient()');
     }
     if (!path.startsWith('src/config/')) {
       for (const m of text.matchAll(/SUPABASE_SERVICE_KEY|SUPABASE_SERVICE_ROLE/g)) {
-        add('service-key-outside-boundary', m.index, `${m[0]} read outside SupabaseService`);
+        add('service-key-outside-boundary', m.index, `${m[0]} read outside DatabaseService`);
       }
     }
   }
@@ -160,4 +160,4 @@ function parseBaseline(text) {
   return parsed;
 }
 
-module.exports = { scanSource, scanRepoJwt, countPrivilegedCalls, compareToBaseline, lowerBaseline, parseBaseline, SUPABASE_SERVICE };
+module.exports = { scanSource, scanRepoJwt, countPrivilegedCalls, compareToBaseline, lowerBaseline, parseBaseline, DATABASE_SERVICE };

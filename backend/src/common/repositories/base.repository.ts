@@ -11,7 +11,7 @@
  */
 
 import { NotFoundException, InternalServerErrorException } from '@nestjs/common';
-import { SupabaseClient } from '@supabase/supabase-js';
+import type { DbClient } from '../db/postgrest-client';
 import { Logger } from '../logger/logger.service';
 
 interface QueryOptions {
@@ -43,7 +43,7 @@ export abstract class BaseRepository<T> {
    * Returns empty array if no records found (NOT an error)
    */
   async findAll(
-    client: SupabaseClient,
+    client: DbClient,
     options: QueryOptions = {},
   ): Promise<QueryResult<T>> {
     const page = options.page || 1;
@@ -93,7 +93,7 @@ export abstract class BaseRepository<T> {
    * Find single record by ID
    * Throws NotFoundException if not found (correct semantics)
    */
-  async findById(client: SupabaseClient, id: string): Promise<T> {
+  async findById(client: DbClient, id: string): Promise<T> {
     const startTime = Date.now();
 
     try {
@@ -130,7 +130,7 @@ export abstract class BaseRepository<T> {
    * Create new record
    */
   async create(
-    client: SupabaseClient,
+    client: DbClient,
     data: Partial<T>,
     userId: string,
     organizationId?: string,
@@ -173,7 +173,7 @@ export abstract class BaseRepository<T> {
    * Update existing record
    */
   async update(
-    client: SupabaseClient,
+    client: DbClient,
     id: string,
     data: Partial<T>,
   ): Promise<T> {
@@ -211,7 +211,7 @@ export abstract class BaseRepository<T> {
   /**
    * Delete record
    */
-  async delete(client: SupabaseClient, id: string): Promise<void> {
+  async delete(client: DbClient, id: string): Promise<void> {
     const startTime = Date.now();
 
     try {

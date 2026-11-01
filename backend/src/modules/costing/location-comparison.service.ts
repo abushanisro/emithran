@@ -1,6 +1,7 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
-import { SupabaseService } from '../../common/supabase/supabase.service';
-import { ExchangeRateService } from '../../common/exchange-rate/exchange-rate.service';
+import { Injectable, BadRequestException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { DatabaseService } from '../../common/database/database.service';
+import { ExchangeRateService, organizationIdOf } from '../../common/exchange-rate/exchange-rate.service';
+import { readSellingPriceSettings } from './cost-aggregation.service';
 import {
   LOCATION_INFO,
 } from '../bom-items/costing/shared/core/default-rates.constants';
@@ -57,7 +58,7 @@ const ALL_LOCATIONS = [
 @Injectable()
 export class LocationComparisonService {
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly databaseService: DatabaseService,
     private readonly exchangeRateService: ExchangeRateService,
   ) {}
 
@@ -65,9 +66,14 @@ export class LocationComparisonService {
     bomItemId: string,
     token: string,
   ): Promise<LocationComparisonDto> {
-    const db      = this.supabaseService.getClient(token);
-    const adminDb = this.supabaseService.getPrivilegedClient('reference-data: costing_settings and rate benchmarks, global');
+    const db      = this.databaseService.getClient(token);
+    const adminDb = this.databaseService.getPrivilegedClient('reference-data: costing_settings and rate benchmarks, global');
     const serviceWarnings: string[] = [];
+
+    // The part's organization decides which budget exchange rates apply (read as the caller, so RLS decides visibility).
+    const { data: item, error: itemError } = await db.from('bom_items').select('organization_id').eq('id', bomItemId).maybeSingle();
+    if (itemError) throw new InternalServerErrorException(`Unable to read the BOM item: ${itemError.message}`);
+    if (!item) throw new NotFoundException('BOM item not found');
 
     // 0. Load exchange rates (one snapshot for this whole comparison — every
     // location below converts through the exact same rates) and costing
@@ -75,29 +81,19 @@ export class LocationComparisonService {
     // whole app — throws if exchange_rates has no active rates, rather than
     // silently comparing locations at a stale/guessed rate.
     const [rates, settingsResult] = await Promise.all([
-      this.exchangeRateService.getSnapshot(token),
+      this.exchangeRateService.getSnapshot(token, organizationIdOf(item)),
       adminDb
         .from('costing_settings')
         .select('key, value'),
     ]);
 
-    // Load SGA and profit from costing_settings table
-    const settingsMap = new Map<string, number>();
-    for (const s of settingsResult.data ?? []) settingsMap.set(s.key as string, Number(s.value));
-
-    const sgaPct = settingsMap.has('sga_pct') ? settingsMap.get('sga_pct')! : null;
-    const profitPct = settingsMap.has('profit_pct') ? settingsMap.get('profit_pct')! : null;
-
-    if (sgaPct == null) {
-      serviceWarnings.push(
-        'sga_pct not found in costing_settings — SG&A excluded from selling price; deploy migration 364 and set the row',
-      );
+    // Load SGA and profit from costing_settings table. A failed read is an
+    // error: comparing selling prices without SG&A and profit would understate them.
+    if (settingsResult.error) {
+      throw new InternalServerErrorException(`Unable to read costing_settings (SG&A and profit): ${settingsResult.error.message}`);
     }
-    if (profitPct == null) {
-      serviceWarnings.push(
-        'profit_pct not found in costing_settings — profit margin excluded from selling price; deploy migration 364 and set the row',
-      );
-    }
+    const { sgaPct, profitPct, pricingGaps } = readSellingPriceSettings(settingsResult.data ?? []);
+    serviceWarnings.push(...pricingGaps);
 
     // 1. Fetch active process cost records for this BOM item
     const { data: processRows, error: pcErr } = await db

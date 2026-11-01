@@ -5,7 +5,7 @@ import { EVENT_BUS, InProcessEventBus } from './event-bus';
 /**
  * The live-progress event bus. In-process on purpose: the free-tier deployment runs one backend instance, and keeping the bus
  * in memory means the backend holds no direct Postgres connection. Moving to several instances means swapping this provider
- * for a shared bus (Supabase Realtime broadcast); nothing that publishes or subscribes changes.
+ * for a shared bus (Postgres LISTEN/NOTIFY); nothing that publishes or subscribes changes.
  */
 @Global()
 @Module({

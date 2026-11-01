@@ -8,7 +8,7 @@
 import { ExchangeRateService } from '../../../../common/exchange-rate/exchange-rate.service';
 import { BomItemCostService } from '../../../../modules/bom-items/services/bom-item-cost.service';
 import { type Logger } from '../../../../common/logger/logger.service';
-import { type SupabaseService } from '../../../../common/supabase/supabase.service';
+import { type DatabaseService } from '../../../../common/database/database.service';
 
 function makeQueryChain(result: { data: any; error: any }) {
   const chain: any = {};
@@ -31,12 +31,12 @@ describe('BomItemCostService.getOrCreateCost', () => {
       .mockReturnValueOnce(existingFetch) // the "try to get existing" select
       .mockReturnValueOnce(insertChain);  // the insert
 
-    const supabaseService = {
+    const databaseService = {
       getClient: jest.fn().mockReturnValue({ from: fromMock }),
-    } as unknown as SupabaseService;
+    } as unknown as DatabaseService;
 
     const service = new BomItemCostService(
-      supabaseService,
+      databaseService,
       { error: jest.fn() } as unknown as Logger,
       // Third constructor arg since P1b-iii. getOrCreateCost never resolves an
       // FX snapshot, so these tests never reach it.
@@ -70,12 +70,12 @@ describe('BomItemCostService recalculateCost sibling-table lookups', () => {
       return chain;
     });
 
-    const supabaseService = {
+    const databaseService = {
       getClient: jest.fn().mockReturnValue({ from: fromMock }),
-    } as unknown as SupabaseService;
+    } as unknown as DatabaseService;
 
     const service = new BomItemCostService(
-      supabaseService,
+      databaseService,
       { error: jest.fn(), log: jest.fn(), warn: jest.fn() } as unknown as Logger,
       // Third constructor arg since P1b-iii: recalculateCost resolves exactly
       // one FX snapshot per rollup. convertOptional is the only member the

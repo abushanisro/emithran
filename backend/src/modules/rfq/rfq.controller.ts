@@ -33,7 +33,7 @@ import {
   RfqTrackingStatsDto 
 } from './dto/rfq-tracking.dto';
 import { RfqTrackingService } from './services/rfq-tracking.service';
-import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
+import { RequestAuthGuard } from '../../common/guards/request-auth.guard';
 import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
@@ -41,7 +41,7 @@ import { CurrentOrganization } from '../../common/decorators/current-organizatio
 
 @ApiTags('RFQ (Request for Quotation)')
 @ApiBearerAuth()
-@UseGuards(SupabaseAuthGuard)
+@UseGuards(RequestAuthGuard)
 @Controller({ path: 'api/rfq', version: '1' })
 export class RfqController {
   private readonly logger = new Logger(RfqController.name);

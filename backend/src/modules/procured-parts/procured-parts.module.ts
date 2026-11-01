@@ -13,11 +13,11 @@
 import { Module } from '@nestjs/common';
 import { ProcuredPartsCostController } from './procured-parts-cost.controller';
 import { ProcuredPartsCostService } from './procured-parts-cost.service';
-import { SupabaseModule } from '../../common/supabase/supabase.module';
+import { DatabaseModule } from '../../common/database/database.module';
 import { LoggerModule } from '../../common/logger/logger.module';
 
 @Module({
-  imports: [SupabaseModule, LoggerModule],
+  imports: [DatabaseModule, LoggerModule],
   controllers: [ProcuredPartsCostController],
   providers: [ProcuredPartsCostService],
   exports: [ProcuredPartsCostService],
