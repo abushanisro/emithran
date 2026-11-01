@@ -12,13 +12,15 @@ environment that still has data in an old Supabase project.
 **Auth0**
 1. Tenant. Create an **API**: identifier = `AUTH0_AUDIENCE` (e.g. `https://api.emithran.com`), signing algorithm **RS256** (the backend accepts nothing else).
 2. Create a **Regular Web Application**. Allowed Callback URL `<APP_BASE_URL>/auth/callback`, Allowed Logout URL `<APP_BASE_URL>`. Enable the
-   Google social connection and the database connection; **turn off sign-ups** on the database connection (people are invited).
-   **Company SSO (Google Workspace)** instead of the Google social connection: in Google Cloud (project under the company's organisation),
+   database connection and **turn off sign-ups** on it (people are invited). **Do not enable the Google social connection** (or any other
+   public social login): sign-in is company SSO or an invited database account only.
+   **Company SSO** is an Auth0 enterprise connection. For Google Workspace: in Google Cloud (project under the company's organisation),
    OAuth consent screen **Internal**, then a Web OAuth client with redirect URI `https://<AUTH0_DOMAIN>/login/callback`. In Auth0,
    Authentication → Enterprise → Google Workspace: purpose Authentication, the company domain, that client id and secret, Admin Directory
-   API and extended attributes off, "Use ID instead of Email" on; enable it for the application. Set
-   `NEXT_PUBLIC_AUTH0_GOOGLE_CONNECTION` to the connection's name so "Sign in with Google" goes to it. The Free plan includes one
-   enterprise connection; Home Realm Discovery is not in Free.
+   API and extended attributes off, "Use ID instead of Email" on; enable it for the application. (Microsoft Entra ID or SAML work the same
+   way through their own enterprise connection.) Set `NEXT_PUBLIC_AUTH0_SSO_CONNECTION` (build time) to the connection's name so
+   "Sign in with SSO" goes straight to it; without it the app shows no SSO button. The Free plan includes one enterprise connection; Home
+   Realm Discovery is not in Free.
 3. Add a **post-login Action** so the access token carries what the backend reads (replace the namespace with your `AUTH0_CLAIM_NAMESPACE`):
    ```js
    exports.onExecutePostLogin = async (event, api) => {
@@ -30,7 +32,7 @@ environment that still has data in an old Supabase project.
    ```
    Without `sid` every login is refused (the inactivity timeout needs a session id). Without a verified email nobody can be linked to an existing user, and a verified email links only the first login of an invited account (one with no login yet; migration 938): any later new login for an account that already has one is refused. Only these namespaced claims are read; plain `email`, `email_verified` and `sid` claims are ignored.
 4. **Branding, so Auth0's page matches the app's own sign-in page.** The app's `/auth` page keeps its design (logo, welcome text, image, "Sign In",
-   "Sign in with Google", "Request a demo") and its buttons lead to Auth0; the email and password boxes are on Auth0's page. In Auth0 Dashboard, Branding,
+   "Sign in with SSO", "Request a demo") and its buttons lead to Auth0; the email and password boxes are on Auth0's page. In Auth0 Dashboard, Branding,
    Universal Login: upload the M logo, set the dark theme with the app's primary colour, and set the page title to eMithran. Leave sign-ups off so the
    "Request a demo" link remains the only way in.
 5. Record: domain, client id, client secret, `AUTH0_SECRET` (`openssl rand -hex 32`).
