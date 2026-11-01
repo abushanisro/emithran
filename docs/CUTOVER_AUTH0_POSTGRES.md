@@ -28,7 +28,7 @@ environment that still has data in an old Supabase project.
      api.accessToken.setCustomClaim(`${ns}sid`, event.session?.id ?? '');
    };
    ```
-   Without `sid` every login is refused (the inactivity timeout needs a session id). Without a verified email nobody can be linked to an existing user.
+   Without `sid` every login is refused (the inactivity timeout needs a session id). Without a verified email nobody can be linked to an existing user, and a verified email links only the first login of an invited account (one with no login yet; migration 938): any later new login for an account that already has one is refused. Only these namespaced claims are read; plain `email`, `email_verified` and `sid` claims are ignored.
 4. **Branding, so Auth0's page matches the app's own sign-in page.** The app's `/auth` page keeps its design (logo, welcome text, image, "Sign In",
    "Sign in with Google", "Request a demo") and its buttons lead to Auth0; the email and password boxes are on Auth0's page. In Auth0 Dashboard, Branding,
    Universal Login: upload the M logo, set the dark theme with the app's primary colour, and set the page title to eMithran. Leave sign-ups off so the

@@ -7,11 +7,12 @@ import { sessionKeyFromAuth0Sid } from './session-key';
 const USER = '11111111-1111-4111-8111-111111111111';
 const login = (over: Partial<VerifiedLogin> = {}): VerifiedLogin => ({ provider: 'auth0', sub: 'auth0|a', email: 'a@x.com', emailVerified: true, sessionId: 's1', expiresAt: 9e9, ...over });
 
-function build(opts: { login?: VerifiedLogin | TokenRejected; linked?: unknown; allowed?: unknown; linkError?: boolean } = {}) {
+function build(opts: { login?: VerifiedLogin | TokenRejected; linked?: unknown; accountEmail?: unknown; linkError?: boolean; accountError?: boolean } = {}) {
   const verify = jest.fn(async () => { if (opts.login instanceof TokenRejected) throw opts.login; return opts.login ?? login(); });
   const rpc = jest.fn(async (fn: string) => {
     if (fn === 'link_identity') return opts.linkError ? { data: null, error: { message: 'x' } } : { data: 'linked' in opts ? opts.linked : USER, error: null };
-    return { data: 'allowed' in opts ? opts.allowed : true, error: null };
+    if (fn === 'identity_user_email') return opts.accountError ? { data: null, error: { message: 'x' } } : { data: 'accountEmail' in opts ? opts.accountEmail : 'a@x.com', error: null };
+    throw new Error(`unexpected rpc ${fn}`);
   });
   const db = { getPrivilegedClient: jest.fn(() => ({ rpc })), mintDbUserToken: jest.fn((id: string) => `db-token-for-${id}`) };
   let t = 1_000;
@@ -28,6 +29,18 @@ describe('IdentityService', () => {
     expect(db.mintDbUserToken).toHaveBeenCalledWith(USER, { email: 'a@x.com', sessionId: sessionKeyFromAuth0Sid('s1') });
   });
 
+  it('binds the account email (auth.users), never the token email claim, into the request user and the database token', async () => {
+    const { service, rpc, db } = build({ login: login({ email: 'b@x.com', emailVerified: false }), accountEmail: 'a@x.com' });
+    const r = await service.authenticate('tok');
+    expect(rpc).toHaveBeenCalledWith('identity_user_email', { p_user_id: USER });
+    expect(r.user.email).toBe('a@x.com');
+    expect(db.mintDbUserToken).toHaveBeenCalledWith(USER, { email: 'a@x.com', sessionId: sessionKeyFromAuth0Sid('s1') });
+  });
+
+  it('403s when the account has no email to bind (fails closed)', async () => {
+    await expect(build({ accountEmail: '' }).service.authenticate('t')).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
   it('sends the verified flag through untouched, so an unverified email can never link (the database decides)', async () => {
     const { service, rpc } = build({ login: login({ emailVerified: false }), linked: null });
     await expect(service.authenticate('t')).rejects.toBeInstanceOf(ForbiddenException);
@@ -42,7 +55,7 @@ describe('IdentityService', () => {
 
   it('403s someone nobody invited, and someone no longer authorised', async () => {
     await expect(build({ linked: null }).service.authenticate('t')).rejects.toBeInstanceOf(ForbiddenException);
-    await expect(build({ allowed: false }).service.authenticate('t')).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(build({ accountEmail: null }).service.authenticate('t')).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('401s a bad token without touching the database', async () => {
@@ -54,13 +67,14 @@ describe('IdentityService', () => {
   it('503s when Auth0 keys or the database cannot be reached (never a 401/403 verdict on the person)', async () => {
     await expect(build({ login: new TokenRejected('keys_unavailable', 'x') }).service.authenticate('t')).rejects.toBeInstanceOf(ServiceUnavailableException);
     await expect(build({ linkError: true }).service.authenticate('t')).rejects.toBeInstanceOf(ServiceUnavailableException);
+    await expect(build({ accountError: true }).service.authenticate('t')).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 
   it('reuses a decision for a minute, then asks the database again (so a revoked invite takes effect within a minute)', async () => {
     const b = build();
     await b.service.authenticate('t');
     await b.service.authenticate('t');
-    expect(b.rpc).toHaveBeenCalledTimes(2); // link + authorised, once
+    expect(b.rpc).toHaveBeenCalledTimes(2); // link + account email, once
     b.advance(61_000);
     await b.service.authenticate('t');
     expect(b.rpc).toHaveBeenCalledTimes(4);

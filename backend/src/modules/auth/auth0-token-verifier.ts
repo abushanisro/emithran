@@ -57,10 +57,11 @@ export class Auth0TokenVerifier {
         clockTolerance: this.options.clockToleranceSeconds ?? 5,
       });
       if (typeof payload.sub !== 'string' || payload.sub === '') throw new TokenRejected('no_subject', 'the token names nobody');
+      // Only the namespaced claims written by our post-login Action count; plain email/email_verified/sid are never read.
       const ns = this.options.claimNamespace;
-      const email = (payload[`${ns}email`] ?? payload.email) as unknown;
-      const verified = (payload[`${ns}email_verified`] ?? payload.email_verified) as unknown;
-      const sid = (payload[`${ns}sid`] ?? payload.sid) as unknown;
+      const email = payload[`${ns}email`] as unknown;
+      const verified = payload[`${ns}email_verified`] as unknown;
+      const sid = payload[`${ns}sid`] as unknown;
       return {
         provider: 'auth0',
         sub: payload.sub,
