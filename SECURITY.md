@@ -1,4 +1,10 @@
 
+# Reporting a vulnerability
+
+Please report security issues privately through GitHub: **Security → Report a vulnerability** on this repository. Do not open a
+public issue. Reports are acknowledged within two working days; the handling process is in
+[docs/ops/incident-response.md](docs/ops/incident-response.md).
+
 # Security Architecture & Database Constraints
 
 ## Table of Contents

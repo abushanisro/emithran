@@ -14,6 +14,8 @@ environment that still has data in an old Supabase project.
 2. Create a **Regular Web Application**. Allowed Callback URL `<APP_BASE_URL>/auth/callback`, Allowed Logout URL `<APP_BASE_URL>`. Enable the
    database connection and **turn off sign-ups** on it (people are invited). **Do not enable the Google social connection** (or any other
    public social login): sign-in is company SSO or an invited database account only.
+   Then authorize it for the API: **Applications → APIs → (the API) → Application Access**, set the web application's **User Access**
+   to **Authorized**. Without this every sign-in is refused with `Client "…" is not authorized to access resource server "<AUTH0_AUDIENCE>"`.
    **Company SSO** is an Auth0 enterprise connection. For Google Workspace: in Google Cloud (project under the company's organisation),
    OAuth consent screen **Internal**, then a Web OAuth client with redirect URI `https://<AUTH0_DOMAIN>/login/callback`. In Auth0,
    Authentication → Enterprise → Google Workspace: purpose Authentication, the company domain, that client id and secret, Admin Directory
@@ -84,7 +86,7 @@ They sign in through Auth0; the first verified login links to that row. Check: `
 ## 5. Verify on stage (all of it, before production)
 
 - The QA security tests (DB-RLS-01, DB-RLS-19, DB-RPC-02) against the new stack.
-- Sign in, sign out, Google sign-in, an uninvited account, 30 minutes idle (sign-out with the notice), a token without `sid` (refused).
+- Sign in, sign out, SSO sign-in, an uninvited account, 30 minutes idle (sign-out with the notice), a token without `sid` (refused).
 - Upload a ZIP assembly: runner claims it (`cad_uploads` row goes queued, running, analysed, done), items appear, 3D viewer loads through a signed URL, original deleted.
 - RFQ email with attachments; a drawing extraction; an electronics upload.
 - Soak a few days. Then repeat 2 to 5 on production.
