@@ -1,9 +1,11 @@
-// Load the root .env with override:true so its values always win over system env vars (local development only: containers have no file)
+// Load the root .env. On a local development machine its values win over stale shell exports; anywhere else the environment the
+// deployment set wins over a stray file (runtime-flags.ts).
 import * as dotenv from 'dotenv';
 import * as path from 'node:path';
+import { apiDocsEnabled, dotenvOverride } from './common/runtime-flags';
 // The one local env file lives at the repo root (backend/dist/main.js -> ../../.env). Deployed containers have no file: compose sets the
 // variables, and a missing file is not an error.
-dotenv.config({ path: path.resolve(__dirname, '..', '..', '.env'), override: true });
+dotenv.config({ path: path.resolve(__dirname, '..', '..', '.env'), override: dotenvOverride(process.env) });
 
 // Telemetry starts here, after .env is loaded and before http/express are required by the imports below,
 // so the instrumentations can patch them. A no-op (and loads no SDK) unless OTEL_EXPORTER_OTLP_ENDPOINT is set.
@@ -156,21 +158,25 @@ async function bootstrap() {
   }, 1000);
   
 
-  const config = new DocumentBuilder()
-    .setTitle('mithran API Gateway')
-    .setDescription('Manufacturing One-Stop Solution - API Gateway')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .addTag('Authentication')
-    .addTag('Projects')
-    .addTag('Vendors')
-    .addTag('MHR', 'Machine Hour Rate calculations')
-    .addTag('LHR', 'Labour Hour Rate database')
-    .addTag('Health')
-    .build();
+  // The API map at /docs is unauthenticated, so production does not mount it unless ENABLE_API_DOCS=true (runtime-flags.ts).
+  const docs = apiDocsEnabled(process.env);
+  if (docs) {
+    const config = new DocumentBuilder()
+      .setTitle('mithran API Gateway')
+      .setDescription('Manufacturing One-Stop Solution - API Gateway')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .addTag('Authentication')
+      .addTag('Projects')
+      .addTag('Vendors')
+      .addTag('MHR', 'Machine Hour Rate calculations')
+      .addTag('LHR', 'Labour Hour Rate database')
+      .addTag('Health')
+      .build();
 
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document);
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('docs', app, document);
+  }
 
   // Railway provides PORT environment variable automatically
   const configuredPort = process.env.BACKEND_PORT ?? process.env.PORT; // BACKEND_PORT in the shared local .env; PORT in containers
@@ -182,7 +188,7 @@ async function bootstrap() {
   
   logger.log(`Environment: ${configService.get<string>('APP_ENV', 'local')} | ${backends((name) => configService.get<string>(name))}`, 'Bootstrap');
   logger.log(`API Gateway running on: ${baseUrl}`, 'Bootstrap');
-  logger.log(`API Documentation: ${baseUrl}/docs`, 'Bootstrap');
+  if (docs) logger.log(`API Documentation: ${baseUrl}/docs`, 'Bootstrap');
 }
 
 /** Where data, files and logins actually go, for the startup log. Hosts only: never a key. */

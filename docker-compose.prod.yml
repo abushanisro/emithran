@@ -29,7 +29,7 @@ services:
   cloudflared:
     <<: *hardened
     image: cloudflare/cloudflared:2026.10.5@sha256:1b1d34d0a9c0bfca9de72db8460d328db3f19edd2b96169114e3e893a97bbe53
-    command: tunnel --no-autoupdate --metrics 0.0.0.0:2000 run
+    command: tunnel --no-autoupdate --metrics 127.0.0.1:2000 run
     environment:
       TUNNEL_TOKEN: ${TUNNEL_TOKEN:?set TUNNEL_TOKEN (from the Cloudflare tunnel) in the env file}
     healthcheck:
@@ -226,12 +226,12 @@ services:
     environment:
       # The same data API and bucket as the backend (the runner refuses to start, naming the missing setting, when one is empty).
       POSTGREST_URL: http://postgrest:3000
-      DB_JWT_SECRET: ${DB_JWT_SECRET:-}
-      S3_BUCKET: ${S3_BUCKET:-}
-      S3_REGION: ${S3_REGION:-}
+      DB_JWT_SECRET: ${DB_JWT_SECRET:?set DB_JWT_SECRET in the env file}
+      S3_BUCKET: ${S3_BUCKET:?set S3_BUCKET in the env file}
+      S3_REGION: ${S3_REGION:?set S3_REGION in the env file}
       S3_ENDPOINT: ${S3_ENDPOINT:-}
-      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
-      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?set S3_ACCESS_KEY_ID in the env file}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?set S3_SECRET_ACCESS_KEY in the env file}
       S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-}
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-50}
       WORKER_DEADLINE_SECONDS: 600
@@ -253,8 +253,8 @@ services:
         reservations: { cpus: '0.5', memory: 256M }
 
   # --- PostgREST: the data API in front of the managed Postgres (docs: docs/ENGINEERING.md "Leaving Supabase"). Reachable ONLY from
-  # the backend: it is on the private `db` network with it and nothing
-  # else, never published, and it accepts only tokens the backend signs with DB_JWT_SECRET. It needs outbound access to the database,
+  # the backend and, with the rust-core profile, cad-core: it is on the private `db` network with them and nothing else, never
+  # published, and it accepts only tokens signed with DB_JWT_SECRET (its admin server listens on loopback only). It needs outbound access to the database,
   # which is why it is not on the no-internet `internal` network. Connects as the `authenticator` role, which can only switch to
   # anon/authenticated/service_role. ---
   postgrest:
@@ -271,6 +271,9 @@ services:
       PGRST_JWT_SECRET: ${DB_JWT_SECRET:?set DB_JWT_SECRET in the env file}
       PGRST_SERVER_HOST: 0.0.0.0
       PGRST_SERVER_PORT: 3000
+      # The admin server (health, metrics, config) answers only inside the container: `postgrest --ready` runs there, and no
+      # db-network peer (backend, cad-core) can reach it.
+      PGRST_ADMIN_SERVER_HOST: 127.0.0.1
       PGRST_ADMIN_SERVER_PORT: 3001
       PGRST_DB_POOL: 10
       # A transaction-mode pooler (Neon's, PgBouncer) cannot hold prepared statements; harmless with a direct connection.
@@ -318,7 +321,7 @@ volumes:
   backend-logs:
 
 networks:
-  # The backend and PostgREST only: PostgREST needs a route out to the database, so it cannot live on `internal`, and it must not share
+  # PostgREST, the backend and (rust-core profile) cad-core only: PostgREST needs a route out to the database, so it cannot live on `internal`, and it must not share
   # `edge` with the tunnel and the frontend.
   db: {}
   # Has a route to the internet (the tunnel dials out; the backend calls Auth0, the bucket and the model providers).
