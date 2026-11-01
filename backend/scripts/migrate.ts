@@ -15,6 +15,7 @@ import * as path from 'path';
 import { parseEnv } from 'util';
 import { Client } from 'pg';
 
+import { caCertificate, databaseClientConfig } from '../src/common/migrations/db-connection';
 import { checksumOf, migrationNumber, planMigrations, targetProblems, type Baseline } from '../src/common/migrations/migration-plan';
 
 const ADVISORY_LOCK = 727_001; // one runner at a time per database
@@ -40,14 +41,6 @@ function loadSettings(env: string): Record<string, string | undefined> {
   return { ...parseEnv(fs.readFileSync(file, 'utf8')) };
 }
 
-function sslFor(databaseUrl: string): false | { rejectUnauthorized: boolean; ca?: string } {
-  const host = new URL(databaseUrl).hostname;
-  if (['localhost', '127.0.0.1', '::1'].includes(host) || /sslmode=disable/.test(databaseUrl)) return false;
-  // Some managed providers sign their certificates with their own CA, which Node does not ship. Give the CA file to verify the server;
-  // without it the connection is encrypted but the server is not authenticated.
-  const caFile = process.env.MIGRATE_DATABASE_SSL_CA;
-  return caFile ? { rejectUnauthorized: true, ca: fs.readFileSync(caFile, 'utf8') } : { rejectUnauthorized: false };
-}
 
 async function main(): Promise<void> {
   const env = option('env') ?? '';
@@ -70,7 +63,7 @@ async function main(): Promise<void> {
     .map((name) => ({ name, checksum: checksumOf(fs.readFileSync(path.join(dir, name), 'utf8')) }));
 
   const databaseUrl = settings.MIGRATE_DATABASE_URL as string;
-  const client = new Client({ connectionString: databaseUrl, ssl: sslFor(databaseUrl) });
+  const client = new Client(databaseClientConfig(databaseUrl, caCertificate(settings)));
   await client.connect();
   try {
     await client.query('SELECT pg_advisory_lock($1)', [ADVISORY_LOCK]);

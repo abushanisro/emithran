@@ -16,6 +16,7 @@ import * as path from 'path';
 import { parseEnv } from 'util';
 import { Client } from 'pg';
 
+import { caCertificate, databaseClientConfig } from '../src/common/migrations/db-connection';
 import { targetProblems } from '../src/common/migrations/migration-plan';
 import { planCalibration, type CalibrationPair } from '../src/modules/should-cost/calibration';
 
@@ -38,12 +39,6 @@ function loadSettings(env: string): Record<string, string | undefined> {
   return { ...parseEnv(fs.readFileSync(file, 'utf8')) };
 }
 
-function sslFor(databaseUrl: string): false | { rejectUnauthorized: boolean; ca?: string } {
-  const host = new URL(databaseUrl).hostname;
-  if (['localhost', '127.0.0.1', '::1'].includes(host) || /sslmode=disable/.test(databaseUrl)) return false;
-  const caFile = process.env.MIGRATE_DATABASE_SSL_CA;
-  return caFile ? { rejectUnauthorized: true, ca: fs.readFileSync(caFile, 'utf8') } : { rejectUnauthorized: false };
-}
 
 async function main(): Promise<void> {
   const env = option('env') ?? '';
@@ -53,7 +48,7 @@ async function main(): Promise<void> {
   if (problems.length > 0) fail(problems);
 
   const databaseUrl = settings.MIGRATE_DATABASE_URL as string;
-  const client = new Client({ connectionString: databaseUrl, ssl: sslFor(databaseUrl) });
+  const client = new Client(databaseClientConfig(databaseUrl, caCertificate(settings)));
   await client.connect();
   try {
     const missing = (await client.query<{ missing: string }>(
