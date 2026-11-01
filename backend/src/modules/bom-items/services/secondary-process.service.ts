@@ -206,6 +206,8 @@ export class SecondaryProcessService {
     location: string;
     batchSize: number | null;
     accessToken: string;
+    /** The part's organization: its budget exchange rates convert the lines (null: none, the global defaults). */
+    organizationId: string | null;
     /** The machine the engineer picked per machine class (bom_item_machine_overrides). */
     machineOverrides?: ReadonlyMap<string, string>;
   }): Promise<SecondaryProcessesResponse> {
@@ -273,7 +275,7 @@ export class SecondaryProcessService {
     }
 
     const { currency } = getCurrencyForLocation(location);
-    const fx = await this.exchangeRates.getSnapshot(accessToken);
+    const fx = await this.exchangeRates.getSnapshot(accessToken, input.organizationId);
     const usdToLocal = fx.convertStrict('USD', currency);
     const toLocal = (v: number | null | undefined) => (v == null ? null : Number((v * usdToLocal).toFixed(4)));
 

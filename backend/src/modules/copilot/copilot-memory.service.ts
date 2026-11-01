@@ -34,6 +34,19 @@ export class CopilotMemoryService {
     return (data?.preferences as string[] | undefined) ?? [];
   }
 
+  /** Forget everything this user asked the copilot to remember (RLS: own row only). */
+  async clear(userId: string, accessToken: string): Promise<void> {
+    const { error } = await this.database
+      .getUserClient(accessToken)
+      .from('copilot_user_memory')
+      .delete()
+      .eq('user_id', userId);
+    if (error) {
+      this.logger.error(`copilot memory delete failed user=${userId}: ${error.message}`);
+      throw new InternalServerErrorException('Failed to clear copilot memory');
+    }
+  }
+
   async change(userId: string, accessToken: string, add: string[], remove: string[]): Promise<PreferenceChange> {
     const toAdd = add.map((p) => p.trim().replace(/[\u0000-\u001f<>]/g, ' ').replace(/\s+/g, ' ').trim());
     if (toAdd.some((p) => p.length < 1 || p.length > MAX_PREFERENCE_CHARS)) {

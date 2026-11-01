@@ -1,3 +1,4 @@
+import { headers } from 'next/headers'
 import type { Metadata } from 'next'
 import { Outfit, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
@@ -47,11 +48,14 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  // The per-request CSP nonce set by proxy.ts: production CSP runs only scripts that carry it (Next.js adds it to its own scripts).
+  // Reading headers makes every page render per request, which a nonce requires.
+  const nonce = (await headers()).get('x-nonce') ?? undefined
   return (
     <html lang="en" suppressHydrationWarning className={`${outfit.variable} ${jetbrainsMono.variable}`}>
       <head>
@@ -60,6 +64,9 @@ export default function RootLayout({
       </head>
       <body className="antialiased font-sans">
         <script
+          nonce={nonce}
+          // Browsers hide the nonce attribute after load, so the client sees an empty value.
+          suppressHydrationWarning
           dangerouslySetInnerHTML={{
             __html: `
               // Complete browser extension error suppression
@@ -196,7 +203,7 @@ export default function RootLayout({
             `,
           }}
         />
-        <Providers>
+        <Providers nonce={nonce}>
           {children}
         </Providers>
         {process.env.NODE_ENV === 'production' && <SpeedInsights debug={false} />}

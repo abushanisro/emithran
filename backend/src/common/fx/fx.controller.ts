@@ -1,8 +1,9 @@
-import { BadRequestException, Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AccessToken } from '../decorators/access-token.decorator';
-import { CurrentUser } from '../decorators/current-user.decorator';
+import { CurrentOrganization } from '../decorators/current-organization.decorator';
 import { ExchangeRateService } from '../exchange-rate/exchange-rate.service';
+import { OrganizationContextGuard } from '../guards/organization-context.guard';
 import { SetExchangeRateDto } from './dto/set-exchange-rate.dto';
 import { FxRateType, FxService } from './fx.service';
 
@@ -15,22 +16,27 @@ export class FxController {
     private readonly exchangeRateService: ExchangeRateService,
   ) {}
 
-  /** The active budget rates with their provenance — the Process page Exchange Rates panel. */
+  /** The caller's organization's effective budget rates with their provenance — the Process page Exchange Rates panel. */
   @Get('exchange-rates')
-  listExchangeRates(@AccessToken() accessToken: string | null) {
-    return this.exchangeRateService.listRates(accessToken);
+  @UseGuards(OrganizationContextGuard)
+  listExchangeRates(@AccessToken() accessToken: string | null, @CurrentOrganization() organizationId: string) {
+    return this.exchangeRateService.listRates(accessToken, organizationId);
   }
 
-  /** Sets a new budget rate for one currency; the replaced rate is kept as history. */
+  /**
+   * Sets the caller's organization's own budget rate for one currency; the replaced rate is kept as history. Other organizations
+   * and the global default are not affected.
+   */
   @Put('exchange-rates/:currency')
+  @UseGuards(OrganizationContextGuard)
   async setExchangeRate(
     @Param('currency') currency: string,
     @Body() body: SetExchangeRateDto,
-    @CurrentUser() user: { id: string },
     @AccessToken() accessToken: string | null,
+    @CurrentOrganization() organizationId: string,
   ) {
-    await this.exchangeRateService.setRate(currency, body.rate, body.reason.trim(), user.id);
-    return this.exchangeRateService.listRates(accessToken);
+    await this.exchangeRateService.setRate(accessToken, organizationId, currency, body.rate, body.reason.trim());
+    return this.exchangeRateService.listRates(accessToken, organizationId);
   }
 
   @Get('factory-currency')
@@ -49,7 +55,9 @@ export class FxController {
     return this.fxService.listCurrencies(accessToken);
   }
 
+  /** A budget rate is the caller's organization's effective rate, so this route resolves the organization. */
   @Get('rate')
+  @UseGuards(OrganizationContextGuard)
   async getRate(
     @Query('base') base: string,
     @Query('quote') quote: string,
@@ -57,6 +65,7 @@ export class FxController {
     @Query('customRate') customRate: string | undefined,
     @Query('customReason') customReason: string | undefined,
     @AccessToken() accessToken: string | null,
+    @CurrentOrganization() organizationId: string,
   ) {
     if (!base || !quote) throw new BadRequestException('base and quote query parameters are required');
     return this.fxService.getRate({
@@ -64,6 +73,7 @@ export class FxController {
       quote,
       rateType,
       accessToken,
+      organizationId,
       customRate: customRate != null ? Number(customRate) : undefined,
       customReason,
     });

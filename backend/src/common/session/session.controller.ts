@@ -1,6 +1,5 @@
 import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { SkipThrottle } from '@nestjs/throttler';
 import { IsIn } from 'class-validator';
 import { CurrentUser } from '../decorators/current-user.decorator';
 import { SessionId } from './session-id.decorator';
@@ -30,10 +29,6 @@ export class SessionController {
   constructor(private readonly sessionActivity: SessionActivityService) {}
 
   @Get()
-  // Next.js API routes call this for every request they serve, all from the
-  // Next server's one IP, so the per-IP limit would throttle unrelated users.
-  // Read-only and behind RequestAuthGuard; the heartbeat stays throttled.
-  @SkipThrottle()
   @ApiOperation({ summary: 'Inactivity-timeout policy and this session\'s deadline. Does not count as activity.' })
   async status(
     @SessionId() sessionId: string | undefined,

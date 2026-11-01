@@ -37,6 +37,9 @@ const rates: RateSnapshot = {
     throw new Error(`No exchange rate on file for '${from}' → '${to}'`);
   },
   toUsd: (amount) => amount,
+  has: (c) => c === 'USD' || c === 'INR',
+  rates: () => ({ USD: 1, INR: 1 / 80 }),
+  organizationId: null,
 };
 
 describe('BOMItemsService.resolveConsumablePrice', () => {

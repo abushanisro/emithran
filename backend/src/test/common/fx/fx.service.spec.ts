@@ -24,6 +24,7 @@ function readReferenceRows(): ReferenceRow[] {
 
 const REFERENCE = readReferenceRows();
 const refRate = (code: string) => REFERENCE.find((r) => r.to_currency === code)!.rate; // 1 USD = refRate CCY
+const ORG = 'aaaaaaaa-0000-4000-8000-000000000001';
 
 function makeExchangeRateService(rows: ReferenceRow[] = REFERENCE): ExchangeRateService {
   const query: any = {
@@ -31,7 +32,8 @@ function makeExchangeRateService(rows: ReferenceRow[] = REFERENCE): ExchangeRate
     eq: () => query,
     then: (resolve: (v: { data: ReferenceRow[]; error: null }) => unknown) => resolve({ data: rows, error: null }),
   };
-  const databaseService = { getUserClient: () => ({ from: () => query }) } as any;
+  // the organization has no budget rates of its own: the global defaults apply
+  const databaseService = { getUserClient: () => ({ from: () => query, rpc: async () => ({ data: [], error: null }) }) } as any;
   return new ExchangeRateService(databaseService, {} as any);
 }
 
@@ -49,7 +51,7 @@ describe('FxService — budget rate type (reference exchange rate table, USD anc
 
   it('USD → INR is the stored rate itself (direct, not a cross-rate)', async () => {
     const svc = new FxService(makeFakeFxRateCacheService(), makeExchangeRateService());
-    const result = await svc.getRate({ base: 'USD', quote: 'INR', rateType: 'budget', accessToken: null });
+    const result = await svc.getRate({ base: 'USD', quote: 'INR', rateType: 'budget', accessToken: null, organizationId: ORG });
     expect(result.rate).toBeCloseTo(refRate('INR'), 6);
     expect(result.rateType).toBe('budget');
     expect(result.source).toBe('exchange_rates (budget rate)');
@@ -57,13 +59,13 @@ describe('FxService — budget rate type (reference exchange rate table, USD anc
 
   it('INR → USD is the inverse of the stored rate', async () => {
     const svc = new FxService(makeFakeFxRateCacheService(), makeExchangeRateService());
-    const result = await svc.getRate({ base: 'INR', quote: 'USD', rateType: 'budget', accessToken: null });
+    const result = await svc.getRate({ base: 'INR', quote: 'USD', rateType: 'budget', accessToken: null, organizationId: ORG });
     expect(result.rate).toBeCloseTo(1 / refRate('INR'), 9);
   });
 
   it('EUR → GBP — neither side is the USD anchor, so it is a cross-rate through USD', async () => {
     const svc = new FxService(makeFakeFxRateCacheService(), makeExchangeRateService());
-    const result = await svc.getRate({ base: 'EUR', quote: 'GBP', rateType: 'budget', accessToken: null });
+    const result = await svc.getRate({ base: 'EUR', quote: 'GBP', rateType: 'budget', accessToken: null, organizationId: ORG });
     // 1 EUR = (1/EUR_per_USD) USD = GBP_per_USD/EUR_per_USD GBP
     expect(result.rate).toBeCloseTo(refRate('GBP') / refRate('EUR'), 9);
     expect(result.source).toContain('cross-rate');
@@ -73,7 +75,7 @@ describe('FxService — budget rate type (reference exchange rate table, USD anc
 
   it('INR → MXN — two factory currencies, derived from their own reference rows', async () => {
     const svc = new FxService(makeFakeFxRateCacheService(), makeExchangeRateService());
-    const result = await svc.getRate({ base: 'INR', quote: 'MXN', rateType: 'budget', accessToken: null });
+    const result = await svc.getRate({ base: 'INR', quote: 'MXN', rateType: 'budget', accessToken: null, organizationId: ORG });
     expect(result.rate).toBeCloseTo(refRate('MXN') / refRate('INR'), 9);
   });
 
@@ -81,7 +83,7 @@ describe('FxService — budget rate type (reference exchange rate table, USD anc
     const exchangeRateService = makeExchangeRateService();
     const getSnapshot = jest.spyOn(exchangeRateService, 'getSnapshot');
     const svc = new FxService(makeFakeFxRateCacheService(), exchangeRateService);
-    const result = await svc.getRate({ base: 'USD', quote: 'USD', rateType: 'budget', accessToken: null });
+    const result = await svc.getRate({ base: 'USD', quote: 'USD', rateType: 'budget', accessToken: null, organizationId: ORG });
     expect(result.rate).toBe(1);
     expect(result.rateType).toBe('budget');
     expect(getSnapshot).not.toHaveBeenCalled();
@@ -92,10 +94,10 @@ describe('FxService — budget rate type (reference exchange rate table, USD anc
     const svc = new FxService(fxRateCacheService, makeExchangeRateService());
     // VND was in the old hand-written seed; it is not in the reference table.
     await expect(
-      svc.getRate({ base: 'VND', quote: 'EUR', rateType: 'budget', accessToken: null }),
+      svc.getRate({ base: 'VND', quote: 'EUR', rateType: 'budget', accessToken: null, organizationId: ORG }),
     ).rejects.toThrow(UnprocessableEntityException);
     await expect(
-      svc.getRate({ base: 'VND', quote: 'EUR', rateType: 'budget', accessToken: null }),
+      svc.getRate({ base: 'VND', quote: 'EUR', rateType: 'budget', accessToken: null, organizationId: ORG }),
     ).rejects.toThrow(/VND/);
     expect(fxRateCacheService.getCachedOrFetch).not.toHaveBeenCalled();
   });
@@ -103,7 +105,7 @@ describe('FxService — budget rate type (reference exchange rate table, USD anc
   it('budget selection never falls through to reference for a supported pair either', async () => {
     const fxRateCacheService = makeFakeFxRateCacheService();
     const svc = new FxService(fxRateCacheService, makeExchangeRateService());
-    await svc.getRate({ base: 'EUR', quote: 'USD', rateType: 'budget', accessToken: null });
+    await svc.getRate({ base: 'EUR', quote: 'USD', rateType: 'budget', accessToken: null, organizationId: ORG });
     expect(fxRateCacheService.getCachedOrFetch).not.toHaveBeenCalled();
   });
 });
@@ -151,13 +153,13 @@ describe('FxService — custom rate type', () => {
   it('requires a positive rate and a reason, never derives a value itself', async () => {
     const svc = new FxService(makeFakeFxRateCacheService(), makeExchangeRateService());
     await expect(
-      svc.getRate({ base: 'EUR', quote: 'USD', rateType: 'custom', accessToken: null }),
+      svc.getRate({ base: 'EUR', quote: 'USD', rateType: 'custom', accessToken: null, organizationId: ORG }),
     ).rejects.toThrow(UnprocessableEntityException);
     await expect(
-      svc.getRate({ base: 'EUR', quote: 'USD', rateType: 'custom', accessToken: null, customRate: 1.1 }),
+      svc.getRate({ base: 'EUR', quote: 'USD', rateType: 'custom', accessToken: null, organizationId: ORG, customRate: 1.1 }),
     ).rejects.toThrow(/reason/i);
     const result = await svc.getRate({
-      base: 'EUR', quote: 'USD', rateType: 'custom', accessToken: null,
+      base: 'EUR', quote: 'USD', rateType: 'custom', accessToken: null, organizationId: ORG,
       customRate: 1.1, customReason: 'Contract-locked rate for Q3 quote',
     });
     expect(result.rate).toBe(1.1);

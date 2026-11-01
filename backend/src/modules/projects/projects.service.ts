@@ -10,6 +10,9 @@ import { ExchangeRateService } from '../../common/exchange-rate/exchange-rate.se
 import { ROLLUP_REPORTING_CURRENCY } from '../bom-items/costing/shared/core/persisted-currency-contract';
 import { loadBomTotals, readAllRows } from '../boms/bom-totals';
 
+// One answer for an unknown account and for an account of another organization, so adding a member reveals nobody's account.
+const NOT_AN_ORG_MEMBER = 'No member of this organization with that email or user id. Invite them to the organization first.';
+
 @Injectable()
 export class ProjectsService {
   private readonly logger = new Logger(ProjectsService.name);
@@ -382,7 +385,7 @@ export class ProjectsService {
       const bomRows = await readAllRows<{ id: string; project_id: string }>((from, to) => client.from('boms')
         .select('id, project_id', { count: 'exact' }).in('project_id', projectIds).order('id').range(from, to));
       const totals = await loadBomTotals(client, bomRows.map(bom => bom.id),
-        () => this.exchangeRates.getSnapshot(accessToken ?? null), message => this.logger.warn(message), reportingCurrency);
+        organizationId => this.exchangeRates.getSnapshot(accessToken ?? null, organizationId), message => this.logger.warn(message), reportingCurrency);
       for (const bom of bomRows) {
         const stats = resultMap.get(bom.project_id)!;
         const total = totals.get(bom.id)!;
@@ -395,6 +398,23 @@ export class ProjectsService {
       for (const stats of resultMap.values()) stats.actualCost = null;
     }
     return resultMap;
+  }
+
+  /**
+   * The ids among `userIds` that are active members of the organization, read with the caller's own client (organization_members
+   * RLS shows a member the rows of their own organizations). No organization or no visible row means no one: fails closed.
+   */
+  private async activeOrgMemberIds(client: ReturnType<DatabaseService['getUserClient']>, organizationId: string | null | undefined, userIds: string[]): Promise<Set<string>> {
+    const unique = [...new Set(userIds.filter(Boolean))];
+    if (!organizationId || unique.length === 0) return new Set();
+    const { data, error } = await client
+      .from('organization_members')
+      .select('user_id')
+      .eq('organization_id', organizationId)
+      .eq('status', 'active')
+      .in('user_id', unique);
+    if (error) throw new Error(`Could not check organization membership: ${error.message}`);
+    return new Set(((data ?? []) as Array<{ user_id: string }>).map((row) => row.user_id));
   }
 
   async getTeamMembers(id: string, userId: string, accessToken?: string): Promise<TeamMembersListResponseDto> {
@@ -412,7 +432,7 @@ export class ProjectsService {
       const client = this.database.getUserClient(accessToken);
       
       // Verify project exists and user has access
-      await this.projectsRepository.findById(client, id);
+      const project = await this.projectsRepository.findById(client, id);
 
       // Check if project_team_members table exists, if not return empty team
       let teamMembers: any[] = [];
@@ -460,12 +480,15 @@ export class ProjectsService {
       }
 
       // Get user details separately to avoid relationship issues
+      // Directory data (account email, name) only for active members of the project's organization; a leftover row of
+      // anyone else shows just what the row itself holds.
       const userIds = (teamMembers || []).map(m => m.user_id).filter(Boolean);
-      const userDetails = await this.directory.findByIds(userIds);
+      const orgMemberIds = await this.activeOrgMemberIds(client, project.organization_id, userIds);
+      const userDetails = await this.directory.findByIds([...orgMemberIds]);
 
       const formattedMembers = (teamMembers || []).map(member => {
         const user = userDetails.get(member.user_id);
-        const email = user?.email || (member as any).email || 'unknown@example.com';
+        const email = user?.email || (member as any).email || undefined;
         const name = user?.fullName || email?.split('@')[0] || 'Team Member';
         
         return {
@@ -517,18 +540,18 @@ export class ProjectsService {
       const client = this.database.getUserClient(accessToken);
       
       // Verify project exists and user has access
-      await this.projectsRepository.findById(client, id);
+      const project = await this.projectsRepository.findById(client, id);
 
-      let targetUserId = dto.userId;
-
-      // Only people who already have an account can be added; there are no placeholder members for unknown emails.
-      if (dto.email && !targetUserId) {
-        const existingId = await this.directory.findIdByEmail(dto.email);
-        if (!existingId) {
-          throw new NotFoundException(`No user with the email ${dto.email}. Invite them to the organization first.`);
-        }
-        targetUserId = existingId;
+      // Only active members of the project's organization can be added. An unknown account and an account of another
+      // organization get the same answer, so this endpoint cannot be used to learn who has an account.
+      const candidateId = dto.userId ?? (dto.email ? await this.directory.findIdByEmail(dto.email) : null);
+      const members = candidateId ? await this.activeOrgMemberIds(client, project.organization_id, [candidateId]) : new Set<string>();
+      if (!candidateId || !members.has(candidateId)) {
+        throw new NotFoundException(NOT_AN_ORG_MEMBER);
       }
+      const targetUserId = candidateId;
+      // The stored and returned email is the account's own, never the text the caller typed.
+      const account = (await this.directory.findByIds([targetUserId])).get(targetUserId);
 
       const { data: existingMember, error: existingError } = await client
         .from('project_team_members')
@@ -550,7 +573,7 @@ export class ProjectsService {
           project_id: id,
           user_id: targetUserId,
           role: dto.role || TeamMemberRole.VIEWER,
-          email: dto.email,
+          email: account?.email ?? null,
         })
         .select(`
           id,
@@ -569,13 +592,13 @@ export class ProjectsService {
         throw new Error(`Could not insert team member: ${insertError.message}`);
       }
 
-      const email = newMember.email || dto.email;
+      const email = account?.email ?? undefined;
       return {
         teamMember: {
           id: newMember.id,
           userId: newMember.user_id,
           email,
-          name: email?.split('@')[0] || 'Team Member',
+          name: account?.fullName || email?.split('@')[0] || 'Team Member',
           role: newMember.role,
           addedAt: newMember.created_at,
         },
@@ -611,7 +634,7 @@ export class ProjectsService {
       const client = this.database.getUserClient(accessToken);
       
       // Verify project exists and user has access
-      await this.projectsRepository.findById(client, id);
+      const project = await this.projectsRepository.findById(client, id);
 
       // Update team member
       const { data: updatedMember, error } = await client
@@ -640,7 +663,11 @@ export class ProjectsService {
       let userName = '';
       
       try {
-        if (updatedMember.user_id && !updatedMember.user_id.startsWith('pending-')) {
+        // Directory data only for an active member of the project's organization.
+        const orgMembers = updatedMember.user_id
+          ? await this.activeOrgMemberIds(client, project.organization_id, [updatedMember.user_id])
+          : new Set<string>();
+        if (orgMembers.has(updatedMember.user_id)) {
           const authUser = (await this.directory.findByIds([updatedMember.user_id])).get(updatedMember.user_id);
           if (authUser) {
             userEmail = authUser.email || '';

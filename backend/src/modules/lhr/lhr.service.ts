@@ -5,8 +5,9 @@ import { DatabaseService } from '../../common/database/database.service';
 import { CreateLHRDto, UpdateLHRDto } from './lhr.dto';
 import { validate as isValidUUID } from 'uuid';
 import * as ExcelJS from 'exceljs';
+import { assertXlsxWithinLimits } from '../../common/archive/xlsx-limits';
 import { getCurrencyForLocation } from '../mhr/constants/mhr-calculation.constants';
-import { ExchangeRateService, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
+import { ExchangeRateService, organizationIdOf, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
 
 @Injectable()
 export class LHRService {
@@ -51,7 +52,8 @@ export class LHRService {
       throw new ConflictException(`Labour code ${CreateLHRDto.labourCode} already exists`);
     }
 
-    const rates = await this.exchangeRateService.getSnapshot(accessToken);
+    // lhr_records carry no organization, so the global default rates apply.
+    const rates = await this.exchangeRateService.getSnapshot(accessToken, null);
     const lhrCurrency = this.computeLhrCurrencyFields(CreateLHRDto.lhr, CreateLHRDto.location, rates);
 
     const { data, error } = await this.databaseService
@@ -333,7 +335,8 @@ export class LHRService {
     // Always recompute currency and lhr_usd_effective from the effective lhr + location
     const effectiveLhr      = UpdateLHRDto.lhr      ?? existingRecord.lhr;
     const effectiveLocation = UpdateLHRDto.location  ?? existingRecord.location;
-    const rates = await this.exchangeRateService.getSnapshot(accessToken);
+    // The record's organization's budget rates; lhr_records carry none today, so the global default rates apply.
+    const rates = await this.exchangeRateService.getSnapshot(accessToken, organizationIdOf(existingRecord));
     const lhrCurrency = this.computeLhrCurrencyFields(effectiveLhr, effectiveLocation, rates);
     updateData.currency          = lhrCurrency.currency;
     updateData.currency_symbol   = lhrCurrency.currencySymbol;
@@ -403,7 +406,8 @@ export class LHRService {
   async bulkCreate(data: CreateLHRDto[], userId: string, accessToken: string) {
     this.logger.log(`Bulk creating ${data.length} LHR records`, 'LHRService');
 
-    const rates = await this.exchangeRateService.getSnapshot(accessToken);
+    // lhr_records carry no organization, so the global default rates apply.
+    const rates = await this.exchangeRateService.getSnapshot(accessToken, null);
     const records = data.map(dto => {
       const lhrCurrency = this.computeLhrCurrencyFields(dto.lhr, dto.location, rates);
       return {
@@ -459,6 +463,7 @@ export class LHRService {
     accessToken: string,
   ): Promise<{ imported: number; skipped: number; errors: string[] }> {
     this.logger.log(`Importing LHR records from Excel for user ${userId}`, 'LHRService');
+    assertXlsxWithinLimits(fileBuffer); // measured before ExcelJS inflates anything
 
     const workbook = new ExcelJS.Workbook();
     const arrayBuffer = fileBuffer.buffer.slice(

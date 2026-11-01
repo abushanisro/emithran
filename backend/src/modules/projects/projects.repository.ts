@@ -17,6 +17,7 @@ interface ProjectEntity {
   target_bom_cost?: number;
   target_bom_cost_currency?: string;
   user_id: string;
+  organization_id?: string | null;
   created_at: string;
   updated_at: string;
 }

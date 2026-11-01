@@ -1,6 +1,8 @@
 import { type NextRequest } from "next/server";
 
 import { requireUserForAi } from "@/lib/server/auth";
+import { refuseCrossOrigin } from "@/lib/server/bff/origin";
+import { readBodyBytes } from "@/lib/server/read-body";
 import { settingWithDevDefault } from '@/lib/utils/required-setting';
 
 // Server-side: the private backend address (API_URL, which already ends in /v1/api, the NestJS global prefix), so this call
@@ -23,11 +25,15 @@ const json = (body: unknown, status: number, headers?: Record<string, string>) =
  * data read as that user. Nothing identity-related is read from the body.
  */
 export async function POST(request: NextRequest) {
+  const refused = refuseCrossOrigin(request);
+  if (refused) return refused;
   const gate = await requireUserForAi("manufacturing-copilot");
   if (!gate.ok) return gate.response;
 
-  const raw = await request.text();
-  if (raw.length > MAX_BODY_BYTES) return json({ error: "Request too large" }, 413);
+  // Capped while reading, not after: the body is never buffered past the limit.
+  const body = await readBodyBytes(request, MAX_BODY_BYTES);
+  if (!body.ok) return body.response;
+  const raw = body.value;
 
   let upstream: Response;
   try {

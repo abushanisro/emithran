@@ -10,11 +10,12 @@ import { MHRInputValidator } from './validators/mhr-input.validator';
 import { getCurrencyForLocation, MHR_CALCULATION_CONSTANTS } from './constants/mhr-calculation.constants';
 import { invalidateMachinePools } from '../bom-items/costing/shared/capability/machine-selection/pool-cache';
 import { resolveMachineEconomics } from '../bom-items/costing/shared/capability/machine-selection/economics-resolver';
-import { ExchangeRateService, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
+import { ExchangeRateService, organizationIdOf, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
 import { LHRService } from '../lhr/lhr.service';
 import { mapMhrRowToDto, storedNumber } from './mhr-row-mapping';
 import { pickRegionalReferenceRow, specsReferenceDetail } from './specs-reference-detail';
 import * as ExcelJS from 'exceljs';
+import { assertXlsxWithinLimits } from '../../common/archive/xlsx-limits';
 
 /**
  * MHR Service
@@ -660,7 +661,9 @@ export class MHRService {
       );
     }
 
-    const rates = await this.exchangeRateService.getSnapshot(accessToken);
+    // A new MHR record is written without an organization (mhr_records rows are
+    // user-owned until they carry one), so the global default rates apply.
+    const rates = await this.exchangeRateService.getSnapshot(accessToken, null);
 
     // Canonical MHR (2026-08-27 decision): Machine Hour Rate = Total Overhead
     // = Direct OH + Indirect OH, always. Direct/indirect are the sole
@@ -977,7 +980,8 @@ export class MHRService {
     const effectiveLocation = updateMHRDto.location ?? existing.location;
     const effectiveLhrInr   = updateMHRDto.lhrInrPerHr ?? (existing as any).lhrInrPerHr ?? null;
     const effectiveUsdLhr   = updateMHRDto.usdLhrTotal ?? (existing as any).usdLhrTotal ?? null;
-    const rates = await this.exchangeRateService.getSnapshot(accessToken);
+    // The record's own organization's budget rates (global defaults for a record without one).
+    const rates = await this.exchangeRateService.getSnapshot(accessToken, organizationIdOf(existing));
 
     // Canonical MHR (2026-08-27 decision): Machine Hour Rate = Total Overhead
     // = Direct OH + Indirect OH, always — mirrors create()'s override above.
@@ -1160,10 +1164,12 @@ export class MHRService {
     accessToken: string,
   ): Promise<{ imported: number; skipped: number; errors: string[] }> {
     this.logger.log(`Importing MHR records from Excel for user ${userId}`, 'MHRService');
+    assertXlsxWithinLimits(fileBuffer); // measured before ExcelJS inflates anything
 
     // Loaded once for the whole import — every row's USD→local conversion below
     // reads from this live DB-backed rate map, never a hardcoded FX table.
-    const importRates = await this.exchangeRateService.getSnapshot(accessToken);
+    // Imported rows are written without an organization, so the global default rates apply.
+    const importRates = await this.exchangeRateService.getSnapshot(accessToken, null);
     const missingRateCurrencies = new Set<string>();
     // Populated per-sheet below (shiftsCol etc. are scoped inside the sheet
     // loop) — aggregated here so one disclosure covers every sheet processed.

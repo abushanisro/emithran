@@ -51,10 +51,9 @@ export class OrganizationsController {
   invite(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: InviteMemberDto,
-    @CurrentUser('id') userId: string,
     @AccessToken() token: string,
   ): Promise<void> {
-    return this.organizations.invite(id, userId, dto, token);
+    return this.organizations.invite(id, dto, token);
   }
 
   @Delete(':id/members/:memberId')

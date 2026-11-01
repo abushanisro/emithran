@@ -89,7 +89,7 @@ pub async fn run(
         .arg(config.deadline.as_millis().to_string())
         .arg(out_dir)
         .args(inputs)
-        .env_clear() // no credentials ever reach the process that parses customer files
+        .env_clear() // no credentials in its environment; the runner is non-dumpable so /proc cannot leak its own (isolation.rs)
         .envs(config.pass_env.iter().cloned())
         .stdin(Stdio::null())
         .stdout(Stdio::null())

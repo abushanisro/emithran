@@ -73,9 +73,8 @@ jobs:
           NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}
           CAD_ENGINE_URL: ${{ secrets.CAD_ENGINE_URL || 'https://cad.build-check.invalid' }}
           API_URL: ${{ secrets.API_URL || 'https://api.build-check.invalid/v1/api' }}
-          CAD_ENGINE_API_KEY: ${{ secrets.CAD_ENGINE_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # No server API keys (Anthropic, Gemini, CAD engine): Next reads them at request time only, and this step runs every
+          # dependency's build script on pull requests. test/deploy/ci-workflow.test.ts keeps them out.
 
   backend:
     name: Backend (NestJS)

@@ -16,6 +16,7 @@ import {
   ParseArrayPipe,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { MAX_XLSX_UPLOAD_BYTES } from '../../common/archive/xlsx-limits';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { LHRService } from './lhr.service';
 import { CreateLHRDto, UpdateLHRDto } from './lhr.dto';
@@ -150,7 +151,7 @@ export class LHRController {
   }
 
   @Post('import-excel')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_XLSX_UPLOAD_BYTES, files: 1 } }))
   @ApiOperation({ summary: 'Import LHR records from Excel (.xlsx)' })
   @ApiResponse({ status: 201, description: 'LHR records imported successfully' })
   async importFromExcel(

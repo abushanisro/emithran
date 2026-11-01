@@ -53,6 +53,16 @@ describe('Auth0TokenVerifier', () => {
     expect((await verifier.verify(await mint({ [`${NS}email_verified`]: undefined }))).emailVerified).toBe(false);
   });
 
+  it('ignores un-namespaced email, email_verified and sid claims (only the post-login Action\'s namespaced claims count)', async () => {
+    const login = await verifier.verify(await mint({
+      [`${NS}email`]: undefined, [`${NS}email_verified`]: undefined, [`${NS}sid`]: undefined,
+      email: 'mallory@example.com', email_verified: true, sid: 'plain-sid',
+    }));
+    expect(login.email).toBeUndefined();
+    expect(login.emailVerified).toBe(false);
+    expect(login.sessionId).toBeUndefined();
+  });
+
   it('works without any custom claims (the email is then simply unknown)', async () => {
     const login = await verifier.verify(await mint({ [`${NS}email`]: undefined, [`${NS}email_verified`]: undefined, [`${NS}sid`]: undefined }));
     expect(login.email).toBeUndefined();

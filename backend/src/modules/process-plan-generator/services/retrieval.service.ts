@@ -21,7 +21,7 @@ import { rankTooling } from '../ranking/tooling-ranker';
 
 import { ScopeClassifierService } from './scope-classifier.service';
 import { DrawingExtractorService } from './drawing-extractor.service';
-import { ExchangeRateService, RateSnapshot } from '../../../common/exchange-rate/exchange-rate.service';
+import { ExchangeRateService, organizationIdOf, RateSnapshot } from '../../../common/exchange-rate/exchange-rate.service';
 import { FeatureGraphService } from './feature-graph.service';
 import { RuleEngineService } from './rule-engine.service';
 import { ManufacturingKnowledgeService } from '../../../modules/manufacturing-knowledge/manufacturing-knowledge.service';
@@ -68,11 +68,6 @@ export class RetrievalService {
     userId: string,
     accessToken: string | null,
   ): Promise<{ brief: EngineeringBrief; candidates: CandidateSet }> {
-    // ── Load budget exchange rates (must happen before candidate queries) ───
-    // One snapshot for the whole assemble() call — every row converted below
-    // uses the exact same rates, even if the shared cache reloads meanwhile.
-    const rates = await this.fx.getSnapshot(accessToken);
-
     const client = this.databaseService.getUserClient(accessToken ?? undefined);
 
     // ── Load BOM item ──────────────────────────────────────────────────────
@@ -91,6 +86,12 @@ export class RetrievalService {
     // been fetched above if the caller's organization already matched.
     // A user_id-based re-check here would incorrectly 404 a legitimate
     // org-mate who didn't personally create this bom_item.
+
+    // ── Load budget exchange rates (must happen before candidate queries) ───
+    // The BOM item's organization's budget rates. One snapshot for the whole
+    // assemble() call — every row converted below uses the exact same rates,
+    // even if the shared cache reloads meanwhile.
+    const rates = await this.fx.getSnapshot(accessToken, organizationIdOf(bomRow));
 
     // ── Resolve organization location ──────────────────────────────────────
     const planLocation = await this.resolveOrgLocation(client, bomRow);
@@ -336,7 +337,7 @@ export class RetrievalService {
       drawing,
       featureGraph,
       mandatoryOps,
-      context: { organizationLocation: orgLocation, locationSource: planLocation.source, currency: PLAN_WORKING_CURRENCY, language: 'en', exchangeRateSnapshot: this.fx.snapshot(), warnings: briefWarnings },
+      context: { organizationLocation: orgLocation, locationSource: planLocation.source, currency: PLAN_WORKING_CURRENCY, language: 'en', exchangeRateSnapshot: rates.rates(), warnings: briefWarnings },
       scope,
       routingTemplate,
     };

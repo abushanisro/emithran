@@ -62,7 +62,8 @@ function makeRates(inrPerUnit: Record<string, number>): RateSnapshot {
     if (r == null) throw new Error(`No exchange rate on file for '${from}' → '${to}'`);
     return r;
   };
-  return { convertOptional, convertStrict, toUsd: (amount, from) => amount * convertStrict(from, 'USD') };
+  return { convertOptional, convertStrict, toUsd: (amount, from) => amount * convertStrict(from, 'USD'),
+    has: (c) => rates.has(c.toUpperCase()), rates: () => Object.fromEntries(rates), organizationId: null };
 }
 
 function minimalCostSummary(overrides: Partial<CostSummaryDto> = {}): CostSummaryDto {

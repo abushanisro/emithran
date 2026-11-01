@@ -174,6 +174,20 @@ describe('SessionActivityService', () => {
     await expect(svc.assertActive('s1', 'u1', T0)).resolves.toEqual({ lastActivityAt: T0, lastJobAt: null });
   });
 
+  it.each([['staging'], [''], [undefined]])('fails closed on a missing table when NODE_ENV is %p (not explicitly development or test)', async (env) => {
+    if (env === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = env;
+    const db = fakeDatabase({ readError: { code: 'PGRST205', message: 'missing table' } });
+    const svc = new SessionActivityService(db.service);
+    await expect(svc.assertActive('s1', 'u1', T0)).rejects.toThrow(ServiceUnavailableException);
+  });
+
+  it('lets requests through in test while migration 901 is not applied', async () => {
+    process.env.NODE_ENV = 'test';
+    const db = fakeDatabase({ readError: { code: '42P01', message: 'missing table' } });
+    const svc = new SessionActivityService(db.service);
+    await expect(svc.assertActive('s1', 'u1', T0)).resolves.toEqual({ lastActivityAt: T0, lastJobAt: null });
+  });
+
   it('still fails closed outside production for any other storage error', async () => {
     process.env.NODE_ENV = 'development';
     const db = fakeDatabase({ readError: { code: '08006', message: 'connection failure' } });
