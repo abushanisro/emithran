@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUserForAi } from '@/lib/server/auth';
+import { refuseCrossOrigin } from '@/lib/server/bff/origin';
+import { readJsonBody } from '@/lib/server/read-body';
 import { fetchTrustedFile, PayloadTooLargeError, readLimited, UntrustedUrlError } from '@/lib/server/safe-fetch';
 import { settingWithDevDefault } from '@/lib/utils/required-setting';
 import {
@@ -13,26 +15,41 @@ const cadEngineUrl = () =>
   settingWithDevDefault(process.env.CAD_ENGINE_URL ?? process.env.NEXT_PUBLIC_CAD_ENGINE_URL, 'CAD_ENGINE_URL', 'http://localhost:5055');
 const CAD_ENGINE_API_KEY = process.env.CAD_ENGINE_API_KEY ?? '';
 
+// The same 15 MiB image limit as a fetched drawing, as base64 (4/3 larger), plus room for the other fields.
+const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
+const MAX_IMAGE_BASE64_CHARS = Math.ceil(MAX_IMAGE_BYTES / 3) * 4;
+const MAX_BODY_BYTES = MAX_IMAGE_BASE64_CHARS + 256 * 1024;
+
 /**
  * Thin proxy — all drawing analysis logic (PDF rendering, Groq vision) lives
  * in the CAD engine's POST /drawing/analyze endpoint.
  */
 export async function POST(request: NextRequest) {
+  const refused = refuseCrossOrigin(request);
+  if (refused) return refused;
   const auth = await requireUserForAi('vave-drawing-analysis');
   if (!auth.ok) return auth.response;
 
   try {
-    const body = await request.json();
+    const parsed = await readJsonBody<Record<string, unknown> | null>(request, MAX_BODY_BYTES);
+    if (!parsed.ok) return parsed.response;
+    if (!parsed.value || typeof parsed.value !== 'object' || Array.isArray(parsed.value)) {
+      return NextResponse.json({ error: 'Request body must be a JSON object' }, { status: 400 });
+    }
+    const body = parsed.value;
 
     if (!body.imageBase64 && !body.imageUrl) {
       return NextResponse.json({ error: 'imageBase64 or imageUrl is required' }, { status: 400 });
+    }
+    if (body.imageBase64 !== undefined && (typeof body.imageBase64 !== 'string' || body.imageBase64.length > MAX_IMAGE_BASE64_CHARS)) {
+      return NextResponse.json({ error: 'imageBase64 must be a base64 string of at most 15 MiB of image data' }, { status: 413 });
     }
 
     // If caller passed a URL instead of base64, fetch and convert here.
     // VAVE items store either a trusted storage URL or the BOM item's storage
     // path; a path is signed by the backend under the caller's permissions.
-    if (body.imageUrl && !body.imageBase64) {
-      const imageRef = String(body.imageUrl);
+    if (typeof body.imageUrl === 'string' && body.imageUrl && !body.imageBase64) {
+      const imageRef = body.imageUrl;
       let fileUrl: string;
       const storagePath = parseBomItemStoragePath(imageRef);
       if (storagePath) {
@@ -76,7 +93,7 @@ export async function POST(request: NextRequest) {
           : 'image/png';
       let buffer: Buffer;
       try {
-        buffer = await readLimited(imgRes, 15 * 1024 * 1024);
+        buffer = await readLimited(imgRes, MAX_IMAGE_BYTES);
       } catch (e) {
         if (e instanceof PayloadTooLargeError) return NextResponse.json({ error: 'Drawing image is too large' }, { status: 413 });
         throw e;

@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { isAllowedOrigin } from '@/lib/server/bff/origin';
+import { isAllowedOrigin, refuseCrossOrigin } from '@/lib/server/bff/origin';
 
 const APP = 'https://app.example.com';
 const request = (method: string, origin?: string) =>
@@ -25,5 +25,21 @@ describe('isAllowedOrigin', () => {
 
   it('compares origins, not strings, so a trailing slash or path in the setting does not matter', () => {
     expect(isAllowedOrigin(request('POST', APP), `${APP}/`)).toBe(true);
+  });
+});
+
+describe('refuseCrossOrigin (route handlers outside the BFF)', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('lets a same-origin POST through and refuses others with 403', () => {
+    vi.stubEnv('APP_BASE_URL', APP);
+    expect(refuseCrossOrigin(request('POST', APP))).toBeNull();
+    expect(refuseCrossOrigin(request('POST', 'https://sibling.example.com'))?.status).toBe(403);
+    expect(refuseCrossOrigin(request('DELETE'))?.status).toBe(403);
+  });
+
+  it('fails closed when APP_BASE_URL is not set', () => {
+    vi.stubEnv('APP_BASE_URL', '');
+    expect(refuseCrossOrigin(request('POST', APP))?.status).toBe(500);
   });
 });

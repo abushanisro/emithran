@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { VaveBomItem } from '@/lib/api/vave';
 import { requireUserForAi } from '@/lib/server/auth';
+import { refuseCrossOrigin } from '@/lib/server/bff/origin';
+import { readJsonBody } from '@/lib/server/read-body';
 import { parseAiJson, requestAiText } from '@/lib/server/anthropic';
 import { AiResultError, shouldCostFromAi } from '@/lib/vave/ai-results';
 
@@ -11,11 +13,16 @@ import { AiResultError, shouldCostFromAi } from '@/lib/vave/ai-results';
  * so when the AI cannot answer the request fails with an explicit status.
  */
 export async function POST(request: NextRequest) {
+  const refused = refuseCrossOrigin(request);
+  if (refused) return refused;
   const auth = await requireUserForAi('vave-should-cost');
   if (!auth.ok) return auth.response;
 
   try {
-    const { part }: { part: VaveBomItem } = await request.json();
+    // One part with its drawing analysis.
+    const parsed = await readJsonBody<{ part?: VaveBomItem } | null>(request, 512 * 1024);
+    if (!parsed.ok) return parsed.response;
+    const { part } = parsed.value ?? {};
 
     if (!part) {
       return NextResponse.json({ error: 'part is required' }, { status: 400 });
