@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 
-import { addActiveHttpRequests, recordHttpServerDuration, statusClassOf } from './metrics';
+import { addActiveHttpRequests, recordHttpRejection, recordHttpServerDuration, statusClassOf } from './metrics';
 
 // The matched route PATTERN (`/v1/bom-items/:id/apply-route`), never the URL: patterns are a closed
 // set, URLs carry ids. Anything that is not a plain string pattern (no match, regex routes) is "unmatched".
@@ -29,12 +29,15 @@ export function httpMetricsMiddleware(request: Request, response: Response, next
   response.once('close', () => {
     safely(() => addActiveHttpRequests(-1));
     try {
+      const route = routeTemplate(request);
       recordHttpServerDuration(
         Number(process.hrtime.bigint() - started) / 1e9,
         request.method,
-        routeTemplate(request),
+        route,
         response.writableFinished ? statusClassOf(response.statusCode) : 'aborted',
       );
+      const status = response.statusCode;
+      if (status === 413 || status === 429) recordHttpRejection(request.method, route, status);
     } catch {
       // Recording a metric must never throw into the response lifecycle.
     }

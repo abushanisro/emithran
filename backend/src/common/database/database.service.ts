@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { DbTokenMinter } from '../db/db-token';
 import { createDbClient, type DbClient } from '../db/postgrest-client';
 import { currentRequestAuth } from '../request-context/request-auth-context';
+import { privilegedSite, recordPrivilegedClientCall } from '../../telemetry/metrics';
 
 /**
  * Database clients for the PostgREST in front of plain Postgres. Every token PostgREST accepts is signed here with DB_JWT_SECRET: a
@@ -57,6 +58,7 @@ export class DatabaseService {
       throw new Error('getPrivilegedClient requires a non-empty reason');
     }
     this.logger.debug(`privileged client: ${reason}`);
+    recordPrivilegedClientCall(privilegedSite(reason));
     return createDbClient(this.postgrestUrl, this.minter.forService());
   }
 

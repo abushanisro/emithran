@@ -2,11 +2,11 @@ import {
   rankMaterialMatches,
   pickUnambiguousBest,
   designationTokens,
-  escapeLikePattern,
   orderByRelevance,
   rankableFromDbRow,
   type RankableMaterial,
 } from '../../../modules/raw-materials/material-search-ranking';
+import { escapeLikePattern } from '../../../common/db/postgrest-filter';
 
 // Pure functions over real raw_materials rows -- no database, no mocks.
 //

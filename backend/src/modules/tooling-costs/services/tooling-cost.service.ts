@@ -18,6 +18,7 @@ import {
   ToolingCostResponseDto,
   ToolingCostListResponseDto,
 } from '../dto/tooling-cost.dto';
+import { orIlikeContains } from '../../../common/db/postgrest-filter';
 
 @Injectable()
 export class ToolingCostService {
@@ -90,7 +91,7 @@ export class ToolingCostService {
       }
       if (search) {
         queryBuilder = queryBuilder.or(
-          `description.ilike.%${search}%,supplier.ilike.%${search}%,specifications.ilike.%${search}%`
+          orIlikeContains(['description', 'supplier', 'specifications'], search)
         );
       }
 

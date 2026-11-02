@@ -44,6 +44,11 @@ CREATE TABLE public.organization_members (
 
 -- what migration 935 builds on: organizations, and api_keys as migration 200 created it (with its row-level security)
 CREATE TABLE public.organizations (id uuid PRIMARY KEY DEFAULT gen_random_uuid());
+-- the columns of mhr_records (migrations 001..542) that should-cost calibration (953) works on
+CREATE TABLE public.mhr_records (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), process_family text, location text, source_type text,
+  total_machine_hour_rate numeric, mhr_usd_per_hour numeric, organization_id uuid
+);
 CREATE TABLE public.api_keys (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,

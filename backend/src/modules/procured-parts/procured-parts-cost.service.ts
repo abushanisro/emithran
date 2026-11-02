@@ -21,6 +21,7 @@ import {
   ProcuredPartsCostResponseDto,
   ProcuredPartsCostListResponseDto,
 } from './dto/procured-parts-cost.dto';
+import { orIlikeContains } from '../../common/db/postgrest-filter';
 
 @Injectable()
 export class ProcuredPartsCostService {
@@ -63,7 +64,7 @@ export class ProcuredPartsCostService {
 
       if (query.search) {
         queryBuilder = queryBuilder.or(
-          `part_name.ilike.%${query.search}%,part_number.ilike.%${query.search}%`
+          orIlikeContains(['part_name', 'part_number'], query.search)
         );
       }
 

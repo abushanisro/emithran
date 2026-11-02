@@ -24,7 +24,7 @@ import {
   RawMaterialCostCalculationEngine,
   RawMaterialCostInput,
 } from '../engines/raw-material-cost-calculation.engine';
-import { quoteFilterValue } from '../../../common/db/postgrest-filter';
+import { orIlikeContains } from '../../../common/db/postgrest-filter';
 
 @Injectable()
 export class RawMaterialCostService {
@@ -67,7 +67,7 @@ export class RawMaterialCostService {
 
     if (query.search) {
       queryBuilder = queryBuilder.or(
-        `material_name.ilike.%${query.search}%,cost_name.ilike.%${query.search}%`
+        orIlikeContains(['material_name', 'cost_name'], query.search)
       );
     }
 
@@ -598,12 +598,9 @@ export class RawMaterialCostService {
   ): Promise<MaterialPriceLookup> {
     const g = materialName.trim();
     const tokens = g.split(/[\s\-\/]+/).filter((t) => t.length >= 3);
-    // Each value is quoted whole, wildcards included, so PostgREST treats commas and parens inside it as literals, not OR
-    // separators or grouping ("Steel," would break .or() otherwise). Quoting only the token (%"Steel"%) made the quotes literal.
-    const q = (t: string) => quoteFilterValue(`%${t}%`);
-    const orClause = (tokens.length > 1 ? tokens : [g])
-      .flatMap((t) => [`name.ilike.${q(t)}`, `grade.ilike.${q(t)}`])
-      .join(',');
+    // Each token goes in through orIlikeContains (quoted whole, LIKE wildcards escaped), so commas and parens in a name ("Steel,")
+    // stay literal instead of becoming OR separators or grouping.
+    const orClause = (tokens.length > 1 ? tokens : [g]).map((t) => orIlikeContains(['name', 'grade'], t)).join(',');
     const local = MATERIAL_PRICE_COLUMNS[country];
     const columns = local && local.col !== 'cost_india' ? `${local.col}, cost_india, density` : 'cost_india, density';
     const { data, error } = await this.databaseService

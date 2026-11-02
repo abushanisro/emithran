@@ -23,7 +23,7 @@ import {
 import { PLASTIC_REFERENCE_SOURCE_VERSION } from '../plastic-molding/plastic-reference';
 import { CORE_LOOKUP_KEYS, CORE_TEXT_VARIABLE_KEYS, CORE_VARIABLE_KEYS, resolveCoreReference, type CoreReference } from './coremaking';
 import type { FinishingMachine } from './casting-finishing';
-import { quoteFilterValue } from '../../../../common/db/postgrest-filter';
+import { escapeLikePattern, quoteFilterValue } from '../../../../common/db/postgrest-filter';
 
 /** HR Rates machine class of the High Pressure Die Casting machines (migration 845). */
 const HPDC_MACHINE_CLASS = 'die_casting_high_pressure_die_casting';
@@ -129,7 +129,7 @@ export class CastingReferenceService {
     const { data: rows, error } = await client.from('raw_materials')
       .select('id, name, grade, material_type, density_kg_m3, cost_usa, cut_code')
       .eq('material_group', DIE_CASTING_MATERIAL_GROUP)
-      .or(`name.ilike.${escapeIlike(g)},grade.ilike.${escapeIlike(g)}`)
+      .or(`name.ilike.${quoteFilterValue(escapeLikePattern(g))},grade.ilike.${quoteFilterValue(escapeLikePattern(g))}`)
       .limit(2);
     if (error || !rows || rows.length !== 1) return null;
     const row = rows[0] as any;
@@ -184,9 +184,4 @@ export async function readFinishingMachines(client: DbClient, machineClass: stri
     machineRatePerHr: n(r.mhr_usd_per_hour), labourRatePerHr: n(r.usd_labor_rate_per_hr),
     operators: n(r.operators), setupTimeHr: n(r.setup_time_hr), specs: (r.specs ?? {}) as Record<string, unknown>,
   }));
-}
-
-/** PostgREST or-filter value: escape the ilike wildcards and the filter delimiters. */
-function escapeIlike(s: string): string {
-  return quoteFilterValue(s.replace(/[\\%_]/g, (c) => `\\${c}`));
 }

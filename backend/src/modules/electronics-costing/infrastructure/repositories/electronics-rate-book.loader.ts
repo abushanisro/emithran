@@ -4,6 +4,7 @@ import { ElectronicsReferenceRepository } from './electronics-reference.reposito
 import { DatabaseService } from '../../../../common/database/database.service';
 
 import type { MachineCandidate, RateBook, RateEntry } from '../../domain/rates/rate-book';
+import { quoteFilterValue } from '../../../../common/db/postgrest-filter';
 
 export interface MachineRateRow {
   id: string;
@@ -67,7 +68,7 @@ export class ElectronicsRateBookLoader {
       .from('mhr_records')
       .select('id, machine_name, machine_class, location, mhr_usd_per_hour, usd_labor_rate_per_hr, operators, setup_time_hr, currency_code, specs, economics_version, updated_at')
       .in('id', ids)
-      .or(`organization_id.is.null,organization_id.eq.${organizationId}`);
+      .or(`organization_id.is.null,organization_id.eq.${quoteFilterValue(organizationId)}`);
     if (error) throw new Error(`mhr_records read failed: ${error.message}`);
     return (data as Record<string, unknown>[]).map((r) => ({
       recordId: String(r.id),
@@ -92,7 +93,7 @@ export class ElectronicsRateBookLoader {
       .select('id, machine_name, location, mhr_usd_per_hour, usd_labor_rate_per_hr, currency_code, economics_version, updated_at')
       .in('machine_name', names)
       .eq('location', location)
-      .or(`organization_id.is.null,organization_id.eq.${organizationId}`);
+      .or(`organization_id.is.null,organization_id.eq.${quoteFilterValue(organizationId)}`);
     if (error) throw new Error(`mhr_records read failed: ${error.message}`);
 
     return chooseRateRows(data as MachineRateRow[]).flatMap((row) => {

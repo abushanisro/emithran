@@ -47,6 +47,16 @@ are immutable once applied: undo a bad one with a new forward migration, tested 
 3. Check the provider's logs for use between the leak and the revocation; if it was used, treat it as a data incident.
 4. If it was committed, stop it recurring: GitHub push protection is on; gitleaks fails CI on new findings.
 
+Per-secret steps (`DB_JWT_SECRET`, engine keys, provider keys, the credentials in `.github/gitleaks-baseline.json`):
+[runbooks/rotate-secrets.md](../runbooks/rotate-secrets.md).
+
+### Other runbooks
+
+- Stop all AI calls: [runbooks/disable-ai.md](../runbooks/disable-ai.md)
+- Stop exchange-rate changes: [runbooks/freeze-fx-writes.md](../runbooks/freeze-fx-writes.md)
+- Grant or revoke platform admin: [runbooks/platform-admin.md](../runbooks/platform-admin.md)
+- The nightly schema-drift check failed: [runbooks/schema-drift.md](../runbooks/schema-drift.md)
+
 ### Data loss or corruption
 
 Two copies exist: the managed Postgres's own point-in-time backups (use these first), and the nightly `ops.yml` run's encrypted

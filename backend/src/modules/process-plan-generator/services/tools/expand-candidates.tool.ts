@@ -8,6 +8,7 @@ import { rankMachines } from '../../ranking/machine-ranker';
 import { rankLabour } from '../../ranking/labour-ranker';
 import { rankProcesses } from '../../ranking/process-ranker';
 import { rankCalculators } from '../../ranking/calculator-ranker';
+import { orIlikeContains } from '../../../../common/db/postgrest-filter';
 
 /**
  * Handler for the LLM tool `expand_candidates`.
@@ -17,9 +18,8 @@ import { rankCalculators } from '../../ranking/calculator-ranker';
  * (ones not already present in the current CandidateSet) with fresh
  * symbolic IDs (rm-9, mc-7, etc.) so existing references stay stable.
  *
- * The input `query` is parameterised (passed through .ilike() with %), so
- * it's safe against SQL injection — but we still strip wildcards and
- * percent signs as a defence-in-depth.
+ * The input `query` comes from the model, so it goes into the filter only through orIlikeContains: quoted, with its
+ * LIKE wildcards escaped, it can neither add PostgREST filters nor widen the match.
  */
 @Injectable()
 export class ExpandCandidatesTool {
@@ -37,7 +37,7 @@ export class ExpandCandidatesTool {
     currentCandidates: CandidateSet;
     dfm: { holeCount: number; pocketCount: number; thinWallCount: number; undercutCount: number; volumeMm3: number; surfaceAreaMm2: number; boundingBox: { lengthMm: number; widthMm: number; heightMm: number } };
   }): Promise<{ added: any[]; kind: string; nextStartId: number }> {
-    const safeQuery = String(args.query ?? '').replace(/[%_]/g, '').trim().slice(0, 80);
+    const safeQuery = String(args.query ?? '').trim().slice(0, 80);
     if (!safeQuery) {
       return { added: [], kind: args.kind, nextStartId: 0 };
     }
@@ -57,7 +57,7 @@ export class ExpandCandidatesTool {
     const { data, error } = await client
       .from('raw_materials')
       .select('id, material_group, grade, name, density_kg_m3, cost, location, user_id')
-      .or(`grade.ilike.%${q}%,name.ilike.%${q}%,material_group.ilike.%${q}%`)
+      .or(orIlikeContains(['grade', 'name', 'material_group'], q))
       .limit(40);
     if (error) {
       this.logger.warn(`expand materials failed: ${error.message}`);
@@ -78,7 +78,7 @@ export class ExpandCandidatesTool {
     const { data, error } = await client
       .from('mhr_records')
       .select('id, machine_name, machine_description, commodity_code, total_machine_hour_rate, location')
-      .or(`machine_name.ilike.%${q}%,machine_description.ilike.%${q}%,commodity_code.ilike.%${q}%`)
+      .or(orIlikeContains(['machine_name', 'machine_description', 'commodity_code'], q))
       .not('total_machine_hour_rate', 'is', null)
       .limit(40);
     if (error) {
@@ -98,7 +98,7 @@ export class ExpandCandidatesTool {
     const { data, error } = await client
       .from('lhr_records')
       .select('id, labour_type, labour_code, lhr, location')
-      .or(`labour_type.ilike.%${q}%,labour_code.ilike.%${q}%`)
+      .or(orIlikeContains(['labour_type', 'labour_code'], q))
       .not('lhr', 'is', null)
       .limit(20);
     if (error) {
@@ -118,7 +118,7 @@ export class ExpandCandidatesTool {
     const { data, error } = await client
       .from('process_calculator_mappings')
       .select('id, process_group, process_route, operation, calculator_id')
-      .or(`process_group.ilike.%${q}%,process_route.ilike.%${q}%,operation.ilike.%${q}%`)
+      .or(orIlikeContains(['process_group', 'process_route', 'operation'], q))
       .eq('is_active', true)
       .limit(40);
     if (error) {
@@ -138,7 +138,7 @@ export class ExpandCandidatesTool {
     const { data, error } = await client
       .from('calculators')
       .select('id, name, calc_category, description')
-      .or(`name.ilike.%${q}%,calc_category.ilike.%${q}%`)
+      .or(orIlikeContains(['name', 'calc_category'], q))
       .limit(20);
     if (error) {
       this.logger.warn(`expand calculators failed: ${error.message}`);
