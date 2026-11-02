@@ -29,5 +29,6 @@ import { IdentityService } from './identity.service';
       },
     },
   ],
+  exports: [IdentityService],
 })
 export class AuthModule {}
