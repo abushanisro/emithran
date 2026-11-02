@@ -67,7 +67,7 @@
     "react-dropzone": "^14.3.8",
     "react-hook-form": "^7.61.1",
     "react-leaflet": "^5.0.0",
-    "react-resizable-panels": "^2.1.9",
+    "react-resizable-panels": "^4.15.2",
     "recharts": "^2.15.4",
     "shiki": "4.1.0",
     "sonner": "^1.7.4",
