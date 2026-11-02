@@ -1,18 +1,30 @@
-import * as fs from 'node:fs';
-import * as path from 'node:path';
-import { BadRequestException } from '@nestjs/common';
-import * as ExcelJS from 'exceljs';
+import * as zlib from 'node:zlib';
 
 import { expandArchive } from './expand-archive';
-import { inspectZip, type ZipLimits } from './inspect-zip';
+import { inflateEntry, inspectZip, verifyZip, type ZipLimits } from './inspect-zip';
 import { zip } from './test-zip';
-import { assertXlsxWithinLimits } from './xlsx-limits';
+import { xlsxZipLimits } from './xlsx-limits';
 
 const MB = 1024 * 1024;
 const LIMITS: ZipLimits = { maxEntries: 100, maxEntryBytes: 25 * MB, maxTotalBytes: 50 * MB, maxRatio: 100 };
 const zeros = (bytes: number) => Buffer.alloc(bytes);
 
-describe('inspectZip', () => {
+/** A raw deflate stream of `bytes` zero bytes, built a megabyte at a time so the test never holds the inflated size. */
+async function deflatedZeros(bytes: number): Promise<Buffer> {
+  const deflate = zlib.createDeflateRaw({ level: 9 });
+  const out: Buffer[] = [];
+  deflate.on('data', (chunk: Buffer) => out.push(chunk));
+  const done = new Promise<void>((resolve, reject) => deflate.on('end', resolve).on('error', reject));
+  const chunk = Buffer.alloc(MB);
+  for (let written = 0; written < bytes; written += MB) {
+    if (!deflate.write(chunk)) await new Promise((resolve) => deflate.once('drain', resolve));
+  }
+  deflate.end();
+  await done;
+  return Buffer.concat(out);
+}
+
+describe('inspectZip (layer 1: the central directory, nothing inflated)', () => {
   it('accepts an ordinary archive and reports where each entry\'s data starts', () => {
     const bytes = zip([{ name: 'a.txt', data: 'hello' }, { name: 'b.txt', data: 'world', deflate: true }]);
     const result = inspectZip(bytes, LIMITS);
@@ -49,6 +61,12 @@ describe('inspectZip', () => {
     expect(inspectZip(three, LIMITS)).toMatchObject({ ok: false, code: 'archive_too_large' });
   });
 
+  it('holds entries under a path prefix to their own, tighter limit', () => {
+    const limits = { ...LIMITS, maxRatio: undefined, prefixLimits: [{ prefix: 'xl/media/', maxBytes: 5 * MB }] };
+    expect(inspectZip(zip([{ name: 'xl/media/a.png', data: 'x', statedSize: 6 * MB }]), limits)).toMatchObject({ ok: false, code: 'archive_entry_too_large' });
+    expect(inspectZip(zip([{ name: 'xl/worksheets/s.xml', data: 'x', statedSize: 6 * MB }]), limits).ok).toBe(true);
+  });
+
   it('refuses a compression ratio above the limit', () => {
     const bytes = zip([{ name: 'zeros.bin', data: zeros(5 * MB), deflate: true }]);
     expect(inspectZip(bytes, LIMITS)).toMatchObject({ ok: false, code: 'archive_ratio' });
@@ -62,6 +80,59 @@ describe('inspectZip', () => {
     expect(inspectZip(zip64, LIMITS)).toMatchObject({ ok: false, code: 'archive_zip64' });
     expect(inspectZip(Buffer.from('not a zip'), LIMITS)).toMatchObject({ ok: false, code: 'archive_unreadable' });
   });
+
+  it.each(['/etc/passwd', '../x.xml', 'a/../../x.xml', 'C:/x.xml', 'a\\..\\x.xml', 'a//b.xml', './a.xml'])('refuses the unsafe path %s', (name) => {
+    expect(inspectZip(zip([{ name, data: 'x' }]), LIMITS)).toMatchObject({ ok: false, code: 'archive_unsafe_path' });
+  });
+
+  it('refuses encrypted entries and compression methods other than stored and deflate', () => {
+    expect(inspectZip(zip([{ name: 'a.xml', data: 'x', encrypted: true }]), LIMITS)).toMatchObject({ ok: false, code: 'archive_encrypted' });
+    expect(inspectZip(zip([{ name: 'a.xml', data: 'x', method: 12 }]), LIMITS)).toMatchObject({ ok: false, code: 'archive_unsupported_method' });
+  });
+});
+
+describe('inflateEntry and verifyZip (layer 2: actual output, capped at the declared size)', () => {
+  it('returns exactly the declared bytes', () => {
+    const bytes = zip([{ name: 'a.txt', data: 'hello world', deflate: true }]);
+    const inspected = inspectZip(bytes, LIMITS);
+    if (!inspected.ok) throw new Error(inspected.message);
+    expect(inflateEntry(bytes, inspected.entries[0])).toEqual({ ok: true, bytes: Buffer.from('hello world') });
+    expect(verifyZip(bytes, LIMITS).ok).toBe(true);
+  });
+
+  it('refuses an entry that understates its size, after at most the declared bytes', () => {
+    // Declared 1 KB, really 10 MB: the directory is within every limit (the ratio is not checked below 1 MB).
+    const liar = zip([{ name: 'xl/worksheets/sheet1.xml', data: zeros(10 * MB), deflate: true, statedSize: 1024 }]);
+    expect(inspectZip(liar, LIMITS).ok).toBe(true);
+    // The module object itself (inspect-zip.ts calls through it), not the import-star copy above.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const inflate = jest.spyOn(require('zlib') as typeof zlib, 'inflateRawSync');
+    try {
+      expect(verifyZip(liar, LIMITS)).toMatchObject({ ok: false, code: 'archive_size_mismatch' });
+      expect(inflate.mock.calls.map(([, options]) => options?.maxOutputLength)).toEqual([1024]);
+    } finally {
+      inflate.mockRestore();
+    }
+  });
+
+  it('refuses an entry declared empty that inflates to anything', () => {
+    const liar = zip([{ name: 'a.xml', data: 'not empty', deflate: true, statedSize: 0 }]);
+    expect(verifyZip(liar, LIMITS)).toMatchObject({ ok: false, code: 'archive_size_mismatch' });
+  });
+
+  it('refuses a stored entry whose bytes are not its declared size', () => {
+    const liar = zip([{ name: 'a.xml', data: 'hello', statedSize: 3 }]);
+    expect(verifyZip(liar, LIMITS)).toMatchObject({ ok: false, code: 'archive_size_mismatch' });
+  });
+
+  it('stops a 600 MB-expanding entry that claims 1 MB at 1 MB', async () => {
+    const stream = await deflatedZeros(600 * MB);
+    expect(stream.length).toBeLessThan(2 * MB);
+    const bomb = zip([{ name: 'xl/worksheets/sheet1.xml', deflated: { stream, inflatedSize: MB } }]);
+    const before = process.memoryUsage().arrayBuffers;
+    expect(verifyZip(bomb, { ...xlsxZipLimits(), maxRatio: 10_000 })).toMatchObject({ ok: false, code: 'archive_size_mismatch' });
+    expect(process.memoryUsage().arrayBuffers - before).toBeLessThan(64 * MB);
+  }, 60_000);
 });
 
 describe('expandArchive measures before it inflates', () => {
@@ -72,49 +143,5 @@ describe('expandArchive measures before it inflates', () => {
     ]);
     const limits = { maxEntries: 10, maxEntryBytes: 25 * MB, maxTotalBytes: 200 * MB };
     expect(expandArchive('p.zip', bomb, limits)).toMatchObject({ ok: false, code: 'archive_unreadable' });
-  });
-});
-
-describe('assertXlsxWithinLimits', () => {
-  it('lets a real workbook through', async () => {
-    const workbook = new ExcelJS.Workbook();
-    workbook.addWorksheet('Rates').addRow(['Machine', 'Rate']);
-    const bytes = Buffer.from(await workbook.xlsx.writeBuffer());
-    expect(() => assertXlsxWithinLimits(bytes)).not.toThrow();
-  });
-
-  it('refuses a workbook with a media part that inflates to gigabytes, before ExcelJS sees it', () => {
-    const bomb = zip([
-      { name: '[Content_Types].xml', data: '<Types/>' },
-      { name: 'xl/media/a.bin', data: zeros(60 * MB), deflate: true },
-    ]);
-    expect(bomb.length).toBeLessThan(200 * 1024);
-    expect(() => assertXlsxWithinLimits(bomb)).toThrow(BadRequestException);
-  });
-
-  it('refuses something that is not a zip', () => {
-    expect(() => assertXlsxWithinLimits(Buffer.from('a,b\n1,2\n'))).toThrow('not a readable .xlsx');
-  });
-
-  it('runs before every ExcelJS load of uploaded bytes', () => {
-    const root = path.resolve(__dirname, '..', '..');
-    const files: string[] = [];
-    const walk = (dir: string) => {
-      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-        const full = path.join(dir, entry.name);
-        if (entry.isDirectory()) walk(full);
-        else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.spec.ts')) files.push(full);
-      }
-    };
-    walk(root);
-    const loaders = files.filter((f) => fs.readFileSync(f, 'utf8').includes('xlsx.load('));
-    expect(loaders.length).toBeGreaterThanOrEqual(5);
-    for (const file of loaders) {
-      const source = fs.readFileSync(file, 'utf8');
-      expect({ file: path.relative(root, file), guarded: source.split('xlsx.load(').length - 1 <= source.split('assertXlsxWithinLimits(').length - 1 }).toEqual({
-        file: path.relative(root, file),
-        guarded: true,
-      });
-    }
   });
 });

@@ -1,12 +1,14 @@
-import { Inject, Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, PayloadTooLargeException, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import FormData from 'form-data';
 
-import { expandArchive, type ArchiveLimits } from '../../common/archive/expand-archive';
+import { type ArchiveLimits, type ExpandedArchive } from '../../common/archive/expand-archive';
+import { expandArchiveInWorker } from '../../common/heavy-work/heavy-work';
 import { AuditService } from '../../common/audit/audit.service';
 import { cadEngineHttp } from '../../common/resilience/engine-http';
 import { OBJECT_STORE, type ObjectStore } from '../../common/storage/object-store';
 import { DatabaseService } from '../../common/database/database.service';
-import { MAX_ARCHIVE_EXPANDED_BYTES, MAX_CAD_FILE_BYTES } from '../../common/upload-limits';
+import { RESOURCE_LIMITS } from '../../common/resource-limits';
+import { MAX_CAD_FILE_BYTES } from '../../common/upload-limits';
 import { type CreateBOMItemDto } from '../bom-items/dto/bom-items.dto';
 import { BOMItemsService } from '../bom-items/bom-items.service';
 import { FileStorageService } from '../bom-items/services/file-storage.service';
@@ -27,8 +29,8 @@ const MAX_ATTEMPTS = 3;
 const STALE_SECONDS = 1800;
 const MATERIALIZE_STALE_SECONDS = 900;
 const ENGINE_TIMEOUT_MS = 600_000;
-// A zip is unpacked in memory, so what it may expand to follows the upload limit (8x) instead of a fixed gigabyte.
-const CAD_ARCHIVE_LIMITS: ArchiveLimits = { maxEntries: 10_000, maxEntryBytes: MAX_CAD_FILE_BYTES, maxTotalBytes: MAX_ARCHIVE_EXPANDED_BYTES };
+// A zip is unpacked in a heavy-work worker; what it may expand to is the one archive budget (ARCHIVE_MAX_EXPANDED_MB).
+const CAD_ARCHIVE_LIMITS: ArchiveLimits = { maxEntries: 10_000, maxEntryBytes: MAX_CAD_FILE_BYTES, maxTotalBytes: RESOURCE_LIMITS.archiveMaxExpandedBytes };
 
 /** The entry name the engine gives a part in /assembly/parts (cad-engine shared/assembly_report.py part_file_name). */
 const partFileName = (definition: string) => `${definition.replace(/:/g, '_')}.step`;
@@ -275,7 +277,7 @@ export class CadUploadRunner implements OnModuleInit, OnModuleDestroy {
     if (row.source_deleted_at) throw new PermanentFailure('source_expired', 'The original upload was removed to save space. Upload the file again.');
     const original = await this.objects.get(CAD_BUCKET, row.storage_path);
     if (!original) throw new Error('could not read the stored upload: not found');
-    const { files, skipped } = this.stepFiles(row, original);
+    const { files, skipped } = await this.stepFiles(row, original);
 
     const report = await this.analyse(files);
     if (report.assembly.length === 0) throw new PermanentFailure('no_solids', 'None of the STEP files could be read as a part or assembly.');
@@ -301,10 +303,23 @@ export class CadUploadRunner implements OnModuleInit, OnModuleDestroy {
     this.logger.log(`CAD upload ${row.id} done in ${Date.now() - startedAt} ms: ${row.file_name}, ${files.length} STEP file(s), ${report.parts.length} distinct parts (attempt ${row.attempts})`);
   }
 
-  private stepFiles(row: CadUploadRow, bytes: Buffer): { files: StepFile[]; skipped: { path: string; reason: string }[] } {
+  /**
+   * Unpacks a zip in a heavy-work worker. The runner handles one upload at a time, so it takes no request slot; a zip too large or
+   * slow to unpack within the worker's limits is the upload's fault, and final.
+   */
+  private async expand(fileName: string, bytes: Buffer): Promise<ExpandedArchive> {
+    try {
+      return await expandArchiveInWorker(fileName, bytes, CAD_ARCHIVE_LIMITS);
+    } catch (error) {
+      if (error instanceof PayloadTooLargeException) throw new PermanentFailure('archive_too_large', error.message);
+      throw error;
+    }
+  }
+
+  private async stepFiles(row: CadUploadRow, bytes: Buffer): Promise<{ files: StepFile[]; skipped: { path: string; reason: string }[] }> {
     if (!/\.zip$/i.test(row.file_name)) return { files: [{ name: row.file_name, bytes }], skipped: [] };
 
-    const archive = expandArchive(row.file_name, bytes, CAD_ARCHIVE_LIMITS);
+    const archive = await this.expand(row.file_name, bytes);
     if (!archive.ok) throw new PermanentFailure(archive.code, archive.message);
     const skipped = [...archive.skipped];
     const files: StepFile[] = [];
@@ -356,7 +371,7 @@ export class CadUploadRunner implements OnModuleInit, OnModuleDestroy {
     const out = new Map<string, Buffer>();
     if (definitions.length === 0) return out;
     const zipBytes = Buffer.from((await this.callEngine('/assembly/parts', files, { parts: JSON.stringify(definitions) }, true)) as ArrayBuffer);
-    const archive = expandArchive('parts.zip', zipBytes, CAD_ARCHIVE_LIMITS);
+    const archive = await this.expand('parts.zip', zipBytes);
     if (!archive.ok) throw new Error(`cad-engine returned an unreadable parts archive: ${archive.message}`);
     const byName = new Map(archive.entries.map((e) => [e.name, e.bytes]));
     for (const definition of definitions) {

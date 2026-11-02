@@ -1,7 +1,7 @@
-import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException, HttpException } from '@nestjs/common';
 import { Logger } from '../../common/logger/logger.service';
 import { DatabaseService } from '../../common/database/database.service';
-import { assertXlsxWithinLimits } from '../../common/archive/xlsx-limits';
+import { readWorkbook } from '../../common/heavy-work/heavy-work';
 import {
   CreateVendorDto,
   UpdateVendorDto,
@@ -893,19 +893,17 @@ export class VendorsService {
         ...results,
       };
     } catch (error: any) {
-      if (error instanceof BadRequestException) throw error; // a rejected file is the caller's error, not a server error
+      // A deliberate answer (a rejected file, a busy server asking to retry) is passed on, not reported as a server error.
+      if (error instanceof HttpException) throw error;
       this.logger.error(`File import failed: ${error.message}`, 'VendorsService');
       throw new InternalServerErrorException(`Failed to import file: ${error.message}`);
     }
   }
 
   private async parseExcelBuffer(buffer: Buffer): Promise<string[][]> {
-    assertXlsxWithinLimits(buffer); // measured before ExcelJS inflates anything
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const ExcelJS = require('exceljs');
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer);
-    const worksheet = workbook.worksheets[0];
+    const workbook = await readWorkbook(buffer); // gated and parsed in a heavy-work worker
+    const worksheet = workbook.worksheets.at(0);
+    if (!worksheet) throw new BadRequestException('The workbook has no worksheets.');
 
     const rows: string[][] = [];
     worksheet.eachRow({ includeEmpty: false }, (row: any) => {

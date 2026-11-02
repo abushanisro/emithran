@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { forwardRequest, upstreamUrl } from '@/lib/server/bff/forward';
+import { clientAddressHeaders, forwardRequest, forwardSecretProblem, upstreamUrl } from '@/lib/server/bff/forward';
 
 const API = 'http://api.internal:4000/v1/api';
 
@@ -149,5 +149,44 @@ describe('forwardRequest', () => {
     const req = new Request('https://app.example.com/api/v1/files', { method: 'POST', body: stream, duplex: 'half' } as RequestInit & { duplex: 'half' });
     const res = await forwardRequest(req, url, 't', fetcher, 25);
     expect(res.status).toBe(413);
+  });
+});
+
+describe('the client address forwarded to the API', () => {
+  const SECRET = 'a-shared-secret-of-at-least-32-characters';
+  const fromCloudflare = (ip: string, extra: Record<string, string> = {}) =>
+    new Request('https://app.example.com/api/v1/projects', { headers: { 'cf-connecting-ip': ip, ...extra } });
+
+  it('signs the Cloudflare address with the secret the API shares (same vector as backend client-ip.spec.ts)', () => {
+    expect(clientAddressHeaders(fromCloudflare('203.0.113.7'), SECRET, 1_800_000_000)).toEqual({
+      'x-emithran-client-ip': '203.0.113.7',
+      'x-emithran-client-ip-signature': '1800000000.d8520f7e2398d5c93fea926eb6d44339f2b30d7caeabf60e25dfabc5fce79401',
+    });
+  });
+
+  it('sends nothing without a secret, without an address, or with something that is not an address', () => {
+    expect(clientAddressHeaders(fromCloudflare('203.0.113.7'), undefined, 1)).toEqual({});
+    expect(clientAddressHeaders(new Request('https://app.example.com/'), SECRET, 1)).toEqual({});
+    expect(clientAddressHeaders(fromCloudflare('1.2.3.4, 5.6.7.8'), SECRET, 1)).toEqual({});
+  });
+
+  it('forwards the signed address, and never a client-supplied one', async () => {
+    const { fetcher, sent } = capture(new Response('{}'));
+    const req = fromCloudflare('203.0.113.7', {
+      'x-emithran-client-ip': '198.51.100.1',
+      'x-emithran-client-ip-signature': 'forged',
+    });
+    await forwardRequest(req, new URL(`${API}/projects`), 't', fetcher, 1024, SECRET);
+    const { headers } = sent();
+    expect(headers.get('x-emithran-client-ip')).toBe('203.0.113.7');
+    expect(headers.get('x-emithran-client-ip-signature')).toMatch(/^\d+\.[0-9a-f]{64}$/);
+    expect(headers.get('cf-connecting-ip')).toBeNull();
+  });
+
+  it('is required in production', () => {
+    expect(forwardSecretProblem({ NODE_ENV: 'production' })).toMatch(/BFF_FORWARD_SECRET/);
+    expect(forwardSecretProblem({ NODE_ENV: 'production', BFF_FORWARD_SECRET: 'short' })).toMatch(/BFF_FORWARD_SECRET/);
+    expect(forwardSecretProblem({ NODE_ENV: 'production', BFF_FORWARD_SECRET: SECRET })).toBeNull();
+    expect(forwardSecretProblem({ NODE_ENV: 'development' })).toBeNull();
   });
 });

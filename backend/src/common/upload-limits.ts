@@ -4,6 +4,4 @@ const configured = Number(process.env.MAX_UPLOAD_MB ?? 50);
 
 export const MAX_UPLOAD_MB = Number.isFinite(configured) && configured > 0 ? configured : 50;
 export const MAX_CAD_FILE_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
-
-/** A zip is unpacked in memory, so what it may expand to is a multiple of the upload limit, not a fixed gigabyte. */
-export const MAX_ARCHIVE_EXPANDED_BYTES = MAX_CAD_FILE_BYTES * 8;
+// What an uploaded .zip may expand to is ARCHIVE_MAX_EXPANDED_MB, in common/resource-limits.ts with the other parse limits.
