@@ -41,7 +41,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@types/three": "^0.182.0",
-    "@vercel/speed-insights": "^1.3.1",
+    "@vercel/speed-insights": "^2.0.0",
     "baseline-browser-mapping": "2.11.27",
     "caniuse-lite": "1.0.30001793",
     "class-variance-authority": "^0.7.1",
