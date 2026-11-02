@@ -35,6 +35,9 @@ docker run --rm --network emithran-prd_db -e AWS_ACCESS_KEY_ID=<key> -e AWS_SECR
 cd backend
 ./scripts/baseline-dump.sh '<old database url>' ~/emithran-baseline        # read-only on the old database
 DOCKER_NETWORK=emithran-prd_db ./scripts/baseline-load.sh ~/emithran-baseline 'postgres://postgres:<POSTGRES_PASSWORD>@postgres:5432/postgres'
+# If it stops on "rows with no parent row", the old database was not enforcing its foreign keys. Look at the listed rows, empty the
+# target (drop and recreate the database), then run it again with DROP_DANGLING=1: those rows are saved to <baseline-dir>.dangling/ and
+# the rest loads, every key valid and every count checked.
 # (new installation with no old data: use --schema-only on a reference database, or ask for the schema baseline)
 
 # 3. Password of the data API's role (once), then the migrations
