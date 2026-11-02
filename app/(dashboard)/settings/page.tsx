@@ -10,6 +10,7 @@ import {
   LayoutGrid, Mail, X,
 } from 'lucide-react';
 import Link from 'next/link';
+import { CopilotMemorySection } from '@/components/features/settings/CopilotMemorySection';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,7 +37,6 @@ import { useAuth } from '@/lib/providers/auth';
 import { useTheme } from 'next-themes';
 import { useDensity } from '@/lib/providers/density-provider';
 import { Switch } from '@/components/ui/switch';
-import { CopilotMemorySection } from '@/components/features/settings/CopilotMemorySection';
 import {
   useMyOrganization, useCreateOrganization, useUpdateOrganization,
   useDeleteOrganization, useOrgMembers, useInviteMember, useRemoveMember,
