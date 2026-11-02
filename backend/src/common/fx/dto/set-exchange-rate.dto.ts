@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsNumber, IsPositive, IsString, MaxLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsBoolean, IsNotEmpty, IsNumber, IsOptional, IsPositive, IsString, MaxLength } from 'class-validator';
 
 /** Body of PUT /api/fx/exchange-rates/:currency — a new budget rate, 1 USD = rate CCY. */
 export class SetExchangeRateDto {
@@ -13,4 +13,12 @@ export class SetExchangeRateDto {
   @IsNotEmpty()
   @MaxLength(500)
   reason!: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Apply a change larger than FX_RATE_MAX_CHANGE_PERCENT of the current rate; without it such a change is refused with 422 FX_RATE_CHANGE_NEEDS_CONFIRMATION.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  confirm?: boolean;
 }

@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsInt, IsISO8601, IsOptional, IsUUID, Matches, Max, Min } from 'class-validator';
 
+import { OrgRole } from '../authz/authz-policy';
 import { AccessToken } from '../decorators/access-token.decorator';
 import { DatabaseService } from '../database/database.service';
 
@@ -24,6 +25,7 @@ const DEFAULT_LIMIT = 50;
 // of their organizations, everyone else sees an empty list. Nothing here can write.
 @ApiTags('Audit')
 @ApiBearerAuth()
+@OrgRole('admin')
 @Controller({ path: 'api/audit-events', version: '1' })
 export class AuditController {
   constructor(private readonly database: DatabaseService) {}

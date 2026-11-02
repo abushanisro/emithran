@@ -83,6 +83,23 @@ Users start fresh (the user directory is carried by the baseline; Auth0 accounts
 They sign in through Auth0; the first verified login links to that row. Check: `/auth/me` returns their internal id; an uninvited Auth0 account gets the
 "not invited" screen (403), not an error.
 
+**Roles (migration 944, decision D5).** `organization_members.role` is enforced by the API (`AuthzGuard`) and, where a policy decides, by the
+database: `viewer` reads, `member` edits project data, `admin` (or `owner`) changes organization-wide settings (budget FX rates, API keys,
+members, workspaces, forcing the delete of a part used in production lots). A person in several organizations acts with their lowest role
+there. `/auth/me` returns `organizationRole` so the app hides what the API would refuse.
+
+**Platform administrators (migration 943).** Platform-wide actions (`POST /fx/refresh`, `GET /should-cost/calibration/history`) are for the
+operators listed in `platform_admins`; no API role can read or change that table. Grant and revoke as the database owner, naming who granted:
+
+```sql
+INSERT INTO public.platform_admins (user_id, granted_by)
+SELECT u.id, (SELECT id FROM auth.users WHERE email = 'operator-granting@company.com')
+  FROM auth.users u WHERE u.email = 'new-operator@company.com';
+DELETE FROM public.platform_admins WHERE user_id = (SELECT id FROM auth.users WHERE email = 'former-operator@company.com');
+```
+
+It takes effect on the person's next request (nothing is cached). Keep the list to the people on call.
+
 ## 5. Verify on stage (all of it, before production)
 
 - The QA security tests (DB-RLS-01, DB-RLS-19, DB-RPC-02) against the new stack.

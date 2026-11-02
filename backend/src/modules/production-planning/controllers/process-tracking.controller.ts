@@ -28,9 +28,11 @@ import {
 } from '../dto/process-tracking.dto';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../../common/decorators/access-token.decorator';
+import { OrgRole } from '../../../common/authz/authz-policy';
 
 @ApiTags('Process Tracking')
 @ApiBearerAuth()
+@OrgRole('member')
 @Controller({ path: 'api/production-planning/tracking', version: '1' })
 export class ProcessTrackingController {
   constructor(private readonly processTrackingService: ProcessTrackingService) {}
@@ -50,6 +52,7 @@ export class ProcessTrackingController {
     return this.processTrackingService.createTimeline(createDto, userId, token);
   }
 
+  @OrgRole('viewer')
   @Get('timelines/:lotId')
   @ApiOperation({ summary: 'Get timeline for production lot' })
   @ApiResponse({ status: 200, description: 'Timeline retrieved successfully' })
@@ -87,6 +90,7 @@ export class ProcessTrackingController {
     return this.processTrackingService.createProcessTracking(createDto, userId, token);
   }
 
+  @OrgRole('viewer')
   @Get('processes/:timelineId')
   @ApiOperation({ summary: 'Get all process tracking for timeline' })
   @ApiResponse({ status: 200, description: 'Process tracking retrieved successfully' })
@@ -125,6 +129,7 @@ export class ProcessTrackingController {
     return this.processTrackingService.createSubtaskTracking(createDto, userId, token);
   }
 
+  @OrgRole('viewer')
   @Get('subtasks/:processTrackingId')
   @ApiOperation({ summary: 'Get subtask tracking for process' })
   @ApiResponse({ status: 200, description: 'Subtask tracking retrieved successfully' })
@@ -162,6 +167,7 @@ export class ProcessTrackingController {
     return this.processTrackingService.createBomTracking(createDto, userId, token);
   }
 
+  @OrgRole('viewer')
   @Get('bom-items/:subtaskTrackingId')
   @ApiOperation({ summary: 'Get BOM item tracking for subtask' })
   @ApiResponse({ status: 200, description: 'BOM item tracking retrieved successfully' })
@@ -214,6 +220,7 @@ export class ProcessTrackingController {
   // GANTT CHART DATA
   // =====================================================
 
+  @OrgRole('viewer')
   @Get('gantt-data/:lotId')
   @ApiOperation({ summary: 'Get complete Gantt chart data for production lot' })
   @ApiResponse({ status: 200, description: 'Gantt chart data retrieved successfully' })
@@ -229,6 +236,7 @@ export class ProcessTrackingController {
   // TRACKING HISTORY & AUDIT
   // =====================================================
 
+  @OrgRole('viewer')
   @Get('history/:timelineId')
   @ApiOperation({ summary: 'Get tracking update history' })
   @ApiResponse({ status: 200, description: 'Tracking history retrieved successfully' })

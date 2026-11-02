@@ -3,14 +3,17 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@ne
 import { ProcessPlanningService } from './process-planning.service';
 import { CreateProcessPlanningSpecDto, UpdateProcessPlanningSpecDto, ProcessPlanningSpecResponseDto } from './dto/process-planning.dto';
 import { RequestAuthGuard } from '../../common/guards/request-auth.guard';
+import { OrgRole } from '../../common/authz/authz-policy';
 
 @ApiTags('Process Planning')
+@OrgRole('member')
 @Controller({ path: 'api/process-planning', version: '1' })
 @UseGuards(RequestAuthGuard)
 @ApiBearerAuth()
 export class ProcessPlanningController {
   constructor(private readonly processPlanningService: ProcessPlanningService) {}
 
+  @OrgRole('viewer')
   @Get('bom-items/:bomItemId/specifications')
   @ApiOperation({ summary: 'Get process planning specifications for a BOM item' })
   @ApiResponse({ status: 200, description: 'Process planning specifications retrieved successfully', type: ProcessPlanningSpecResponseDto })
@@ -24,6 +27,7 @@ export class ProcessPlanningController {
     return this.processPlanningService.getSpecificationsByBomItem(bomItemId, userId);
   }
 
+  @OrgRole('viewer')
   @Get('projects/:projectId/specifications')
   @ApiOperation({ summary: 'Get all process planning specifications for a project' })
   @ApiResponse({ status: 200, description: 'Process planning specifications retrieved successfully', type: [ProcessPlanningSpecResponseDto] })

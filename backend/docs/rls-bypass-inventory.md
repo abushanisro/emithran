@@ -16,6 +16,8 @@ Authoritative as of 2026-10-01. `npm run check:rls` (scripts/rls-bypass-rules.js
 
 There is no second database path (2026-10-29): `typeorm`, `knex`, `nestjs-knex`, `pg` and `kysely` are not imported anywhere in `src` (CI rule `second-db-path`). The one exception, from 2026-10-30, is the platform database layer `src/platform/db/`, which may import `pg` and `kysely` (Design Doc 9; no such files exist yet), and the backend holds no Postgres connection or database password. The electronics job queue is the `job_queue` table (migration 920), the live-progress event bus is in-process, and invoices use the Supabase client like the rest of the delivery module. `pg` remains a dependency only for `scripts/migrate.ts`, which runs from CI or an operator.
 
+No controller calls `getPrivilegedClient` (2026-11-02, CI rule `privileged-in-controller`): a privileged read or write lives in a service, where it is named and tested. The last one, the material density lookup, moved into `BOMItemsService.materialDensity`. Changes to the baseline, `backend/migrations/` and `backend/src/common/guards/` need a review by a code owner (`.github/CODEOWNERS`).
+
 The deprecated `getAdminClient()` and `.client` accessors have been removed from `SupabaseService`; CI rule `get-admin-client` / `dot-client` rejects their reintroduction.
 
 ## Counts (production code, excluding specs)
@@ -36,7 +38,7 @@ The deprecated `getAdminClient()` and `.client` accessors have been removed from
 | 2 | reference-data: `mhr/lhr` benchmark rates (no `user_id`) | `process-cost.service.ts` |
 | 1 + 2 | reference-data: `mhr_benchmark_rates`, `lhr_benchmark_rates` | `mhr.service.ts`, `lhr.service.ts` |
 | 2 | reference-data: `costing_settings` (global `sga_pct`/`profit_pct`) | `cost-aggregation.service.ts`, `location-comparison.service.ts` |
-| 1 each | reference-data: `sm_lookup_stroke_rate`, `process_cycle_time_library`, `material_density_lookup`, `machining_parameters`, `machining_material_groups`, `laser_cutting_parameters`, `injection_molding_materials` | calculators, cycle-time-library, bom-items.controller, manufacturing-rules |
+| 1 each | reference-data: `sm_lookup_stroke_rate`, `process_cycle_time_library`, `material_density_lookup`, `machining_parameters`, `machining_material_groups`, `laser_cutting_parameters`, `injection_molding_materials` | calculators, cycle-time-library, bom-items.service (density lookup), manufacturing-rules |
 | 1 | rfq-number: `rfq_number` is UNIQUE across all orgs, so the count must see every org | `rfq.service.ts` |
 | 1 | bom-item cascade delete: `production_lot_materials` rows RLS hides, bounded to an item already verified visible to the caller | `bom-items.service.ts` |
 | 2 | system-cache: `fx_rate_snapshots`, no user context | `fx-rate-cache.service.ts` |

@@ -11,6 +11,7 @@ import { OrganizationContextGuard } from '../../common/guards/organization-conte
 import { MAX_CAD_FILE_BYTES } from '../../common/upload-limits';
 import { type CadUploadRow } from './cad-upload.types';
 import { CadUploadsService } from './cad-uploads.service';
+import { OrgRole } from '../../common/authz/authz-policy';
 
 function view(row: CadUploadRow) {
   return {
@@ -31,6 +32,7 @@ function view(row: CadUploadRow) {
 @ApiTags('CAD uploads')
 @UseGuards(OrganizationContextGuard)
 @ApiBearerAuth()
+@OrgRole('member')
 @Controller({ path: 'api/cad-uploads', version: '1' })
 export class CadUploadsController {
   constructor(private readonly uploads: CadUploadsService) {}
@@ -61,6 +63,7 @@ export class CadUploadsController {
     return { ...view(upload), duplicate };
   }
 
+  @OrgRole('viewer')
   @Get(':id')
   @ApiOperation({ summary: 'Status of an upload: queued, running, done (with the result) or failed (with a code)' })
   async get(@Param('id', ParseUUIDPipe) id: string, @AccessToken() token: string) {

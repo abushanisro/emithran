@@ -109,6 +109,7 @@ import { CadEvidencePanel, type CadEvidence } from '@/components/features/proces
 import type { FeatureGraph, FeatureGraphSummary, DFMWarning, DFMSeverity, HoleGroup, HoleGroupLocation, FeatureNodeV2, FaceMapEntry, DFMScoresResponse } from '@/lib/types/manufacturing';
 import { hasDfmRiskFactor } from '@/lib/dfm/hasRiskFactor';
 import { useMachiningNeed } from '@/lib/api/hooks/useFeatureTolerances';
+import { useAuth } from '@/lib/providers/auth-context';
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 type PanelId = 'left' | 'center' | 'right' | 'process' | 'drivers';
@@ -5490,6 +5491,8 @@ function CostGuidePanel({
             : null)
         : (liveFxRate ?? null);
   const refreshFxRate = useRefreshFxRate();
+  // Refreshing writes the shared reference snapshot every organization reads: platform administrators only (the API enforces it).
+  const canRefreshFx = useAuth().user?.platformAdmin === true;
   const fxRateOnDemand = useFxRateOnDemand();
   const handleScenarioCurrencyChange = (next: string) => {
     if (askPriceDraft.trim() && next !== scenarioCurrencyDraft) {
@@ -5850,7 +5853,7 @@ function CostGuidePanel({
                     {usdReferenceRate.rateDate ? ` · ${usdReferenceRate.rateDate}` : ''}
                   </p>
                 )}
-                {rateTypeDraft !== 'custom' && !isIdentityCurrency && factoryCurrencyInfo && (
+                {canRefreshFx && rateTypeDraft !== 'custom' && !isIdentityCurrency && factoryCurrencyInfo && (
                   <button
                     onClick={() => { refreshFxRate.mutate({ base: factoryCurrencyInfo.code, quote: scenarioCurrencyDraft }); }}
                     disabled={refreshFxRate.isPending}

@@ -46,10 +46,12 @@ import {
   PartWiseCostBaseDataDto,
   BulkUpdatePartWiseCostAnalysisDto
 } from './dto/part-wise-cost-analysis.dto';
+import { OrgRole } from '../../common/authz/authz-policy';
 
 @ApiTags('supplier-nominations')
 @ApiBearerAuth()
 @UseGuards(RequestAuthGuard)
+@OrgRole('member')
 @Controller('api/supplier-nominations')
 export class SupplierNominationsController {
   constructor(
@@ -72,6 +74,7 @@ export class SupplierNominationsController {
   }
 
 
+  @OrgRole('viewer')
   @Get('project/:projectId')
   @ApiOperation({ summary: 'Get all nominations for a project' })
   @ApiResponse({
@@ -87,6 +90,7 @@ export class SupplierNominationsController {
     return this.supplierNominationsService.findByProject(userId, projectId, token);
   }
 
+  @OrgRole('viewer')
   @Get(':id')
   @ApiOperation({ summary: 'Get supplier nomination by ID' })
   @ApiResponse({
@@ -248,6 +252,7 @@ export class SupplierNominationsController {
     );
   }
 
+  @OrgRole('viewer')
   @Get('evaluations/:evaluationId/data')
   @ApiOperation({ summary: 'Get complete evaluation data' })
   @ApiResponse({
@@ -289,6 +294,7 @@ export class SupplierNominationsController {
     );
   }
 
+  @OrgRole('viewer')
   @Get('evaluations/:evaluationId/scores')
   @ApiOperation({ summary: 'Get calculated evaluation scores for all sections' })
   @ApiResponse({
@@ -332,6 +338,7 @@ export class SupplierNominationsController {
   }
 
   // Ranking Factor Weights Management Endpoints
+  @OrgRole('viewer')
   @Get(':nominationId/factor-weights')
   @ApiOperation({ summary: 'Get ranking factor weights for a nomination' })
   @ApiResponse({
@@ -423,6 +430,7 @@ export class SupplierNominationsController {
     return this.supplierNominationsService.storeSupplierRankings(userId, nominationId, token);
   }
 
+  @OrgRole('viewer')
   @Get(':nominationId/rankings')
   @ApiOperation({ summary: 'Get stored supplier rankings' })
   @ApiResponse({
@@ -466,6 +474,7 @@ export class SupplierNominationsController {
     return this.supplierNominationsService.getStoredRankings(userId, nominationId, token);
   }
 
+  @OrgRole('viewer')
   @Get('approved-vendors/bom-part/:bomPartId')
   @ApiOperation({ summary: 'Get approved vendors for a specific BOM part from supplier nominations' })
   @ApiResponse({
@@ -507,6 +516,7 @@ export class SupplierNominationsController {
   }
 
   // Cost Competency Analysis Endpoints
+  @OrgRole('viewer')
   @Get(':id/cost-analysis')
   @ApiOperation({ summary: 'Get cost competency analysis data for nomination' })
   @ApiResponse({
@@ -601,6 +611,7 @@ export class SupplierNominationsController {
   }
 
   // Capability Scoring Endpoints
+  @OrgRole('viewer')
   @Get(':id/capability-scores')
   @ApiOperation({ summary: 'Get capability scoring data for nomination' })
   @ApiResponse({
@@ -684,6 +695,7 @@ export class SupplierNominationsController {
   }
 
   // Vendor Assessment Matrix Endpoints
+  @OrgRole('viewer')
   @Get(':nominationId/vendors/:vendorId/assessment')
   @ApiOperation({ summary: 'Get vendor assessment criteria' })
   @ApiResponse({
@@ -779,6 +791,7 @@ export class SupplierNominationsController {
     );
   }
 
+  @OrgRole('viewer')
   @Get(':nominationId/vendors/:vendorId/assessment/metrics')
   @ApiOperation({ summary: 'Get calculated assessment metrics for vendor' })
   @ApiResponse({
@@ -823,6 +836,7 @@ export class SupplierNominationsController {
   // Vendor Rating Matrix Endpoints (ENTERPRISE GRADE - CLEANED UP)
   // =======================================
 
+  @OrgRole('viewer')
   @Get(':nominationId/vendors/:vendorId/rating-matrix')
   @ApiOperation({ 
     summary: 'Get vendor rating matrix data',
@@ -917,6 +931,7 @@ export class SupplierNominationsController {
     );
   }
 
+  @OrgRole('viewer')
   @Get(':nominationId/vendors/:vendorId/rating-matrix/overall-scores')
   @ApiOperation({ 
     summary: 'Get calculated overall scores for vendor rating',
@@ -949,6 +964,7 @@ export class SupplierNominationsController {
   // Part-wise Cost Analysis Endpoints (ENTERPRISE GRADE)
   // =======================================
 
+  @OrgRole('viewer')
   @Get(':nominationId/parts/:bomItemId/cost-analysis')
   @ApiOperation({ 
     summary: 'Get part-wise cost analysis for specific BOM part',
@@ -1060,6 +1076,7 @@ export class SupplierNominationsController {
     );
   }
 
+  @OrgRole('viewer')
   @Get(':nominationId/part-wise-analysis-summary')
   @ApiOperation({ 
     summary: 'Get part-wise analysis summary for dashboard',

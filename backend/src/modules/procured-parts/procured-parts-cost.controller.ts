@@ -39,9 +39,11 @@ import {
   ProcuredPartsCostResponseDto,
   ProcuredPartsCostListResponseDto,
 } from './dto/procured-parts-cost.dto';
+import { OrgRole } from '../../common/authz/authz-policy';
 
 @ApiTags('Procured Parts Costs')
 @ApiBearerAuth()
+@OrgRole('member')
 @Controller('api/procured-parts-costs')
 @UseGuards(RequestAuthGuard)
 export class ProcuredPartsCostController {
@@ -52,6 +54,7 @@ export class ProcuredPartsCostController {
   /**
    * Get all procured parts costs with pagination and filtering
    */
+  @OrgRole('viewer')
   @Get()
   @ApiOperation({ summary: 'Get all procured parts costs' })
   @ApiResponse({
@@ -70,6 +73,7 @@ async findAll(
   /**
    * Get single procured part cost by ID
    */
+  @OrgRole('viewer')
   @Get(':id')
   @ApiOperation({ summary: 'Get procured part cost by ID' })
   @ApiResponse({
@@ -160,6 +164,7 @@ async findAll(
   /**
    * Get total procured parts cost for a BOM item
    */
+  @OrgRole('viewer')
   @Get('bom-item/:bomItemId/total')
   @ApiOperation({ summary: 'Get total procured parts cost for a BOM item' })
   @ApiResponse({

@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
+import { OrgRole } from '../../common/authz/authz-policy';
 import { SpendsAi } from '../../common/throttling/throttlers';
 import { CopilotService, type CopilotEvent } from './copilot.service';
 import { CopilotChatDto } from './dto/chat.dto';
@@ -14,6 +15,7 @@ interface AuthUser {
 
 @ApiTags('Copilot')
 @ApiBearerAuth()
+@OrgRole('member')
 @Controller({ path: 'api/copilot', version: '1' })
 export class CopilotController {
   constructor(

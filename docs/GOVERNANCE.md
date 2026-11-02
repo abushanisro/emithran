@@ -30,6 +30,10 @@ gh api -X PUT repos/abushanisro/emithran/rulesets/$(gh api repos/abushanisro/emi
 - CodeQL must have analysed the change; a new high or critical alert blocks the merge.
 - Required approvals are 0 while there is one maintainer (GitHub does not let authors approve their own pull request); raise to 1
   when a second engineer joins. Repository admins may bypass only through a pull request, for emergencies.
+- [`.github/CODEOWNERS`](../.github/CODEOWNERS) names the owner of the security-sensitive paths (migrations, the API guards and
+  authorization policies, the privileged-client baseline), so a change there always requests their review. When approvals rise to
+  1, also set `require_code_owner_review` to `true` in the ruleset so that review becomes mandatory; with a single maintainer it
+  would only force an admin bypass on every such pull request.
 
 A new CI job that should block merges must also be added to the ruleset's required checks.
 

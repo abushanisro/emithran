@@ -33,9 +33,11 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
 import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
 import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
+import { OrgRole } from '../../common/authz/authz-policy';
 
 @ApiTags('Vendors')
 @ApiBearerAuth()
+@OrgRole('member')
 @Controller({ path: 'api/vendors', version: '1' })
 export class VendorsController {
   constructor(private readonly vendorsService: VendorsService) {}
@@ -44,6 +46,7 @@ export class VendorsController {
   // VENDOR ENDPOINTS
   // ============================================================================
 
+  @OrgRole('viewer')
   @Get()
   @ApiOperation({ summary: 'Get all vendors with advanced filtering' })
   @ApiResponse({ status: 200, description: 'Vendors retrieved successfully' })
@@ -70,6 +73,7 @@ export class VendorsController {
     return this.vendorsService.importFromCsv(file, user.id, token, organizationId);
   }
 
+  @OrgRole('viewer')
   @Get('equipment-types')
   @ApiOperation({ summary: 'Get all unique equipment types' })
   @ApiResponse({ status: 200, description: 'Equipment types retrieved successfully' })
@@ -89,6 +93,7 @@ export class VendorsController {
   // PARAMETERIZED ROUTES - Must come after specific routes
   // ============================================================================
 
+  @OrgRole('viewer')
   @Get(':id')
   @ApiOperation({ summary: 'Get vendor by ID' })
   @ApiResponse({ status: 200, description: 'Vendor retrieved successfully' })
@@ -142,6 +147,7 @@ export class VendorsController {
   // VENDOR EQUIPMENT ENDPOINTS
   // ============================================================================
 
+  @OrgRole('viewer')
   @Get(':vendorId/equipment')
   @ApiOperation({ summary: 'Get equipment for a vendor' })
   @ApiResponse({ status: 200, description: 'Equipment retrieved successfully' })
@@ -176,6 +182,7 @@ export class VendorsController {
   // VENDOR SERVICES ENDPOINTS
   // ============================================================================
 
+  @OrgRole('viewer')
   @Get(':vendorId/services')
   @ApiOperation({ summary: 'Get services for a vendor' })
   @ApiResponse({ status: 200, description: 'Services retrieved successfully' })
@@ -210,6 +217,7 @@ export class VendorsController {
   // VENDOR CONTACTS ENDPOINTS
   // ============================================================================
 
+  @OrgRole('viewer')
   @Get(':vendorId/contacts')
   @ApiOperation({ summary: 'Get contacts for a vendor' })
   @ApiResponse({ status: 200, description: 'Contacts retrieved successfully' })

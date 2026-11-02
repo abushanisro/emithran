@@ -2,7 +2,9 @@ import { Controller, Post, Body, Get, Logger } from "@nestjs/common";
 import { ManufacturingRulesService } from "./manufacturing-rules.service";
 import { EvaluateOperationDto } from "./dto/evaluate-operation.dto";
 import { CalculatorRegistry } from "./calculators/calculator.registry";
+import { OrgRole } from '../../common/authz/authz-policy';
 
+@OrgRole('member')
 @Controller("v1/api/manufacturing-rules")
 export class ManufacturingRulesController {
   private readonly logger = new Logger(ManufacturingRulesController.name);
@@ -26,6 +28,7 @@ export class ManufacturingRulesController {
     });
   }
 
+  @OrgRole('viewer')
   @Get("operations")
   listOperations() {
     return { operations: this.calculatorRegistry.list() };

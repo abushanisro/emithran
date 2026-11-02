@@ -17,15 +17,18 @@ import {
 } from './dto/vave.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
+import { OrgRole } from '../../common/authz/authz-policy';
 
 @ApiTags('VAVE')
 @ApiBearerAuth()
+@OrgRole('member')
 @Controller({ path: 'api/vave', version: '1' })
 export class VaveController {
   constructor(private readonly vaveService: VaveService) {}
 
   // ─── Projects ─────────────────────────────────────────────────────────────
 
+  @OrgRole('viewer')
   @Get('projects')
   @ApiOperation({ summary: 'List all VAVE projects for the current user' })
   @ApiResponse({ status: 200 })
@@ -47,6 +50,7 @@ export class VaveController {
     return this.vaveService.createProject(dto, user.id, token);
   }
 
+  @OrgRole('viewer')
   @Get('projects/:id')
   @ApiOperation({ summary: 'Get VAVE project detail with stats' })
   async getProject(
@@ -81,6 +85,7 @@ export class VaveController {
 
   // ─── BOM Items ────────────────────────────────────────────────────────────
 
+  @OrgRole('viewer')
   @Get('projects/:id/bom')
   @ApiOperation({ summary: 'List BOM items for a VAVE project' })
   async listBomItems(
@@ -123,6 +128,7 @@ export class VaveController {
 
   // ─── Ideas ────────────────────────────────────────────────────────────────
 
+  @OrgRole('viewer')
   @Get('projects/:id/ideas')
   @ApiOperation({ summary: 'List VAVE ideas for a project' })
   async listIdeas(
@@ -176,6 +182,7 @@ export class VaveController {
 
   // ─── Should Costs ─────────────────────────────────────────────────────────
 
+  @OrgRole('viewer')
   @Get('projects/:id/should-costs')
   @ApiOperation({ summary: 'List should-cost records for a VAVE project' })
   async listShouldCosts(

@@ -30,6 +30,7 @@ import {
   GenerateRequestDto,
 } from './dto/apply-request.dto';
 import { GenerationResponse } from './dto/generation-response.dto';
+import { OrgRole } from '../../common/authz/authz-policy';
 
 interface AuthUser {
   id: string;
@@ -39,6 +40,7 @@ interface AuthUser {
 
 @ApiTags('Process Plan Generator')
 @ApiBearerAuth()
+@OrgRole('member')
 @Controller({ path: 'api/process-plan-generator', version: '1' })
 export class ProcessPlanGeneratorController {
   private readonly logger = new Logger(ProcessPlanGeneratorController.name);
@@ -112,6 +114,7 @@ export class ProcessPlanGeneratorController {
    * Returns the latest draft_ready generation for a BOM item, or null.
    * Used by the frontend to reload an existing draft when navigating back.
    */
+  @OrgRole('viewer')
   @Get(':bomItemId/draft')
   @ApiOperation({ summary: 'Get the latest draft_ready generation for a BOM item (or null)' })
   async getLatestDraft(
@@ -129,6 +132,7 @@ export class ProcessPlanGeneratorController {
    * Replay endpoint — load a stored generation for the draft panel's
    * reasoning trail and per-line "candidates considered" drill-down.
    */
+  @OrgRole('viewer')
   @Get('generations/:id')
   @ApiOperation({ summary: 'Get a generation by id (replay / "why this?" view)' })
   async getGeneration(

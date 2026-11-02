@@ -49,6 +49,8 @@ import { FxModule } from './common/fx/fx.module';
 import { LoggerModule } from './common/logger/logger.module';
 import { DatabaseService } from './common/database/database.service';
 import { RequestAuthGuard } from './common/guards/request-auth.guard';
+import { AuthzGuard } from './common/guards/authz.guard';
+import { AuthzModule } from './common/authz/authz.module';
 import { SessionModule } from './common/session/session.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { StorageModule } from './common/storage/storage.module';
@@ -118,6 +120,7 @@ import { AppController } from './app.controller';
     FxModule,
     SessionModule,
     AuthModule,
+    AuthzModule,
     DatabaseModule,
     StorageModule,
   ],
@@ -127,6 +130,11 @@ import { AppController } from './app.controller';
     {
       provide: APP_GUARD,
       useClass: RequestAuthGuard,
+    },
+    // Default deny: every route declares who may call it (common/authz/authz-policy.ts), checked once the caller is known.
+    {
+      provide: APP_GUARD,
+      useClass: AuthzGuard,
     },
     // Global so rate limiting can never be missed by a controller that forgot to opt in.
     // The one controller that previously applied @UseGuards(ThrottlerGuard) locally
