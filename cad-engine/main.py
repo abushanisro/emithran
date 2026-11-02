@@ -187,12 +187,12 @@ async def require_api_key(api_key: str = Security(_api_key_header)):
     if not api_key or not hmac.compare_digest(api_key, _CAD_API_KEY):
         raise HTTPException(status_code=403, detail="Invalid or missing API key")
 
-def _internal_error(operation: str) -> HTTPException:
-    """A 500 for the exception being handled: the traceback goes to the log under a fresh error id, the caller gets only the
-    id. Exception text can carry file paths, library internals or customer content, so it never goes into the response."""
+def _internal_error(operation: str, status_code: int = 500) -> HTTPException:
+    """An error response for the exception being handled: the traceback goes to the log under a fresh error id, the caller gets
+    only the id. Exception text can carry file paths, library internals or customer content, so it never goes into the response."""
     error_id = uuid.uuid4().hex
     logger.error("%s failed (error %s)", operation, error_id, exc_info=True)
-    return HTTPException(status_code=500, detail=f"{operation} failed (error {error_id}).")
+    return HTTPException(status_code=status_code, detail=f"{operation} failed (error {error_id}).")
 
 
 # 2D Drawing analysis (Groq vision + PyMuPDF PDF rendering)
@@ -613,7 +613,7 @@ def analyze_geometry_advanced(
             logger.info("STEP file successfully read for analysis")
         except Exception as e:
             cleanup_files(step_path)
-            raise HTTPException(status_code=422, detail=f"Failed to read STEP file: {str(e)}")
+            raise _internal_error("Reading the STEP file", status_code=422)
 
         try:
             response = analyze_part(
@@ -693,7 +693,7 @@ def measure_geometry(
         try:
             shape = StepReader().read(step_path)
         except Exception as e:
-            raise HTTPException(status_code=422, detail=f"Failed to read STEP file: {str(e)}")
+            raise _internal_error("Reading the STEP file", status_code=422)
         m = measure_solid(shape)
         return {
             "volume_mm3": round(float(m["volume"]), 4),
