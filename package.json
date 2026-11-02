@@ -48,7 +48,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "country-state-city": "^3.2.1",
-    "date-fns": "^3.6.0",
+    "date-fns": "^4.4.0",
     "dxf-viewer": "1.0.48",
     "exceljs": "4.4.0",
     "framer-motion": "^12.23.26",
