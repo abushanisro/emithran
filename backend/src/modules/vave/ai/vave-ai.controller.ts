@@ -5,6 +5,7 @@ import { AccessToken } from '../../../common/decorators/access-token.decorator';
 import { CurrentOrganization } from '../../../common/decorators/current-organization.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { OrganizationContextGuard } from '../../../common/guards/organization-context.guard';
+import { OrgRole } from '../../../common/authz/authz-policy';
 import { SpendsAi } from '../../../common/throttling/throttlers';
 import type { AiCaller } from '../../../common/ai/ai-budget.service';
 import { VaveBomAnalysisDto } from './vave-ai.dto';
@@ -17,6 +18,7 @@ import type { ShouldCostResult, VaveIdeaDraft } from './vave-ai.results';
  */
 @ApiTags('VAVE')
 @ApiBearerAuth()
+@OrgRole('member')
 @Controller({ path: 'api/vave', version: '1' })
 @UseGuards(OrganizationContextGuard)
 export class VaveAiController {

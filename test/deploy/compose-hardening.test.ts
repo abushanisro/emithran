@@ -179,6 +179,30 @@ describe('docker-compose.prod.yml', () => {
     expect(String(compose.services.backend?.environment?.TRUST_PROXY)).toBe('0');
   });
 
+  it('keeps the runner off the edge network: it could forge the Cloudflare client-address header to the backend from there', () => {
+    expect(compose.services['cad-core']?.networks).toEqual(['db']);
+    expect(compose.services['cad-worker']?.networks).toBeUndefined();
+    const edgePeers = services.filter(([, s]) => (s.networks ?? []).includes('edge')).map(([n]) => n).sort();
+    expect(edgePeers).toEqual(['backend', 'cloudflared', 'frontend']);
+  });
+
+  it('passes every AI, authorization and limit setting through to the backend, each documented in both env templates', () => {
+    const backendEnv = compose.services.backend?.environment ?? {};
+    const settings = [
+      'ANTHROPIC_API_KEY', 'AI_DISABLED', 'AI_USER_DAILY_TOKENS', 'AI_ORG_DAILY_TOKENS', 'AI_GLOBAL_DAILY_TOKENS', 'AI_MAX_CONCURRENT_PER_USER',
+      'FX_RATE_MAX_CHANGE_PERCENT', 'AUTH_DECISION_CACHE_SECONDS', 'ORG_THROTTLE_LIMIT', 'ORG_THROTTLE_TTL',
+      'ARCHIVE_MAX_EXPANDED_MB', 'HEAVY_WORK_MAX_CONCURRENT', 'HEAVY_WORK_MAX_PER_TENANT',
+    ];
+    for (const name of settings) {
+      expect(String(backendEnv[name]), name).toMatch(new RegExp(`^\\$\\{${name}:-`));
+      for (const template of ['env/stage.env.example', 'env/prd.env.example', '.env.example']) {
+        expect(read(template), `${template} ${name}`).toMatch(new RegExp(`^#? ?${name}=`, 'm'));
+      }
+    }
+    // Required: sign-in cannot link a new login without the trusted connections.
+    expect(String(backendEnv.AUTH0_TRUSTED_CONNECTIONS)).toMatch(/^\$\{AUTH0_TRUSTED_CONNECTIONS:\?/);
+  });
+
   it('contains no secret value, only references to the env file', () => {
     const text = read('docker-compose.prod.yml');
     expect(text).not.toMatch(/sb_secret_|eyJ[A-Za-z0-9_-]{20,}|sk-ant-|AIza[0-9A-Za-z_-]{20,}/);

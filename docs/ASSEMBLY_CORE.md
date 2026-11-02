@@ -25,7 +25,7 @@ secrets never parses CAD. `core/Dockerfile` builds two images and `docker-compos
 |---|---|---|
 | runs | `cad-runner` | `cad-worker-host` (PID 1), which runs `geometry-worker` per job |
 | credentials | `DB_JWT_SECRET`, S3 keys | none (the host refuses to start if one is set) |
-| network | `edge` (bucket), `db` (PostgREST) | `network_mode: none` (loopback only) |
+| network | `db` only (PostgREST and the bucket, outbound; never `edge`, which holds the tunnel and the frontend) | `network_mode: none` (loopback only) |
 | filesystem | read-only, 16 MB `/tmp` (heartbeat) | read-only, 1 GB `/tmp` scratch (owner-only) |
 
 Shared: only the `cad-worker-socket` volume, holding the host's Unix socket (mode 0660, group 10005, which the runner joins). One

@@ -271,7 +271,7 @@ pub async fn run_once<B: Backend>(backend: &B, config: &Config) -> Result<bool, 
 #[cfg(test)]
 mod tests {
     use std::cell::RefCell;
-    use std::os::unix::fs::PermissionsExt;
+    use std::os::unix::fs::OpenOptionsExt;
     use std::time::Duration;
 
     use super::*;
@@ -359,11 +359,40 @@ mod tests {
         worker_with_deadline(dir, body, Duration::from_secs(10))
     }
 
+    /// The one executable every fake worker runs: it sources the test's own `body.sh`. It is written once per test process, and
+    /// never again. Writing a script and executing it right away races with every other test thread that forks in between: the
+    /// forked child still holds the script's write descriptor until it execs, and `exec` of a file open for writing fails with
+    /// ETXTBSY ("Text file busy"). Each test writes only `body.sh`, which the shell reads and nothing executes.
+    fn shared_worker_script() -> &'static std::path::Path {
+        use std::io::Write;
+        static SCRIPT: std::sync::OnceLock<(tempfile::TempDir, std::path::PathBuf)> =
+            std::sync::OnceLock::new();
+        let (_, path) = SCRIPT.get_or_init(|| {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("worker.sh");
+            let mut file = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o755)
+                .open(&path)
+                .unwrap();
+            // $1 --deadline-ms, $2 ms, $3 out folder, $4.. the input files
+            file.write_all(b"#!/bin/sh\nout=\"$3\"\n. \"${0%/*}/body.sh\"\n")
+                .unwrap();
+            file.sync_all().unwrap();
+            drop(file);
+            (dir, path)
+        });
+        path
+    }
+
     fn worker_with_deadline(dir: &std::path::Path, body: &str, deadline: Duration) -> WorkerConfig {
         let path = dir.join("worker.sh");
-        // $1 --deadline-ms, $2 ms, $3 out folder, $4.. the input files
-        std::fs::write(&path, format!("#!/bin/sh\nout=\"$3\"\n{body}\n")).unwrap();
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        std::fs::write(dir.join("body.sh"), format!("{body}\n")).unwrap();
+        // A test may call this again for the same folder with another body: the link stays, only body.sh changes.
+        if path.symlink_metadata().is_err() {
+            std::os::unix::fs::symlink(shared_worker_script(), &path).unwrap();
+        }
         WorkerConfig {
             program: path,
             wrapper: vec![],

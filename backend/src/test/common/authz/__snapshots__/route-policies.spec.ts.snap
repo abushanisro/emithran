@@ -12,6 +12,7 @@ org:member      DELETE /v1/api/calculators/:id/formulas/:formulaId  CalculatorsC
 org:member      DELETE /v1/api/child-part-costs/:id  ChildPartCostController.remove
 org:member      DELETE /v1/api/comments/:id  CommentController.deleteComment
 org:member      DELETE /v1/api/copilot/memory  CopilotController.clearMemory
+org:member      DELETE /v1/api/copilot/memory/preferences  CopilotController.deleteMemoryItem
 org:viewer      DELETE /v1/api/developer/api-keys/:id/revoke  ApiKeysController.revoke
 org:member      DELETE /v1/api/electronics/designs/:designId  ElectronicsController.deleteDesign
 org:member      DELETE /v1/api/electronics/designs/:designId/revisions/:revisionId  ElectronicsController.deleteRevision
@@ -125,7 +126,7 @@ org:viewer      GET /v1/api/child-part-costs  ChildPartCostController.findAll
 org:viewer      GET /v1/api/child-part-costs/:id  ChildPartCostController.findOne
 org:viewer      GET /v1/api/child-part-costs/bom-item/:bomItemId  ChildPartCostController.findByBomItemId
 org:viewer      GET /v1/api/comments/remark/:remarkId  CommentController.getCommentsByRemark
-org:member      GET /v1/api/copilot/memory  CopilotController.getMemory
+org:viewer      GET /v1/api/copilot/memory  CopilotController.getMemory
 org:viewer      GET /v1/api/cost-analysis/bom-item/:bomItemId  CostAnalysisController.getBomItemCost
 org:viewer      GET /v1/api/cost-analysis/bom-item/:bomItemId/excel  CostAnalysisController.downloadBomItemExcel
 org:viewer      GET /v1/api/cost-analysis/bom-item/:bomItemId/location-comparison  CostAnalysisController.getLocationComparison
@@ -409,6 +410,7 @@ org:member      POST /v1/api/child-part-costs  ChildPartCostController.create
 org:member      POST /v1/api/child-part-costs/calculate  ChildPartCostController.calculateOnly
 org:member      POST /v1/api/comments  CommentController.createComment
 org:member      POST /v1/api/copilot/chat  CopilotController.chat
+org:member      POST /v1/api/copilot/memory/proposals/:id/confirm  CopilotController.confirmMemoryProposal
 org:admin       POST /v1/api/developer/api-keys  ApiKeysController.create
 org:member      POST /v1/api/electronics/designs  ElectronicsController.createDesign
 org:member      POST /v1/api/electronics/quotes  ElectronicsController.quote
@@ -525,7 +527,11 @@ org:member      POST /v1/api/supplier-nominations/:nominationId/vendors/:vendorI
 org:member      POST /v1/api/supplier-nominations/evaluations/:evaluationId/data  SupplierNominationsController.storeEvaluationData
 org:member      POST /v1/api/tooling-costs  ToolingCostController.create
 org:member      POST /v1/api/tooling-costs/bulk-total  ToolingCostController.getBulkTotalCosts
+org:member      POST /v1/api/vave/ai/bom-analysis  VaveAiController.bomAnalysis
 org:member      POST /v1/api/vave/projects  VaveController.createProject
+org:member      POST /v1/api/vave/projects/:id/ai/cost-analysis  VaveAiController.costAnalysis
+org:member      POST /v1/api/vave/projects/:id/ai/ideation  VaveAiController.ideation
+org:member      POST /v1/api/vave/projects/:id/ai/should-cost/:itemId  VaveAiController.shouldCost
 org:member      POST /v1/api/vave/projects/:id/bom  VaveController.createBomItem
 org:member      POST /v1/api/vave/projects/:id/bom/bulk  VaveController.bulkImportBom
 org:member      POST /v1/api/vave/projects/:id/ideas  VaveController.createIdea

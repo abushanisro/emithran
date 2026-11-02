@@ -27,6 +27,7 @@ export class CopilotController {
 
   /** What the copilot has saved for this user (their own row only, RLS). */
   @Get('memory')
+  @OrgRole('viewer')
   @ApiOperation({ summary: 'List the preferences the copilot has saved for the current user' })
   async getMemory(@CurrentUser() user: AuthUser, @AccessToken() token: string): Promise<{ preferences: string[] }> {
     return { preferences: await this.memory.load(user.id, token) };
