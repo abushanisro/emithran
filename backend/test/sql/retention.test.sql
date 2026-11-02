@@ -6,8 +6,6 @@ DECLARE r jsonb; org uuid := gen_random_uuid(); item uuid := gen_random_uuid(); 
 BEGIN
   INSERT INTO boms (id) VALUES (bom);
 
-  -- request log: old rows go, recent rows stay
-  INSERT INTO api_request_logs (created_at) VALUES (now() - interval '20 days'), (now() - interval '2 days');
   -- fx: an old row goes, but the newest rate of a pair is kept even when it is old
   INSERT INTO fx_rate_snapshots (provider, base_currency, quote_currency, rate, rate_date, created_at) VALUES
     ('p','USD','INR',83,'2026-01-01', now() - interval '200 days'),  -- newest of USD/INR, old: kept
@@ -25,14 +23,13 @@ BEGIN
 
   r := prune_old_rows();
 
-  ASSERT (SELECT count(*) FROM api_request_logs) = 1, 'old request logs removed, recent kept';
   ASSERT (SELECT count(*) FROM fx_rate_snapshots) = 3, 'one superseded old FX row removed, newest per pair kept';
   ASSERT (SELECT count(*) FROM fx_rate_snapshots WHERE quote_currency = 'INR') = 1, 'the only (old) INR rate is never pruned';
   ASSERT (SELECT count(*) FROM cad_analysis_history WHERE bom_item_id = item) = 3, 'history trimmed to 3 per item';
   ASSERT (SELECT count(*) FROM cad_analysis_history WHERE bom_item_id = other) = 2, 'a short history is left alone';
   ASSERT (SELECT count(*) FROM cad_uploads WHERE sha256 = 'h1') = 0, 'old failed upload removed';
   ASSERT (SELECT count(*) FROM cad_uploads WHERE sha256 IN ('h2','h3')) = 2, 'recent failed and old done uploads kept';
-  ASSERT (r ->> 'api_request_logs')::int = 1 AND (r ->> 'cad_analysis_history')::int = 2, 'the function reports what it removed';
+  ASSERT (r ->> 'fx_rate_snapshots')::int = 1 AND (r ->> 'cad_analysis_history')::int = 2, 'the function reports what it removed';
 END $$;
 
 -- file_paths_in_use: reads every file_*_path column that exists, even one added later
@@ -57,10 +54,10 @@ END $$;
 DO $$
 DECLARE r jsonb;
 BEGIN
-  DROP TABLE api_request_logs;
+  DROP TABLE fx_rate_snapshots;
   r := prune_old_rows();
   ASSERT r ? 'cad_analysis_history', 'the other prunes still ran';
-  ASSERT NOT (r ? 'api_request_logs'), 'the missing table was skipped, not reported';
+  ASSERT NOT (r ? 'fx_rate_snapshots'), 'the missing table was skipped, not reported';
 END $$;
 
 -- only the service may call these

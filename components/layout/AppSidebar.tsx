@@ -13,7 +13,6 @@ import {
   Lightbulb,
   Settings,
   SlidersHorizontal,
-  Key,
   Building2,
   LayoutGrid,
   HelpCircle,
@@ -236,14 +235,6 @@ export function AppSidebar() {
             >
               <LayoutGrid className="h-4 w-4 text-muted-foreground" />
               Workspaces
-            </DropdownMenuItem>
-
-            <DropdownMenuItem
-              className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm cursor-pointer"
-              onSelect={() => router.push('/settings?tab=api-keys')}
-            >
-              <Key className="h-4 w-4 text-muted-foreground" />
-              API Keys
             </DropdownMenuItem>
 
             <DropdownMenuSeparator />

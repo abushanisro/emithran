@@ -86,14 +86,6 @@ const nextConfig: NextConfig = {
   // Disable x-powered-by header for security
   poweredByHeader: false,
 
-  async redirects() {
-    return [
-      { source: '/portal',             destination: '/settings?tab=portal',   permanent: false },
-      { source: '/portal/api-keys',    destination: '/settings?tab=api-keys', permanent: false },
-      { source: '/portal/logs',        destination: '/settings?tab=portal',   permanent: false },
-      { source: '/developer/portal',   destination: '/settings?tab=portal',   permanent: false },
-    ];
-  },
   // The Content-Security-Policy is set per request in proxy.ts (one definition, every environment).
 
 }

@@ -2,15 +2,11 @@ import {
   Injectable,
   CanActivate,
   ExecutionContext,
-  ForbiddenException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { ApiKeyAuthService } from '../../modules/auth/api-key-auth.service';
 import { IdentityService } from '../../modules/auth/identity.service';
-import { API_KEY_PREFIX, type ApiKeyScope } from '../api-keys/api-key-scopes';
 import { DatabaseService } from '../database/database.service';
-import { API_KEY_SCOPES_KEY } from '../decorators/api-key-scopes.decorator';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { SessionActivityService } from '../session/session-activity.service';
 
@@ -29,7 +25,6 @@ export class RequestAuthGuard implements CanActivate {
     private databaseService: DatabaseService,
     private sessionActivity: SessionActivityService,
     private identity: IdentityService,
-    private apiKeys: ApiKeyAuthService,
   ) {}
 
   /**
@@ -120,29 +115,6 @@ export class RequestAuthGuard implements CanActivate {
       const user = await this.getAdminFallbackUser();
       request.user = user;
       request.accessToken = this.databaseService.mintDbUserToken(user.id, { email: user.email });
-      return true;
-    }
-
-    // API key: acts as its owner, but only on endpoints that declare @ApiKeyScopes, and only with every scope listed there. Keys
-    // have their own expiry instead of the people-only inactivity timeout, so no session clock runs for them.
-    if (token.startsWith(API_KEY_PREFIX)) {
-      const login = await this.apiKeys.authenticate(token);
-      const required = this.reflector.getAllAndOverride<ApiKeyScope[] | undefined>(API_KEY_SCOPES_KEY, [
-        context.getHandler(),
-        context.getClass(),
-      ]);
-      if (!required || required.length === 0) {
-        await this.apiKeys.refuseScope(login.apiKey, login.user.id, 'api_key_endpoint_not_allowed');
-        throw new ForbiddenException('This endpoint does not accept API keys');
-      }
-      const missing = required.filter((scope) => !login.apiKey.scopes.includes(scope));
-      if (missing.length > 0) {
-        await this.apiKeys.refuseScope(login.apiKey, login.user.id, 'api_key_scope_missing');
-        throw new ForbiddenException(`This API key lacks the scope ${missing.join(', ')}`);
-      }
-      request.user = login.user;
-      request.accessToken = login.dbToken;
-      request.apiKey = login.apiKey;
       return true;
     }
 

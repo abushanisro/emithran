@@ -61,6 +61,8 @@ Numbers 946 and 954 onward are not used by this release. Check on the new databa
 3. Rust assembly core only: apply 951 first, then add `--profile rust-core`. `cad-core` is on the `db` network only (it talks to PostgREST
    and the bucket); it is no longer on `edge`, so it cannot forge the Cloudflare client-address header to the backend.
 4. Calibration (operator-run): 952 and 953 applied, then `npm run should-cost:calibrate`.
+5. API keys and the developer portal are removed: migration 954 drops `api_keys` (any issued keys stop working for good, and
+   they could not authenticate anything before 935 anyway). Apply 954 in the same `db:migrate` run, with the new backend.
 
 ## 5. Verify
 

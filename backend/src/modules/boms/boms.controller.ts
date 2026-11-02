@@ -25,7 +25,6 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
 import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
 import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
-import { ApiKeyScopes } from '../../common/decorators/api-key-scopes.decorator';
 import { OrgRole } from '../../common/authz/authz-policy';
 
 @ApiTags('BOMs')
@@ -43,7 +42,6 @@ export class BOMsController {
 
   @OrgRole('viewer')
   @Get()
-  @ApiKeyScopes('boms:read')
   @ApiOperation({ summary: 'Get all BOMs' })
   @ApiResponse({ status: 200, description: 'BOMs retrieved successfully', type: BOMListResponseDto })
   async findAll(@Query() query: QueryBOMsDto, @CurrentUser() user: User, @AccessToken() token: string): Promise<BOMListResponseDto> {
@@ -52,7 +50,6 @@ export class BOMsController {
 
   @OrgRole('viewer')
   @Get(':id')
-  @ApiKeyScopes('boms:read')
   @ApiOperation({ summary: 'Get BOM by ID' })
   @ApiResponse({ status: 200, description: 'BOM retrieved successfully', type: BOMResponseDto })
   @ApiResponse({ status: 404, description: 'BOM not found' })
@@ -62,7 +59,6 @@ export class BOMsController {
 
   @OrgRole('viewer')
   @Get(':id/items')
-  @ApiKeyScopes('boms:read')
   @ApiOperation({ summary: 'Get all BOM items for a specific BOM' })
   @ApiResponse({ status: 200, description: 'BOM items retrieved successfully', type: BOMItemListResponseDto })
   @ApiResponse({ status: 404, description: 'BOM not found' })
@@ -117,7 +113,6 @@ export class BOMsController {
 
   @OrgRole('viewer')
   @Get(':id/cost-summary')
-  @ApiKeyScopes('costing:read')
   @ApiOperation({ summary: 'Get cost summary for all top-level assemblies in a BOM' })
   @ApiResponse({ status: 200, description: 'Cost summary retrieved successfully' })
   async getCostSummary(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string): Promise<any> {
@@ -126,7 +121,6 @@ export class BOMsController {
 
   @OrgRole('viewer')
   @Get(':id/cost-report')
-  @ApiKeyScopes('costing:read')
   @ApiOperation({ summary: 'Get comprehensive cost report for a BOM' })
   @ApiResponse({ status: 200, description: 'Cost report generated successfully' })
   async getCostReport(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string): Promise<any> {

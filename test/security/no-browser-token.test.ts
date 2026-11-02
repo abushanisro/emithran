@@ -19,8 +19,8 @@ const TOKEN_PATTERNS = [
 ];
 
 const ROOTS = ['app', 'components', 'hooks', 'lib'];
-// Server-only code may hold the token: that is the point of the BFF. lib/docs holds API documentation text, not code that runs.
-const NOT_BROWSER_CODE = [/^app\/api\//, /^lib\/server\//, /^lib\/auth0\.ts$/, /^lib\/supabase\/server\.ts$/, /^lib\/docs\//];
+// Server-only code may hold the token: that is the point of the BFF.
+const NOT_BROWSER_CODE = [/^app\/api\//, /^lib\/server\//, /^lib\/auth0\.ts$/, /^lib\/supabase\/server\.ts$/];
 
 function browserFiles(root: string): string[] {
   const out: string[] = [];

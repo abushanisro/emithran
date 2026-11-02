@@ -35,7 +35,6 @@ import { QualityControlModule } from './modules/quality-control/quality-control.
 import { ProjectReportsModule } from './modules/project-reports/project-reports.module';
 import { VaveModule } from './modules/vave/vave.module';
 import { BenchmarkSessionsModule } from './modules/benchmark-sessions/benchmark-sessions.module';
-import { DeveloperModule } from './modules/developer/developer.module';
 import { ProfileModule } from './modules/profile/profile.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
 import { ProcessPlanGeneratorModule } from './modules/process-plan-generator/process-plan-generator.module';
@@ -108,7 +107,6 @@ import { AppController } from './app.controller';
     ProjectReportsModule,
     VaveModule,
     BenchmarkSessionsModule,
-    DeveloperModule,
     ProfileModule,
     OrganizationsModule,
     ProcessPlanGeneratorModule,

@@ -11,10 +11,8 @@ import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
  *   @Authenticated()        any signed-in, invited person, whatever their organizations: their own session, profile, identity,
  *                           and creating their first organization.
  *   @OrgRole('viewer')      reads organization data. @OrgRole('member') edits project data. @OrgRole('admin') changes
- *                           organization-wide settings (budget FX rates, API keys, members, workspaces, forced deletes).
+ *                           organization-wide settings (budget FX rates, members, workspaces, forced deletes).
  *   @PlatformAdmin()        platform-wide actions, for the operators in platform_admins (migration 943) only.
- *
- * @ApiKeyScopes is not a policy: it additionally lets an API key call the route, and the key's owner still needs the route's role.
  */
 export type RequiredOrgRole = 'viewer' | 'member' | 'admin';
 

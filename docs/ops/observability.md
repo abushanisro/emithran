@@ -1,7 +1,6 @@
 # Observability
 
 Operational telemetry (traces, metrics, logs) for the NestJS backend, `cad-engine`, `ecad-engine` and queue jobs.
-Separate from the customer-facing request logs (`backend/src/modules/developer`), which are a product feature and stay as they are.
 
 ## Design rules
 - Applications speak **OTLP only**. The backend is chosen by `OTEL_EXPORTER_OTLP_ENDPOINT`; no vendor SDK in application code.

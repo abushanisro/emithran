@@ -3,7 +3,6 @@ import { ConfigService } from '@nestjs/config';
 
 import { DatabaseModule } from '../../common/database/database.module';
 import { DatabaseService } from '../../common/database/database.service';
-import { ApiKeyAuthService } from './api-key-auth.service';
 import { Auth0TokenVerifier } from './auth0-token-verifier';
 import { AuthController } from './auth.controller';
 import { IdentityService } from './identity.service';
@@ -29,8 +28,7 @@ import { IdentityService } from './identity.service';
         });
       },
     },
-    ApiKeyAuthService,
   ],
-  exports: [IdentityService, ApiKeyAuthService],
+  exports: [IdentityService],
 })
 export class AuthModule {}

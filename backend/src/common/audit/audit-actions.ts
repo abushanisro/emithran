@@ -21,8 +21,6 @@ export const AUDIT_ACTIONS = {
   'member.removed': ['role'],
   'member.role_changed': ['role', 'previousRole'],
   'auth.forbidden': ['reason'],
-  'api_key.created': ['name', 'scopes', 'expiresAt'],
-  'api_key.revoked': ['name'],
   'copilot_memory.changed': ['saved', 'removed', 'via'],
   'copilot_memory.cleared': ['via'],
 } as const satisfies Record<string, readonly string[]>;
