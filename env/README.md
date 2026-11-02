@@ -26,6 +26,7 @@ Build the frontend image **per environment**: `NEXT_PUBLIC_*` values are compile
 | `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | the file bucket and a key limited to it; `S3_ENDPOINT` only for R2 or MinIO | your S3-compatible provider |
 | `TRUSTED_STORAGE_HOSTS` | the bucket's download host, which the file proxy and the browser's 3D viewer may fetch from | your S3-compatible provider |
 | `AUTH0_DOMAIN`, `AUTH0_AUDIENCE`, `AUTH0_CLAIM_NAMESPACE` | the tenant, the API identifier and the post-login Action's claim namespace | Auth0 (docs/CUTOVER_AUTH0_POSTGRES.md) |
+| `AUTH0_TRUSTED_CONNECTIONS` | comma-separated Auth0 connection names whose verified email may link a new login to an invited account: the company SSO connection and the database connection (decision D3). Any other connection is refused unless its login is already linked | Auth0, Authentication (connection names) |
 | `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_SECRET`, `APP_BASE_URL` | the web app's Auth0 application, its session secret and the public app URL; **server only** | Auth0; `AUTH0_SECRET`: `openssl rand -hex 32` |
 | `CAD_ENGINE_API_KEY`, `ECAD_ENGINE_API_KEY` | shared secrets between the backend and the engines | generate: `openssl rand -hex 32` |
 | `TUNNEL_TOKEN` | the Cloudflare Tunnel token; the tunnel is the only way into the host (no published ports) | Cloudflare Zero Trust, Tunnels |

@@ -108,6 +108,7 @@ services:
       AUTH0_DOMAIN: ${AUTH0_DOMAIN:?set AUTH0_DOMAIN in the env file}
       AUTH0_AUDIENCE: ${AUTH0_AUDIENCE:?set AUTH0_AUDIENCE in the env file}
       AUTH0_CLAIM_NAMESPACE: ${AUTH0_CLAIM_NAMESPACE:?set AUTH0_CLAIM_NAMESPACE in the env file}
+      AUTH0_TRUSTED_CONNECTIONS: ${AUTH0_TRUSTED_CONNECTIONS:?set AUTH0_TRUSTED_CONNECTIONS in the env file}
       # The browser's origin; production validation rejects localhost and *.
       CORS_ORIGIN: ${CORS_ORIGIN:?set CORS_ORIGIN (the public frontend URL) in the env file}
       # The only way to reach this container is the Cloudflare tunnel, so the client address comes from CF-Connecting-IP.
