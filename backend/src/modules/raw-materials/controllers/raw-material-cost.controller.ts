@@ -38,9 +38,11 @@ import {
   RawMaterialCostResponseDto,
   RawMaterialCostListResponseDto,
 } from '../dto/raw-material-cost.dto';
+import { OrgRole } from '../../../common/authz/authz-policy';
 
 @ApiTags('Raw Material Costs')
 @ApiBearerAuth()
+@OrgRole('member')
 @Controller('api/raw-material-costs')
 @UseGuards(RequestAuthGuard)
 export class RawMaterialCostController {
@@ -51,6 +53,7 @@ export class RawMaterialCostController {
   /**
    * Get all raw material costs with pagination and filtering
    */
+  @OrgRole('viewer')
   @Get()
   @ApiOperation({ summary: 'Get all raw material costs' })
   @ApiResponse({
@@ -69,6 +72,7 @@ export class RawMaterialCostController {
   /**
    * Get single raw material cost by ID
    */
+  @OrgRole('viewer')
   @Get(':id')
   @ApiOperation({ summary: 'Get raw material cost by ID' })
   @ApiResponse({
@@ -159,6 +163,7 @@ export class RawMaterialCostController {
   /**
    * Get total raw material cost for a BOM item
    */
+  @OrgRole('viewer')
   @Get('bom-item/:bomItemId/total')
   @ApiOperation({ summary: 'Get total raw material cost for a BOM item' })
   @ApiResponse({

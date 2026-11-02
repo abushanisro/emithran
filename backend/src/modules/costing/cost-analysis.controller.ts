@@ -6,9 +6,11 @@ import { LocationComparisonService, LocationComparisonDto } from './location-com
 import { ExcelReportService } from './excel-report.service';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { OrgRole } from '../../common/authz/authz-policy';
 
 @ApiTags('Cost Analysis')
 @ApiBearerAuth()
+@OrgRole('member')
 @Controller({ path: 'api/cost-analysis', version: '1' })
 export class CostAnalysisController {
   constructor(
@@ -17,6 +19,7 @@ export class CostAnalysisController {
     private readonly excelReport: ExcelReportService,
   ) {}
 
+  @OrgRole('viewer')
   @Get('bom-item/:bomItemId')
   @ApiOperation({ summary: 'Get authoritative aggregated cost breakdown for a BOM item. Computes from raw source fields — never reads stale stored totals.' })
   @ApiResponse({ status: 200, description: 'BOM item cost breakdown computed successfully' })
@@ -27,6 +30,7 @@ export class CostAnalysisController {
     return this.costAggregation.computeBomItemCost(bomItemId, token);
   }
 
+  @OrgRole('viewer')
   @Get('bom-item/:bomItemId/excel')
   @ApiOperation({ summary: 'Download a formula-driven Part Cost Report workbook (.xlsx) for a BOM item — editable process/material cost formulas plus a live CAD-calculation-trace verification sheet, all sourced from the same data as the on-screen cost analysis.' })
   @ApiResponse({ status: 200, description: 'XLSX file stream' })
@@ -51,6 +55,7 @@ export class CostAnalysisController {
     res.send(buffer);
   }
 
+  @OrgRole('viewer')
   @Get('bom-item/:bomItemId/location-comparison')
   @ApiOperation({ summary: 'Re-cost the same route across all 10 digital factory locations using their actual MHR+LHR rates, sorted cheapest to most expensive.' })
   @ApiResponse({ status: 200, description: 'Location comparison matrix returned successfully' })

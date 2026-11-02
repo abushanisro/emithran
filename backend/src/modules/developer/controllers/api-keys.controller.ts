@@ -7,10 +7,14 @@ import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../../common/decorators/access-token.decorator';
 import { CurrentOrganization } from '../../../common/decorators/current-organization.decorator';
 import { OrganizationContextGuard } from '../../../common/guards/organization-context.guard';
+import { OrgRole } from '../../../common/authz/authz-policy';
 
 // No @ApiKeyScopes here on purpose: managing keys needs a person signed in, so an API key cannot issue or revoke keys.
+// Issuing a key for the organization is an admin's decision (D5; the database insert policy agrees, migration 944). Anyone may
+// list and revoke their own keys: revoking only ever removes access.
 @ApiTags('Developer - API Keys')
 @ApiBearerAuth()
+@OrgRole('viewer')
 @Controller({ path: 'api/developer/api-keys', version: '1' })
 export class ApiKeysController {
   constructor(private readonly apiKeysService: ApiKeysService) {}
@@ -23,6 +27,7 @@ export class ApiKeysController {
   }
 
   @Post()
+  @OrgRole('admin')
   @UseGuards(OrganizationContextGuard)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create an API key for your organization; the raw key is returned only once' })

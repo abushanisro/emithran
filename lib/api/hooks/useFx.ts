@@ -97,13 +97,17 @@ export function useExchangeRates(enabled = true) {
 /**
  * Sets a new budget rate for one currency (a reason is required; the old
  * rate is kept as history server-side). Invalidates every FX query, since
- * budget conversions and the currency list both read this table.
+ * budget conversions and the currency list both read this table. Organization
+ * admins only. A change beyond the server's limit is refused with
+ * FX_RATE_CHANGE_NEEDS_CONFIRMATION until it is sent again with `confirm`.
  */
+export const FX_RATE_CHANGE_NEEDS_CONFIRMATION = 'FX_RATE_CHANGE_NEEDS_CONFIRMATION';
+
 export function useSetExchangeRate() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ currency, rate, reason }: { currency: string; rate: number; reason: string }) =>
-      apiClient.put<ExchangeRateRow[]>(`/fx/exchange-rates/${encodeURIComponent(currency)}`, { rate, reason }),
+    mutationFn: ({ currency, rate, reason, confirm }: { currency: string; rate: number; reason: string; confirm?: boolean }) =>
+      apiClient.put<ExchangeRateRow[]>(`/fx/exchange-rates/${encodeURIComponent(currency)}`, { rate, reason, ...(confirm ? { confirm: true } : {}) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['fx'] });
     },

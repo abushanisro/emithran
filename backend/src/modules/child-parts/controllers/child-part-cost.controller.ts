@@ -38,8 +38,10 @@ import {
   ChildPartCostListResponseDto,
   CalculateChildPartCostDto,
 } from '../dto/child-part-cost.dto';
+import { OrgRole } from '../../../common/authz/authz-policy';
 
 @ApiTags('Child Part Costs')
+@OrgRole('member')
 @Controller('api/child-part-costs')
 @UseGuards(RequestAuthGuard)
 @ApiBearerAuth()
@@ -49,6 +51,7 @@ export class ChildPartCostController {
   /**
    * Get all child part cost records with pagination and filtering
    */
+  @OrgRole('viewer')
   @Get()
   @ApiOperation({
     summary: 'Get all child part cost records',
@@ -73,6 +76,7 @@ export class ChildPartCostController {
   /**
    * Get a single child part cost record by ID
    */
+  @OrgRole('viewer')
   @Get(':id')
   @ApiOperation({
     summary: 'Get child part cost by ID',
@@ -95,6 +99,7 @@ export class ChildPartCostController {
   /**
    * Get child part cost by BOM item ID
    */
+  @OrgRole('viewer')
   @Get('bom-item/:bomItemId')
   @ApiOperation({
     summary: 'Get child part cost by BOM item ID',

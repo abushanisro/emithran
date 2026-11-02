@@ -34,7 +34,7 @@ function makeExchangeRateService(rows: ReferenceRow[] = REFERENCE): ExchangeRate
   };
   // the organization has no budget rates of its own: the global defaults apply
   const databaseService = { getUserClient: () => ({ from: () => query, rpc: async () => ({ data: [], error: null }) }) } as any;
-  return new ExchangeRateService(databaseService, {} as any);
+  return new ExchangeRateService(databaseService, {} as any, {} as any, {} as any);
 }
 
 function makeFakeFxRateCacheService() {

@@ -22,13 +22,16 @@ import { AccessToken } from '../../common/decorators/access-token.decorator';
 import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
 import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
 import { ApiKeyScopes } from '../../common/decorators/api-key-scopes.decorator';
+import { OrgRole } from '../../common/authz/authz-policy';
 
 @ApiTags('Projects')
 @ApiBearerAuth()
+@OrgRole('member')
 @Controller({ path: 'api/projects', version: '1' })
 export class ProjectsController {
   constructor(private readonly projectsService: ProjectsService) {}
 
+  @OrgRole('viewer')
   @Get()
   @ApiKeyScopes('projects:read')
   @ApiOperation({ summary: 'Get all projects with pagination' })
@@ -37,6 +40,7 @@ export class ProjectsController {
     return this.projectsService.findAll(query, user.id, token);
   }
 
+  @OrgRole('viewer')
   @Get(':id')
   @ApiKeyScopes('projects:read')
   @ApiOperation({ summary: 'Get project by ID' })
@@ -90,6 +94,7 @@ export class ProjectsController {
     return this.projectsService.remove(id, user.id, token);
   }
 
+  @OrgRole('viewer')
   @Get(':id/cost-analysis')
   @ApiOperation({ summary: 'Get project cost analysis' })
   @ApiResponse({ status: 200, description: 'Cost analysis retrieved successfully' })
@@ -101,6 +106,7 @@ export class ProjectsController {
   // TEAM MEMBER ENDPOINTS
   // ============================================================================
 
+  @OrgRole('viewer')
   @Get(':id/team')
   @ApiOperation({ summary: 'Get project team members' })
   @ApiResponse({ status: 200, description: 'Team members retrieved successfully', type: TeamMembersListResponseDto })

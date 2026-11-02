@@ -6,18 +6,27 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { apiConfig } from '@/lib/api/config'
 import { sessionSource } from '@/lib/auth/session-source'
 import { appReadiness } from '@/lib/core/app-readiness'
-import { AuthContext, type AuthContextType, type AuthUser } from '@/lib/providers/auth-context'
+import { AuthContext, type AuthContextType, type AuthUser, type OrganizationRole } from '@/lib/providers/auth-context'
 
-type Me = { state: 'loading' } | { state: 'denied' } | { state: 'failed' } | { state: 'ok'; id: string; email: string }
+type Me =
+  | { state: 'loading' }
+  | { state: 'denied' }
+  | { state: 'failed' }
+  | { state: 'ok'; id: string; email: string; organizationRole: OrganizationRole | null; platformAdmin: boolean }
 
-/** Asks the backend who this login is. 403 means signed in with Auth0 but never invited. */
+/** Asks the backend who this login is, and the role it acts with. 403 means signed in with Auth0 but never invited. */
 async function fetchMe(): Promise<Me> {
   try {
     const res = await fetch(`${apiConfig.endpoints.api.v1}/auth/me`, { cache: 'no-store' })
     if (res.status === 403) return { state: 'denied' }
     if (!res.ok) return { state: 'failed' }
-    const body = (await res.json()) as { data?: { id?: string; email?: string } }
-    return body.data?.id ? { state: 'ok', id: body.data.id, email: body.data.email ?? '' } : { state: 'failed' }
+    const body = (await res.json()) as {
+      data?: { id?: string; email?: string; organizationRole?: OrganizationRole | null; platformAdmin?: boolean }
+    }
+    const me = body.data
+    return me?.id
+      ? { state: 'ok', id: me.id, email: me.email ?? '', organizationRole: me.organizationRole ?? null, platformAdmin: me.platformAdmin === true }
+      : { state: 'failed' }
   } catch {
     return { state: 'failed' }
   }
@@ -69,7 +78,16 @@ export function Auth0AuthProvider({ children }: { children: React.ReactNode }) {
   }, [auth0User, isLoading])
 
   const user = useMemo<AuthUser | null>(
-    () => (me.state === 'ok' ? { id: me.id, email: me.email, user_metadata: { full_name: auth0User?.name ?? '', avatar_url: auth0User?.picture ?? '' } } : null),
+    () =>
+      me.state === 'ok'
+        ? {
+            id: me.id,
+            email: me.email,
+            user_metadata: { full_name: auth0User?.name ?? '', avatar_url: auth0User?.picture ?? '' },
+            organizationRole: me.organizationRole,
+            platformAdmin: me.platformAdmin,
+          }
+        : null,
     [me, auth0User],
   )
 

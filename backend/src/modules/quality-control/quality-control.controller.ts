@@ -32,9 +32,11 @@ import {
   CreateDetailedInspectionReportDto,
   DetailedInspectionReportResponseDto,
 } from './dto/detailed-inspection-report.dto';
+import { OrgRole } from '../../common/authz/authz-policy';
 
 @ApiTags('Quality Control')
 @ApiBearerAuth()
+@OrgRole('member')
 @Controller('api/quality-control')
 @UseGuards(RequestAuthGuard)
 export class QualityControlController {
@@ -84,6 +86,7 @@ export class QualityControlController {
     }
   }
 
+  @OrgRole('viewer')
   @Get('inspections')
   @ApiOperation({ summary: 'Get all quality inspections' })
   @ApiResponse({ status: 200, description: 'Inspections retrieved successfully' })
@@ -107,6 +110,7 @@ export class QualityControlController {
     }
   }
 
+  @OrgRole('viewer')
   @Get('inspections/:id')
   @ApiOperation({ summary: 'Get quality inspection by ID' })
   @ApiResponse({ status: 200, description: 'Inspection retrieved successfully' })
@@ -189,6 +193,7 @@ export class QualityControlController {
     return createResponse(result);
   }
 
+  @OrgRole('viewer')
   @Get('inspections/:id/results')
   @ApiOperation({ summary: 'Get inspection results' })
   @ApiResponse({ status: 200, description: 'Results retrieved successfully' })
@@ -305,6 +310,7 @@ export class QualityControlController {
     return createResponse(result);
   }
 
+  @OrgRole('viewer')
   @Get('non-conformances')
   @ApiOperation({ summary: 'Get all non-conformances' })
   @ApiResponse({ status: 200, description: 'Non-conformances retrieved successfully' })
@@ -325,6 +331,7 @@ export class QualityControlController {
   // QUALITY METRICS & REPORTING ENDPOINTS
   // ============================================================================
 
+  @OrgRole('viewer')
   @Get('projects/:projectId/metrics')
   @ApiOperation({ summary: 'Get quality metrics for project' })
   @ApiResponse({ status: 200, description: 'Metrics retrieved successfully' })
@@ -348,6 +355,7 @@ export class QualityControlController {
     }
   }
 
+  @OrgRole('viewer')
   @Get('projects/:projectId/quality-report')
   @ApiOperation({ summary: 'Generate quality report' })
   @ApiResponse({ status: 200, description: 'Report generated successfully' })
@@ -374,6 +382,7 @@ export class QualityControlController {
   // DASHBOARD ENDPOINTS
   // ============================================================================
 
+  @OrgRole('viewer')
   @Get('projects/:projectId/dashboard')
   @ApiOperation({ summary: 'Get quality control dashboard data' })
   @ApiResponse({ status: 200, description: 'Dashboard data retrieved successfully' })
@@ -420,6 +429,7 @@ export class QualityControlController {
     }
   }
 
+  @OrgRole('viewer')
   @Get('inspections/:id/detailed-report')
   @ApiOperation({ summary: 'Get detailed inspection report' })
   @ApiResponse({ status: 200, description: 'Report retrieved successfully', type: DetailedInspectionReportResponseDto })

@@ -7,6 +7,8 @@ import { SheetMetalCatalogOperationsService } from './costing/sheet-metal/operat
 import type { SheetMetalFeature } from './costing/sheet-metal/operation/catalog-operation-resolver';
 import { Injectable, Logger, NotFoundException, InternalServerErrorException, BadRequestException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { DatabaseService } from '../../common/database/database.service';
+import { quoteFilterValue } from '../../common/db/postgrest-filter';
+import { expandSearchTermSpellingVariants } from '../raw-materials/material-search-spelling';
 import { CreateBOMItemDto, UpdateBOMItemDto } from './dto/bom-items.dto';
 import { BOM_ITEM_DTO_COLUMNS, BOMItemResponseDto, BOMItemListResponseDto } from './dto/bom-item-response.dto';
 import { RecentKeys } from '../../common/cache/recent-keys';
@@ -166,7 +168,16 @@ function appendLines<T extends CostSummaryDto>(dto: T, lines: ProcessLineCost[])
 
 /** Refusal when a BOM item is still used by a production lot the caller does not own (BOMItemsService.remove). */
 export const IN_ANOTHER_MEMBERS_LOT =
-  'This part is used in a production lot owned by another member; remove it from that lot first';
+  'This part is used in a production lot owned by another member; remove it from that lot first, or ask an organization admin to force the delete';
+
+/** The machine-readable code of that refusal; `details` carries the blocking lots (LotBlockers). */
+export const BOM_ITEM_IN_PRODUCTION_LOTS = 'BOM_ITEM_IN_PRODUCTION_LOTS';
+
+/** Production lots that use a BOM item: the ids of those the caller can see, and how many more they cannot. */
+export interface LotBlockers {
+  visibleLotIds: string[];
+  hiddenLotCount: number;
+}
 
 @Injectable()
 export class BOMItemsService {
@@ -681,8 +692,9 @@ export class BOMItemsService {
    * Deletes a BOM item and the references the caller may remove: their production lot materials, the item's process routes
    * (and steps), and the parent link of its children. Everything is written as the caller (RLS). Production lot materials are
    * readable and writable only by the owner of the lot's BOM (migration 067) and reference the item ON DELETE RESTRICT, so when
-   * another member's lot uses the part the delete is refused before anything is changed, never forced through with the
-   * privileged client.
+   * another member's lot uses the part the delete is refused before anything is changed, with 409 BOM_ITEM_IN_PRODUCTION_LOTS
+   * naming the blocking lots (LotBlockers); never forced through with the privileged client. An organization admin can force it
+   * with forceRemove().
    */
   async remove(
     id: string,
@@ -702,19 +714,11 @@ export class BOMItemsService {
     if (!item) throw new NotFoundException(`BOM item with ID ${id} not found`);
 
     // Production lot materials: the caller's own (visible under RLS) are removed below; any the caller cannot see belong to a
-    // lot owned by another member, and the item must not be deleted from under them. Counting all of them is the only
-    // privileged step, and it only reads.
-    const { data: visible, error: visibleError } = await client.from('production_lot_materials').select('id').eq('bom_item_id', id);
-    if (visibleError) fail('could not check production lot materials', visibleError);
-    const { count: total, error: totalError } = await this.databaseService
-      .getPrivilegedClient('bom-item delete: count production_lot_materials referencing a BOM item the caller can see, to refuse when another member\'s lot uses it (read only)')
-      .from('production_lot_materials')
-      .select('id', { count: 'exact', head: true })
-      .eq('bom_item_id', id);
-    if (totalError || total == null) fail('could not check production lot materials', totalError ?? { message: 'no count returned' });
-    if ((total as number) > (visible?.length ?? 0)) throw new ConflictException(IN_ANOTHER_MEMBERS_LOT);
+    // lot owned by another member, and the item must not be deleted from under them.
+    const blockers = await this.lotBlockers(client, id, fail);
+    if (blockers.hiddenLotCount > 0) throw this.inProductionLots(blockers);
 
-    if (visible && visible.length > 0) {
+    if (blockers.visibleLotIds.length > 0) {
       const { error } = await client.from('production_lot_materials').delete().eq('bom_item_id', id);
       if (error) fail('could not remove production lot materials', error);
     }
@@ -735,7 +739,7 @@ export class BOMItemsService {
     if (deleteError) {
       if (deleteError.code === '23503') {
         // a lot material added by another member since the check above
-        if (deleteError.message.includes('production_lot_materials')) throw new ConflictException(IN_ANOTHER_MEMBERS_LOT);
+        if (deleteError.message.includes('production_lot_materials')) throw this.inProductionLots(await this.lotBlockers(client, id, fail));
         throw new ConflictException(
           `Cannot delete BOM item "${item.part_number || id}": it is referenced by other data. Remove those references first.`,
         );
@@ -744,6 +748,112 @@ export class BOMItemsService {
       fail('could not delete the item', deleteError);
     }
     this.logger.log(`Deleted BOM item "${item.part_number || id}"`);
+  }
+
+  /**
+   * An organization admin's delete of an item other members' production lots still use: delete_bom_item_cascade() (migration 945)
+   * checks the caller is an admin of the item's organization, removes every lot's reference to it, its routes and the item, and
+   * writes the audit event, in one transaction, as one reviewed SECURITY DEFINER function.
+   */
+  async forceRemove(id: string, accessToken: string): Promise<{ lotMaterials: number; lots: number }> {
+    const { data, error } = await this.databaseService.getUserClient(accessToken).rpc('delete_bom_item_cascade', { p_item_id: id });
+    if (error) {
+      if (error.code === 'P0002') throw new NotFoundException(`BOM item with ID ${id} not found`);
+      if (error.code === '42501') throw new ForbiddenException('Only an admin of the item\'s organization can force its delete.');
+      this.logger.error(`BOM item ${id}: forced delete failed: ${error.message}`);
+      throw new InternalServerErrorException(`Failed to delete BOM item: ${error.message}`);
+    }
+    return data as { lotMaterials: number; lots: number };
+  }
+
+  /**
+   * The production lots using an item: the lot materials the caller can see (their own lots) give the visible lot ids; reading
+   * every lot material of the item is the one privileged step, read only, and only its count of other lots leaves this method.
+   */
+  private async lotBlockers(
+    client: ReturnType<DatabaseService['getUserClient']>,
+    id: string,
+    fail: (what: string, error: { message: string }) => never,
+  ): Promise<LotBlockers> {
+    const { data: visible, error: visibleError } = await client.from('production_lot_materials').select('production_lot_id').eq('bom_item_id', id);
+    if (visibleError) fail('could not check production lot materials', visibleError);
+    const { data: all, error: allError } = await this.databaseService
+      .getPrivilegedClient('bom-item delete: which production lots use a BOM item the caller can see, to refuse when another member\'s lot uses it (read only)')
+      .from('production_lot_materials')
+      .select('production_lot_id')
+      .eq('bom_item_id', id);
+    if (allError || !all) fail('could not check production lot materials', allError ?? { message: 'no rows returned' });
+    const lotsOf = (rows: unknown) => new Set(((rows ?? []) as Array<{ production_lot_id: string }>).map((r) => r.production_lot_id));
+    const visibleLots = lotsOf(visible);
+    const hiddenLotCount = [...lotsOf(all)].filter((lot) => !visibleLots.has(lot)).length;
+    return { visibleLotIds: [...visibleLots].sort(), hiddenLotCount };
+  }
+
+  private inProductionLots(blockers: LotBlockers): ConflictException {
+    return new ConflictException({ code: BOM_ITEM_IN_PRODUCTION_LOTS, message: IN_ANOTHER_MEMBERS_LOT, details: blockers });
+  }
+
+  /**
+   * Density of a material grade (g/cm³): the curated material_density_lookup reference table first (exact, then partial match, any
+   * real spelling variant), then the caller's own raw materials. Nulls when nothing plausible is found.
+   */
+  async materialDensity(
+    grade: string,
+    accessToken: string,
+  ): Promise<{ density_g_cm3: number | null; material_name: string | null; material_grade: string | null }> {
+    const none = { density_g_cm3: null, material_name: null, material_grade: null };
+    const g = grade.trim();
+    if (!g) return none;
+    const client = this.databaseService.getPrivilegedClient('reference-data: material_density_lookup, global shared');
+    // Same real AmE/BrE spelling variants the Material search already reconciles (material-search-spelling.ts): a drawing
+    // extracting "ALUMINIUM" must resolve to the same "Aluminum"-spelled rows the search box finds.
+    const variants = expandSearchTermSpellingVariants(g);
+    const orClause = (columns: string[], wildcard: boolean) =>
+      variants.flatMap((v) => {
+        const pattern = wildcard ? `%${v}%` : v;
+        return columns.map((col) => `${col}.ilike.${quoteFilterValue(pattern)}`);
+      }).join(',');
+
+    // 1. Exact match in the curated lookup table, 2. partial match there
+    let { data } = await client
+      .from('material_density_lookup')
+      .select('material_name, material_grade, density_g_cm3')
+      .or(orClause(['material_grade'], false))
+      .limit(1)
+      .maybeSingle();
+    if (!data) {
+      ({ data } = await client
+        .from('material_density_lookup')
+        .select('material_name, material_grade, density_g_cm3')
+        .or(orClause(['material_grade', 'material_name'], true))
+        .limit(1)
+        .maybeSingle());
+    }
+
+    // 3. The caller's own raw materials (density in g/cm³), org-scoped: read as the caller, never with the service role.
+    if (!data) {
+      const rm = await this.databaseService.getUserClient(accessToken)
+        .from('raw_materials')
+        .select('grade, name, density')
+        .or(orClause(['name', 'grade'], true))
+        .not('density', 'is', null)
+        .limit(1)
+        .maybeSingle();
+      if (rm.data) {
+        const d = parseFloat(rm.data.density);
+        // Real engineering materials are 0.5–22 g/cm³
+        if (isFinite(d) && d >= 0.5 && d <= 22) {
+          return { density_g_cm3: d, material_name: rm.data.grade, material_grade: rm.data.name };
+        }
+      }
+    }
+
+    if (!data) return none;
+    return {
+      density_g_cm3: parseFloat(data.density_g_cm3),
+      material_name: data.material_name,
+      material_grade: data.material_grade,
+    };
   }
 
   async getBOMIdForItem(

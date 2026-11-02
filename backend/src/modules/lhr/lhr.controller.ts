@@ -22,9 +22,11 @@ import { LHRService } from './lhr.service';
 import { CreateLHRDto, UpdateLHRDto } from './lhr.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
+import { OrgRole } from '../../common/authz/authz-policy';
 
 @ApiTags('LHR')
 @ApiBearerAuth()
+@OrgRole('member')
 @Controller({ path: 'api/lhr', version: '1' })
 export class LHRController {
   constructor(private readonly LHRService: LHRService) { }
@@ -42,6 +44,7 @@ export class LHRController {
     return this.LHRService.create(CreateLHRDto, user.id, token);
   }
 
+  @OrgRole('viewer')
   @Get()
   @ApiOperation({ summary: 'Get all LHR records with optional search' })
   @ApiResponse({ status: 200, description: 'LHR records retrieved successfully' })
@@ -53,6 +56,7 @@ export class LHRController {
     return this.LHRService.findAll(search, user.id, token);
   }
 
+  @OrgRole('viewer')
   @Get('count')
   @ApiOperation({ summary: 'Number of LHR records, without the rows' })
   async count(@AccessToken() token: string) {
@@ -60,6 +64,7 @@ export class LHRController {
   }
 
 
+  @OrgRole('viewer')
   @Get('benchmark')
   @ApiOperation({ summary: 'Get global benchmark LHR rates (no auth required beyond JWT)' })
   @ApiResponse({ status: 200, description: 'Benchmark LHR rates from lhr_benchmark_rates table' })
@@ -67,6 +72,7 @@ export class LHRController {
     return this.LHRService.getBenchmarkRates(location);
   }
 
+  @OrgRole('viewer')
   @Get('effective-rate')
   @ApiOperation({ summary: 'Preview the real cost-engine-aligned labor rate for a (location, process_group)' })
   @ApiResponse({ status: 200, description: 'Resolved rate, or null with source "none" if nothing is on file' })
@@ -81,6 +87,7 @@ export class LHRController {
     return this.LHRService.getEffectiveRate(location, processGroup, token);
   }
 
+  @OrgRole('viewer')
   @Get('code/:labourCode')
   @ApiOperation({ summary: 'Get LHR record by labour code' })
   @ApiResponse({ status: 200, description: 'LHR record retrieved successfully' })
@@ -93,6 +100,7 @@ export class LHRController {
     return this.LHRService.findByLabourCode(labourCode, user.id, token);
   }
 
+  @OrgRole('viewer')
   @Get(':id')
   @ApiOperation({ summary: 'Get LHR record by ID' })
   @ApiResponse({ status: 200, description: 'LHR record retrieved successfully' })

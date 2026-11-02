@@ -37,9 +37,11 @@ import {
 } from './dto/process-route-response.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
+import { OrgRole } from '../../common/authz/authz-policy';
 
 @ApiTags('Process Routes')
 @ApiBearerAuth()
+@OrgRole('member')
 @Controller({ path: 'api/process-routes', version: '1' })
 export class ProcessRoutesController {
   constructor(private readonly processRoutesService: ProcessRoutesService) {}
@@ -48,6 +50,7 @@ export class ProcessRoutesController {
   // PROCESS ROUTES CRUD
   // ============================================================================
 
+  @OrgRole('viewer')
   @Get()
   @ApiOperation({ summary: 'Get all process routes with filtering and pagination' })
   @ApiResponse({
@@ -63,6 +66,7 @@ export class ProcessRoutesController {
     return this.processRoutesService.findAll(query, user.id, token);
   }
 
+  @OrgRole('viewer')
   @Get(':id')
   @ApiOperation({ summary: 'Get process route by ID' })
   @ApiResponse({
@@ -208,6 +212,7 @@ export class ProcessRoutesController {
     return this.processRoutesService.archive(id, dto, user.id, token);
   }
 
+  @OrgRole('viewer')
   @Get(':id/workflow/history')
   @ApiOperation({ summary: 'Get workflow history for process route' })
   @ApiResponse({
@@ -227,6 +232,7 @@ export class ProcessRoutesController {
   // PROCESS ROUTE STEPS MANAGEMENT
   // ============================================================================
 
+  @OrgRole('viewer')
   @Get(':id/steps')
   @ApiOperation({ summary: 'Get all steps for a process route' })
   @ApiResponse({
@@ -327,6 +333,7 @@ export class ProcessRoutesController {
     return this.processRoutesService.executeCalculator(routeId, stepId, dto, user.id, token);
   }
 
+  @OrgRole('viewer')
   @Get(':id/cost-summary')
   @ApiOperation({ summary: 'Get cost summary for process route' })
   @ApiResponse({
@@ -346,6 +353,7 @@ export class ProcessRoutesController {
   // SESSION MANAGEMENT
   // ============================================================================
 
+  @OrgRole('viewer')
   @Get('sessions/active')
   @ApiOperation({ summary: 'Get active session for user and BOM item' })
   @ApiResponse({
@@ -380,6 +388,7 @@ export class ProcessRoutesController {
   // USER ROLES MANAGEMENT
   // ============================================================================
 
+  @OrgRole('viewer')
   @Get('roles/me')
   @ApiOperation({ summary: 'Get current user roles' })
   @ApiResponse({

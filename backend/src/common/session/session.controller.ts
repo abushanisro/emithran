@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsIn } from 'class-validator';
+import { Authenticated } from '../authz/authz-policy';
 import { CurrentUser } from '../decorators/current-user.decorator';
 import { SessionId } from './session-id.decorator';
 import { SessionActivityService, type ActivityKind } from './session-activity.service';
@@ -24,6 +25,7 @@ export interface SessionStatusDto {
  */
 @ApiTags('Session')
 @ApiBearerAuth()
+@Authenticated()
 @Controller({ path: 'api/auth/session', version: '1' })
 export class SessionController {
   constructor(private readonly sessionActivity: SessionActivityService) {}

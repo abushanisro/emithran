@@ -24,9 +24,11 @@ import {
   QueryAssemblyBreakdownDto,
   CreateAssemblyBreakdownDto,
 } from './dto/should-cost.dto';
+import { OrgRole, PlatformAdmin } from '../../common/authz/authz-policy';
 
 @ApiTags('Should-Cost Intelligence')
 @ApiBearerAuth()
+@OrgRole('member')
 @Controller({ path: 'api/should-cost', version: '1' })
 export class ShouldCostController {
   constructor(
@@ -36,8 +38,10 @@ export class ShouldCostController {
 
   // ── Calibration ──────────────────────────────────────────────────────────────
   // Read-only. Running a calibration and recording actuals are operator work (scripts/should-cost-calibrate.ts), never an HTTP
-  // request: a run changes the global BENCHMARK machine-hour rates every organization uses.
+  // request: a run changes the global BENCHMARK machine-hour rates every organization uses. The history is platform-wide (it
+  // describes every organization's actuals in aggregate), so only platform administrators read it.
 
+  @PlatformAdmin()
   @Get('calibration/history')
   @ApiOperation({ summary: 'Return past calibration run history, most recent first' })
   @ApiQuery({ name: 'limit', required: false, description: 'Max rows to return (default 50)' })
@@ -48,6 +52,7 @@ export class ShouldCostController {
 
   // ── Analytics views (before parameterised routes to prevent routing conflict) ─
 
+  @OrgRole('viewer')
   @Get('analytics/win-rate')
   @ApiOperation({ summary: 'Win rate by process — from rfq_win_rate_by_process view' })
   @ApiResponse({ status: 200, description: 'Win rate analytics per process' })
@@ -55,6 +60,7 @@ export class ShouldCostController {
     return this.service.getWinRateByProcess(user.id, token);
   }
 
+  @OrgRole('viewer')
   @Get('analytics/estimation-accuracy')
   @ApiOperation({ summary: 'Estimation accuracy by process — avg variance % from actuals' })
   @ApiResponse({ status: 200, description: 'Estimation accuracy analytics' })
@@ -62,6 +68,7 @@ export class ShouldCostController {
     return this.service.getEstimationAccuracy(user.id, token);
   }
 
+  @OrgRole('viewer')
   @Get('analytics/price-to-win')
   @ApiOperation({ summary: 'Price-to-win intelligence — lost RFQ price gap analysis' })
   @ApiResponse({ status: 200, description: 'Price-to-win analytics per process' })
@@ -69,6 +76,7 @@ export class ShouldCostController {
     return this.service.getPriceToWin(user.id, token);
   }
 
+  @OrgRole('viewer')
   @Get('analytics/bom-cost-drivers')
   @ApiOperation({ summary: 'BOM cost driver analysis — top cost contributors across assemblies' })
   @ApiResponse({ status: 200, description: 'BOM cost driver analytics' })
@@ -78,6 +86,7 @@ export class ShouldCostController {
 
   // ── RFQ History ──────────────────────────────────────────────────────────────
 
+  @OrgRole('viewer')
   @Get('rfq')
   @ApiOperation({ summary: 'List RFQ history with status and process filters' })
   @ApiResponse({ status: 200, description: 'Paginated RFQ history' })
@@ -89,6 +98,7 @@ export class ShouldCostController {
     return this.service.listRfq(query, user.id, token);
   }
 
+  @OrgRole('viewer')
   @Get('rfq/:id')
   @ApiParam({ name: 'id', description: 'RFQ UUID' })
   @ApiOperation({ summary: 'Get a single RFQ record' })
@@ -137,6 +147,7 @@ export class ShouldCostController {
 
   // ── Quote Line Items ─────────────────────────────────────────────────────────
 
+  @OrgRole('viewer')
   @Get('quote-line-items')
   @ApiOperation({ summary: 'List quote line items; filter by rfqId' })
   listLineItems(
@@ -147,6 +158,7 @@ export class ShouldCostController {
     return this.service.listLineItems(query, user.id, token);
   }
 
+  @OrgRole('viewer')
   @Get('quote-line-items/:id')
   @ApiParam({ name: 'id', description: 'Line item UUID' })
   @ApiOperation({ summary: 'Get a single quote line item' })
@@ -194,6 +206,7 @@ export class ShouldCostController {
 
   // ── Quote Outcomes ────────────────────────────────────────────────────────────
 
+  @OrgRole('viewer')
   @Get('quote-outcomes')
   @ApiOperation({ summary: 'List quote outcomes; filter by rfqId or outcome (Won/Lost)' })
   listOutcomes(
@@ -228,6 +241,7 @@ export class ShouldCostController {
 
   // ── Actual vs Estimated ───────────────────────────────────────────────────────
 
+  @OrgRole('viewer')
   @Get('actuals')
   @ApiOperation({ summary: 'List actual vs estimated cost records; total_variance_pct is DB-computed' })
   listActuals(
@@ -262,6 +276,7 @@ export class ShouldCostController {
 
   // ── BOM Cost Snapshots ────────────────────────────────────────────────────────
 
+  @OrgRole('viewer')
   @Get('bom-snapshots')
   @ApiOperation({ summary: 'List BOM cost snapshots; filter by projectId' })
   listBomSnapshots(
@@ -272,6 +287,7 @@ export class ShouldCostController {
     return this.service.listBomSnapshots(query, user.id, token);
   }
 
+  @OrgRole('viewer')
   @Get('bom-snapshots/:id')
   @ApiParam({ name: 'id', description: 'Snapshot UUID' })
   @ApiOperation({ summary: 'Get a BOM snapshot with cost_per_unit_usd computed column' })
@@ -307,6 +323,7 @@ export class ShouldCostController {
 
   // ── Assembly Cost Breakdown ───────────────────────────────────────────────────
 
+  @OrgRole('viewer')
   @Get('assembly-breakdown')
   @ApiOperation({ summary: 'List assembly cost breakdown rows; filter by bomSnapshotId' })
   listAssemblyBreakdown(

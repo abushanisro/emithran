@@ -21,14 +21,17 @@ import {
   ProductionProcessResponseDto,
   LotVendorAssignmentResponseDto as VendorAssignmentResponseDto,
 } from '../dto/production-lot.dto';
+import { OrgRole } from '../../../common/authz/authz-policy';
 
 @ApiTags('Production Processes')
+@OrgRole('member')
 @Controller('api/production-planning/processes')
 @UseGuards(RequestAuthGuard)
 export class ProductionProcessController {
   constructor(private readonly productionProcessService: ProductionProcessService) { }
 
 
+  @OrgRole('viewer')
   @Get('/:id')
   @ApiOperation({ summary: 'Get production process by ID' })
   @ApiResponse({ type: ProductionProcessResponseDto })
@@ -49,6 +52,7 @@ export class ProductionProcessController {
     return this.productionProcessService.deleteProductionProcess(id, user.id);
   }
 
+  @OrgRole('viewer')
   @Get('/lot/:lotId')
   @ApiOperation({ summary: 'Get all processes for a production lot' })
   @ApiResponse({ type: [ProductionProcessResponseDto] })
@@ -70,6 +74,7 @@ export class ProductionProcessController {
     return this.productionProcessService.assignVendorToProcess(processId, assignmentDto, user.id);
   }
 
+  @OrgRole('viewer')
   @Get('/:processId/vendor-assignments')
   @ApiOperation({ summary: 'Get vendor assignments for process' })
   @ApiResponse({ type: [VendorAssignmentResponseDto] })

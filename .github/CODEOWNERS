@@ -1,0 +1,9 @@
+# Security-sensitive paths: a change here needs a review by a code owner (docs/GOVERNANCE.md#branch-protection).
+#   backend/migrations/                     row-level security, SECURITY DEFINER functions, grants
+#   backend/src/common/guards/              who may call the API (RequestAuthGuard, AuthzGuard, OrganizationContextGuard)
+#   backend/src/common/authz/               the authorization policies and role checks AuthzGuard applies
+#   backend/scripts/rls-bypass-baseline.json  the privileged database client budget; raising it is a reviewed decision
+/backend/migrations/                        @abushanisro
+/backend/src/common/guards/                 @abushanisro
+/backend/src/common/authz/                  @abushanisro
+/backend/scripts/rls-bypass-baseline.json   @abushanisro

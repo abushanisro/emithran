@@ -38,6 +38,7 @@ import { isArchiveName } from '../../../common/archive/expand-archive';
 import { isFolderUpload, parseUploadPaths } from '../domain/uploads/upload-paths';
 import { acceptedFormats, MAX_UPLOAD_BYTES } from '../domain/uploads/validate-upload';
 import { ElectronicsRepository, type CostResultRow, type RevisionRow } from '../infrastructure/repositories/electronics.repository';
+import { OrgRole } from '../../../common/authz/authz-policy';
 
 interface User {
   id: string;
@@ -105,6 +106,7 @@ export function toCostResultView(row: CostResultRow): CostResultView {
 @ApiTags('Electronics costing')
 @ApiBearerAuth()
 @UseGuards(OrganizationContextGuard)
+@OrgRole('member')
 @Controller({ path: 'api/electronics', version: '1' })
 export class ElectronicsController {
   constructor(
@@ -211,12 +213,14 @@ export class ElectronicsController {
     });
   }
 
+  @OrgRole('viewer')
   @Get('file-formats')
   @ApiOperation({ summary: 'The file types an upload accepts, with the role each board file extension has' })
   formats() {
     return acceptedFormats();
   }
 
+  @OrgRole('viewer')
   @Get('uploads/:uploadId/features')
   @ApiOperation({ summary: 'An upload with its file report, extracted feature graph (provenance, unresolved, findings) and attached documents' })
   async features(@Param('uploadId', ParseUUIDPipe) uploadId: string, @AccessToken() token: string) {
@@ -238,6 +242,7 @@ export class ElectronicsController {
     };
   }
 
+  @OrgRole('viewer')
   @Get('uploads/:uploadId/preview')
   @ApiOperation({ summary: 'The layers of an uploaded board set drawn as SVG on one shared frame' })
   async preview(
@@ -248,6 +253,7 @@ export class ElectronicsController {
     return this.boardPreview.execute(uploadId, organizationId, token);
   }
 
+  @OrgRole('viewer')
   @Get('uploads/:uploadId/thumbnail')
   @ApiOperation({ summary: 'A small SVG picture of the board for list cards, served from storage (svg is null when none can be shown)' })
   async thumbnail(
@@ -258,6 +264,7 @@ export class ElectronicsController {
     return this.boardPreview.thumbnail(uploadId, organizationId, token);
   }
 
+  @OrgRole('viewer')
   @Get('designs')
   @ApiOperation({ summary: 'Designs of the organization (optionally one project), each with its revisions and their upload status' })
   async listDesigns(@Query() query: ListDesignsDto, @AccessToken() token: string): Promise<DesignView[]> {
@@ -316,12 +323,14 @@ export class ElectronicsController {
     return this.reparse.execute({ uploadId, organizationId, userId: user.id, token });
   }
 
+  @OrgRole('viewer')
   @Get('designs/:designId')
   @ApiOperation({ summary: 'One design with its revisions and their upload status' })
   async getDesign(@Param('designId', ParseUUIDPipe) designId: string, @AccessToken() token: string): Promise<DesignView> {
     return this.designs.get(designId, token);
   }
 
+  @OrgRole('viewer')
   @Get('designs/:designId/revisions')
   @ApiOperation({ summary: 'Every revision of a design, with the input hash that identifies its files' })
   async revisions(@Param('designId', ParseUUIDPipe) designId: string, @AccessToken() token: string): Promise<RevisionRow[]> {
@@ -329,18 +338,21 @@ export class ElectronicsController {
     return this.repository.listRevisions(designId, token);
   }
 
+  @OrgRole('viewer')
   @Get('reference-coverage')
   @ApiOperation({ summary: 'For every planned engine: which inputs are sourced, pending confirmation, or a written gap' })
   async coverage(): Promise<ReferenceCoverageView> {
     return this.referenceCoverage.execute();
   }
 
+  @OrgRole('viewer')
   @Get('jobs/:jobId')
   @ApiOperation({ summary: 'Status of a parse or quote job' })
   async job(@Param('jobId', ParseUUIDPipe) jobId: string, @AccessToken() token: string): Promise<JobStatusView> {
     return this.jobStatus.execute(jobId, token);
   }
 
+  @OrgRole('viewer')
   @Get('uploads/:uploadId/scenario-options')
   @ApiOperation({ summary: 'The assembly steps a scenario can price for this board, whether each applies, and the inputs each reads' })
   async scenarioOptions(@Param('uploadId', ParseUUIDPipe) uploadId: string, @AccessToken() token: string): Promise<ScenarioOptions | null> {
@@ -349,6 +361,7 @@ export class ElectronicsController {
     return scenarioOptions(graph.graph, PLANNED_ENGINES);
   }
 
+  @OrgRole('viewer')
   @Get('uploads/:uploadId/latest-result')
   @ApiOperation({ summary: 'The most recent cost result of an upload (with the scenario it was priced with), or null' })
   async latestResult(@Param('uploadId', ParseUUIDPipe) uploadId: string, @AccessToken() token: string): Promise<CostResultView | null> {
@@ -356,6 +369,7 @@ export class ElectronicsController {
     return row ? toCostResultView(row) : null;
   }
 
+  @OrgRole('viewer')
   @Get('results/:resultId')
   @ApiOperation({ summary: 'A versioned cost result with its full trace' })
   async result(@Param('resultId', ParseUUIDPipe) resultId: string, @AccessToken() token: string): Promise<CostResultView> {

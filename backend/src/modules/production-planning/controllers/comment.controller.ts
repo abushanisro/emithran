@@ -20,8 +20,10 @@ import {
   CommentResponseDto,
   CommentFilterDto 
 } from '../dto/comment.dto';
+import { OrgRole } from '../../../common/authz/authz-policy';
 
 @ApiTags('Comments')
+@OrgRole('member')
 @Controller('api/comments')
 @UseGuards(RequestAuthGuard)
 @ApiBearerAuth()
@@ -45,6 +47,7 @@ export class CommentController {
     return this.commentService.createComment(createDto, userId);
   }
 
+  @OrgRole('viewer')
   @Get('remark/:remarkId')
   @ApiOperation({ summary: 'Get comments for a specific remark' })
   @ApiResponse({ 

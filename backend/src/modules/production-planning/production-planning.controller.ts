@@ -42,7 +42,9 @@ import {
   DailyProductionEntryResponseDto,
   ProductionSummaryDto,
 } from './dto/daily-production.dto';
+import { OrgRole } from '../../common/authz/authz-policy';
 
+@OrgRole('member')
 @Controller({ path: 'api/production-planning', version: '1' })
 @UseGuards(RequestAuthGuard)
 export class ProductionPlanningController {
@@ -82,6 +84,7 @@ export class ProductionPlanningController {
     }
   }
 
+  @OrgRole('viewer')
   @Get('lots')
   async getProductionLots(
     @CurrentUser() user: User,
@@ -105,6 +108,7 @@ export class ProductionPlanningController {
     }
   }
 
+  @OrgRole('viewer')
   @Get('lots/:id')
   async getProductionLotById(
     @Param('id', ParseUUIDPipe) id: string,
@@ -120,6 +124,7 @@ export class ProductionPlanningController {
     }
   }
 
+  @OrgRole('viewer')
   @Get('lots/:id/bom-items')
   async getProductionLotBomItems(
     @Param('id', ParseUUIDPipe) id: string,
@@ -129,6 +134,7 @@ export class ProductionPlanningController {
     return createResponse(result);
   }
 
+  @OrgRole('viewer')
   @Get('lots/:id/vendor-assignments')
   async getProductionLotVendorAssignments(
     @Param('id', ParseUUIDPipe) id: string,
@@ -228,6 +234,7 @@ export class ProductionPlanningController {
     return createResponse(result);
   }
 
+  @OrgRole('viewer')
   @Get('lots/:lotId/processes')
   async getProductionProcesses(
     @Param('lotId', ParseUUIDPipe) lotId: string,
@@ -278,6 +285,7 @@ export class ProductionPlanningController {
     return createResponse(result);
   }
 
+  @OrgRole('viewer')
   @Get('processes/:processId/subtasks')
   async getProcessSubtasks(
     @Param('processId', ParseUUIDPipe) processId: string,
@@ -321,6 +329,7 @@ export class ProductionPlanningController {
     return createResponse(result);
   }
 
+  @OrgRole('viewer')
   @Get('lots/:lotId/production-entries')
   async getDailyProductionEntries(
     @Param('lotId', ParseUUIDPipe) lotId: string,
@@ -351,6 +360,7 @@ export class ProductionPlanningController {
   // DASHBOARD & REPORTING ENDPOINTS
   // ============================================================================
 
+  @OrgRole('viewer')
   @Get('lots/:lotId/summary')
   async getProductionSummary(
     @Param('lotId', ParseUUIDPipe) lotId: string,
@@ -360,6 +370,7 @@ export class ProductionPlanningController {
     return createResponse(result);
   }
 
+  @OrgRole('viewer')
   @Get('dashboard')
   async getDashboardData(
     @CurrentUser() user: User,
@@ -370,6 +381,7 @@ export class ProductionPlanningController {
     return createResponse(result);
   }
 
+  @OrgRole('viewer')
   @Get('lots/:lotId/gantt')
   async getGanttData(
     @Param('lotId', ParseUUIDPipe) lotId: string,
@@ -393,6 +405,7 @@ export class ProductionPlanningController {
     return createResponse(result);
   }
 
+  @OrgRole('viewer')
   @Get('lots/:lotId/materials')
   async getLotMaterials(
     @Param('lotId', ParseUUIDPipe) lotId: string,
@@ -412,6 +425,7 @@ export class ProductionPlanningController {
     return createResponse(result);
   }
 
+  @OrgRole('viewer')
   @Get('materials/:materialId/tracking-history')
   async getMaterialTrackingHistory(
     @Param('materialId', ParseUUIDPipe) materialId: string,
@@ -425,6 +439,7 @@ export class ProductionPlanningController {
   // INTEGRATED MONITORING ENDPOINTS
   // ============================================================================
 
+  @OrgRole('viewer')
   @Get('lots/:lotId/monitoring')
   async getProductionMonitoring(
     @Param('lotId', ParseUUIDPipe) lotId: string,
@@ -434,6 +449,7 @@ export class ProductionPlanningController {
     return createResponse(result);
   }
 
+  @OrgRole('viewer')
   @Get('lots/:lotId/integrated-dashboard')
   async getIntegratedDashboard(
     @Param('lotId', ParseUUIDPipe) lotId: string,
@@ -457,6 +473,7 @@ export class ProductionPlanningController {
   // ALERTS MANAGEMENT ENDPOINTS
   // ============================================================================
 
+  @OrgRole('viewer')
   @Get('lots/:lotId/alerts')
   async getProductionAlerts(
     @Param('lotId', ParseUUIDPipe) lotId: string,
@@ -490,6 +507,7 @@ export class ProductionPlanningController {
   // DIRECT SUBTASKS ENDPOINT
   // ============================================================================
 
+  @OrgRole('viewer')
   @Get('lots/:lotId/subtasks-direct')
   async getSubtasksDirectByLot(
     @Param('lotId', ParseUUIDPipe) lotId: string,
@@ -503,6 +521,7 @@ export class ProductionPlanningController {
   // PROCESS TEMPLATES ENDPOINTS
   // ============================================================================
 
+  @OrgRole('viewer')
   @Get('process-templates')
   async getDefaultProcessTemplates(
     @CurrentUser() user: User,

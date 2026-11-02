@@ -41,10 +41,12 @@ import {
   ProcessCostListResponseDto,
 } from '../dto/process-cost.dto';
 import { ProcessCostInput } from '../engines/process-cost-calculation.engine';
+import { OrgRole } from '../../../common/authz/authz-policy';
 
 @ApiTags('Process Costs')
 @ApiBearerAuth()
 @UseGuards(RequestAuthGuard)
+@OrgRole('member')
 @Controller('api/process-costs')
 export class ProcessCostController {
   private readonly logger = new Logger(ProcessCostController.name);
@@ -54,6 +56,7 @@ export class ProcessCostController {
   /**
    * Get all process cost records with pagination and filtering
    */
+  @OrgRole('viewer')
   @Get()
   @ApiOperation({ summary: 'Get all process cost records' })
   @ApiResponse({
@@ -88,6 +91,7 @@ export class ProcessCostController {
   /**
    * Get single process cost by ID
    */
+  @OrgRole('viewer')
   @Get(':id')
   @ApiOperation({ summary: 'Get process cost by ID' })
   @ApiResponse({
@@ -223,6 +227,7 @@ export class ProcessCostController {
   /**
    * Get total process cost for a BOM item
    */
+  @OrgRole('viewer')
   @Get('bom-item/:bomItemId/total')
   @ApiOperation({ summary: 'Get total process cost for a BOM item' })
   @ApiResponse({

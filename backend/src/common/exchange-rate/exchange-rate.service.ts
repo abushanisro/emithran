@@ -1,5 +1,7 @@
 import { createHash } from 'crypto';
 import { ForbiddenException, Injectable, Logger, ServiceUnavailableException, UnprocessableEntityException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { AuditService } from '../audit/audit.service';
 import { UserDirectory } from '../database/user-directory';
 import { DatabaseService } from '../database/database.service';
 import { currentRequestAuth } from '../request-context/request-auth-context';
@@ -100,6 +102,14 @@ interface CacheEntry<T> {
   loadedAt: number;
 }
 
+/** The error code of a budget-rate change refused for moving too far without confirmation (ExchangeRateService.setRate). */
+export const FX_RATE_CHANGE_NEEDS_CONFIRMATION = 'FX_RATE_CHANGE_NEEDS_CONFIRMATION';
+
+/** How far `next` is from `current`, in percent of `current`. */
+export function rateChangePercent(current: number, next: number): number {
+  return (Math.abs(next - current) / current) * 100;
+}
+
 /**
  * Budget exchange rates, per organization. The global `exchange_rates` table
  * (migration 803) is the read-only default, maintained by migrations and
@@ -138,6 +148,8 @@ export class ExchangeRateService {
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly directory: UserDirectory,
+    private readonly config: ConfigService,
+    private readonly audit: AuditService,
   ) {}
 
   /**
@@ -226,26 +238,79 @@ export class ExchangeRateService {
 
   /**
    * Sets the organization's own budget rate (1 USD = rate `currency`) through
-   * set_organization_exchange_rate() (migration 940), as the caller: RLS lets a
-   * member write only their own organization's rates, the replaced rate is kept
-   * as inactive history, and the row records the caller and `reason`. Other
-   * organizations and the global default are untouched.
+   * set_organization_exchange_rate() (migrations 940, 944), as the caller: only
+   * an admin of the organization may, the replaced rate is kept as inactive
+   * history, and the row records the caller and `reason`. Other organizations
+   * and the global default are untouched.
+   *
+   * A rate that moves more than FX_RATE_MAX_CHANGE_PERCENT from the current
+   * one (a typo such as 8.81 for 88.1 reprices every quote) is refused with
+   * 422 FX_RATE_CHANGE_NEEDS_CONFIRMATION unless `confirmed`. Every change is
+   * recorded in the audit trail (fx_rate.changed) with the previous rate.
    */
-  async setRate(accessToken: string | null, organizationId: string, currency: string, rate: number, reason: string): Promise<void> {
-    const { error } = await this.databaseService.getUserClient(accessToken ?? undefined).rpc('set_organization_exchange_rate', {
-      p_organization_id: organizationId,
-      p_currency: currency,
-      p_rate: rate,
-      p_reason: reason,
-    });
-    if (error) {
-      if (error.code === '42501') throw new ForbiddenException('You are not a member of this organization.');
-      throw new UnprocessableEntityException(`Could not update the ${currency.toUpperCase()} exchange rate: ${error.message}`);
+  async setRate(
+    accessToken: string | null,
+    organizationId: string,
+    currency: string,
+    rate: number,
+    reason: string,
+    confirmed = false,
+  ): Promise<void> {
+    const code = currency.trim().toUpperCase();
+    const previousRate = await this.storedRate(accessToken, organizationId, code);
+    const maxChangePercent = this.config.getOrThrow<number>('FX_RATE_MAX_CHANGE_PERCENT');
+    const changePercent = previousRate === null ? null : rateChangePercent(previousRate, rate);
+    if (changePercent !== null && changePercent > maxChangePercent && !confirmed) {
+      throw new UnprocessableEntityException({
+        code: FX_RATE_CHANGE_NEEDS_CONFIRMATION,
+        message: `The new ${code} rate is ${changePercent.toFixed(1)}% away from the current one (limit ${maxChangePercent}%). Confirm the change to apply it.`,
+        details: { currency: code, currentRate: previousRate, rate, changePercent, maxChangePercent },
+      });
     }
+
+    await this.audit.audited(
+      {
+        action: 'fx_rate.changed',
+        organizationId,
+        targetType: 'exchange_rate',
+        targetId: code,
+        meta: { currency: code, rate, reason, confirmed, ...(previousRate !== null ? { previousRate } : {}) },
+      },
+      async () => {
+        const { error } = await this.databaseService.getUserClient(accessToken ?? undefined).rpc('set_organization_exchange_rate', {
+          p_organization_id: organizationId,
+          p_currency: code,
+          p_rate: rate,
+          p_reason: reason,
+        });
+        if (error) {
+          if (error.code === '42501') throw new ForbiddenException('Only an admin of this organization can change its exchange rates.');
+          throw new UnprocessableEntityException(`Could not update the ${code} exchange rate: ${error.message}`);
+        }
+      },
+    );
     // This instance reads the new rate right away; other instances within the cache TTL.
     for (const key of [...this.organizationRates.keys()]) {
       if (key.startsWith(`${organizationId}:`)) this.organizationRates.delete(key);
     }
+  }
+
+  /** The organization's current rate for `code` as stored (1 USD = rate `code`): its own, else the global default, else null. */
+  private async storedRate(accessToken: string | null, organizationId: string, code: string): Promise<number | null> {
+    const own = (await this.readOrganizationRows(accessToken, organizationId)).find((r) => r.currency === code);
+    if (own) return Number(own.rate);
+    const { data, error } = await this.databaseService
+      .getUserClient(accessToken ?? undefined)
+      .from('exchange_rates')
+      .select('to_currency, rate')
+      .eq('is_active', true)
+      .eq('from_currency', ANCHOR_CURRENCY)
+      .eq('to_currency', code);
+    if (error) {
+      throw new ServiceUnavailableException(`Exchange rates unavailable — failed to read exchange_rates: ${error.message}`);
+    }
+    const row = (data ?? []).find((r) => r.to_currency === code);
+    return row ? Number(row.rate) : null;
   }
 
   /** The global default rates (USD per 1 unit). Throws if the table can't be read or has no active rates. */

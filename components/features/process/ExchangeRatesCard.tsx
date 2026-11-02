@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ApiError } from '@/lib/api/client';
-import { useExchangeRates, useSetExchangeRate, type ExchangeRateRow } from '@/lib/api/hooks/useFx';
+import { FX_RATE_CHANGE_NEEDS_CONFIRMATION, useExchangeRates, useSetExchangeRate, type ExchangeRateRow } from '@/lib/api/hooks/useFx';
+import { isOrganizationAdmin, useAuth } from '@/lib/providers/auth-context';
 
 /**
  * Your organization's budget exchange rates: the rates the "Budget" rate type
@@ -19,40 +20,51 @@ import { useExchangeRates, useSetExchangeRate, type ExchangeRateRow } from '@/li
  * organizations and the default are unaffected); it requires a reason, and the
  * server keeps the replaced rate as history and records who changed it. The
  * reference provenance (source date/author and its active flag) stays visible
- * next to any edit.
+ * next to any edit. Only organization admins (and the owner) see the edit
+ * control; a change far from the current rate must be confirmed once more.
  */
 export function ExchangeRatesCard() {
   const [expanded, setExpanded] = useState(false);
   const { data: rates, isLoading, error } = useExchangeRates(expanded);
   const setRate = useSetExchangeRate();
+  const { user } = useAuth();
+  const canEdit = isOrganizationAdmin(user);
 
   const [editing, setEditing] = useState<string | null>(null);
   const [rateDraft, setRateDraft] = useState('');
   const [reasonDraft, setReasonDraft] = useState('');
+  /** The server's explanation while a large change waits for the admin's explicit confirmation. */
+  const [needsConfirmation, setNeedsConfirmation] = useState<string | null>(null);
 
   const startEdit = (row: ExchangeRateRow) => {
     setEditing(row.currency);
     setRateDraft(String(row.rate));
     setReasonDraft('');
+    setNeedsConfirmation(null);
   };
   const cancelEdit = () => {
     setEditing(null);
     setRateDraft('');
     setReasonDraft('');
+    setNeedsConfirmation(null);
   };
 
   const parsedRate = Number(rateDraft);
   const canSave = rateDraft.trim() !== '' && parsedRate > 0 && reasonDraft.trim() !== '' && !setRate.isPending;
 
-  const save = (currency: string) => {
+  const save = (currency: string, confirm = false) => {
     setRate.mutate(
-      { currency, rate: parsedRate, reason: reasonDraft.trim() },
+      { currency, rate: parsedRate, reason: reasonDraft.trim(), confirm },
       {
         onSuccess: () => {
           toast.success(`Budget rate updated: 1 USD = ${parsedRate} ${currency}`);
           cancelEdit();
         },
         onError: (err) => {
+          if (err instanceof ApiError && err.code === FX_RATE_CHANGE_NEEDS_CONFIRMATION) {
+            setNeedsConfirmation(err.message);
+            return;
+          }
           toast.error(err instanceof ApiError ? err.message : `Could not update the ${currency} rate`);
         },
       },
@@ -75,7 +87,7 @@ export function ExchangeRatesCard() {
               {rates && <Badge variant="secondary" className="ml-1">{rates.length}</Badge>}
             </CardTitle>
             <CardDescription>
-              Your organization&apos;s budget rates (1 USD = rate) used by the Budget rate type in your costing — editing changes your organization&apos;s rate only, needs a reason, and every change is kept as history
+              Your organization&apos;s budget rates (1 USD = rate) used by the Budget rate type in your costing — organization admins can edit them; editing changes your organization&apos;s rate only, needs a reason, and every change is kept as history
             </CardDescription>
           </div>
         </button>
@@ -122,7 +134,7 @@ export function ExchangeRatesCard() {
                               min="0"
                               step="any"
                               value={rateDraft}
-                              onChange={(e) => setRateDraft(e.target.value)}
+                              onChange={(e) => { setRateDraft(e.target.value); setNeedsConfirmation(null); }}
                               className="h-8 w-32 ml-auto text-right"
                               autoFocus
                             />
@@ -165,15 +177,23 @@ export function ExchangeRatesCard() {
                         </TableCell>
                         <TableCell>
                           {isEditing ? (
-                            <div className="flex items-center gap-1">
-                              <Button size="sm" onClick={() => save(row.currency)} disabled={!canSave}>
-                                {setRate.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                              </Button>
-                              <Button size="sm" variant="ghost" onClick={cancelEdit} disabled={setRate.isPending}>
-                                <XCircle className="h-4 w-4" />
-                              </Button>
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  size="sm"
+                                  variant={needsConfirmation ? 'destructive' : 'default'}
+                                  onClick={() => save(row.currency, needsConfirmation !== null)}
+                                  disabled={!canSave}
+                                >
+                                  {setRate.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : needsConfirmation ? 'Apply anyway' : <Save className="h-4 w-4" />}
+                                </Button>
+                                <Button size="sm" variant="ghost" onClick={cancelEdit} disabled={setRate.isPending}>
+                                  <XCircle className="h-4 w-4" />
+                                </Button>
+                              </div>
+                              {needsConfirmation && <p className="max-w-[260px] text-xs text-amber-600">{needsConfirmation}</p>}
                             </div>
-                          ) : (
+                          ) : canEdit && (
                             <Button
                               size="sm"
                               variant="ghost"

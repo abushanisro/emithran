@@ -14,8 +14,10 @@ import { RequestAuthGuard } from '@/common/guards/request-auth.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { SubtaskService } from '../services/subtask.service';
 import { CreateSubtaskDto, UpdateSubtaskDto, SubtaskResponseDto } from '../dto/subtask.dto';
+import { OrgRole } from '../../../common/authz/authz-policy';
 
 @ApiTags('Production Subtasks')
+@OrgRole('member')
 @Controller('api/production-planning/processes/subtasks')
 @UseGuards(RequestAuthGuard)
 export class SubtaskController {
@@ -31,6 +33,7 @@ export class SubtaskController {
     return this.subtaskService.createSubtask(createDto, user.id);
   }
 
+  @OrgRole('viewer')
   @Get(':id')
   @ApiOperation({ summary: 'Get subtask by ID' })
   @ApiResponse({ type: SubtaskResponseDto })
@@ -41,6 +44,7 @@ export class SubtaskController {
     return this.subtaskService.getSubtaskById(id, user.id);
   }
 
+  @OrgRole('viewer')
   @Get('/process/:processId')
   @ApiOperation({ summary: 'Get all subtasks for a production process' })
   @ApiResponse({ type: [SubtaskResponseDto] })

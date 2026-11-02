@@ -21,15 +21,18 @@ import { CreateMHRDto, UpdateMHRDto, QueryMHRDto } from './dto/mhr.dto';
 import { MHRResponseDto, MHRListResponseDto, MHRReferenceDetailDto, MHRPickerRowDto } from './dto/mhr-response.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
+import { OrgRole } from '../../common/authz/authz-policy';
 
 @ApiTags('MHR')
 @ApiBearerAuth()
+@OrgRole('member')
 @Controller({ path: 'api/mhr', version: '1' })
 export class MHRController {
   private readonly logger = new Logger(MHRController.name);
 
   constructor(private readonly mhrService: MHRService) {}
 
+  @OrgRole('viewer')
   @Get()
   @ApiOperation({ summary: 'Get all MHR records with pagination and filters' })
   @ApiResponse({ status: 200, description: 'MHR records retrieved successfully', type: MHRListResponseDto })
@@ -43,6 +46,7 @@ export class MHRController {
     }
   }
 
+  @OrgRole('viewer')
   @Get('picker')
   @ApiOperation({ summary: 'Every machine at a location, slim, for the Process/Category/Machine pickers' })
   @ApiResponse({ status: 200, type: [MHRPickerRowDto] })
@@ -50,12 +54,14 @@ export class MHRController {
     return this.mhrService.findPickerRows(location || undefined, token);
   }
 
+  @OrgRole('viewer')
   @Get('categories')
   @ApiOperation({ summary: 'Get distinct real machine categories (benchmark_source_key-derived, machine_class fallback), optionally scoped to a real process group' })
   async getCategories(@Query('processGroup') processGroup: string | undefined, @AccessToken() token: string): Promise<string[]> {
     return this.mhrService.getDistinctCategories(token, processGroup || undefined);
   }
 
+  @OrgRole('viewer')
   @Get('categories-with-class')
   @ApiOperation({ summary: 'Get distinct real machine categories paired with their real underlying machine_class, so a form choosing an existing category can reuse its real class instead of saving the display label as a new one' })
   async getCategoriesWithClass(
@@ -65,36 +71,42 @@ export class MHRController {
     return this.mhrService.getDistinctCategoriesWithClass(token, processGroup || undefined);
   }
 
+  @OrgRole('viewer')
   @Get('process-groups')
   @ApiOperation({ summary: 'Get distinct real process_group values on file in MHR records' })
   async getProcessGroups(@AccessToken() token: string): Promise<string[]> {
     return this.mhrService.getDistinctProcessGroups(token);
   }
 
+  @OrgRole('viewer')
   @Get('locations')
   @ApiOperation({ summary: 'Get distinct locations from MHR records' })
   async getLocations(@AccessToken() token: string): Promise<string[]> {
     return this.mhrService.getDistinctLocations(token);
   }
 
+  @OrgRole('viewer')
   @Get('manufacturer-countries')
   @ApiOperation({ summary: 'Get distinct manufacturer countries from MHR records' })
   async getManufacturerCountries(@AccessToken() token: string): Promise<string[]> {
     return this.mhrService.getDistinctManufacturerCountries(token);
   }
 
+  @OrgRole('viewer')
   @Get('wage-grades')
   @ApiOperation({ summary: 'Get distinct real wage grades from MHR records' })
   async getWageGrades(@AccessToken() token: string): Promise<string[]> {
     return this.mhrService.getDistinctWageGrades(token);
   }
 
+  @OrgRole('viewer')
   @Get('currencies')
   @ApiOperation({ summary: 'Get distinct currencies from MHR records' })
   async getCurrencies(@AccessToken() token: string): Promise<string[]> {
     return this.mhrService.getDistinctCurrencies(token);
   }
 
+  @OrgRole('viewer')
   @Get('benchmark')
   @ApiOperation({ summary: 'Get global MHR benchmark rates (no user data required)' })
   @ApiResponse({ status: 200, description: 'Benchmark MHR rates from mhr_benchmark_rates table' })
@@ -106,6 +118,7 @@ export class MHRController {
     return this.mhrService.getBenchmarkRates(location, processGroup, machineClass);
   }
 
+  @OrgRole('viewer')
   @Get(':id')
   @ApiOperation({ summary: 'Get MHR record by ID' })
   @ApiResponse({ status: 200, description: 'MHR record retrieved successfully', type: MHRResponseDto })
@@ -120,6 +133,7 @@ export class MHRController {
     }
   }
 
+  @OrgRole('viewer')
   @Get(':id/reference-detail')
   @ApiOperation({ summary: 'Get full machine_library reference detail for an MHR record (read-only)' })
   @ApiResponse({ status: 200, description: 'Reference detail lookup result', type: MHRReferenceDetailDto })

@@ -30,9 +30,11 @@ import { OrganizationContextGuard } from '../../common/guards/organization-conte
 import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
 import * as ExcelJS from 'exceljs';
 import { assertXlsxWithinLimits } from '../../common/archive/xlsx-limits';
+import { OrgRole } from '../../common/authz/authz-policy';
 
 @ApiTags('Raw Materials')
 @ApiBearerAuth()
+@OrgRole('member')
 @Controller({ path: 'api/raw-materials', version: '1' })
 export class RawMaterialsController {
   private readonly logger = new Logger(RawMaterialsController.name);
@@ -43,6 +45,7 @@ export class RawMaterialsController {
     private readonly editorService: RawMaterialEditorService,
   ) { }
 
+  @OrgRole('viewer')
   @Get('enhanced')
   @ApiOperation({ summary: 'Get enhanced raw materials with comprehensive properties' })
   @ApiResponse({ status: 200, description: 'Enhanced materials retrieved successfully' })
@@ -70,6 +73,7 @@ export class RawMaterialsController {
     }, user.id, token);
   }
 
+  @OrgRole('viewer')
   @Get()
   @ApiOperation({ summary: 'Get all raw materials' })
   @ApiResponse({ status: 200, description: 'Raw materials retrieved successfully', type: RawMaterialListResponseDto })
@@ -77,6 +81,7 @@ export class RawMaterialsController {
     return this.rawMaterialsService.findAll(query, user.id, token);
   }
 
+  @OrgRole('viewer')
   @Get('filter-options')
   @ApiOperation({ summary: 'Get unique filter options for raw materials' })
   @ApiResponse({ status: 200, description: 'Filter options retrieved successfully' })
@@ -86,6 +91,7 @@ export class RawMaterialsController {
 
   // Before @Get(':id'). Which processes each material group belongs to (migration
   // 879): the Create BOM Item dialog derives the process from the chosen material.
+  @OrgRole('viewer')
   @Get('process-material-groups')
   @ApiOperation({ summary: 'Process group <-> material group links' })
   async getProcessMaterialGroups(@AccessToken() token: string) {
@@ -93,6 +99,7 @@ export class RawMaterialsController {
   }
 
   // Must be declared before @Get(':id') so 'aliases' isn't swallowed as an :id param.
+  @OrgRole('viewer')
   @Get('aliases')
   @ApiOperation({ summary: 'Get all material aliases (alias_normalized -> raw_material_id), for client-side alias-aware search' })
   async getAliases(@AccessToken() token: string) {
@@ -100,6 +107,7 @@ export class RawMaterialsController {
   }
 
   // Before @Get(':id'). Stock-form prices by location (material_stock_prices, migration 833).
+  @OrgRole('viewer')
   @Get('stock-prices')
   @ApiOperation({ summary: 'Material price by stock form and location (reference data, migration 833)' })
   async getStockPrices(@AccessToken() token: string, @Query('location') location?: string) {
@@ -115,6 +123,7 @@ export class RawMaterialsController {
     return this.rawMaterialsService.materialClassesFor(names, token);
   }
 
+  @OrgRole('viewer')
   @Get('grouped')
   @ApiOperation({ summary: 'Get raw materials grouped by material group' })
   @ApiResponse({ status: 200, description: 'Grouped materials retrieved successfully' })
@@ -123,12 +132,14 @@ export class RawMaterialsController {
   }
 
   // Stock form list (the same set the price table allows), before ':id' routes.
+  @OrgRole('viewer')
   @Get('stock-forms')
   @ApiOperation({ summary: 'Stock forms a material can be priced by' })
   stockForms() {
     return { forms: this.stockPricesService.stockForms() };
   }
 
+  @OrgRole('viewer')
   @Get(':id/stock-prices')
   @ApiOperation({ summary: 'Stock prices of a material, by form and location' })
   async getMaterialStockPrices(@Param('id') id: string, @AccessToken() token: string) {
@@ -137,6 +148,7 @@ export class RawMaterialsController {
 
 
   // Every property of one material (raw_material_properties, migration 855).
+  @OrgRole('viewer')
   @Get(':id/properties')
   @ApiOperation({ summary: 'Get every property of a raw material, with its unit and source' })
   async getProperties(@Param('id') id: string, @AccessToken() token: string) {
@@ -144,6 +156,7 @@ export class RawMaterialsController {
   }
 
   // The edit form: one load, one save. See RawMaterialEditorService.
+  @OrgRole('viewer')
   @Get(':id/editor')
   @ApiOperation({ summary: 'Everything the edit form shows for one material, in one response' })
   async getEditor(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string) {
@@ -163,6 +176,7 @@ export class RawMaterialsController {
     return this.editorService.save(id, body, user.id, token, organizationId);
   }
 
+  @OrgRole('viewer')
   @Get(':id')
   @ApiOperation({ summary: 'Get raw material by ID' })
   @ApiResponse({ status: 200, description: 'Raw material retrieved successfully', type: RawMaterialResponseDto })

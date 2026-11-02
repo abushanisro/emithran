@@ -3,6 +3,7 @@ import { BadRequestException, Body, Controller, Get, Patch, Post, UploadedFile, 
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiBearerAuth, ApiConsumes, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { memoryStorage } from 'multer';
+import { Authenticated } from '../../common/authz/authz-policy';
 import { AVATAR_MAX_BYTES } from './avatar';
 import { ProfileService } from './profile.service';
 import { UpdateProfileDto, ProfileResponseDto } from './dto/profile.dto';
@@ -11,6 +12,7 @@ import { AccessToken } from '../../common/decorators/access-token.decorator';
 
 @ApiTags('Profile')
 @ApiBearerAuth()
+@Authenticated()
 @Controller({ path: 'api/profile', version: '1' })
 export class ProfileController {
   constructor(private readonly profileService: ProfileService) {}

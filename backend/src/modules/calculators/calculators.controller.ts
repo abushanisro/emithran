@@ -17,9 +17,11 @@ import {
   UpdateFormulaDto,
   SheetMetalLookupDto,
 } from './dto/calculator.dto';
+import { OrgRole } from '../../common/authz/authz-policy';
 
 @ApiTags('Calculators')
 @ApiBearerAuth()
+@OrgRole('member')
 @Controller({ path: 'api/calculators', version: '1' })
 export class CalculatorsController {
   constructor(
@@ -27,6 +29,7 @@ export class CalculatorsController {
     private readonly calculatorsService: CalculatorsServiceV2
   ) { }
 
+  @OrgRole('viewer')
   @Get()
   @ApiOperation({ summary: 'Get all calculators' })
   @ApiResponse({ status: 200, description: 'Calculators retrieved successfully' })
@@ -38,6 +41,7 @@ export class CalculatorsController {
     return this.calculatorsService.findAll(query, user.id, token);
   }
 
+  @OrgRole('viewer')
   @Get(':id')
   @ApiOperation({ summary: 'Get calculator by ID' })
   @ApiResponse({ status: 200, description: 'Calculator retrieved successfully' })
@@ -115,6 +119,7 @@ export class CalculatorsController {
   // FIELD ENDPOINTS
   // ========================================
 
+  @OrgRole('viewer')
   @Get(':id/fields')
   @ApiOperation({ summary: 'Get all fields for a calculator' })
   async getFields(
@@ -163,6 +168,7 @@ export class CalculatorsController {
   // FORMULA ENDPOINTS
   // ========================================
 
+  @OrgRole('viewer')
   @Get(':id/formulas')
   @ApiOperation({ summary: 'Get all formulas for a calculator' })
   async getFormulas(

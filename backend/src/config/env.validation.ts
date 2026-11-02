@@ -152,6 +152,14 @@ class EnvironmentVariables {
   @Max(500)
   MAX_UPLOAD_MB: number = 50;
 
+  // How far (percent of the current rate) an organization's budget exchange rate may move in one change before the admin must
+  // confirm it explicitly (common/exchange-rate/exchange-rate.service.ts setRate). Catches a misplaced decimal point.
+  @IsNumber()
+  @IsOptional()
+  @Min(0.1)
+  @Max(1000)
+  FX_RATE_MAX_CHANGE_PERCENT: number = 10;
+
   // Development auth bypass opt-in. Off unless explicitly 'true': with it off, a missing or
   // invalid bearer token is a 401 in every environment. ADMIN_FALLBACK_EMAIL alone enables nothing.
   @IsString()

@@ -38,9 +38,11 @@ import {
   ToolingCostResponseDto,
   ToolingCostListResponseDto,
 } from '../dto/tooling-cost.dto';
+import { OrgRole } from '../../../common/authz/authz-policy';
 
 @ApiTags('Tooling Costs')
 @ApiBearerAuth()
+@OrgRole('member')
 @Controller({ path: 'api/tooling-costs', version: '1' })
 @UseGuards(RequestAuthGuard)
 export class ToolingCostController {
@@ -51,6 +53,7 @@ export class ToolingCostController {
   /**
    * Get all tooling costs with pagination and filtering
    */
+  @OrgRole('viewer')
   @Get()
   @ApiOperation({ summary: 'Get all tooling costs' })
   @ApiResponse({
@@ -69,6 +72,7 @@ export class ToolingCostController {
   /**
    * Get single tooling cost by ID
    */
+  @OrgRole('viewer')
   @Get(':id')
   @ApiOperation({ summary: 'Get tooling cost by ID' })
   @ApiResponse({
@@ -159,6 +163,7 @@ export class ToolingCostController {
   /**
    * Get total tooling cost for a BOM item
    */
+  @OrgRole('viewer')
   @Get('bom-item/:bomItemId/total')
   @ApiOperation({ summary: 'Get total tooling cost for a BOM item' })
   @ApiResponse({
