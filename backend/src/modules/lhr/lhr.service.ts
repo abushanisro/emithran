@@ -8,6 +8,7 @@ import * as ExcelJS from 'exceljs';
 import { readWorkbook } from '../../common/heavy-work/heavy-work';
 import { getCurrencyForLocation } from '../mhr/constants/mhr-calculation.constants';
 import { ExchangeRateService, organizationIdOf, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
+import { orIlikeContains } from '../../common/db/postgrest-filter';
 
 @Injectable()
 export class LHRService {
@@ -214,7 +215,7 @@ export class LHRService {
         .order('id', { ascending: true })
         .range(from, to);
       if (search) {
-        q = q.or(`labour_code.ilike.%${search}%,labour_type.ilike.%${search}%,description.ilike.%${search}%`);
+        q = q.or(orIlikeContains(['labour_code', 'labour_type', 'description'], search));
       }
       return q;
     });

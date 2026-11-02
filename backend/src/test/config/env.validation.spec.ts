@@ -12,6 +12,7 @@ function baseConfig(overrides: Record<string, unknown> = {}) {
     AUTH0_DOMAIN: 'tenant.example.auth0.com',
     AUTH0_AUDIENCE: 'https://api.example.com',
     AUTH0_CLAIM_NAMESPACE: 'https://example.com/',
+    AUTH0_TRUSTED_CONNECTIONS: 'company-sso,Username-Password-Authentication',
     ...overrides,
   };
 }

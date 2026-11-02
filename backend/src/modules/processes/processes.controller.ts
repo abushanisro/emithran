@@ -39,10 +39,12 @@ import { AccessToken } from '../../common/decorators/access-token.decorator';
 import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
 import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
 import { REFERENCE_DOMAINS, isReferenceDomain, referenceDomainList } from './reference-domains';
+import { OrgRole } from '../../common/authz/authz-policy';
 import { MAX_XLSX_UPLOAD_BYTES } from '../../common/archive/xlsx-limits';
 
 @ApiTags('Processes')
 @ApiBearerAuth()
+@OrgRole('member')
 @Controller({ path: 'api/processes', version: '1' })
 export class ProcessesController {
   constructor(private readonly processesService: ProcessesService) {}
@@ -74,6 +76,7 @@ export class ProcessesController {
     );
   }
 
+  @OrgRole('viewer')
   @Get('variables')
   @ApiOperation({ summary: 'Get domain reference-data variables (sm_reference_data / im_reference_data / machining_reference_data)' })
   @ApiResponse({ status: 200, description: 'Domain variables retrieved successfully' })
@@ -89,12 +92,14 @@ export class ProcessesController {
     return this.processesService.getDomainVariables(domain, token, search, category);
   }
 
+  @OrgRole('viewer')
   @Get('reference-domains')
   @ApiOperation({ summary: 'Every reference-data domain (memory/ folder) the Process page can list' })
   getReferenceDomains() {
     return referenceDomainList();
   }
 
+  @OrgRole('viewer')
   @Get('reference-lookup')
   @ApiOperation({ summary: 'One staged reference lookup table (columns + rows) of a reference-data domain' })
   async getReferenceLookup(
@@ -109,6 +114,7 @@ export class ProcessesController {
     return this.processesService.getReferenceLookup(domain, key, token);
   }
 
+  @OrgRole('viewer')
   @Get('calculator-mappings')
   @ApiOperation({ summary: 'Get all process calculator mappings' })
   @ApiResponse({ status: 200, description: 'Process calculator mappings retrieved successfully', type: ProcessCalculatorMappingListResponseDto })
@@ -119,6 +125,7 @@ export class ProcessesController {
     return this.processesService.getProcessCalculatorMappings(query, token);
   }
 
+  @OrgRole('viewer')
   @Get('calculator-mappings/:id')
   @ApiOperation({ summary: 'Get process calculator mapping by ID' })
   @ApiResponse({ status: 200, description: 'Process calculator mapping retrieved successfully', type: ProcessCalculatorMappingResponseDto })
@@ -172,6 +179,7 @@ export class ProcessesController {
   // PROCESS CRUD ENDPOINTS
   // ============================================================================
 
+  @OrgRole('viewer')
   @Get()
   @ApiOperation({ summary: 'Get all processes' })
   @ApiResponse({ status: 200, description: 'Processes retrieved successfully', type: ProcessListResponseDto })
@@ -179,6 +187,7 @@ export class ProcessesController {
     return this.processesService.findAll(query, user.id, token);
   }
 
+  @OrgRole('viewer')
   @Get('sm-lookup-tables')
   @ApiOperation({ summary: 'Get live sm_lookup_* cost-engine tables for a process route, shaped as reference tables' })
   @ApiResponse({ status: 200, description: 'Live lookup tables retrieved successfully' })
@@ -190,6 +199,7 @@ export class ProcessesController {
     return this.processesService.getSmLookupTables(group, route, token);
   }
 
+  @OrgRole('viewer')
   @Get('deslag-allowance-table')
   @ApiOperation({ summary: 'Perimeter allowance (s/mm) of every Deslag machine in the machine library, shaped as a lookup table' })
   @ApiResponse({ status: 200, description: 'Table retrieved successfully' })
@@ -197,6 +207,7 @@ export class ProcessesController {
     return this.processesService.getDeslagAllowanceTable();
   }
 
+  @OrgRole('viewer')
   @Get('turret-machines-table')
   @ApiOperation({ summary: 'Punch rate, tool change time and nibble speed of every Turret Press machine, shaped as a lookup table' })
   @ApiResponse({ status: 200, description: 'Table retrieved successfully' })
@@ -204,6 +215,7 @@ export class ProcessesController {
     return this.processesService.getTurretMachinesTable();
   }
 
+  @OrgRole('viewer')
   @Get('waterjet-machines-table')
   @ApiOperation({ summary: 'Nozzle delay (pierce time) and jet data of every waterjet machine, shaped as a lookup table' })
   @ApiResponse({ status: 200, description: 'Table retrieved successfully' })
@@ -211,6 +223,7 @@ export class ProcessesController {
     return this.processesService.getWaterjetMachinesTable();
   }
 
+  @OrgRole('viewer')
   @Get('stroke-rate-factor-table')
   @ApiOperation({ summary: 'Lookup Table 1: stroke rate factor by machine tonnage and part complexity' })
   @ApiResponse({ status: 200, description: 'Table retrieved successfully' })
@@ -218,6 +231,7 @@ export class ProcessesController {
     return this.processesService.getStrokeRateFactorTable();
   }
 
+  @OrgRole('viewer')
   @Get('sm-lookup-tables/by-name/:table')
   @ApiOperation({ summary: 'Get one real sm_lookup_* cost-engine table by name (allowlisted tables only) — used by calculator popups\' "view lookup table" button' })
   @ApiResponse({ status: 200, description: 'Live lookup table retrieved successfully' })
@@ -229,6 +243,7 @@ export class ProcessesController {
     return this.processesService.getSmLookupTableByName(table, token);
   }
 
+  @OrgRole('viewer')
   @Get('machining-lookup-tables/by-name/:table')
   @ApiOperation({ summary: 'Get one machining reference table a machining calculator field reads, flattened — for the calculator dialog lookup-table viewer' })
   @ApiResponse({ status: 200, description: 'Machining lookup table retrieved successfully' })
@@ -240,6 +255,7 @@ export class ProcessesController {
     return this.processesService.getMachiningLookupTableByName(table, outputColumn);
   }
 
+  @OrgRole('viewer')
   @Get('reference-lookup-tables/:domain/by-name/:table')
   @ApiOperation({ summary: 'Get one reference table a calculator field of a domain (machining, die_casting) reads, flattened — for the calculator dialog lookup-table viewer' })
   @ApiResponse({ status: 200, description: 'Lookup table retrieved successfully' })
@@ -266,6 +282,7 @@ export class ProcessesController {
     return this.processesService.updateSmLookupRow(table, id, updates, token);
   }
 
+  @OrgRole('viewer')
   @Get(':id')
   @ApiOperation({ summary: 'Get process by ID' })
   @ApiResponse({ status: 200, description: 'Process retrieved successfully', type: ProcessResponseDto })
@@ -299,6 +316,7 @@ export class ProcessesController {
   // REFERENCE TABLES ENDPOINTS
   // ============================================================================
 
+  @OrgRole('viewer')
   @Get(':processId/reference-tables')
   @ApiOperation({ summary: 'Get all reference tables for a process' })
   @ApiResponse({ status: 200, description: 'Reference tables retrieved successfully' })
@@ -306,6 +324,7 @@ export class ProcessesController {
     return this.processesService.getReferenceTables(processId, token);
   }
 
+  @OrgRole('viewer')
   @Get('reference-tables/:tableId')
   @ApiOperation({ summary: 'Get a specific reference table with rows' })
   @ApiResponse({ status: 200, description: 'Reference table retrieved successfully' })
@@ -395,6 +414,7 @@ export class ProcessesController {
   // VENDOR PROCESS CAPABILITIES (Industry-standard for supplier evaluation)
   // ============================================================================
 
+  @OrgRole('viewer')
   @Get('vendors-by-process/:processId')
   @ApiOperation({
     summary: 'Get vendors capable of performing a specific process',
@@ -412,6 +432,7 @@ export class ProcessesController {
     return this.processesService.getVendorsByProcess(processId, userId, token);
   }
 
+  @OrgRole('viewer')
   @Get('by-vendor/:vendorId')
   @ApiOperation({
     summary: 'Get processes that a vendor can perform',

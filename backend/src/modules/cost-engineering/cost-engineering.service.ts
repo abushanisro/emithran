@@ -17,7 +17,7 @@ import {
   QuerySupplierCapabilitiesDto,
   QuerySustainabilityDto,
 } from './dto/cost-engineering.dto';
-import { quoteFilterValue } from '../../common/db/postgrest-filter';
+import { orIlikeContains } from '../../common/db/postgrest-filter';
 
 @Injectable()
 export class CostEngineeringService {
@@ -144,8 +144,7 @@ export class CostEngineeringService {
       if (query.materialForm) q = q.ilike('material_form', `%${query.materialForm}%`);
       if (query.region) q = q.ilike('region', `%${query.region}%`);
       if (query.search) {
-        const pattern = quoteFilterValue(`%${query.search}%`);
-        q = q.or(`material_name.ilike.${pattern},material_grade.ilike.${pattern}`);
+        q = q.or(orIlikeContains(['material_name', 'material_grade'], query.search));
       }
       return q.order('material_name').order('region');
     }, pag);

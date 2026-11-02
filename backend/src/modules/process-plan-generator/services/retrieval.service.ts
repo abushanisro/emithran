@@ -21,12 +21,14 @@ import { rankTooling } from '../ranking/tooling-ranker';
 
 import { ScopeClassifierService } from './scope-classifier.service';
 import { DrawingExtractorService } from './drawing-extractor.service';
+import { AiBudgetExceededException } from '../../../common/ai/ai-budget.service';
 import { ExchangeRateService, organizationIdOf, RateSnapshot } from '../../../common/exchange-rate/exchange-rate.service';
 import { FeatureGraphService } from './feature-graph.service';
 import { RuleEngineService } from './rule-engine.service';
 import { ManufacturingKnowledgeService } from '../../../modules/manufacturing-knowledge/manufacturing-knowledge.service';
 import { InspectionKnowledgeService } from '../../../modules/manufacturing-knowledge/services/inspection-knowledge.service';
 import { CADAnalysisService } from '../../bom-items/services/cad-analysis.service';
+import { orIlikeContains } from '../../../common/db/postgrest-filter';
 
 /**
  * Stage 1 — assembles the EngineeringBrief and a tenant-scoped CandidateSet.
@@ -67,6 +69,8 @@ export class RetrievalService {
     bomItemId: string,
     userId: string,
     accessToken: string | null,
+    /** The organization the request acts for; a fresh drawing extraction is charged to it (AiBudgetService). */
+    organizationId?: string,
   ): Promise<{ brief: EngineeringBrief; candidates: CandidateSet }> {
     const client = this.databaseService.getUserClient(accessToken ?? undefined);
 
@@ -162,12 +166,16 @@ export class RetrievalService {
     // Done in parallel-ish with scope classification since neither depends on
     // the other. Drawing extraction is the longest single step when fresh
     // (~5–15s), so failing fast here avoids stalling the whole pipeline.
-    const drawing = await this.drawingExtractor
-      .getBriefFor(bomItemId, bomRow, accessToken)
-      .catch((e) => {
-        this.logger.warn(`Drawing extraction threw, continuing without it: ${e.message}`);
-        return { ...UNAVAILABLE_DRAWING_BRIEF };
-      });
+    // A spent AI budget fails the request with 429 (AiBudgetExceededException) instead of planning without the drawing.
+    const drawing = accessToken && organizationId
+      ? await this.drawingExtractor
+        .getBriefFor(bomItemId, bomRow, { userId, organizationId, accessToken })
+        .catch((e) => {
+          if (e instanceof AiBudgetExceededException) throw e;
+          this.logger.warn(`Drawing extraction threw, continuing without it: ${e.message}`);
+          return { ...UNAVAILABLE_DRAWING_BRIEF, extractionWarnings: [String(e.message ?? e).slice(0, 200)] };
+        })
+      : { ...UNAVAILABLE_DRAWING_BRIEF, extractionWarnings: ['The drawing was not read: no signed-in organization context for AI.'] };
 
     // ── Promote drawing fields — drawing is authoritative source of truth ──
     if (drawing.available) {
@@ -706,17 +714,13 @@ export class RetrievalService {
    */
   private async resolveMaterialFamilyFromDb(client: any, hint: string | null): Promise<string | null> {
     if (!hint?.trim()) return null;
-    const clean = hint.replace(/'/g, '').slice(0, 30).trim();
+    const clean = hint.slice(0, 30).trim();
     if (clean.length < 3) return null;
     try {
       const { data } = await client
         .from('raw_materials')
         .select('material_family')
-        .or(
-          `name.ilike.%${clean}%,` +
-          `grade.ilike.%${clean}%,` +
-          `material_group.ilike.%${clean}%`,
-        )
+        .or(orIlikeContains(['name', 'grade', 'material_group'], clean))
         .not('material_family', 'is', null)
         .limit(1)
         .maybeSingle();
@@ -727,12 +731,11 @@ export class RetrievalService {
     // Second pass: try individual keywords (handles long drawing callouts like "Mild Steel IS2062 E250A - Sheet")
     const keywords = hint.split(/\s+/).filter((k) => k.length >= 4).slice(0, 4);
     for (const kw of keywords) {
-      const kClean = kw.replace(/'/g, '');
       try {
         const { data: kd } = await client
           .from('raw_materials')
           .select('material_family')
-          .or(`name.ilike.%${kClean}%,grade.ilike.%${kClean}%`)
+          .or(orIlikeContains(['name', 'grade'], kw))
           .not('material_family', 'is', null)
           .limit(1)
           .maybeSingle();

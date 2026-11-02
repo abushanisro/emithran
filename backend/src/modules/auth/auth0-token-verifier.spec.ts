@@ -16,7 +16,7 @@ let tenant: Signer;
 let verifier: Auth0TokenVerifier;
 const mint = (over: Record<string, unknown> = {}, opts: { signer?: Signer; issuer?: string; audience?: string; expires?: string | number; alg?: string } = {}) => {
   const s = opts.signer ?? tenant;
-  const jwt = new SignJWT({ [`${NS}email`]: 'Alice@Example.com', [`${NS}email_verified`]: true, [`${NS}sid`]: 'sess-1', ...over })
+  const jwt = new SignJWT({ [`${NS}email`]: 'Alice@Example.com', [`${NS}email_verified`]: true, [`${NS}sid`]: 'sess-1', [`${NS}connection`]: 'company-sso', ...over })
     .setProtectedHeader({ alg: opts.alg ?? 'RS256', kid: s.kid })
     .setIssuer(opts.issuer ?? ISSUER)
     .setAudience(opts.audience ?? AUDIENCE)
@@ -41,9 +41,9 @@ beforeAll(async () => {
 });
 
 describe('Auth0TokenVerifier', () => {
-  it('accepts a good token and reads the login: sub, lower-cased verified email, session id', async () => {
+  it('accepts a good token and reads the login: sub, lower-cased verified email, session id, connection', async () => {
     const login = await verifier.verify(await mint());
-    expect(login).toMatchObject({ provider: 'auth0', sub: 'auth0|alice', email: 'alice@example.com', emailVerified: true, sessionId: 'sess-1' });
+    expect(login).toMatchObject({ provider: 'auth0', sub: 'auth0|alice', email: 'alice@example.com', emailVerified: true, sessionId: 'sess-1', connection: 'company-sso' });
     expect(login.expiresAt).toBeGreaterThan(Date.now() / 1000);
   });
 
@@ -53,14 +53,20 @@ describe('Auth0TokenVerifier', () => {
     expect((await verifier.verify(await mint({ [`${NS}email_verified`]: undefined }))).emailVerified).toBe(false);
   });
 
-  it('ignores un-namespaced email, email_verified and sid claims (only the post-login Action\'s namespaced claims count)', async () => {
+  it('ignores un-namespaced email, email_verified, sid and connection claims (only the post-login Action\'s namespaced claims count)', async () => {
     const login = await verifier.verify(await mint({
-      [`${NS}email`]: undefined, [`${NS}email_verified`]: undefined, [`${NS}sid`]: undefined,
-      email: 'mallory@example.com', email_verified: true, sid: 'plain-sid',
+      [`${NS}email`]: undefined, [`${NS}email_verified`]: undefined, [`${NS}sid`]: undefined, [`${NS}connection`]: undefined,
+      email: 'mallory@example.com', email_verified: true, sid: 'plain-sid', connection: 'company-sso',
     }));
     expect(login.email).toBeUndefined();
     expect(login.emailVerified).toBe(false);
     expect(login.sessionId).toBeUndefined();
+    expect(login.connection).toBeUndefined();
+  });
+
+  it('reads no connection from a non-string or empty claim (such a login can never link by email)', async () => {
+    expect((await verifier.verify(await mint({ [`${NS}connection`]: '' }))).connection).toBeUndefined();
+    expect((await verifier.verify(await mint({ [`${NS}connection`]: ['company-sso'] }))).connection).toBeUndefined();
   });
 
   it('works without any custom claims (the email is then simply unknown)', async () => {

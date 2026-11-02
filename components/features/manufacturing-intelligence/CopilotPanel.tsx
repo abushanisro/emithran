@@ -4,15 +4,31 @@ import { Bot, Send, RotateCcw, Loader2 } from "lucide-react";
 import { useCallback, useRef, useState, useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
+import { apiClient } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
+
+/**
+ * A memory change the copilot proposed in one turn. Nothing is saved until the user presses Save, which calls the backend's
+ * confirm endpoint (single use, within 10 minutes, for this conversation and turn).
+ */
+interface MemoryProposal {
+  proposalId: string;
+  add: string[];
+  remove: string[];
+  expiresAt: string;
+  turn: number;
+  status: "pending" | "saving" | "saved" | "dismissed" | "failed";
+  note?: string;
+}
 
 interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
   streaming?: boolean;
+  proposals?: MemoryProposal[];
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -61,11 +77,13 @@ const MAX_ANSWER_CHARS = 8000;
 /** One JSON object per SSE frame, as written by the NestJS copilot controller. */
 type CopilotEvent =
   | { type: "text"; delta: string }
+  | { type: "memory_proposal"; proposalId: string; add: string[]; remove: string[]; expiresAt: string }
   | { type: "done" }
   | { type: "error"; code: string };
 
 const ERROR_TEXT: Record<string, string> = {
   rate_limited: "The copilot is busy right now. Try again in a moment.",
+  budget_exhausted: "The daily AI allowance is used up. It resets at 00:00 UTC.",
   upstream_unavailable: "The AI service is unavailable. Try again shortly.",
   refused: "The copilot could not answer that question.",
   tool_limit: "That question needed too many steps. Try a narrower question.",
@@ -77,8 +95,31 @@ const HTTP_ERROR_TEXT: Record<number, string> = {
   404: "This part was not found.",
   413: "That request was too large.",
   429: "Too many requests. Wait a moment and try again.",
-  503: "The copilot is not configured.",
+  503: "The copilot is not available right now.",
 };
+
+/** The backend's AI budget codes (passed on by the copilot route) and what they mean to the user. */
+const AI_CODE_TEXT: Record<string, string> = {
+  AI_BUDGET_EXHAUSTED: "The daily AI allowance is used up. It resets at 00:00 UTC.",
+  AI_TOO_MANY_REQUESTS: "You already have the maximum number of AI requests running. Wait for one to finish.",
+  AI_DISABLED: "AI features are switched off by the operator.",
+  AI_NOT_CONFIGURED: "The copilot is not configured.",
+};
+
+const CONVERSATION_KEY = (id: string) => `copilot_conversation_${id}`;
+
+/** The id this panel's conversation is known by on the server (a memory proposal is bound to it); new after a reset. */
+function conversationIdFor(bomItemId: string): string {
+  try {
+    const saved = localStorage.getItem(CONVERSATION_KEY(bomItemId));
+    if (saved) return saved;
+    const id = crypto.randomUUID();
+    localStorage.setItem(CONVERSATION_KEY(bomItemId), id);
+    return id;
+  } catch {
+    return crypto.randomUUID();
+  }
+}
 
 interface CopilotScenario {
   batchSize: number;
@@ -97,6 +138,7 @@ function useCopilotChat(bomItemId: string, scenario: CopilotScenario) {
   });
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState(() => conversationIdFor(bomItemId));
   const abortRef = useRef<AbortController | null>(null);
 
   // Persist completed messages to localStorage (never save in-flight streaming ones)
@@ -115,8 +157,45 @@ function useCopilotChat(bomItemId: string, scenario: CopilotScenario) {
     setMessages([]);
     setError(null);
     setIsStreaming(false);
-    try { localStorage.removeItem(STORAGE_KEY(bomItemId)); } catch { /* ignore */ }
+    try {
+      localStorage.removeItem(STORAGE_KEY(bomItemId));
+      localStorage.removeItem(CONVERSATION_KEY(bomItemId));
+    } catch { /* ignore */ }
+    setConversationId(conversationIdFor(bomItemId));
   }, [bomItemId]);
+
+  const updateProposal = useCallback((proposalId: string, patch: Partial<MemoryProposal>) => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.proposals?.some((p) => p.proposalId === proposalId)
+          ? { ...m, proposals: m.proposals.map((p) => (p.proposalId === proposalId ? { ...p, ...patch } : p)) }
+          : m,
+      ),
+    );
+  }, []);
+
+  /** Save: the only way a copilot proposal reaches saved memory. */
+  const confirmProposal = useCallback(
+    async (proposal: MemoryProposal) => {
+      updateProposal(proposal.proposalId, { status: "saving" });
+      try {
+        await apiClient.post(
+          `/copilot/memory/proposals/${proposal.proposalId}/confirm`,
+          { conversationId, turn: proposal.turn },
+          { retry: false },
+        );
+        updateProposal(proposal.proposalId, { status: "saved" });
+      } catch (e) {
+        updateProposal(proposal.proposalId, { status: "failed", note: e instanceof Error ? e.message : "Could not save." });
+      }
+    },
+    [conversationId, updateProposal],
+  );
+
+  const dismissProposal = useCallback(
+    (proposal: MemoryProposal) => { updateProposal(proposal.proposalId, { status: "dismissed" }); },
+    [updateProposal],
+  );
 
   const send = useCallback(
     async (text: string) => {
@@ -157,8 +236,12 @@ function useCopilotChat(bomItemId: string, scenario: CopilotScenario) {
           // Answers saved from earlier sessions can exceed what the server accepts; trimming old history is harmless.
           content: m.content.slice(0, m.role === "user" ? MAX_QUESTION_CHARS : MAX_ANSWER_CHARS),
         }));
+      // Which user message of the conversation this is (all of it, not only the history sent).
+      const turn = [...messages, userMsg].filter((m) => m.role === "user").length;
       const payload = {
         bomItemId,
+        conversationId,
+        turn,
         location: scenario.location,
         batchSize: scenario.batchSize,
         productionLifeYears: scenario.productionLife,
@@ -182,7 +265,8 @@ function useCopilotChat(bomItemId: string, scenario: CopilotScenario) {
       }
 
       if (!resp.ok || !resp.body) {
-        setError(HTTP_ERROR_TEXT[resp.status] ?? "The copilot is unavailable. Try again shortly.");
+        const code = ((await resp.json().catch(() => null)) as { code?: string } | null)?.code;
+        setError((code && AI_CODE_TEXT[code]) ?? HTTP_ERROR_TEXT[resp.status] ?? "The copilot is unavailable. Try again shortly.");
         dropPlaceholder();
         setIsStreaming(false);
         return;
@@ -196,6 +280,12 @@ function useCopilotChat(bomItemId: string, scenario: CopilotScenario) {
         if (event.type === "text") {
           setMessages((prev) =>
             prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + event.delta, streaming: true } : m)),
+          );
+        } else if (event.type === "memory_proposal") {
+          const { proposalId, add, remove, expiresAt } = event;
+          const proposal: MemoryProposal = { proposalId, add, remove, expiresAt, turn, status: "pending" };
+          setMessages((prev) =>
+            prev.map((m) => (m.id === assistantId ? { ...m, proposals: [...(m.proposals ?? []), proposal] } : m)),
           );
         } else if (event.type === "error") {
           setError(ERROR_TEXT[event.code] ?? "Something went wrong. Try again.");
@@ -224,14 +314,14 @@ function useCopilotChat(bomItemId: string, scenario: CopilotScenario) {
       setMessages((prev) =>
         prev
           .map((m) => (m.id === assistantId ? { ...m, streaming: false } : m))
-          .filter((m) => m.id !== assistantId || m.content),
+          .filter((m) => m.id !== assistantId || m.content || m.proposals?.length),
       );
       setIsStreaming(false);
     },
-    [bomItemId, isStreaming, messages, scenario.batchSize, scenario.productionLife, scenario.location],
+    [bomItemId, conversationId, isStreaming, messages, scenario.batchSize, scenario.productionLife, scenario.location],
   );
 
-  return { messages, isStreaming, error, send, reset };
+  return { messages, isStreaming, error, send, reset, confirmProposal, dismissProposal };
 }
 
 // ── Copilot response renderer ──────────────────────────────────────────────────
@@ -352,7 +442,52 @@ function CopilotResponse({ content, showSources }: { content: string; showSource
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
-function MessageBubble({ msg, showSources }: { msg: ChatMessage; showSources: boolean }) {
+/** "Save to memory" confirmation for one copilot proposal. Text is rendered as text, never as markup. */
+export function MemoryProposalChip({
+  proposal,
+  onSave,
+  onDismiss,
+}: {
+  proposal: MemoryProposal;
+  onSave: (p: MemoryProposal) => void;
+  onDismiss: (p: MemoryProposal) => void;
+}) {
+  const expired = proposal.status === "pending" && Date.parse(proposal.expiresAt) <= Date.now();
+  return (
+    <div className="mt-1.5 rounded border border-brand-200 dark:border-brand-800 bg-background px-2 py-1.5 text-[10px]" data-testid="memory-proposal">
+      <p className="font-medium text-foreground">Save to copilot memory?</p>
+      {proposal.add.map((p) => (
+        <p key={`a-${p}`} className="text-foreground/80">+ {p}</p>
+      ))}
+      {proposal.remove.map((p) => (
+        <p key={`r-${p}`} className="text-foreground/80 line-through">{p}</p>
+      ))}
+      {proposal.status === "pending" && !expired && (
+        <div className="mt-1 flex gap-1.5">
+          <Button size="sm" className="h-5 px-2 text-[10px]" onClick={() => { onSave(proposal); }}>Save</Button>
+          <Button size="sm" variant="outline" className="h-5 px-2 text-[10px]" onClick={() => { onDismiss(proposal); }}>Dismiss</Button>
+        </div>
+      )}
+      {proposal.status === "saving" && <p className="mt-1 text-muted-foreground">Saving…</p>}
+      {proposal.status === "saved" && <p className="mt-1 text-emerald-600">Saved. Manage it in Settings, Preferences.</p>}
+      {proposal.status === "dismissed" && <p className="mt-1 text-muted-foreground">Dismissed: nothing was saved.</p>}
+      {proposal.status === "failed" && <p className="mt-1 text-destructive">{proposal.note ?? "Could not save."}</p>}
+      {expired && <p className="mt-1 text-muted-foreground">Expired: nothing was saved. Ask the copilot again.</p>}
+    </div>
+  );
+}
+
+function MessageBubble({
+  msg,
+  showSources,
+  onSave,
+  onDismiss,
+}: {
+  msg: ChatMessage;
+  showSources: boolean;
+  onSave: (p: MemoryProposal) => void;
+  onDismiss: (p: MemoryProposal) => void;
+}) {
   const isUser = msg.role === "user";
   return (
     <div className={cn("flex gap-2 px-3 py-2", isUser ? "flex-row-reverse" : "flex-row")}>
@@ -391,6 +526,9 @@ function MessageBubble({ msg, showSources }: { msg: ChatMessage; showSources: bo
         {msg.streaming && msg.content && (
           <span className="inline-block w-1 h-3 bg-brand-500 animate-pulse ml-0.5 align-text-bottom" />
         )}
+        {msg.proposals?.map((p) => (
+          <MemoryProposalChip key={p.proposalId} proposal={p} onSave={onSave} onDismiss={onDismiss} />
+        ))}
       </div>
     </div>
   );
@@ -410,7 +548,7 @@ export function CopilotPanel({ itemId, batchSize, productionLife, factory }: Cop
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const { messages, isStreaming, error, send, reset } = useCopilotChat(itemId, {
+  const { messages, isStreaming, error, send, reset, confirmProposal, dismissProposal } = useCopilotChat(itemId, {
     batchSize,
     productionLife,
     location: factory,
@@ -520,7 +658,7 @@ export function CopilotPanel({ itemId, batchSize, productionLife, factory }: Cop
               /\b(source|citation|cite|reference|where did|where from|provenance|grounding)\b/i.test(m.content)
           );
           return (
-            <MessageBubble key={msg.id} msg={msg} showSources={showSources} />
+            <MessageBubble key={msg.id} msg={msg} showSources={showSources} onSave={(p) => void confirmProposal(p)} onDismiss={dismissProposal} />
           );
         })}
 

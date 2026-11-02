@@ -16,6 +16,7 @@ import {
   CreateFormulaDto,
   UpdateFormulaDto,
 } from './dto/calculator.dto';
+import { orIlikeContains } from '../../common/db/postgrest-filter';
 
 /**
  * CalculatorsServiceV2 - Enterprise Grade
@@ -76,7 +77,7 @@ export class CalculatorsServiceV2 {
 
     // Apply filters
     if (query.search) {
-      queryBuilder = queryBuilder.or(`name.ilike.%${query.search}%,description.ilike.%${query.search}%`);
+      queryBuilder = queryBuilder.or(orIlikeContains(['name', 'description'], query.search));
     }
 
     if (query.calcCategory) {

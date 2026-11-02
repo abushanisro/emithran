@@ -1,7 +1,7 @@
 import { DEFAULT_CAD_ENGINE_URL } from '../common/engine-urls';
 import { trustProxySetting } from '../common/client-ip';
 import { plainToClass } from 'class-transformer';
-import { IsString, IsNumber, IsOptional, validateSync, IsEnum, MinLength, IsIn, Min, Max } from 'class-validator';
+import { IsString, IsNumber, IsInt, IsOptional, validateSync, IsEnum, MinLength, IsIn, Min, Max, Matches } from 'class-validator';
 
 enum Environment {
   Development = 'development',
@@ -83,9 +83,23 @@ class EnvironmentVariables {
   @IsString()
   AUTH0_AUDIENCE!: string;
 
-  // Namespace of the custom claims the post-login Action adds (email, email_verified, sid), e.g. https://emithran.com/
+  // Namespace of the custom claims the post-login Action adds (email, email_verified, sid, connection), e.g. https://emithran.com/
   @IsString()
   AUTH0_CLAIM_NAMESPACE!: string;
+
+  // The Auth0 connections whose verified email may link a new login to an invited account (decision D3), comma-separated names
+  // exactly as in Auth0: the company SSO connection and the database connection, e.g. emithran-auth,Username-Password-Authentication.
+  // A login from any other connection is refused unless it is already linked (migration 947).
+  @Matches(/^[A-Za-z0-9-]+(,[A-Za-z0-9-]+)*$/, { message: 'AUTH0_TRUSTED_CONNECTIONS must be comma-separated Auth0 connection names' })
+  AUTH0_TRUSTED_CONNECTIONS!: string;
+
+  // Seconds one "who is this, still authorised?" answer is reused per login: the longest a user removed from authorized_users keeps
+  // access. 0 asks the database on every request.
+  @IsInt()
+  @IsOptional()
+  @Min(0)
+  @Max(60)
+  AUTH_DECISION_CACHE_SECONDS: number = 10;
 
   @IsString()
   @IsOptional()
@@ -114,6 +128,38 @@ class EnvironmentVariables {
   @IsNumber()
   @IsOptional()
   AI_LIMIT_PER_MINUTE: number = 20;
+
+  // AI spend (common/ai/ai-budget.service.ts, decision D6). Tokens are input (including cached) plus output, from each response's
+  // usage, counted per UTC day in ai_usage_daily (migration 949). A call over a limit is refused with 429 until 00:00 UTC.
+  /** Kill switch: 'true' refuses every AI call with 503, at once, without a deploy of code. */
+  @IsString()
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  AI_DISABLED: string = 'false';
+
+  /** Tokens one user may spend per UTC day, across every organization and AI feature. */
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  AI_USER_DAILY_TOKENS: number = 2_000_000;
+
+  /** Tokens one organization may spend per UTC day, all its members together. */
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  AI_ORG_DAILY_TOKENS: number = 20_000_000;
+
+  /** Tokens the whole deployment may spend per UTC day (keep it under the Anthropic workspace spend limit). A warning is logged at 80%. */
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  AI_GLOBAL_DAILY_TOKENS: number = 50_000_000;
+
+  /** AI requests (copilot streams, drawing extraction, VAVE analyses) one user may have running at once, per backend instance. */
+  @IsNumber()
+  @IsOptional()
+  @Min(1)
+  AI_MAX_CONCURRENT_PER_USER: number = 2;
 
   @IsString()
   @IsOptional()
@@ -161,6 +207,14 @@ class EnvironmentVariables {
   @Min(1)
   @Max(500)
   MAX_UPLOAD_MB: number = 50;
+
+  // How far (percent of the current rate) an organization's budget exchange rate may move in one change before the admin must
+  // confirm it explicitly (common/exchange-rate/exchange-rate.service.ts setRate). Catches a misplaced decimal point.
+  @IsNumber()
+  @IsOptional()
+  @Min(0.1)
+  @Max(1000)
+  FX_RATE_MAX_CHANGE_PERCENT: number = 10;
 
   // Development auth bypass opt-in. Off unless explicitly 'true': with it off, a missing or
   // invalid bearer token is a 401 in every environment. ADMIN_FALLBACK_EMAIL alone enables nothing.

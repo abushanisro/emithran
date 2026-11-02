@@ -20,8 +20,10 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
 import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
 import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
+import { OrgRole } from '../../common/authz/authz-policy';
 
 @ApiTags('supplier-evaluation-groups')
+@OrgRole('member')
 @Controller('api/supplier-evaluation-groups')
 export class SupplierEvaluationGroupsController {
   constructor(
@@ -45,6 +47,7 @@ export class SupplierEvaluationGroupsController {
     return this.supplierEvaluationGroupsService.create(userId, createDto, token, organizationId);
   }
 
+  @OrgRole('viewer')
   @Get()
   @ApiOperation({ summary: 'Get all evaluation groups for user' })
   @ApiResponse({
@@ -59,6 +62,7 @@ export class SupplierEvaluationGroupsController {
     return this.supplierEvaluationGroupsService.findAll(userId, token);
   }
 
+  @OrgRole('viewer')
   @Get('project/:projectId')
   @ApiOperation({ summary: 'Get all evaluation groups for a project' })
   @ApiResponse({
@@ -74,6 +78,7 @@ export class SupplierEvaluationGroupsController {
     return this.supplierEvaluationGroupsService.findByProject(userId, projectId, token);
   }
 
+  @OrgRole('viewer')
   @Get('project/:projectId/latest')
   @ApiOperation({ summary: 'Get the latest evaluation group for a project' })
   @ApiResponse({
@@ -89,6 +94,7 @@ export class SupplierEvaluationGroupsController {
     return this.supplierEvaluationGroupsService.getLatestByProject(userId, projectId, token);
   }
 
+  @OrgRole('viewer')
   @Get(':id')
   @ApiOperation({ summary: 'Get evaluation group by ID' })
   @ApiResponse({
@@ -120,6 +126,7 @@ export class SupplierEvaluationGroupsController {
     return this.supplierEvaluationGroupsService.update(userId, id, updateDto, token);
   }
 
+  @OrgRole('viewer')
   @Get(':id/validate-deletion')
   @ApiOperation({ summary: 'Validate if evaluation group can be deleted' })
   @ApiResponse({

@@ -23,9 +23,11 @@ import {
 import { RequestAuthGuard } from '../../common/guards/request-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
+import { OrgRole } from '../../common/authz/authz-policy';
 
 @ApiTags('Supplier Evaluation')
 @ApiBearerAuth()
+@OrgRole('member')
 @Controller({ path: 'api/supplier-evaluations', version: '1' })
 @UseGuards(RequestAuthGuard)
 export class SupplierEvaluationController {
@@ -60,6 +62,7 @@ export class SupplierEvaluationController {
     }
   }
 
+  @OrgRole('viewer')
   @Get()
   @ApiOperation({ summary: 'Get all supplier evaluations with optional filters' })
   @ApiResponse({
@@ -82,6 +85,7 @@ export class SupplierEvaluationController {
     }
   }
 
+  @OrgRole('viewer')
   @Get(':id')
   @ApiOperation({ summary: 'Get supplier evaluation by ID' })
   @ApiResponse({

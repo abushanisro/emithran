@@ -88,6 +88,8 @@ Names are the OpenTelemetry names with dots as underscores and the unit as suffi
 |---|---|---|---|
 | `emithran_http_server_duration_seconds` | histogram | `http_request_method`, `http_route` (pattern), `emithran_status_class` | backend middleware (every request, guard rejections and 404s included) |
 | `emithran_http_server_active_requests` | gauge | none | same middleware (new) |
+| `emithran_http_server_rejections_total` | counter | `http_request_method`, `http_route` (pattern), `http_response_status_code` (413, 429) | same middleware: requests refused for size or rate. A 413 from the body parser comes before routing, so its route is `unmatched` |
+| `emithran_privileged_client_calls_total` | counter | `emithran_privileged_site` (the reason's category before `:`, e.g. `reference-data`, `audit`) | `DatabaseService.getPrivilegedClient`, one per privileged (RLS-bypassing) client handed out; other code can count through `recordPrivilegedClientCall` in `telemetry/metrics.ts` |
 | `emithran_costing_duration_seconds` | histogram | `emithran_operation` (cost_summary, route_comparison), `emithran_outcome` (ok, error) | `@Traced` on `getCostSummary` / `getRouteComparison`; the `_count` is the run count |
 | `emithran_cad_upload_duration_seconds` | histogram | `emithran_outcome` (ok, error, retry) | CAD upload runner, one point per processing attempt (new) |
 | `emithran_job_queue_depth` | gauge | `emithran_queue` (`cad_upload`, electronics queues) | read when metrics are exported; 2 s bound per queue (CAD upload reader new) |
@@ -134,7 +136,7 @@ Source of truth is the database (`kpi.*`, daily in UTC), not Prometheus. A job t
 - Container restarts and per-container resources (cAdvisor, above). Query latency / slow queries (postgres-exporter, above).
 
 ## Alerting
-`monitoring/prometheus/rules/alerts.yml`, 14 rules, evaluated by Prometheus; unit tests in `monitoring/prometheus/tests/alerts.test.yml`.
+`monitoring/prometheus/rules/alerts.yml`, 16 rules, evaluated by Prometheus; unit tests in `monitoring/prometheus/tests/alerts.test.yml`.
 Thresholds are literals in the file (Prometheus rules take no variables): edit, `promtool check rules`, restart Prometheus. All are **initial values to tune from about a week of real baseline**.
 
 | Alert | Condition | Hold | Severity | Response |
@@ -145,12 +147,14 @@ Thresholds are literals in the file (Prometheus rules take no variables): edit, 
 | BackendTelemetryMissing | backend live but no `target_info` for 10 m | 5 m | warning | `OTEL_*` on the backend; Prometheus receiver flag. Other alerts are blind without it. |
 | HighServerErrorRate | 5xx > 5% of requests, and > 0.05 req/s | 10 m | critical | Application Performance dashboard; DB and engine alerts first. |
 | HighApiLatencyP95 | p95 > 5 s on ordinary routes (long-running routes excluded), traffic > 0.05 req/s | 15 m | warning | Slowest endpoints panel; outbound latency. |
+| RateLimitSpike | > 50 requests answered 429 on one route in 10 m | 5 m | warning | Find the caller in the backend log; abuse: block at Cloudflare; real load: raise that route's throttle. |
 | CadProcessingFailureSpike | `error` / (`ok` + `error`) > 25% over 1 h, at least 5 finished; retries excluded | 10 m | warning | `error_code` in `cad_uploads`; engine alert and logs. |
 | CostingFailureSpike | failed / all > 25% over 1 h, at least 10 runs | 10 m | warning | Costing traces; recent rate/reference-data migrations. |
 | CostingSlow | costing p95 > 180 s over 30 m | 15 m | warning | Backend CPU, engine stage durations, database latency. |
 | BackgroundQueueBacklog | queue depth > 10 for 15 m (minimum over the window) | 5 m | warning | Runner stopped (`CAD_UPLOAD_RUNNER=off` everywhere) or slow. |
 | HighCpuUtilization | host CPU > 85% | 15 m | warning | `docker stats`; lower `MAX_CONCURRENT_ANALYSES`. |
 | HighMemoryUtilization | host memory > 90% | 10 m | critical | Engine memory limits and concurrency. |
+| ContainerOomKilled | the kernel's OOM-kill counter (`node_vmstat_oom_kill`) rose in the last 10 m | 1 m | critical | `docker inspect` (State.OOMKilled) finds the container; its log shows the request. Treat as a resource-exhaustion attempt or a limit to tighten. |
 | DiskSpaceLow | < 15% free on any real filesystem | 10 m | critical | `docker system df`; log volumes; `PROM_RETENTION_SIZE`. |
 | DiskWillFillIn24h | `predict_linear` over 6 h reaches 0 within 24 h | 30 m | warning | Find what is growing before the 15% alert. |
 | DatabaseConnectionsHigh (Grafana-managed) | sessions > 80% of `max_connections` | 10 m | warning | The pooler, PostgREST, a runaway job; raise the limit or lower pools. Quiet when the KPI datasource is unreachable. |
@@ -181,7 +185,7 @@ What ran: the real Prometheus 3.15.1, Grafana 13.3.0, blackbox 0.29.1 and node-e
 | OTLP push to Prometheus from Node and Python, separate metrics endpoint | arrived; names and labels as in the table above |
 | Every panel query of all 4 dashboards, executed through Grafana's query API | 0 errors; every panel returned rows once its source existed (engines, node-exporter, fixtures) except RFQs sent (no fixture rows) |
 | Business panels | read the `kpi.*` views through `grafana_reader` (datasource health OK) |
-| `promtool check config`, `check rules`, `test rules` | pass (14 rules, 8 unit-test scenarios incl. low-traffic and retry-only negatives) |
+| `promtool check config`, `check rules`, `test rules` | pass (16 rules, 10 unit-test scenarios incl. low-traffic and retry-only negatives) |
 | Live alerts | `HighServerErrorRate`, `CadProcessingFailureSpike` went pending on injected failures; stopping the stand-in backend made `AppDown` go pending and **fire exactly after its 3 m hold**, and `EngineUnavailable` pending |
 | Persistence | `docker compose down` (no `-v`) then `up`: Prometheus samples from before the restart still queryable; Grafana dashboards and datasource back |
 | Security | only Grafana published (loopback); Prometheus unreachable from the host; anonymous API and sign-up answered 401; containers read-only, all capabilities dropped; no label value looked like an id, file name, email or token |

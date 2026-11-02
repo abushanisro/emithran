@@ -8,7 +8,9 @@ import type {
   SubmitFeedbackDto,
   ValidateRouteDto,
 } from './dto/kb.dto';
+import { OrgRole } from '../../common/authz/authz-policy';
 
+@OrgRole('member')
 @Controller('api/manufacturing-knowledge')
 export class ManufacturingKnowledgeController {
   constructor(
@@ -16,6 +18,7 @@ export class ManufacturingKnowledgeController {
     private readonly validation: ProcessValidationService,
   ) {}
 
+  @OrgRole('viewer')
   @Get('feature-process-mapping')
   getFeatureProcessMapping(@Request() req: any, @Query('featureType') featureType?: string) {
     return this.kb.getFeatureProcessMapping(req.token, featureType);
@@ -26,6 +29,7 @@ export class ManufacturingKnowledgeController {
     return this.kb.createFeatureProcessMapping(req.token, dto, req.user.id);
   }
 
+  @OrgRole('viewer')
   @Get('machine-capabilities')
   getMachineCapabilities(@Request() req: any, @Query('machineType') machineType?: string) {
     return this.kb.getMachineCapabilities(req.token, machineType);
@@ -36,6 +40,7 @@ export class ManufacturingKnowledgeController {
     return this.kb.createMachineCapability(req.token, dto, req.user.id);
   }
 
+  @OrgRole('viewer')
   @Get('routing-rules')
   getRoutingRules(@Request() req: any, @Query('partFamily') partFamily?: string) {
     return this.kb.getRoutingRules(req.token, partFamily);
@@ -46,17 +51,20 @@ export class ManufacturingKnowledgeController {
     return this.kb.createRoutingRule(req.token, dto, req.user.id);
   }
 
+  @OrgRole('viewer')
   @Get('templates')
   getTemplates(@Request() req: any, @Query('partFamily') partFamily?: string, @Query('complexity') complexity?: string) {
     if (partFamily) return this.kb.getTemplate(req.token, partFamily, complexity);
     return this.kb.getAllTemplates(req.token);
   }
 
+  @OrgRole('viewer')
   @Get('templates/:partFamily')
   getTemplate(@Request() req: any, @Param('partFamily') partFamily: string, @Query('complexity') complexity?: string) {
     return this.kb.getTemplate(req.token, partFamily, complexity);
   }
 
+  @OrgRole('viewer')
   @Get('machine-process-mapping')
   getMachineProcessMapping(@Request() req: any, @Query('featureType') featureType?: string, @Query('partFamily') partFamily?: string) {
     return this.kb.getMachineProcessMapping(req.token, featureType, partFamily);
@@ -67,6 +75,7 @@ export class ManufacturingKnowledgeController {
     return this.kb.submitFeedback(req.token, dto, req.user.id);
   }
 
+  @OrgRole('viewer')
   @Get('feedback/:bomItemId')
   getFeedback(@Request() req: any, @Param('bomItemId') bomItemId: string) {
     return this.kb.getFeedbackForBomItem(req.token, bomItemId);

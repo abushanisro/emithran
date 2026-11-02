@@ -36,9 +36,11 @@ import {
   CommentResponseDto,
   PaginatedRemarksResponseDto,
 } from '../dto/remark.dto';
+import { OrgRole } from '../../../common/authz/authz-policy';
 
 @ApiTags('Remarks & Issues')
 @ApiBearerAuth()
+@OrgRole('member')
 @Controller('api/remarks')
 @UseGuards(RequestAuthGuard)
 export class RemarkController {
@@ -65,6 +67,7 @@ export class RemarkController {
     return this.remarkService.createRemark(createRemarkDto, userId);
   }
 
+  @OrgRole('viewer')
   @Get()
   @ApiOperation({ 
     summary: 'Get filtered remarks',
@@ -90,6 +93,7 @@ export class RemarkController {
     return this.remarkService.getRemarks(filterDto);
   }
 
+  @OrgRole('viewer')
   @Get('lot/:lotId')
   @ApiOperation({ 
     summary: 'Get remarks for a specific lot',
@@ -111,6 +115,7 @@ export class RemarkController {
     return this.remarkService.getRemarksByLot(lotId, filterDto);
   }
 
+  @OrgRole('viewer')
   @Get('lot/:lotId/stats')
   @ApiOperation({ 
     summary: 'Get remark statistics for a lot',
@@ -132,6 +137,7 @@ export class RemarkController {
     return this.remarkService.getRemarkStats(lotId);
   }
 
+  @OrgRole('viewer')
   @Get(':id')
   @ApiOperation({ 
     summary: 'Get remark by ID',
@@ -218,6 +224,7 @@ export class RemarkController {
     return this.remarkService.createComment(createCommentDto, userId, userName);
   }
 
+  @OrgRole('viewer')
   @Get(':remarkId/comments')
   @ApiOperation({ 
     summary: 'Get comments for a remark',

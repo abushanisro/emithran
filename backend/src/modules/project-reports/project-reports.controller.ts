@@ -25,9 +25,11 @@ import {
   InspectionReportDto,
   DiagramAnnotationDto,
 } from './dto/project-reports.dto';
+import { OrgRole } from '../../common/authz/authz-policy';
 
 @ApiTags('Project Reports')
 @ApiBearerAuth()
+@OrgRole('member')
 @Controller({ path: 'api/project-reports', version: '1' })
 @UseGuards(RequestAuthGuard)
 export class ProjectReportsController {
@@ -66,6 +68,7 @@ export class ProjectReportsController {
     }
   }
 
+  @OrgRole('viewer')
   @Get('projects/:projectId/balloon-diagrams')
   @ApiOperation({ summary: 'Get balloon diagrams for project' })
   @ApiResponse({ status: 200, description: 'Balloon diagrams retrieved successfully' })
@@ -86,6 +89,7 @@ export class ProjectReportsController {
     }
   }
 
+  @OrgRole('viewer')
   @Get('balloon-diagrams/:id')
   @ApiOperation({ summary: 'Get balloon diagram by ID' })
   @ApiResponse({ status: 200, description: 'Balloon diagram retrieved successfully' })
@@ -206,6 +210,7 @@ export class ProjectReportsController {
   // INSPECTION REPORT ENDPOINTS
   // ============================================================================
 
+  @OrgRole('viewer')
   @Get('projects/:projectId/inspection-report')
   @ApiOperation({ summary: 'Generate inspection report for project' })
   @ApiResponse({ status: 200, description: 'Inspection report generated successfully' })
@@ -229,6 +234,7 @@ export class ProjectReportsController {
     }
   }
 
+  @OrgRole('viewer')
   @Get('projects/:projectId/complete-report')
   @ApiOperation({ summary: 'Generate complete project report with balloon diagram and inspection' })
   @ApiResponse({ status: 200, description: 'Complete report generated successfully' })

@@ -26,7 +26,6 @@ function makeService(fromMock: jest.Mock) {
   return new OrchestratorService(
     databaseService,
     {} as any, // retrieval
-    {} as any, // reasoning
     {} as any, // resolver
     {} as any, // deterministicPlanner
     {} as any, // alternativeRoutePlanner
@@ -101,7 +100,7 @@ describe('OrchestratorService.getLatestDraft', () => {
 describe('OrchestratorService SSE through the event bus', () => {
   it('a stream receives events published for its (user, item) channel and completes when the generation ends', async () => {
     const bus = new InProcessEventBus();
-    const service = new OrchestratorService({} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, bus);
+    const service = new OrchestratorService({} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, bus);
     const seen: string[] = [];
     const done = new Promise<void>((resolve) => {
       service.streamFor('item-1', 'user-1').subscribe({ next: (e) => seen.push(String(e.type)), complete: () => resolve() });

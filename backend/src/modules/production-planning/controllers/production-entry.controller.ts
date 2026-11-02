@@ -22,10 +22,12 @@ import {
   ProductionEntriesQueryDto
 } from '../dto/production-entry.dto';
 import { RequestAuthGuard } from '@/common/guards/request-auth.guard';
+import { OrgRole } from '../../../common/authz/authz-policy';
 
 @ApiTags('production-entries')
 @ApiBearerAuth()
 @UseGuards(RequestAuthGuard)
+@OrgRole('member')
 @Controller('api/production-planning/production-entries')
 export class ProductionEntryController {
   constructor(private readonly productionEntryService: ProductionEntryService) {}
@@ -52,6 +54,7 @@ export class ProductionEntryController {
     return createResponse(result);
   }
 
+  @OrgRole('viewer')
   @Get('debug')
   @ApiOperation({ summary: 'Debug endpoint to test controller registration' })
   async debug(): Promise<{ message: string; timestamp: string }> {
@@ -61,6 +64,7 @@ export class ProductionEntryController {
     };
   }
 
+  @OrgRole('viewer')
   @Get()
   @ApiOperation({ summary: 'Get production entries with optional filters' })
   @ApiResponse({
@@ -75,6 +79,7 @@ export class ProductionEntryController {
     return createResponse(result);
   }
 
+  @OrgRole('viewer')
   @Get('weekly-summary/:lotId')
   @ApiOperation({ summary: 'Get weekly production summary for a lot' })
   @ApiResponse({
@@ -89,6 +94,7 @@ export class ProductionEntryController {
     return createResponse(result);
   }
 
+  @OrgRole('viewer')
   @Get(':id')
   @ApiOperation({ summary: 'Get a specific production entry by ID' })
   @ApiResponse({

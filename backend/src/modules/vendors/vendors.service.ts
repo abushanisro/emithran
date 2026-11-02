@@ -15,6 +15,7 @@ import {
 } from './dto/vendor.dto';
 import { MatchVendorsDto, RankedVendor, RankedProcessGroup } from './dto/match-vendors.dto';
 import { validate as isValidUUID } from 'uuid';
+import { orIlikeContains } from '../../common/db/postgrest-filter';
 
 /** Upload bounds for the vendor import (file size, CSV rows, CSV line length). */
 export const VENDOR_IMPORT_MAX_BYTES = 10 * 1024 * 1024;
@@ -51,7 +52,7 @@ export class VendorsService {
     // Apply search filter (search across name, city, state)
     if (query.search) {
       queryBuilder = queryBuilder.or(
-        `name.ilike.%${query.search}%,city.ilike.%${query.search}%,state.ilike.%${query.search}%,supplier_code.ilike.%${query.search}%`
+        orIlikeContains(['name', 'city', 'state', 'supplier_code'], query.search)
       );
     }
 

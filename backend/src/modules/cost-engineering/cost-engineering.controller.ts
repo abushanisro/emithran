@@ -19,13 +19,16 @@ import {
   QuerySupplierCapabilitiesDto,
   QuerySustainabilityDto,
 } from './dto/cost-engineering.dto';
+import { OrgRole } from '../../common/authz/authz-policy';
 
 @ApiTags('Cost Engineering')
 @ApiBearerAuth()
+@OrgRole('member')
 @Controller({ path: 'api/cost-engineering', version: '1' })
 export class CostEngineeringController {
   constructor(private readonly service: CostEngineeringService) {}
 
+  @OrgRole('viewer')
   @Get('scrap-rates')
   @ApiOperation({ summary: 'Process scrap rates by category and material' })
   @ApiResponse({ status: 200, description: 'List of scrap rate benchmarks' })
@@ -33,6 +36,7 @@ export class CostEngineeringController {
     return this.service.getScrapRates(query, token);
   }
 
+  @OrgRole('viewer')
   @Get('country-factors')
   @ApiOperation({ summary: 'Country cost index factors for global sourcing comparison' })
   @ApiResponse({ status: 200, description: 'Country cost factor data (China=1.00 baseline)' })
@@ -40,6 +44,7 @@ export class CostEngineeringController {
     return this.service.getCountryFactors(query, token);
   }
 
+  @OrgRole('viewer')
   @Get('machine-utilization')
   @ApiOperation({ summary: 'Machine effective utilization benchmarks by process and type' })
   @ApiResponse({ status: 200, description: 'Machine utilization factor data' })
@@ -47,6 +52,7 @@ export class CostEngineeringController {
     return this.service.getMachineUtilization(query, token);
   }
 
+  @OrgRole('viewer')
   @Get('tool-life')
   @ApiOperation({ summary: 'Tool life reference data: cutting speed, feed, life, and cost per piece' })
   @ApiResponse({ status: 200, description: 'Tool life reference data' })
@@ -54,6 +60,7 @@ export class CostEngineeringController {
     return this.service.getToolLife(query, token);
   }
 
+  @OrgRole('viewer')
   @Get('overhead-profiles')
   @ApiOperation({ summary: 'Overhead profiles by industry sector, region, and company size' })
   @ApiResponse({ status: 200, description: 'Overhead profile data' })
@@ -61,6 +68,7 @@ export class CostEngineeringController {
     return this.service.getOverheadProfiles(query, token);
   }
 
+  @OrgRole('viewer')
   @Get('material-density')
   @ApiOperation({ summary: 'Material density library for volume-to-weight cost calculations' })
   @ApiResponse({ status: 200, description: 'Material density data (kg/m³)' })
@@ -68,6 +76,7 @@ export class CostEngineeringController {
     return this.service.getMaterialDensity(query, token);
   }
 
+  @OrgRole('viewer')
   @Get('machines')
   @ApiOperation({ summary: 'Machine master with hourly rate low/mid/high bands' })
   @ApiResponse({ status: 200, description: 'Machine master data' })
@@ -75,6 +84,7 @@ export class CostEngineeringController {
     return this.service.getMachines(query, token);
   }
 
+  @OrgRole('viewer')
   @Get('surface-finish-costs')
   @ApiOperation({ summary: 'Surface finish achievability and relative cost index by process' })
   @ApiResponse({ status: 200, description: 'Surface finish cost factor data' })
@@ -82,6 +92,7 @@ export class CostEngineeringController {
     return this.service.getSurfaceFinishCosts(query, token);
   }
 
+  @OrgRole('viewer')
   @Get('inspection-costs')
   @ApiOperation({ summary: 'Inspection level cost multipliers and AQL sample sizes' })
   @ApiResponse({ status: 200, description: 'Inspection cost factor data' })
@@ -89,6 +100,7 @@ export class CostEngineeringController {
     return this.service.getInspectionCosts(query, token);
   }
 
+  @OrgRole('viewer')
   @Get('freight-rates')
   @ApiOperation({ summary: 'Freight rates by mode, origin, and destination region' })
   @ApiResponse({ status: 200, description: 'Freight rate data (USD/kg)' })
@@ -96,6 +108,7 @@ export class CostEngineeringController {
     return this.service.getFreightRates(query, token);
   }
 
+  @OrgRole('viewer')
   @Get('material-prices')
   @ApiOperation({ summary: 'Material price library by form, grade, and region (USD/kg)' })
   @ApiResponse({ status: 200, description: 'Material price data' })
@@ -103,6 +116,7 @@ export class CostEngineeringController {
     return this.service.getMaterialPrices(query, token);
   }
 
+  @OrgRole('viewer')
   @Get('cycle-times')
   @ApiOperation({ summary: 'Process cycle time library: MRR, shot cycle, laser speed, weld speed' })
   @ApiResponse({ status: 200, description: 'Cycle time reference data' })
@@ -110,6 +124,7 @@ export class CostEngineeringController {
     return this.service.getCycleTimes(query, token);
   }
 
+  @OrgRole('viewer')
   @Get('labor-content')
   @ApiOperation({ summary: 'Labor content library: operation time in minutes by region and skill level' })
   @ApiResponse({ status: 200, description: 'Labor content data' })
@@ -117,6 +132,7 @@ export class CostEngineeringController {
     return this.service.getLaborContent(query, token);
   }
 
+  @OrgRole('viewer')
   @Get('supplier-capabilities')
   @ApiOperation({ summary: 'Supplier capability benchmarks: world-class vs typical by process' })
   @ApiResponse({ status: 200, description: 'Supplier capability benchmark data' })
@@ -124,6 +140,7 @@ export class CostEngineeringController {
     return this.service.getSupplierCapabilities(query, token);
   }
 
+  @OrgRole('viewer')
   @Get('sustainability')
   @ApiOperation({ summary: 'Sustainability emission factors: kgCO2e/unit for materials, processes, and transport' })
   @ApiResponse({ status: 200, description: 'Sustainability factor data' })

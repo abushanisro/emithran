@@ -7,6 +7,7 @@ import { ConfigService } from '@nestjs/config';
 
 import { DbTokenMinter } from '../../src/common/db/db-token';
 import { DatabaseService } from '../../src/common/database/database.service';
+import { orIlikeContains } from '../../src/common/db/postgrest-filter';
 
 const SECRET = process.env.JWT_SECRET ?? '';
 const URL_ = process.env.PGRST_URL ?? '';
@@ -55,6 +56,16 @@ const forge = (claims: object, secret: string) => {
   check('an expired token is rejected', !!expired.error, expired.error?.message);
   const raised = await service.getClient(forge({ sub: A, role: 'postgres', exp: Math.floor(Date.now() / 1000) + 300 }, SECRET)).from('notes').select('body');
   check('a role the backend never mints cannot be reached, even with the right secret', !!raised.error, raised.error?.message);
+  const search = (text: string) => as(A).from('catalog').select('name').or(orIlikeContains(['name', 'grade'], text)).order('id');
+  const names = (res: { data: { name: string }[] | null }) => (res.data ?? []).map((row) => row.name).join('|');
+  let s = await search(',id.not.is.null');
+  check('a search for ",id.not.is.null" adds no filter: no rows, no error', !s.error && s.data?.length === 0, JSON.stringify(s.error ?? s.data));
+  s = await search('Steel, Alloy');
+  check('a search with a comma matches only that row', !s.error && names(s) === 'Steel, Alloy', JSON.stringify(s.error ?? s.data));
+  s = await search('50%');
+  check('a % in the search is literal, not a wildcard', !s.error && names(s) === '50% glass fibre', JSON.stringify(s.error ?? s.data));
+  s = await search('x"),name.not.is.null,name.eq.(\\');
+  check('quotes, parentheses and a trailing backslash stay inside the value', !s.error && s.data?.length === 0, JSON.stringify(s.error ?? s.data));
   process.exit(failed ? 1 : 0);
 })().catch((error) => {
   console.error(error);

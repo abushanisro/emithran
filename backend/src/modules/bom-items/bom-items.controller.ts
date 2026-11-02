@@ -22,6 +22,7 @@ import {
   InternalServerErrorException,
   ServiceUnavailableException,
   UseGuards,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { gunzip } from 'zlib';
@@ -30,7 +31,6 @@ import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express
 import { memoryStorage } from 'multer';
 import * as path from 'path';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
-import { expandSearchTermSpellingVariants } from '../raw-materials/material-search-spelling';
 import { BOMItemsService } from './bom-items.service';
 import { FeatureToleranceService } from './services/feature-tolerance.service';
 import { CreateBOMItemDto, UpdateBOMItemDto, QueryBOMItemsDto, BOMItemType } from './dto/bom-items.dto';
@@ -70,7 +70,7 @@ import axios from 'axios';
 import { CalculatorInputsRequestDto, MachiningCalculatorInputsRequestDto } from './dto/machining-calculator-inputs.dto';
 import { SIGNED_URL_TTL_SEC, getReusableSignedUrl, rememberSignedUrl } from './services/signed-url-cache';
 import { DEFAULT_CAD_ENGINE_URL } from '../../common/engine-urls';
-import { quoteFilterValue } from '../../common/db/postgrest-filter';
+import { OrgRole } from '../../common/authz/authz-policy';
 
 // Define User type if not available
 interface User {
@@ -87,6 +87,7 @@ interface User {
 
 @ApiTags('BOM Items')
 @ApiBearerAuth()
+@OrgRole('member')
 @Controller({ path: 'api/bom-items', version: '1' })
 export class BOMItemsController {
   private readonly logger = new Logger(BOMItemsController.name);
@@ -198,6 +199,7 @@ export class BOMItemsController {
     return { jobId };
   }
 
+  @OrgRole('viewer')
   @Get('analyze-for-autofill/:jobId')
   @ApiOperation({ summary: 'Poll the status/result of a background analysis job' })
   async getAnalyzeForAutoFillStatus(
@@ -210,6 +212,7 @@ export class BOMItemsController {
     return { status: job.status, result: job.result, error: job.error };
   }
 
+  @OrgRole('viewer')
   @Get()
   @ApiOperation({ summary: 'Get all BOM items' })
   @ApiResponse({ status: 200, description: 'BOM items retrieved successfully', type: BOMItemListResponseDto })
@@ -229,6 +232,7 @@ export class BOMItemsController {
     }
   }
 
+  @OrgRole('viewer')
   @Get('material-density')
   @ApiOperation({ summary: 'Look up density for a material grade from the reference table' })
   @ApiResponse({ status: 200, description: 'Density result' })
@@ -236,73 +240,16 @@ export class BOMItemsController {
     @Query('grade') grade: string,
     @AccessToken() token: string,
   ): Promise<{ density_g_cm3: number | null; material_name: string | null; material_grade: string | null }> {
-    if (!grade?.trim()) {
-      return { density_g_cm3: null, material_name: null, material_grade: null };
-    }
     try {
-      const client = this.databaseService.getPrivilegedClient('reference-data: material_density_lookup, global shared');
-      const g = grade.trim();
-      // Same real AmE/BrE spelling variants the Material search already
-      // reconciles (material-search-spelling.ts, root-caused 2026-09-18) —
-      // a drawing extracting "ALUMINIUM" must resolve to the same real
-      // "Aluminum"-spelled rows the search box already finds, not silently
-      // fail density lookup and leave Weight blank for the exact same
-      // material a different endpoint can already find.
-      const variants = expandSearchTermSpellingVariants(g);
-      const orClause = (columns: string[], wildcard: boolean) =>
-        variants.flatMap((v) => {
-          const pattern = wildcard ? `%${v}%` : v;
-          return columns.map((col) => `${col}.ilike.${quoteFilterValue(pattern)}`);
-        }).join(',');
-
-      // 1. Exact match in curated lookup table (any real spelling variant)
-      let { data } = await client
-        .from('material_density_lookup')
-        .select('material_name, material_grade, density_g_cm3')
-        .or(orClause(['material_grade'], false))
-        .limit(1)
-        .maybeSingle();
-
-      // 2. Partial match in lookup table
-      if (!data) {
-        ({ data } = await client
-          .from('material_density_lookup')
-          .select('material_name, material_grade, density_g_cm3')
-          .or(orClause(['material_grade', 'material_name'], true))
-          .limit(1)
-          .maybeSingle());
-      }
-
-      // 3. Fallback to raw_materials (user's own data, density in g/cm³)
-      if (!data) {
-        // raw_materials is org-scoped: read it as the caller, never with the service role.
-        const rm = await this.databaseService.getUserClient(token)
-          .from('raw_materials')
-          .select('grade, name, density')
-          .or(orClause(['name', 'grade'], true))
-          .not('density', 'is', null)
-          .limit(1)
-          .maybeSingle();
-        if (rm.data) {
-          const d = parseFloat(rm.data.density);
-          // Reject implausible densities — real engineering materials are 0.5–22 g/cm³
-          if (isFinite(d) && d >= 0.5 && d <= 22) {
-            return { density_g_cm3: d, material_name: rm.data.grade, material_grade: rm.data.name };
-          }
-        }
-      }
-
-      if (!data) return { density_g_cm3: null, material_name: null, material_grade: null };
-      return {
-        density_g_cm3: parseFloat(data.density_g_cm3),
-        material_name: data.material_name,
-        material_grade: data.material_grade,
-      };
-    } catch {
+      return await this.bomItemsService.materialDensity(grade ?? '', token);
+    } catch (error) {
+      // A lookup that fails leaves Weight for the user to fill in; it never blocks the form.
+      this.logger.warn(`Material density lookup failed for "${grade}": ${error instanceof Error ? error.message : String(error)}`);
       return { density_g_cm3: null, material_name: null, material_grade: null };
     }
   }
 
+  @OrgRole('viewer')
   @Get('analysis-version')
   @ApiOperation({ summary: 'Return the current feature graph version the backend produces' })
   @ApiResponse({ status: 200, description: 'Current analysis version' })
@@ -313,6 +260,7 @@ export class BOMItemsController {
     };
   }
 
+  @OrgRole('viewer')
   @Get(':id')
   @ApiOperation({ summary: 'Get BOM item by ID' })
   @ApiResponse({ status: 200, description: 'BOM item retrieved successfully', type: BOMItemResponseDto })
@@ -321,6 +269,7 @@ export class BOMItemsController {
     return this.bomItemsService.findOne(id, user.id, token);
   }
 
+  @OrgRole('viewer')
   @Get(':id/material-intelligence')
   @ApiOperation({ summary: 'Return top-3 material candidates scored against geometry and family' })
   @ApiResponse({ status: 200, description: 'Material candidates returned' })
@@ -400,6 +349,7 @@ export class BOMItemsController {
   }
 
   // ── Required tolerances per feature instance (GD&T tab, migration 881) ────
+  @OrgRole('viewer')
   @Get(':id/feature-tolerances')
   @ApiOperation({ summary: 'Every detected feature instance with its required tolerances (Manual values, then the Tolerance Policy), each with its source' })
   async getFeatureTolerances(@Param('id') id: string, @AccessToken() token: string) {
@@ -418,6 +368,7 @@ export class BOMItemsController {
   }
 
   // ── Engineer review of PMI values decoded from drawn glyphs (migration 908) ──
+  @OrgRole('viewer')
   @Get(':id/pmi-records')
   @ApiOperation({ summary: 'The part PMI engineering records with their review state, and whether the caller may approve or reject' })
   async getPmiRecords(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string) {
@@ -430,12 +381,14 @@ export class BOMItemsController {
     return this.pmiReviewService.review(id, user.id, token, body);
   }
 
+  @OrgRole('viewer')
   @Get(':id/pmi-records/history')
   @ApiOperation({ summary: 'Every decision taken on one PMI record, newest first' })
   async getPmiRecordHistory(@Param('id') id: string, @Query('recordKey') recordKey: string, @AccessToken() token: string) {
     return this.pmiReviewService.history(id, recordKey, token);
   }
 
+  @OrgRole('viewer')
   @Get(':id/machining-need')
   @ApiOperation({ summary: 'Features the primary process leaves short of their required tolerances (or cannot form), with the machining operations able to finish each' })
   async getMachiningNeed(@Param('id') id: string, @AccessToken() token: string) {
@@ -448,6 +401,7 @@ export class BOMItemsController {
     return this.featureToleranceService.setPolicy(id, policy, token);
   }
 
+  @OrgRole('viewer')
   @Get(':id/dfm-scores')
   @ApiOperation({ summary: 'Compute per-occurrence DFM risk scores from stored feature_graph_v2 metrics' })
   @ApiResponse({ status: 200, description: 'DFM scores returned' })
@@ -482,6 +436,7 @@ export class BOMItemsController {
     return this.materialResolutionService.resolveMaterialStrengths(token, item.materialGrade ?? null, family);
   }
 
+  @OrgRole('viewer')
   @Get(':id/material-strengths')
   @ApiOperation({ summary: 'Tensile, shear and yield strength of the part material, from the row its quote uses' })
   async getMaterialStrengths(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string) {
@@ -658,6 +613,7 @@ export class BOMItemsController {
     );
   }
 
+  @OrgRole('viewer')
   @Get(':id/dependencies')
   @ApiOperation({ summary: 'Check BOM item delete dependencies' })
   @ApiResponse({ status: 200, description: 'Dependencies checked successfully' })
@@ -665,14 +621,17 @@ export class BOMItemsController {
     return this.bomItemsService.checkDeleteDependencies(id, user.id, token);
   }
 
+  /**
+   * An organization admin deletes an item even though other members' production lots use it: the lot references go with it. The
+   * database function checks the admin role in the item's own organization and writes the audit event (migration 945).
+   */
   @Delete(':id/force')
-  @ApiOperation({ summary: 'Force delete BOM item with cascade cleanup' })
-  @ApiResponse({ status: 200, description: 'BOM item force deleted successfully' })
-  async forceRemove(@Param('id') id: string, @CurrentUser() user: User, @AccessToken() token: string) {
-    return this.audit.auditedRowChange('bom_items', id, 'bom_item.deleted', async () => {
-    // This calls the same cascade delete but with explicit force intent
-    return this.bomItemsService.remove(id, user.id, token);
-  });
+  @OrgRole('admin')
+  @ApiOperation({ summary: 'Force delete a BOM item still used in production lots (organization admins)' })
+  @ApiResponse({ status: 200, description: 'BOM item deleted; how many lot materials and lots referenced it' })
+  @ApiResponse({ status: 403, description: 'Not an admin of the item\'s organization' })
+  async forceRemove(@Param('id', ParseUUIDPipe) id: string, @AccessToken() token: string) {
+    return this.bomItemsService.forceRemove(id, token);
   }
 
   @Delete(':id')
@@ -718,6 +677,7 @@ export class BOMItemsController {
     return this.bomItemsService.updateSortOrder(body.items, user.id, token);
   }
 
+  @OrgRole('viewer')
   @Get(':id/file-url/:fileType')
   @ApiOperation({ summary: 'Get signed URL for BOM item file' })
   @ApiResponse({ status: 200, description: 'Signed URL generated successfully' })
@@ -911,6 +871,7 @@ export class BOMItemsController {
     return this.bomItemsService.update(id, updateData, user.id, token);
   }
 
+  @OrgRole('viewer')
   @Get(':id/file-url/dxf')
   @ApiOperation({ summary: 'Get signed URL for BOM item DXF drawing' })
   @ApiResponse({ status: 200, description: 'Signed URL generated successfully' })
@@ -927,6 +888,7 @@ export class BOMItemsController {
     return { url: signedUrl };
   }
 
+  @OrgRole('viewer')
   @Get(':id/dxf-content')
   @ApiOperation({ summary: 'Download decompressed DXF content for browser rendering' })
   @ApiResponse({ status: 200, description: 'Raw DXF content' })
@@ -962,6 +924,7 @@ export class BOMItemsController {
     res.send(content);
   }
 
+  @OrgRole('viewer')
   @Get(':id/dxf-content-legacy')
   @ApiOperation({ summary: 'Download decompressed DXF from legacy file2dPath (migration helper)' })
   @ApiResponse({ status: 200, description: 'Raw DXF content' })
@@ -1122,6 +1085,7 @@ export class BOMItemsController {
     }
   }
 
+  @OrgRole('viewer')
   @Get(':id/cad-analysis')
   @ApiOperation({ summary: 'Get CAD analysis results for BOM item' })
   @ApiResponse({ status: 200, description: 'CAD analysis results retrieved successfully' })
@@ -1193,6 +1157,7 @@ export class BOMItemsController {
     }
   }
 
+  @OrgRole('viewer')
   @Get(':id/cad-analysis/history')
   @ApiOperation({ summary: 'Get CAD analysis history for BOM item' })
   @ApiResponse({ status: 200, description: 'Analysis history retrieved successfully' })
@@ -1477,6 +1442,7 @@ export class BOMItemsController {
     };
   }
 
+  @OrgRole('viewer')
   @Get(':id/manufacturing-implications')
   @ApiOperation({ summary: 'Get deterministic manufacturing implications from drawing intelligence' })
   @ApiResponse({ status: 200, description: 'Implications derived from drawing-confirmed data' })
@@ -1497,6 +1463,7 @@ export class BOMItemsController {
     return { bomItemId: id, implications };
   }
 
+  @OrgRole('viewer')
   @Get(':id/cost-summary')
   @ApiOperation({ summary: 'Deterministic cost breakdown — material + process lines, no LLM' })
   @ApiResponse({ status: 200, description: 'Cost summary returned' })
@@ -1522,6 +1489,7 @@ export class BOMItemsController {
     );
   }
 
+  @OrgRole('viewer')
   @Get(':id/secondary-processes')
   @ApiOperation({ summary: 'Every secondary process (inspection, NDT, cleaning, packaging) for this part: applicability, machine, cycle time and cost from the reference data and CAD facts' })
   async getSecondaryProcesses(
@@ -1548,6 +1516,7 @@ export class BOMItemsController {
     });
   }
 
+  @OrgRole('viewer')
   @Get(':id/nre')
   @ApiOperation({ summary: 'One-time investment (NC programming, fixture, CMM programming) from reference data, with amortization' })
   async getNre(
@@ -1566,6 +1535,7 @@ export class BOMItemsController {
     });
   }
 
+  @OrgRole('viewer')
   @Get(':id/true-nest')
   @ApiOperation({ summary: 'True (real polygon) 2D nesting placement — visualization only, not a cost source. On-demand; call only when the Nest view opens.' })
   @ApiResponse({ status: 200, description: 'True nest computed' })
@@ -1599,6 +1569,7 @@ export class BOMItemsController {
     return result;
   }
 
+  @OrgRole('viewer')
   @Get(':id/route-comparison')
   @ApiOperation({
     summary: 'Compare Fiber Laser vs Turret Punch vs Waterjet routes with real cost numbers',
@@ -1626,6 +1597,7 @@ export class BOMItemsController {
     );
   }
 
+  @OrgRole('viewer')
   @Get(':id/candidate-routes')
   @ApiOperation({
     summary: 'Compare feasible manufacturing routes across blank types (sheet, bar, billet)',
@@ -1653,6 +1625,7 @@ export class BOMItemsController {
     );
   }
 
+  @OrgRole('viewer')
   @Get(':id/gdt-analysis')
   @ApiOperation({ summary: 'GD&T severity analysis derived from drawing intelligence' })
   @ApiResponse({ status: 200, description: 'GD&T analysis returned' })

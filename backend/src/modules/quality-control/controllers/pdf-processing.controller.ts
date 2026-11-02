@@ -12,8 +12,10 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { PDFProcessorService, PDFProcessingResult } from '../services/pdf-processor.service';
 import { ApiTags, ApiOperation, ApiConsumes, ApiResponse } from '@nestjs/swagger';
 import { PDFDocument } from 'pdf-lib';
+import { OrgRole } from '../../../common/authz/authz-policy';
 
 @ApiTags('PDF Processing')
+@OrgRole('member')
 @Controller('pdf-processing')
 export class PDFProcessingController {
   private readonly logger = new Logger(PDFProcessingController.name);

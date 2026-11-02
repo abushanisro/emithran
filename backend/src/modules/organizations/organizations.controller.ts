@@ -1,26 +1,34 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
+import { Authenticated, OrgRole } from '../../common/authz/authz-policy';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 import { CreateOrganizationDto, InviteMemberDto, UpdateOrganizationDto, WorkspaceDto } from './dto/organization.dto';
 import { OrganizationsService, type MemberView, type OrganizationRow, type WorkspaceRow } from './organizations.service';
 
-/** The browser's organization settings, which used to query these tables straight from the browser. */
+/**
+ * The browser's organization settings, which used to query these tables straight from the browser. Changing an organization, its
+ * members or its workspaces is for its admins (D5). Membership changes go through database functions that check the same role in
+ * the organization itself (942).
+ */
 @ApiTags('Organizations')
 @ApiBearerAuth()
+@OrgRole('admin')
 @Controller({ path: 'api/organizations', version: '1' })
 export class OrganizationsController {
   constructor(private readonly organizations: OrganizationsService) {}
 
   @Get('mine')
+  @Authenticated()
   @ApiOperation({ summary: 'The organization the signed-in user owns, or null' })
   mine(@CurrentUser('id') userId: string, @AccessToken() token: string): Promise<OrganizationRow | null> {
     return this.organizations.mine(userId, token);
   }
 
   @Post()
+  @Authenticated()
   @ApiOperation({ summary: 'Create an organization owned by the signed-in user, with its default workspace' })
   create(@Body() dto: CreateOrganizationDto, @CurrentUser('id') userId: string, @AccessToken() token: string): Promise<OrganizationRow> {
     return this.organizations.create(userId, dto, token);
@@ -42,6 +50,7 @@ export class OrganizationsController {
   }
 
   @Get(':id/members')
+  @OrgRole('viewer')
   members(@Param('id', ParseUUIDPipe) id: string, @AccessToken() token: string): Promise<MemberView[]> {
     return this.organizations.members(id, token);
   }
@@ -67,6 +76,7 @@ export class OrganizationsController {
   }
 
   @Get(':id/workspaces')
+  @OrgRole('viewer')
   workspaces(@Param('id', ParseUUIDPipe) id: string, @AccessToken() token: string): Promise<WorkspaceRow[]> {
     return this.organizations.workspaces(id, token);
   }

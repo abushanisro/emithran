@@ -11,6 +11,9 @@ export const AUDIT_ACTIONS = {
   'file.deleted': ['fileType'],
   'bom.deleted': ['name'],
   'bom_item.deleted': ['name', 'itemType'],
+  // written by the delete_bom_item_cascade() database function itself (migration 945), listed so the trail has one vocabulary
+  'bom_item.force_deleted': ['name', 'lotMaterials', 'lots'],
+  'fx_rate.changed': ['currency', 'previousRate', 'rate', 'reason', 'confirmed'],
   'cost.applied': ['route', 'custom'],
   'export.generated': ['kind', 'rows'],
   'rfq.sent': ['recipients'],
@@ -20,6 +23,8 @@ export const AUDIT_ACTIONS = {
   'auth.forbidden': ['reason'],
   'api_key.created': ['name', 'scopes', 'expiresAt'],
   'api_key.revoked': ['name'],
+  'copilot_memory.changed': ['saved', 'removed', 'via'],
+  'copilot_memory.cleared': ['via'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS;

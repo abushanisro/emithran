@@ -43,7 +43,7 @@ APP="$TMP/app/backend"; mkdir -p "$APP"; cp -r dist "$APP/dist"; cp package.json
 ( cd "$APP" && env -i PATH="$PATH" HOME="$HOME" NODE_ENV=development APP_ENV=local BACKEND_PORT=4529 CAD_UPLOAD_RUNNER=off ELECTRONICS_QUEUE_DRIVER=memory \
     POSTGREST_URL="http://127.0.0.1:$LOCAL_API_PORT" DB_JWT_SECRET="$(grep '^DB_JWT_SECRET=' "$TMP/.env" | cut -d= -f2-)" \
     S3_BUCKET=emithran S3_REGION=us-east-1 S3_ENDPOINT="http://127.0.0.1:$LOCAL_S3_PORT" S3_FORCE_PATH_STYLE=true S3_ACCESS_KEY_ID=test S3_SECRET_ACCESS_KEY=testtesttest \
-    AUTH0_DOMAIN=t.eu.auth0.com AUTH0_AUDIENCE=https://api.example.com AUTH0_CLAIM_NAMESPACE=https://example.com/ \
+    AUTH0_DOMAIN=t.eu.auth0.com AUTH0_AUDIENCE=https://api.example.com AUTH0_CLAIM_NAMESPACE=https://example.com/ AUTH0_TRUSTED_CONNECTIONS=company-sso \
     ALLOW_DEV_AUTH_BYPASS=true ADMIN_FALLBACK_EMAIL=alice@example.com node dist/main > "$TMP/backend.log" 2>&1 & echo $! > "$TMP/backend.pid" )
 for _ in $(seq 1 90); do curl -s -o /dev/null http://127.0.0.1:4529/api/health/live && break; sleep 1; done
 me="$(curl -s -m 10 http://127.0.0.1:4529/v1/api/auth/me)"

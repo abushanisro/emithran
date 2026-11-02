@@ -11,6 +11,7 @@ import {
   PaginatedRemarksResponseDto,
   RemarkScope
 } from '../dto/remark.dto';
+import { orIlikeContains } from '../../../common/db/postgrest-filter';
 
 @Injectable()
 export class RemarkService {
@@ -213,7 +214,7 @@ export class RemarkService {
     }
 
     if (filterDto.search) {
-      query = query.or(`title.ilike.%${filterDto.search}%,description.ilike.%${filterDto.search}%`);
+      query = query.or(orIlikeContains(['title', 'description'], filterDto.search));
     }
 
     // Add pagination

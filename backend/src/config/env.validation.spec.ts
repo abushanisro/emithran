@@ -11,6 +11,7 @@ const base = {
   AUTH0_DOMAIN: 'tenant.example.auth0.com',
   AUTH0_AUDIENCE: 'https://api.example.com',
   AUTH0_CLAIM_NAMESPACE: 'https://example.com/',
+  AUTH0_TRUSTED_CONNECTIONS: 'company-sso,Username-Password-Authentication',
 };
 const production = { ...base, NODE_ENV: 'production', CORS_ORIGIN: 'https://app.example.com', APP_ENV: 'prd', BFF_FORWARD_SECRET: 'x'.repeat(32) };
 
@@ -77,10 +78,21 @@ describe('env validation: APP_ENV', () => {
 });
 
 describe('required runtime settings', () => {
-  it.each(['POSTGREST_URL', 'DB_JWT_SECRET', 'S3_BUCKET', 'AUTH0_DOMAIN', 'AUTH0_AUDIENCE'])('refuses to boot without %s', (name) => {
+  it.each(['POSTGREST_URL', 'DB_JWT_SECRET', 'S3_BUCKET', 'AUTH0_DOMAIN', 'AUTH0_AUDIENCE', 'AUTH0_TRUSTED_CONNECTIONS'])('refuses to boot without %s', (name) => {
     const config: Record<string, unknown> = { ...base };
     delete config[name];
     expect(() => validate(config)).toThrow(new RegExp(name));
+  });
+
+  it.each(['', ',', 'company-sso,', 'company sso', 'company-sso;db'])('refuses AUTH0_TRUSTED_CONNECTIONS=%p (not a list of connection names)', (value) => {
+    expect(() => validate({ ...base, AUTH0_TRUSTED_CONNECTIONS: value })).toThrow(/AUTH0_TRUSTED_CONNECTIONS/);
+  });
+
+  it('caches an identity decision for 10 s by default, at most 60 s, and 0 turns the cache off', () => {
+    expect(validate(base).AUTH_DECISION_CACHE_SECONDS).toBe(10);
+    expect(validate({ ...base, AUTH_DECISION_CACHE_SECONDS: '0' }).AUTH_DECISION_CACHE_SECONDS).toBe(0);
+    expect(() => validate({ ...base, AUTH_DECISION_CACHE_SECONDS: '61' })).toThrow(/AUTH_DECISION_CACHE_SECONDS/);
+    expect(() => validate({ ...base, AUTH_DECISION_CACHE_SECONDS: '-1' })).toThrow(/AUTH_DECISION_CACHE_SECONDS/);
   });
 
   it('needs no Supabase settings', () => {

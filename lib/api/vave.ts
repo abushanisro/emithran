@@ -226,6 +226,9 @@ export interface ShouldCostResult {
 
 // ─── API client ───────────────────────────────────────────────────────────────
 
+/** An AI analysis takes tens of seconds (the backend allows the model 60 s per attempt, up to 3 attempts). Never retried here. */
+const AI_REQUEST = { retry: false, timeout: 200_000 } as const;
+
 export const vaveApi = {
   // Projects
   getProjects: () =>
@@ -281,4 +284,28 @@ export const vaveApi = {
 
   deleteShouldCost: (projectId: string, costId: string) =>
     apiClient.delete(`/vave/projects/${projectId}/should-costs/${costId}`),
+
+  // AI analyses: the backend builds every prompt from the project's own data and charges the caller's AI budget. Not retried: a
+  // 429 means the daily allowance is used up (the error message says so), and a retry would only spend more.
+  aiCostAnalysis: (projectId: string) =>
+    apiClient.post<CostAnalysisResult>(`/vave/projects/${projectId}/ai/cost-analysis`, {}, AI_REQUEST),
+
+  aiIdeation: (projectId: string) =>
+    apiClient.post<CreateVaveIdea[]>(`/vave/projects/${projectId}/ai/ideation`, {}, AI_REQUEST),
+
+  aiShouldCost: (projectId: string, itemId: string) =>
+    apiClient.post<ShouldCostResult>(`/vave/projects/${projectId}/ai/should-cost/${itemId}`, {}, AI_REQUEST),
+
+  /** VAVE insights for one benchmark BOM, from structured metrics only (at most 50 items, bounded text). */
+  aiBomAnalysis: <T>(bom: VaveBomAnalysisInput) =>
+    apiClient.post<T>('/vave/ai/bom-analysis', bom, AI_REQUEST),
 };
+
+export interface VaveBomAnalysisInput {
+  bomName?: string | null | undefined;
+  totalParts?: number | null | undefined;
+  totalCost?: number | null | undefined;
+  totalWeight?: number | null | undefined;
+  makeVsBuy?: { make?: number | null | undefined; buy?: number | null | undefined };
+  items: Record<string, string | number | null | undefined>[];
+}

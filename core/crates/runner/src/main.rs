@@ -6,8 +6,10 @@ use runner::backend::{Backend, Platform};
 use runner::health;
 use runner::isolation;
 use runner::job::{self, Config};
+use runner::remote::{ANSWER_MARGIN, RemoteWorker};
 use runner::s3::{S3, S3Settings};
-use runner::worker::WorkerConfig;
+use runner::secrets::{self, Credentials};
+use runner::token::SigningKey;
 
 fn setting(name: &str) -> Result<String, String> {
     std::env::var(name).map_err(|_| format!("{name} is not set"))
@@ -20,41 +22,25 @@ fn number(name: &str, default: u64) -> u64 {
         .unwrap_or(default)
 }
 
+const MIB: u64 = 1024 * 1024;
+
 fn config() -> Result<(Config, Duration), String> {
-    let max_upload_mb = number("MAX_UPLOAD_MB", 50);
-    let max_entry = max_upload_mb * 1024 * 1024;
-    let deadline = Duration::from_secs(number("WORKER_DEADLINE_SECONDS", 600));
-    // Limit the worker's memory, CPU time and file size where `prlimit` exists (Linux); the deadline kills it either way.
-    let wrapper = if number("WORKER_LIMITS", 1) == 1 && PathBuf::from("/usr/bin/prlimit").exists() {
-        let mem = number("WORKER_MEMORY_MB", 4096) * 1024 * 1024;
-        vec![
-            "/usr/bin/prlimit".to_string(),
-            format!("--as={mem}"),
-            format!("--cpu={}", deadline.as_secs() + 30),
-            format!("--fsize={}", max_entry * 8),
-            "--".to_string(),
-        ]
-    } else {
-        vec![]
-    };
-    // Only what the worker needs to start: where its shared libraries are. Everything else (keys, URLs) stays out.
-    let pass_env: Vec<(String, String)> = ["LD_LIBRARY_PATH"]
-        .iter()
-        .filter_map(|n| std::env::var(n).ok().map(|v| ((*n).to_string(), v)))
-        .collect();
+    let max_entry = number("MAX_UPLOAD_MB", 50) * MIB;
+    let max_entries = 10_000;
     let config = Config {
-        worker: WorkerConfig {
-            program: PathBuf::from(
-                std::env::var("WORKER_BIN")
-                    .unwrap_or_else(|_| "/usr/local/bin/geometry-worker".to_string()),
+        worker: RemoteWorker {
+            socket: PathBuf::from(
+                std::env::var("WORKER_SOCKET")
+                    .unwrap_or_else(|_| "/run/cad-worker/worker.sock".to_string()),
             ),
-            wrapper,
-            pass_env,
-            deadline,
-            grace: Duration::from_secs(15),
+            deadline: Duration::from_secs(number("WORKER_DEADLINE_SECONDS", 600)),
+            answer_margin: ANSWER_MARGIN,
+            // result.json plus one file per distinct part; the parts are held in memory until they are stored.
+            max_outputs: max_entries + 1,
+            max_output_bytes: number("WORKER_MAX_OUTPUT_MB", 512) * MIB,
         },
         archive: Limits {
-            max_entries: 10_000,
+            max_entries,
             max_entry_bytes: max_entry,
             max_total_bytes: max_entry * 8,
         },
@@ -63,22 +49,19 @@ fn config() -> Result<(Config, Duration), String> {
 }
 
 /// The database (PostgREST on plain Postgres) and the S3-compatible file store, from the same settings the backend reads.
-fn backend_from_env() -> Result<Platform, String> {
+/// Each credential is taken out of `credentials` and dropped (wiped) once it is keyed into what uses it.
+fn backend(credentials: &mut Credentials) -> Result<Platform, String> {
     let files = S3::new(S3Settings {
         bucket: setting("S3_BUCKET")?,
         region: setting("S3_REGION")?,
         endpoint: std::env::var("S3_ENDPOINT").ok().filter(|v| !v.is_empty()),
-        access_key_id: setting("S3_ACCESS_KEY_ID")?,
-        secret_access_key: setting("S3_SECRET_ACCESS_KEY")?,
+        access_key_id: credentials.take("S3_ACCESS_KEY_ID")?.to_string(),
+        secret_access_key: credentials.take("S3_SECRET_ACCESS_KEY")?.to_string(),
         path_style: std::env::var("S3_FORCE_PATH_STYLE").as_deref() == Ok("true"),
     })
     .map_err(|e| e.to_string())?;
-    Platform::new(
-        &setting("POSTGREST_URL")?,
-        &setting("DB_JWT_SECRET")?,
-        files,
-    )
-    .map_err(|e| e.to_string())
+    let key = SigningKey::new(&credentials.take("DB_JWT_SECRET")?)?;
+    Platform::new(&setting("POSTGREST_URL")?, key, files).map_err(|e| e.to_string())
 }
 
 fn heartbeat_path() -> PathBuf {
@@ -87,29 +70,33 @@ fn heartbeat_path() -> PathBuf {
     )
 }
 
-#[tokio::main]
-async fn main() {
+fn fail(message: &str) -> ! {
+    eprintln!("cad-runner cannot start: {message}");
+    std::process::exit(78);
+}
+
+fn main() {
     // `cad-runner health`: the container's healthcheck. Exit 0 while the heartbeat is recent.
     if std::env::args().nth(1).as_deref() == Some("health") {
         let alive = health::is_fresh(&heartbeat_path(), health::MAX_AGE);
         std::process::exit(if alive { 0 } else { 1 });
     }
-    // Before any credential is read or any worker started: a compromised worker (same UID) must not be able to read this
-    // process's environment (DB_JWT_SECRET, S3 keys) through /proc. Refuse to run without it.
+    // Before any credential is read: nothing else may read this process's memory through /proc (isolation.rs).
     if let Err(error) = isolation::make_non_dumpable() {
-        eprintln!("cad-runner cannot start: cannot mark the process non-dumpable: {error}");
-        std::process::exit(78);
+        fail(&format!("cannot mark the process non-dumpable: {error}"));
     }
-    let started = config()
-        .and_then(|(config, poll)| backend_from_env().map(|backend| (config, poll, backend)));
-    let (config, poll, backend) = match started {
-        Ok(parts) => parts,
-        Err(message) => {
-            eprintln!("cad-runner cannot start: {message}");
-            std::process::exit(78);
-        }
-    };
-    serve(&backend, &config, poll).await;
+    // The first start restarts itself here without the credentials in its environment (secrets.rs); the restart continues.
+    let mut credentials = secrets::load().unwrap_or_else(|message| fail(&message));
+    let started = config().and_then(|(config, poll)| {
+        backend(&mut credentials).map(|backend| (config, poll, backend))
+    });
+    drop(credentials);
+    let (config, poll, backend) = started.unwrap_or_else(|message| fail(&message));
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap_or_else(|error| fail(&format!("cannot start the async runtime: {error}")));
+    runtime.block_on(serve(&backend, &config, poll));
 }
 
 async fn serve<B: Backend>(backend: &B, config: &Config, poll: Duration) {
@@ -123,9 +110,10 @@ async fn serve<B: Backend>(backend: &B, config: &Config, poll: Duration) {
         }
     });
     eprintln!(
-        "cad-runner started (poll every {}s, worker deadline {}s)",
+        "cad-runner started (poll every {}s, worker deadline {}s, worker at {})",
         poll.as_secs(),
-        config.worker.deadline.as_secs()
+        config.worker.deadline.as_secs(),
+        config.worker.socket.display()
     );
     loop {
         // Drain the queue, then sleep; a stop signal ends the loop between uploads, never in the middle of one.

@@ -88,6 +88,13 @@ function scanSource(relPath, text) {
     add('hardcoded-jwt', m.index, 'a JWT literal is committed in source; remove it and rotate the key');
   }
 
+  // 8. A controller only handles HTTP: a privileged read or write belongs in a service, where it is named, reviewed and tested.
+  if (path.endsWith('.controller.ts')) {
+    for (const m of text.matchAll(/getPrivilegedClient\s*\(/g)) {
+      add('privileged-in-controller', m.index, 'getPrivilegedClient in a controller; move the privileged access into a service');
+    }
+  }
+
   return out;
 }
 

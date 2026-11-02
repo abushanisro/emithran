@@ -39,9 +39,11 @@ import {
   PackagingLogisticsCostResponseDto,
   PackagingLogisticsCostListResponseDto,
 } from './dto/packaging-logistics-cost.dto';
+import { OrgRole } from '../../common/authz/authz-policy';
 
 @ApiTags('Packaging & Logistics Costs')
 @ApiBearerAuth()
+@OrgRole('member')
 @Controller('api/packaging-logistics-costs')
 @UseGuards(RequestAuthGuard)
 export class PackagingLogisticsCostController {
@@ -52,6 +54,7 @@ export class PackagingLogisticsCostController {
   /**
    * Get all packaging/logistics costs with pagination and filtering
    */
+  @OrgRole('viewer')
   @Get()
   @ApiOperation({ summary: 'Get all packaging/logistics costs' })
   @ApiResponse({
@@ -72,6 +75,7 @@ async findAll(
    * source for the "Add Logistics Item" dialog. Declared before the ':id'
    * route so it isn't captured by that param matcher.
    */
+  @OrgRole('viewer')
   @Get('freight-rate-benchmarks')
   @ApiOperation({ summary: 'Get real region-pair freight reference rates (USD/kg)' })
   @ApiResponse({ status: 200, description: 'Returns the freight rate benchmark list' })
@@ -84,6 +88,7 @@ async findAll(
   /**
    * Get single packaging/logistics cost by ID
    */
+  @OrgRole('viewer')
   @Get(':id')
   @ApiOperation({ summary: 'Get packaging/logistics cost by ID' })
   @ApiResponse({
@@ -174,6 +179,7 @@ async findAll(
   /**
    * Get total packaging/logistics cost for a BOM item
    */
+  @OrgRole('viewer')
   @Get('bom-item/:bomItemId/total')
   @ApiOperation({ summary: 'Get total packaging/logistics cost for a BOM item' })
   @ApiResponse({

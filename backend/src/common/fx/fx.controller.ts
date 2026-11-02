@@ -1,5 +1,6 @@
 import { BadRequestException, Body, Controller, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { OrgRole, PlatformAdmin } from '../authz/authz-policy';
 import { AccessToken } from '../decorators/access-token.decorator';
 import { CurrentOrganization } from '../decorators/current-organization.decorator';
 import { ExchangeRateService } from '../exchange-rate/exchange-rate.service';
@@ -9,6 +10,7 @@ import { FxRateType, FxService } from './fx.service';
 
 @ApiTags('fx')
 @ApiBearerAuth()
+@OrgRole('viewer')
 @Controller({ path: 'api/fx', version: '1' })
 export class FxController {
   constructor(
@@ -25,9 +27,10 @@ export class FxController {
 
   /**
    * Sets the caller's organization's own budget rate for one currency; the replaced rate is kept as history. Other organizations
-   * and the global default are not affected.
+   * and the global default are not affected. An organization-wide setting, so admins only (the database agrees, migration 944).
    */
   @Put('exchange-rates/:currency')
+  @OrgRole('admin')
   @UseGuards(OrganizationContextGuard)
   async setExchangeRate(
     @Param('currency') currency: string,
@@ -35,7 +38,7 @@ export class FxController {
     @AccessToken() accessToken: string | null,
     @CurrentOrganization() organizationId: string,
   ) {
-    await this.exchangeRateService.setRate(accessToken, organizationId, currency, body.rate, body.reason.trim());
+    await this.exchangeRateService.setRate(accessToken, organizationId, currency, body.rate, body.reason.trim(), body.confirm === true);
     return this.exchangeRateService.listRates(accessToken, organizationId);
   }
 
@@ -79,7 +82,9 @@ export class FxController {
     });
   }
 
+  /** Fetches from the reference provider and writes the shared snapshot every organization reads: a platform-wide action. */
   @Post('refresh')
+  @PlatformAdmin()
   async refresh(@Body() body: { base?: string; quote?: string }) {
     if (!body?.base || !body?.quote) throw new BadRequestException('base and quote are required');
     return this.fxService.refresh(body.base, body.quote);

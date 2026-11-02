@@ -159,6 +159,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     // Extract validation errors if present
     const validationErrors = this.extractValidationErrors(exception);
+    const details = this.clientDetails(exception);
 
     // Structured error object
     const errorResponse = {
@@ -167,6 +168,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         code: this.getErrorCode(exception, httpStatus),
         message: userFriendlyMessage,
         ...(validationErrors && { validationErrors }),
+        ...(details && { details }),
       },
       metadata: {
         timestamp,
@@ -289,6 +291,18 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     }
 
     return 'An unexpected error occurred';
+  }
+
+  /**
+   * Machine-readable facts a handler chose to give the client with a refusal, e.g. which production lots block a delete:
+   * `throw new ConflictException({ code, message, details: { ... } })`. Only an HttpException's own `details` object is passed on.
+   */
+  private clientDetails(exception: unknown): Record<string, unknown> | undefined {
+    if (!(exception instanceof HttpException)) return undefined;
+    const response = exception.getResponse();
+    if (typeof response !== 'object' || response === null || !('details' in response)) return undefined;
+    const details = (response as { details: unknown }).details;
+    return typeof details === 'object' && details !== null && !Array.isArray(details) ? (details as Record<string, unknown>) : undefined;
   }
 
   private getErrorDetails(exception: unknown): any {

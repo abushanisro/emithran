@@ -23,6 +23,7 @@ import {
   ChildPartCostCalculationEngine,
   ChildPartCostInput,
 } from '../engines/child-part-cost-calculation.engine';
+import { orIlikeContains } from '../../../common/db/postgrest-filter';
 
 @Injectable()
 export class ChildPartCostService {
@@ -72,7 +73,7 @@ export class ChildPartCostService {
 
     if (query.search) {
       queryBuilder = queryBuilder.or(
-        `part_number.ilike.%${query.search}%,part_name.ilike.%${query.search}%`
+        orIlikeContains(['part_number', 'part_name'], query.search)
       );
     }
 

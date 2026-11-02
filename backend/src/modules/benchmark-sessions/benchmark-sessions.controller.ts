@@ -11,13 +11,16 @@ import {
 } from './dto/benchmark-sessions.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
+import { OrgRole } from '../../common/authz/authz-policy';
 
 @ApiTags('Benchmark Sessions')
 @ApiBearerAuth()
+@OrgRole('member')
 @Controller({ path: 'api/benchmark-sessions', version: '1' })
 export class BenchmarkSessionsController {
   constructor(private readonly benchmarkSessionsService: BenchmarkSessionsService) {}
 
+  @OrgRole('viewer')
   @Get()
   @ApiOperation({ summary: 'List all benchmark sessions for the current user' })
   @ApiResponse({ status: 200 })
@@ -39,6 +42,7 @@ export class BenchmarkSessionsController {
     return this.benchmarkSessionsService.create(dto, user.id, token);
   }
 
+  @OrgRole('viewer')
   @Get(':id')
   @ApiOperation({ summary: 'Get a benchmark session by ID' })
   async findOne(

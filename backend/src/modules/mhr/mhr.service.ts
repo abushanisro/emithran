@@ -15,6 +15,7 @@ import { LHRService } from '../lhr/lhr.service';
 import { mapMhrRowToDto, storedNumber } from './mhr-row-mapping';
 import { pickRegionalReferenceRow, specsReferenceDetail } from './specs-reference-detail';
 import * as ExcelJS from 'exceljs';
+import { orIlikeContains } from '../../common/db/postgrest-filter';
 import { readWorkbook } from '../../common/heavy-work/heavy-work';
 
 /**
@@ -295,7 +296,7 @@ export class MHRService {
         .order('created_at', { ascending: false })
         .order('id', { ascending: true })
         .range(rangeFrom, rangeTo);
-      if (query.search) q = q.or(`machine_name.ilike.%${query.search}%,machine_description.ilike.%${query.search}%`);
+      if (query.search) q = q.or(orIlikeContains(['machine_name', 'machine_description'], query.search));
       if (query.location) q = q.eq('location', query.location);
       if (query.currency) q = q.eq('currency', query.currency);
       if (query.commodityCode) q = q.eq('commodity_code', query.commodityCode);

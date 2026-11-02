@@ -6,7 +6,6 @@ import { ProcessPlanGeneratorController } from './process-plan-generator.control
 import { OrchestratorService } from './services/orchestrator.service';
 import { RetrievalService } from './services/retrieval.service';
 import { ScopeClassifierService } from './services/scope-classifier.service';
-import { ReasoningService } from './services/reasoning.service';
 import { ResolverService } from './services/resolver.service';
 import { PersistenceService } from './services/persistence.service';
 import { CreditMeterService } from './services/credit-meter.service';
@@ -33,7 +32,6 @@ import { ManufacturingRulesModule } from '../manufacturing-rules/manufacturing-r
     OrchestratorService,
     RetrievalService,
     ScopeClassifierService,
-    ReasoningService,
     ResolverService,
     PersistenceService,
     CreditMeterService,

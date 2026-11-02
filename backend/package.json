@@ -35,6 +35,7 @@
     "test:s3": "bash test/storage/run.sh",
     "test:boot": "bash test/smoke/boot.sh",
     "test:baseline": "bash test/baseline/run.sh",
+    "test:schema-drift": "bash test/schema-drift/run.sh",
     "local:up": "bash scripts/local-data.sh up",
     "local:load": "bash scripts/local-data.sh load",
     "local:use": "bash scripts/local-data.sh use",
@@ -43,6 +44,7 @@
     "local:down": "bash scripts/local-data.sh down",
     "local:reset": "bash scripts/local-data.sh reset",
     "auth0:check": "ts-node -r tsconfig-paths/register scripts/auth0-check.ts",
+    "eval:copilot-injection": "ts-node -r tsconfig-paths/register scripts/copilot-injection-eval.ts",
     "test:local": "bash test/local-data/run.sh"
   },
   "dependencies": {
@@ -130,6 +132,9 @@
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "moduleNameMapper": {
+      "^@/(.*)$": "<rootDir>/$1"
     },
     "collectCoverageFrom": [
       "**/*.(t|j)s"

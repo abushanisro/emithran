@@ -10,6 +10,7 @@ import {
   LayoutGrid, Mail, X,
 } from 'lucide-react';
 import Link from 'next/link';
+import { CopilotMemorySection } from '@/components/features/settings/CopilotMemorySection';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -267,6 +268,10 @@ function PreferencesTab() {
           })}
         </div>
       </section>
+
+      <div className="h-px bg-border" />
+
+      <CopilotMemorySection />
 
     </div>
   );

@@ -13,7 +13,7 @@ trap cleanup EXIT
 cd "$TMP/backend"
 env -i PATH="$PATH" HOME="$HOME" NODE_ENV=development APP_ENV=local BACKEND_PORT=$PORT CAD_UPLOAD_RUNNER=off \
   POSTGREST_URL=http://127.0.0.1:1 DB_JWT_SECRET="$(python3 -c 'import secrets;print(secrets.token_urlsafe(48))')" \
-  AUTH0_DOMAIN=t.eu.auth0.com AUTH0_AUDIENCE=https://api.example.com AUTH0_CLAIM_NAMESPACE=https://emithran.com/ \
+  AUTH0_DOMAIN=t.eu.auth0.com AUTH0_AUDIENCE=https://api.example.com AUTH0_CLAIM_NAMESPACE=https://emithran.com/ AUTH0_TRUSTED_CONNECTIONS=company-sso \
   S3_BUCKET=b S3_REGION=us-east-1 S3_ACCESS_KEY_ID=a S3_SECRET_ACCESS_KEY=b \
   node dist/main > "$TMP/boot.log" 2>&1 &
 PID=$!

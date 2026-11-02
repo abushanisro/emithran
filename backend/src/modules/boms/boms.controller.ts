@@ -26,9 +26,11 @@ import { AccessToken } from '../../common/decorators/access-token.decorator';
 import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
 import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
 import { ApiKeyScopes } from '../../common/decorators/api-key-scopes.decorator';
+import { OrgRole } from '../../common/authz/authz-policy';
 
 @ApiTags('BOMs')
 @ApiBearerAuth()
+@OrgRole('member')
 @Controller({ path: 'api/boms', version: '1' })
 export class BOMsController {
   constructor(
@@ -39,6 +41,7 @@ export class BOMsController {
     private readonly audit: AuditService,
   ) {}
 
+  @OrgRole('viewer')
   @Get()
   @ApiKeyScopes('boms:read')
   @ApiOperation({ summary: 'Get all BOMs' })
@@ -47,6 +50,7 @@ export class BOMsController {
     return this.bomsService.findAll(query, user.id, token);
   }
 
+  @OrgRole('viewer')
   @Get(':id')
   @ApiKeyScopes('boms:read')
   @ApiOperation({ summary: 'Get BOM by ID' })
@@ -56,6 +60,7 @@ export class BOMsController {
     return this.bomsService.findOne(id, user.id, token);
   }
 
+  @OrgRole('viewer')
   @Get(':id/items')
   @ApiKeyScopes('boms:read')
   @ApiOperation({ summary: 'Get all BOM items for a specific BOM' })
@@ -110,6 +115,7 @@ export class BOMsController {
     return { message: 'All costs recalculated successfully' };
   }
 
+  @OrgRole('viewer')
   @Get(':id/cost-summary')
   @ApiKeyScopes('costing:read')
   @ApiOperation({ summary: 'Get cost summary for all top-level assemblies in a BOM' })
@@ -118,6 +124,7 @@ export class BOMsController {
     return this.bomItemCostService.getBomCostSummary(id, user.id, token);
   }
 
+  @OrgRole('viewer')
   @Get(':id/cost-report')
   @ApiKeyScopes('costing:read')
   @ApiOperation({ summary: 'Get comprehensive cost report for a BOM' })
@@ -130,6 +137,7 @@ export class BOMsController {
   // CAD ANALYSIS ENDPOINTS FOR BOMs
   // ============================================================================
 
+  @OrgRole('viewer')
   @Get(':id/manufacturing-insights')
   @ApiOperation({ summary: 'Get comprehensive manufacturing insights for a BOM' })
   @ApiResponse({ status: 200, description: 'Manufacturing insights retrieved successfully' })

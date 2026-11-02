@@ -4,6 +4,7 @@
 
 use runner::backend::{Backend, Platform};
 use runner::s3::{S3, S3Settings};
+use runner::token::SigningKey;
 
 fn platform(secret: &str) -> Option<Platform> {
     let url = std::env::var("POSTGREST_TEST_URL").ok()?;
@@ -16,7 +17,7 @@ fn platform(secret: &str) -> Option<Platform> {
         path_style: true,
     })
     .ok()?;
-    Platform::new(&url, secret, files).ok()
+    Platform::new(&url, SigningKey::new(secret).ok()?, files).ok()
 }
 
 #[tokio::test]

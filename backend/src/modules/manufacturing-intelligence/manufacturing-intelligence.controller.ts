@@ -17,15 +17,18 @@ import {
   CreateSupplierPerformanceDto,
   UpdateSupplierPerformanceDto,
 } from './dto/manufacturing-intelligence.dto';
+import { OrgRole } from '../../common/authz/authz-policy';
 
 @ApiTags('Manufacturing Intelligence')
 @ApiBearerAuth()
+@OrgRole('member')
 @Controller({ path: 'api/manufacturing-intelligence', version: '1' })
 export class ManufacturingIntelligenceController {
   constructor(private readonly service: ManufacturingIntelligenceService) {}
 
   // ── Global knowledge tables ─────────────────────────────────────────────────
 
+  @OrgRole('viewer')
   @Get('material-process-compatibility')
   @ApiOperation({ summary: 'Material-process compatibility matrix with suitability scores (1-10)' })
   @ApiResponse({ status: 200, description: 'Compatibility data ordered by score descending' })
@@ -36,6 +39,7 @@ export class ManufacturingIntelligenceController {
     return this.service.getMaterialProcessCompatibility(query, token);
   }
 
+  @OrgRole('viewer')
   @Get('feature-cost-rules')
   @ApiOperation({ summary: 'Feature-level cost rules: machining time and cost by feature type and size' })
   @ApiResponse({ status: 200, description: 'Feature cost rules for CAD-to-cost estimation' })
@@ -46,6 +50,7 @@ export class ManufacturingIntelligenceController {
     return this.service.getFeatureCostRules(query, token);
   }
 
+  @OrgRole('viewer')
   @Get('dfm-rules')
   @ApiOperation({ summary: 'DFM rules library: violations, cost impact, and recommendations by process' })
   @ApiResponse({ status: 200, description: 'DFM rules ordered Critical > Warning > Advisory' })
@@ -56,6 +61,7 @@ export class ManufacturingIntelligenceController {
     return this.service.getDfmRules(query, token);
   }
 
+  @OrgRole('viewer')
   @Get('supplier-kpi-benchmarks')
   @ApiOperation({ summary: 'Supplier KPI benchmarks: world-class / target / acceptable / poor thresholds' })
   @ApiResponse({ status: 200, description: 'KPI benchmark data by industry sector' })
@@ -66,6 +72,7 @@ export class ManufacturingIntelligenceController {
     return this.service.getSupplierKpiBenchmarks(query, token);
   }
 
+  @OrgRole('viewer')
   @Get('commodity-prices')
   @ApiOperation({ summary: 'Commodity price history: LME metals, steel, polymers — quarterly 2021-2024' })
   @ApiResponse({ status: 200, description: 'Commodity price history data' })
@@ -78,6 +85,7 @@ export class ManufacturingIntelligenceController {
 
   // ── Supplier performance records (user-owned CRUD) ──────────────────────────
 
+  @OrgRole('viewer')
   @Get('supplier-performance')
   @ApiOperation({ summary: 'List supplier performance records for the authenticated user' })
   @ApiResponse({ status: 200, description: 'Supplier performance records' })
@@ -89,6 +97,7 @@ export class ManufacturingIntelligenceController {
     return this.service.getSupplierPerformance(query, user.id, token);
   }
 
+  @OrgRole('viewer')
   @Get('supplier-performance/:id')
   @ApiOperation({ summary: 'Get a single supplier performance record' })
   @ApiParam({ name: 'id', description: 'Record UUID' })

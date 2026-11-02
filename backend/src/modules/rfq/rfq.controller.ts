@@ -38,10 +38,12 @@ import { OrganizationContextGuard } from '../../common/guards/organization-conte
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
 import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
+import { OrgRole } from '../../common/authz/authz-policy';
 
 @ApiTags('RFQ (Request for Quotation)')
 @ApiBearerAuth()
 @UseGuards(RequestAuthGuard)
+@OrgRole('member')
 @Controller({ path: 'api/rfq', version: '1' })
 export class RfqController {
   private readonly logger = new Logger(RfqController.name);
@@ -75,6 +77,7 @@ export class RfqController {
     }
   }
 
+  @OrgRole('viewer')
   @Get()
   @ApiOperation({ summary: 'Get all RFQs for the current user' })
   @ApiQuery({ 
@@ -128,6 +131,7 @@ export class RfqController {
     }
   }
 
+  @OrgRole('viewer')
   @Get('tracking')
   @ApiOperation({ summary: 'Get all RFQ tracking records for user in project' })
   @ApiQuery({
@@ -162,6 +166,7 @@ export class RfqController {
     }
   }
 
+  @OrgRole('viewer')
   @Get('tracking/stats')
   @ApiOperation({ summary: 'Get RFQ tracking statistics for project' })
   @ApiQuery({
@@ -196,6 +201,7 @@ export class RfqController {
     }
   }
 
+  @OrgRole('viewer')
   @Get('tracking/:id')
   @ApiOperation({ summary: 'Get RFQ tracking record by ID' })
   @ApiParam({ name: 'id', description: 'RFQ tracking ID' })
@@ -299,6 +305,7 @@ export class RfqController {
   // STANDARD RFQ ENDPOINTS
   // ============================================================================
 
+  @OrgRole('viewer')
   @Get(':id')
   @ApiOperation({ summary: 'Get RFQ details by ID' })
   @ApiParam({ name: 'id', description: 'RFQ ID' })

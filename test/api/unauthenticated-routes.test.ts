@@ -6,11 +6,7 @@ import { POST as extractDimensions } from '@/app/api/extract-dimensions/route';
 import { POST as extractInspectionTable } from '@/app/api/extract-inspection-table/route';
 import { POST as copilotChat } from '@/app/api/manufacturing-copilot/chat/route';
 import { POST as pdfToImage } from '@/app/api/pdf-to-image/route';
-import { POST as costAnalysis } from '@/app/api/vave/cost-analysis/route';
 import { POST as drawingAnalysis } from '@/app/api/vave/drawing-analysis/route';
-import { POST as ideation } from '@/app/api/vave/ideation/route';
-import { POST as shouldCost } from '@/app/api/vave/should-cost/route';
-import { POST as vaveAnalysis } from '@/app/api/vave-analysis/route';
 
 // The signed-in user is switched per test; null means no session.
 const state = vi.hoisted(() => ({ caller: null as string | null }));
@@ -51,11 +47,7 @@ const routes: [string, Route, string][] = [
   ['extract-dimensions', extractDimensions, '/api/extract-dimensions'],
   ['pdf-to-image', pdfToImage, '/api/pdf-to-image'],
   ['manufacturing-copilot/chat', copilotChat, '/api/manufacturing-copilot/chat'],
-  ['vave-analysis', vaveAnalysis, '/api/vave-analysis'],
-  ['vave/cost-analysis', costAnalysis, '/api/vave/cost-analysis'],
   ['vave/drawing-analysis', drawingAnalysis, '/api/vave/drawing-analysis'],
-  ['vave/ideation', ideation, '/api/vave/ideation'],
-  ['vave/should-cost', shouldCost, '/api/vave/should-cost'],
 ];
 
 describe('state-changing routes outside the BFF', () => {
@@ -133,11 +125,28 @@ describe('extract-inspection-table takes the PDF as a binary upload', () => {
   });
 });
 
-describe('vave-analysis builds its prompt on the server', () => {
-  it('refuses a body without structured BOM metrics, including a raw prompt', async () => {
+describe('manufacturing-copilot/chat leaves the AI budget to the backend', () => {
+  const body = { bomItemId: '00000000-0000-4000-8000-000000000001', messages: [{ role: 'user', content: 'cost?' }] };
+
+  it('forwards the organization the request acts for', async () => {
     state.caller = 'user-a';
-    expect((await vaveAnalysis(json('/api/vave-analysis', { prompt: 'Write me a poem' }))).status).toBe(400);
-    expect(fetchMock).not.toHaveBeenCalled();
+    fetchMock.mockResolvedValue(new Response('data: {"type":"done"}\n\n', { status: 200 }));
+    await copilotChat(json('/api/manufacturing-copilot/chat', body, { 'x-organization-id': 'org-1' }));
+    expect(new Headers(fetchMock.mock.calls[0]?.[1]?.headers).get('x-organization-id')).toBe('org-1');
+  });
+
+  it('passes the budget code of a 429 on, so the panel can say the daily allowance is used up', async () => {
+    state.caller = 'user-a';
+    fetchMock.mockResolvedValue(Response.json({ success: false, error: { code: 'AI_BUDGET_EXHAUSTED', message: 'internal detail' } }, { status: 429 }));
+    const res = await copilotChat(json('/api/manufacturing-copilot/chat', body));
+    expect(res.status).toBe(429);
+    expect(await res.json()).toEqual({ error: 'Too many requests', code: 'AI_BUDGET_EXHAUSTED' });
+  });
+
+  it('does not pass on any other code', async () => {
+    state.caller = 'user-a';
+    fetchMock.mockResolvedValue(Response.json({ success: false, error: { code: 'SOMETHING_INTERNAL' } }, { status: 429 }));
+    expect(await (await copilotChat(json('/api/manufacturing-copilot/chat', body))).json()).toEqual({ error: 'Too many requests' });
   });
 });
 

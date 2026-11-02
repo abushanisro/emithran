@@ -80,6 +80,12 @@ describe('RLS boundary CI rules', () => {
     }
   });
 
+  it('refuses the privileged client in any controller, even with a reason, and allows it in a service', () => {
+    const call = "this.databaseService.getPrivilegedClient('reference-data: material_density_lookup, global shared')";
+    expect(rulesFor('src/modules/bom-items/bom-items.controller.ts', call)).toEqual(['privileged-in-controller']);
+    expect(rulesFor('src/modules/bom-items/bom-items.service.ts', call)).toEqual([]);
+  });
+
   it('reports the 1-based line of each violation', () => {
     const r = scanSource(svc, 'a\nb\nconst c = this.database.getClient();');
     expect(r[0].line).toBe(3);

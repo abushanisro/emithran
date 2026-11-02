@@ -1,5 +1,5 @@
 //! What the runner needs from the database and file storage, and its implementation `Platform`: PostgREST on plain Postgres with a
-//! token signed here, and files in an S3-compatible bucket. Over HTTPS only: the runner holds no Postgres connection, like the rest of
+//! token signed here for the runner's own role `cad_runner` (token.rs, migration 951), and files in an S3-compatible bucket. Over HTTPS only: the runner holds no Postgres connection, like the rest of
 //! the backend.
 
 use std::sync::Mutex;
@@ -8,7 +8,7 @@ use std::time::Duration;
 use serde::Deserialize;
 
 use crate::s3::S3;
-use crate::token::{now_seconds, service_token};
+use crate::token::{SigningKey, now_seconds, runner_token};
 
 pub const BUCKET: &str = "bom-files";
 
@@ -66,16 +66,16 @@ pub trait Backend {
     ) -> impl Future<Output = Result<(), BackendError>>;
 }
 
-/// A short-lived service-role token signed with the shared secret (what the backend's own client uses), cached until near expiry.
+/// A short-lived `cad_runner` token, cached until near expiry.
 struct Auth {
-    secret: String,
+    key: SigningKey,
     cached: Mutex<Option<(String, u64)>>,
 }
 
 const TOKEN_LIFETIME: Duration = Duration::from_secs(300);
 const REFRESH_BEFORE_SECONDS: u64 = 30;
 
-/// The database half: the three calls on `cad_uploads`, over PostgREST.
+/// The database half: the three functions of migrations 917 and 951, over PostgREST. The role has no table access of its own.
 struct Rest {
     http: reqwest::Client,
     url: String,
@@ -95,7 +95,7 @@ impl Rest {
     }
 
     fn bearer(&self) -> Result<String, BackendError> {
-        let Auth { secret, cached } = &self.auth;
+        let Auth { key, cached } = &self.auth;
         let now = now_seconds();
         if let Ok(guard) = cached.lock()
             && let Some((token, expires)) = guard.as_ref()
@@ -103,7 +103,7 @@ impl Rest {
         {
             return Ok(token.clone());
         }
-        let token = service_token(secret, now, TOKEN_LIFETIME).map_err(BackendError)?;
+        let token = runner_token(key, now, TOKEN_LIFETIME);
         if let Ok(mut guard) = cached.lock() {
             *guard = Some((token.clone(), now + TOKEN_LIFETIME.as_secs()));
         }
@@ -159,20 +159,36 @@ impl Rest {
         Ok(rows.into_iter().next())
     }
 
-    async fn mark_analysed(
+    /// Calls a function that answers whether it found the upload still `running` (only such an upload can be finished).
+    async fn finish(
         &self,
+        function: &str,
         id: &str,
-        result: &serde_json::Value,
+        body: serde_json::Value,
     ) -> Result<(), BackendError> {
-        let body = serde_json::json!({ "status": "analysed", "result": result, "error_code": null, "error_detail": null });
-        Self::ok(
-            self.request(reqwest::Method::PATCH, &format!("/cad_uploads?id=eq.{id}"))?
+        let response = Self::ok(
+            self.request(reqwest::Method::POST, &format!("/rpc/{function}"))?
                 .json(&body)
                 .send()
                 .await?,
         )
         .await?;
-        Ok(())
+        if response.json::<bool>().await? {
+            Ok(())
+        } else {
+            Err(BackendError(format!(
+                "upload {id} is no longer running, so it was not changed"
+            )))
+        }
+    }
+
+    async fn mark_analysed(
+        &self,
+        id: &str,
+        result: &serde_json::Value,
+    ) -> Result<(), BackendError> {
+        let body = serde_json::json!({ "p_id": id, "p_result": result });
+        self.finish("cad_runner_mark_analysed", id, body).await
     }
 
     async fn mark_failed(
@@ -182,19 +198,9 @@ impl Rest {
         code: &str,
         detail: &str,
     ) -> Result<(), BackendError> {
-        let body = if retry {
-            serde_json::json!({ "status": "queued", "error_detail": detail })
-        } else {
-            serde_json::json!({ "status": "failed", "error_code": code, "error_detail": detail, "finished_at": "now" })
-        };
-        Self::ok(
-            self.request(reqwest::Method::PATCH, &format!("/cad_uploads?id=eq.{id}"))?
-                .json(&body)
-                .send()
-                .await?,
-        )
-        .await?;
-        Ok(())
+        let body =
+            serde_json::json!({ "p_id": id, "p_retry": retry, "p_code": code, "p_detail": detail });
+        self.finish("cad_runner_mark_failed", id, body).await
     }
 }
 
@@ -205,14 +211,12 @@ pub struct Platform {
 }
 
 impl Platform {
-    pub fn new(postgrest_url: &str, jwt_secret: &str, files: S3) -> Result<Self, BackendError> {
-        // Fail at start, not on the first upload, when the secret could not sign a token.
-        service_token(jwt_secret, now_seconds(), TOKEN_LIFETIME).map_err(BackendError)?;
+    pub fn new(postgrest_url: &str, key: SigningKey, files: S3) -> Result<Self, BackendError> {
         Ok(Self {
             rest: Rest::new(
                 postgrest_url,
                 Auth {
-                    secret: jwt_secret.to_string(),
+                    key,
                     cached: Mutex::new(None),
                 },
             )?,

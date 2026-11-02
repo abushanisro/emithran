@@ -110,6 +110,7 @@ services:
       AUTH0_DOMAIN: ${AUTH0_DOMAIN:?set AUTH0_DOMAIN in the env file}
       AUTH0_AUDIENCE: ${AUTH0_AUDIENCE:?set AUTH0_AUDIENCE in the env file}
       AUTH0_CLAIM_NAMESPACE: ${AUTH0_CLAIM_NAMESPACE:?set AUTH0_CLAIM_NAMESPACE in the env file}
+      AUTH0_TRUSTED_CONNECTIONS: ${AUTH0_TRUSTED_CONNECTIONS:?set AUTH0_TRUSTED_CONNECTIONS in the env file}
       # The browser's origin; production validation rejects localhost and *.
       CORS_ORIGIN: ${CORS_ORIGIN:?set CORS_ORIGIN (the public frontend URL) in the env file}
       # The only way to reach this container is the Cloudflare tunnel, so for direct /v1/* calls the client address comes from
@@ -124,6 +125,26 @@ services:
       NODE_OPTIONS: --max-old-space-size=1434
       # The largest upload accepted (frontend and engine follow).
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-50}
+      # How long one "is this person still authorised" answer is reused: bounds how long a removed user keeps access (0 = every request).
+      AUTH_DECISION_CACHE_SECONDS: ${AUTH_DECISION_CACHE_SECONDS:-10}
+      # Requests one organization may make per ORG_THROTTLE_TTL ms, across all its users and routes.
+      ORG_THROTTLE_LIMIT: ${ORG_THROTTLE_LIMIT:-3000}
+      ORG_THROTTLE_TTL: ${ORG_THROTTLE_TTL:-60000}
+      # Parse limits (backend/src/common/resource-limits.ts): what a CAD or electronics .zip may expand to, and how many workbook/archive
+      # parses run at once per process and per organization. Raise only together with the memory limit below.
+      ARCHIVE_MAX_EXPANDED_MB: ${ARCHIVE_MAX_EXPANDED_MB:-256}
+      HEAVY_WORK_MAX_CONCURRENT: ${HEAVY_WORK_MAX_CONCURRENT:-2}
+      HEAVY_WORK_MAX_PER_TENANT: ${HEAVY_WORK_MAX_PER_TENANT:-1}
+      # A budget FX rate change beyond this % of the current rate needs the admin's explicit confirmation.
+      FX_RATE_MAX_CHANGE_PERCENT: ${FX_RATE_MAX_CHANGE_PERCENT:-10}
+      # AI (the only place the model key lives; unset = AI features answer 503). AI_DISABLED=true refuses every AI call; the daily
+      # token budgets are per UTC day (backend/src/common/ai/ai-budget.service.ts).
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      AI_DISABLED: ${AI_DISABLED:-false}
+      AI_USER_DAILY_TOKENS: ${AI_USER_DAILY_TOKENS:-2000000}
+      AI_ORG_DAILY_TOKENS: ${AI_ORG_DAILY_TOKENS:-20000000}
+      AI_GLOBAL_DAILY_TOKENS: ${AI_GLOBAL_DAILY_TOKENS:-50000000}
+      AI_MAX_CONCURRENT_PER_USER: ${AI_MAX_CONCURRENT_PER_USER:-2}
       # python: this backend analyses uploads with the Python cad-engine. rust: the cad-core service does, and this backend only creates the BOM items.
       CAD_CORE: ${CAD_CORE:-python}
       # python: cad-engine /nest. rust: the nester binary shipped in this image (falls back to python if it is unavailable).
@@ -220,9 +241,11 @@ services:
         limits: { cpus: '2', memory: 2G, pids: 512 }
         reservations: { cpus: '0.5', memory: 512M }
 
-  # --- Assembly core: claims queued CAD uploads and analyses them with the C++ geometry worker (docs/ASSEMBLY_CORE.md). It talks to PostgREST and the
-  # S3 bucket over HTTP(S) only (no Postgres connection) and parses untrusted files in a child process that runs with an empty environment under
-  # prlimit and a deadline. Runs only when CAD_CORE=rust (`docker compose --profile rust-core up`); with CAD_CORE=python the backend does it itself. ---
+  # --- Assembly core (docs/ASSEMBLY_CORE.md "Isolation"): two containers. cad-core (the runner) claims queued CAD uploads, holds the database
+  # and bucket credentials, talks to PostgREST and the bucket over HTTP(S) only (no Postgres connection) and never parses CAD. cad-worker runs
+  # the C++ geometry worker on the customer's files: no credential, no network at all, its own UID, a fresh scratch tmpfs. The two share only
+  # a Unix socket on the cad-worker-socket volume. Run only when CAD_CORE=rust (`docker compose --profile rust-core up`); with CAD_CORE=python
+  # the backend does it itself. ---
   cad-core:
     <<: *hardened
     profiles: [rust-core]
@@ -230,11 +253,13 @@ services:
     build:
       context: ./core
       dockerfile: Dockerfile
-      additional_contexts:
-        geometry: ./geometry-worker
-        fixtures: ./backend/test/fixtures/cad
+      target: runner
+    user: "10003:10003"
+    # The worker's group, only to reach its socket (mode 0660).
+    group_add: ["10005"]
     environment:
       # The same data API and bucket as the backend (the runner refuses to start, naming the missing setting, when one is empty).
+      # The runner moves its three credentials out of its environment at start and signs tokens for the cad_runner role (migration 951).
       POSTGREST_URL: http://postgrest:3000
       DB_JWT_SECRET: ${DB_JWT_SECRET:?set DB_JWT_SECRET in the env file}
       S3_BUCKET: ${S3_BUCKET:?set S3_BUCKET in the env file}
@@ -245,8 +270,14 @@ services:
       S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-}
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-50}
       WORKER_DEADLINE_SECONDS: 600
-      # The container limit below is 2 GB; the worker's own address-space limit stays under it (~16 MB of RAM per MB of STEP).
-      WORKER_MEMORY_MB: 1536
+      WORKER_SOCKET: /run/cad-worker/worker.sock
+      # What the worker may send back (result.json and the part files); held in memory until stored.
+      WORKER_MAX_OUTPUT_MB: 512
+    volumes:
+      - cad-worker-socket:/run/cad-worker
+    depends_on:
+      cad-worker:
+        condition: service_healthy
     healthcheck:
       # No HTTP port: the runner rewrites a heartbeat file every 10 s from its own task, and `health` checks that it is recent.
       test: ["CMD", "cad-runner", "health"]
@@ -255,18 +286,55 @@ services:
       retries: 3
       start_period: 20s
     tmpfs:
-      - /tmp:size=1g
-    networks: [edge, db]
+      - /tmp:size=16m
+    networks: [db]
     deploy:
       resources:
-        limits: { cpus: '2', memory: 2G, pids: 256 }
+        # An upload is unzipped in memory (up to 8x MAX_UPLOAD_MB) and the worker's outputs are held until stored.
+        limits: { cpus: '1', memory: 2G, pids: 128 }
+        reservations: { cpus: '0.25', memory: 256M }
+
+  cad-worker:
+    <<: *hardened
+    profiles: [rust-core]
+    platform: linux/amd64
+    build:
+      context: ./core
+      dockerfile: Dockerfile
+      target: worker
+      additional_contexts:
+        geometry: ./geometry-worker
+        fixtures: ./backend/test/fixtures/cad
+    user: "10005:10005"
+    # No network at all: no interface but loopback, so a compromised worker can neither phone home nor reach PostgREST or the bucket.
+    network_mode: none
+    # Limits only. No credential and no address belongs here (cad-worker-host refuses to start if one of the runner's is set).
+    environment:
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-50}
+      # The container limit below is 2 GB; the worker's own address-space limit stays under it (~16 MB of RAM per MB of STEP).
+      WORKER_MEMORY_MB: 1536
+    volumes:
+      - cad-worker-socket:/run/cad-worker
+    healthcheck:
+      # The socket accepts a connection.
+      test: ["CMD", "cad-worker-host", "health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    tmpfs:
+      # The jobs' scratch: the host empties it and kills every leftover process after each job.
+      - /tmp:size=1g,uid=10005,gid=10005,mode=0700
+    deploy:
+      resources:
+        limits: { cpus: '2', memory: 2G, pids: 128 }
         reservations: { cpus: '0.5', memory: 256M }
 
   # --- PostgREST: the data API in front of the managed Postgres (docs: docs/ENGINEERING.md "Leaving Supabase"). Reachable ONLY from
   # the backend and, with the rust-core profile, cad-core: it is on the private `db` network with them and nothing else, never
   # published, and it accepts only tokens signed with DB_JWT_SECRET (its admin server listens on loopback only). It needs outbound access to the database,
   # which is why it is not on the no-internet `internal` network. Connects as the `authenticator` role, which can only switch to
-  # anon/authenticated/service_role. ---
+  # anon/authenticated/service_role and (migration 951) cad_runner, the runner's role. ---
   postgrest:
     <<: *hardened
     image: postgrest/postgrest@sha256:1347d7552b88f17832912c06afbf7c43209af6eeeb60834b04aae12c9bd9d5cc
@@ -326,6 +394,8 @@ services:
         limits: { cpus: '1', memory: 1G, pids: 512 }
 
 volumes:
+  # The runner's and the worker's only shared object: the worker host's Unix socket.
+  cad-worker-socket:
   cad-temp:
   cad-logs:
   backend-logs:
