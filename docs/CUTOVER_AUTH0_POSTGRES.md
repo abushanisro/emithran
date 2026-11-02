@@ -73,7 +73,7 @@ The database tools are read-only on the old database, refuse to touch a database
 `930_postgres_compat` (roles, `auth` schema, `auth.uid()/role()/jwt()`), `931_identity_functions`, `932_user_directory`, plus any of 920, 922, 923 not yet applied.
 Check: `npm run test:sql` is green locally first; on the new database `SELECT has_function_privilege('anon','public.link_identity(text,text,text,boolean,text,text[])','EXECUTE')` must be `false`.
 Migration 947 replaces `link_identity` with the version that takes the connection and the allow-list: deploy the backend that passes
-them together with it (the old backend's calls fail with "not invited" for new logins until then; known logins are unaffected).
+them right after it: in between, the old backend calls the removed 4-argument function and sign-in answers 503 (it never lets anyone in).
 
 ## 3. Deploy (stage)
 
