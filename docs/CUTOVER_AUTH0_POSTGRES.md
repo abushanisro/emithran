@@ -104,6 +104,7 @@ It refuses a login that belongs to someone else, and is recorded with your name.
 mail service exists); tell them yourself. **Every link decision** (allowed and denied, with the reason `first_login`, `admin_link`,
 `unverified`, `untrusted_connection`, `not_invited` or `link_required`) is in `auth.link_events`, readable by the database owner only:
 `SELECT at, outcome, reason, provider_id, connection, email, user_id, actor FROM auth.link_events ORDER BY at DESC LIMIT 50;`
+
 **Roles (migration 944, decision D5).** `organization_members.role` is enforced by the API (`AuthzGuard`) and, where a policy decides, by the
 database: `viewer` reads, `member` edits project data, `admin` (or `owner`) changes organization-wide settings (budget FX rates, API keys,
 members, workspaces, forcing the delete of a part used in production lots). A person in several organizations acts with their lowest role

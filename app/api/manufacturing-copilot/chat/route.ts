@@ -1,6 +1,6 @@
 import { type NextRequest } from "next/server";
 
-import { requireUserForAi } from "@/lib/server/auth";
+import { requireUser } from "@/lib/server/auth";
 import { refuseCrossOrigin } from "@/lib/server/bff/origin";
 import { readBodyBytes } from "@/lib/server/read-body";
 import { settingWithDevDefault } from '@/lib/utils/required-setting';
@@ -16,6 +16,17 @@ const MAX_BODY_BYTES = 64 * 1024;
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+/** The backend's AI budget codes (backend/src/common/ai/ai-budget.service.ts); anything else is not passed on. */
+const AI_ERROR_CODES = new Set(["AI_BUDGET_EXHAUSTED", "AI_TOO_MANY_REQUESTS", "AI_DISABLED", "AI_NOT_CONFIGURED"]);
+function aiErrorCode(body: string): string | null {
+  try {
+    const code = (JSON.parse(body) as { error?: { code?: unknown } }).error?.code;
+    return typeof code === "string" && AI_ERROR_CODES.has(code) ? code : null;
+  } catch {
+    return null;
+  }
+}
+
 const json = (body: unknown, status: number, headers?: Record<string, string>) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", ...headers } });
 
@@ -27,19 +38,26 @@ const json = (body: unknown, status: number, headers?: Record<string, string>) =
 export async function POST(request: NextRequest) {
   const refused = refuseCrossOrigin(request);
   if (refused) return refused;
-  const gate = await requireUserForAi("manufacturing-copilot");
+  // The AI budget (daily tokens, concurrent requests, rate) is enforced by the backend, the one place that holds the AI key.
+  const gate = await requireUser();
   if (!gate.ok) return gate.response;
 
   // Capped while reading, not after: the body is never buffered past the limit.
   const body = await readBodyBytes(request, MAX_BODY_BYTES);
   if (!body.ok) return body.response;
   const raw = body.value;
+  const organization = request.headers.get("x-organization-id");
 
   let upstream: Response;
   try {
     upstream = await fetch(`${backendUrl()}/copilot/chat`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${gate.accessToken}` },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${gate.accessToken}`,
+        // Which organization the request acts for (the AI spend is charged to it); the backend checks membership.
+        ...(organization && { "X-Organization-Id": organization }),
+      },
       body: raw,
       signal: request.signal,
     });
@@ -50,12 +68,15 @@ export async function POST(request: NextRequest) {
   }
 
   if (!upstream.ok || !upstream.body) {
-    // Upstream text can carry internal detail: log the status, return a fixed message.
-    console.error(`[manufacturing-copilot] backend responded ${upstream.status}: ${(await upstream.text().catch(() => "")).slice(0, 300)}`);
+    // Upstream text can carry internal detail: log the status, return a fixed message. The one exception is the AI budget's
+    // code, which the panel needs to say why (daily allowance used up, too many requests running, AI switched off).
+    const detail = await upstream.text().catch(() => "");
+    console.error(`[manufacturing-copilot] backend responded ${upstream.status}: ${detail.slice(0, 300)}`);
+    const code = aiErrorCode(detail);
     if (upstream.status === 400) return json({ error: "Invalid request" }, 400);
     if (upstream.status === 404) return json({ error: "Part not found" }, 404);
-    if (upstream.status === 429) return json({ error: "Too many requests" }, 429, { "Retry-After": upstream.headers.get("Retry-After") ?? "30" });
-    if (upstream.status === 503) return json({ error: "Manufacturing Copilot is not configured" }, 503);
+    if (upstream.status === 429) return json({ error: "Too many requests", ...(code && { code }) }, 429, { "Retry-After": upstream.headers.get("Retry-After") ?? "30" });
+    if (upstream.status === 503) return json({ error: "Manufacturing Copilot is not available", ...(code && { code }) }, 503);
     return json({ error: "Manufacturing Copilot unavailable" }, 502);
   }
 

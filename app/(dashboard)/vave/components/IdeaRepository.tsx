@@ -7,10 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  useVaveIdeas, useVaveBom, useVaveShouldCosts,
+  useVaveIdeas, useVaveBom,
   useBulkCreateVaveIdeas, useUpdateVaveIdea, useDeleteVaveIdea,
 } from '@/lib/api/hooks/useVave';
-import type { VaveIdea, CreateVaveIdea, VaveBomItem, VaveShouldCost } from '@/lib/api/vave';
+import { vaveApi, type VaveIdea, type VaveBomItem } from '@/lib/api/vave';
 import { toast } from 'sonner';
 
 interface Props {
@@ -381,7 +381,6 @@ export function IdeaRepository({ projectId }: Props) {
 
   const { data: ideas } = useVaveIdeas(projectId);
   const { data: bomItems } = useVaveBom(projectId);
-  const { data: shouldCosts } = useVaveShouldCosts(projectId);
 
   const bulkCreate = useBulkCreateVaveIdeas(projectId);
   const updateIdea = useUpdateVaveIdea(projectId);
@@ -389,7 +388,6 @@ export function IdeaRepository({ projectId }: Props) {
 
   const allIdeas = (ideas as VaveIdea[]) ?? [];
   const items = (bomItems as VaveBomItem[]) ?? [];
-  const costs = (shouldCosts as VaveShouldCost[]) ?? [];
 
   const filtered = allIdeas.filter((idea) => {
     if (filterFramework !== 'all' && idea.framework !== filterFramework) return false;
@@ -411,18 +409,8 @@ export function IdeaRepository({ projectId }: Props) {
     }
     setGenerating(true);
     try {
-      const sorted = [...items].sort((a, b) => b.annualSpend - a.annualSpend);
-      const focusAreas = sorted.slice(0, 5).map(
-        (i) => `${i.partNumber} (${i.description ?? 'no desc'}) — $${i.annualSpend.toLocaleString()} annual spend`
-      );
-      const res = await fetch('/api/vave/ideation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bomItems: items, focusAreas, shouldCostGaps: costs }),
-      });
-      const body = (await res.json().catch(() => null)) as { error?: string } | null;
-      if (!res.ok) throw new Error(body?.error ?? `Ideation failed (${res.status})`);
-      const generated = body as unknown as CreateVaveIdea[];
+      // The server reads this project's BOM and should-cost gaps itself and builds the prompt.
+      const generated = await vaveApi.aiIdeation(projectId);
       if (!generated.length) {
         toast.error('AI returned no ideas — try adding more BOM data');
         return;

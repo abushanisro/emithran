@@ -5,6 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { vaveApi } from "@/lib/api/vave";
 import type { BOMMetricEntry } from "../../types";
 import { itemCost, formatPrice } from "../../utils";
 
@@ -62,102 +64,51 @@ interface AIVAVEInsights {
 
 // LLM API integration for VAVE insights
 const analyzeVAVEWithAI = async (bomData: BOMMetricEntry): Promise<AIVAVEInsights> => {
+  // The server's limits (VaveBomAnalysisDto): at most 50 items, strings up to 200 characters, numbers finite.
+  const text = (v: unknown) => (typeof v === 'string' ? v.slice(0, 200) : undefined);
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
   const bomAnalysis = {
-    bomName: bomData.bom.name,
-    totalParts: bomData.metrics.totalParts,
-    totalCost: bomData.metrics.totalCost,
-    totalWeight: bomData.metrics.totalWeight,
-    makeVsBuy: bomData.metrics.makeVsBuy,
-    items: (bomData.items || []).map(item => ({
-      name: item.name,
-      partNumber: item.partNumber,
-      material: item.material,
-      quantity: item.quantity,
-      unitCost: item.unitCost,
-      totalCost: itemCost(item),
-      weight: item.weight || item.unitWeight,
-      makeBuy: item.makeBuy,
-      supplier: item.supplier,
-      manufacturingProcess: item.manufacturingProcess,
-      toleranceGrade: item.toleranceGrade,
-      surfaceFinish: item.surfaceFinish,
-      heatTreatment: item.heatTreatment,
-    })).slice(0, 50) // Limit to avoid API payload size issues
+    bomName: text(bomData.bom.name),
+    totalParts: num(bomData.metrics.totalParts),
+    totalCost: num(bomData.metrics.totalCost),
+    totalWeight: num(bomData.metrics.totalWeight),
+    makeVsBuy: { make: num(bomData.metrics.makeVsBuy?.make), buy: num(bomData.metrics.makeVsBuy?.buy) },
+    items: (bomData.items || []).slice(0, 50).map(item => ({
+      name: text(item.name),
+      partNumber: text(item.partNumber),
+      material: text(item.material),
+      quantity: num(item.quantity),
+      unitCost: num(item.unitCost),
+      totalCost: num(itemCost(item)),
+      weight: num(item.weight || item.unitWeight),
+      makeBuy: text(item.makeBuy),
+      supplier: text(item.supplier),
+      manufacturingProcess: text(item.manufacturingProcess),
+      toleranceGrade: text(item.toleranceGrade),
+      surfaceFinish: text(item.surfaceFinish),
+      heatTreatment: text(item.heatTreatment),
+    })),
   };
 
-  try {
-    const response = await fetch('/api/vave-analysis', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      // Structured metrics only: the server builds the prompt (lib/vave/bom-vave-prompt).
-      body: JSON.stringify({ bom: bomAnalysis })
-    });
-
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const content: string = typeof data.text === 'string' ? data.text : '';
-    
-    // Extract JSON from response
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
-    }
-    
-    throw new Error('No valid JSON found in response');
-  } catch (error) {
-    console.error('AI service error:', error);
-    // Return fallback insights
-    return {
-      specificOpportunities: [{
-        type: "API Analysis Unavailable",
-        priority: "Medium" as const,
-        description: "Unable to generate AI insights. Using rule-based analysis.",
-        costImpact: 0,
-        implementation: "Check API connectivity",
-        timeframe: "N/A",
-        confidence: 0
-      }],
-      materialOptimization: { substitutions: [], consolidations: [] },
-      designOptimization: { partConsolidation: [], toleranceOptimization: [] },
-      supplierOptimization: { makeVsBuyRecommendations: [], supplierConsolidation: [] },
-      totalPotentialSavings: 0,
-      confidence: 0
-    };
-  }
+  // The backend builds the prompt from these structured metrics and charges the caller's AI budget.
+  return vaveApi.aiBomAnalysis<AIVAVEInsights>(bomAnalysis);
 };
 
 export function VAVETab({ bomMetrics }: Props) {
   const [aiInsights, setAiInsights] = useState<Map<string, AIVAVEInsights>>(new Map());
   const [loadingAI, setLoadingAI] = useState<Set<string>>(new Set());
 
-  const handleAIAnalysis = async (bomData: BOMMetricEntry) => {
+  // Returns whether insights were produced. A failure (for example the daily AI allowance being used up) is shown as the server
+  // reported it, never replaced by placeholder insights.
+  const handleAIAnalysis = async (bomData: BOMMetricEntry): Promise<boolean> => {
     setLoadingAI(prev => new Set(prev).add(bomData.bom.id));
-    
     try {
       const insights = await analyzeVAVEWithAI(bomData);
       setAiInsights(prev => new Map(prev).set(bomData.bom.id, insights));
+      return true;
     } catch (error) {
-      setAiInsights(prev => new Map(prev).set(bomData.bom.id, {
-        specificOpportunities: [{
-          type: "Analysis Unavailable",
-          priority: "Medium" as const,
-          description: "Unable to generate AI insights. Please try again.",
-          costImpact: 0,
-          implementation: "Check connectivity",
-          timeframe: "N/A",
-          confidence: 0
-        }],
-        materialOptimization: { substitutions: [], consolidations: [] },
-        designOptimization: { partConsolidation: [], toleranceOptimization: [] },
-        supplierOptimization: { makeVsBuyRecommendations: [], supplierConsolidation: [] },
-        totalPotentialSavings: 0,
-        confidence: 0
-      }));
+      toast.error(`AI insights for ${bomData.bom.name}: ${error instanceof Error ? error.message : 'failed'}`);
+      return false;
     } finally {
       setLoadingAI(prev => {
         const next = new Set(prev);
@@ -172,7 +123,7 @@ export function VAVETab({ bomMetrics }: Props) {
     setAiInsights(new Map());
     
     for (const bd of bomMetrics) {
-      await handleAIAnalysis(bd);
+      if (!(await handleAIAnalysis(bd))) break; // the next ones would fail the same way
     }
   };
 

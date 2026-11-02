@@ -44,6 +44,7 @@
     "local:down": "bash scripts/local-data.sh down",
     "local:reset": "bash scripts/local-data.sh reset",
     "auth0:check": "ts-node -r tsconfig-paths/register scripts/auth0-check.ts",
+    "eval:copilot-injection": "ts-node -r tsconfig-paths/register scripts/copilot-injection-eval.ts",
     "test:local": "bash test/local-data/run.sh"
   },
   "dependencies": {

@@ -2,7 +2,7 @@
  * An in-memory stand-in for the PostgREST client surface the services use (`from(...).select/insert/update/delete/eq/in/...`,
  * `rpc`). Tests answer each request from a handler and assert on the recorded calls; nothing goes over the network.
  */
-export type Op = 'select' | 'insert' | 'update' | 'delete';
+export type Op = 'select' | 'insert' | 'update' | 'upsert' | 'delete';
 export interface Call { table: string; op: Op; filters: Array<[string, unknown]>; payload?: unknown }
 export type Result = { data: unknown; error: unknown };
 export type Handler = (call: Call) => Result;
@@ -19,9 +19,11 @@ export function fakeClient(handler: Handler, rpc: (fn: string, args: unknown) =>
         select: () => q,
         insert: (payload: unknown) => { call.op = 'insert'; call.payload = payload; return q; },
         update: (payload: unknown) => { call.op = 'update'; call.payload = payload; return q; },
+        upsert: (payload: unknown) => { call.op = 'upsert'; call.payload = payload; return q; },
         delete: () => { call.op = 'delete'; return q; },
         eq: (column: string, value: unknown) => { call.filters.push([column, value]); return q; },
         in: (column: string, value: unknown) => { call.filters.push([column, value]); return q; },
+        lt: (column: string, value: unknown) => { call.filters.push([column, value]); return q; },
         order: () => q,
         limit: () => q,
         single: run,

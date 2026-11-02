@@ -23,6 +23,8 @@ export const AUDIT_ACTIONS = {
   'auth.forbidden': ['reason'],
   'api_key.created': ['name', 'scopes', 'expiresAt'],
   'api_key.revoked': ['name'],
+  'copilot_memory.changed': ['saved', 'removed', 'via'],
+  'copilot_memory.cleared': ['via'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS;

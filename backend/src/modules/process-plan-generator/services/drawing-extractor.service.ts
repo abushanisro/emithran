@@ -1,14 +1,14 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 
 import { BomFileAccess } from '../../../common/storage/bom-file-access';
 import { OBJECT_STORE, type ObjectStore } from '../../../common/storage/object-store';
 import { DatabaseService } from '../../../common/database/database.service';
+import { AiBudgetExceededException, AiBudgetService, type AiCaller } from '../../../common/ai/ai-budget.service';
+import { modelText } from '../../../common/ai/model-text';
 import type { DrawingBrief } from '../dto/drawing-brief.dto';
 import { UNAVAILABLE_DRAWING_BRIEF } from '../dto/drawing-brief.dto';
 
 const EXTRACTION_MODEL = 'claude-sonnet-4-6';
-const EXTRACTION_MAX_TOKENS = 8192;
 const VISION_TIMEOUT_MS = 60_000;
 const STORAGE_BUCKET = process.env.SUPABASE_BUCKET_BOM_FILES || 'bom-files';
 const MAX_PDF_BYTES = 50 * 1024 * 1024;
@@ -30,25 +30,25 @@ const MAX_PDF_BYTES = 50 * 1024 * 1024;
 @Injectable()
 export class DrawingExtractorService {
   private readonly logger = new Logger(DrawingExtractorService.name);
-  private readonly apiKey: string;
 
   constructor(
-    private readonly configService: ConfigService,
     private readonly databaseService: DatabaseService,
     private readonly fileAccess: BomFileAccess,
     @Inject(OBJECT_STORE) private readonly objects: ObjectStore,
-  ) {
-    this.apiKey =
-      this.configService.get<string>('ANTHROPIC_API_KEY') ??
-      process.env.ANTHROPIC_API_KEY ??
-      '';
-  }
+    private readonly ai: AiBudgetService,
+  ) {}
 
+  /**
+   * The drawing brief for one BOM item. A fresh extraction spends the caller's AI budget (AiBudgetService): a spent budget is a
+   * 429 for the whole request, not a plan silently made without the drawing; any other extraction failure returns an unavailable
+   * brief that says why (extractionWarnings).
+   */
   async getBriefFor(
     bomItemId: string,
     bomRow: any,
-    accessToken: string | null,
+    caller: AiCaller,
   ): Promise<DrawingBrief> {
+    const { accessToken } = caller;
     // ── 1) Cached? ──────────────────────────────────────────────────────────
     const cached = bomRow?.drawing_extraction as DrawingBrief | null | undefined;
     if (cached && cached.available && cached.sourceFilePath === bomRow.file_2d_path) {
@@ -61,11 +61,6 @@ export class DrawingExtractorService {
       return { ...UNAVAILABLE_DRAWING_BRIEF, source: 'unavailable' };
     }
 
-    if (!this.apiKey) {
-      this.logger.warn('ANTHROPIC_API_KEY not configured — skipping drawing extraction');
-      return { ...UNAVAILABLE_DRAWING_BRIEF };
-    }
-
     // ── 3) Fresh extraction ────────────────────────────────────────────────
     try {
       const pdfBase64 = await this.fetchPdfBase64(bomRow.file_2d_path, accessToken);
@@ -73,7 +68,7 @@ export class DrawingExtractorService {
         return { ...UNAVAILABLE_DRAWING_BRIEF };
       }
 
-      const brief = await this.callModelWithPdf(pdfBase64, bomRow.file_2d_path);
+      const brief = await this.callModelWithPdf(caller, pdfBase64, bomRow.file_2d_path);
       const finalBrief: DrawingBrief = {
         ...brief,
         source: 'fresh',
@@ -92,6 +87,7 @@ export class DrawingExtractorService {
       );
       return finalBrief;
     } catch (e: any) {
+      if (e instanceof AiBudgetExceededException) throw e;
       this.logger.warn(`Drawing extraction failed for ${bomItemId}: ${e.message}`);
       return { ...UNAVAILABLE_DRAWING_BRIEF, extractionWarnings: [String(e.message ?? e).slice(0, 200)] };
     }
@@ -121,7 +117,7 @@ export class DrawingExtractorService {
 
   // ── Model PDF extraction ────────────────────────────────────────────────
 
-  private async callModelWithPdf(pdfBase64: string, sourcePath: string): Promise<DrawingBrief> {
+  private async callModelWithPdf(caller: AiCaller, pdfBase64: string, sourcePath: string): Promise<DrawingBrief> {
     const systemPrompt = `You are a senior manufacturing engineer reading an Indian-shop 2D engineering drawing.
 Your job is to extract a structured JSON description of every callout that drives process planning.
 
@@ -188,48 +184,32 @@ Rules:
 - If the drawing is unreadable in part, add a short note to extractionWarnings and continue.
 - Do NOT invent values. If unsure, omit the entry.`;
 
-    const userPrompt = `Extract the engineering drawing data. Source file: ${sourcePath}`;
+    // The file name is user-supplied: one line of plain text (common/ai/model-text).
+    const userPrompt = `Extract the engineering drawing data. Source file: ${modelText(sourcePath, 300)}`;
 
-    const body = {
-      model: EXTRACTION_MODEL,
-      max_tokens: EXTRACTION_MAX_TOKENS,
-      system: systemPrompt,
-      messages: [
+    const session = await this.ai.open(caller, 'drawing_extraction');
+    let text: string;
+    try {
+      const message = await session.create(
         {
-          role: 'user',
-          content: [
+          model: EXTRACTION_MODEL,
+          system: systemPrompt,
+          messages: [
             {
-              type: 'document',
-              source: {
-                type: 'base64',
-                media_type: 'application/pdf',
-                data: pdfBase64,
-              },
+              role: 'user',
+              content: [
+                { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 } },
+                { type: 'text', text: userPrompt },
+              ],
             },
-            { type: 'text', text: userPrompt },
           ],
         },
-      ],
-    };
-
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': this.apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'pdfs-2024-09-25',
-      },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(VISION_TIMEOUT_MS),
-    });
-
-    if (!resp.ok) {
-      const errText = await resp.text();
-      throw new Error(`Model PDF API ${resp.status}: ${errText.slice(0, 300)}`);
+        { timeout: VISION_TIMEOUT_MS },
+      );
+      text = message.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('');
+    } finally {
+      session.close();
     }
-    const data = await resp.json() as any;
-    const text = data.content?.[0]?.text ?? '';
     const json = this.parseExtraction(text);
 
     return this.normaliseBrief(json);
