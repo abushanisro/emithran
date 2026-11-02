@@ -1,5 +1,5 @@
 
-import { checksumOf, migrationNumber, planMigrations, targetProblems, type Baseline, type Target } from './migration-plan';
+import { checksumOf, migrationNumber, planMigrations, targetProblems, type Baseline, type Target, trackingTableProblem } from './migration-plan';
 
 const BASELINE: Baseline = { upToNumber: 917, alsoIncluded: ['999_fix_currency_code_trigger.sql'] };
 const file = (name: string, sql = 'select 1') => ({ name, checksum: checksumOf(sql) });
@@ -73,5 +73,16 @@ describe('targetProblems', () => {
   it('refuses an unknown environment name and a missing database URL', () => {
     expect(targetProblems({ ...stage, env: 'staging', appEnv: 'staging' }).join()).toMatch(/--env must be local, stage or prd/);
     expect(targetProblems({ ...stage, databaseUrl: undefined }).join()).toMatch(/MIGRATE_DATABASE_URL is not set/);
+  });
+});
+
+describe('trackingTableProblem', () => {
+  it('accepts no table yet, or the runner\'s own table', () => {
+    expect(trackingTableProblem([])).toBeNull();
+    expect(trackingTableProblem(['name', 'checksum', 'applied_at'])).toBeNull();
+  });
+
+  it('refuses a tracking table left by another migration tool', () => {
+    expect(trackingTableProblem(['version', 'inserted_at'])).toMatch(/not made by this runner \(columns: inserted_at, version\)/);
   });
 });
