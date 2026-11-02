@@ -13,7 +13,6 @@ org:member      DELETE /v1/api/child-part-costs/:id  ChildPartCostController.rem
 org:member      DELETE /v1/api/comments/:id  CommentController.deleteComment
 org:member      DELETE /v1/api/copilot/memory  CopilotController.clearMemory
 org:member      DELETE /v1/api/copilot/memory/preferences  CopilotController.deleteMemoryItem
-org:viewer      DELETE /v1/api/developer/api-keys/:id/revoke  ApiKeysController.revoke
 org:member      DELETE /v1/api/electronics/designs/:designId  ElectronicsController.deleteDesign
 org:member      DELETE /v1/api/electronics/designs/:designId/revisions/:revisionId  ElectronicsController.deleteRevision
 org:member      DELETE /v1/api/lhr  LHRController.removeAll
@@ -145,7 +144,6 @@ org:viewer      GET /v1/api/cost-engineering/supplier-capabilities  CostEngineer
 org:viewer      GET /v1/api/cost-engineering/surface-finish-costs  CostEngineeringController.getSurfaceFinishCosts
 org:viewer      GET /v1/api/cost-engineering/sustainability  CostEngineeringController.getSustainability
 org:viewer      GET /v1/api/cost-engineering/tool-life  CostEngineeringController.getToolLife
-org:viewer      GET /v1/api/developer/api-keys  ApiKeysController.findAll
 org:viewer      GET /v1/api/electronics/designs  ElectronicsController.listDesigns
 org:viewer      GET /v1/api/electronics/designs/:designId  ElectronicsController.getDesign
 org:viewer      GET /v1/api/electronics/designs/:designId/revisions  ElectronicsController.revisions
@@ -411,7 +409,6 @@ org:member      POST /v1/api/child-part-costs/calculate  ChildPartCostController
 org:member      POST /v1/api/comments  CommentController.createComment
 org:member      POST /v1/api/copilot/chat  CopilotController.chat
 org:member      POST /v1/api/copilot/memory/proposals/:id/confirm  CopilotController.confirmMemoryProposal
-org:admin       POST /v1/api/developer/api-keys  ApiKeysController.create
 org:member      POST /v1/api/electronics/designs  ElectronicsController.createDesign
 org:member      POST /v1/api/electronics/quotes  ElectronicsController.quote
 org:member      POST /v1/api/electronics/uploads  ElectronicsController.upload

@@ -34,7 +34,7 @@ export function orgThrottleOptions(setting: Setting): { limit: number; ttl: numb
 }
 
 /**
- * The throttlers every route runs through (ClientIpThrottlerGuard supplies the tracker: user, API key or client address):
+ * The throttlers every route runs through (ClientIpThrottlerGuard supplies the tracker: user or client address):
  * - default: THROTTLE_LIMIT requests per THROTTLE_TTL ms, per route handler and caller;
  * - ai: AI_LIMIT_PER_MINUTE requests per minute per caller, shared by all @SpendsAi endpoints and skipped everywhere else.
  */

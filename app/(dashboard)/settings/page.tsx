@@ -3,20 +3,17 @@
 import { useState, useRef, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
-  Key, Plus, Copy, Check,
+  Plus, Copy, Check,
   Camera, Loader2,
-  ExternalLink, ArrowRight,
   Monitor, Sun, Moon, Building2, Trash2,
   LayoutGrid, Mail, X,
 } from 'lucide-react';
-import Link from 'next/link';
 import { CopilotMemorySection } from '@/components/features/settings/CopilotMemorySection';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -25,7 +22,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { useProfile, useUpdateProfile, useUploadAvatar } from '@/lib/api/hooks/useProfile';
-import { useApiKeys, useCreateApiKey, useRevokeApiKey } from '@/lib/api/hooks/useDeveloper';
 import {
   useFeatureProcessMappings,
   useRoutingRules,
@@ -42,21 +38,12 @@ import {
   useDeleteOrganization, useOrgMembers, useInviteMember, useRemoveMember,
   useWorkspaces, useCreateWorkspace, useDeleteWorkspace,
 } from '@/lib/api/hooks/useOrganization';
-import type { ApiKey } from '@/lib/api/developer';
 
 const TIMEZONES = [
   'UTC', 'Asia/Kolkata', 'Asia/Tokyo', 'Asia/Shanghai', 'Asia/Singapore',
   'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'America/New_York',
   'America/Chicago', 'America/Denver', 'America/Los_Angeles',
 ];
-
-// Must match API_KEY_SCOPES in backend/src/common/api-keys/api-key-scopes.ts. Keys expire after 90 days.
-const SCOPE_OPTIONS = [
-  { value: 'projects:read',  label: 'Projects: read',  description: 'List and read projects' },
-  { value: 'projects:write', label: 'Projects: write', description: 'Create projects' },
-  { value: 'boms:read',      label: 'BOMs: read',      description: 'List and read BOMs and their items' },
-  { value: 'costing:read',   label: 'Costing: read',   description: 'Read BOM cost summaries and reports' },
-] as const;
 
 // ─────────────────────────────────────────────────────────────
 // Preferences Tab
@@ -405,320 +392,6 @@ function ProfileTab() {
           </div>
         </CardContent>
       </Card>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
-// API Keys Tab  (key table)
-// ─────────────────────────────────────────────────────────────
-function ApiKeysTab() {
-  const { data: keys = [], isLoading } = useApiKeys();
-  const createMutation = useCreateApiKey();
-  const revokeMutation = useRevokeApiKey();
-  const { data: org } = useMyOrganization();
-  const { data: workspaces = [] } = useWorkspaces(org?.id);
-
-  const [createOpen, setCreateOpen] = useState(false);
-  const [newKeyName, setNewKeyName] = useState('');
-  const [selectedScopes, setSelectedScopes] = useState<string[]>(['projects:read']);
-  const [selectedWorkspace, setSelectedWorkspace] = useState('default');
-  const [createdKey, setCreatedKey] = useState<ApiKey | null>(null);
-  const [keyToRevoke, setKeyToRevoke] = useState<ApiKey | null>(null);
-  const [copied, setCopied] = useState(false);
-
-  const toggleScope = (scope: string) =>
-    setSelectedScopes((prev) => prev.includes(scope) ? prev.filter((s) => s !== scope) : [...prev, scope]);
-
-  const handleCreate = () => {
-    if (!newKeyName.trim() || selectedScopes.length === 0) return;
-    createMutation.mutate({ name: newKeyName.trim(), scopes: selectedScopes }, {
-      onSuccess: (key) => { setCreateOpen(false); setNewKeyName(''); setSelectedScopes(['projects:read']); setSelectedWorkspace('default'); setCreatedKey(key); },
-    });
-  };
-
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    toast.success('Copied to clipboard');
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <div className="space-y-8 w-full">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-semibold">API keys</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Keys are shown by prefix only. The full key is displayed once on creation and cannot be recovered.
-          </p>
-        </div>
-        <Button onClick={() => setCreateOpen(true)} className="shrink-0">
-          Create Key
-        </Button>
-      </div>
-
-      {/* Table */}
-      <div className="rounded-lg border border-border overflow-hidden">
-        {/* Table header */}
-        <div className="grid grid-cols-[1fr_160px_130px_130px_80px] gap-0 border-b border-border bg-muted/40 px-4 py-2.5">
-          {['Name', 'Key', 'Created', 'Last used', ''].map((h) => (
-            <span key={h} className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{h}</span>
-          ))}
-        </div>
-
-        {isLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          </div>
-        ) : keys.length === 0 ? (
-          <div className="py-16 text-center">
-            <p className="text-sm font-medium">No API keys yet</p>
-            <p className="mt-1 text-sm text-muted-foreground">Create a key to start making authenticated requests.</p>
-            <Button variant="outline" size="sm" className="mt-4" onClick={() => setCreateOpen(true)}>
-              Create your first key
-            </Button>
-          </div>
-        ) : (
-          <div className="divide-y divide-border">
-            {keys.map((key) => (
-              <div key={key.id} className="grid grid-cols-[1fr_160px_130px_130px_80px] gap-0 px-4 py-3.5 items-center hover:bg-muted/20 transition-colors">
-                {/* Name + scopes */}
-                <div className="min-w-0 pr-4">
-                  <p className="text-sm font-medium truncate">{key.name}</p>
-                  <div className="flex gap-1 mt-0.5">
-                    {key.scopes.map((s) => (
-                      <span key={s} className="text-[10px] text-muted-foreground capitalize">{s}</span>
-                    ))}
-                  </div>
-                </div>
-                {/* Key prefix */}
-                <code className="text-xs font-mono text-muted-foreground pr-4 truncate">
-                  {key.keyPrefix}••••••••••••
-                </code>
-                {/* Created */}
-                <span className="text-xs text-muted-foreground pr-4">
-                  {format(new Date(key.createdAt), 'MMM d, yyyy')}
-                </span>
-                {/* Last used */}
-                <span className="text-xs text-muted-foreground pr-4">
-                  {key.lastUsedAt ? format(new Date(key.lastUsedAt), 'MMM d, yyyy') : 'Never'}
-                </span>
-                {/* Actions */}
-                <button
-                  onClick={() => setKeyToRevoke(key)}
-                  className="text-xs text-muted-foreground hover:text-destructive transition-colors font-medium"
-                >
-                  Revoke
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Permissions info */}
-      <div className="rounded-lg border border-border p-4 space-y-3 bg-muted/20">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Permission scopes</p>
-        <div className="space-y-2">
-          {SCOPE_OPTIONS.map((s) => (
-            <div key={s.value} className="flex gap-3 text-sm">
-              <span className="font-medium w-12 capitalize shrink-0">{s.label}</span>
-              <span className="text-muted-foreground">{s.description}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Create dialog ── */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="sm:max-w-[440px]">
-          <DialogHeader>
-            <DialogTitle>Create API key</DialogTitle>
-            <DialogDescription>Give your key a name and choose the permissions it needs.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-5 py-2">
-            <div className="space-y-1.5">
-              <Label>Key name</Label>
-              <Input
-                value={newKeyName}
-                onChange={(e) => setNewKeyName(e.target.value)}
-                placeholder="e.g. Production Integration"
-                onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-              />
-            </div>
-
-            {/* Workspace selector */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label>Workspace</Label>
-                {!org && (
-                  <Link
-                    href="/settings?tab=organization"
-                    className="flex items-center gap-1 text-xs text-primary hover:underline"
-                  >
-                    <Plus className="h-3 w-3" /> Create organization
-                  </Link>
-                )}
-              </div>
-              <Select value={selectedWorkspace} onValueChange={setSelectedWorkspace}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="default">Default workspace</SelectItem>
-                  {workspaces.filter((w) => !w.isDefault).map((ws) => (
-                    <SelectItem key={ws.id} value={ws.id}>{ws.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Permissions</Label>
-              <div className="rounded-lg border border-border divide-y divide-border">
-                {SCOPE_OPTIONS.map((s) => (
-                  <label key={s.value} className="flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-muted/40 transition-colors">
-                    <Checkbox
-                      className="mt-0.5"
-                      checked={selectedScopes.includes(s.value)}
-                      onCheckedChange={() => toggleScope(s.value)}
-                    />
-                    <div>
-                      <p className="text-sm font-medium capitalize">{s.label}</p>
-                      <p className="text-xs text-muted-foreground">{s.description}</p>
-                    </div>
-                  </label>
-                ))}
-              </div>
-              {selectedScopes.length === 0 && (
-                <p className="text-xs text-destructive">Select at least one permission.</p>
-              )}
-            </div>
-          </div>
-          <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreate} disabled={!newKeyName.trim() || selectedScopes.length === 0 || createMutation.isPending}>
-              {createMutation.isPending ? 'Creating…' : 'Create Key'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Show raw key once ── */}
-      <Dialog open={!!createdKey} onOpenChange={() => setCreatedKey(null)}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Save your API key</DialogTitle>
-            <DialogDescription>Copy this key now. For security reasons, it won't be shown again.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-3">
-              <p className="text-xs text-amber-400 font-medium">
-                This API key will not be shown again. Store it somewhere safe, such as a password manager or secrets vault.
-              </p>
-            </div>
-            <div className="rounded-md border border-border bg-muted/30 px-4 py-3 flex items-center gap-3">
-              <code className="text-xs font-mono text-foreground break-all flex-1">{createdKey?.rawKey}</code>
-              <button
-                onClick={() => handleCopy(createdKey?.rawKey ?? '')}
-                className="shrink-0 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
-              >
-                {copied ? <><Check className="h-3.5 w-3.5 text-green-400" />Copied</> : <><Copy className="h-3.5 w-3.5" />Copy</>}
-              </button>
-            </div>
-          </div>
-          <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => handleCopy(createdKey?.rawKey ?? '')}>
-              {copied ? 'Copied!' : 'Copy key'}
-            </Button>
-            <Button onClick={() => setCreatedKey(null)}>Done</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Revoke confirmation ── */}
-      <AlertDialog open={!!keyToRevoke} onOpenChange={() => setKeyToRevoke(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Revoke "{keyToRevoke?.name}"?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will immediately invalidate the key. Any integrations using it will stop working. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => revokeMutation.mutate(keyToRevoke!.id, { onSuccess: () => setKeyToRevoke(null) })}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Revoke key
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
-// Developer Portal Tab
-// ─────────────────────────────────────────────────────────────
-function DeveloperPortalTab() {
-  const { data: keys } = useApiKeys();
-
-  // Request history is no longer stored (only errors are logged, to a file), so
-  // there are no request statistics to show.
-  const statCards = [
-    { label: 'Active API Keys', value: keys?.length ?? 0, icon: Key, color: 'text-primary', bg: 'bg-primary/10', border: 'border-l-primary' },
-  ];
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">API keys and reference.</p>
-        <Button asChild variant="outline" size="sm" className="gap-2">
-          <Link href="/developer" target="_blank"><ExternalLink className="h-4 w-4" />API Reference</Link>
-        </Button>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-4">
-        {statCards.map((card) => (
-          <Card key={card.label} className={`border-l-4 ${card.border}`}>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className={`h-12 w-12 rounded-xl ${card.bg} flex items-center justify-center`}>
-                  <card.icon className={`h-6 w-6 ${card.color}`} />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground font-medium">{card.label}</p>
-                  <p className="text-2xl font-bold">{card.value}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="hover:border-primary/40 transition-colors">
-          <CardHeader>
-            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center mb-2">
-              <Key className="h-5 w-5 text-primary" />
-            </div>
-            <CardTitle className="text-base">API Keys</CardTitle>
-            <CardDescription>Generate, view, and revoke API keys for programmatic access.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild variant="outline" size="sm" className="gap-2 w-full">
-              <Link href="/settings?tab=api-keys">Manage Keys <ArrowRight className="h-4 w-4" /></Link>
-            </Button>
-          </CardContent>
-        </Card>
-
-      </div>
-
     </div>
   );
 }
@@ -1763,7 +1436,7 @@ function FeedbackSubtab() {
 // ─────────────────────────────────────────────────────────────
 // Settings Page — vertical sidebar layout
 // ─────────────────────────────────────────────────────────────
-const VALID_TABS = ['profile', 'preferences', 'organization', 'workspaces', 'api-keys', 'portal', 'manufacturing-knowledge'] as const;
+const VALID_TABS = ['profile', 'preferences', 'organization', 'workspaces', 'manufacturing-knowledge'] as const;
 type Tab = typeof VALID_TABS[number];
 
 const NAV_SECTIONS = [
@@ -1782,13 +1455,6 @@ const NAV_SECTIONS = [
     ],
   },
   {
-    label: 'Developer',
-    items: [
-      { id: 'api-keys'     as Tab, label: 'API Keys' },
-      { id: 'portal'       as Tab, label: 'Developer Portal' },
-    ],
-  },
-  {
     label: 'Manufacturing',
     items: [
       { id: 'manufacturing-knowledge' as Tab, label: 'Knowledge Base' },
@@ -1801,8 +1467,6 @@ const TAB_TITLES: Record<Tab, string> = {
   'preferences':              'Preferences',
   'organization':             'Organization',
   'workspaces':               'Workspaces',
-  'api-keys':                 'API Keys',
-  'portal':                   'Developer Portal',
   'manufacturing-knowledge':  'Manufacturing Knowledge',
 };
 
@@ -1821,8 +1485,6 @@ function SettingsInner() {
     'preferences':              <PreferencesTab />,
     'organization':             <OrganizationTab />,
     'workspaces':               <WorkspacesTab />,
-    'api-keys':                 <ApiKeysTab />,
-    'portal':                   <DeveloperPortalTab />,
     'manufacturing-knowledge':  <ManufacturingKnowledgeTab />,
   };
 

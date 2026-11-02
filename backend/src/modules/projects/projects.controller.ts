@@ -21,7 +21,6 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
 import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
 import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
-import { ApiKeyScopes } from '../../common/decorators/api-key-scopes.decorator';
 import { OrgRole } from '../../common/authz/authz-policy';
 
 @ApiTags('Projects')
@@ -33,7 +32,6 @@ export class ProjectsController {
 
   @OrgRole('viewer')
   @Get()
-  @ApiKeyScopes('projects:read')
   @ApiOperation({ summary: 'Get all projects with pagination' })
   @ApiResponse({ status: 200, description: 'Projects retrieved successfully', type: ProjectListResponseDto })
   async findAll(@Query() query: QueryProjectsDto, @CurrentUser() user: User, @AccessToken() token: string): Promise<ProjectListResponseDto> {
@@ -42,7 +40,6 @@ export class ProjectsController {
 
   @OrgRole('viewer')
   @Get(':id')
-  @ApiKeyScopes('projects:read')
   @ApiOperation({ summary: 'Get project by ID' })
   @ApiParam({ name: 'id', description: 'Project ID', example: '123e4567-e89b-12d3-a456-426614174000' })
   @ApiResponse({ status: 200, description: 'Project retrieved successfully', type: ProjectResponseDto })
@@ -54,7 +51,6 @@ export class ProjectsController {
   }
 
   @Post()
-  @ApiKeyScopes('projects:write')
   @UseGuards(OrganizationContextGuard)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create new project' })

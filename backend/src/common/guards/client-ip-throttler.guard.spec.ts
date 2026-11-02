@@ -54,25 +54,6 @@ describe('ClientIpThrottlerGuard behind a Cloudflare tunnel', () => {
   });
 });
 
-describe('ClientIpThrottlerGuard with API keys', () => {
-  // getTracker is protected; this exposes it without booting the throttler.
-  class Probe extends ClientIpThrottlerGuard {
-    track(req: Record<string, unknown>) {
-      return this.getTracker(req);
-    }
-  }
-  const probe = Object.create(Probe.prototype) as Probe;
-
-  it('counts a request made with an API key against the key, whatever address it comes from', async () => {
-    await expect(probe.track({ apiKey: { id: 'key-1' }, headers: {}, ip: '10.0.0.1' })).resolves.toBe('api-key:key-1');
-    await expect(probe.track({ apiKey: { id: 'key-1' }, headers: {}, ip: '10.0.0.2' })).resolves.toBe('api-key:key-1');
-  });
-
-  it('counts everything else by client address', async () => {
-    await expect(probe.track({ headers: {}, ip: '10.0.0.1' })).resolves.not.toMatch(/^api-key:/);
-  });
-});
-
 describe('ClientIpThrottlerGuard for signed-in users', () => {
   class Probe extends ClientIpThrottlerGuard {
     track(req: Record<string, unknown>) {
@@ -86,8 +67,7 @@ describe('ClientIpThrottlerGuard for signed-in users', () => {
     await expect(probe.track({ user: { id: 'u-1' }, headers: {}, ip: '10.0.0.9' })).resolves.toBe('user:u-1');
   });
 
-  it('still counts an API key against the key, and an anonymous caller by address', async () => {
-    await expect(probe.track({ apiKey: { id: 'k' }, user: { id: 'owner' }, headers: {}, ip: '10.0.0.1' })).resolves.toBe('api-key:k');
+  it('counts an anonymous caller by address', async () => {
     await expect(probe.track({ user: {}, headers: {}, ip: '10.0.0.1' })).resolves.toBe('10.0.0.1');
   });
 });

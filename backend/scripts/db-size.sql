@@ -31,8 +31,7 @@ SELECT 'cad_uploads.result', count(*),
 FROM cad_uploads WHERE result IS NOT NULL;
 
 -- 4. Tables that only ever grow: how many rows, and how old
-SELECT 'api_request_logs' AS "table", count(*) AS rows, min(created_at) AS oldest FROM api_request_logs
-UNION ALL SELECT 'cad_analysis_history', count(*), min(created_at) FROM cad_analysis_history
+SELECT 'cad_analysis_history', count(*), min(created_at) FROM cad_analysis_history
 UNION ALL SELECT 'fx_rate_snapshots', count(*), min(created_at) FROM fx_rate_snapshots;
 
 -- 5. Storage against the 1 GB limit (the free tier also refuses any single object over 50 MB)
