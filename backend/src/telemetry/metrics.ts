@@ -13,6 +13,7 @@ export const METRIC_LABEL_KEYS = [
   'emithran.operation',
   'emithran.outcome',
   'emithran.queue',
+  'emithran.privileged_site',
   // Set by the HTTP client instrumentation (outbound calls to PostgREST, the engines, FX).
   'server.address',
   'http.response.status_code',
@@ -67,6 +68,14 @@ function createInstruments() {
       description: 'Duration of one CAD upload processing attempt (STEP/ZIP to BOM items) by outcome',
       advice: { explicitBucketBoundaries: JOB_BUCKETS },
     }),
+    httpRejections: meter.createCounter('emithran.http.server.rejections', {
+      unit: '{request}',
+      description: 'Requests refused for size (413) or rate (429), by route template, method and status code',
+    }),
+    privilegedClientCalls: meter.createCounter('emithran.privileged_client.calls', {
+      unit: '{call}',
+      description: 'Privileged (RLS-bypassing) database clients handed out, by call-site category',
+    }),
   };
 }
 
@@ -112,6 +121,40 @@ export function addActiveHttpRequests(delta: 1 | -1): void {
 
 export function recordCadUploadDuration(seconds: number, outcome: CadUploadOutcome): void {
   get().cadUploadDuration.record(seconds, { 'emithran.outcome': outcome });
+}
+
+/** The status codes counted as rejections: a body over the limit (413) and a throttled request (429). */
+export type RejectionStatus = 413 | 429;
+
+/**
+ * One request refused for size or rate. `route` is the matched route template (routeTemplate); a 413 raised by the body parser
+ * comes before routing and is counted as "unmatched".
+ */
+export function recordHttpRejection(method: string, route: string, status: RejectionStatus): void {
+  get().httpRejections.add(1, {
+    'http.request.method': KNOWN_METHODS.has(method) ? method : '_OTHER',
+    'http.route': route,
+    'http.response.status_code': status,
+  });
+}
+
+/**
+ * The call-site category of a privileged-client reason: the text before its first ':' ("reference-data: sm_reference_data" ->
+ * "reference-data"). Reasons are string literals in code (check:rls refuses computed ones), so this is a closed set; it is still
+ * reduced to lower-case letters, digits, spaces and dashes, at most 40 characters, so a label can never carry free text.
+ */
+export function privilegedSite(reason: string): string {
+  const category = reason.split(':', 1)[0].trim().toLowerCase().replace(/[^a-z0-9 -]+/g, '').slice(0, 40).trim();
+  return category || 'unspecified';
+}
+
+/** One privileged (RLS-bypassing) client handed out at `site` (privilegedSite of the reason). Never throws. */
+export function recordPrivilegedClientCall(site: string): void {
+  try {
+    get().privilegedClientCalls.add(1, { 'emithran.privileged_site': site });
+  } catch {
+    // Recording a metric must never break the caller.
+  }
 }
 
 const DEPTH_READ_TIMEOUT_MS = 2_000;

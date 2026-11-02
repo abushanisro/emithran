@@ -2,16 +2,18 @@ import { EventEmitter } from 'events';
 import { Writable } from 'stream';
 
 import { ConsoleLogger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { context, metrics, SpanStatusCode, trace } from '@opentelemetry/api';
 import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks';
 import { AggregationTemporality, InMemoryMetricExporter, MeterProvider, PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
 import { InMemorySpanExporter, SimpleSpanProcessor, TracerProvider } from '@opentelemetry/sdk-trace';
 import * as winston from 'winston';
 
+import { DatabaseService } from '../common/database/database.service';
 import { Logger as WinstonLogger } from '../common/logger/logger.service';
 import { CorrelatedConsoleLogger } from './correlated-console-logger';
 import { httpMetricsMiddleware, routeTemplate } from './http-metrics.middleware';
-import { METRIC_LABEL_KEYS, observeQueueDepth, recordCadUploadDuration, recordCostingDuration, recordHttpServerDuration, resetMetricInstruments, statusClassOf } from './metrics';
+import { METRIC_LABEL_KEYS, observeQueueDepth, privilegedSite, recordCadUploadDuration, recordCostingDuration, recordHttpServerDuration, resetMetricInstruments, statusClassOf } from './metrics';
 import { setTelemetryActive } from './telemetry-state';
 import { Traced } from './traced';
 
@@ -254,5 +256,45 @@ describe('httpMetricsMiddleware', () => {
     const classes = metric.dataPoints.map((p) => p.attributes['emithran.status_class']);
     expect(classes).toEqual(expect.arrayContaining(['4xx', 'aborted']));
     expect(() => run('/x', 200, true)).not.toThrow();
+  });
+});
+
+describe('413/429 rejections and privileged client calls', () => {
+  const find = async (name: string) => (await collectedMetrics()).find((m) => m.descriptor.name === name);
+  const close = (route: string, statusCode: number) => {
+    const response = Object.assign(new EventEmitter(), { statusCode, writableFinished: true });
+    httpMetricsMiddleware({ method: 'POST', route: { path: route } } as never, response as never, jest.fn());
+    response.emit('close');
+  };
+
+  it('counts 413 and 429 per route template and status code, and nothing else', async () => {
+    close('/v1/bom-items/:id/cad', 413);
+    close('/v1/copilot/chat', 429);
+    close('/v1/copilot/chat', 429);
+    close('/v1/copilot/chat', 403);
+    close('/v1/copilot/chat', 200);
+    const metric = (await find('emithran.http.server.rejections'))!;
+    const counts = Object.fromEntries(
+      metric.dataPoints.map((p) => [`${String(p.attributes['http.route'])} ${String(p.attributes['http.response.status_code'])}`, p.value]),
+    );
+    expect(counts).toEqual({ '/v1/bom-items/:id/cad 413': 1, '/v1/copilot/chat 429': 2 });
+  });
+
+  it('counts each privileged client DatabaseService hands out, labelled by the category of its reason', async () => {
+    const database = new DatabaseService(new ConfigService({ POSTGREST_URL: 'http://postgrest.invalid', DB_JWT_SECRET: 'x'.repeat(40) }));
+    database.getPrivilegedClient('reference-data: sm_reference_data');
+    database.getPrivilegedClient('reference-data: machining_reference_data');
+    database.getPrivilegedClient('audit: write an audit event');
+    const metric = (await find('emithran.privileged_client.calls'))!;
+    const bySite = Object.fromEntries(metric.dataPoints.map((p) => [p.attributes['emithran.privileged_site'], p.value]));
+    expect(bySite).toMatchObject({ 'reference-data': 2, audit: 1 });
+  });
+
+  it('reduces a reason to a short, closed label', () => {
+    expect(privilegedSite('reference-data: sm_reference_data')).toBe('reference-data');
+    expect(privilegedSite('lhr bulk delete scoped by user_id')).toBe('lhr bulk delete scoped by userid');
+    expect(privilegedSite('<script>\r\n: x')).toBe('script');
+    expect(privilegedSite(':')).toBe('unspecified');
+    expect(privilegedSite('a'.repeat(100))).toHaveLength(40);
   });
 });

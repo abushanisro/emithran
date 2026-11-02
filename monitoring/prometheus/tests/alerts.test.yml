@@ -126,3 +126,40 @@ tests:
             exp_annotations:
               summary: "Less than 15% disk space free on /"
               response: "docker system df; prune old images, check log volumes (backend-logs, cad-logs) and the Prometheus volume (PROM_RETENTION_SIZE)."
+
+  - name: a 429 spike on one route fires; a steady trickle and 413s do not
+    interval: 1m
+    input_series:
+      # 10 throttled requests a minute on the chat route
+      - series: 'emithran_http_server_rejections_total{http_route="/v1/copilot/chat", http_response_status_code="429", http_request_method="POST"}'
+        values: '0+10x30'
+      # 1 a minute elsewhere: 10 in 10 minutes, below the threshold
+      - series: 'emithran_http_server_rejections_total{http_route="/v1/projects", http_response_status_code="429", http_request_method="GET"}'
+        values: '0+1x30'
+      # 413s are size rejections, not throttling
+      - series: 'emithran_http_server_rejections_total{http_route="/v1/projects", http_response_status_code="413", http_request_method="POST"}'
+        values: '0+20x30'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: RateLimitSpike
+        exp_alerts:
+          - exp_labels: { severity: warning, http_route: /v1/copilot/chat }
+            exp_annotations:
+              summary: "/v1/copilot/chat: more than 50 requests throttled (429) in 10 minutes"
+              response: "Find the caller in the backend log for that route (user and organization). Abuse: block it at Cloudflare. Legitimate load: raise that route's throttle in common/throttling."
+
+  - name: any OOM kill fires, a quiet kernel does not
+    interval: 1m
+    input_series:
+      - series: 'node_vmstat_oom_kill{instance="node-exporter:9100", job="node"}'
+        values: '3+0x10 4+0x20'
+    alert_rule_test:
+      - { eval_time: 8m, alertname: ContainerOomKilled, exp_alerts: [] }
+      - eval_time: 13m
+        alertname: ContainerOomKilled
+        exp_alerts:
+          - exp_labels: { severity: critical, instance: "node-exporter:9100", job: node }
+            exp_annotations:
+              summary: "The kernel killed a process for running out of memory (a container hit its limit)"
+              response: "docker ps -a, then docker inspect on the restarted container (State.OOMKilled) finds which one; docker logs shows the request it was handling. An upload or parse that big is a resource-exhaustion attempt or a limit to tighten, not a reason to raise the container memory."
+      - { eval_time: 28m, alertname: ContainerOomKilled, exp_alerts: [] }

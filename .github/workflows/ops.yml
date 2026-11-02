@@ -4,9 +4,11 @@ name: Operations
 #   backup       nightly pg_dump of the public schema and the user directory (auth schema), encrypted with age, kept as a workflow
 #                artifact (7 days; Sundays 28 days), next to the managed Postgres's own point-in-time backups. Stored files are in the
 #                bucket and not part of this backup.
+#   schema-drift nightly read-only comparison of the live `public` schema with main's baseline + migrations; fails on any difference.
 # Secrets live in the GitHub Environments `stage` and `production` (never in the repo):
 #   MIGRATE_DATABASE_URL                      direct connection string of the managed Postgres
 #   BACKUP_AGE_RECIPIENT                      the age PUBLIC key; the private key stays offline with the operator
+#   SCHEMA_READER_DATABASE_URL                connection string of the read-only `schema_reader` role (docs/runbooks/schema-drift.md)
 
 on:
   schedule:
@@ -59,3 +61,49 @@ jobs:
           path: backup-${{ matrix.environment }}.tar.age
           retention-days: ${{ env.RETENTION }}
           if-no-files-found: error
+
+  # Schema drift (docs/runbooks/schema-drift.md): the live `public` schema must be exactly what main's schema-only baseline plus main's
+  # migrations build, so a change made by hand (a policy edited in a dashboard, a function created outside migrations) fails this job.
+  # Read-only: it connects with SCHEMA_READER_DATABASE_URL (default_transaction_read_only, pg_read_all_data), never with
+  # MIGRATE_DATABASE_URL. A missing secret or baseline fails the job: an unverified schema is never reported as a clean one.
+  schema-drift:
+    name: schema drift (${{ matrix.environment }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [stage, production]
+    environment: ${{ matrix.environment }}
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+      - name: Compare the live schema with main
+        env:
+          SCHEMA_READER_DATABASE_URL: ${{ secrets.SCHEMA_READER_DATABASE_URL }}
+          ENVIRONMENT: ${{ matrix.environment }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SCHEMA_READER_DATABASE_URL" ]; then
+            echo "::error::SCHEMA_READER_DATABASE_URL is not set for $ENVIRONMENT (docs/runbooks/schema-drift.md)"; exit 1
+          fi
+          if [ ! -f migrations/baseline/db.dump ]; then
+            echo "::error::no schema-only baseline in backend/migrations/baseline (docs/runbooks/schema-drift.md)"; exit 1
+          fi
+          status=0
+          bash scripts/schema-drift.sh migrations/baseline "$SCHEMA_READER_DATABASE_URL" "$RUNNER_TEMP/drift.diff" || status=$?
+          if [ "$status" = 3 ]; then
+            { echo "### Schema drift in $ENVIRONMENT"; echo; echo '```diff'; head -n 400 "$RUNNER_TEMP/drift.diff"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::the $ENVIRONMENT schema differs from main (see the run summary)"
+          fi
+          exit "$status"

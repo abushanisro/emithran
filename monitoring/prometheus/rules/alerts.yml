@@ -64,6 +64,15 @@ groups:
           summary: "p95 latency of ordinary API routes is above 5 s"
           response: "Open Application Performance, Slow endpoints. Check the database latency and the outbound client durations (http_client_request_duration)."
 
+      # Throttled requests (429) on one route: either a client hammering it or a limit set too low for real use.
+      - alert: RateLimitSpike
+        expr: sum by (http_route) (increase(emithran_http_server_rejections_total{http_response_status_code="429"}[10m])) > 50
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $labels.http_route }}: more than 50 requests throttled (429) in 10 minutes"
+          response: "Find the caller in the backend log for that route (user and organization). Abuse: block it at Cloudflare. Legitimate load: raise that route's throttle in common/throttling."
+
   - name: pipelines
     rules:
       # Terminal attempts only: a retry is neither a success nor a failure. At least 5 finished uploads in the hour.
@@ -123,6 +132,16 @@ groups:
         annotations:
           summary: "Host memory above 90%"
           response: "Large STEP files cost about 16 MB per MB each. Check engine memory limits and concurrency before the OOM killer picks a container."
+
+      # The kernel's OOM-kill counter: a container that hit its memory limit was killed (Docker then restarts it). Any kill fires; the
+      # 10-minute window keeps it visible long enough for the hold time.
+      - alert: ContainerOomKilled
+        expr: increase(node_vmstat_oom_kill[10m]) > 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "The kernel killed a process for running out of memory (a container hit its limit)"
+          response: "docker ps -a, then docker inspect on the restarted container (State.OOMKilled) finds which one; docker logs shows the request it was handling. An upload or parse that big is a resource-exhaustion attempt or a limit to tighten, not a reason to raise the container memory."
 
       - alert: DiskSpaceLow
         expr: |
