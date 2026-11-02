@@ -8,12 +8,12 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 IMAGE="postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b"
 ID="baseline-$$"; WORK="$(mktemp -d)"
-cleanup() { docker rm -f "$ID-src" "$ID-dst" "$ID-dst2" "$ID-dst3" >/dev/null 2>&1 || true; docker network rm "$ID" >/dev/null 2>&1 || true; rm -rf "$WORK"; }
+cleanup() { docker rm -f "$ID-src" "$ID-dst" "$ID-dst2" "$ID-dst3" "$ID-dst4" "$ID-dst5" >/dev/null 2>&1 || true; docker network rm "$ID" >/dev/null 2>&1 || true; rm -rf "$WORK"; }
 trap cleanup EXIT
 docker network create "$ID" >/dev/null
 start() { docker run -d --rm --name "$ID-$1" --network "$ID" -e POSTGRES_PASSWORD=pw -v "$PWD/migrations":/migrations:ro "$IMAGE" >/dev/null; }
-for n in src dst dst2 dst3; do start $n; done
-for n in src dst dst2 dst3; do for _ in $(seq 1 60); do docker exec "$ID-$n" pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1 && break; sleep 1; done; done
+for n in src dst dst2 dst3 dst4 dst5; do start $n; done
+for n in src dst dst2 dst3 dst4 dst5; do for _ in $(seq 1 60); do docker exec "$ID-$n" pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1 && break; sleep 1; done; done
 sql() { docker exec -i "$ID-$1" psql -U postgres -v ON_ERROR_STOP=1 -At -q "${@:2}"; }
 url() { echo "postgres://postgres:pw@$ID-$1:5432/postgres"; }
 fail=0
@@ -81,4 +81,36 @@ bash scripts/baseline-load.sh "$WORK/schema" "$(url dst3)" | tail -1
 check "a schema-only baseline carries every table" "$(sql src -c "select count(*) from information_schema.tables where table_schema='public' and table_name<>'schema_migrations'")" "$(sql dst3 -c "select count(*) from information_schema.tables where table_schema='public'")"
 check "and no rows and no users" "0|0|0" "$(sql dst3 -c "select (select count(*) from public.projects), (select count(*) from public.big), (select count(*) from auth.users)")"
 check "row-level security comes with the structure" "t|1" "$(sql dst3 -c "select relrowsecurity, (select count(*) from pg_policies where tablename='projects') from pg_class where relname='projects'")"
+
+# --- a database that was not enforcing its keys: rows whose parent (or user) is gone -----------------------------------------------
+# Built the way it happens: the keys are NOT VALID, and rows were left behind when a parent or an account was deleted.
+sql src -c "CREATE DATABASE orphans" >/dev/null
+docker exec -i "$ID-src" psql -U postgres -d orphans -v ON_ERROR_STOP=1 -At -q >/dev/null <<'SQL'
+\i /migrations/930_postgres_compat.sql
+INSERT INTO auth.users (id, email) VALUES ('11111111-1111-4111-8111-111111111111', 'alice@example.com');
+CREATE TABLE public.parents (id uuid PRIMARY KEY);
+CREATE TABLE public.kids (id serial PRIMARY KEY, parent_id uuid, owner_id uuid, note text);
+CREATE TABLE public.grandkids (id serial PRIMARY KEY, kid_id int);
+INSERT INTO public.parents VALUES ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+INSERT INTO public.kids (parent_id, owner_id, note) VALUES
+  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '11111111-1111-4111-8111-111111111111', 'fine'),
+  ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', '11111111-1111-4111-8111-111111111111', 'parent is gone'),
+  (NULL, '99999999-9999-4999-8999-999999999999', 'no parent set, owner account deleted');
+INSERT INTO public.grandkids (kid_id) VALUES (1), (2);
+ALTER TABLE public.kids ADD CONSTRAINT kids_parent_fk FOREIGN KEY (parent_id) REFERENCES public.parents(id) NOT VALID;
+ALTER TABLE public.kids ADD CONSTRAINT kids_owner_fk FOREIGN KEY (owner_id) REFERENCES auth.users(id) NOT VALID;
+ALTER TABLE public.grandkids ADD CONSTRAINT grandkids_kid_fk FOREIGN KEY (kid_id) REFERENCES public.kids(id) NOT VALID;
+SQL
+orph_url="postgres://postgres:pw@$ID-src:5432/orphans"
+bash scripts/baseline-dump.sh "$orph_url" "$WORK/orphans" 2>&1 | tail -2
+check "an account that rows name but auth.users lacks is carried as a placeholder" "removed-user-99999999@invalid.invalid" "$(grep -o 'removed-user-[0-9a-f]*@invalid.invalid' "$WORK/orphans/auth_users.csv")"
+check "and counted among the users" "2" "$(tr -d ' \n' < "$WORK/orphans/auth_users.count")"
+if bash scripts/baseline-load.sh "$WORK/orphans" "$(url dst4)" >"$WORK/orph.out" 2>&1; then echo "FAIL the loader accepted rows with no parent"; fail=1; else echo "ok   the loader stops on rows with no parent"; fi
+check "and names them" "1" "$(grep -c 'kids .*1 row' "$WORK/orph.out")"
+check "and the refused load loaded no keys that could not hold" "0" "$(sql dst4 -c "select count(*) from pg_constraint where contype='f' and connamespace='public'::regnamespace and convalidated" 2>/dev/null || echo 0)"
+DROP_DANGLING=1 bash scripts/baseline-load.sh "$WORK/orphans" "$(url dst5)" >"$WORK/orph2.out" 2>&1 || { echo "FAIL DROP_DANGLING=1 load failed"; tail -5 "$WORK/orph2.out"; fail=1; }
+check "DROP_DANGLING=1 keeps the rows that have a parent (or no parent set)" "fine|no parent set, owner account deleted" "$(sql dst5 -c "select string_agg(note, '|' order by id) from public.kids")"
+check "removes the row below a removed row too" "1" "$(sql dst5 -c "select count(*) from public.grandkids")"
+check "and every key is valid afterwards" "0" "$(sql dst5 -c "select count(*) from pg_constraint where contype='f' and connamespace='public'::regnamespace and not convalidated")"
+check "the removed row is saved, not lost" "parent is gone" "$(grep -o 'parent is gone' "$WORK/orphans.dangling/kids.csv" | head -1)"
 exit $fail
