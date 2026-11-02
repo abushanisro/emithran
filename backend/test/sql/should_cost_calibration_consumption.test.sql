@@ -1,6 +1,8 @@
 -- 941: a calibration run records the pairs it consumed; pairs that predate 941 and were already applied by a logged run are
 -- marked consumed so they are never applied again; signed-in users cannot touch calibration data. Tables as legacy 177 has them
 -- (only the columns 941 relies on).
+-- run.sh has already built them from migration 952; this test is about a database that ran legacy 177 instead, so start from that.
+DROP TABLE public.should_cost_actuals, public.should_cost_predictions, public.rate_calibration_history CASCADE;
 CREATE TABLE public.should_cost_actuals (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), prediction_id uuid, created_at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE public.rate_calibration_history (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), calibrated_at timestamptz NOT NULL DEFAULT now());
 GRANT ALL ON public.should_cost_actuals, public.rate_calibration_history TO authenticated;
