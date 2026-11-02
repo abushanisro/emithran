@@ -1,16 +1,10 @@
-//! Keeps the runner's credentials out of reach of the geometry worker it supervises.
+//! Keeps the runner's memory (its signing key and S3 keys) unreadable by other processes.
 //!
-//! The worker parses customer STEP files and runs as the same UID as the runner, which holds DB_JWT_SECRET and the S3 keys in
-//! its environment. `env_clear` (worker.rs) keeps them out of the worker's own environment, but a same-UID process can still
-//! read the runner's `/proc/<pid>/environ` and `/proc/<pid>/mem` while the runner is dumpable. Marking the runner non-dumpable
-//! (`prctl(PR_SET_DUMPABLE, 0)`) makes the kernel refuse those reads (and ptrace) to any process without CAP_SYS_PTRACE; the
-//! container drops every capability. The flag is not inherited across `execve`, so the worker itself is unaffected.
-//!
-//! Network: the worker is not moved into its own network namespace. `unshare(CLONE_NEWNET)` needs CAP_SYS_ADMIN, or an
-//! unprivileged user namespace, which Docker's default seccomp profile blocks without CAP_SYS_ADMIN; doing it in the child
-//! between fork and exec also needs `unsafe` (`pre_exec`), which this workspace forbids. Granting CAP_SYS_ADMIN to the
-//! container would weaken it more than it gains. What the worker can reach on the network is limited in
-//! docker-compose.prod.yml instead (PostgREST's admin server bound to loopback, cloudflared metrics on loopback).
+//! The geometry worker no longer runs beside the runner: it is in its own container, with its own UID and PID namespace and no
+//! network (docs/ASSEMBLY_CORE.md "Isolation"), and the runner's credentials are not in its environment (secrets.rs). As defence
+//! in depth the runner stays non-dumpable (`prctl(PR_SET_DUMPABLE, 0)`): the kernel then refuses `/proc/<pid>/mem`, `environ`
+//! and ptrace to any process without CAP_SYS_PTRACE, which the container drops. The flag is reset by `execve`, so the runner sets
+//! it again after restarting itself in secrets.rs.
 
 use std::io;
 

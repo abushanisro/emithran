@@ -6,14 +6,46 @@ separate process; everything around it is supervised, bounded and verified.
 ```
 NestJS upload (check, sha256, store, insert row)  ->  cad_uploads  queued
 core/crates/runner  `cad-runner`   queued -> running -> analysed
-    claim_next_cad_upload() RPC -> download -> unzip (core/crates/archive, hard caps) -> geometry-worker (deadline, empty env, prlimit)
+    claim_next_cad_upload() RPC -> download -> unzip (core/crates/archive, hard caps) -> socket -> cad-worker-host (worker container)
+    -> geometry-worker (deadline, empty env, prlimit)
     -> result.json parsed into core/crates/domain types and checked by domain::verify() -> one STEP file per distinct part stored
 NestJS materializer                analysed -> materializing -> done
     claim_next_analysed_upload() RPC (migration 923) -> planItems -> createItems (BOM rules, audit, file paths) -> remove work files
 ```
-The runner talks to PostgREST and the S3-compatible bucket over HTTP(S) only (a backend-minted database token, `DB_JWT_SECRET`): no Postgres connection, like the rest of the backend.
+The runner talks to PostgREST and the S3-compatible bucket over HTTP(S) only (a token it signs with `DB_JWT_SECRET` for the `cad_runner`
+role, migration 951): no Postgres connection, like the rest of the backend.
 `CAD_CORE=python` (default) keeps the old path (NestJS calls the Python `cad-engine`); `CAD_CORE=rust` makes NestJS materialize only and
 `cad-runner` analyse. Exactly one analyser may run for a deployment.
+
+## Isolation (two containers)
+The process that parses customer STEP holds no secret, has no network, a read-only root and its own UID; the process that holds the
+secrets never parses CAD. `core/Dockerfile` builds two images and `docker-compose.prod.yml` runs them under the `rust-core` profile:
+
+| | `cad-core` (target `runner`, UID 10003) | `cad-worker` (target `worker`, UID 10005) |
+|---|---|---|
+| runs | `cad-runner` | `cad-worker-host` (PID 1), which runs `geometry-worker` per job |
+| credentials | `DB_JWT_SECRET`, S3 keys | none (the host refuses to start if one is set) |
+| network | `edge` (bucket), `db` (PostgREST) | `network_mode: none` (loopback only) |
+| filesystem | read-only, 16 MB `/tmp` (heartbeat) | read-only, 1 GB `/tmp` scratch (owner-only) |
+
+Shared: only the `cad-worker-socket` volume, holding the host's Unix socket (mode 0660, group 10005, which the runner joins). One
+connection is one job (`core/crates/runner/src/wire.rs`): the runner sends the inputs' plain names, sizes and bytes and the deadline;
+the host writes them to a fresh scratch folder, runs the worker with an empty environment under `prlimit` (address space
+`WORKER_MEMORY_MB`, CPU = deadline + 30 s, file size 8x `MAX_UPLOAD_MB`) and the deadline + 15 s grace, and sends back how it ended
+(exit code, signal, overrun) with the last 300 bytes of its stderr, `result.json` and the regular files in `parts/` (links and folders
+are never sent). The runner refuses any output name other than `result.json` or `parts/<plain name>`, more than 10 001 outputs or more
+than `WORKER_MAX_OUTPUT_MB` (512) in total, keeps them in memory (never a path the worker chose), gives up after the deadline + 75 s,
+and then parses and verifies them as before. After every job the host kills every other process in its container and empties the
+scratch folder, so nothing a worker started or left behind can read or change the next upload.
+
+The runner's credentials: at start it hands them to a fresh copy of itself over a pipe and `exec`s it without them in the environment
+(`secrets.rs`; Rust 2024 makes `remove_var` unsafe, which the workspace forbids, and `/proc/<pid>/environ` would keep them anyway), keys
+`DB_JWT_SECRET` into HMAC once and wipes the text (`zeroize`); the process is non-dumpable. Its database role `cad_runner` (migration
+951) has EXECUTE on `claim_next_cad_upload`, `cad_runner_mark_analysed` and `cad_runner_mark_failed` (both change only a `running`
+upload) and no table privilege, so row-level security never applies to it and it needs no `BYPASSRLS`.
+Known limit: PostgREST trusts one signing secret, so a fully compromised runner could still sign a token for another role. The split
+keeps CAD parsing out of the runner so that it does not get compromised; giving the runner its own key would need a token issuer
+in front of PostgREST.
 
 ## Statuses (migration 923)
 `queued -> running -> analysed -> materializing -> done`, `failed` from any step. `running` is claimed by the analysis runner (stale after
@@ -22,7 +54,7 @@ The runner talks to PostgREST and the S3-compatible bucket over HTTP(S) only (a 
 ## geometry-worker contract
 `geometry-worker --deadline-ms <ms> <out_dir> <file1.step> [file2.step ...]`
 - Inputs are named `NNNN_<basename>` (position first): part ids start with the file's position, so ids are unique across files.
-- Runs with an **empty environment**, no network use, no credentials. Writes only under `<out_dir>`.
+- Runs with an **empty environment** in the worker container (no network, no credentials). Writes only under `<out_dir>`.
 - Reads each file with XDE (`STEPCAFControl_Reader`), builds the tree, collapses instances of one definition under one parent into a quantity,
   measures each distinct part once, and writes:
   - `<out_dir>/result.json`, **atomically** (temp file, fsync, rename): the version-1 report, `cad-engine/contract/assembly.schema.json`.

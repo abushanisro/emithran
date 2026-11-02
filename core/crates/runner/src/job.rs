@@ -1,9 +1,8 @@
 //! One upload, start to finish: download -> unzip -> geometry worker -> verify -> store the parts -> mark `analysed`.
-//! The API never parses CAD and neither does this file: the worker does, in its own process, and what it writes is checked
-//! (typed parse + `domain::verify`) before anything is stored. A wrong number is worse than a missing one.
+//! The API never parses CAD and neither does this file: the worker does, in its own container (remote.rs), and what it returns
+//! is checked (typed parse + `domain::verify`) before anything is stored. A wrong number is worse than a missing one.
 
 use std::collections::HashMap;
-use std::path::PathBuf;
 
 use archive::Limits;
 use domain::{Kind, Node, Report};
@@ -11,14 +10,15 @@ use serde::Serialize;
 
 use crate::backend::{Backend, BackendError, Row};
 use crate::names::{part_file_name, restore_file_names, wire_name};
-use crate::worker::{self, WorkerConfig, WorkerError};
+use crate::remote::RemoteWorker;
+use crate::worker::WorkerError;
 
 pub const MAX_ATTEMPTS: u32 = 3;
 pub const STALE_SECONDS: u32 = 1800;
 
 #[derive(Clone, Debug)]
 pub struct Config {
-    pub worker: WorkerConfig,
+    pub worker: RemoteWorker,
     pub archive: Limits,
 }
 
@@ -156,25 +156,17 @@ pub async fn process<B: Backend>(backend: &B, config: &Config, row: &Row) -> Res
     let bytes = backend.download(&row.storage_path).await?;
     let (files, skipped) = step_files(row, bytes, config.archive)?;
 
-    let work = tempfile::tempdir()
-        .map_err(|e| Failure::Retryable(format!("cannot create a work folder: {e}")))?;
-    let (in_dir, out_dir) = (work.path().join("in"), work.path().join("out"));
-    for dir in [&in_dir, &out_dir, &out_dir.join("parts")] {
-        std::fs::create_dir_all(dir)
-            .map_err(|e| Failure::Retryable(format!("cannot create a work folder: {e}")))?;
-    }
-    let mut inputs: Vec<PathBuf> = Vec::new();
-    for (i, file) in files.iter().enumerate() {
-        let path = in_dir.join(wire_name(i, &file.name));
-        std::fs::write(&path, &file.bytes)
-            .map_err(|e| Failure::Retryable(format!("cannot write a work file: {e}")))?;
-        inputs.push(path);
-    }
+    let inputs: Vec<(String, &[u8])> = files
+        .iter()
+        .enumerate()
+        .map(|(i, file)| (wire_name(i, &file.name), file.bytes.as_slice()))
+        .collect();
+    let mut output = config.worker.run(&inputs).await?;
 
-    worker::run(&config.worker, &out_dir, &inputs).await?;
-
-    let raw = std::fs::read(out_dir.join("result.json"))
-        .map_err(|e| Failure::Retryable(format!("the worker wrote no result.json: {e}")))?;
+    let raw = output
+        .result
+        .take()
+        .ok_or_else(|| Failure::Retryable("the worker wrote no result.json".to_string()))?;
     let mut report: Report = serde_json::from_slice(&raw).map_err(|e| {
         Failure::permanent(
             "invalid_engine_result",
@@ -217,9 +209,12 @@ pub async fn process<B: Backend>(backend: &B, config: &Config, row: &Row) -> Res
             .and_then(|file| original.get(file.as_str()))
         {
             Some(bytes) => bytes.to_vec(),
-            None => std::fs::read(out_dir.join("parts").join(part_file_name(&part.id))).map_err(
-                |e| Failure::Retryable(format!("the worker did not return part {}: {e}", part.id)),
-            )?,
+            None => output
+                .parts
+                .remove(&part_file_name(&part.id))
+                .ok_or_else(|| {
+                    Failure::Retryable(format!("the worker did not return part {}", part.id))
+                })?,
         };
         let path = part_path(row, &part.id);
         if let Err(error) = backend.upload(&path, bytes).await {
@@ -280,6 +275,8 @@ mod tests {
     use std::time::Duration;
 
     use super::*;
+    use crate::host::{self, HostConfig};
+    use crate::worker::WorkerConfig;
 
     // ---- a fake backend that records what the runner does -------------------------------------------------------------
 
@@ -376,9 +373,36 @@ mod tests {
         }
     }
 
+    /// Starts a real `cad-worker-host` loop (host.rs) in this runtime, next to the fake worker script, and points the runner at
+    /// its socket: every test goes through the same socket protocol as production.
     fn config(worker: WorkerConfig) -> Config {
+        let dir = worker.program.parent().unwrap().to_path_buf();
+        let scratch = dir.join("scratch");
+        std::fs::create_dir_all(&scratch).unwrap();
+        let socket = dir.join("worker.sock");
+        let listener = host::bind(&socket).unwrap();
+        let deadline = worker.deadline;
+        tokio::spawn(host::serve(
+            listener,
+            HostConfig {
+                program: worker.program,
+                limits: None,
+                pass_env: worker.pass_env,
+                grace: worker.grace,
+                scratch,
+                max_inputs: 100,
+                max_input_bytes: 8 << 20,
+                sweep: false,
+            },
+        ));
         Config {
-            worker,
+            worker: RemoteWorker {
+                socket,
+                deadline,
+                answer_margin: Duration::from_secs(5),
+                max_outputs: 100,
+                max_output_bytes: 8 << 20,
+            },
             archive: Limits {
                 max_entries: 100,
                 max_entry_bytes: 1 << 20,
@@ -474,6 +498,32 @@ mod tests {
         assert_eq!(uploads.len(), 1, "{:?}", backend.failed.borrow());
         assert_eq!(uploads[0].0, "cad-uploads/org1/up1/parts/0_2.step");
         assert_eq!(uploads[0].1, b"EXPORTED"); // the worker's export, not the whole assembly file
+    }
+
+    #[tokio::test]
+    async fn a_part_file_the_worker_made_a_link_is_never_followed_or_stored() {
+        let json = r#"{"schema_version":1,"units":"mm","status":"complete",
+          "inputs":[{"file":"0000_top.step","status":"ok","inside":null}],
+          "assembly":[{"definition":"0:1","name":"Top","kind":"assembly","quantity":1,"file":"0000_top.step","children":[
+             {"definition":"0:2","name":"Bolt","kind":"part","quantity":4,"file":"0000_top.step","children":[]}]}],
+          "parts":[{"id":"0:2","name":"Bolt","file":"0000_top.step","quantity_total":4,"volume_mm3":1.0,"surface_area_mm2":2.0,
+                    "bounding_box":{"length":3.0,"width":2.0,"height":1.0,"diagonal":3.7}}],"problems":[]}"#;
+        let dir = tempfile::tempdir().unwrap();
+        // A compromised worker points its part file at a file of the machine it runs on.
+        let body = format!(
+            "{}\n/bin/ln -s /etc/hosts \"$out/parts/0_2.step\"",
+            writes(json)
+        );
+        let backend = fake("top.step", 1, b"original");
+        assert!(
+            run_once(&backend, &config(worker(dir.path(), &body)))
+                .await
+                .unwrap()
+        );
+        assert!(backend.uploads.borrow().is_empty());
+        let (_, retry, _, detail) = backend.failed.borrow().clone().unwrap();
+        assert!(retry);
+        assert!(detail.contains("did not return part 0:2"), "{detail}");
     }
 
     #[tokio::test]

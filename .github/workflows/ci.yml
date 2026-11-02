@@ -189,9 +189,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # Builds the Rust runner and the C++ worker (its hand-worked checks run in the build), then runs the real runner on a real zip
-      # of the STEP fixtures against a stand-in for the PostgREST and S3 endpoints it uses.
-      - run: docker build --platform linux/amd64 --build-context geometry=geometry-worker --build-context fixtures=backend/test/fixtures/cad -t cad-core:dev core
+      # Builds the worker image (the C++ worker, whose hand-worked checks run in the build, and cad-worker-host) and the runner image,
+      # then runs them in two containers isolated as in docker-compose.prod.yml on a real zip of the STEP fixtures, against a stand-in
+      # for the PostgREST and S3 endpoints. Also checks the isolation: no credential and no network in the worker container, no
+      # credential in the runner's process environment, only the cad_runner database role used, no process outliving its job.
+      - run: docker build --platform linux/amd64 --build-context geometry=geometry-worker --build-context fixtures=backend/test/fixtures/cad --target worker -t cad-worker:dev core
+      - run: docker build --platform linux/amd64 -t cad-core:dev core
       - run: python3 core/tests/e2e.py
 
   postgres-compat:
