@@ -91,7 +91,8 @@ describe('docker-compose.prod.yml', () => {
     const runtime = Object.keys(frontend?.environment ?? {});
     const buildArgs = Object.keys(frontend?.build?.args ?? {});
     // The Next.js server is the confidential Auth0 client: its client secret and session secret are runtime settings on the server.
-    expect(runtime.filter((n) => /SECRET|SERVICE_KEY|DATABASE_URL|PASSWORD|TOKEN/i.test(n)).sort()).toEqual(['AUTH0_CLIENT_SECRET', 'AUTH0_SECRET']);
+    // BFF_FORWARD_SECRET signs the client address it forwards to the API (lib/server/bff/forward.ts).
+    expect(runtime.filter((n) => /SECRET|SERVICE_KEY|DATABASE_URL|PASSWORD|TOKEN/i.test(n)).sort()).toEqual(['AUTH0_CLIENT_SECRET', 'AUTH0_SECRET', 'BFF_FORWARD_SECRET']);
     expect(buildArgs.filter((n) => /SECRET|SERVICE_KEY|DATABASE_URL|PASSWORD|TOKEN/i.test(n))).toEqual([]);
     for (const arg of buildArgs) expect(arg.startsWith('NEXT_PUBLIC_')).toBe(true);
   });
@@ -160,6 +161,22 @@ describe('docker-compose.prod.yml', () => {
     expect(text).toMatch(/\n\s+MAX_UPLOAD_MB: \$\{MAX_UPLOAD_MB:-50\}/);
     expect(text).toMatch(/MAX_FILE_SIZE_MB: \$\{MAX_UPLOAD_MB:-50\}/);
     expect(read('Dockerfile.frontend')).toMatch(/ARG NEXT_PUBLIC_MAX_UPLOAD_MB\b/);
+  });
+
+  it('caps the backend V8 heap at about 70% of its container memory, so V8 fails before the kernel kills the container', () => {
+    const backend = compose.services.backend;
+    const heapMb = Number(/--max-old-space-size=(\d+)/.exec(String(backend?.environment?.NODE_OPTIONS))?.[1]);
+    const limit = /^(\d+)([MG])$/.exec(String(backend?.deploy?.resources?.limits?.memory));
+    const limitMb = limit ? Number(limit[1]) * (limit[2] === 'G' ? 1024 : 1) : NaN;
+    expect(heapMb / limitMb).toBeGreaterThanOrEqual(0.6);
+    expect(heapMb / limitMb).toBeLessThanOrEqual(0.75);
+  });
+
+  it('gives the BFF and the backend the same required secret for the forwarded client address, and trusts no proxy hop', () => {
+    for (const service of ['frontend', 'backend']) {
+      expect(String(compose.services[service]?.environment?.BFF_FORWARD_SECRET)).toMatch(/^\$\{BFF_FORWARD_SECRET:\?/);
+    }
+    expect(String(compose.services.backend?.environment?.TRUST_PROXY)).toBe('0');
   });
 
   it('contains no secret value, only references to the env file', () => {

@@ -15,8 +15,8 @@ import { LHRService } from '../lhr/lhr.service';
 import { mapMhrRowToDto, storedNumber } from './mhr-row-mapping';
 import { pickRegionalReferenceRow, specsReferenceDetail } from './specs-reference-detail';
 import * as ExcelJS from 'exceljs';
-import { assertXlsxWithinLimits } from '../../common/archive/xlsx-limits';
 import { orIlikeContains } from '../../common/db/postgrest-filter';
+import { readWorkbook } from '../../common/heavy-work/heavy-work';
 
 /**
  * MHR Service
@@ -1165,7 +1165,7 @@ export class MHRService {
     accessToken: string,
   ): Promise<{ imported: number; skipped: number; errors: string[] }> {
     this.logger.log(`Importing MHR records from Excel for user ${userId}`, 'MHRService');
-    assertXlsxWithinLimits(fileBuffer); // measured before ExcelJS inflates anything
+    const workbook = await readWorkbook(fileBuffer); // gated and parsed in a heavy-work worker
 
     // Loaded once for the whole import — every row's USD→local conversion below
     // reads from this live DB-backed rate map, never a hardcoded FX table.
@@ -1175,13 +1175,6 @@ export class MHRService {
     // Populated per-sheet below (shiftsCol etc. are scoped inside the sheet
     // loop) — aggregated here so one disclosure covers every sheet processed.
     const missingOperationalColsSet = new Set<string>();
-
-    const workbook = new ExcelJS.Workbook();
-    const arrayBuffer = fileBuffer.buffer.slice(
-      fileBuffer.byteOffset,
-      fileBuffer.byteOffset + fileBuffer.byteLength,
-    ) as ArrayBuffer;
-    await workbook.xlsx.load(arrayBuffer);
 
     // Sheet name → commodity code for the multi-sheet eMithran format
     const SHEET_COMMODITY: Record<string, string> = {

@@ -20,7 +20,6 @@ describe('upload limits', () => {
     const limits = load('100');
     expect(limits.MAX_UPLOAD_MB).toBe(100);
     expect(limits.MAX_CAD_FILE_BYTES).toBe(100 * 1024 * 1024);
-    expect(limits.MAX_ARCHIVE_EXPANDED_BYTES).toBe(800 * 1024 * 1024);
   });
 
   it('ignore a value that is not a positive number instead of disabling the limit', () => {

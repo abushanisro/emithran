@@ -1,4 +1,5 @@
 import { DEFAULT_CAD_ENGINE_URL } from '../common/engine-urls';
+import { trustProxySetting } from '../common/client-ip';
 import { plainToClass } from 'class-transformer';
 import { IsString, IsNumber, IsInt, IsOptional, validateSync, IsEnum, MinLength, IsIn, Min, Max, Matches } from 'class-validator';
 
@@ -27,6 +28,18 @@ class EnvironmentVariables {
   @IsOptional()
   @IsIn(['true', 'false'])
   TRUST_CLOUDFLARE_HEADERS: string = 'false';
+
+  // Shared with the Next.js BFF, which signs the client address it forwards with it (common/client-ip.ts). Required in
+  // production: without it every browser user would be counted under the frontend container's address.
+  @IsString()
+  @IsOptional()
+  @MinLength(32)
+  BFF_FORWARD_SECRET?: string;
+
+  // Express "trust proxy": a hop count (default 0: X-Forwarded-For is ignored) or proxy addresses/subnets; never "true".
+  @IsString()
+  @IsOptional()
+  TRUST_PROXY: string = '0';
 
   @IsNumber()
   @IsOptional()
@@ -99,6 +112,17 @@ class EnvironmentVariables {
   @IsNumber()
   @IsOptional()
   THROTTLE_LIMIT: number = 100;
+
+  /** Requests one organization may make per ORG_THROTTLE_TTL ms across all routes and members (common/throttling/throttlers.ts). */
+  @IsNumber()
+  @IsOptional()
+  @Min(1)
+  ORG_THROTTLE_LIMIT: number = 3000;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(1000)
+  ORG_THROTTLE_TTL: number = 60000;
 
   /** Calls per minute one caller may make, across every endpoint that spends the AI key (common/throttling/throttlers.ts). */
   @IsNumber()
@@ -245,7 +269,16 @@ export function validate(config: Record<string, unknown>) {
     throw new Error(`Configuration validation error: ${errors.toString()}`);
   }
 
+  trustProxySetting(validatedConfig.TRUST_PROXY); // throws on "true" or anything that is not a hop count or proxy list
+
   if (validatedConfig.NODE_ENV === Environment.Production) {
+    if (!validatedConfig.BFF_FORWARD_SECRET) {
+      throw new Error(
+        'CONFIGURATION ERROR: BFF_FORWARD_SECRET must be set in production (at least 32 characters, the same value as the ' +
+        'frontend\'s), so the API can trust the client address the BFF forwards.'
+      );
+    }
+
     if (validatedConfig.APP_ENV === 'local') {
       throw new Error(
         'CONFIGURATION ERROR: APP_ENV must be set to "stage" or "prd" when NODE_ENV=production, so the deployment ' +

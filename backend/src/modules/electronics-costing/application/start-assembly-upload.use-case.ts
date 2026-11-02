@@ -1,9 +1,10 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 
 import { StartUploadUseCase, type StartUploadResult } from './start-upload.use-case';
-import { expandArchive } from '../../../common/archive/expand-archive';
+import { withHeavyWorkSlot, expandArchiveInWorker } from '../../../common/heavy-work/heavy-work';
 import { planAssembly, type PlanNode } from '../domain/uploads/plan-assembly';
-import { ELECTRONICS_ARCHIVE_LIMITS, validateUpload, type UploadVerdict } from '../domain/uploads/validate-upload';
+import { type UploadVerdict } from '../domain/uploads/validate-upload';
+import { ELECTRONICS_ARCHIVE_LIMITS, validateDesignFile } from './validate-design-file';
 import { ElectronicsRepository, type DesignRow } from '../infrastructure/repositories/electronics.repository';
 
 export interface AssemblyFileInput {
@@ -75,7 +76,7 @@ export class StartAssemblyUploadUseCase {
     const skipped: StartAssemblyResult['skipped'] = [];
     const accepted: (AssemblyFileInput & { verdict: Extract<UploadVerdict, { ok: true }> })[] = [];
     for (const file of input.files) {
-      const verdict = validateUpload(file.name, file.bytes);
+      const verdict = validateDesignFile(file.name, file.bytes);
       if (verdict.ok) accepted.push({ ...file, verdict });
       else if (verdict.code === 'unsupported_extension' || verdict.code === 'empty') skipped.push({ path: file.path, reason: verdict.message });
       else throw new BadRequestException({ code: verdict.code, message: `${file.path}: ${verdict.message}` });
@@ -136,10 +137,15 @@ export class StartAssemblyUploadUseCase {
   // A .zip design pack is read as the folder it was made from: unpacked here, then planned like a dropped folder, so one
   // pack of several boards becomes Assembly > Sub-Assembly > Child Parts and each board is parsed on its own. A pack sent
   // for a revision of one part adds its files (folders flattened) to that part.
-  async executeArchive(input: StartArchiveInput): Promise<StartAssemblyResult | (StartUploadResult & { skipped: StartAssemblyResult['skipped'] })> {
-    const verdict = validateUpload(input.name, input.bytes);
+  // The unpacked files stay in memory until they are stored, so the whole of it holds one heavy-work slot (common/heavy-work).
+  executeArchive(input: StartArchiveInput): Promise<StartAssemblyResult | (StartUploadResult & { skipped: StartAssemblyResult['skipped'] })> {
+    return withHeavyWorkSlot(() => this.unpackAndStart(input));
+  }
+
+  private async unpackAndStart(input: StartArchiveInput): Promise<StartAssemblyResult | (StartUploadResult & { skipped: StartAssemblyResult['skipped'] })> {
+    const verdict = validateDesignFile(input.name, input.bytes);
     if (!verdict.ok) throw new BadRequestException({ code: verdict.code, message: `${input.name}: ${verdict.message}` });
-    const archive = expandArchive(input.name, input.bytes, ELECTRONICS_ARCHIVE_LIMITS);
+    const archive = await expandArchiveInWorker(input.name, input.bytes, ELECTRONICS_ARCHIVE_LIMITS);
     if (!archive.ok) throw new BadRequestException({ code: archive.code, message: `${input.name}: ${archive.message}` });
     const scope = { organizationId: input.organizationId, userId: input.userId, token: input.token };
 
@@ -148,7 +154,7 @@ export class StartAssemblyUploadUseCase {
       const files: { name: string; bytes: Buffer }[] = [];
       const seen = new Set<string>();
       for (const entry of archive.entries) {
-        const check = validateUpload(entry.name, entry.bytes);
+        const check = validateDesignFile(entry.name, entry.bytes);
         if (!check.ok && (check.code === 'unsupported_extension' || check.code === 'empty')) {
           skipped.push({ path: entry.path, reason: check.message });
           continue;

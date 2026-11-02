@@ -1,10 +1,12 @@
 import { Controller, Get, Injectable, Post, type CanActivate, type ExecutionContext, type INestApplication } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import { ThrottlerModule } from '@nestjs/throttler';
 import request from 'supertest';
 
 import { ClientIpThrottlerGuard } from './client-ip-throttler.guard';
+import { OrgThrottleInterceptor } from '../throttling/org-throttle.interceptor';
 import { SpendsAi, throttlerOptions } from '../throttling/throttlers';
 
 @Controller('ping')
@@ -155,6 +157,75 @@ describe('Rate limits behind the BFF (every request from one address)', () => {
     expect(await call('post', '/work/generate', 'c')).toBe(429);
     expect(await call('post', '/work/chat', 'd')).toBe(201); // another user has their own budget
     expect(await call('get', '/work/list', 'c')).toBe(200); // the AI cap does not touch other endpoints
+  });
+});
+
+describe('Per-organization limit, next to the per-user one', () => {
+  /** Stands in for RequestAuthGuard and OrganizationContextGuard: user from x-test-user, organization from x-test-org. */
+  @Injectable()
+  class FakeAuthAndOrgGuard implements CanActivate {
+    canActivate(context: ExecutionContext): boolean {
+      const req = context.switchToHttp().getRequest<{ headers: Record<string, string | undefined>; user?: { id?: string }; organizationId?: string }>();
+      req.user = { id: req.headers['x-test-user'] };
+      const org = req.headers['x-test-org'];
+      if (typeof org === 'string') req.organizationId = org;
+      return true;
+    }
+  }
+
+  @Controller('org')
+  class OrgController {
+    @Get('a')
+    a() {
+      return { ok: true };
+    }
+
+    @Get('b')
+    b() {
+      return { ok: true };
+    }
+  }
+
+  let app: INestApplication;
+  beforeAll(async () => {
+    const limits: Record<string, number> = { THROTTLE_TTL: 60_000, THROTTLE_LIMIT: 100, ORG_THROTTLE_LIMIT: 3 };
+    const moduleRef = await Test.createTestingModule({
+      imports: [
+        ConfigModule.forRoot({ ignoreEnvFile: true, load: [() => limits] }),
+        ThrottlerModule.forRoot(throttlerOptions((name, fallback) => limits[name] ?? fallback)),
+      ],
+      controllers: [OrgController],
+      providers: [
+        { provide: APP_GUARD, useClass: FakeAuthAndOrgGuard },
+        { provide: APP_GUARD, useClass: ClientIpThrottlerGuard },
+        { provide: APP_INTERCEPTOR, useClass: OrgThrottleInterceptor },
+      ],
+    }).compile();
+    app = moduleRef.createNestApplication();
+    await app.init();
+  });
+  afterAll(() => app.close());
+
+  const call = (path: string, user: string, org?: string) => {
+    const req = request(app.getHttpServer()).get(path).set('x-test-user', user);
+    return (org ? req.set('x-test-org', org) : req);
+  };
+
+  it('caps one organization across all its users and routes, and tells it when to retry', async () => {
+    const statuses = [
+      (await call('/org/a', 'u1', 'org-1')).status,
+      (await call('/org/b', 'u2', 'org-1')).status,
+      (await call('/org/a', 'u3', 'org-1')).status,
+    ];
+    expect(statuses).toEqual([200, 200, 200]);
+    const refused = await call('/org/b', 'u4', 'org-1');
+    expect(refused.status).toBe(429);
+    expect(Number(refused.headers['retry-after'])).toBeGreaterThan(0);
+  });
+
+  it('leaves other organizations, and routes without one, to the per-user limit', async () => {
+    expect((await call('/org/a', 'u1', 'org-2')).status).toBe(200);
+    for (let i = 0; i < 5; i++) expect((await call('/org/a', 'u9')).status).toBe(200);
   });
 });
 

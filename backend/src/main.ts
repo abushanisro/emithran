@@ -34,6 +34,9 @@ import { FileErrorConsoleLogger } from './common/logger/file-error-console-logge
 import { startErrorLogCleanup } from './common/logger/error-log-file';
 import { httpMetricsMiddleware } from './telemetry/http-metrics.middleware';
 import { configureBodyParsers } from './common/http/body-limits';
+import { applyServerLimits } from './common/http/server-limits';
+import { RESOURCE_LIMITS } from './common/resource-limits';
+import { trustProxySetting } from './common/client-ip';
 
 async function bootstrap() {
   startErrorLogCleanup();
@@ -59,6 +62,11 @@ async function bootstrap() {
   
   // Bodies are parsed before any guard runs, so the limit is small for every route; a larger body gets 413 unread.
   configureBodyParsers(app);
+
+  // Slow or header-flooding connections are cut off (common/http/server-limits.ts, limits in common/resource-limits.ts).
+  applyServerLimits(app.getHttpServer(), RESOURCE_LIMITS.http);
+  // X-Forwarded-For is followed only for the configured hops (default none); the client address is common/client-ip.ts.
+  app.set('trust proxy', trustProxySetting(process.env.TRUST_PROXY));
 
   app.enableVersioning({
     type: VersioningType.URI,

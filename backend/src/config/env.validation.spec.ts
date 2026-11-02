@@ -13,7 +13,7 @@ const base = {
   AUTH0_CLAIM_NAMESPACE: 'https://example.com/',
   AUTH0_TRUSTED_CONNECTIONS: 'company-sso,Username-Password-Authentication',
 };
-const production = { ...base, NODE_ENV: 'production', CORS_ORIGIN: 'https://app.example.com', APP_ENV: 'prd' };
+const production = { ...base, NODE_ENV: 'production', CORS_ORIGIN: 'https://app.example.com', APP_ENV: 'prd', BFF_FORWARD_SECRET: 'x'.repeat(32) };
 
 describe('env validation: development auth bypass', () => {
   it('is off by default', () => {
@@ -97,5 +97,23 @@ describe('required runtime settings', () => {
 
   it('needs no Supabase settings', () => {
     expect(() => validate(base)).not.toThrow();
+  });
+});
+
+describe('env validation: the client address behind the BFF', () => {
+  it('refuses a production boot without BFF_FORWARD_SECRET, or with a short one', () => {
+    const { BFF_FORWARD_SECRET: _omitted, ...withoutSecret } = production;
+    expect(() => validate(withoutSecret)).toThrow(/BFF_FORWARD_SECRET must be set in production/);
+    expect(() => validate({ ...production, BFF_FORWARD_SECRET: 'short' })).toThrow(/BFF_FORWARD_SECRET/);
+  });
+
+  it('does not need the secret outside production', () => {
+    expect(() => validate(base)).not.toThrow();
+  });
+
+  it('refuses TRUST_PROXY=true, and takes a hop count or proxy list', () => {
+    expect(() => validate({ ...base, TRUST_PROXY: 'true' })).toThrow(/TRUST_PROXY/);
+    expect(validate({ ...base, TRUST_PROXY: '1' }).TRUST_PROXY).toBe('1');
+    expect(validate(base).TRUST_PROXY).toBe('0');
   });
 });

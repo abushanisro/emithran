@@ -40,6 +40,7 @@ import { OrganizationContextGuard } from '../../common/guards/organization-conte
 import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
 import { REFERENCE_DOMAINS, isReferenceDomain, referenceDomainList } from './reference-domains';
 import { OrgRole } from '../../common/authz/authz-policy';
+import { MAX_XLSX_UPLOAD_BYTES } from '../../common/archive/xlsx-limits';
 
 @ApiTags('Processes')
 @ApiBearerAuth()
@@ -55,7 +56,7 @@ export class ProcessesController {
 
   @Post('calculator-mappings/import-excel')
   @UseGuards(OrganizationContextGuard)
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_XLSX_UPLOAD_BYTES, files: 1 } }))
   @ApiOperation({ summary: 'Import process calculator mappings from Excel file' })
   @ApiResponse({ status: 201, description: 'Mappings imported successfully' })
   async importCalculatorMappings(

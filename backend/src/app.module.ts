@@ -2,9 +2,10 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { HttpModule } from '@nestjs/axios';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ClientIpThrottlerGuard } from './common/guards/client-ip-throttler.guard';
 import { throttlerOptions } from './common/throttling/throttlers';
+import { OrgThrottleInterceptor } from './common/throttling/org-throttle.interceptor';
 
 import { ProjectsModule } from './modules/projects/projects.module'; 862 
 import { VendorsModule } from './modules/vendors/vendors.module';
@@ -145,6 +146,11 @@ import { AppController } from './app.controller';
     {
       provide: APP_GUARD,
       useClass: ClientIpThrottlerGuard,
+    },
+    // The looser per-organization limit, applied once a route has resolved its organization (after every guard).
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: OrgThrottleInterceptor,
     },
   ],
 })

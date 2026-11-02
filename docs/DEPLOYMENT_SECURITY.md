@@ -55,7 +55,8 @@ bad migration is fixed by a new migration.
 | A secret key can never reach the browser | No database or storage client in browser code (`npm run check:boundary`); only `NEXT_PUBLIC_*` build arguments reach the frontend image (`test/deploy/compose-hardening.test.ts`); the Auth0 token endpoint is closed (`lib/auth0.ts`) | ASVS V14.3 |
 | Production refuses to boot without `APP_ENV` and with the dev auth bypass | `backend/src/config/env.validation.ts` | ASVS V14.1 |
 | Data-creating tests refuse to run against production | `backend/src/common/environment-guard.ts`, `playwright.config.ts` | change control |
-| Real client IP behind the tunnel for rate limiting | `backend/src/common/client-ip.ts` (`TRUST_CLOUDFLARE_HEADERS`) | ASVS V13 |
+| Real client IP behind the tunnel and the BFF for rate limiting | `backend/src/common/client-ip.ts` (`TRUST_CLOUDFLARE_HEADERS` for direct `/v1/*`; the BFF forwards the address signed with `BFF_FORWARD_SECRET`; `TRUST_PROXY` never `true`) | ASVS V13 |
+| Per-organization rate limit, parse limits, slowloris timeouts | `backend/src/common/throttling/org-throttle.interceptor.ts`, `backend/src/common/resource-limits.ts`, `backend/src/common/heavy-work/` (worker threads with heap caps, concurrency slots) | ASVS V13 |
 | Row-level security and no stray service-role use | `npm run check:rls`, `backend/docs/rls-bypass-inventory.md` | ASVS V4 |
 | Upload content checks, zip limits, no path traversal | `cad-uploads/check-upload.ts`, `common/archive/expand-archive.ts` | ASVS V12 |
 | Secrets in history, vulnerable dependencies, container and config scans, SAST | `.github/workflows/security.yml` | OWASP A06, OpenSSF |
