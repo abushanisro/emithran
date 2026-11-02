@@ -1,6 +1,6 @@
 import { DEFAULT_CAD_ENGINE_URL } from '../common/engine-urls';
 import { plainToClass } from 'class-transformer';
-import { IsString, IsNumber, IsOptional, validateSync, IsEnum, MinLength, IsIn, Min, Max } from 'class-validator';
+import { IsString, IsNumber, IsInt, IsOptional, validateSync, IsEnum, MinLength, IsIn, Min, Max, Matches } from 'class-validator';
 
 enum Environment {
   Development = 'development',
@@ -70,9 +70,23 @@ class EnvironmentVariables {
   @IsString()
   AUTH0_AUDIENCE!: string;
 
-  // Namespace of the custom claims the post-login Action adds (email, email_verified, sid), e.g. https://emithran.com/
+  // Namespace of the custom claims the post-login Action adds (email, email_verified, sid, connection), e.g. https://emithran.com/
   @IsString()
   AUTH0_CLAIM_NAMESPACE!: string;
+
+  // The Auth0 connections whose verified email may link a new login to an invited account (decision D3), comma-separated names
+  // exactly as in Auth0: the company SSO connection and the database connection, e.g. emithran-auth,Username-Password-Authentication.
+  // A login from any other connection is refused unless it is already linked (migration 947).
+  @Matches(/^[A-Za-z0-9-]+(,[A-Za-z0-9-]+)*$/, { message: 'AUTH0_TRUSTED_CONNECTIONS must be comma-separated Auth0 connection names' })
+  AUTH0_TRUSTED_CONNECTIONS!: string;
+
+  // Seconds one "who is this, still authorised?" answer is reused per login: the longest a user removed from authorized_users keeps
+  // access. 0 asks the database on every request.
+  @IsInt()
+  @IsOptional()
+  @Min(0)
+  @Max(60)
+  AUTH_DECISION_CACHE_SECONDS: number = 10;
 
   @IsString()
   @IsOptional()

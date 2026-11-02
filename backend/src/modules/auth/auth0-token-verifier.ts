@@ -9,6 +9,9 @@ export interface VerifiedLogin {
   emailVerified: boolean;
   /** Auth0's session id (the `sid` claim added by the post-login Action): what the idle-timeout tracks. */
   sessionId?: string;
+  /** The Auth0 connection the person signed in through (the `connection` claim added by the post-login Action, e.g. the company
+   *  SSO connection). Only a trusted connection may link a new login to an invited account (migration 947). */
+  connection?: string;
   /** Seconds since the epoch. */
   expiresAt: number;
 }
@@ -30,7 +33,7 @@ export interface Auth0VerifierOptions {
   issuer: string;
   /** The API identifier the tokens are meant for. */
   audience: string;
-  /** Namespace of the custom claims the post-login Action adds, e.g. https://emithran.com/ (email, email_verified, sid). */
+  /** Namespace of the custom claims the post-login Action adds, e.g. https://emithran.com/ (email, email_verified, sid, connection). */
   claimNamespace: string;
   keys: JWTVerifyGetKey;
   clockToleranceSeconds?: number;
@@ -57,17 +60,19 @@ export class Auth0TokenVerifier {
         clockTolerance: this.options.clockToleranceSeconds ?? 5,
       });
       if (typeof payload.sub !== 'string' || payload.sub === '') throw new TokenRejected('no_subject', 'the token names nobody');
-      // Only the namespaced claims written by our post-login Action count; plain email/email_verified/sid are never read.
+      // Only the namespaced claims written by our post-login Action count; plain email/email_verified/sid/connection are never read.
       const ns = this.options.claimNamespace;
       const email = payload[`${ns}email`] as unknown;
       const verified = payload[`${ns}email_verified`] as unknown;
       const sid = payload[`${ns}sid`] as unknown;
+      const connection = payload[`${ns}connection`] as unknown;
       return {
         provider: 'auth0',
         sub: payload.sub,
         ...(typeof email === 'string' && email !== '' && { email: email.toLowerCase() }),
         emailVerified: verified === true,
         ...(typeof sid === 'string' && sid !== '' && { sessionId: sid }),
+        ...(typeof connection === 'string' && connection !== '' && { connection }),
         expiresAt: payload.exp ?? 0,
       };
     } catch (error) {

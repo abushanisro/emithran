@@ -62,9 +62,10 @@ check "signed-in users and the service can call the extension functions, as on S
   "$(sql dst -c "begin; set local role authenticated; select uuid_generate_v4() is not null;" | tail -1)|$(sql dst -c "begin; set local role service_role; select length(digest('x','sha256')) = 32;" | tail -1)"
 
 # --- what the cutover depends on: a carried user links by verified email -------------------------------------------------------------
-sql dst -c "\i /migrations/931_identity_functions.sql" >/dev/null
-check "a carried user is linked by a verified email, to the SAME id" "11111111-1111-4111-8111-111111111111" "$(sql dst -c "select public.link_identity('auth0','auth0|alice','Alice@Example.com',true)")"
-check "an unverified email links nobody" "" "$(sql dst -c "select coalesce(public.link_identity('auth0','auth0|evil','bob@example.com',false)::text,'')")"
+for m in 931_identity_functions 938_identity_link_first_login_only 947_identity_trusted_connections; do sql dst -c "\i /migrations/$m.sql" >/dev/null; done
+check "a carried user is linked by a verified email, to the SAME id" "11111111-1111-4111-8111-111111111111" "$(sql dst -c "select public.link_identity('auth0','auth0|alice','Alice@Example.com',true,'company-sso',array['company-sso'])")"
+check "an unverified email links nobody" "" "$(sql dst -c "select coalesce(public.link_identity('auth0','auth0|evil','bob@example.com',false,'company-sso',array['company-sso'])::text,'')")"
+check "an untrusted connection links nobody" "" "$(sql dst -c "select coalesce(public.link_identity('auth0','google-oauth2|evil','bob@example.com',true,'google-oauth2',array['company-sso'])::text,'')")"
 check "the allow-list came across, so the linked user is authorised" "t" "$(sql dst -c "select public.identity_is_authorized('11111111-1111-4111-8111-111111111111')")"
 
 # --- safety ----------------------------------------------------------------------------------------------------------------------------

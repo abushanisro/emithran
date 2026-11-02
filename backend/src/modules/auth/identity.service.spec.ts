@@ -5,9 +5,10 @@ import { IdentityService } from './identity.service';
 import { sessionKeyFromAuth0Sid } from './session-key';
 
 const USER = '11111111-1111-4111-8111-111111111111';
-const login = (over: Partial<VerifiedLogin> = {}): VerifiedLogin => ({ provider: 'auth0', sub: 'auth0|a', email: 'a@x.com', emailVerified: true, sessionId: 's1', expiresAt: 9e9, ...over });
+const login = (over: Partial<VerifiedLogin> = {}): VerifiedLogin => ({ provider: 'auth0', sub: 'auth0|a', email: 'a@x.com', emailVerified: true, sessionId: 's1', connection: 'company-sso', expiresAt: 9e9, ...over });
+const TRUSTED = ['company-sso', 'Username-Password-Authentication'];
 
-function build(opts: { login?: VerifiedLogin | TokenRejected; linked?: unknown; accountEmail?: unknown; linkError?: boolean; accountError?: boolean } = {}) {
+function build(opts: { login?: VerifiedLogin | TokenRejected; linked?: unknown; accountEmail?: unknown; linkError?: boolean; accountError?: boolean; ttlMs?: number } = {}) {
   const verify = jest.fn(async () => { if (opts.login instanceof TokenRejected) throw opts.login; return opts.login ?? login(); });
   const rpc = jest.fn(async (fn: string) => {
     if (fn === 'link_identity') return opts.linkError ? { data: null, error: { message: 'x' } } : { data: 'linked' in opts ? opts.linked : USER, error: null };
@@ -16,7 +17,7 @@ function build(opts: { login?: VerifiedLogin | TokenRejected; linked?: unknown; 
   });
   const db = { getPrivilegedClient: jest.fn(() => ({ rpc })), mintDbUserToken: jest.fn((id: string) => `db-token-for-${id}`) };
   let t = 1_000;
-  const service = new IdentityService({ verify } as unknown as Auth0TokenVerifier, db as never, () => t);
+  const service = new IdentityService({ verify } as unknown as Auth0TokenVerifier, db as never, { trustedConnections: TRUSTED, decisionTtlMs: opts.ttlMs ?? 10_000 }, () => t);
   return { service, verify, rpc, db, advance: (ms: number) => { t += ms; } };
 }
 
@@ -25,8 +26,29 @@ describe('IdentityService', () => {
     const { service, rpc, db } = build();
     const r = await service.authenticate('tok');
     expect(r).toMatchObject({ user: { id: USER, email: 'a@x.com', role: 'authenticated' }, dbToken: `db-token-for-${USER}`, sessionId: sessionKeyFromAuth0Sid('s1') });
-    expect(rpc).toHaveBeenCalledWith('link_identity', { p_provider: 'auth0', p_sub: 'auth0|a', p_email: 'a@x.com', p_email_verified: true });
+    expect(rpc).toHaveBeenCalledWith('link_identity', {
+      p_provider: 'auth0', p_sub: 'auth0|a', p_email: 'a@x.com', p_email_verified: true, p_connection: 'company-sso', p_trusted_connections: TRUSTED,
+    });
     expect(db.mintDbUserToken).toHaveBeenCalledWith(USER, { email: 'a@x.com', sessionId: sessionKeyFromAuth0Sid('s1') });
+  });
+
+  it('hands the database the login\'s connection and the configured allow-list, so it decides whether a new login may link', async () => {
+    const { service, rpc } = build({ login: login({ connection: 'google-oauth2' }), linked: null });
+    await expect(service.authenticate('t')).rejects.toBeInstanceOf(ForbiddenException);
+    expect(rpc).toHaveBeenCalledWith('link_identity', expect.objectContaining({ p_connection: 'google-oauth2', p_trusted_connections: TRUSTED }));
+  });
+
+  it('sends no connection when the token carries none (the database then refuses to link a new login)', async () => {
+    const { service, rpc } = build({ login: login({ connection: undefined }) });
+    await service.authenticate('t');
+    expect(rpc).toHaveBeenCalledWith('link_identity', expect.objectContaining({ p_connection: null }));
+  });
+
+  it('refuses to start without a trusted connection or with a meaningless cache lifetime', () => {
+    const make = (policy: { trustedConnections: string[]; decisionTtlMs: number }) => () => new IdentityService({} as Auth0TokenVerifier, {} as never, policy);
+    expect(make({ trustedConnections: [], decisionTtlMs: 0 })).toThrow(/trusted Auth0 connection/);
+    expect(make({ trustedConnections: [' ', ''], decisionTtlMs: 0 })).toThrow(/trusted Auth0 connection/);
+    expect(make({ trustedConnections: TRUSTED, decisionTtlMs: -1 })).toThrow(/decisionTtlMs/);
   });
 
   it('binds the account email (auth.users), never the token email claim, into the request user and the database token', async () => {
@@ -70,14 +92,30 @@ describe('IdentityService', () => {
     await expect(build({ accountError: true }).service.authenticate('t')).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 
-  it('reuses a decision for a minute, then asks the database again (so a revoked invite takes effect within a minute)', async () => {
-    const b = build();
+  it('reuses a decision only for the configured lifetime, so a user removed from the allow-list loses access within it', async () => {
+    const b = build({ ttlMs: 10_000 });
     await b.service.authenticate('t');
+    b.advance(9_999);
     await b.service.authenticate('t');
     expect(b.rpc).toHaveBeenCalledTimes(2); // link + account email, once
-    b.advance(61_000);
+    b.advance(1);
+    b.rpc.mockImplementation(async (fn: string) => (fn === 'identity_user_email' ? { data: null, error: null } : { data: USER, error: null }));
+    await expect(b.service.authenticate('t')).rejects.toBeInstanceOf(ForbiddenException); // deactivated: refused at the next check
+  });
+
+  it('asks the database on every request when the cache is off (lifetime 0)', async () => {
+    const b = build({ ttlMs: 0 });
+    await b.service.authenticate('t');
     await b.service.authenticate('t');
     expect(b.rpc).toHaveBeenCalledTimes(4);
+  });
+
+  it('does not reuse a decision when the connection changes', async () => {
+    const b = build();
+    await b.service.authenticate('t');
+    b.verify.mockResolvedValueOnce(login({ connection: 'Username-Password-Authentication' }));
+    await b.service.authenticate('t');
+    expect(b.rpc.mock.calls.filter(([f]) => f === 'link_identity')).toHaveLength(2);
   });
 
   it('does not reuse a decision when the login facts change (email verified later)', async () => {

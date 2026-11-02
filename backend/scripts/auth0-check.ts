@@ -25,6 +25,8 @@ async function main(): Promise<void> {
   check(/^[a-z0-9-]+(\.[a-z0-9-]+)*\.auth0\.com$|^[a-z0-9.-]+\.[a-z]{2,}$/i.test(domain), `AUTH0_DOMAIN is ${domain}`, 'AUTH0_DOMAIN is missing or not a host name (e.g. your-tenant.eu.auth0.com)');
   check(/^https?:\/\/\S+$/.test(audience), `AUTH0_AUDIENCE is ${audience}`, 'AUTH0_AUDIENCE is missing (the API identifier you created in Auth0, e.g. https://api.emithran.com)');
   check(/^https?:\/\/\S+\/$/.test(namespace), `AUTH0_CLAIM_NAMESPACE is ${namespace}`, 'AUTH0_CLAIM_NAMESPACE must be a URL ending in "/" (e.g. https://emithran.com/), the same one the post-login Action uses');
+  check(/^[A-Za-z0-9-]+(,[A-Za-z0-9-]+)*$/.test(settings.AUTH0_TRUSTED_CONNECTIONS ?? ''), `AUTH0_TRUSTED_CONNECTIONS is ${settings.AUTH0_TRUSTED_CONNECTIONS}`,
+    'AUTH0_TRUSTED_CONNECTIONS is missing: the company SSO connection and the database connection, comma-separated (e.g. emithran-auth,Username-Password-Authentication)');
   check((settings.AUTH0_SECRET ?? '').length >= 32, 'AUTH0_SECRET is set', 'AUTH0_SECRET is missing or short (openssl rand -hex 32)');
   check(!!settings.AUTH0_CLIENT_ID, 'AUTH0_CLIENT_ID is set', 'AUTH0_CLIENT_ID is missing (from the Regular Web Application)');
   check(!!settings.AUTH0_CLIENT_SECRET, 'AUTH0_CLIENT_SECRET is set', 'AUTH0_CLIENT_SECRET is missing (from the Regular Web Application)');

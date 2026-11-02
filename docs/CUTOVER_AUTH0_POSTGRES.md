@@ -30,9 +30,14 @@ environment that still has data in an old Supabase project.
      api.accessToken.setCustomClaim(`${ns}email`, event.user.email);
      api.accessToken.setCustomClaim(`${ns}email_verified`, event.user.email_verified === true);
      api.accessToken.setCustomClaim(`${ns}sid`, event.session?.id ?? '');
+     api.accessToken.setCustomClaim(`${ns}connection`, event.connection.name);
    };
    ```
-   Without `sid` every login is refused (the inactivity timeout needs a session id). Without a verified email nobody can be linked to an existing user, and a verified email links only the first login of an invited account (one with no login yet; migration 938): any later new login for an account that already has one is refused. Only these namespaced claims are read; plain `email`, `email_verified` and `sid` claims are ignored.
+   Without `sid` every login is refused (the inactivity timeout needs a session id). A new login links to an invited account only when
+   all of these hold (migrations 938, 947): the email is verified, `connection` is in the backend's `AUTH0_TRUSTED_CONNECTIONS` (the
+   company SSO connection and the database connection, decision D3), and the account has no login yet. Anything else is refused with
+   the "not invited" screen and recorded in `auth.link_events`; a login that is already linked keeps working whatever its connection.
+   Only these namespaced claims are read; plain `email`, `email_verified`, `sid` and `connection` claims are ignored.
 4. **Branding, so Auth0's page matches the app's own sign-in page.** The app's `/auth` page keeps its design (logo, welcome text, image, "Sign In",
    "Sign in with SSO", "Request a demo") and its buttons lead to Auth0; the email and password boxes are on Auth0's page. In Auth0 Dashboard, Branding,
    Universal Login: upload the M logo, set the dark theme with the app's primary colour, and set the page title to eMithran. Leave sign-ups off so the
@@ -66,12 +71,17 @@ The database tools are read-only on the old database, refuse to touch a database
 ## 2. Apply migrations (stage), in order
 
 `930_postgres_compat` (roles, `auth` schema, `auth.uid()/role()/jwt()`), `931_identity_functions`, `932_user_directory`, plus any of 920, 922, 923 not yet applied.
-Check: `npm run test:sql` is green locally first; on the new database `SELECT has_function_privilege('anon','public.link_identity(text,text,text,boolean)','EXECUTE')` must be `false`.
+Check: `npm run test:sql` is green locally first; on the new database `SELECT has_function_privilege('anon','public.link_identity(text,text,text,boolean,text,text[])','EXECUTE')` must be `false`.
+Migration 947 replaces `link_identity` with the version that takes the connection and the allow-list: deploy the backend that passes
+them right after it: in between, the old backend calls the removed 4-argument function and sign-in answers 503 (it never lets anyone in).
 
 ## 3. Deploy (stage)
 
 1. `env/stage.env`: `POSTGREST_DB_URI` (role `authenticator`), `DB_JWT_SECRET` (>= 32 chars, **the same value** for backend, PostgREST and `cad-runner`),
-   `S3_*` (set `S3_ENDPOINT` for anything other than AWS), `AUTH0_DOMAIN`, `AUTH0_AUDIENCE`, `AUTH0_CLAIM_NAMESPACE`.
+   `S3_*` (set `S3_ENDPOINT` for anything other than AWS), `AUTH0_DOMAIN`, `AUTH0_AUDIENCE`, `AUTH0_CLAIM_NAMESPACE`,
+   `AUTH0_TRUSTED_CONNECTIONS` (e.g. `emithran-auth,Username-Password-Authentication`: the SSO connection, the same name as
+   `NEXT_PUBLIC_AUTH0_SSO_CONNECTION`, and the database connection). Optional: `AUTH_DECISION_CACHE_SECONDS` (default 10, at most 60),
+   the longest a person removed from `authorized_users` keeps access.
 2. Frontend build: `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_SECRET`, `AUTH0_AUDIENCE`, `APP_BASE_URL`.
 3. `docker compose -p emithran-stage -f docker-compose.prod.yml --env-file env/stage.env --profile rust-core up -d --build` (PostgREST always runs).
 4. Check: `curl <stage>/v1/api/health/live` is 200; `GET /v1/api/auth/me` without a token is 401. Locally the same wiring is proven by `npm run test:boot`.
@@ -80,8 +90,16 @@ Check: `npm run test:sql` is green locally first; on the new database `SELECT ha
 
 Users start fresh (the user directory is carried by the baseline; Auth0 accounts are new). For each person, as `service_role`:
 `SELECT public.provision_user('person@company.com', 'Full Name');`, then add the email to `authorized_users` (active) and to `organization_members`.
-They sign in through Auth0; the first verified login links to that row. Check: `/auth/me` returns their internal id; an uninvited Auth0 account gets the
+They sign in through Auth0; the first verified login from a trusted connection links to that row. Check: `/auth/me` returns their internal id; an uninvited Auth0 account gets the
 "not invited" screen (403), not an error.
+
+**A second login for the same person** (e.g. they used the database connection first and now use SSO) is never linked by email. After
+checking with the person, as `service_role` or the database owner:
+`SELECT public.admin_link_identity('<user uuid>', 'auth0', '<the new Auth0 sub, e.g. google-apps|123>', '<your email>');`
+It refuses a login that belongs to someone else, and is recorded with your name. No email is sent to the person yet (no transactional
+mail service exists); tell them yourself. **Every link decision** (allowed and denied, with the reason `first_login`, `admin_link`,
+`unverified`, `untrusted_connection`, `not_invited` or `link_required`) is in `auth.link_events`, readable by the database owner only:
+`SELECT at, outcome, reason, provider_id, connection, email, user_id, actor FROM auth.link_events ORDER BY at DESC LIMIT 50;`
 
 ## 5. Verify on stage (all of it, before production)
 

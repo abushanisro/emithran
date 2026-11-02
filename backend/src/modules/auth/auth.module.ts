@@ -23,7 +23,10 @@ import { IdentityService } from './identity.service';
           config.getOrThrow<string>('AUTH0_AUDIENCE'),
           config.getOrThrow<string>('AUTH0_CLAIM_NAMESPACE'),
         );
-        return new IdentityService(verifier, db);
+        return new IdentityService(verifier, db, {
+          trustedConnections: config.getOrThrow<string>('AUTH0_TRUSTED_CONNECTIONS').split(','),
+          decisionTtlMs: config.getOrThrow<number>('AUTH_DECISION_CACHE_SECONDS') * 1000,
+        });
       },
     },
     ApiKeyAuthService,

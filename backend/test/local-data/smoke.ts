@@ -33,7 +33,7 @@ async function main(): Promise<void> {
     must(alice.length === 1 && bob.length === 0, `alice ${alice.length}, bob ${bob.length}`);
   });
   await check('the data API refuses an anonymous request to a protected function', async () => {
-    const res = await fetch(`${env.POSTGREST_URL}/rpc/link_identity`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ p_provider: 'auth0', p_sub: 'x', p_email: 'alice@example.com', p_email_verified: true }) });
+    const res = await fetch(`${env.POSTGREST_URL}/rpc/link_identity`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ p_provider: 'auth0', p_sub: 'x', p_email: 'alice@example.com', p_email_verified: true, p_connection: 'company-sso', p_trusted_connections: ['company-sso'] }) });
     must(res.status === 401 || res.status === 403 || res.status === 404, `HTTP ${res.status}`);
   });
   await check('files round-trip through the local bucket the script created', async () => {
