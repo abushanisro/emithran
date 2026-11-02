@@ -1,0 +1,82 @@
+# The data tier, run by whoever hosts Emithran (you or a customer): Postgres and an S3-compatible file store, on any machine with
+# Docker. No cloud service is needed. Layer it over the stage/production file:
+#
+#   docker compose -p emithran-prd -f docker-compose.prod.yml -f docker-compose.data.yml --env-file env/prd.env up -d --build
+#
+# Instead, a managed Postgres (RDS, Cloud SQL, Azure) and a bucket (S3, Azure Blob through a gateway) work with docker-compose.prod.yml
+# alone: leave this file out and point MIGRATE_DATABASE_URL, POSTGREST_DB_URI and S3_* at them.
+#
+# What it adds, all on the private `db` network (nothing is published to the internet):
+#   postgres  Postgres 17, data in the `pgdata` volume. Reachable from the host on 127.0.0.1 only, for db:migrate and backups.
+#   storage   SeaweedFS S3 API (http://storage:8333), data in the `storage-data` volume. The only access key is S3_ACCESS_KEY_ID /
+#             S3_SECRET_ACCESS_KEY from the env file. Create the bucket once (docs/SELF-HOSTED.md).
+#
+# Env file: POSTGRES_PASSWORD (the superuser; db:migrate and backups use it), plus the S3_* values the backend already needs, with
+# S3_ENDPOINT=http://storage:8333 and S3_FORCE_PATH_STYLE=true. Set the `authenticator` role's password once after the first load
+# (docs/SELF-HOSTED.md) and put it in POSTGREST_DB_URI=postgres://authenticator:...@postgres:5432/postgres.
+# Back up `pgdata` with pg_dump (backend/scripts/baseline-dump.sh) and `storage-data` with a volume snapshot.
+x-data-hardened: &data-hardened
+  restart: unless-stopped
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  postgres:
+    <<: *data-hardened
+    image: postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+    # The image's postgres user (uid 70) owns the data volume, so the entrypoint needs no root, no chown and no capabilities.
+    user: "70:70"
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in the env file}
+    command: ["postgres", "-c", "max_connections=100", "-c", "shared_buffers=256MB"]
+    ports: ["127.0.0.1:${PG_PORT:-5432}:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    tmpfs:
+      - /tmp
+      - /var/run/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    networks: [db]
+    deploy:
+      resources:
+        limits: { cpus: '2', memory: 2G, pids: 256 }
+
+  storage:
+    <<: *data-hardened
+    image: chrislusf/seaweedfs@sha256:c2658820e763294a9e9de7b36c81e59b879e3459148351aee4e31a126ca64860
+    # The image's seaweed user (uid 1000) owns the data volume; started as it, the entrypoint needs no root and no capabilities.
+    user: "1000:1000"
+    command: ["server", "-s3", "-dir=/data", "-ip.bind=0.0.0.0"]
+    # With no identity file, SeaweedFS makes one admin identity from these two variables.
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?set S3_ACCESS_KEY_ID in the env file}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?set S3_SECRET_ACCESS_KEY in the env file}
+    volumes:
+      - storage-data:/data
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8333/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    networks: [db]
+    deploy:
+      resources:
+        limits: { cpus: '1', memory: 1G, pids: 256 }
+
+volumes:
+  pgdata:
+  storage-data:
