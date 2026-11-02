@@ -1,4 +1,28 @@
+import { createHmac } from 'node:crypto';
+import { isIP } from 'node:net';
+
 import { MAX_REQUEST_BODY_BYTES } from '@/lib/server/body-limits';
+
+/**
+ * The browser's address, passed on to the API so its pre-auth rate limit and audit trail see the person, not this container.
+ * Cloudflare sets CF-Connecting-IP and overwrites any value a client sent; the frontend is reachable only through the tunnel, so the
+ * header is the client's. It is sent as X-Emithran-Client-Ip with a fresh HMAC-SHA256 signature of "<unix seconds>.<address>" made
+ * with BFF_FORWARD_SECRET, the secret the API shares; the API honours the address only when that signature verifies
+ * (backend/src/common/client-ip.ts). Without a secret, or without a valid address, nothing is sent and the API counts this container.
+ */
+export function clientAddressHeaders(req: Request, secret: string | undefined, nowSeconds: number): Record<string, string> {
+  const ip = req.headers.get('cf-connecting-ip')?.trim();
+  if (!secret || !ip || isIP(ip) === 0) return {};
+  const signature = createHmac('sha256', secret).update(`${nowSeconds}.${ip}`).digest('hex');
+  return { 'x-emithran-client-ip': ip, 'x-emithran-client-ip-signature': `${nowSeconds}.${signature}` };
+}
+
+/** In production the BFF must forward the client address; a missing or short secret is a deployment error (the route refuses). */
+export function forwardSecretProblem(env: Record<string, string | undefined> = process.env): string | null {
+  if (env.NODE_ENV !== 'production') return null;
+  const secret = env.BFF_FORWARD_SECRET;
+  return secret && secret.length >= 32 ? null : 'BFF_FORWARD_SECRET must be set (at least 32 characters, the same value as the API)';
+}
 
 /**
  * Browser headers the API may see. An allow-list, so cookies, the browser's own Authorization and any identity-looking header never
@@ -55,8 +79,12 @@ export async function forwardRequest(
   token: string,
   fetcher: typeof fetch = fetch,
   maxBodyBytes: number = MAX_REQUEST_BODY_BYTES,
+  forwardSecret: string | undefined = process.env.BFF_FORWARD_SECRET,
 ): Promise<Response> {
-  const headers = new Headers({ authorization: `Bearer ${token}` });
+  const headers = new Headers({
+    authorization: `Bearer ${token}`,
+    ...clientAddressHeaders(req, forwardSecret, Math.floor(Date.now() / 1000)),
+  });
   for (const name of FORWARDED_REQUEST_HEADERS) {
     const value = req.headers.get(name);
     if (value !== null) headers.set(name, value);

@@ -75,6 +75,8 @@ services:
       AUTH0_SECRET: ${AUTH0_SECRET:?set AUTH0_SECRET in the env file}
       # Hosts of the file bucket that the file proxy and the browser's 3D viewer may fetch signed links from.
       TRUSTED_STORAGE_HOSTS: ${TRUSTED_STORAGE_HOSTS:?set TRUSTED_STORAGE_HOSTS (the bucket's download host) in the env file}
+      # Signs the client address the BFF forwards to the backend (lib/server/bff/forward.ts); the same value as the backend's.
+      BFF_FORWARD_SECRET: ${BFF_FORWARD_SECRET:?set BFF_FORWARD_SECRET (32+ random characters, shared with the backend) in the env file}
     tmpfs:
       - /tmp
       - /app/.next/cache:uid=1001,gid=1001
@@ -110,8 +112,16 @@ services:
       AUTH0_CLAIM_NAMESPACE: ${AUTH0_CLAIM_NAMESPACE:?set AUTH0_CLAIM_NAMESPACE in the env file}
       # The browser's origin; production validation rejects localhost and *.
       CORS_ORIGIN: ${CORS_ORIGIN:?set CORS_ORIGIN (the public frontend URL) in the env file}
-      # The only way to reach this container is the Cloudflare tunnel, so the client address comes from CF-Connecting-IP.
+      # The only way to reach this container is the Cloudflare tunnel, so for direct /v1/* calls the client address comes from
+      # CF-Connecting-IP. Browser calls arrive from the frontend's BFF, which forwards the address signed with BFF_FORWARD_SECRET.
       TRUST_CLOUDFLARE_HEADERS: "true"
+      BFF_FORWARD_SECRET: ${BFF_FORWARD_SECRET:?set BFF_FORWARD_SECRET (32+ random characters, shared with the frontend) in the env file}
+      # Nothing in front of this container sets X-Forwarded-For that the API relies on: no proxy hops are trusted (never "true").
+      TRUST_PROXY: "0"
+      # V8 heap of the API thread: ~70% of the 2G limit below, so V8 fails with a catchable error before the kernel kills the
+      # container. Heavy-work workers (HEAVY_WORK_MAX_CONCURRENT x HEAVY_WORK_WORKER_HEAP_MB, default 2 x 256 MB) have their own heaps
+      # inside the same limit: raise those only together with the memory limit (backend/src/common/resource-limits.ts).
+      NODE_OPTIONS: --max-old-space-size=1434
       # The largest upload accepted (frontend and engine follow).
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-50}
       # python: this backend analyses uploads with the Python cad-engine. rust: the cad-core service does, and this backend only creates the BOM items.

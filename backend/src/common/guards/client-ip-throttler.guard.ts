@@ -11,6 +11,8 @@ import { clientIp } from '../client-ip';
  *   the backend through the Next.js BFF, so all of it has the frontend container as its address; keying it by address would put
  *   every user of every tenant in one bucket per route;
  * - anything else (public routes) is counted by the real client address (see client-ip.ts).
+ * On top of this per-caller limit, a looser one per organization (common/throttling/org-throttle.interceptor.ts) runs once the
+ * route has resolved the organization, which happens after every guard.
  */
 @Injectable()
 export class ClientIpThrottlerGuard extends ThrottlerGuard {

@@ -13,6 +13,7 @@ import {
   UseInterceptors,
   UseGuards,
   BadRequestException,
+  HttpException,
   Logger,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -29,7 +30,8 @@ import { AccessToken } from '../../common/decorators/access-token.decorator';
 import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
 import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
 import * as ExcelJS from 'exceljs';
-import { assertXlsxWithinLimits } from '../../common/archive/xlsx-limits';
+import { MAX_XLSX_UPLOAD_BYTES } from '../../common/archive/xlsx-limits';
+import { readWorkbook } from '../../common/heavy-work/heavy-work';
 
 @ApiTags('Raw Materials')
 @ApiBearerAuth()
@@ -211,7 +213,7 @@ export class RawMaterialsController {
   @ApiConsumes('multipart/form-data')
   @ApiResponse({ status: 200, description: 'Excel file processed successfully' })
   @ApiResponse({ status: 400, description: 'Invalid file or data' })
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_XLSX_UPLOAD_BYTES, files: 1 } }))
   async uploadExcel(
     @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: User,
@@ -236,11 +238,8 @@ export class RawMaterialsController {
     }
 
     try {
-      // Parse Excel file using ExcelJS
-      assertXlsxWithinLimits(file.buffer); // measured before ExcelJS inflates anything
-      const workbook = new ExcelJS.Workbook();
-      await workbook.xlsx.load(file.buffer as any);
-      
+      const workbook = await readWorkbook(file.buffer); // gated and parsed in a heavy-work worker
+
       if (!workbook.worksheets.length) {
         throw new BadRequestException('Excel file has no worksheets');
       }
@@ -588,6 +587,8 @@ export class RawMaterialsController {
         dataWarnings: dataWarnings.length > 0 ? dataWarnings : undefined,
       };
     } catch (error) {
+      // A deliberate answer (a refused file, a busy server asking to retry) keeps its status; anything else is the file's fault.
+      if (error instanceof HttpException) throw error;
       throw new BadRequestException(`Failed to process Excel file: ${error.message}`);
     }
   }

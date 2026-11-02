@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 
 import { inferDesign, type DesignKind, type InputTier } from '../domain/uploads/infer-design';
-import { validateUpload } from '../domain/uploads/validate-upload';
+import { validateDesignFile, type DesignFileVerdict } from './validate-design-file';
 import { ELECTRONICS_JOB_QUEUE, ELECTRONICS_QUEUES, type JobQueue } from '../infrastructure/queue/job-queue.port';
 import {
   ElectronicsRepository,
@@ -80,7 +80,7 @@ export class StartUploadUseCase {
 
     const uploadId = randomUUID();
     const stored: StoredUploadFile[] = [];
-    const verdicts = raw.files.map((file) => validateUpload(file.name, file.bytes));
+    const verdicts = raw.files.map((file) => validateDesignFile(file.name, file.bytes));
     const input = this.resolveKind(raw, verdicts);
     for (const [index, file] of input.files.entries()) {
       const verdict = verdicts[index];
@@ -113,7 +113,7 @@ export class StartUploadUseCase {
 
   // One upload field serves every kind of design: the kind and tier come from the files. A caller that states them must
   // agree with what the files are.
-  private resolveKind(input: StartUploadInput, verdicts: ReturnType<typeof validateUpload>[]): ResolvedInput {
+  private resolveKind(input: StartUploadInput, verdicts: DesignFileVerdict[]): ResolvedInput {
     const inferred = inferDesign(
       input.files.map((file, i) => {
         const verdict = verdicts[i];

@@ -11,6 +11,10 @@ export interface TestEntry {
   statedCompressedSize?: number;
   /** Write no data of its own: the central record points at the local header of entry number `sharesWith` (a crafted bomb). */
   sharesWith?: number;
+  /** A deflate stream written as is, standing for `inflatedSize` bytes (for streams too large to build from raw data). */
+  deflated?: { stream: Buffer; inflatedSize: number };
+  /** Compression method written to the headers instead of stored/deflate. */
+  method?: number;
 }
 
 // Writes the smallest well-formed zip that holds the given entries (local headers, central directory, end record).
@@ -21,13 +25,13 @@ export function zip(entries: TestEntry[]): Buffer {
   let offset = 0;
   for (const e of entries) {
     const raw = typeof e.data === 'string' || e.data === undefined ? Buffer.from(e.data ?? '', 'utf8') : e.data;
-    const body = e.deflate ? deflateRawSync(raw) : raw;
+    const body = e.deflated ? e.deflated.stream : e.deflate ? deflateRawSync(raw) : raw;
     const name = Buffer.from(e.name, 'utf8');
     const flags = 0x800 | (e.encrypted ? 0x1 : 0);
     const shared = e.sharesWith === undefined ? undefined : written[e.sharesWith];
-    const method = shared ? shared.method : e.deflate ? 8 : 0;
+    const method = shared ? shared.method : e.method ?? (e.deflate || e.deflated ? 8 : 0);
     const compressed = shared ? shared.compressed : body.length;
-    const size = shared ? shared.size : raw.length;
+    const size = shared ? shared.size : e.deflated ? e.deflated.inflatedSize : raw.length;
     const localOffset = shared ? shared.offset : offset;
     if (!shared) {
       const local = Buffer.alloc(30);

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 import { sessionAccessToken } from '@/lib/server/auth';
-import { forwardRequest, upstreamUrl } from '@/lib/server/bff/forward';
+import { forwardRequest, forwardSecretProblem, upstreamUrl } from '@/lib/server/bff/forward';
 import { isAllowedOrigin } from '@/lib/server/bff/origin';
 
 const refuse = (status: number, code: string, message: string) =>
@@ -17,6 +17,8 @@ async function handle(req: NextRequest, ctx: RouteContext<'/api/v1/[...path]'>):
   const appUrl = process.env.APP_BASE_URL;
   const apiBase = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL;
   if (!appUrl || !apiBase) return refuse(500, 'BFF_NOT_CONFIGURED', 'APP_BASE_URL and API_URL must be set');
+  const secretProblem = forwardSecretProblem();
+  if (secretProblem) return refuse(500, 'BFF_NOT_CONFIGURED', secretProblem);
 
   if (!isAllowedOrigin(req, appUrl)) return refuse(403, 'ORIGIN_NOT_ALLOWED', 'Request origin not allowed');
 

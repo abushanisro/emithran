@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { clientIp } from '../client-ip';
+import { TryAgainLaterException } from '../http/try-again-later.exception';
 
 /**
  * A client error raised by Express middleware before Nest sees the request, such as the body parser's 413 (body over the limit,
@@ -193,6 +194,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     });
 
     // Send response
+    if (exception instanceof TryAgainLaterException) response.setHeader('Retry-After', String(exception.retryAfterSeconds));
     response.status(httpStatus).json(errorResponse);
   }
 

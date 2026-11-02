@@ -21,6 +21,18 @@ function spendsAi(context: ExecutionContext): boolean {
 
 type Setting = (name: string, fallback: number) => number;
 
+export const DEFAULT_ORG_LIMIT = 3_000;
+export const DEFAULT_ORG_TTL_MS = 60_000;
+
+/**
+ * The second, looser limit: ORG_THROTTLE_LIMIT requests per ORG_THROTTLE_TTL ms for one organization across every route and
+ * every member, so one tenant's many users (or a script spread over many accounts) cannot starve the process for everyone else.
+ * Enforced by OrgThrottleInterceptor once the route has resolved the organization.
+ */
+export function orgThrottleOptions(setting: Setting): { limit: number; ttl: number } {
+  return { limit: setting('ORG_THROTTLE_LIMIT', DEFAULT_ORG_LIMIT), ttl: setting('ORG_THROTTLE_TTL', DEFAULT_ORG_TTL_MS) };
+}
+
 /**
  * The throttlers every route runs through (ClientIpThrottlerGuard supplies the tracker: user, API key or client address):
  * - default: THROTTLE_LIMIT requests per THROTTLE_TTL ms, per route handler and caller;
