@@ -16,7 +16,7 @@ import { parseEnv } from 'util';
 import { Client } from 'pg';
 
 import { caCertificate, databaseClientConfig } from '../src/common/migrations/db-connection';
-import { checksumOf, migrationNumber, planMigrations, targetProblems, type Baseline } from '../src/common/migrations/migration-plan';
+import { checksumOf, migrationNumber, planMigrations, targetProblems, trackingTableProblem, type Baseline } from '../src/common/migrations/migration-plan';
 
 const ADVISORY_LOCK = 727_001; // one runner at a time per database
 const NO_TRANSACTION = /^--\s*migrate:\s*no-transaction/m;
@@ -67,11 +67,24 @@ async function main(): Promise<void> {
   await client.connect();
   try {
     await client.query('SELECT pg_advisory_lock($1)', [ADVISORY_LOCK]);
-    // No policies and RLS on: the tracking table is invisible to the API roles; only the service connection reads it.
-    await client.query(`CREATE TABLE IF NOT EXISTS public.schema_migrations (
-      name text PRIMARY KEY, checksum text NOT NULL, applied_at timestamptz NOT NULL DEFAULT now())`);
-    await client.query('ALTER TABLE public.schema_migrations ENABLE ROW LEVEL SECURITY');
-    const applied = (await client.query<{ name: string; checksum: string }>('SELECT name, checksum FROM public.schema_migrations')).rows;
+    // A dry run only reads: the tracking table is created on the first real run, not by a dry run.
+    const columns = (
+      await client.query<{ column_name: string }>(
+        `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'schema_migrations'`,
+      )
+    ).rows.map((r) => r.column_name);
+    const problem = trackingTableProblem(columns);
+    if (problem) fail([problem]);
+    if (columns.length === 0 && !dryRun) {
+      // No policies and RLS on: the tracking table is invisible to the API roles; only the service connection reads it.
+      await client.query(`CREATE TABLE public.schema_migrations (
+        name text PRIMARY KEY, checksum text NOT NULL, applied_at timestamptz NOT NULL DEFAULT now())`);
+      await client.query('ALTER TABLE public.schema_migrations ENABLE ROW LEVEL SECURITY');
+    }
+    const applied =
+      columns.length === 0
+        ? []
+        : (await client.query<{ name: string; checksum: string }>('SELECT name, checksum FROM public.schema_migrations')).rows;
 
     const plan = planMigrations(files, applied, baseline);
     for (const w of plan.warnings) console.warn(`  ! ${w}`);

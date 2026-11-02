@@ -92,3 +92,16 @@ export function targetProblems(t: Target): string[] {
   if (t.env === 'prd' && !t.dryRun && !t.confirm) problems.push('production needs --confirm (or use --dry-run to see the plan)');
   return problems;
 }
+
+/**
+ * Why an existing public.schema_migrations cannot be used, or null. `columns` are its column names (empty: no table yet). A table
+ * with other columns belongs to an older migration tool: this database was never brought onto this runner, and guessing what
+ * it has applied could re-run or skip migrations.
+ */
+export function trackingTableProblem(columns: string[]): string | null {
+  if (columns.length === 0 || (columns.includes('name') && columns.includes('checksum'))) return null;
+  return (
+    `public.schema_migrations exists but was not made by this runner (columns: ${[...columns].sort().join(', ')}). This database ` +
+    'has not been moved to the new stack: build the target from a baseline (docs/CUTOVER_AUTH0_POSTGRES.md, section 1) instead of migrating it in place.'
+  );
+}
