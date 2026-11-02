@@ -93,11 +93,6 @@ function normalizeDesignation(text: string | null | undefined): string {
   return (text ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
-/** Escapes LIKE/ILIKE metacharacters so a grade like "6061_T6" matches literally. */
-export function escapeLikePattern(s: string): string {
-  return s.replace(/[\\%_]/g, (c) => `\\${c}`);
-}
-
 type TokenMatch = { matched: number; whole: number; total: number };
 
 // The query is counted in WORDS ("IS2062" is one word even though it tokenizes

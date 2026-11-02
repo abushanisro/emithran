@@ -11,11 +11,10 @@ import type { BOMItemResponseDto } from '../dto/bom-item-response.dto';
 import {
   rankMaterialMatches,
   pickUnambiguousBest,
-  escapeLikePattern,
   type RankedMaterial,
 } from '../../raw-materials/material-search-ranking';
 import { expandSearchTermSpellingVariants } from '../../raw-materials/material-search-spelling';
-import { quoteFilterValue } from '../../../common/db/postgrest-filter';
+import { escapeLikePattern, ilikeContains } from '../../../common/db/postgrest-filter';
 
 interface MatchedMaterialRow {
   id: string;
@@ -329,7 +328,7 @@ export class MaterialResolutionService {
       const orClause = terms
         .flatMap((t) => expandSearchTermSpellingVariants(t))
         .flatMap((v) => {
-          const pattern = quoteFilterValue(`%${escapeLikePattern(v)}%`);
+          const pattern = ilikeContains(v);
           return ['name', 'grade', 'astm_standard', 'din_standard', 'en_standard', 'jis_standard']
             .map((col) => `${col}.ilike.${pattern}`);
         })

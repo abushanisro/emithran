@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { BaseRepository } from '@/common/repositories/base.repository';
 import { Logger } from '@/common/logger/logger.service';
 import type { DbClient } from '../../common/db/postgrest-client';
+import { orIlikeContains } from '../../common/db/postgrest-filter';
 
 interface ProjectEntity {
   id: string;
@@ -45,7 +46,7 @@ export class ProjectsRepository extends BaseRepository<ProjectEntity> {
       let query = client
         .from(this.tableName)
         .select('*', { count: 'exact' })
-        .or(`name.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`)
+        .or(orIlikeContains(['name', 'description'], searchTerm))
         .range(from, to);
 
       if (options.orderBy) {

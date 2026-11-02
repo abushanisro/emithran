@@ -146,6 +146,7 @@ import { realBendLengthsMm } from './costing/shared/bend-lengths';
 import { cachedRead } from './costing/shared/core/request-cache';
 import { ReferenceMemo } from '../../common/cache/reference-memo';
 import { Traced } from '../../telemetry/traced';
+import { orIlikeContains } from '../../common/db/postgrest-filter';
 
 /** A quote with extra lines appended: process total, total, cycle time and completeness follow. */
 function appendLines<T extends CostSummaryDto>(dto: T, lines: ProcessLineCost[]): T {
@@ -296,7 +297,7 @@ export class BOMItemsService {
       this.logger.log(`Filtering BOM items for BOM ID: ${bomId}`);
     }
     if (search) {
-      query = query.or(`part_number.ilike.%${search}%,description.ilike.%${search}%`);
+      query = query.or(orIlikeContains(['part_number', 'description'], search));
     }
     if (itemType) {
       query = query.eq('item_type', itemType);
@@ -308,7 +309,7 @@ export class BOMItemsService {
       .select('*', { count: 'exact', head: true });
 
     if (bomId) countQuery = countQuery.eq('bom_id', bomId);
-    if (search) countQuery = countQuery.or(`part_number.ilike.%${search}%,description.ilike.%${search}%`);
+    if (search) countQuery = countQuery.or(orIlikeContains(['part_number', 'description'], search));
     if (itemType) countQuery = countQuery.eq('item_type', itemType);
 
     const { count } = await countQuery;

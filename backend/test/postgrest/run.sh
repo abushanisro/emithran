@@ -21,6 +21,10 @@ INSERT INTO public.notes (owner, body) VALUES ('11111111-1111-1111-1111-11111111
 ALTER TABLE public.notes ENABLE ROW LEVEL SECURITY;
 CREATE POLICY own_read ON public.notes FOR SELECT TO authenticated USING (owner = auth.uid());
 CREATE POLICY own_write ON public.notes FOR INSERT TO authenticated WITH CHECK (owner = auth.uid());
+-- Text search through orIlikeContains (src/common/db/postgrest-filter.ts): request text must not add filters or wildcards.
+CREATE TABLE public.catalog (id serial PRIMARY KEY, name text, grade text);
+INSERT INTO public.catalog (name, grade) VALUES ('Steel, Alloy', '4140'), ('Steel', '1018'), ('50% glass fibre', 'PA66'), ('500 bar line', '316L');
+GRANT SELECT ON public.catalog TO authenticated;
 -- What the upload queue (migrations 917, 918, 923) needs, so the Rust runner can be tested against it for real.
 CREATE TABLE public.projects (id uuid PRIMARY KEY DEFAULT gen_random_uuid());
 CREATE TABLE public.boms (id uuid PRIMARY KEY DEFAULT gen_random_uuid());

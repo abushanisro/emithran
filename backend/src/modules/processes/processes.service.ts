@@ -33,6 +33,7 @@ import {
   ProcessCalculatorMappingListResponseDto,
   ProcessTaxonomyHint,
 } from './dto/process-calculator-mapping.dto';
+import { orIlikeContains, quoteFilterValue } from '../../common/db/postgrest-filter';
 
 @Injectable()
 export class ProcessesService {
@@ -167,7 +168,7 @@ export class ProcessesService {
       // Comma-separated patterns are OR'd (e.g. '%bend%,%press%') — a route's
       // relevant staged data is rarely captured by one substring alone.
       const patterns = keyPattern.split(',');
-      query = query.or(patterns.map((p) => `key.ilike.${p}`).join(','));
+      query = query.or(patterns.map((p) => `key.ilike.${quoteFilterValue(p)}`).join(','));
       // sm_reference_data patterns can match hundreds of rows (e.g. laser
       // nesting-cut-rate data) — capped so this stays a reference panel, not
       // a full table dump; sorted so the cap drops consistently, not at random.
@@ -489,7 +490,7 @@ export class ProcessesService {
 
     // Apply search filter (search in process_name and description)
     if (query.search) {
-      queryBuilder = queryBuilder.or(`process_name.ilike.%${query.search}%,description.ilike.%${query.search}%`);
+      queryBuilder = queryBuilder.or(orIlikeContains(['process_name', 'description'], query.search));
     }
 
     const { data, error, count } = await queryBuilder;
@@ -955,7 +956,7 @@ export class ProcessesService {
 
     if (query.search) {
       queryBuilder = queryBuilder.or(
-        `process_group.ilike.%${query.search}%,process_route.ilike.%${query.search}%,operation.ilike.%${query.search}%,calculator_name.ilike.%${query.search}%`,
+        orIlikeContains(['process_group', 'process_route', 'operation', 'calculator_name'], query.search),
       );
     }
 
