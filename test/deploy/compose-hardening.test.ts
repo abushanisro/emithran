@@ -17,6 +17,8 @@ interface Service {
   security_opt?: string[];
   privileged?: boolean;
   network_mode?: string;
+  user?: string;
+  group_add?: string[];
   pid_limit?: number;
   pids_limit?: number;
   ports?: unknown[];
@@ -37,13 +39,14 @@ const compose = yaml.load(read('docker-compose.prod.yml')) as Compose;
 const services = Object.entries(compose.services);
 
 describe('docker-compose.prod.yml', () => {
-  it.each(services)('%s is locked down: read-only, no capabilities, no privilege escalation, limits, logs, restart', (_name, s) => {
+  it.each(services)('%s is locked down: read-only, no capabilities, no privilege escalation, limits, logs, restart', (name, s) => {
     expect(s.read_only).toBe(true);
     expect(s.cap_drop).toContain('ALL');
     expect(s.cap_add).toBeUndefined();
     expect(s.security_opt).toContain('no-new-privileges:true');
     expect(s.privileged).toBeUndefined();
-    expect(s.network_mode).toBeUndefined();
+    // Sharing another container's or the host's network namespace is never allowed; only the CAD worker has none at all.
+    expect(s.network_mode).toBe(name === 'cad-worker' ? 'none' : undefined);
     expect(s.deploy?.resources?.limits?.pids).toBeGreaterThan(0);
     expect(s.deploy?.resources?.limits?.memory).toBeTruthy();
     expect(s.deploy?.resources?.limits?.cpus).toBeTruthy();
@@ -115,6 +118,26 @@ describe('docker-compose.prod.yml', () => {
     const cloudflared = compose.services.cloudflared as Service & { command?: string };
     expect(cloudflared.command).toMatch(/--metrics 127\.0\.0\.1:2000\b/);
     expect(cloudflared.command).not.toMatch(/0\.0\.0\.0/);
+  });
+
+  it('parses customer CAD only in cad-worker: no credential, no network, its own user, only the socket volume shared', () => {
+    const worker = compose.services['cad-worker'];
+    const runner = compose.services['cad-core'];
+    expect(worker?.network_mode).toBe('none');
+    expect(worker?.networks).toBeUndefined();
+    // Limits only: anything else in its environment needs a deliberate change here.
+    expect(Object.keys(worker?.environment ?? {}).sort()).toEqual(['MAX_UPLOAD_MB', 'WORKER_MEMORY_MB']);
+    expect(/^ {2}cad-worker:\n(?: {4}.*\n|\n)*/m.exec(read('docker-compose.prod.yml'))?.[0]).not.toMatch(/SECRET|KEY|TOKEN|PASSWORD|URL|DB_URI/);
+    expect(worker?.user).toBeTruthy();
+    expect(runner?.user).toBeTruthy();
+    expect(worker?.user?.split(':')[0]).not.toBe(runner?.user?.split(':')[0]);
+    expect(worker?.read_only).toBe(true);
+    expect(worker?.cap_drop).toContain('ALL');
+    // The worker's volume is the socket's only, and only the runner shares it.
+    expect(worker?.volumes).toEqual(['cad-worker-socket:/run/cad-worker']);
+    const sharing = services.filter(([, s]) => (s.volumes ?? []).some((v) => v.startsWith('cad-worker-socket:'))).map(([n]) => n).sort();
+    expect(sharing).toEqual(['cad-core', 'cad-worker']);
+    expect(runner?.group_add).toEqual([worker?.user?.split(':')[1]]);
   });
 
   it('cad-core refuses to start without its database secret and bucket settings', () => {

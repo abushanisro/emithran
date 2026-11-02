@@ -9,18 +9,26 @@ publish.workspace = true
 name = "cad-runner"
 path = "src/main.rs"
 
+# Runs the geometry worker in its own container (no credential, no network) for cad-runner, over a Unix socket (src/host.rs).
+[[bin]]
+name = "cad-worker-host"
+path = "src/host_main.rs"
+
 [dependencies]
 archive = { path = "../archive" }
 domain = { path = "../domain" }
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.154"
 tempfile = "=3.27.0"
-tokio = { version = "=1.54.1", features = ["rt-multi-thread", "macros", "process", "time", "fs", "signal", "io-util"] }
+tokio = { version = "=1.54.1", features = ["rt-multi-thread", "macros", "process", "time", "fs", "signal", "io-util", "net"] }
 reqwest = { version = "=0.13.5", default-features = false, features = ["json", "rustls"] }
-hmac = "=0.13.0"
+hmac = { version = "=0.13.0", features = ["zeroize"] }
 sha2 = "=0.11.1"
 base64 = "=0.23.1"
 hex = "=0.4.3"
+# Wipes the runner's credentials from memory when they are dropped (src/secrets.rs). Already in the tree through rustls;
+# Apache-2.0 OR MIT, RustCrypto.
+zeroize = "=1.9.1"
 
 # PR_SET_DUMPABLE for the runner (src/isolation.rs). Already in the tree through tempfile; Apache-2.0 OR MIT, Bytecode Alliance.
 [target.'cfg(target_os = "linux")'.dependencies]

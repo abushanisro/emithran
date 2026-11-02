@@ -66,6 +66,8 @@ The database tools are read-only on the old database, refuse to touch a database
 ## 2. Apply migrations (stage), in order
 
 `930_postgres_compat` (roles, `auth` schema, `auth.uid()/role()/jwt()`), `931_identity_functions`, `932_user_directory`, plus any of 920, 922, 923 not yet applied.
+With the Rust assembly core (`--profile rust-core`): `951_cad_runner_role` before deploying it (the runner signs tokens for the `cad_runner` role, which
+may only claim and finish uploads; without 951 PostgREST refuses its token). Check: `SELECT pg_has_role('authenticator','cad_runner','MEMBER')` is `true`.
 Check: `npm run test:sql` is green locally first; on the new database `SELECT has_function_privilege('anon','public.link_identity(text,text,text,boolean)','EXECUTE')` must be `false`.
 
 ## 3. Deploy (stage)
@@ -74,6 +76,8 @@ Check: `npm run test:sql` is green locally first; on the new database `SELECT ha
    `S3_*` (set `S3_ENDPOINT` for anything other than AWS), `AUTH0_DOMAIN`, `AUTH0_AUDIENCE`, `AUTH0_CLAIM_NAMESPACE`.
 2. Frontend build: `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_SECRET`, `AUTH0_AUDIENCE`, `APP_BASE_URL`.
 3. `docker compose -p emithran-stage -f docker-compose.prod.yml --env-file env/stage.env --profile rust-core up -d --build` (PostgREST always runs).
+   The profile starts two containers: `cad-core` (the runner, with the credentials) and `cad-worker` (parses the CAD; no credential, `network_mode: none`).
+   They share only the `cad-worker-socket` volume. Check: `docker inspect <cad-worker> --format '{{.HostConfig.NetworkMode}}'` is `none`.
 4. Check: `curl <stage>/v1/api/health/live` is 200; `GET /v1/api/auth/me` without a token is 401. Locally the same wiring is proven by `npm run test:boot`.
 
 ## 4. People

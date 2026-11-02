@@ -30,6 +30,8 @@ CREATE FUNCTION public.my_email() RETURNS text LANGUAGE sql STABLE SECURITY DEFI
 \i /migrations/917_cad_uploads.sql
 \i /migrations/918_free_tier_housekeeping.sql
 \i /migrations/923_cad_upload_analysed.sql
+-- The runner acts as its own role (951), not service_role: the Rust check below goes through it.
+\i /migrations/951_cad_runner_role.sql
 INSERT INTO public.boms (id) VALUES ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
 INSERT INTO public.cad_uploads (id, organization_id, created_by, bom_id, file_name, sha256, size_bytes, storage_path, created_at) VALUES
   ('a0000000-0000-4000-8000-000000000001','cccccccc-cccc-4ccc-8ccc-cccccccccccc','11111111-1111-1111-1111-111111111111','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','a.step','s1',1,'p/a.step', now() - interval '3 minutes'),

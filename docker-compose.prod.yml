@@ -210,9 +210,11 @@ services:
         limits: { cpus: '2', memory: 2G, pids: 512 }
         reservations: { cpus: '0.5', memory: 512M }
 
-  # --- Assembly core: claims queued CAD uploads and analyses them with the C++ geometry worker (docs/ASSEMBLY_CORE.md). It talks to PostgREST and the
-  # S3 bucket over HTTP(S) only (no Postgres connection) and parses untrusted files in a child process that runs with an empty environment under
-  # prlimit and a deadline. Runs only when CAD_CORE=rust (`docker compose --profile rust-core up`); with CAD_CORE=python the backend does it itself. ---
+  # --- Assembly core (docs/ASSEMBLY_CORE.md "Isolation"): two containers. cad-core (the runner) claims queued CAD uploads, holds the database
+  # and bucket credentials, talks to PostgREST and the bucket over HTTP(S) only (no Postgres connection) and never parses CAD. cad-worker runs
+  # the C++ geometry worker on the customer's files: no credential, no network at all, its own UID, a fresh scratch tmpfs. The two share only
+  # a Unix socket on the cad-worker-socket volume. Run only when CAD_CORE=rust (`docker compose --profile rust-core up`); with CAD_CORE=python
+  # the backend does it itself. ---
   cad-core:
     <<: *hardened
     profiles: [rust-core]
@@ -220,11 +222,13 @@ services:
     build:
       context: ./core
       dockerfile: Dockerfile
-      additional_contexts:
-        geometry: ./geometry-worker
-        fixtures: ./backend/test/fixtures/cad
+      target: runner
+    user: "10003:10003"
+    # The worker's group, only to reach its socket (mode 0660).
+    group_add: ["10005"]
     environment:
       # The same data API and bucket as the backend (the runner refuses to start, naming the missing setting, when one is empty).
+      # The runner moves its three credentials out of its environment at start and signs tokens for the cad_runner role (migration 951).
       POSTGREST_URL: http://postgrest:3000
       DB_JWT_SECRET: ${DB_JWT_SECRET:?set DB_JWT_SECRET in the env file}
       S3_BUCKET: ${S3_BUCKET:?set S3_BUCKET in the env file}
@@ -235,8 +239,14 @@ services:
       S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-}
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-50}
       WORKER_DEADLINE_SECONDS: 600
-      # The container limit below is 2 GB; the worker's own address-space limit stays under it (~16 MB of RAM per MB of STEP).
-      WORKER_MEMORY_MB: 1536
+      WORKER_SOCKET: /run/cad-worker/worker.sock
+      # What the worker may send back (result.json and the part files); held in memory until stored.
+      WORKER_MAX_OUTPUT_MB: 512
+    volumes:
+      - cad-worker-socket:/run/cad-worker
+    depends_on:
+      cad-worker:
+        condition: service_healthy
     healthcheck:
       # No HTTP port: the runner rewrites a heartbeat file every 10 s from its own task, and `health` checks that it is recent.
       test: ["CMD", "cad-runner", "health"]
@@ -245,18 +255,55 @@ services:
       retries: 3
       start_period: 20s
     tmpfs:
-      - /tmp:size=1g
+      - /tmp:size=16m
     networks: [edge, db]
     deploy:
       resources:
-        limits: { cpus: '2', memory: 2G, pids: 256 }
+        # An upload is unzipped in memory (up to 8x MAX_UPLOAD_MB) and the worker's outputs are held until stored.
+        limits: { cpus: '1', memory: 2G, pids: 128 }
+        reservations: { cpus: '0.25', memory: 256M }
+
+  cad-worker:
+    <<: *hardened
+    profiles: [rust-core]
+    platform: linux/amd64
+    build:
+      context: ./core
+      dockerfile: Dockerfile
+      target: worker
+      additional_contexts:
+        geometry: ./geometry-worker
+        fixtures: ./backend/test/fixtures/cad
+    user: "10005:10005"
+    # No network at all: no interface but loopback, so a compromised worker can neither phone home nor reach PostgREST or the bucket.
+    network_mode: none
+    # Limits only. No credential and no address belongs here (cad-worker-host refuses to start if one of the runner's is set).
+    environment:
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-50}
+      # The container limit below is 2 GB; the worker's own address-space limit stays under it (~16 MB of RAM per MB of STEP).
+      WORKER_MEMORY_MB: 1536
+    volumes:
+      - cad-worker-socket:/run/cad-worker
+    healthcheck:
+      # The socket accepts a connection.
+      test: ["CMD", "cad-worker-host", "health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    tmpfs:
+      # The jobs' scratch: the host empties it and kills every leftover process after each job.
+      - /tmp:size=1g,uid=10005,gid=10005,mode=0700
+    deploy:
+      resources:
+        limits: { cpus: '2', memory: 2G, pids: 128 }
         reservations: { cpus: '0.5', memory: 256M }
 
   # --- PostgREST: the data API in front of the managed Postgres (docs: docs/ENGINEERING.md "Leaving Supabase"). Reachable ONLY from
   # the backend and, with the rust-core profile, cad-core: it is on the private `db` network with them and nothing else, never
   # published, and it accepts only tokens signed with DB_JWT_SECRET (its admin server listens on loopback only). It needs outbound access to the database,
   # which is why it is not on the no-internet `internal` network. Connects as the `authenticator` role, which can only switch to
-  # anon/authenticated/service_role. ---
+  # anon/authenticated/service_role and (migration 951) cad_runner, the runner's role. ---
   postgrest:
     <<: *hardened
     image: postgrest/postgrest@sha256:1347d7552b88f17832912c06afbf7c43209af6eeeb60834b04aae12c9bd9d5cc
@@ -316,6 +363,8 @@ services:
         limits: { cpus: '1', memory: 1G, pids: 512 }
 
 volumes:
+  # The runner's and the worker's only shared object: the worker host's Unix socket.
+  cad-worker-socket:
   cad-temp:
   cad-logs:
   backend-logs:
