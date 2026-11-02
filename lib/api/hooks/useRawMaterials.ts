@@ -328,7 +328,7 @@ export function useDeleteAllRawMaterials() {
 
   return useMutation({
     mutationFn: async () => {
-      const response = await apiClient.delete<{ message: string; deleted: number }>('/raw-materials');
+      const response = await apiClient.delete<{ message: string; deleted: number }>('/raw-materials?confirm=delete-all');
 
       if (!response) {
         throw new Error('Failed to delete all materials');

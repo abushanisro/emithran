@@ -1,4 +1,5 @@
 interface User { id: string; email: string; [key: string]: any; }
+import { Throttle } from '@nestjs/throttler';
 import {
   Controller,
   Get,
@@ -30,6 +31,8 @@ import { AccessToken } from '../../common/decorators/access-token.decorator';
 import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
 import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
 import * as ExcelJS from 'exceljs';
+import { AuditService } from '../../common/audit/audit.service';
+import { requireBulkDeleteConfirmation } from '../../common/http/bulk-delete';
 import { OrgRole } from '../../common/authz/authz-policy';
 import { MAX_XLSX_UPLOAD_BYTES } from '../../common/archive/xlsx-limits';
 import { readWorkbook } from '../../common/heavy-work/heavy-work';
@@ -45,6 +48,7 @@ export class RawMaterialsController {
     private readonly rawMaterialsService: RawMaterialsService,
     private readonly stockPricesService: MaterialStockPricesService,
     private readonly editorService: RawMaterialEditorService,
+    private readonly audit: AuditService,
   ) { }
 
   @OrgRole('viewer')
@@ -214,13 +218,19 @@ export class RawMaterialsController {
     return this.rawMaterialsService.remove(id, user.id, token);
   }
 
+  @OrgRole('admin')
   @Delete()
-  @ApiOperation({ summary: 'Delete all raw materials for current user' })
+  @ApiOperation({ summary: 'Delete all raw materials for current user (administrators; needs ?confirm=delete-all)' })
   @ApiResponse({ status: 200, description: 'All raw materials deleted successfully' })
-  async removeAll(@CurrentUser() user: User, @AccessToken() token: string) {
-    return this.rawMaterialsService.removeAll(user.id, token);
+  async removeAll(@CurrentUser() user: User, @AccessToken() token: string, @Query('confirm') confirm?: string) {
+    requireBulkDeleteConfirmation(confirm);
+    return this.audit.purged('raw_materials', async () => {
+      const result = await this.rawMaterialsService.removeAll(user.id, token);
+      return { ...result, deleted: result.deleted ?? 0 };
+    });
   }
 
+  @Throttle({ default: { limit: 10, ttl: 60_000 } }) // heavy: parses or analyses a file
   @Post('upload-excel')
   @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: 'Upload Excel file to bulk import raw materials' })

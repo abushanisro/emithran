@@ -16,7 +16,6 @@ import { createResponse, ApiResponse as StandardApiResponse } from '@/common/dto
 import { ProductionEntryService } from '../services/production-entry.service';
 import {
   CreateProductionEntryDto,
-  UpdateProductionEntryDto,
   ProductionEntryResponseDto,
   WeeklySummaryDto,
   ProductionEntriesQueryDto
@@ -52,16 +51,6 @@ export class ProductionEntryController {
       req.user.id
     );
     return createResponse(result);
-  }
-
-  @OrgRole('viewer')
-  @Get('debug')
-  @ApiOperation({ summary: 'Debug endpoint to test controller registration' })
-  async debug(): Promise<{ message: string; timestamp: string }> {
-    return {
-      message: 'Production entries controller is working!',
-      timestamp: new Date().toISOString()
-    };
   }
 
   @OrgRole('viewer')
@@ -108,29 +97,6 @@ export class ProductionEntryController {
   })
   async findOne(@Param('id') id: string): Promise<StandardApiResponse<ProductionEntryResponseDto>> {
     const result = await this.productionEntryService.getProductionEntryById(id);
-    return createResponse(result);
-  }
-
-  @Patch(':id')
-  @ApiOperation({ summary: 'Update a production entry' })
-  @ApiResponse({
-    status: 200,
-    description: 'Production entry updated successfully',
-    type: ProductionEntryResponseDto
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Production entry not found'
-  })
-  @ApiResponse({
-    status: 409,
-    description: 'Another production entry already exists for this lot, process, date, and shift'
-  })
-  async update(
-    @Param('id') id: string,
-    @Body() updateProductionEntryDto: UpdateProductionEntryDto
-  ): Promise<StandardApiResponse<ProductionEntryResponseDto>> {
-    const result = await this.productionEntryService.updateProductionEntry(id, updateProductionEntryDto);
     return createResponse(result);
   }
 

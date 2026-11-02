@@ -3,6 +3,7 @@ import {
   NotFoundException,
   InternalServerErrorException,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import { Logger } from '../../common/logger/logger.service';
 import { DatabaseService } from '../../common/database/database.service';
@@ -264,6 +265,22 @@ export class ProcessRoutesService {
     userId: string,
     accessToken: string,
   ): Promise<ProcessRouteResponseDto> {
+    // Only a route that was submitted for review can be approved; a draft cannot skip the review.
+    const { data: current, error: currentError } = await this.databaseService
+      .getClient(accessToken)
+      .from('process_routes')
+      .select('workflow_state')
+      .eq('id', id)
+      .maybeSingle();
+    if (currentError) {
+      this.logger.error(`Error reading process route: ${currentError.message}`, 'ProcessRoutesService');
+      throw new InternalServerErrorException('Failed to read the process route');
+    }
+    if (!current) throw new NotFoundException(`Process route with ID ${id} not found`);
+    if (current.workflow_state !== WorkflowState.IN_REVIEW) {
+      throw new ConflictException(`Only a route that is in review can be approved (this one is ${current.workflow_state}).`);
+    }
+
     const { data, error } = await this.databaseService
       .getClient(accessToken)
       .from('process_routes')
@@ -274,6 +291,7 @@ export class ProcessRoutesService {
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
+      .eq('workflow_state', WorkflowState.IN_REVIEW)
       .select()
       .single();
 

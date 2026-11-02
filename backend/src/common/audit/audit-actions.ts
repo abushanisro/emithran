@@ -14,6 +14,8 @@ export const AUDIT_ACTIONS = {
   // written by the delete_bom_item_cascade() database function itself (migration 945), listed so the trail has one vocabulary
   'bom_item.force_deleted': ['name', 'lotMaterials', 'lots'],
   'fx_rate.changed': ['currency', 'previousRate', 'rate', 'reason', 'confirmed'],
+  // an administrator deleted every row of a rate or master-data table (DELETE on /lhr, /mhr, /vendors, /raw-materials, /processes/calculator-mappings)
+  'reference_data.purged': ['dataset', 'deleted'],
   'cost.applied': ['route', 'custom'],
   'export.generated': ['kind', 'rows'],
   'rfq.sent': ['recipients'],

@@ -1,4 +1,5 @@
 interface User { id: string; email: string; [key: string]: any; }
+import { Throttle } from '@nestjs/throttler';
 import {
   Controller,
   Get,
@@ -22,6 +23,8 @@ import { LHRService } from './lhr.service';
 import { CreateLHRDto, UpdateLHRDto } from './lhr.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
+import { AuditService } from '../../common/audit/audit.service';
+import { requireBulkDeleteConfirmation } from '../../common/http/bulk-delete';
 import { OrgRole } from '../../common/authz/authz-policy';
 
 @ApiTags('LHR')
@@ -29,7 +32,7 @@ import { OrgRole } from '../../common/authz/authz-policy';
 @OrgRole('member')
 @Controller({ path: 'api/lhr', version: '1' })
 export class LHRController {
-  constructor(private readonly LHRService: LHRService) { }
+  constructor(private readonly LHRService: LHRService, private readonly audit: AuditService) { }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -126,11 +129,13 @@ export class LHRController {
     return this.LHRService.update(id, UpdateLHRDto, user.id, token);
   }
 
+  @OrgRole('admin')
   @Delete()
-  @ApiOperation({ summary: 'Delete all LHR records for the current user' })
+  @ApiOperation({ summary: 'Delete all LHR records for the current user (administrators; needs ?confirm=delete-all)' })
   @ApiResponse({ status: 200, description: 'All LHR records deleted' })
-  async removeAll(@CurrentUser() user: User, @AccessToken() token: string) {
-    return this.LHRService.removeAll(user.id, token);
+  async removeAll(@CurrentUser() user: User, @AccessToken() token: string, @Query('confirm') confirm?: string) {
+    requireBulkDeleteConfirmation(confirm);
+    return this.audit.purged('lhr', () => this.LHRService.removeAll(user.id, token));
   }
 
   @Delete(':id')
@@ -158,6 +163,7 @@ export class LHRController {
     return this.LHRService.bulkCreate(data, user.id, token);
   }
 
+  @Throttle({ default: { limit: 10, ttl: 60_000 } }) // heavy: parses or analyses a file
   @Post('import-excel')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_XLSX_UPLOAD_BYTES, files: 1 } }))
   @ApiOperation({ summary: 'Import LHR records from Excel (.xlsx)' })

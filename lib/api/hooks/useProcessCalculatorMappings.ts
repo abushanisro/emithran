@@ -118,7 +118,7 @@ const processCalculatorMappingsApi = {
   },
 
   clearAll: async () => {
-    return apiClient.delete<{ deleted: number }>('/processes/calculator-mappings');
+    return apiClient.delete<{ deleted: number }>('/processes/calculator-mappings?confirm=delete-all');
   },
 };
 

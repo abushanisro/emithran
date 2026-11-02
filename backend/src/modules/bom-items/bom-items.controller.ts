@@ -1,3 +1,4 @@
+import { Throttle } from '@nestjs/throttler';
 import { AuditService } from '../../common/audit/audit.service';
 import { MAX_CAD_FILE_BYTES } from '../../common/upload-limits';
 import { breakerFor, CAD_ENGINE, isServiceUnavailable } from '../../common/resilience/circuit-breaker';
@@ -23,6 +24,7 @@ import {
   ServiceUnavailableException,
   UseGuards,
   ParseUUIDPipe,
+  ParseEnumPipe,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { gunzip } from 'zlib';
@@ -85,6 +87,9 @@ interface User {
 // without standing up a controller and a database.
 
 
+/** The files served by the generic signed-URL route; 'dxf' has its own route above it. */
+const SIGNED_FILE_TYPES = { TWO_D: '2d', THREE_D: '3d' } as const;
+
 @ApiTags('BOM Items')
 @ApiBearerAuth()
 @OrgRole('member')
@@ -111,6 +116,7 @@ export class BOMItemsController {
   ) {}
 
   // ── Stateless CAD auto-fill (no DB writes) ──────────────────────────────────
+  @Throttle({ default: { limit: 20, ttl: 60_000 } }) // heavy: parses or analyses a file
   @Post('analyze-for-autofill')
   @ApiOperation({ summary: 'Analyze a 3D file and return auto-fill suggestions (stateless, no DB write)' })
   @ApiConsumes('multipart/form-data')
@@ -168,6 +174,7 @@ export class BOMItemsController {
   // ── Background variant: for large/complex files where CAD analysis can take
   // minutes (mostly OCC's own STEP transfer). Returns a jobId immediately;
   // poll GET analyze-for-autofill/:jobId for the result. ──────────────────────
+  @Throttle({ default: { limit: 20, ttl: 60_000 } }) // heavy: parses or analyses a file
   @Post('analyze-for-autofill/start')
   @ApiOperation({ summary: 'Start a background 3D file analysis; returns a jobId to poll' })
   @ApiConsumes('multipart/form-data')
@@ -677,13 +684,31 @@ export class BOMItemsController {
     return this.bomItemsService.updateSortOrder(body.items, user.id, token);
   }
 
+  // Registered before the generic route below: ':fileType' would otherwise swallow 'dxf'.
+  @OrgRole('viewer')
+  @Get(':id/file-url/dxf')
+  @ApiOperation({ summary: 'Get signed URL for BOM item DXF drawing' })
+  @ApiResponse({ status: 200, description: 'Signed URL generated successfully' })
+  async getDxfFileUrl(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+  ): Promise<{ url: string }> {
+    const bomItem = await this.bomItemsService.findOne(id, user.id, token);
+    if (!bomItem.fileDxfPath) {
+      throw new BadRequestException('No DXF file found for this item');
+    }
+    const signedUrl = await this.fileStorageService.getSignedUrl(bomItem.fileDxfPath, 3600);
+    return { url: signedUrl };
+  }
+
   @OrgRole('viewer')
   @Get(':id/file-url/:fileType')
   @ApiOperation({ summary: 'Get signed URL for BOM item file' })
   @ApiResponse({ status: 200, description: 'Signed URL generated successfully' })
   async getFileUrl(
     @Param('id') id: string,
-    @Param('fileType') fileType: '2d' | '3d',
+    @Param('fileType', new ParseEnumPipe(SIGNED_FILE_TYPES)) fileType: '2d' | '3d',
     @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<{ url: string }> {
@@ -707,6 +732,7 @@ export class BOMItemsController {
     return { url: signedUrl };
   }
 
+  @Throttle({ default: { limit: 10, ttl: 60_000 } }) // heavy: parses or analyses a file
   @Post(':id/upload-files')
   @ApiOperation({ summary: 'Upload 2D/3D/DXF files for BOM item' })
   @ApiConsumes('multipart/form-data')
@@ -869,23 +895,6 @@ export class BOMItemsController {
 
     // Update BOM item with file paths
     return this.bomItemsService.update(id, updateData, user.id, token);
-  }
-
-  @OrgRole('viewer')
-  @Get(':id/file-url/dxf')
-  @ApiOperation({ summary: 'Get signed URL for BOM item DXF drawing' })
-  @ApiResponse({ status: 200, description: 'Signed URL generated successfully' })
-  async getDxfFileUrl(
-    @Param('id') id: string,
-    @CurrentUser() user: User,
-    @AccessToken() token: string,
-  ): Promise<{ url: string }> {
-    const bomItem = await this.bomItemsService.findOne(id, user.id, token);
-    if (!bomItem.fileDxfPath) {
-      throw new BadRequestException('No DXF file found for this item');
-    }
-    const signedUrl = await this.fileStorageService.getSignedUrl(bomItem.fileDxfPath, 3600);
-    return { url: signedUrl };
   }
 
   @OrgRole('viewer')
@@ -1193,6 +1202,7 @@ export class BOMItemsController {
     }
   }
 
+  @Throttle({ default: { limit: 10, ttl: 60_000 } }) // heavy: parses or analyses a file
   @Post('batch-analyze-cad')
   @ApiOperation({ summary: 'Perform batch CAD analysis on multiple BOM items' })
   @ApiResponse({ status: 200, description: 'Batch CAD analysis completed' })

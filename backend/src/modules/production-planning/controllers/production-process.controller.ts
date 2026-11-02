@@ -43,15 +43,6 @@ export class ProductionProcessController {
   }
 
 
-  @Delete('/:id')
-  @ApiOperation({ summary: 'Delete production process' })
-  async deleteProductionProcess(
-    @Param('id') id: string,
-    @CurrentUser() user: User
-  ): Promise<void> {
-    return this.productionProcessService.deleteProductionProcess(id, user.id);
-  }
-
   @OrgRole('viewer')
   @Get('/lot/:lotId')
   @ApiOperation({ summary: 'Get all processes for a production lot' })

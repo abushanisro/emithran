@@ -240,7 +240,7 @@ export const vendorsApi = {
    * Delete all vendors
    */
   deleteAll: async (): Promise<{ deleted: number }> => {
-    return apiClient.delete<{ deleted: number }>('/vendors');
+    return apiClient.delete<{ deleted: number }>('/vendors?confirm=delete-all');
   },
 
   /**

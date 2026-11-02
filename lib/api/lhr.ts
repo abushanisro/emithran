@@ -144,7 +144,7 @@ export const lhrApi = {
   },
 
   deleteAll: async (): Promise<{ deleted: number }> => {
-    const response = await apiClient.delete<{ deleted: number }>('/lhr');
+    const response = await apiClient.delete<{ deleted: number }>('/lhr?confirm=delete-all');
     return response ?? { deleted: 0 };
   },
 

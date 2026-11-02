@@ -450,7 +450,7 @@ export const mhrApi = {
    * Delete all MHR records for the current user
    */
   deleteAll: async (): Promise<{ deleted: number }> => {
-    return apiClient.delete<{ deleted: number }>('/mhr') ?? { deleted: 0 };
+    return apiClient.delete<{ deleted: number }>('/mhr?confirm=delete-all') ?? { deleted: 0 };
   },
 
   getBenchmarkRates: async (location?: string, processGroup?: string, machineClass?: string): Promise<MHRBenchmarkEntry[]> => {

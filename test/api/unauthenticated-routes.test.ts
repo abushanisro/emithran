@@ -94,8 +94,8 @@ describe('state-changing routes outside the BFF', () => {
 
 describe('PDF routes call the backend as the session user', () => {
   it.each([
-    ['pdf-to-image', pdfToImage, '/api/pdf-to-image', '/v1/pdf-processing/validate-pdf'],
-    ['extract-dimensions', extractDimensions, '/api/extract-dimensions', '/v1/pdf-processing/extract-dimensions'],
+    ['pdf-to-image', pdfToImage, '/api/pdf-to-image', '/v1/api/pdf-processing/validate-pdf'],
+    ['extract-dimensions', extractDimensions, '/api/extract-dimensions', '/v1/api/pdf-processing/extract-dimensions'],
   ] as const)('%s sends the session token, never the browser header, and does not follow redirects', async (_l, route, path, backendPath) => {
     state.caller = 'user-a';
     fetchMock

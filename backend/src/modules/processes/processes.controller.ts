@@ -1,4 +1,5 @@
 interface User { id: string; email: string; [key: string]: any; }
+import { Throttle } from '@nestjs/throttler';
 import {
   Controller,
   Get,
@@ -39,6 +40,8 @@ import { AccessToken } from '../../common/decorators/access-token.decorator';
 import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
 import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
 import { REFERENCE_DOMAINS, isReferenceDomain, referenceDomainList } from './reference-domains';
+import { AuditService } from '../../common/audit/audit.service';
+import { requireBulkDeleteConfirmation } from '../../common/http/bulk-delete';
 import { OrgRole } from '../../common/authz/authz-policy';
 import { MAX_XLSX_UPLOAD_BYTES } from '../../common/archive/xlsx-limits';
 
@@ -47,13 +50,14 @@ import { MAX_XLSX_UPLOAD_BYTES } from '../../common/archive/xlsx-limits';
 @OrgRole('member')
 @Controller({ path: 'api/processes', version: '1' })
 export class ProcessesController {
-  constructor(private readonly processesService: ProcessesService) {}
+  constructor(private readonly processesService: ProcessesService, private readonly audit: AuditService) {}
 
   // ============================================================================
   // PROCESS CALCULATOR MAPPING ENDPOINTS (Must be before :id routes)
   // Routes ordered: most specific -> general -> dynamic params
   // ============================================================================
 
+  @Throttle({ default: { limit: 10, ttl: 60_000 } }) // heavy: parses or analyses a file
   @Post('calculator-mappings/import-excel')
   @UseGuards(OrganizationContextGuard)
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_XLSX_UPLOAD_BYTES, files: 1 } }))
@@ -161,11 +165,13 @@ export class ProcessesController {
     return this.processesService.updateProcessCalculatorMapping(id, updateDto, token);
   }
 
+  @OrgRole('admin')
   @Delete('calculator-mappings')
-  @ApiOperation({ summary: 'Clear all process calculator mappings' })
+  @ApiOperation({ summary: 'Clear all process calculator mappings (administrators; needs ?confirm=delete-all)' })
   @ApiResponse({ status: 200, description: 'All process calculator mappings deleted' })
-  async clearAllCalculatorMappings(@AccessToken() token: string) {
-    return this.processesService.clearAllCalculatorMappings(token);
+  async clearAllCalculatorMappings(@AccessToken() token: string, @Query('confirm') confirm?: string) {
+    requireBulkDeleteConfirmation(confirm);
+    return this.audit.purged('process_calculator_mappings', () => this.processesService.clearAllCalculatorMappings(token));
   }
 
   @Delete('calculator-mappings/:id')

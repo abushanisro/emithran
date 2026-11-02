@@ -737,6 +737,29 @@ export class SupplierNominationsController {
     );
   }
 
+  @Put(':nominationId/vendors/:vendorId/assessment/batch')
+  @ApiOperation({ summary: 'Batch update vendor assessment criteria - ENTERPRISE BEST PRACTICE' })
+  @ApiResponse({
+    status: 200,
+    description: 'Assessment criteria updated successfully in batch',
+    type: [VendorAssessmentCriteriaDto]
+  })
+  batchUpdateVendorAssessmentCriteria(
+    @CurrentUser('id') userId: string,
+    @AccessToken() token: string,
+    @Param('nominationId') nominationId: string,
+    @Param('vendorId') vendorId: string,
+    @Body() updateDto: BatchAssessmentUpdateDto
+  ): Promise<VendorAssessmentCriteriaDto[]> {
+    return this.supplierNominationsService.batchUpdateVendorAssessmentCriteria(
+      userId,
+      nominationId,
+      vendorId,
+      updateDto.updates,
+      token
+    );
+  }
+
   @Put(':nominationId/vendors/:vendorId/assessment/:criteriaId')
   @ApiOperation({ summary: 'Update individual assessment criterion' })
   @ApiResponse({
@@ -764,29 +787,6 @@ export class SupplierNominationsController {
       vendorId,
       criteriaId,
       updateDto,
-      token
-    );
-  }
-
-  @Put(':nominationId/vendors/:vendorId/assessment/batch')
-  @ApiOperation({ summary: 'Batch update vendor assessment criteria - ENTERPRISE BEST PRACTICE' })
-  @ApiResponse({
-    status: 200,
-    description: 'Assessment criteria updated successfully in batch',
-    type: [VendorAssessmentCriteriaDto]
-  })
-  batchUpdateVendorAssessmentCriteria(
-    @CurrentUser('id') userId: string,
-    @AccessToken() token: string,
-    @Param('nominationId') nominationId: string,
-    @Param('vendorId') vendorId: string,
-    @Body() updateDto: BatchAssessmentUpdateDto
-  ): Promise<VendorAssessmentCriteriaDto[]> {
-    return this.supplierNominationsService.batchUpdateVendorAssessmentCriteria(
-      userId,
-      nominationId,
-      vendorId,
-      updateDto.updates,
       token
     );
   }

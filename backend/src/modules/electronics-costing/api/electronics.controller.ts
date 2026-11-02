@@ -1,3 +1,4 @@
+import { Throttle } from '@nestjs/throttler';
 import {
   BadRequestException,
   Body,
@@ -123,6 +124,7 @@ export class ElectronicsController {
     private readonly reparse: ReparseUploadUseCase,
   ) {}
 
+  @Throttle({ default: { limit: 10, ttl: 60_000 } }) // heavy: parses or analyses a file
   @Post('uploads')
   @ApiOperation({ summary: 'Store a PCBA or harness upload and queue its parse job' })
   @ApiConsumes('multipart/form-data')
@@ -312,6 +314,7 @@ export class ElectronicsController {
     return this.deleter.deleteRevision(designId, revisionId, organizationId, token);
   }
 
+  @Throttle({ default: { limit: 10, ttl: 60_000 } }) // heavy: parses or analyses a file
   @Post('uploads/:uploadId/reparse')
   @ApiOperation({ summary: 'Read the stored files of a revision again' })
   async reparseUpload(

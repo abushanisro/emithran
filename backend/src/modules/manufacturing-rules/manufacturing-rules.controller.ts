@@ -5,7 +5,7 @@ import { CalculatorRegistry } from "./calculators/calculator.registry";
 import { OrgRole } from '../../common/authz/authz-policy';
 
 @OrgRole('member')
-@Controller("v1/api/manufacturing-rules")
+@Controller({ path: 'api/manufacturing-rules', version: '1' })
 export class ManufacturingRulesController {
   private readonly logger = new Logger(ManufacturingRulesController.name);
 
