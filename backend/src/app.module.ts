@@ -12,6 +12,7 @@ import { BOMsModule } from './modules/boms/boms.module';
 import { BOMItemsModule } from './modules/bom-items/bom-items.module';
 import { CadUploadsModule } from './modules/cad-uploads/cad-uploads.module';
 import { AuditModule } from './common/audit/audit.module';
+import { AiModule } from './common/ai/ai.module';
 import { ProcessesModule } from './modules/processes/processes.module';
 import { ProcessRoutesModule } from './modules/process-routes/process-routes.module';
 import { RawMaterialsModule } from './modules/raw-materials/raw-materials.module';
@@ -82,6 +83,7 @@ import { AppController } from './app.controller';
     BOMItemsModule,
     CadUploadsModule,
     AuditModule,
+    AiModule,
     ProcessesModule,
     ProcessRoutesModule,
     RawMaterialsModule,

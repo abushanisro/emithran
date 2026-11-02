@@ -29,6 +29,8 @@ Build the frontend image **per environment**: `NEXT_PUBLIC_*` values are compile
 | `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_SECRET`, `APP_BASE_URL` | the web app's Auth0 application, its session secret and the public app URL; **server only** | Auth0; `AUTH0_SECRET`: `openssl rand -hex 32` |
 | `CAD_ENGINE_API_KEY`, `ECAD_ENGINE_API_KEY` | shared secrets between the backend and the engines | generate: `openssl rand -hex 32` |
 | `TUNNEL_TOKEN` | the Cloudflare Tunnel token; the tunnel is the only way into the host (no published ports) | Cloudflare Zero Trust, Tunnels |
+| `ANTHROPIC_API_KEY` | the AI key; **backend only** (every model call goes through AiBudgetService; the web app holds no AI key). Unset = AI features answer 503. Not yet passed to the backend container by `docker-compose.prod.yml` | Anthropic console (also set a workspace spend limit) |
+| `AI_DISABLED`, `AI_USER_DAILY_TOKENS`, `AI_ORG_DAILY_TOKENS`, `AI_GLOBAL_DAILY_TOKENS`, `AI_MAX_CONCURRENT_PER_USER` | AI kill switch (`true` refuses every AI call with 503) and spend limits in tokens per UTC day; defaults 2,000,000 / 20,000,000 / 50,000,000 tokens and 2 requests (`backend/src/config/env.validation.ts`). Optional; same compose caveat as `ANTHROPIC_API_KEY` | you |
 | `NEXT_PUBLIC_API_GATEWAY_URL`, `CORS_ORIGIN` | the public URL of the app, the same value for both: Cloudflare serves the frontend there and routes `/v1/*` to the backend, so the API is same-origin. The engines have no public URL | your DNS |
 
 Never paste a secret key, a database password or a connection string into chat, an issue or a commit.

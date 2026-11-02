@@ -91,6 +91,38 @@ class EnvironmentVariables {
   @IsOptional()
   AI_LIMIT_PER_MINUTE: number = 20;
 
+  // AI spend (common/ai/ai-budget.service.ts, decision D6). Tokens are input (including cached) plus output, from each response's
+  // usage, counted per UTC day in ai_usage_daily (migration 949). A call over a limit is refused with 429 until 00:00 UTC.
+  /** Kill switch: 'true' refuses every AI call with 503, at once, without a deploy of code. */
+  @IsString()
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  AI_DISABLED: string = 'false';
+
+  /** Tokens one user may spend per UTC day, across every organization and AI feature. */
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  AI_USER_DAILY_TOKENS: number = 2_000_000;
+
+  /** Tokens one organization may spend per UTC day, all its members together. */
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  AI_ORG_DAILY_TOKENS: number = 20_000_000;
+
+  /** Tokens the whole deployment may spend per UTC day (keep it under the Anthropic workspace spend limit). A warning is logged at 80%. */
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  AI_GLOBAL_DAILY_TOKENS: number = 50_000_000;
+
+  /** AI requests (copilot streams, drawing extraction, VAVE analyses) one user may have running at once, per backend instance. */
+  @IsNumber()
+  @IsOptional()
+  @Min(1)
+  AI_MAX_CONCURRENT_PER_USER: number = 2;
+
   @IsString()
   @IsOptional()
   @IsIn(['error', 'warn', 'info', 'debug', 'verbose'])

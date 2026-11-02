@@ -18,7 +18,8 @@ import type { GenerationResponse, ToolCallLogEntry } from '../dto/generation-res
 import { deriveImplications } from '../dto/manufacturing-implication.dto';
 
 import { RetrievalService } from './retrieval.service';
-import { ReasoningService, REASONING_MODEL } from './reasoning.service';
+// The model id recorded on an out-of-scope generation row (no model is called for it; plans are built deterministically).
+const REASONING_MODEL = 'claude-sonnet-4-6';
 import { ResolverService } from './resolver.service';
 import { DeterministicPlannerService } from './deterministic-planner.service';
 import { AlternativeRoutePlannerService } from './alternative-route-planner.service';
@@ -61,7 +62,6 @@ export class OrchestratorService {
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly retrieval: RetrievalService,
-    private readonly reasoning: ReasoningService,
     private readonly resolver: ResolverService,
     private readonly deterministicPlanner: DeterministicPlannerService,
     private readonly alternativeRoutePlanner: AlternativeRoutePlannerService,
@@ -76,7 +76,7 @@ export class OrchestratorService {
     const stream = this.streamKey(bomItemId, userId);
 
     // ── Stage 1 — retrieval + scope gate ──────────────────────────────────
-    const { brief, candidates } = await this.retrieval.assemble(bomItemId, userId, accessToken);
+    const { brief, candidates } = await this.retrieval.assemble(bomItemId, userId, accessToken, organizationId);
     this.emit(stream, {
       type: 'scope_decided',
       data: { family: brief.scope.family, inScope: brief.scope.inScope, reason: brief.scope.reason },

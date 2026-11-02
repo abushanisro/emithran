@@ -21,6 +21,26 @@ export const COPILOT_MAX_MESSAGES = 8;
 export const COPILOT_MAX_USER_CHARS = 2000;
 /** Earlier answers are sent back as history and are much longer than a question. */
 export const COPILOT_MAX_ASSISTANT_CHARS = 8000;
+export const COPILOT_MAX_TURNS = 10_000;
+
+/** Save or dismiss is the user's answer to a proposal shown in one conversation turn; the confirm call names both. */
+export class ConfirmMemoryProposalDto {
+  @IsUUID()
+  conversationId: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(COPILOT_MAX_TURNS)
+  turn: number;
+}
+
+export class DeleteMemoryItemDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  preference: string;
+}
 
 export class CopilotMessageDto {
   @IsIn(['user', 'assistant'])
@@ -43,6 +63,17 @@ export class CopilotMessageDto {
 export class CopilotChatDto {
   @IsUUID()
   bomItemId: string;
+
+  /** The panel's conversation (a UUID it makes when the conversation starts). A memory proposal is bound to it. */
+  @IsUUID()
+  conversationId: string;
+
+  /** Which user message of the conversation this is, from 1. A memory proposal is bound to it. */
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(COPILOT_MAX_TURNS)
+  turn: number;
 
   @IsString()
   @MinLength(1)

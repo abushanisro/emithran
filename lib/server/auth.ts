@@ -46,7 +46,11 @@ export async function sessionAccessToken(): Promise<string | null> {
 
 const AI_LIMIT_PER_MINUTE = Number(process.env.AI_ROUTE_LIMIT_PER_MINUTE ?? 20);
 
-/** requireUser plus a per-user cap on paid AI calls. */
+/**
+ * requireUser plus a per-user, per-instance cap, for the one route that spends a paid vision service from this server: the drawing
+ * analysis proxy to the CAD engine. Anthropic calls are not capped here: they all run in the backend through AiBudgetService (daily
+ * token budgets, concurrency, kill switch), which holds the only Anthropic key.
+ */
 export async function requireUserForAi(route: string): Promise<AuthResult> {
   const auth = await requireUser();
   if (!auth.ok) return auth;

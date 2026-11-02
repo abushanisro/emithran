@@ -13,7 +13,7 @@ import {
   ReferenceLine, Cell, CartesianGrid, BarChart, PieChart, Pie,
 } from 'recharts';
 import { useVaveBom, useVaveShouldCosts, useUpsertShouldCost } from '@/lib/api/hooks/useVave';
-import type { VaveBomItem, CostAnalysisResult, ShouldCostResult } from '@/lib/api/vave';
+import { vaveApi, type VaveBomItem, type CostAnalysisResult } from '@/lib/api/vave';
 import { toast } from 'sonner';
 
 interface Props { projectId: string }
@@ -405,14 +405,8 @@ export function CostAnalysis({ projectId }: Props) {
     if (!items.length) { toast.error('Add BOM items first'); return; }
     setAiLoading(true);
     try {
-      const res = await fetch('/api/vave/cost-analysis', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bomItems: items }),
-      });
-      const body = (await res.json().catch(() => null)) as { error?: string } | null;
-      if (!res.ok) throw new Error(body?.error ?? `AI analysis failed (${res.status})`);
-      setAiResult(body as unknown as CostAnalysisResult);
+      // The server reads this project's BOM itself and builds the prompt.
+      setAiResult(await vaveApi.aiCostAnalysis(projectId));
       toast.success('AI analysis complete');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'AI analysis failed');
@@ -425,14 +419,7 @@ export function CostAnalysis({ projectId }: Props) {
   const calculateShouldCost = async (item: VaveBomItem): Promise<boolean> => {
     setCalculatingId(item.id);
     try {
-      const res = await fetch('/api/vave/should-cost', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ part: item }),
-      });
-      const body = (await res.json().catch(() => null)) as { error?: string } | null;
-      if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status}`);
-      const result = body as unknown as ShouldCostResult;
+      const result = await vaveApi.aiShouldCost(projectId, item.id);
       // Components the AI did not estimate are left out, not saved as 0.
       await upsertShouldCost.mutateAsync({
         partNumber: item.partNumber,

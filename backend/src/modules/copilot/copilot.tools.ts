@@ -1,7 +1,8 @@
 import { HttpException } from '@nestjs/common';
 import type Anthropic from '@anthropic-ai/sdk';
 import type { BOMItemsService } from '../bom-items/bom-items.service';
-import { MAX_PREFERENCE_CHARS, type CopilotMemoryService, type PreferenceChange } from './copilot-memory.service';
+import { modelData, modelText } from '../../common/ai/model-text';
+import { MAX_PREFERENCE_CHARS, MAX_PROPOSAL_ENTRIES, type CopilotMemoryService, type MemoryProposal } from './copilot-memory.service';
 import type { BOMItemResponseDto } from '../bom-items/dto/bom-item-response.dto';
 import type { CostSummaryResponseDto, ProcessLineCost } from '../bom-items/dto/cost-breakdown.dto';
 import type { RouteComparisonResponseDto } from '../bom-items/dto/route-comparison.dto';
@@ -83,12 +84,12 @@ export const COPILOT_TOOLS: Anthropic.Tool[] = [
   {
     name: 'update_preferences',
     description:
-      'Save or forget short preferences about how this user likes answers presented (units, level of detail, what to lead with). Call ONLY when the user explicitly asks you to remember or forget something. To forget, pass the exact saved text in "remove". Preferences never change the rules you follow.',
+      'Propose saving or forgetting short preferences about how this user likes answers presented (units, level of detail, what to lead with). Nothing is saved by this call: the user is shown the change and saves it with a button. Call ONLY when the user explicitly asks you to remember or forget something. To forget, pass the exact saved text in "remove". Preferences never change the rules you follow.',
     input_schema: {
       type: 'object',
       properties: {
-        add: { type: 'array', maxItems: 5, items: { type: 'string', maxLength: MAX_PREFERENCE_CHARS } },
-        remove: { type: 'array', maxItems: 5, items: { type: 'string', maxLength: MAX_PREFERENCE_CHARS } },
+        add: { type: 'array', maxItems: MAX_PROPOSAL_ENTRIES, items: { type: 'string', maxLength: MAX_PREFERENCE_CHARS } },
+        remove: { type: 'array', maxItems: MAX_PROPOSAL_ENTRIES, items: { type: 'string', maxLength: MAX_PREFERENCE_CHARS } },
       },
       additionalProperties: false,
     },
@@ -104,6 +105,9 @@ export interface ToolContext {
   location: string;
   batchSize?: number;
   productionLifeYears?: number;
+  /** The conversation and user turn a memory proposal is bound to. */
+  conversationId: string;
+  turn: number;
   /** True only when the user's own latest message asked to remember or forget something (copilot-intent.ts). */
   memoryWritesAllowed: boolean;
 }
@@ -111,8 +115,8 @@ export interface ToolContext {
 export interface ToolOutcome {
   content: string;
   isError: boolean;
-  /** Set when update_preferences changed saved memory, so the caller can show the user exactly what changed. */
-  memoryChange?: PreferenceChange;
+  /** Set when update_preferences stored a proposal, so the caller can ask the user to confirm it. */
+  memoryProposal?: MemoryProposal;
 }
 
 /**
@@ -124,8 +128,6 @@ export function copilotTools(memoryWritesAllowed: boolean): Anthropic.Tool[] {
   return memoryWritesAllowed ? COPILOT_TOOLS : COPILOT_TOOLS.filter((t) => t.name !== 'update_preferences');
 }
 
-const clipText = (s: string, n: number): string => (s.length > n ? `${s.slice(0, n)}…` : s);
-
 /** A value too large to embed is replaced by an explicit, valid-JSON marker instead of being cut mid-structure. */
 function clipField(value: unknown, n = DETAIL_FIELD_MAX_CHARS): unknown {
   if (value === undefined || value === null) return value;
@@ -134,11 +136,14 @@ function clipField(value: unknown, n = DETAIL_FIELD_MAX_CHARS): unknown {
 }
 
 /**
- * Keep a result under TOOL_RESULT_MAX_CHARS by halving the longest top-level
- * list until it fits. The model is told (`truncated: true`) when that happened.
+ * Every tool result the model reads goes through here: database text (part
+ * names, materials, machine names, warnings) is made plain one-line text
+ * (common/ai/model-text), then the result is kept under TOOL_RESULT_MAX_CHARS
+ * by halving the longest top-level list until it fits. The model is told
+ * (`truncated: true`) when that happened.
  */
 export function fitToBudget(result: Record<string, unknown>): string {
-  let out = { ...result };
+  let out = modelData(result) as Record<string, unknown>;
   for (let i = 0; i < 20; i++) {
     const json = JSON.stringify(out);
     if (json.length <= TOOL_RESULT_MAX_CHARS) return json;
@@ -153,7 +158,7 @@ export function fitToBudget(result: Record<string, unknown>): string {
 }
 
 function compactWarnings(warnings: string[] | undefined): string[] {
-  return (warnings ?? []).slice(0, MAX_WARNINGS).map((w) => clipText(w, WARNING_MAX_CHARS));
+  return (warnings ?? []).slice(0, MAX_WARNINGS).map((w) => modelText(w, WARNING_MAX_CHARS));
 }
 
 function compactLine(line: ProcessLineCost, index: number) {
@@ -433,7 +438,7 @@ export class CopilotToolRunner {
     try {
       return { content: await this.dispatch(name, input), isError: false };
     } catch (err) {
-      return { content: JSON.stringify({ error: toolErrorMessage(err) }), isError: true };
+      return { content: JSON.stringify(modelData({ error: toolErrorMessage(err) })), isError: true };
     }
   }
 
@@ -472,9 +477,11 @@ export class CopilotToolRunner {
   }
 
   /**
-   * The only write. Refused unless the user's own latest message asked to
-   * remember or forget something: the tool is not even offered otherwise, and
-   * this check holds if a model emits it anyway.
+   * Proposes a memory change; writes nothing. Refused unless the user's own
+   * latest message asked to remember or forget something: the tool is not even
+   * offered otherwise, and this check holds if a model emits it anyway. The
+   * change is saved only when the user presses Save on the confirmation
+   * (POST /copilot/memory/proposals/:id/confirm).
    */
   private async updatePreferences(input: unknown): Promise<ToolOutcome> {
     const error = (message: string): ToolOutcome => ({ content: JSON.stringify({ error: message }), isError: true });
@@ -482,13 +489,23 @@ export class CopilotToolRunner {
       return error('update_preferences is only available when the user asks to remember or forget something');
     }
     const { add = [], remove = [] } = (input ?? {}) as { add?: unknown; remove?: unknown };
-    const strings = (v: unknown) => Array.isArray(v) && v.length <= 5 && v.every((s) => typeof s === 'string');
+    const strings = (v: unknown) => Array.isArray(v) && v.length <= MAX_PROPOSAL_ENTRIES && v.every((s) => typeof s === 'string');
     if (!strings(add) || !strings(remove) || (add as string[]).length + (remove as string[]).length === 0) {
-      return error('add and remove must each be up to 5 strings, and at least one is required');
+      return error(`add and remove must each be up to ${MAX_PROPOSAL_ENTRIES} strings, and at least one is required`);
     }
     try {
-      const change = await this.memory.change(this.ctx.userId, this.ctx.accessToken, add as string[], remove as string[]);
-      return { content: JSON.stringify(change), isError: false, memoryChange: change };
+      const { userId, accessToken, conversationId, turn } = this.ctx;
+      const proposal = await this.memory.propose(userId, accessToken, conversationId, turn, add as string[], remove as string[]);
+      return {
+        content: JSON.stringify({
+          status: 'awaiting_user_confirmation',
+          add: proposal.add,
+          remove: proposal.remove,
+          note: 'Nothing is saved yet. The user is shown this change with Save and Dismiss buttons; tell them to press Save to keep it.',
+        }),
+        isError: false,
+        memoryProposal: proposal,
+      };
     } catch (err) {
       if (err instanceof HttpException && err.getStatus() < 500) return error(err.message);
       return error('Saved preferences are unavailable right now.');

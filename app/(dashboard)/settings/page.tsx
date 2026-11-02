@@ -36,6 +36,7 @@ import { useAuth } from '@/lib/providers/auth';
 import { useTheme } from 'next-themes';
 import { useDensity } from '@/lib/providers/density-provider';
 import { Switch } from '@/components/ui/switch';
+import { CopilotMemorySection } from '@/components/features/settings/CopilotMemorySection';
 import {
   useMyOrganization, useCreateOrganization, useUpdateOrganization,
   useDeleteOrganization, useOrgMembers, useInviteMember, useRemoveMember,
@@ -267,6 +268,10 @@ function PreferencesTab() {
           })}
         </div>
       </section>
+
+      <div className="h-px bg-border" />
+
+      <CopilotMemorySection />
 
     </div>
   );
