@@ -408,13 +408,13 @@ export async function analyzeForAutoFill(file: File, familyHint?: string): Promi
   // Protected from the inactivity sign-out (up to 15 extra minutes): the
   // result only reaches the form through this polling loop.
   const promise = runProtectedJob('cad-autofill', async () => {
-    const { jobId } = await apiClient.uploadFiles<{ jobId: string }>('/bom-items/analyze-for-autofill/start', form);
+    const { jobId } = await apiClient.uploadFiles<{ jobId: string }>('/bom-items/autofill-analysis-jobs', form);
     if (!jobId) throw new Error('No job started for auto-fill analysis');
 
     const deadline = Date.now() + ANALYZE_MAX_WAIT_MS;
     while (Date.now() < deadline) {
       const status = await apiClient.get<{ status: 'processing' | 'ready' | 'error'; result?: AutoFillResponse; error?: string }>(
-        `/bom-items/analyze-for-autofill/${jobId}`,
+        `/bom-items/autofill-analysis-jobs/${jobId}`,
       );
       if (!status) throw new Error('No response from auto-fill analysis');
       if (status.status === 'ready') {
@@ -1481,7 +1481,7 @@ export function useApplyRoute(bomItemId: string | undefined) {
   return useMutation({
     mutationFn: (payload: { routeId: string; batchSize?: number; location?: string }) =>
       apiClient.post<{ created: number; operations: string[]; routeLabel: string; routeId: string }>(
-        `/bom-items/${bomItemId}/apply-route`,
+        `/bom-items/${bomItemId}/route-applications`,
         payload,
         // Re-runs the whole route-comparison engine before writing records —
         // observed taking 12-157s in practice, well past the 15s dev-mode
@@ -1529,7 +1529,7 @@ export function useApplyCustomRoute(bomItemId: string | undefined) {
   return useMutation({
     mutationFn: (payload: { baseCuttingRouteId: string; steps: ApplyCustomRouteStep[]; batchSize?: number; location?: string }) =>
       apiClient.post<{ created: number; operations: string[]; routeLabel: string; needsManualCycleTime: string[] }>(
-        `/bom-items/${bomItemId}/apply-custom-route`,
+        `/bom-items/${bomItemId}/custom-route-applications`,
         payload,
         // Same route-comparison re-run as apply-route (46-157 s). A shorter client
         // timeout reports failure for a write still running and invites a second click.

@@ -144,29 +144,29 @@ export interface ProductionSummary {
 const productionPlanningApi = {
   // Production Lots
   getProductionLots: (filters?: { status?: string; bomId?: string; priority?: string; projectId?: string }) =>
-    apiClient.get('/production-planning/lots', { ...(filters !== undefined ? { params: filters } : {}) }),
+    apiClient.get('/production-lots', { ...(filters !== undefined ? { params: filters } : {}) }),
 
   getProductionLotById: (id: string) =>
-    apiClient.get(`/production-planning/lots/${id}`),
+    apiClient.get(`/production-lots/${id}`),
 
   createProductionLot: (data: any) =>
-    apiClient.post('/production-planning/lots', data),
+    apiClient.post('/production-lots', data),
 
   updateProductionLot: (id: string, data: any) =>
-    apiClient.put(`/production-planning/lots/${id}`, data),
+    apiClient.put(`/production-lots/${id}`, data),
 
   deleteProductionLot: (id: string) =>
-    apiClient.delete(`/production-planning/lots/${id}`),
+    apiClient.delete(`/production-lots/${id}`),
 
   // Vendor Assignments
   getVendorAssignments: (lotId: string) =>
-    apiClient.get(`/production-planning/lots/${lotId}/vendor-assignments`),
+    apiClient.get(`/production-lots/${lotId}/vendor-assignments`),
 
   createVendorAssignment: (lotId: string, data: any) =>
-    apiClient.post(`/production-planning/lots/${lotId}/vendor-assignments`, data),
+    apiClient.post(`/production-lots/${lotId}/vendor-assignments`, data),
 
   bulkCreateVendorAssignments: (lotId: string, data: any) =>
-    apiClient.post(`/production-planning/lots/${lotId}/vendor-assignments/bulk`, data),
+    apiClient.post(`/production-lots/${lotId}/vendor-assignments/bulk`, data),
 
   updateVendorAssignment: (id: string, data: any) =>
     apiClient.put(`/production-planning/vendor-assignments/${id}`, data),
@@ -176,46 +176,46 @@ const productionPlanningApi = {
 
   // Production Processes
   getProductionProcesses: (lotId: string, filters?: { status?: string }) =>
-    apiClient.get(`/production-planning/lots/${lotId}/processes`, { ...(filters !== undefined ? { params: filters } : {}) }),
+    apiClient.get(`/production-lots/${lotId}/processes`, { ...(filters !== undefined ? { params: filters } : {}) }),
 
   createProductionProcess: (lotId: string, data: any) =>
-    apiClient.post(`/production-planning/lots/${lotId}/processes`, data),
+    apiClient.post(`/production-lots/${lotId}/processes`, data),
 
   updateProductionProcess: (id: string, data: any) =>
-    apiClient.put(`/production-planning/processes/${id}`, data),
+    apiClient.put(`/production-processes/${id}`, data),
 
   // Process Subtasks
   getProcessSubtasks: (processId: string) =>
-    apiClient.get(`/production-planning/processes/${processId}/subtasks`),
+    apiClient.get(`/production-processes/${processId}/subtasks`),
 
   createProcessSubtask: (processId: string, data: any) =>
-    apiClient.post(`/production-planning/processes/${processId}/subtasks`, data),
+    apiClient.post(`/production-processes/${processId}/subtasks`, data),
 
   updateProcessSubtask: (id: string, data: any) =>
-    apiClient.put(`/production-planning/subtasks/${id}`, data),
+    apiClient.put(`/production-subtasks/${id}`, data),
 
   deleteProcessSubtask: (id: string) =>
-    apiClient.delete(`/production-planning/subtasks/${id}`),
+    apiClient.delete(`/production-subtasks/${id}`),
 
   // Daily Production Entries
   getDailyProductionEntries: (lotId: string, filters?: { startDate?: string; endDate?: string; entryType?: string }) =>
-    apiClient.get(`/production-planning/lots/${lotId}/production-entries`, { ...(filters !== undefined ? { params: filters } : {}) }),
+    apiClient.get(`/production-lots/${lotId}/production-entries`, { ...(filters !== undefined ? { params: filters } : {}) }),
 
   createDailyProductionEntry: (lotId: string, data: any) =>
-    apiClient.post(`/production-planning/lots/${lotId}/production-entries`, data),
+    apiClient.post(`/production-lots/${lotId}/production-entries`, data),
 
   updateDailyProductionEntry: (id: string, data: any) =>
-    apiClient.put(`/production-planning/production-entries/${id}`, data),
+    apiClient.put(`/production-entries/${id}`, data),
 
   // Dashboard & Reporting
   getProductionSummary: (lotId: string) =>
-    apiClient.get(`/production-planning/lots/${lotId}/summary`),
+    apiClient.get(`/production-lots/${lotId}/summary`),
 
   getDashboardData: (filters?: { startDate?: string; endDate?: string }) =>
-    apiClient.get('/production-planning/dashboard', { ...(filters !== undefined ? { params: filters } : {}) }),
+    apiClient.get('/production-lots/dashboard', { ...(filters !== undefined ? { params: filters } : {}) }),
 
   getGanttData: (lotId: string) =>
-    apiClient.get(`/production-planning/lots/${lotId}/gantt`),
+    apiClient.get(`/production-lots/${lotId}/gantt`),
 };
 
 // Query keys

@@ -150,9 +150,9 @@ describe('docker-compose.prod.yml', () => {
 
   it('hands the browser bundle the real API address, not the localhost default it would otherwise compile in', () => {
     const args = compose.services.frontend?.build?.args ?? {};
-    expect(String(args.NEXT_PUBLIC_API_URL)).toBe('${NEXT_PUBLIC_API_GATEWAY_URL}/v1/api');
+    expect(String(args.NEXT_PUBLIC_API_URL)).toBe('${NEXT_PUBLIC_API_GATEWAY_URL}/api/v1');
     expect(read('Dockerfile.frontend')).toMatch(/ARG NEXT_PUBLIC_API_URL\b/);
-    expect(String(compose.services.frontend?.environment?.API_URL)).toBe('http://backend:4000/v1/api'); // server-side, private
+    expect(String(compose.services.frontend?.environment?.API_URL)).toBe('http://backend:4000/api/v1'); // server-side, private
   });
 
   it('feeds one upload limit to the browser, the backend and the engine', () => {

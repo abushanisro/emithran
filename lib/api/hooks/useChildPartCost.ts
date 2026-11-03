@@ -91,7 +91,7 @@ export interface ChildPartCostRecord extends ChildPartCostResult {
 export function useCalculateChildPartCost() {
   return useMutation<ChildPartCostResult, Error, ChildPartCostInput>({
     mutationFn: async (input: ChildPartCostInput) => {
-      const result = await apiClient.post<ChildPartCostResult>('/child-part-costs/calculate', input);
+      const result = await apiClient.post<ChildPartCostResult>('/child-part-costs/calculations', input);
       return result;
     },
   });

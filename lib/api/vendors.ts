@@ -250,7 +250,7 @@ export const vendorsApi = {
     const formData = new FormData();
     formData.append('file', file);
     // Use 5 minute timeout for large CSV files
-    return apiClient.uploadFiles<CsvImportResult>('/vendors/upload-csv', formData, { timeout: 300000 });
+    return apiClient.uploadFiles<CsvImportResult>('/vendors/imports', formData, { timeout: 300000 });
   },
 
   // ============================================================================

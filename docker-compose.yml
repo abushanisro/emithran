@@ -197,12 +197,12 @@ services:
       dockerfile: Dockerfile.frontend
       args:
         NEXT_PUBLIC_API_GATEWAY_URL: ${NEXT_PUBLIC_API_GATEWAY_URL:-http://localhost:4000}
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_GATEWAY_URL:-http://localhost:4000}/v1/api
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_GATEWAY_URL:-http://localhost:4000}/api/v1
     container_name: mithran-frontend
     environment:
       NODE_ENV: ${NODE_ENV:-production}
       # Server-side API calls (within Docker network)
-      API_URL: http://backend:4000/v1/api
+      API_URL: http://backend:4000/api/v1
       # Client-side API calls (from browser)
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_GATEWAY_URL:-http://localhost:4000}
       # Auth0 sign-in runs on this server; APP_BASE_URL is also the origin the BFF accepts.

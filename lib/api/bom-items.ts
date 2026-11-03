@@ -82,7 +82,7 @@ export const bomItemsApi = {
       console.log('CAD Analysis Request:', { bomItemId, requestBody });
 
       const response = await apiClient.post<any>(
-        `/bom-items/${bomItemId}/analyze-cad`,
+        `/bom-items/${bomItemId}/cad-analyses`,
         requestBody,
         {
           timeout: 120000, // Extended to 120 seconds for process-specific analysis

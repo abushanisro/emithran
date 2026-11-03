@@ -324,7 +324,7 @@ export const mhrApi = {
    * pickers. Not silent: a failure must show as an error, never as an empty list.
    */
   getPickerRows: async (location?: string): Promise<MHRPickerRow[]> =>
-    apiClient.get<MHRPickerRow[]>('/mhr/picker', { retry: false, ...(location ? { params: { location } } : {}) }),
+    apiClient.get<MHRPickerRow[]>('/machine-rates/picker', { retry: false, ...(location ? { params: { location } } : {}) }),
 
   getAll: async (query?: MHRQuery): Promise<MHRListResponse | null> => {
     const params = new URLSearchParams();
@@ -340,7 +340,7 @@ export const mhrApi = {
     const queryString = params.toString();
     // 2026 Best Practice: Silent mode for background/optional data
     return apiClient.get<MHRListResponse>(
-      `/mhr${queryString ? `?${queryString}` : ''}`,
+      `/machine-rates${queryString ? `?${queryString}` : ''}`,
       {
         silent: true, // Don't show error toasts for background data
         retry: false, // Fail fast - don't retry background data
@@ -353,7 +353,7 @@ export const mhrApi = {
    * optionally scoped to a real process group (e.g. "Sheet Metal", "Machining").
    */
   getCategories: async (processGroup?: string): Promise<string[]> => {
-    return (await apiClient.get<string[]>('/mhr/categories', {
+    return (await apiClient.get<string[]>('/machine-rates/categories', {
       silent: true, retry: false,
       ...(processGroup ? { params: { processGroup } } : {}),
     })) ?? [];
@@ -367,7 +367,7 @@ export const mhrApi = {
    * persisting the display label itself as a brand-new, unmatchable class.
    */
   getCategoriesWithClass: async (processGroup?: string): Promise<Array<{ category: string; machineClass: string | null }>> => {
-    return (await apiClient.get<Array<{ category: string; machineClass: string | null }>>('/mhr/categories-with-class', {
+    return (await apiClient.get<Array<{ category: string; machineClass: string | null }>>('/machine-rates/categories-with-class', {
       silent: true, retry: false,
       ...(processGroup ? { params: { processGroup } } : {}),
     })) ?? [];
@@ -380,77 +380,77 @@ export const mhrApi = {
    * whether real HR Rates machines exist for that group).
    */
   getProcessGroups: async (): Promise<string[]> => {
-    return (await apiClient.get<string[]>('/mhr/process-groups', { silent: true, retry: false })) ?? [];
+    return (await apiClient.get<string[]>('/machine-rates/process-groups', { silent: true, retry: false })) ?? [];
   },
 
   /**
    * Get distinct locations from MHR records
    */
   getLocations: async (): Promise<string[]> => {
-    return (await apiClient.get<string[]>('/mhr/locations', { silent: true, retry: false })) ?? [];
+    return (await apiClient.get<string[]>('/machine-rates/locations', { silent: true, retry: false })) ?? [];
   },
 
   /**
    * Get distinct currencies from MHR records
    */
   getCurrencies: async (): Promise<string[]> => {
-    return (await apiClient.get<string[]>('/mhr/currencies', { silent: true, retry: false })) ?? [];
+    return (await apiClient.get<string[]>('/machine-rates/currencies', { silent: true, retry: false })) ?? [];
   },
 
   /**
    * Get distinct manufacturer countries from MHR records
    */
   getManufacturerCountries: async (): Promise<string[]> => {
-    return (await apiClient.get<string[]>('/mhr/manufacturer-countries', { silent: true, retry: false })) ?? [];
+    return (await apiClient.get<string[]>('/machine-rates/manufacturer-countries', { silent: true, retry: false })) ?? [];
   },
 
   /**
    * Get distinct real wage grades from MHR records
    */
   getWageGrades: async (): Promise<string[]> => {
-    return (await apiClient.get<string[]>('/mhr/wage-grades', { silent: true, retry: false })) ?? [];
+    return (await apiClient.get<string[]>('/machine-rates/wage-grades', { silent: true, retry: false })) ?? [];
   },
 
   /**
    * Get MHR record by ID
    */
   getById: async (id: string): Promise<MHRRecord> => {
-    return apiClient.get<MHRRecord>(`/mhr/${id}`);
+    return apiClient.get<MHRRecord>(`/machine-rates/${id}`);
   },
 
   /**
    * Get full machine_library reference detail for an MHR record (read-only)
    */
   getReferenceDetail: async (id: string): Promise<MHRReferenceDetail> => {
-    return (await apiClient.get<MHRReferenceDetail>(`/mhr/${id}/reference-detail`, { silent: true, retry: false })) ?? { found: false, sourceKey: null, raw: null };
+    return (await apiClient.get<MHRReferenceDetail>(`/machine-rates/${id}/reference-detail`, { silent: true, retry: false })) ?? { found: false, sourceKey: null, raw: null };
   },
 
   /**
    * Create new MHR record
    */
   create: async (data: CreateMHRData): Promise<MHRRecord> => {
-    return apiClient.post<MHRRecord>('/mhr', data);
+    return apiClient.post<MHRRecord>('/machine-rates', data);
   },
 
   /**
    * Update MHR record
    */
   update: async (id: string, data: UpdateMHRData): Promise<MHRRecord> => {
-    return apiClient.put<MHRRecord>(`/mhr/${id}`, data);
+    return apiClient.put<MHRRecord>(`/machine-rates/${id}`, data);
   },
 
   /**
    * Delete MHR record
    */
   delete: async (id: string): Promise<void> => {
-    return apiClient.delete(`/mhr/${id}`);
+    return apiClient.delete(`/machine-rates/${id}`);
   },
 
   /**
    * Delete all MHR records for the current user
    */
   deleteAll: async (): Promise<{ deleted: number }> => {
-    return apiClient.delete<{ deleted: number }>('/mhr?confirm=delete-all') ?? { deleted: 0 };
+    return apiClient.delete<{ deleted: number }>('/machine-rates?confirm=delete-all') ?? { deleted: 0 };
   },
 
   getBenchmarkRates: async (location?: string, processGroup?: string, machineClass?: string): Promise<MHRBenchmarkEntry[]> => {
@@ -459,7 +459,7 @@ export const mhrApi = {
     if (machineClass) params.append('machineClass', machineClass);
     else if (processGroup) params.append('processGroup', processGroup);
     const qs = params.toString();
-    return (await apiClient.get<MHRBenchmarkEntry[]>(`/mhr/benchmark${qs ? `?${qs}` : ''}`, { silent: true, retry: false })) ?? [];
+    return (await apiClient.get<MHRBenchmarkEntry[]>(`/machine-rates/benchmark${qs ? `?${qs}` : ''}`, { silent: true, retry: false })) ?? [];
   },
 
   /**
@@ -469,7 +469,7 @@ export const mhrApi = {
     const formData = new FormData();
     formData.append('file', file);
     return (await apiClient.uploadFiles<{ imported: number; skipped: number; errors: string[] }>(
-      '/mhr/import-excel',
+      '/machine-rates/imports',
       formData,
     )) ?? { imported: 0, skipped: 0, errors: [] };
   },

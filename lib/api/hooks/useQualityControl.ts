@@ -127,7 +127,7 @@ export function useQualityInspections(
       if (filters?.inspector) params.append('inspector', filters.inspector);
 
       const response = await apiClient.get<QualityInspection[]>(
-        `/quality-control/inspections?${params.toString()}`
+        `/quality-inspections?${params.toString()}`
       );
       return response;
     },
@@ -141,7 +141,7 @@ export function useQualityInspection(id: string) {
   return useQuery({
     queryKey: QUERY_KEYS.inspection(id),
     queryFn: async () => {
-      const response = await apiClient.get<QualityInspection>(`/quality-control/inspections/${id}`);
+      const response = await apiClient.get<QualityInspection>(`/quality-inspections/${id}`);
       return response;
     },
     enabled: !!id,
@@ -155,7 +155,7 @@ export function useCreateQualityInspection() {
 
   return useMutation({
     mutationFn: async (data: CreateQualityInspectionRequest) => {
-      const response = await apiClient.post<QualityInspection>('/quality-control/inspections', data);
+      const response = await apiClient.post<QualityInspection>('/quality-inspections', data);
       return response;
     },
     onSuccess: (_newInspection, variables) => {
@@ -183,7 +183,7 @@ export function useUpdateQualityInspection() {
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<CreateQualityInspectionRequest> }) => {
-      const response = await apiClient.put<QualityInspection>(`/quality-control/inspections/${id}`, data);
+      const response = await apiClient.put<QualityInspection>(`/quality-inspections/${id}`, data);
       return response;
     },
     onSuccess: (updatedInspection) => {
@@ -213,7 +213,7 @@ export function useSaveDetailedInspectionReport() {
   return useMutation({
     mutationFn: async (report: DetailedInspectionReport) => {
       const response = await apiClient.post<DetailedInspectionReport>(
-        `/quality-control/inspections/${report.inspectionId}/detailed-report`,
+        `/quality-inspections/${report.inspectionId}/detailed-report`,
         report
       );
       return response;
@@ -258,7 +258,7 @@ export function useApproveQualityInspection() {
 
   return useMutation({
     mutationFn: async (inspectionId: string) => {
-      const response = await apiClient.post<QualityInspection>(`/quality-control/inspections/${inspectionId}/approve`, {});
+      const response = await apiClient.post<QualityInspection>(`/quality-inspections/${inspectionId}/approve`, {});
       return response;
     },
     onSuccess: (updatedInspection) => {
@@ -278,7 +278,7 @@ export function useRejectQualityInspection() {
 
   return useMutation({
     mutationFn: async ({ inspectionId, reason }: { inspectionId: string; reason?: string }) => {
-      const response = await apiClient.post<QualityInspection>(`/quality-control/inspections/${inspectionId}/reject`, {
+      const response = await apiClient.post<QualityInspection>(`/quality-inspections/${inspectionId}/reject`, {
         rejectionReason: reason,
         correctiveAction: ''
       });
@@ -301,7 +301,7 @@ export function useResetInspectionStatus() {
 
   return useMutation({
     mutationFn: async (inspectionId: string) => {
-      const response = await apiClient.post<QualityInspection>(`/quality-control/inspections/${inspectionId}/reset`, {});
+      const response = await apiClient.post<QualityInspection>(`/quality-inspections/${inspectionId}/reset`, {});
       return response;
     },
     onSuccess: (updatedInspection) => {
@@ -321,7 +321,7 @@ export function useDeleteQualityInspection() {
 
   return useMutation({
     mutationFn: async (inspectionId: string) => {
-      const response = await apiClient.delete(`/quality-control/inspections/${inspectionId}`);
+      const response = await apiClient.delete(`/quality-inspections/${inspectionId}`);
       return response;
     },
     onSuccess: (_, inspectionId) => {
@@ -354,7 +354,7 @@ export function useDetailedInspectionReport(inspectionId: string) {
     queryKey: ['detailed-inspection-report', inspectionId],
     queryFn: () =>
       apiClient.get<DetailedInspectionReport>(
-        `/quality-control/inspections/${inspectionId}/detailed-report`,
+        `/quality-inspections/${inspectionId}/detailed-report`,
         { silent: true },
       ),
     enabled: !!inspectionId,

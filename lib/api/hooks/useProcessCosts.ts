@@ -145,7 +145,7 @@ export interface ProcessCostListResponse {
 export function useCalculateProcessCost() {
   return useMutation<any, Error, ProcessCostInput>({
     mutationFn: async (input: ProcessCostInput) => {
-      const result = await apiClient.post<any>('/process-costs/calculate', input);
+      const result = await apiClient.post<any>('/process-costs/calculations', input);
       return result;
     },
   });

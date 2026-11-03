@@ -112,7 +112,7 @@ const processCalculatorMappingsApi = {
     formData.append('file', file);
     formData.append('replaceExisting', String(replaceExisting));
     return apiClient.uploadFiles<{ imported: number; skipped: number }>(
-      '/processes/calculator-mappings/import-excel',
+      '/processes/calculator-mappings/imports',
       formData,
     );
   },

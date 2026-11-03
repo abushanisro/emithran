@@ -72,14 +72,14 @@ export const productionEntriesApi = {
    * Get production entries for a lot
    */
   getEntriesByLot: async (lotId: string): Promise<ProductionEntry[]> => {
-    return apiClient.get(`/production-planning/lots/${lotId}/production-entries`);
+    return apiClient.get(`/production-lots/${lotId}/production-entries`);
   },
 
   /**
    * Get production entries for a process
    */
   getEntriesByProcess: async (processId: string): Promise<ProductionEntry[]> => {
-    return apiClient.get(`/production-planning/processes/${processId}/production-entries`);
+    return apiClient.get(`/production-processes/${processId}/production-entries`);
   },
 
   /**
@@ -87,28 +87,28 @@ export const productionEntriesApi = {
    */
   createEntry: async (data: CreateProductionEntryRequest & { lot_id: string }): Promise<ProductionEntry> => {
     const { lot_id, ...entryData } = data;
-    return apiClient.post(`/production-planning/lots/${lot_id}/production-entries`, entryData);
+    return apiClient.post(`/production-lots/${lot_id}/production-entries`, entryData);
   },
 
   /**
    * Update a production entry
    */
   updateEntry: async (entryId: string, data: UpdateProductionEntryRequest): Promise<ProductionEntry> => {
-    return apiClient.put(`/production-planning/production-entries/${entryId}`, data);
+    return apiClient.put(`/production-entries/${entryId}`, data);
   },
 
   /**
    * Delete a production entry
    */
   deleteEntry: async (entryId: string): Promise<void> => {
-    return apiClient.delete(`/production-planning/production-entries/${entryId}`);
+    return apiClient.delete(`/production-entries/${entryId}`);
   },
 
   /**
    * Get entry by ID
    */
   getEntryById: async (entryId: string): Promise<ProductionEntry> => {
-    return apiClient.get(`/production-planning/production-entries/${entryId}`);
+    return apiClient.get(`/production-entries/${entryId}`);
   },
 
   /**
@@ -143,6 +143,6 @@ export const productionEntriesApi = {
       efficiency: number;
     }>;
   }[]> => {
-    return apiClient.get(`/production-planning/production-entries/weekly-summary/${lotId}`);
+    return apiClient.get(`/production-entries/weekly-summary/${lotId}`);
   }
 };

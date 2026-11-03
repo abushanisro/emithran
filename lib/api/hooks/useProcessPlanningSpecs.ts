@@ -62,7 +62,7 @@ export function useProcessPlanningSpecsByBomItem(bomItemId?: string) {
       
       try {
         const response = await apiClient.get<ProcessPlanningSpec>(
-          `/process-planning/bom-items/${bomItemId}/specifications`
+          `/bom-items/${bomItemId}/process-specifications`
         );
         return response;
       } catch (error: any) {

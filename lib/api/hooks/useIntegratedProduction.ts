@@ -6,38 +6,38 @@ import { apiClient } from '../client';
 // ============================================================================
 
 const getIntegratedDashboardData = async (lotId: string) => {
-  const response = await apiClient.get(`/production-planning/lots/${lotId}/integrated-dashboard`);
+  const response = await apiClient.get(`/production-lots/${lotId}/integrated-dashboard`);
   return response.data;
 };
 
 const getProductionMonitoring = async (lotId: string) => {
-  const response = await apiClient.get(`/production-planning/lots/${lotId}/monitoring`);
+  const response = await apiClient.get(`/production-lots/${lotId}/monitoring`);
   return response.data;
 };
 
 const getLotMaterials = async (lotId: string) => {
-  const response = await apiClient.get(`/production-planning/lots/${lotId}/materials`);
+  const response = await apiClient.get(`/production-lots/${lotId}/materials`);
   return response.data;
 };
 
 const getProductionAlerts = async (lotId: string) => {
-  const response = await apiClient.get(`/production-planning/lots/${lotId}/alerts`);
+  const response = await apiClient.get(`/production-lots/${lotId}/alerts`);
   return response.data;
 };
 
 const updateMaterialStatus = async (materialId: string, updateData: any) => {
-  const response = await apiClient.put(`/production-planning/materials/${materialId}/status`, updateData);
+  const response = await apiClient.put(`/production-materials/${materialId}/status`, updateData);
   return response.data;
 };
 
 
 const resolveAlert = async (alertId: string, notes: string) => {
-  const response = await apiClient.put(`/production-planning/alerts/${alertId}/resolve`, { notes });
+  const response = await apiClient.put(`/production-alerts/${alertId}/resolve`, { notes });
   return response.data;
 };
 
 const initializeLotMaterials = async (lotId: string) => {
-  const response = await apiClient.post(`/production-planning/lots/${lotId}/materials/initialize`);
+  const response = await apiClient.post(`/production-lots/${lotId}/materials`);
   return response.data;
 };
 

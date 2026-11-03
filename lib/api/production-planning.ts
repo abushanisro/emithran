@@ -22,7 +22,7 @@ export const productionPlanningApi = {
     scheduleData: ProcessScheduleUpdate
   ) => {
     return apiClient.put(
-      `/production-planning/processes/${processId}/schedule-dates`,
+      `/production-processes/${processId}/schedule-dates`,
       scheduleData
     );
   },
@@ -38,7 +38,7 @@ export const productionPlanningApi = {
     }
   ) => {
     return apiClient.put(
-      `/production-planning/lots/${lotId}`,
+      `/production-lots/${lotId}`,
       dateData,
       {
         timeout: 20000, // Longer timeout for date updates
@@ -51,7 +51,7 @@ export const productionPlanningApi = {
    */
 getProcessesByLot: async (lotId: string, _useCache: boolean = true) => {
     return apiClient.get(
-      `/production-planning/processes/lot/${lotId}`
+      `/production-processes/lot/${lotId}`
     );
   },
 
@@ -60,7 +60,7 @@ getProcessesByLot: async (lotId: string, _useCache: boolean = true) => {
    */
   getProductionLotById: async (lotId: string, _useCache: boolean = true) => {
     return apiClient.get(
-      `/production-planning/lots/${lotId}`
+      `/production-lots/${lotId}`
     );
   },
 
@@ -130,7 +130,7 @@ getProcessesByLot: async (lotId: string, _useCache: boolean = true) => {
    */
   getProcessTemplates: async (_useCache: boolean = true) => {
     return apiClient.get(
-      `/production-planning/process-templates`
+      `/production-process-templates`
     );
   },
 
@@ -143,7 +143,7 @@ getProcessesByLot: async (lotId: string, _useCache: boolean = true) => {
     category?: string;
   }) => {
     return apiClient.post(
-      `/production-planning/process-templates`,
+      `/production-process-templates`,
       templateData
     );
   },
@@ -153,7 +153,7 @@ getProcessesByLot: async (lotId: string, _useCache: boolean = true) => {
    */
   updateLotStatus: async (lotId: string, status: string) => {
     return apiClient.put(
-      `/production-planning/lots/${lotId}`,
+      `/production-lots/${lotId}`,
       { status }
     );
   },
@@ -163,7 +163,7 @@ getProcessesByLot: async (lotId: string, _useCache: boolean = true) => {
    */
   updateLotStatusByProgress: async (lotId: string) => {
     return apiClient.post(
-      `/production-planning/lots/${lotId}/update-status-by-progress`,
+      `/production-lots/${lotId}/status-updates`,
       {}
     );
   },
@@ -173,7 +173,7 @@ getProcessesByLot: async (lotId: string, _useCache: boolean = true) => {
    */
   cleanupLotMaterials: async (lotId: string) => {
     return apiClient.post(
-      `/production-planning/lots/${lotId}/cleanup-materials`,
+      `/production-lots/${lotId}/cleanup-materials`,
       {}
     );
   },

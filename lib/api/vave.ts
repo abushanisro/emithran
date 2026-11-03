@@ -232,73 +232,73 @@ const AI_REQUEST = { retry: false, timeout: 200_000 } as const;
 export const vaveApi = {
   // Projects
   getProjects: () =>
-    apiClient.get<VaveProject[]>('/vave/projects'),
+    apiClient.get<VaveProject[]>('/vave-projects'),
 
   getProject: (id: string) =>
-    apiClient.get<VaveProject>(`/vave/projects/${id}`),
+    apiClient.get<VaveProject>(`/vave-projects/${id}`),
 
   createProject: (data: CreateVaveProject) =>
-    apiClient.post<VaveProject>('/vave/projects', data),
+    apiClient.post<VaveProject>('/vave-projects', data),
 
   updateProject: (id: string, data: UpdateVaveProject) =>
-    apiClient.put<VaveProject>(`/vave/projects/${id}`, data),
+    apiClient.put<VaveProject>(`/vave-projects/${id}`, data),
 
   deleteProject: (id: string) =>
-    apiClient.delete(`/vave/projects/${id}`),
+    apiClient.delete(`/vave-projects/${id}`),
 
   // BOM
   getBomItems: (projectId: string) =>
-    apiClient.get<VaveBomItem[]>(`/vave/projects/${projectId}/bom`),
+    apiClient.get<VaveBomItem[]>(`/vave-projects/${projectId}/bom`),
 
   createBomItem: (projectId: string, data: CreateVaveBomItem) =>
-    apiClient.post<VaveBomItem>(`/vave/projects/${projectId}/bom`, data),
+    apiClient.post<VaveBomItem>(`/vave-projects/${projectId}/bom`, data),
 
   bulkImportBom: (projectId: string, items: CreateVaveBomItem[]) =>
-    apiClient.post<VaveBomItem[]>(`/vave/projects/${projectId}/bom/bulk`, { items }),
+    apiClient.post<VaveBomItem[]>(`/vave-projects/${projectId}/bom/batches`, { items }),
 
   deleteBomItem: (projectId: string, itemId: string) =>
-    apiClient.delete(`/vave/projects/${projectId}/bom/${itemId}`),
+    apiClient.delete(`/vave-projects/${projectId}/bom/${itemId}`),
 
   // Ideas
   getIdeas: (projectId: string) =>
-    apiClient.get<VaveIdea[]>(`/vave/projects/${projectId}/ideas`),
+    apiClient.get<VaveIdea[]>(`/vave-projects/${projectId}/ideas`),
 
   createIdea: (projectId: string, data: CreateVaveIdea) =>
-    apiClient.post<VaveIdea>(`/vave/projects/${projectId}/ideas`, data),
+    apiClient.post<VaveIdea>(`/vave-projects/${projectId}/ideas`, data),
 
   bulkCreateIdeas: (projectId: string, ideas: CreateVaveIdea[]) =>
-    apiClient.post<VaveIdea[]>(`/vave/projects/${projectId}/ideas/bulk`, { ideas }),
+    apiClient.post<VaveIdea[]>(`/vave-projects/${projectId}/ideas/batches`, { ideas }),
 
   updateIdea: (projectId: string, ideaId: string, data: Partial<CreateVaveIdea>) =>
-    apiClient.put<VaveIdea>(`/vave/projects/${projectId}/ideas/${ideaId}`, data),
+    apiClient.put<VaveIdea>(`/vave-projects/${projectId}/ideas/${ideaId}`, data),
 
   deleteIdea: (projectId: string, ideaId: string) =>
-    apiClient.delete(`/vave/projects/${projectId}/ideas/${ideaId}`),
+    apiClient.delete(`/vave-projects/${projectId}/ideas/${ideaId}`),
 
   // Should Costs
   getShouldCosts: (projectId: string) =>
-    apiClient.get<VaveShouldCost[]>(`/vave/projects/${projectId}/should-costs`),
+    apiClient.get<VaveShouldCost[]>(`/vave-projects/${projectId}/should-costs`),
 
   upsertShouldCost: (projectId: string, data: CreateVaveShouldCost) =>
-    apiClient.post<VaveShouldCost>(`/vave/projects/${projectId}/should-costs`, data),
+    apiClient.post<VaveShouldCost>(`/vave-projects/${projectId}/should-costs`, data),
 
   deleteShouldCost: (projectId: string, costId: string) =>
-    apiClient.delete(`/vave/projects/${projectId}/should-costs/${costId}`),
+    apiClient.delete(`/vave-projects/${projectId}/should-costs/${costId}`),
 
   // AI analyses: the backend builds every prompt from the project's own data and charges the caller's AI budget. Not retried: a
   // 429 means the daily allowance is used up (the error message says so), and a retry would only spend more.
   aiCostAnalysis: (projectId: string) =>
-    apiClient.post<CostAnalysisResult>(`/vave/projects/${projectId}/ai/cost-analysis`, {}, AI_REQUEST),
+    apiClient.post<CostAnalysisResult>(`/vave-projects/${projectId}/ai/cost-analysis`, {}, AI_REQUEST),
 
   aiIdeation: (projectId: string) =>
-    apiClient.post<CreateVaveIdea[]>(`/vave/projects/${projectId}/ai/ideation`, {}, AI_REQUEST),
+    apiClient.post<CreateVaveIdea[]>(`/vave-projects/${projectId}/ai/ideation`, {}, AI_REQUEST),
 
   aiShouldCost: (projectId: string, itemId: string) =>
-    apiClient.post<ShouldCostResult>(`/vave/projects/${projectId}/ai/should-cost/${itemId}`, {}, AI_REQUEST),
+    apiClient.post<ShouldCostResult>(`/vave-projects/${projectId}/should-cost-estimates/${itemId}`, {}, AI_REQUEST),
 
   /** VAVE insights for one benchmark BOM, from structured metrics only (at most 50 items, bounded text). */
   aiBomAnalysis: <T>(bom: VaveBomAnalysisInput) =>
-    apiClient.post<T>('/vave/ai/bom-analysis', bom, AI_REQUEST),
+    apiClient.post<T>('/vave-bom-analyses', bom, AI_REQUEST),
 };
 
 export interface VaveBomAnalysisInput {

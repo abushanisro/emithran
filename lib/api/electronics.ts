@@ -1,6 +1,6 @@
 /**
  * Electronics costing API: board and harness uploads, extraction results, quotes.
- * Routes: /v1/api/electronics/* (the client base URL already ends in /v1/api).
+ * Routes: /api/v1/electronics/* (the client base URL already ends in /api/v1).
  */
 
 import { apiClient } from './client';
@@ -282,12 +282,12 @@ export interface DeleteResult { designs: number; revisions: number; files: numbe
 
 export const electronicsApi = {
   createContainer: (args: { itemType: 'assembly' | 'sub_assembly'; name: string; projectId?: string; parentDesignId?: string }) =>
-    apiClient.post<DesignView>('/electronics/designs', args),
-  deleteDesign: (designId: string) => apiClient.delete<DeleteResult>(`/electronics/designs/${designId}`),
-  deleteRevision: (designId: string, revisionId: string) => apiClient.delete<DeleteResult>(`/electronics/designs/${designId}/revisions/${revisionId}`),
-  reparse: (uploadId: string) => apiClient.post<{ jobId: string }>(`/electronics/uploads/${uploadId}/reparse`, {}),
+    apiClient.post<DesignView>('/electronic-designs', args),
+  deleteDesign: (designId: string) => apiClient.delete<DeleteResult>(`/electronic-designs/${designId}`),
+  deleteRevision: (designId: string, revisionId: string) => apiClient.delete<DeleteResult>(`/electronic-designs/${designId}/revisions/${revisionId}`),
+  reparse: (uploadId: string) => apiClient.post<{ jobId: string }>(`/electronic-uploads/${uploadId}/reparse`, {}),
 
-  fileFormats: () => apiClient.get<FileFormats>('/electronics/file-formats', { retry: false }),
+  fileFormats: () => apiClient.get<FileFormats>('/electronic-file-formats', { retry: false }),
 
   startUpload(args: {
     files: File[];
@@ -314,20 +314,20 @@ export const electronicsApi = {
     if (args.revision) form.append('revision', args.revision);
     if (args.supplied && Object.keys(args.supplied).length > 0) form.append('supplied', JSON.stringify(args.supplied));
     for (const file of args.files) form.append('files', file, file.name);
-    return apiClient.uploadFiles<StartUploadResult | StartAssemblyResult>('/electronics/uploads', form, { timeout: 120_000 });
+    return apiClient.uploadFiles<StartUploadResult | StartAssemblyResult>('/electronic-uploads', form, { timeout: 120_000 });
   },
 
-  designs: (projectId: string) => apiClient.get<DesignView[]>(`/electronics/designs?projectId=${encodeURIComponent(projectId)}`, { retry: false }),
-  design: (designId: string) => apiClient.get<DesignView>(`/electronics/designs/${designId}`, { retry: false }),
-  job: (jobId: string) => apiClient.get<JobStatus>(`/electronics/jobs/${jobId}`, { retry: false }),
-  preview: (uploadId: string) => apiClient.get<BoardPreview>(`/electronics/uploads/${uploadId}/preview`, { retry: false }),
+  designs: (projectId: string) => apiClient.get<DesignView[]>(`/electronic-designs?projectId=${encodeURIComponent(projectId)}`, { retry: false }),
+  design: (designId: string) => apiClient.get<DesignView>(`/electronic-designs/${designId}`, { retry: false }),
+  job: (jobId: string) => apiClient.get<JobStatus>(`/electronic-jobs/${jobId}`, { retry: false }),
+  preview: (uploadId: string) => apiClient.get<BoardPreview>(`/electronic-uploads/${uploadId}/preview`, { retry: false }),
   /** A small SVG of the board for list cards, read from storage by the platform (svg is null when none can be shown). */
-  thumbnail: (uploadId: string) => apiClient.get<{ svg: string | null }>(`/electronics/uploads/${uploadId}/thumbnail`, { retry: false }),
-  features: (uploadId: string) => apiClient.get<UploadFeatures>(`/electronics/uploads/${uploadId}/features`, { retry: false }),
+  thumbnail: (uploadId: string) => apiClient.get<{ svg: string | null }>(`/electronic-uploads/${uploadId}/thumbnail`, { retry: false }),
+  features: (uploadId: string) => apiClient.get<UploadFeatures>(`/electronic-uploads/${uploadId}/features`, { retry: false }),
   requestQuote: (uploadId: string, batchSize: number, scenario?: ElectronicsScenario) =>
-    apiClient.post<{ jobId: string }>('/electronics/quotes', { uploadId, batchSize, ...(scenario ? { scenario } : {}) }),
-  scenarioOptions: (uploadId: string) => apiClient.get<ScenarioOptions | null>(`/electronics/uploads/${uploadId}/scenario-options`, { retry: false }),
-  latestResult: (uploadId: string) => apiClient.get<CostResult | null>(`/electronics/uploads/${uploadId}/latest-result`, { retry: false }),
-  result: (resultId: string) => apiClient.get<CostResult>(`/electronics/results/${resultId}`, { retry: false }),
-  coverage: () => apiClient.get<ReferenceCoverage>('/electronics/reference-coverage', { retry: false }),
+    apiClient.post<{ jobId: string }>('/electronic-quotes', { uploadId, batchSize, ...(scenario ? { scenario } : {}) }),
+  scenarioOptions: (uploadId: string) => apiClient.get<ScenarioOptions | null>(`/electronic-uploads/${uploadId}/scenario-options`, { retry: false }),
+  latestResult: (uploadId: string) => apiClient.get<CostResult | null>(`/electronic-uploads/${uploadId}/latest-result`, { retry: false }),
+  result: (resultId: string) => apiClient.get<CostResult>(`/electronic-results/${resultId}`, { retry: false }),
+  coverage: () => apiClient.get<ReferenceCoverage>('/electronic-coverage-reports', { retry: false }),
 };

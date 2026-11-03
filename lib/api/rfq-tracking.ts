@@ -108,7 +108,7 @@ export async function createRfqTracking(
   data: CreateRfqTrackingData
 ): Promise<RfqTrackingRecord> {
   const response = await apiClient.post<RfqTrackingRecord>(
-    '/rfq/tracking',
+    '/rfq-trackings',
     data
   );
   return response;
@@ -121,8 +121,8 @@ export async function getRfqTrackingRecords(
   projectId?: string
 ): Promise<RfqTrackingRecord[]> {
   const url = projectId 
-    ? `/rfq/tracking?projectId=${projectId}`
-    : '/rfq/tracking';
+    ? `/rfq-trackings?projectId=${projectId}`
+    : '/rfq-trackings';
   
   const response = await apiClient.get<RfqTrackingRecord[]>(url);
   return response || [];
@@ -135,8 +135,8 @@ export async function getRfqTrackingStats(
   projectId?: string
 ): Promise<RfqTrackingStats> {
   const url = projectId 
-    ? `/rfq/tracking/stats?projectId=${projectId}`
-    : '/rfq/tracking/stats';
+    ? `/rfq-trackings/stats?projectId=${projectId}`
+    : '/rfq-trackings/stats';
     
   const response = await apiClient.get<RfqTrackingStats>(url);
   return response;
@@ -150,7 +150,7 @@ export async function updateRfqTrackingStatus(
   data: UpdateTrackingStatusData
 ): Promise<void> {
   await apiClient.patch(
-    `/rfq/tracking/${trackingId}/status`,
+    `/rfq-trackings/${trackingId}/status`,
     data
   );
 }
@@ -159,7 +159,7 @@ export async function updateRfqTrackingStatus(
  * Delete RFQ tracking record (cancel RFQ)
  */
 export async function deleteRfqTracking(trackingId: string): Promise<void> {
-  await apiClient.delete(`/rfq/tracking/${trackingId}`);
+  await apiClient.delete(`/rfq-trackings/${trackingId}`);
 }
 
 // ============================================================================

@@ -187,6 +187,10 @@ A route that was renamed keeps answering on its old path until its Sunset date. 
 | `/supplier-nominations/:n/capability-scores/:c/vendor/:v` | `/supplier-nominations/:n/capability-scores/:c/:v` |
 | `/supplier-nominations/evaluations/:e/sections/:s` | `/supplier-nominations/evaluation-sections/:e/:s` |
 
+## The web app and the API agree
+
+`test/contract/api-paths.test.ts` reads every API path the web app calls and checks it against the backend's route list, by canonical name. A rename, a typo or a call to a route that does not exist fails there instead of as a 404 the client swallows. The calls that are wrong today are listed in `api-paths-unmatched.json` (11, mostly routes the backend never had: `boms/:id/approve`, `boms/:id/release`, `boms/:id/items/:itemId`, `calculators/formulas/validate`, production vendor assignments and daily production, the cost recalculation paths); the list can only shrink.
+
 ## How the rules are enforced
 
 - `backend/src/test/common/api-design.spec.ts` reads the route inventory and fails on a new route that has a verb in its path (rule 2), a singular collection (rule 3) or more than two levels of nesting (rule 4).
@@ -205,6 +209,6 @@ A route that was renamed keeps answering on its old path until its Sunset date. 
 | 6 Filter, sort, paginate | About 20 lists page; no shared helper or cap; sorting is uneven |
 | 7 Security | Done, two open items: a `reference-data:write` permission, and the approver not being the submitter |
 | 8 Caching | Not started |
-| 9 Versioning | `/api/v1` live and `/v1/api` deprecated; the web app still calls the old prefix (a config change, `API_URL` and `NEXT_PUBLIC_API_URL`) |
+| 9 Versioning | Done: `/api/v1` is what the web app calls (`API_URL` and `NEXT_PUBLIC_API_URL` end in `/api/v1`), with the new resource names; `/v1/api` and the old names remain for outside callers until their Sunset date |
 
 Not built: cursor pagination, `Idempotency-Key` on creates, `ETag`/`If-Match` on writes, a shared `/jobs` resource for long work.

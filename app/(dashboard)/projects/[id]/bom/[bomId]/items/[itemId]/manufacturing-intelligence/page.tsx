@@ -10197,7 +10197,7 @@ export default function ManufacturingIntelligencePage() {
       // refresh that already succeeded above.
       if (item.file2dPath?.toLowerCase().endsWith('.pdf')) {
         try {
-          await apiClient.post(`/bom-items/${itemId}/analyze-drawing`, {}, { timeout: 60_000 });
+          await apiClient.post(`/bom-items/${itemId}/drawing-analyses`, {}, { timeout: 60_000 });
           // P0.6: analyze-drawing rewrites bom_items.drawing_intelligence, which
           // gdt-analysis reads directly — without this, a re-parsed drawing's
           // new tolerance callouts/general-tolerance block kept showing the

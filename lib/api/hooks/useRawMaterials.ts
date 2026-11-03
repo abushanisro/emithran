@@ -341,7 +341,7 @@ export function useUploadRawMaterialsExcel() {
         failed: number;
         errors?: any[];
         dataWarnings?: string[];
-      }>('/raw-materials/upload-excel', formData, {
+      }>('/raw-materials/imports', formData, {
         timeout: 300000, // 5 minutes timeout
       });
 

@@ -2,17 +2,17 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { clientAddressHeaders, forwardRequest, forwardSecretProblem, upstreamUrl } from '@/lib/server/bff/forward';
 
-const API = 'http://api.internal:4000/v1/api';
+const API = 'http://api.internal:4000/api/v1';
 
 describe('upstreamUrl', () => {
   it('maps the path segments and query onto the API base', () => {
     expect(upstreamUrl(['projects', 'p1', 'boms'], '?page=2&q=a%20b', API)?.href).toBe(
-      'http://api.internal:4000/v1/api/projects/p1/boms?page=2&q=a%20b',
+      'http://api.internal:4000/api/v1/projects/p1/boms?page=2&q=a%20b',
     );
   });
 
   it('re-encodes each segment, so a decoded value stays inside its segment', () => {
-    expect(upstreamUrl(['files', 'a b?c#d'], '', API)?.pathname).toBe('/v1/api/files/a%20b%3Fc%23d');
+    expect(upstreamUrl(['files', 'a b?c#d'], '', API)?.pathname).toBe('/api/v1/files/a%20b%3Fc%23d');
   });
 
   it.each([

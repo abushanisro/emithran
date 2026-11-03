@@ -28,6 +28,6 @@ describe('.github/workflows/ci.yml', () => {
   it('keeps the placeholder URLs for a build without secrets', () => {
     const env = workflow.jobs.frontend?.steps.find((s) => s.run === 'npm run build')?.env ?? {};
     expect(env.NEXT_PUBLIC_API_GATEWAY_URL).toMatch(/\.invalid'/);
-    expect(env.API_URL).toMatch(/\.invalid\/v1\/api'/);
+    expect(env.API_URL).toMatch(/\.invalid\/api\/v1'/);
   });
 });
