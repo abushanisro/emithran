@@ -100,8 +100,10 @@ GET /vendors?processId=…&q=casting&sort=+name,-createdAt&page=2&limit=50
 
 ## 8. Cache data to improve performance
 
-- API responses carry `Cache-Control: private, no-store` unless the route opts in. Data is per organization, so a shared cache (`public`) is never allowed.
-- Reference data that changes rarely (rates, lookup tables, materials) opts in with `Cache-Control: private, max-age=300` and a weak `ETag`; a repeat request with `If-None-Match` gets `304`.
+- **Reads** carry `Cache-Control: private, no-cache` and a weak `ETag` computed from the data (not from the envelope, whose timestamp changes on every response). A client may keep the response, but must ask again before using it; a repeat request with `If-None-Match` gets `304` and no body. `private` because the data belongs to one organization: a shared cache never stores it.
+- **Writes** carry `Cache-Control: no-store`.
+- **No `max-age`.** Members edit rates and reference data, so a browser that kept a list for minutes would show old numbers after an edit. A route can set its own `Cache-Control` (the copilot stream does).
+- Server-side caches (in-process, per request) are an implementation detail and never change what a client sees.
 
 ## 9. Version the API
 
@@ -124,7 +126,7 @@ The version is the first path segment: `/api/v1/…`. A change that can break a 
 | 5 Errors | Done: problem details on `/api/v1`, deletes answer 204 (200 only when they return data and say so), creates carry `Location` |
 | 6 Filter, sort, paginate | About 20 lists page; no shared helper or cap; sorting is uneven |
 | 7 Security | Done, two open items: a `reference-data:write` permission, and the approver not being the submitter |
-| 8 Caching | Not started |
+| 8 Caching | Done: `private, no-cache` and a data-only `ETag` on reads (304 on a repeat), `no-store` on writes; no `max-age` by design |
 | 9 Versioning | `/api/v1` live and `/v1/api` deprecated; the web app still calls the old prefix (a config change, `API_URL` and `NEXT_PUBLIC_API_URL`) |
 
 Not built: cursor pagination, `Idempotency-Key` on creates, `ETag`/`If-Match` on writes, a shared `/jobs` resource for long work.
