@@ -13,6 +13,8 @@ import {
   UseGuards,
   UploadedFile,
   BadRequestException,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
@@ -169,6 +171,7 @@ export class ProcessesController {
   }
 
   @OrgRole('admin')
+  @HttpCode(HttpStatus.OK)
   @Delete('calculator-mappings')
   @ApiOperation({ summary: 'Clear all process calculator mappings (administrators; needs ?confirm=delete-all)' })
   @ApiResponse({ status: 200, description: 'All process calculator mappings deleted' })
@@ -178,6 +181,7 @@ export class ProcessesController {
   }
 
   @OrgRole('admin')
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete('calculator-mappings/:id')
   @ApiOperation({ summary: 'Delete process calculator mapping' })
   @ApiResponse({ status: 200, description: 'Process calculator mapping deleted successfully' })
@@ -307,6 +311,7 @@ export class ProcessesController {
   }
 
   @OrgRole('admin')
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id')
   @ApiOperation({ summary: 'Delete process' })
   @ApiResponse({ status: 200, description: 'Process deleted successfully' })
@@ -363,6 +368,7 @@ export class ProcessesController {
   }
 
   @OrgRole('admin')
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete('reference-tables/:tableId')
   @ApiOperation({ summary: 'Delete a reference table' })
   @ApiResponse({ status: 200, description: 'Reference table deleted successfully' })
@@ -398,6 +404,7 @@ export class ProcessesController {
   }
 
   @OrgRole('admin')
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete('reference-tables/rows/:rowId')
   @ApiOperation({ summary: 'Delete a table row' })
   @ApiResponse({ status: 200, description: 'Table row deleted successfully' })

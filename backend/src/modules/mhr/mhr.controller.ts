@@ -13,6 +13,8 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { MAX_XLSX_UPLOAD_BYTES } from '../../common/archive/xlsx-limits';
@@ -173,6 +175,7 @@ export class MHRController {
   }
 
   @OrgRole('admin')
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id')
   @ApiOperation({ summary: 'Delete MHR record' })
   @ApiResponse({ status: 200, description: 'MHR record deleted successfully' })
@@ -187,6 +190,7 @@ export class MHRController {
   }
 
   @OrgRole('admin')
+  @HttpCode(HttpStatus.OK)
   @Delete()
   @ApiOperation({ summary: 'Delete all MHR records for the current user (administrators; needs ?confirm=delete-all)' })
   @ApiResponse({ status: 200, description: 'All MHR records deleted' })

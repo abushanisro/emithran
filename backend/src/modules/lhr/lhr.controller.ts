@@ -132,6 +132,7 @@ export class LHRController {
   }
 
   @OrgRole('admin')
+  @HttpCode(HttpStatus.OK)
   @Delete()
   @ApiOperation({ summary: 'Delete all LHR records for the current user (administrators; needs ?confirm=delete-all)' })
   @ApiResponse({ status: 200, description: 'All LHR records deleted' })

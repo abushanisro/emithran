@@ -1,5 +1,5 @@
 interface User { id: string; email: string; [key: string]: any; }
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, Inject, forwardRef, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, Inject, forwardRef, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { CalculatorsServiceV2 } from './calculators.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -82,6 +82,7 @@ export class CalculatorsController {
   }
 
   @OrgRole('admin')
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id')
   @ApiOperation({ summary: 'Delete calculator' })
   @ApiResponse({ status: 200, description: 'Calculator deleted successfully' })
@@ -159,6 +160,7 @@ export class CalculatorsController {
   }
 
   @OrgRole('admin')
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id/fields/:fieldId')
   @ApiOperation({ summary: 'Remove a field from calculator' })
   async removeField(
@@ -211,6 +213,7 @@ export class CalculatorsController {
   }
 
   @OrgRole('admin')
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id/formulas/:formulaId')
   @ApiOperation({ summary: 'Remove a formula from calculator' })
   async removeFormula(

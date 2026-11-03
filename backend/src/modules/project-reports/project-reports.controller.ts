@@ -12,6 +12,8 @@ import {
   ParseUUIDPipe,
   Logger,
   UnauthorizedException,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { RequestAuthGuard } from '@/common/guards/request-auth.guard';
@@ -132,6 +134,7 @@ export class ProjectReportsController {
     }
   }
 
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete('balloon-diagrams/:id')
   @ApiOperation({ summary: 'Delete balloon diagram' })
   @ApiResponse({ status: 200, description: 'Balloon diagram deleted successfully' })
@@ -190,6 +193,7 @@ export class ProjectReportsController {
     return createResponse(result);
   }
 
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete('balloon-diagrams/:diagramId/annotations/:annotationId')
   @ApiOperation({ summary: 'Delete diagram annotation' })
   @ApiResponse({ status: 200, description: 'Annotation deleted successfully' })

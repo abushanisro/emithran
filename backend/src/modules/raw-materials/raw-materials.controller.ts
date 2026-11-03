@@ -16,6 +16,7 @@ import {
   BadRequestException,
   HttpException,
   Logger,
+  HttpStatus,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
@@ -215,6 +216,7 @@ export class RawMaterialsController {
   }
 
   @OrgRole('admin')
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id')
   @ApiOperation({ summary: 'Delete raw material' })
   @ApiResponse({ status: 200, description: 'Raw material deleted successfully' })
@@ -223,6 +225,7 @@ export class RawMaterialsController {
   }
 
   @OrgRole('admin')
+  @HttpCode(HttpStatus.OK)
   @Delete()
   @ApiOperation({ summary: 'Delete all raw materials for current user (administrators; needs ?confirm=delete-all)' })
   @ApiResponse({ status: 200, description: 'All raw materials deleted successfully' })

@@ -150,7 +150,7 @@ async findAll(
    * Delete packaging/logistics cost
    */
   @Delete(':id')
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete packaging/logistics cost' })
   @ApiResponse({ status: 200, description: 'Packaging/logistics cost deleted successfully' })
   @ApiResponse({ status: 404, description: 'Packaging/logistics cost not found' })

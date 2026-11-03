@@ -86,6 +86,7 @@ export class BOMsController {
     return this.bomsService.update(id, updateBOMDto, user.id, token);
   }
 
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id')
   @ApiOperation({ summary: 'Delete BOM' })
   @ApiResponse({ status: 200, description: 'BOM deleted successfully' })

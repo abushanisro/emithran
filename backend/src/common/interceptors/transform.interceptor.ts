@@ -6,6 +6,8 @@ import {
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
+import { applyCacheHeaders } from '../http/cache-headers';
+import { createdLocation } from '../http/created-location';
 
 export interface Response<T> {
   success: boolean;
@@ -25,18 +27,25 @@ export class TransformInterceptor<T>
     context: ExecutionContext,
     next: CallHandler,
   ): Observable<Response<T>> {
-    const request = context.switchToHttp().getRequest();
+    const http = context.switchToHttp();
+    const request = http.getRequest();
     const requestId = request.headers['x-request-id'];
 
     return next.handle().pipe(
-      map((data) => ({
-        success: true,
-        data: this.transformKeys(data),
-        metadata: {
-          timestamp: new Date().toISOString(),
-          requestId,
-        },
-      })),
+      map((data) => {
+        const body = this.transformKeys(data);
+        const location = createdLocation(context.getHandler(), String(request.originalUrl ?? request.url ?? ''), body);
+        if (location) http.getResponse().setHeader('Location', location);
+        applyCacheHeaders(request.method, http.getResponse(), body);
+        return {
+          success: true,
+          data: body,
+          metadata: {
+            timestamp: new Date().toISOString(),
+            requestId,
+          },
+        };
+      }),
     );
   }
 

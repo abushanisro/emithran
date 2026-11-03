@@ -25,6 +25,8 @@ import {
   UseGuards,
   ParseUUIDPipe,
   ParseEnumPipe,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { gunzip } from 'zlib';
@@ -626,6 +628,7 @@ export class BOMItemsController {
    * An organization admin deletes an item even though other members' production lots use it: the lot references go with it. The
    * database function checks the admin role in the item's own organization and writes the audit event (migration 945).
    */
+  @HttpCode(HttpStatus.OK)
   @Delete(':id/force')
   @OrgRole('admin')
   @ApiOperation({ summary: 'Force delete a BOM item still used in production lots (organization admins)' })
@@ -635,6 +638,7 @@ export class BOMItemsController {
     return this.bomItemsService.forceRemove(id, token);
   }
 
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id')
   @ApiOperation({ summary: 'Delete BOM item' })
   @ApiResponse({ status: 200, description: 'BOM item deleted successfully' })

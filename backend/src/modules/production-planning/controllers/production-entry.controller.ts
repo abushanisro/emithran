@@ -9,7 +9,9 @@ import {
   Delete,
   Query,
   UseGuards,
-  Request
+  Request,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { createResponse, ApiResponse as StandardApiResponse } from '@/common/dto/api-response.dto';
@@ -100,6 +102,7 @@ export class ProductionEntryController {
     return createResponse(result);
   }
 
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a production entry' })
   @ApiResponse({
