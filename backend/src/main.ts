@@ -3,6 +3,7 @@
 import * as dotenv from 'dotenv';
 import * as path from 'node:path';
 import { apiDocsEnabled, dotenvOverride } from './common/runtime-flags';
+import { apiV1Middleware } from './common/http/api-v1';
 // The one local env file lives at the repo root (backend/dist/main.js -> ../../.env). Deployed containers have no file: compose sets the
 // variables, and a missing file is not an error.
 dotenv.config({ path: path.resolve(__dirname, '..', '..', '.env'), override: dotenvOverride(process.env) });
@@ -72,6 +73,8 @@ async function bootstrap() {
     type: VersioningType.URI,
     defaultVersion: '1',
   });
+  // /api/v1/* is the public prefix; /v1/api/* keeps working and is marked deprecated (common/http/api-v1.ts).
+  app.use(apiV1Middleware());
 
   // Enhanced security headers
   app.use(
