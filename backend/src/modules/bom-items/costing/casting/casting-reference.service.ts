@@ -6,8 +6,12 @@ import {
   CASTING_MATERIAL_PROPERTY_KEYS,
   CASTING_REFERENCE_SOURCE_VERSION,
   CASTING_VARIABLE_KEYS,
+  SAND_CASTABILITY_LOOKUP_KEYS,
+  SAND_CASTING_REFERENCE_SOURCE_VERSION,
   resolveCastingMaterial,
   resolveCastingReference,
+  resolveSandCastabilityReference,
+  type CastabilityReference,
   type CastingMaterial,
   type CastingReference,
 } from './casting-reference';
@@ -27,8 +31,10 @@ import { escapeLikePattern, quoteFilterValue } from '../../../../common/db/postg
 
 /** HR Rates machine class of the High Pressure Die Casting machines (migration 845). */
 const HPDC_MACHINE_CLASS = 'die_casting_high_pressure_die_casting';
-/** raw_materials.material_group of the die-casting alloys (migration 855). */
-const DIE_CASTING_MATERIAL_GROUP = 'Die Casting';
+/** raw_materials.material_group of each casting process's materials: die-casting alloys (migration 855), sand-casting materials (852). */
+const MATERIAL_GROUP = { die_casting: 'Die Casting', sand_casting: 'Sand Casting' } as const;
+/** The casting processes whose wall and hole limits (and materials) are staged. Investment casting has none yet. */
+export type CastabilityProcess = keyof typeof MATERIAL_GROUP;
 
 /**
  * Loads the staged memory/Die Casting rows the casting engines read and
@@ -60,6 +66,27 @@ export class CastingReferenceService {
       lookups: Object.fromEntries((lookups.data ?? []).map((r: any) => [r.key, Array.isArray(r.raw?.rows) ? r.raw.rows : undefined])),
     });
     return this.cached;
+  }
+
+  private cachedSand: { reference: CastabilityReference | null; missing: string[] } | null = null;
+
+  /**
+   * The wall and hole limits of one casting process: the die-casting reference (memory/Die Casting) or the sand-casting tables
+   * (memory/Sand casting, source version of its own). A process is never judged by another process's numbers.
+   */
+  async getCastabilityReference(process: CastabilityProcess): Promise<{ reference: CastabilityReference | null; missing: string[] }> {
+    if (process === 'die_casting') return this.getReference();
+    if (this.cachedSand) return this.cachedSand;
+    const db = this.database.getPrivilegedClient('reference-data: machining_reference_data, public-read');
+    const lookups = await db.from('machining_reference_data').select('key, raw')
+      .eq('category', 'lookup_table').eq('source_version', SAND_CASTING_REFERENCE_SOURCE_VERSION)
+      .in('key', [...SAND_CASTABILITY_LOOKUP_KEYS]);
+    if (lookups.error) return { reference: null, missing: [`Sand casting reference data (${lookups.error.message})`] };
+    const resolved = resolveSandCastabilityReference(
+      Object.fromEntries((lookups.data ?? []).map((r: any) => [r.key, Array.isArray(r.raw?.rows) ? r.raw.rows : undefined])),
+    );
+    if (resolved.reference) this.cachedSand = resolved;
+    return resolved;
   }
 
   private cachedTooling: { reference: DieToolingReference | null; missing: string[] } | null = null;
@@ -119,16 +146,17 @@ export class CastingReferenceService {
   }
 
   /**
-   * The die-casting alloy whose name or grade (the memory Name / Source Name)
-   * equals the BOM item's material grade, case-insensitively. null when the
-   * grade is not a die-casting alloy; the engine then reports it as missing.
+   * The casting material of `process` (a die-casting alloy by default) whose name or
+   * grade (the memory Name / Source Name) equals the BOM item's material grade,
+   * case-insensitively. null when the grade is not a material of that process;
+   * the engine then reports it as missing.
    */
-  async getMaterial(client: DbClient, grade: string | null): Promise<CastingMaterial | null> {
+  async getMaterial(client: DbClient, grade: string | null, process: CastabilityProcess = 'die_casting'): Promise<CastingMaterial | null> {
     const g = (grade ?? '').trim();
     if (!g) return null;
     const { data: rows, error } = await client.from('raw_materials')
       .select('id, name, grade, material_type, density_kg_m3, cost_usa, cut_code')
-      .eq('material_group', DIE_CASTING_MATERIAL_GROUP)
+      .eq('material_group', MATERIAL_GROUP[process])
       .or(`name.ilike.${quoteFilterValue(escapeLikePattern(g))},grade.ilike.${quoteFilterValue(escapeLikePattern(g))}`)
       .limit(2);
     if (error || !rows || rows.length !== 1) return null;

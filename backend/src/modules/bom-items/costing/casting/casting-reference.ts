@@ -31,6 +31,10 @@ import MANIFEST from '../../../processes/memory-reference-domains.json';
 export const CASTING_REFERENCE_SOURCE_VERSION: string =
   MANIFEST.domains.find((d) => d.key === 'die_casting')!.sourceVersion;
 
+/** Source version of memory/Sand casting (migration 853): its own lookup tables, staged under the file names. */
+export const SAND_CASTING_REFERENCE_SOURCE_VERSION: string =
+  MANIFEST.domains.find((d) => d.key === 'sand_casting')!.sourceVersion;
+
 export const CASTING_VARIABLE_KEYS = [
   'clampForceSafetyFactor', 'partSurfaceQuality', 'solidificationConstantHPDC',
   'ladleFillTime', 'ladleRate', 'lubeTimeConstant', 'lubeTimeCoefficient', 'ejectTimeHPDC',
@@ -117,6 +121,59 @@ const num = (v: unknown): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
+type LookupRows = ReadonlyArray<Record<string, unknown>>;
+
+// Row mappers shared by the die-casting reference and the sand-casting castability reference: the column headers are the
+// same in both memory folders.
+const wallLimitRows = (rows: LookupRows): CastingReference['wallLimits'] => rows.map((r) => ({
+  materialType: String(r['Material Type']), process: String(r['Process Name']),
+  maxMm: num(r['Maximum Wall Thickness (mm)']) ?? NaN, minMm: num(r['Minimum Wall Thickness (mm)']) ?? NaN,
+}));
+const minHoleDiameterRows = (rows: LookupRows): CastingReference['minHoleDiameter'] => rows.map((r) => ({
+  materialType: String(r['Material Type']), process: String(r['Process Name']), diameterMm: num(r['Min Hole Diameter (mm)']) ?? NaN,
+}));
+const maxHoleDepthRows = (rows: LookupRows): CastingReference['maxHoleDepth'] => rows.map((r) => ({
+  diameterMm: num(r['Hole Diameter (mm)']) ?? NaN, depthMm: num(r['Hole Max Depth (mm)']) ?? NaN,
+  materialType: String(r['Material Type']), process: String(r['Process Name']),
+}));
+const holeProximityRows = (rows: LookupRows): CastingReference['holeProximity'] => rows.map((r) => ({
+  process: String(r['Process Name']), diameterMm: num(r['Hole Diameter (mm)']) ?? NaN, minDistanceMm: num(r['Minimum Distance (mm)']) ?? NaN,
+}));
+
+/**
+ * What deciding whether a feature can be cast needs, for any casting process: the wall and hole limits. The die-casting reference
+ * carries these among much else; a process with its own folder (sand casting) supplies just these. A limit table the process's
+ * data does not have is an empty list: the checks then say what they could not decide, or skip a limit the data never had.
+ */
+export type CastabilityReference = Pick<CastingReference, 'wallLimits' | 'minHoleDiameter' | 'maxHoleDepth' | 'holeProximity'>;
+
+/** The sand-casting lookup tables castability reads, as staged by migration 853 (named after their files). */
+export const SAND_CASTABILITY_LOOKUP_KEYS = [
+  'lookupTables_Component_tblMinHoleDiameter',
+  'lookupTables_Component_tblWallThickness',
+] as const;
+
+/**
+ * The sand-casting castability reference from memory/Sand casting. It has a minimum hole diameter and wall limits by material
+ * type; it has no maximum hole depth and no hole-to-hole proximity table (those two are die-casting limits), so those stay empty
+ * rather than borrowing the die-casting numbers.
+ */
+export function resolveSandCastabilityReference(
+  lookups: Readonly<Record<string, LookupRows | undefined>>,
+): { reference: CastabilityReference | null; missing: string[] } {
+  const missing: string[] = [];
+  const table = (key: (typeof SAND_CASTABILITY_LOOKUP_KEYS)[number]) => {
+    const t = lookups[key];
+    if (!t || t.length === 0) missing.push(`${key} (not staged, migration 853)`);
+    return t ?? [];
+  };
+  const minHoleDiameter = minHoleDiameterRows(table('lookupTables_Component_tblMinHoleDiameter'));
+  const wallLimits = wallLimitRows(table('lookupTables_Component_tblWallThickness'));
+  return missing.length
+    ? { reference: null, missing }
+    : { reference: { wallLimits, minHoleDiameter, maxHoleDepth: [], holeProximity: [] }, missing };
+}
+
 export function resolveCastingReference(rows: CastingReferenceRows): { reference: CastingReference | null; missing: string[] } {
   const missing: string[] = [];
   const vars = new Map(rows.variables.map((v) => [v.key, num(v.value)]));
@@ -147,10 +204,7 @@ export function resolveCastingReference(rows: CastingReferenceRows): { reference
     const v = num(r['Num Shots Per Tool']);
     if (v != null) toolLifeShotsByType.set(String(r['Material Type']), v);
   }
-  const wallLimits = table('tblWallThickness').map((r) => ({
-    materialType: String(r['Material Type']), process: String(r['Process Name']),
-    maxMm: num(r['Maximum Wall Thickness (mm)']) ?? NaN, minMm: num(r['Minimum Wall Thickness (mm)']) ?? NaN,
-  }));
+  const wallLimits = wallLimitRows(table('tblWallThickness'));
 
   const overflow = table('tblOverflowDim').map((r) => ({
     wallMm: num(r['Wall Thickness (mm)']) ?? NaN,
@@ -158,16 +212,9 @@ export function resolveCastingReference(rows: CastingReferenceRows): { reference
     low: num(r['Overflow Volume Ratio Low']) ?? NaN,
   })).sort((a, b) => a.wallMm - b.wallMm);
 
-  const minHoleDiameter = table('tblMinHoleDiameter').map((r) => ({
-    materialType: String(r['Material Type']), process: String(r['Process Name']), diameterMm: num(r['Min Hole Diameter (mm)']) ?? NaN,
-  }));
-  const maxHoleDepth = table('tblMaxHoleDepth').map((r) => ({
-    diameterMm: num(r['Hole Diameter (mm)']) ?? NaN, depthMm: num(r['Hole Max Depth (mm)']) ?? NaN,
-    materialType: String(r['Material Type']), process: String(r['Process Name']),
-  }));
-  const holeProximity = table('tblHighPressureDieCastingProximity').map((r) => ({
-    process: String(r['Process Name']), diameterMm: num(r['Hole Diameter (mm)']) ?? NaN, minDistanceMm: num(r['Minimum Distance (mm)']) ?? NaN,
-  }));
+  const minHoleDiameter = minHoleDiameterRows(table('tblMinHoleDiameter'));
+  const maxHoleDepth = maxHoleDepthRows(table('tblMaxHoleDepth'));
+  const holeProximity = holeProximityRows(table('tblHighPressureDieCastingProximity'));
   const visualInspection = table('tblVisualInspection').map((r) => ({
     maxWeightKg: num(r['Max Weight (kg)']) ?? NaN,
     internalMinPerM2: num(r['Internal Inspection Rate (min / m^2)']) ?? NaN,
@@ -259,7 +306,7 @@ export const CASTING_MATERIAL_PROPERTY_KEYS = [
  * tblWallThickness row. null when there is no row (or no measurement).
  */
 export function wallFeasibility(
-  ref: CastingReference, process: string, materialType: string | null, wallNominalMm: number | null, wallMaxMm: number | null,
+  ref: CastabilityReference, process: string, materialType: string | null, wallNominalMm: number | null, wallMaxMm: number | null,
 ): { feasible: boolean | null; detail: string } {
   if (!materialType) return { feasible: null, detail: 'material has no Material Type' };
   const row = ref.wallLimits.find((w) => w.materialType === materialType && w.process === process);
@@ -287,7 +334,7 @@ export type HoleCastability =
  * null when the table has no row for the material type and process.
  */
 export function holeCastability(
-  ref: CastingReference, process: string, materialType: string | null, diameterMm: number, depthMm: number | null,
+  ref: CastabilityReference, process: string, materialType: string | null, diameterMm: number, depthMm: number | null,
 ): HoleCastability {
   if (!materialType) return { castable: null, detail: 'material has no Material Type' };
   const min = ref.minHoleDiameter.find((r) => r.materialType === materialType && r.process === process);
@@ -296,6 +343,8 @@ export function holeCastability(
     return { castable: false, detail: `Ø${diameterMm} mm < ${process} minimum Ø${min.diameterMm} mm for ${materialType} (tblMinHoleDiameter)` };
   }
   if (depthMm == null || !(depthMm > 0)) return { castable: true, detail: `Ø${diameterMm} mm ≥ minimum Ø${min.diameterMm} mm; depth not measured` };
+  // A reference with no depth limits at all (sand casting's data has none) has nothing to decide on: the hole is castable by diameter.
+  if (ref.maxHoleDepth.length === 0) return { castable: true, detail: `Ø${diameterMm} mm ≥ minimum Ø${min.diameterMm} mm; the reference data has no depth limit for ${process}` };
   const rows = ref.maxHoleDepth.filter((r) => r.materialType === materialType && r.process === process).sort((a, b) => a.diameterMm - b.diameterMm);
   const band = [...rows].reverse().find((r) => r.diameterMm <= diameterMm);
   if (!band) return { castable: null, detail: `tblMaxHoleDepth has no ${materialType} / ${process} row at or below Ø${diameterMm} mm` };
@@ -314,7 +363,7 @@ export function holeCastability(
  * null when the process has no proximity rows (the table is HPDC only).
  */
 export function holeProximityCastability(
-  ref: CastingReference,
+  ref: CastabilityReference,
   process: string,
   hole: { diameterMm: number; centroidMm: [number, number, number]; axis: [number, number, number] },
   others: ReadonlyArray<{ label: string; diameterMm: number; centroidMm: [number, number, number]; axis: [number, number, number] }>,
