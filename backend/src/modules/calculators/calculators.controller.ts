@@ -22,7 +22,7 @@ import { OrgRole } from '../../common/authz/authz-policy';
 @ApiTags('Calculators')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/calculators', version: '1' })
+@Controller({ path: 'calculators', version: '1' })
 export class CalculatorsController {
   constructor(
     @Inject(forwardRef(() => CalculatorsServiceV2))

@@ -16,7 +16,7 @@ import { OrgRole } from '../../../common/authz/authz-policy';
 
 @ApiTags('PDF Processing')
 @OrgRole('member')
-@Controller({ path: 'api/pdf-documents', version: '1' })
+@Controller({ path: 'pdf-documents', version: '1' })
 export class PDFProcessingController {
   private readonly logger = new Logger(PDFProcessingController.name);
 

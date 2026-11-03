@@ -45,7 +45,7 @@ import {
 import { OrgRole } from '../../common/authz/authz-policy';
 
 @OrgRole('member')
-@Controller({ path: 'api', version: '1' })
+@Controller({ path: '', version: '1' })
 @UseGuards(RequestAuthGuard)
 export class ProductionPlanningController {
   private readonly logger = new Logger(ProductionPlanningController.name);

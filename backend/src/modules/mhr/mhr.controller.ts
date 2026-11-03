@@ -29,7 +29,7 @@ import { OrgRole } from '../../common/authz/authz-policy';
 @ApiTags('MHR')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/machine-rates', version: '1' })
+@Controller({ path: 'machine-rates', version: '1' })
 export class MHRController {
   private readonly logger = new Logger(MHRController.name);
 

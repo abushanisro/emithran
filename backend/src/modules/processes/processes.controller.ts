@@ -48,7 +48,7 @@ import { MAX_XLSX_UPLOAD_BYTES } from '../../common/archive/xlsx-limits';
 @ApiTags('Processes')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/processes', version: '1' })
+@Controller({ path: 'processes', version: '1' })
 export class ProcessesController {
   constructor(private readonly processesService: ProcessesService, private readonly audit: AuditService) {}
 

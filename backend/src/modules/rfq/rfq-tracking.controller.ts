@@ -40,7 +40,7 @@ import { OrgRole } from '../../common/authz/authz-policy';
 @ApiBearerAuth()
 @UseGuards(RequestAuthGuard)
 @OrgRole('member')
-@Controller({ path: 'api/rfq-trackings', version: '1' })
+@Controller({ path: 'rfq-trackings', version: '1' })
 export class RfqTrackingController {
   private readonly logger = new Logger(RfqTrackingController.name);
 

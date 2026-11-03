@@ -44,7 +44,7 @@ import { OrgRole } from '../../common/authz/authz-policy';
 @ApiTags('Packaging & Logistics Costs')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller('api/packaging-logistics-costs')
+@Controller('packaging-logistics-costs')
 @UseGuards(RequestAuthGuard)
 export class PackagingLogisticsCostController {
   constructor(

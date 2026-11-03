@@ -9,7 +9,7 @@ import { decodeJwtPayload } from '../database/jwt-payload';
  * JOB_EXTENSION_MAX_MS beyond the idle deadline. Every input only ever moves
  * forward, so the deadline only ever moves forward too.
  *
- * The browser reads these values from GET /v1/api/auth/session instead of
+ * The browser reads these values from GET /api/v1/auth/session instead of
  * keeping its own copy, so the countdown can never drift from what the server
  * enforces.
  */

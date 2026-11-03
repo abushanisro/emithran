@@ -19,7 +19,7 @@ import type { ShouldCostResult, VaveIdeaDraft } from './vave-ai.results';
 @ApiTags('VAVE')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api', version: '1' })
+@Controller({ path: '', version: '1' })
 @UseGuards(OrganizationContextGuard)
 export class VaveAiController {
   constructor(private readonly vaveAi: VaveAiService) {}

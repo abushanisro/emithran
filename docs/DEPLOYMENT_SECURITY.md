@@ -19,8 +19,9 @@ backend / frontend ──► Supabase project for this environment (stage and pr
 - **Engines are private.** They parse untrusted CAD and board files, so they get no internet and cannot be reached from outside.
 - **One image set per environment.** `NEXT_PUBLIC_*` values are compiled into the browser bundle, so stage and prd build their own
   frontend from their own env file.
-- **Same-origin API.** The browser calls `https://<app host>/v1/api/...`; Cloudflare routes `/v1/*` to the backend and everything
-  else to the frontend. No CORS, and one Cloudflare Access login covers both.
+- **Same-origin API.** The browser calls `https://<app host>/api/v1/...`, which is the Next.js BFF (it adds the session's token and
+  forwards to the private backend at `/api/v1/...`). No CORS, and one Cloudflare Access login covers it. If the backend is also
+  published for direct callers, give it its own host: `/api/v1/*` on the app host is the BFF, so the two cannot share a route.
 
 ## Environments and promotion
 
@@ -73,7 +74,7 @@ Zero Trust → Networks → Tunnels → create a tunnel per environment (`emithr
    Set `NEXT_PUBLIC_API_GATEWAY_URL` and `CORS_ORIGIN` to `https://app.<domain>`.
 2. **Access (stage only):** an Access application on the stage hostname, policy *Allow* the team (email domain or your SSO group),
    session 24 h. Add a service token for CI smoke tests. Production has no Access application.
-3. **WAF:** enable the Cloudflare Managed Ruleset and the OWASP Core Ruleset. Add rate-limiting rules: `POST /v1/api/cad-uploads`
+3. **WAF:** enable the Cloudflare Managed Ruleset and the OWASP Core Ruleset. Add rate-limiting rules: `POST /api/v1/cad-uploads`
    (about 10 per minute per IP), and a general `/v1/*` limit.
 4. **TLS:** minimum TLS 1.2, Always Use HTTPS, HSTS. **Cache:** bypass `/v1/*` and `/api/*`.
 5. **Host firewall:** allow outbound only. `cloudflared` needs outbound TCP/UDP 7844 (and 443). No inbound rules at all.

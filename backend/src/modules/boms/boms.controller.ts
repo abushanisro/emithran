@@ -30,7 +30,7 @@ import { OrgRole } from '../../common/authz/authz-policy';
 @ApiTags('BOMs')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/boms', version: '1' })
+@Controller({ path: 'boms', version: '1' })
 export class BOMsController {
   constructor(
     private readonly bomsService: BOMsService,

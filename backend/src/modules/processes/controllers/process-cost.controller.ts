@@ -47,7 +47,7 @@ import { OrgRole } from '../../../common/authz/authz-policy';
 @ApiBearerAuth()
 @UseGuards(RequestAuthGuard)
 @OrgRole('member')
-@Controller('api/process-costs')
+@Controller('process-costs')
 export class ProcessCostController {
   private readonly logger = new Logger(ProcessCostController.name);
 

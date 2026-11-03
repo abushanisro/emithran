@@ -31,8 +31,8 @@ function routes(): Route[] {
     const m = /^"?(\S+)\s+(GET|POST|PUT|PATCH|DELETE)\s+(\S+)\s+\w+\.\w+/.exec(line);
     if (!m) continue;
     const full = m[3];
-    if (!full.startsWith('/v1/api/')) continue; // health and ping live outside the API prefix
-    const segments = full.replace(/^\/v1\/api\//, '').split('/').filter(Boolean);
+    if (!full.startsWith('/api/v1/')) continue; // health and ping live outside the versioned API
+    const segments = full.replace(/^\/api\/v1\//, '').split('/').filter(Boolean);
     out.push({ method: m[2], segments, text: `${m[2]} /${segments.join('/')}` });
   }
   return out;

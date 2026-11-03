@@ -9,7 +9,6 @@ import {
 import { Request, Response } from 'express';
 import { clientIp } from '../client-ip';
 import { TryAgainLaterException } from '../http/try-again-later.exception';
-import type { ApiV1Request } from '../http/api-v1';
 import { STATUS_CODES } from 'node:http';
 
 /**
@@ -199,8 +198,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     // Send response
     if (exception instanceof TryAgainLaterException) response.setHeader('Retry-After', String(exception.retryAfterSeconds));
-    if ((request as ApiV1Request).apiV1 === true) {
-      // The public /api/v1 surface answers with RFC 9457 problem details; the old /v1/api surface keeps its body.
+    if (String(request.originalUrl ?? request.url ?? '').startsWith('/api/v1/')) {
+      // The API (/api/v1) answers errors as RFC 9457 problem details; the liveness and health routes keep the plain envelope.
       response.status(httpStatus).type('application/problem+json').json({
         type: 'about:blank',
         title: STATUS_CODES[httpStatus] ?? 'Error',
@@ -209,6 +208,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         instance: String(request.originalUrl ?? '').split('?')[0],
         code: errorResponse.error.code,
         ...(validationErrors && { errors: validationErrors }),
+        ...(details && { details }), // an extension member (RFC 9457 section 3.2): what a client needs to resolve a refusal
         ...(errorResponse.metadata.requestId && { requestId: errorResponse.metadata.requestId }),
       });
       return;

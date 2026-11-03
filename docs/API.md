@@ -105,91 +105,17 @@ GET /vendors?processId=…&q=casting&sort=+name,-createdAt&page=2&limit=50
 
 ## 9. Version the API
 
-The version is the first path segment: `/api/v1/…`. Only major versions exist. A change that can break a client ships as `/api/v2`; within `v1` changes only add.
+The version is the first path segment after `api`: **`/api/v1/<resource>`**. There is one spelling of every path: the global prefix is `api`, the version is `v1`, and a controller names only its resource (`common/http/api-prefix.ts`). Nothing else answers: not `/v1/api/…`, not an old resource name. Only major versions exist.
 
 - **Not breaking:** a new endpoint, a new optional request field or query parameter, a new response field.
-- **Breaking** (needs a new major version): removing or renaming a response field, changing a field's type or meaning, making an optional request field required, changing who may call a route.
+- **Breaking** (needs `/api/v2` beside `v1`): removing or renaming a response field, changing a field's type or meaning, making an optional request field required, changing who may call a route.
+- **Deprecating a route or version** (once there are callers outside the web app): announce it with the standard headers, `Deprecation: @<unix seconds>` (RFC 9745, a date, not `true`) and `Sunset: <HTTP-date>` (RFC 8594) plus `Link: <…>; rel="successor-version"`, and remove it only after the published Sunset date with a migration guide, not when traffic reaches zero: an integration may run once a quarter.
 
-The old prefix **`/v1/api/…`** and every renamed resource path (table below) still work and are **deprecated**, announced with the standard headers:
-
-```
-Deprecation: @1793664000                                   RFC 9745: when it was deprecated, as a date
-Sunset: Wed, 30 Jun 2027 00:00:00 GMT                      RFC 8594: when it stops working (once announced)
-Link: </api/v1/machine-rates/7>; rel="successor-version", <https://docs…/deprecations/v1>; rel="deprecation"
-```
-
-`Deprecation` is a structured date (`@` and Unix seconds), not `true`. The dates and the notice URL are settings, checked at start (a wrong one stops the server): `LEGACY_API_DEPRECATED_AT` (default 2026-11-03), `LEGACY_API_SUNSET`, `API_DEPRECATION_DOCS_URL`.
-
-**Removal policy.** A deprecated path is removed only after its `Sunset` date, which is published in advance together with a migration guide (we propose no less than six months). Zero traffic in the request log is not the trigger: an integration may run once a quarter. The log tells us whom to contact before the date. Health checks stay at `/api/health/*`.
-
-## Renamed paths
-
-A route that was renamed keeps answering on its old path until its Sunset date. The table is `backend/src/common/http/legacy-paths.ts` (old path to new path, on whole segments; a `:name` segment matches any segment and is copied across): a request to the old path is routed to the new one and answered with the deprecation headers of rule 9. The controllers carry only the new name, so the route inventory lists each route once. A rule is removed after the Sunset date, never because traffic reached zero.
-
-| Old | New |
-|---|---|
-| `/mhr`, `/mhr/…` | `/machine-rates`, `/machine-rates/…` |
-| `/mhr/import-excel` | `/machine-rates/imports` |
-| `/lhr`, `/lhr/…` | `/labour-rates`, `/labour-rates/…` |
-| `/lhr/import-excel` | `/labour-rates/imports` |
-| `/lhr/bulk` | `/labour-rates/batches` |
-| `/rfq`, `/rfq/…` | `/rfqs`, `/rfqs/…` |
-| `/rfq/tracking`, `/rfq/tracking/…` | `/rfq-trackings`, `/rfq-trackings/…` |
-| `/fx/exchange-rates`, `/fx/exchange-rates/:currency` | `/exchange-rates`, `/exchange-rates/:currency` |
-| `/fx/rate` | `/exchange-rates/effective` |
-| `/fx/refresh` | `/exchange-rates/refresh` |
-| `/fx/currencies`, `/fx/factories` | `/currencies`, `/factories` |
-| `/fx/factory-currency` | `/factory-currencies` |
-| `/production-planning/lots`, `…/lots/:id/…` | `/production-lots`, `/production-lots/:id/…` |
-| `/production-planning/processes` | `/production-processes` |
-| `/production-planning/subtasks`, `…/materials`, `…/alerts` | `/production-subtasks`, `/production-materials`, `/production-alerts` |
-| `/production-planning/production-entries` | `/production-entries` |
-| `/production-planning/process-templates` | `/production-process-templates` |
-| `/production-planning/dashboard` | `/production-lots/dashboard` |
-| `/vave/projects/…` | `/vave-projects/…` (`…/bulk` becomes `…/batches`) |
-| `/vave/ai/bom-analysis` | `/vave-bom-analyses` |
-| `/quality-control/inspections/…` | `/quality-inspections/…` |
-| `/manufacturing-knowledge/feature-process-mapping`, `machine-capabilities`, `routing-rules`, `templates` | `/feature-process-mappings`, `/machine-capabilities`, `/routing-rules`, `/routing-templates` |
-| `/process-planning/bom-items/:id/specifications` | `/bom-items/:id/process-specifications` |
-| `/process-planning/specifications/upsert` | `/process-specifications` |
-| `/pdf-processing/extract-dimensions`, `/validate-pdf` | `/pdf-documents/dimension-extractions`, `/pdf-documents/validations` |
-
-### Verbs that became nouns
-
-| Old | New |
-|---|---|
-| `…/import-excel`, `…/upload-excel`, `…/upload-csv` | `…/imports` (rates, calculator mappings, raw materials, vendors) |
-| `bom-items/:id/analyze-cad`, `analyze-drawing` | `bom-items/:id/cad-analyses`, `drawing-analyses` |
-| `bom-items/analyze-for-autofill`, `…/start`, `…/:jobId` | `bom-items/autofill-analyses`, `autofill-analysis-jobs`, `autofill-analysis-jobs/:jobId` |
-| `bom-items/batch-analyze-cad` | `bom-items/cad-analysis-batches` |
-| `bom-items/:id/apply-route`, `apply-custom-route`, `convert-step`, `upload-files` | `…/route-applications`, `custom-route-applications`, `step-conversions`, `files` |
-| `boms/:id/recalculate-all-costs` | `boms/:id/cost-recalculations` |
-| `<cost>/bulk-total`, `process-costs/calculate`, `child-part-costs/calculate` | `<cost>/totals`, `…/calculations` |
-| `calculators/sheet-metal/lookup`, `vendors/match` | `…/lookups`, `vendors/matches` |
-| `…/rows/bulk`, `…/cost-analysis/bulk`, `…/capability-scores/batch`, `…/rating-matrix/batch` | `…/rows/batches`; a `PUT` on the collection (`cost-analysis`, `capability-scores`, `rating-matrix`) |
-| `…/capability-scores/init`, `…/rating-matrix/init`, `…/cost-analysis/init` | a `POST` on the collection |
-| `supplier-nominations/:id/calculate-rankings`, `store-rankings` | `…/rankings/calculations`, `POST …/rankings` |
-| `production-lots/:id/update-status-by-progress`, `…/materials/initialize` | `…/status-updates`, `POST …/materials` |
-| `supplier-evaluation-groups/:id/validate-deletion`, `project-reports/…/complete-report` | `…/deletion-check`, `…/full-report` |
-
-### Flattened
-
-| Old | New |
-|---|---|
-| `/electronics/designs`, `uploads`, `jobs`, `results`, `quotes`, `file-formats`, `reference-coverage` | `/electronic-designs`, `/electronic-uploads`, `/electronic-jobs`, `/electronic-results`, `/electronic-quotes`, `/electronic-file-formats`, `/electronic-coverage-reports` |
-| `/project-reports/balloon-diagrams/…` | `/balloon-diagrams/…` |
-| `/copilot/memory/proposals/:id/confirm` | `/copilot/memory-proposals/:id/confirm` |
-| `/processes/sm-lookup-tables/rows/:table/:id` | `/processes/sm-lookup-table-rows/:table/:id` |
-| `/processes/reference-tables/:id/rows/batches` | `/processes/reference-tables/:id/row-batches` |
-| `/vave-projects/:id/ai/should-cost/:itemId` | `/vave-projects/:id/should-cost-estimates/:itemId` |
-| `/supplier-nominations/:n/parts/:part/cost-analysis` | `/supplier-nominations/:n/part-cost-analyses/:part` |
-| `/supplier-nominations/:n/vendors/:v/rating-matrix` (and `/overall-scores`) | `/supplier-nominations/:n/vendor-ratings/:v` (and `/vendor-overall-scores/:v`) |
-| `/supplier-nominations/:n/capability-scores/:c/vendor/:v` | `/supplier-nominations/:n/capability-scores/:c/:v` |
-| `/supplier-nominations/evaluations/:e/sections/:s` | `/supplier-nominations/evaluation-sections/:e/:s` |
+Liveness is outside the versioned API: `GET /` and `GET /ping`; health checks are `/api/health/*` (no version). Until 2026-11-03 the API was served at `/v1/api/…` with a few abbreviated resource names; with no external callers that spelling, the alias table and the deprecation headers were removed instead of being kept as a compatibility layer.
 
 ## The web app and the API agree
 
-`test/contract/api-paths.test.ts` reads every API path the web app calls and checks it against the backend's route list, by canonical name. A rename, a typo or a call to a route that does not exist fails there instead of as a 404 the client swallows. The calls that are wrong today are listed in `api-paths-unmatched.json` (11, mostly routes the backend never had: `boms/:id/approve`, `boms/:id/release`, `boms/:id/items/:itemId`, `calculators/formulas/validate`, production vendor assignments and daily production, the cost recalculation paths); the list can only shrink.
+`test/contract/api-paths.test.ts` reads every API path the web app calls and checks it against the backend's route list, by canonical name. A rename, a typo or a call to a route that does not exist fails there instead of as a 404 the client swallows. The calls that are wrong today are listed in `api-paths-unmatched.json` (9, mostly routes the backend never had: `boms/:id/approve`, `boms/:id/release`, `boms/:id/items/:itemId`, `calculators/formulas/validate`, production vendor assignments and daily production, the cost recalculation paths); the list can only shrink.
 
 ## How the rules are enforced
 
@@ -202,13 +128,13 @@ A route that was renamed keeps answering on its old path until its Sunset date. 
 | Rule | State |
 |---|---|
 | 1 JSON | Done |
-| 2 Nouns | 2 routes: the AI process-plan generator (`generate`, `select-route`), kept as it is until it is decided whether the feature stays |
-| 3 Plural | 8 routes: the same generator (`process-plan-generator`). Everything else is renamed |
+| 2 Nouns | Done |
+| 3 Plural | Done |
 | 4 Nesting | 1 route: `PUT supplier-nominations/:id/capability-scores/:criteriaId/:vendorId` (one cell of a score grid; it needs both ids). Everything else is two levels or less |
 | 5 Errors | Problem details on `/api/v1`; deletes still answer 200 with a body in about 40 places; no `Location` on create |
 | 6 Filter, sort, paginate | About 20 lists page; no shared helper or cap; sorting is uneven |
 | 7 Security | Done, two open items: a `reference-data:write` permission, and the approver not being the submitter |
 | 8 Caching | Not started |
-| 9 Versioning | Done: `/api/v1` is what the web app calls (`API_URL` and `NEXT_PUBLIC_API_URL` end in `/api/v1`), with the new resource names; `/v1/api` and the old names remain for outside callers until their Sunset date |
+| 9 Versioning | Done: `/api/v1` is the only prefix; the web app calls it through its BFF (`API_URL` and `NEXT_PUBLIC_API_URL` end in `/api/v1`) |
 
 Not built: cursor pagination, `Idempotency-Key` on creates, `ETag`/`If-Match` on writes, a shared `/jobs` resource for long work.

@@ -27,7 +27,7 @@ import { OrgRole } from '../../../common/authz/authz-policy';
 @ApiBearerAuth()
 @UseGuards(RequestAuthGuard)
 @OrgRole('member')
-@Controller('api/production-entries')
+@Controller('production-entries')
 export class ProductionEntryController {
   constructor(private readonly productionEntryService: ProductionEntryService) {}
 

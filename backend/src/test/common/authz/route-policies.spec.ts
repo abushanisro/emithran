@@ -44,7 +44,8 @@ function routesOf(controller: Ctor): Array<{ route: string; policy: string }> {
     const policy = describeAuthzPolicy(resolveAuthzPolicy(reflector, handler, controller));
     for (const v of versions) {
       for (const b of base) {
-        for (const p of paths) rows.push({ route: `${RequestMethod[method]} ${join(v, b, p)}  ${controller.name}.${name}`, policy });
+        // the global prefix `api` (common/http/api-prefix.ts), except for the two liveness routes of AppController at the root
+        for (const p of paths) rows.push({ route: `${RequestMethod[method]} ${controller.name === 'AppController' ? join(v, b, p) : join('api', v, b, p)}  ${controller.name}.${name}`, policy });
       }
     }
   }

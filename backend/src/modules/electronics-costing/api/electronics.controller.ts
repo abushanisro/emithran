@@ -108,7 +108,7 @@ export function toCostResultView(row: CostResultRow): CostResultView {
 @ApiBearerAuth()
 @UseGuards(OrganizationContextGuard)
 @OrgRole('member')
-@Controller({ path: 'api', version: '1' })
+@Controller({ path: '', version: '1' })
 export class ElectronicsController {
   constructor(
     private readonly startUpload: StartUploadUseCase,

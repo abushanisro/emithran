@@ -9,7 +9,7 @@ import type {
 import { OrgRole } from '../../common/authz/authz-policy';
 
 @OrgRole('member')
-@Controller('api')
+@Controller()
 export class ManufacturingKnowledgeController {
   constructor(
     private readonly kb: ManufacturingKnowledgeService,

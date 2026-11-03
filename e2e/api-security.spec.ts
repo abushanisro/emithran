@@ -5,7 +5,7 @@ import { test, expect, request as pwRequest } from '@playwright/test';
 // the server fetch an untrusted address. Nothing here reaches a paid service.
 const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:3000';
 
-// The VAVE AI analyses run in the backend (POST /v1/api/vave/.../ai/*, behind the BFF and its own auth), not as Next routes.
+// The VAVE AI analyses run in the backend (POST /api/v1/vave-projects/.../ai/*, behind the BFF and its own auth), not as Next routes.
 const AI_ROUTES = [
   '/api/vave/drawing-analysis',
   '/api/manufacturing-copilot/chat',

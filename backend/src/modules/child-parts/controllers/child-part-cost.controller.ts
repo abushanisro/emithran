@@ -42,7 +42,7 @@ import { OrgRole } from '../../../common/authz/authz-policy';
 
 @ApiTags('Child Part Costs')
 @OrgRole('member')
-@Controller('api/child-part-costs')
+@Controller('child-part-costs')
 @UseGuards(RequestAuthGuard)
 @ApiBearerAuth()
 export class ChildPartCostController {

@@ -43,7 +43,7 @@ import { OrgRole } from '../../../common/authz/authz-policy';
 @ApiTags('Tooling Costs')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/tooling-costs', version: '1' })
+@Controller({ path: 'tooling-costs', version: '1' })
 @UseGuards(RequestAuthGuard)
 export class ToolingCostController {
   constructor(

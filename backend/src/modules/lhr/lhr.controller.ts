@@ -30,7 +30,7 @@ import { OrgRole } from '../../common/authz/authz-policy';
 @ApiTags('LHR')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/labour-rates', version: '1' })
+@Controller({ path: 'labour-rates', version: '1' })
 export class LHRController {
   constructor(private readonly LHRService: LHRService, private readonly audit: AuditService) { }
 

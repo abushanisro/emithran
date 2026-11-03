@@ -24,4 +24,9 @@ describe('problem details', () => {
     expect(fromProblemDetails({ status: 404, title: 'Not Found' }).error).toEqual({ code: 'HTTP_ERROR', message: 'Not Found' });
     expect(fromProblemDetails({ status: 500 }).error.message).toBe('Request failed with status 500');
   });
+
+  it('carries the details a refusal comes with, as the old error body did', () => {
+    const body = fromProblemDetails({ status: 409, detail: 'in use', code: 'BOM_ITEM_IN_PRODUCTION_LOTS', details: { visibleLotIds: ['l1'] } });
+    expect(body.error.details).toEqual({ visibleLotIds: ['l1'] });
+  });
 });

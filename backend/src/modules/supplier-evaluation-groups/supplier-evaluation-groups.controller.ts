@@ -24,7 +24,7 @@ import { OrgRole } from '../../common/authz/authz-policy';
 
 @ApiTags('supplier-evaluation-groups')
 @OrgRole('member')
-@Controller('api/supplier-evaluation-groups')
+@Controller('supplier-evaluation-groups')
 export class SupplierEvaluationGroupsController {
   constructor(
     private readonly supplierEvaluationGroupsService: SupplierEvaluationGroupsService,

@@ -36,7 +36,7 @@ import { OrgRole } from '../../common/authz/authz-policy';
 @ApiTags('Quality Control')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller('api/quality-inspections')
+@Controller('quality-inspections')
 @UseGuards(RequestAuthGuard)
 export class QualityControlController {
   private readonly logger = new Logger(QualityControlController.name);

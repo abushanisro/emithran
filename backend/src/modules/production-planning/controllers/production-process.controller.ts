@@ -25,7 +25,7 @@ import { OrgRole } from '../../../common/authz/authz-policy';
 
 @ApiTags('Production Processes')
 @OrgRole('member')
-@Controller('api/production-processes')
+@Controller('production-processes')
 @UseGuards(RequestAuthGuard)
 export class ProductionProcessController {
   constructor(private readonly productionProcessService: ProductionProcessService) { }

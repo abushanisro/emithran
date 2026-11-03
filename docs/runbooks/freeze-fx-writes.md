@@ -7,8 +7,8 @@ FX is written in three places:
 
 | What | Written by | Path |
 |---|---|---|
-| an organization's budget rates (`organization_exchange_rates`, migration 940) | members, through `set_organization_exchange_rate()` as the signed-in user | `PUT /v1/api/fx/exchange-rates/:currency` |
-| the global market-rate cache (`fx_rate_snapshots`) | the backend's service connection | `POST /v1/api/fx/refresh` and the scheduled refresh |
+| an organization's budget rates (`organization_exchange_rates`, migration 940) | members, through `set_organization_exchange_rate()` as the signed-in user | `PUT /api/v1/exchange-rates/:currency` |
+| the global market-rate cache (`fx_rate_snapshots`) | the backend's service connection | `POST /api/v1/exchange-rates/refresh` and the scheduled refresh |
 | the global default rates (`exchange_rates`) | migrations and operators only | none |
 
 ## 1. Stop it at the edge (seconds)
@@ -16,8 +16,8 @@ FX is written in three places:
 Cloudflare → the zone → Security → WAF → Custom rules → create a rule, action **Block**:
 
 ```
-(http.request.uri.path wildcard "/v1/api/fx/exchange-rates/*" and http.request.method eq "PUT")
-or (http.request.uri.path eq "/v1/api/fx/refresh" and http.request.method eq "POST")
+(http.request.uri.path wildcard "/api/v1/exchange-rates/*" and http.request.method eq "PUT")
+or (http.request.uri.path eq "/api/v1/exchange-rates/refresh" and http.request.method eq "POST")
 ```
 
 ## 2. Stop it in the database (holds whatever the path)

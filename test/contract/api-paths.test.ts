@@ -19,7 +19,7 @@ const PLACEHOLDER = ':x';
 function backendRoutes(): string[][] {
   const out: string[][] = [];
   for (const line of fs.readFileSync(SNAPSHOT, 'utf8').split('\n')) {
-    const m = /^"?\S+\s+(?:GET|POST|PUT|PATCH|DELETE)\s+\/v1\/api\/(\S+)\s/.exec(line);
+    const m = /^"?\S+\s+(?:GET|POST|PUT|PATCH|DELETE)\s+\/api\/v1\/(\S+)\s/.exec(line);
     if (m) out.push(m[1].split('/'));
   }
   return out;

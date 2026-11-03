@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { groupMachineLibraryDetail } from '@/lib/utils/machineLibraryDetail';
 
 // Real payload, captured verbatim from this deployment via
-// GET /v1/api/mhr/:id/reference-detail for the press brake that appears on the
+// GET /api/v1/machine-rates/:id/reference-detail for the press brake that appears on the
 // reported quote. Nothing here is invented — it is the machine library record
 // the cost engine actually costs "Bend Brake" against.
 const PRESS_BRAKE_RAW = {

@@ -26,7 +26,7 @@ import { OrgRole } from '../../common/authz/authz-policy';
 @ApiTags('Projects')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/projects', version: '1' })
+@Controller({ path: 'projects', version: '1' })
 export class ProjectsController {
   constructor(private readonly projectsService: ProjectsService) {}
 

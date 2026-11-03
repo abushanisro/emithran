@@ -18,7 +18,7 @@ interface AuthUser {
 @ApiTags('Copilot')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/copilot', version: '1' })
+@Controller({ path: 'copilot', version: '1' })
 export class CopilotController {
   constructor(
     private readonly copilot: CopilotService,

@@ -11,6 +11,7 @@ export interface ProblemDetails {
   instance?: string;
   code?: string;
   errors?: unknown;
+  details?: unknown;
   requestId?: string;
 }
 
@@ -30,7 +31,7 @@ export function fromProblemDetails(problem: ProblemDetails): {
     error: {
       code: problem.code ?? 'HTTP_ERROR',
       message: problem.detail ?? problem.title ?? `Request failed with status ${problem.status}`,
-      ...(problem.errors !== undefined && { details: problem.errors }),
+      ...((problem.details ?? problem.errors) !== undefined && { details: problem.details ?? problem.errors }),
     },
     metadata: {
       timestamp: new Date().toISOString(),

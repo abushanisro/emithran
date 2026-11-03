@@ -21,7 +21,7 @@ import { Public } from '../../common/decorators/public.decorator';
 
 @ApiTags('Health')
 // live, ready and the overall check are public for monitoring; /db lists tables and is for platform administrators only.
-@Controller({ path: 'api/health', version: VERSION_NEUTRAL })
+@Controller({ path: 'health', version: VERSION_NEUTRAL })
 export class HealthController {
   constructor(
     private readonly health: HealthCheckService,

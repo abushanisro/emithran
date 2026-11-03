@@ -40,7 +40,7 @@ import { readWorkbook } from '../../common/heavy-work/heavy-work';
 @ApiTags('Raw Materials')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/raw-materials', version: '1' })
+@Controller({ path: 'raw-materials', version: '1' })
 export class RawMaterialsController {
   private readonly logger = new Logger(RawMaterialsController.name);
 

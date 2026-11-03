@@ -44,7 +44,7 @@ import { OrgRole } from '../../common/authz/authz-policy';
 @ApiTags('Procured Parts Costs')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller('api/procured-parts-costs')
+@Controller('procured-parts-costs')
 @UseGuards(RequestAuthGuard)
 export class ProcuredPartsCostController {
   constructor(

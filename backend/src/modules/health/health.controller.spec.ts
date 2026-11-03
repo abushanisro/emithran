@@ -1,3 +1,4 @@
+import { configureApiPrefix } from '../../common/http/api-prefix';
 import * as http from 'http';
 import type { AddressInfo } from 'net';
 
@@ -81,6 +82,7 @@ describe('HealthController: liveness and readiness', () => {
       ],
     }).compile();
     app = moduleRef.createNestApplication();
+    configureApiPrefix(app); // /api/health/* as main.ts serves it
     await app.init();
   }
 

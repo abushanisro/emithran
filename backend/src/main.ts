@@ -3,7 +3,6 @@
 import * as dotenv from 'dotenv';
 import * as path from 'node:path';
 import { apiDocsEnabled, dotenvOverride } from './common/runtime-flags';
-import { apiV1Middleware } from './common/http/api-v1';
 // The one local env file lives at the repo root (backend/dist/main.js -> ../../.env). Deployed containers have no file: compose sets the
 // variables, and a missing file is not an error.
 dotenv.config({ path: path.resolve(__dirname, '..', '..', '.env'), override: dotenvOverride(process.env) });
@@ -15,7 +14,7 @@ const telemetry = startTelemetry();
 if (telemetry) flushOnTermination(telemetry);
 
 import { NestFactory } from '@nestjs/core';
-import { VersioningType, type LogLevel } from '@nestjs/common';
+import { type LogLevel } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import type { NestExpressApplication } from '@nestjs/platform-express';
@@ -30,6 +29,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { Logger } from './common/logger/logger.service';
 import { DatabaseService } from './common/database/database.service';
 import { isAllowedCorsOrigin } from './common/cors-origins';
+import { configureApiPrefix } from './common/http/api-prefix';
 import { CorrelatedConsoleLogger } from './telemetry/correlated-console-logger';
 import { FileErrorConsoleLogger } from './common/logger/file-error-console-logger';
 import { startErrorLogCleanup } from './common/logger/error-log-file';
@@ -58,9 +58,8 @@ async function bootstrap() {
   // First middleware, so it times (and counts) every request, including ones rejected by guards.
   if (telemetry) app.use(httpMetricsMiddleware);
 
-  // No global prefix - all controllers use explicit prefixes
-  // AppController uses no prefix for root routes
-  
+  configureApiPrefix(app); // /api/v1/<resource> (common/http/api-prefix.ts)
+
   // Bodies are parsed before any guard runs, so the limit is small for every route; a larger body gets 413 unread.
   configureBodyParsers(app);
 
@@ -69,12 +68,6 @@ async function bootstrap() {
   // X-Forwarded-For is followed only for the configured hops (default none); the client address is common/client-ip.ts.
   app.set('trust proxy', trustProxySetting(process.env.TRUST_PROXY));
 
-  app.enableVersioning({
-    type: VersioningType.URI,
-    defaultVersion: '1',
-  });
-  // /api/v1/* is the public prefix; /v1/api/* keeps working and is marked deprecated (common/http/api-v1.ts).
-  app.use(apiV1Middleware());
 
   // Enhanced security headers
   app.use(

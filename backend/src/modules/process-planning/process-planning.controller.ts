@@ -7,7 +7,7 @@ import { OrgRole } from '../../common/authz/authz-policy';
 
 @ApiTags('Process Planning')
 @OrgRole('member')
-@Controller({ path: 'api', version: '1' })
+@Controller({ path: '', version: '1' })
 @UseGuards(RequestAuthGuard)
 @ApiBearerAuth()
 export class ProcessPlanningController {

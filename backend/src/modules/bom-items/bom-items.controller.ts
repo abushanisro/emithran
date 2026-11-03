@@ -93,7 +93,7 @@ const SIGNED_FILE_TYPES = { TWO_D: '2d', THREE_D: '3d' } as const;
 @ApiTags('BOM Items')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/bom-items', version: '1' })
+@Controller({ path: 'bom-items', version: '1' })
 export class BOMItemsController {
   private readonly logger = new Logger(BOMItemsController.name);
 

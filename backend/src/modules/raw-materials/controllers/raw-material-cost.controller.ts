@@ -43,7 +43,7 @@ import { OrgRole } from '../../../common/authz/authz-policy';
 @ApiTags('Raw Material Costs')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller('api/raw-material-costs')
+@Controller('raw-material-costs')
 @UseGuards(RequestAuthGuard)
 export class RawMaterialCostController {
   constructor(

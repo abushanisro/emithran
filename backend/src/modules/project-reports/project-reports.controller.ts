@@ -30,7 +30,7 @@ import { OrgRole } from '../../common/authz/authz-policy';
 @ApiTags('Project Reports')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api', version: '1' })
+@Controller({ path: '', version: '1' })
 @UseGuards(RequestAuthGuard)
 export class ProjectReportsController {
   private readonly logger = new Logger(ProjectReportsController.name);

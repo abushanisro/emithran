@@ -41,7 +41,7 @@ import { OrgRole } from '../../common/authz/authz-policy';
 @ApiTags('Vendors')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/vendors', version: '1' })
+@Controller({ path: 'vendors', version: '1' })
 export class VendorsController {
   constructor(private readonly vendorsService: VendorsService, private readonly audit: AuditService) {}
 

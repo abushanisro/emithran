@@ -11,7 +11,7 @@ import { FxRateType, FxService } from './fx.service';
 @ApiTags('fx')
 @ApiBearerAuth()
 @OrgRole('viewer')
-@Controller({ path: 'api', version: '1' })
+@Controller({ path: '', version: '1' })
 export class FxController {
   constructor(
     private readonly fxService: FxService,

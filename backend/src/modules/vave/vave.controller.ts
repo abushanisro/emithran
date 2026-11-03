@@ -22,7 +22,7 @@ import { OrgRole } from '../../common/authz/authz-policy';
 @ApiTags('VAVE')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/vave-projects', version: '1' })
+@Controller({ path: 'vave-projects', version: '1' })
 export class VaveController {
   constructor(private readonly vaveService: VaveService) {}
 

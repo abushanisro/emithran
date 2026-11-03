@@ -48,7 +48,7 @@ import { OrgRole } from '../../common/authz/authz-policy';
 @ApiBearerAuth()
 @UseGuards(RequestAuthGuard)
 @OrgRole('member')
-@Controller('api/supplier-nominations')
+@Controller('supplier-nominations')
 export class SupplierNominationsController {
   constructor(
     private readonly supplierNominationsService: SupplierNominationsService

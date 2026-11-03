@@ -11,7 +11,7 @@ import { OrgRole } from '../../common/authz/authz-policy';
 @ApiTags('Cost Analysis')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/cost-analysis', version: '1' })
+@Controller({ path: 'cost-analysis', version: '1' })
 export class CostAnalysisController {
   constructor(
     private readonly costAggregation: CostAggregationService,

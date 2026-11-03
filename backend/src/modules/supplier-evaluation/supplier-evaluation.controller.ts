@@ -22,7 +22,7 @@ import { OrgRole } from '../../common/authz/authz-policy';
 @ApiTags('Supplier Evaluation')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/supplier-evaluations', version: '1' })
+@Controller({ path: 'supplier-evaluations', version: '1' })
 @UseGuards(RequestAuthGuard)
 export class SupplierEvaluationController {
   private readonly logger = new Logger(SupplierEvaluationController.name);
