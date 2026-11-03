@@ -1,5 +1,6 @@
 'use client';
 
+import { highlightLabel, uniqueOccurrenceTriangles } from '@/lib/features/highlight-display';
 import { faceIdForTriangle } from '@/lib/features/machining-feature-tree';
 import React, { Suspense, useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
@@ -3230,21 +3231,8 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
   // Group highlight: all occurrences EXCEPT the selected one (amber — secondary, fallback)
   const groupFaceIndices = useMemo((): number[] => {
     if (!highlightOccurrences || !faceMapIndex.size) return [];
-    const result: number[] = [];
-    for (let i = 0; i < highlightOccurrences.occurrences.length; i++) {
-      if (i === selectedOccurrenceIndex) continue;  // selected gets SelectedFaceHighlight
-      const occ = highlightOccurrences.occurrences[i];
-      if (!occ) continue;
-      for (const fid of (occ.face_ids ?? [])) {
-        const entry = faceMapIndex.get(fid);
-        if (entry && entry.tri_count > 0) {
-          for (let t = entry.tri_start; t < entry.tri_start + entry.tri_count; t++) {
-            result.push(t);
-          }
-        }
-      }
-    }
-    return result;
+    // The selected occurrence gets SelectedFaceHighlight; faces shared by several occurrences are painted once.
+    return uniqueOccurrenceTriangles(highlightOccurrences.occurrences, faceMapIndex, selectedOccurrenceIndex);
   }, [highlightOccurrences, faceMapIndex, selectedOccurrenceIndex]);
 
   // Risk-colored group highlights — one bucket per risk level, replaces amber group when scores available
@@ -4187,9 +4175,7 @@ const [projectedFaceIndices, setProjectedFaceIndices] = useState<number[]>([]);
             <div className="absolute top-12 left-4 z-10 bg-black/70 backdrop-blur-sm border border-white/20 rounded px-2.5 py-1 text-xs flex items-center gap-2 pointer-events-none">
               <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
               <span className="font-medium text-white">
-                {highlightOccurrences.feature_type === 'SimpleHole'
-                  ? `Ø${highlightOccurrences.diameter_mm?.toFixed(1) ?? '?'}mm`
-                  : `R${highlightOccurrences.radius_mm?.toFixed(1) ?? '?'}mm bend`}
+                {highlightLabel(highlightOccurrences)}
               </span>
               <span className="text-white/60">
                 {highlightOccurrences.occurrences.length} instances

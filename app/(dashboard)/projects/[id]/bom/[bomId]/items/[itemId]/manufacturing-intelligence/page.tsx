@@ -712,10 +712,12 @@ function buildProcessTree(
     recs.flatMap((r) => (lineForRec(r)?.featureBreakdown ?? []).flatMap((b) => b.featureIds ?? [])),
   );
 
-  const featureLeaf = (idPrefix: string, f: FeatureNodeV2, machine: string): ProcessTreeNode => {
+  const featureLeaf = (idPrefix: string, f: FeatureNodeV2, machine: string, alone = false): ProcessTreeNode => {
     const occ = f.occurrences.length;
     const dia = f.diameter_mm != null ? ` Ø${f.diameter_mm.toFixed(1)}` : '';
-    const variant = f.variant ? ` (${f.variant})` : '';
+    // "(default)" only tells variants apart; a type with a single feature has nothing to tell it from.
+    const showVariant = !!f.variant && !(alone && f.variant === 'default');
+    const variant = showVariant ? ` (${f.variant})` : '';
     return {
       id: `${idPrefix}_${f.id}`,
       kind: 'feature',
@@ -724,7 +726,7 @@ function buildProcessTree(
       v2FeatureIds: [f.id],
       attrs: [
         { name: 'Feature', value: String(f.feature_type) },
-        ...(f.variant ? [{ name: 'Variant', value: f.variant }] : []),
+        ...(showVariant ? [{ name: 'Variant', value: f.variant as string }] : []),
         ...(f.canonical_operation ? [{ name: 'Operation', value: f.canonical_operation }] : []),
         { name: 'Occurrences', value: String(occ) },
         ...(f.diameter_mm != null ? [{ name: 'Diameter', value: `${f.diameter_mm.toFixed(1)} mm` }] : []),
@@ -735,6 +737,12 @@ function buildProcessTree(
   const typeGroupNodes = (idPrefix: string, features: FeatureNodeV2[], machine: string): ProcessTreeNode[] =>
     groupFeaturesByType(features).map((g) => {
       const members = g.variants.flatMap((v) => v.features);
+      // One feature in the group: a child row would repeat the group row ("SharpEdge ×160" over "SharpEdge ×160"), so the group
+      // row is that feature, with its own attributes.
+      if (members.length === 1) {
+        const only = featureLeaf(idPrefix, members[0]!, machine, true);
+        return { ...only, id: `${idPrefix}_${g.type}`, label: `${g.type} ×${g.occurrenceCount}` };
+      }
       return {
         id: `${idPrefix}_${g.type}`,
         kind: 'feature' as const,
