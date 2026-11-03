@@ -5,17 +5,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getRfqTrackingRecords,
-  getRfqTrackingById,
   getRfqTrackingStats,
   createRfqTracking,
   updateRfqTrackingStatus,
-  updateVendorResponse,
   deleteRfqTracking,
 } from '../rfq-tracking';
 import type {
   CreateRfqTrackingData,
   UpdateTrackingStatusData,
-  UpdateVendorResponseData,
   RfqTrackingRecord,
 } from '../rfq-tracking';
 
@@ -70,18 +67,6 @@ export function useRfqTrackingRecords(projectId?: string) {
     },
     retryDelay: 1000,
     throwOnError: false,
-  });
-}
-
-/**
- * Get RFQ tracking record by ID
- */
-export function useRfqTrackingById(trackingId: string) {
-  return useQuery({
-    queryKey: rfqTrackingKeys.detail(trackingId),
-    queryFn: () => getRfqTrackingById(trackingId),
-    enabled: !!trackingId,
-    staleTime: 2 * 60 * 1000, // 2 minutes
   });
 }
 
@@ -210,64 +195,6 @@ export function useUpdateRfqTrackingStatus(projectId?: string) {
 }
 
 /**
- * Update vendor response
- */
-export function useUpdateVendorResponse() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ 
-      trackingId, 
-      vendorId, 
-      data 
-    }: { 
-      trackingId: string; 
-      vendorId: string; 
-      data: UpdateVendorResponseData 
-    }) => updateVendorResponse(trackingId, vendorId, data),
-    onSuccess: (_, { trackingId, vendorId, data }) => {
-      // Invalidate and refetch the specific tracking record
-      queryClient.invalidateQueries({ queryKey: rfqTrackingKeys.detail(trackingId) });
-      queryClient.invalidateQueries({ queryKey: rfqTrackingKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: rfqTrackingKeys.stats() });
-
-      // Optimistically update the vendor response in cache
-      queryClient.setQueryData(
-        rfqTrackingKeys.detail(trackingId),
-        (old: RfqTrackingRecord | undefined) => {
-          if (!old) return old;
-          
-          const updatedVendors = old.vendors.map(vendor => {
-            if (vendor.id === vendorId) {
-              return {
-                ...vendor,
-                responded: data.responded,
-                ...(data.responded && {
-                  responseReceivedAt: new Date(),
-                  quoteAmount: data.quoteAmount,
-                  leadTimeDays: data.leadTimeDays,
-                })
-              };
-            }
-            return vendor;
-          });
-
-          const responseCount = updatedVendors.filter(v => v.responded).length;
-
-          return {
-            ...old,
-            vendors: updatedVendors,
-            responseCount,
-            ...(responseCount > 0 && !old.firstResponseAt && { firstResponseAt: new Date() }),
-            lastResponseAt: new Date(),
-          };
-        }
-      );
-    },
-  });
-}
-
-/**
  * Delete RFQ tracking record - Production-grade with targeted cache updates
  */
 export function useDeleteRfqTracking(projectId?: string) {
@@ -330,36 +257,6 @@ export function useDeleteRfqTracking(projectId?: string) {
       queryClient.invalidateQueries({ queryKey: rfqTrackingKeys.stats() });
     },
   });
-}
-
-// ============================================================================
-// UTILITY HOOKS
-// ============================================================================
-
-/**
- * Prefetch RFQ tracking record
- */
-export function usePrefetchRfqTracking() {
-  const queryClient = useQueryClient();
-
-  return (trackingId: string) => {
-    queryClient.prefetchQuery({
-      queryKey: rfqTrackingKeys.detail(trackingId),
-      queryFn: () => getRfqTrackingById(trackingId),
-      staleTime: 2 * 60 * 1000,
-    });
-  };
-}
-
-/**
- * Get cached RFQ tracking data without triggering a request
- */
-export function useRfqTrackingCache(trackingId: string) {
-  const queryClient = useQueryClient();
-  
-  return queryClient.getQueryData<RfqTrackingRecord>(
-    rfqTrackingKeys.detail(trackingId)
-  );
 }
 
 /**

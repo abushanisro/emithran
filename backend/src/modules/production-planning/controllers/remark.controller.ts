@@ -115,27 +115,6 @@ export class RemarkController {
     return this.remarkService.getRemarksByLot(lotId, filterDto);
   }
 
-  @OrgRole('viewer')
-  @Get('lot/:lotId/stats')
-  @ApiOperation({ 
-    summary: 'Get remark statistics for a lot',
-    description: 'Retrieves aggregated statistics for remarks in a production lot'
-  })
-  @ApiResponse({ 
-    status: HttpStatus.OK, 
-    description: 'Statistics retrieved successfully'
-  })
-  @ApiParam({ name: 'lotId', description: 'Production lot ID' })
-  async getRemarkStats(
-    @Param('lotId', ParseUUIDPipe) lotId: string,
-  ): Promise<{
-    total: number;
-    byStatus: Record<string, number>;
-    byPriority: Record<string, number>;
-    byType: Record<string, number>;
-  }> {
-    return this.remarkService.getRemarkStats(lotId);
-  }
 
   @OrgRole('viewer')
   @Get(':id')

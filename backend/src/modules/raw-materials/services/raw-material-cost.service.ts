@@ -522,40 +522,6 @@ export class RawMaterialCostService {
     };
   }
 
-  /**
-   * Get total raw material cost for a specific BOM item
-   */
-  async getTotalCostForBomItem(
-    bomItemId: string,
-    userId?: string,
-    accessToken?: string,
-  ): Promise<number> {
-    this.logger.log(`Calculating total raw material cost for BOM item: ${bomItemId}`, 'RawMaterialCostService');
-
-    const client = this.databaseService.getUserClient(accessToken);
-
-    // Get all active raw material costs for this BOM item — compute from source fields
-    // Formula: gross_usage × unit_cost × (1 + overhead/100)
-    // We never read stored total_cost which may be null for AI-applied records.
-    const { data: costs, error } = await client
-      .from('raw_material_cost_records')
-      .select('gross_usage, unit_cost, overhead')
-      .eq('bom_item_id', bomItemId)
-      .eq('is_active', true);
-
-    if (error) {
-      this.logger.error('Error fetching raw material costs for BOM item', error.message, 'RawMaterialCostService');
-      throw new InternalServerErrorException('Failed to fetch raw material costs');
-    }
-
-    const totalCost = costs?.reduce((sum, r) => {
-      const computed = (parseFloat(r.gross_usage) || 0) * (parseFloat(r.unit_cost) || 0) * (1 + (parseFloat(r.overhead) || 0) / 100);
-      return sum + computed;
-    }, 0) || 0;
-
-    this.logger.log(`Total raw material cost for BOM item ${bomItemId}: ${totalCost}`, 'RawMaterialCostService');
-    return totalCost;
-  }
 
   async getBulkTotalCosts(
     bomItemIds: string[],

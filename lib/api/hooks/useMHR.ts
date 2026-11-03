@@ -8,7 +8,6 @@ import type {
   CreateMHRData,
   UpdateMHRData,
   MHRQuery,
-  MHRBenchmarkEntry,
   MHRListResponse,
   MHRRecord,
   MHRReferenceDetail,
@@ -108,27 +107,6 @@ export function useMHRReferenceDetail(id: string | undefined | null, options?: {
     refetchOnWindowFocus: false,
     throwOnError: false,
   });
-}
-
-export function useMHRBenchmark(
-  location?: string,
-  machineClass?: string,
-  options?: { enabled?: boolean },
-): { data: MHRBenchmarkEntry[]; isLoading: boolean; error: unknown } {
-  const query = useQuery({
-    queryKey: [...mhrKeys.all, 'benchmark', location ?? '__all__', machineClass ?? '__all__'],
-    queryFn: () => mhrApi.getBenchmarkRates(location, undefined, machineClass),
-    staleTime: 1000 * 60 * 30, // benchmark data changes rarely — 30 min cache
-    retry: false,
-    refetchOnWindowFocus: false,
-    throwOnError: false,
-    enabled: options?.enabled !== false,
-  });
-  return {
-    data: (query.data ?? []) as MHRBenchmarkEntry[],
-    isLoading: query.isLoading,
-    error: query.error,
-  };
 }
 
 // refetchOnMount: 'always' on these distinct-value lookups matches

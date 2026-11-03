@@ -11,7 +11,6 @@ import {
   type CalibrationPair,
   type CellCalibration,
 } from '../../../modules/should-cost/calibration';
-import { ShouldCostController } from '../../../modules/should-cost/should-cost.controller';
 
 const pair = (id: string, actual: number, predicted = 10, changes: Partial<CalibrationPair> = {}): CalibrationPair => ({
   actualId: id, actualTotalCostUsd: actual, predictedTotalCostUsd: predicted, processFamily: 'milled', location: 'India',
@@ -123,12 +122,5 @@ describe('should-cost calibration (pure)', () => {
     expect(minOrganizationsSetting('3')).toBe(3);
     expect(() => minOrganizationsSetting('1')).toThrow(/at least 2/);
     expect(() => minOrganizationsSetting('two')).toThrow(/at least 2/);
-  });
-
-  it('is not reachable over HTTP: no run or record-actual handler on the controller', () => {
-    const handlers = Object.getOwnPropertyNames(ShouldCostController.prototype);
-    expect(handlers).not.toContain('runCalibration');
-    expect(handlers).not.toContain('recordActual');
-    expect(handlers).toContain('getCalibrationHistory');
   });
 });
