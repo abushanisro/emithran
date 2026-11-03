@@ -22,21 +22,32 @@ function configuredHosts(): string[] {
 
 const IPV4 = /^\d{1,3}(\.\d{1,3}){3}$/;
 
+/**
+ * The URL to fetch, or null when `raw` is not on a trusted storage host. The result is rebuilt from the configured host entry
+ * (a server-side value) plus the caller's path and query, so the host that is contacted never comes from the request itself.
+ */
+export function trustedStorageUrl(
+  raw: string,
+  hosts: readonly string[] = configuredHosts(),
+  nodeEnv: string | undefined = process.env.NODE_ENV,
+): string | null {
+  let url: URL;
+  try { url = new URL(raw); } catch { return null; }
+  if (url.username || url.password) return null;
+  // url.host is hostname[:port], with the scheme's default port dropped.
+  const trusted = hosts.find((h) => h === url.host.toLowerCase());
+  if (!trusted) return null;
+  const local = nodeEnv !== 'production' && (IPV4.test(url.hostname) || url.hostname === 'localhost');
+  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && local)) return null;
+  return `${url.protocol}//${trusted}${url.pathname}${url.search}`;
+}
+
 export function isTrustedStorageUrl(
   raw: string,
   hosts: readonly string[] = configuredHosts(),
   nodeEnv: string | undefined = process.env.NODE_ENV,
 ): boolean {
-  let url: URL;
-  try { url = new URL(raw); } catch { return false; }
-  if (url.username || url.password) return false;
-  // url.host is hostname[:port], with the scheme's default port dropped.
-  const host = url.host.toLowerCase();
-  if (!hosts.includes(host)) return false;
-  if (url.protocol === 'https:') return true;
-  return url.protocol === 'http:'
-    && nodeEnv !== 'production'
-    && (IPV4.test(url.hostname) || url.hostname === 'localhost');
+  return trustedStorageUrl(raw, hosts, nodeEnv) !== null;
 }
 
 export class UntrustedUrlError extends Error {}
@@ -47,21 +58,19 @@ export async function fetchTrustedFile(
   opts: { timeoutMs?: number; maxRedirects?: number; headers?: Record<string, string> } = {},
 ): Promise<Response> {
   const { timeoutMs = 30_000, maxRedirects = 3, headers } = opts;
-  if (!isTrustedStorageUrl(rawUrl)) throw new UntrustedUrlError('URL is not on the trusted storage host');
-  const origin = new URL(rawUrl).origin;
-  let url = rawUrl;
+  const first = trustedStorageUrl(rawUrl);
+  if (!first) throw new UntrustedUrlError('URL is not on the trusted storage host');
+  const origin = new URL(first).origin;
+  let url = first;
   for (let hop = 0; hop <= maxRedirects; hop++) {
     const res = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(timeoutMs), ...(headers ? { headers } : {}) });
     if (res.status >= 300 && res.status < 400) {
       const location = res.headers.get('location');
       if (!location) throw new UntrustedUrlError('Redirect without a location');
-      const next = new URL(location, url);
-      // Same origin only: a storage host must not send us to another host,
-      // even another trusted one.
-      if (next.origin !== origin || !isTrustedStorageUrl(next.toString())) {
-        throw new UntrustedUrlError('Redirect leaves the storage host');
-      }
-      url = next.toString();
+      // Same origin only: a storage host must not send us to another host, even another trusted one.
+      const next = trustedStorageUrl(new URL(location, url).toString());
+      if (!next || new URL(next).origin !== origin) throw new UntrustedUrlError('Redirect leaves the storage host');
+      url = next;
       continue;
     }
     return res;
