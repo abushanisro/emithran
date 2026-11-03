@@ -87,8 +87,9 @@ GET /vendors?processId=…&q=casting&sort=+name,-createdAt&page=2&limit=50
 ```
 
 - **Filter** with query parameters named after the field, never with path segments.
-- **Sort** with `sort=+field,-field` (`+` ascending, `-` descending), only on documented fields.
-- **Paginate** with `page` and `limit`; `limit` defaults to 50 and is capped at 200. The response says where it is: `metadata.page = { page, limit, total }`.
+- **Sort** with `sort=+field,-field` (`+` ascending, `-` descending), only on documented fields: `parseSort(sort, allowed, map)` refuses any other with a 400.
+- **Paginate** with `page` and `limit`. A **new** list extends `PageQueryDto` (`common/dto/page-query.ts`): `limit` defaults to 50 and is at most 200. `pageRange(page, limit)` gives the PostgREST range.
+- **Every `limit` is capped.** Existing lists that picker screens load whole (vendors, process catalog, BOM item search) accept up to 1000; anything above is refused with a 400. A test fails on a request `limit` without `@Max`.
 
 ## 7. Keep good security practice
 
@@ -122,7 +123,7 @@ The version is the first path segment: `/api/v1/…`. A change that can break a 
 | 3 Plural | 150 routes under 10 singular, abbreviated or area names (`mhr`, `lhr`, `rfq`, `fx`, `vave`, `production-planning`, `quality-control`, …) |
 | 4 Nesting | 26 routes have five or more segments |
 | 5 Errors | Problem details on `/api/v1`; deletes still answer 200 with a body in about 40 places; no `Location` on create |
-| 6 Filter, sort, paginate | About 20 lists page; no shared helper or cap; sorting is uneven |
+| 6 Filter, sort, paginate | Shared `PageQueryDto`, `parseSort` and `pageRange` for new lists; every request `limit` is capped (a test enforces it). Existing lists keep their own shapes and defaults: moving the screens that load a whole list (rate pickers ask for up to 10000) to real paging is separate frontend work |
 | 7 Security | Done, two open items: a `reference-data:write` permission, and the approver not being the submitter |
 | 8 Caching | Not started |
 | 9 Versioning | `/api/v1` live and `/v1/api` deprecated; the web app still calls the old prefix (a config change, `API_URL` and `NEXT_PUBLIC_API_URL`) |
