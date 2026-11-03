@@ -44,16 +44,6 @@ export class SubtaskController {
     return this.subtaskService.getSubtaskById(id, user.id);
   }
 
-  @OrgRole('viewer')
-  @Get('/process/:processId')
-  @ApiOperation({ summary: 'Get all subtasks for a production process' })
-  @ApiResponse({ type: [SubtaskResponseDto] })
-  async getSubtasksByProcess(
-    @Param('processId') processId: string,
-    @CurrentUser() user: User
-  ): Promise<SubtaskResponseDto[]> {
-    return this.subtaskService.getSubtasksByProcess(processId, user.id);
-  }
 
   @Put(':id')
   @ApiOperation({ summary: 'Update subtask' })

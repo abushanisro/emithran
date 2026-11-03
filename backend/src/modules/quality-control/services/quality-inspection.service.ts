@@ -5,7 +5,6 @@ import {
   CreateQualityInspectionDto,
   UpdateQualityInspectionDto,
   QualityInspectionResponseDto,
-  InspectionResultDto,
   InspectionStatus,
 } from '../dto/quality-inspection.dto';
 import {
@@ -200,27 +199,7 @@ export class QualityInspectionService {
     }
   }
 
-  async startInspection(
-    id: string,
-    userId: string,
-  ): Promise<QualityInspectionResponseDto> {
-    return this.updateInspection(id, {
-      status: InspectionStatus.IN_PROGRESS,
-      actualStartDate: new Date().toISOString(),
-    }, userId);
-  }
 
-  async completeInspection(
-    id: string,
-    completionData: { notes?: string; finalResult: 'pass' | 'fail' | 'conditional' },
-    userId: string,
-  ): Promise<QualityInspectionResponseDto> {
-    return this.updateInspection(id, {
-      status: InspectionStatus.COMPLETED,
-      actualEndDate: new Date().toISOString(),
-      notes: completionData.notes,
-    }, userId);
-  }
 
   async approveInspection(
     id: string,
@@ -395,132 +374,9 @@ export class QualityInspectionService {
     return this.mapToResponseDto(data);
   }
 
-  async submitInspectionResults(
-    inspectionId: string,
-    resultsDto: InspectionResultDto,
-    userId: string,
-  ): Promise<any> {
-    const organizationId = await this.getInspectionOrganization(inspectionId);
 
-    const resultData = {
-      inspection_id: inspectionId,
-      organization_id: organizationId,
-      checklist_results: resultsDto.checklistResults,
-      overall_result: resultsDto.overallResult,
-      notes: resultsDto.notes,
-      recommendations: resultsDto.recommendations,
-      attachments: resultsDto.attachments || [],
-      submitted_by: userId,
-      submitted_at: new Date().toISOString(),
-    };
 
-    const { data, error } = await this.db()
-      .from('quality_inspection_results')
-      .upsert(resultData, { onConflict: 'inspection_id' })
-      .select('*')
-      .single();
 
-    if (error) {
-      throw qualityDbError(error, 'submit the inspection results');
-    }
-
-    // Update inspection status
-    await this.updateInspection(inspectionId, {
-      status: InspectionStatus.COMPLETED,
-      actualEndDate: new Date().toISOString(),
-    }, userId);
-
-    return data;
-  }
-
-  async getInspectionResults(
-    inspectionId: string,
-    userId: string,
-  ): Promise<any> {
-    // 404 for an inspection the caller cannot see, rather than "no results yet"
-    await this.getInspectionOrganization(inspectionId);
-
-    const { data, error } = await this.db()
-      .from('quality_inspection_results')
-      .select('*')
-      .eq('inspection_id', inspectionId)
-      .maybeSingle();
-
-    if (error) {
-      this.logger.error(`Failed to get results of inspection ${inspectionId} (user ${userId}): ${error.code} ${error.message}`);
-      throw qualityDbError(error, 'read the inspection results');
-    }
-
-    return data;
-  }
-
-  async createNonConformance(
-    inspectionId: string,
-    nonConformanceData: any,
-    userId: string,
-  ): Promise<any> {
-    const organizationId = await this.getInspectionOrganization(inspectionId);
-
-    // The body describes the non-conformance; which inspection and organization it belongs to, and who made it, are set here.
-    const ncData = {
-      ...nonConformanceData,
-      inspection_id: inspectionId,
-      organization_id: organizationId,
-      created_by: userId,
-      created_at: new Date().toISOString(),
-    };
-
-    const { data, error } = await this.db()
-      .from('quality_non_conformances')
-      .insert(ncData)
-      .select('*')
-      .single();
-
-    if (error) {
-      throw qualityDbError(error, 'create the non-conformance');
-    }
-
-    return data;
-  }
-
-  async getNonConformances(
-    userId: string,
-    filters: {
-      projectId?: string;
-      status?: string;
-      severity?: string;
-    } = {},
-  ): Promise<any[]> {
-    // !inner: a project filter on the embedded inspection must drop the non-conformances of other projects, not just blank the embed
-    let query = this.db()
-      .from('quality_non_conformances')
-      .select(`
-        *,
-        quality_inspections!inspection_id!inner (id, name, project_id)
-      `)
-      .order('created_at', { ascending: false });
-
-    if (filters.projectId) {
-      query = query.eq('quality_inspections.project_id', filters.projectId);
-    }
-
-    if (filters.status) {
-      query = query.eq('status', filters.status);
-    }
-
-    if (filters.severity) {
-      query = query.eq('severity', filters.severity);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      this.logger.error(`Failed to get non-conformances for user ${userId}: ${error.code} ${error.message}`);
-      throw qualityDbError(error, 'retrieve non-conformances');
-    }
-
-    return data || [];
-  }
 
   private mapToResponseDto(data: any): QualityInspectionResponseDto {
     return {

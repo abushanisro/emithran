@@ -241,49 +241,6 @@ export function useBOMItem(itemId?: string) {
 }
 
 /**
- * Create a new BOM item
- */
-export function useCreateBOMItem() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (dto: CreateBOMItemDto) => {
-      return apiClient.post<BOMItem>('/bom-items', dto);
-    },
-    onSuccess: async (_data, variables) => {
-      // Invalidate BOM item queries
-      queryClient.invalidateQueries({ queryKey: bomItemKeys.list(variables.bomId) });
-      
-      // Trigger automatic cost calculation for the BOM
-      try {
-        await apiClient.post(`/bom/${variables.bomId}/recalculate-all-costs`);
-        // Invalidate cost-related queries
-        queryClient.invalidateQueries({ queryKey: ['bom-item-cost'] });
-        queryClient.invalidateQueries({ queryKey: ['bom-cost-summary'] });
-        queryClient.invalidateQueries({ queryKey: ['bom-cost-report'] });
-      } catch (error) {
-        // Cost recalculation failed but item was created successfully
-        console.warn('Auto cost recalculation failed for new BOM item:', error);
-      }
-    },
-    onError: (error: any) => {
-      const status = error?.status || error?.response?.status;
-      if (status === 400) {
-        toast.error('Please check all BOM item details are filled out correctly.');
-      } else if (status === 409) {
-        toast.error('A BOM item with this part number already exists in this BOM.');
-      } else if (status === 403) {
-        toast.error('You do not have permission to add items to this BOM.');
-      } else if (status === 422) {
-        toast.error('Please ensure quantity and volume are valid numbers.');
-      } else {
-        toast.error('Unable to create BOM item. Please try again or contact support.');
-      }
-    },
-  });
-}
-
-/**
  * Update an existing BOM item
  */
 // P0.5: DFM scores are material/thickness-bracketed (UNDERSIZED_HOLE, CRACK_RISK
@@ -362,34 +319,6 @@ export function usePatchScenarioOverrides() {
     },
     onError: () => {
       toast.error('Failed to save override. Please try again.');
-    },
-  });
-}
-
-/**
- * Delete a BOM item
- */
-export function useDeleteBOMItem() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (id: string) => {
-      await apiClient.delete(`/bom-items/${id}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: bomItemKeys.lists() });
-    },
-    onError: (error: any) => {
-      const status = error?.status || error?.response?.status;
-      if (status === 404) {
-        toast.error('This BOM item has already been deleted.');
-      } else if (status === 409) {
-        toast.error('Cannot delete BOM item because it has child components.');
-      } else if (status === 403) {
-        toast.error('You do not have permission to delete this BOM item.');
-      } else {
-        toast.error('Unable to delete BOM item. Please try again or contact support.');
-      }
     },
   });
 }
@@ -502,12 +431,6 @@ export async function analyzeForAutoFill(file: File, familyHint?: string): Promi
 
   _analyzeInFlight.set(key, promise);
   return promise;
-}
-
-export function useAnalyzeForAutoFill() {
-  return useMutation({
-    mutationFn: (file: File) => analyzeForAutoFill(file),
-  });
 }
 
 export function useAnalysisVersion() {
@@ -1544,24 +1467,6 @@ export interface CandidateRouteComparisonDto {
   currency?: string;
   currencySymbol?: string;
   candidates: CandidateRouteDto[];
-}
-
-/** `batchSize` semantics are identical to useCostSummary above. */
-export function useCandidateRoutes(
-  itemId: string | undefined,
-  batchSize: number | undefined,
-  location = 'USA',
-) {
-  return useQuery({
-    queryKey: ['bom-items', itemId, 'candidate-routes', batchSize, location],
-    queryFn: () =>
-      apiClient.get<CandidateRouteComparisonDto>(
-        `/bom-items/${itemId}/candidate-routes?${costingQuery(batchSize, location)}`,
-      ),
-    enabled: useAuthEnabledWith(!!itemId),
-    staleTime: 1000 * 60 * 5,
-    refetchOnWindowFocus: false,
-  });
 }
 
 /** Apply the route the server itself recommends (mirrors AUTO_ROUTE_ID in apply-route.dto.ts). */

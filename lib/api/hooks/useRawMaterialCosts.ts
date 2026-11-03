@@ -138,23 +138,6 @@ export function useRawMaterialCosts(options: UseRawMaterialCostsOptions = {}) {
 }
 
 /**
- * Hook to fetch single raw material cost
- */
-export function useRawMaterialCost(id?: string) {
-  return useQuery({
-    queryKey: ['raw-material-cost', id],
-    queryFn: async () => {
-      if (!id) throw new Error('ID is required');
-      const data = await apiClient.get<RawMaterialCostRecord>(`/raw-material-costs/${id}`);
-      return data;
-    },
-    enabled: !!id,
-    // Same staleness class as useRawMaterialCosts above.
-    refetchOnMount: 'always',
-  });
-}
-
-/**
  * Hook to create raw material cost
  */
 export function useCreateRawMaterialCost() {

@@ -266,17 +266,6 @@ export async function getSupplierNomination(
 }
 
 /**
- * Update nomination criteria
- */
-export async function updateNominationCriteria(
-  nominationId: string,
-  criteria: CreateCriteriaData[]
-): Promise<NominationCriteria[]> {
-  const response = await apiClient.put(`/supplier-nominations/${nominationId}/criteria`, criteria);
-  return response || [];
-}
-
-/**
  * Update vendor evaluation
  */
 export async function updateVendorEvaluation(
@@ -339,50 +328,6 @@ export async function updateSupplierNomination(
   data: Partial<Pick<CreateSupplierNominationData, 'nominationName' | 'description' | 'nominationType'>>
 ): Promise<SupplierNomination> {
   const response = await apiClient.put(`/supplier-nominations/${nominationId}`, data);
-  return response;
-}
-
-/**
- * Store complete evaluation data (Overview, Cost Analysis, Rating Engine, Capability, Technical)
- */
-export async function storeEvaluationData(
-  evaluationId: string,
-  evaluationData: {
-    overview?: any;
-    costAnalysis?: any;
-    ratingEngine?: any;
-    capability?: any;
-    technical?: any;
-  }
-): Promise<any> {
-  const response = await apiClient.post(`/supplier-nominations/evaluations/${evaluationId}/data`, evaluationData);
-  return response;
-}
-
-/**
- * Get complete evaluation data
- */
-export async function getEvaluationData(
-  evaluationId: string,
-  section: string
-): Promise<any> {
-  try {
-    const response = await apiClient.get(`/supplier-nominations/evaluations/${evaluationId}/sections/${section}`);
-    return response;
-  } catch (error) {
-    throw error;
-  }
-}
-
-/**
- * Save evaluation section data (overview, cost_analysis, rating_engine, capability, technical)
- */
-export async function saveEvaluationData(
-  evaluationId: string,
-  section: string,
-  sectionData: any
-): Promise<any> {
-  const response = await apiClient.put(`/supplier-nominations/evaluations/${evaluationId}/sections/${section}`, sectionData);
   return response;
 }
 
@@ -462,7 +407,7 @@ export function getRecommendationColor(recommendation: Recommendation): string {
  * Reset API circuit breaker (for debugging)
  * Call this from browser console: resetApiCircuitBreaker()
  */
-export function resetApiCircuitBreaker(): void {
+function resetApiCircuitBreaker(): void {
   try {
     apiClient.resetCircuitBreaker();
     // Circuit breaker reset successfully
@@ -474,7 +419,7 @@ export function resetApiCircuitBreaker(): void {
 /**
  * Get circuit breaker status
  */
-export function getApiCircuitBreakerStatus() {
+function getApiCircuitBreakerStatus() {
   try {
     const metrics = apiClient.getCircuitBreakerMetrics();
     return metrics;
@@ -525,18 +470,6 @@ export async function getFactorWeights(nominationId: string): Promise<FactorWeig
   }
 }
 
-/**
- * Update ranking factor weights for a nomination
- */
-export async function updateFactorWeights(nominationId: string, weights: FactorWeights): Promise<boolean> {
-  try {
-    const response = await apiClient.put(`/supplier-nominations/${nominationId}/factor-weights`, weights);
-    return response;
-  } catch (error) {
-    throw error;
-  }
-}
-
 // ============================================================================
 // SUPPLIER RANKING API
 // ============================================================================
@@ -558,42 +491,6 @@ export interface StoredRanking extends SupplierRanking {
   calculatedAt: string;
 }
 
-/**
- * Calculate supplier rankings based on current data and weights
- */
-export async function calculateSupplierRankings(nominationId: string): Promise<SupplierRanking[]> {
-  try {
-    const response = await apiClient.post(`/supplier-nominations/${nominationId}/calculate-rankings`);
-    return response || [];
-  } catch (error) {
-    throw error;
-  }
-}
-
-/**
- * Calculate and store supplier rankings in database
- */
-export async function storeSupplierRankings(nominationId: string): Promise<boolean> {
-  try {
-    const response = await apiClient.post(`/supplier-nominations/${nominationId}/store-rankings`);
-    return response;
-  } catch (error) {
-    throw error;
-  }
-}
-
-/**
- * Get stored supplier rankings from database
- */
-export async function getStoredRankings(nominationId: string): Promise<StoredRanking[]> {
-  try {
-    const response = await apiClient.get(`/supplier-nominations/${nominationId}/rankings`);
-    return response || [];
-  } catch (error) {
-    throw error;
-  }
-}
-
 // ============================================================================
 // EVALUATION SCORES API
 // ============================================================================
@@ -604,24 +501,6 @@ export interface EvaluationScores {
   rating_score: number;
   capability_score: number;
   overview_score: number;
-}
-
-/**
- * Get calculated evaluation scores for all sections
- */
-export async function getEvaluationScores(evaluationId: string): Promise<EvaluationScores> {
-  try {
-    const response = await apiClient.get(`/supplier-nominations/evaluations/${evaluationId}/scores`);
-    return response || {
-      overall_score: 0,
-      cost_score: 0,
-      rating_score: 0,
-      capability_score: 0,
-      overview_score: 0
-    };
-  } catch (error) {
-    throw error;
-  }
 }
 
 // ============================================================================
@@ -812,20 +691,6 @@ export async function bulkUpdatePartWiseCostAnalysis(
   try {
     const response = await apiClient.put(`/supplier-nominations/${nominationId}/parts/${bomItemId}/cost-analysis/bulk`, updateData);
     return response || { costAnalysis: [], baseData: null };
-  } catch (error) {
-    throw error;
-  }
-}
-
-/**
- * Get part-wise analysis summary for dashboard
- */
-export async function getPartWiseAnalysisSummary(
-  nominationId: string
-): Promise<PartWiseAnalysisSummary[]> {
-  try {
-    const response = await apiClient.get(`/supplier-nominations/${nominationId}/part-wise-analysis-summary`);
-    return response || [];
   } catch (error) {
     throw error;
   }

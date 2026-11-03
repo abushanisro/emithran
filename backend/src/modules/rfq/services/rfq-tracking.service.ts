@@ -193,58 +193,6 @@ export class RfqTrackingService {
     return (data || []).map(record => this.mapToTrackingResponseDto(record));
   }
 
-  /**
-   * Update vendor response information
-   */
-  async updateVendorResponse(
-    trackingId: string,
-    vendorId: string,
-    userId: string,
-    accessToken: string,
-    responseData: UpdateVendorResponseData
-  ): Promise<void> {
-    const client = this.databaseService.getClient(accessToken);
-
-    // Verify this RFQ tracking record is accessible (RLS enforces org scope)
-    const { data: tracking, error: trackingError } = await client
-      .from('rfq_tracking')
-      .select('id')
-      .eq('id', trackingId)
-      .single();
-
-    if (trackingError || !tracking) {
-      throw new NotFoundException(`RFQ tracking record not found: ${trackingId}`);
-    }
-
-    // Update vendor response
-    const updateData: any = {
-      responded: responseData.responded,
-      updated_at: new Date().toISOString()
-    };
-
-    if (responseData.responded) {
-      updateData.response_received_at = new Date().toISOString();
-      if (responseData.quoteAmount) {
-        updateData.quote_amount = responseData.quoteAmount;
-      }
-      if (responseData.leadTimeDays) {
-        updateData.lead_time_days = responseData.leadTimeDays;
-      }
-    }
-
-    const { error: updateError } = await client
-      .from('rfq_tracking_vendors')
-      .update(updateData)
-      .eq('rfq_tracking_id', trackingId)
-      .eq('vendor_id', vendorId);
-
-    if (updateError) {
-      throw new BadRequestException(`Failed to update vendor response: ${updateError.message}`);
-    }
-
-    // Update response counts and timestamps in main tracking record
-    await this.updateTrackingStats(trackingId, accessToken);
-  }
 
   /**
    * Update RFQ tracking status

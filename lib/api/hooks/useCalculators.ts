@@ -10,15 +10,9 @@ import type {
   UpdateCalculatorData,
   CreateFieldData,
   UpdateFieldData,
-  CreateFormulaData,
-  UpdateFormulaData,
   ExecuteCalculatorData,
-  SaveExecutionData,
-  ValidateFormulaData,
   CalculatorQuery,
   ExecutionQuery,
-  ResolveDatabaseFieldData,
-  GetLookupOptionsData,
 } from '../calculators';
 import { ApiError } from '../client';
 import { toast } from 'sonner';
@@ -69,24 +63,6 @@ export function useCalculator(id: string, options?: { enabled?: boolean }) {
       }
       return failureCount < 3;
     },
-  });
-}
-
-export function useCalculatorFields(calculatorId: string, options?: { enabled?: boolean }) {
-  return useQuery({
-    queryKey: calculatorKeys.fields(calculatorId),
-    queryFn: () => calculatorsApi.getFields(calculatorId),
-    enabled: options?.enabled !== false && !!calculatorId,
-    staleTime: 1000 * 60 * 2,
-  });
-}
-
-export function useCalculatorFormulas(calculatorId: string, options?: { enabled?: boolean }) {
-  return useQuery({
-    queryKey: calculatorKeys.formulas(calculatorId),
-    queryFn: () => calculatorsApi.getFormulas(calculatorId),
-    enabled: options?.enabled !== false && !!calculatorId,
-    staleTime: 1000 * 60 * 2,
   });
 }
 
@@ -351,126 +327,6 @@ export function useDeleteField() {
 }
 
 // ========================================
-// FORMULA MUTATIONS
-// ========================================
-
-export function useCreateFormula() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (data: CreateFormulaData) => calculatorsApi.createFormula(data),
-    onMutate: async ({ calculatorId, ...data }) => {
-      await queryClient.cancelQueries({ queryKey: calculatorKeys.detail(calculatorId!) });
-      const previousCalculator = queryClient.getQueryData<any>(calculatorKeys.detail(calculatorId!));
-
-      if (previousCalculator) {
-        queryClient.setQueryData(calculatorKeys.detail(calculatorId!), {
-          ...previousCalculator,
-          formulas: (previousCalculator.formulas || []).map((f: any) =>
-            f.id === 'temp' ? { ...f, ...data } : f
-          ),
-        });
-      }
-
-      return { previousCalculator };
-    },
-    onSuccess: (savedFormula, variables) => {
-      queryClient.setQueryData(calculatorKeys.detail(variables.calculatorId!), (old: any) => {
-        if (!old) return old;
-        return {
-          ...old,
-          formulas: [...(old.formulas || []), savedFormula]
-        };
-      });
-      toast.success('Formula added successfully');
-    },
-    onError: (error: ApiError, variables, context) => {
-      if (context?.previousCalculator) {
-        queryClient.setQueryData(calculatorKeys.detail(variables.calculatorId!), context.previousCalculator);
-      }
-      if (error.status === 400) {
-        toast.error('Please check the formula syntax and field references.');
-      } else if (error.status === 404) {
-        toast.error('This calculator no longer exists. Please refresh the page.');
-      } else if (error.status === 409) {
-        toast.error('A formula with this name already exists in this calculator.');
-      } else if (error.status === 403) {
-        toast.error('You do not have permission to add formulas to this calculator.');
-      } else if (error.status === 422) {
-        toast.error('Formula contains invalid syntax or field references.');
-      } else {
-        toast.error('Unable to add formula. Please try again or contact support.');
-      }
-    },
-    onSettled: (_, __, variables) => {
-      if (variables.calculatorId) {
-        queryClient.invalidateQueries({ queryKey: calculatorKeys.detail(variables.calculatorId!) });
-      }
-    },
-  });
-}
-
-export function useUpdateFormula() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ calculatorId, formulaId, data }: { calculatorId: string; formulaId: string; data: UpdateFormulaData }) =>
-      calculatorsApi.updateFormula(calculatorId, formulaId, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: calculatorKeys.formulas(variables.calculatorId) });
-      queryClient.invalidateQueries({ queryKey: calculatorKeys.detail(variables.calculatorId) });
-      toast.success('Formula updated successfully');
-    },
-    onError: (error: ApiError) => {
-      if (error.status === 400) {
-        toast.error('Please check the formula syntax and field references.');
-      } else if (error.status === 404) {
-        toast.error('This formula no longer exists. It may have been deleted.');
-      } else if (error.status === 409) {
-        toast.error('Another user is editing this formula. Please refresh and try again.');
-      } else if (error.status === 403) {
-        toast.error('You do not have permission to edit this formula.');
-      } else if (error.status === 422) {
-        toast.error('Formula contains invalid syntax or field references.');
-      } else {
-        toast.error('Unable to update formula. Please try again or contact support.');
-      }
-    },
-  });
-}
-
-export function useDeleteFormula() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ calculatorId, formulaId }: { calculatorId: string; formulaId: string }) =>
-      calculatorsApi.deleteFormula(calculatorId, formulaId),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: calculatorKeys.formulas(variables.calculatorId) });
-      queryClient.invalidateQueries({ queryKey: calculatorKeys.detail(variables.calculatorId) });
-      toast.success('Formula deleted successfully');
-    },
-    onError: (error: ApiError) => {
-      if (error.status === 404) {
-        toast.error('This formula has already been deleted.');
-      } else if (error.status === 409) {
-        toast.error('Cannot delete formula because it is being referenced by other formulas.');
-      } else if (error.status === 403) {
-        toast.error('You do not have permission to delete this formula.');
-      } else {
-        toast.error('Unable to delete formula. Please try again or contact support.');
-      }
-    },
-  });
-}
-
-export function useValidateFormula() {
-  return useMutation({
-    mutationFn: (data: ValidateFormulaData) => calculatorsApi.validateFormula(data),
-  });
-}
-
-// ========================================
 // EXECUTION QUERIES & MUTATIONS
 // ========================================
 
@@ -490,80 +346,5 @@ export function useExecuteCalculator() {
         toast.error('Unable to execute calculator. Please try again or contact support.');
       }
     },
-  });
-}
-
-export function useSaveExecution() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (data: SaveExecutionData) => calculatorsApi.saveExecution(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: calculatorKeys.executions() });
-      toast.success('Execution saved successfully');
-    },
-    onError: (error: ApiError) => {
-      if (error.status === 400) {
-        toast.error('Please ensure all execution data is valid before saving.');
-      } else if (error.status === 404) {
-        toast.error('This calculator no longer exists.');
-      } else if (error.status === 409) {
-        toast.error('An execution with this name already exists.');
-      } else if (error.status === 403) {
-        toast.error('You do not have permission to save calculator executions.');
-      } else {
-        toast.error('Unable to save execution. Please try again or contact support.');
-      }
-    },
-  });
-}
-
-export function useExecutions(query?: ExecutionQuery, options?: { enabled?: boolean }) {
-  return useQuery({
-    queryKey: calculatorKeys.executionList(query),
-    queryFn: () => calculatorsApi.getExecutions(query),
-    staleTime: 1000 * 60 * 5,
-    enabled: options?.enabled !== false,
-  });
-}
-
-export function useExecution(executionId: string, options?: { enabled?: boolean }) {
-  return useQuery({
-    queryKey: calculatorKeys.execution(executionId),
-    queryFn: () => calculatorsApi.getExecution(executionId),
-    enabled: options?.enabled !== false && !!executionId,
-    staleTime: 1000 * 60 * 10,
-  });
-}
-
-// ========================================
-// DATABASE LOOKUP QUERIES
-// ========================================
-
-export function useResolveDatabaseField() {
-  return useMutation({
-    mutationFn: (data: ResolveDatabaseFieldData) => calculatorsApi.resolveDatabaseField(data),
-    onError: (error: ApiError) => {
-      if (error.status === 400) {
-        toast.error('Please check the database field configuration.');
-      } else if (error.status === 404) {
-        toast.error('Database table or field not found.');
-      } else if (error.status === 403) {
-        toast.error('You do not have permission to access this database.');
-      } else if (error.status === 500) {
-        toast.error('Database connection error. Please try again.');
-      } else {
-        toast.error('Unable to resolve database field. Please try again or contact support.');
-      }
-    },
-  });
-}
-
-export function useDatabaseLookupOptions(data: GetLookupOptionsData, options?: { enabled?: boolean }) {
-  return useQuery({
-    queryKey: ['database-lookup', data.dataSource, data.search, data.limit],
-    queryFn: () => calculatorsApi.getLookupOptions(data),
-    enabled: options?.enabled !== false && !!data.dataSource,
-    staleTime: 1000 * 60 * 5,
   });
 }

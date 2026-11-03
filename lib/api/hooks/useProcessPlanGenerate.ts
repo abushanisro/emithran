@@ -11,11 +11,9 @@
  * Shapes mirror backend DTOs in backend/src/modules/process-plan-generator/dto/.
  */
 
-import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { apiClient } from '../client';
-import { apiConfig } from '../config';
 
 // ─── Types (mirror backend DTOs) ────────────────────────────────────────────
 
@@ -194,29 +192,6 @@ export function useLatestDraftGeneration(bomItemId: string | null) {
   });
 }
 
-export function useGenerateProcessPlan() {
-  return useMutation({
-    mutationFn: async (input: { bomItemId: string; forceRefresh?: boolean; notes?: string }) => {
-      const result = await apiClient.post<GenerationResponse>(
-        `${BASE}/${input.bomItemId}/generate`,
-        { forceRefresh: !!input.forceRefresh, notes: input.notes },
-        { timeout: 120_000 },
-      );
-      return result;
-    },
-    onError: (error: any) => {
-      const status = error?.status ?? error?.response?.status;
-      if (status === 404) {
-        toast.error('BOM item not found.');
-      } else if (status === 403) {
-        toast.error('You do not have permission to generate for this part.');
-      } else {
-        toast.error('Failed to generate process plan. Try again or use deterministic auto-fill.');
-      }
-    },
-  });
-}
-
 export function useApplyGeneration() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -244,44 +219,6 @@ export function useApplyGeneration() {
   });
 }
 
-export function useDiscardGeneration() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ generationId, bomItemId }: { generationId: string; bomItemId?: string }) => {
-      await apiClient.post(`${BASE}/generations/${generationId}/discard`, {});
-      return { generationId, bomItemId };
-    },
-    onSuccess: (_data) => {
-      queryClient.invalidateQueries({ queryKey: ['process-plan-draft'], exact: false });
-    },
-  });
-}
-
-export function useRecordLineEdit() {
-  return useMutation({
-    mutationFn: async ({ generationId, edit }: { generationId: string; edit: CreateLineEdit }) => {
-      return apiClient.post<{ id: string }>(`${BASE}/generations/${generationId}/edits`, edit);
-    },
-    // Silent — these fire on every field change; don't toast.
-  });
-}
-
-export function useSelectRoute() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ generationId, routeId }: { generationId: string; routeId: string }) => {
-      return apiClient.post(`${BASE}/generations/${generationId}/select-route`, { routeId });
-    },
-    onSuccess: (_data, { generationId }) => {
-      queryClient.invalidateQueries({ queryKey: ['process-plan-draft'], exact: false });
-      queryClient.invalidateQueries({ queryKey: ['process-plan-generation', generationId] });
-    },
-    onError: () => {
-      toast.error('Failed to select route. Please try again.');
-    },
-  });
-}
-
 // ─── SSE stream hook ────────────────────────────────────────────────────────
 
 export type StreamEvent =
@@ -294,60 +231,3 @@ export type StreamEvent =
   | { type: 'out_of_scope'; data: { reason: string } }
   | { type: 'failed'; data: { stage: string; error: string } }
   | { type: 'ping'; data: { t: number } };
-
-/**
- * Subscribes to /process-plan-generator/:bomItemId/stream as long as
- * `enabled` is true. Returns an in-memory array of events received.
- *
- * The stream is same-origin (/api/v1): the session cookie authenticates it
- * and the BFF route streams it through with the token attached server-side.
- */
-export function useGenerationStream(bomItemId: string, enabled: boolean): StreamEvent[] {
-  const [events, setEvents] = useState<StreamEvent[]>([]);
-  const sourceRef = useRef<EventSource | null>(null);
-
-  useEffect(() => {
-    if (!enabled || !bomItemId) {
-      sourceRef.current?.close();
-      sourceRef.current = null;
-      return;
-    }
-
-    let cancelled = false;
-    (async () => {
-      if (cancelled) return;
-
-      const url = `${apiConfig.endpoints.api.v1}${BASE}/${bomItemId}/stream`;
-      const src = new EventSource(url);
-      sourceRef.current = src;
-
-      const handlers: StreamEvent['type'][] = [
-        'scope_decided',
-        'retrieval.done',
-        'reasoning.started',
-        'reasoning.tool_call',
-        'resolver.done',
-        'draft_ready',
-        'out_of_scope',
-        'failed',
-        'ping',
-      ];
-      for (const t of handlers) {
-        src.addEventListener(t, (e: MessageEvent) => {
-          try {
-            const data = JSON.parse((e as any).data);
-            setEvents((prev) => [...prev, { type: t, data } as StreamEvent]);
-          } catch { /* malformed event, ignore */ }
-        });
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      sourceRef.current?.close();
-      sourceRef.current = null;
-    };
-  }, [bomItemId, enabled]);
-
-  return events;
-}

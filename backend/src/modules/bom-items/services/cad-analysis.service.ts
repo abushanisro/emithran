@@ -187,45 +187,6 @@ export class CADAnalysisService {
     }
   }
 
-  /**
-   * Get CAD analysis summary for a BOM
-   */
-  async getBOMAnalysisSummary(bomId: string, accessToken: string): Promise<any> {
-    try {
-      this.logger.log(`Getting CAD analysis summary for BOM: ${bomId}`);
-
-      const client = this.databaseService.getClient(accessToken);
-
-      const { data, error } = await client
-        .from('manufacturing_insights_summary')
-        .select('*')
-        .eq('bom_id', bomId)
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        throw new InternalServerErrorException(`Failed to get BOM analysis summary: ${error.message}`);
-      }
-
-      return data || {
-        bom_id: bomId,
-        total_items: 0,
-        analyzed_items: 0,
-        avg_manufacturability_score: null,
-        easy_items: 0,
-        medium_items: 0,
-        hard_items: 0,
-        very_hard_items: 0,
-        most_common_process: null,
-        avg_memory_reduction: null,
-        avg_processing_time_ms: null,
-        latest_analysis: null
-      };
-
-    } catch (error) {
-      this.logger.error(`Failed to get BOM analysis summary: ${error.message}`, error.stack);
-      throw new InternalServerErrorException(`Failed to get BOM analysis summary: ${error.message}`);
-    }
-  }
 
   /**
    * Get detailed analysis for a specific BOM item
@@ -339,28 +300,6 @@ export class CADAnalysisService {
     }
   }
 
-  /**
-   * Clean up old analysis cache entries
-   */
-  async cleanupAnalysisCache(accessToken: string): Promise<number> {
-    try {
-      const client = this.databaseService.getClient(accessToken);
-
-      const { data, error } = await client.rpc('cleanup_cad_analysis_cache');
-
-      if (error) {
-        throw new InternalServerErrorException(`Failed to cleanup analysis cache: ${error.message}`);
-      }
-
-      const deletedCount = data || 0;
-      this.logger.log(`Cleaned up ${deletedCount} expired cache entries`);
-      return deletedCount;
-
-    } catch (error) {
-      this.logger.error(`Failed to cleanup analysis cache: ${error.message}`, error.stack);
-      throw new InternalServerErrorException(`Failed to cleanup analysis cache: ${error.message}`);
-    }
-  }
 
   // Private helper methods
 

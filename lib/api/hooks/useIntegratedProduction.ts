@@ -30,10 +30,6 @@ const updateMaterialStatus = async (materialId: string, updateData: any) => {
   return response.data;
 };
 
-const recordProductionMetrics = async (lotId: string, metricsData: any) => {
-  const response = await apiClient.post(`/production-planning/lots/${lotId}/metrics`, metricsData);
-  return response.data;
-};
 
 const resolveAlert = async (alertId: string, notes: string) => {
   const response = await apiClient.put(`/production-planning/alerts/${alertId}/resolve`, { notes });
@@ -45,10 +41,6 @@ const initializeLotMaterials = async (lotId: string) => {
   return response.data;
 };
 
-const getMaterialTrackingHistory = async (materialId: string) => {
-  const response = await apiClient.get(`/production-planning/materials/${materialId}/tracking-history`);
-  return response.data;
-};
 
 // ============================================================================
 // REACT QUERY HOOKS
@@ -90,14 +82,6 @@ export const useProductionAlerts = (lotId: string) => {
   });
 };
 
-export const useMaterialTrackingHistory = (materialId: string) => {
-  return useQuery({
-    queryKey: ['material-tracking', materialId],
-    queryFn: () => getMaterialTrackingHistory(materialId),
-    enabled: !!materialId,
-  });
-};
-
 // ============================================================================
 // MUTATION HOOKS
 // ============================================================================
@@ -114,19 +98,6 @@ export const useUpdateMaterialStatus = () => {
       queryClient.invalidateQueries({ queryKey: ['integrated-dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['production-monitoring'] });
       queryClient.invalidateQueries({ queryKey: ['material-tracking', variables.materialId] });
-    },
-  });
-};
-
-export const useRecordProductionMetrics = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: ({ lotId, metricsData }: { lotId: string; metricsData: any }) =>
-      recordProductionMetrics(lotId, metricsData),
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['production-monitoring', variables.lotId] });
-      queryClient.invalidateQueries({ queryKey: ['integrated-dashboard', variables.lotId] });
     },
   });
 };
