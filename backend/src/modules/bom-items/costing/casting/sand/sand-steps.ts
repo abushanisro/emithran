@@ -66,7 +66,7 @@ export type StepOutcome =
 const fail = (...reasons: string[]): StepOutcome => ({ ok: false, reasons });
 
 /** One calculator run: seed every input from its declared source, run it, or say what is missing. */
-function runStep(
+export function runStep(
   ctx: SandRouteContext,
   calculator: string,
   machine: SandMachine | null,
