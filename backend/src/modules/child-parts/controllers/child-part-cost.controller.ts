@@ -19,6 +19,8 @@ import {
   Query,
   UseGuards,
   Request,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -156,6 +158,7 @@ export class ChildPartCostController {
   /**
    * Delete a child part cost record
    */
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id')
   @ApiOperation({
     summary: 'Delete child part cost',

@@ -8,7 +8,9 @@ import {
   Param,
   Query,
   UseGuards,
-  BadRequestException
+  BadRequestException,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SupplierNominationsService } from './supplier-nominations.service';
@@ -275,6 +277,7 @@ export class SupplierNominationsController {
     );
   }
 
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id')
   @ApiOperation({ summary: 'Delete supplier nomination' })
   @ApiResponse({
