@@ -112,50 +112,6 @@ export class SubtaskService {
     return this.mapToSubtaskResponse(data);
   }
 
-  async getSubtasksByProcess(processId: string, userId: string): Promise<SubtaskResponseDto[]> {
-    UuidValidator.validateUuid(processId, 'Process ID');
-
-    const database = this.databaseService.getUserClient();
-
-    // Verify process access first
-    const { data: processData } = await database
-      .from('production_processes')
-      .select('id, production_lot:production_lots!inner(created_by)')
-      .eq('id', processId)
-      .eq('production_lots.created_by', userId)
-      .single();
-
-    if (!processData) {
-      throw new NotFoundException('Production process not found or access denied');
-    }
-
-    const { data, error } = await database
-      .from('process_subtasks')
-      .select(`
-        *,
-        bom_requirements:subtask_bom_requirements(
-          id,
-          bom_item_id,
-          required_quantity,
-          unit,
-          requirement_status,
-          bom_item:bom_items(
-            id,
-            part_number,
-            name,
-            description
-          )
-        )
-      `)
-      .eq('production_process_id', processId)
-      .order('task_sequence');
-
-    if (error) {
-      throw new InternalServerErrorException('Failed to fetch subtasks: ' + error.message);
-    }
-
-    return (data || []).map(subtask => this.mapToSubtaskResponse(subtask));
-  }
 
   async updateSubtask(subtaskId: string, updateDto: UpdateSubtaskDto, userId: string): Promise<SubtaskResponseDto> {
     UuidValidator.validateUuid(subtaskId, 'Subtask ID');

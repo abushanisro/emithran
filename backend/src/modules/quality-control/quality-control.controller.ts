@@ -294,38 +294,7 @@ export class QualityControlController {
   // NON-CONFORMANCE ENDPOINTS
   // ============================================================================
 
-  @Post('inspections/:id/non-conformances')
-  @ApiOperation({ summary: 'Create non-conformance report' })
-  @ApiResponse({ status: 201, description: 'Non-conformance created successfully' })
-  async createNonConformance(
-    @Param('id', ParseUUIDPipe) inspectionId: string,
-    @Body() nonConformanceData: any,
-    @CurrentUser() user: User,
-  ): Promise<CustomApiResponse<any>> {
-    const result = await this.qualityInspectionService.createNonConformance(
-      inspectionId,
-      nonConformanceData,
-      this.getUserId(user),
-    );
-    return createResponse(result);
-  }
 
-  @OrgRole('viewer')
-  @Get('non-conformances')
-  @ApiOperation({ summary: 'Get all non-conformances' })
-  @ApiResponse({ status: 200, description: 'Non-conformances retrieved successfully' })
-  async getNonConformances(
-    @CurrentUser() user: User,
-    @Query('projectId') projectId?: string,
-    @Query('status') status?: string,
-    @Query('severity') severity?: string,
-  ): Promise<CustomApiResponse<any[]>> {
-    const result = await this.qualityInspectionService.getNonConformances(
-      this.getUserId(user),
-      { projectId, status, severity }
-    );
-    return createResponse(result);
-  }
 
   // ============================================================================
   // QUALITY METRICS & REPORTING ENDPOINTS
@@ -355,28 +324,6 @@ export class QualityControlController {
     }
   }
 
-  @OrgRole('viewer')
-  @Get('projects/:projectId/quality-report')
-  @ApiOperation({ summary: 'Generate quality report' })
-  @ApiResponse({ status: 200, description: 'Report generated successfully' })
-  async generateQualityReport(
-    @Param('projectId', ParseUUIDPipe) projectId: string,
-    @CurrentUser() user: User,
-    @Query('reportType') reportType?: string,
-  ): Promise<CustomApiResponse<any>> {
-    try {
-      this.logger.log(`Generating quality report for project ${projectId}, type: ${reportType || 'comprehensive'}`);
-      const result = await this.qualityControlService.generateQualityReport(
-        projectId,
-        this.getUserId(user),
-        reportType,
-      );
-      return createResponse(result);
-    } catch (error) {
-      this.logger.error(`Failed to generate quality report for project ${projectId}: ${error.message}`, error.stack);
-      throw error;
-    }
-  }
 
   // ============================================================================
   // DASHBOARD ENDPOINTS

@@ -454,73 +454,7 @@ export class QualityInspectionService {
     return data;
   }
 
-  async createNonConformance(
-    inspectionId: string,
-    nonConformanceData: any,
-    userId: string,
-  ): Promise<any> {
-    const organizationId = await this.getInspectionOrganization(inspectionId);
 
-    // The body describes the non-conformance; which inspection and organization it belongs to, and who made it, are set here.
-    const ncData = {
-      ...nonConformanceData,
-      inspection_id: inspectionId,
-      organization_id: organizationId,
-      created_by: userId,
-      created_at: new Date().toISOString(),
-    };
-
-    const { data, error } = await this.db()
-      .from('quality_non_conformances')
-      .insert(ncData)
-      .select('*')
-      .single();
-
-    if (error) {
-      throw qualityDbError(error, 'create the non-conformance');
-    }
-
-    return data;
-  }
-
-  async getNonConformances(
-    userId: string,
-    filters: {
-      projectId?: string;
-      status?: string;
-      severity?: string;
-    } = {},
-  ): Promise<any[]> {
-    // !inner: a project filter on the embedded inspection must drop the non-conformances of other projects, not just blank the embed
-    let query = this.db()
-      .from('quality_non_conformances')
-      .select(`
-        *,
-        quality_inspections!inspection_id!inner (id, name, project_id)
-      `)
-      .order('created_at', { ascending: false });
-
-    if (filters.projectId) {
-      query = query.eq('quality_inspections.project_id', filters.projectId);
-    }
-
-    if (filters.status) {
-      query = query.eq('status', filters.status);
-    }
-
-    if (filters.severity) {
-      query = query.eq('severity', filters.severity);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      this.logger.error(`Failed to get non-conformances for user ${userId}: ${error.code} ${error.message}`);
-      throw qualityDbError(error, 'retrieve non-conformances');
-    }
-
-    return data || [];
-  }
 
   private mapToResponseDto(data: any): QualityInspectionResponseDto {
     return {

@@ -507,15 +507,6 @@ export class ProductionPlanningController {
   // DIRECT SUBTASKS ENDPOINT
   // ============================================================================
 
-  @OrgRole('viewer')
-  @Get('lots/:lotId/subtasks-direct')
-  async getSubtasksDirectByLot(
-    @Param('lotId', ParseUUIDPipe) lotId: string,
-    @CurrentUser() user: User,
-  ): Promise<ApiResponse<any[]>> {
-    const result = await this.productionPlanningService.getSubtasksDirectByLot(lotId, this.getUserId(user));
-    return createResponse(result);
-  }
 
   // ============================================================================
   // PROCESS TEMPLATES ENDPOINTS

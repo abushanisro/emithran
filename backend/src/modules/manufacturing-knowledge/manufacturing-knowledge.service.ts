@@ -80,15 +80,6 @@ export class ManufacturingKnowledgeService {
     return (data ?? []) as PartFamilyRoutingTemplate[];
   }
 
-  async getMachineProcessMapping(token: string, featureType?: string, partFamily?: string): Promise<MachineProcessMapping[]> {
-    let q = this.database.getClient(token).from('machine_process_mapping').select('*').order('priority');
-    if (featureType) q = q.eq('feature_type', featureType);
-    const { data, error } = await q;
-    if (error) throw new InternalServerErrorException(`machine_process_mapping: ${error.message}`);
-    const rows = (data ?? []) as MachineProcessMapping[];
-    if (!partFamily) return rows;
-    return rows.filter((r) => !r.applies_to_family || r.applies_to_family === partFamily);
-  }
 
   async submitFeedback(token: string, dto: SubmitFeedbackDto, userId: string): Promise<ProcessPlanFeedback> {
     const { data, error } = await this.database.getClient(token)

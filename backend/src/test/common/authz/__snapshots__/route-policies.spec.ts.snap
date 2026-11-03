@@ -5,7 +5,6 @@ exports[`route authorization inventory matches the reviewed route-policy table 1
 org:member      DELETE /v1/api/bom-items/:id  BOMItemsController.remove
 org:admin       DELETE /v1/api/bom-items/:id/force  BOMItemsController.forceRemove
 org:member      DELETE /v1/api/boms/:id  BOMsController.remove
-org:member      DELETE /v1/api/boms/:id/analysis-cache  BOMsController.clearBOMAnalysisCache
 org:member      DELETE /v1/api/calculators/:id  CalculatorsController.remove
 org:member      DELETE /v1/api/calculators/:id/fields/:fieldId  CalculatorsController.removeField
 org:member      DELETE /v1/api/calculators/:id/formulas/:formulaId  CalculatorsController.removeFormula
@@ -102,9 +101,7 @@ org:viewer      GET /v1/api/bom-items/material-density  BOMItemsController.getMa
 org:viewer      GET /v1/api/boms  BOMsController.findAll
 org:viewer      GET /v1/api/boms/:id  BOMsController.findOne
 org:viewer      GET /v1/api/boms/:id/cost-report  BOMsController.getCostReport
-org:viewer      GET /v1/api/boms/:id/cost-summary  BOMsController.getCostSummary
 org:viewer      GET /v1/api/boms/:id/items  BOMsController.getBomItems
-org:viewer      GET /v1/api/boms/:id/manufacturing-insights  BOMsController.getManufacturingInsights
 org:viewer      GET /v1/api/cad-uploads/:id  CadUploadsController.get
 org:viewer      GET /v1/api/calculators  CalculatorsController.findAll
 org:viewer      GET /v1/api/calculators/:id  CalculatorsController.findOne
@@ -119,7 +116,6 @@ org:viewer      GET /v1/api/cost-analysis/bom-item/:bomItemId/excel  CostAnalysi
 org:viewer      GET /v1/api/cost-analysis/bom-item/:bomItemId/location-comparison  CostAnalysisController.getLocationComparison
 org:viewer      GET /v1/api/electronics/designs  ElectronicsController.listDesigns
 org:viewer      GET /v1/api/electronics/designs/:designId  ElectronicsController.getDesign
-org:viewer      GET /v1/api/electronics/designs/:designId/revisions  ElectronicsController.revisions
 org:viewer      GET /v1/api/electronics/file-formats  ElectronicsController.formats
 org:viewer      GET /v1/api/electronics/jobs/:jobId  ElectronicsController.job
 org:viewer      GET /v1/api/electronics/reference-coverage  ElectronicsController.coverage
@@ -143,10 +139,8 @@ org:viewer      GET /v1/api/lhr/effective-rate  LHRController.getEffectiveRate
 org:viewer      GET /v1/api/manufacturing-knowledge/feature-process-mapping  ManufacturingKnowledgeController.getFeatureProcessMapping
 org:viewer      GET /v1/api/manufacturing-knowledge/feedback/:bomItemId  ManufacturingKnowledgeController.getFeedback
 org:viewer      GET /v1/api/manufacturing-knowledge/machine-capabilities  ManufacturingKnowledgeController.getMachineCapabilities
-org:viewer      GET /v1/api/manufacturing-knowledge/machine-process-mapping  ManufacturingKnowledgeController.getMachineProcessMapping
 org:viewer      GET /v1/api/manufacturing-knowledge/routing-rules  ManufacturingKnowledgeController.getRoutingRules
 org:viewer      GET /v1/api/manufacturing-knowledge/templates  ManufacturingKnowledgeController.getTemplates
-org:viewer      GET /v1/api/manufacturing-knowledge/templates/:partFamily  ManufacturingKnowledgeController.getTemplate
 org:viewer      GET /v1/api/mhr  MHRController.findAll
 org:viewer      GET /v1/api/mhr/:id  MHRController.findOne
 org:viewer      GET /v1/api/mhr/:id/reference-detail  MHRController.getReferenceDetail
@@ -164,11 +158,9 @@ org:viewer      GET /v1/api/organizations/:id/workspaces  OrganizationsControlle
 authenticated   GET /v1/api/organizations/mine  OrganizationsController.mine
 org:viewer      GET /v1/api/packaging-logistics-costs  PackagingLogisticsCostController.findAll
 org:viewer      GET /v1/api/packaging-logistics-costs/:id  PackagingLogisticsCostController.findOne
-org:viewer      GET /v1/api/packaging-logistics-costs/bom-item/:bomItemId/total  PackagingLogisticsCostController.getTotalCostForBomItem
 org:viewer      GET /v1/api/packaging-logistics-costs/freight-rate-benchmarks  PackagingLogisticsCostController.getFreightRateBenchmarks
 org:viewer      GET /v1/api/process-costs  ProcessCostController.findAll
 org:viewer      GET /v1/api/process-costs/:id  ProcessCostController.findOne
-org:viewer      GET /v1/api/process-costs/bom-item/:bomItemId/total  ProcessCostController.getTotalCostForBomItem
 org:viewer      GET /v1/api/process-plan-generator/:bomItemId/draft  ProcessPlanGeneratorController.getLatestDraft
 org:member      GET /v1/api/process-plan-generator/:bomItemId/stream  ProcessPlanGeneratorController.stream
 org:viewer      GET /v1/api/process-plan-generator/generations/:id  ProcessPlanGeneratorController.getGeneration
@@ -184,7 +176,6 @@ org:viewer      GET /v1/api/processes/deslag-allowance-table  ProcessesControlle
 org:viewer      GET /v1/api/processes/machining-lookup-tables/by-name/:table  ProcessesController.getMachiningLookupTableByName
 org:viewer      GET /v1/api/processes/reference-domains  ProcessesController.getReferenceDomains
 org:viewer      GET /v1/api/processes/reference-lookup  ProcessesController.getReferenceLookup
-org:viewer      GET /v1/api/processes/reference-lookup-tables/:domain/by-name/:table  ProcessesController.getReferenceLookupTableByName
 org:viewer      GET /v1/api/processes/reference-tables/:tableId  ProcessesController.getReferenceTable
 org:viewer      GET /v1/api/processes/sm-lookup-tables  ProcessesController.getSmLookupTables
 org:viewer      GET /v1/api/processes/sm-lookup-tables/by-name/:table  ProcessesController.getSmLookupTableByName
@@ -195,7 +186,6 @@ org:viewer      GET /v1/api/processes/vendors-by-process/:processId  ProcessesCo
 org:viewer      GET /v1/api/processes/waterjet-machines-table  ProcessesController.getWaterjetMachinesTable
 org:viewer      GET /v1/api/procured-parts-costs  ProcuredPartsCostController.findAll
 org:viewer      GET /v1/api/procured-parts-costs/:id  ProcuredPartsCostController.findOne
-org:viewer      GET /v1/api/procured-parts-costs/bom-item/:bomItemId/total  ProcuredPartsCostController.getTotalCostForBomItem
 org:viewer      GET /v1/api/production-planning/dashboard  ProductionPlanningController.getDashboardData
 org:viewer      GET /v1/api/production-planning/lots  ProductionPlanningController.getProductionLots
 org:viewer      GET /v1/api/production-planning/lots/:id  ProductionPlanningController.getProductionLotById
@@ -208,7 +198,6 @@ org:viewer      GET /v1/api/production-planning/lots/:lotId/materials  Productio
 org:viewer      GET /v1/api/production-planning/lots/:lotId/monitoring  ProductionPlanningController.getProductionMonitoring
 org:viewer      GET /v1/api/production-planning/lots/:lotId/processes  ProductionPlanningController.getProductionProcesses
 org:viewer      GET /v1/api/production-planning/lots/:lotId/production-entries  ProductionPlanningController.getDailyProductionEntries
-org:viewer      GET /v1/api/production-planning/lots/:lotId/subtasks-direct  ProductionPlanningController.getSubtasksDirectByLot
 org:viewer      GET /v1/api/production-planning/lots/:lotId/summary  ProductionPlanningController.getProductionSummary
 org:viewer      GET /v1/api/production-planning/materials/:materialId/tracking-history  ProductionPlanningController.getMaterialTrackingHistory
 org:viewer      GET /v1/api/production-planning/process-templates  ProductionPlanningController.getDefaultProcessTemplates
@@ -217,7 +206,6 @@ org:viewer      GET /v1/api/production-planning/processes/:processId/subtasks  P
 org:viewer      GET /v1/api/production-planning/processes/:processId/vendor-assignments  ProductionProcessController.getProcessVendorAssignments
 org:viewer      GET /v1/api/production-planning/processes/lot/:lotId  ProductionProcessController.getProcessesByLot
 org:viewer      GET /v1/api/production-planning/processes/subtasks/:id  SubtaskController.getSubtaskById
-org:viewer      GET /v1/api/production-planning/processes/subtasks/process/:processId  SubtaskController.getSubtasksByProcess
 org:viewer      GET /v1/api/production-planning/production-entries  ProductionEntryController.findAll
 org:viewer      GET /v1/api/production-planning/production-entries/:id  ProductionEntryController.findOne
 org:viewer      GET /v1/api/production-planning/production-entries/debug  ProductionEntryController.debug
@@ -235,13 +223,10 @@ org:viewer      GET /v1/api/quality-control/inspections  QualityControlControlle
 org:viewer      GET /v1/api/quality-control/inspections/:id  QualityControlController.getInspectionById
 org:viewer      GET /v1/api/quality-control/inspections/:id/detailed-report  QualityControlController.getDetailedInspectionReport
 org:viewer      GET /v1/api/quality-control/inspections/:id/results  QualityControlController.getInspectionResults
-org:viewer      GET /v1/api/quality-control/non-conformances  QualityControlController.getNonConformances
 org:viewer      GET /v1/api/quality-control/projects/:projectId/dashboard  QualityControlController.getQualityDashboard
 org:viewer      GET /v1/api/quality-control/projects/:projectId/metrics  QualityControlController.getQualityMetrics
-org:viewer      GET /v1/api/quality-control/projects/:projectId/quality-report  QualityControlController.generateQualityReport
 org:viewer      GET /v1/api/raw-material-costs  RawMaterialCostController.findAll
 org:viewer      GET /v1/api/raw-material-costs/:id  RawMaterialCostController.findOne
-org:viewer      GET /v1/api/raw-material-costs/bom-item/:bomItemId/total  RawMaterialCostController.getTotalCostForBomItem
 org:viewer      GET /v1/api/raw-materials  RawMaterialsController.findAll
 org:viewer      GET /v1/api/raw-materials/:id  RawMaterialsController.findOne
 org:viewer      GET /v1/api/raw-materials/:id/editor  RawMaterialsController.getEditor
@@ -258,7 +243,6 @@ org:viewer      GET /v1/api/remarks  RemarkController.getRemarks
 org:viewer      GET /v1/api/remarks/:id  RemarkController.getRemarkById
 org:viewer      GET /v1/api/remarks/:remarkId/comments  RemarkController.getCommentsByRemark
 org:viewer      GET /v1/api/remarks/lot/:lotId  RemarkController.getRemarksByLot
-org:viewer      GET /v1/api/remarks/lot/:lotId/stats  RemarkController.getRemarkStats
 org:viewer      GET /v1/api/rfq  RfqController.findAll
 org:viewer      GET /v1/api/rfq/:id  RfqController.findOne
 org:viewer      GET /v1/api/rfq/tracking  RfqController.getTracking
@@ -279,7 +263,6 @@ org:viewer      GET /v1/api/supplier-nominations/:nominationId/part-wise-analysi
 org:viewer      GET /v1/api/supplier-nominations/:nominationId/parts/:bomItemId/cost-analysis  SupplierNominationsController.getPartWiseCostAnalysis
 org:viewer      GET /v1/api/supplier-nominations/:nominationId/rankings  SupplierNominationsController.getStoredRankings
 org:viewer      GET /v1/api/supplier-nominations/:nominationId/vendors/:vendorId/assessment  SupplierNominationsController.getVendorAssessmentCriteria
-org:viewer      GET /v1/api/supplier-nominations/:nominationId/vendors/:vendorId/assessment/metrics  SupplierNominationsController.getVendorAssessmentMetrics
 org:viewer      GET /v1/api/supplier-nominations/:nominationId/vendors/:vendorId/rating-matrix  SupplierNominationsController.getVendorRatingMatrix
 org:viewer      GET /v1/api/supplier-nominations/:nominationId/vendors/:vendorId/rating-matrix/overall-scores  SupplierNominationsController.getVendorRatingOverallScores
 org:viewer      GET /v1/api/supplier-nominations/approved-vendors/bom-part/:bomPartId  SupplierNominationsController.getApprovedVendorsByBomPart
@@ -288,7 +271,6 @@ org:viewer      GET /v1/api/supplier-nominations/evaluations/:evaluationId/score
 org:viewer      GET /v1/api/supplier-nominations/project/:projectId  SupplierNominationsController.findByProject
 org:viewer      GET /v1/api/tooling-costs  ToolingCostController.findAll
 org:viewer      GET /v1/api/tooling-costs/:id  ToolingCostController.findOne
-org:viewer      GET /v1/api/tooling-costs/bom-item/:bomItemId/total  ToolingCostController.getTotalCostForBomItem
 org:viewer      GET /v1/api/vave/projects  VaveController.listProjects
 org:viewer      GET /v1/api/vave/projects/:id  VaveController.getProject
 org:viewer      GET /v1/api/vave/projects/:id/bom  VaveController.listBomItems
@@ -334,7 +316,6 @@ org:member      POST /v1/api/bom-items/batch-analyze-cad  BOMItemsController.bat
 org:member      POST /v1/api/bom-items/measure-for-autofill  BOMItemsController.measureForAutoFill
 org:member      POST /v1/api/bom-items/process-step-file  BOMItemsController.processStepFile
 org:member      POST /v1/api/boms  BOMsController.create
-org:member      POST /v1/api/boms/:id/analyze-all-items  BOMsController.analyzeAllBOMItems
 org:member      POST /v1/api/boms/:id/recalculate-all-costs  BOMsController.recalculateAllCosts
 org:member      POST /v1/api/cad-uploads  CadUploadsController.create
 org:member      POST /v1/api/calculators  CalculatorsController.create
@@ -358,7 +339,6 @@ org:member      POST /v1/api/manufacturing-knowledge/feature-process-mapping  Ma
 org:member      POST /v1/api/manufacturing-knowledge/feedback  ManufacturingKnowledgeController.submitFeedback
 org:member      POST /v1/api/manufacturing-knowledge/machine-capabilities  ManufacturingKnowledgeController.createMachineCapability
 org:member      POST /v1/api/manufacturing-knowledge/routing-rules  ManufacturingKnowledgeController.createRoutingRule
-org:member      POST /v1/api/manufacturing-knowledge/validate-route  ManufacturingKnowledgeController.validateRoute
 org:member      POST /v1/api/mhr  MHRController.create
 org:member      POST /v1/api/mhr/import-excel  MHRController.importFromExcel
 authenticated   POST /v1/api/organizations  OrganizationsController.create
@@ -407,7 +387,6 @@ org:member      POST /v1/api/quality-control/inspections  QualityControlControll
 org:member      POST /v1/api/quality-control/inspections/:id/approve  QualityControlController.approveInspection
 org:member      POST /v1/api/quality-control/inspections/:id/complete  QualityControlController.completeInspection
 org:member      POST /v1/api/quality-control/inspections/:id/detailed-report  QualityControlController.saveDetailedInspectionReport
-org:member      POST /v1/api/quality-control/inspections/:id/non-conformances  QualityControlController.createNonConformance
 org:member      POST /v1/api/quality-control/inspections/:id/reject  QualityControlController.rejectInspection
 org:member      POST /v1/api/quality-control/inspections/:id/reset  QualityControlController.resetInspectionStatus
 org:member      POST /v1/api/quality-control/inspections/:id/results  QualityControlController.submitInspectionResults
@@ -433,7 +412,6 @@ org:member      POST /v1/api/supplier-nominations/:id/vendors  SupplierNominatio
 org:member      POST /v1/api/supplier-nominations/:nominationId/calculate-rankings  SupplierNominationsController.calculateSupplierRankings
 org:member      POST /v1/api/supplier-nominations/:nominationId/parts/:bomItemId/cost-analysis/init  SupplierNominationsController.initializePartWiseCostAnalysis
 org:member      POST /v1/api/supplier-nominations/:nominationId/store-rankings  SupplierNominationsController.storeSupplierRankings
-org:member      POST /v1/api/supplier-nominations/:nominationId/vendors/:vendorId/assessment/init  SupplierNominationsController.initializeVendorAssessmentCriteria
 org:member      POST /v1/api/supplier-nominations/:nominationId/vendors/:vendorId/rating-matrix/init  SupplierNominationsController.initializeVendorRatingMatrix
 org:member      POST /v1/api/supplier-nominations/evaluations/:evaluationId/data  SupplierNominationsController.storeEvaluationData
 org:member      POST /v1/api/tooling-costs  ToolingCostController.create
@@ -507,8 +485,6 @@ org:member      PUT /v1/api/supplier-nominations/:id/cost-analysis/batch  Suppli
 org:member      PUT /v1/api/supplier-nominations/:id/criteria  SupplierNominationsController.updateCriteria
 org:member      PUT /v1/api/supplier-nominations/:nominationId/factor-weights  SupplierNominationsController.updateFactorWeights
 org:member      PUT /v1/api/supplier-nominations/:nominationId/parts/:bomItemId/cost-analysis/bulk  SupplierNominationsController.bulkUpdatePartWiseCostAnalysis
-org:member      PUT /v1/api/supplier-nominations/:nominationId/vendors/:vendorId/assessment/:criteriaId  SupplierNominationsController.updateVendorAssessmentCriterion
-org:member      PUT /v1/api/supplier-nominations/:nominationId/vendors/:vendorId/assessment/batch  SupplierNominationsController.batchUpdateVendorAssessmentCriteria
 org:member      PUT /v1/api/supplier-nominations/:nominationId/vendors/:vendorId/rating-matrix/batch  SupplierNominationsController.batchUpdateVendorRatingMatrix
 org:member      PUT /v1/api/supplier-nominations/evaluations/:evaluationId  SupplierNominationsController.updateVendorEvaluation
 org:member      PUT /v1/api/supplier-nominations/evaluations/:evaluationId/scores  SupplierNominationsController.updateEvaluationScores

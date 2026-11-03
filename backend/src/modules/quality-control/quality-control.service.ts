@@ -103,58 +103,6 @@ export class QualityControlService {
     };
   }
 
-  async generateQualityReport(
-    projectId: string,
-    userId: string,
-    reportType?: string,
-  ): Promise<any> {
-    if (!projectId) {
-      throw new BadRequestException('Project ID is required to generate a quality report.');
-    }
-
-    const metrics = await this.getQualityMetrics(projectId, userId);
-
-    // Get detailed inspection data
-    const { data: inspections, error: inspectionsError } = await this.db()
-      .from('quality_inspections')
-      .select(`
-        *,
-        quality_inspection_results (*),
-        projects (name),
-        boms (name, version)
-      `)
-      .eq('project_id', projectId)
-      .order('created_at', { ascending: false });
-
-    if (inspectionsError) {
-      this.logger.error(`Error fetching detailed inspection data for report: ${inspectionsError.code} ${inspectionsError.message}`);
-      throw qualityDbError(inspectionsError, 'retrieve inspection data for the report');
-    }
-
-    // Get non-conformances with details
-    const { data: nonConformances, error: nonConformancesError } = await this.db()
-      .from('quality_non_conformances')
-      .select(`
-        *,
-        quality_inspections!inspection_id!inner (name, type, project_id)
-      `)
-      .eq('quality_inspections.project_id', projectId);
-
-    if (nonConformancesError) {
-      this.logger.error(`Error fetching non-conformances for report: ${nonConformancesError.code} ${nonConformancesError.message}`);
-      throw qualityDbError(nonConformancesError, 'retrieve non-conformances for the report');
-    }
-
-    return {
-      reportType: reportType || 'comprehensive',
-      generatedAt: new Date().toISOString(),
-      projectId,
-      summary: metrics,
-      inspections,
-      nonConformances,
-      recommendations: this.generateRecommendations(metrics),
-    };
-  }
 
   async getQualityDashboard(
     projectId: string,

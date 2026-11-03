@@ -58,17 +58,7 @@ export class ManufacturingKnowledgeController {
     return this.kb.getAllTemplates(req.token);
   }
 
-  @OrgRole('viewer')
-  @Get('templates/:partFamily')
-  getTemplate(@Request() req: any, @Param('partFamily') partFamily: string, @Query('complexity') complexity?: string) {
-    return this.kb.getTemplate(req.token, partFamily, complexity);
-  }
 
-  @OrgRole('viewer')
-  @Get('machine-process-mapping')
-  getMachineProcessMapping(@Request() req: any, @Query('featureType') featureType?: string, @Query('partFamily') partFamily?: string) {
-    return this.kb.getMachineProcessMapping(req.token, featureType, partFamily);
-  }
 
   @Post('feedback')
   submitFeedback(@Request() req: any, @Body() dto: SubmitFeedbackDto) {
@@ -81,16 +71,4 @@ export class ManufacturingKnowledgeController {
     return this.kb.getFeedbackForBomItem(req.token, bomItemId);
   }
 
-  @Post('validate-route')
-  async validateRoute(@Request() req: any, @Body() dto: ValidateRouteDto) {
-    const [rules, capabilities] = await Promise.all([
-      this.kb.getRoutingRules(req.token, dto.partFamily),
-      this.kb.getMachineCapabilities(req.token),
-    ]);
-    const routeIssues = this.validation.validateRoute(dto.processSequence, dto.partFamily, rules);
-    const machineIssues = dto.machineAssignments
-      ? this.validation.validateMachines(dto.processSequence, dto.machineAssignments, capabilities)
-      : [];
-    return [...routeIssues, ...machineIssues];
-  }
 }
