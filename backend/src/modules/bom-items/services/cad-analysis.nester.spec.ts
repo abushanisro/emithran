@@ -15,10 +15,19 @@ const request = {
 };
 
 function fakeNester(script: string): void {
-  const file = join(mkdtempSync(join(tmpdir(), 'nester-')), 'nester');
-  writeFileSync(file, `#!/bin/sh\n${script}\n`);
-  chmodSync(file, 0o755);
-  process.env.NESTER_BIN = file;
+  const dir = mkdtempSync(join(tmpdir(), 'nester-'));
+  if (process.platform === 'win32') {
+    const shFile = join(dir, 'nester.sh');
+    const cmdFile = join(dir, 'nester.cmd');
+    writeFileSync(shFile, `#!/bin/sh\n${script}\n`);
+    writeFileSync(cmdFile, `@"C:\\Program Files\\Git\\bin\\sh.exe" "${shFile.replace(/\\/g, '/')}"\r\n`);
+    process.env.NESTER_BIN = cmdFile;
+  } else {
+    const file = join(dir, 'nester');
+    writeFileSync(file, `#!/bin/sh\n${script}\n`);
+    chmodSync(file, 0o755);
+    process.env.NESTER_BIN = file;
+  }
 }
 
 const pythonAnswer = {

@@ -36,6 +36,12 @@ interface ComboboxProps {
   emptyText?: string
   disabled?: boolean
   className?: string
+  // Set true when the Combobox sits inside a modal Dialog. The Dialog's
+  // scroll lock otherwise swallows mouse-wheel events on the portaled list,
+  // so the options can't be scrolled. A modal Popover becomes the top scroll
+  // layer and gets the wheel back.
+  modal?: boolean
+  id?: string
 }
 
 export function Combobox({
@@ -47,15 +53,18 @@ export function Combobox({
   emptyText = "No results found.",
   disabled = false,
   className,
+  modal = false,
+  id,
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false)
 
   const selectedOption = options.find((option) => option.value === value)
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={modal}>
       <PopoverTrigger asChild>
         <Button
+          id={id}
           variant="outline"
           role="combobox"
           aria-expanded={open}
@@ -72,7 +81,13 @@ export function Combobox({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50 shrink-0" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
+      {/* collisionPadding keeps the panel off the viewport edge; Radix flips
+          it above the trigger when there isn't room below. */}
+      <PopoverContent
+        className="w-(--radix-popover-trigger-width) min-w-[220px] p-0"
+        align="start"
+        collisionPadding={12}
+      >
         {/* shouldFilter left at cmdk's default -- Command's own value/
             onValueChange controls its transient KEYBOARD-CURSOR position
             (aria-selected, cmdk's bg-accent highlight), a different concept
@@ -86,7 +101,9 @@ export function Combobox({
             behave normally (starts at the top, moves with arrow keys/hover). */}
         <Command shouldFilter={true}>
           <CommandInput placeholder={searchPlaceholder} />
-          <CommandList className="max-h-[300px]">
+          {/* Never taller than the space Radix measured on the chosen side
+              (minus the ~44px search box), so the list is never clipped. */}
+          <CommandList className="max-h-[min(300px,calc(var(--radix-popover-content-available-height)-44px))]">
             <CommandEmpty>{emptyText}</CommandEmpty>
             <CommandGroup>
               {options.map((option) => {

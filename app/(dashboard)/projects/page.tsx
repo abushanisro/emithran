@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useProjects, useCreateProject, useUpdateProject, useDeleteProject } from '@/lib/api/hooks/useProjects';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import {
   Plus,
   FolderKanban,
@@ -58,9 +59,40 @@ export default function Projects() {
   const [countryCode, setCountryCode] = useState('');
   const [stateCode, setStateCode] = useState('');
   
-  // Get available states and cities based on selection
-  const availableStates = countryCode ? State.getStatesOfCountry(countryCode) : [];
-  const availableCities = countryCode && stateCode ? City.getCitiesOfState(countryCode, stateCode) : [];
+  // Location options for the searchable comboboxes. All countries / all of a
+  // country's states / all of a state's cities -- sorted, never truncated.
+  const countryOptions = useMemo<ComboboxOption[]>(
+    () =>
+      Country.getAllCountries()
+        .map((c) => ({ value: c.isoCode, label: c.name, keywords: [c.isoCode] }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [],
+  );
+  const availableStates = useMemo(
+    () => (countryCode ? State.getStatesOfCountry(countryCode) : []),
+    [countryCode],
+  );
+  const stateOptions = useMemo<ComboboxOption[]>(
+    () =>
+      availableStates
+        .map((s) => ({ value: s.isoCode, label: s.name, keywords: [s.isoCode] }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [availableStates],
+  );
+  const cityOptions = useMemo<ComboboxOption[]>(
+    () =>
+      countryCode && stateCode
+        ? City.getCitiesOfState(countryCode, stateCode)
+            .map((c) => ({ value: c.name, label: c.name }))
+            .sort((a, b) => a.label.localeCompare(b.label))
+        : [],
+    [countryCode, stateCode],
+  );
+  // The country-state-city dataset has no states for some countries and no
+  // cities for some states. In those cases we fall back to a free-text input
+  // so the user is never stuck.
+  const statesListed = !!countryCode && stateOptions.length > 0;
+  const citiesListed = !!stateCode && cityOptions.length > 0;
 
   // Open dialog if ?new=true in URL
   useEffect(() => {
@@ -78,34 +110,102 @@ export default function Projects() {
   const projects = projectsData?.projects || [];
 
   // Handle country selection
+  // (Combobox passes '' when the user clicks the already-selected option,
+  // which clears the field and everything below it.)
   const handleCountryChange = (value: string) => {
-    const selectedCountry = Country.getAllCountries().find(c => c.isoCode === value);
-    if (selectedCountry) {
-      setCountryCode(value);
-      setCountry(selectedCountry.name);
-      setState('');
-      setCity('');
-      setStateCode('');
-    }
+    const selectedCountry = countryOptions.find(c => c.value === value);
+    setCountryCode(selectedCountry ? value : '');
+    setCountry(selectedCountry ? selectedCountry.label : '');
+    setStateCode('');
+    setState('');
+    setCity('');
   };
 
-  // Handle state selection  
+  // Handle state selection
   const handleStateChange = (value: string) => {
-    const selectedState = availableStates.find(s => s.isoCode === value);
-    if (selectedState) {
-      setStateCode(value);
-      setState(selectedState.name);
-      setCity('');
-    }
+    const selectedState = stateOptions.find(s => s.value === value);
+    setStateCode(selectedState ? value : '');
+    setState(selectedState ? selectedState.label : '');
+    setCity('');
   };
 
   // Handle city selection
   const handleCityChange = (value: string) => {
-    const selectedCity = availableCities.find(c => c.name === value);
-    if (selectedCity) {
-      setCity(selectedCity.name);
-    }
+    setCity(cityOptions.some(c => c.value === value) ? value : '');
   };
+
+  // Country / State / City fields, shared by the Create and Edit dialogs.
+  // idPrefix keeps the element ids unique ('' for create, 'edit-' for edit).
+  const renderLocationFields = (idPrefix: string) => (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <Label htmlFor={`${idPrefix}country`} className="text-sm font-medium">Country</Label>
+        <Combobox
+          id={`${idPrefix}country`}
+          modal
+          className="mt-1"
+          options={countryOptions}
+          value={countryCode}
+          onValueChange={handleCountryChange}
+          placeholder="Select country"
+          searchPlaceholder="Search country..."
+          emptyText="No country found."
+        />
+      </div>
+
+      <div>
+        <Label htmlFor={`${idPrefix}state`} className="text-sm font-medium">State/Province</Label>
+        {countryCode && !statesListed ? (
+          <Input
+            id={`${idPrefix}state`}
+            className="mt-1"
+            value={state}
+            onChange={(e) => setState(e.target.value)}
+            placeholder="Enter state/province"
+          />
+        ) : (
+          <Combobox
+            id={`${idPrefix}state`}
+            modal
+            className="mt-1"
+            options={stateOptions}
+            value={stateCode}
+            onValueChange={handleStateChange}
+            disabled={!countryCode}
+            placeholder={countryCode ? 'Select state' : 'Select country first'}
+            searchPlaceholder="Search state..."
+            emptyText="No state found."
+          />
+        )}
+      </div>
+
+      <div>
+        <Label htmlFor={`${idPrefix}city`} className="text-sm font-medium">City</Label>
+        {(stateCode && !citiesListed) || (countryCode && !statesListed) ? (
+          <Input
+            id={`${idPrefix}city`}
+            className="mt-1"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            placeholder="Enter city"
+          />
+        ) : (
+          <Combobox
+            id={`${idPrefix}city`}
+            modal
+            className="mt-1"
+            options={cityOptions}
+            value={city}
+            onValueChange={handleCityChange}
+            disabled={!stateCode}
+            placeholder={stateCode ? 'Select city' : 'Select state first'}
+            searchPlaceholder="Search city..."
+            emptyText="No city found."
+          />
+        )}
+      </div>
+    </div>
+  );
 
   const handleCreate = () => {
     createMutation.mutate(
@@ -587,81 +687,7 @@ export default function Projects() {
                   <p className="text-xs text-muted-foreground">Manufacturing location details</p>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <Label htmlFor="country" className="text-sm font-medium">Country</Label>
-                    <Select value={countryCode} onValueChange={handleCountryChange}>
-                      <SelectTrigger id="country" className="mt-1">
-                        <SelectValue placeholder="Select country" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-[300px] overflow-y-auto z-50">
-                        {Country.getAllCountries()
-                          .sort((a, b) => a.name.localeCompare(b.name))
-                          .map((country) => (
-                          <SelectItem 
-                            key={country.isoCode} 
-                            value={country.isoCode}
-                            className="cursor-pointer hover:bg-accent focus:bg-accent transition-colors duration-150 select-none"
-                          >
-                            {country.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="state" className="text-sm font-medium">State/Province</Label>
-                    <Select 
-                      value={stateCode} 
-                      onValueChange={handleStateChange}
-                      disabled={!countryCode}
-                    >
-                      <SelectTrigger id="state" className="mt-1">
-                        <SelectValue placeholder={countryCode ? "Select state" : "Select country first"} />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-[300px] overflow-y-auto z-50">
-                        {availableStates
-                          .sort((a, b) => a.name.localeCompare(b.name))
-                          .map((state) => (
-                          <SelectItem 
-                            key={state.isoCode} 
-                            value={state.isoCode}
-                            className="cursor-pointer hover:bg-accent focus:bg-accent transition-colors duration-150 select-none"
-                          >
-                            {state.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="city" className="text-sm font-medium">City</Label>
-                    <Select 
-                      value={city} 
-                      onValueChange={handleCityChange}
-                      disabled={!stateCode}
-                    >
-                      <SelectTrigger id="city" className="mt-1">
-                        <SelectValue placeholder={stateCode ? "Select city" : "Select state first"} />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-[300px] overflow-y-auto z-50">
-                        {availableCities
-                          .sort((a, b) => a.name.localeCompare(b.name))
-                          .map((city) => (
-                          <SelectItem 
-                            key={city.name} 
-                            value={city.name}
-                            className="cursor-pointer hover:bg-accent focus:bg-accent transition-colors duration-150 select-none"
-                          >
-                            {city.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+                {renderLocationFields('')}
               </div>
             </div>
           </div>
@@ -843,81 +869,7 @@ export default function Projects() {
                   <p className="text-xs text-muted-foreground">Manufacturing location details</p>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <Label htmlFor="edit-country" className="text-sm font-medium">Country</Label>
-                    <Select value={countryCode} onValueChange={handleCountryChange}>
-                      <SelectTrigger id="edit-country" className="mt-1">
-                        <SelectValue placeholder="Select country" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-[300px] overflow-y-auto z-50">
-                        {Country.getAllCountries()
-                          .sort((a, b) => a.name.localeCompare(b.name))
-                          .map((country) => (
-                          <SelectItem 
-                            key={country.isoCode} 
-                            value={country.isoCode}
-                            className="cursor-pointer hover:bg-accent focus:bg-accent transition-colors duration-150 select-none"
-                          >
-                            {country.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="edit-state" className="text-sm font-medium">State/Province</Label>
-                    <Select 
-                      value={stateCode} 
-                      onValueChange={handleStateChange}
-                      disabled={!countryCode}
-                    >
-                      <SelectTrigger id="edit-state" className="mt-1">
-                        <SelectValue placeholder={countryCode ? "Select state" : "Select country first"} />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-[300px] overflow-y-auto z-50">
-                        {availableStates
-                          .sort((a, b) => a.name.localeCompare(b.name))
-                          .map((state) => (
-                          <SelectItem 
-                            key={state.isoCode} 
-                            value={state.isoCode}
-                            className="cursor-pointer hover:bg-accent focus:bg-accent transition-colors duration-150 select-none"
-                          >
-                            {state.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="edit-city" className="text-sm font-medium">City</Label>
-                    <Select 
-                      value={city} 
-                      onValueChange={handleCityChange}
-                      disabled={!stateCode}
-                    >
-                      <SelectTrigger id="edit-city" className="mt-1">
-                        <SelectValue placeholder={stateCode ? "Select city" : "Select state first"} />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-[300px] overflow-y-auto z-50">
-                        {availableCities
-                          .sort((a, b) => a.name.localeCompare(b.name))
-                          .map((city) => (
-                          <SelectItem 
-                            key={city.name} 
-                            value={city.name}
-                            className="cursor-pointer hover:bg-accent focus:bg-accent transition-colors duration-150 select-none"
-                          >
-                            {city.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+                {renderLocationFields('edit-')}
               </div>
             </div>
           </div>

@@ -4,6 +4,8 @@ import { useUser } from '@auth0/nextjs-auth0'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { apiConfig } from '@/lib/api/config'
+import { signOutForInactivity } from '@/lib/auth/session-idle/browser'
+import { SESSION_IDLE_TIMEOUT_CODE } from '@/lib/auth/session-idle/policy'
 import { sessionSource } from '@/lib/auth/session-source'
 import { appReadiness } from '@/lib/core/app-readiness'
 import { AuthContext, type AuthContextType, type AuthUser, type OrganizationRole } from '@/lib/providers/auth-context'
@@ -11,14 +13,23 @@ import { AuthContext, type AuthContextType, type AuthUser, type OrganizationRole
 type Me =
   | { state: 'loading' }
   | { state: 'denied' }
+  | { state: 'idle' }
   | { state: 'failed' }
   | { state: 'ok'; id: string; email: string; organizationRole: OrganizationRole | null; platformAdmin: boolean }
 
-/** Asks the backend who this login is, and the role it acts with. 403 means signed in with Auth0 but never invited. */
+/**
+ * Asks the backend who this login is, and the role it acts with. 403 means signed in with Auth0 but never invited. A 401 for
+ * inactivity means this Auth0 session is past its idle deadline for good (the deadline never moves): it has to be ended at Auth0,
+ * or "Sign in" silently resumes the same session and is refused again.
+ */
 async function fetchMe(): Promise<Me> {
   try {
     const res = await fetch(`${apiConfig.endpoints.api.v1}/auth/me`, { cache: 'no-store' })
     if (res.status === 403) return { state: 'denied' }
+    if (res.status === 401) {
+      const body = (await res.json().catch(() => null)) as { error?: { code?: string } } | null
+      if (body?.error?.code === SESSION_IDLE_TIMEOUT_CODE) return { state: 'idle' }
+    }
     if (!res.ok) return { state: 'failed' }
     const body = (await res.json()) as {
       data?: { id?: string; email?: string; organizationRole?: OrganizationRole | null; platformAdmin?: boolean }
@@ -70,6 +81,12 @@ export function Auth0AuthProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false
     void fetchMe().then((result) => {
       if (cancelled) return
+      // The idle timer only runs while a tab is open; after a sleep or a closed browser, this is where the expired session is found.
+      if (result.state === 'idle') {
+        appReadiness.resetAuth()
+        void signOutForInactivity()
+        return
+      }
       setMe(result)
       if (result.state === 'ok') appReadiness.setAuthValidated()
       else appReadiness.resetAuth()

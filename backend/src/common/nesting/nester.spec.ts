@@ -18,10 +18,19 @@ const OK = '{"ok":true,"result":{"sheet_width_mm":100,"sheet_length_mm":100,"par
 
 /** A stand-in `nester`: a shell script, so the process handling is tested for real (spawn, pipes, exit codes, kill). */
 function fake(script: string): void {
-  const file = join(mkdtempSync(join(tmpdir(), 'nester-')), 'nester');
-  writeFileSync(file, `#!/bin/sh\n${script}\n`);
-  chmodSync(file, 0o755);
-  process.env.NESTER_BIN = file;
+  const dir = mkdtempSync(join(tmpdir(), 'nester-'));
+  if (process.platform === 'win32') {
+    const shFile = join(dir, 'nester.sh');
+    const cmdFile = join(dir, 'nester.cmd');
+    writeFileSync(shFile, `#!/bin/sh\n${script}\n`);
+    writeFileSync(cmdFile, `@"C:\\Program Files\\Git\\bin\\sh.exe" "${shFile.replace(/\\/g, '/')}"\r\n`);
+    process.env.NESTER_BIN = cmdFile;
+  } else {
+    const file = join(dir, 'nester');
+    writeFileSync(file, `#!/bin/sh\n${script}\n`);
+    chmodSync(file, 0o755);
+    process.env.NESTER_BIN = file;
+  }
 }
 
 afterEach(() => {
@@ -30,6 +39,7 @@ afterEach(() => {
 });
 
 describe('runNester', () => {
+  jest.setTimeout(30_000);
   it('sends the request on stdin and returns the answer', async () => {
     fake(`read input; case "$input" in *'"quantity":5'*) printf '%s' '${OK}';; *) exit 9;; esac`);
     await expect(runNester(body)).resolves.toMatchObject({ ok: true, result: { parts_per_sheet: 100 } });

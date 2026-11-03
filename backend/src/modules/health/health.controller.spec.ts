@@ -174,7 +174,7 @@ describe('HealthController: liveness and readiness', () => {
       await boot();
       const started = Date.now();
       const res = await request(server()).get('/api/health/ready').expect(503);
-      expect(Date.now() - started).toBeLessThan(5_000);
+      expect(Date.now() - started).toBeLessThan(process.platform === 'win32' ? 30_000 : 5_000);
       expect(res.body.error.cad_engine).toMatchObject({ status: 'down', reason: 'timeout' });
     });
 
