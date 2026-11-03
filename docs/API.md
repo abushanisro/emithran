@@ -121,6 +121,17 @@ Liveness is outside the versioned API: `GET /` and `GET /ping`; health checks ar
 
 `test/contract/api-paths.test.ts` reads every API path the web app calls and checks it against the backend's route list, by canonical name. A rename, a typo or a call to a route that does not exist fails there instead of as a 404 the client swallows. The calls that are wrong today are listed in `api-paths-unmatched.json` (9, mostly routes the backend never had: `boms/:id/approve`, `boms/:id/release`, `boms/:id/items/:itemId`, `calculators/formulas/validate`, production vendor assignments and daily production, the cost recalculation paths); the list can only shrink.
 
+## The OpenAPI specification
+
+`openapi/openapi.json` is the committed OpenAPI 3 document of the API, generated from the controllers and DTOs by the same code that serves `/docs` (`backend/src/common/http/openapi.ts`). It is never edited by hand.
+
+```
+cd backend && npm run openapi          # regenerate openapi/openapi.json
+cd backend && npm run openapi:check    # what CI runs: fails if the file is out of date
+```
+
+**A change to a route, a request or response type or a decorator that shows in the document must include the regenerated `openapi/openapi.json` in the same pull request.** Generation builds the app without starting it: no database, no credentials, and the output does not depend on the machine (keys are sorted, dev auth bypass is forced off).
+
 ## How the rules are enforced
 
 - `backend/src/test/common/api-design.spec.ts` reads the route inventory and fails on a new route that has a verb in its path (rule 2), a singular collection (rule 3) or more than two levels of nesting (rule 4).

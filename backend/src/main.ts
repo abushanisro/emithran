@@ -15,7 +15,8 @@ if (telemetry) flushOnTermination(telemetry);
 
 import { NestFactory } from '@nestjs/core';
 import { type LogLevel } from '@nestjs/common';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { SwaggerModule } from '@nestjs/swagger';
+import { createOpenApiDocument } from './common/http/openapi';
 import { ConfigService } from '@nestjs/config';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
@@ -167,20 +168,7 @@ async function bootstrap() {
   // The API map at /docs is unauthenticated, so production does not mount it unless ENABLE_API_DOCS=true (runtime-flags.ts).
   const docs = apiDocsEnabled(process.env);
   if (docs) {
-    const config = new DocumentBuilder()
-      .setTitle('mithran API Gateway')
-      .setDescription('Manufacturing One-Stop Solution - API Gateway')
-      .setVersion('1.0')
-      .addBearerAuth()
-      .addTag('Authentication')
-      .addTag('Projects')
-      .addTag('Vendors')
-      .addTag('MHR', 'Machine Hour Rate calculations')
-      .addTag('LHR', 'Labour Hour Rate database')
-      .addTag('Health')
-      .build();
-
-    const document = SwaggerModule.createDocument(app, config);
+    const document = createOpenApiDocument(app);
     SwaggerModule.setup('docs', app, document);
   }
 
