@@ -1,2 +1,0 @@
-ALTER TABLE bom_items
-  ADD COLUMN IF NOT EXISTS validation_config JSONB DEFAULT NULL;
