@@ -152,21 +152,6 @@ export function useDeleteChildPartCost() {
 }
 
 /**
- * Hook to get child part cost by BOM item ID
- */
-export function useChildPartCostByBomItem(bomItemId: string | null) {
-  return useQuery<ChildPartCostRecord | null, Error>({
-    queryKey: ['child-part-cost-by-bom-item', bomItemId],
-    queryFn: async () => {
-      if (!bomItemId) return null;
-      const result = await apiClient.get<ChildPartCostRecord>(`/child-part-costs/bom-item/${bomItemId}`);
-      return result;
-    },
-    enabled: !!bomItemId,
-  });
-}
-
-/**
  * Hook to get all child part costs (paginated)
  */
 export function useChildPartCosts(params?: {

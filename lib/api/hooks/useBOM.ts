@@ -10,7 +10,7 @@ import { ApiError } from '../client';
 import { toast } from 'sonner';
 import { useAuthEnabled, useAuthEnabledWith } from './useAuthEnabled';
 
-export const bomKeys = {
+const bomKeys = {
   all: ['bom'] as const,
   lists: () => [...bomKeys.all, 'list'] as const,
   list: (query?: BOMQuery) => [...bomKeys.lists(), query] as const,
@@ -34,15 +34,6 @@ export function useBOM(id: string, includeItems = true) {
     queryFn: () => bomApi.getById(id, includeItems),
     enabled: useAuthEnabledWith(!!id),
     staleTime: 1000 * 60 * 5,
-  });
-}
-
-export function useBOMCostBreakdown(bomId: string) {
-  return useQuery({
-    queryKey: bomKeys.costBreakdown(bomId),
-    queryFn: () => bomApi.getCostBreakdown(bomId),
-    enabled: useAuthEnabledWith(!!bomId),
-    staleTime: 1000 * 60 * 2,
   });
 }
 

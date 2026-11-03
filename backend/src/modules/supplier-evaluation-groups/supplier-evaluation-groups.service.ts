@@ -417,25 +417,4 @@ export class SupplierEvaluationGroupsService {
     }
   }
 
-  async getLatestByProject(userId: string, projectId: string, accessToken: string): Promise<SupplierEvaluationGroupDto | null> {
-    this.logger.log(`Getting latest evaluation group for project ${projectId}`);
-
-    try {
-      const groups = await this.findByProject(userId, projectId, accessToken);
-      
-      if (groups.length === 0) {
-        return null;
-      }
-
-      // Get the most recent group
-      const latestGroup = groups.sort((a, b) => 
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      )[0];
-
-      return this.findOne(userId, latestGroup.id, accessToken);
-    } catch (error) {
-      this.logger.error('Failed to get latest evaluation group:', error);
-      throw error;
-    }
-  }
 }

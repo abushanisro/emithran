@@ -434,59 +434,6 @@ export class SupplierEvaluationService {
     return this.mapToResponseDto(data);
   }
 
-  /**
-   * Approve evaluation (freezes it and creates snapshot)
-   */
-  async approve(id: string, userId: string, accessToken: string): Promise<{ snapshotId: string }> {
-    this.logger.log(`Approving and freezing evaluation ${id}`, 'SupplierEvaluationService');
-
-    const existing = await this.findOne(id, userId, accessToken);
-    if (existing.isFrozen) {
-      throw new BadRequestException(
-        'This supplier evaluation has already been approved and frozen. No further action is required.'
-      );
-    }
-    
-    if (existing.status !== 'completed') {
-      throw new BadRequestException(
-        'Only completed evaluations can be approved. Please complete the evaluation first.'
-      );
-    }
-    
-    // Validate that evaluation has recommendation status set
-    if (!existing.recommendationStatus || existing.recommendationStatus === 'pending') {
-      throw new BadRequestException(
-        'Please set a recommendation status (approved/rejected/conditional) before approving the evaluation.'
-      );
-    }
-
-    // Call freeze_evaluation function
-    const { data, error } = await this.databaseService
-      .getClient(accessToken)
-      .rpc('freeze_evaluation', {
-        p_evaluation_id: id,
-        p_user_id: userId,
-      });
-
-    if (error) {
-      this.logger.error(`Error approving evaluation: ${error.message}`, 'SupplierEvaluationService');
-      
-      // Handle specific approval errors
-      if (error.message.includes('evaluation not found')) {
-        throw new NotFoundException('The supplier evaluation to approve was not found.');
-      }
-      
-      if (error.message.includes('already frozen')) {
-        throw new BadRequestException('This evaluation has already been approved and frozen.');
-      }
-      
-      throw new InternalServerErrorException(
-        'Failed to approve and freeze the supplier evaluation. Please try again later.'
-      );
-    }
-
-    return { snapshotId: data };
-  }
 
   // ============================================================================
   // VALIDATION GUARDS

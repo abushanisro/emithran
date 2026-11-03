@@ -8,7 +8,7 @@ import type { AddTeamMemberData, UpdateTeamMemberData } from '../project-team';
 import { ApiError } from '../client';
 import { toast } from 'sonner';
 
-export const projectTeamKeys = {
+const projectTeamKeys = {
   all: (projectId: string) => ['projects', projectId, 'team'] as const,
 };
 

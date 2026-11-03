@@ -388,12 +388,6 @@ export class BOMItemsController {
     return this.pmiReviewService.review(id, user.id, token, body);
   }
 
-  @OrgRole('viewer')
-  @Get(':id/pmi-records/history')
-  @ApiOperation({ summary: 'Every decision taken on one PMI record, newest first' })
-  async getPmiRecordHistory(@Param('id') id: string, @Query('recordKey') recordKey: string, @AccessToken() token: string) {
-    return this.pmiReviewService.history(id, recordKey, token);
-  }
 
   @OrgRole('viewer')
   @Get(':id/machining-need')

@@ -5,12 +5,9 @@ import type {
   MachineCapability,
   ProcessRoutingRule,
   PartFamilyRoutingTemplate,
-  MachineProcessMapping,
-  ProcessPlanFeedback,
   CreateFeatureProcessMappingDto,
   CreateMachineCapabilityDto,
   CreateProcessRoutingRuleDto,
-  SubmitFeedbackDto,
 } from './dto/kb.dto';
 
 @Injectable()
@@ -80,41 +77,8 @@ export class ManufacturingKnowledgeService {
     return (data ?? []) as PartFamilyRoutingTemplate[];
   }
 
-  async getMachineProcessMapping(token: string, featureType?: string, partFamily?: string): Promise<MachineProcessMapping[]> {
-    let q = this.database.getClient(token).from('machine_process_mapping').select('*').order('priority');
-    if (featureType) q = q.eq('feature_type', featureType);
-    const { data, error } = await q;
-    if (error) throw new InternalServerErrorException(`machine_process_mapping: ${error.message}`);
-    const rows = (data ?? []) as MachineProcessMapping[];
-    if (!partFamily) return rows;
-    return rows.filter((r) => !r.applies_to_family || r.applies_to_family === partFamily);
-  }
 
-  async submitFeedback(token: string, dto: SubmitFeedbackDto, userId: string): Promise<ProcessPlanFeedback> {
-    const { data, error } = await this.database.getClient(token)
-      .from('process_plan_feedback')
-      .insert({
-        bom_item_id: dto.bomItemId,
-        owner_id: userId,
-        ai_process_sequence: dto.aiProcessSequence,
-        ai_machines: dto.aiMachines ?? null,
-        engineer_sequence: dto.engineerSequence,
-        engineer_machines: dto.engineerMachines ?? null,
-        correction_reason: dto.correctionReason ?? null,
-        part_family: dto.partFamily ?? null,
-        material: dto.material ?? null,
-      })
-      .select()
-      .single();
-    if (error || !data) throw new InternalServerErrorException(`submitFeedback: ${error?.message}`);
-    return data as ProcessPlanFeedback;
-  }
 
-  async getFeedbackForBomItem(token: string, bomItemId: string): Promise<ProcessPlanFeedback[]> {
-    const { data, error } = await this.database.getClient(token).from('process_plan_feedback').select('*').eq('bom_item_id', bomItemId).order('created_at', { ascending: false });
-    if (error) throw new InternalServerErrorException(`getFeedback: ${error.message}`);
-    return (data ?? []) as ProcessPlanFeedback[];
-  }
 
   async createFeatureProcessMapping(token: string, dto: CreateFeatureProcessMappingDto, userId: string): Promise<FeatureProcessMapping> {
     const { data, error } = await this.database.getClient(token)

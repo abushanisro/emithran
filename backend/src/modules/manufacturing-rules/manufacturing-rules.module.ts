@@ -1,5 +1,4 @@
 import { Module } from "@nestjs/common";
-import { ManufacturingRulesController } from "./manufacturing-rules.controller";
 import { ManufacturingRulesService } from "./manufacturing-rules.service";
 import { MaterialGroupResolver } from "./resolvers/material-group.resolver";
 import { ParameterResolver } from "./resolvers/parameter.resolver";
@@ -16,7 +15,6 @@ import { LoggerModule } from "../../common/logger/logger.module";
 
 @Module({
   imports: [DatabaseModule, LoggerModule],
-  controllers: [ManufacturingRulesController],
   providers: [
     ManufacturingRulesService,
     MaterialGroupResolver,

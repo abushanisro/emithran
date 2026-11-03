@@ -9,8 +9,6 @@ import type {
   UpdateVendorData,
   VendorQuery,
   VendorEquipment,
-  VendorService,
-  VendorContact,
 } from '../vendors';
 export type { Vendor } from '../vendors';
 import { apiClient } from '../client';
@@ -50,7 +48,7 @@ export interface RankedProcessGroup {
 }
 
 
-export const vendorKeys = {
+const vendorKeys = {
   all: ['vendors'] as const,
   lists: () => [...vendorKeys.all, 'list'] as const,
   list: (query?: VendorQuery) => [...vendorKeys.lists(), query] as const,
@@ -83,31 +81,6 @@ export function useVendor(id: string) {
     queryFn: () => vendorsApi.getById(id),
     enabled: !!id,
     staleTime: 1000 * 60 * 5,
-  });
-}
-
-export function useVendorPerformance(id: string) {
-  return useQuery({
-    queryKey: vendorKeys.performance(id),
-    queryFn: () => vendorsApi.getPerformance(id),
-    enabled: !!id,
-    staleTime: 1000 * 60 * 10,
-  });
-}
-
-export function useVendorCapabilities() {
-  return useQuery({
-    queryKey: vendorKeys.capabilities(),
-    queryFn: () => vendorsApi.getCapabilities(),
-    staleTime: 1000 * 60 * 30,
-  });
-}
-
-export function useEquipmentTypes() {
-  return useQuery({
-    queryKey: vendorKeys.equipmentTypes(),
-    queryFn: () => vendorsApi.getEquipmentTypes(),
-    staleTime: 1000 * 60 * 30,
   });
 }
 
@@ -162,29 +135,6 @@ export function useUpdateVendor() {
         toast.error('Please ensure contact information and addresses are valid.');
       } else {
         toast.error('Unable to save changes. Please try again or contact support.');
-      }
-    },
-  });
-}
-
-export function useDeleteVendor() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (id: string) => vendorsApi.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: vendorKeys.lists() });
-      toast.success('Vendor deleted successfully');
-    },
-    onError: (error: ApiError) => {
-      if (error.statusCode === 404) {
-        toast.error('This vendor has already been deleted.');
-      } else if (error.statusCode === 409) {
-        toast.error('Cannot delete vendor because it is being used in active projects or RFQs.');
-      } else if (error.statusCode === 403) {
-        toast.error('You do not have permission to delete this vendor.');
-      } else {
-        toast.error('Unable to delete vendor. Please try again or contact support.');
       }
     },
   });
@@ -354,95 +304,6 @@ export function useDeleteVendorEquipment() {
 }
 
 // ============================================================================
-// VENDOR SERVICES HOOKS
-// ============================================================================
-
-export function useVendorServices(vendorId: string | undefined) {
-  return useQuery({
-    queryKey: vendorKeys.services(vendorId || ''),
-    queryFn: () => vendorsApi.getServices(vendorId!),
-    enabled: !!vendorId,
-    staleTime: 1000 * 60 * 5,
-  });
-}
-
-export function useCreateVendorService() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (data: Partial<VendorService>) => vendorsApi.createService(data),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: vendorKeys.services(data.vendorId) });
-      toast.success('Service added successfully');
-    },
-    onError: (error: ApiError) => {
-      if (error.statusCode === 400) {
-        toast.error('Please check all service details are filled out correctly.');
-      } else if (error.statusCode === 404) {
-        toast.error('This vendor no longer exists. Please refresh the page.');
-      } else if (error.statusCode === 409) {
-        toast.error('Service with this name already exists for this vendor.');
-      } else if (error.statusCode === 403) {
-        toast.error('You do not have permission to add services for this vendor.');
-      } else {
-        toast.error('Unable to add service. Please try again or contact support.');
-      }
-    },
-  });
-}
-
-export function useUpdateVendorService() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<VendorService> }) =>
-      vendorsApi.updateService(id, data),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: vendorKeys.services(data.vendorId) });
-      toast.success('Service updated successfully');
-    },
-    onError: (error: ApiError) => {
-      if (error.statusCode === 400) {
-        toast.error('Please check that all service information is valid.');
-      } else if (error.statusCode === 404) {
-        toast.error('This service no longer exists. It may have been deleted.');
-      } else if (error.statusCode === 409) {
-        toast.error('Another user is editing this service. Please refresh and try again.');
-      } else if (error.statusCode === 403) {
-        toast.error('You do not have permission to edit this service.');
-      } else {
-        toast.error('Unable to update service. Please try again or contact support.');
-      }
-    },
-  });
-}
-
-export function useDeleteVendorService() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ id, vendorId }: { id: string; vendorId: string }) => {
-      return vendorsApi.deleteService(id).then(() => ({ vendorId }));
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: vendorKeys.services(data.vendorId) });
-      toast.success('Service deleted successfully');
-    },
-    onError: (error: ApiError) => {
-      if (error.statusCode === 404) {
-        toast.error('This service has already been deleted.');
-      } else if (error.statusCode === 409) {
-        toast.error('Cannot delete service because it is being used in active projects.');
-      } else if (error.statusCode === 403) {
-        toast.error('You do not have permission to delete this service.');
-      } else {
-        toast.error('Unable to delete service. Please try again or contact support.');
-      }
-    },
-  });
-}
-
-// ============================================================================
 // VENDOR CONTACTS HOOKS
 // ============================================================================
 
@@ -455,89 +316,9 @@ export function useVendorContacts(vendorId: string | undefined) {
   });
 }
 
-export function useCreateVendorContact() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (data: Partial<VendorContact>) => vendorsApi.createContact(data),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: vendorKeys.contacts(data.vendorId) });
-      toast.success('Contact added successfully');
-    },
-    onError: (error: ApiError) => {
-      if (error.statusCode === 400) {
-        toast.error('Please check all contact details are filled out correctly.');
-      } else if (error.statusCode === 404) {
-        toast.error('This vendor no longer exists. Please refresh the page.');
-      } else if (error.statusCode === 409) {
-        toast.error('Contact with this email already exists for this vendor.');
-      } else if (error.statusCode === 403) {
-        toast.error('You do not have permission to add contacts for this vendor.');
-      } else if (error.statusCode === 422) {
-        toast.error('Please ensure the email address and phone number are valid.');
-      } else {
-        toast.error('Unable to add contact. Please try again or contact support.');
-      }
-    },
-  });
-}
-
-export function useUpdateVendorContact() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<VendorContact> }) =>
-      vendorsApi.updateContact(id, data),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: vendorKeys.contacts(data.vendorId) });
-      toast.success('Contact updated successfully');
-    },
-    onError: (error: ApiError) => {
-      if (error.statusCode === 400) {
-        toast.error('Please check that all contact information is valid.');
-      } else if (error.statusCode === 404) {
-        toast.error('This contact no longer exists. It may have been deleted.');
-      } else if (error.statusCode === 409) {
-        toast.error('Another user is editing this contact. Please refresh and try again.');
-      } else if (error.statusCode === 403) {
-        toast.error('You do not have permission to edit this contact.');
-      } else if (error.statusCode === 422) {
-        toast.error('Please ensure the email address and phone number are valid.');
-      } else {
-        toast.error('Unable to update contact. Please try again or contact support.');
-      }
-    },
-  });
-}
-
-export function useDeleteVendorContact() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ id, vendorId }: { id: string; vendorId: string }) => {
-      return vendorsApi.deleteContact(id).then(() => ({ vendorId }));
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: vendorKeys.contacts(data.vendorId) });
-      toast.success('Contact deleted successfully');
-    },
-    onError: (error: ApiError) => {
-      if (error.statusCode === 404) {
-        toast.error('This contact has already been deleted.');
-      } else if (error.statusCode === 409) {
-        toast.error('Cannot delete contact because they are the primary contact for active projects.');
-      } else if (error.statusCode === 403) {
-        toast.error('You do not have permission to delete this contact.');
-      } else {
-        toast.error('Unable to delete contact. Please try again or contact support.');
-      }
-    },
-  });
-}
-
 // ── Vendor matching ───────────────────────────────────────────────────────────
 
-export const vendorMatchKeys = {
+const vendorMatchKeys = {
   match: (processes: string[], material?: string) => ['vendor-match', processes, material] as const,
 };
 

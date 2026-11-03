@@ -119,32 +119,6 @@ export class ChildPartCostService {
     return ChildPartCostResponseDto.fromDatabase(recalculatedData);
   }
 
-  /**
-   * Get child part cost by BOM item ID
-   */
-  async findByBomItemId(
-    bomItemId: string,
-    userId: string,
-    accessToken: string
-  ): Promise<ChildPartCostResponseDto | null> {
-    this.logger.log(`Fetching child part cost for BOM item: ${bomItemId}`, 'ChildPartCostService');
-
-    const { data, error } = await this.databaseService
-      .getClient(accessToken)
-      .from('child_part_cost_records')
-      .select('*')
-      .eq('bom_item_id', bomItemId)
-      .single();
-
-    if (error || !data) {
-      return null;
-    }
-
-    // Recalculate to ensure fresh values
-    const recalculatedData = this.recalculateRecord(data);
-
-    return ChildPartCostResponseDto.fromDatabase(recalculatedData);
-  }
 
   /**
    * Create a new child part cost record with calculation

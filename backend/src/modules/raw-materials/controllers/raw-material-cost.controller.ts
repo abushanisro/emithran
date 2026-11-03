@@ -160,28 +160,4 @@ export class RawMaterialCostController {
     return this.rawMaterialCostService.getBulkTotalCosts(bomItemIds, accessToken);
   }
 
-  /**
-   * Get total raw material cost for a BOM item
-   */
-  @OrgRole('viewer')
-  @Get('bom-item/:bomItemId/total')
-  @ApiOperation({ summary: 'Get total raw material cost for a BOM item' })
-  @ApiResponse({
-    status: 200,
-    description: 'Returns total raw material cost for the BOM item',
-    schema: {
-      type: 'object',
-      properties: {
-        totalCost: { type: 'number', example: 1250.50 }
-      }
-    }
-  })
-  async getTotalCostForBomItem(
-    @Param('bomItemId') bomItemId: string,
-    @CurrentUser('id') userId: string,
-    @AccessToken() accessToken: string,
-  ): Promise<{ totalCost: number }> {
-    const totalCost = await this.rawMaterialCostService.getTotalCostForBomItem(bomItemId, userId, accessToken);
-    return { totalCost };
-  }
 }

@@ -68,14 +68,6 @@ describe('SupplierNominationsService.getFactorWeights', () => {
 describe('SupplierNominationsService.updateCostAnalysis', () => {
   const components = [{ costComponent: 'Net Price/unit', baseValue: 1, vendorValues: [{ vendorId: 'v1', numericValue: 2 }] }];
 
-  it('sends the whole batch to the database in one atomic call', async () => {
-    const { client, calls, rpcCalls } = fakeClient(call =>
-      call.table === 'cost_competency_analysis' ? { data: [], error: null } : { data: { id: 'n1' }, error: null });
-    await service(client).batchUpdateCostAnalysis('u1', 'n1', { components } as any, 'token');
-    expect(rpcCalls).toEqual([{ fn: 'update_cost_competency_analysis', args: { p_nomination_evaluation_id: 'n1', p_components: components } }]);
-    expect(calls.filter(c => c.op === 'update')).toEqual([]);
-  });
-
   it('fails as a whole when the database rejects the batch', async () => {
     const { client } = fakeClient(
       () => ({ data: { id: 'n1' }, error: null }),

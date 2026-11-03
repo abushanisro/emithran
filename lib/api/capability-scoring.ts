@@ -27,7 +27,7 @@ export async function initializeCapabilityScores(nominationId: string): Promise<
 /**
  * Update capability score for specific vendor and criteria
  */
-export async function updateCapabilityScore(
+async function updateCapabilityScore(
   nominationId: string,
   criteriaId: string,
   vendorId: string,

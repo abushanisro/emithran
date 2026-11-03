@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { organizationApi, type CreateOrgData, type UpdateOrgData } from '../organization';
 import { toast } from 'sonner';
 
-export const orgKeys = {
+const orgKeys = {
   org:        ['organization']                    as const,
   members:    (id: string) => ['org-members', id] as const,
   workspaces: (id: string) => ['workspaces', id]  as const,

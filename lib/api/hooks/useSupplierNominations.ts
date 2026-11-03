@@ -10,20 +10,15 @@ import {
   createSupplierNomination,
   getSupplierNominationsByProject,
   getSupplierNomination,
-  updateNominationCriteria,
   updateVendorEvaluation,
   updateEvaluationScores,
   addVendorsToNomination,
   completeSupplierNomination,
   deleteSupplierNomination,
   updateSupplierNomination,
-  storeEvaluationData,
-  getEvaluationData,
-  saveEvaluationData,
   type SupplierNomination,
   type SupplierNominationSummary,
   type CreateSupplierNominationData,
-  type CreateCriteriaData,
   type UpdateVendorEvaluationData,
   type CreateEvaluationScoreData,
 } from '../supplier-nominations';
@@ -72,38 +67,6 @@ export function useSupplierNomination(nominationId: string) {
   });
 }
 
-/**
- * Get evaluation data for a vendor evaluation
- */
-export function useEvaluationData(evaluationId: string | undefined, section: string) {
-  return useQuery({
-    queryKey: supplierNominationKeys.evaluationData(evaluationId || '', section),
-    queryFn: () => evaluationId ? getEvaluationData(evaluationId, section) : Promise.resolve(null),
-    enabled: useAuthEnabledWith(!!evaluationId && evaluationId !== ''),
-    staleTime: 30 * 1000, // 30 seconds - frequently updated data
-    retry: (failureCount, error) => {
-      // Don't retry on circuit breaker errors
-      if (error?.message?.includes('Circuit breaker is OPEN')) {
-        
-        return false;
-      }
-      // Retry up to 2 times for other errors
-      return failureCount < 2;
-    },
-    retryDelay: 2000,
-    refetchOnWindowFocus: false,
-    // Return empty data instead of erroring on circuit breaker
-    meta: {
-      errorHandler: (error: any) => {
-        if (error?.message?.includes('Circuit breaker is OPEN')) {
-          
-          return null; // Return null instead of throwing
-        }
-        throw error;
-      }
-    }
-  });
-}
 
 // ============================================================================
 // MUTATION HOOKS
@@ -129,37 +92,6 @@ export function useCreateSupplierNomination() {
     },
     onError: (error: any) => {
       toast.error(error.message || 'Failed to create supplier nomination');
-    },
-  });
-}
-
-/**
- * Update nomination criteria
- */
-export function useUpdateNominationCriteria(nominationId: string) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (criteria: CreateCriteriaData[]) => 
-      updateNominationCriteria(nominationId, criteria),
-    onSuccess: (updatedCriteria) => {
-      // Update nomination details
-      queryClient.setQueryData(
-        supplierNominationKeys.detail(nominationId),
-        (old: SupplierNomination | undefined) => {
-          if (!old) return old;
-          return {
-            ...old,
-            criteria: updatedCriteria,
-            updatedAt: new Date()
-          };
-        }
-      );
-
-      toast.success('Evaluation criteria updated successfully');
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to update criteria');
     },
   });
 }
@@ -418,206 +350,4 @@ export function useUpdateSupplierNomination() {
       toast.error(error.message || 'Failed to update nomination');
     },
   });
-}
-
-// ============================================================================
-// UTILITY HOOKS
-// ============================================================================
-
-/**
- * Prefetch supplier nomination
- */
-export function usePrefetchSupplierNomination() {
-  const queryClient = useQueryClient();
-
-  return (nominationId: string) => {
-    queryClient.prefetchQuery({
-      queryKey: supplierNominationKeys.detail(nominationId),
-      queryFn: () => getSupplierNomination(nominationId),
-      staleTime: 2 * 60 * 1000,
-    });
-  };
-}
-
-/**
- * Store complete evaluation data (Overview, Cost Analysis, Rating Engine, Capability, Technical)
- */
-export function useStoreEvaluationData() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ 
-      evaluationId, 
-      evaluationData 
-    }: { 
-      evaluationId: string; 
-      evaluationData: {
-        overview?: any;
-        costAnalysis?: any;
-        ratingEngine?: any;
-        capability?: any;
-        technical?: any;
-      }
-    }) => storeEvaluationData(evaluationId, evaluationData),
-    onMutate: async ({ evaluationId, evaluationData }) => {
-      // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: supplierNominationKeys.evaluationData(evaluationId) });
-
-      // Snapshot previous value
-      const previousData = queryClient.getQueryData(supplierNominationKeys.evaluationData(evaluationId));
-
-      // Optimistically update cache with new data
-      if (previousData) {
-        queryClient.setQueryData(supplierNominationKeys.evaluationData(evaluationId), {
-          ...previousData,
-          ...evaluationData,
-        });
-      }
-
-      return { previousData };
-    },
-    onError: (_err, { evaluationId }, context) => {
-      // Rollback on error
-      if (context?.previousData) {
-        queryClient.setQueryData(supplierNominationKeys.evaluationData(evaluationId), context.previousData);
-      }
-      toast.error('Failed to store evaluation data');
-    },
-    onSuccess: (result, { evaluationId }) => {
-      // Update cache with server response
-      queryClient.setQueryData(supplierNominationKeys.evaluationData(evaluationId), result);
-
-      // Invalidate related nomination queries to refresh scores
-      queryClient.invalidateQueries({
-        queryKey: supplierNominationKeys.all,
-        refetchType: 'active',
-      });
-
-      toast.success('Evaluation data saved successfully');
-    },
-  });
-}
-
-/**
- * Update specific evaluation section
- */
-export function useUpdateEvaluationSection() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ 
-      evaluationId, 
-      section, 
-      sectionData 
-    }: { 
-      evaluationId: string; 
-      section: string; 
-      sectionData: any;
-    }) => saveEvaluationData(evaluationId, section, sectionData),
-    onMutate: async ({ evaluationId, section, sectionData }) => {
-      // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: supplierNominationKeys.evaluationData(evaluationId, section) });
-
-      // Snapshot previous value
-      const previousData = queryClient.getQueryData(supplierNominationKeys.evaluationData(evaluationId, section));
-
-      // Optimistically update the specific section
-      if (previousData) {
-        const updatedData = {
-          ...previousData,
-          [section]: {
-            ...(previousData as any)[section],
-            ...sectionData,
-          },
-        };
-        queryClient.setQueryData(supplierNominationKeys.evaluationData(evaluationId), updatedData);
-      }
-
-      return { previousData };
-    },
-    onError: (_err, { evaluationId, section }, context) => {
-      // Rollback on error
-      if (context?.previousData) {
-        queryClient.setQueryData(supplierNominationKeys.evaluationData(evaluationId, section), context.previousData);
-      }
-      toast.error('Failed to save evaluation section');
-    },
-    onSuccess: (result, { evaluationId, section }) => {
-      // Update cache with server response
-      queryClient.setQueryData(supplierNominationKeys.evaluationData(evaluationId, section), result);
-      
-      const sectionNames: Record<string, string> = {
-        overview: 'Overview',
-        cost_analysis: 'Cost Analysis',
-        rating_engine: 'Rating Engine',
-        capability: 'Capability',
-        technical: 'Technical'
-      };
-      
-      toast.success(`${sectionNames[section] || section} updated successfully`);
-    },
-  });
-}
-
-/**
- * Invalidate all supplier nomination queries
- */
-export function useInvalidateSupplierNominations() {
-  const queryClient = useQueryClient();
-
-  return () => {
-    queryClient.invalidateQueries({ queryKey: supplierNominationKeys.all });
-  };
-}
-
-// ============================================================================
-// EVALUATION DATA UTILITY HOOKS
-// ============================================================================
-
-/**
- * Check evaluation data status and completion
- */
-export function useEvaluationDataStatus(evaluationId: string | undefined, section: string) {
-  const { data, isLoading, error } = useEvaluationData(evaluationId, section);
-
-  const hasData = !!data && typeof data === 'object' && Object.keys(data).length > 0;
-  
-  const completionPercentage = hasData ? 100 : 0;
-
-  return {
-    isLoading,
-    error,
-    hasData,
-    completionPercentage: Math.round(completionPercentage),
-    overallScore: (data as any)?.overall_score || 0,
-    finalRank: (data as any)?.final_rank || null,
-    recommendation: (data as any)?.overview?.recommendation,
-    riskLevel: (data as any)?.overview?.risk_level,
-  };
-}
-
-/**
- * Get supplier nomination statistics for a project
- */
-export function useSupplierNominationStats(projectId: string | undefined) {
-  const { data: nominations, isLoading } = useSupplierNominations(projectId || '');
-
-  if (isLoading || !nominations || !projectId) {
-    return { isLoading, stats: null };
-  }
-
-  const stats = {
-    total: nominations.length,
-    draft: nominations.filter(n => n.status === 'draft').length,
-    inProgress: nominations.filter(n => n.status === 'in_progress').length,
-    completed: nominations.filter(n => n.status === 'completed').length,
-    approved: nominations.filter(n => n.status === 'approved').length,
-    rejected: nominations.filter(n => n.status === 'rejected').length,
-    totalVendors: nominations.reduce((sum, n) => sum + n.vendorCount, 0),
-    avgCompletion: nominations.length > 0 
-      ? Math.round(nominations.reduce((sum, n) => sum + n.completionPercentage, 0) / nominations.length)
-      : 0,
-  };
-
-  return { isLoading: false, stats };
 }

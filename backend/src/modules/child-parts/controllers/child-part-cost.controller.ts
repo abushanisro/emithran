@@ -96,31 +96,6 @@ export class ChildPartCostController {
     return this.childPartCostService.findOne(id, userId, accessToken);
   }
 
-  /**
-   * Get child part cost by BOM item ID
-   */
-  @OrgRole('viewer')
-  @Get('bom-item/:bomItemId')
-  @ApiOperation({
-    summary: 'Get child part cost by BOM item ID',
-    description: 'Retrieve child part cost record for a specific BOM item',
-  })
-  @ApiParam({ name: 'bomItemId', description: 'BOM item ID (UUID)' })
-  @ApiResponse({
-    status: 200,
-    description: 'Child part cost retrieved successfully',
-    type: ChildPartCostResponseDto,
-  })
-  @ApiResponse({ status: 404, description: 'Child part cost not found' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async findByBomItemId(
-    @Param('bomItemId') bomItemId: string,
-    @Request() req: any,
-  ): Promise<ChildPartCostResponseDto | null> {
-    const userId = req.user?.id;
-    const accessToken = req.headers.authorization?.replace('Bearer ', '');
-    return this.childPartCostService.findByBomItemId(bomItemId, userId, accessToken);
-  }
 
   /**
    * Create or update a child part cost record

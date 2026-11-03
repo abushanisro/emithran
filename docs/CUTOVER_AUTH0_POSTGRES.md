@@ -110,7 +110,7 @@ database: `viewer` reads, `member` edits project data, `admin` (or `owner`) chan
 members, workspaces, forcing the delete of a part used in production lots). A person in several organizations acts with their lowest role
 there. `/auth/me` returns `organizationRole` so the app hides what the API would refuse.
 
-**Platform administrators (migration 943).** Platform-wide actions (`POST /fx/refresh`, `GET /should-cost/calibration/history`) are for the
+**Platform administrators (migration 943).** Platform-wide actions (`POST /fx/refresh`; the calibration history is read from the database) are for the
 operators listed in `platform_admins`; no API role can read or change that table. Grant and revoke as the database owner, naming who granted:
 
 ```sql

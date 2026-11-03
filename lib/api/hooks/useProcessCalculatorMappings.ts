@@ -153,14 +153,6 @@ export function useProcessCalculatorMappings(
   });
 }
 
-export function useProcessCalculatorMapping(id: string) {
-  return useQuery({
-    queryKey: QUERY_KEYS.mapping(id),
-    queryFn: () => processCalculatorMappingsApi.getOne(id),
-    enabled: !!id,
-  });
-}
-
 export function useCreateProcessCalculatorMapping() {
   const queryClient = useQueryClient();
 
@@ -214,27 +206,5 @@ export function useClearAllProcessCalculatorMappings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['process-calculator-mappings'] });
     },
-  });
-}
-
-// Helper hook to get calculator for a specific process combination
-export function useCalculatorForProcess(processGroup?: string, processRoute?: string, operation?: string) {
-  return useQuery({
-    queryKey: ['process-calculator', processGroup, processRoute, operation],
-    queryFn: async () => {
-      if (!processGroup || !processRoute || !operation) {
-        return null;
-      }
-
-      const response = await processCalculatorMappingsApi.getAll({
-        processGroup,
-        processRoute,
-        operation,
-        isActive: true,
-      });
-
-      return response.mappings[0] || null;
-    },
-    enabled: !!processGroup && !!processRoute && !!operation,
   });
 }
