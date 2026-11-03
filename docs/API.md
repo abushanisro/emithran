@@ -87,8 +87,9 @@ GET /vendors?processId=…&q=casting&sort=+name,-createdAt&page=2&limit=50
 ```
 
 - **Filter** with query parameters named after the field, never with path segments.
-- **Sort** with `sort=+field,-field` (`+` ascending, `-` descending), only on documented fields.
-- **Paginate** with `page` and `limit`; `limit` defaults to 50 and is capped at 200. The response says where it is: `metadata.page = { page, limit, total }`.
+- **Sort** with `sort=+field,-field` (`+` ascending, `-` descending), only on documented fields: `parseSort(sort, allowed, map)` refuses any other with a 400.
+- **Paginate** with `page` and `limit`. A **new** list extends `PageQueryDto` (`common/dto/page-query.ts`): `limit` defaults to 50 and is at most 200. `pageRange(page, limit)` gives the PostgREST range.
+- **Every `limit` is capped.** Existing lists that picker screens load whole (vendors, process catalog, BOM item search) accept up to 1000; anything above is refused with a 400. A test fails on a request `limit` without `@Max`.
 
 ## 7. Keep good security practice
 
@@ -135,7 +136,7 @@ Liveness is outside the versioned API: `GET /` and `GET /ping`; health checks ar
 | 3 Plural | Done |
 | 4 Nesting | 1 route: `PUT supplier-nominations/:id/capability-scores/:criteriaId/:vendorId` (one cell of a score grid; it needs both ids). Everything else is two levels or less |
 | 5 Errors | Done: problem details on `/api/v1`, deletes answer 204 (200 only when they return data and say so), creates carry `Location` |
-| 6 Filter, sort, paginate | About 20 lists page; no shared helper or cap; sorting is uneven |
+| 6 Filter, sort, paginate | Shared `PageQueryDto`, `parseSort` and `pageRange` for new lists; every request `limit` is capped (a test enforces it). Existing lists keep their own shapes and defaults: moving the screens that load a whole list (rate pickers ask for up to 10000) to real paging is separate frontend work |
 | 7 Security | Done: default deny, roles, admin-only rate and master-data writes, four eyes on inspections, row-level security, audit |
 | 8 Caching | Done: `private, no-cache` and a data-only `ETag` on reads (304 on a repeat), `no-store` on writes; no `max-age` by design |
 | 9 Versioning | Done: `/api/v1` is the only prefix; the web app calls it through its BFF (`API_URL` and `NEXT_PUBLIC_API_URL` end in `/api/v1`) |

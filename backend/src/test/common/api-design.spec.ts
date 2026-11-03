@@ -1,6 +1,7 @@
 // API design rules (docs/API.md), checked against the route inventory (authz/__snapshots__/route-policies.spec.ts.snap):
 //   verbs     the path names a thing, the HTTP method is the verb; only state changes (POST /things/:id/approve) are actions
 //   plural    a collection is a plural noun (singletons such as /auth, /profile excepted)
+//   paging    every request `limit` is capped (@Max), so no list can be asked for "everything"
 //   depth     at most two levels of nesting: collection/:id/child/:id (4 segments); deeper children are top-level, filtered by the parent
 //
 // Existing routes that break a rule are listed in api-design-violations.json. The list can only shrink: a NEW violation fails, and
@@ -103,5 +104,24 @@ describe('API design rules', () => {
       }
     }
     expect(undeclared).toEqual([]);
+  });
+
+  it('every request `limit` is capped', () => {
+    const uncapped: string[] = [];
+    const walk = (dir: string): string[] => fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) return e.name === 'test' || e.name === 'node_modules' ? [] : walk(full);
+      return e.name.endsWith('.ts') && !e.name.endsWith('.spec.ts') ? [full] : [];
+    });
+    for (const file of walk(path.resolve(__dirname, '../..'))) {
+      const lines = fs.readFileSync(file, 'utf8').split('\n');
+      lines.forEach((line, i) => {
+        if (!/^\s*limit\??\s*:\s*number\b/.test(line) && !/^\s*limit\s*:\s*number\s*=/.test(line)) return;
+        const above = lines.slice(Math.max(0, i - 8), i).join('\n');
+        const isRequestField = /@(IsInt|IsNumber|Type)\b/.test(above); // a response type has no validators
+        if (isRequestField && !/@Max\(/.test(above)) uncapped.push(`${path.relative(path.resolve(__dirname, '../..'), file)}:${i + 1}`);
+      });
+    }
+    expect(uncapped).toEqual([]);
   });
 });

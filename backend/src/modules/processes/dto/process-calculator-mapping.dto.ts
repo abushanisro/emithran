@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { IsString, IsOptional, IsBoolean, IsNumber, IsUUID, Min } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsNumber, IsUUID, Min, Max } from 'class-validator';
+import { PAGE_LIMIT_PICKER_MAX } from '../../../common/dto/page-query';
 import { Type } from 'class-transformer';
 import { IsOptionalBoolean } from '../../../common/decorators/validation.decorators';
 
@@ -86,6 +87,7 @@ export class QueryProcessCalculatorMappingsDto {
   @Type(() => Number)
   @IsNumber()
   @Min(1)
+  @Max(PAGE_LIMIT_PICKER_MAX)
   limit?: number;
 }
 

@@ -12,6 +12,7 @@
 
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsString, IsNumber, IsOptional, IsBoolean, IsUUID, Min, Max, IsObject, IsInt } from 'class-validator';
+import { PAGE_LIMIT_PICKER_MAX } from '../../../common/dto/page-query';
 import { Type } from 'class-transformer';
 import { IsOptionalBoolean } from '../../../common/decorators/validation.decorators';
 
@@ -258,6 +259,7 @@ export class QueryProcuredPartsCostsDto {
   @Type(() => Number)
   @IsNumber()
   @Min(1)
+  @Max(PAGE_LIMIT_PICKER_MAX)
   limit?: number;
 }
 
