@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { IsString, IsOptional, IsUUID, IsNumber, IsEnum, Min, IsIn, registerDecorator, ValidationOptions, ValidationArguments } from 'class-validator';
+import { IsString, IsOptional, IsUUID, IsNumber, IsEnum, Min, Max, IsIn, registerDecorator, ValidationOptions, ValidationArguments } from 'class-validator';
+import { PAGE_LIMIT_PICKER_MAX } from '../../../common/dto/page-query';
 import { Type } from 'class-transformer';
 
 export enum BOMItemType {
@@ -306,5 +307,6 @@ export class QueryBOMItemsDto {
   @Type(() => Number)
   @IsNumber()
   @Min(1)
+  @Max(PAGE_LIMIT_PICKER_MAX)
   limit?: number;
 }

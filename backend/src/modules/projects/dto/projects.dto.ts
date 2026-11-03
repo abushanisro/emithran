@@ -3,6 +3,7 @@
 
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { IsString, IsOptional, IsNumber, IsEnum, Max, Min } from 'class-validator';
+import { PAGE_LIMIT_PICKER_MAX } from '../../../common/dto/page-query';
 import { Type } from 'class-transformer';
 import {
   IsProjectName,
@@ -106,5 +107,7 @@ export class QueryProjectsDto {
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
+  @Min(1)
+  @Max(PAGE_LIMIT_PICKER_MAX)
   limit?: number;
 }
