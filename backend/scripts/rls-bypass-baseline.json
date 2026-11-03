@@ -35,5 +35,7 @@
   "src/modules/mhr/mhr.service.ts": 1,
   "src/modules/processes/processes.service.ts": 5,
   "src/modules/processes/services/process-cost.service.ts": 2,
-  "src/modules/raw-materials/services/raw-material-editor.service.ts": 1
+  "src/modules/raw-materials/services/raw-material-editor.service.ts": 1,
+  "src/modules/sand-casting/casting-analysis-runner.ts": 1,
+  "src/modules/sand-casting/sand-casting.service.ts": 1
 }
