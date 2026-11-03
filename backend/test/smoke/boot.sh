@@ -25,5 +25,7 @@ expect() { # name, expected-status, actual-status
 expect "health is up" 200 "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/api/health/live")"
 expect "/auth/me without a token is 401" 401 "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/v1/api/auth/me")"
 expect "/auth/me with a forged token is 401" 401 "$(curl -s -o /dev/null -w '%{http_code}' -H 'Authorization: Bearer a.b.c' "http://127.0.0.1:$PORT/v1/api/auth/me")"
+expect "/api/v1/auth/me without a token is 401, as a problem" "401 application/problem+json" "$(curl -s -o /dev/null -w '%{http_code} %{content_type}' "http://127.0.0.1:$PORT/api/v1/auth/me" | sed 's/;.*//')"
+expect "the old /v1/api prefix is marked deprecated" "true" "$(curl -s -D - -o /dev/null "http://127.0.0.1:$PORT/v1/api/auth/me" | tr -d '\r' | awk -F': ' 'tolower($1)=="deprecation"{print $2}')"
 expect "a data route without a token is 401" 401 "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/v1/api/profile")"
 exit $fail

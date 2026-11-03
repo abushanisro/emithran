@@ -16,6 +16,7 @@
 
 import { config as appConfig } from '../config';
 import { apiConfig } from './config';
+import { fromProblemDetails, isProblemContentType } from './problem-details';
 import { SESSION_IDLE_TIMEOUT_CODE, SESSION_IDLE_TIMEOUT_EVENT } from '../auth/session-idle/policy';
 
 import { CircuitBreaker, CircuitBreakerError } from './circuit-breaker';
@@ -530,6 +531,8 @@ class ApiClient {
               data: { message: 'Operation completed successfully' } as any,
               metadata: { timestamp: new Date().toISOString() },
             };
+          } else if (isProblemContentType(contentType) && responseText.trim()) {
+            data = fromProblemDetails(JSON.parse(responseText));
           } else if (contentType && contentType.includes('application/json') && responseText.trim()) {
             data = JSON.parse(responseText);
           } else if (responseText.trim()) {
