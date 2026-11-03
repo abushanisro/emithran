@@ -935,48 +935,6 @@ export class ProcessCostService {
     };
   }
 
-  /**
-   * Get total process cost for a specific BOM item
-   */
-  async getTotalCostForBomItem(
-    bomItemId: string,
-    userId?: string,
-    accessToken?: string,
-  ): Promise<number> {
-    this.logger.log(`Calculating total process cost for BOM item: ${bomItemId}`, 'ProcessCostService');
-
-    const client = this.databaseService.getUserClient(accessToken);
-
-    // Prefer the stored total_cost_per_part — every creation path (manual create/update,
-    // process-plan-generator apply) now computes and persists it via the shared
-    // ProcessCostCalculationEngine at write time. Recompute from source fields only as a
-    // fallback for rows saved before that engine existed, where the column is still null.
-    const { data: costs, error } = await client
-      .from('process_cost_records')
-      .select(PERSISTED_PROCESS_COST_COLUMNS)
-      .eq('bom_item_id', bomItemId)
-      .eq('is_active', true);
-
-    if (error) {
-      this.logger.error('Error fetching process costs for BOM item', error.message, 'ProcessCostService');
-      throw new InternalServerErrorException('Failed to fetch process costs');
-    }
-
-    // P1b-iv-b: this prefer-stored-then-derive logic was written out here and
-    // again in the bulk path below, and a third and fourth time in
-    // boms.service.ts and cost-aggregation.service.ts (those two without the
-    // prefer-stored half). One implementation now.
-    // Cast at the boundary: the PostgREST client infers no row type from a select list that
-    // is not a string literal, and PERSISTED_PROCESS_COST_COLUMNS is shared
-    // deliberately so every caller selects exactly the columns the resolver
-    // reads.
-    const { total: totalCost } = sumPersistedProcessCost(
-      (costs ?? []) as unknown as PersistedProcessCostRow[],
-    );
-
-    this.logger.log(`Total process cost for BOM item ${bomItemId}: ${totalCost}`, 'ProcessCostService');
-    return totalCost;
-  }
 
   async getBulkTotalCosts(
     bomItemIds: string[],

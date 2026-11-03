@@ -247,3 +247,32 @@ describe('Dockerfiles', () => {
     expect(lines.some((l) => l === 'logs' || l === 'logs/' || l === '**/*.log')).toBe(true);
   });
 });
+
+describe('docker-compose.data.yml (self-hosted data tier)', () => {
+  const data = yaml.load(read('docker-compose.data.yml')) as Compose;
+
+  it.each(Object.entries(data.services))('%s is locked down and private', (_name, s) => {
+    expect(s.read_only).toBe(true);
+    expect(s.cap_drop).toContain('ALL');
+    expect(s.cap_add).toBeUndefined();
+    expect(s.security_opt).toContain('no-new-privileges:true');
+    expect(s.privileged).toBeUndefined();
+    expect(s.network_mode).toBeUndefined();
+    expect(s.user).toMatch(/^\d+:\d+$/);
+    expect(s.networks).toEqual(['db']);
+    expect(s.deploy?.resources?.limits?.pids).toBeGreaterThan(0);
+    expect(s.deploy?.resources?.limits?.memory).toBeTruthy();
+    expect(s.healthcheck).toBeTruthy();
+  });
+
+  it('publishes nothing to the network: Postgres only on the host loopback, the file store not at all', () => {
+    expect(data.services.postgres.ports).toEqual(['127.0.0.1:${PG_PORT:-5432}:5432']);
+    expect(data.services.storage.ports).toBeUndefined();
+  });
+
+  it('has no password or key in the file: every secret comes from the env file', () => {
+    for (const s of Object.values(data.services)) {
+      for (const value of Object.values(s.environment ?? {})) expect(String(value)).toMatch(/^\$\{/);
+    }
+  });
+});

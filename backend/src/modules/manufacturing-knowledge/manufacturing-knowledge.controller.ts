@@ -1,12 +1,10 @@
-import { Controller, Get, Post, Body, Param, Query, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, Request } from '@nestjs/common';
 import { ManufacturingKnowledgeService } from './manufacturing-knowledge.service';
 import { ProcessValidationService } from './services/process-validation.service';
 import type {
   CreateFeatureProcessMappingDto,
   CreateMachineCapabilityDto,
   CreateProcessRoutingRuleDto,
-  SubmitFeedbackDto,
-  ValidateRouteDto,
 } from './dto/kb.dto';
 import { OrgRole } from '../../common/authz/authz-policy';
 
@@ -58,39 +56,8 @@ export class ManufacturingKnowledgeController {
     return this.kb.getAllTemplates(req.token);
   }
 
-  @OrgRole('viewer')
-  @Get('templates/:partFamily')
-  getTemplate(@Request() req: any, @Param('partFamily') partFamily: string, @Query('complexity') complexity?: string) {
-    return this.kb.getTemplate(req.token, partFamily, complexity);
-  }
 
-  @OrgRole('viewer')
-  @Get('machine-process-mapping')
-  getMachineProcessMapping(@Request() req: any, @Query('featureType') featureType?: string, @Query('partFamily') partFamily?: string) {
-    return this.kb.getMachineProcessMapping(req.token, featureType, partFamily);
-  }
 
-  @Post('feedback')
-  submitFeedback(@Request() req: any, @Body() dto: SubmitFeedbackDto) {
-    return this.kb.submitFeedback(req.token, dto, req.user.id);
-  }
 
-  @OrgRole('viewer')
-  @Get('feedback/:bomItemId')
-  getFeedback(@Request() req: any, @Param('bomItemId') bomItemId: string) {
-    return this.kb.getFeedbackForBomItem(req.token, bomItemId);
-  }
 
-  @Post('validate-route')
-  async validateRoute(@Request() req: any, @Body() dto: ValidateRouteDto) {
-    const [rules, capabilities] = await Promise.all([
-      this.kb.getRoutingRules(req.token, dto.partFamily),
-      this.kb.getMachineCapabilities(req.token),
-    ]);
-    const routeIssues = this.validation.validateRoute(dto.processSequence, dto.partFamily, rules);
-    const machineIssues = dto.machineAssignments
-      ? this.validation.validateMachines(dto.processSequence, dto.machineAssignments, capabilities)
-      : [];
-    return [...routeIssues, ...machineIssues];
-  }
 }

@@ -330,13 +330,6 @@ export class ElectronicsController {
     return this.designs.get(designId, token);
   }
 
-  @OrgRole('viewer')
-  @Get('designs/:designId/revisions')
-  @ApiOperation({ summary: 'Every revision of a design, with the input hash that identifies its files' })
-  async revisions(@Param('designId', ParseUUIDPipe) designId: string, @AccessToken() token: string): Promise<RevisionRow[]> {
-    await this.repository.getDesign(designId, token);
-    return this.repository.listRevisions(designId, token);
-  }
 
   @OrgRole('viewer')
   @Get('reference-coverage')

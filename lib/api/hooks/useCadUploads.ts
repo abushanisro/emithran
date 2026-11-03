@@ -10,7 +10,7 @@ import { isInFlight } from '@/lib/cad-uploads/upload-view';
 import { cadUploadsApi, type CadUpload } from '../cad-uploads';
 import { ApiError } from '../client';
 
-export const cadUploadKeys = {
+const cadUploadKeys = {
   all: ['cad-uploads'] as const,
   one: (uploadId: string) => [...cadUploadKeys.all, uploadId] as const,
 };

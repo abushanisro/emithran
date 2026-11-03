@@ -96,14 +96,6 @@ export function usePmiRecords(itemId: string | undefined, enabled = true) {
   });
 }
 
-export function usePmiRecordHistory(itemId: string | undefined, recordKey: string | null) {
-  return useQuery({
-    queryKey: [...key(itemId ?? ''), 'history', recordKey] as const,
-    queryFn: () => apiClient.get<PmiReviewRow[]>(`/bom-items/${itemId}/pmi-records/history?recordKey=${encodeURIComponent(recordKey ?? '')}`),
-    enabled: useAuthEnabledWith(!!itemId && !!recordKey),
-  });
-}
-
 export function useReviewPmiRecord(itemId: string | undefined) {
   const queryClient = useQueryClient();
   return useMutation({

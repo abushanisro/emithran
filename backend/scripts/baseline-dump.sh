@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Takes the baseline of a database: everything in the `public` schema (structure and data) plus the user DIRECTORY (id, email, name),
 # which the 59 foreign keys to auth.users need. Passwords, sessions and tokens are NOT taken: people sign in through Auth0 and are linked
-# to their carried row by verified email (migration 931). Read-only on the source.
+# to their carried row by verified email (migration 931). A user that rows name but auth.users lacks is carried as a placeholder.
+# Read-only on the source.
 #
 #   backend/scripts/baseline-dump.sh [--schema-only] <source-connection-url> <output-dir>
 #   DOCKER_NETWORK=<net> ...     only when the source is another container (tests)
@@ -43,9 +44,27 @@ echo "reading the user directory..."
 # Lower-cased emails are what link_identity matches on; a user without an email cannot be linked and is carried only if rows need them.
 pg sh -c 'psql "$SRC" -v ON_ERROR_STOP=1 -q -c "\copy (select id, lower(email), coalesce(raw_user_meta_data, '"'"'{}'"'"'::jsonb), created_at from auth.users order by id) to stdout with (format csv)"' > "$out/auth_users.csv"
 
+# Rows can name a user that auth.users no longer holds (an account deleted while its rows stayed). Loading them would fail on the
+# foreign key, and dropping or re-owning them would change who can see them. Each such id is carried as a placeholder user with no
+# real email (removed-user-<id>@invalid.invalid, which nobody can sign in as or be linked to); the rows stay exactly as they were.
+pg sh -c 'psql "$SRC" -v ON_ERROR_STOP=1 -At -q' <<'SQL' >> "$out/auth_users.csv"
+SELECT format($q$COPY (SELECT id, 'removed-user-' || left(id::text, 8) || '@invalid.invalid', '{}'::jsonb, now()
+                         FROM (%s) r WHERE id IS NOT NULL AND id NOT IN (SELECT id FROM auth.users) ORDER BY id) TO STDOUT WITH (FORMAT csv)$q$,
+              string_agg(format('SELECT %I AS id FROM %I.%I', a.attname, n.nspname, c.relname), ' UNION '))
+FROM pg_constraint k
+JOIN pg_class c ON c.oid = k.conrelid
+JOIN pg_namespace n ON n.oid = c.relnamespace
+JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum = k.conkey[1]
+WHERE k.contype = 'f' AND k.confrelid = 'auth.users'::regclass AND n.nspname = 'public'
+\gexec
+SQL
+carried="$(wc -l < "$out/auth_users.csv" | tr -d ' ')"
+real="$(pg sh -c 'psql "$SRC" -At -c "select count(*) from auth.users"')"
+echo "$carried" > "$out/auth_users.count"
+[ "$carried" -eq "$real" ] || echo "note: $((carried - real)) removed user(s) carried as placeholders"
+
 echo "counting rows..."
 pg sh -c 'psql "$SRC" -At -F" " -c "select table_name, (xpath('"'"'/row/c/text()'"'"', query_to_xml(format('"'"'select count(*) as c from %I.%I'"'"', table_schema, table_name), false, true, '"'"''"'"')))[1]::text::bigint from information_schema.tables where table_schema = '"'"'public'"'"' and table_type = '"'"'BASE TABLE'"'"' and table_name <> '"'"'schema_migrations'"'"' order by 1"' > "$out/counts.txt"
-pg sh -c 'psql "$SRC" -At -c "select count(*) from auth.users"' > "$out/auth_users.count"
 
 test -s "$out/db.dump" && test -s "$out/counts.txt" || { echo "the dump is empty: nothing written"; exit 1; }
 (cd "$out" && shasum -a 256 db.dump auth_users.csv counts.txt auth_users.count > SHA256SUMS)

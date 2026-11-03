@@ -565,64 +565,6 @@ export class BomItemCostService {
     return children;
   }
 
-  /**
-   * Get cost summary for a BOM (all top-level assemblies with recursive children)
-   */
-  async getBomCostSummary(bomId: string, userId: string, accessToken: string): Promise<BomItemCostSummaryDto[]> {
-    // Get all root items (no parent) that have cost data
-    const { data: costsWithItems, error: costsError } = await this.databaseService
-      .getClient(accessToken)
-      .from('bom_item_costs')
-      .select(`
-        total_cost,
-        raw_material_cost,
-        process_cost,
-        tooling_cost,
-        packaging_logistics_cost,
-        procured_parts_cost,
-        direct_children_cost,
-        is_stale,
-        bom_item_id,
-        bom_items!inner(id, name, item_type, parent_item_id, bom_id)
-      `)
-      .eq('bom_items.bom_id', bomId)
-      .is('bom_items.parent_item_id', null);
-
-    if (costsError || !costsWithItems) {
-      this.logger.error(`Error fetching cost data: ${costsError?.message}`, 'BomItemCostService');
-      return [];
-    }
-
-    const summaries: BomItemCostSummaryDto[] = [];
-
-    for (const record of costsWithItems) {
-      // bom_items is a single object from the join, not an array
-      const item = Array.isArray(record.bom_items) ? record.bom_items[0] : record.bom_items;
-
-      if (!item) continue;
-
-      // Recursively get children with cost data
-      const children = await this.getChildrenCostSummary(item.id, userId, accessToken);
-
-      summaries.push({
-        bomItemId: item.id,
-        name: item.name,
-        itemType: item.item_type,
-        totalCost: parseFloat(record.total_cost || '0'),
-        rawMaterialCost: parseFloat(record.raw_material_cost || '0'),
-        processCost: parseFloat(record.process_cost || '0'),
-        toolingCost: parseFloat(record.tooling_cost || '0'),
-        packagingLogisticsCost: parseFloat(record.packaging_logistics_cost || '0'),
-        procuredPartsCost: parseFloat(record.procured_parts_cost || '0'),
-        directChildrenCost: parseFloat(record.direct_children_cost || '0'),
-        isStale: record.is_stale || false,
-        childrenCount: children.length,
-        children: children.length > 0 ? children : undefined,
-      });
-    }
-
-    return summaries;
-  }
 
   /**
    * Get comprehensive cost report for a BOM

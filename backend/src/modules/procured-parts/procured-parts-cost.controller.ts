@@ -161,28 +161,4 @@ async findAll(
     return this.procuredPartsCostService.getBulkTotalCosts(bomItemIds, accessToken);
   }
 
-  /**
-   * Get total procured parts cost for a BOM item
-   */
-  @OrgRole('viewer')
-  @Get('bom-item/:bomItemId/total')
-  @ApiOperation({ summary: 'Get total procured parts cost for a BOM item' })
-  @ApiResponse({
-    status: 200,
-    description: 'Returns total procured parts cost for the BOM item',
-    schema: {
-      type: 'object',
-      properties: {
-        totalCost: { type: 'number', example: 325.50 }
-      }
-    }
-  })
-  async getTotalCostForBomItem(
-    @Param('bomItemId') bomItemId: string,
-    @CurrentUser('id') userId: string,
-    @AccessToken() accessToken?: string,
-  ): Promise<{ totalCost: number }> {
-    const totalCost = await this.procuredPartsCostService.getTotalCostForBomItem(bomItemId, userId, accessToken);
-    return { totalCost };
-  }
 }

@@ -10,7 +10,7 @@
  *   - useSubmitKbFeedback        — POST engineer correction
  */
 
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../client';
 
 // ─── Types (mirror backend kb.dto.ts) ───────────────────────────────────────
@@ -140,26 +140,5 @@ export function useMachineCapabilities() {
       return apiClient.get<MachineCapability[]>(`${BASE}/machine-capabilities`);
     },
     staleTime: 5 * 60_000,
-  });
-}
-
-export function useKbFeedback(bomItemId: string) {
-  return useQuery({
-    queryKey: ['kb-feedback', bomItemId],
-    queryFn: async (): Promise<ProcessPlanFeedback[]> => {
-      return apiClient.get<ProcessPlanFeedback[]>(`${BASE}/feedback/${bomItemId}`);
-    },
-    enabled: !!bomItemId,
-    staleTime: 30_000,
-  });
-}
-
-// ─── Mutation Hooks ───────────────────────────────────────────────────────────
-
-export function useSubmitKbFeedback() {
-  return useMutation({
-    mutationFn: async (dto: SubmitFeedbackDto): Promise<ProcessPlanFeedback> => {
-      return apiClient.post<ProcessPlanFeedback>(`${BASE}/feedback`, dto);
-    },
   });
 }

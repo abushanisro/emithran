@@ -3,7 +3,6 @@ import { toast } from 'sonner';
 import { projectReportsApi } from '../project-reports';
 import type {
   CreateBalloonDiagramRequest,
-  UpdateBalloonDiagramRequest,
   DiagramAnnotationRequest,
 } from '../project-reports';
 
@@ -18,15 +17,6 @@ export function useBalloonDiagrams(projectId: string) {
   return useQuery({
     queryKey: QUERY_KEYS.balloonDiagrams(projectId),
     queryFn: () => projectReportsApi.getBalloonDiagrams(projectId),
-    staleTime: 1000 * 60 * 5, // 5 minutes
-  });
-}
-
-export function useBalloonDiagram(id: string) {
-  return useQuery({
-    queryKey: QUERY_KEYS.balloonDiagram(id),
-    queryFn: () => projectReportsApi.getBalloonDiagram(id),
-    enabled: !!id,
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
@@ -46,46 +36,6 @@ export function useCreateBalloonDiagram() {
     onError: (error) => {
       console.error('Failed to create balloon diagram:', error);
       toast.error('Failed to create balloon diagram');
-    },
-  });
-}
-
-export function useUpdateBalloonDiagram() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateBalloonDiagramRequest }) =>
-      projectReportsApi.updateBalloonDiagram(id, data),
-    onSuccess: (updatedDiagram) => {
-      toast.success('Balloon diagram updated successfully');
-      queryClient.setQueryData(
-        QUERY_KEYS.balloonDiagram(updatedDiagram.id),
-        updatedDiagram
-      );
-      queryClient.invalidateQueries({
-        queryKey: QUERY_KEYS.balloonDiagrams(updatedDiagram.project_id),
-      });
-    },
-    onError: (error) => {
-      console.error('Failed to update balloon diagram:', error);
-      toast.error('Failed to update balloon diagram');
-    },
-  });
-}
-
-export function useDeleteBalloonDiagram() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (id: string) => projectReportsApi.deleteBalloonDiagram(id),
-    onSuccess: (_, id) => {
-      toast.success('Balloon diagram deleted successfully');
-      queryClient.removeQueries({ queryKey: QUERY_KEYS.balloonDiagram(id) });
-      queryClient.invalidateQueries({ queryKey: ['balloon-diagrams'] });
-    },
-    onError: (error) => {
-      console.error('Failed to delete balloon diagram:', error);
-      toast.error('Failed to delete balloon diagram');
     },
   });
 }

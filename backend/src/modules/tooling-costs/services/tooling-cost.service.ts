@@ -326,38 +326,6 @@ export class ToolingCostService {
     }
   }
 
-  /**
-   * Get total tooling cost for a BOM item
-   */
-  async getTotalCostForBomItem(
-    bomItemId: string,
-    userId: string,
-    accessToken: string,
-  ): Promise<number> {
-    try {
-      const client = this.databaseService.getClient(accessToken);
-
-      const { data, error } = await client
-        .from('tooling_cost_records')
-        .select('total_cost')
-        .eq('bom_item_id', bomItemId)
-        .eq('is_active', true);
-
-      if (error) {
-        this.logger.error('Error calculating total tooling cost:', error);
-        throw new BadRequestException('Failed to calculate total tooling cost');
-      }
-
-      const totalCost = data?.reduce((sum, record) => sum + (parseFloat(record.total_cost) || 0), 0) || 0;
-      
-      this.logger.log(`Total tooling cost for BOM item ${bomItemId}: ${totalCost} (from ${data?.length || 0} records)`);
-      
-      return totalCost;
-    } catch (error) {
-      this.logger.error('Error in getTotalCostForBomItem:', error);
-      throw error;
-    }
-  }
 
   async getBulkTotalCosts(
     bomItemIds: string[],

@@ -94,18 +94,6 @@ export class PmiReviewService {
     };
   }
 
-  /** Every decision ever taken on one record, newest first (the audit history). */
-  async history(id: string, recordKey: string, accessToken: string): Promise<PmiReviewRow[]> {
-    await this.loadItem(id, accessToken);
-    const { data, error } = await this.database.getUserClient(accessToken)
-      .from('pmi_record_reviews')
-      .select('*')
-      .eq('bom_item_id', id)
-      .eq('record_key', recordKey)
-      .order('reviewed_at', { ascending: false });
-    if (error) throw new InternalServerErrorException(`Failed to read PMI review history: ${error.message}`);
-    return (data ?? []).map(toRow);
-  }
 
   async review(id: string, userId: string, accessToken: string, request: PmiReviewRequest): Promise<PmiRecordsView> {
     const scope: PmiReviewScope = request.scope ?? 'record';

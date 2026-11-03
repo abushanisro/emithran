@@ -13,7 +13,7 @@ import type {
 
 // ─── Query Keys ───────────────────────────────────────────────────────────────
 
-export const vaveKeys = {
+const vaveKeys = {
   all: ['vave'] as const,
   projects: () => [...vaveKeys.all, 'projects'] as const,
   project: (id: string) => [...vaveKeys.all, 'project', id] as const,

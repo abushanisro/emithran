@@ -39,32 +39,6 @@ export class ProcessPlanningService {
     }
   }
 
-  /**
-   * Get all process planning specifications for a project
-   */
-  async getSpecificationsByProject(projectId: string, userId: string): Promise<ProcessPlanningSpecResponseDto[]> {
-    try {
-      const client = this.databaseService.getUserClient();
-
-      const { data, error } = await client
-        .from('process_planning_with_bom_details')
-        .select('*')
-        .eq('project_id', projectId)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        throw error;
-      }
-
-      return (data || []).map(item => this.mapToResponseDto(item));
-    } catch (error) {
-      this.logger.error(`Error getting process planning specs for project ${projectId}:`, error);
-      if (error.message?.includes('row-level security')) {
-        throw new ForbiddenException('You do not have permission to access these specifications.');
-      }
-      throw new BadRequestException('Failed to retrieve process planning specifications.');
-    }
-  }
 
   /**
    * Upsert (create or update) process planning specifications
@@ -108,60 +82,6 @@ export class ProcessPlanningService {
     }
   }
 
-  /**
-   * Create new process planning specifications
-   */
-  async createSpecifications(dto: CreateProcessPlanningSpecDto, userId: string): Promise<ProcessPlanningSpecResponseDto> {
-    try {
-      const client = this.databaseService.getUserClient();
-
-      // Check if specifications already exist for this BOM item
-      const { data: existing } = await client
-        .from('process_planning_specifications')
-        .select('id')
-        .eq('bom_item_id', dto.bomItemId)
-        .eq('project_id', dto.projectId)
-        .single();
-
-      if (existing) {
-        throw new BadRequestException('Process planning specifications already exist for this BOM item.');
-      }
-
-      const { data, error } = await client
-        .from('process_planning_specifications')
-        .insert({
-          bom_item_id: dto.bomItemId,
-          project_id: dto.projectId,
-          tolerance_grade: dto.toleranceGrade || 'IT8',
-          surface_finish: dto.surfaceFinish || 'Ra 3.2 μm',
-          heat_treatment: dto.heatTreatment || 'As Required',
-          hardness: dto.hardness,
-          manufacturing_method: dto.manufacturingMethod,
-          tooling_required: dto.toolingRequired,
-          special_instructions: dto.specialInstructions,
-          coating_specification: dto.coatingSpecification,
-          created_by: userId,
-          updated_by: userId
-        })
-        .select()
-        .single();
-
-      if (error) {
-        throw error;
-      }
-
-      return this.mapToResponseDto(data);
-    } catch (error) {
-      this.logger.error(`Error creating process planning specs:`, error);
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-      if (error.message?.includes('row-level security')) {
-        throw new ForbiddenException('You do not have permission to create specifications for this project.');
-      }
-      throw new BadRequestException('Failed to create process planning specifications.');
-    }
-  }
 
   /**
    * Update existing process planning specifications
