@@ -7,14 +7,14 @@ import { OrgRole } from '../../common/authz/authz-policy';
 
 @ApiTags('Process Planning')
 @OrgRole('member')
-@Controller({ path: 'api/process-planning', version: '1' })
+@Controller({ path: 'api', version: '1' })
 @UseGuards(RequestAuthGuard)
 @ApiBearerAuth()
 export class ProcessPlanningController {
   constructor(private readonly processPlanningService: ProcessPlanningService) {}
 
   @OrgRole('viewer')
-  @Get('bom-items/:bomItemId/specifications')
+  @Get('bom-items/:bomItemId/process-specifications')
   @ApiOperation({ summary: 'Get process planning specifications for a BOM item' })
   @ApiResponse({ status: 200, description: 'Process planning specifications retrieved successfully', type: ProcessPlanningSpecResponseDto })
   @ApiResponse({ status: 404, description: 'Specifications not found' })
@@ -29,7 +29,7 @@ export class ProcessPlanningController {
 
 
 
-  @Put('bom-items/:bomItemId/specifications')
+  @Put('bom-items/:bomItemId/process-specifications')
   @ApiOperation({ summary: 'Update process planning specifications for a BOM item' })
   @ApiResponse({ status: 200, description: 'Process planning specifications updated successfully', type: ProcessPlanningSpecResponseDto })
   @ApiResponse({ status: 404, description: 'Specifications not found' })
@@ -43,7 +43,7 @@ export class ProcessPlanningController {
     return this.processPlanningService.updateSpecifications(bomItemId, dto, userId);
   }
 
-  @Post('specifications/upsert')
+  @Post('process-specifications')
   @ApiOperation({ summary: 'Create or update process planning specifications (upsert)' })
   @ApiResponse({ status: 200, description: 'Process planning specifications saved successfully', type: ProcessPlanningSpecResponseDto })
   async upsertSpecifications(
@@ -54,7 +54,7 @@ export class ProcessPlanningController {
     return this.processPlanningService.upsertSpecifications(dto, userId);
   }
 
-  @Delete('bom-items/:bomItemId/specifications')
+  @Delete('bom-items/:bomItemId/process-specifications')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete process planning specifications for a BOM item' })
   @ApiResponse({ status: 204, description: 'Process planning specifications deleted successfully' })

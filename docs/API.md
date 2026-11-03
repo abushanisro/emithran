@@ -109,7 +109,7 @@ The version is the first path segment: `/api/v1/…`. A change that can break a 
 
 ## Renamed paths
 
-A route that was renamed keeps answering on its old path until nobody uses it. The table is `backend/src/common/http/legacy-paths.ts` (old path prefix to new path prefix, on whole segments): a request to the old path is routed to the new one and answered with `Deprecation: true` and `Link: </api/v1/new-path>; rel="successor-version"`. The controllers carry only the new name, so the route inventory lists each route once. A rule is removed once the deprecated-path log shows no traffic for 30 days.
+A route that was renamed keeps answering on its old path until nobody uses it. The table is `backend/src/common/http/legacy-paths.ts` (old path to new path, on whole segments; a `:name` segment matches any segment and is copied across): a request to the old path is routed to the new one and answered with `Deprecation: true` and `Link: </api/v1/new-path>; rel="successor-version"`. The controllers carry only the new name, so the route inventory lists each route once. A rule is removed once the deprecated-path log shows no traffic for 30 days.
 
 | Old | New |
 |---|---|
@@ -131,6 +131,13 @@ A route that was renamed keeps answering on its old path until nobody uses it. T
 | `/production-planning/production-entries` | `/production-entries` |
 | `/production-planning/process-templates` | `/production-process-templates` |
 | `/production-planning/dashboard` | `/production-lots/dashboard` |
+| `/vave/projects/…` | `/vave-projects/…` (`…/bulk` becomes `…/batches`) |
+| `/vave/ai/bom-analysis` | `/vave-bom-analyses` |
+| `/quality-control/inspections/…` | `/quality-inspections/…` |
+| `/manufacturing-knowledge/feature-process-mapping`, `machine-capabilities`, `routing-rules`, `templates` | `/feature-process-mappings`, `/machine-capabilities`, `/routing-rules`, `/routing-templates` |
+| `/process-planning/bom-items/:id/specifications` | `/bom-items/:id/process-specifications` |
+| `/process-planning/specifications/upsert` | `/process-specifications` |
+| `/pdf-processing/extract-dimensions`, `/validate-pdf` | `/pdf-documents/dimension-extractions`, `/pdf-documents/validations` |
 
 ## How the rules are enforced
 
@@ -143,9 +150,9 @@ A route that was renamed keeps answering on its old path until nobody uses it. T
 | Rule | State |
 |---|---|
 | 1 JSON | Done |
-| 2 Nouns | 50 existing routes break it (`analyze-*`, `bulk-total`, `init`, `batch`, `calculate`, `PATCH rfqs/:id/send` and `close` (actions are POST), …) |
-| 3 Plural | 53 routes under 5 area names (`vave`, `quality-control`, `process-planning`, `process-plan-generator`, `manufacturing-knowledge`). Done: rates, RFQs, exchange rates, production planning |
-| 4 Nesting | 24 routes have five or more segments |
+| 2 Nouns | 46 existing routes break it (`analyze-*`, `bulk-total`, `initialize`, `batch`, `calculate`, `update-status-by-progress`, `resolve`, `reset`, `PATCH rfqs/:id/send` and `close` (actions are POST), …) |
+| 3 Plural | 8 routes: the AI process-plan generator (`process-plan-generator`), kept as it is until it is decided whether the feature stays. Everything else is renamed |
+| 4 Nesting | 16 routes have five or more segments |
 | 5 Errors | Problem details on `/api/v1`; deletes still answer 200 with a body in about 40 places; no `Location` on create |
 | 6 Filter, sort, paginate | About 20 lists page; no shared helper or cap; sorting is uneven |
 | 7 Security | Done, two open items: a `reference-data:write` permission, and the approver not being the submitter |

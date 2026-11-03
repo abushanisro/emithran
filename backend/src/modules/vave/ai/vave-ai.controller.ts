@@ -19,12 +19,12 @@ import type { ShouldCostResult, VaveIdeaDraft } from './vave-ai.results';
 @ApiTags('VAVE')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/vave', version: '1' })
+@Controller({ path: 'api', version: '1' })
 @UseGuards(OrganizationContextGuard)
 export class VaveAiController {
   constructor(private readonly vaveAi: VaveAiService) {}
 
-  @Post('projects/:id/ai/cost-analysis')
+  @Post('vave-projects/:id/ai/cost-analysis')
   @HttpCode(200)
   @SpendsAi()
   @ApiOperation({ summary: 'AI cost analysis (affinity groups, focus areas, QFD) of a VAVE project BOM, with its Pareto' })
@@ -37,7 +37,7 @@ export class VaveAiController {
     return this.vaveAi.costAnalysis(projectId, caller(user, organizationId, token));
   }
 
-  @Post('projects/:id/ai/ideation')
+  @Post('vave-projects/:id/ai/ideation')
   @HttpCode(200)
   @SpendsAi()
   @ApiOperation({ summary: 'AI VAVE ideas for a project, from its BOM and should-cost gaps (not saved)' })
@@ -50,7 +50,7 @@ export class VaveAiController {
     return this.vaveAi.ideation(projectId, caller(user, organizationId, token));
   }
 
-  @Post('projects/:id/ai/should-cost/:itemId')
+  @Post('vave-projects/:id/ai/should-cost/:itemId')
   @HttpCode(200)
   @SpendsAi()
   @ApiOperation({ summary: 'AI should-cost estimate of one VAVE BOM item (not saved)' })
@@ -64,7 +64,7 @@ export class VaveAiController {
     return this.vaveAi.shouldCost(projectId, itemId, caller(user, organizationId, token));
   }
 
-  @Post('ai/bom-analysis')
+  @Post('vave-bom-analyses')
   @HttpCode(200)
   @SpendsAi()
   @ApiOperation({ summary: 'AI VAVE insights for one benchmark BOM, from its structured metrics' })
