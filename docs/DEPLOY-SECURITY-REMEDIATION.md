@@ -45,7 +45,7 @@ Numbers 946 and 954 onward are not used by this release. Check on the new databa
   deploying list who is a viewer and who should not be, and fix it on stage and production:
   `SELECT u.email, m.organization_id, m.role FROM organization_members m JOIN auth.users u ON u.id = m.user_id WHERE m.status = 'active' ORDER BY m.role;`
   Make sure every organization has at least one `admin` or `owner`: nobody else can set budget FX rates or issue API keys.
-- **Platform administrators** (`POST /fx/refresh`, `GET /should-cost/calibration/history`) are listed in `platform_admins`, empty after
+- **Platform administrators** (`POST /fx/refresh`; the calibration history is read from the database) are listed in `platform_admins`, empty after
   the migration, so nobody can use those routes until you insert the operators (as the database owner; `granted_by` names who granted):
 
   ```sql
@@ -67,7 +67,7 @@ Numbers 946 and 954 onward are not used by this release. Check on the new databa
 ## 5. Verify
 
 `ci/all.sh release`; `/auth/me` returns `organizationRole`; a viewer's `POST` to a member route answers 403; an admin sets a budget FX
-rate; a non-admin cannot; a listed platform admin reaches `GET /should-cost/calibration/history` and an unlisted one gets 403;
+rate; a non-admin cannot; a listed platform admin can refresh FX rates (`POST /fx/refresh`) and an unlisted one gets 403;
 `AI_DISABLED=true` makes `/copilot/chat` answer 503 and `false` restores it; `auth.link_events` shows the decision for a new login.
 
 ## Rollback

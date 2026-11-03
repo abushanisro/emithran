@@ -9,12 +9,8 @@ import { ProductionEntryController } from './controllers/production-entry.contro
 import { ProductionEntryService } from './services/production-entry.service';
 import { RemarkController } from './controllers/remark.controller';
 import { RemarkService } from './services/remark.service';
-import { CommentController } from './controllers/comment.controller';
-import { CommentService } from './services/comment.service';
 import { SubtaskController } from './controllers/subtask.controller';
 import { SubtaskService } from './services/subtask.service';
-import { ProcessTrackingController } from './controllers/process-tracking.controller';
-import { ProcessTrackingService } from './services/process-tracking.service';
 
 @Module({
   imports: [
@@ -25,9 +21,7 @@ import { ProcessTrackingService } from './services/process-tracking.service';
     ProductionProcessController,
     ProductionEntryController,
     RemarkController,
-    CommentController,
     SubtaskController,
-    ProcessTrackingController,
   ],
   providers: [
     ProductionPlanningService,
@@ -35,9 +29,7 @@ import { ProcessTrackingService } from './services/process-tracking.service';
     ProductionProcessService,
     ProductionEntryService,
     RemarkService,
-    CommentService,
     SubtaskService,
-    ProcessTrackingService,
   ],
   exports: [
     ProductionPlanningService,
@@ -46,7 +38,6 @@ import { ProcessTrackingService } from './services/process-tracking.service';
     ProductionEntryService,
     RemarkService,
     SubtaskService,
-    ProcessTrackingService,
   ],
 })
 export class ProductionPlanningModule { }
