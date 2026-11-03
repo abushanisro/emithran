@@ -9,7 +9,7 @@ CONTAINER="${CONTAINER:-docker}"
 IMAGE="casting-worker:${IMAGE_TAG:-check}"
 WORK=".cache/casting-worker-check-$$"
 trap 'rm -rf "$WORK"' EXIT
-mkdir -p "$WORK/samples"
+mkdir -p "$WORK/samples"; chmod 777 "$WORK/samples"   # the worker container runs as uid 65532, not the runner user (Linux bind mounts keep the host owner)
 compare() { (cd backend && npx ts-node -r tsconfig-paths/register scripts/casting-worker-results.ts "$@"); }
 
 pass() { echo "PASS  $1"; }
