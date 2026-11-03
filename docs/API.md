@@ -119,7 +119,7 @@ Liveness is outside the versioned API: `GET /` and `GET /ping`; health checks ar
 
 ## The web app and the API agree
 
-`test/contract/api-paths.test.ts` reads every API path the web app calls and checks it against the backend's route list, by canonical name. A rename, a typo or a call to a route that does not exist fails there instead of as a 404 the client swallows. The calls that are wrong today are listed in `api-paths-unmatched.json` (9, mostly routes the backend never had: `boms/:id/approve`, `boms/:id/release`, `boms/:id/items/:itemId`, `calculators/formulas/validate`, production vendor assignments and daily production, the cost recalculation paths); the list can only shrink.
+`test/contract/api-paths.test.ts` reads every API path the web app calls and checks it against the backend's route list, by canonical name. A rename, a typo or a call to a route that does not exist fails there instead of as a 404 the client swallows. The check is by method and path, so a `POST` to a route that only has a `GET` fails too. Calls that are wrong are listed in `api-paths-unmatched.json`, which can only shrink; it is empty now.
 
 ## How the rules are enforced
 

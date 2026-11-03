@@ -349,17 +349,6 @@ export const vendorsApi = {
     return apiClient.delete(`/vendors/contacts/${id}`);
   },
 
-  // ============================================================================
-  // LEGACY / FUTURE
-  // ============================================================================
-
-  /**
-   * Get vendor performance metrics
-   */
-  getPerformance: async (id: string): Promise<VendorPerformance> => {
-    return apiClient.get<VendorPerformance>(`/vendors/${id}/performance`);
-  },
-
   /**
    * Get vendor capabilities
    */

@@ -165,15 +165,6 @@ const productionPlanningApi = {
   createVendorAssignment: (lotId: string, data: any) =>
     apiClient.post(`/production-lots/${lotId}/vendor-assignments`, data),
 
-  bulkCreateVendorAssignments: (lotId: string, data: any) =>
-    apiClient.post(`/production-lots/${lotId}/vendor-assignments/bulk`, data),
-
-  updateVendorAssignment: (id: string, data: any) =>
-    apiClient.put(`/production-planning/vendor-assignments/${id}`, data),
-
-  deleteVendorAssignment: (id: string) =>
-    apiClient.delete(`/production-planning/vendor-assignments/${id}`),
-
   // Production Processes
   getProductionProcesses: (lotId: string, filters?: { status?: string }) =>
     apiClient.get(`/production-lots/${lotId}/processes`, { ...(filters !== undefined ? { params: filters } : {}) }),

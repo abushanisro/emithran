@@ -177,6 +177,17 @@ export class ProductionPlanningController {
     return createResponse(result);
   }
 
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Delete('production-lots/:id/vendor-assignments/:assignmentId')
+  async deleteVendorAssignment(
+    @Param('id', ParseUUIDPipe) _lotId: string,
+    @Param('assignmentId', ParseUUIDPipe) assignmentId: string,
+    @CurrentUser() user: User,
+  ): Promise<ApiResponse<void>> {
+    await this.productionPlanningService.deleteVendorAssignment(assignmentId, this.getUserId(user));
+    return createResponse(undefined);
+  }
+
   @Put('production-lots/:id')
   // 20 per 15 minutes per client: production changes are deliberate, not bulk
   @Throttle({ default: { limit: 20, ttl: 15 * 60 * 1000 } })

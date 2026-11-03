@@ -3,7 +3,6 @@
  */
 
 import { apiClient } from './client';
-import { apiConfig } from './config';
 
 export type BOMItem = {
   id: string;
@@ -142,68 +141,9 @@ export const bomApi = {
   },
 
   /**
-   * Get BOM items
-   */
-  getItems: async (bomId: string): Promise<BOMItem[]> => {
-    return apiClient.get<BOMItem[]>(`/boms/${bomId}/items`);
-  },
-
-  /**
-   * Add BOM item
-   */
-  addItem: async (bomId: string, data: CreateBOMItemData): Promise<BOMItem> => {
-    return apiClient.post<BOMItem>(`/boms/${bomId}/items`, data) as Promise<BOMItem>;
-  },
-
-  /**
-   * Update BOM item
-   */
-  updateItem: async (
-    bomId: string,
-    itemId: string,
-    data: UpdateBOMItemData,
-  ): Promise<BOMItem> => {
-    return apiClient.put<BOMItem>(`/boms/${bomId}/items/${itemId}`, data) as Promise<BOMItem>;
-  },
-
-  /**
-   * Delete BOM item
-   */
-  deleteItem: async (bomId: string, itemId: string): Promise<void> => {
-    return apiClient.delete(`/boms/${bomId}/items/${itemId}`) as Promise<void>;
-  },
-
-  /**
    * Get BOM cost breakdown
    */
   getCostBreakdown: async (bomId: string): Promise<BOMCostBreakdown> => {
     return apiClient.get<BOMCostBreakdown>(`/boms/${bomId}/cost-report`);
-  },
-
-  /**
-   * Approve BOM
-   */
-  approve: async (bomId: string): Promise<BOM> => {
-    return apiClient.post<BOM>(`/boms/${bomId}/approve`, {}) as Promise<BOM>;
-  },
-
-  /**
-   * Release BOM
-   */
-  release: async (bomId: string): Promise<BOM> => {
-    return apiClient.post<BOM>(`/boms/${bomId}/release`, {}) as Promise<BOM>;
-  },
-
-  /**
-   * Upload BOM file
-   */
-  uploadFile: async (bomId: string, file: File): Promise<{ success: boolean; itemsImported: number }> => {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    return fetch(`${apiConfig.endpoints.api.v1}/boms/${bomId}/upload`, {
-      method: 'POST',
-      body: formData,
-    }).then((res) => res.json());
   },
 };

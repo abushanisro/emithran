@@ -332,36 +332,10 @@ export const calculatorsApi = {
     return apiClient.delete<void>(`/calculators/${calculatorId}/formulas/${formulaId}`) as Promise<void>;
   },
 
-  validateFormula: async (data: ValidateFormulaData): Promise<FormulaValidationResult> => {
-    return apiClient.post<FormulaValidationResult>('/calculators/formulas/validate', data) as Promise<FormulaValidationResult>;
-  },
-
   // Execution
   execute: async (data: ExecuteCalculatorData): Promise<ExecutionResult> => {
     const { calculatorId, ...executeData } = data;
     return apiClient.post<ExecutionResult>(`/calculators/${calculatorId}/execute`, executeData) as Promise<ExecutionResult>;
-  },
-
-  saveExecution: async (data: SaveExecutionData): Promise<CalculatorExecution> => {
-    return apiClient.post<CalculatorExecution>('/calculators/executions', data) as Promise<CalculatorExecution>;
-  },
-
-  getExecutions: async (query?: ExecutionQuery): Promise<ExecutionListResponse> => {
-    const params = new URLSearchParams();
-    if (query?.calculatorId) params.append('calculatorId', query.calculatorId);
-    if (query?.search) params.append('search', query.search);
-    if (query?.projectReference) params.append('projectReference', query.projectReference);
-    if (query?.page) params.append('page', query.page.toString());
-    if (query?.limit) params.append('limit', query.limit.toString());
-
-    const queryString = params.toString();
-    return apiClient.get<ExecutionListResponse>(
-      `/calculators/executions${queryString ? `?${queryString}` : ''}`,
-    ) as Promise<ExecutionListResponse>;
-  },
-
-  getExecution: async (executionId: string): Promise<CalculatorExecution> => {
-    return apiClient.get<CalculatorExecution>(`/calculators/executions/${executionId}`) as Promise<CalculatorExecution>;
   },
 
   // Sheet metal parameterized lookup tables
@@ -373,14 +347,5 @@ export const calculatorsApi = {
     fromMachineSpec?: boolean;
   }> => {
     return apiClient.post('/calculators/sheet-metal/lookups', { tableName, params }) as Promise<any>;
-  },
-
-  // Database lookups
-  resolveDatabaseField: async (data: ResolveDatabaseFieldData): Promise<{ value: number }> => {
-    return apiClient.post<{ value: number }>('/calculators/resolve-field', data) as Promise<{ value: number }>;
-  },
-
-  getLookupOptions: async (data: GetLookupOptionsData): Promise<LookupRecord[]> => {
-    return apiClient.post<LookupRecord[]>('/calculators/lookup', data) as Promise<LookupRecord[]>;
   },
 };
