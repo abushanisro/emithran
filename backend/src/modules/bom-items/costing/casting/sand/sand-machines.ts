@@ -55,6 +55,12 @@ export const asFinishingMachine = (m: SandMachine): FinishingMachine => ({
   operators: m.operators, setupTimeHr: m.setupTimeHr, specs: { ...m.specs },
 });
 
+/** A text spec of a machine (a type such as shakeout_type), trimmed and lower-cased; null when absent. */
+export function machineText(m: SandMachine, key: string): string | null {
+  const v = m.specs[key];
+  return v == null || String(v).trim() === '' ? null : String(v).trim().toLowerCase();
+}
+
 /** The value of a machine column: a spec of the machine, or its power, by the key the calculator spec names. */
 export function machineValue(m: SandMachine, key: string): number | null {
   return key === 'machine_power_kw' ? m.powerKw : num(m.specs[key]);
