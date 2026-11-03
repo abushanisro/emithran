@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../../../common/database/database.service';
 import { resolveGdtCallouts } from '../costing/shared/physics/gdt-callouts';
-import { CastingReferenceService } from '../costing/casting/casting-reference.service';
+import { CastingReferenceService, type CastabilityProcess } from '../costing/casting/casting-reference.service';
 import { holeCastability, holeProximityCastability, type HoleCastability } from '../costing/casting/casting-reference';
 import { castingProcessLabel, castingProcessOfFamily } from '../costing/casting/casting-cost-summary';
 import { resolveScenarioDieCastingProcess } from '../costing/casting/die-casting-process-choice';
@@ -168,15 +168,23 @@ export class FeatureToleranceService {
     // The grade the part is costed on: the same precedence as getCostSummary
     // (Material Grade, else the material picked at Create BOM).
     const grade = item.material_grade ?? item.material ?? null;
-    const [{ reference: castRef, missing: castMissing }, alloy] = await Promise.all([
-      this.castingReference.getReference(),
-      this.castingReference.getMaterial(this.database.getUserClient(accessToken), grade),
-    ]);
+    // Each casting process is judged by its own wall and hole limits and its own materials: die casting by memory/Die Casting,
+    // sand casting by memory/Sand casting. A process with no staged limits (investment casting) is not assessed, never judged
+    // by another process's numbers.
+    const limitsOf: CastabilityProcess | null = casting === 'die_casting' || casting === 'sand_casting' ? casting : null;
+    const [{ reference: castRef, missing: castMissing }, alloy] = limitsOf
+      ? await Promise.all([
+          this.castingReference.getCastabilityReference(limitsOf),
+          this.castingReference.getMaterial(this.database.getUserClient(accessToken), grade, limitsOf),
+        ])
+      : [{ reference: null, missing: [`no staged hole and wall limits for ${familyProcess}`] }, null];
     const formabilityNote = !castRef
       ? `hole castability not assessed: ${castMissing.join(', ')}`
       : !alloy
-        ? `hole castability not assessed: "${grade ?? '(no material)'}" is not a die-casting alloy`
+        ? `hole castability not assessed: "${grade ?? '(no material)'}" is not a ${familyProcess} material`
         : null;
+    // The hole-to-hole wall limit is a die-casting table; a process whose data has none has no such limit to check.
+    const hasProximityLimits = !!castRef && castRef.holeProximity.length > 0;
 
     // Other parallel holes, for the hole-to-hole wall check.
     const holes = tolerances.instances
@@ -198,11 +206,13 @@ export class FeatureToleranceService {
         if (instance.featureType === 'SimpleHole' && instance.sizeMm != null) {
           if (formabilityNote) return { formable: null, detail: formabilityNote };
           const checks = [holeCastability(castRef!, primaryProcess, alloy!.materialType, instance.sizeMm, instance.depthMm)];
-          checks.push(instance.centroidMm && instance.axis
-            ? holeProximityCastability(castRef!, primaryProcess,
-                { diameterMm: instance.sizeMm, centroidMm: instance.centroidMm, axis: instance.axis },
-                holes.filter((h) => h.label !== instance.label))
-            : { castable: null, detail: 'hole axis not measured (re-run analysis): hole-to-hole wall not checked' });
+          if (hasProximityLimits) {
+            checks.push(instance.centroidMm && instance.axis
+              ? holeProximityCastability(castRef!, primaryProcess,
+                  { diameterMm: instance.sizeMm, centroidMm: instance.centroidMm, axis: instance.axis },
+                  holes.filter((h) => h.label !== instance.label))
+              : { castable: null, detail: 'hole axis not measured (re-run analysis): hole-to-hole wall not checked' });
+          }
           return all(checks);
         }
         if (instance.featureType === 'MultiStepHole' && instance.steps?.length) {
