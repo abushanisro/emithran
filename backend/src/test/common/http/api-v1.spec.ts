@@ -71,7 +71,7 @@ describe('/api/v1 prefix', () => {
     expect(res.headers['content-type']).toMatch(/^application\/json/);
     expect(res.body.success).toBe(false);
     expect(res.body.error.message).toBe('The id is not valid');
-    expect(res.headers.deprecation).toBe('true');
+    expect(res.headers.deprecation).toBe('@1793664000');
     expect(res.headers.link).toBe('</api/v1/things/bad/input>; rel="successor-version"');
     expect(res.headers.sunset).toBeUndefined();
   });
@@ -109,7 +109,7 @@ describe('/api/v1 prefix', () => {
       const res = await request(app.getHttpServer()).get('/api/v1/mhr/7?x=1');
       expect(res.status).toBe(200);
       expect(res.body).toEqual({ id: 'rate' });
-      expect(res.headers.deprecation).toBe('true');
+      expect(res.headers.deprecation).toBe('@1793664000');
       expect(res.headers.link).toBe('</api/v1/machine-rates/7>; rel="successor-version"');
     });
 
@@ -124,5 +124,15 @@ describe('/api/v1 prefix', () => {
       expect(res.status).toBe(404);
       expect(res.headers['content-type']).toMatch(/^application\/problem\+json/);
     });
+  });
+
+  it('links the deprecation notice too once API_DEPRECATION_DOCS_URL is set, with both link relations in one header', async () => {
+    const documented = await boot({ API_DEPRECATION_DOCS_URL: 'https://docs.example.com/deprecations/v1' });
+    try {
+      const res = await request(documented.getHttpServer()).get('/v1/api/things/1');
+      expect(res.headers.link).toBe('</api/v1/things/1>; rel="successor-version", <https://docs.example.com/deprecations/v1>; rel="deprecation"; type="text/html"');
+    } finally {
+      await documented.close();
+    }
   });
 });

@@ -5,7 +5,7 @@
  *
  * `from` and `to` are paths after the API prefix, matched on whole segments. A `:name` segment in `from` matches any one segment and
  * is copied to the same `:name` in `to`; whatever follows the matched segments is kept. The rule with the most segments wins, then
- * the first listed. Remove a rule once the deprecated-path log shows no traffic for 30 days.
+ * the first listed. A rule goes only after the Sunset date, announced in advance (docs/API.md), not when traffic reaches zero.
  */
 const RULES: Array<readonly [from: string, to: string]> = [
   // rates

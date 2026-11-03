@@ -105,11 +105,26 @@ GET /vendors?processId=…&q=casting&sort=+name,-createdAt&page=2&limit=50
 
 ## 9. Version the API
 
-The version is the first path segment: `/api/v1/…`. A change that can break a client ships as `/api/v2`. Within `v1` changes only add. The old prefix **`/v1/api/…`** still works and is deprecated: each response carries `Deprecation: true`, `Link: </api/v1/…>; rel="successor-version"` and, once `LEGACY_API_SUNSET` is set, `Sunset`. It is removed after its request log has shown no traffic for 30 days. Health checks stay at `/api/health/*`.
+The version is the first path segment: `/api/v1/…`. Only major versions exist. A change that can break a client ships as `/api/v2`; within `v1` changes only add.
+
+- **Not breaking:** a new endpoint, a new optional request field or query parameter, a new response field.
+- **Breaking** (needs a new major version): removing or renaming a response field, changing a field's type or meaning, making an optional request field required, changing who may call a route.
+
+The old prefix **`/v1/api/…`** and every renamed resource path (table below) still work and are **deprecated**, announced with the standard headers:
+
+```
+Deprecation: @1793664000                                   RFC 9745: when it was deprecated, as a date
+Sunset: Wed, 30 Jun 2027 00:00:00 GMT                      RFC 8594: when it stops working (once announced)
+Link: </api/v1/machine-rates/7>; rel="successor-version", <https://docs…/deprecations/v1>; rel="deprecation"
+```
+
+`Deprecation` is a structured date (`@` and Unix seconds), not `true`. The dates and the notice URL are settings, checked at start (a wrong one stops the server): `LEGACY_API_DEPRECATED_AT` (default 2026-11-03), `LEGACY_API_SUNSET`, `API_DEPRECATION_DOCS_URL`.
+
+**Removal policy.** A deprecated path is removed only after its `Sunset` date, which is published in advance together with a migration guide (we propose no less than six months). Zero traffic in the request log is not the trigger: an integration may run once a quarter. The log tells us whom to contact before the date. Health checks stay at `/api/health/*`.
 
 ## Renamed paths
 
-A route that was renamed keeps answering on its old path until nobody uses it. The table is `backend/src/common/http/legacy-paths.ts` (old path to new path, on whole segments; a `:name` segment matches any segment and is copied across): a request to the old path is routed to the new one and answered with `Deprecation: true` and `Link: </api/v1/new-path>; rel="successor-version"`. The controllers carry only the new name, so the route inventory lists each route once. A rule is removed once the deprecated-path log shows no traffic for 30 days.
+A route that was renamed keeps answering on its old path until its Sunset date. The table is `backend/src/common/http/legacy-paths.ts` (old path to new path, on whole segments; a `:name` segment matches any segment and is copied across): a request to the old path is routed to the new one and answered with the deprecation headers of rule 9. The controllers carry only the new name, so the route inventory lists each route once. A rule is removed after the Sunset date, never because traffic reached zero.
 
 | Old | New |
 |---|---|
