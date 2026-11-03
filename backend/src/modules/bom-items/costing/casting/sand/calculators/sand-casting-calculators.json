@@ -1,0 +1,1409 @@
+{
+  "domain": "sand casting",
+  "processGroup": "Sand Casting",
+  "calculators": [
+    {
+      "key": "sand.risers",
+      "name": "Sand Casting - Risers",
+      "description": "Risers by the modulus method with its feed-volume check (D146): each riser's modulus is the casting's (volume / surface) times a factor, so it freezes after the casting; and the risers hold the metal the casting and they shrink by, of which a riser gives only its feed efficiency. A cylinder cooling through its side and top, the larger of the two sizes. Factor, shape and efficiency are the standard rules, the shrinkage the alloy family's typical value, until the plant sets its own. One riser per ingate.",
+      "operations": [],
+      "helper": true,
+      "output": "Riser Weight",
+      "results": [
+        "Riser Diameter",
+        "Riser Height"
+      ],
+      "fields": [
+        {
+          "name": "Casting Modulus",
+          "unit": "mm",
+          "source": {
+            "cad": "modulus_mm"
+          }
+        },
+        {
+          "name": "Casting Volume",
+          "unit": "mm³",
+          "source": {
+            "cad": "volume_mm3"
+          }
+        },
+        {
+          "name": "Density",
+          "unit": "kg/m³",
+          "source": {
+            "material": "density_kg_m3"
+          }
+        },
+        {
+          "name": "Risers",
+          "unit": null,
+          "source": {
+            "engine": "risers"
+          }
+        },
+        {
+          "name": "Shrinkage (estimate)",
+          "unit": "%",
+          "source": {
+            "engine": "shrinkage_pct"
+          }
+        },
+        {
+          "name": "Riser Modulus Factor (standard rule)",
+          "unit": null,
+          "formula": "1.2"
+        },
+        {
+          "name": "Height to Diameter (standard rule)",
+          "unit": null,
+          "formula": "1.5"
+        },
+        {
+          "name": "Feed Efficiency (standard rule)",
+          "unit": "%",
+          "formula": "14"
+        },
+        {
+          "name": "Riser Modulus",
+          "unit": "mm",
+          "formula": "{Casting Modulus} * {Riser Modulus Factor (standard rule)}"
+        },
+        {
+          "name": "Diameter by Modulus",
+          "unit": "mm",
+          "formula": "{Riser Modulus} * (4 * {Height to Diameter (standard rule)} + 1) / {Height to Diameter (standard rule)}"
+        },
+        {
+          "name": "Feed Volume per Riser",
+          "unit": "mm³",
+          "formula": "{Shrinkage (estimate)} * {Casting Volume} / ({Feed Efficiency (standard rule)} - {Shrinkage (estimate)}) / {Risers}"
+        },
+        {
+          "name": "Diameter by Feeding",
+          "unit": "mm",
+          "formula": "(4 * {Feed Volume per Riser} / (pi * {Height to Diameter (standard rule)})) ^ (1 / 3)"
+        },
+        {
+          "name": "Riser Diameter",
+          "unit": "mm",
+          "formula": "max({Diameter by Modulus}, {Diameter by Feeding})"
+        },
+        {
+          "name": "Riser Height",
+          "unit": "mm",
+          "formula": "{Riser Diameter} * {Height to Diameter (standard rule)}"
+        },
+        {
+          "name": "Riser Volume",
+          "unit": "mm³",
+          "formula": "pi / 4 * {Riser Diameter} ^ 2 * {Riser Height}"
+        },
+        {
+          "name": "Riser Weight",
+          "unit": "kg",
+          "formula": "{Risers} * {Riser Volume} / 1e9 * {Density}"
+        }
+      ]
+    },
+    {
+      "key": "sand.gating",
+      "name": "Sand Casting - Gating system",
+      "description": "Sprue, sprue well, runner and ingates (D146): the choke area lets the metal of one mould in within the pouring time under the cope's head (the casting gated at the parting line: half its height in the cope is lost), at the gating ratio's efficiency; the sprue, runner and ingates follow the plant's ratio, and their shapes the plant's aspect ratios. One sprue a mould; a runner and ingates per casting.",
+      "operations": [],
+      "helper": true,
+      "output": "Gating Weight",
+      "results": [
+        "Pour Time",
+        "Effective Head",
+        "Choke Area",
+        "Sprue Diameter",
+        "Sprue Height",
+        "Well Diameter",
+        "Well Depth",
+        "Runner Width",
+        "Runner Height",
+        "Runner Length",
+        "Ingate Width",
+        "Ingate Height",
+        "Ingate Length",
+        "Ingate Area"
+      ],
+      "fields": [
+        {
+          "name": "Poured per Mould",
+          "unit": "kg",
+          "source": {
+            "engine": "poured_per_mould_kg"
+          }
+        },
+        {
+          "name": "Cavities",
+          "unit": null,
+          "source": {
+            "engine": "cavities"
+          }
+        },
+        {
+          "name": "Density",
+          "unit": "kg/m³",
+          "source": {
+            "material": "density_kg_m3"
+          }
+        },
+        {
+          "name": "Pouring Coefficient",
+          "unit": null,
+          "source": {
+            "lookup": "tblPouringCoefficients.Coefficient"
+          }
+        },
+        {
+          "name": "Cope Height",
+          "unit": "mm",
+          "source": {
+            "engine": "cope_height_mm"
+          }
+        },
+        {
+          "name": "Casting Height in Cope",
+          "unit": "mm",
+          "source": {
+            "engine": "above_parting_mm"
+          }
+        },
+        {
+          "name": "Part Length",
+          "unit": "mm",
+          "source": {
+            "engine": "part_length_mm"
+          }
+        },
+        {
+          "name": "Ingates",
+          "unit": null,
+          "source": {
+            "engine": "ingates"
+          }
+        },
+        {
+          "name": "Sprue Multiplier",
+          "unit": null,
+          "source": {
+            "variable": "sprueMultiplier"
+          }
+        },
+        {
+          "name": "Runner Multiplier",
+          "unit": null,
+          "source": {
+            "variable": "runnerMultiplier"
+          }
+        },
+        {
+          "name": "Ingate Multiplier",
+          "unit": null,
+          "source": {
+            "variable": "ingateMultiplier"
+          }
+        },
+        {
+          "name": "Efficiency",
+          "unit": null,
+          "source": {
+            "lookup": "tblGatingRatios.Efficiency Coefficient"
+          }
+        },
+        {
+          "name": "Well Area Ratio",
+          "unit": null,
+          "source": {
+            "variable": "sprueWellAreaToWellBase"
+          }
+        },
+        {
+          "name": "Runner Aspect Ratio",
+          "unit": null,
+          "source": {
+            "variable": "runnerAspectRatio"
+          }
+        },
+        {
+          "name": "Ingate Aspect Ratio",
+          "unit": null,
+          "source": {
+            "variable": "ingateAspectRatio"
+          }
+        },
+        {
+          "name": "Ingate Length Ratio",
+          "unit": null,
+          "source": {
+            "variable": "ingateLengthToPartLength"
+          }
+        },
+        {
+          "name": "Well Depth to Runner Height (standard rule)",
+          "unit": null,
+          "formula": "2"
+        },
+        {
+          "name": "Pour Time",
+          "unit": "s",
+          "formula": "{Pouring Coefficient} * sqrt({Poured per Mould} / 0.45359237)"
+        },
+        {
+          "name": "Effective Head",
+          "unit": "mm",
+          "formula": "{Cope Height} - {Casting Height in Cope} / 2"
+        },
+        {
+          "name": "Choke Area",
+          "unit": "mm²",
+          "formula": "{Poured per Mould} / ({Density} * {Pour Time} * {Efficiency} * sqrt(2 * 9.81 * {Effective Head} / 1000)) * 1e6"
+        },
+        {
+          "name": "Smallest Multiplier",
+          "unit": null,
+          "formula": "min({Sprue Multiplier}, {Runner Multiplier}, {Ingate Multiplier})"
+        },
+        {
+          "name": "Sprue Area",
+          "unit": "mm²",
+          "formula": "{Choke Area} * {Sprue Multiplier} / {Smallest Multiplier}"
+        },
+        {
+          "name": "Runner Area",
+          "unit": "mm²",
+          "formula": "{Choke Area} * {Runner Multiplier} / {Smallest Multiplier} / {Cavities}"
+        },
+        {
+          "name": "Ingate Area",
+          "unit": "mm²",
+          "formula": "{Choke Area} * {Ingate Multiplier} / {Smallest Multiplier} / {Cavities}"
+        },
+        {
+          "name": "Sprue Diameter",
+          "unit": "mm",
+          "formula": "sqrt(4 * {Sprue Area} / pi)"
+        },
+        {
+          "name": "Sprue Height",
+          "unit": "mm",
+          "formula": "{Cope Height}"
+        },
+        {
+          "name": "Well Diameter",
+          "unit": "mm",
+          "formula": "sqrt(4 * {Well Area Ratio} * {Sprue Area} / pi)"
+        },
+        {
+          "name": "Runner Height",
+          "unit": "mm",
+          "formula": "sqrt({Runner Area} / {Runner Aspect Ratio})"
+        },
+        {
+          "name": "Runner Width",
+          "unit": "mm",
+          "formula": "{Runner Aspect Ratio} * {Runner Height}"
+        },
+        {
+          "name": "Well Depth",
+          "unit": "mm",
+          "formula": "{Well Depth to Runner Height (standard rule)} * {Runner Height}"
+        },
+        {
+          "name": "Ingate Length",
+          "unit": "mm",
+          "formula": "{Ingate Length Ratio} * {Part Length}"
+        },
+        {
+          "name": "Runner Length",
+          "unit": "mm",
+          "formula": "{Part Length} + {Ingate Length}"
+        },
+        {
+          "name": "Ingate Height",
+          "unit": "mm",
+          "formula": "sqrt({Ingate Area} / {Ingates} / {Ingate Aspect Ratio})"
+        },
+        {
+          "name": "Ingate Width",
+          "unit": "mm",
+          "formula": "{Ingate Aspect Ratio} * {Ingate Height}"
+        },
+        {
+          "name": "Sprue and Well per Casting",
+          "unit": "mm³",
+          "formula": "({Sprue Area} * {Sprue Height} + pi / 4 * {Well Diameter} ^ 2 * {Well Depth}) / {Cavities}"
+        },
+        {
+          "name": "Runner and Ingates",
+          "unit": "mm³",
+          "formula": "{Runner Area} * {Runner Length} + {Ingate Area} * {Ingate Length}"
+        },
+        {
+          "name": "Gating Weight",
+          "unit": "kg",
+          "formula": "({Sprue and Well per Casting} + {Runner and Ingates}) / 1e9 * {Density}"
+        }
+      ]
+    },
+    {
+      "key": "sand.metal",
+      "name": "Sand Casting - Metal per casting",
+      "description": "Net weight from the CAD volume; poured weight with the casting's share of its designed gating system and its risers (D146), which go back to the furnace.",
+      "operations": [],
+      "helper": true,
+      "output": "Poured Weight",
+      "results": [
+        "Net Weight"
+      ],
+      "fields": [
+        {
+          "name": "Volume",
+          "unit": "mm³",
+          "source": {
+            "cad": "volume_mm3"
+          }
+        },
+        {
+          "name": "Density",
+          "unit": "kg/m³",
+          "source": {
+            "material": "density_kg_m3"
+          }
+        },
+        {
+          "name": "Gating",
+          "unit": "kg",
+          "source": {
+            "engine": "gating_kg"
+          }
+        },
+        {
+          "name": "Risers",
+          "unit": "kg",
+          "source": {
+            "engine": "risers_kg"
+          }
+        },
+        {
+          "name": "Net Weight",
+          "unit": "kg",
+          "formula": "{Volume} / 1e9 * {Density}"
+        },
+        {
+          "name": "Poured Weight",
+          "unit": "kg",
+          "formula": "{Net Weight} + {Gating} + {Risers}"
+        }
+      ]
+    },
+    {
+      "key": "sand.material_cost",
+      "name": "Sand Casting - Material cost",
+      "description": "Metal bought per good casting: the net weight, the furnace's melt loss, and the gates and risers not remelted; scrap paid by the good parts.",
+      "operations": [],
+      "helper": true,
+      "output": "Material Cost",
+      "fields": [
+        {
+          "name": "Net Weight",
+          "unit": "kg",
+          "source": {
+            "engine": "net_kg"
+          }
+        },
+        {
+          "name": "Poured Weight",
+          "unit": "kg",
+          "source": {
+            "engine": "poured_kg"
+          }
+        },
+        {
+          "name": "Furnace Yield Loss Factor",
+          "unit": null,
+          "source": {
+            "engine": "furnace_yield_loss_factor"
+          }
+        },
+        {
+          "name": "Remelt Allowance",
+          "unit": null,
+          "source": {
+            "variable": "defaultRemeltAllowanceSandCasting"
+          }
+        },
+        {
+          "name": "Price",
+          "unit": "USD/kg",
+          "source": {
+            "material": "cost_usa"
+          }
+        },
+        {
+          "name": "Final Yield",
+          "unit": null,
+          "source": {
+            "engine": "final_yield"
+          }
+        },
+        {
+          "name": "Melt Loss",
+          "unit": "kg",
+          "formula": "{Poured Weight} / {Furnace Yield Loss Factor} - {Poured Weight}"
+        },
+        {
+          "name": "Bought Weight",
+          "unit": "kg",
+          "formula": "{Net Weight} + {Melt Loss} + ({Poured Weight} - {Net Weight}) * (1 - min(max({Remelt Allowance}, 0), 1))"
+        },
+        {
+          "name": "Material Cost",
+          "unit": "USD",
+          "formula": "{Bought Weight} * {Price} / {Final Yield}"
+        }
+      ]
+    },
+    {
+      "key": "sand.melting",
+      "name": "Sand Casting - Melting",
+      "description": "Heat to bring the metal from ambient to pouring temperature and melt it, times the furnace factor, at the furnace's power.",
+      "operations": [
+        "Melting"
+      ],
+      "results": [
+        "Energy Cost"
+      ],
+      "fields": [
+        {
+          "name": "Poured Weight",
+          "unit": "kg",
+          "source": {
+            "engine": "poured_kg"
+          }
+        },
+        {
+          "name": "Yield Loss Factor",
+          "unit": null,
+          "source": {
+            "machine": "yield_loss_factor"
+          }
+        },
+        {
+          "name": "Specific Heat",
+          "unit": "J/(kg K)",
+          "source": {
+            "material": "specific_heat_rt_j_kg_k"
+          }
+        },
+        {
+          "name": "Pour Temperature",
+          "unit": "°C",
+          "source": {
+            "material": "injection_temp_c"
+          }
+        },
+        {
+          "name": "Ambient Temperature",
+          "unit": "°C",
+          "source": {
+            "variable": "ambientTemp"
+          }
+        },
+        {
+          "name": "Heat of Fusion",
+          "unit": "J/kg",
+          "source": {
+            "material": "heat_of_fusion_j_kg"
+          }
+        },
+        {
+          "name": "Furnace Factor",
+          "unit": null,
+          "source": {
+            "machine": "furnace_factor"
+          }
+        },
+        {
+          "name": "Power",
+          "unit": "kW",
+          "source": {
+            "machine": "machine_power_kw"
+          }
+        },
+        {
+          "name": "Energy Price",
+          "unit": "USD/kWh",
+          "source": {
+            "scenario": "energy_price"
+          }
+        },
+        {
+          "name": "Metal Melted",
+          "unit": "kg",
+          "formula": "{Poured Weight} / {Yield Loss Factor}"
+        },
+        {
+          "name": "Heat of the Melt",
+          "unit": "J/kg",
+          "formula": "{Specific Heat} * ({Pour Temperature} - {Ambient Temperature}) + {Heat of Fusion}"
+        },
+        {
+          "name": "Energy",
+          "unit": "J",
+          "formula": "{Metal Melted} * {Heat of the Melt} * {Furnace Factor}"
+        },
+        {
+          "name": "Energy Cost",
+          "unit": "USD",
+          "formula": "{Energy} / 3.6e6 * {Energy Price}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Energy} / ({Power} * 1000)"
+        }
+      ]
+    },
+    {
+      "key": "sand.moulding.line",
+      "name": "Sand Casting - Moulding (automatic line)",
+      "description": "The line's mould rate, slowed by every core set in the mould, at its efficiency; shared by the cavities.",
+      "operations": [
+        "Horizontal Automatic",
+        "Vertical Automatic"
+      ],
+      "fields": [
+        {
+          "name": "Mould Rate No Core",
+          "unit": "moulds/h",
+          "source": {
+            "machine": "mold_rate_no_core_cycles_per_hr"
+          }
+        },
+        {
+          "name": "Reduction per Core",
+          "unit": "moulds/h",
+          "source": {
+            "machine": "mold_rate_reduction_per_core"
+          }
+        },
+        {
+          "name": "Mould Efficiency",
+          "unit": null,
+          "source": {
+            "machine": "mold_efficiency"
+          }
+        },
+        {
+          "name": "Cores per Mould",
+          "unit": null,
+          "source": {
+            "engine": "cores_per_mould"
+          }
+        },
+        {
+          "name": "Cavities",
+          "unit": null,
+          "source": {
+            "engine": "cavities"
+          }
+        },
+        {
+          "name": "Mould Rate",
+          "unit": "moulds/h",
+          "formula": "{Mould Rate No Core} - {Reduction per Core} * {Cores per Mould}"
+        },
+        {
+          "name": "Mould Time",
+          "unit": "s",
+          "formula": "3600 / {Mould Rate} / {Mould Efficiency}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Mould Time} / {Cavities}"
+        }
+      ]
+    },
+    {
+      "key": "sand.moulding.manual",
+      "name": "Sand Casting - Moulding (manual flask)",
+      "description": "Sand to fill the flask around the metal, slung at the slinging rate, plus the sand's cure time, at the flask's efficiency; shared by the cavities.",
+      "operations": [
+        "Manual Std Moldmaking",
+        "Manual Pit Moldmaking",
+        "Manual Floor Moldmaking"
+      ],
+      "fields": [
+        {
+          "name": "Flask Length",
+          "unit": "mm",
+          "source": {
+            "machine": "flask_length_mm"
+          }
+        },
+        {
+          "name": "Flask Width",
+          "unit": "mm",
+          "source": {
+            "machine": "flask_width_mm"
+          }
+        },
+        {
+          "name": "Flask Height",
+          "unit": "mm",
+          "source": {
+            "machine": "flask_height_mm"
+          }
+        },
+        {
+          "name": "Poured per Mould",
+          "unit": "kg",
+          "source": {
+            "engine": "poured_per_mould_kg"
+          }
+        },
+        {
+          "name": "Metal Density",
+          "unit": "kg/m³",
+          "source": {
+            "material": "density_kg_m3"
+          }
+        },
+        {
+          "name": "Sand Density",
+          "unit": "kg/m³",
+          "source": {
+            "variable": "sandMoldDensity"
+          }
+        },
+        {
+          "name": "Slinging Rate",
+          "unit": "kg/min",
+          "source": {
+            "variable": "sandSlingingRate"
+          }
+        },
+        {
+          "name": "Cure Time",
+          "unit": "min",
+          "source": {
+            "engine": "sand_cure_min"
+          }
+        },
+        {
+          "name": "Mould Efficiency",
+          "unit": null,
+          "source": {
+            "machine": "mold_efficiency"
+          }
+        },
+        {
+          "name": "Cavities",
+          "unit": null,
+          "source": {
+            "engine": "cavities"
+          }
+        },
+        {
+          "name": "Flask Volume",
+          "unit": "m³",
+          "formula": "{Flask Length} * {Flask Width} * {Flask Height} * 1e-9"
+        },
+        {
+          "name": "Sand per Mould",
+          "unit": "kg",
+          "formula": "{Sand Density} * ({Flask Volume} - {Poured per Mould} / {Metal Density})"
+        },
+        {
+          "name": "Mould Time",
+          "unit": "s",
+          "formula": "({Sand per Mould} / {Slinging Rate} * 60 + {Cure Time} * 60) / {Mould Efficiency}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Mould Time} / {Cavities}"
+        }
+      ]
+    },
+    {
+      "key": "sand.pour",
+      "name": "Sand Casting - Pour",
+      "description": "Pouring time per mould from the alloy's coefficient and the pounds poured (aPriori pour formula), plus the ladle transport shared by the moulds one ladle fills; shared by the cavities.",
+      "operations": [
+        "Pour"
+      ],
+      "fields": [
+        {
+          "name": "Poured per Mould",
+          "unit": "kg",
+          "source": {
+            "engine": "poured_per_mould_kg"
+          }
+        },
+        {
+          "name": "Pouring Coefficient",
+          "unit": null,
+          "source": {
+            "lookup": "tblPouringCoefficients.Coefficient"
+          }
+        },
+        {
+          "name": "Ladle Capacity",
+          "unit": "kg",
+          "source": {
+            "machine": "ladle_weight_capacity_kg"
+          }
+        },
+        {
+          "name": "Ladle Transport Time",
+          "unit": "min",
+          "source": {
+            "variable": "defaultLadleTransportTime"
+          }
+        },
+        {
+          "name": "Cavities",
+          "unit": null,
+          "source": {
+            "engine": "cavities"
+          }
+        },
+        {
+          "name": "Poured per Mould (lb)",
+          "unit": "lb",
+          "formula": "{Poured per Mould} / 0.45359237"
+        },
+        {
+          "name": "Moulds per Ladle",
+          "unit": null,
+          "formula": "max(1, floor({Ladle Capacity} / {Poured per Mould}))"
+        },
+        {
+          "name": "Pour Time per Mould",
+          "unit": "s",
+          "formula": "{Pouring Coefficient} * sqrt({Poured per Mould (lb)}) + {Ladle Transport Time} * 60 / {Moulds per Ladle}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Pour Time per Mould} / {Cavities}"
+        }
+      ]
+    },
+    {
+      "key": "sand.cooling",
+      "name": "Sand Casting - Cooling",
+      "description": "Chvorinov's rule: time in the mould = B x (V/A)^n, with the mould constant B from the metal and the sand; shared by the cavities.",
+      "operations": [
+        "Cooling"
+      ],
+      "fields": [
+        {
+          "name": "Metal Density",
+          "unit": "kg/m³",
+          "source": {
+            "material": "density_kg_m3"
+          }
+        },
+        {
+          "name": "Heat of Fusion",
+          "unit": "J/kg",
+          "source": {
+            "material": "heat_of_fusion_j_kg"
+          }
+        },
+        {
+          "name": "Specific Heat Liquid",
+          "unit": "J/(kg K)",
+          "source": {
+            "material": "specific_heat_solidus_j_kg_k"
+          }
+        },
+        {
+          "name": "Pour Temperature",
+          "unit": "°C",
+          "source": {
+            "material": "injection_temp_c"
+          }
+        },
+        {
+          "name": "Liquidus",
+          "unit": "°C",
+          "source": {
+            "material": "liquidus_temp_c"
+          }
+        },
+        {
+          "name": "Sand Conductivity",
+          "unit": "W/(m K)",
+          "source": {
+            "variable": "sandMoldThermalConductivity"
+          }
+        },
+        {
+          "name": "Sand Density",
+          "unit": "kg/m³",
+          "source": {
+            "variable": "sandMoldDensity"
+          }
+        },
+        {
+          "name": "Sand Specific Heat",
+          "unit": "J/(kg K)",
+          "source": {
+            "variable": "sandMoldSpecificHeat"
+          }
+        },
+        {
+          "name": "Mould Temperature",
+          "unit": "°C",
+          "source": {
+            "variable": "sandMoldTemp"
+          }
+        },
+        {
+          "name": "Modulus",
+          "unit": "mm",
+          "source": {
+            "cad": "modulus_mm"
+          }
+        },
+        {
+          "name": "Exponent",
+          "unit": null,
+          "source": {
+            "engine": "modulus_exponent"
+          }
+        },
+        {
+          "name": "Cavities",
+          "unit": null,
+          "source": {
+            "engine": "cavities"
+          }
+        },
+        {
+          "name": "Superheat",
+          "unit": "K",
+          "formula": "max({Pour Temperature} - {Liquidus}, 0)"
+        },
+        {
+          "name": "Heat Term",
+          "unit": null,
+          "formula": "{Metal Density} * ({Heat of Fusion} + {Specific Heat Liquid} * {Superheat}) / ({Liquidus} - {Mould Temperature})"
+        },
+        {
+          "name": "Mould Constant",
+          "unit": "s/m²",
+          "formula": "{Heat Term} ^ 2 * pi / (4 * {Sand Conductivity} * {Sand Density} * {Sand Specific Heat})"
+        },
+        {
+          "name": "Cooling Time",
+          "unit": "s",
+          "formula": "{Mould Constant} * ({Modulus} / 1000) ^ {Exponent}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Cooling Time} / {Cavities}"
+        }
+      ]
+    },
+    {
+      "key": "sand.shakeout",
+      "name": "Sand Casting - Shakeout",
+      "description": "Shakeout time by the rough mass of one mould (metal and core sand), shared by the cavities.",
+      "operations": [
+        "Shakeout"
+      ],
+      "fields": [
+        {
+          "name": "Shakeout Time",
+          "unit": "min",
+          "source": {
+            "lookup": "tblShakeoutTime.Shakeout Time (min)"
+          }
+        },
+        {
+          "name": "Cavities",
+          "unit": null,
+          "source": {
+            "engine": "cavities"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Shakeout Time} * 60 / {Cavities}"
+        }
+      ]
+    },
+    {
+      "key": "sand.shakeout.manual",
+      "name": "Sand Casting - Shakeout (manual)",
+      "description": "Manual shakeout time by the part's mass.",
+      "operations": [],
+      "helper": true,
+      "fields": [
+        {
+          "name": "Shakeout Time",
+          "unit": "min",
+          "source": {
+            "lookup": "tblManualShakeoutTime.Shakeout Time (min)"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Shakeout Time} * 60"
+        }
+      ]
+    },
+    {
+      "key": "sand.degating",
+      "name": "Sand Casting - Degating",
+      "description": "Cutting the designed ingates and riser contacts off (D146) at the machine's feed rate.",
+      "operations": [
+        "Degating"
+      ],
+      "fields": [
+        {
+          "name": "Ingate Area",
+          "unit": "mm²",
+          "source": {
+            "engine": "ingate_area_mm2"
+          }
+        },
+        {
+          "name": "Riser Contact",
+          "unit": "mm²",
+          "source": {
+            "engine": "riser_contact_mm2"
+          }
+        },
+        {
+          "name": "Feed Rate",
+          "unit": "mm²/s",
+          "source": {
+            "machine": "feed_rate_mm2_per_s"
+          }
+        },
+        {
+          "name": "Cut Area",
+          "unit": "mm²",
+          "formula": "{Ingate Area} + {Riser Contact}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Cut Area} / {Feed Rate}"
+        }
+      ]
+    },
+    {
+      "key": "sand.cleaning",
+      "name": "Sand Casting - Cleaning (shot blast loads)",
+      "description": "The blast machine's time per load, shared by the parts one load holds.",
+      "operations": [
+        "Cleaning"
+      ],
+      "fields": [
+        {
+          "name": "Time per Load",
+          "unit": "min",
+          "source": {
+            "machine": "time_per_load_min"
+          }
+        },
+        {
+          "name": "Parts per Load",
+          "unit": null,
+          "source": {
+            "engine": "parts_per_load"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Time per Load} * 60 / {Parts per Load}"
+        }
+      ]
+    },
+    {
+      "key": "sand.cleaning.room",
+      "name": "Sand Casting - Cleaning (blast room)",
+      "description": "The outer surface at the room's blast rate.",
+      "operations": [],
+      "helper": true,
+      "fields": [
+        {
+          "name": "Surface",
+          "unit": "mm²",
+          "source": {
+            "cad": "area_mm2"
+          }
+        },
+        {
+          "name": "Blast Rate",
+          "unit": "m²/min",
+          "source": {
+            "machine": "external_surface_blast_rate_m2_per_min"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Surface} / 1e6 / {Blast Rate} * 60"
+        }
+      ]
+    },
+    {
+      "key": "sand.finishing",
+      "name": "Sand Casting - Finishing (grinding)",
+      "description": "Grinding the ingate and riser stubs of the designed gating (D146) and the parting-line flash at the machine's grinding speeds and the material's factor.",
+      "operations": [
+        "Finishing"
+      ],
+      "fields": [
+        {
+          "name": "Ingate Area",
+          "unit": "mm²",
+          "source": {
+            "engine": "ingate_area_mm2"
+          }
+        },
+        {
+          "name": "Riser Contact",
+          "unit": "mm²",
+          "source": {
+            "engine": "riser_contact_mm2"
+          }
+        },
+        {
+          "name": "Stub Height",
+          "unit": "mm",
+          "source": {
+            "lookup": "tblGrindingDimensions.Ingate Height (mm)"
+          }
+        },
+        {
+          "name": "Riser Stub Height",
+          "unit": "mm",
+          "source": {
+            "lookup": "tblGrindingDimensions.Riser Height (mm)"
+          }
+        },
+        {
+          "name": "Parting Line",
+          "unit": "mm",
+          "source": {
+            "engine": "parting_line_mm"
+          }
+        },
+        {
+          "name": "Flash Thickness",
+          "unit": "mm",
+          "source": {
+            "lookup": "tblGrindingDimensions.Parting Line Thickness (mm)"
+          }
+        },
+        {
+          "name": "Flash Height",
+          "unit": "mm",
+          "source": {
+            "lookup": "tblGrindingDimensions.Parting Line Height (mm)"
+          }
+        },
+        {
+          "name": "Grinding Speed Gating",
+          "unit": "mm³/s",
+          "source": {
+            "machine": "grinding_speed_gating_mm3_per_s"
+          }
+        },
+        {
+          "name": "Grinding Speed Non-Gating",
+          "unit": "mm³/s",
+          "source": {
+            "machine": "grinding_speed_non_gating_mm3_per_s"
+          }
+        },
+        {
+          "name": "Material Factor",
+          "unit": null,
+          "source": {
+            "lookup": "tblGrindingSpeedMaterialFactor.Grinding Speed Material Factor"
+          }
+        },
+        {
+          "name": "Gate Stubs",
+          "unit": "mm³",
+          "formula": "{Ingate Area} * {Stub Height} + {Riser Contact} * {Riser Stub Height}"
+        },
+        {
+          "name": "Flash",
+          "unit": "mm³",
+          "formula": "{Parting Line} * {Flash Thickness} * {Flash Height}"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Gate Stubs} / ({Grinding Speed Gating} * {Material Factor}) + {Flash} / ({Grinding Speed Non-Gating} * {Material Factor})"
+        }
+      ]
+    },
+    {
+      "key": "sand.inspection",
+      "name": "Sand Casting - Visual inspection",
+      "description": "The outer surface at the inspection rate for the part's weight; cored castings take longer.",
+      "operations": [
+        "Visual Inspection"
+      ],
+      "fields": [
+        {
+          "name": "Surface",
+          "unit": "mm²",
+          "source": {
+            "cad": "area_mm2"
+          }
+        },
+        {
+          "name": "Inspection Rate",
+          "unit": "min/m²",
+          "source": {
+            "lookup": "tblVisualInspection.External Inspection Rate (min / m^2)"
+          }
+        },
+        {
+          "name": "Cores",
+          "unit": null,
+          "source": {
+            "engine": "cores"
+          }
+        },
+        {
+          "name": "Single Core Factor",
+          "unit": null,
+          "source": {
+            "variable": "singleCoreInspectionFactor"
+          }
+        },
+        {
+          "name": "Double Core Factor",
+          "unit": null,
+          "source": {
+            "variable": "doubleCoreInspectionFactor"
+          }
+        },
+        {
+          "name": "Multi Core Adder",
+          "unit": null,
+          "source": {
+            "variable": "multiCoreInspectionFactor"
+          }
+        },
+        {
+          "name": "Core Factor",
+          "unit": null,
+          "formula": "IF({Cores} == 0, 1, IF({Cores} == 1, {Single Core Factor}, {Double Core Factor} + {Multi Core Adder} * ({Cores} - 2)))"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Surface} / 1e6 * {Inspection Rate} * 60 * {Core Factor}"
+        }
+      ]
+    },
+    {
+      "key": "sand.core_sand",
+      "name": "Sand Casting - Core sand",
+      "description": "Sand in one core: the core plus its prints (the cross-section times the print length, at both ends).",
+      "operations": [],
+      "helper": true,
+      "output": "Core Sand",
+      "fields": [
+        {
+          "name": "Core Volume",
+          "unit": "mm³",
+          "source": {
+            "engine": "core_volume_mm3"
+          }
+        },
+        {
+          "name": "Core Length",
+          "unit": "mm",
+          "source": {
+            "engine": "core_length_mm"
+          }
+        },
+        {
+          "name": "Print Length",
+          "unit": "mm",
+          "source": {
+            "variable": "lengthCorePrint"
+          }
+        },
+        {
+          "name": "Sand Density",
+          "unit": "kg/m³",
+          "source": {
+            "variable": "sandMoldDensity"
+          }
+        },
+        {
+          "name": "Core Sand",
+          "unit": "kg",
+          "formula": "({Core Volume} + 2 * {Core Volume} / {Core Length} * {Print Length}) * 1e-9 * {Sand Density}"
+        }
+      ]
+    },
+    {
+      "key": "sand.coremaking",
+      "name": "Sand Casting - Coremaking",
+      "description": "One core per core box shot at the machine's base cycle time.",
+      "operations": [
+        "CO2 Cured",
+        "Isocure Gas",
+        "Manual Coremaking",
+        "No Bake",
+        "Oil Core",
+        "Shell"
+      ],
+      "fields": [
+        {
+          "name": "Core Sand",
+          "unit": "kg",
+          "source": {
+            "engine": "core_sand_kg"
+          }
+        },
+        {
+          "name": "Cycle per Core",
+          "unit": "s",
+          "source": {
+            "machine": "base_cycle_time_s"
+          }
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Cycle per Core}"
+        }
+      ]
+    },
+    {
+      "key": "sand.hot_box",
+      "name": "Sand Casting - Hot box coremaking",
+      "description": "One core per hot core box: sand blown at the plant's blowing rate, then cured in the heated box and stripped. Cure and strip times are estimates (D143) until the plant's hot-box times are known.",
+      "operations": [
+        "Hot Box"
+      ],
+      "fields": [
+        {
+          "name": "Core Sand",
+          "unit": "kg",
+          "source": {
+            "engine": "core_sand_kg"
+          }
+        },
+        {
+          "name": "Blowing Rate",
+          "unit": "kg/min",
+          "source": {
+            "variable": "coreBoxSandBlowingRate"
+          }
+        },
+        {
+          "name": "Blow Time",
+          "unit": "s",
+          "formula": "{Core Sand} / {Blowing Rate} * 60"
+        },
+        {
+          "name": "Cure Time (estimate)",
+          "unit": "s",
+          "formula": "30"
+        },
+        {
+          "name": "Strip and Handling (estimate)",
+          "unit": "s",
+          "formula": "10"
+        },
+        {
+          "name": "Cycle Time",
+          "unit": "s",
+          "formula": "{Blow Time} + {Cure Time (estimate)} + {Strip and Handling (estimate)}"
+        }
+      ]
+    },
+    {
+      "key": "sand.core_box",
+      "name": "Sand Casting - Core box",
+      "description": "Core boxes of one material over the lifetime volume: a box makes refurb life x (refurbs + 1) cores.",
+      "operations": [],
+      "helper": true,
+      "output": "Cost per Part",
+      "results": [
+        "Boxes",
+        "Tooling Cost"
+      ],
+      "fields": [
+        {
+          "name": "Lifetime Volume",
+          "unit": "pcs",
+          "source": {
+            "scenario": "lifetime_volume"
+          }
+        },
+        {
+          "name": "Refurb Life",
+          "unit": "cores",
+          "source": {
+            "lookup": "tblCoreboxMaterial.Corebox Refurb Life"
+          }
+        },
+        {
+          "name": "Refurbs per Tool",
+          "unit": null,
+          "source": {
+            "lookup": "tblCoreboxMaterial.Corebox Refurbs Per Tool"
+          }
+        },
+        {
+          "name": "One Cavity Cost",
+          "unit": "USD",
+          "source": {
+            "lookup": "tblCoreboxMaterial.One Cavity Cost (USD)"
+          }
+        },
+        {
+          "name": "Region Multiplier",
+          "unit": null,
+          "source": {
+            "variable": "toolShopRegionMultiplier"
+          }
+        },
+        {
+          "name": "Boxes",
+          "unit": null,
+          "formula": "max(1, CEIL({Lifetime Volume} / ({Refurb Life} * ({Refurbs per Tool} + 1))))"
+        },
+        {
+          "name": "Tooling Cost",
+          "unit": "USD",
+          "formula": "{Boxes} * {One Cavity Cost} * {Region Multiplier}"
+        },
+        {
+          "name": "Cost per Part",
+          "unit": "USD",
+          "formula": "{Tooling Cost} / {Lifetime Volume}"
+        }
+      ]
+    }
+  ]
+}

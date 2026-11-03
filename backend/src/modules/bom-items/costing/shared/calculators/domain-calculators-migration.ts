@@ -63,11 +63,11 @@ BEGIN
     (calculator_id, field_name, display_label, field_type, unit, data_source, source_table, source_field, default_value, display_order, is_required)
   VALUES
 ${rows.map((r) => `    (v_id, ${q(r.field_name)}, ${q(r.display_label)}, ${q(r.field_type)}, ${q(r.unit)}, NULL, NULL, NULL, ${q(r.default_value as string | null)}, ${r.display_order}, ${r.field_type !== 'calculated'})`).join(',\n')};
-
+${c.operations.length === 0 ? '' : `
   UPDATE public.process_calculator_mappings
   SET calculator_id = v_id, calculator_name = ${q(c.name)}
   WHERE process_group = ${q(spec.processGroup)} AND operation IN (${c.operations.map((o) => q(o)).join(', ')});
-END
+`}END
 $calc$;
 `);
   }
