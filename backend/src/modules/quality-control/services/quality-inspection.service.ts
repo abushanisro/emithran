@@ -5,7 +5,6 @@ import {
   CreateQualityInspectionDto,
   UpdateQualityInspectionDto,
   QualityInspectionResponseDto,
-  InspectionResultDto,
   InspectionStatus,
 } from '../dto/quality-inspection.dto';
 import {
@@ -200,27 +199,7 @@ export class QualityInspectionService {
     }
   }
 
-  async startInspection(
-    id: string,
-    userId: string,
-  ): Promise<QualityInspectionResponseDto> {
-    return this.updateInspection(id, {
-      status: InspectionStatus.IN_PROGRESS,
-      actualStartDate: new Date().toISOString(),
-    }, userId);
-  }
 
-  async completeInspection(
-    id: string,
-    completionData: { notes?: string; finalResult: 'pass' | 'fail' | 'conditional' },
-    userId: string,
-  ): Promise<QualityInspectionResponseDto> {
-    return this.updateInspection(id, {
-      status: InspectionStatus.COMPLETED,
-      actualEndDate: new Date().toISOString(),
-      notes: completionData.notes,
-    }, userId);
-  }
 
   async approveInspection(
     id: string,
@@ -395,64 +374,7 @@ export class QualityInspectionService {
     return this.mapToResponseDto(data);
   }
 
-  async submitInspectionResults(
-    inspectionId: string,
-    resultsDto: InspectionResultDto,
-    userId: string,
-  ): Promise<any> {
-    const organizationId = await this.getInspectionOrganization(inspectionId);
 
-    const resultData = {
-      inspection_id: inspectionId,
-      organization_id: organizationId,
-      checklist_results: resultsDto.checklistResults,
-      overall_result: resultsDto.overallResult,
-      notes: resultsDto.notes,
-      recommendations: resultsDto.recommendations,
-      attachments: resultsDto.attachments || [],
-      submitted_by: userId,
-      submitted_at: new Date().toISOString(),
-    };
-
-    const { data, error } = await this.db()
-      .from('quality_inspection_results')
-      .upsert(resultData, { onConflict: 'inspection_id' })
-      .select('*')
-      .single();
-
-    if (error) {
-      throw qualityDbError(error, 'submit the inspection results');
-    }
-
-    // Update inspection status
-    await this.updateInspection(inspectionId, {
-      status: InspectionStatus.COMPLETED,
-      actualEndDate: new Date().toISOString(),
-    }, userId);
-
-    return data;
-  }
-
-  async getInspectionResults(
-    inspectionId: string,
-    userId: string,
-  ): Promise<any> {
-    // 404 for an inspection the caller cannot see, rather than "no results yet"
-    await this.getInspectionOrganization(inspectionId);
-
-    const { data, error } = await this.db()
-      .from('quality_inspection_results')
-      .select('*')
-      .eq('inspection_id', inspectionId)
-      .maybeSingle();
-
-    if (error) {
-      this.logger.error(`Failed to get results of inspection ${inspectionId} (user ${userId}): ${error.code} ${error.message}`);
-      throw qualityDbError(error, 'read the inspection results');
-    }
-
-    return data;
-  }
 
 
 

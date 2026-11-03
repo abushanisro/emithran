@@ -141,7 +141,7 @@ export interface ProductionSummary {
 }
 
 // API functions
-export const productionPlanningApi = {
+const productionPlanningApi = {
   // Production Lots
   getProductionLots: (filters?: { status?: string; bomId?: string; priority?: string; projectId?: string }) =>
     apiClient.get('/production-planning/lots', { ...(filters !== undefined ? { params: filters } : {}) }),
@@ -248,16 +248,6 @@ export function useProductionLots(filters?: { status?: string; bomId?: string; p
   });
 }
 
-export function useProductionLot(id?: string) {
-  return useQuery({
-    queryKey: PRODUCTION_PLANNING_QUERY_KEYS.lot(id!),
-    queryFn: () => productionPlanningApi.getProductionLotById(id!),
-    enabled: !!id,
-    staleTime: 3 * 60 * 1000,
-    select: (data) => data.data?.data,
-  });
-}
-
 export function useCreateProductionLot() {
   const queryClient = useQueryClient();
 
@@ -278,19 +268,6 @@ export function useCreateProductionLot() {
   });
 }
 
-export function useUpdateProductionLot() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) =>
-      productionPlanningApi.updateProductionLot(id, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: PRODUCTION_PLANNING_QUERY_KEYS.lot(variables.id) });
-      queryClient.invalidateQueries({ queryKey: PRODUCTION_PLANNING_QUERY_KEYS.lots() });
-    },
-  });
-}
-
 export function useDeleteProductionLot() {
   const queryClient = useQueryClient();
 
@@ -298,30 +275,6 @@ export function useDeleteProductionLot() {
     mutationFn: productionPlanningApi.deleteProductionLot,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: PRODUCTION_PLANNING_QUERY_KEYS.lots() });
-    },
-  });
-}
-
-export function useVendorAssignments(lotId?: string) {
-  return useQuery({
-    queryKey: PRODUCTION_PLANNING_QUERY_KEYS.lotVendorAssignments(lotId!),
-    queryFn: () => productionPlanningApi.getVendorAssignments(lotId!),
-    enabled: !!lotId,
-    staleTime: 3 * 60 * 1000,
-    select: (data) => data.data?.data,
-  });
-}
-
-export function useCreateVendorAssignment() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ lotId, data }: { lotId: string; data: any }) =>
-      productionPlanningApi.createVendorAssignment(lotId, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: PRODUCTION_PLANNING_QUERY_KEYS.lotVendorAssignments(variables.lotId)
-      });
     },
   });
 }
@@ -347,16 +300,6 @@ export function useCreateProductionProcess() {
         queryKey: PRODUCTION_PLANNING_QUERY_KEYS.lotProcesses(variables.lotId)
       });
     },
-  });
-}
-
-export function useProcessSubtasks(processId?: string) {
-  return useQuery({
-    queryKey: PRODUCTION_PLANNING_QUERY_KEYS.processSubtasks(processId!),
-    queryFn: () => productionPlanningApi.getProcessSubtasks(processId!),
-    enabled: !!processId,
-    staleTime: 3 * 60 * 1000,
-    select: (data) => data.data?.data,
   });
 }
 
@@ -404,55 +347,10 @@ export function useDeleteProcessSubtask() {
   });
 }
 
-export function useDailyProductionEntries(
-  lotId?: string,
-  filters?: { startDate?: string; endDate?: string; entryType?: string }
-) {
-  return useQuery({
-    queryKey: [...PRODUCTION_PLANNING_QUERY_KEYS.lotProductionEntries(lotId!), filters],
-    queryFn: () => productionPlanningApi.getDailyProductionEntries(lotId!, filters),
-    enabled: !!lotId,
-    staleTime: 3 * 60 * 1000,
-    select: (data) => data.data?.data,
-  });
-}
-
-export function useCreateDailyProductionEntry() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ lotId, data }: { lotId: string; data: any }) =>
-      productionPlanningApi.createDailyProductionEntry(lotId, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: PRODUCTION_PLANNING_QUERY_KEYS.lotProductionEntries(variables.lotId)
-      });
-    },
-  });
-}
-
-export function useProductionSummary(lotId?: string) {
-  return useQuery({
-    queryKey: PRODUCTION_PLANNING_QUERY_KEYS.lotSummary(lotId!),
-    queryFn: () => productionPlanningApi.getProductionSummary(lotId!),
-    enabled: !!lotId,
-    select: (data) => data.data?.data,
-  });
-}
-
 export function useProductionDashboard(filters?: { startDate?: string; endDate?: string }) {
   return useQuery({
     queryKey: [...PRODUCTION_PLANNING_QUERY_KEYS.dashboard(), filters],
     queryFn: () => productionPlanningApi.getDashboardData(filters),
-    select: (data) => data.data?.data,
-  });
-}
-
-export function useGanttData(lotId?: string) {
-  return useQuery({
-    queryKey: PRODUCTION_PLANNING_QUERY_KEYS.gantt(lotId!),
-    queryFn: () => productionPlanningApi.getGanttData(lotId!),
-    enabled: !!lotId,
     select: (data) => data.data?.data,
   });
 }

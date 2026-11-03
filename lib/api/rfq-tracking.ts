@@ -129,18 +129,6 @@ export async function getRfqTrackingRecords(
 }
 
 /**
- * Get RFQ tracking record by ID
- */
-export async function getRfqTrackingById(
-  trackingId: string
-): Promise<RfqTrackingRecord> {
-  const response = await apiClient.get<RfqTrackingRecord>(
-    `/rfq/tracking/${trackingId}`
-  );
-  return response;
-}
-
-/**
  * Get RFQ tracking statistics
  */
 export async function getRfqTrackingStats(
@@ -168,20 +156,6 @@ export async function updateRfqTrackingStatus(
 }
 
 /**
- * Update vendor response information
- */
-export async function updateVendorResponse(
-  trackingId: string,
-  vendorId: string,
-  data: UpdateVendorResponseData
-): Promise<void> {
-  await apiClient.patch(
-    `/rfq/tracking/${trackingId}/vendors/${vendorId}/response`,
-    data
-  );
-}
-
-/**
  * Delete RFQ tracking record (cancel RFQ)
  */
 export async function deleteRfqTracking(trackingId: string): Promise<void> {
@@ -195,7 +169,7 @@ export async function deleteRfqTracking(trackingId: string): Promise<void> {
 /**
  * Calculate response rate percentage
  */
-export function calculateResponseRate(tracking: RfqTrackingRecord): number {
+function calculateResponseRate(tracking: RfqTrackingRecord): number {
   if (tracking.vendorCount === 0) return 0;
   return Math.round((tracking.responseCount / tracking.vendorCount) * 100);
 }
@@ -241,22 +215,6 @@ export function getStatusText(status: RfqTrackingStatus): string {
 }
 
 /**
- * Check if RFQ has any files attached
- */
-export function hasAttachedFiles(tracking: RfqTrackingRecord): boolean {
-  return tracking.parts.some(part => part.has2dFile || part.has3dFile);
-}
-
-/**
- * Get total file count for RFQ
- */
-export function getTotalFileCount(tracking: RfqTrackingRecord): number {
-  return tracking.parts.reduce((count, part) => {
-    return count + (part.has2dFile ? 1 : 0) + (part.has3dFile ? 1 : 0);
-  }, 0);
-}
-
-/**
  * Format average response time for display
  */
 export function formatResponseTime(days: number): string {
@@ -264,17 +222,6 @@ export function formatResponseTime(days: number): string {
   if (days < 1) return 'Less than 1 day';
   if (days === 1) return '1 day';
   return `${Math.round(days * 10) / 10} days`;
-}
-
-/**
- * Check if RFQ tracking is overdue (based on typical response time)
- */
-export function isOverdue(tracking: RfqTrackingRecord, expectedDays: number = 7): boolean {
-  if (tracking.status === RfqTrackingStatus.COMPLETED) return false;
-  if (tracking.responseCount > 0) return false;
-  
-  const daysSinceSent = (Date.now() - new Date(tracking.sentAt).getTime()) / (1000 * 60 * 60 * 24);
-  return daysSinceSent > expectedDays;
 }
 
 /**

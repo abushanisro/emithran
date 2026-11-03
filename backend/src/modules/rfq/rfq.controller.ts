@@ -27,7 +27,6 @@ import { CreateRfqDto } from './dto/create-rfq.dto';
 import { RfqRecord, RfqSummary } from './dto/rfq-response.dto';
 import { 
   CreateRfqTrackingDto, 
-  UpdateVendorResponseDto, 
   UpdateTrackingStatusDto,
   RfqTrackingResponseDto,
   RfqTrackingStatsDto 
@@ -248,36 +247,6 @@ export class RfqController {
     }
   }
 
-  @Patch('tracking/:trackingId/vendors/:vendorId/response')
-  @ApiOperation({ summary: 'Update vendor response information' })
-  @ApiParam({ name: 'trackingId', description: 'RFQ tracking ID' })
-  @ApiParam({ name: 'vendorId', description: 'Vendor ID' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Vendor response updated successfully'
-  })
-  async updateVendorResponse(
-    @Param('trackingId') trackingId: string,
-    @Param('vendorId') vendorId: string,
-    @CurrentUser() user: User,
-    @AccessToken() token: string,
-    @Body() updateResponseDto: UpdateVendorResponseDto
-  ): Promise<{ message: string }> {
-    try {
-      this.logger.log(`Updating vendor response for tracking ${trackingId}, vendor ${vendorId}`);
-      await this.rfqTrackingService.updateVendorResponse(
-        trackingId,
-        vendorId,
-        user.id,
-        token,
-        updateResponseDto
-      );
-      return { message: 'Vendor response updated successfully' };
-    } catch (error) {
-      this.logger.error(`Failed to update vendor response: ${error.message}`, error.stack);
-      throw error;
-    }
-  }
 
   @Delete('tracking/:id')
   @ApiOperation({ summary: 'Delete RFQ tracking record (cancel RFQ)' })

@@ -78,21 +78,6 @@ export class SupplierEvaluationGroupsController {
     return this.supplierEvaluationGroupsService.findByProject(userId, projectId, token);
   }
 
-  @OrgRole('viewer')
-  @Get('project/:projectId/latest')
-  @ApiOperation({ summary: 'Get the latest evaluation group for a project' })
-  @ApiResponse({
-    status: 200,
-    description: 'Latest evaluation group retrieved successfully',
-    type: SupplierEvaluationGroupDto,
-  })
-  getLatestByProject(
-    @CurrentUser('id') userId: string,
-    @AccessToken() token: string,
-    @Param('projectId') projectId: string,
-  ): Promise<SupplierEvaluationGroupDto | null> {
-    return this.supplierEvaluationGroupsService.getLatestByProject(userId, projectId, token);
-  }
 
   @OrgRole('viewer')
   @Get(':id')

@@ -32,10 +32,6 @@ import {
   UpdateCostValueDto
 } from './dto/cost-competency.dto';
 import {
-  VendorAssessmentCriteriaDto,
-  BatchAssessmentUpdateDto
-} from './dto/vendor-assessment.dto';
-import {
   VendorRatingMatrixDto,
   BatchVendorRatingUpdateDto,
   VendorRatingOverallScoresDto,
@@ -226,51 +222,7 @@ export class SupplierNominationsController {
     return this.supplierNominationsService.update(userId, id, updateDto, token);
   }
 
-  @Post('evaluations/:evaluationId/data')
-  @ApiOperation({ summary: 'Store complete evaluation data (Overview, Cost Analysis, Rating Engine, Capability, Technical)' })
-  @ApiResponse({
-    status: 200,
-    description: 'Evaluation data stored successfully'
-  })
-  storeEvaluationData(
-    @CurrentUser('id') userId: string,
-    @AccessToken() token: string,
-    @Param('evaluationId') evaluationId: string,
-    @Body() evaluationData: {
-      overview?: any;
-      costAnalysis?: any;
-      ratingEngine?: any;
-      capability?: any;
-      technical?: any;
-    }
-  ): Promise<any> {
-    return this.supplierNominationsService.storeEvaluationData(
-      userId,
-      evaluationId,
-      evaluationData,
-      token
-    );
-  }
 
-  @OrgRole('viewer')
-  @Get('evaluations/:evaluationId/data')
-  @ApiOperation({ summary: 'Get complete evaluation data' })
-  @ApiResponse({
-    status: 200,
-    description: 'Evaluation data retrieved successfully'
-  })
-  getEvaluationData(
-    @CurrentUser('id') userId: string,
-    @AccessToken() token: string,
-    @Param('evaluationId') evaluationId: string
-  ): Promise<any> {
-    return this.supplierNominationsService.getEvaluationData(
-      userId,
-      evaluationId,
-      'overview',
-      token
-    );
-  }
 
   @Put('evaluations/:evaluationId/sections/:section')
   @ApiOperation({ summary: 'Update specific evaluation section (overview, cost_analysis, rating_engine, capability)' })
@@ -532,19 +484,6 @@ export class SupplierNominationsController {
     return this.supplierNominationsService.getCostAnalysis(userId, nominationId, token);
   }
 
-  @Post(':id/cost-analysis/init')
-  @ApiOperation({ summary: 'Initialize cost competency analysis data for nomination' })
-  @ApiResponse({
-    status: 201,
-    description: 'Cost analysis data initialized successfully'
-  })
-  initializeCostAnalysis(
-    @CurrentUser('id') userId: string,
-    @AccessToken() token: string,
-    @Param('id') nominationId: string
-  ): Promise<void> {
-    return this.supplierNominationsService.initializeCostAnalysis(userId, nominationId, token);
-  }
 
   @Put(':id/cost-analysis')
   @ApiOperation({ summary: 'Bulk update cost competency analysis data' })
@@ -561,21 +500,6 @@ export class SupplierNominationsController {
     return this.supplierNominationsService.updateCostAnalysis(userId, nominationId, updateDto, token);
   }
 
-  // Declared before ':id/cost-analysis/:component', which would otherwise take 'batch' as a component name.
-  @Put(':id/cost-analysis/batch')
-  @ApiOperation({ summary: 'Batch update cost competency analysis data in one transaction' })
-  @ApiResponse({
-    status: 200,
-    description: 'Cost analysis data updated successfully in batch'
-  })
-  batchUpdateCostAnalysis(
-    @CurrentUser('id') userId: string,
-    @AccessToken() token: string,
-    @Param('id') nominationId: string,
-    @Body() updateDto: BulkUpdateCostDataDto
-  ): Promise<CostCompetencyAnalysisDto[]> {
-    return this.supplierNominationsService.batchUpdateCostAnalysis(userId, nominationId, updateDto, token);
-  }
 
   @Put(':id/cost-analysis/:component')
   @ApiOperation({ summary: 'Update specific cost component' })
@@ -593,22 +517,6 @@ export class SupplierNominationsController {
     return this.supplierNominationsService.updateCostComponent(userId, nominationId, costComponent, updateDto, token);
   }
 
-  @Put(':id/cost-analysis/:component/vendor/:vendorId')
-  @ApiOperation({ summary: 'Update vendor-specific cost value' })
-  @ApiResponse({
-    status: 200,
-    description: 'Vendor cost value updated successfully'
-  })
-  updateVendorCostValue(
-    @CurrentUser('id') userId: string,
-    @AccessToken() token: string,
-    @Param('id') nominationId: string,
-    @Param('component') costComponent: string,
-    @Param('vendorId') vendorId: string,
-    @Body() updateDto: { numericValue?: number; textValue?: string }
-  ): Promise<void> {
-    return this.supplierNominationsService.updateVendorCostValue(userId, nominationId, costComponent, vendorId, updateDto, token);
-  }
 
   // Capability Scoring Endpoints
   @OrgRole('viewer')
@@ -694,28 +602,6 @@ export class SupplierNominationsController {
     return this.supplierNominationsService.updateCapabilityCriteria(userId, nominationId, criteriaId, updateDto.criteriaName, token);
   }
 
-  // Vendor Assessment Matrix Endpoints
-  @OrgRole('viewer')
-  @Get(':nominationId/vendors/:vendorId/assessment')
-  @ApiOperation({ summary: 'Get vendor assessment criteria' })
-  @ApiResponse({
-    status: 200,
-    description: 'Assessment criteria retrieved successfully',
-    type: [VendorAssessmentCriteriaDto]
-  })
-  getVendorAssessmentCriteria(
-    @CurrentUser('id') userId: string,
-    @AccessToken() token: string,
-    @Param('nominationId') nominationId: string,
-    @Param('vendorId') vendorId: string
-  ): Promise<VendorAssessmentCriteriaDto[]> {
-    return this.supplierNominationsService.getVendorAssessmentCriteria(
-      userId,
-      nominationId,
-      vendorId,
-      token
-    );
-  }
 
 
 

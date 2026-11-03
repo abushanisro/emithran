@@ -139,32 +139,6 @@ export function usePackagingLogisticsCosts(params?: {
   });
 }
 
-/**
- * Hook to get a single packaging/logistics cost by ID
- *
- * Best practices (2026):
- * - Null-safe with proper fallback
- * - Type validation
- */
-export function usePackagingLogisticsCost(id: string) {
-  return useQuery<PackagingLogisticsCostRecord | null>({
-    queryKey: ['packaging-logistics-cost', id],
-    queryFn: async () => {
-      // Use silent mode to prevent console errors
-      const response = await apiClient.get<PackagingLogisticsCostRecord>(
-        `/packaging-logistics-costs/${id}`,
-        { silent: true }
-      );
-
-      // Response is null if error occurred or cost doesn't exist
-      return response;
-    },
-    enabled: !!id,
-    staleTime: 30000,
-    retry: 1,
-  });
-}
-
 export interface FreightRateBenchmark {
   rateType: string;
   rateUsdPerKg: number;

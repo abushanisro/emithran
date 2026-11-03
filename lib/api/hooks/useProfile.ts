@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { profileApi, type UpdateProfileData } from '../profile';
 import { toast } from 'sonner';
 
-export const profileKeys = {
+const profileKeys = {
   profile: ['profile'] as const,
 };
 

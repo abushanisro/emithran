@@ -248,21 +248,6 @@ export class ProductionMaterialTrackingService {
     return updatedMaterial;
   }
 
-  async getMaterialTrackingHistory(materialId: string, userId: string): Promise<MaterialTrackingHistoryEntry[]> {
-    const database = this.databaseService.getUserClient();
-
-    const { data: history, error } = await database
-      .from('material_tracking_history')
-      .select('*')
-      .eq('production_lot_material_id', materialId)
-      .order('performed_at', { ascending: false });
-
-    if (error) {
-      throw new BadRequestException(`Failed to fetch tracking history: ${error.message}`);
-    }
-
-    return history || [];
-  }
 
   // ============================================================================
   // MONITORING DASHBOARD METHODS
@@ -374,43 +359,6 @@ export class ProductionMaterialTrackingService {
     };
   }
 
-  async recordProductionMetrics(
-    lotId: string,
-    metricsData: MonitoringMetrics,
-    userId: string,
-  ): Promise<any> {
-    const database = this.databaseService.getUserClient();
-
-    await this.verifyLotAccess(lotId, userId);
-
-    const { data: metrics, error } = await database
-      .from('production_monitoring_metrics')
-      .upsert({
-        production_lot_id: lotId,
-        production_process_id: metricsData.processId,
-        metric_date: metricsData.date,
-        metric_type: 'production_output',
-        planned_output: metricsData.plannedOutput,
-        actual_output: metricsData.actualOutput,
-        accepted_output: metricsData.acceptedOutput,
-        rejected_output: metricsData.rejectedOutput,
-        rework_output: metricsData.reworkOutput,
-        quality_rate: metricsData.qualityRate,
-        efficiency_percentage: metricsData.efficiencyPercentage,
-        downtime_hours: metricsData.downtimeHours,
-        downtime_reason: metricsData.downtimeReason,
-      }, {
-        onConflict: 'production_lot_id,production_process_id,metric_date,metric_type'
-      })
-      .select('*')
-      .single();
-
-    if (error) {
-      throw new BadRequestException(`Failed to record metrics: ${error.message}`);
-    }
-
-    return metrics;
-  }
 
   // ============================================================================
   // ALERTS MANAGEMENT

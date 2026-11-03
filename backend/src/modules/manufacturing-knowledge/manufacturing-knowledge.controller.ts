@@ -1,12 +1,10 @@
-import { Controller, Get, Post, Body, Param, Query, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, Request } from '@nestjs/common';
 import { ManufacturingKnowledgeService } from './manufacturing-knowledge.service';
 import { ProcessValidationService } from './services/process-validation.service';
 import type {
   CreateFeatureProcessMappingDto,
   CreateMachineCapabilityDto,
   CreateProcessRoutingRuleDto,
-  SubmitFeedbackDto,
-  ValidateRouteDto,
 } from './dto/kb.dto';
 import { OrgRole } from '../../common/authz/authz-policy';
 
@@ -60,15 +58,6 @@ export class ManufacturingKnowledgeController {
 
 
 
-  @Post('feedback')
-  submitFeedback(@Request() req: any, @Body() dto: SubmitFeedbackDto) {
-    return this.kb.submitFeedback(req.token, dto, req.user.id);
-  }
 
-  @OrgRole('viewer')
-  @Get('feedback/:bomItemId')
-  getFeedback(@Request() req: any, @Param('bomItemId') bomItemId: string) {
-    return this.kb.getFeedbackForBomItem(req.token, bomItemId);
-  }
 
 }

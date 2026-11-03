@@ -425,15 +425,6 @@ export class ProductionPlanningController {
     return createResponse(result);
   }
 
-  @OrgRole('viewer')
-  @Get('materials/:materialId/tracking-history')
-  async getMaterialTrackingHistory(
-    @Param('materialId', ParseUUIDPipe) materialId: string,
-    @CurrentUser() user: User,
-  ): Promise<ApiResponse<any[]>> {
-    const result = await this.materialTrackingService.getMaterialTrackingHistory(materialId, this.getUserId(user));
-    return createResponse(result);
-  }
 
   // ============================================================================
   // INTEGRATED MONITORING ENDPOINTS
@@ -459,15 +450,6 @@ export class ProductionPlanningController {
     return createResponse(result);
   }
 
-  @Post('lots/:lotId/metrics')
-  async recordProductionMetrics(
-    @Param('lotId', ParseUUIDPipe) lotId: string,
-    @Body() metricsData: any,
-    @CurrentUser() user: User,
-  ): Promise<ApiResponse<any>> {
-    const result = await this.materialTrackingService.recordProductionMetrics(lotId, metricsData, this.getUserId(user));
-    return createResponse(result);
-  }
 
   // ============================================================================
   // ALERTS MANAGEMENT ENDPOINTS

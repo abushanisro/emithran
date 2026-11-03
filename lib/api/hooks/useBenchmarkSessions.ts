@@ -9,7 +9,7 @@ import type {
 
 // ─── Query Keys ───────────────────────────────────────────────────────────────
 
-export const benchmarkKeys = {
+const benchmarkKeys = {
   all: ['benchmark-sessions'] as const,
   sessions: () => [...benchmarkKeys.all, 'sessions'] as const,
   session: (id: string) => [...benchmarkKeys.all, 'session', id] as const,

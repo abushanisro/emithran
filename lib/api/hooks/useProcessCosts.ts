@@ -323,20 +323,3 @@ export function useProcessCosts(options: {
     refetchOnMount: 'always',
   });
 }
-
-/**
- * Hook to get a single process cost by ID
- */
-export function useProcessCost(id?: string) {
-  return useQuery({
-    queryKey: ['process-cost', id],
-    queryFn: async () => {
-      if (!id) throw new Error('ID is required');
-      const result = await apiClient.get<ProcessCostRecord>(`/process-costs/${id}`);
-      return result;
-    },
-    enabled: !!id,
-    // Same staleness class as useProcessCosts above.
-    refetchOnMount: 'always',
-  });
-}

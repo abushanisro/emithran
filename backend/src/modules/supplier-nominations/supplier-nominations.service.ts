@@ -33,11 +33,6 @@ import {
   UpdateCostValueDto
 } from './dto/cost-competency.dto';
 import {
-  VendorAssessmentCriteriaDto,
-  BatchAssessmentUpdateItemDto,
-  VendorAssessmentMetricsDto
-} from './dto/vendor-assessment.dto';
-import {
   VendorRatingMatrixDto,
   BatchVendorRatingUpdateItemDto,
   UpdateVendorRatingDto,
@@ -766,151 +761,7 @@ export class SupplierNominationsService {
     };
   }
 
-  async storeEvaluationData(
-    userId: string,
-    vendorEvaluationId: string,
-    evaluationData: {
-      overview?: any;
-      costAnalysis?: any;
-      ratingEngine?: any;
-      capability?: any;
-    },
-    accessToken: string
-  ): Promise<any> {
-    const client = this.databaseService.getClient(accessToken);
 
-    try {
-      // Get evaluation details
-      const { data: evaluation } = await client
-        .from('vendor_nomination_evaluations')
-        .select('nomination_evaluation_id, vendor_id')
-        .eq('id', vendorEvaluationId)
-        .single();
-
-      if (!evaluation) {
-        throw new NotFoundException('Vendor evaluation not found');
-      }
-
-      await this.verifyNominationOwnership(userId, evaluation.nomination_evaluation_id, accessToken);
-
-      // Store each section separately using clean structure
-      const results: any = {};
-
-      // Store Overview section
-      if (evaluationData.overview) {
-        const { error: overviewError } = await client
-          .rpc('save_evaluation_section', {
-            p_nomination_evaluation_id: evaluation.nomination_evaluation_id,
-            p_vendor_id: evaluation.vendor_id,
-            p_section: 'overview',
-            p_data: evaluationData.overview,
-            p_updated_by: userId
-          });
-
-        if (overviewError) {
-          throw new BadRequestException(`Failed to save overview: ${overviewError.message}`);
-        }
-        results.overview = true;
-      }
-
-      // Store Cost Analysis section
-      if (evaluationData.costAnalysis) {
-        const { error: costError } = await client
-          .rpc('save_evaluation_section', {
-            p_nomination_evaluation_id: evaluation.nomination_evaluation_id,
-            p_vendor_id: evaluation.vendor_id,
-            p_section: 'cost_analysis',
-            p_data: evaluationData.costAnalysis,
-            p_updated_by: userId
-          });
-
-        if (costError) {
-          throw new BadRequestException(`Failed to save cost analysis: ${costError.message}`);
-        }
-        results.cost_analysis = true;
-      }
-
-      // Store Rating Engine section
-      if (evaluationData.ratingEngine) {
-        const { error: ratingError } = await client
-          .rpc('save_evaluation_section', {
-            p_nomination_evaluation_id: evaluation.nomination_evaluation_id,
-            p_vendor_id: evaluation.vendor_id,
-            p_section: 'rating_engine',
-            p_data: evaluationData.ratingEngine,
-            p_updated_by: userId
-          });
-
-        if (ratingError) {
-          throw new BadRequestException(`Failed to save rating engine: ${ratingError.message}`);
-        }
-        results.rating_engine = true;
-      }
-
-      // Store Capability section
-      if (evaluationData.capability) {
-        const { error: capabilityError } = await client
-          .rpc('save_evaluation_section', {
-            p_nomination_evaluation_id: evaluation.nomination_evaluation_id,
-            p_vendor_id: evaluation.vendor_id,
-            p_section: 'capability',
-            p_data: evaluationData.capability,
-            p_updated_by: userId
-          });
-
-        if (capabilityError) {
-          throw new BadRequestException(`Failed to save capability: ${capabilityError.message}`);
-        }
-        results.capability = true;
-      }
-
-      return results;
-    } catch (error) {
-      this.logger.error('Failed to store evaluation data:', error);
-      throw error;
-    }
-  }
-
-  async getEvaluationData(
-    userId: string,
-    vendorEvaluationId: string,
-    section: string,
-    accessToken: string
-  ): Promise<any> {
-    const client = this.databaseService.getClient(accessToken);
-
-    try {
-      // Get evaluation details
-      const { data: evaluation } = await client
-        .from('vendor_nomination_evaluations')
-        .select('nomination_evaluation_id, vendor_id')
-        .eq('id', vendorEvaluationId)
-        .single();
-
-      if (!evaluation) {
-        throw new NotFoundException('Vendor evaluation not found');
-      }
-
-      await this.verifyNominationOwnership(userId, evaluation.nomination_evaluation_id, accessToken);
-
-      // Get specific evaluation section using clean function
-      const { data, error } = await client
-        .rpc('get_evaluation_section', {
-          p_nomination_evaluation_id: evaluation.nomination_evaluation_id,
-          p_section: section,
-          p_vendor_id: evaluation.vendor_id
-        });
-
-      if (error) {
-        throw new BadRequestException(`Failed to get evaluation data: ${error.message}`);
-      }
-
-      return data || {};
-    } catch (error) {
-      this.logger.error('Failed to get evaluation data:', error);
-      throw error;
-    }
-  }
 
   async updateEvaluationSection(
     userId: string,
@@ -1398,44 +1249,6 @@ export class SupplierNominationsService {
     }
   }
 
-  async initializeCostAnalysis(
-    userId: string,
-    nominationId: string,
-    accessToken: string
-  ): Promise<void> {
-    const client = this.databaseService.getClient(accessToken);
-
-    try {
-      await this.verifyNominationOwnership(userId, nominationId, accessToken);
-
-      // Get vendor IDs for this nomination
-      const { data: vendorEvaluations } = await client
-        .from('vendor_nomination_evaluations')
-        .select('vendor_id')
-        .eq('nomination_evaluation_id', nominationId);
-
-      if (!vendorEvaluations || vendorEvaluations.length === 0) {
-        throw new BadRequestException('No vendors found for this nomination');
-      }
-
-      const vendorIds = vendorEvaluations.map(ve => ve.vendor_id);
-
-      // Initialize cost analysis data using the database function
-      const { error } = await client.rpc('initialize_cost_competency_analysis', {
-        p_nomination_evaluation_id: nominationId,
-        p_vendor_ids: vendorIds
-      });
-
-      if (error) {
-        throw new BadRequestException(`Failed to initialize cost analysis: ${error.message}`);
-      }
-
-      this.logger.log(`Initialized cost analysis for nomination ${nominationId} with ${vendorIds.length} vendors`);
-    } catch (error) {
-      this.logger.error('Failed to initialize cost analysis:', error);
-      throw error;
-    }
-  }
 
   async updateCostAnalysis(
     userId: string,
@@ -1466,15 +1279,6 @@ export class SupplierNominationsService {
     }
   }
 
-  async batchUpdateCostAnalysis(
-    userId: string,
-    nominationId: string,
-    updateDto: BulkUpdateCostDataDto,
-    accessToken: string
-  ): Promise<CostCompetencyAnalysisDto[]> {
-    // The same atomic update as updateCostAnalysis: the whole batch is applied in one transaction or not at all.
-    return this.updateCostAnalysis(userId, nominationId, updateDto, accessToken);
-  }
 
   async updateCostComponent(
     userId: string,
@@ -1512,53 +1316,6 @@ export class SupplierNominationsService {
     }
   }
 
-  // Add vendor-specific update method
-  async updateVendorCostValue(
-    userId: string,
-    nominationId: string,
-    costComponent: string,
-    vendorId: string,
-    updateDto: { numericValue?: number; textValue?: string },
-    accessToken: string
-  ): Promise<void> {
-    const client = this.databaseService.getClient(accessToken);
-
-    try {
-      await this.verifyNominationOwnership(userId, nominationId, accessToken);
-
-      // Get the cost analysis ID
-      const { data: costAnalysis, error: getError } = await client
-        .from('cost_competency_analysis')
-        .select('id')
-        .eq('nomination_evaluation_id', nominationId)
-        .eq('cost_component', costComponent)
-        .single();
-
-      if (getError || !costAnalysis) {
-        throw new BadRequestException(`Cost component ${costComponent} not found`);
-      }
-
-      // Update vendor value
-      const { error: updateError } = await client
-        .from('cost_competency_vendor_values')
-        .update({
-          numeric_value: updateDto.numericValue,
-          text_value: updateDto.textValue,
-          updated_at: new Date().toISOString()
-        })
-        .eq('cost_analysis_id', costAnalysis.id)
-        .eq('vendor_id', vendorId);
-
-      if (updateError) {
-        throw new BadRequestException(`Failed to update vendor cost value: ${updateError.message}`);
-      }
-
-      this.logger.log(`Updated vendor ${vendorId} value for ${costComponent} in nomination ${nominationId}`);
-    } catch (error) {
-      this.logger.error('Failed to update vendor cost value:', error);
-      throw error;
-    }
-  }
 
   // Capability Scoring Methods
   async getCapabilityScores(
@@ -1750,37 +1507,6 @@ export class SupplierNominationsService {
   // VENDOR ASSESSMENT MATRIX METHODS
   // =====================================================================================
 
-  /**
-   * Get vendor assessment criteria for a specific nomination and vendor
-   */
-  async getVendorAssessmentCriteria(
-    userId: string,
-    nominationId: string,
-    vendorId: string,
-    accessToken: string
-  ): Promise<VendorAssessmentCriteriaDto[]> {
-    const client = this.databaseService.getClient(accessToken);
-
-    try {
-      await this.verifyNominationOwnership(userId, nominationId, accessToken);
-
-      const { data, error } = await client
-        .from('vendor_assessment_criteria')
-        .select('*')
-        .eq('nomination_evaluation_id', nominationId)
-        .eq('vendor_id', vendorId)
-        .order('sort_order', { ascending: true });
-
-      if (error) {
-        throw new BadRequestException(`Failed to get assessment criteria: ${error.message}`);
-      }
-
-      return data || [];
-    } catch (error) {
-      this.logger.error('Failed to get vendor assessment criteria:', error);
-      throw error;
-    }
-  }
 
 
 

@@ -222,29 +222,6 @@ export function useMaterialStockPrices() {
   });
 }
 
-export function useRawMaterial(id: string | undefined) {
-  return useQuery({
-    queryKey: ['raw-materials', 'detail', id],
-    queryFn: async () => {
-      if (!id) throw new Error('Raw material ID is required');
-      const response = await apiClient.get<RawMaterial>(`/raw-materials/${id}`);
-      return response;
-    },
-    enabled: !!id,
-  });
-}
-
-export function useRawMaterialsGrouped() {
-  return useQuery({
-    queryKey: ['raw-materials', 'grouped'],
-    queryFn: async () => {
-      const response = await apiClient.get<any>('/raw-materials/grouped');
-      return response;
-    },
-    staleTime: 1000 * 60 * 5,
-  });
-}
-
 // Hook to get unique filter options for dropdowns
 /**
  * The stored material class (Ferrous / Non-Ferrous / Plastic & Rubber) of each

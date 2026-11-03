@@ -12,7 +12,7 @@ import type {
 import { ApiError } from '../client';
 import { toast } from 'sonner';
 
-export const projectKeys = {
+const projectKeys = {
   all: ['projects'] as const,
   lists: () => [...projectKeys.all, 'list'] as const,
   list: (query?: ProjectQuery) => [...projectKeys.lists(), query] as const,
@@ -52,15 +52,6 @@ export function useProject(id: string, options?: { enabled?: boolean; retry?: bo
     refetchOnWindowFocus: (query) => {
       return query.state.status !== 'error';
     },
-  });
-}
-
-export function useProjectCostAnalysis(id: string) {
-  return useQuery({
-    queryKey: projectKeys.costAnalysis(id),
-    queryFn: () => projectsApi.getCostAnalysis(id),
-    enabled: !!id,
-    staleTime: 1000 * 60 * 2,
   });
 }
 
