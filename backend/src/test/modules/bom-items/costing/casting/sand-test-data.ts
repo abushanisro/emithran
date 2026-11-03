@@ -59,7 +59,21 @@ export function sandMaterial(name: string): SandMaterial {
     columns: {
       density_kg_m3: n('Density (kg / m^3)'), heat_of_fusion_j_kg: n('Heat of Fusion (J / kg)'), specific_heat_rt_j_kg_k: n('Specific Heat RT (J / kg * K)'),
       specific_heat_solidus_j_kg_k: n('Specific Heat at Solidus Temperature (J / kg * K)'), injection_temp_c: n('Injection Temp (C)'),
-      liquidus_temp_c: n('Liquidus Temp (C)'), cut_code: n('Cut Code'),
+      liquidus_temp_c: n('Liquidus Temp (C)'), cut_code: n('Cut Code'), cost_usa: n('Unit Cost (USD / kg)'),
     },
   };
 }
+
+/** Every sand machine class of the route with its machines from the real Machine/ CSVs (furnaces priced by a stand-in for the HR Rates engine). */
+export const allSandMachines = (): Record<string, SandMachine[]> => {
+  const files: Record<string, string> = {
+    sand_casting_horizontal_automatic: 'machines_horizontal_automatic.csv', sand_casting_vertical_automatic: 'machines_vertical_automatic.csv',
+    sand_casting_manual_std_moldmaking: 'machines_manual_std_moldmaking.csv', sand_casting_manual_floor_moldmaking: 'machines_manual_floor_moldmaking.csv',
+    sand_casting_manual_pit_moldmaking: 'machines_manual_pit_moldmaking.csv', sand_casting_melting: 'machines_melting.csv', sand_casting_pour: 'machines_pour.csv',
+    sand_casting_cooling: 'machines_cooling.csv', sand_casting_shakeout: 'machines_shakeout.csv', sand_casting_degating: 'machines_degating.csv',
+    sand_casting_cleaning: 'machines_cleaning.csv', sand_casting_finishing: 'machines_finishing.csv', sand_casting_visual_inspection: 'machines_visual_inspection.csv',
+    sand_casting_hot_box: 'machines_hot_box.csv', sand_casting_co2_coremaking: 'machines_co2_coremaking.csv', sand_casting_no_bake: 'machines_no_bake_coremaking.csv',
+    sand_casting_oil_core: 'machines_oil_core.csv', sand_casting_shell: 'machines_shell_coremaking.csv',
+  };
+  return Object.fromEntries(Object.entries(files).map(([cls, file]) => [cls, sandMachines(file, cls, () => ({ ratePerHr: 12.5, assumedDefaults: ['payback_period_years'] }))]));
+};
