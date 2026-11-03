@@ -367,3 +367,24 @@ describe('MHRService.getDistinctCategoriesWithClass', () => {
     expect(result).toEqual(['Gun Drill', 'Inspection']);
   });
 });
+
+describe('MHRService.engineHourRate (the rate of a machine with no stored rate, for the cost engines)', () => {
+  const service = () => new MHRService(makeDatabaseService({}).service, testLogger, makeExchangeRateService({ USD: 1 }), makeLhrService());
+
+  it('prices a row from its landed cost, and says which inputs it had to assume (a seeded furnace has the cost and little else)', () => {
+    const r = service().engineHourRate({ id: 'f1', machine_name: 'Induction Furnace', location: 'USA', currency: 'USD', landed_machine_cost: 8700 });
+    expect(r.ratePerHr).toBeGreaterThan(0);
+    expect(r.assumedDefaults.join(' ')).toMatch(/paybackPeriodYears/);
+  });
+
+  it('a dearer machine costs more per hour', () => {
+    const cheap = service().engineHourRate({ id: 'a', location: 'USA', currency: 'USD', landed_machine_cost: 8700 });
+    const dear = service().engineHourRate({ id: 'b', location: 'USA', currency: 'USD', landed_machine_cost: 87000 });
+    expect(dear.ratePerHr).toBeGreaterThan(cheap.ratePerHr);
+  });
+
+  it('a row with no landed cost says so: its ownership costs are 0, never invented', () => {
+    const r = service().engineHourRate({ id: 'c', machine_name: 'No cost', location: 'USA', currency: 'USD' });
+    expect(r.assumedDefaults.join(' ')).toMatch(/landedMachineCost missing/);
+  });
+});

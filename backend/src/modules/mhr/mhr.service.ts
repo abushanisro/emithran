@@ -231,6 +231,16 @@ export class MHRService {
   }
 
   /**
+   * The machine hour rate (in the row's currency) the engine gives a stored machine row: what the pickers and the list show for a row
+   * with no stored rate. Cost engines use it for a machine that has none, instead of a second formula of their own. `assumedDefaults` names
+   * the fields the row lacked and the engine filled with its defaults: the rate must not look measured when it is not.
+   */
+  engineHourRate(row: Record<string, any>): { ratePerHr: number; assumedDefaults: string[] } {
+    const result = this.calculateFromRow(row);
+    return { ratePerHr: result.totalMachineHourRate, assumedDefaults: result.assumedDefaults ?? [] };
+  }
+
+  /**
    * Every machine at a location, slim (MHRPickerRowDto), for the process
    * dialog's pickers. findAll() returns the full row (~2.7 KB each, ~11 MB for
    * one location), which outran the browser's request timeout.
