@@ -144,6 +144,7 @@ export class MHRController {
     return this.mhrService.getReferenceDetail(id, token);
   }
 
+  @OrgRole('admin')
   @Post()
   @ApiOperation({ summary: 'Create new MHR record' })
   @ApiResponse({ status: 201, description: 'MHR record created successfully', type: MHRResponseDto })
@@ -157,6 +158,7 @@ export class MHRController {
     }
   }
 
+  @OrgRole('admin')
   @Put(':id')
   @ApiOperation({ summary: 'Update MHR record' })
   @ApiResponse({ status: 200, description: 'MHR record updated successfully', type: MHRResponseDto })
@@ -170,6 +172,7 @@ export class MHRController {
     }
   }
 
+  @OrgRole('admin')
   @Delete(':id')
   @ApiOperation({ summary: 'Delete MHR record' })
   @ApiResponse({ status: 200, description: 'MHR record deleted successfully' })
@@ -194,6 +197,7 @@ export class MHRController {
   }
 
   @Throttle({ default: { limit: 10, ttl: 60_000 } }) // heavy: parses or analyses a file
+  @OrgRole('admin')
   @Post('imports')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_XLSX_UPLOAD_BYTES, files: 1 } }))
   @ApiOperation({ summary: 'Import MHR records from Excel (.xlsx)' })

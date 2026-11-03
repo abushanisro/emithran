@@ -54,6 +54,7 @@ export class CalculatorsController {
     return this.calculatorsService.findOne(id, user.id, token);
   }
 
+  @OrgRole('admin')
   @Post()
   @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: 'Create new calculator' })
@@ -67,6 +68,7 @@ export class CalculatorsController {
     return this.calculatorsService.create(dto, user.id, token, organizationId);
   }
 
+  @OrgRole('admin')
   @Put(':id')
   @ApiOperation({ summary: 'Update calculator' })
   @ApiResponse({ status: 200, description: 'Calculator updated successfully' })
@@ -79,6 +81,7 @@ export class CalculatorsController {
     return this.calculatorsService.update(id, dto, user.id, token);
   }
 
+  @OrgRole('admin')
   @Delete(':id')
   @ApiOperation({ summary: 'Delete calculator' })
   @ApiResponse({ status: 200, description: 'Calculator deleted successfully' })
@@ -130,6 +133,7 @@ export class CalculatorsController {
     return this.calculatorsService.getFields(id, user.id, token);
   }
 
+  @OrgRole('admin')
   @Post(':id/fields')
   @ApiOperation({ summary: 'Add a new field to calculator' })
   async createField(
@@ -141,6 +145,7 @@ export class CalculatorsController {
     return this.calculatorsService.createField(id, dto, user.id, token);
   }
 
+  @OrgRole('admin')
   @Put(':id/fields/:fieldId')
   @ApiOperation({ summary: 'Update a specific field' })
   async updateField(
@@ -153,6 +158,7 @@ export class CalculatorsController {
     return this.calculatorsService.updateField(id, fieldId, dto, user.id, token);
   }
 
+  @OrgRole('admin')
   @Delete(':id/fields/:fieldId')
   @ApiOperation({ summary: 'Remove a field from calculator' })
   async removeField(
@@ -179,6 +185,7 @@ export class CalculatorsController {
     return this.calculatorsService.getFormulas(id, user.id, token);
   }
 
+  @OrgRole('admin')
   @Post(':id/formulas')
   @ApiOperation({ summary: 'Add a new formula to calculator' })
   async createFormula(
@@ -190,6 +197,7 @@ export class CalculatorsController {
     return this.calculatorsService.createFormula(id, dto, user.id, token);
   }
 
+  @OrgRole('admin')
   @Put(':id/formulas/:formulaId')
   @ApiOperation({ summary: 'Update a specific formula' })
   async updateFormula(
@@ -202,6 +210,7 @@ export class CalculatorsController {
     return this.calculatorsService.updateFormula(id, formulaId, dto, user.id, token);
   }
 
+  @OrgRole('admin')
   @Delete(':id/formulas/:formulaId')
   @ApiOperation({ summary: 'Remove a formula from calculator' })
   async removeFormula(

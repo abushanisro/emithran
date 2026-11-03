@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { DatabaseService } from '@/common/database/database.service';
 import type { DbClient } from '@/common/db/postgrest-client';
 import {
@@ -201,6 +201,25 @@ export class QualityInspectionService {
 
 
 
+  /**
+   * Four eyes: the person who created an inspection cannot approve or reject it, unless the organization has only one active member
+   * (it could never approve anything). The read of the members fails closed: if it cannot be made, nobody is let through.
+   */
+  private async assertApproverIsNotCreator(inspection: { created_by?: string | null; organization_id?: string | null }, userId: string): Promise<void> {
+    if (!inspection.created_by || inspection.created_by !== userId) return;
+    const { data, error } = await this.db()
+      .from('organization_members')
+      .select('user_id')
+      .eq('organization_id', inspection.organization_id)
+      .eq('status', 'active');
+    if (error) throw qualityDbError(error, 'check who may decide on the inspection');
+    if ((data?.length ?? 0) <= 1) return;
+    throw new ForbiddenException({
+      code: 'APPROVER_IS_CREATOR',
+      message: 'An inspection cannot be approved or rejected by the person who created it. Ask another member of your organization.',
+    });
+  }
+
   async approveInspection(
     id: string,
     approvalData: { approverNotes?: string } = {},
@@ -217,6 +236,7 @@ export class QualityInspectionService {
     if (inspectionError) {
       throw qualityDbError(inspectionError, 'read the inspection');
     }
+    await this.assertApproverIsNotCreator(inspection, userId);
     if (inspection.status !== InspectionStatus.COMPLETED) {
       throw new ConflictException(
         inspection.status === InspectionStatus.APPROVED
@@ -295,6 +315,14 @@ export class QualityInspectionService {
     userId: string,
     userEmail?: string,
   ): Promise<QualityInspectionResponseDto> {
+    const { data: existing, error: existingError } = await this.db()
+      .from('quality_inspections')
+      .select('created_by, organization_id')
+      .eq('id', id)
+      .single();
+    if (existingError) throw qualityDbError(existingError, 'read the inspection');
+    await this.assertApproverIsNotCreator(existing, userId);
+
     const updateData = {
       status: InspectionStatus.REJECTED,
       rejected_by: userId,

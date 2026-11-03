@@ -94,7 +94,8 @@ GET /vendors?processId=…&q=casting&sort=+name,-createdAt&page=2&limit=50
 
 - **TLS only.** The edge terminates it; nothing is served over plain HTTP.
 - **Default deny.** A route without a declared policy is refused (`@Public`, `@Authenticated`, `@OrgRole('viewer' | 'member' | 'admin')`, `@PlatformAdmin`); `route-policies.spec.ts` lists every route and who may call it.
-- **Least privilege.** A viewer reads, a member edits project data, an admin changes organization-wide settings, deletes everything in a table (with `?confirm=delete-all`, audited) or forces a delete.
+- **Least privilege.** A viewer reads, a member edits project data, an admin changes organization-wide settings, **writes rates and master data** (machine and labour rates, raw materials, processes, reference tables, calculators, fields and formulas: they change cost results for the whole organization), deletes everything in a table (with `?confirm=delete-all`, audited) or forces a delete. Running a calculator (`POST /calculators/:id/execute`) and lookups stay with members.
+- **Four eyes.** The person who created a quality inspection cannot approve or reject it (403 `APPROVER_IS_CREATOR`), unless the organization has only one active member. If the members cannot be read, nobody is let through.
 - **Row-level security** in the database scopes every read and write to the caller's organization, whatever the API code does.
 - Limits per caller, tighter on AI, import and upload routes. Destructive and security decisions go to the audit trail.
 
@@ -133,7 +134,7 @@ Liveness is outside the versioned API: `GET /` and `GET /ping`; health checks ar
 | 4 Nesting | 1 route: `PUT supplier-nominations/:id/capability-scores/:criteriaId/:vendorId` (one cell of a score grid; it needs both ids). Everything else is two levels or less |
 | 5 Errors | Problem details on `/api/v1`; deletes still answer 200 with a body in about 40 places; no `Location` on create |
 | 6 Filter, sort, paginate | About 20 lists page; no shared helper or cap; sorting is uneven |
-| 7 Security | Done, two open items: a `reference-data:write` permission, and the approver not being the submitter |
+| 7 Security | Done: default deny, roles, admin-only rate and master-data writes, four eyes on inspections, row-level security, audit |
 | 8 Caching | Not started |
 | 9 Versioning | Done: `/api/v1` is the only prefix; the web app calls it through its BFF (`API_URL` and `NEXT_PUBLIC_API_URL` end in `/api/v1`) |
 

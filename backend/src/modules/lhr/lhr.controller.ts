@@ -34,6 +34,7 @@ import { OrgRole } from '../../common/authz/authz-policy';
 export class LHRController {
   constructor(private readonly LHRService: LHRService, private readonly audit: AuditService) { }
 
+  @OrgRole('admin')
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create new LHR record' })
@@ -116,6 +117,7 @@ export class LHRController {
     return this.LHRService.findOne(id, user.id, token);
   }
 
+  @OrgRole('admin')
   @Put(':id')
   @ApiOperation({ summary: 'Update LHR record' })
   @ApiResponse({ status: 200, description: 'LHR record updated successfully' })
@@ -138,6 +140,7 @@ export class LHRController {
     return this.audit.purged('lhr', () => this.LHRService.removeAll(user.id, token));
   }
 
+  @OrgRole('admin')
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete LHR record' })
@@ -151,6 +154,7 @@ export class LHRController {
     return this.LHRService.remove(id, user.id, token);
   }
 
+  @OrgRole('admin')
   @Post('batches')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Bulk create LHR records' })
@@ -164,6 +168,7 @@ export class LHRController {
   }
 
   @Throttle({ default: { limit: 10, ttl: 60_000 } }) // heavy: parses or analyses a file
+  @OrgRole('admin')
   @Post('imports')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_XLSX_UPLOAD_BYTES, files: 1 } }))
   @ApiOperation({ summary: 'Import LHR records from Excel (.xlsx)' })

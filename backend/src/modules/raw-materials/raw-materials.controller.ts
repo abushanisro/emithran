@@ -169,6 +169,7 @@ export class RawMaterialsController {
     return this.editorService.load(id, user.id, token);
   }
 
+  @OrgRole('admin')
   @Put(':id/editor')
   @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: 'Save the edit form (core fields, property values, stock prices) in one transaction' })
@@ -191,6 +192,7 @@ export class RawMaterialsController {
     return this.rawMaterialsService.findOne(id, user.id, token);
   }
 
+  @OrgRole('admin')
   @Post()
   @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: 'Create new raw material' })
@@ -204,6 +206,7 @@ export class RawMaterialsController {
     return this.rawMaterialsService.create(createRawMaterialDto, user.id, token, organizationId);
   }
 
+  @OrgRole('admin')
   @Put(':id')
   @ApiOperation({ summary: 'Update raw material' })
   @ApiResponse({ status: 200, description: 'Raw material updated successfully', type: RawMaterialResponseDto })
@@ -211,6 +214,7 @@ export class RawMaterialsController {
     return this.rawMaterialsService.update(id, updateRawMaterialDto, user.id, token);
   }
 
+  @OrgRole('admin')
   @Delete(':id')
   @ApiOperation({ summary: 'Delete raw material' })
   @ApiResponse({ status: 200, description: 'Raw material deleted successfully' })
@@ -231,6 +235,7 @@ export class RawMaterialsController {
   }
 
   @Throttle({ default: { limit: 10, ttl: 60_000 } }) // heavy: parses or analyses a file
+  @OrgRole('admin')
   @Post('imports')
   @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: 'Upload Excel file to bulk import raw materials' })

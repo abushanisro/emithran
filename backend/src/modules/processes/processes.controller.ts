@@ -58,6 +58,7 @@ export class ProcessesController {
   // ============================================================================
 
   @Throttle({ default: { limit: 10, ttl: 60_000 } }) // heavy: parses or analyses a file
+  @OrgRole('admin')
   @Post('calculator-mappings/imports')
   @UseGuards(OrganizationContextGuard)
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_XLSX_UPLOAD_BYTES, files: 1 } }))
@@ -141,6 +142,7 @@ export class ProcessesController {
     return this.processesService.getProcessCalculatorMapping(id, token);
   }
 
+  @OrgRole('admin')
   @Post('calculator-mappings')
   @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: 'Create new process calculator mapping' })
@@ -153,6 +155,7 @@ export class ProcessesController {
     return this.processesService.createProcessCalculatorMapping(createDto, token, organizationId);
   }
 
+  @OrgRole('admin')
   @Put('calculator-mappings/:id')
   @ApiOperation({ summary: 'Update process calculator mapping' })
   @ApiResponse({ status: 200, description: 'Process calculator mapping updated successfully', type: ProcessCalculatorMappingResponseDto })
@@ -174,6 +177,7 @@ export class ProcessesController {
     return this.audit.purged('process_calculator_mappings', () => this.processesService.clearAllCalculatorMappings(token));
   }
 
+  @OrgRole('admin')
   @Delete('calculator-mappings/:id')
   @ApiOperation({ summary: 'Delete process calculator mapping' })
   @ApiResponse({ status: 200, description: 'Process calculator mapping deleted successfully' })
@@ -262,6 +266,7 @@ export class ProcessesController {
   }
 
 
+  @OrgRole('admin')
   @Put('sm-lookup-table-rows/:table/:id')
   @ApiOperation({ summary: 'Update one row of a real sm_lookup_* cost-engine table (allowlisted tables/columns only)' })
   @ApiResponse({ status: 200, description: 'Row updated successfully' })
@@ -285,6 +290,7 @@ export class ProcessesController {
     return this.processesService.findOne(id, user.id, token);
   }
 
+  @OrgRole('admin')
   @Post()
   @ApiOperation({ summary: 'Create new process' })
   @ApiResponse({ status: 201, description: 'Process created successfully', type: ProcessResponseDto })
@@ -292,6 +298,7 @@ export class ProcessesController {
     return this.processesService.create(createProcessDto, user.id, token);
   }
 
+  @OrgRole('admin')
   @Put(':id')
   @ApiOperation({ summary: 'Update process' })
   @ApiResponse({ status: 200, description: 'Process updated successfully', type: ProcessResponseDto })
@@ -299,6 +306,7 @@ export class ProcessesController {
     return this.processesService.update(id, updateProcessDto, user.id, token);
   }
 
+  @OrgRole('admin')
   @Delete(':id')
   @ApiOperation({ summary: 'Delete process' })
   @ApiResponse({ status: 200, description: 'Process deleted successfully' })
@@ -327,6 +335,7 @@ export class ProcessesController {
     return this.processesService.getReferenceTable(tableId, token);
   }
 
+  @OrgRole('admin')
   @Post(':processId/reference-tables')
   @ApiOperation({ summary: 'Create a new reference table' })
   @ApiResponse({ status: 201, description: 'Reference table created successfully' })
@@ -340,6 +349,7 @@ export class ProcessesController {
     return this.processesService.createReferenceTable(createDto, token);
   }
 
+  @OrgRole('admin')
   @Put('reference-tables/:tableId')
   @ApiOperation({ summary: 'Update a reference table' })
   @ApiResponse({ status: 200, description: 'Reference table updated successfully' })
@@ -352,6 +362,7 @@ export class ProcessesController {
     return this.processesService.updateReferenceTable(tableId, updateDto, token);
   }
 
+  @OrgRole('admin')
   @Delete('reference-tables/:tableId')
   @ApiOperation({ summary: 'Delete a reference table' })
   @ApiResponse({ status: 200, description: 'Reference table deleted successfully' })
@@ -359,6 +370,7 @@ export class ProcessesController {
     return this.processesService.deleteReferenceTable(tableId, token);
   }
 
+  @OrgRole('admin')
   @Post('reference-tables/:tableId/rows')
   @ApiOperation({ summary: 'Add a row to a reference table' })
   @ApiResponse({ status: 201, description: 'Table row created successfully' })
@@ -372,6 +384,7 @@ export class ProcessesController {
     return this.processesService.createTableRow(createDto, token);
   }
 
+  @OrgRole('admin')
   @Put('reference-tables/rows/:rowId')
   @ApiOperation({ summary: 'Update a table row' })
   @ApiResponse({ status: 200, description: 'Table row updated successfully' })
@@ -384,6 +397,7 @@ export class ProcessesController {
     return this.processesService.updateTableRow(rowId, updateDto, token);
   }
 
+  @OrgRole('admin')
   @Delete('reference-tables/rows/:rowId')
   @ApiOperation({ summary: 'Delete a table row' })
   @ApiResponse({ status: 200, description: 'Table row deleted successfully' })
@@ -391,6 +405,7 @@ export class ProcessesController {
     return this.processesService.deleteTableRow(rowId, token);
   }
 
+  @OrgRole('admin')
   @Post('reference-tables/:tableId/row-batches')
   @ApiOperation({ summary: 'Bulk update table rows (delete old, insert new)' })
   @ApiResponse({ status: 200, description: 'Table rows updated successfully' })
