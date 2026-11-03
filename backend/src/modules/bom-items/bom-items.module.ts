@@ -21,6 +21,7 @@ import { MachiningLookupService } from './costing/machining/lookup/machining-loo
 import { SecondaryProcessService } from './services/secondary-process.service';
 import { PlasticReferenceService } from './costing/plastic-molding/lookup/plastic-reference.service';
 import { CastingReferenceService } from './costing/casting/casting-reference.service';
+import { SandReferenceService } from './costing/casting/sand/sand-reference.service';
 import { FeatureToleranceService } from './services/feature-tolerance.service';
 import { PmiReviewService } from './services/pmi-review.service';
 import { ToleranceReferenceService } from './costing/shared/tolerance/tolerance-reference.service';
@@ -34,7 +35,7 @@ import { ExchangeRateModule } from '../../common/exchange-rate/exchange-rate.mod
 @Module({
   imports: [DatabaseModule, LoggerModule, ConfigModule, ManufacturingKnowledgeModule, ManufacturingRulesModule, ExchangeRateModule],
   controllers: [BOMItemsController],
-  providers: [BOMItemsService, FileStorageService, StepConverterService, BomItemCostService, CADAnalysisService, AutoFillService, DFMScoringService, MaterialIntelligenceService, BlankOptimizerService, SheetMetalLookupService, MachiningLookupService, RateResolutionService, CalculatorCatalogService, MaterialResolutionService, MachineDiscoveryService, SecondaryProcessService, NreService, PlasticReferenceService, CastingReferenceService, FeatureToleranceService, PmiReviewService, ToleranceReferenceService, SheetMetalCatalogOperationsService, HydroformingReferenceService],
+  providers: [BOMItemsService, FileStorageService, StepConverterService, BomItemCostService, CADAnalysisService, AutoFillService, DFMScoringService, MaterialIntelligenceService, BlankOptimizerService, SheetMetalLookupService, MachiningLookupService, RateResolutionService, CalculatorCatalogService, MaterialResolutionService, MachineDiscoveryService, SecondaryProcessService, NreService, PlasticReferenceService, CastingReferenceService, SandReferenceService, FeatureToleranceService, PmiReviewService, ToleranceReferenceService, SheetMetalCatalogOperationsService, HydroformingReferenceService],
   exports: [BOMItemsService, FileStorageService, BomItemCostService, CADAnalysisService, AutoFillService, SheetMetalLookupService, MachiningLookupService],
 })
 export class BOMItemsModule {}
