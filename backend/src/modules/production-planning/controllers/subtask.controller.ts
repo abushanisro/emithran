@@ -8,6 +8,8 @@ import {
   Param,
   Body,
   UseGuards,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { RequestAuthGuard } from '@/common/guards/request-auth.guard';
@@ -56,6 +58,7 @@ export class SubtaskController {
     return this.subtaskService.updateSubtask(id, updateDto, user.id);
   }
 
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id')
   @ApiOperation({ summary: 'Delete subtask' })
   async deleteSubtask(

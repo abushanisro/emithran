@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Query, Res, UseGuards, HttpStatus } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -42,6 +42,7 @@ export class CopilotController {
   }
 
   /** Forget one saved preference (its exact text). */
+  @HttpCode(HttpStatus.OK)
   @Delete('memory/preferences')
   @ApiOperation({ summary: 'Delete one preference the copilot has saved for the current user' })
   async deleteMemoryItem(

@@ -13,6 +13,7 @@ import {
   UseGuards,
   ParseUUIDPipe,
   HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
@@ -123,6 +124,7 @@ export class VendorsController {
     return this.vendorsService.update(id, updateVendorDto, user.id, token);
   }
 
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id')
   @ApiOperation({ summary: 'Delete vendor' })
   @ApiResponse({ status: 200, description: 'Vendor deleted successfully' })
@@ -131,6 +133,7 @@ export class VendorsController {
     return this.vendorsService.remove(id, user.id, token);
   }
 
+  @HttpCode(HttpStatus.OK)
   @Delete()
   @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: "Delete all vendors in the caller's organization" })
@@ -170,6 +173,7 @@ export class VendorsController {
     return this.vendorsService.updateEquipment(id, updateEquipmentDto, user.id, token);
   }
 
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete('equipment/:id')
   @ApiOperation({ summary: 'Delete equipment' })
   @ApiResponse({ status: 200, description: 'Equipment deleted successfully' })
@@ -205,6 +209,7 @@ export class VendorsController {
     return this.vendorsService.updateService(id, updateServiceDto, user.id, token);
   }
 
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete('services/:id')
   @ApiOperation({ summary: 'Delete service' })
   @ApiResponse({ status: 200, description: 'Service deleted successfully' })
@@ -240,6 +245,7 @@ export class VendorsController {
     return this.vendorsService.updateContact(id, updateContactDto, user.id, token);
   }
 
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete('contacts/:id')
   @ApiOperation({ summary: 'Delete contact' })
   @ApiResponse({ status: 200, description: 'Contact deleted successfully' })

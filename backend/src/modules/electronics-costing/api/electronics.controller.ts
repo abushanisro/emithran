@@ -11,6 +11,8 @@ import {
   UploadedFiles,
   UseGuards,
   UseInterceptors,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -291,6 +293,7 @@ export class ElectronicsController {
     return this.designs.get(created.id, token);
   }
 
+  @HttpCode(HttpStatus.OK)
   @Delete('designs/:designId')
   @ApiOperation({ summary: 'Delete a design and everything below it, with its files (permanent)' })
   async deleteDesign(
@@ -301,6 +304,7 @@ export class ElectronicsController {
     return this.deleter.deleteDesign(designId, organizationId, token);
   }
 
+  @HttpCode(HttpStatus.OK)
   @Delete('designs/:designId/revisions/:revisionId')
   @ApiOperation({ summary: 'Delete one revision and its files; the last revision removes the part (permanent)' })
   async deleteRevision(

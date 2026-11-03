@@ -121,7 +121,7 @@ The version is the first path segment: `/api/v1/…`. A change that can break a 
 | 2 Nouns | 52 existing routes break it (`bulk`, `analyze-*`, `import-excel`, `init`, `batch`, …) |
 | 3 Plural | 150 routes under 10 singular, abbreviated or area names (`mhr`, `lhr`, `rfq`, `fx`, `vave`, `production-planning`, `quality-control`, …) |
 | 4 Nesting | 26 routes have five or more segments |
-| 5 Errors | Problem details on `/api/v1`; deletes still answer 200 with a body in about 40 places; no `Location` on create |
+| 5 Errors | Done: problem details on `/api/v1`, deletes answer 204 (200 only when they return data and say so), creates carry `Location` |
 | 6 Filter, sort, paginate | About 20 lists page; no shared helper or cap; sorting is uneven |
 | 7 Security | Done, two open items: a `reference-data:write` permission, and the approver not being the submitter |
 | 8 Caching | Not started |

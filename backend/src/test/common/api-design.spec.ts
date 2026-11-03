@@ -1,6 +1,7 @@
 // API design rules (docs/API.md), checked against the route inventory (authz/__snapshots__/route-policies.spec.ts.snap):
 //   verbs     the path names a thing, the HTTP method is the verb; only state changes (POST /things/:id/approve) are actions
 //   plural    a collection is a plural noun (singletons such as /auth, /profile excepted)
+//   deletes   a DELETE handler declares its status: 204 (nothing to return) or 200 (it returns data); never Nest's silent default
 //   depth     at most two levels of nesting: collection/:id/child/:id (4 segments); deeper children are top-level, filtered by the parent
 //
 // Existing routes that break a rule are listed in api-design-violations.json. The list can only shrink: a NEW violation fails, and
@@ -8,6 +9,8 @@
 //   UPDATE_API_DESIGN_VIOLATIONS=1 npx jest src/test/common/api-design.spec.ts
 import * as fs from 'fs';
 import * as path from 'path';
+import { RequestMethod } from '@nestjs/common';
+import { HTTP_CODE_METADATA, METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 
 const SNAPSHOT = path.resolve(__dirname, 'authz/__snapshots__/route-policies.spec.ts.snap');
 const ALLOWLIST = path.resolve(__dirname, 'api-design-violations.json');
@@ -75,5 +78,28 @@ describe('API design rules', () => {
     ['GET', 'bom-items/analyze-cad', 1], ['POST', 'lhr/import-excel', 2], ['GET', 'as/:id/bs/:id/cs', 1],
   ] as const)('%s /%s is judged as expected (%i violations)', (method, p, count) => {
     expect(violationsOf({ method, segments: p.split('/'), text: '' })).toHaveLength(count);
+  });
+
+  it('every DELETE handler declares its status (204, or 200 when it returns data)', () => {
+    const undeclared: string[] = [];
+    const sourceFiles = (dir: string): string[] => fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) return e.name === 'test' || e.name === 'node_modules' ? [] : sourceFiles(full);
+      return e.name.endsWith('.controller.ts') ? [full] : [];
+    });
+    for (const file of sourceFiles(path.resolve(__dirname, '../..'))) {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      for (const ctor of Object.values(require(file) as Record<string, unknown>)) {
+        if (typeof ctor !== 'function' || Reflect.getMetadata(PATH_METADATA, ctor) === undefined) continue;
+        const proto = (ctor as { prototype: Record<string, unknown> }).prototype;
+        for (const name of Object.getOwnPropertyNames(proto)) {
+          const handler = Object.getOwnPropertyDescriptor(proto, name)?.value;
+          if (typeof handler !== 'function' || Reflect.getMetadata(METHOD_METADATA, handler) !== RequestMethod.DELETE) continue;
+          const code = Reflect.getMetadata(HTTP_CODE_METADATA, handler);
+          if (code !== 204 && code !== 200) undeclared.push(`${ctor.name}.${name}`);
+        }
+      }
+    }
+    expect(undeclared).toEqual([]);
   });
 });

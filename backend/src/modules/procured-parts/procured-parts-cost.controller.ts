@@ -135,7 +135,7 @@ async findAll(
    * Delete procured part cost
    */
   @Delete(':id')
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete procured part cost' })
   @ApiResponse({ status: 200, description: 'Procured part cost deleted successfully' })
   @ApiResponse({ status: 404, description: 'Procured part cost not found' })
