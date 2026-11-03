@@ -1,1 +1,0 @@
-ALTER TABLE bom_items ADD COLUMN IF NOT EXISTS thumbnail_url TEXT NULL;
