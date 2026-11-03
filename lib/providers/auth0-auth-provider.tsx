@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { apiConfig } from '@/lib/api/config'
 import { signOutForInactivity } from '@/lib/auth/session-idle/browser'
-import { SESSION_IDLE_TIMEOUT_CODE } from '@/lib/auth/session-idle/policy'
+import { isSessionIdleBody } from '@/lib/auth/session-idle/policy'
 import { sessionSource } from '@/lib/auth/session-source'
 import { appReadiness } from '@/lib/core/app-readiness'
 import { AuthContext, type AuthContextType, type AuthUser, type OrganizationRole } from '@/lib/providers/auth-context'
@@ -27,8 +27,7 @@ async function fetchMe(): Promise<Me> {
     const res = await fetch(`${apiConfig.endpoints.api.v1}/auth/me`, { cache: 'no-store' })
     if (res.status === 403) return { state: 'denied' }
     if (res.status === 401) {
-      const body = (await res.json().catch(() => null)) as { error?: { code?: string } } | null
-      if (body?.error?.code === SESSION_IDLE_TIMEOUT_CODE) return { state: 'idle' }
+      if (isSessionIdleBody(await res.json().catch(() => null))) return { state: 'idle' }
     }
     if (!res.ok) return { state: 'failed' }
     const body = (await res.json()) as {

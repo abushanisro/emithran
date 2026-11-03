@@ -315,3 +315,14 @@ describe('protected job registry', () => {
     expect(protectedJobCount()).toBe(0);
   });
 });
+
+describe('isSessionIdleBody', () => {
+  it('reads the problem-details code (/api/v1) and the nested envelope code', async () => {
+    const { isSessionIdleBody } = await import('@/lib/auth/session-idle/policy');
+    expect(isSessionIdleBody({ status: 401, code: 'SESSION_IDLE_TIMEOUT' })).toBe(true);
+    expect(isSessionIdleBody({ success: false, error: { code: 'SESSION_IDLE_TIMEOUT' } })).toBe(true);
+    expect(isSessionIdleBody({ status: 401, code: 'UNAUTHORIZED' })).toBe(false);
+    expect(isSessionIdleBody(null)).toBe(false);
+    expect(isSessionIdleBody('SESSION_IDLE_TIMEOUT')).toBe(false);
+  });
+});
