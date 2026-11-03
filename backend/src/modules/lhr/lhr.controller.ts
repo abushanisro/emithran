@@ -30,7 +30,7 @@ import { OrgRole } from '../../common/authz/authz-policy';
 @ApiTags('LHR')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/lhr', version: '1' })
+@Controller({ path: 'api/labour-rates', version: '1' })
 export class LHRController {
   constructor(private readonly LHRService: LHRService, private readonly audit: AuditService) { }
 
@@ -151,7 +151,7 @@ export class LHRController {
     return this.LHRService.remove(id, user.id, token);
   }
 
-  @Post('bulk')
+  @Post('batches')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Bulk create LHR records' })
   @ApiResponse({ status: 201, description: 'LHR records created successfully' })
@@ -164,7 +164,7 @@ export class LHRController {
   }
 
   @Throttle({ default: { limit: 10, ttl: 60_000 } }) // heavy: parses or analyses a file
-  @Post('import-excel')
+  @Post('imports')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_XLSX_UPLOAD_BYTES, files: 1 } }))
   @ApiOperation({ summary: 'Import LHR records from Excel (.xlsx)' })
   @ApiResponse({ status: 201, description: 'LHR records imported successfully' })

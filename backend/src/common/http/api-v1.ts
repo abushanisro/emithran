@@ -1,5 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 
+import { renamedPath } from './legacy-paths';
+
 /**
  * The public API prefix is /api/v1 (docs/API.md). The controllers were written under /v1/api (Nest's URI version 1 plus the
  * `api/...` controller paths), so the new prefix is an alias for them: a request to /api/v1/<path> is routed exactly as /v1/api/<path>.
@@ -18,14 +20,28 @@ export interface ApiV1Request extends Request {
 }
 
 export function apiV1Middleware(env: Record<string, string | undefined> = process.env) {
+  const deprecate = (res: Response, successor: string): void => {
+    res.setHeader('Deprecation', 'true');
+    res.setHeader('Link', `<${successor}>; rel="successor-version"`);
+    if (env.LEGACY_API_SUNSET) res.setHeader('Sunset', env.LEGACY_API_SUNSET);
+  };
+
   return (req: ApiV1Request, res: Response, next: NextFunction): void => {
-    if (req.url.startsWith(NEW_PREFIX)) {
+    const viaNew = req.url.startsWith(NEW_PREFIX);
+    if (!viaNew && !req.url.startsWith(OLD_PREFIX)) return next();
+
+    const rest = req.url.slice((viaNew ? NEW_PREFIX : OLD_PREFIX).length);
+    const queryAt = rest.indexOf('?');
+    const path = queryAt === -1 ? rest : rest.slice(0, queryAt);
+    const query = queryAt === -1 ? '' : rest.slice(queryAt);
+    const renamed = renamedPath(path);
+
+    req.url = OLD_PREFIX + (renamed ?? path) + query;
+    if (viaNew) {
       req.apiV1 = true;
-      req.url = OLD_PREFIX + req.url.slice(NEW_PREFIX.length);
-    } else if (req.url.startsWith(OLD_PREFIX)) {
-      res.setHeader('Deprecation', 'true');
-      res.setHeader('Link', `<${NEW_PREFIX}${req.url.slice(OLD_PREFIX.length).split('?')[0]}>; rel="successor-version"`);
-      if (env.LEGACY_API_SUNSET) res.setHeader('Sunset', env.LEGACY_API_SUNSET);
+      if (renamed) deprecate(res, NEW_PREFIX + renamed); // the new prefix with a path that has since been renamed
+    } else {
+      deprecate(res, NEW_PREFIX + (renamed ?? path)); // the old prefix
     }
     next();
   };

@@ -29,7 +29,7 @@ import { OrgRole } from '../../common/authz/authz-policy';
 @ApiTags('MHR')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/mhr', version: '1' })
+@Controller({ path: 'api/machine-rates', version: '1' })
 export class MHRController {
   private readonly logger = new Logger(MHRController.name);
 
@@ -194,7 +194,7 @@ export class MHRController {
   }
 
   @Throttle({ default: { limit: 10, ttl: 60_000 } }) // heavy: parses or analyses a file
-  @Post('import-excel')
+  @Post('imports')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_XLSX_UPLOAD_BYTES, files: 1 } }))
   @ApiOperation({ summary: 'Import MHR records from Excel (.xlsx)' })
   @ApiResponse({ status: 201, description: 'MHR records imported successfully' })

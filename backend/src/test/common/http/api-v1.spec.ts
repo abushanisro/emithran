@@ -7,6 +7,14 @@ import request from 'supertest';
 import { GlobalExceptionFilter } from '../../../common/filters/global-exception.filter';
 import { apiV1Middleware } from '../../../common/http/api-v1';
 
+@Controller({ path: 'api/machine-rates', version: '1' })
+class RatesController {
+  @Get(':id')
+  one(): { id: string } {
+    return { id: 'rate' };
+  }
+}
+
 @Controller({ path: 'api/things', version: '1' })
 class ThingsController {
   @Get(':id')
@@ -21,7 +29,7 @@ class ThingsController {
 }
 
 async function boot(env: Record<string, string | undefined> = {}): Promise<INestApplication> {
-  const moduleRef = await Test.createTestingModule({ controllers: [ThingsController] }).compile();
+  const moduleRef = await Test.createTestingModule({ controllers: [ThingsController, RatesController] }).compile();
   const app = moduleRef.createNestApplication();
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
   app.use(apiV1Middleware(env));
@@ -88,5 +96,33 @@ describe('/api/v1 prefix', () => {
     const res = await request(app.getHttpServer()).get('/api/things/1');
     expect(res.status).toBe(404);
     expect(res.headers.deprecation).toBeUndefined();
+  });
+
+  describe('renamed resources', () => {
+    it('serves the new name without a deprecation notice', async () => {
+      const res = await request(app.getHttpServer()).get('/api/v1/machine-rates/7');
+      expect(res.status).toBe(200);
+      expect(res.headers.deprecation).toBeUndefined();
+    });
+
+    it('routes the old name on the new prefix to the new controller, and says where it moved', async () => {
+      const res = await request(app.getHttpServer()).get('/api/v1/mhr/7?x=1');
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ id: 'rate' });
+      expect(res.headers.deprecation).toBe('true');
+      expect(res.headers.link).toBe('</api/v1/machine-rates/7>; rel="successor-version"');
+    });
+
+    it('routes the old name on the old prefix the same way, with the successor on the new prefix', async () => {
+      const res = await request(app.getHttpServer()).get('/v1/api/mhr/7');
+      expect(res.status).toBe(200);
+      expect(res.headers.link).toBe('</api/v1/machine-rates/7>; rel="successor-version"');
+    });
+
+    it('answers a problem on the new prefix, even through an old name', async () => {
+      const res = await request(app.getHttpServer()).get('/api/v1/mhr');
+      expect(res.status).toBe(404);
+      expect(res.headers['content-type']).toMatch(/^application\/problem\+json/);
+    });
   });
 });

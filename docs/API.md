@@ -107,6 +107,18 @@ GET /vendors?processId=…&q=casting&sort=+name,-createdAt&page=2&limit=50
 
 The version is the first path segment: `/api/v1/…`. A change that can break a client ships as `/api/v2`. Within `v1` changes only add. The old prefix **`/v1/api/…`** still works and is deprecated: each response carries `Deprecation: true`, `Link: </api/v1/…>; rel="successor-version"` and, once `LEGACY_API_SUNSET` is set, `Sunset`. It is removed after its request log has shown no traffic for 30 days. Health checks stay at `/api/health/*`.
 
+## Renamed paths
+
+A route that was renamed keeps answering on its old path until nobody uses it. The table is `backend/src/common/http/legacy-paths.ts` (old path prefix to new path prefix, on whole segments): a request to the old path is routed to the new one and answered with `Deprecation: true` and `Link: </api/v1/new-path>; rel="successor-version"`. The controllers carry only the new name, so the route inventory lists each route once. A rule is removed once the deprecated-path log shows no traffic for 30 days.
+
+| Old | New |
+|---|---|
+| `/mhr`, `/mhr/…` | `/machine-rates`, `/machine-rates/…` |
+| `/mhr/import-excel` | `/machine-rates/imports` |
+| `/lhr`, `/lhr/…` | `/labour-rates`, `/labour-rates/…` |
+| `/lhr/import-excel` | `/labour-rates/imports` |
+| `/lhr/bulk` | `/labour-rates/batches` |
+
 ## How the rules are enforced
 
 - `backend/src/test/common/api-design.spec.ts` reads the route inventory and fails on a new route that has a verb in its path (rule 2), a singular collection (rule 3) or more than two levels of nesting (rule 4).
@@ -118,8 +130,8 @@ The version is the first path segment: `/api/v1/…`. A change that can break a 
 | Rule | State |
 |---|---|
 | 1 JSON | Done |
-| 2 Nouns | 52 existing routes break it (`bulk`, `analyze-*`, `import-excel`, `init`, `batch`, …) |
-| 3 Plural | 150 routes under 10 singular, abbreviated or area names (`mhr`, `lhr`, `rfq`, `fx`, `vave`, `production-planning`, `quality-control`, …) |
+| 2 Nouns | 51 existing routes break it (`analyze-*`, `bulk-total`, `init`, `batch`, `calculate`, …) |
+| 3 Plural | 120 routes under 8 singular, abbreviated or area names (`rfq`, `fx`, `vave`, `production-planning`, `quality-control`, …). Done: `machine-rates`, `labour-rates` |
 | 4 Nesting | 26 routes have five or more segments |
 | 5 Errors | Problem details on `/api/v1`; deletes still answer 200 with a body in about 40 places; no `Location` on create |
 | 6 Filter, sort, paginate | About 20 lists page; no shared helper or cap; sorting is uneven |
