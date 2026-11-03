@@ -172,6 +172,21 @@ A route that was renamed keeps answering on its old path until its Sunset date. 
 | `production-lots/:id/update-status-by-progress`, `…/materials/initialize` | `…/status-updates`, `POST …/materials` |
 | `supplier-evaluation-groups/:id/validate-deletion`, `project-reports/…/complete-report` | `…/deletion-check`, `…/full-report` |
 
+### Flattened
+
+| Old | New |
+|---|---|
+| `/electronics/designs`, `uploads`, `jobs`, `results`, `quotes`, `file-formats`, `reference-coverage` | `/electronic-designs`, `/electronic-uploads`, `/electronic-jobs`, `/electronic-results`, `/electronic-quotes`, `/electronic-file-formats`, `/electronic-coverage-reports` |
+| `/project-reports/balloon-diagrams/…` | `/balloon-diagrams/…` |
+| `/copilot/memory/proposals/:id/confirm` | `/copilot/memory-proposals/:id/confirm` |
+| `/processes/sm-lookup-tables/rows/:table/:id` | `/processes/sm-lookup-table-rows/:table/:id` |
+| `/processes/reference-tables/:id/rows/batches` | `/processes/reference-tables/:id/row-batches` |
+| `/vave-projects/:id/ai/should-cost/:itemId` | `/vave-projects/:id/should-cost-estimates/:itemId` |
+| `/supplier-nominations/:n/parts/:part/cost-analysis` | `/supplier-nominations/:n/part-cost-analyses/:part` |
+| `/supplier-nominations/:n/vendors/:v/rating-matrix` (and `/overall-scores`) | `/supplier-nominations/:n/vendor-ratings/:v` (and `/vendor-overall-scores/:v`) |
+| `/supplier-nominations/:n/capability-scores/:c/vendor/:v` | `/supplier-nominations/:n/capability-scores/:c/:v` |
+| `/supplier-nominations/evaluations/:e/sections/:s` | `/supplier-nominations/evaluation-sections/:e/:s` |
+
 ## How the rules are enforced
 
 - `backend/src/test/common/api-design.spec.ts` reads the route inventory and fails on a new route that has a verb in its path (rule 2), a singular collection (rule 3) or more than two levels of nesting (rule 4).
@@ -185,7 +200,7 @@ A route that was renamed keeps answering on its old path until its Sunset date. 
 | 1 JSON | Done |
 | 2 Nouns | 2 routes: the AI process-plan generator (`generate`, `select-route`), kept as it is until it is decided whether the feature stays |
 | 3 Plural | 8 routes: the same generator (`process-plan-generator`). Everything else is renamed |
-| 4 Nesting | 16 routes have five or more segments |
+| 4 Nesting | 1 route: `PUT supplier-nominations/:id/capability-scores/:criteriaId/:vendorId` (one cell of a score grid; it needs both ids). Everything else is two levels or less |
 | 5 Errors | Problem details on `/api/v1`; deletes still answer 200 with a body in about 40 places; no `Location` on create |
 | 6 Filter, sort, paginate | About 20 lists page; no shared helper or cap; sorting is uneven |
 | 7 Security | Done, two open items: a `reference-data:write` permission, and the approver not being the submitter |

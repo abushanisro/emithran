@@ -57,7 +57,7 @@ export class CopilotController {
    * The user pressed Save on a memory change the copilot proposed. The only way the copilot's proposals reach saved memory:
    * single use, within 10 minutes, for the same conversation and turn (410 otherwise).
    */
-  @Post('memory/proposals/:id/confirm')
+  @Post('memory-proposals/:id/confirm')
   @HttpCode(200)
   @ApiOperation({ summary: 'Save a memory change the copilot proposed' })
   async confirmMemoryProposal(

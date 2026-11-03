@@ -1,13 +1,7 @@
 [
-  "DELETE /electronics/designs/:designId/revisions/:revisionId # depth",
-  "DELETE /project-reports/balloon-diagrams/:diagramId/annotations/:annotationId # depth",
   "GET /process-plan-generator/:bomItemId/draft # plural:process-plan-generator",
   "GET /process-plan-generator/:bomItemId/stream # plural:process-plan-generator",
   "GET /process-plan-generator/generations/:id # plural:process-plan-generator",
-  "GET /supplier-nominations/:nominationId/parts/:bomItemId/cost-analysis # depth",
-  "GET /supplier-nominations/:nominationId/vendors/:vendorId/rating-matrix # depth",
-  "GET /supplier-nominations/:nominationId/vendors/:vendorId/rating-matrix/overall-scores # depth",
-  "POST /copilot/memory/proposals/:id/confirm # depth",
   "POST /process-plan-generator/:bomItemId/generate # plural:process-plan-generator",
   "POST /process-plan-generator/:bomItemId/generate # verb:generate",
   "POST /process-plan-generator/generations/:id/apply # plural:process-plan-generator",
@@ -15,14 +9,5 @@
   "POST /process-plan-generator/generations/:id/edits # plural:process-plan-generator",
   "POST /process-plan-generator/generations/:id/select-route # plural:process-plan-generator",
   "POST /process-plan-generator/generations/:id/select-route # verb:select-route",
-  "POST /processes/reference-tables/:tableId/rows/batches # depth",
-  "POST /supplier-nominations/:nominationId/parts/:bomItemId/cost-analysis # depth",
-  "POST /supplier-nominations/:nominationId/vendors/:vendorId/rating-matrix # depth",
-  "POST /vave-projects/:id/ai/should-cost/:itemId # depth",
-  "PUT /processes/sm-lookup-tables/rows/:table/:id # depth",
-  "PUT /project-reports/balloon-diagrams/:diagramId/annotations/:annotationId # depth",
-  "PUT /supplier-nominations/:id/capability-scores/:criteriaId/vendor/:vendorId # depth",
-  "PUT /supplier-nominations/:nominationId/parts/:bomItemId/cost-analysis # depth",
-  "PUT /supplier-nominations/:nominationId/vendors/:vendorId/rating-matrix # depth",
-  "PUT /supplier-nominations/evaluations/:evaluationId/sections/:section # depth"
+  "PUT /supplier-nominations/:id/capability-scores/:criteriaId/:vendorId # depth"
 ]

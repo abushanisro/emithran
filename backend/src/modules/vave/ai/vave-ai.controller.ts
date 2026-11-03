@@ -50,7 +50,7 @@ export class VaveAiController {
     return this.vaveAi.ideation(projectId, caller(user, organizationId, token));
   }
 
-  @Post('vave-projects/:id/ai/should-cost/:itemId')
+  @Post('vave-projects/:id/should-cost-estimates/:itemId')
   @HttpCode(200)
   @SpendsAi()
   @ApiOperation({ summary: 'AI should-cost estimate of one VAVE BOM item (not saved)' })

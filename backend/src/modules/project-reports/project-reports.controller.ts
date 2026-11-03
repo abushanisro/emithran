@@ -30,7 +30,7 @@ import { OrgRole } from '../../common/authz/authz-policy';
 @ApiTags('Project Reports')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/project-reports', version: '1' })
+@Controller({ path: 'api', version: '1' })
 @UseGuards(RequestAuthGuard)
 export class ProjectReportsController {
   private readonly logger = new Logger(ProjectReportsController.name);
@@ -69,7 +69,7 @@ export class ProjectReportsController {
   }
 
   @OrgRole('viewer')
-  @Get('projects/:projectId/balloon-diagrams')
+  @Get('project-reports/projects/:projectId/balloon-diagrams')
   @ApiOperation({ summary: 'Get balloon diagrams for project' })
   @ApiResponse({ status: 200, description: 'Balloon diagrams retrieved successfully' })
   async getBalloonDiagrams(
@@ -211,7 +211,7 @@ export class ProjectReportsController {
   // ============================================================================
 
   @OrgRole('viewer')
-  @Get('projects/:projectId/inspection-report')
+  @Get('project-reports/projects/:projectId/inspection-report')
   @ApiOperation({ summary: 'Generate inspection report for project' })
   @ApiResponse({ status: 200, description: 'Inspection report generated successfully' })
   async generateInspectionReport(
@@ -235,7 +235,7 @@ export class ProjectReportsController {
   }
 
   @OrgRole('viewer')
-  @Get('projects/:projectId/full-report')
+  @Get('project-reports/projects/:projectId/full-report')
   @ApiOperation({ summary: 'Generate complete project report with balloon diagram and inspection' })
   @ApiResponse({ status: 200, description: 'Complete report generated successfully' })
   async generateCompleteReport(

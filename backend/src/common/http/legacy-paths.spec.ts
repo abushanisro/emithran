@@ -86,10 +86,34 @@ describe('verb paths become nouns', () => {
     ['supplier-nominations/n1/calculate-rankings', 'supplier-nominations/n1/rankings/calculations'],
     ['supplier-nominations/n1/capability-scores/init', 'supplier-nominations/n1/capability-scores'],
     ['supplier-nominations/n1/capability-scores/batch', 'supplier-nominations/n1/capability-scores'],
-    ['supplier-nominations/n1/parts/p1/cost-analysis/bulk', 'supplier-nominations/n1/parts/p1/cost-analysis'],
+    ['supplier-nominations/n1/parts/p1/cost-analysis/bulk', 'supplier-nominations/n1/part-cost-analyses/p1'],
     ['production-planning/lots/l1/update-status-by-progress', 'production-lots/l1/status-updates'],
     ['production-planning/lots/l1/materials/initialize', 'production-lots/l1/materials'],
     ['project-reports/projects/p1/complete-report', 'project-reports/projects/p1/full-report'],
+  ])('%s -> %s', (from, to) => {
+    expect(renamedPath(from)).toBe(to);
+  });
+});
+
+describe('deep paths become flat resources', () => {
+  it.each([
+    ['electronics/designs', 'electronic-designs'],
+    ['electronics/designs/d1/revisions/r1', 'electronic-designs/d1/revisions/r1'],
+    ['electronics/uploads/u1/reparse', 'electronic-uploads/u1/reparse'],
+    ['electronics/jobs/j1', 'electronic-jobs/j1'],
+    ['electronics/file-formats', 'electronic-file-formats'],
+    ['project-reports/balloon-diagrams/b1/annotations/a1', 'balloon-diagrams/b1/annotations/a1'],
+    ['copilot/memory/proposals/p1/confirm', 'copilot/memory-proposals/p1/confirm'],
+    ['processes/sm-lookup-tables/rows/t1/7', 'processes/sm-lookup-table-rows/t1/7'],
+    ['processes/reference-tables/t1/rows/batches', 'processes/reference-tables/t1/row-batches'],
+    ['processes/reference-tables/t1/rows/bulk', 'processes/reference-tables/t1/row-batches'],
+    ['vave/projects/9/ai/should-cost/i1', 'vave-projects/9/should-cost-estimates/i1'],
+    ['supplier-nominations/n1/vendors/v1/rating-matrix', 'supplier-nominations/n1/vendor-ratings/v1'],
+    ['supplier-nominations/n1/vendors/v1/rating-matrix/batch', 'supplier-nominations/n1/vendor-ratings/v1'],
+    ['supplier-nominations/n1/vendors/v1/rating-matrix/overall-scores', 'supplier-nominations/n1/vendor-overall-scores/v1'],
+    ['supplier-nominations/n1/parts/p1/cost-analysis', 'supplier-nominations/n1/part-cost-analyses/p1'],
+    ['supplier-nominations/n1/capability-scores/c1/vendor/v1', 'supplier-nominations/n1/capability-scores/c1/v1'],
+    ['supplier-nominations/evaluations/e1/sections/pricing', 'supplier-nominations/evaluation-sections/e1/pricing'],
   ])('%s -> %s', (from, to) => {
     expect(renamedPath(from)).toBe(to);
   });

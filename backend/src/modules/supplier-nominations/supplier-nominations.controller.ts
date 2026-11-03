@@ -224,7 +224,7 @@ export class SupplierNominationsController {
 
 
 
-  @Put('evaluations/:evaluationId/sections/:section')
+  @Put('evaluation-sections/:evaluationId/:section')
   @ApiOperation({ summary: 'Update specific evaluation section (overview, cost_analysis, rating_engine, capability)' })
   @ApiResponse({
     status: 200,
@@ -548,7 +548,7 @@ export class SupplierNominationsController {
     return this.supplierNominationsService.initializeCapabilityScores(userId, nominationId, token);
   }
 
-  @Put(':id/capability-scores/:criteriaId/vendor/:vendorId')
+  @Put(':id/capability-scores/:criteriaId/:vendorId')
   @ApiOperation({ summary: 'Update capability score for specific vendor and criteria' })
   @ApiResponse({
     status: 200,
@@ -612,7 +612,7 @@ export class SupplierNominationsController {
   // =======================================
 
   @OrgRole('viewer')
-  @Get(':nominationId/vendors/:vendorId/rating-matrix')
+  @Get(':nominationId/vendor-ratings/:vendorId')
   @ApiOperation({ 
     summary: 'Get vendor rating matrix data',
     description: 'Retrieve complete rating matrix for vendor assessment'
@@ -640,7 +640,7 @@ export class SupplierNominationsController {
     );
   }
 
-  @Post(':nominationId/vendors/:vendorId/rating-matrix')
+  @Post(':nominationId/vendor-ratings/:vendorId')
   @ApiOperation({ 
     summary: 'Initialize vendor rating matrix',
     description: 'Create rating matrix with default criteria for vendor assessment'
@@ -668,7 +668,7 @@ export class SupplierNominationsController {
     );
   }
 
-  @Put(':nominationId/vendors/:vendorId/rating-matrix')
+  @Put(':nominationId/vendor-ratings/:vendorId')
   @ApiOperation({ 
     summary: 'Batch update rating matrix - ATOMIC ENTERPRISE OPERATION',
     description: 'Atomically update multiple rating matrix items in single transaction'
@@ -707,7 +707,7 @@ export class SupplierNominationsController {
   }
 
   @OrgRole('viewer')
-  @Get(':nominationId/vendors/:vendorId/rating-matrix/overall-scores')
+  @Get(':nominationId/vendor-overall-scores/:vendorId')
   @ApiOperation({ 
     summary: 'Get calculated overall scores for vendor rating',
     description: 'Calculate and return aggregated scores from rating matrix data'
@@ -740,7 +740,7 @@ export class SupplierNominationsController {
   // =======================================
 
   @OrgRole('viewer')
-  @Get(':nominationId/parts/:bomItemId/cost-analysis')
+  @Get(':nominationId/part-cost-analyses/:bomItemId')
   @ApiOperation({ 
     summary: 'Get part-wise cost analysis for specific BOM part',
     description: 'Retrieve cost analysis data for all vendors for a specific BOM part within nomination'
@@ -777,7 +777,7 @@ export class SupplierNominationsController {
     );
   }
 
-  @Post(':nominationId/parts/:bomItemId/cost-analysis')
+  @Post(':nominationId/part-cost-analyses/:bomItemId')
   @ApiOperation({ 
     summary: 'Initialize part-wise cost analysis for BOM part',
     description: 'Create cost analysis records for all vendors for a specific BOM part'
@@ -804,7 +804,7 @@ export class SupplierNominationsController {
     );
   }
 
-  @Put(':nominationId/parts/:bomItemId/cost-analysis')
+  @Put(':nominationId/part-cost-analyses/:bomItemId')
   @ApiOperation({ 
     summary: 'Bulk update part-wise cost analysis - ATOMIC ENTERPRISE OPERATION',
     description: 'Atomically update cost analysis data for all vendors for a specific BOM part'

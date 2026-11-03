@@ -262,7 +262,7 @@ export class ProcessesController {
   }
 
 
-  @Put('sm-lookup-tables/rows/:table/:id')
+  @Put('sm-lookup-table-rows/:table/:id')
   @ApiOperation({ summary: 'Update one row of a real sm_lookup_* cost-engine table (allowlisted tables/columns only)' })
   @ApiResponse({ status: 200, description: 'Row updated successfully' })
   @ApiResponse({ status: 400, description: 'Unrecognized table or column' })
@@ -391,7 +391,7 @@ export class ProcessesController {
     return this.processesService.deleteTableRow(rowId, token);
   }
 
-  @Post('reference-tables/:tableId/rows/batches')
+  @Post('reference-tables/:tableId/row-batches')
   @ApiOperation({ summary: 'Bulk update table rows (delete old, insert new)' })
   @ApiResponse({ status: 200, description: 'Table rows updated successfully' })
   async bulkUpdateTableRows(
