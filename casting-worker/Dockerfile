@@ -8,7 +8,7 @@
 
 FROM docker.io/library/debian:trixie-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad AS occt
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        g++=4:14.2.0-1 cmake=3.31.6-2 ninja-build=1.12.1-1+b1 rapidjson-dev=1.1.0+dfsg2-7.4 \
+        g++=4:14.2.0-1 cmake=3.31.6-2 ninja-build=1.12.1-1* rapidjson-dev=1.1.0+dfsg2-7.4 \
     && rm -rf /var/lib/apt/lists/*
 ADD --checksum=sha256:dba62b81078dd43cec23feba89432be301582341001edad1b93342ad8bda35ea \
     https://github.com/Open-Cascade-SAS/OCCT/archive/b8f597c677811d1f9f4d8a97f5ae2825c0353a42.tar.gz /tmp/occt.tar.gz
