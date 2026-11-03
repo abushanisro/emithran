@@ -64,7 +64,7 @@ export async function getVendorRatingMatrix(
   }
 
   try {
-    const response = await apiClient.get(`/supplier-nominations/${nominationId}/vendors/${vendorId}/rating-matrix`);
+    const response = await apiClient.get(`/supplier-nominations/${nominationId}/vendor-ratings/${vendorId}`);
 
     // Extract data - API client returns direct array
     const data = Array.isArray(response) ? response : [];
@@ -95,7 +95,7 @@ export async function getVendorRatingMatrix(
     const status = err?.response?.status;
     const statusText = err?.response?.statusText;
 
-    apiLogger.logApiError('GET', `/supplier-nominations/${nominationId}/vendors/${vendorId}/rating-matrix`, error, {
+    apiLogger.logApiError('GET', `/supplier-nominations/${nominationId}/vendor-ratings/${vendorId}`, error, {
       status,
       statusText,
       nominationId,
@@ -124,7 +124,7 @@ export async function initializeVendorRatingMatrix(
   }
 
   try {
-    const response = await apiClient.post(`/supplier-nominations/${nominationId}/vendors/${vendorId}/rating-matrix/init`);
+    const response = await apiClient.post(`/supplier-nominations/${nominationId}/vendor-ratings/${vendorId}`);
 
     // Extract data - API client returns direct array
     const dataArray = Array.isArray(response) ? response : [];
@@ -158,7 +158,7 @@ export async function initializeVendorRatingMatrix(
     const err = error as any;
     const status = err?.response?.status;
 
-    apiLogger.logApiError('POST', `/supplier-nominations/${nominationId}/vendors/${vendorId}/rating-matrix/init`, error, {
+    apiLogger.logApiError('POST', `/supplier-nominations/${nominationId}/vendor-ratings/${vendorId}`, error, {
       status,
       nominationId,
       vendorId
@@ -373,11 +373,11 @@ export async function batchUpdateVendorRatingMatrix(
     VendorRatingDataTransformer.validateDto(payload);
 
     const response = await apiClient.put(
-      `/supplier-nominations/${nominationId}/vendors/${vendorId}/rating-matrix/batch`,
+      `/supplier-nominations/${nominationId}/vendor-ratings/${vendorId}`,
       payload
     );
 
-    apiLogger.logApiResponse('PUT', `/supplier-nominations/${nominationId}/vendors/${vendorId}/rating-matrix/batch`,
+    apiLogger.logApiResponse('PUT', `/supplier-nominations/${nominationId}/vendor-ratings/${vendorId}`,
       response, { updateCount: payload.updates.length });
 
     // The batch update endpoint returns data directly as an array
@@ -431,7 +431,7 @@ export async function batchUpdateVendorRatingMatrix(
       payloadUpdates: payload?.updates?.length || 0
     });
 
-    apiLogger.logApiError('PUT', `/supplier-nominations/${nominationId}/vendors/${vendorId}/rating-matrix/batch`, error, {
+    apiLogger.logApiError('PUT', `/supplier-nominations/${nominationId}/vendor-ratings/${vendorId}`, error, {
       status,
       statusText,
       errorMessage: message,
@@ -463,7 +463,7 @@ export async function getVendorRatingOverallScores(
   }
 
   try {
-    const response = await apiClient.get(`/supplier-nominations/${nominationId}/vendors/${vendorId}/rating-matrix/overall-scores`);
+    const response = await apiClient.get(`/supplier-nominations/${nominationId}/vendor-overall-scores/${vendorId}`);
 
     // API client returns data directly, not wrapped in .data
     const data = response;
@@ -489,7 +489,7 @@ export async function getVendorRatingOverallScores(
     const err = error as any;
     const status = err?.response?.status;
 
-    apiLogger.logApiError('GET', `/supplier-nominations/${nominationId}/vendors/${vendorId}/rating-matrix/overall-scores`, error, {
+    apiLogger.logApiError('GET', `/supplier-nominations/${nominationId}/vendor-overall-scores/${vendorId}`, error, {
       status,
       nominationId,
       vendorId

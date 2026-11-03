@@ -749,7 +749,7 @@ function ProcessPlanningPageContent() {
       };
 
       // Save manufacturing specifications to database via Process Planning API
-      await apiClient.post('/process-planning/specifications/upsert', manufacturingSpecs);
+      await apiClient.post('/process-specifications', manufacturingSpecs);
 
       // manufacturingFamilyOverride lives on the BOM item itself (resolveEffectiveFamily,
       // bom-items.service.ts), not the process-planning specs table above — saved via

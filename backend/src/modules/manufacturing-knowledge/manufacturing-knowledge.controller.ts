@@ -9,7 +9,7 @@ import type {
 import { OrgRole } from '../../common/authz/authz-policy';
 
 @OrgRole('member')
-@Controller('api/manufacturing-knowledge')
+@Controller()
 export class ManufacturingKnowledgeController {
   constructor(
     private readonly kb: ManufacturingKnowledgeService,
@@ -17,12 +17,12 @@ export class ManufacturingKnowledgeController {
   ) {}
 
   @OrgRole('viewer')
-  @Get('feature-process-mapping')
+  @Get('feature-process-mappings')
   getFeatureProcessMapping(@Request() req: any, @Query('featureType') featureType?: string) {
     return this.kb.getFeatureProcessMapping(req.token, featureType);
   }
 
-  @Post('feature-process-mapping')
+  @Post('feature-process-mappings')
   createFeatureProcessMapping(@Request() req: any, @Body() dto: CreateFeatureProcessMappingDto) {
     return this.kb.createFeatureProcessMapping(req.token, dto, req.user.id);
   }
@@ -50,7 +50,7 @@ export class ManufacturingKnowledgeController {
   }
 
   @OrgRole('viewer')
-  @Get('templates')
+  @Get('routing-templates')
   getTemplates(@Request() req: any, @Query('partFamily') partFamily?: string, @Query('complexity') complexity?: string) {
     if (partFamily) return this.kb.getTemplate(req.token, partFamily, complexity);
     return this.kb.getAllTemplates(req.token);

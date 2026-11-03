@@ -26,7 +26,7 @@ import { OrgRole } from '../../common/authz/authz-policy';
 @ApiTags('Projects')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/projects', version: '1' })
+@Controller({ path: 'projects', version: '1' })
 export class ProjectsController {
   constructor(private readonly projectsService: ProjectsService) {}
 
@@ -79,6 +79,7 @@ export class ProjectsController {
     return this.projectsService.update(id, updateProjectDto, user.id, token);
   }
 
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id')
   @ApiOperation({ summary: 'Delete project and all associated data' })
   @ApiParam({ name: 'id', description: 'Project ID', example: '123e4567-e89b-12d3-a456-426614174000' })
@@ -124,6 +125,7 @@ export class ProjectsController {
     return this.projectsService.updateTeamMember(id, memberId, dto, user.id, token);
   }
 
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id/team/:memberId')
   @ApiOperation({ summary: 'Remove team member from project' })
   @ApiResponse({ status: 200, description: 'Team member removed successfully' })

@@ -39,7 +39,7 @@ export interface FxRateResult {
 export function useFactoryCurrency(location: string | undefined) {
   return useQuery({
     queryKey: ['fx', 'factory-currency', location],
-    queryFn: () => apiClient.get<FactoryCurrencyInfo>(`/fx/factory-currency?location=${encodeURIComponent(location!)}`),
+    queryFn: () => apiClient.get<FactoryCurrencyInfo>(`/factory-currencies?location=${encodeURIComponent(location!)}`),
     enabled: useAuthEnabledWith(!!location),
     staleTime: Infinity, // LOCATION_INFO is a static map — never changes at runtime
   });
@@ -49,7 +49,7 @@ export function useFactoryCurrency(location: string | undefined) {
 export function useFactories() {
   return useQuery({
     queryKey: ['fx', 'factories'],
-    queryFn: () => apiClient.get<FactoryLocationInfo[]>('/fx/factories'),
+    queryFn: () => apiClient.get<FactoryLocationInfo[]>('/factories'),
     enabled: useAuthEnabledWith(true),
     staleTime: Infinity, // LOCATION_INFO is a static map — never changes at runtime
   });
@@ -59,7 +59,7 @@ export function useFactories() {
 export function useCurrencies() {
   return useQuery({
     queryKey: ['fx', 'currencies'],
-    queryFn: () => apiClient.get<CurrencyInfo[]>('/fx/currencies'),
+    queryFn: () => apiClient.get<CurrencyInfo[]>('/currencies'),
     enabled: useAuthEnabledWith(true),
     staleTime: 5 * 60 * 1000, // the exchange_rates table; editing a rate invalidates it
   });
@@ -89,7 +89,7 @@ export interface ExchangeRateRow {
 export function useExchangeRates(enabled = true) {
   return useQuery({
     queryKey: ['fx', 'exchange-rates'],
-    queryFn: () => apiClient.get<ExchangeRateRow[]>('/fx/exchange-rates'),
+    queryFn: () => apiClient.get<ExchangeRateRow[]>('/exchange-rates'),
     enabled: useAuthEnabledWith(enabled),
   });
 }
@@ -107,7 +107,7 @@ export function useSetExchangeRate() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ currency, rate, reason, confirm }: { currency: string; rate: number; reason: string; confirm?: boolean }) =>
-      apiClient.put<ExchangeRateRow[]>(`/fx/exchange-rates/${encodeURIComponent(currency)}`, { rate, reason, ...(confirm ? { confirm: true } : {}) }),
+      apiClient.put<ExchangeRateRow[]>(`/exchange-rates/${encodeURIComponent(currency)}`, { rate, reason, ...(confirm ? { confirm: true } : {}) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['fx'] });
     },
@@ -131,7 +131,7 @@ export function useFxRate(params: {
     queryKey: ['fx', 'rate', base, quote, rateType],
     queryFn: () =>
       apiClient.get<FxRateResult>(
-        `/fx/rate?base=${encodeURIComponent(base!)}&quote=${encodeURIComponent(quote!)}&rateType=${rateType}`,
+        `/exchange-rates/effective?base=${encodeURIComponent(base!)}&quote=${encodeURIComponent(quote!)}&rateType=${rateType}`,
       ),
     enabled: useAuthEnabledWith(!!base && !!quote && enabled),
     staleTime: 60 * 1000,
@@ -161,7 +161,7 @@ export function useFxRatesForCurrencies(codes: string[]): Record<string, number 
       // Callers already treat a missing entry in the returned map as "rate
       // unknown" (see mhrCurrencyOf's `?? 1` loading/unavailable fallback).
       queryFn: () =>
-        apiClient.get<FxRateResult>(`/fx/rate?base=USD&quote=${encodeURIComponent(quote)}&rateType=reference`, { silent: true }),
+        apiClient.get<FxRateResult>(`/exchange-rates/effective?base=USD&quote=${encodeURIComponent(quote)}&rateType=reference`, { silent: true }),
       enabled: authEnabled,
       retry: false,
       throwOnError: false,
@@ -180,7 +180,7 @@ export function useRefreshFxRate() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ base, quote }: { base: string; quote: string }) =>
-      apiClient.post<FxRateResult>('/fx/refresh', { base, quote }),
+      apiClient.post<FxRateResult>('/exchange-rates/refresh', { base, quote }),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['fx', 'rate', variables.base, variables.quote] });
     },
@@ -198,7 +198,7 @@ export function useFxRateOnDemand() {
   return useMutation({
     mutationFn: ({ base, quote }: { base: string; quote: string }) =>
       apiClient.get<FxRateResult>(
-        `/fx/rate?base=${encodeURIComponent(base)}&quote=${encodeURIComponent(quote)}&rateType=reference`,
+        `/exchange-rates/effective?base=${encodeURIComponent(base)}&quote=${encodeURIComponent(quote)}&rateType=reference`,
       ),
   });
 }

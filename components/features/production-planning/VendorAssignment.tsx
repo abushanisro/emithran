@@ -119,11 +119,11 @@ export const VendorAssignment = ({ lotId }: VendorAssignmentProps) => {
     const fetchLotData = async () => {
       try {
         // Fetch production lot details
-        const lotResponse: any = await apiClient.get(`/production-planning/lots/${lotId}`);
+        const lotResponse: any = await apiClient.get(`/production-lots/${lotId}`);
         const lotData = lotResponse.data;
 
         // Fetch BOM items for this production lot from the dedicated endpoint
-        const bomItemsResponse: any = await apiClient.get(`/production-planning/lots/${lotId}/bom-items`);
+        const bomItemsResponse: any = await apiClient.get(`/production-lots/${lotId}/bom-items`);
         const bomItems = bomItemsResponse.data || [];
 
         // Transform BOM items for display
@@ -209,7 +209,7 @@ export const VendorAssignment = ({ lotId }: VendorAssignmentProps) => {
         // Process vendor assignments - get existing assignments for this lot
         let assignments: VendorAssignment[] = [];
         try {
-          const assignmentsResponse: any = await apiClient.get(`/production-planning/lots/${lotId}/vendor-assignments`);
+          const assignmentsResponse: any = await apiClient.get(`/production-lots/${lotId}/vendor-assignments`);
           assignments = assignmentsResponse.data || [];
           
         } catch (assignmentError) {
@@ -331,7 +331,7 @@ setVendorAssignments(assignments);
         remarks: 'Assigned via production planning'
       };
 
-await apiClient.post(`/production-planning/lots/${lotId}/vendor-assignments`, assignmentData);
+await apiClient.post(`/production-lots/${lotId}/vendor-assignments`, assignmentData);
 
       toast.success('Vendor assigned successfully');
       setShowNewAssignment(false);
@@ -344,7 +344,7 @@ await apiClient.post(`/production-planning/lots/${lotId}/vendor-assignments`, as
       // setLeadTimeDays('');
 
       // Refresh assignments
-      const assignmentsResponse: any = await apiClient.get(`/production-planning/lots/${lotId}/vendor-assignments`);
+      const assignmentsResponse: any = await apiClient.get(`/production-lots/${lotId}/vendor-assignments`);
       const assignments = assignmentsResponse.data || [];
 
       setVendorAssignments(assignments);
@@ -360,7 +360,7 @@ await apiClient.post(`/production-planning/lots/${lotId}/vendor-assignments`, as
     }
 
     try {
-      await apiClient.delete(`/production-planning/lots/${lotId}/vendor-assignments/${assignmentId}`);
+      await apiClient.delete(`/production-lots/${lotId}/vendor-assignments/${assignmentId}`);
       toast.success('Vendor assignment deleted successfully');
 
       // Remove from local state
@@ -410,7 +410,7 @@ await apiClient.post(`/production-planning/lots/${lotId}/vendor-assignments`, as
         remarks: 'Updated via production planning'
       };
 
-      await apiClient.patch(`/production-planning/lots/${lotId}/vendor-assignments/${editingAssignment.id}`, updateData);
+      await apiClient.patch(`/production-lots/${lotId}/vendor-assignments/${editingAssignment.id}`, updateData);
 
       toast.success('Vendor assignment updated successfully');
       setShowNewAssignment(false);
@@ -424,7 +424,7 @@ await apiClient.post(`/production-planning/lots/${lotId}/vendor-assignments`, as
       // setLeadTimeDays('');
 
       // Refresh assignments
-      const assignmentsResponse: any = await apiClient.get(`/production-planning/lots/${lotId}/vendor-assignments`);
+      const assignmentsResponse: any = await apiClient.get(`/production-lots/${lotId}/vendor-assignments`);
       const assignments = assignmentsResponse.data || [];
 
       setVendorAssignments(assignments);

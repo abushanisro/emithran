@@ -9,8 +9,6 @@ import { ProductionEntryController } from './controllers/production-entry.contro
 import { ProductionEntryService } from './services/production-entry.service';
 import { RemarkController } from './controllers/remark.controller';
 import { RemarkService } from './services/remark.service';
-import { SubtaskController } from './controllers/subtask.controller';
-import { SubtaskService } from './services/subtask.service';
 
 @Module({
   imports: [
@@ -21,7 +19,6 @@ import { SubtaskService } from './services/subtask.service';
     ProductionProcessController,
     ProductionEntryController,
     RemarkController,
-    SubtaskController,
   ],
   providers: [
     ProductionPlanningService,
@@ -29,7 +26,6 @@ import { SubtaskService } from './services/subtask.service';
     ProductionProcessService,
     ProductionEntryService,
     RemarkService,
-    SubtaskService,
   ],
   exports: [
     ProductionPlanningService,
@@ -37,7 +33,6 @@ import { SubtaskService } from './services/subtask.service';
     ProductionProcessService,
     ProductionEntryService,
     RemarkService,
-    SubtaskService,
   ],
 })
 export class ProductionPlanningModule { }

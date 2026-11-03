@@ -1,4 +1,5 @@
 interface User { id: string; email: string; [key: string]: any; }
+import { Throttle } from '@nestjs/throttler';
 import {
   Controller,
   Get,
@@ -15,6 +16,7 @@ import {
   BadRequestException,
   HttpException,
   Logger,
+  HttpStatus,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
@@ -30,6 +32,8 @@ import { AccessToken } from '../../common/decorators/access-token.decorator';
 import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
 import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
 import * as ExcelJS from 'exceljs';
+import { AuditService } from '../../common/audit/audit.service';
+import { requireBulkDeleteConfirmation } from '../../common/http/bulk-delete';
 import { OrgRole } from '../../common/authz/authz-policy';
 import { MAX_XLSX_UPLOAD_BYTES } from '../../common/archive/xlsx-limits';
 import { readWorkbook } from '../../common/heavy-work/heavy-work';
@@ -37,7 +41,7 @@ import { readWorkbook } from '../../common/heavy-work/heavy-work';
 @ApiTags('Raw Materials')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/raw-materials', version: '1' })
+@Controller({ path: 'raw-materials', version: '1' })
 export class RawMaterialsController {
   private readonly logger = new Logger(RawMaterialsController.name);
 
@@ -45,6 +49,7 @@ export class RawMaterialsController {
     private readonly rawMaterialsService: RawMaterialsService,
     private readonly stockPricesService: MaterialStockPricesService,
     private readonly editorService: RawMaterialEditorService,
+    private readonly audit: AuditService,
   ) { }
 
   @OrgRole('viewer')
@@ -165,6 +170,7 @@ export class RawMaterialsController {
     return this.editorService.load(id, user.id, token);
   }
 
+  @OrgRole('admin')
   @Put(':id/editor')
   @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: 'Save the edit form (core fields, property values, stock prices) in one transaction' })
@@ -187,6 +193,7 @@ export class RawMaterialsController {
     return this.rawMaterialsService.findOne(id, user.id, token);
   }
 
+  @OrgRole('admin')
   @Post()
   @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: 'Create new raw material' })
@@ -200,6 +207,7 @@ export class RawMaterialsController {
     return this.rawMaterialsService.create(createRawMaterialDto, user.id, token, organizationId);
   }
 
+  @OrgRole('admin')
   @Put(':id')
   @ApiOperation({ summary: 'Update raw material' })
   @ApiResponse({ status: 200, description: 'Raw material updated successfully', type: RawMaterialResponseDto })
@@ -207,6 +215,8 @@ export class RawMaterialsController {
     return this.rawMaterialsService.update(id, updateRawMaterialDto, user.id, token);
   }
 
+  @OrgRole('admin')
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id')
   @ApiOperation({ summary: 'Delete raw material' })
   @ApiResponse({ status: 200, description: 'Raw material deleted successfully' })
@@ -214,14 +224,22 @@ export class RawMaterialsController {
     return this.rawMaterialsService.remove(id, user.id, token);
   }
 
+  @OrgRole('admin')
+  @HttpCode(HttpStatus.OK)
   @Delete()
-  @ApiOperation({ summary: 'Delete all raw materials for current user' })
+  @ApiOperation({ summary: 'Delete all raw materials for current user (administrators; needs ?confirm=delete-all)' })
   @ApiResponse({ status: 200, description: 'All raw materials deleted successfully' })
-  async removeAll(@CurrentUser() user: User, @AccessToken() token: string) {
-    return this.rawMaterialsService.removeAll(user.id, token);
+  async removeAll(@CurrentUser() user: User, @AccessToken() token: string, @Query('confirm') confirm?: string) {
+    requireBulkDeleteConfirmation(confirm);
+    return this.audit.purged('raw_materials', async () => {
+      const result = await this.rawMaterialsService.removeAll(user.id, token);
+      return { ...result, deleted: result.deleted ?? 0 };
+    });
   }
 
-  @Post('upload-excel')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } }) // heavy: parses or analyses a file
+  @OrgRole('admin')
+  @Post('imports')
   @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: 'Upload Excel file to bulk import raw materials' })
   @ApiConsumes('multipart/form-data')

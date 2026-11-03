@@ -26,7 +26,7 @@ const DEFAULT_LIMIT = 50;
 @ApiTags('Audit')
 @ApiBearerAuth()
 @OrgRole('admin')
-@Controller({ path: 'api/audit-events', version: '1' })
+@Controller({ path: 'audit-events', version: '1' })
 export class AuditController {
   constructor(private readonly database: DatabaseService) {}
 

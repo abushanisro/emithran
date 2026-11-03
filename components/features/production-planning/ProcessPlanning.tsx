@@ -128,7 +128,7 @@ export const ProcessPlanning = ({ lotId }: ProcessPlanningProps) => {
   const { data: lotBomItems = [] } = useQuery({
     queryKey: ['lot-bom-items', lotId],
     queryFn: async () => {
-      const res = await apiClient.get(`/production-planning/lots/${lotId}/bom-items`);
+      const res = await apiClient.get(`/production-lots/${lotId}/bom-items`);
       return (res as any).data || [];
     },
     enabled: !!lotId,

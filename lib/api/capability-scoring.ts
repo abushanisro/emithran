@@ -21,7 +21,7 @@ export async function getCapabilityScores(nominationId: string): Promise<Capabil
  * Initialize capability scoring criteria for a nomination
  */
 export async function initializeCapabilityScores(nominationId: string): Promise<void> {
-  await apiClient.post(`/supplier-nominations/${nominationId}/capability-scores/init`);
+  await apiClient.post(`/supplier-nominations/${nominationId}/capability-scores`);
 }
 
 /**
@@ -33,7 +33,7 @@ async function updateCapabilityScore(
   vendorId: string,
   score: number
 ): Promise<void> {
-  await apiClient.put(`/supplier-nominations/${nominationId}/capability-scores/${criteriaId}/vendor/${vendorId}`, {
+  await apiClient.put(`/supplier-nominations/${nominationId}/capability-scores/${criteriaId}/${vendorId}`, {
     score
   });
 }
@@ -53,7 +53,7 @@ export async function batchUpdateCapabilityScores(
 ): Promise<void> {
   try {
     // Try batch endpoint first (preferred)
-    await apiClient.put(`/supplier-nominations/${nominationId}/capability-scores/batch`, {
+    await apiClient.put(`/supplier-nominations/${nominationId}/capability-scores`, {
       updates
     });
   } catch (error) {

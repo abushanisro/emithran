@@ -58,7 +58,7 @@ export const rfqApi = {
    * Create a new RFQ
    */
   async create(data: CreateRfqData): Promise<RfqRecord> {
-    return apiClient.post<RfqRecord>('/rfq', data);
+    return apiClient.post<RfqRecord>('/rfqs', data);
   },
 
   /**
@@ -70,7 +70,7 @@ export const rfqApi = {
       params.append('projectId', query.projectId);
     }
 
-    const url = params.toString() ? `/rfq?${params.toString()}` : '/rfq';
+    const url = params.toString() ? `/rfqs?${params.toString()}` : '/rfqs';
     return apiClient.get<RfqSummary[]>(url);
   },
 
@@ -78,20 +78,20 @@ export const rfqApi = {
    * Get RFQ details by ID
    */
   async getById(id: string): Promise<RfqRecord> {
-    return apiClient.get<RfqRecord>(`/rfq/${id}`);
+    return apiClient.get<RfqRecord>(`/rfqs/${id}`);
   },
 
   /**
    * Send RFQ to vendors
    */
   async send(id: string): Promise<{ message: string }> {
-    return apiClient.patch<{ message: string }>(`/rfq/${id}/send`, {});
+    return apiClient.patch<{ message: string }>(`/rfqs/${id}/send`, {});
   },
 
   /**
    * Close RFQ (no more responses accepted)
    */
   async close(id: string): Promise<{ message: string }> {
-    return apiClient.patch<{ message: string }>(`/rfq/${id}/close`, {});
+    return apiClient.patch<{ message: string }>(`/rfqs/${id}/close`, {});
   },
 };

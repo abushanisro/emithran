@@ -1,12 +1,12 @@
 // Approval and rejection are decisions with an author (approved_by/rejected_by) and, for approval, approved items: a plain
 // update may not set them, and an inspection is approved only from completed, once.
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { QualityInspectionService } from '../../../modules/quality-control/services/quality-inspection.service';
 import { InspectionStatus } from '../../../modules/quality-control/dto/quality-inspection.dto';
 
 jest.mock('@/common/database/database.service', () => ({ DatabaseService: class {} }), { virtual: true });
 
-function harness(inspection: Record<string, unknown>) {
+function harness(inspection: Record<string, unknown>, members: string[] = ['u1', 'u2']) {
   const writes: Array<{ table: string; op: string; values: unknown; filters: Array<[string, unknown]> }> = [];
   const client = {
     from(table: string) {
@@ -14,6 +14,7 @@ function harness(inspection: Record<string, unknown>) {
       let op = 'select';
       let values: unknown = null;
       const result = async () => {
+        if (op === 'select' && table === 'organization_members') return { data: members.map((user_id) => ({ user_id })), error: null };
         if (op === 'select') return { data: inspection, error: null };
         writes.push({ table, op, values, filters: [...filters] });
         if (table === 'quality_inspections' && op === 'update') {
@@ -67,5 +68,49 @@ describe('quality inspection workflow', () => {
     const { service, writes } = harness({ ...completed(), status });
     await expect(service.approveInspection('i1', {}, 'u1')).rejects.toThrow(ConflictException);
     expect(writes).toEqual([]);
+  });
+
+  describe('the person who created an inspection does not decide on it', () => {
+    it('cannot approve it, and nothing is written', async () => {
+      const { service, writes } = harness({ ...completed(), created_by: 'u1' });
+      await expect(service.approveInspection('i1', {}, 'u1')).rejects.toThrow(ForbiddenException);
+      expect(writes).toEqual([]);
+    });
+
+    it('cannot reject it either', async () => {
+      const { service, writes } = harness({ ...completed(), created_by: 'u1' });
+      await expect(service.rejectInspection('i1', { rejectionReason: 'no' }, 'u1')).rejects.toThrow(ForbiddenException);
+      expect(writes).toEqual([]);
+    });
+
+    it('another member can approve or reject it', async () => {
+      const approved = harness({ ...completed(), created_by: 'u1' });
+      await approved.service.approveInspection('i1', {}, 'u2');
+      expect(approved.inspection.status).toBe(InspectionStatus.APPROVED);
+      const rejected = harness({ ...completed(), created_by: 'u1' });
+      await rejected.service.rejectInspection('i1', { rejectionReason: 'no' }, 'u2');
+      expect(rejected.inspection.status).toBe(InspectionStatus.REJECTED);
+    });
+
+    it('a one-person organization can approve its own inspection (nobody else could)', async () => {
+      const { service, inspection } = harness({ ...completed(), created_by: 'u1' }, ['u1']);
+      await service.approveInspection('i1', {}, 'u1');
+      expect(inspection.status).toBe(InspectionStatus.APPROVED);
+    });
+
+    it('fails closed when the members cannot be read', async () => {
+      const { service } = harness({ ...completed(), created_by: 'u1' });
+      (service as any).db = () => ({
+        from: (table: string) => ({
+          select: () => ({
+            eq: () => ({
+              eq: async () => (table === 'organization_members' ? { data: null, error: { message: 'down', code: '503' } } : { data: null, error: null }),
+              single: async () => ({ data: { ...completed(), created_by: 'u1' }, error: null }),
+            }),
+          }),
+        }),
+      });
+      await expect(service.approveInspection('i1', {}, 'u1')).rejects.toThrow();
+    });
   });
 });

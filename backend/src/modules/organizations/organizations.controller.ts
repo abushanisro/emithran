@@ -16,7 +16,7 @@ import { OrganizationsService, type MemberView, type OrganizationRow, type Works
 @ApiTags('Organizations')
 @ApiBearerAuth()
 @OrgRole('admin')
-@Controller({ path: 'api/organizations', version: '1' })
+@Controller({ path: 'organizations', version: '1' })
 export class OrganizationsController {
   constructor(private readonly organizations: OrganizationsService) {}
 

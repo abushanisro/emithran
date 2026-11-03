@@ -44,7 +44,7 @@ import { OrgRole } from '../../common/authz/authz-policy';
 @ApiTags('Procured Parts Costs')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller('api/procured-parts-costs')
+@Controller('procured-parts-costs')
 @UseGuards(RequestAuthGuard)
 export class ProcuredPartsCostController {
   constructor(
@@ -135,7 +135,7 @@ async findAll(
    * Delete procured part cost
    */
   @Delete(':id')
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete procured part cost' })
   @ApiResponse({ status: 200, description: 'Procured part cost deleted successfully' })
   @ApiResponse({ status: 404, description: 'Procured part cost not found' })
@@ -150,7 +150,7 @@ async findAll(
   /**
    * Get total procured parts costs for multiple BOM items in a single request
    */
-  @Post('bulk-total')
+  @Post('totals')
   @ApiOperation({ summary: 'Get total procured parts costs for multiple BOM items' })
   @ApiResponse({ status: 201, description: 'Returns a map of bomItemId → totalCost' })
   async getBulkTotalCosts(

@@ -7,6 +7,8 @@ import {
   Param,
   Delete,
   UseGuards,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { SupplierEvaluationGroupsService } from './supplier-evaluation-groups.service';
@@ -24,7 +26,7 @@ import { OrgRole } from '../../common/authz/authz-policy';
 
 @ApiTags('supplier-evaluation-groups')
 @OrgRole('member')
-@Controller('api/supplier-evaluation-groups')
+@Controller('supplier-evaluation-groups')
 export class SupplierEvaluationGroupsController {
   constructor(
     private readonly supplierEvaluationGroupsService: SupplierEvaluationGroupsService,
@@ -112,7 +114,7 @@ export class SupplierEvaluationGroupsController {
   }
 
   @OrgRole('viewer')
-  @Get(':id/validate-deletion')
+  @Get(':id/deletion-check')
   @ApiOperation({ summary: 'Validate if evaluation group can be deleted' })
   @ApiResponse({
     status: 200,
@@ -144,6 +146,7 @@ export class SupplierEvaluationGroupsController {
     return this.supplierEvaluationGroupsService.validateDeletion(userId, id, token);
   }
 
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id')
   @ApiOperation({ summary: 'Delete evaluation group' })
   @ApiResponse({

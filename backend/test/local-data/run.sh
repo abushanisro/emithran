@@ -46,7 +46,7 @@ APP="$TMP/app/backend"; mkdir -p "$APP"; cp -r dist "$APP/dist"; cp package.json
     AUTH0_DOMAIN=t.eu.auth0.com AUTH0_AUDIENCE=https://api.example.com AUTH0_CLAIM_NAMESPACE=https://example.com/ AUTH0_TRUSTED_CONNECTIONS=company-sso \
     ALLOW_DEV_AUTH_BYPASS=true ADMIN_FALLBACK_EMAIL=alice@example.com node dist/main > "$TMP/backend.log" 2>&1 & echo $! > "$TMP/backend.pid" )
 for _ in $(seq 1 90); do curl -s -o /dev/null http://127.0.0.1:4529/api/health/live && break; sleep 1; done
-me="$(curl -s -m 10 http://127.0.0.1:4529/v1/api/auth/me)"
+me="$(curl -s -m 10 http://127.0.0.1:4529/api/v1/auth/me)"
 kill "$(cat "$TMP/backend.pid")" 2>/dev/null || true
 if echo "$me" | grep -q '11111111-1111-4111-8111-111111111111'; then echo "ok   the backend runs in development on local Postgres with no Supabase and acts as the dev account (Alice)"; else echo "FAIL backend /auth/me: $me"; tail -5 "$TMP/backend.log"; fail=1; fi
 bash scripts/local-data.sh restore >/dev/null

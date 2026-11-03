@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../../../common/database/database.service';
-import { rankMaterials } from '../../process-plan-generator/ranking/material-ranker';
-import type { GeometrySignals } from '../../process-plan-generator/ranking/material-ranker';
+import { rankMaterials } from '../intelligence/material-ranker';
+import type { GeometrySignals } from '../intelligence/material-ranker';
 
 export interface MaterialCandidate {
   material: string;

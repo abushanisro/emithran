@@ -16,13 +16,13 @@ import { OrgRole } from '../../../common/authz/authz-policy';
 
 @ApiTags('PDF Processing')
 @OrgRole('member')
-@Controller('pdf-processing')
+@Controller({ path: 'pdf-documents', version: '1' })
 export class PDFProcessingController {
   private readonly logger = new Logger(PDFProcessingController.name);
 
   constructor(private readonly pdfProcessor: PDFProcessorService) {}
 
-  @Post('extract-dimensions')
+  @Post('dimension-extractions')
   @HttpCode(HttpStatus.OK)
   @UseInterceptors(FileInterceptor('pdf', {
     limits: {
@@ -214,7 +214,7 @@ export class PDFProcessingController {
     }
   }
 
-  @Post('validate-pdf')
+  @Post('validations')
   @HttpCode(HttpStatus.OK)
   @UseInterceptors(FileInterceptor('pdf', {
     limits: { fileSize: 50 * 1024 * 1024 },

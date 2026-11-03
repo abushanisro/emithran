@@ -56,6 +56,8 @@ Numbers 946 and 954 onward are not used by this release. Check on the new databa
 
 ## 4. Deploy
 
+0. **Set the API base URL to the new prefix, frontend and backend together:** `API_URL` (server side, e.g. `http://backend:4000/api/v1`) and `NEXT_PUBLIC_API_URL` (e.g. `https://api.example.com/api/v1`) now end in `/api/v1`, not `/v1/api`. The compose files already do; in Vercel (or any other host) change the two variables before the deploy. The old `/v1/api` prefix no longer exists, so the frontend and backend must go out together. If a Cloudflare route sends `/v1/*` to the backend, change it: the backend is `/api/v1/*` now, and on the app host that path is the BFF, so a directly published backend needs its own host.
+
 1. Apply migrations 943, 944, 945, then 947, 949, 950 (and 948), as one `db:migrate` run.
 2. Deploy the backend and the frontend together (they share `BFF_FORWARD_SECRET`): `docker compose -f docker-compose.prod.yml --env-file env/<stage|prd>.env up -d --build`.
 3. Rust assembly core only: apply 951 first, then add `--profile rust-core`. `cad-core` is on the `db` network only (it talks to PostgREST

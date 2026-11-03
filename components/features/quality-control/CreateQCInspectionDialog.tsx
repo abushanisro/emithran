@@ -84,7 +84,7 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
   // Load only the BOM items specifically assigned to this production lot and ensure BOM details are resolved
   const loadBOMItemsForLot = async (lotId: string, bomIdFromLot?: string) => {
     try {
-      const items = await apiClient.get<any[]>(`/production-planning/lots/${lotId}/bom-items`);
+      const items = await apiClient.get<any[]>(`/production-lots/${lotId}/bom-items`);
       const loadedItems = items || [];
       setBomItems(loadedItems);
       const allIds = loadedItems.map(item => item.id);
@@ -107,7 +107,7 @@ export default function CreateQCInspectionDialog({ projectId, onInspectionCreate
       }
 
       try {
-        const lotDetails = await apiClient.get<any>(`/production-planning/lots/${lotId}`);
+        const lotDetails = await apiClient.get<any>(`/production-lots/${lotId}`);
         const resolvedBomId = lotDetails?.bom?.id || lotDetails?.bomId || lotDetails?.bom_id || bomIdFromLot || lotId;
         if (lotDetails?.bom) {
           setSelectedBOM({

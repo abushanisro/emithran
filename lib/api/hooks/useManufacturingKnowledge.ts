@@ -93,7 +93,6 @@ export interface SubmitFeedbackDto {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const BASE = '/manufacturing-knowledge';
 
 // ─── Query Hooks ─────────────────────────────────────────────────────────────
 
@@ -101,7 +100,7 @@ export function useFeatureProcessMappings() {
   return useQuery({
     queryKey: ['kb-feature-process-mappings'],
     queryFn: async (): Promise<FeatureProcessMapping[]> => {
-      return apiClient.get<FeatureProcessMapping[]>(`${BASE}/feature-process-mapping`);
+      return apiClient.get<FeatureProcessMapping[]>('/feature-process-mappings');
     },
     staleTime: 5 * 60_000,
   });
@@ -112,8 +111,8 @@ export function useRoutingRules(partFamily?: string) {
     queryKey: ['kb-routing-rules', partFamily ?? null],
     queryFn: async (): Promise<ProcessRoutingRule[]> => {
       const url = partFamily
-        ? `${BASE}/routing-rules?partFamily=${encodeURIComponent(partFamily)}`
-        : `${BASE}/routing-rules`;
+        ? `/routing-rules?partFamily=${encodeURIComponent(partFamily)}`
+        : '/routing-rules';
       return apiClient.get<ProcessRoutingRule[]>(url);
     },
     staleTime: 5 * 60_000,
@@ -125,8 +124,8 @@ export function useRoutingTemplates(partFamily?: string) {
     queryKey: ['kb-routing-templates', partFamily ?? null],
     queryFn: async (): Promise<PartFamilyRoutingTemplate[]> => {
       const url = partFamily
-        ? `${BASE}/templates?partFamily=${encodeURIComponent(partFamily)}`
-        : `${BASE}/templates`;
+        ? `/routing-templates?partFamily=${encodeURIComponent(partFamily)}`
+        : '/routing-templates';
       return apiClient.get<PartFamilyRoutingTemplate[]>(url);
     },
     staleTime: 5 * 60_000,
@@ -137,7 +136,7 @@ export function useMachineCapabilities() {
   return useQuery({
     queryKey: ['kb-machine-capabilities'],
     queryFn: async (): Promise<MachineCapability[]> => {
-      return apiClient.get<MachineCapability[]>(`${BASE}/machine-capabilities`);
+      return apiClient.get<MachineCapability[]>('/machine-capabilities');
     },
     staleTime: 5 * 60_000,
   });

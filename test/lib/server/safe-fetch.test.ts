@@ -2,10 +2,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   fetchTrustedFile, isServableContentType, isTrustedStorageUrl, limitStream, PayloadTooLargeError, readLimited,
-  UntrustedUrlError,
+  trustedStorageUrl, UntrustedUrlError,
 } from '@/lib/server/safe-fetch';
 
 const HOSTS = ['abc.supabase.co'];
+
+describe('trustedStorageUrl', () => {
+  it('rebuilds the URL from the configured host, keeping only the path and query of the request', () => {
+    expect(trustedStorageUrl('https://ABC.supabase.co:443/storage/v1/x.pdf?token=t', HOSTS, 'production'))
+      .toBe('https://abc.supabase.co/storage/v1/x.pdf?token=t');
+  });
+
+  it('returns null for anything else', () => {
+    expect(trustedStorageUrl('https://evil.example/x', HOSTS, 'production')).toBeNull();
+    expect(trustedStorageUrl('https://abc.supabase.co@evil.example/x', HOSTS, 'production')).toBeNull();
+    expect(trustedStorageUrl('not a url', HOSTS, 'production')).toBeNull();
+  });
+});
 
 describe('isTrustedStorageUrl', () => {
   it('accepts https on exactly the configured storage host', () => {

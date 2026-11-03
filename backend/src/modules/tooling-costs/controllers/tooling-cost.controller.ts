@@ -43,7 +43,7 @@ import { OrgRole } from '../../../common/authz/authz-policy';
 @ApiTags('Tooling Costs')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/tooling-costs', version: '1' })
+@Controller({ path: 'tooling-costs', version: '1' })
 @UseGuards(RequestAuthGuard)
 export class ToolingCostController {
   constructor(
@@ -149,7 +149,7 @@ export class ToolingCostController {
   /**
    * Get total tooling costs for multiple BOM items in a single request
    */
-  @Post('bulk-total')
+  @Post('totals')
   @ApiOperation({ summary: 'Get total tooling costs for multiple BOM items' })
   @ApiResponse({ status: 201, description: 'Returns a map of bomItemId → totalCost' })
   async getBulkTotalCosts(

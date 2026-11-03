@@ -47,7 +47,7 @@ import { OrgRole } from '../../../common/authz/authz-policy';
 @ApiBearerAuth()
 @UseGuards(RequestAuthGuard)
 @OrgRole('member')
-@Controller('api/process-costs')
+@Controller('process-costs')
 export class ProcessCostController {
   private readonly logger = new Logger(ProcessCostController.name);
 
@@ -192,7 +192,7 @@ export class ProcessCostController {
   /**
    * Calculate process cost without saving (preview/what-if analysis)
    */
-  @Post('calculate')
+  @Post('calculations')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Calculate process cost without saving' })
   @ApiResponse({
@@ -213,7 +213,7 @@ export class ProcessCostController {
   /**
    * Get total process costs for multiple BOM items in a single request
    */
-  @Post('bulk-total')
+  @Post('totals')
   @ApiOperation({ summary: 'Get total process costs for multiple BOM items' })
   @ApiResponse({ status: 201, description: 'Returns a map of bomItemId → totalCost' })
   async getBulkTotalCosts(

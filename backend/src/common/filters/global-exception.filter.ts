@@ -9,6 +9,7 @@ import {
 import { Request, Response } from 'express';
 import { clientIp } from '../client-ip';
 import { TryAgainLaterException } from '../http/try-again-later.exception';
+import { STATUS_CODES } from 'node:http';
 
 /**
  * A client error raised by Express middleware before Nest sees the request, such as the body parser's 413 (body over the limit,
@@ -197,6 +198,21 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     // Send response
     if (exception instanceof TryAgainLaterException) response.setHeader('Retry-After', String(exception.retryAfterSeconds));
+    if (String(request.originalUrl ?? request.url ?? '').startsWith('/api/v1/')) {
+      // The API (/api/v1) answers errors as RFC 9457 problem details; the liveness and health routes keep the plain envelope.
+      response.status(httpStatus).type('application/problem+json').json({
+        type: 'about:blank',
+        title: STATUS_CODES[httpStatus] ?? 'Error',
+        status: httpStatus,
+        detail: errorResponse.error.message,
+        instance: String(request.originalUrl ?? '').split('?')[0],
+        code: errorResponse.error.code,
+        ...(validationErrors && { errors: validationErrors }),
+        ...(details && { details }), // an extension member (RFC 9457 section 3.2): what a client needs to resolve a refusal
+        ...(errorResponse.metadata.requestId && { requestId: errorResponse.metadata.requestId }),
+      });
+      return;
+    }
     response.status(httpStatus).json(errorResponse);
   }
 

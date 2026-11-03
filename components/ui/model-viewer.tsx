@@ -264,7 +264,7 @@ export function ModelViewer({
 
     setIsConverting(true);
     try {
-      await apiClient.post(`/bom-items/${bomItemId}/convert-step`, {}, {
+      await apiClient.post(`/bom-items/${bomItemId}/step-conversions`, {}, {
         timeout: 180000 // 3 minutes timeout for STEP conversion
       });
 

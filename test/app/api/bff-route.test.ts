@@ -20,7 +20,7 @@ const call = (handler: typeof GET, path: string[], init: { method?: string; head
 
 beforeEach(() => {
   vi.stubEnv('APP_BASE_URL', APP);
-  vi.stubEnv('API_URL', 'http://api.internal:4000/v1/api');
+  vi.stubEnv('API_URL', 'http://api.internal:4000/api/v1');
   vi.stubGlobal('fetch', upstream);
   sessionAccessToken.mockResolvedValue('server-token');
   upstream.mockReset().mockResolvedValue(new Response('{"data":[]}', { headers: { 'content-type': 'application/json' } }));
@@ -38,7 +38,7 @@ describe('/api/v1/[...path]', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ data: [] });
     const { url, init } = upstreamCall();
-    expect(url).toBe('http://api.internal:4000/v1/api/projects');
+    expect(url).toBe('http://api.internal:4000/api/v1/projects');
     expect(new Headers(init.headers).get('authorization')).toBe('Bearer server-token');
   });
 

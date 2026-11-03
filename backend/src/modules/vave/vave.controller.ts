@@ -22,14 +22,14 @@ import { OrgRole } from '../../common/authz/authz-policy';
 @ApiTags('VAVE')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/vave', version: '1' })
+@Controller({ path: 'vave-projects', version: '1' })
 export class VaveController {
   constructor(private readonly vaveService: VaveService) {}
 
   // ─── Projects ─────────────────────────────────────────────────────────────
 
   @OrgRole('viewer')
-  @Get('projects')
+  @Get()
   @ApiOperation({ summary: 'List all VAVE projects for the current user' })
   @ApiResponse({ status: 200 })
   async listProjects(
@@ -39,7 +39,7 @@ export class VaveController {
     return this.vaveService.findAllProjects(user.id, token);
   }
 
-  @Post('projects')
+  @Post()
   @ApiOperation({ summary: 'Create a new VAVE project' })
   @ApiResponse({ status: 201 })
   async createProject(
@@ -51,7 +51,7 @@ export class VaveController {
   }
 
   @OrgRole('viewer')
-  @Get('projects/:id')
+  @Get(':id')
   @ApiOperation({ summary: 'Get VAVE project detail with stats' })
   async getProject(
     @Param('id') id: string,
@@ -61,7 +61,7 @@ export class VaveController {
     return this.vaveService.findOneProject(id, user.id, token);
   }
 
-  @Put('projects/:id')
+  @Put(':id')
   @ApiOperation({ summary: 'Update VAVE project' })
   async updateProject(
     @Param('id') id: string,
@@ -72,7 +72,7 @@ export class VaveController {
     return this.vaveService.updateProject(id, dto, user.id, token);
   }
 
-  @Delete('projects/:id')
+  @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete VAVE project' })
   async deleteProject(
@@ -86,7 +86,7 @@ export class VaveController {
   // ─── BOM Items ────────────────────────────────────────────────────────────
 
   @OrgRole('viewer')
-  @Get('projects/:id/bom')
+  @Get(':id/bom')
   @ApiOperation({ summary: 'List BOM items for a VAVE project' })
   async listBomItems(
     @Param('id') projectId: string,
@@ -95,7 +95,7 @@ export class VaveController {
     return this.vaveService.findBomItems(projectId, token);
   }
 
-  @Post('projects/:id/bom/bulk')
+  @Post(':id/bom/batches')
   @ApiOperation({ summary: 'Bulk import BOM items into a VAVE project' })
   async bulkImportBom(
     @Param('id') projectId: string,
@@ -105,7 +105,7 @@ export class VaveController {
     return this.vaveService.bulkImportBom(projectId, dto, token);
   }
 
-  @Post('projects/:id/bom')
+  @Post(':id/bom')
   @ApiOperation({ summary: 'Add a single BOM item to a VAVE project' })
   async createBomItem(
     @Param('id') projectId: string,
@@ -115,7 +115,7 @@ export class VaveController {
     return this.vaveService.createBomItem(projectId, dto, token);
   }
 
-  @Delete('projects/:id/bom/:itemId')
+  @Delete(':id/bom/:itemId')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete a BOM item' })
   async deleteBomItem(
@@ -129,7 +129,7 @@ export class VaveController {
   // ─── Ideas ────────────────────────────────────────────────────────────────
 
   @OrgRole('viewer')
-  @Get('projects/:id/ideas')
+  @Get(':id/ideas')
   @ApiOperation({ summary: 'List VAVE ideas for a project' })
   async listIdeas(
     @Param('id') projectId: string,
@@ -138,7 +138,7 @@ export class VaveController {
     return this.vaveService.findIdeas(projectId, token);
   }
 
-  @Post('projects/:id/ideas/bulk')
+  @Post(':id/ideas/batches')
   @ApiOperation({ summary: 'Bulk create VAVE ideas (e.g., from AI ideation)' })
   async bulkCreateIdeas(
     @Param('id') projectId: string,
@@ -148,7 +148,7 @@ export class VaveController {
     return this.vaveService.bulkCreateIdeas(projectId, dto, token);
   }
 
-  @Post('projects/:id/ideas')
+  @Post(':id/ideas')
   @ApiOperation({ summary: 'Create a single VAVE idea' })
   async createIdea(
     @Param('id') projectId: string,
@@ -158,7 +158,7 @@ export class VaveController {
     return this.vaveService.createIdea(projectId, dto, token);
   }
 
-  @Put('projects/:id/ideas/:ideaId')
+  @Put(':id/ideas/:ideaId')
   @ApiOperation({ summary: 'Update a VAVE idea (status, quadrant, etc.)' })
   async updateIdea(
     @Param('id') projectId: string,
@@ -169,7 +169,7 @@ export class VaveController {
     return this.vaveService.updateIdea(projectId, ideaId, dto, token);
   }
 
-  @Delete('projects/:id/ideas/:ideaId')
+  @Delete(':id/ideas/:ideaId')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete a VAVE idea' })
   async deleteIdea(
@@ -183,7 +183,7 @@ export class VaveController {
   // ─── Should Costs ─────────────────────────────────────────────────────────
 
   @OrgRole('viewer')
-  @Get('projects/:id/should-costs')
+  @Get(':id/should-costs')
   @ApiOperation({ summary: 'List should-cost records for a VAVE project' })
   async listShouldCosts(
     @Param('id') projectId: string,
@@ -192,7 +192,7 @@ export class VaveController {
     return this.vaveService.findShouldCosts(projectId, token);
   }
 
-  @Post('projects/:id/should-costs')
+  @Post(':id/should-costs')
   @ApiOperation({ summary: 'Upsert a should-cost record for a part' })
   async upsertShouldCost(
     @Param('id') projectId: string,
@@ -202,7 +202,7 @@ export class VaveController {
     return this.vaveService.upsertShouldCost(projectId, dto, token);
   }
 
-  @Delete('projects/:id/should-costs/:costId')
+  @Delete(':id/should-costs/:costId')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete a should-cost record' })
   async deleteShouldCost(

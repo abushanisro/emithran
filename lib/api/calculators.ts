@@ -372,7 +372,7 @@ export const calculatorsApi = {
     resolution?: { policy?: string; nearestRows?: { columns: Record<string, string | number> }[] };
     fromMachineSpec?: boolean;
   }> => {
-    return apiClient.post('/calculators/sheet-metal/lookup', { tableName, params }) as Promise<any>;
+    return apiClient.post('/calculators/sheet-metal/lookups', { tableName, params }) as Promise<any>;
   },
 
   // Database lookups

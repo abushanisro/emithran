@@ -1213,7 +1213,7 @@ export const CURRENCY_SYMBOLS: Readonly<Record<string, string>> = Object.fromEnt
   Object.values(LOCATION_INFO).map((info) => [info.code, info.symbol]),
 );
 
-/** Every Digital Factory location the app knows about, with its native currency — backs GET /api/fx/factories. */
+/** Every Digital Factory location the app knows about, with its native currency — backs GET /api/factories. */
 export function listFactoryLocations(): Array<{ location: string; code: string; symbol: string }> {
   return Object.entries(LOCATION_INFO).map(([location, info]) => ({ location, code: info.code, symbol: info.symbol }));
 }

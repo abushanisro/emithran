@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Forward to backend PDF processing service
-    const backendResponse = await fetch(`${settingWithDevDefault(process.env.NEXT_PUBLIC_API_GATEWAY_URL, 'NEXT_PUBLIC_API_GATEWAY_URL', 'http://localhost:4000')}/v1/pdf-processing/validate-pdf`, {
+    const backendResponse = await fetch(`${settingWithDevDefault(process.env.NEXT_PUBLIC_API_GATEWAY_URL, 'NEXT_PUBLIC_API_GATEWAY_URL', 'http://localhost:4000')}/api/v1/pdf-documents/validations`, {
       method: 'POST',
       headers: {
         // The session's token: under the BFF the browser holds none to forward.

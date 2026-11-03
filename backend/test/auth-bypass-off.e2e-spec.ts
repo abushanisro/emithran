@@ -22,12 +22,12 @@ jest.setTimeout(180_000);
 
 const GHOST = '00000000-0000-4000-8000-000000000000';
 const ROUTES: Array<['get' | 'post', string]> = [
-  ['get', '/v1/api/electronics/reference-coverage'],
-  ['get', `/v1/api/electronics/jobs/${GHOST}`],
-  ['get', `/v1/api/electronics/results/${GHOST}`],
-  ['post', '/v1/api/electronics/uploads'],
-  ['post', '/v1/api/electronics/quotes'],
-  ['get', '/v1/api/mhr/picker'],
+  ['get', '/api/v1/electronic-coverage-reports'],
+  ['get', `/api/v1/electronic-jobs/${GHOST}`],
+  ['get', `/api/v1/electronic-results/${GHOST}`],
+  ['post', '/api/v1/electronic-uploads'],
+  ['post', '/api/v1/electronic-quotes'],
+  ['get', '/api/v1/machine-rates/picker'],
 ];
 
 describe('[e2e] dev auth bypass OFF — real app, real auth', () => {
@@ -63,12 +63,12 @@ describe('[e2e] dev auth bypass OFF — real app, real auth', () => {
   it('401 for a structurally valid JWT that Auth0 never issued', async () => {
     const b64 = (o: object) => Buffer.from(JSON.stringify(o)).toString('base64url');
     const forged = `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ sub: GHOST, role: 'authenticated', exp: 4102444800 })}.signature`;
-    const res = await request(app.getHttpServer()).get('/v1/api/electronics/reference-coverage').set('Authorization', `Bearer ${forged}`);
+    const res = await request(app.getHttpServer()).get('/api/v1/electronic-coverage-reports').set('Authorization', `Bearer ${forged}`);
     expect(res.status).toBe(401);
   });
 
   it('the query-string token path is also verified, not trusted', async () => {
-    const res = await request(app.getHttpServer()).get('/v1/api/electronics/reference-coverage?token=not-a-real-token');
+    const res = await request(app.getHttpServer()).get('/api/v1/electronic-coverage-reports?token=not-a-real-token');
     expect(res.status).toBe(401);
   });
 });

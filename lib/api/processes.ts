@@ -223,6 +223,6 @@ export const processesApi = {
 
   bulkUpdateTableRows: async (data: BulkUpdateTableRowsData): Promise<TableRow[]> => {
     const { tableId, ...bulkData } = data;
-    return apiClient.post<TableRow[]>(`/processes/reference-tables/${tableId}/rows/bulk`, bulkData);
+    return apiClient.post<TableRow[]>(`/processes/reference-tables/${tableId}/row-batches`, bulkData);
   },
 };

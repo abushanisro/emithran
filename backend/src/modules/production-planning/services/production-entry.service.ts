@@ -2,7 +2,6 @@ import { Injectable, NotFoundException, ConflictException } from '@nestjs/common
 import { DatabaseService } from '@/common/database/database.service';
 import {
   CreateProductionEntryDto,
-  UpdateProductionEntryDto,
   ProductionEntryResponseDto,
   WeeklySummaryDto,
   ProductionEntriesQueryDto
@@ -117,64 +116,6 @@ export class ProductionEntryService {
 
     if (error || !data) {
       throw new NotFoundException(`Production entry with ID ${id} not found`);
-    }
-
-    return this.mapToResponseDto(data);
-  }
-
-  async updateProductionEntry(
-    id: string,
-    updateDto: UpdateProductionEntryDto
-  ): Promise<ProductionEntryResponseDto> {
-    const database = this.databaseService.getUserClient();
-
-    // Check if entry exists
-    const existing = await this.getProductionEntryById(id);
-
-    // Check for conflicts if changing key fields
-    if (updateDto.processId || updateDto.entryDate || updateDto.shift) {
-      const { data: conflicting } = await database
-        .from('production_entries')
-        .select('id')
-        .eq('lot_id', existing.lotId)
-        .eq('process_id', updateDto.processId || existing.processId)
-        .eq('entry_date', updateDto.entryDate || existing.entryDate)
-        .eq('shift', updateDto.shift || existing.shift)
-        .neq('id', id)
-        .single();
-
-      if (conflicting) {
-        throw new ConflictException(
-          `Another production entry already exists for this lot, process, date, and shift`
-        );
-      }
-    }
-
-    const updateData: any = {};
-    
-    // Only include fields that are provided
-    if (updateDto.processId !== undefined) updateData.process_id = updateDto.processId;
-    if (updateDto.processName !== undefined) updateData.process_name = updateDto.processName;
-    if (updateDto.entryDate !== undefined) updateData.entry_date = updateDto.entryDate;
-    if (updateDto.shift !== undefined) updateData.shift = updateDto.shift;
-    if (updateDto.targetQuantity !== undefined) updateData.target_quantity = updateDto.targetQuantity;
-    if (updateDto.producedQuantity !== undefined) updateData.produced_quantity = updateDto.producedQuantity;
-    if (updateDto.rejectedQuantity !== undefined) updateData.rejected_quantity = updateDto.rejectedQuantity;
-    if (updateDto.reworkQuantity !== undefined) updateData.rework_quantity = updateDto.reworkQuantity;
-    if (updateDto.downtimeMinutes !== undefined) updateData.downtime_minutes = updateDto.downtimeMinutes;
-    if (updateDto.downtimeReason !== undefined) updateData.downtime_reason = updateDto.downtimeReason;
-    if (updateDto.qualityIssues !== undefined) updateData.quality_issues = updateDto.qualityIssues;
-    if (updateDto.operatorNotes !== undefined) updateData.operator_notes = updateDto.operatorNotes;
-
-    const { data, error } = await database
-      .from('production_entries')
-      .update(updateData)
-      .eq('id', id)
-      .select(`*`)
-      .single();
-
-    if (error) {
-      throw new Error(`Failed to update production entry: ${error.message}`);
     }
 
     return this.mapToResponseDto(data);

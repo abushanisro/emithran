@@ -20,7 +20,7 @@ import {
 // is a pure function over (field rows, input values). The field rows below are
 // the REAL definitions of the two calculators involved, transcribed from
 // migrations calculators/049 and calculators/053 and confirmed against the live
-// rows served by GET /v1/api/calculators/:id — same field names, same
+// rows served by GET /api/v1/calculators/:id — same field names, same
 // field_type, same default_value formula strings. The seeds are the exact keys
 // bom-items.service.ts passes in seedScope for each.
 

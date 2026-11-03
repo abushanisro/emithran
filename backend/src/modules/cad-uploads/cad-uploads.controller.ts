@@ -33,7 +33,7 @@ function view(row: CadUploadRow) {
 @UseGuards(OrganizationContextGuard)
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/cad-uploads', version: '1' })
+@Controller({ path: 'cad-uploads', version: '1' })
 export class CadUploadsController {
   constructor(private readonly uploads: CadUploadsService) {}
 

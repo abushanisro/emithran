@@ -38,7 +38,7 @@ function createApiConfig(): ApiConfig {
   // The browser calls the BFF on its own origin and the server attaches the token; server code always calls the API itself.
   const apiUrl = typeof window !== 'undefined'
     ? BFF_PATH
-    : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/v1/api';
+    : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
   const cadUrl = process.env.NEXT_PUBLIC_CAD_ENGINE_URL || 'http://localhost:5055';
   
   return {
