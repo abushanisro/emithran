@@ -125,6 +125,12 @@ A route that was renamed keeps answering on its old path until nobody uses it. T
 | `/fx/refresh` | `/exchange-rates/refresh` |
 | `/fx/currencies`, `/fx/factories` | `/currencies`, `/factories` |
 | `/fx/factory-currency` | `/factory-currencies` |
+| `/production-planning/lots`, `…/lots/:id/…` | `/production-lots`, `/production-lots/:id/…` |
+| `/production-planning/processes` | `/production-processes` |
+| `/production-planning/subtasks`, `…/materials`, `…/alerts` | `/production-subtasks`, `/production-materials`, `/production-alerts` |
+| `/production-planning/production-entries` | `/production-entries` |
+| `/production-planning/process-templates` | `/production-process-templates` |
+| `/production-planning/dashboard` | `/production-lots/dashboard` |
 
 ## How the rules are enforced
 
@@ -138,8 +144,8 @@ A route that was renamed keeps answering on its old path until nobody uses it. T
 |---|---|
 | 1 JSON | Done |
 | 2 Nouns | 50 existing routes break it (`analyze-*`, `bulk-total`, `init`, `batch`, `calculate`, `PATCH rfqs/:id/send` and `close` (actions are POST), …) |
-| 3 Plural | 102 routes under 6 singular, abbreviated or area names (`vave`, `production-planning`, `quality-control`, `process-planning`, …). Done: `machine-rates`, `labour-rates`, `rfqs`, `rfq-trackings`, `exchange-rates` |
-| 4 Nesting | 26 routes have five or more segments |
+| 3 Plural | 53 routes under 5 area names (`vave`, `quality-control`, `process-planning`, `process-plan-generator`, `manufacturing-knowledge`). Done: rates, RFQs, exchange rates, production planning |
+| 4 Nesting | 24 routes have five or more segments |
 | 5 Errors | Problem details on `/api/v1`; deletes still answer 200 with a body in about 40 places; no `Location` on create |
 | 6 Filter, sort, paginate | About 20 lists page; no shared helper or cap; sorting is uneven |
 | 7 Security | Done, two open items: a `reference-data:write` permission, and the approver not being the submitter |

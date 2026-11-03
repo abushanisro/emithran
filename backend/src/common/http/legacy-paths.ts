@@ -7,6 +7,14 @@
  * deprecated-path log shows no traffic for 30 days.
  */
 const RULES: Array<readonly [from: string, to: string]> = [
+  ['production-planning/dashboard', 'production-lots/dashboard'],
+  ['production-planning/process-templates', 'production-process-templates'],
+  ['production-planning/lots', 'production-lots'],
+  ['production-planning/processes', 'production-processes'],
+  ['production-planning/subtasks', 'production-subtasks'],
+  ['production-planning/production-entries', 'production-entries'],
+  ['production-planning/materials', 'production-materials'],
+  ['production-planning/alerts', 'production-alerts'],
   ['rfq/tracking', 'rfq-trackings'],
   ['rfq', 'rfqs'],
   ['fx/exchange-rates', 'exchange-rates'],

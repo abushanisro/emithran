@@ -45,7 +45,7 @@ import {
 import { OrgRole } from '../../common/authz/authz-policy';
 
 @OrgRole('member')
-@Controller({ path: 'api/production-planning', version: '1' })
+@Controller({ path: 'api', version: '1' })
 @UseGuards(RequestAuthGuard)
 export class ProductionPlanningController {
   private readonly logger = new Logger(ProductionPlanningController.name);
@@ -69,7 +69,7 @@ export class ProductionPlanningController {
   // PRODUCTION LOTS ENDPOINTS
   // ============================================================================
 
-  @Post('lots')
+  @Post('production-lots')
   async createProductionLot(
     @Body() createDto: CreateProductionLotDto,
     @CurrentUser() user: User,
@@ -85,7 +85,7 @@ export class ProductionPlanningController {
   }
 
   @OrgRole('viewer')
-  @Get('lots')
+  @Get('production-lots')
   async getProductionLots(
     @CurrentUser() user: User,
     @Query('status') status?: string,
@@ -109,7 +109,18 @@ export class ProductionPlanningController {
   }
 
   @OrgRole('viewer')
-  @Get('lots/:id')
+  @Get('production-lots/dashboard')
+  async getDashboardData(
+    @CurrentUser() user: User,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ): Promise<ApiResponse<any>> {
+    const result = await this.productionPlanningService.getDashboardData(this.getUserId(user), { startDate, endDate });
+    return createResponse(result);
+  }
+
+  @OrgRole('viewer')
+  @Get('production-lots/:id')
   async getProductionLotById(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: User,
@@ -125,7 +136,7 @@ export class ProductionPlanningController {
   }
 
   @OrgRole('viewer')
-  @Get('lots/:id/bom-items')
+  @Get('production-lots/:id/bom-items')
   async getProductionLotBomItems(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: User,
@@ -135,7 +146,7 @@ export class ProductionPlanningController {
   }
 
   @OrgRole('viewer')
-  @Get('lots/:id/vendor-assignments')
+  @Get('production-lots/:id/vendor-assignments')
   async getProductionLotVendorAssignments(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: User,
@@ -144,7 +155,7 @@ export class ProductionPlanningController {
     return createResponse(result);
   }
 
-  @Post('lots/:id/vendor-assignments')
+  @Post('production-lots/:id/vendor-assignments')
   async createVendorAssignment(
     @Param('id', ParseUUIDPipe) lotId: string,
     @Body() assignmentData: any,
@@ -154,7 +165,7 @@ export class ProductionPlanningController {
     return createResponse(result);
   }
 
-  @Patch('lots/:id/vendor-assignments/:assignmentId')
+  @Patch('production-lots/:id/vendor-assignments/:assignmentId')
   async updateVendorAssignment(
     @Param('id', ParseUUIDPipe) lotId: string,
     @Param('assignmentId', ParseUUIDPipe) assignmentId: string,
@@ -165,7 +176,7 @@ export class ProductionPlanningController {
     return createResponse(result);
   }
 
-  @Put('lots/:id')
+  @Put('production-lots/:id')
   // 20 per 15 minutes per client: production changes are deliberate, not bulk
   @Throttle({ default: { limit: 20, ttl: 15 * 60 * 1000 } })
   async updateProductionLot(
@@ -210,7 +221,7 @@ export class ProductionPlanningController {
     }
   }
 
-  @Delete('lots/:id')
+  @Delete('production-lots/:id')
   async deleteProductionLot(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: User,
@@ -224,7 +235,7 @@ export class ProductionPlanningController {
   // PRODUCTION PROCESSES ENDPOINTS
   // ============================================================================
 
-  @Post('lots/:lotId/processes')
+  @Post('production-lots/:lotId/processes')
   async createProductionProcess(
     @Param('lotId', ParseUUIDPipe) lotId: string,
     @Body() createDto: CreateProductionProcessDto,
@@ -235,7 +246,7 @@ export class ProductionPlanningController {
   }
 
   @OrgRole('viewer')
-  @Get('lots/:lotId/processes')
+  @Get('production-lots/:lotId/processes')
   async getProductionProcesses(
     @Param('lotId', ParseUUIDPipe) lotId: string,
     @CurrentUser() user: User,
@@ -245,7 +256,7 @@ export class ProductionPlanningController {
     return createResponse(result);
   }
 
-  @Put('processes/:id')
+  @Put('production-processes/:id')
   async updateProductionProcess(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateDto: UpdateProductionProcessDto,
@@ -255,7 +266,7 @@ export class ProductionPlanningController {
     return createResponse(result);
   }
 
-  @Delete('processes/:id')
+  @Delete('production-processes/:id')
   async deleteProductionProcess(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: User,
@@ -268,7 +279,7 @@ export class ProductionPlanningController {
   // PROCESS SUBTASKS ENDPOINTS
   // ============================================================================
 
-  @Post('processes/:processId/subtasks')
+  @Post('production-processes/:processId/subtasks')
   async createProcessSubtask(
     @Param('processId', ParseUUIDPipe) processId: string,
     @Body() createDto: CreateProcessSubtaskDto,
@@ -286,7 +297,7 @@ export class ProductionPlanningController {
   }
 
   @OrgRole('viewer')
-  @Get('processes/:processId/subtasks')
+  @Get('production-processes/:processId/subtasks')
   async getProcessSubtasks(
     @Param('processId', ParseUUIDPipe) processId: string,
     @CurrentUser() user: User,
@@ -296,7 +307,7 @@ export class ProductionPlanningController {
     return createResponse(result);
   }
 
-  @Put('subtasks/:id')
+  @Put('production-subtasks/:id')
   async updateProcessSubtask(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateDto: UpdateProcessSubtaskDto,
@@ -306,7 +317,7 @@ export class ProductionPlanningController {
     return createResponse(result);
   }
 
-  @Delete('subtasks/:id')
+  @Delete('production-subtasks/:id')
   async deleteProcessSubtask(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: User,
@@ -319,7 +330,7 @@ export class ProductionPlanningController {
   // DAILY PRODUCTION ENTRIES ENDPOINTS
   // ============================================================================
 
-  @Post('lots/:lotId/production-entries')
+  @Post('production-lots/:lotId/production-entries')
   async createDailyProductionEntry(
     @Param('lotId', ParseUUIDPipe) lotId: string,
     @Body() createDto: CreateDailyProductionEntryDto,
@@ -330,7 +341,7 @@ export class ProductionPlanningController {
   }
 
   @OrgRole('viewer')
-  @Get('lots/:lotId/production-entries')
+  @Get('production-lots/:lotId/production-entries')
   async getDailyProductionEntries(
     @Param('lotId', ParseUUIDPipe) lotId: string,
     @CurrentUser() user: User,
@@ -361,7 +372,7 @@ export class ProductionPlanningController {
   // ============================================================================
 
   @OrgRole('viewer')
-  @Get('lots/:lotId/summary')
+  @Get('production-lots/:lotId/summary')
   async getProductionSummary(
     @Param('lotId', ParseUUIDPipe) lotId: string,
     @CurrentUser() user: User,
@@ -371,18 +382,7 @@ export class ProductionPlanningController {
   }
 
   @OrgRole('viewer')
-  @Get('dashboard')
-  async getDashboardData(
-    @CurrentUser() user: User,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-  ): Promise<ApiResponse<any>> {
-    const result = await this.productionPlanningService.getDashboardData(this.getUserId(user), { startDate, endDate });
-    return createResponse(result);
-  }
-
-  @OrgRole('viewer')
-  @Get('lots/:lotId/gantt')
+  @Get('production-lots/:lotId/gantt')
   async getGanttData(
     @Param('lotId', ParseUUIDPipe) lotId: string,
     @CurrentUser() user: User,
@@ -396,7 +396,7 @@ export class ProductionPlanningController {
   // MATERIAL TRACKING ENDPOINTS
   // ============================================================================
 
-  @Post('lots/:lotId/materials/initialize')
+  @Post('production-lots/:lotId/materials/initialize')
   async initializeLotMaterials(
     @Param('lotId', ParseUUIDPipe) lotId: string,
     @CurrentUser() user: User,
@@ -406,7 +406,7 @@ export class ProductionPlanningController {
   }
 
   @OrgRole('viewer')
-  @Get('lots/:lotId/materials')
+  @Get('production-lots/:lotId/materials')
   async getLotMaterials(
     @Param('lotId', ParseUUIDPipe) lotId: string,
     @CurrentUser() user: User,
@@ -415,7 +415,7 @@ export class ProductionPlanningController {
     return createResponse(result);
   }
 
-  @Put('materials/:materialId/status')
+  @Put('production-materials/:materialId/status')
   async updateMaterialStatus(
     @Param('materialId', ParseUUIDPipe) materialId: string,
     @Body() updateData: any,
@@ -431,7 +431,7 @@ export class ProductionPlanningController {
   // ============================================================================
 
   @OrgRole('viewer')
-  @Get('lots/:lotId/monitoring')
+  @Get('production-lots/:lotId/monitoring')
   async getProductionMonitoring(
     @Param('lotId', ParseUUIDPipe) lotId: string,
     @CurrentUser() user: User,
@@ -441,7 +441,7 @@ export class ProductionPlanningController {
   }
 
   @OrgRole('viewer')
-  @Get('lots/:lotId/integrated-dashboard')
+  @Get('production-lots/:lotId/integrated-dashboard')
   async getIntegratedDashboard(
     @Param('lotId', ParseUUIDPipe) lotId: string,
     @CurrentUser() user: User,
@@ -456,7 +456,7 @@ export class ProductionPlanningController {
   // ============================================================================
 
   @OrgRole('viewer')
-  @Get('lots/:lotId/alerts')
+  @Get('production-lots/:lotId/alerts')
   async getProductionAlerts(
     @Param('lotId', ParseUUIDPipe) lotId: string,
     @CurrentUser() user: User,
@@ -465,7 +465,7 @@ export class ProductionPlanningController {
     return createResponse(result);
   }
 
-  @Post('lots/:lotId/alerts')
+  @Post('production-lots/:lotId/alerts')
   async createManualAlert(
     @Param('lotId', ParseUUIDPipe) lotId: string,
     @Body() alertData: any,
@@ -475,7 +475,7 @@ export class ProductionPlanningController {
     return createResponse(result);
   }
 
-  @Put('alerts/:alertId/resolve')
+  @Put('production-alerts/:alertId/resolve')
   async resolveAlert(
     @Param('alertId', ParseUUIDPipe) alertId: string,
     @Body() resolutionData: { notes: string },
@@ -495,7 +495,7 @@ export class ProductionPlanningController {
   // ============================================================================
 
   @OrgRole('viewer')
-  @Get('process-templates')
+  @Get('production-process-templates')
   async getDefaultProcessTemplates(
     @CurrentUser() user: User,
   ): Promise<ApiResponse<any[]>> {
@@ -503,7 +503,7 @@ export class ProductionPlanningController {
     return createResponse(result);
   }
 
-  @Post('process-templates')
+  @Post('production-process-templates')
   async createProcessTemplate(
     @Body() templateData: {
       name: string;
@@ -516,7 +516,7 @@ export class ProductionPlanningController {
     return createResponse(result);
   }
 
-  @Post('lots/:id/update-status-by-progress')
+  @Post('production-lots/:id/update-status-by-progress')
   async updateLotStatusByProgress(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: User,
@@ -525,7 +525,7 @@ export class ProductionPlanningController {
     return createResponse(undefined);
   }
 
-  @Post('lots/:id/cleanup-materials')
+  @Post('production-lots/:id/cleanup-materials')
   async cleanupLotMaterials(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: User,
