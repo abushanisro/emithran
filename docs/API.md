@@ -2,7 +2,7 @@
 
 How the API is shaped, so that anyone calling it can predict a path without reading code, and so that new routes stay consistent. Each rule says what we do, why, and shows a real route. Rules 2 to 4 are checked by a test (see the end); the others are reviewed.
 
-The public API is under **`/api/v1`**.
+The public API is under **`/api/v1`**. Every route is listed in [API-REFERENCE.md](API-REFERENCE.md) (generated).
 
 ## 1. Accept and respond with JSON
 
