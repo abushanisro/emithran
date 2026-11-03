@@ -26,7 +26,6 @@ import {
   CreateQualityInspectionDto,
   UpdateQualityInspectionDto,
   QualityInspectionResponseDto,
-  InspectionResultDto,
 } from './dto/quality-inspection.dto';
 import {
   CreateDetailedInspectionReportDto,
@@ -177,70 +176,13 @@ export class QualityControlController {
   // INSPECTION RESULTS ENDPOINTS
   // ============================================================================
 
-  @Post('inspections/:id/results')
-  @ApiOperation({ summary: 'Submit inspection results' })
-  @ApiResponse({ status: 201, description: 'Results submitted successfully' })
-  async submitInspectionResults(
-    @Param('id', ParseUUIDPipe) inspectionId: string,
-    @Body() resultsDto: InspectionResultDto,
-    @CurrentUser() user: User,
-  ): Promise<CustomApiResponse<any>> {
-    const result = await this.qualityInspectionService.submitInspectionResults(
-      inspectionId,
-      resultsDto,
-      this.getUserId(user),
-    );
-    return createResponse(result);
-  }
 
-  @OrgRole('viewer')
-  @Get('inspections/:id/results')
-  @ApiOperation({ summary: 'Get inspection results' })
-  @ApiResponse({ status: 200, description: 'Results retrieved successfully' })
-  async getInspectionResults(
-    @Param('id', ParseUUIDPipe) inspectionId: string,
-    @CurrentUser() user: User,
-  ): Promise<CustomApiResponse<any>> {
-    const result = await this.qualityInspectionService.getInspectionResults(
-      inspectionId,
-      this.getUserId(user),
-    );
-    return createResponse(result);
-  }
 
   // ============================================================================
   // INSPECTION WORKFLOW ENDPOINTS
   // ============================================================================
 
-  @Post('inspections/:id/start')
-  @ApiOperation({ summary: 'Start inspection' })
-  @ApiResponse({ status: 200, description: 'Inspection started successfully' })
-  async startInspection(
-    @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: User,
-  ): Promise<CustomApiResponse<QualityInspectionResponseDto>> {
-    const result = await this.qualityInspectionService.startInspection(
-      id,
-      this.getUserId(user),
-    );
-    return createResponse(result);
-  }
 
-  @Post('inspections/:id/complete')
-  @ApiOperation({ summary: 'Complete inspection' })
-  @ApiResponse({ status: 200, description: 'Inspection completed successfully' })
-  async completeInspection(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() completionData: { notes?: string; finalResult: 'pass' | 'fail' | 'conditional' },
-    @CurrentUser() user: User,
-  ): Promise<CustomApiResponse<QualityInspectionResponseDto>> {
-    const result = await this.qualityInspectionService.completeInspection(
-      id,
-      completionData,
-      this.getUserId(user),
-    );
-    return createResponse(result);
-  }
 
   @Post('inspections/:id/approve')
   @ApiOperation({ summary: 'Approve inspection' })
@@ -294,114 +236,18 @@ export class QualityControlController {
   // NON-CONFORMANCE ENDPOINTS
   // ============================================================================
 
-  @Post('inspections/:id/non-conformances')
-  @ApiOperation({ summary: 'Create non-conformance report' })
-  @ApiResponse({ status: 201, description: 'Non-conformance created successfully' })
-  async createNonConformance(
-    @Param('id', ParseUUIDPipe) inspectionId: string,
-    @Body() nonConformanceData: any,
-    @CurrentUser() user: User,
-  ): Promise<CustomApiResponse<any>> {
-    const result = await this.qualityInspectionService.createNonConformance(
-      inspectionId,
-      nonConformanceData,
-      this.getUserId(user),
-    );
-    return createResponse(result);
-  }
 
-  @OrgRole('viewer')
-  @Get('non-conformances')
-  @ApiOperation({ summary: 'Get all non-conformances' })
-  @ApiResponse({ status: 200, description: 'Non-conformances retrieved successfully' })
-  async getNonConformances(
-    @CurrentUser() user: User,
-    @Query('projectId') projectId?: string,
-    @Query('status') status?: string,
-    @Query('severity') severity?: string,
-  ): Promise<CustomApiResponse<any[]>> {
-    const result = await this.qualityInspectionService.getNonConformances(
-      this.getUserId(user),
-      { projectId, status, severity }
-    );
-    return createResponse(result);
-  }
 
   // ============================================================================
   // QUALITY METRICS & REPORTING ENDPOINTS
   // ============================================================================
 
-  @OrgRole('viewer')
-  @Get('projects/:projectId/metrics')
-  @ApiOperation({ summary: 'Get quality metrics for project' })
-  @ApiResponse({ status: 200, description: 'Metrics retrieved successfully' })
-  async getQualityMetrics(
-    @Param('projectId', ParseUUIDPipe) projectId: string,
-    @CurrentUser() user: User,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-  ): Promise<CustomApiResponse<any>> {
-    try {
-      this.logger.log(`Fetching quality metrics for project ${projectId}`);
-      const result = await this.qualityControlService.getQualityMetrics(
-        projectId,
-        this.getUserId(user),
-        { startDate, endDate }
-      );
-      return createResponse(result);
-    } catch (error) {
-      this.logger.error(`Failed to fetch quality metrics for project ${projectId}: ${error.message}`, error.stack);
-      throw error;
-    }
-  }
 
-  @OrgRole('viewer')
-  @Get('projects/:projectId/quality-report')
-  @ApiOperation({ summary: 'Generate quality report' })
-  @ApiResponse({ status: 200, description: 'Report generated successfully' })
-  async generateQualityReport(
-    @Param('projectId', ParseUUIDPipe) projectId: string,
-    @CurrentUser() user: User,
-    @Query('reportType') reportType?: string,
-  ): Promise<CustomApiResponse<any>> {
-    try {
-      this.logger.log(`Generating quality report for project ${projectId}, type: ${reportType || 'comprehensive'}`);
-      const result = await this.qualityControlService.generateQualityReport(
-        projectId,
-        this.getUserId(user),
-        reportType,
-      );
-      return createResponse(result);
-    } catch (error) {
-      this.logger.error(`Failed to generate quality report for project ${projectId}: ${error.message}`, error.stack);
-      throw error;
-    }
-  }
 
   // ============================================================================
   // DASHBOARD ENDPOINTS
   // ============================================================================
 
-  @OrgRole('viewer')
-  @Get('projects/:projectId/dashboard')
-  @ApiOperation({ summary: 'Get quality control dashboard data' })
-  @ApiResponse({ status: 200, description: 'Dashboard data retrieved successfully' })
-  async getQualityDashboard(
-    @Param('projectId', ParseUUIDPipe) projectId: string,
-    @CurrentUser() user: User,
-  ): Promise<CustomApiResponse<any>> {
-    try {
-      this.logger.log(`Fetching quality dashboard for project ${projectId}`);
-      const result = await this.qualityControlService.getQualityDashboard(
-        projectId,
-        this.getUserId(user),
-      );
-      return createResponse(result);
-    } catch (error) {
-      this.logger.error(`Failed to fetch quality dashboard for project ${projectId}: ${error.message}`, error.stack);
-      throw error;
-    }
-  }
 
   // ============================================================================
   // DETAILED INSPECTION REPORTS ENDPOINTS

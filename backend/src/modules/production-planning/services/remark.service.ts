@@ -412,41 +412,6 @@ export class RemarkService {
     return (data || []).map(comment => this.mapCommentToResponseDto(comment));
   }
 
-  // Analytics methods
-  async getRemarkStats(lotId: string): Promise<{
-    total: number;
-    byStatus: Record<string, number>;
-    byPriority: Record<string, number>;
-    byType: Record<string, number>;
-  }> {
-    const database = this.databaseService.getUserClient();
-
-    const { data, error } = await database
-      .from('remarks_and_issues')
-      .select('status, priority, remark_type')
-      .eq('lot_id', lotId);
-
-    if (error) {
-      this.logger.error('Database error fetching remark stats:', error);
-      throw new BadRequestException('Failed to fetch remark statistics');
-    }
-
-    const remarks = data || [];
-    const stats = {
-      total: remarks.length,
-      byStatus: {} as Record<string, number>,
-      byPriority: {} as Record<string, number>,
-      byType: {} as Record<string, number>,
-    };
-
-    remarks.forEach(remark => {
-      stats.byStatus[remark.status] = (stats.byStatus[remark.status] || 0) + 1;
-      stats.byPriority[remark.priority] = (stats.byPriority[remark.priority] || 0) + 1;
-      stats.byType[remark.remark_type] = (stats.byType[remark.remark_type] || 0) + 1;
-    });
-
-    return stats;
-  }
 
   // Private helper methods
   private async validateRemarkScope(createDto: CreateRemarkDto): Promise<void> {

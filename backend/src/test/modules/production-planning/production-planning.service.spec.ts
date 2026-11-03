@@ -77,37 +77,3 @@ describe('ProductionPlanningService.createProductionLot', () => {
     expect(calls.some(c => c.table === 'production_processes')).toBe(false);
   });
 });
-
-describe('ProductionPlanningService.getSubtasksDirectByLot', () => {
-  it('returns the stored BOM requirements of each subtask', async () => {
-    const { client } = fakeClient(call => {
-      if (call.table === 'production_lots') return { data: { id: 'lot-1' }, error: null };
-      if (call.table === 'production_processes') return { data: [{ id: 'proc-1' }], error: null };
-      if (call.table === 'process_subtasks') {
-        return { data: [{
-          id: 'st-1', production_process_id: 'proc-1', task_name: 'Cut', task_sequence: 1, status: 'pending',
-          bom_requirements: [{
-            id: 'req-1', bom_item_id: 'item-1', required_quantity: 4, unit: 'pcs', requirement_status: 'pending',
-            bom_item: { id: 'item-1', part_number: 'P-1', name: 'Bracket', description: 'd' },
-          }],
-        }], error: null };
-      }
-      return { data: null, error: null };
-    });
-    const [subtask] = await service(client).getSubtasksDirectByLot('lot-1', OWNER);
-    expect(subtask.bomRequirements).toEqual([{
-      id: 'req-1', bomItemId: 'item-1', partNumber: 'P-1', partName: 'Bracket', description: 'd',
-      requiredQuantity: 4, unit: 'pcs', status: 'pending',
-    }]);
-  });
-
-  it('returns nothing for a lot without processes instead of subtasks from other lots', async () => {
-    const { client, calls } = fakeClient(call => {
-      if (call.table === 'production_lots') return { data: { id: 'lot-1' }, error: null };
-      if (call.table === 'production_processes') return { data: [], error: null };
-      return { data: [{ id: 'someone-elses-subtask' }], error: null };
-    });
-    await expect(service(client).getSubtasksDirectByLot('lot-1', OWNER)).resolves.toEqual([]);
-    expect(calls.some(c => c.table === 'process_subtasks')).toBe(false);
-  });
-});

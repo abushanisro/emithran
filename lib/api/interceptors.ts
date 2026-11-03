@@ -21,7 +21,7 @@ const secureLogger = createSecureLogger('API');
  * Request logger interceptor
  * Uses secure logging that masks sensitive data
  */
-export const requestLoggerInterceptor = (config: RequestConfig): RequestConfig => {
+const requestLoggerInterceptor = (config: RequestConfig): RequestConfig => {
   // Skip logging for health checks and frequent polling endpoints
   const isHealthCheck = config.url.includes('/health');
   const isFrequentPolling = config.url.includes('/status') || config.url.includes('/tracking');
@@ -39,7 +39,7 @@ export const requestLoggerInterceptor = (config: RequestConfig): RequestConfig =
  * Response logger interceptor
  * Uses secure logging that masks sensitive data
  */
-export const responseLoggerInterceptor = (response: any): any => {
+const responseLoggerInterceptor = (response: any): any => {
   const isHealthCheck = response?.config?.url?.includes('/health');
   
   if (!isHealthCheck) {
@@ -77,7 +77,7 @@ export const correlationIdInterceptor = (config: RequestConfig): RequestConfig =
 /**
  * Add custom headers
  */
-export const customHeadersInterceptor = (config: RequestConfig): RequestConfig => {
+const customHeadersInterceptor = (config: RequestConfig): RequestConfig => {
   config.headers['X-Client-Version'] = process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0';
   config.headers['X-Client-Platform'] = 'web';
 

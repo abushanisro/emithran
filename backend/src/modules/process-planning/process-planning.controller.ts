@@ -27,30 +27,7 @@ export class ProcessPlanningController {
     return this.processPlanningService.getSpecificationsByBomItem(bomItemId, userId);
   }
 
-  @OrgRole('viewer')
-  @Get('projects/:projectId/specifications')
-  @ApiOperation({ summary: 'Get all process planning specifications for a project' })
-  @ApiResponse({ status: 200, description: 'Process planning specifications retrieved successfully', type: [ProcessPlanningSpecResponseDto] })
-  @ApiParam({ name: 'projectId', description: 'Project ID' })
-  async getSpecificationsByProject(
-    @Param('projectId') projectId: string,
-    @Request() req: any
-  ): Promise<ProcessPlanningSpecResponseDto[]> {
-    const userId = req.user?.sub || req.user?.id;
-    return this.processPlanningService.getSpecificationsByProject(projectId, userId);
-  }
 
-  @Post('specifications')
-  @ApiOperation({ summary: 'Create process planning specifications' })
-  @ApiResponse({ status: 201, description: 'Process planning specifications created successfully', type: ProcessPlanningSpecResponseDto })
-  @ApiResponse({ status: 400, description: 'Bad request - validation failed or specifications already exist' })
-  async createSpecifications(
-    @Body() dto: CreateProcessPlanningSpecDto,
-    @Request() req: any
-  ): Promise<ProcessPlanningSpecResponseDto> {
-    const userId = req.user?.sub || req.user?.id;
-    return this.processPlanningService.createSpecifications(dto, userId);
-  }
 
   @Put('bom-items/:bomItemId/specifications')
   @ApiOperation({ summary: 'Update process planning specifications for a BOM item' })

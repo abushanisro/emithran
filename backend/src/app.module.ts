@@ -15,7 +15,6 @@ import { CadUploadsModule } from './modules/cad-uploads/cad-uploads.module';
 import { AuditModule } from './common/audit/audit.module';
 import { AiModule } from './common/ai/ai.module';
 import { ProcessesModule } from './modules/processes/processes.module';
-import { ProcessRoutesModule } from './modules/process-routes/process-routes.module';
 import { RawMaterialsModule } from './modules/raw-materials/raw-materials.module';
 import { ToolingCostsModule } from './modules/tooling-costs/tooling-costs.module';
 import { ChildPartsModule } from './modules/child-parts/child-parts.module';
@@ -39,10 +38,7 @@ import { ProfileModule } from './modules/profile/profile.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
 import { ProcessPlanGeneratorModule } from './modules/process-plan-generator/process-plan-generator.module';
 import { CopilotModule } from './modules/copilot/copilot.module';
-import { CostEngineeringModule } from './modules/cost-engineering/cost-engineering.module';
-import { ManufacturingIntelligenceModule } from './modules/manufacturing-intelligence/manufacturing-intelligence.module';
 import { ManufacturingKnowledgeModule } from './modules/manufacturing-knowledge/manufacturing-knowledge.module';
-import { ShouldCostModule } from './modules/should-cost/should-cost.module';
 import { CostingModule } from './modules/costing/costing.module';
 import { ManufacturingRulesModule } from './modules/manufacturing-rules/manufacturing-rules.module';
 import { ElectronicsCostingModule } from './modules/electronics-costing/electronics-costing.module';
@@ -87,7 +83,6 @@ import { AppController } from './app.controller';
     AuditModule,
     AiModule,
     ProcessesModule,
-    ProcessRoutesModule,
     RawMaterialsModule,
     ToolingCostsModule,
     ChildPartsModule,
@@ -111,10 +106,7 @@ import { AppController } from './app.controller';
     OrganizationsModule,
     ProcessPlanGeneratorModule,
     CopilotModule,
-    CostEngineeringModule,
-    ManufacturingIntelligenceModule,
     ManufacturingKnowledgeModule,
-    ShouldCostModule,
     CostingModule,
     ManufacturingRulesModule,
     ElectronicsCostingModule,

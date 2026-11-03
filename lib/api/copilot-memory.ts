@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { apiClient } from './client';
 
 /** What the manufacturing copilot has saved for the signed-in user (backend copilot.controller.ts). */
-export const copilotMemoryApi = {
+const copilotMemoryApi = {
   list: () => apiClient.get<{ preferences: string[] }>('/copilot/memory'),
   /** Forget one saved preference, by its exact text. */
   remove: (preference: string) =>

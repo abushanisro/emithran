@@ -145,32 +145,6 @@ export function useProcuredPartsCosts(params?: {
   });
 }
 
-/**
- * Hook to get a single procured part cost by ID
- *
- * Best practices (2026):
- * - Null-safe with proper fallback
- * - Type validation
- */
-export function useProcuredPartsCost(id: string) {
-  return useQuery<ProcuredPartsCostRecord | null>({
-    queryKey: ['procured-parts-cost', id],
-    queryFn: async () => {
-      // Use silent mode to prevent console errors
-      const response = await apiClient.get<ProcuredPartsCostRecord>(
-        `/procured-parts-costs/${id}`,
-        { silent: true }
-      );
-
-      // Response is null if error occurred or cost doesn't exist
-      return response;
-    },
-    enabled: !!id,
-    staleTime: 30000,
-    retry: 1,
-  });
-}
-
 // ============================================================================
 // MUTATION HOOKS
 // ============================================================================

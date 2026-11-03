@@ -169,26 +169,6 @@ export async function initializeVendorRatingMatrix(
 }
 
 /**
- * Update individual rating matrix item
- */
-export async function updateVendorRatingItem(
-  nominationId: string,
-  vendorId: string,
-  ratingId: string,
-  updateData: Partial<UpdateVendorRatingData>
-): Promise<void> {
-  try {
-    await apiClient.put(
-      `/supplier-nominations/${nominationId}/vendors/${vendorId}/rating-matrix/${ratingId}`,
-      updateData
-    );
-  } catch (error) {
-    console.error('Failed to update vendor rating item:', error);
-    throw error;
-  }
-}
-
-/**
  * ENTERPRISE BEST PRACTICE: Batch update vendor rating matrix
  */
 /**

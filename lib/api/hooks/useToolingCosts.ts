@@ -92,21 +92,6 @@ export function useToolingCosts(options: UseToolingCostsOptions = {}) {
 }
 
 /**
- * Hook to fetch single tooling cost
- */
-export function useToolingCost(id?: string) {
-  return useQuery({
-    queryKey: ['tooling-cost', id],
-    queryFn: async () => {
-      if (!id) throw new Error('ID is required');
-      const data = await apiClient.get<ToolingCostRecord>(`/tooling-costs/${id}`);
-      return data;
-    },
-    enabled: !!id,
-  });
-}
-
-/**
  * Hook to create tooling cost
  */
 export function useCreateToolingCost() {
