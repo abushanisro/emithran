@@ -25,6 +25,27 @@ CREATE TABLE public.project_team_members (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), project_id uuid NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
   user_id uuid NOT NULL, role text NOT NULL DEFAULT 'member', email text
 );
+-- the calculator tables as the real database has them (migrations 024, 100, 804), with the sand-casting catalog rows migration 851 seeds:
+-- the calculator migrations after the baseline (956) create calculators and link them to these rows, and fail if a row is missing
+CREATE TABLE public.calculators (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid, name text NOT NULL, calc_category text, calculator_type text,
+  is_template boolean DEFAULT false, is_public boolean DEFAULT false, is_global boolean DEFAULT false, description text,
+  retired_at timestamptz, updated_at timestamptz DEFAULT now()
+);
+CREATE TABLE public.calculator_fields (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), calculator_id uuid NOT NULL REFERENCES public.calculators(id) ON DELETE CASCADE,
+  field_name text NOT NULL, display_label text, field_type text NOT NULL, unit text, data_source text, source_table text, source_field text,
+  default_value text, display_order integer, is_required boolean DEFAULT false
+);
+CREATE TABLE public.process_calculator_mappings (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), process_group varchar(255) NOT NULL, process_route varchar(255) NOT NULL, operation varchar(255) NOT NULL,
+  calculator_id uuid REFERENCES public.calculators(id) ON DELETE CASCADE, calculator_name varchar(255), is_active boolean DEFAULT true,
+  display_order integer DEFAULT 0, CONSTRAINT unique_process_calculator_mapping UNIQUE (process_group, process_route, operation)
+);
+INSERT INTO public.process_calculator_mappings (process_group, process_route, operation, is_active)
+SELECT 'Sand Casting', n, n, false FROM unnest(ARRAY['Cleaning','CO2 Cured','Cooling','Core Refractory Coat','Degating','Finishing','Horizontal Automatic','Hot Box',
+  'Isocure Gas','Manual Coremaking','Manual Floor Moldmaking','Manual Pit Moldmaking','Manual Std Moldmaking','Melting','Mold Refractory Coat','No Bake','Oil Core','Pour',
+  'Refractory Coat Air Dry','Refractory Coat Oven Dry','Shakeout','Shell','Stock Core','Vertical Automatic','Visual Inspection']) AS n;
 INSERT INTO public.projects (user_id, name) VALUES ('11111111-1111-4111-8111-111111111111','Alice project');
 ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
 CREATE POLICY own ON public.projects FOR SELECT TO authenticated USING (user_id = auth.uid());
