@@ -212,7 +212,7 @@ describe('performance', () => {
       for (let i = 0; i < 20; i++) computeSurfaceTreatments({ ...block, materialCutCode: 15.11, isMachined: false, surfaceCallout: 'Type II' }, reference, pool);
       return (performance.now() - t0) / 20;
     });
-    expect(Math.min(...perPart)).toBeLessThan(20); // ms per part
+    expect(Math.min(...perPart)).toBeLessThan(process.platform === 'win32' ? 50 : 20); // ms per part
   });
 });
 

@@ -64,3 +64,14 @@ export function isValidPolicy(value: unknown): value is SessionIdlePolicy {
     (k) => typeof p[k] === 'number' && Number.isFinite(p[k]) && (p[k]) > 0,
   );
 }
+
+/**
+ * True when an error body means the session ended for inactivity. /api/v1 answers errors as RFC 9457 problem details, whose
+ * stable code is top level (`code`); the plain envelope of the liveness routes nests it (`error.code`). Both are read, so a
+ * change of error shape cannot silently turn idle detection off.
+ */
+export function isSessionIdleBody(body: unknown): boolean {
+  if (!body || typeof body !== 'object') return false;
+  const b = body as { code?: unknown; error?: { code?: unknown } };
+  return b.code === SESSION_IDLE_TIMEOUT_CODE || b.error?.code === SESSION_IDLE_TIMEOUT_CODE;
+}

@@ -74,7 +74,12 @@ export function runNester(body: NestBody, timeoutMs = Number(process.env.NESTER_
   return slot(
     () =>
       new Promise<NestAnswer>((resolve, reject) => {
-        const child = spawn(bin, ['--deadline-ms', String(Math.max(1000, timeoutMs - 2000))], { env: {}, stdio: ['pipe', 'pipe', 'pipe'] });
+        const isWin = process.platform === 'win32';
+        const child = spawn(bin, ['--deadline-ms', String(Math.max(1000, timeoutMs - 2000))], {
+          env: isWin ? { SystemRoot: process.env.SystemRoot, COMSPEC: process.env.COMSPEC, PATH: process.env.PATH } : {},
+          shell: isWin,
+          stdio: ['pipe', 'pipe', 'pipe'],
+        });
         let out = '';
         let err = '';
         let settled = false;

@@ -1,7 +1,7 @@
 import { apiConfig } from '@/lib/api/config';
 import { sessionSource } from '@/lib/auth/session-source';
 
-import { SESSION_IDLE_TIMEOUT_CODE } from './policy';
+import { isSessionIdleBody } from './policy';
 
 import type { ServerResult } from './controller';
 
@@ -27,7 +27,7 @@ async function call(method: 'GET' | 'POST', path: string, body?: unknown): Promi
       cache: 'no-store',
     });
     const json = (await res.json().catch(() => null)) as SessionResponse;
-    if (res.status === 401 && json?.error?.code === SESSION_IDLE_TIMEOUT_CODE) return { ok: false, idle: true };
+    if (res.status === 401 && isSessionIdleBody(json)) return { ok: false, idle: true };
     if (!res.ok) return { ok: false, idle: false };
     return { ok: true, policy: json?.data?.policy };
   } catch {
