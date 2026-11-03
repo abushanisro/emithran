@@ -126,6 +126,7 @@ export class LHRController {
     return this.LHRService.update(id, UpdateLHRDto, user.id, token);
   }
 
+  @HttpCode(HttpStatus.OK)
   @Delete()
   @ApiOperation({ summary: 'Delete all LHR records for the current user' })
   @ApiResponse({ status: 200, description: 'All LHR records deleted' })

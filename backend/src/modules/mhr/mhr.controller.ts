@@ -12,6 +12,8 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { MAX_XLSX_UPLOAD_BYTES } from '../../common/archive/xlsx-limits';
@@ -167,6 +169,7 @@ export class MHRController {
     }
   }
 
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id')
   @ApiOperation({ summary: 'Delete MHR record' })
   @ApiResponse({ status: 200, description: 'MHR record deleted successfully' })
@@ -180,6 +183,7 @@ export class MHRController {
     }
   }
 
+  @HttpCode(HttpStatus.OK)
   @Delete()
   @ApiOperation({ summary: 'Delete all MHR records for the current user' })
   @ApiResponse({ status: 200, description: 'All MHR records deleted' })

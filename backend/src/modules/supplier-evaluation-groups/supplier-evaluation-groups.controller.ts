@@ -7,6 +7,8 @@ import {
   Param,
   Delete,
   UseGuards,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { SupplierEvaluationGroupsService } from './supplier-evaluation-groups.service';
@@ -144,6 +146,7 @@ export class SupplierEvaluationGroupsController {
     return this.supplierEvaluationGroupsService.validateDeletion(userId, id, token);
   }
 
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id')
   @ApiOperation({ summary: 'Delete evaluation group' })
   @ApiResponse({

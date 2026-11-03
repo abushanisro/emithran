@@ -12,7 +12,8 @@ import {
   UseGuards,
   HttpStatus,
   BadRequestException,
-  Logger
+  Logger,
+  HttpCode,
 } from '@nestjs/common';
 import { 
   ApiTags, 
@@ -248,6 +249,7 @@ export class RfqController {
   }
 
 
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete('tracking/:id')
   @ApiOperation({ summary: 'Delete RFQ tracking record (cancel RFQ)' })
   @ApiParam({ name: 'id', description: 'RFQ tracking ID' })

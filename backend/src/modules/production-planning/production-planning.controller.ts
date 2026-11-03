@@ -16,6 +16,7 @@ import {
   HttpStatus,
   UnauthorizedException,
   BadRequestException,
+  HttpCode,
 } from '@nestjs/common';
 import { RequestAuthGuard } from '@/common/guards/request-auth.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
@@ -210,6 +211,7 @@ export class ProductionPlanningController {
     }
   }
 
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete('lots/:id')
   async deleteProductionLot(
     @Param('id', ParseUUIDPipe) id: string,
@@ -255,6 +257,7 @@ export class ProductionPlanningController {
     return createResponse(result);
   }
 
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete('processes/:id')
   async deleteProductionProcess(
     @Param('id', ParseUUIDPipe) id: string,
@@ -306,6 +309,7 @@ export class ProductionPlanningController {
     return createResponse(result);
   }
 
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete('subtasks/:id')
   async deleteProcessSubtask(
     @Param('id', ParseUUIDPipe) id: string,

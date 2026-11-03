@@ -13,6 +13,8 @@ import {
   Logger,
   NotFoundException,
   UnauthorizedException,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { RequestAuthGuard } from '@/common/guards/request-auth.guard';
@@ -152,6 +154,7 @@ export class QualityControlController {
     }
   }
 
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete('inspections/:id')
   @ApiOperation({ summary: 'Delete quality inspection' })
   @ApiResponse({ status: 200, description: 'Inspection deleted successfully' })
@@ -301,6 +304,7 @@ export class QualityControlController {
     }
   }
 
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete('inspections/:id/detailed-report')
   @ApiOperation({ summary: 'Delete detailed inspection report' })
   @ApiResponse({ status: 200, description: 'Report deleted successfully' })
