@@ -44,7 +44,7 @@ import { ApplyRouteDto, AUTO_ROUTE_ID, type ApplyRouteResult, ApplyCustomRouteDt
 import type { PhysicsGap } from './dto/cost-breakdown.dto';
 import { LOCATION_INFO } from './costing/shared/core/default-rates.constants';
 import { ExchangeRateService, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
-import { deriveImplications } from '../process-plan-generator/dto/manufacturing-implication.dto';
+import { deriveImplications } from './intelligence/manufacturing-implication.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PmiReviewService, type PmiReviewRequest } from './services/pmi-review.service';
 import { AccessToken } from '../../common/decorators/access-token.decorator';

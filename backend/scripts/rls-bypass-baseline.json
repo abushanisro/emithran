@@ -32,7 +32,6 @@
   "src/modules/manufacturing-rules/resolvers/material-group.resolver.ts": 1,
   "src/modules/manufacturing-rules/resolvers/parameter.resolver.ts": 1,
   "src/modules/mhr/mhr.service.ts": 1,
-  "src/modules/process-plan-generator/services/cycle-time-library.service.ts": 1,
   "src/modules/processes/processes.service.ts": 5,
   "src/modules/processes/services/process-cost.service.ts": 2,
   "src/modules/raw-materials/services/raw-material-editor.service.ts": 1

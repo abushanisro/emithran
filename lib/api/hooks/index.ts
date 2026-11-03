@@ -20,4 +20,3 @@ export * from './useProcesses';
 export * from './useAuthEnabled';
 export * from './useVave';
 export * from './useBenchmarkSessions';
-export * from './useProcessPlanGenerate';

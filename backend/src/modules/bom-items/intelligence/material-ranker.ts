@@ -1,5 +1,5 @@
-import type { PartFamily } from '../dto/engineering-brief.dto';
-import type { MaterialCandidate } from '../dto/candidate-set.dto';
+import type { PartFamily } from './engineering-brief.dto';
+import type { MaterialCandidate } from './candidate-set.dto';
 
 /**
  * Scores raw_materials rows for fit against the brief.

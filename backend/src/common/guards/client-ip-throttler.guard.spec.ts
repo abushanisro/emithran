@@ -212,7 +212,6 @@ describe('Per-organization limit, next to the per-user one', () => {
 describe('AI endpoints carry the AI cap', () => {
   it.each([
     ['copilot chat', () => require('../../modules/copilot/copilot.controller').CopilotController.prototype.chat],
-    ['process-plan generate', () => require('../../modules/process-plan-generator/process-plan-generator.controller').ProcessPlanGeneratorController.prototype.generate],
   ])('%s is marked @SpendsAi', (_name, handler) => {
     expect(Reflect.getMetadata('emithran:spends-ai', handler())).toBe(true);
   });

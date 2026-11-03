@@ -1,13 +1,3 @@
 [
-  "GET /process-plan-generator/:bomItemId/draft # plural:process-plan-generator",
-  "GET /process-plan-generator/:bomItemId/stream # plural:process-plan-generator",
-  "GET /process-plan-generator/generations/:id # plural:process-plan-generator",
-  "POST /process-plan-generator/:bomItemId/generate # plural:process-plan-generator",
-  "POST /process-plan-generator/:bomItemId/generate # verb:generate",
-  "POST /process-plan-generator/generations/:id/apply # plural:process-plan-generator",
-  "POST /process-plan-generator/generations/:id/discard # plural:process-plan-generator",
-  "POST /process-plan-generator/generations/:id/edits # plural:process-plan-generator",
-  "POST /process-plan-generator/generations/:id/select-route # plural:process-plan-generator",
-  "POST /process-plan-generator/generations/:id/select-route # verb:select-route",
   "PUT /supplier-nominations/:id/capability-scores/:criteriaId/:vendorId # depth"
 ]

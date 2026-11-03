@@ -155,9 +155,6 @@ org:viewer      GET /v1/api/packaging-logistics-costs/:id  PackagingLogisticsCos
 org:viewer      GET /v1/api/packaging-logistics-costs/freight-rate-benchmarks  PackagingLogisticsCostController.getFreightRateBenchmarks
 org:viewer      GET /v1/api/process-costs  ProcessCostController.findAll
 org:viewer      GET /v1/api/process-costs/:id  ProcessCostController.findOne
-org:viewer      GET /v1/api/process-plan-generator/:bomItemId/draft  ProcessPlanGeneratorController.getLatestDraft
-org:member      GET /v1/api/process-plan-generator/:bomItemId/stream  ProcessPlanGeneratorController.stream
-org:viewer      GET /v1/api/process-plan-generator/generations/:id  ProcessPlanGeneratorController.getGeneration
 org:viewer      GET /v1/api/processes  ProcessesController.findAll
 org:viewer      GET /v1/api/processes/:id  ProcessesController.findOne
 org:viewer      GET /v1/api/processes/:processId/reference-tables  ProcessesController.getReferenceTables
@@ -332,11 +329,6 @@ org:member      POST /v1/api/pdf-documents/validations  PDFProcessingController.
 org:member      POST /v1/api/process-costs  ProcessCostController.create
 org:member      POST /v1/api/process-costs/calculations  ProcessCostController.calculateOnly
 org:member      POST /v1/api/process-costs/totals  ProcessCostController.getBulkTotalCosts
-org:member      POST /v1/api/process-plan-generator/:bomItemId/generate  ProcessPlanGeneratorController.generate
-org:member      POST /v1/api/process-plan-generator/generations/:id/apply  ProcessPlanGeneratorController.applyGeneration
-org:member      POST /v1/api/process-plan-generator/generations/:id/discard  ProcessPlanGeneratorController.discardGeneration
-org:member      POST /v1/api/process-plan-generator/generations/:id/edits  ProcessPlanGeneratorController.recordEdit
-org:member      POST /v1/api/process-plan-generator/generations/:id/select-route  ProcessPlanGeneratorController.selectRoute
 org:member      POST /v1/api/process-specifications  ProcessPlanningController.upsertSpecifications
 org:member      POST /v1/api/processes  ProcessesController.create
 org:member      POST /v1/api/processes/:processId/reference-tables  ProcessesController.createReferenceTable
