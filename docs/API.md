@@ -118,6 +118,13 @@ A route that was renamed keeps answering on its old path until nobody uses it. T
 | `/lhr`, `/lhr/…` | `/labour-rates`, `/labour-rates/…` |
 | `/lhr/import-excel` | `/labour-rates/imports` |
 | `/lhr/bulk` | `/labour-rates/batches` |
+| `/rfq`, `/rfq/…` | `/rfqs`, `/rfqs/…` |
+| `/rfq/tracking`, `/rfq/tracking/…` | `/rfq-trackings`, `/rfq-trackings/…` |
+| `/fx/exchange-rates`, `/fx/exchange-rates/:currency` | `/exchange-rates`, `/exchange-rates/:currency` |
+| `/fx/rate` | `/exchange-rates/effective` |
+| `/fx/refresh` | `/exchange-rates/refresh` |
+| `/fx/currencies`, `/fx/factories` | `/currencies`, `/factories` |
+| `/fx/factory-currency` | `/factory-currencies` |
 
 ## How the rules are enforced
 
@@ -130,8 +137,8 @@ A route that was renamed keeps answering on its old path until nobody uses it. T
 | Rule | State |
 |---|---|
 | 1 JSON | Done |
-| 2 Nouns | 51 existing routes break it (`analyze-*`, `bulk-total`, `init`, `batch`, `calculate`, …) |
-| 3 Plural | 120 routes under 8 singular, abbreviated or area names (`rfq`, `fx`, `vave`, `production-planning`, `quality-control`, …). Done: `machine-rates`, `labour-rates` |
+| 2 Nouns | 50 existing routes break it (`analyze-*`, `bulk-total`, `init`, `batch`, `calculate`, `PATCH rfqs/:id/send` and `close` (actions are POST), …) |
+| 3 Plural | 102 routes under 6 singular, abbreviated or area names (`vave`, `production-planning`, `quality-control`, `process-planning`, …). Done: `machine-rates`, `labour-rates`, `rfqs`, `rfq-trackings`, `exchange-rates` |
 | 4 Nesting | 26 routes have five or more segments |
 | 5 Errors | Problem details on `/api/v1`; deletes still answer 200 with a body in about 40 places; no `Location` on create |
 | 6 Filter, sort, paginate | About 20 lists page; no shared helper or cap; sorting is uneven |

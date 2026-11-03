@@ -38,7 +38,7 @@ function routes(): Route[] {
 export function violationsOf(r: Route): string[] {
   const found: string[] = [];
   const named = r.segments.filter((s) => !s.startsWith(':'));
-  const lastIsAction = r.segments.length >= 3 && !r.segments[r.segments.length - 1].startsWith(':') && r.segments[r.segments.length - 2].startsWith(':');
+  const lastIsAction = r.segments.length >= 2 && !r.segments[r.segments.length - 1].startsWith(':'); // POST /things/:id/<action> or POST /things/<action>
   for (const s of named) {
     if (!VERB.test(s)) continue;
     const isAction = r.method === 'POST' && lastIsAction && s === r.segments[r.segments.length - 1] && ACTIONS.has(s);
@@ -72,7 +72,7 @@ describe('API design rules', () => {
 
   it.each([
     ['GET', 'projects', 0], ['POST', 'projects', 0], ['POST', 'rfqs/:id/send', 0], ['POST', 'bom-items/:id/analyses', 0],
-    ['GET', 'bom-items/analyze-cad', 1], ['POST', 'lhr/import-excel', 2], ['GET', 'as/:id/bs/:id/cs', 1],
+    ['POST', 'exchange-rates/refresh', 0], ['GET', 'exchange-rates/refresh', 1], ['GET', 'bom-items/analyze-cad', 1], ['POST', 'lhr/import-excel', 2], ['GET', 'as/:id/bs/:id/cs', 1],
   ] as const)('%s /%s is judged as expected (%i violations)', (method, p, count) => {
     expect(violationsOf({ method, segments: p.split('/'), text: '' })).toHaveLength(count);
   });

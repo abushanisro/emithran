@@ -11,7 +11,7 @@ import { FxRateType, FxService } from './fx.service';
 @ApiTags('fx')
 @ApiBearerAuth()
 @OrgRole('viewer')
-@Controller({ path: 'api/fx', version: '1' })
+@Controller({ path: 'api', version: '1' })
 export class FxController {
   constructor(
     private readonly fxService: FxService,
@@ -42,7 +42,7 @@ export class FxController {
     return this.exchangeRateService.listRates(accessToken, organizationId);
   }
 
-  @Get('factory-currency')
+  @Get('factory-currencies')
   getFactoryCurrency(@Query('location') location: string) {
     if (!location) throw new BadRequestException('location query parameter is required');
     return this.fxService.resolveFactoryCurrency(location);
@@ -59,7 +59,7 @@ export class FxController {
   }
 
   /** A budget rate is the caller's organization's effective rate, so this route resolves the organization. */
-  @Get('rate')
+  @Get('exchange-rates/effective')
   @UseGuards(OrganizationContextGuard)
   async getRate(
     @Query('base') base: string,
@@ -83,7 +83,7 @@ export class FxController {
   }
 
   /** Fetches from the reference provider and writes the shared snapshot every organization reads: a platform-wide action. */
-  @Post('refresh')
+  @Post('exchange-rates/refresh')
   @PlatformAdmin()
   async refresh(@Body() body: { base?: string; quote?: string }) {
     if (!body?.base || !body?.quote) throw new BadRequestException('base and quote are required');

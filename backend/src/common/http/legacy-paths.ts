@@ -7,6 +7,14 @@
  * deprecated-path log shows no traffic for 30 days.
  */
 const RULES: Array<readonly [from: string, to: string]> = [
+  ['rfq/tracking', 'rfq-trackings'],
+  ['rfq', 'rfqs'],
+  ['fx/exchange-rates', 'exchange-rates'],
+  ['fx/currencies', 'currencies'],
+  ['fx/factories', 'factories'],
+  ['fx/factory-currency', 'factory-currencies'],
+  ['fx/rate', 'exchange-rates/effective'],
+  ['fx/refresh', 'exchange-rates/refresh'],
   ['lhr/import-excel', 'labour-rates/imports'],
   ['mhr/import-excel', 'machine-rates/imports'],
   ['lhr/bulk', 'labour-rates/batches'],
