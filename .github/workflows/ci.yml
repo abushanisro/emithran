@@ -112,6 +112,10 @@ jobs:
       - name: Type-check
         run: npm run typecheck
 
+      # openapi/openapi.json is generated from the controllers (no database, no secrets); fails with the command to regenerate it.
+      - name: OpenAPI specification is up to date
+        run: npm run openapi:check
+
       - name: RLS boundary and secret check
         run: npm run check:rls
 
