@@ -67,3 +67,30 @@ describe('every rename points at a route that exists', () => {
     expect(found).toBe(true);
   });
 });
+
+describe('verb paths become nouns', () => {
+  it.each([
+    ['bom-items/analyze-for-autofill', 'bom-items/autofill-analyses'],
+    ['bom-items/analyze-for-autofill/start', 'bom-items/autofill-analysis-jobs'],
+    ['bom-items/analyze-for-autofill/j7', 'bom-items/autofill-analysis-jobs/j7'],
+    ['bom-items/b1/analyze-cad', 'bom-items/b1/cad-analyses'],
+    ['bom-items/b1/upload-files', 'bom-items/b1/files'],
+    ['bom-items/batch-analyze-cad', 'bom-items/cad-analysis-batches'],
+    ['boms/b1/recalculate-all-costs', 'boms/b1/cost-recalculations'],
+    ['process-costs/bulk-total', 'process-costs/totals'],
+    ['tooling-costs/calculate', null],
+    ['child-part-costs/calculate', 'child-part-costs/calculations'],
+    ['raw-materials/upload-excel', 'raw-materials/imports'],
+    ['vendors/upload-csv', 'vendors/imports'],
+    ['vendors/match', 'vendors/matches'],
+    ['supplier-nominations/n1/calculate-rankings', 'supplier-nominations/n1/rankings/calculations'],
+    ['supplier-nominations/n1/capability-scores/init', 'supplier-nominations/n1/capability-scores'],
+    ['supplier-nominations/n1/capability-scores/batch', 'supplier-nominations/n1/capability-scores'],
+    ['supplier-nominations/n1/parts/p1/cost-analysis/bulk', 'supplier-nominations/n1/parts/p1/cost-analysis'],
+    ['production-planning/lots/l1/update-status-by-progress', 'production-lots/l1/status-updates'],
+    ['production-planning/lots/l1/materials/initialize', 'production-lots/l1/materials'],
+    ['project-reports/projects/p1/complete-report', 'project-reports/projects/p1/full-report'],
+  ])('%s -> %s', (from, to) => {
+    expect(renamedPath(from)).toBe(to);
+  });
+});

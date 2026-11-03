@@ -106,7 +106,7 @@ export class CalculatorsController {
   // SHEET METAL LOOKUP ENDPOINT
   // ========================================
 
-  @Post('sheet-metal/lookup')
+  @Post('sheet-metal/lookups')
   @ApiOperation({ summary: 'Resolve a sheet metal parameterized lookup table' })
   @ApiResponse({ status: 200, description: 'Lookup resolved' })
   async sheetMetalLookup(

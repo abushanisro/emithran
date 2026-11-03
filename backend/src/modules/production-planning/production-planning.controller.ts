@@ -396,7 +396,7 @@ export class ProductionPlanningController {
   // MATERIAL TRACKING ENDPOINTS
   // ============================================================================
 
-  @Post('production-lots/:lotId/materials/initialize')
+  @Post('production-lots/:lotId/materials')
   async initializeLotMaterials(
     @Param('lotId', ParseUUIDPipe) lotId: string,
     @CurrentUser() user: User,
@@ -516,7 +516,7 @@ export class ProductionPlanningController {
     return createResponse(result);
   }
 
-  @Post('production-lots/:id/update-status-by-progress')
+  @Post('production-lots/:id/status-updates')
   async updateLotStatusByProgress(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: User,

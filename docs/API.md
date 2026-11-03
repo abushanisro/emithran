@@ -27,7 +27,7 @@ The HTTP method is the verb, so the path names a thing.
 | `PUT /projects/:id` | `POST /projects/update` |
 | `DELETE /projects/:id` | `POST /projects/:id/delete` |
 
-One exception: a **state change** that is not a plain update is a `POST` to an action on one item: `POST /rfqs/:id/send`, `POST /process-routes/:id/approve`. The allowed actions are `send`, `close`, `approve`, `reject`, `submit`, `activate`, `archive`, `apply`, `discard`, `refresh`, `execute`.
+One exception: a **state change** that is not a plain update is a `POST` to an action on one item or on a collection: `POST /rfqs/:id/send`, `POST /exchange-rates/refresh`. (Four existing ones are `PUT` or `PATCH`: `rfqs/:id/send` and `close`, `production-alerts/:id/resolve`, `bom-items/reorder`.) The allowed actions are `send`, `close`, `approve`, `reject`, `submit`, `activate`, `archive`, `apply`, `discard`, `refresh`, `execute`, `reset`, `complete`, `resolve`, `reparse`, `reanalyze`, `reorder`.
 
 Work that is not a state change is a noun too: a file import creates an *import* (`POST /imports`), an analysis creates an *analysis* (`POST /bom-items/:id/analyses`), not `import-excel` or `analyze-cad`.
 
@@ -139,6 +139,24 @@ A route that was renamed keeps answering on its old path until nobody uses it. T
 | `/process-planning/specifications/upsert` | `/process-specifications` |
 | `/pdf-processing/extract-dimensions`, `/validate-pdf` | `/pdf-documents/dimension-extractions`, `/pdf-documents/validations` |
 
+### Verbs that became nouns
+
+| Old | New |
+|---|---|
+| `…/import-excel`, `…/upload-excel`, `…/upload-csv` | `…/imports` (rates, calculator mappings, raw materials, vendors) |
+| `bom-items/:id/analyze-cad`, `analyze-drawing` | `bom-items/:id/cad-analyses`, `drawing-analyses` |
+| `bom-items/analyze-for-autofill`, `…/start`, `…/:jobId` | `bom-items/autofill-analyses`, `autofill-analysis-jobs`, `autofill-analysis-jobs/:jobId` |
+| `bom-items/batch-analyze-cad` | `bom-items/cad-analysis-batches` |
+| `bom-items/:id/apply-route`, `apply-custom-route`, `convert-step`, `upload-files` | `…/route-applications`, `custom-route-applications`, `step-conversions`, `files` |
+| `boms/:id/recalculate-all-costs` | `boms/:id/cost-recalculations` |
+| `<cost>/bulk-total`, `process-costs/calculate`, `child-part-costs/calculate` | `<cost>/totals`, `…/calculations` |
+| `calculators/sheet-metal/lookup`, `vendors/match` | `…/lookups`, `vendors/matches` |
+| `…/rows/bulk`, `…/cost-analysis/bulk`, `…/capability-scores/batch`, `…/rating-matrix/batch` | `…/rows/batches`; a `PUT` on the collection (`cost-analysis`, `capability-scores`, `rating-matrix`) |
+| `…/capability-scores/init`, `…/rating-matrix/init`, `…/cost-analysis/init` | a `POST` on the collection |
+| `supplier-nominations/:id/calculate-rankings`, `store-rankings` | `…/rankings/calculations`, `POST …/rankings` |
+| `production-lots/:id/update-status-by-progress`, `…/materials/initialize` | `…/status-updates`, `POST …/materials` |
+| `supplier-evaluation-groups/:id/validate-deletion`, `project-reports/…/complete-report` | `…/deletion-check`, `…/full-report` |
+
 ## How the rules are enforced
 
 - `backend/src/test/common/api-design.spec.ts` reads the route inventory and fails on a new route that has a verb in its path (rule 2), a singular collection (rule 3) or more than two levels of nesting (rule 4).
@@ -150,8 +168,8 @@ A route that was renamed keeps answering on its old path until nobody uses it. T
 | Rule | State |
 |---|---|
 | 1 JSON | Done |
-| 2 Nouns | 46 existing routes break it (`analyze-*`, `bulk-total`, `initialize`, `batch`, `calculate`, `update-status-by-progress`, `resolve`, `reset`, `PATCH rfqs/:id/send` and `close` (actions are POST), …) |
-| 3 Plural | 8 routes: the AI process-plan generator (`process-plan-generator`), kept as it is until it is decided whether the feature stays. Everything else is renamed |
+| 2 Nouns | 2 routes: the AI process-plan generator (`generate`, `select-route`), kept as it is until it is decided whether the feature stays |
+| 3 Plural | 8 routes: the same generator (`process-plan-generator`). Everything else is renamed |
 | 4 Nesting | 16 routes have five or more segments |
 | 5 Errors | Problem details on `/api/v1`; deletes still answer 200 with a body in about 40 places; no `Location` on create |
 | 6 Filter, sort, paginate | About 20 lists page; no shared helper or cap; sorting is uneven |

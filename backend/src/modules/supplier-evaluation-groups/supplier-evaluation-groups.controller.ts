@@ -112,7 +112,7 @@ export class SupplierEvaluationGroupsController {
   }
 
   @OrgRole('viewer')
-  @Get(':id/validate-deletion')
+  @Get(':id/deletion-check')
   @ApiOperation({ summary: 'Validate if evaluation group can be deleted' })
   @ApiResponse({
     status: 200,

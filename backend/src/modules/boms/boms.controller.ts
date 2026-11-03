@@ -96,7 +96,7 @@ export class BOMsController {
   }
 
   // Cost-related endpoints
-  @Post(':id/recalculate-all-costs')
+  @Post(':id/cost-recalculations')
   @UseGuards(OrganizationContextGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Recalculate all costs for a BOM (triggered on save)' })

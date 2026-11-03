@@ -62,7 +62,7 @@ export class VendorsController {
   // ============================================================================
 
   @Throttle({ default: { limit: 10, ttl: 60_000 } }) // heavy: parses or analyses a file
-  @Post('upload-csv')
+  @Post('imports')
   @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: 'Upload vendors from CSV file' })
   @ApiConsumes('multipart/form-data')
@@ -85,7 +85,7 @@ export class VendorsController {
     return this.vendorsService.getEquipmentTypes(user.id, token);
   }
 
-  @Post('match')
+  @Post('matches')
   @HttpCode(200)
   @ApiOperation({ summary: 'Match vendors for a set of manufacturing processes' })
   @ApiResponse({ status: 200, description: 'Ranked vendor groups returned' })

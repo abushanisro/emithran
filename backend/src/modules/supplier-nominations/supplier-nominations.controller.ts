@@ -333,7 +333,7 @@ export class SupplierNominationsController {
   }
 
   // Supplier Ranking Calculation Endpoints
-  @Post(':nominationId/calculate-rankings')
+  @Post(':nominationId/rankings/calculations')
   @ApiOperation({ summary: 'Calculate supplier rankings based on current data and weights' })
   @ApiResponse({
     status: 200,
@@ -368,7 +368,7 @@ export class SupplierNominationsController {
     return this.supplierNominationsService.calculateSupplierRankings(userId, nominationId, token);
   }
 
-  @Post(':nominationId/store-rankings')
+  @Post(':nominationId/rankings')
   @ApiOperation({ summary: 'Calculate and store supplier rankings in database' })
   @ApiResponse({
     status: 200,
@@ -534,7 +534,7 @@ export class SupplierNominationsController {
     return this.supplierNominationsService.getCapabilityScores(userId, nominationId, token);
   }
 
-  @Post(':id/capability-scores/init')
+  @Post(':id/capability-scores')
   @ApiOperation({ summary: 'Initialize capability scoring criteria for nomination' })
   @ApiResponse({
     status: 201,
@@ -565,7 +565,7 @@ export class SupplierNominationsController {
     return this.supplierNominationsService.updateCapabilityScore(userId, nominationId, criteriaId, vendorId, updateDto.score, token);
   }
 
-  @Put(':id/capability-scores/batch')
+  @Put(':id/capability-scores')
   @ApiOperation({ summary: 'Batch update capability scores - ENTERPRISE BEST PRACTICE' })
   @ApiResponse({
     status: 200,
@@ -640,7 +640,7 @@ export class SupplierNominationsController {
     );
   }
 
-  @Post(':nominationId/vendors/:vendorId/rating-matrix/init')
+  @Post(':nominationId/vendors/:vendorId/rating-matrix')
   @ApiOperation({ 
     summary: 'Initialize vendor rating matrix',
     description: 'Create rating matrix with default criteria for vendor assessment'
@@ -668,7 +668,7 @@ export class SupplierNominationsController {
     );
   }
 
-  @Put(':nominationId/vendors/:vendorId/rating-matrix/batch')
+  @Put(':nominationId/vendors/:vendorId/rating-matrix')
   @ApiOperation({ 
     summary: 'Batch update rating matrix - ATOMIC ENTERPRISE OPERATION',
     description: 'Atomically update multiple rating matrix items in single transaction'
@@ -777,7 +777,7 @@ export class SupplierNominationsController {
     );
   }
 
-  @Post(':nominationId/parts/:bomItemId/cost-analysis/init')
+  @Post(':nominationId/parts/:bomItemId/cost-analysis')
   @ApiOperation({ 
     summary: 'Initialize part-wise cost analysis for BOM part',
     description: 'Create cost analysis records for all vendors for a specific BOM part'
@@ -804,7 +804,7 @@ export class SupplierNominationsController {
     );
   }
 
-  @Put(':nominationId/parts/:bomItemId/cost-analysis/bulk')
+  @Put(':nominationId/parts/:bomItemId/cost-analysis')
   @ApiOperation({ 
     summary: 'Bulk update part-wise cost analysis - ATOMIC ENTERPRISE OPERATION',
     description: 'Atomically update cost analysis data for all vendors for a specific BOM part'

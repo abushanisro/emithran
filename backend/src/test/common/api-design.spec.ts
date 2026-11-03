@@ -16,7 +16,10 @@ const ALLOWLIST = path.resolve(__dirname, 'api-design-violations.json');
 const SINGLETONS = new Set(['auth', 'profile', 'copilot', 'health', 'ping', 'me']);
 
 /** State changes: POST /<collection>/:id/<action>. Anything else that reads like a verb is a violation. */
-const ACTIONS = new Set(['send', 'close', 'approve', 'reject', 'submit', 'activate', 'archive', 'apply', 'discard', 'refresh', 'execute']);
+const ACTIONS = new Set(['send', 'close', 'approve', 'reject', 'submit', 'activate', 'archive', 'apply', 'discard', 'refresh', 'execute', 'reset', 'complete', 'resolve', 'reparse', 'reanalyze', 'reorder']);
+
+/** An action is a POST; an existing one may be a PUT or PATCH. */
+const ACTION_METHODS = new Set(['POST', 'PUT', 'PATCH']);
 
 const VERB = /^(get|create|update|delete|remove|add|set|list|fetch|find|import|upload|download|export|analy[sz]e|calculate|recalculate|generate|select|validate|reanalyze|reparse|convert|start|complete|init|initialize|batch|bulk|store|save|check|match|detect|extract|run|record|compare|resolve|reorder|reset|clear|sync|verify|lookup|apply|discard|send|close|approve|reject|submit|activate|archive|refresh|execute)(-|$)/i;
 
@@ -41,7 +44,7 @@ export function violationsOf(r: Route): string[] {
   const lastIsAction = r.segments.length >= 2 && !r.segments[r.segments.length - 1].startsWith(':'); // POST /things/:id/<action> or POST /things/<action>
   for (const s of named) {
     if (!VERB.test(s)) continue;
-    const isAction = r.method === 'POST' && lastIsAction && s === r.segments[r.segments.length - 1] && ACTIONS.has(s);
+    const isAction = ACTION_METHODS.has(r.method) && lastIsAction && s === r.segments[r.segments.length - 1] && ACTIONS.has(s);
     if (!isAction) { found.push(`verb:${s}`); break; }
   }
   const top = r.segments[0];
@@ -72,7 +75,7 @@ describe('API design rules', () => {
 
   it.each([
     ['GET', 'projects', 0], ['POST', 'projects', 0], ['POST', 'rfqs/:id/send', 0], ['POST', 'bom-items/:id/analyses', 0],
-    ['POST', 'exchange-rates/refresh', 0], ['GET', 'exchange-rates/refresh', 1], ['GET', 'bom-items/analyze-cad', 1], ['POST', 'lhr/import-excel', 2], ['GET', 'as/:id/bs/:id/cs', 1],
+    ['POST', 'exchange-rates/refresh', 0], ['PATCH', 'rfqs/:id/send', 0], ['GET', 'exchange-rates/refresh', 1], ['DELETE', 'rfqs/:id/send', 1], ['GET', 'bom-items/analyze-cad', 1], ['POST', 'lhr/import-excel', 2], ['GET', 'as/:id/bs/:id/cs', 1],
   ] as const)('%s /%s is judged as expected (%i violations)', (method, p, count) => {
     expect(violationsOf({ method, segments: p.split('/'), text: '' })).toHaveLength(count);
   });

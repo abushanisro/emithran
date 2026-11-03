@@ -235,7 +235,7 @@ export class ProjectReportsController {
   }
 
   @OrgRole('viewer')
-  @Get('projects/:projectId/complete-report')
+  @Get('projects/:projectId/full-report')
   @ApiOperation({ summary: 'Generate complete project report with balloon diagram and inspection' })
   @ApiResponse({ status: 200, description: 'Complete report generated successfully' })
   async generateCompleteReport(

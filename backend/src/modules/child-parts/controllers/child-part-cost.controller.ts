@@ -184,7 +184,7 @@ export class ChildPartCostController {
   /**
    * Calculate child part cost without saving (preview/what-if analysis)
    */
-  @Post('calculate')
+  @Post('calculations')
   @ApiOperation({
     summary: 'Calculate child part cost (preview)',
     description: 'Calculate child part cost without saving to database. Useful for what-if analysis and previewing costs.',

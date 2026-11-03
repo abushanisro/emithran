@@ -117,7 +117,7 @@ export class BOMItemsController {
 
   // ── Stateless CAD auto-fill (no DB writes) ──────────────────────────────────
   @Throttle({ default: { limit: 20, ttl: 60_000 } }) // heavy: parses or analyses a file
-  @Post('analyze-for-autofill')
+  @Post('autofill-analyses')
   @ApiOperation({ summary: 'Analyze a 3D file and return auto-fill suggestions (stateless, no DB write)' })
   @ApiConsumes('multipart/form-data')
   @ApiResponse({ status: 200, description: 'Auto-fill suggestions returned', type: AutoFillResponseDto })
@@ -175,7 +175,7 @@ export class BOMItemsController {
   // minutes (mostly OCC's own STEP transfer). Returns a jobId immediately;
   // poll GET analyze-for-autofill/:jobId for the result. ──────────────────────
   @Throttle({ default: { limit: 20, ttl: 60_000 } }) // heavy: parses or analyses a file
-  @Post('analyze-for-autofill/start')
+  @Post('autofill-analysis-jobs')
   @ApiOperation({ summary: 'Start a background 3D file analysis; returns a jobId to poll' })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(
@@ -207,7 +207,7 @@ export class BOMItemsController {
   }
 
   @OrgRole('viewer')
-  @Get('analyze-for-autofill/:jobId')
+  @Get('autofill-analysis-jobs/:jobId')
   @ApiOperation({ summary: 'Poll the status/result of a background analysis job' })
   async getAnalyzeForAutoFillStatus(
     @Param('jobId') jobId: string,
@@ -571,7 +571,7 @@ export class BOMItemsController {
   // items whose 2D drawing was already uploaded before drawing-intelligence
   // extraction existed (upload-files only calls this automatically for NEW
   // uploads going forward), or to re-run after the parser itself improves.
-  @Post(':id/analyze-drawing')
+  @Post(':id/drawing-analyses')
   @ApiOperation({ summary: 'Re-run drawing intelligence extraction on the stored 2D file and update drawing_intelligence in DB' })
   @ApiResponse({ status: 200, description: 'Drawing analysis complete', type: BOMItemResponseDto })
   @ApiResponse({ status: 400, description: 'No 2D file found for this item, or it is not a PDF' })
@@ -727,7 +727,7 @@ export class BOMItemsController {
   }
 
   @Throttle({ default: { limit: 10, ttl: 60_000 } }) // heavy: parses or analyses a file
-  @Post(':id/upload-files')
+  @Post(':id/files')
   @ApiOperation({ summary: 'Upload 2D/3D/DXF files for BOM item' })
   @ApiConsumes('multipart/form-data')
   @ApiResponse({ status: 200, description: 'Files uploaded successfully', type: BOMItemResponseDto })
@@ -961,7 +961,7 @@ export class BOMItemsController {
     res.send(content);
   }
 
-  @Post(':id/convert-step')
+  @Post(':id/step-conversions')
   @ApiOperation({ summary: 'Manually convert STEP file to STL for 3D viewing' })
   @ApiResponse({ status: 200, description: 'STEP file converted successfully' })
   @ApiResponse({ status: 400, description: 'No STEP file found or CAD engine unavailable' })
@@ -1042,7 +1042,7 @@ export class BOMItemsController {
   // CAD ANALYSIS ENDPOINTS
   // ============================================================================
 
-  @Post(':id/analyze-cad')
+  @Post(':id/cad-analyses')
   @ApiOperation({ summary: 'Perform advanced CAD analysis on BOM item' })
   @ApiResponse({ status: 200, description: 'CAD analysis completed successfully' })
   @ApiResponse({ status: 400, description: 'No 3D file found or invalid request' })
@@ -1197,7 +1197,7 @@ export class BOMItemsController {
   }
 
   @Throttle({ default: { limit: 10, ttl: 60_000 } }) // heavy: parses or analyses a file
-  @Post('batch-analyze-cad')
+  @Post('cad-analysis-batches')
   @ApiOperation({ summary: 'Perform batch CAD analysis on multiple BOM items' })
   @ApiResponse({ status: 200, description: 'Batch CAD analysis completed' })
   async batchAnalyzeCAD(
@@ -1705,7 +1705,7 @@ export class BOMItemsController {
   // persist an operation whose costing data is missing (findRouteDataGaps).
 
   // ── Apply a selected manufacturing route → write process_cost_records ─────────
-  @Post(':id/apply-route')
+  @Post(':id/route-applications')
   @ApiOperation({
     summary: 'Write process cost records from a user-selected manufacturing route',
     description:
@@ -1828,7 +1828,7 @@ export class BOMItemsController {
   // and reordering, never inventing a cost line the engine didn't already derive from real
   // geometry. Reuses the exact same insert logic as applyRoute (writeProcessLinesAsRecords) —
   // no new cost formulas anywhere in this endpoint.
-  @Post(':id/apply-custom-route')
+  @Post(':id/custom-route-applications')
   @ApiOperation({
     summary: 'Write process cost records from a dynamically-assembled Workflow Builder route',
     description:

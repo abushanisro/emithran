@@ -231,7 +231,7 @@ export class RawMaterialsController {
   }
 
   @Throttle({ default: { limit: 10, ttl: 60_000 } }) // heavy: parses or analyses a file
-  @Post('upload-excel')
+  @Post('imports')
   @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: 'Upload Excel file to bulk import raw materials' })
   @ApiConsumes('multipart/form-data')

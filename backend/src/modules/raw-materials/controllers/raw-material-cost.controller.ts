@@ -149,7 +149,7 @@ export class RawMaterialCostController {
   /**
    * Get total raw material costs for multiple BOM items in a single request
    */
-  @Post('bulk-total')
+  @Post('totals')
   @ApiOperation({ summary: 'Get total raw material costs for multiple BOM items' })
   @ApiResponse({ status: 201, description: 'Returns a map of bomItemId → totalCost' })
   async getBulkTotalCosts(

@@ -192,7 +192,7 @@ export class ProcessCostController {
   /**
    * Calculate process cost without saving (preview/what-if analysis)
    */
-  @Post('calculate')
+  @Post('calculations')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Calculate process cost without saving' })
   @ApiResponse({
@@ -213,7 +213,7 @@ export class ProcessCostController {
   /**
    * Get total process costs for multiple BOM items in a single request
    */
-  @Post('bulk-total')
+  @Post('totals')
   @ApiOperation({ summary: 'Get total process costs for multiple BOM items' })
   @ApiResponse({ status: 201, description: 'Returns a map of bomItemId → totalCost' })
   async getBulkTotalCosts(

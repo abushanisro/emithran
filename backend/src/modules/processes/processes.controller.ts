@@ -58,7 +58,7 @@ export class ProcessesController {
   // ============================================================================
 
   @Throttle({ default: { limit: 10, ttl: 60_000 } }) // heavy: parses or analyses a file
-  @Post('calculator-mappings/import-excel')
+  @Post('calculator-mappings/imports')
   @UseGuards(OrganizationContextGuard)
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_XLSX_UPLOAD_BYTES, files: 1 } }))
   @ApiOperation({ summary: 'Import process calculator mappings from Excel file' })
@@ -391,7 +391,7 @@ export class ProcessesController {
     return this.processesService.deleteTableRow(rowId, token);
   }
 
-  @Post('reference-tables/:tableId/rows/bulk')
+  @Post('reference-tables/:tableId/rows/batches')
   @ApiOperation({ summary: 'Bulk update table rows (delete old, insert new)' })
   @ApiResponse({ status: 200, description: 'Table rows updated successfully' })
   async bulkUpdateTableRows(
