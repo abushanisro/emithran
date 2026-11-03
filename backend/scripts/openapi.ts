@@ -1,10 +1,24 @@
 // Writes the OpenAPI document of the real app to ../openapi/openapi.json, or with --check compares it to the committed file.
 //   npm run openapi         regenerate (commit the result with the API change)
 //   npm run openapi:check   fail if the committed file is out of date (CI)
-// No database, no credentials: the app is built, never started, and nothing is connected to. Dev auth bypass is forced off and
-// the electronics queue is in memory so that the environment of the machine cannot change the output.
+// No database, no credentials: the app is built, never started, and nothing is connected to. The configuration is fixed
+// below (placeholders), so the environment of the machine cannot change the output.
 process.env.ALLOW_DEV_AUTH_BYPASS = 'false';
 process.env.ELECTRONICS_QUEUE_DRIVER = 'memory';
+// The app refuses to build without its configuration (config/env.validation.ts). Placeholders satisfy that; none is ever
+// contacted or used to sign anything, and they are set unconditionally so neither CI secrets nor a developer's .env matter.
+Object.assign(process.env, {
+  POSTGREST_URL: 'http://postgrest.invalid',
+  DB_JWT_SECRET: 'openapi-generation-placeholder-not-a-secret',
+  S3_BUCKET: 'openapi',
+  S3_REGION: 'us-east-1',
+  S3_ACCESS_KEY_ID: 'openapi',
+  S3_SECRET_ACCESS_KEY: 'openapi',
+  AUTH0_DOMAIN: 'openapi.invalid',
+  AUTH0_AUDIENCE: 'https://openapi.invalid',
+  AUTH0_CLAIM_NAMESPACE: 'https://openapi.invalid/',
+  AUTH0_TRUSTED_CONNECTIONS: 'google-oauth2',
+});
 
 import * as fs from 'fs';
 import * as path from 'path';
