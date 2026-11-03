@@ -26,7 +26,7 @@ export interface SessionStatusDto {
 @ApiTags('Session')
 @ApiBearerAuth()
 @Authenticated()
-@Controller({ path: 'api/auth/session', version: '1' })
+@Controller({ path: 'auth/session', version: '1' })
 export class SessionController {
   constructor(private readonly sessionActivity: SessionActivityService) {}
 

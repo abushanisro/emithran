@@ -31,8 +31,8 @@ export const config = {
     // missing setting in production throws naming the variable.
     get baseUrl(): string {
       return typeof window === 'undefined'
-        ? settingWithDevDefault(process.env.API_URL, 'API_URL', 'http://localhost:4000/v1/api')
-        : settingWithDevDefault(process.env.NEXT_PUBLIC_API_URL, 'NEXT_PUBLIC_API_URL', 'http://localhost:4000/v1/api');
+        ? settingWithDevDefault(process.env.API_URL, 'API_URL', 'http://localhost:4000/api/v1')
+        : settingWithDevDefault(process.env.NEXT_PUBLIC_API_URL, 'NEXT_PUBLIC_API_URL', 'http://localhost:4000/api/v1');
     },
 
     // Timeout Configuration - 2026 Best Practice: Balance between fast fail and database operations

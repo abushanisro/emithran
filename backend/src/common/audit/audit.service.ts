@@ -64,6 +64,22 @@ export class AuditService {
   }
 
   /**
+   * Runs a delete-everything action on a rate or master-data table and records it, with the number of rows it removed. The record
+   * is awaited like audited(): a purge that could not be recorded fails the request.
+   */
+  async purged(dataset: string, run: () => Promise<{ deleted: number }>): Promise<{ deleted: number }> {
+    let result: { deleted: number };
+    try {
+      result = await run();
+    } catch (error) {
+      await this.recordBestEffort({ action: 'reference_data.purged', targetType: dataset, outcome: 'error', meta: { dataset } });
+      throw error;
+    }
+    await this.record({ action: 'reference_data.purged', targetType: dataset, outcome: 'ok', meta: { dataset, deleted: result.deleted } });
+    return result;
+  }
+
+  /**
    * Audits a change to one row (delete it, apply a cost to it): reads the row's organization and name first, because the route
    * may not resolve an organization and the row is gone afterwards, then runs the change under audited().
    */

@@ -1,4 +1,5 @@
 interface User { id: string; email: string; [key: string]: any; }
+import { Throttle } from '@nestjs/throttler';
 import {
   Controller,
   Get,
@@ -13,6 +14,7 @@ import {
   UseGuards,
   ParseUUIDPipe,
   HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
@@ -33,14 +35,16 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
 import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
 import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
+import { AuditService } from '../../common/audit/audit.service';
+import { requireBulkDeleteConfirmation } from '../../common/http/bulk-delete';
 import { OrgRole } from '../../common/authz/authz-policy';
 
 @ApiTags('Vendors')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/vendors', version: '1' })
+@Controller({ path: 'vendors', version: '1' })
 export class VendorsController {
-  constructor(private readonly vendorsService: VendorsService) {}
+  constructor(private readonly vendorsService: VendorsService, private readonly audit: AuditService) {}
 
   // ============================================================================
   // VENDOR ENDPOINTS
@@ -58,7 +62,8 @@ export class VendorsController {
   // SPECIFIC ROUTES - Must come before parameterized routes
   // ============================================================================
 
-  @Post('upload-csv')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } }) // heavy: parses or analyses a file
+  @Post('imports')
   @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: 'Upload vendors from CSV file' })
   @ApiConsumes('multipart/form-data')
@@ -81,7 +86,7 @@ export class VendorsController {
     return this.vendorsService.getEquipmentTypes(user.id, token);
   }
 
-  @Post('match')
+  @Post('matches')
   @HttpCode(200)
   @ApiOperation({ summary: 'Match vendors for a set of manufacturing processes' })
   @ApiResponse({ status: 200, description: 'Ranked vendor groups returned' })
@@ -123,6 +128,7 @@ export class VendorsController {
     return this.vendorsService.update(id, updateVendorDto, user.id, token);
   }
 
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id')
   @ApiOperation({ summary: 'Delete vendor' })
   @ApiResponse({ status: 200, description: 'Vendor deleted successfully' })
@@ -131,16 +137,20 @@ export class VendorsController {
     return this.vendorsService.remove(id, user.id, token);
   }
 
+  @OrgRole('admin')
+  @HttpCode(HttpStatus.OK)
   @Delete()
   @UseGuards(OrganizationContextGuard)
-  @ApiOperation({ summary: "Delete all vendors in the caller's organization" })
+  @ApiOperation({ summary: "Delete all vendors in the caller's organization (administrators; needs ?confirm=delete-all)" })
   @ApiResponse({ status: 200, description: 'Vendors deleted successfully' })
   async removeAll(
     @CurrentUser() user: User,
     @AccessToken() token: string,
     @CurrentOrganization() organizationId: string,
+    @Query('confirm') confirm?: string,
   ) {
-    return this.vendorsService.removeAll(user.id, token, organizationId);
+    requireBulkDeleteConfirmation(confirm);
+    return this.audit.purged('vendors', () => this.vendorsService.removeAll(user.id, token, organizationId));
   }
 
   // ============================================================================
@@ -170,6 +180,7 @@ export class VendorsController {
     return this.vendorsService.updateEquipment(id, updateEquipmentDto, user.id, token);
   }
 
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete('equipment/:id')
   @ApiOperation({ summary: 'Delete equipment' })
   @ApiResponse({ status: 200, description: 'Equipment deleted successfully' })
@@ -205,6 +216,7 @@ export class VendorsController {
     return this.vendorsService.updateService(id, updateServiceDto, user.id, token);
   }
 
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete('services/:id')
   @ApiOperation({ summary: 'Delete service' })
   @ApiResponse({ status: 200, description: 'Service deleted successfully' })
@@ -240,6 +252,7 @@ export class VendorsController {
     return this.vendorsService.updateContact(id, updateContactDto, user.id, token);
   }
 
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete('contacts/:id')
   @ApiOperation({ summary: 'Delete contact' })
   @ApiResponse({ status: 200, description: 'Contact deleted successfully' })

@@ -19,6 +19,8 @@ import {
   Query,
   UseGuards,
   Request,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -42,7 +44,7 @@ import { OrgRole } from '../../../common/authz/authz-policy';
 
 @ApiTags('Child Part Costs')
 @OrgRole('member')
-@Controller('api/child-part-costs')
+@Controller('child-part-costs')
 @UseGuards(RequestAuthGuard)
 @ApiBearerAuth()
 export class ChildPartCostController {
@@ -156,6 +158,7 @@ export class ChildPartCostController {
   /**
    * Delete a child part cost record
    */
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id')
   @ApiOperation({
     summary: 'Delete child part cost',
@@ -184,7 +187,7 @@ export class ChildPartCostController {
   /**
    * Calculate child part cost without saving (preview/what-if analysis)
    */
-  @Post('calculate')
+  @Post('calculations')
   @ApiOperation({
     summary: 'Calculate child part cost (preview)',
     description: 'Calculate child part cost without saving to database. Useful for what-if analysis and previewing costs.',

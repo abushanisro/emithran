@@ -11,7 +11,7 @@ const ENGINE_LINES = [
 ];
 
 // The rows actually persisted for that part, verified live via
-// GET /v1/api/process-costs. Note the catalog operation names ("Bend Brake",
+// GET /api/v1/process-costs. Note the catalog operation names ("Bend Brake",
 // "Deslag", "CMM Inspection") differ from the engine labels above for the
 // very same machine classes.
 const STORED = [

@@ -1,0 +1,11 @@
+[
+  "lib/api/bom.ts: /boms/:x/approve",
+  "lib/api/bom.ts: /boms/:x/items/:x",
+  "lib/api/bom.ts: /boms/:x/release",
+  "lib/api/bom.ts: /boms/:x/upload",
+  "lib/api/calculators.ts: /calculators/formulas/validate",
+  "lib/api/hooks/useProductionPlanning.ts: /production-planning/vendor-assignments/:x",
+  "lib/api/production-entries.ts: /production-planning/daily-production/:x",
+  "lib/hooks/useAutoRecalculateCost.ts: /bom-items/:x/cost/recalculate",
+  "lib/hooks/useAutoRecalculateCost.ts: /bom/:x/recalculate-all-costs"
+]

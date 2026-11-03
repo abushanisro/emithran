@@ -13,6 +13,8 @@ import {
   Logger,
   NotFoundException,
   UnauthorizedException,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { RequestAuthGuard } from '@/common/guards/request-auth.guard';
@@ -36,7 +38,7 @@ import { OrgRole } from '../../common/authz/authz-policy';
 @ApiTags('Quality Control')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller('api/quality-control')
+@Controller('quality-inspections')
 @UseGuards(RequestAuthGuard)
 export class QualityControlController {
   private readonly logger = new Logger(QualityControlController.name);
@@ -62,7 +64,7 @@ export class QualityControlController {
 
   // A new inspection belongs to the request's organization; every other write acts on an existing row, whose organization
   // row-level security (migration 936) already fixes.
-  @Post('inspections')
+  @Post()
   @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: 'Create new quality inspection' })
   @ApiResponse({ status: 201, description: 'Inspection created successfully' })
@@ -86,7 +88,7 @@ export class QualityControlController {
   }
 
   @OrgRole('viewer')
-  @Get('inspections')
+  @Get()
   @ApiOperation({ summary: 'Get all quality inspections' })
   @ApiResponse({ status: 200, description: 'Inspections retrieved successfully' })
   async getInspections(
@@ -110,7 +112,7 @@ export class QualityControlController {
   }
 
   @OrgRole('viewer')
-  @Get('inspections/:id')
+  @Get(':id')
   @ApiOperation({ summary: 'Get quality inspection by ID' })
   @ApiResponse({ status: 200, description: 'Inspection retrieved successfully' })
   async getInspectionById(
@@ -130,7 +132,7 @@ export class QualityControlController {
     }
   }
 
-  @Put('inspections/:id')
+  @Put(':id')
   @ApiOperation({ summary: 'Update quality inspection' })
   @ApiResponse({ status: 200, description: 'Inspection updated successfully' })
   async updateInspection(
@@ -152,7 +154,8 @@ export class QualityControlController {
     }
   }
 
-  @Delete('inspections/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Delete(':id')
   @ApiOperation({ summary: 'Delete quality inspection' })
   @ApiResponse({ status: 200, description: 'Inspection deleted successfully' })
   async deleteInspection(
@@ -184,7 +187,7 @@ export class QualityControlController {
 
 
 
-  @Post('inspections/:id/approve')
+  @Post(':id/approve')
   @ApiOperation({ summary: 'Approve inspection' })
   @ApiResponse({ status: 200, description: 'Inspection approved successfully' })
   async approveInspection(
@@ -201,7 +204,7 @@ export class QualityControlController {
     return createResponse(result);
   }
 
-  @Post('inspections/:id/reject')
+  @Post(':id/reject')
   @ApiOperation({ summary: 'Reject inspection' })
   @ApiResponse({ status: 200, description: 'Inspection rejected successfully' })
   async rejectInspection(
@@ -218,7 +221,7 @@ export class QualityControlController {
     return createResponse(result);
   }
 
-  @Post('inspections/:id/reset')
+  @Post(':id/reset')
   @ApiOperation({ summary: 'Reset inspection status (undo approve/reject)' })
   @ApiResponse({ status: 200, description: 'Inspection status reset successfully' })
   async resetInspectionStatus(
@@ -253,7 +256,7 @@ export class QualityControlController {
   // DETAILED INSPECTION REPORTS ENDPOINTS
   // ============================================================================
 
-  @Post('inspections/:id/detailed-report')
+  @Post(':id/detailed-report')
   @ApiOperation({ summary: 'Save or update detailed inspection report' })
   @ApiResponse({ status: 200, description: 'Report saved successfully', type: DetailedInspectionReportResponseDto })
   async saveDetailedInspectionReport(
@@ -276,7 +279,7 @@ export class QualityControlController {
   }
 
   @OrgRole('viewer')
-  @Get('inspections/:id/detailed-report')
+  @Get(':id/detailed-report')
   @ApiOperation({ summary: 'Get detailed inspection report' })
   @ApiResponse({ status: 200, description: 'Report retrieved successfully', type: DetailedInspectionReportResponseDto })
   @ApiResponse({ status: 404, description: 'No detailed report created yet for this inspection' })
@@ -301,7 +304,8 @@ export class QualityControlController {
     }
   }
 
-  @Delete('inspections/:id/detailed-report')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Delete(':id/detailed-report')
   @ApiOperation({ summary: 'Delete detailed inspection report' })
   @ApiResponse({ status: 200, description: 'Report deleted successfully' })
   async deleteDetailedInspectionReport(

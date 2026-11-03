@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { RfqController } from './rfq.controller';
+import { RfqTrackingController } from './rfq-tracking.controller';
 import { RfqService } from './rfq.service';
 import { RfqEmailService } from './services/rfq-email.service';
 import { RfqTrackingService } from './services/rfq-tracking.service';
@@ -9,7 +10,7 @@ import { DatabaseModule } from '../../common/database/database.module';
 
 @Module({
   imports: [DatabaseModule, VendorsModule, BOMItemsModule],
-  controllers: [RfqController],
+  controllers: [RfqController, RfqTrackingController],
   providers: [RfqService, RfqEmailService, RfqTrackingService],
   exports: [RfqService],
 })

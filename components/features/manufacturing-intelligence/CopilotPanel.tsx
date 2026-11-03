@@ -180,7 +180,7 @@ function useCopilotChat(bomItemId: string, scenario: CopilotScenario) {
       updateProposal(proposal.proposalId, { status: "saving" });
       try {
         await apiClient.post(
-          `/copilot/memory/proposals/${proposal.proposalId}/confirm`,
+          `/copilot/memory-proposals/${proposal.proposalId}/confirm`,
           { conversationId, turn: proposal.turn },
           { retry: false },
         );

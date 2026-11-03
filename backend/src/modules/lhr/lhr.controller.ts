@@ -1,4 +1,5 @@
 interface User { id: string; email: string; [key: string]: any; }
+import { Throttle } from '@nestjs/throttler';
 import {
   Controller,
   Get,
@@ -22,15 +23,18 @@ import { LHRService } from './lhr.service';
 import { CreateLHRDto, UpdateLHRDto } from './lhr.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
+import { AuditService } from '../../common/audit/audit.service';
+import { requireBulkDeleteConfirmation } from '../../common/http/bulk-delete';
 import { OrgRole } from '../../common/authz/authz-policy';
 
 @ApiTags('LHR')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/lhr', version: '1' })
+@Controller({ path: 'labour-rates', version: '1' })
 export class LHRController {
-  constructor(private readonly LHRService: LHRService) { }
+  constructor(private readonly LHRService: LHRService, private readonly audit: AuditService) { }
 
+  @OrgRole('admin')
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create new LHR record' })
@@ -113,6 +117,7 @@ export class LHRController {
     return this.LHRService.findOne(id, user.id, token);
   }
 
+  @OrgRole('admin')
   @Put(':id')
   @ApiOperation({ summary: 'Update LHR record' })
   @ApiResponse({ status: 200, description: 'LHR record updated successfully' })
@@ -126,13 +131,17 @@ export class LHRController {
     return this.LHRService.update(id, UpdateLHRDto, user.id, token);
   }
 
+  @OrgRole('admin')
+  @HttpCode(HttpStatus.OK)
   @Delete()
-  @ApiOperation({ summary: 'Delete all LHR records for the current user' })
+  @ApiOperation({ summary: 'Delete all LHR records for the current user (administrators; needs ?confirm=delete-all)' })
   @ApiResponse({ status: 200, description: 'All LHR records deleted' })
-  async removeAll(@CurrentUser() user: User, @AccessToken() token: string) {
-    return this.LHRService.removeAll(user.id, token);
+  async removeAll(@CurrentUser() user: User, @AccessToken() token: string, @Query('confirm') confirm?: string) {
+    requireBulkDeleteConfirmation(confirm);
+    return this.audit.purged('lhr', () => this.LHRService.removeAll(user.id, token));
   }
 
+  @OrgRole('admin')
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete LHR record' })
@@ -146,7 +155,8 @@ export class LHRController {
     return this.LHRService.remove(id, user.id, token);
   }
 
-  @Post('bulk')
+  @OrgRole('admin')
+  @Post('batches')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Bulk create LHR records' })
   @ApiResponse({ status: 201, description: 'LHR records created successfully' })
@@ -158,7 +168,9 @@ export class LHRController {
     return this.LHRService.bulkCreate(data, user.id, token);
   }
 
-  @Post('import-excel')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } }) // heavy: parses or analyses a file
+  @OrgRole('admin')
+  @Post('imports')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_XLSX_UPLOAD_BYTES, files: 1 } }))
   @ApiOperation({ summary: 'Import LHR records from Excel (.xlsx)' })
   @ApiResponse({ status: 201, description: 'LHR records imported successfully' })

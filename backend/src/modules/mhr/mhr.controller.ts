@@ -1,4 +1,5 @@
 interface User { id: string; email: string; [key: string]: any; }
+import { Throttle } from '@nestjs/throttler';
 import {
   Controller,
   Get,
@@ -12,6 +13,8 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { MAX_XLSX_UPLOAD_BYTES } from '../../common/archive/xlsx-limits';
@@ -21,16 +24,18 @@ import { CreateMHRDto, UpdateMHRDto, QueryMHRDto } from './dto/mhr.dto';
 import { MHRResponseDto, MHRListResponseDto, MHRReferenceDetailDto, MHRPickerRowDto } from './dto/mhr-response.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
+import { AuditService } from '../../common/audit/audit.service';
+import { requireBulkDeleteConfirmation } from '../../common/http/bulk-delete';
 import { OrgRole } from '../../common/authz/authz-policy';
 
 @ApiTags('MHR')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/mhr', version: '1' })
+@Controller({ path: 'machine-rates', version: '1' })
 export class MHRController {
   private readonly logger = new Logger(MHRController.name);
 
-  constructor(private readonly mhrService: MHRService) {}
+  constructor(private readonly mhrService: MHRService, private readonly audit: AuditService) {}
 
   @OrgRole('viewer')
   @Get()
@@ -141,6 +146,7 @@ export class MHRController {
     return this.mhrService.getReferenceDetail(id, token);
   }
 
+  @OrgRole('admin')
   @Post()
   @ApiOperation({ summary: 'Create new MHR record' })
   @ApiResponse({ status: 201, description: 'MHR record created successfully', type: MHRResponseDto })
@@ -154,6 +160,7 @@ export class MHRController {
     }
   }
 
+  @OrgRole('admin')
   @Put(':id')
   @ApiOperation({ summary: 'Update MHR record' })
   @ApiResponse({ status: 200, description: 'MHR record updated successfully', type: MHRResponseDto })
@@ -167,6 +174,8 @@ export class MHRController {
     }
   }
 
+  @OrgRole('admin')
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id')
   @ApiOperation({ summary: 'Delete MHR record' })
   @ApiResponse({ status: 200, description: 'MHR record deleted successfully' })
@@ -180,15 +189,20 @@ export class MHRController {
     }
   }
 
+  @OrgRole('admin')
+  @HttpCode(HttpStatus.OK)
   @Delete()
-  @ApiOperation({ summary: 'Delete all MHR records for the current user' })
+  @ApiOperation({ summary: 'Delete all MHR records for the current user (administrators; needs ?confirm=delete-all)' })
   @ApiResponse({ status: 200, description: 'All MHR records deleted' })
-  async removeAll(@CurrentUser() user: User, @AccessToken() token: string) {
+  async removeAll(@CurrentUser() user: User, @AccessToken() token: string, @Query('confirm') confirm?: string) {
+    requireBulkDeleteConfirmation(confirm);
     this.logger.log(`Deleting all MHR records for user ${user.id}`);
-    return this.mhrService.removeAll(user.id, token);
+    return this.audit.purged('mhr', () => this.mhrService.removeAll(user.id, token));
   }
 
-  @Post('import-excel')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } }) // heavy: parses or analyses a file
+  @OrgRole('admin')
+  @Post('imports')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_XLSX_UPLOAD_BYTES, files: 1 } }))
   @ApiOperation({ summary: 'Import MHR records from Excel (.xlsx)' })
   @ApiResponse({ status: 201, description: 'MHR records imported successfully' })

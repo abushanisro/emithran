@@ -206,7 +206,7 @@ export function useUpdateSmLookupRow() {
 
   return useMutation({
     mutationFn: async ({ table, rowId, updates }: { table: string; rowId: string; updates: Record<string, unknown> }) => {
-      const response = await apiClient.put<TableRow>(`/processes/sm-lookup-tables/rows/${table}/${rowId}`, updates);
+      const response = await apiClient.put<TableRow>(`/processes/sm-lookup-table-rows/${table}/${rowId}`, updates);
       return response;
     },
     onSuccess: () => {
@@ -301,7 +301,7 @@ export function useBulkUpdateTableRows() {
   return useMutation({
     mutationFn: async (data: BulkUpdateTableRowsData) => {
       const response = await apiClient.post<TableRow[]>(
-        `/processes/reference-tables/${data.tableId}/rows/bulk`,
+        `/processes/reference-tables/${data.tableId}/row-batches`,
         data
       );
       return response;

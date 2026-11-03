@@ -23,7 +23,9 @@ expect() { # name, expected-status, actual-status
   if [ "$2" = "$3" ]; then echo "ok   $1"; else echo "FAIL $1 (wanted $2, got $3)"; fail=1; fi
 }
 expect "health is up" 200 "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/api/health/live")"
-expect "/auth/me without a token is 401" 401 "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/v1/api/auth/me")"
-expect "/auth/me with a forged token is 401" 401 "$(curl -s -o /dev/null -w '%{http_code}' -H 'Authorization: Bearer a.b.c' "http://127.0.0.1:$PORT/v1/api/auth/me")"
-expect "a data route without a token is 401" 401 "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/v1/api/profile")"
+expect "/auth/me without a token is 401" 401 "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/api/v1/auth/me")"
+expect "/auth/me with a forged token is 401" 401 "$(curl -s -o /dev/null -w '%{http_code}' -H 'Authorization: Bearer a.b.c' "http://127.0.0.1:$PORT/api/v1/auth/me")"
+expect "/api/v1/auth/me without a token is 401, as a problem" "401 application/problem+json" "$(curl -s -o /dev/null -w '%{http_code} %{content_type}' "http://127.0.0.1:$PORT/api/v1/auth/me" | sed 's/;.*//')"
+expect "the old /v1/api prefix is gone" 404 "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/v1/api/auth/me")"
+expect "a data route without a token is 401" 401 "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/api/v1/profile")"
 exit $fail

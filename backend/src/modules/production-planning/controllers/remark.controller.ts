@@ -41,7 +41,7 @@ import { OrgRole } from '../../../common/authz/authz-policy';
 @ApiTags('Remarks & Issues')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller('api/remarks')
+@Controller('remarks')
 @UseGuards(RequestAuthGuard)
 export class RemarkController {
   constructor(private readonly remarkService: RemarkService) {}

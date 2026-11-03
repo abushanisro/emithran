@@ -98,7 +98,7 @@ class ProjectReportsApi {
   constructor(private client: typeof apiClient) {}
 
   async createBalloonDiagram(data: CreateBalloonDiagramRequest): Promise<BalloonDiagram> {
-    const response = await this.client.post('/project-reports/balloon-diagrams', data);
+    const response = await this.client.post('/balloon-diagrams', data);
     return response.data;
   }
 
@@ -108,21 +108,21 @@ class ProjectReportsApi {
   }
 
   async getBalloonDiagram(id: string): Promise<BalloonDiagram> {
-    const response = await this.client.get(`/project-reports/balloon-diagrams/${id}`);
+    const response = await this.client.get(`/balloon-diagrams/${id}`);
     return response.data;
   }
 
   async updateBalloonDiagram(id: string, data: UpdateBalloonDiagramRequest): Promise<BalloonDiagram> {
-    const response = await this.client.put(`/project-reports/balloon-diagrams/${id}`, data);
+    const response = await this.client.put(`/balloon-diagrams/${id}`, data);
     return response.data;
   }
 
   async deleteBalloonDiagram(id: string): Promise<void> {
-    await this.client.delete(`/project-reports/balloon-diagrams/${id}`);
+    await this.client.delete(`/balloon-diagrams/${id}`);
   }
 
   async addAnnotation(diagramId: string, data: DiagramAnnotationRequest): Promise<BalloonDiagramAnnotation> {
-    const response = await this.client.post(`/project-reports/balloon-diagrams/${diagramId}/annotations`, data);
+    const response = await this.client.post(`/balloon-diagrams/${diagramId}/annotations`, data);
     return response.data;
   }
 
@@ -132,14 +132,14 @@ class ProjectReportsApi {
     data: DiagramAnnotationRequest
   ): Promise<BalloonDiagramAnnotation> {
     const response = await this.client.put(
-      `/project-reports/balloon-diagrams/${diagramId}/annotations/${annotationId}`,
+      `/balloon-diagrams/${diagramId}/annotations/${annotationId}`,
       data
     );
     return response.data;
   }
 
   async deleteAnnotation(diagramId: string, annotationId: string): Promise<void> {
-    await this.client.delete(`/project-reports/balloon-diagrams/${diagramId}/annotations/${annotationId}`);
+    await this.client.delete(`/balloon-diagrams/${diagramId}/annotations/${annotationId}`);
   }
 
   async generateInspectionReport(
@@ -157,7 +157,7 @@ class ProjectReportsApi {
   }
 
   async generateCompleteReport(projectId: string): Promise<CompleteProjectReport> {
-    const response = await this.client.get(`/project-reports/projects/${projectId}/complete-report`);
+    const response = await this.client.get(`/project-reports/projects/${projectId}/full-report`);
     return response.data;
   }
 }

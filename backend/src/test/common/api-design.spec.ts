@@ -9,6 +9,8 @@
 //   UPDATE_API_DESIGN_VIOLATIONS=1 npx jest src/test/common/api-design.spec.ts
 import * as fs from 'fs';
 import * as path from 'path';
+import { RequestMethod } from '@nestjs/common';
+import { HTTP_CODE_METADATA, METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 
 const SNAPSHOT = path.resolve(__dirname, 'authz/__snapshots__/route-policies.spec.ts.snap');
 const ALLOWLIST = path.resolve(__dirname, 'api-design-violations.json');
@@ -17,7 +19,10 @@ const ALLOWLIST = path.resolve(__dirname, 'api-design-violations.json');
 const SINGLETONS = new Set(['auth', 'profile', 'copilot', 'health', 'ping', 'me']);
 
 /** State changes: POST /<collection>/:id/<action>. Anything else that reads like a verb is a violation. */
-const ACTIONS = new Set(['send', 'close', 'approve', 'reject', 'submit', 'activate', 'archive', 'apply', 'discard', 'refresh', 'execute']);
+const ACTIONS = new Set(['send', 'close', 'approve', 'reject', 'submit', 'activate', 'archive', 'apply', 'discard', 'refresh', 'execute', 'reset', 'complete', 'resolve', 'reparse', 'reanalyze', 'reorder']);
+
+/** An action is a POST; an existing one may be a PUT or PATCH. */
+const ACTION_METHODS = new Set(['POST', 'PUT', 'PATCH']);
 
 const VERB = /^(get|create|update|delete|remove|add|set|list|fetch|find|import|upload|download|export|analy[sz]e|calculate|recalculate|generate|select|validate|reanalyze|reparse|convert|start|complete|init|initialize|batch|bulk|store|save|check|match|detect|extract|run|record|compare|resolve|reorder|reset|clear|sync|verify|lookup|apply|discard|send|close|approve|reject|submit|activate|archive|refresh|execute)(-|$)/i;
 
@@ -29,8 +34,8 @@ function routes(): Route[] {
     const m = /^"?(\S+)\s+(GET|POST|PUT|PATCH|DELETE)\s+(\S+)\s+\w+\.\w+/.exec(line);
     if (!m) continue;
     const full = m[3];
-    if (!full.startsWith('/v1/api/')) continue; // health and ping live outside the API prefix
-    const segments = full.replace(/^\/v1\/api\//, '').split('/').filter(Boolean);
+    if (!full.startsWith('/api/v1/')) continue; // health and ping live outside the versioned API
+    const segments = full.replace(/^\/api\/v1\//, '').split('/').filter(Boolean);
     out.push({ method: m[2], segments, text: `${m[2]} /${segments.join('/')}` });
   }
   return out;
@@ -39,10 +44,10 @@ function routes(): Route[] {
 export function violationsOf(r: Route): string[] {
   const found: string[] = [];
   const named = r.segments.filter((s) => !s.startsWith(':'));
-  const lastIsAction = r.segments.length >= 3 && !r.segments[r.segments.length - 1].startsWith(':') && r.segments[r.segments.length - 2].startsWith(':');
+  const lastIsAction = r.segments.length >= 2 && !r.segments[r.segments.length - 1].startsWith(':'); // POST /things/:id/<action> or POST /things/<action>
   for (const s of named) {
     if (!VERB.test(s)) continue;
-    const isAction = r.method === 'POST' && lastIsAction && s === r.segments[r.segments.length - 1] && ACTIONS.has(s);
+    const isAction = ACTION_METHODS.has(r.method) && lastIsAction && s === r.segments[r.segments.length - 1] && ACTIONS.has(s);
     if (!isAction) { found.push(`verb:${s}`); break; }
   }
   const top = r.segments[0];
@@ -73,9 +78,32 @@ describe('API design rules', () => {
 
   it.each([
     ['GET', 'projects', 0], ['POST', 'projects', 0], ['POST', 'rfqs/:id/send', 0], ['POST', 'bom-items/:id/analyses', 0],
-    ['GET', 'bom-items/analyze-cad', 1], ['POST', 'lhr/import-excel', 2], ['GET', 'as/:id/bs/:id/cs', 1],
+    ['POST', 'exchange-rates/refresh', 0], ['PATCH', 'rfqs/:id/send', 0], ['GET', 'exchange-rates/refresh', 1], ['DELETE', 'rfqs/:id/send', 1], ['GET', 'bom-items/analyze-cad', 1], ['POST', 'lhr/import-excel', 2], ['GET', 'as/:id/bs/:id/cs', 1],
   ] as const)('%s /%s is judged as expected (%i violations)', (method, p, count) => {
     expect(violationsOf({ method, segments: p.split('/'), text: '' })).toHaveLength(count);
+  });
+
+  it('every DELETE handler declares its status (204, or 200 when it returns data)', () => {
+    const undeclared: string[] = [];
+    const sourceFiles = (dir: string): string[] => fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) return e.name === 'test' || e.name === 'node_modules' ? [] : sourceFiles(full);
+      return e.name.endsWith('.controller.ts') ? [full] : [];
+    });
+    for (const file of sourceFiles(path.resolve(__dirname, '../..'))) {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      for (const ctor of Object.values(require(file) as Record<string, unknown>)) {
+        if (typeof ctor !== 'function' || Reflect.getMetadata(PATH_METADATA, ctor) === undefined) continue;
+        const proto = (ctor as { prototype: Record<string, unknown> }).prototype;
+        for (const name of Object.getOwnPropertyNames(proto)) {
+          const handler = Object.getOwnPropertyDescriptor(proto, name)?.value;
+          if (typeof handler !== 'function' || Reflect.getMetadata(METHOD_METADATA, handler) !== RequestMethod.DELETE) continue;
+          const code = Reflect.getMetadata(HTTP_CODE_METADATA, handler);
+          if (code !== 204 && code !== 200) undeclared.push(`${ctor.name}.${name}`);
+        }
+      }
+    }
+    expect(undeclared).toEqual([]);
   });
 
   it('every request `limit` is capped', () => {

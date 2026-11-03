@@ -305,7 +305,7 @@ export function useDeleteAllRawMaterials() {
 
   return useMutation({
     mutationFn: async () => {
-      const response = await apiClient.delete<{ message: string; deleted: number }>('/raw-materials');
+      const response = await apiClient.delete<{ message: string; deleted: number }>('/raw-materials?confirm=delete-all');
 
       if (!response) {
         throw new Error('Failed to delete all materials');
@@ -341,7 +341,7 @@ export function useUploadRawMaterialsExcel() {
         failed: number;
         errors?: any[];
         dataWarnings?: string[];
-      }>('/raw-materials/upload-excel', formData, {
+      }>('/raw-materials/imports', formData, {
         timeout: 300000, // 5 minutes timeout
       });
 

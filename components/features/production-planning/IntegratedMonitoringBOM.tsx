@@ -228,7 +228,7 @@ export const IntegratedMonitoringBOM = ({ lotId }: IntegratedMonitoringBOMProps)
   const { data: bomData, isLoading: bomLoading, error: bomError } = useQuery<any>({
     queryKey: ['production-lot-bom-items', lotId],
     queryFn: async () => {
-      const response: any = await apiClient.get(`/production-planning/lots/${lotId}/bom-items`);
+      const response: any = await apiClient.get(`/production-lots/${lotId}/bom-items`);
       // createResponse wraps the rows in { data }
       return response?.data ?? response;
     },

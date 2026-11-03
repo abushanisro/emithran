@@ -325,7 +325,7 @@ const vendorMatchKeys = {
 export function useVendorMatch(processes: string[], material?: string) {
   return useQuery<RankedProcessGroup[]>({
     queryKey: vendorMatchKeys.match(processes, material),
-    queryFn: () => apiClient.post<RankedProcessGroup[]>('/vendors/match', { processes, material }),
+    queryFn: () => apiClient.post<RankedProcessGroup[]>('/vendors/matches', { processes, material }),
     enabled: processes.length > 0,
     staleTime: 5 * 60 * 1000,
   });

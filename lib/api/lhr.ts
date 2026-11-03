@@ -101,7 +101,7 @@ export interface BenchmarkLHREntry {
 export const lhrApi = {
   getAll: async (search?: string): Promise<LHRListResponse> => {
     const params = search ? { search } : {};
-    const response = await apiClient.get<LHRListResponse>('/lhr', {
+    const response = await apiClient.get<LHRListResponse>('/labour-rates', {
       params,
       silent: true,
       retry: false,
@@ -111,51 +111,51 @@ export const lhrApi = {
 
   /** How many LHR records exist, without downloading them. */
   getCount: async (): Promise<number> => {
-    const response = await apiClient.get<{ total: number }>('/lhr/count', { silent: true, retry: false });
+    const response = await apiClient.get<{ total: number }>('/labour-rates/count', { silent: true, retry: false });
     return response?.total ?? 0;
   },
 
   getById: async (id: string | number): Promise<LHREntry> => {
-    const response = await apiClient.get<LHREntry>(`/lhr/${id}`);
+    const response = await apiClient.get<LHREntry>(`/labour-rates/${id}`);
     if (!response) throw new Error('LHR record not found');
     return response;
   },
 
   getByLabourCode: async (labourCode: string): Promise<LHREntry> => {
-    const response = await apiClient.get<LHREntry>(`/lhr/code/${labourCode}`);
+    const response = await apiClient.get<LHREntry>(`/labour-rates/code/${labourCode}`);
     if (!response) throw new Error('Labour code not found');
     return response;
   },
 
   create: async (data: CreateLHRDto): Promise<LHREntry> => {
-    const response = await apiClient.post<LHREntry>('/lhr', data);
+    const response = await apiClient.post<LHREntry>('/labour-rates', data);
     if (!response) throw new Error('Failed to create LHR record');
     return response;
   },
 
   update: async (id: string | number, data: UpdateLHRDto): Promise<LHREntry> => {
-    const response = await apiClient.put<LHREntry>(`/lhr/${id}`, data);
+    const response = await apiClient.put<LHREntry>(`/labour-rates/${id}`, data);
     if (!response) throw new Error('Failed to update LHR record');
     return response;
   },
 
   delete: async (id: string | number): Promise<void> => {
-    await apiClient.delete(`/lhr/${id}`);
+    await apiClient.delete(`/labour-rates/${id}`);
   },
 
   deleteAll: async (): Promise<{ deleted: number }> => {
-    const response = await apiClient.delete<{ deleted: number }>('/lhr');
+    const response = await apiClient.delete<{ deleted: number }>('/labour-rates?confirm=delete-all');
     return response ?? { deleted: 0 };
   },
 
   bulkCreate: async (data: CreateLHRDto[]): Promise<LHREntry[]> => {
-    const response = await apiClient.post<LHREntry[]>('/lhr/bulk', data);
+    const response = await apiClient.post<LHREntry[]>('/labour-rates/batches', data);
     return response || [];
   },
 
   getBenchmarkRates: async (location?: string): Promise<BenchmarkLHREntry[]> => {
     const params = location ? { location } : {};
-    const response = await apiClient.get<BenchmarkLHREntry[]>('/lhr/benchmark', {
+    const response = await apiClient.get<BenchmarkLHREntry[]>('/labour-rates/benchmark', {
       params,
       silent: true,
       retry: false,
@@ -167,7 +167,7 @@ export const lhrApi = {
   // process_group) — same precedence bom-items.service.ts's resolveLHRRates()
   // already uses for real quote costing (LHRService.getEffectiveRate).
   getEffectiveRate: async (location: string, processGroup: string): Promise<EffectiveLHRRate> => {
-    const response = await apiClient.get<EffectiveLHRRate>('/lhr/effective-rate', {
+    const response = await apiClient.get<EffectiveLHRRate>('/labour-rates/effective-rate', {
       params: { location, processGroup },
       silent: true,
       retry: false,
@@ -179,7 +179,7 @@ export const lhrApi = {
     const formData = new FormData();
     formData.append('file', file);
     return (await apiClient.uploadFiles<{ imported: number; skipped: number; errors: string[] }>(
-      '/lhr/import-excel',
+      '/labour-rates/imports',
       formData,
     )) ?? { imported: 0, skipped: 0, errors: [] };
   },

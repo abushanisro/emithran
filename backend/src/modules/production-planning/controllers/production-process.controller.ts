@@ -25,7 +25,7 @@ import { OrgRole } from '../../../common/authz/authz-policy';
 
 @ApiTags('Production Processes')
 @OrgRole('member')
-@Controller('api/production-planning/processes')
+@Controller('production-processes')
 @UseGuards(RequestAuthGuard)
 export class ProductionProcessController {
   constructor(private readonly productionProcessService: ProductionProcessService) { }
@@ -42,15 +42,6 @@ export class ProductionProcessController {
     return this.productionProcessService.getProductionProcessById(id, user.id);
   }
 
-
-  @Delete('/:id')
-  @ApiOperation({ summary: 'Delete production process' })
-  async deleteProductionProcess(
-    @Param('id') id: string,
-    @CurrentUser() user: User
-  ): Promise<void> {
-    return this.productionProcessService.deleteProductionProcess(id, user.id);
-  }
 
   @OrgRole('viewer')
   @Get('/lot/:lotId')

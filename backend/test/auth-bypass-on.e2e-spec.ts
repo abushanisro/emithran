@@ -33,13 +33,13 @@ describe('[e2e] dev auth bypass ON (explicit opt-in)', () => {
   });
 
   it('serves a request with no token as the configured bypass account', async () => {
-    const res = await request(app.getHttpServer()).get('/v1/api/electronics/reference-coverage');
+    const res = await request(app.getHttpServer()).get('/api/v1/electronic-coverage-reports');
     expect(res.status).toBe(200);
   });
 
   it('serves a request with a forged token as the bypass account', async () => {
     const res = await request(app.getHttpServer())
-      .get('/v1/api/electronics/reference-coverage')
+      .get('/api/v1/electronic-coverage-reports')
       .set('Authorization', 'Bearer not-a-real-token');
     expect(res.status).toBe(200);
   });

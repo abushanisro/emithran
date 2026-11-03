@@ -9,14 +9,15 @@ import {
   Delete,
   Query,
   UseGuards,
-  Request
+  Request,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { createResponse, ApiResponse as StandardApiResponse } from '@/common/dto/api-response.dto';
 import { ProductionEntryService } from '../services/production-entry.service';
 import {
   CreateProductionEntryDto,
-  UpdateProductionEntryDto,
   ProductionEntryResponseDto,
   WeeklySummaryDto,
   ProductionEntriesQueryDto
@@ -28,7 +29,7 @@ import { OrgRole } from '../../../common/authz/authz-policy';
 @ApiBearerAuth()
 @UseGuards(RequestAuthGuard)
 @OrgRole('member')
-@Controller('api/production-planning/production-entries')
+@Controller('production-entries')
 export class ProductionEntryController {
   constructor(private readonly productionEntryService: ProductionEntryService) {}
 
@@ -52,16 +53,6 @@ export class ProductionEntryController {
       req.user.id
     );
     return createResponse(result);
-  }
-
-  @OrgRole('viewer')
-  @Get('debug')
-  @ApiOperation({ summary: 'Debug endpoint to test controller registration' })
-  async debug(): Promise<{ message: string; timestamp: string }> {
-    return {
-      message: 'Production entries controller is working!',
-      timestamp: new Date().toISOString()
-    };
   }
 
   @OrgRole('viewer')
@@ -111,29 +102,7 @@ export class ProductionEntryController {
     return createResponse(result);
   }
 
-  @Patch(':id')
-  @ApiOperation({ summary: 'Update a production entry' })
-  @ApiResponse({
-    status: 200,
-    description: 'Production entry updated successfully',
-    type: ProductionEntryResponseDto
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Production entry not found'
-  })
-  @ApiResponse({
-    status: 409,
-    description: 'Another production entry already exists for this lot, process, date, and shift'
-  })
-  async update(
-    @Param('id') id: string,
-    @Body() updateProductionEntryDto: UpdateProductionEntryDto
-  ): Promise<StandardApiResponse<ProductionEntryResponseDto>> {
-    const result = await this.productionEntryService.updateProductionEntry(id, updateProductionEntryDto);
-    return createResponse(result);
-  }
-
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a production entry' })
   @ApiResponse({

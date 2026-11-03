@@ -88,7 +88,7 @@ may only claim and finish uploads; without 951 PostgREST refuses its token). Che
 3. `docker compose -p emithran-stage -f docker-compose.prod.yml --env-file env/stage.env --profile rust-core up -d --build` (PostgREST always runs).
    The profile starts two containers: `cad-core` (the runner, with the credentials) and `cad-worker` (parses the CAD; no credential, `network_mode: none`).
    They share only the `cad-worker-socket` volume. Check: `docker inspect <cad-worker> --format '{{.HostConfig.NetworkMode}}'` is `none`.
-4. Check: `curl <stage>/v1/api/health/live` is 200; `GET /v1/api/auth/me` without a token is 401. Locally the same wiring is proven by `npm run test:boot`.
+4. Check: `curl <stage>/api/health/live` is 200; `GET /api/v1/auth/me` without a token is 401. Locally the same wiring is proven by `npm run test:boot`.
 
 ## 4. People
 

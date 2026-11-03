@@ -12,6 +12,8 @@ import {
   ParseUUIDPipe,
   Logger,
   UnauthorizedException,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { RequestAuthGuard } from '@/common/guards/request-auth.guard';
@@ -30,7 +32,7 @@ import { OrgRole } from '../../common/authz/authz-policy';
 @ApiTags('Project Reports')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/project-reports', version: '1' })
+@Controller({ path: '', version: '1' })
 @UseGuards(RequestAuthGuard)
 export class ProjectReportsController {
   private readonly logger = new Logger(ProjectReportsController.name);
@@ -69,7 +71,7 @@ export class ProjectReportsController {
   }
 
   @OrgRole('viewer')
-  @Get('projects/:projectId/balloon-diagrams')
+  @Get('project-reports/projects/:projectId/balloon-diagrams')
   @ApiOperation({ summary: 'Get balloon diagrams for project' })
   @ApiResponse({ status: 200, description: 'Balloon diagrams retrieved successfully' })
   async getBalloonDiagrams(
@@ -132,6 +134,7 @@ export class ProjectReportsController {
     }
   }
 
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete('balloon-diagrams/:id')
   @ApiOperation({ summary: 'Delete balloon diagram' })
   @ApiResponse({ status: 200, description: 'Balloon diagram deleted successfully' })
@@ -190,6 +193,7 @@ export class ProjectReportsController {
     return createResponse(result);
   }
 
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete('balloon-diagrams/:diagramId/annotations/:annotationId')
   @ApiOperation({ summary: 'Delete diagram annotation' })
   @ApiResponse({ status: 200, description: 'Annotation deleted successfully' })
@@ -211,7 +215,7 @@ export class ProjectReportsController {
   // ============================================================================
 
   @OrgRole('viewer')
-  @Get('projects/:projectId/inspection-report')
+  @Get('project-reports/projects/:projectId/inspection-report')
   @ApiOperation({ summary: 'Generate inspection report for project' })
   @ApiResponse({ status: 200, description: 'Inspection report generated successfully' })
   async generateInspectionReport(
@@ -235,7 +239,7 @@ export class ProjectReportsController {
   }
 
   @OrgRole('viewer')
-  @Get('projects/:projectId/complete-report')
+  @Get('project-reports/projects/:projectId/full-report')
   @ApiOperation({ summary: 'Generate complete project report with balloon diagram and inspection' })
   @ApiResponse({ status: 200, description: 'Complete report generated successfully' })
   async generateCompleteReport(

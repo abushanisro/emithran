@@ -53,34 +53,6 @@ export class ProductionProcessService {
   }
 
 
-  async deleteProductionProcess(id: string, userId: string): Promise<void> {
-    UuidValidator.validateUuid(id, 'Process ID');
-
-    const database = this.databaseService.getUserClient();
-
-    // Verify ownership
-    const { data: existing } = await database
-      .from('production_processes')
-      .select('id, production_lot:production_lots!inner(created_by)')
-      .eq('id', id)
-      .eq('production_lots.created_by', userId)
-      .single();
-
-    if (!existing) {
-      throw new NotFoundException('Production process not found or access denied');
-    }
-
-    const { error } = await database
-      .from('production_processes')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      this.logger.error('Failed to delete production process', { error: error.message, id });
-      throw new InternalServerErrorException('Failed to delete production process');
-    }
-  }
-
   async getProcessesByLot(lotId: string, userId: string): Promise<ProductionProcessResponseDto[]> {
     UuidValidator.validateUuid(lotId, 'Lot ID');
 

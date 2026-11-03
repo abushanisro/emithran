@@ -36,7 +36,6 @@ import { VaveModule } from './modules/vave/vave.module';
 import { BenchmarkSessionsModule } from './modules/benchmark-sessions/benchmark-sessions.module';
 import { ProfileModule } from './modules/profile/profile.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
-import { ProcessPlanGeneratorModule } from './modules/process-plan-generator/process-plan-generator.module';
 import { CopilotModule } from './modules/copilot/copilot.module';
 import { ManufacturingKnowledgeModule } from './modules/manufacturing-knowledge/manufacturing-knowledge.module';
 import { CostingModule } from './modules/costing/costing.module';
@@ -104,7 +103,6 @@ import { AppController } from './app.controller';
     BenchmarkSessionsModule,
     ProfileModule,
     OrganizationsModule,
-    ProcessPlanGeneratorModule,
     CopilotModule,
     ManufacturingKnowledgeModule,
     CostingModule,

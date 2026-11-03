@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Query, Res, UseGuards, HttpStatus } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -18,7 +18,7 @@ interface AuthUser {
 @ApiTags('Copilot')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/copilot', version: '1' })
+@Controller({ path: 'copilot', version: '1' })
 export class CopilotController {
   constructor(
     private readonly copilot: CopilotService,
@@ -42,6 +42,7 @@ export class CopilotController {
   }
 
   /** Forget one saved preference (its exact text). */
+  @HttpCode(HttpStatus.OK)
   @Delete('memory/preferences')
   @ApiOperation({ summary: 'Delete one preference the copilot has saved for the current user' })
   async deleteMemoryItem(
@@ -57,7 +58,7 @@ export class CopilotController {
    * The user pressed Save on a memory change the copilot proposed. The only way the copilot's proposals reach saved memory:
    * single use, within 10 minutes, for the same conversation and turn (410 otherwise).
    */
-  @Post('memory/proposals/:id/confirm')
+  @Post('memory-proposals/:id/confirm')
   @HttpCode(200)
   @ApiOperation({ summary: 'Save a memory change the copilot proposed' })
   async confirmMemoryProposal(

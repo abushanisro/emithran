@@ -21,7 +21,7 @@ export interface Me {
 @ApiTags('Auth')
 @ApiBearerAuth()
 @Authenticated()
-@Controller({ path: 'api/auth', version: '1' })
+@Controller({ path: 'auth', version: '1' })
 export class AuthController {
   constructor(private readonly access: AccessService) {}
 

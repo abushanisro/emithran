@@ -1,5 +1,5 @@
 interface User { id: string; email: string; [key: string]: any; }
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, Inject, forwardRef, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, Inject, forwardRef, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { CalculatorsServiceV2 } from './calculators.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -22,7 +22,7 @@ import { OrgRole } from '../../common/authz/authz-policy';
 @ApiTags('Calculators')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/calculators', version: '1' })
+@Controller({ path: 'calculators', version: '1' })
 export class CalculatorsController {
   constructor(
     @Inject(forwardRef(() => CalculatorsServiceV2))
@@ -54,6 +54,7 @@ export class CalculatorsController {
     return this.calculatorsService.findOne(id, user.id, token);
   }
 
+  @OrgRole('admin')
   @Post()
   @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: 'Create new calculator' })
@@ -67,6 +68,7 @@ export class CalculatorsController {
     return this.calculatorsService.create(dto, user.id, token, organizationId);
   }
 
+  @OrgRole('admin')
   @Put(':id')
   @ApiOperation({ summary: 'Update calculator' })
   @ApiResponse({ status: 200, description: 'Calculator updated successfully' })
@@ -79,6 +81,8 @@ export class CalculatorsController {
     return this.calculatorsService.update(id, dto, user.id, token);
   }
 
+  @OrgRole('admin')
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id')
   @ApiOperation({ summary: 'Delete calculator' })
   @ApiResponse({ status: 200, description: 'Calculator deleted successfully' })
@@ -106,7 +110,7 @@ export class CalculatorsController {
   // SHEET METAL LOOKUP ENDPOINT
   // ========================================
 
-  @Post('sheet-metal/lookup')
+  @Post('sheet-metal/lookups')
   @ApiOperation({ summary: 'Resolve a sheet metal parameterized lookup table' })
   @ApiResponse({ status: 200, description: 'Lookup resolved' })
   async sheetMetalLookup(
@@ -130,6 +134,7 @@ export class CalculatorsController {
     return this.calculatorsService.getFields(id, user.id, token);
   }
 
+  @OrgRole('admin')
   @Post(':id/fields')
   @ApiOperation({ summary: 'Add a new field to calculator' })
   async createField(
@@ -141,6 +146,7 @@ export class CalculatorsController {
     return this.calculatorsService.createField(id, dto, user.id, token);
   }
 
+  @OrgRole('admin')
   @Put(':id/fields/:fieldId')
   @ApiOperation({ summary: 'Update a specific field' })
   async updateField(
@@ -153,6 +159,8 @@ export class CalculatorsController {
     return this.calculatorsService.updateField(id, fieldId, dto, user.id, token);
   }
 
+  @OrgRole('admin')
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id/fields/:fieldId')
   @ApiOperation({ summary: 'Remove a field from calculator' })
   async removeField(
@@ -179,6 +187,7 @@ export class CalculatorsController {
     return this.calculatorsService.getFormulas(id, user.id, token);
   }
 
+  @OrgRole('admin')
   @Post(':id/formulas')
   @ApiOperation({ summary: 'Add a new formula to calculator' })
   async createFormula(
@@ -190,6 +199,7 @@ export class CalculatorsController {
     return this.calculatorsService.createFormula(id, dto, user.id, token);
   }
 
+  @OrgRole('admin')
   @Put(':id/formulas/:formulaId')
   @ApiOperation({ summary: 'Update a specific formula' })
   async updateFormula(
@@ -202,6 +212,8 @@ export class CalculatorsController {
     return this.calculatorsService.updateFormula(id, formulaId, dto, user.id, token);
   }
 
+  @OrgRole('admin')
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id/formulas/:formulaId')
   @ApiOperation({ summary: 'Remove a formula from calculator' })
   async removeFormula(

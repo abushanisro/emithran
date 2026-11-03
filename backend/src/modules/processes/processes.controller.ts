@@ -1,4 +1,5 @@
 interface User { id: string; email: string; [key: string]: any; }
+import { Throttle } from '@nestjs/throttler';
 import {
   Controller,
   Get,
@@ -12,6 +13,8 @@ import {
   UseGuards,
   UploadedFile,
   BadRequestException,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
@@ -39,22 +42,26 @@ import { AccessToken } from '../../common/decorators/access-token.decorator';
 import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
 import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
 import { REFERENCE_DOMAINS, isReferenceDomain, referenceDomainList } from './reference-domains';
+import { AuditService } from '../../common/audit/audit.service';
+import { requireBulkDeleteConfirmation } from '../../common/http/bulk-delete';
 import { OrgRole } from '../../common/authz/authz-policy';
 import { MAX_XLSX_UPLOAD_BYTES } from '../../common/archive/xlsx-limits';
 
 @ApiTags('Processes')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/processes', version: '1' })
+@Controller({ path: 'processes', version: '1' })
 export class ProcessesController {
-  constructor(private readonly processesService: ProcessesService) {}
+  constructor(private readonly processesService: ProcessesService, private readonly audit: AuditService) {}
 
   // ============================================================================
   // PROCESS CALCULATOR MAPPING ENDPOINTS (Must be before :id routes)
   // Routes ordered: most specific -> general -> dynamic params
   // ============================================================================
 
-  @Post('calculator-mappings/import-excel')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } }) // heavy: parses or analyses a file
+  @OrgRole('admin')
+  @Post('calculator-mappings/imports')
   @UseGuards(OrganizationContextGuard)
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_XLSX_UPLOAD_BYTES, files: 1 } }))
   @ApiOperation({ summary: 'Import process calculator mappings from Excel file' })
@@ -137,6 +144,7 @@ export class ProcessesController {
     return this.processesService.getProcessCalculatorMapping(id, token);
   }
 
+  @OrgRole('admin')
   @Post('calculator-mappings')
   @UseGuards(OrganizationContextGuard)
   @ApiOperation({ summary: 'Create new process calculator mapping' })
@@ -149,6 +157,7 @@ export class ProcessesController {
     return this.processesService.createProcessCalculatorMapping(createDto, token, organizationId);
   }
 
+  @OrgRole('admin')
   @Put('calculator-mappings/:id')
   @ApiOperation({ summary: 'Update process calculator mapping' })
   @ApiResponse({ status: 200, description: 'Process calculator mapping updated successfully', type: ProcessCalculatorMappingResponseDto })
@@ -161,13 +170,18 @@ export class ProcessesController {
     return this.processesService.updateProcessCalculatorMapping(id, updateDto, token);
   }
 
+  @OrgRole('admin')
+  @HttpCode(HttpStatus.OK)
   @Delete('calculator-mappings')
-  @ApiOperation({ summary: 'Clear all process calculator mappings' })
+  @ApiOperation({ summary: 'Clear all process calculator mappings (administrators; needs ?confirm=delete-all)' })
   @ApiResponse({ status: 200, description: 'All process calculator mappings deleted' })
-  async clearAllCalculatorMappings(@AccessToken() token: string) {
-    return this.processesService.clearAllCalculatorMappings(token);
+  async clearAllCalculatorMappings(@AccessToken() token: string, @Query('confirm') confirm?: string) {
+    requireBulkDeleteConfirmation(confirm);
+    return this.audit.purged('process_calculator_mappings', () => this.processesService.clearAllCalculatorMappings(token));
   }
 
+  @OrgRole('admin')
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete('calculator-mappings/:id')
   @ApiOperation({ summary: 'Delete process calculator mapping' })
   @ApiResponse({ status: 200, description: 'Process calculator mapping deleted successfully' })
@@ -256,7 +270,8 @@ export class ProcessesController {
   }
 
 
-  @Put('sm-lookup-tables/rows/:table/:id')
+  @OrgRole('admin')
+  @Put('sm-lookup-table-rows/:table/:id')
   @ApiOperation({ summary: 'Update one row of a real sm_lookup_* cost-engine table (allowlisted tables/columns only)' })
   @ApiResponse({ status: 200, description: 'Row updated successfully' })
   @ApiResponse({ status: 400, description: 'Unrecognized table or column' })
@@ -279,6 +294,7 @@ export class ProcessesController {
     return this.processesService.findOne(id, user.id, token);
   }
 
+  @OrgRole('admin')
   @Post()
   @ApiOperation({ summary: 'Create new process' })
   @ApiResponse({ status: 201, description: 'Process created successfully', type: ProcessResponseDto })
@@ -286,6 +302,7 @@ export class ProcessesController {
     return this.processesService.create(createProcessDto, user.id, token);
   }
 
+  @OrgRole('admin')
   @Put(':id')
   @ApiOperation({ summary: 'Update process' })
   @ApiResponse({ status: 200, description: 'Process updated successfully', type: ProcessResponseDto })
@@ -293,6 +310,8 @@ export class ProcessesController {
     return this.processesService.update(id, updateProcessDto, user.id, token);
   }
 
+  @OrgRole('admin')
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id')
   @ApiOperation({ summary: 'Delete process' })
   @ApiResponse({ status: 200, description: 'Process deleted successfully' })
@@ -321,6 +340,7 @@ export class ProcessesController {
     return this.processesService.getReferenceTable(tableId, token);
   }
 
+  @OrgRole('admin')
   @Post(':processId/reference-tables')
   @ApiOperation({ summary: 'Create a new reference table' })
   @ApiResponse({ status: 201, description: 'Reference table created successfully' })
@@ -334,6 +354,7 @@ export class ProcessesController {
     return this.processesService.createReferenceTable(createDto, token);
   }
 
+  @OrgRole('admin')
   @Put('reference-tables/:tableId')
   @ApiOperation({ summary: 'Update a reference table' })
   @ApiResponse({ status: 200, description: 'Reference table updated successfully' })
@@ -346,6 +367,8 @@ export class ProcessesController {
     return this.processesService.updateReferenceTable(tableId, updateDto, token);
   }
 
+  @OrgRole('admin')
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete('reference-tables/:tableId')
   @ApiOperation({ summary: 'Delete a reference table' })
   @ApiResponse({ status: 200, description: 'Reference table deleted successfully' })
@@ -353,6 +376,7 @@ export class ProcessesController {
     return this.processesService.deleteReferenceTable(tableId, token);
   }
 
+  @OrgRole('admin')
   @Post('reference-tables/:tableId/rows')
   @ApiOperation({ summary: 'Add a row to a reference table' })
   @ApiResponse({ status: 201, description: 'Table row created successfully' })
@@ -366,6 +390,7 @@ export class ProcessesController {
     return this.processesService.createTableRow(createDto, token);
   }
 
+  @OrgRole('admin')
   @Put('reference-tables/rows/:rowId')
   @ApiOperation({ summary: 'Update a table row' })
   @ApiResponse({ status: 200, description: 'Table row updated successfully' })
@@ -378,6 +403,8 @@ export class ProcessesController {
     return this.processesService.updateTableRow(rowId, updateDto, token);
   }
 
+  @OrgRole('admin')
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete('reference-tables/rows/:rowId')
   @ApiOperation({ summary: 'Delete a table row' })
   @ApiResponse({ status: 200, description: 'Table row deleted successfully' })
@@ -385,7 +412,8 @@ export class ProcessesController {
     return this.processesService.deleteTableRow(rowId, token);
   }
 
-  @Post('reference-tables/:tableId/rows/bulk')
+  @OrgRole('admin')
+  @Post('reference-tables/:tableId/row-batches')
   @ApiOperation({ summary: 'Bulk update table rows (delete old, insert new)' })
   @ApiResponse({ status: 200, description: 'Table rows updated successfully' })
   async bulkUpdateTableRows(

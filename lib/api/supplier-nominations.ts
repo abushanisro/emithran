@@ -656,7 +656,7 @@ export async function getPartWiseCostAnalysis(
   baseData: PartWiseCostBaseData | null;
 }> {
   try {
-    const response = await apiClient.get(`/supplier-nominations/${nominationId}/parts/${bomItemId}/cost-analysis`);
+    const response = await apiClient.get(`/supplier-nominations/${nominationId}/part-cost-analyses/${bomItemId}`);
     return response || { costAnalysis: [], baseData: null };
   } catch (error) {
     throw error;
@@ -671,7 +671,7 @@ export async function initializePartWiseCostAnalysis(
   bomItemId: string
 ): Promise<void> {
   try {
-    await apiClient.post(`/supplier-nominations/${nominationId}/parts/${bomItemId}/cost-analysis/init`);
+    await apiClient.post(`/supplier-nominations/${nominationId}/part-cost-analyses/${bomItemId}`);
   } catch (error) {
     throw error;
   }
@@ -689,7 +689,7 @@ export async function bulkUpdatePartWiseCostAnalysis(
   baseData: PartWiseCostBaseData | null;
 }> {
   try {
-    const response = await apiClient.put(`/supplier-nominations/${nominationId}/parts/${bomItemId}/cost-analysis/bulk`, updateData);
+    const response = await apiClient.put(`/supplier-nominations/${nominationId}/part-cost-analyses/${bomItemId}`, updateData);
     return response || { costAnalysis: [], baseData: null };
   } catch (error) {
     throw error;

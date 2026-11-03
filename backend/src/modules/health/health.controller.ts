@@ -16,11 +16,12 @@ import { HealthCheckService, HealthCheck, HealthCheckResult } from '@nestjs/term
 import { DatabaseHealthIndicator } from './indicators/database.health';
 import { EngineHealthIndicator } from './indicators/engine.health';
 import { ElectronicsQueueHealthIndicator } from '../electronics-costing/infrastructure/queue/queue.health';
+import { PlatformAdmin } from '../../common/authz/authz-policy';
 import { Public } from '../../common/decorators/public.decorator';
 
 @ApiTags('Health')
-@Controller({ path: 'api/health', version: VERSION_NEUTRAL })
-@Public() // Health checks should be publicly accessible for monitoring
+// live, ready and the overall check are public for monitoring; /db lists tables and is for platform administrators only.
+@Controller({ path: 'health', version: VERSION_NEUTRAL })
 export class HealthController {
   constructor(
     private readonly health: HealthCheckService,
@@ -34,6 +35,7 @@ export class HealthController {
    * Liveness: the process is up and its event loop answers. Depends on NOTHING external, so a database
    * or engine outage can never make a platform restart a healthy process. Use this for restart decisions.
    */
+  @Public()
   @Get('live')
   @ApiOperation({ summary: 'Liveness (process only, no dependencies)' })
   @ApiResponse({ status: 200, description: 'Process is alive' })
@@ -49,6 +51,7 @@ export class HealthController {
    * A dependency with no URL or backend configured is reported `configured: false` and does not fail readiness.
    * cad-engine is probed on its own /ready route (deploy cad-engine before the backend that probes it).
    */
+  @Public()
   @Get('ready')
   @ApiOperation({ summary: 'Readiness (database and engines)' })
   @ApiResponse({ status: 200, description: 'Dependencies are reachable' })
@@ -63,6 +66,7 @@ export class HealthController {
     ]);
   }
 
+  @Public()
   @Get()
   @ApiOperation({ summary: 'Overall health check' })
   @ApiResponse({ status: 200, description: 'Service is healthy' })
@@ -74,7 +78,8 @@ export class HealthController {
     ]);
   }
 
-  @Get('/db')
+  @PlatformAdmin()
+  @Get('db')
   @ApiOperation({ summary: 'Database health check with table verification' })
   @ApiResponse({ status: 200, description: 'Database is healthy' })
   @ApiResponse({ status: 503, description: 'Database is unhealthy' })

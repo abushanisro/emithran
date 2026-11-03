@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 
-import { Plus, Edit, Trash2, Loader2, Eye, Calculator, Database, FlaskConical, Zap } from 'lucide-react';
+import { Plus, Edit, Trash2, Loader2, Eye, Calculator, Database, FlaskConical } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ProcessCostDialog } from './ProcessCostDialog';
@@ -16,10 +16,6 @@ import {
 } from '@/lib/api/hooks/useProcessCosts';
 import { featureMetaFromGroup } from '@/lib/utils/feature-colors';
 import type { FeatureGroup } from '@/lib/utils/feature-colors';
-import {
-  useLatestDraftGeneration,
-  useApplyGeneration,
-} from '@/lib/api/hooks/useProcessPlanGenerate';
 
 interface ManufacturingProcessSectionProps {
   bomItemId?: string;
@@ -189,7 +185,6 @@ export function ManufacturingProcessSection({
   const [editProcess, setEditProcess] = useState<any | null>(null);
   const [openBreakdownId, setOpenBreakdownId] = useState<string | null>(null);
   const [isDeletingAll, setIsDeletingAll] = useState(false);
-  const [isRegenerating, setIsRegenerating] = useState(false);
 
   const bomItemData = bomItem;
   const queryClient = useQueryClient();
@@ -204,28 +199,7 @@ export function ManufacturingProcessSection({
   const updateMutation = useUpdateProcessCost();
   const deleteMutation = useDeleteProcessCost();
 
-  // Regenerate from Manufacturing Intelligence — checks for existing draft_ready generation
-  const { data: latestDraft } = useLatestDraftGeneration(bomItemId ?? null);
-  const applyGeneration = useApplyGeneration();
-
   const processes = data?.records || [];
-
-  const handleRegenerate = async () => {
-    if (!bomItemId) return;
-    if (latestDraft?.status !== 'draft_ready') {
-      toast.info('No draft ready. Generate a process plan in the Manufacturing Intelligence tab first, then come back to apply it here.');
-      return;
-    }
-    setIsRegenerating(true);
-    try {
-      await applyGeneration.mutateAsync({ generationId: latestDraft.id, body: {}, bomItemId });
-      toast.success('Process plan regenerated from Manufacturing Intelligence.');
-    } catch {
-      // error toast is handled by useApplyGeneration
-    } finally {
-      setIsRegenerating(false);
-    }
-  };
 
   const handleAddProcess = () => {
     const lastOpNbr = sortedProcesses.length > 0
@@ -455,18 +429,6 @@ export function ManufacturingProcessSection({
           <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleAddProcess}>
             <Plus className="h-3 w-3 mr-1" /> Add Process
           </Button>
-          {latestDraft && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs border-primary/40 text-primary hover:bg-primary/10"
-              onClick={handleRegenerate}
-              disabled={isRegenerating}
-            >
-              {isRegenerating ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Zap className="h-3 w-3 mr-1" />}
-              {latestDraft.status === 'draft_ready' ? 'Apply MI Plan' : 'Regen'}
-            </Button>
-          )}
           {sortedProcesses.length > 0 && (
             <Button
               variant="outline"
@@ -533,9 +495,7 @@ export function ManufacturingProcessSection({
                     <td colSpan={12} className="p-8 text-center text-muted-foreground">
                       <p className="text-sm">No manufacturing processes added yet</p>
                       <p className="text-xs mt-1">
-                        {latestDraft?.status === 'draft_ready'
-                          ? 'A process plan is ready — click "Regenerate from MI" to apply it.'
-                          : 'Use "Add Process" to add manually, or generate a plan in Manufacturing Intelligence.'}
+                        Use "Add Process" to add one.
                       </p>
                     </td>
                   </tr>
@@ -699,20 +659,6 @@ export function ManufacturingProcessSection({
               <Plus className="h-3 w-3 mr-1" />
               Add Process
             </Button>
-            {latestDraft && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-primary/40 text-primary hover:bg-primary/10"
-                onClick={handleRegenerate}
-                disabled={isRegenerating}
-              >
-                {isRegenerating
-                  ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                  : <Zap className="h-3 w-3 mr-1" />}
-                {latestDraft.status === 'draft_ready' ? 'Apply MI Plan' : 'Regenerate from MI'}
-              </Button>
-            )}
             {sortedProcesses.length > 0 && (
               <Button
                 variant="outline"

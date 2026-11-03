@@ -13,7 +13,7 @@ import { AccessToken } from '../../common/decorators/access-token.decorator';
 @ApiTags('Profile')
 @ApiBearerAuth()
 @Authenticated()
-@Controller({ path: 'api/profile', version: '1' })
+@Controller({ path: 'profile', version: '1' })
 export class ProfileController {
   constructor(private readonly profileService: ProfileService) {}
 

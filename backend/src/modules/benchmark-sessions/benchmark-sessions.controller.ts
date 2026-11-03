@@ -16,7 +16,7 @@ import { OrgRole } from '../../common/authz/authz-policy';
 @ApiTags('Benchmark Sessions')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/benchmark-sessions', version: '1' })
+@Controller({ path: 'benchmark-sessions', version: '1' })
 export class BenchmarkSessionsController {
   constructor(private readonly benchmarkSessionsService: BenchmarkSessionsService) {}
 

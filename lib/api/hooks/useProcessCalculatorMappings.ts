@@ -112,13 +112,13 @@ const processCalculatorMappingsApi = {
     formData.append('file', file);
     formData.append('replaceExisting', String(replaceExisting));
     return apiClient.uploadFiles<{ imported: number; skipped: number }>(
-      '/processes/calculator-mappings/import-excel',
+      '/processes/calculator-mappings/imports',
       formData,
     );
   },
 
   clearAll: async () => {
-    return apiClient.delete<{ deleted: number }>('/processes/calculator-mappings');
+    return apiClient.delete<{ deleted: number }>('/processes/calculator-mappings?confirm=delete-all');
   },
 };
 

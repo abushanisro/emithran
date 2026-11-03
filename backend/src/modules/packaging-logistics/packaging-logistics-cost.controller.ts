@@ -44,7 +44,7 @@ import { OrgRole } from '../../common/authz/authz-policy';
 @ApiTags('Packaging & Logistics Costs')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller('api/packaging-logistics-costs')
+@Controller('packaging-logistics-costs')
 @UseGuards(RequestAuthGuard)
 export class PackagingLogisticsCostController {
   constructor(
@@ -150,7 +150,7 @@ async findAll(
    * Delete packaging/logistics cost
    */
   @Delete(':id')
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete packaging/logistics cost' })
   @ApiResponse({ status: 200, description: 'Packaging/logistics cost deleted successfully' })
   @ApiResponse({ status: 404, description: 'Packaging/logistics cost not found' })
@@ -165,7 +165,7 @@ async findAll(
   /**
    * Get total packaging/logistics costs for multiple BOM items in a single request
    */
-  @Post('bulk-total')
+  @Post('totals')
   @ApiOperation({ summary: 'Get total packaging/logistics costs for multiple BOM items' })
   @ApiResponse({ status: 201, description: 'Returns a map of bomItemId → totalCost' })
   async getBulkTotalCosts(

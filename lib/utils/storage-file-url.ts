@@ -18,7 +18,7 @@ export { isTrustedStorageUrl };
 // Resolved per request: localhost only outside production; a missing setting
 // in production throws naming the variable.
 const backendUrl = () =>
-  settingWithDevDefault(process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL, 'API_URL', 'http://localhost:4000/v1/api');
+  settingWithDevDefault(process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL, 'API_URL', 'http://localhost:4000/api/v1');
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

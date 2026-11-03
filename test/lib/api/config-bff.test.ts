@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const API = 'http://localhost:4000/v1/api';
+const API = 'http://localhost:4000/api/v1';
 
 async function apiBase({ browser }: { browser: boolean }) {
   vi.resetModules();

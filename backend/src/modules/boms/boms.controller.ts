@@ -30,7 +30,7 @@ import { OrgRole } from '../../common/authz/authz-policy';
 @ApiTags('BOMs')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/boms', version: '1' })
+@Controller({ path: 'boms', version: '1' })
 export class BOMsController {
   constructor(
     private readonly bomsService: BOMsService,
@@ -86,6 +86,7 @@ export class BOMsController {
     return this.bomsService.update(id, updateBOMDto, user.id, token);
   }
 
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id')
   @ApiOperation({ summary: 'Delete BOM' })
   @ApiResponse({ status: 200, description: 'BOM deleted successfully' })
@@ -96,7 +97,7 @@ export class BOMsController {
   }
 
   // Cost-related endpoints
-  @Post(':id/recalculate-all-costs')
+  @Post(':id/cost-recalculations')
   @UseGuards(OrganizationContextGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Recalculate all costs for a BOM (triggered on save)' })

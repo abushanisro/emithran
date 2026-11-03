@@ -145,7 +145,7 @@ export async function validateSupplierEvaluationGroupDeletion(groupId: string): 
   blockers: string[];
   impactSummary: Array<{ label: string; count: number }>;
 }> {
-  const response = await apiClient.get(`/supplier-evaluation-groups/${groupId}/validate-deletion`);
+  const response = await apiClient.get(`/supplier-evaluation-groups/${groupId}/deletion-check`);
   return response;
 }
 

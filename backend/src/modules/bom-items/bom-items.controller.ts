@@ -1,3 +1,4 @@
+import { Throttle } from '@nestjs/throttler';
 import { AuditService } from '../../common/audit/audit.service';
 import { MAX_CAD_FILE_BYTES } from '../../common/upload-limits';
 import { breakerFor, CAD_ENGINE, isServiceUnavailable } from '../../common/resilience/circuit-breaker';
@@ -23,6 +24,9 @@ import {
   ServiceUnavailableException,
   UseGuards,
   ParseUUIDPipe,
+  ParseEnumPipe,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { gunzip } from 'zlib';
@@ -42,7 +46,7 @@ import { ApplyRouteDto, AUTO_ROUTE_ID, type ApplyRouteResult, ApplyCustomRouteDt
 import type { PhysicsGap } from './dto/cost-breakdown.dto';
 import { LOCATION_INFO } from './costing/shared/core/default-rates.constants';
 import { ExchangeRateService, RateSnapshot } from '../../common/exchange-rate/exchange-rate.service';
-import { deriveImplications } from '../process-plan-generator/dto/manufacturing-implication.dto';
+import { deriveImplications } from './intelligence/manufacturing-implication.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PmiReviewService, type PmiReviewRequest } from './services/pmi-review.service';
 import { AccessToken } from '../../common/decorators/access-token.decorator';
@@ -85,10 +89,13 @@ interface User {
 // without standing up a controller and a database.
 
 
+/** The files served by the generic signed-URL route; 'dxf' has its own route above it. */
+const SIGNED_FILE_TYPES = { TWO_D: '2d', THREE_D: '3d' } as const;
+
 @ApiTags('BOM Items')
 @ApiBearerAuth()
 @OrgRole('member')
-@Controller({ path: 'api/bom-items', version: '1' })
+@Controller({ path: 'bom-items', version: '1' })
 export class BOMItemsController {
   private readonly logger = new Logger(BOMItemsController.name);
 
@@ -111,7 +118,8 @@ export class BOMItemsController {
   ) {}
 
   // ── Stateless CAD auto-fill (no DB writes) ──────────────────────────────────
-  @Post('analyze-for-autofill')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } }) // heavy: parses or analyses a file
+  @Post('autofill-analyses')
   @ApiOperation({ summary: 'Analyze a 3D file and return auto-fill suggestions (stateless, no DB write)' })
   @ApiConsumes('multipart/form-data')
   @ApiResponse({ status: 200, description: 'Auto-fill suggestions returned', type: AutoFillResponseDto })
@@ -168,7 +176,8 @@ export class BOMItemsController {
   // ── Background variant: for large/complex files where CAD analysis can take
   // minutes (mostly OCC's own STEP transfer). Returns a jobId immediately;
   // poll GET analyze-for-autofill/:jobId for the result. ──────────────────────
-  @Post('analyze-for-autofill/start')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } }) // heavy: parses or analyses a file
+  @Post('autofill-analysis-jobs')
   @ApiOperation({ summary: 'Start a background 3D file analysis; returns a jobId to poll' })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(
@@ -200,7 +209,7 @@ export class BOMItemsController {
   }
 
   @OrgRole('viewer')
-  @Get('analyze-for-autofill/:jobId')
+  @Get('autofill-analysis-jobs/:jobId')
   @ApiOperation({ summary: 'Poll the status/result of a background analysis job' })
   async getAnalyzeForAutoFillStatus(
     @Param('jobId') jobId: string,
@@ -564,7 +573,7 @@ export class BOMItemsController {
   // items whose 2D drawing was already uploaded before drawing-intelligence
   // extraction existed (upload-files only calls this automatically for NEW
   // uploads going forward), or to re-run after the parser itself improves.
-  @Post(':id/analyze-drawing')
+  @Post(':id/drawing-analyses')
   @ApiOperation({ summary: 'Re-run drawing intelligence extraction on the stored 2D file and update drawing_intelligence in DB' })
   @ApiResponse({ status: 200, description: 'Drawing analysis complete', type: BOMItemResponseDto })
   @ApiResponse({ status: 400, description: 'No 2D file found for this item, or it is not a PDF' })
@@ -619,6 +628,7 @@ export class BOMItemsController {
    * An organization admin deletes an item even though other members' production lots use it: the lot references go with it. The
    * database function checks the admin role in the item's own organization and writes the audit event (migration 945).
    */
+  @HttpCode(HttpStatus.OK)
   @Delete(':id/force')
   @OrgRole('admin')
   @ApiOperation({ summary: 'Force delete a BOM item still used in production lots (organization admins)' })
@@ -628,6 +638,7 @@ export class BOMItemsController {
     return this.bomItemsService.forceRemove(id, token);
   }
 
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id')
   @ApiOperation({ summary: 'Delete BOM item' })
   @ApiResponse({ status: 200, description: 'BOM item deleted successfully' })
@@ -671,13 +682,31 @@ export class BOMItemsController {
     return this.bomItemsService.updateSortOrder(body.items, user.id, token);
   }
 
+  // Registered before the generic route below: ':fileType' would otherwise swallow 'dxf'.
+  @OrgRole('viewer')
+  @Get(':id/file-url/dxf')
+  @ApiOperation({ summary: 'Get signed URL for BOM item DXF drawing' })
+  @ApiResponse({ status: 200, description: 'Signed URL generated successfully' })
+  async getDxfFileUrl(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @AccessToken() token: string,
+  ): Promise<{ url: string }> {
+    const bomItem = await this.bomItemsService.findOne(id, user.id, token);
+    if (!bomItem.fileDxfPath) {
+      throw new BadRequestException('No DXF file found for this item');
+    }
+    const signedUrl = await this.fileStorageService.getSignedUrl(bomItem.fileDxfPath, 3600);
+    return { url: signedUrl };
+  }
+
   @OrgRole('viewer')
   @Get(':id/file-url/:fileType')
   @ApiOperation({ summary: 'Get signed URL for BOM item file' })
   @ApiResponse({ status: 200, description: 'Signed URL generated successfully' })
   async getFileUrl(
     @Param('id') id: string,
-    @Param('fileType') fileType: '2d' | '3d',
+    @Param('fileType', new ParseEnumPipe(SIGNED_FILE_TYPES)) fileType: '2d' | '3d',
     @CurrentUser() user: User,
     @AccessToken() token: string,
   ): Promise<{ url: string }> {
@@ -701,7 +730,8 @@ export class BOMItemsController {
     return { url: signedUrl };
   }
 
-  @Post(':id/upload-files')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } }) // heavy: parses or analyses a file
+  @Post(':id/files')
   @ApiOperation({ summary: 'Upload 2D/3D/DXF files for BOM item' })
   @ApiConsumes('multipart/form-data')
   @ApiResponse({ status: 200, description: 'Files uploaded successfully', type: BOMItemResponseDto })
@@ -866,23 +896,6 @@ export class BOMItemsController {
   }
 
   @OrgRole('viewer')
-  @Get(':id/file-url/dxf')
-  @ApiOperation({ summary: 'Get signed URL for BOM item DXF drawing' })
-  @ApiResponse({ status: 200, description: 'Signed URL generated successfully' })
-  async getDxfFileUrl(
-    @Param('id') id: string,
-    @CurrentUser() user: User,
-    @AccessToken() token: string,
-  ): Promise<{ url: string }> {
-    const bomItem = await this.bomItemsService.findOne(id, user.id, token);
-    if (!bomItem.fileDxfPath) {
-      throw new BadRequestException('No DXF file found for this item');
-    }
-    const signedUrl = await this.fileStorageService.getSignedUrl(bomItem.fileDxfPath, 3600);
-    return { url: signedUrl };
-  }
-
-  @OrgRole('viewer')
   @Get(':id/dxf-content')
   @ApiOperation({ summary: 'Download decompressed DXF content for browser rendering' })
   @ApiResponse({ status: 200, description: 'Raw DXF content' })
@@ -952,7 +965,7 @@ export class BOMItemsController {
     res.send(content);
   }
 
-  @Post(':id/convert-step')
+  @Post(':id/step-conversions')
   @ApiOperation({ summary: 'Manually convert STEP file to STL for 3D viewing' })
   @ApiResponse({ status: 200, description: 'STEP file converted successfully' })
   @ApiResponse({ status: 400, description: 'No STEP file found or CAD engine unavailable' })
@@ -1033,7 +1046,7 @@ export class BOMItemsController {
   // CAD ANALYSIS ENDPOINTS
   // ============================================================================
 
-  @Post(':id/analyze-cad')
+  @Post(':id/cad-analyses')
   @ApiOperation({ summary: 'Perform advanced CAD analysis on BOM item' })
   @ApiResponse({ status: 200, description: 'CAD analysis completed successfully' })
   @ApiResponse({ status: 400, description: 'No 3D file found or invalid request' })
@@ -1187,7 +1200,8 @@ export class BOMItemsController {
     }
   }
 
-  @Post('batch-analyze-cad')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } }) // heavy: parses or analyses a file
+  @Post('cad-analysis-batches')
   @ApiOperation({ summary: 'Perform batch CAD analysis on multiple BOM items' })
   @ApiResponse({ status: 200, description: 'Batch CAD analysis completed' })
   async batchAnalyzeCAD(
@@ -1695,7 +1709,7 @@ export class BOMItemsController {
   // persist an operation whose costing data is missing (findRouteDataGaps).
 
   // ── Apply a selected manufacturing route → write process_cost_records ─────────
-  @Post(':id/apply-route')
+  @Post(':id/route-applications')
   @ApiOperation({
     summary: 'Write process cost records from a user-selected manufacturing route',
     description:
@@ -1818,7 +1832,7 @@ export class BOMItemsController {
   // and reordering, never inventing a cost line the engine didn't already derive from real
   // geometry. Reuses the exact same insert logic as applyRoute (writeProcessLinesAsRecords) —
   // no new cost formulas anywhere in this endpoint.
-  @Post(':id/apply-custom-route')
+  @Post(':id/custom-route-applications')
   @ApiOperation({
     summary: 'Write process cost records from a dynamically-assembled Workflow Builder route',
     description:

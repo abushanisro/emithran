@@ -117,9 +117,11 @@ class HealthCheckManager {
 
       // Use standardized health endpoint from backend logs: /api/health
       // Backend serves: [RouterExplorer] Mapped {/api/health, GET} (version: Neutral) route
-      const healthUrl = baseUrl.includes('/v1/api') 
-        ? baseUrl.replace('/v1/api', '/api/health')
-        : `${baseUrl}/api/health`;
+      const healthUrl = baseUrl.includes('/api/v1')
+        ? baseUrl.replace('/api/v1', '/api/health')
+        : baseUrl.includes('/v1/api')
+          ? baseUrl.replace('/v1/api', '/api/health')
+          : `${baseUrl}/api/health`;
       const response = await fetch(healthUrl, {
         method: 'GET',
         signal: controller.signal,

@@ -24,7 +24,7 @@ export function useExchangeRates() {
   return useQuery({
     // Same key and source as useFx's table query, so editing a rate refreshes this too.
     queryKey: ['fx', 'exchange-rates'],
-    queryFn: () => apiClient.get<ExchangeRateRow[]>('/fx/exchange-rates'),
+    queryFn: () => apiClient.get<ExchangeRateRow[]>('/exchange-rates'),
     select: inrRatesFromUsdTable,
     staleTime: 5 * 60 * 1000, // 5-minute TTL — matches backend cache
   });
