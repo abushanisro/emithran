@@ -1,0 +1,828 @@
+{
+  "_comment": "Answers for tools/make_samples.cpp, worked out by hand. Numbers match within 0.1 %; counts, names, kinds, flags and quantities exactly; null must be null. Only the fields listed are checked. Casting measurements (D126) are sampled by rays: {\"approx\": n, \"within_pct\": p}; round outlines come out about 5 % long.",
+  "box.step": {
+    "exit": 0,
+    "tree": [
+      {
+        "kind": "part",
+        "quantity": 1,
+        "children": []
+      }
+    ],
+    "parts": [
+      {
+        "total_quantity": 1,
+        "volume_mm3": 100000,
+        "area_mm2": 16000,
+        "centre_mm": [
+          50,
+          25,
+          10
+        ],
+        "box_mm": {
+          "size": [
+            100,
+            50,
+            20
+          ]
+        },
+        "oriented_box_size_mm": [
+          100,
+          50,
+          20
+        ],
+        "solids": 1,
+        "faces": 6,
+        "edges": 12,
+        "face_types": {
+          "plane": 6
+        },
+        "valid": true,
+        "healed": false,
+        "valid_as_read": true,
+        "problems": [],
+        "casting": {
+          "draw_axis": "z",
+          "draw_depth_mm": 20,
+          "projected_area_mm2": 5000,
+          "parting_line_mm": 300,
+          "parting": {
+            "height_mm": 10,
+            "length_mm": 300,
+            "area_mm2": 5000,
+            "outside_fraction": 0,
+            "planar": true
+          },
+          "footprint_mm": [
+            100,
+            50
+          ],
+          "hidden_fraction": 0,
+          "wall_mm": {
+            "min": {
+              "approx": 20,
+              "within_pct": 1
+            },
+            "nominal": {
+              "approx": 20,
+              "within_pct": 1
+            },
+            "max": {
+              "approx": 100,
+              "within_pct": 1
+            }
+          },
+          "cores": []
+        },
+        "feature_counts": {
+          "PlanarFace": 6,
+          "SharpEdge": 12
+        },
+        "concave_sharp_edges": 0,
+        "holes": []
+      }
+    ],
+    "status": "complete"
+  },
+  "plate-with-hole.step": {
+    "exit": 0,
+    "parts": [
+      {
+        "volume_mm3": 113716.8147,
+        "area_mm2": 19028.3185,
+        "centre_mm": [
+          50,
+          30,
+          10
+        ],
+        "box_mm": {
+          "size": [
+            100,
+            60,
+            20
+          ]
+        },
+        "oriented_box_size_mm": [
+          100,
+          60,
+          20
+        ],
+        "solids": 1,
+        "face_types": {
+          "plane": 6,
+          "cylinder": 1
+        },
+        "valid": true,
+        "valid_as_read": true,
+        "problems": [],
+        "casting": {
+          "draw_axis": "z",
+          "draw_depth_mm": 20,
+          "projected_area_mm2": {
+            "approx": 5685.84,
+            "within_pct": 2
+          },
+          "parting_line_mm": 320,
+          "parting": {
+            "height_mm": 10,
+            "length_mm": 320,
+            "area_mm2": 6000,
+            "planar": true
+          },
+          "hidden_fraction": 0,
+          "wall_mm": {
+            "nominal": {
+              "approx": 20,
+              "within_pct": 1
+            }
+          },
+          "cores": []
+        },
+        "feature_counts": {
+          "PlanarFace": 6,
+          "CurvedWall": 1,
+          "SharpEdge": 12,
+          "Edge": 2,
+          "SimpleHole": 1
+        },
+        "concave_sharp_edges": 0,
+        "holes": [
+          "SimpleHole d=20.0 L=20.0 through"
+        ]
+      }
+    ]
+  },
+  "cylinder.step": {
+    "exit": 0,
+    "parts": [
+      {
+        "volume_mm3": 78539.8163,
+        "area_mm2": 10210.1761,
+        "centre_mm": [
+          0,
+          0,
+          20
+        ],
+        "box_mm": {
+          "size": [
+            50,
+            50,
+            40
+          ]
+        },
+        "oriented_box_size_mm": [
+          50,
+          50,
+          40
+        ],
+        "solids": 1,
+        "face_types": {
+          "plane": 2,
+          "cylinder": 1
+        },
+        "valid": true,
+        "valid_as_read": true,
+        "problems": [],
+        "casting": {
+          "draw_axis": "z",
+          "draw_depth_mm": 40,
+          "projected_area_mm2": {
+            "approx": 1963.5,
+            "within_pct": 3
+          },
+          "parting_line_mm": 157.0796,
+          "parting": {
+            "height_mm": 20,
+            "length_mm": 157.0796,
+            "area_mm2": {
+              "approx": 1963.5,
+              "within_pct": 0.5
+            },
+            "planar": true
+          },
+          "hidden_fraction": 0,
+          "wall_mm": {
+            "min": {
+              "approx": 40,
+              "within_pct": 1
+            },
+            "nominal": {
+              "approx": 50,
+              "within_pct": 1
+            },
+            "max": {
+              "approx": 50,
+              "within_pct": 1
+            }
+          }
+        },
+        "feature_counts": {
+          "Ring": 1,
+          "PlanarFace": 2,
+          "CurvedWall": 1,
+          "SharpEdge": 2
+        },
+        "holes": [
+          "Ring d=50.0 w=40.0 outer"
+        ]
+      }
+    ]
+  },
+  "assembly.step": {
+    "exit": 0,
+    "tree": [
+      {
+        "name": "pump-assembly",
+        "kind": "assembly",
+        "quantity": 1,
+        "children": [
+          {
+            "name": "housing",
+            "kind": "part",
+            "quantity": 1,
+            "children": []
+          },
+          {
+            "name": "bolt-set",
+            "kind": "assembly",
+            "quantity": 2,
+            "children": [
+              {
+                "name": "bolt",
+                "kind": "part",
+                "quantity": 4,
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "parts_by_name": {
+      "housing": {
+        "total_quantity": 1,
+        "volume_mm3": 100000,
+        "area_mm2": 16000,
+        "solids": 1,
+        "valid": true,
+        "holes": []
+      },
+      "bolt": {
+        "total_quantity": 8,
+        "volume_mm3": 2356.1945,
+        "area_mm2": 1099.5574,
+        "solids": 1,
+        "valid": true,
+        "casting": {
+          "draw_axis": "x",
+          "draw_depth_mm": 10,
+          "hidden_fraction": 0
+        },
+        "holes": [
+          "Ring d=10.0 w=30.0 outer"
+        ]
+      }
+    },
+    "status": "complete",
+    "diagnostics": {
+      "distinct_parts": 2,
+      "part_instances": 9,
+      "solid_instances": 9
+    }
+  },
+  "open-shell.step": {
+    "exit": 3,
+    "error": "no_solids"
+  },
+  "shifted-vertex.step": {
+    "_comment": "OCCT's STEP reader repairs a vertex 0.5 mm off its edges on import: valid, exact box volume. Invalid and healed shapes are tested in tests/unit_tests.cpp.",
+    "exit": 0,
+    "parts": [
+      {
+        "volume_mm3": 100000,
+        "solids": 1,
+        "faces": 6,
+        "valid_as_read": true,
+        "healed": false,
+        "valid": true,
+        "problems": []
+      }
+    ]
+  },
+  "flat-face.step": {
+    "exit": 3,
+    "error": "no_solids"
+  },
+  "tube.step": {
+    "exit": 0,
+    "parts": [
+      {
+        "volume_mm3": 78539.8163,
+        "area_mm2": 18849.5559,
+        "centre_mm": [
+          0,
+          0,
+          25
+        ],
+        "box_mm": {
+          "size": [
+            60,
+            60,
+            50
+          ]
+        },
+        "solids": 1,
+        "face_types": {
+          "plane": 2,
+          "cylinder": 2
+        },
+        "valid": true,
+        "problems": [],
+        "casting": {
+          "draw_axis": "z",
+          "draw_depth_mm": 50,
+          "projected_area_mm2": {
+            "approx": 1570.8,
+            "within_pct": 3
+          },
+          "parting_line_mm": 188.4956,
+          "parting": {
+            "height_mm": 25,
+            "length_mm": 188.4956,
+            "area_mm2": {
+              "approx": 2827.43,
+              "within_pct": 0.5
+            },
+            "planar": true
+          },
+          "hidden_fraction": 0,
+          "wall_mm": {
+            "min": {
+              "approx": 10,
+              "within_pct": 1
+            },
+            "nominal": {
+              "approx": 10,
+              "within_pct": 1
+            },
+            "max": {
+              "approx": 50,
+              "within_pct": 1
+            }
+          },
+          "cores": []
+        },
+        "feature_counts": {
+          "Ring": 1,
+          "SimpleHole": 1,
+          "PlanarFace": 2,
+          "CurvedWall": 2,
+          "SharpEdge": 2,
+          "Edge": 2
+        },
+        "concave_sharp_edges": 0,
+        "holes": [
+          "Ring d=60.0 w=50.0 outer",
+          "SimpleHole d=40.0 L=50.0 through"
+        ]
+      }
+    ]
+  },
+  "two-blocks.step": {
+    "_comment": "One part definition (one STEP product) with two solids: volumes are added (D108). OCCT's writer would by default save such a compound as an assembly of one product per solid; then the worker reports two parts.",
+    "exit": 0,
+    "parts": [
+      {
+        "solids": 2,
+        "volume_mm3": 7000,
+        "area_mm2": 2800,
+        "box_mm": {
+          "size": [
+            110,
+            20,
+            30
+          ]
+        },
+        "valid": true,
+        "problems": []
+      }
+    ],
+    "tree": [
+      {
+        "kind": "part",
+        "quantity": 1,
+        "children": []
+      }
+    ]
+  },
+  "box-inch.step": {
+    "_comment": "Written in inches by OCCT (file values 3.937...), read back in millimetres.",
+    "exit": 0,
+    "parts": [
+      {
+        "volume_mm3": 100000,
+        "area_mm2": 16000,
+        "box_mm": {
+          "size": [
+            100,
+            50,
+            20
+          ]
+        },
+        "valid": true
+      }
+    ]
+  },
+  "mixed.step": {
+    "_comment": "One good part and one part that is only an open shell: the file is read (exit 0), the result is partial, the good part is complete.",
+    "exit": 0,
+    "status": "partial",
+    "parts_by_name": {
+      "good-box": {
+        "volume_mm3": 100000,
+        "problems": []
+      },
+      "open-shell": {
+        "solids": 0,
+        "volume_mm3": null,
+        "centre_mm": null,
+        "area_mm2": 8000,
+        "problems": [
+          "no_solid"
+        ],
+        "casting": null
+      }
+    },
+    "diagnostics": {
+      "distinct_parts": 2,
+      "part_instances": 2,
+      "solid_instances": 1
+    }
+  },
+  "hollow-box.step": {
+    "_comment": "A closed void: every axis sees hidden material; the void hides least along x (20 x 20 of 60 x 40). The core body (D145) is the void closed on itself: exactly 60 x 20 x 20.",
+    "exit": 0,
+    "parts": [
+      {
+        "volume_mm3": 216000,
+        "solids": 1,
+        "valid": true,
+        "casting": {
+          "draw_axis": "x",
+          "draw_depth_mm": 100,
+          "projected_area_mm2": 2400,
+          "parting_line_mm": 200,
+          "parting": {
+            "height_mm": 50,
+            "length_mm": 200,
+            "area_mm2": 2400,
+            "planar": true
+          },
+          "hidden_fraction": {
+            "approx": 0.16667,
+            "within_pct": 5
+          },
+          "wall_mm": {
+            "min": {
+              "approx": 10,
+              "within_pct": 2
+            }
+          },
+          "cores": [
+            {
+              "volume_mm3": 24000,
+              "size_mm": [
+                60,
+                20,
+                20
+              ],
+              "centre_mm": [
+                50,
+                30,
+                20
+              ],
+              "body": true,
+              "problem": null
+            }
+          ],
+          "cores_glb": "parts/0-1-1-1-cores.glb"
+        },
+        "feature_counts": {
+          "PlanarFace": 12,
+          "SharpEdge": 24,
+          "Void": 1
+        },
+        "concave_sharp_edges": 12,
+        "holes": [
+          "Void 60.0x20.0x20.0 core=1"
+        ]
+      }
+    ]
+  },
+  "step-block.step": {
+    "_comment": "An L step: 8 planar faces, 18 sharp edges, the inner corner concave.",
+    "exit": 0,
+    "parts": [
+      {
+        "volume_mm3": 180000,
+        "casting": {
+          "draw_axis": "z",
+          "parting": {
+            "height_mm": 10,
+            "length_mm": 320,
+            "area_mm2": 6000,
+            "planar": true
+          }
+        },
+        "feature_counts": {
+          "PlanarFace": 8,
+          "SharpEdge": 18
+        },
+        "concave_sharp_edges": 1,
+        "holes": []
+      }
+    ]
+  },
+  "fillet-block.step": {
+    "_comment": "One vertical edge rounded r 5: the round meets its side faces smoothly (not sharp), its arcs continue the top and bottom edges smoothly, so the top and bottom each have 3 chains and 3 vertical edges stay: 9 sharp-edge features, all convex.",
+    "exit": 0,
+    "parts": [
+      {
+        "feature_counts": {
+          "PlanarFace": 6,
+          "CurvedWall": 1,
+          "SharpEdge": 9
+        },
+        "concave_sharp_edges": 0,
+        "holes": []
+      }
+    ]
+  },
+  "holes.step": {
+    "_comment": "Worked from tools/make_samples.cpp holes(): steps along +z from the bottom, so stepped bores widen upwards (monotonic: MultiStepHole); the grooved bore widens and narrows (RingedHole: the bore plus a Ring). Cores (D145), largest first by rays: the Ø8 cross hole (π·16·120 = 6031.858 mm³, capped at x 0 and 120) and the grooved bore, whose rays see only the groove but whose body is the whole bore with it (π·25·40 + π·39·10 = 4366.814 mm³).",
+    "exit": 0,
+    "parts": [
+      {
+        "volume_mm3": {
+          "approx": 357504,
+          "within_pct": 0.1
+        },
+        "holes": [
+          "MultiStepHole d=10.0-20.0 L=40.0 through",
+          "MultiStepHole d=8.0-24.0 L=40.0 through",
+          "Ring d=16.0 w=10.0 inner in RingedHole",
+          "RingedHole d=10.0-16.0 L=40.0 through hidden",
+          "SimpleHole d=10.0 L=32.0 in MultiStepHole",
+          "SimpleHole d=10.0 L=40.0 in RingedHole",
+          "SimpleHole d=10.0 L=40.0 through",
+          "SimpleHole d=12.0 L=15.0 blind",
+          "SimpleHole d=16.0 L=12.0 in MultiStepHole",
+          "SimpleHole d=20.0 L=8.0 in MultiStepHole",
+          "SimpleHole d=24.0 L=6.0 in MultiStepHole",
+          "SimpleHole d=8.0 L=120.0 through hidden",
+          "SimpleHole d=8.0 L=22.0 in MultiStepHole"
+        ],
+        "feature_counts": {
+          "SimpleHole": 9,
+          "MultiStepHole": 2,
+          "RingedHole": 1,
+          "Ring": 1
+        },
+        "casting": {
+          "draw_axis": "z",
+          "cores": [
+            {
+              "volume_mm3": 6031.858,
+              "size_mm": [
+                120,
+                8,
+                8
+              ],
+              "centre_mm": [
+                60,
+                40,
+                20
+              ],
+              "body": true,
+              "problem": null
+            },
+            {
+              "volume_mm3": 4366.814,
+              "size_mm": [
+                40,
+                16,
+                16
+              ],
+              "centre_mm": [
+                90,
+                60,
+                20
+              ],
+              "body": true,
+              "problem": null
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "boss.step": {
+    "_comment": "Plate 100 x 80 x 10 with a Ø30 x 15 boss: the boss is an outer Ring (its wall and its top disk); the boss base circle is the one concave edge.",
+    "exit": 0,
+    "parts": [
+      {
+        "holes": [
+          "Ring d=30.0 w=15.0 outer"
+        ],
+        "casting": {
+          "draw_axis": "z",
+          "parting_line_mm": 360,
+          "parting": {
+            "height_mm": 5,
+            "length_mm": 360,
+            "area_mm2": 8000,
+            "planar": true
+          }
+        },
+        "feature_counts": {
+          "Ring": 1,
+          "PlanarFace": 7,
+          "CurvedWall": 1,
+          "SharpEdge": 14
+        },
+        "concave_sharp_edges": 1
+      }
+    ]
+  },
+  "combo.step": {
+    "_comment": "Block 100 x 60 x 40, void 10 x 10 x 30 at x 45..55, y 25..35, z 5..35, Ø8 hole along x from outside into the void at y 30, z 20 (volume 240000 - 3000 - π·16·45). Hidden fraction least along z: void 10 x 10 plus hole 8 x 45 of 100 x 60 (= 0.0767; along x 250 of 2400, along y 660 of 4000). One core along z, the void and the hole (3000 + 2262 mm³, centre x (3000·50 + 2262·22.5) / 5262 = 38.2), makes both: a ComboVoid, the hole hidden. The hole's rims are its 2 Edges; the void's 12 concave edges are SharpEdges under it. Grid tolerances as for the hollow box, wider for the thin hole. Its body (D145): the void and the hole up to the opening at x 0 (closed by a flat cap), exactly 3000 + π·16·45 = 5261.947 mm³, 55 x 30 x 10, centre x 38.18.",
+    "exit": 0,
+    "parts": [
+      {
+        "volume_mm3": {
+          "approx": 234738.05,
+          "within_pct": 0.1
+        },
+        "casting": {
+          "draw_axis": "z",
+          "draw_depth_mm": 40,
+          "projected_area_mm2": 6000,
+          "parting_line_mm": 320,
+          "parting": {
+            "height_mm": 8,
+            "length_mm": 320,
+            "area_mm2": 6000,
+            "planar": true
+          },
+          "hidden_fraction": {
+            "approx": 0.07667,
+            "within_pct": 10
+          },
+          "cores": [
+            {
+              "volume_mm3": 5261.947,
+              "centre_mm": [
+                38.1785,
+                30,
+                20
+              ],
+              "size_mm": [
+                55,
+                30,
+                10
+              ],
+              "body": true,
+              "problem": null
+            }
+          ]
+        },
+        "feature_counts": {
+          "PlanarFace": 12,
+          "CurvedWall": 1,
+          "SimpleHole": 1,
+          "Void": 1,
+          "ComboVoid": 1,
+          "Edge": 2,
+          "SharpEdge": 24
+        },
+        "concave_sharp_edges": 12,
+        "holes": [
+          "ComboVoid members=2 core=1",
+          "SimpleHole d=8.0 L=45.0 through hidden in ComboVoid",
+          "Void 30.0x10.0x10.0 core=1 in ComboVoid"
+        ]
+      }
+    ]
+  },
+  "bolt.step": {
+    "_comment": "The assembly's bolt alone: one file, one root tagged with it.",
+    "exit": 0,
+    "status": "complete",
+    "inputs": [
+      {
+        "file": "bolt.step",
+        "read": true,
+        "inside": null
+      }
+    ],
+    "tree": [
+      {
+        "name": "bolt",
+        "kind": "part",
+        "quantity": 1,
+        "file": "bolt.step",
+        "children": []
+      }
+    ]
+  },
+  "several.step": {
+    "_comment": "One worker run on box.step, assembly.step, bolt.step and not-step.step (ci/check-geometry-worker.sh), one product (D136): the box and the pump assembly are the roots, each tagged with its file; bolt.step is the assembly's own bolt, so it is not repeated; not-step.step cannot be read, so the result is partial. Parts: box, housing, bolt (8 in the assembly).",
+    "exit": 0,
+    "status": "partial",
+    "inputs": [
+      {
+        "file": "box.step",
+        "read": true,
+        "inside": null
+      },
+      {
+        "file": "assembly.step",
+        "read": true,
+        "inside": null
+      },
+      {
+        "file": "bolt.step",
+        "read": true,
+        "inside": "assembly.step"
+      },
+      {
+        "file": "not-step.step",
+        "read": false,
+        "inside": null
+      }
+    ],
+    "tree": [
+      {
+        "kind": "part",
+        "quantity": 1,
+        "file": "box.step",
+        "children": []
+      },
+      {
+        "name": "pump-assembly",
+        "kind": "assembly",
+        "quantity": 1,
+        "file": "assembly.step"
+      }
+    ],
+    "diagnostics": {
+      "distinct_parts": 3,
+      "part_instances": 10,
+      "solid_instances": 10
+    }
+  },
+  "rod.step": {
+    "_comment": "Ø20 x 100 along x, axis at y 30, z 30: drawn across it (y and z see the same, so either may be the axis), widest at the axis: a 100 x 20 outline, 240 mm, in the plane through the axis (D144).",
+    "exit": 0,
+    "parts": [
+      {
+        "casting": {
+          "draw_depth_mm": 20,
+          "parting_line_mm": 240,
+          "parting": {
+            "height_mm": 30,
+            "length_mm": 240,
+            "area_mm2": 2000,
+            "outside_fraction": 0,
+            "planar": true
+          }
+        }
+      }
+    ]
+  },
+  "stepped-block.step": {
+    "_comment": "60 x 50 x 10 with 50 x 50 x 10 on top at x 50..100: seen from above 100 x 50, but the widest flat section is the bottom plate (60 x 50, 220 mm, middle at z 5). The rays covering x 60..100 (26 of 64 columns, 0.406) lie outside it: not planar, so parting_line_mm stays the grid outline (about 300).",
+    "exit": 0,
+    "parts": [
+      {
+        "casting": {
+          "draw_axis": "z",
+          "parting_line_mm": {
+            "approx": 300,
+            "within_pct": 1
+          },
+          "parting": {
+            "height_mm": 5,
+            "length_mm": 220,
+            "area_mm2": 3000,
+            "outside_fraction": {
+              "approx": 0.40625,
+              "within_pct": 1
+            },
+            "planar": false
+          }
+        }
+      }
+    ]
+  }
+}

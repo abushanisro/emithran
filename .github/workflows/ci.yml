@@ -271,6 +271,24 @@ jobs:
       # Same fixtures through the Python engine and the C++ worker; the two reports must agree.
       - run: python3 geometry-worker/tests/parity.py
 
+  casting-worker:
+    name: Casting worker (C++ build, sandboxed run, hand-worked results)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      # The worker's sources must still be what was copied from petrus-demo (Dockerfile is the one edited file).
+      - run: grep -v ' \./Dockerfile$' PROVENANCE.sha256 | shasum -a 256 -c -
+        working-directory: casting-worker
+      - run: npm ci --legacy-peer-deps --no-audit --no-fund
+        working-directory: backend
+      # Builds OCCT from source (slow), runs the unit tests and the samples in the production sandbox, compares results.
+      - run: casting-worker/check.sh
+
   cad-engine:
     name: CAD Engine (Docker build)
     runs-on: ubuntu-latest
