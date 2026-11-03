@@ -46,11 +46,16 @@ export type CastabilityProcess = keyof typeof MATERIAL_GROUP;
 export class CastingReferenceService {
   constructor(private readonly database: DatabaseService) {}
 
+  /** The staged reference tables are public-read data with no user context: one place opens that client. */
+  private get referenceDb() {
+    return this.database.getPrivilegedClient('reference-data: machining_reference_data, public-read');
+  }
+
   private cached: { reference: CastingReference | null; missing: string[] } | null = null;
 
   async getReference(): Promise<{ reference: CastingReference | null; missing: string[] }> {
     if (this.cached) return this.cached;
-    const db = this.database.getPrivilegedClient('reference-data: machining_reference_data, public-read');
+    const db = this.referenceDb;
     const [vars, lookups] = await Promise.all([
       db.from('machining_reference_data').select('key, value')
         .eq('category', 'variable').eq('source_version', CASTING_REFERENCE_SOURCE_VERSION)
@@ -77,7 +82,7 @@ export class CastingReferenceService {
   async getCastabilityReference(process: CastabilityProcess): Promise<{ reference: CastabilityReference | null; missing: string[] }> {
     if (process === 'die_casting') return this.getReference();
     if (this.cachedSand) return this.cachedSand;
-    const db = this.database.getPrivilegedClient('reference-data: machining_reference_data, public-read');
+    const db = this.referenceDb;
     const lookups = await db.from('machining_reference_data').select('key, raw')
       .eq('category', 'lookup_table').eq('source_version', SAND_CASTING_REFERENCE_SOURCE_VERSION)
       .in('key', [...SAND_CASTABILITY_LOOKUP_KEYS]);
@@ -95,7 +100,7 @@ export class CastingReferenceService {
   /** The sand-core reference (coremaking.ts): memory/Die Casting variables and lookups. */
   async getCoreReference(): Promise<{ reference: CoreReference | null; missing: string[] }> {
     if (this.cachedCores) return this.cachedCores;
-    const db = this.database.getPrivilegedClient('reference-data: machining_reference_data, public-read');
+    const db = this.referenceDb;
     const [vars, lookups] = await Promise.all([
       db.from('machining_reference_data').select('key, value')
         .eq('category', 'variable').eq('source_version', CASTING_REFERENCE_SOURCE_VERSION)
@@ -121,7 +126,7 @@ export class CastingReferenceService {
    */
   async getDieToolingReference(): Promise<{ reference: DieToolingReference | null; missing: string[] }> {
     if (this.cachedTooling) return this.cachedTooling;
-    const db = this.database.getPrivilegedClient('reference-data: machining_reference_data, public-read');
+    const db = this.referenceDb;
     const [vars, lookups, shop] = await Promise.all([
       db.from('machining_reference_data').select('key, value')
         .eq('category', 'variable').eq('source_version', CASTING_REFERENCE_SOURCE_VERSION)
