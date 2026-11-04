@@ -12,6 +12,7 @@ import type { CostContext } from '../casting-finishing';
 import { coreboxTooling, coreLine, sandCores, type CoreboxTooling, type CoreRegion } from './sand-cores';
 import { cleanStep, degateStep, finishStep, inspectStep, shakeoutStep, type SandFinishContext } from './sand-finishing-steps';
 import { designGating, type GatingSystem } from './sand-gating';
+import { ingateVelocityNote, RISER_EFFICIENCY_NOTE } from './sand-velocity';
 import { machineValue, type SandMachine } from './sand-machines';
 import type { SandReference } from './sand-reference';
 import { valuesProvider } from './sand-seeds';
@@ -155,6 +156,7 @@ function sharedFor(input: SandRouteInput, mould: SandMachine, cavities: number):
     ref, spec: input.spec, calculators: input.calculators,
   });
   if (!gating) return fail(...gatingMissing);
+  notes.push(ingateVelocityNote(input.material.materialType, gating.ingateVelocityMs, gating.chokeVelocityMs), RISER_EFFICIENCY_NOTE);
 
   const metal = runStep(
     base, METAL_PER_CASTING, null,

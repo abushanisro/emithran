@@ -60,7 +60,7 @@
           "formula": "1.5"
         },
         {
-          "name": "Feed Efficiency (standard rule)",
+          "name": "Feed Efficiency (unverified rule)",
           "unit": "%",
           "formula": "14"
         },
@@ -77,7 +77,7 @@
         {
           "name": "Feed Volume per Riser",
           "unit": "mm³",
-          "formula": "{Shrinkage (estimate)} * {Casting Volume} / ({Feed Efficiency (standard rule)} - {Shrinkage (estimate)}) / {Risers}"
+          "formula": "{Shrinkage (estimate)} * {Casting Volume} / ({Feed Efficiency (unverified rule)} - {Shrinkage (estimate)}) / {Risers}"
         },
         {
           "name": "Diameter by Feeding",
@@ -109,7 +109,7 @@
     {
       "key": "sand.gating",
       "name": "Sand Casting - Gating system",
-      "description": "Sprue, sprue well, runner and ingates (D146): the choke area lets the metal of one mould in within the pouring time under the cope's head (the casting gated at the parting line: half its height in the cope is lost), at the gating ratio's efficiency; the sprue, runner and ingates follow the plant's ratio, and their shapes the plant's aspect ratios. One sprue a mould; a runner and ingates per casting.",
+      "description": "Sprue, sprue well, runner and ingates (D146): the choke area lets the metal of one mould in within the pouring time under the cope's head (the casting gated at the parting line: half its height in the cope is lost), at the gating ratio's efficiency; the sprue, runner and ingates follow the plant's ratio, and their shapes the plant's aspect ratios. One sprue a mould; a runner and ingates per casting. The velocity of the metal at the choke, in the runner and in the ingates is the flow (the mould's metal over its pouring time) over the area it passes through; at the choke it equals the efficiency times sqrt(2 g H) by construction.",
       "operations": [],
       "helper": true,
       "output": "Gating Weight",
@@ -127,7 +127,10 @@
         "Ingate Width",
         "Ingate Height",
         "Ingate Length",
-        "Ingate Area"
+        "Ingate Area",
+        "Choke Velocity",
+        "Runner Velocity",
+        "Ingate Velocity"
       ],
       "fields": [
         {
@@ -281,6 +284,26 @@
           "name": "Ingate Area",
           "unit": "mm²",
           "formula": "{Choke Area} * {Ingate Multiplier} / {Smallest Multiplier} / {Cavities}"
+        },
+        {
+          "name": "Flow Rate",
+          "unit": "m³/s",
+          "formula": "{Poured per Mould} / ({Density} * {Pour Time})"
+        },
+        {
+          "name": "Choke Velocity",
+          "unit": "m/s",
+          "formula": "{Flow Rate} / ({Choke Area} / 1e6)"
+        },
+        {
+          "name": "Runner Velocity",
+          "unit": "m/s",
+          "formula": "{Flow Rate} / ({Runner Area} * {Cavities} / 1e6)"
+        },
+        {
+          "name": "Ingate Velocity",
+          "unit": "m/s",
+          "formula": "{Flow Rate} / ({Ingate Area} * {Cavities} / 1e6)"
         },
         {
           "name": "Sprue Diameter",

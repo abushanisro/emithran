@@ -122,6 +122,9 @@ export interface GatingSystem {
   ingateLengthMm: number;
   /** All ingates of one casting together. */
   ingateAreaMm2: number;
+  /** The metal's speed at the choke and through the ingates (m/s): the mould's metal over its pouring time, over the area it passes. */
+  chokeVelocityMs: number;
+  ingateVelocityMs: number;
   risers: number;
   riserDiameterMm: number;
   riserHeightMm: number;
@@ -210,6 +213,7 @@ export function designGating(input: GatingInput): { system: GatingSystem | null;
         sprueDiameterMm: out('Sprue Diameter'), sprueHeightMm: out('Sprue Height'), wellDiameterMm: out('Well Diameter'), wellDepthMm: out('Well Depth'),
         runnerWidthMm: out('Runner Width'), runnerHeightMm: out('Runner Height'), runnerLengthMm: out('Runner Length'),
         ingates: mould.ingates, ingateWidthMm: out('Ingate Width'), ingateHeightMm: out('Ingate Height'), ingateLengthMm: out('Ingate Length'), ingateAreaMm2: out('Ingate Area'),
+        chokeVelocityMs: out('Choke Velocity'), ingateVelocityMs: out('Ingate Velocity'),
         risers: mould.ingates, riserDiameterMm: riserDiameter, riserHeightMm: risers.outputs['Riser Height']!,
         riserContactMm2: (mould.ingates * Math.PI * riserDiameter * riserDiameter) / 4,
         gatingKg, risersKg, runs: { risers, gating: run },

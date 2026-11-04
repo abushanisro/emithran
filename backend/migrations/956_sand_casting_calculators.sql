@@ -46,10 +46,10 @@ BEGIN
     (v_id, $q$Shrinkage (estimate)$q$, $q$Shrinkage (estimate) (%)$q$, $q$number$q$, $q$%$q$, NULL, NULL, NULL, NULL, 5, true),
     (v_id, $q$Riser Modulus Factor (standard rule)$q$, $q$Riser Modulus Factor (standard rule)$q$, $q$calculated$q$, NULL, NULL, NULL, NULL, $q$1.2$q$, 6, false),
     (v_id, $q$Height to Diameter (standard rule)$q$, $q$Height to Diameter (standard rule)$q$, $q$calculated$q$, NULL, NULL, NULL, NULL, $q$1.5$q$, 7, false),
-    (v_id, $q$Feed Efficiency (standard rule)$q$, $q$Feed Efficiency (standard rule) (%)$q$, $q$calculated$q$, $q$%$q$, NULL, NULL, NULL, $q$14$q$, 8, false),
+    (v_id, $q$Feed Efficiency (unverified rule)$q$, $q$Feed Efficiency (unverified rule) (%)$q$, $q$calculated$q$, $q$%$q$, NULL, NULL, NULL, $q$14$q$, 8, false),
     (v_id, $q$Riser Modulus$q$, $q$Riser Modulus (mm)$q$, $q$calculated$q$, $q$mm$q$, NULL, NULL, NULL, $q${Casting Modulus} * {Riser Modulus Factor (standard rule)}$q$, 9, false),
     (v_id, $q$Diameter by Modulus$q$, $q$Diameter by Modulus (mm)$q$, $q$calculated$q$, $q$mm$q$, NULL, NULL, NULL, $q${Riser Modulus} * (4 * {Height to Diameter (standard rule)} + 1) / {Height to Diameter (standard rule)}$q$, 10, false),
-    (v_id, $q$Feed Volume per Riser$q$, $q$Feed Volume per Riser (mm³)$q$, $q$calculated$q$, $q$mm³$q$, NULL, NULL, NULL, $q${Shrinkage (estimate)} * {Casting Volume} / ({Feed Efficiency (standard rule)} - {Shrinkage (estimate)}) / {Risers}$q$, 11, false),
+    (v_id, $q$Feed Volume per Riser$q$, $q$Feed Volume per Riser (mm³)$q$, $q$calculated$q$, $q$mm³$q$, NULL, NULL, NULL, $q${Shrinkage (estimate)} * {Casting Volume} / ({Feed Efficiency (unverified rule)} - {Shrinkage (estimate)}) / {Risers}$q$, 11, false),
     (v_id, $q$Diameter by Feeding$q$, $q$Diameter by Feeding (mm)$q$, $q$calculated$q$, $q$mm$q$, NULL, NULL, NULL, $q$(4 * {Feed Volume per Riser} / (pi * {Height to Diameter (standard rule)})) ^ (1 / 3)$q$, 12, false),
     (v_id, $q$Riser Diameter$q$, $q$Riser Diameter (mm)$q$, $q$calculated$q$, $q$mm$q$, NULL, NULL, NULL, $q$max({Diameter by Modulus}, {Diameter by Feeding})$q$, 13, false),
     (v_id, $q$Riser Height$q$, $q$Riser Height (mm)$q$, $q$calculated$q$, $q$mm$q$, NULL, NULL, NULL, $q${Riser Diameter} * {Height to Diameter (standard rule)}$q$, 14, false),
@@ -65,10 +65,10 @@ BEGIN
   SELECT id INTO v_id FROM public.calculators WHERE name = $q$Sand Casting - Gating system$q$ AND user_id IS NULL AND retired_at IS NULL;
   IF v_id IS NULL THEN
     INSERT INTO public.calculators (user_id, name, calc_category, calculator_type, is_template, is_public, is_global, description)
-    VALUES (NULL, $q$Sand Casting - Gating system$q$, 'process', 'single', false, true, true, $q$Sprue, sprue well, runner and ingates (D146): the choke area lets the metal of one mould in within the pouring time under the cope's head (the casting gated at the parting line: half its height in the cope is lost), at the gating ratio's efficiency; the sprue, runner and ingates follow the plant's ratio, and their shapes the plant's aspect ratios. One sprue a mould; a runner and ingates per casting.$q$)
+    VALUES (NULL, $q$Sand Casting - Gating system$q$, 'process', 'single', false, true, true, $q$Sprue, sprue well, runner and ingates (D146): the choke area lets the metal of one mould in within the pouring time under the cope's head (the casting gated at the parting line: half its height in the cope is lost), at the gating ratio's efficiency; the sprue, runner and ingates follow the plant's ratio, and their shapes the plant's aspect ratios. One sprue a mould; a runner and ingates per casting. The velocity of the metal at the choke, in the runner and in the ingates is the flow (the mould's metal over its pouring time) over the area it passes through; at the choke it equals the efficiency times sqrt(2 g H) by construction.$q$)
     RETURNING id INTO v_id;
   ELSE
-    UPDATE public.calculators SET calc_category = 'process', description = $q$Sprue, sprue well, runner and ingates (D146): the choke area lets the metal of one mould in within the pouring time under the cope's head (the casting gated at the parting line: half its height in the cope is lost), at the gating ratio's efficiency; the sprue, runner and ingates follow the plant's ratio, and their shapes the plant's aspect ratios. One sprue a mould; a runner and ingates per casting.$q$, updated_at = now() WHERE id = v_id;
+    UPDATE public.calculators SET calc_category = 'process', description = $q$Sprue, sprue well, runner and ingates (D146): the choke area lets the metal of one mould in within the pouring time under the cope's head (the casting gated at the parting line: half its height in the cope is lost), at the gating ratio's efficiency; the sprue, runner and ingates follow the plant's ratio, and their shapes the plant's aspect ratios. One sprue a mould; a runner and ingates per casting. The velocity of the metal at the choke, in the runner and in the ingates is the flow (the mould's metal over its pouring time) over the area it passes through; at the choke it equals the efficiency times sqrt(2 g H) by construction.$q$, updated_at = now() WHERE id = v_id;
   END IF;
 
   DELETE FROM public.calculator_fields WHERE calculator_id = v_id;
@@ -99,19 +99,23 @@ BEGIN
     (v_id, $q$Sprue Area$q$, $q$Sprue Area (mm²)$q$, $q$calculated$q$, $q$mm²$q$, NULL, NULL, NULL, $q${Choke Area} * {Sprue Multiplier} / {Smallest Multiplier}$q$, 22, false),
     (v_id, $q$Runner Area$q$, $q$Runner Area (mm²)$q$, $q$calculated$q$, $q$mm²$q$, NULL, NULL, NULL, $q${Choke Area} * {Runner Multiplier} / {Smallest Multiplier} / {Cavities}$q$, 23, false),
     (v_id, $q$Ingate Area$q$, $q$Ingate Area (mm²)$q$, $q$calculated$q$, $q$mm²$q$, NULL, NULL, NULL, $q${Choke Area} * {Ingate Multiplier} / {Smallest Multiplier} / {Cavities}$q$, 24, false),
-    (v_id, $q$Sprue Diameter$q$, $q$Sprue Diameter (mm)$q$, $q$calculated$q$, $q$mm$q$, NULL, NULL, NULL, $q$sqrt(4 * {Sprue Area} / pi)$q$, 25, false),
-    (v_id, $q$Sprue Height$q$, $q$Sprue Height (mm)$q$, $q$calculated$q$, $q$mm$q$, NULL, NULL, NULL, $q${Cope Height}$q$, 26, false),
-    (v_id, $q$Well Diameter$q$, $q$Well Diameter (mm)$q$, $q$calculated$q$, $q$mm$q$, NULL, NULL, NULL, $q$sqrt(4 * {Well Area Ratio} * {Sprue Area} / pi)$q$, 27, false),
-    (v_id, $q$Runner Height$q$, $q$Runner Height (mm)$q$, $q$calculated$q$, $q$mm$q$, NULL, NULL, NULL, $q$sqrt({Runner Area} / {Runner Aspect Ratio})$q$, 28, false),
-    (v_id, $q$Runner Width$q$, $q$Runner Width (mm)$q$, $q$calculated$q$, $q$mm$q$, NULL, NULL, NULL, $q${Runner Aspect Ratio} * {Runner Height}$q$, 29, false),
-    (v_id, $q$Well Depth$q$, $q$Well Depth (mm)$q$, $q$calculated$q$, $q$mm$q$, NULL, NULL, NULL, $q${Well Depth to Runner Height (standard rule)} * {Runner Height}$q$, 30, false),
-    (v_id, $q$Ingate Length$q$, $q$Ingate Length (mm)$q$, $q$calculated$q$, $q$mm$q$, NULL, NULL, NULL, $q${Ingate Length Ratio} * {Part Length}$q$, 31, false),
-    (v_id, $q$Runner Length$q$, $q$Runner Length (mm)$q$, $q$calculated$q$, $q$mm$q$, NULL, NULL, NULL, $q${Part Length} + {Ingate Length}$q$, 32, false),
-    (v_id, $q$Ingate Height$q$, $q$Ingate Height (mm)$q$, $q$calculated$q$, $q$mm$q$, NULL, NULL, NULL, $q$sqrt({Ingate Area} / {Ingates} / {Ingate Aspect Ratio})$q$, 33, false),
-    (v_id, $q$Ingate Width$q$, $q$Ingate Width (mm)$q$, $q$calculated$q$, $q$mm$q$, NULL, NULL, NULL, $q${Ingate Aspect Ratio} * {Ingate Height}$q$, 34, false),
-    (v_id, $q$Sprue and Well per Casting$q$, $q$Sprue and Well per Casting (mm³)$q$, $q$calculated$q$, $q$mm³$q$, NULL, NULL, NULL, $q$({Sprue Area} * {Sprue Height} + pi / 4 * {Well Diameter} ^ 2 * {Well Depth}) / {Cavities}$q$, 35, false),
-    (v_id, $q$Runner and Ingates$q$, $q$Runner and Ingates (mm³)$q$, $q$calculated$q$, $q$mm³$q$, NULL, NULL, NULL, $q${Runner Area} * {Runner Length} + {Ingate Area} * {Ingate Length}$q$, 36, false),
-    (v_id, $q$Gating Weight$q$, $q$Gating Weight (kg)$q$, $q$calculated$q$, $q$kg$q$, NULL, NULL, NULL, $q$({Sprue and Well per Casting} + {Runner and Ingates}) / 1e9 * {Density}$q$, 37, false);
+    (v_id, $q$Flow Rate$q$, $q$Flow Rate (m³/s)$q$, $q$calculated$q$, $q$m³/s$q$, NULL, NULL, NULL, $q${Poured per Mould} / ({Density} * {Pour Time})$q$, 25, false),
+    (v_id, $q$Choke Velocity$q$, $q$Choke Velocity (m/s)$q$, $q$calculated$q$, $q$m/s$q$, NULL, NULL, NULL, $q${Flow Rate} / ({Choke Area} / 1e6)$q$, 26, false),
+    (v_id, $q$Runner Velocity$q$, $q$Runner Velocity (m/s)$q$, $q$calculated$q$, $q$m/s$q$, NULL, NULL, NULL, $q${Flow Rate} / ({Runner Area} * {Cavities} / 1e6)$q$, 27, false),
+    (v_id, $q$Ingate Velocity$q$, $q$Ingate Velocity (m/s)$q$, $q$calculated$q$, $q$m/s$q$, NULL, NULL, NULL, $q${Flow Rate} / ({Ingate Area} * {Cavities} / 1e6)$q$, 28, false),
+    (v_id, $q$Sprue Diameter$q$, $q$Sprue Diameter (mm)$q$, $q$calculated$q$, $q$mm$q$, NULL, NULL, NULL, $q$sqrt(4 * {Sprue Area} / pi)$q$, 29, false),
+    (v_id, $q$Sprue Height$q$, $q$Sprue Height (mm)$q$, $q$calculated$q$, $q$mm$q$, NULL, NULL, NULL, $q${Cope Height}$q$, 30, false),
+    (v_id, $q$Well Diameter$q$, $q$Well Diameter (mm)$q$, $q$calculated$q$, $q$mm$q$, NULL, NULL, NULL, $q$sqrt(4 * {Well Area Ratio} * {Sprue Area} / pi)$q$, 31, false),
+    (v_id, $q$Runner Height$q$, $q$Runner Height (mm)$q$, $q$calculated$q$, $q$mm$q$, NULL, NULL, NULL, $q$sqrt({Runner Area} / {Runner Aspect Ratio})$q$, 32, false),
+    (v_id, $q$Runner Width$q$, $q$Runner Width (mm)$q$, $q$calculated$q$, $q$mm$q$, NULL, NULL, NULL, $q${Runner Aspect Ratio} * {Runner Height}$q$, 33, false),
+    (v_id, $q$Well Depth$q$, $q$Well Depth (mm)$q$, $q$calculated$q$, $q$mm$q$, NULL, NULL, NULL, $q${Well Depth to Runner Height (standard rule)} * {Runner Height}$q$, 34, false),
+    (v_id, $q$Ingate Length$q$, $q$Ingate Length (mm)$q$, $q$calculated$q$, $q$mm$q$, NULL, NULL, NULL, $q${Ingate Length Ratio} * {Part Length}$q$, 35, false),
+    (v_id, $q$Runner Length$q$, $q$Runner Length (mm)$q$, $q$calculated$q$, $q$mm$q$, NULL, NULL, NULL, $q${Part Length} + {Ingate Length}$q$, 36, false),
+    (v_id, $q$Ingate Height$q$, $q$Ingate Height (mm)$q$, $q$calculated$q$, $q$mm$q$, NULL, NULL, NULL, $q$sqrt({Ingate Area} / {Ingates} / {Ingate Aspect Ratio})$q$, 37, false),
+    (v_id, $q$Ingate Width$q$, $q$Ingate Width (mm)$q$, $q$calculated$q$, $q$mm$q$, NULL, NULL, NULL, $q${Ingate Aspect Ratio} * {Ingate Height}$q$, 38, false),
+    (v_id, $q$Sprue and Well per Casting$q$, $q$Sprue and Well per Casting (mm³)$q$, $q$calculated$q$, $q$mm³$q$, NULL, NULL, NULL, $q$({Sprue Area} * {Sprue Height} + pi / 4 * {Well Diameter} ^ 2 * {Well Depth}) / {Cavities}$q$, 39, false),
+    (v_id, $q$Runner and Ingates$q$, $q$Runner and Ingates (mm³)$q$, $q$calculated$q$, $q$mm³$q$, NULL, NULL, NULL, $q${Runner Area} * {Runner Length} + {Ingate Area} * {Ingate Length}$q$, 40, false),
+    (v_id, $q$Gating Weight$q$, $q$Gating Weight (kg)$q$, $q$calculated$q$, $q$kg$q$, NULL, NULL, NULL, $q$({Sprue and Well per Casting} + {Runner and Ingates}) / 1e9 * {Density}$q$, 41, false);
 END
 $calc$;
 
@@ -681,7 +685,7 @@ BEGIN
   SELECT string_agg(e.name, ', ') INTO bad
   FROM (VALUES
     ($q$Sand Casting - Risers$q$, 16, 0),
-    ($q$Sand Casting - Gating system$q$, 37, 0),
+    ($q$Sand Casting - Gating system$q$, 41, 0),
     ($q$Sand Casting - Metal per casting$q$, 6, 0),
     ($q$Sand Casting - Material cost$q$, 9, 0),
     ($q$Sand Casting - Melting$q$, 14, 1),
