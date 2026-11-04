@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import type { SandGatingLayout } from '@/lib/casting/gating-layout';
 import { apiClient } from '../client';
 import { useAuthEnabledWith } from './useAuthEnabled';
 import { toast } from 'sonner';
@@ -871,7 +872,7 @@ export interface CostSummaryDto {
   /** Present when a die-cast part reached the HPDC cavity step — see DieCastingBreakdown. */
   dieCasting?: DieCastingBreakdown;
   /** Sand casting: what the route decided (mirrors the backend's SandCastingBreakdown). */
-  sandCasting?: { mouldingProcess: string; mouldingMachine: string; cavities: number; coresMade: number; coresLeftSolid: number; complete: boolean; measuredBy: 'casting analysis' | 'cad-engine' };
+  sandCasting?: { mouldingProcess: string; mouldingMachine: string; cavities: number; coresMade: number; coresLeftSolid: number; complete: boolean; measuredBy: 'casting analysis' | 'cad-engine'; gating: SandGatingLayout };
   /** The die-casting die amortised over its life (USD, separate from the piece cost). */
   dieTooling?: DieToolingDto;
   /** Heat / surface / other secondary operations, shared by every family. See SecondaryOperationsDto. */

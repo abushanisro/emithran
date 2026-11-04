@@ -621,6 +621,27 @@ export interface CalculatorRunDto {
   missing: string[];
 }
 
+/**
+ * The designed gating system and risers of one casting (calculators "Sand Casting - Gating system" and "- Risers"): the sizes in mm the viewer lays out
+ * around the part. Designed, not extracted: the part's CAD holds none of it.
+ */
+export interface SandGatingLayout {
+  sprueDiameterMm: number;
+  sprueHeightMm: number;
+  wellDiameterMm: number;
+  wellDepthMm: number;
+  runnerWidthMm: number;
+  runnerHeightMm: number;
+  runnerLengthMm: number;
+  ingates: number;
+  ingateWidthMm: number;
+  ingateHeightMm: number;
+  ingateLengthMm: number;
+  risers: number;
+  riserDiameterMm: number;
+  riserHeightMm: number;
+}
+
 /** What the sand route decided: the moulding process and machine, the cavities per mould and the cores. */
 export interface SandCastingBreakdown {
   mouldingProcess: string;
@@ -633,6 +654,8 @@ export interface SandCastingBreakdown {
   complete: boolean;
   /** Where the part was measured: the casting worker's analysis of the exact solid, or the cad-engine. */
   measuredBy: 'casting analysis' | 'cad-engine';
+  /** The designed gating system and risers, to draw around the part. */
+  gating: SandGatingLayout;
 }
 
 export interface MachineChoiceDto {

@@ -8,6 +8,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 import { fitCameraToBox, type Box3Like } from "@/lib/geometry/camera-fit";
+import type { GlbShape } from "@/lib/casting/gating-layout";
 import {
   glbMatchesFaces,
   lineSegments,
@@ -20,6 +21,8 @@ const FEATURE_COLOR = "#22c55e";
 const EDGE_COLOR = "#ef4444";
 const PARTING_COLOR = "#2563eb";
 const CORE_COLOR = "#f59e0b";
+const GATING_COLOR = "#8b5cf6";
+const RISER_COLOR = "#ec4899";
 /** A part's GLB is a few hundred KB; a file far beyond that is not one the worker made. */
 const MAX_GLB_BYTES = 40 * 1024 * 1024;
 
@@ -44,6 +47,9 @@ interface CastingPartViewerProps {
   partingPoints?: Xyz[] | null;
   showCores?: boolean;
   showParting?: boolean;
+  /** The designed gating system and risers, already in the GLB frame (toGlbShape): a schematic placement, not part of the part. */
+  gating?: readonly GlbShape[];
+  showGating?: boolean;
 }
 
 /**
@@ -58,6 +64,8 @@ export function CastingPartViewer({
   partingPoints = null,
   showCores = true,
   showParting = true,
+  gating = [],
+  showGating = true,
 }: CastingPartViewerProps) {
   const part = useGlb(partUrl);
   const cores = useGlb(coresUrl);
@@ -112,6 +120,7 @@ export function CastingPartViewer({
           {showCores && cores.scene && <Cores scene={cores.scene} />}
           <Lines positions={edges} color={EDGE_COLOR} />
           {showParting && <Lines positions={parting} color={PARTING_COLOR} />}
+          {showGating && <GatingSolids shapes={gating} />}
           <CameraRig bounds={bounds} nonce={nonce} />
           <OrbitControls makeDefault enableDamping />
         </Canvas>
@@ -290,6 +299,36 @@ function Body({
       {overlays.map((o) => (
         <primitive key={o.uuid} object={o} />
       ))}
+    </>
+  );
+}
+
+/** The designed gating system and risers as translucent solids (box or cylinder per shape); risers in their own colour. */
+function GatingSolids({ shapes }: { shapes: readonly GlbShape[] }) {
+  return (
+    <>
+      {shapes.map((shape) => {
+        const color = shape.name.startsWith("Riser") ? RISER_COLOR : GATING_COLOR;
+        if (shape.kind === "box") {
+          return (
+            <mesh key={shape.name} position={shape.center} name={shape.name}>
+              <boxGeometry args={shape.size} />
+              <meshStandardMaterial color={color} transparent opacity={0.55} />
+            </mesh>
+          );
+        }
+        // A cylinder is built along +Y; turn +Y onto the shape's direction.
+        const quaternion = new THREE.Quaternion().setFromUnitVectors(
+          new THREE.Vector3(0, 1, 0),
+          new THREE.Vector3(...shape.direction),
+        );
+        return (
+          <mesh key={shape.name} position={shape.center} quaternion={quaternion} name={shape.name}>
+            <cylinderGeometry args={[shape.radius, shape.radius, shape.length, 32]} />
+            <meshStandardMaterial color={color} transparent opacity={0.55} />
+          </mesh>
+        );
+      })}
     </>
   );
 }

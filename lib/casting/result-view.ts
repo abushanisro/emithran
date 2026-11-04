@@ -16,6 +16,9 @@ export interface CastingPartView {
   drawAxis: "x" | "y" | "z" | null;
   /** Whether the worker chose the axis ("auto") or measured along the one it was given ("requested"). */
   drawAxisSource: "auto" | "requested" | null;
+  /** The part's bounding box and the parting plane's height along the draw axis (part coordinates, mm), where the gating is laid out. */
+  box: { min: Xyz; max: Xyz } | null;
+  partingHeight: number | null;
 }
 
 const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
@@ -33,13 +36,14 @@ export function castingPartView(result: unknown): CastingPartView | { reason: st
     };
   const p = parts[0] as {
     glb?: unknown;
+    box_mm?: { min?: unknown; max?: unknown } | null;
     glb_faces?: unknown;
     features?: unknown;
     casting?: {
       cores_glb?: unknown;
       draw_axis?: unknown;
       draw_axis_source?: unknown;
-      parting?: { points?: unknown } | null;
+      parting?: { points?: unknown; height_mm?: unknown } | null;
     } | null;
   };
   const features = (Array.isArray(p.features) ? p.features : []).flatMap(
@@ -74,5 +78,7 @@ export function castingPartView(result: unknown): CastingPartView | { reason: st
       Array.isArray(points) && points.length > 2 ? points.filter(isXyz) : null,
     drawAxis: axis === "x" || axis === "y" || axis === "z" ? axis : null,
     drawAxisSource: source === "auto" || source === "requested" ? source : null,
+    box: isXyz(p.box_mm?.min) && isXyz(p.box_mm?.max) ? { min: p.box_mm.min, max: p.box_mm.max } : null,
+    partingHeight: isNum(p.casting?.parting?.height_mm) ? p.casting.parting.height_mm : null,
   };
 }

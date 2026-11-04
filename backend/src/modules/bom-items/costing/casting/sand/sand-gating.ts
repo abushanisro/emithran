@@ -5,6 +5,7 @@
 //
 // Nothing is substituted: a selector that finds no row, or a missing input, returns what is missing and no design.
 import type { ReferenceCalcRun, ReferenceCalculatorDef } from '../../shared/calculators/reference-calculator';
+import type { SandGatingLayout } from '../../../dto/cost-breakdown.dto';
 import { runReferenceCalculator } from '../../shared/calculators/reference-calculator';
 import type { DomainCalculatorSpec } from '../../shared/calculators/domain-calculator-spec';
 import { seedsFor, valuesProvider, variableProvider } from './sand-seeds';
@@ -131,6 +132,16 @@ export interface GatingSystem {
   risersKg: number;
   /** The two calculator runs (inputs with sources, formulas), for the trace. */
   runs: { risers: ReferenceCalcRun; gating: ReferenceCalcRun };
+}
+
+/** The sizes of the designed system the viewer draws around the part (mm): what the calculators decided, none of their bookkeeping. */
+export function gatingLayout(g: GatingSystem): SandGatingLayout {
+  return {
+    sprueDiameterMm: g.sprueDiameterMm, sprueHeightMm: g.sprueHeightMm, wellDiameterMm: g.wellDiameterMm, wellDepthMm: g.wellDepthMm,
+    runnerWidthMm: g.runnerWidthMm, runnerHeightMm: g.runnerHeightMm, runnerLengthMm: g.runnerLengthMm,
+    ingates: g.ingates, ingateWidthMm: g.ingateWidthMm, ingateHeightMm: g.ingateHeightMm, ingateLengthMm: g.ingateLengthMm,
+    risers: g.risers, riserDiameterMm: g.riserDiameterMm, riserHeightMm: g.riserHeightMm,
+  };
 }
 
 export function designGating(input: GatingInput): { system: GatingSystem | null; missing: string[] } {
