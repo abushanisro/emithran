@@ -6,6 +6,7 @@ org:member      DELETE /api/v1/balloon-diagrams/:id  ProjectReportsController.de
 org:member      DELETE /api/v1/benchmark-sessions/:id  BenchmarkSessionsController.remove
 org:member      DELETE /api/v1/bom-items/:bomItemId/process-specifications  ProcessPlanningController.deleteSpecifications
 org:member      DELETE /api/v1/bom-items/:id  BOMItemsController.remove
+org:member      DELETE /api/v1/bom-items/:id/draw-direction  BomItemDrawDirectionController.clear
 org:admin       DELETE /api/v1/bom-items/:id/force  BOMItemsController.forceRemove
 org:member      DELETE /api/v1/boms/:id  BOMsController.remove
 org:admin       DELETE /api/v1/calculators/:id  CalculatorsController.remove
@@ -78,6 +79,7 @@ org:viewer      GET /api/v1/bom-items/:id/candidate-routes  BOMItemsController.g
 org:viewer      GET /api/v1/bom-items/:id/cost-summary  BOMItemsController.getCostSummary
 org:viewer      GET /api/v1/bom-items/:id/dependencies  BOMItemsController.checkDeleteDependencies
 org:viewer      GET /api/v1/bom-items/:id/dfm-scores  BOMItemsController.getDFMScores
+org:viewer      GET /api/v1/bom-items/:id/draw-direction  BomItemDrawDirectionController.get
 org:viewer      GET /api/v1/bom-items/:id/dxf-content  BOMItemsController.getDxfContent
 org:viewer      GET /api/v1/bom-items/:id/dxf-content-legacy  BOMItemsController.getDxfContentLegacy
 org:viewer      GET /api/v1/bom-items/:id/feature-tolerances  BOMItemsController.getFeatureTolerances
@@ -407,6 +409,7 @@ org:member      PUT /api/v1/balloon-diagrams/:id  ProjectReportsController.updat
 org:member      PUT /api/v1/benchmark-sessions/:id  BenchmarkSessionsController.update
 org:member      PUT /api/v1/bom-items/:bomItemId/process-specifications  ProcessPlanningController.updateSpecifications
 org:member      PUT /api/v1/bom-items/:id  BOMItemsController.update
+org:member      PUT /api/v1/bom-items/:id/draw-direction  BomItemDrawDirectionController.set
 org:member      PUT /api/v1/bom-items/:id/feature-tolerances/:featureKey  BOMItemsController.setFeatureTolerances
 org:member      PUT /api/v1/bom-items/:id/tolerance-policy  BOMItemsController.setTolerancePolicy
 org:member      PUT /api/v1/boms/:id  BOMsController.update

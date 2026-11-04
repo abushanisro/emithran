@@ -15,8 +15,11 @@ import {
   CASTING_SCHEMA_VERSION,
   CASTING_SOURCE_BUCKET,
   CASTING_WORKER_VERSION,
+  type CastingAnalysisConfig,
   type CastingAnalysisRow,
+  parseCastingConfig,
 } from "./casting-analysis.types";
+import { drawDirectionMismatch, workerInputs } from "./casting-config";
 import { parseCastingResult } from "./casting-result";
 import { WorkerHostClient, WorkerRunError } from "./worker-host-client";
 
@@ -163,7 +166,11 @@ export class CastingAnalysisRunner implements OnModuleInit, OnModuleDestroy {
       );
     }
 
-    const output = await this.runWorker(bytes);
+    // The configuration is the row's own: a row whose configuration this backend does not know is not run with a guess.
+    const config = parseCastingConfig(row.config);
+    if (!config)
+      throw new PermanentFailure("invalid_config", "The analysis has a configuration this backend does not know.");
+    const output = await this.runWorker(bytes, config);
     if (!output.result)
       throw new WorkerRunError(
         "no_result",
@@ -202,6 +209,10 @@ export class CastingAnalysisRunner implements OnModuleInit, OnModuleDestroy {
       );
     }
 
+    // The worker must have done what was asked: a result along another axis would be stored as an answer to a question it did not answer.
+    const mismatch = drawDirectionMismatch(result, config);
+    if (mismatch) throw new PermanentFailure("draw_direction_mismatch", mismatch);
+
     const prefix = `casting-analyses/${row.organization_id}/${row.id}`;
     for (const [name, content] of output.parts)
       await this.objects.put(CASTING_SOURCE_BUCKET, `${prefix}/${name}`, content, {
@@ -226,8 +237,8 @@ export class CastingAnalysisRunner implements OnModuleInit, OnModuleDestroy {
 
   /** Records the failure; true when the analysis was put back in the queue for another attempt. */
   /** The one call to the sandboxed worker host; a seam for tests. */
-  protected runWorker(bytes: Buffer) {
-    return (this.host as WorkerHostClient).run([{ name: "part.step", bytes }]);
+  protected runWorker(bytes: Buffer, config: CastingAnalysisConfig) {
+    return (this.host as WorkerHostClient).run(workerInputs(bytes, config));
   }
 
   private async fail(row: CastingAnalysisRow, error: unknown): Promise<boolean> {

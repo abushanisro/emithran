@@ -65,6 +65,26 @@ for f in corrupt not-step; do
 done
 compare compare "$PWD/casting-worker/tests/expected.json" "$PWD/$WORK/results" "$PWD/casting-worker/result.schema.json"
 
+echo "== draw axis (the engineer's choice)"
+# hollow-box.step is a 100 x 60 x 40 mm block with a closed cavity: along x, y, z the part is 100, 60, 40 mm deep. Chosen by the worker: x (the fewest
+# hidden regions, then the shallowest); requested: the asked axis, and the result says so.
+axis_case() { # <axis or auto> <expected axis> <expected source> <expected depth mm>
+    ask="$1"; want="$2 $3 $4"; mkdir -p "$WORK/results/axis-$ask"; chmod 777 "$WORK/results/axis-$ask"
+    if [ "$ask" = auto ]; then set --; else set -- --draw-axis "$ask"; fi
+    worker -v "$PWD/$WORK/results/axis-$ask:/out" "$IMAGE" "$@" /in/hollow-box.step /out >/dev/null || fail "draw axis $ask: the worker failed"
+    got="$(node -e 'const c=JSON.parse(require("fs").readFileSync(process.argv[1])).parts[0].casting;console.log(c.draw_axis,c.draw_axis_source,c.draw_depth_mm)' "$WORK/results/axis-$ask/result.json")"
+    [ "$got" = "$want" ] && pass "draw axis $ask: $got" || fail "draw axis $ask: got '$got', expected '$want'"
+}
+axis_case auto x auto 100
+axis_case x x requested 100
+axis_case y y requested 60
+axis_case z z requested 40
+for bad in w X xy ''; do
+    set +e; worker "$IMAGE" --draw-axis "$bad" /in/box.step /tmp >/dev/null 2>&1; rc=$?; set -e
+    [ "$rc" = 64 ] || fail "draw axis '$bad' accepted (exit $rc)"
+done
+pass "an invalid draw axis (w, X, xy, empty) is refused: exit 64"
+
 echo "== limits"
 run_sample assembly --deadline-ms 1
 mv "$WORK/results/assembly.out" "$WORK/deadline.out"; mv "$WORK/results/assembly.exit" "$WORK/deadline.exit"
