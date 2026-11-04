@@ -15,6 +15,9 @@ export const AUDIT_ACTIONS = {
   // an engineer set (or released) one plant variable for one sand-cast part; the reason is the engineer's own words
   'sand_variable_override.set': ['variable', 'value', 'reason', 'previousValue', 'plantValue'],
   'sand_variable_override.cleared': ['variable', 'previousValue', 'previousReason'],
+  // a member froze a sand-cast part's cost result; a different member approved or rejected it, with a note
+  'sand_snapshot.created': ['snapshotId', 'label', 'pieceCost'],
+  'sand_snapshot.reviewed': ['snapshotId', 'decision', 'note'],
   'casting_analysis.failed': ['errorCode'],
   'file.deleted': ['fileType'],
   'bom.deleted': ['name'],

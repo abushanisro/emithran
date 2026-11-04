@@ -96,6 +96,7 @@ org:viewer      GET /api/v1/bom-items/:id/nre  BOMItemsController.getNre
 org:viewer      GET /api/v1/bom-items/:id/pmi-records  BOMItemsController.getPmiRecords
 org:viewer      GET /api/v1/bom-items/:id/route-comparison  BOMItemsController.getRouteComparison
 org:viewer      GET /api/v1/bom-items/:id/sand-dfm  BOMItemsController.getSandDfm
+org:viewer      GET /api/v1/bom-items/:id/sand-snapshots  SandSnapshotsController.list
 org:viewer      GET /api/v1/bom-items/:id/sand-variable-overrides  SandVariableOverridesController.list
 org:viewer      GET /api/v1/bom-items/:id/secondary-processes  BOMItemsController.getSecondaryProcesses
 org:viewer      GET /api/v1/bom-items/:id/true-nest  BOMItemsController.getTrueNest
@@ -299,6 +300,7 @@ org:member      POST /api/v1/bom-items/:id/machining-calculator-inputs  BOMItems
 org:member      POST /api/v1/bom-items/:id/pmi-records/review  BOMItemsController.reviewPmiRecord
 org:member      POST /api/v1/bom-items/:id/reanalyze  BOMItemsController.reanalyze
 org:member      POST /api/v1/bom-items/:id/route-applications  BOMItemsController.applyRoute
+org:member      POST /api/v1/bom-items/:id/sand-snapshots  SandSnapshotsController.create
 org:member      POST /api/v1/bom-items/:id/step-conversions  BOMItemsController.convertStepFile
 org:member      POST /api/v1/bom-items/autofill-analyses  BOMItemsController.analyzeForAutoFill
 org:member      POST /api/v1/bom-items/autofill-analysis-jobs  BOMItemsController.startAnalyzeForAutoFill
@@ -379,6 +381,7 @@ org:member      POST /api/v1/remarks/:remarkId/comments  RemarkController.create
 org:member      POST /api/v1/rfq-trackings  RfqTrackingController.createTracking
 org:member      POST /api/v1/rfqs  RfqController.create
 org:member      POST /api/v1/routing-rules  ManufacturingKnowledgeController.createRoutingRule
+org:member      POST /api/v1/sand-snapshots/:snapshotId/review  SandSnapshotReviewController.review
 org:member      POST /api/v1/supplier-evaluation-groups  SupplierEvaluationGroupsController.create
 org:member      POST /api/v1/supplier-evaluations  SupplierEvaluationController.create
 org:member      POST /api/v1/supplier-nominations  SupplierNominationsController.create
