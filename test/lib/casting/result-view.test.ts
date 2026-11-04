@@ -29,6 +29,7 @@ const part = {
   ],
   casting: {
     draw_axis: "z",
+    draw_axis_source: "requested",
     cores_glb: "parts/0-1-1-1-cores.glb",
     parting: {
       points: [
@@ -76,6 +77,7 @@ describe("castingPartView", () => {
         [1, 1, 5],
       ],
       drawAxis: "z",
+      drawAxisSource: "requested",
     });
   });
 
@@ -109,6 +111,7 @@ describe("castingPartView", () => {
       glbFaces: [],
       partingPoints: null,
       drawAxis: null,
+      drawAxisSource: null,
       features: [
         {
           id: "Ring:1",
