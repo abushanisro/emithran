@@ -45,8 +45,8 @@ describe('docker-compose.prod.yml', () => {
     expect(s.cap_add).toBeUndefined();
     expect(s.security_opt).toContain('no-new-privileges:true');
     expect(s.privileged).toBeUndefined();
-    // Sharing another container's or the host's network namespace is never allowed; only the CAD worker has none at all.
-    expect(s.network_mode).toBe(name === 'cad-worker' ? 'none' : undefined);
+    // Sharing another container's or the host's network namespace is never allowed; only the two CAD workers have none at all.
+    expect(s.network_mode).toBe(['cad-worker', 'casting-worker'].includes(name) ? 'none' : undefined);
     expect(s.deploy?.resources?.limits?.pids).toBeGreaterThan(0);
     expect(s.deploy?.resources?.limits?.memory).toBeTruthy();
     expect(s.deploy?.resources?.limits?.cpus).toBeTruthy();
@@ -141,6 +141,27 @@ describe('docker-compose.prod.yml', () => {
     expect(runner?.group_add).toEqual([worker?.user?.split(':')[1]]);
   });
 
+  it('parses customer CAD in casting-worker as in cad-worker: no credential, no network, its own user, only its socket volume shared, with the backend', () => {
+    const worker = compose.services['casting-worker'];
+    const backend = compose.services.backend;
+    expect(worker?.network_mode).toBe('none');
+    expect(worker?.networks).toBeUndefined();
+    expect(worker?.profiles).toEqual(['sand-casting']);
+    expect(Object.keys(worker?.environment ?? {}).sort()).toEqual(['MAX_UPLOAD_MB', 'WORKER_MEMORY_MB']);
+    expect(/^ {2}casting-worker:\n(?: {4}.*\n|\n)*/m.exec(read('docker-compose.prod.yml'))?.[0]).not.toMatch(/SECRET|KEY|TOKEN|PASSWORD|URL|DB_URI/);
+    expect(worker?.user).toBeTruthy();
+    expect(backend?.user ?? '').not.toBe(worker?.user);
+    expect(worker?.read_only).toBe(true);
+    expect(worker?.cap_drop).toContain('ALL');
+    // Its volume is its socket's only, and only the backend (which sends the files) shares it.
+    expect(worker?.volumes).toEqual(['casting-worker-socket:/run/cad-worker']);
+    const sharing = services.filter(([, s]) => (s.volumes ?? []).some((v) => v.startsWith('casting-worker-socket:'))).map(([n]) => n).sort();
+    expect(sharing).toEqual(['backend', 'casting-worker']);
+    // The backend reaches the socket through the worker's group, and the setting is empty (analyses stay queued) unless set.
+    expect(backend?.group_add).toEqual([worker?.user?.split(':')[1]]);
+    expect(String(backend?.environment?.CASTING_WORKER_SOCKET)).toBe('${CASTING_WORKER_SOCKET:-}');
+  });
+
   it('cad-core refuses to start without its database secret and bucket settings', () => {
     const env = compose.services['cad-core']?.environment ?? {};
     for (const name of ['DB_JWT_SECRET', 'S3_BUCKET', 'S3_REGION', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY']) {
@@ -182,6 +203,7 @@ describe('docker-compose.prod.yml', () => {
   it('keeps the runner off the edge network: it could forge the Cloudflare client-address header to the backend from there', () => {
     expect(compose.services['cad-core']?.networks).toEqual(['db']);
     expect(compose.services['cad-worker']?.networks).toBeUndefined();
+    expect(compose.services['casting-worker']?.networks).toBeUndefined();
     const edgePeers = services.filter(([, s]) => (s.networks ?? []).includes('edge')).map(([n]) => n).sort();
     expect(edgePeers).toEqual(['backend', 'cloudflared', 'frontend']);
   });
