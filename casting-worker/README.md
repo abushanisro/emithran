@@ -16,6 +16,18 @@ folder were removed, and the `ninja-build` pin loosened to `1.12.1-1*` (the exac
 This is a separate worker from `geometry-worker/` (the assembly measurer `cad-uploads` uses); neither is changed by
 the other. Merging them is a later decision.
 
+## The worker host (sand casting module)
+
+Target `host` of the Dockerfile is core's `cad-worker-host` and this worker in one sandboxed container (no network, no credentials, non-root 10005), the way the assembly core runs
+its worker: the backend sends a part's STEP bytes over a Unix socket and gets `result.json` and the mesh files back (`backend/src/modules/sand-casting`). The host calls its worker as
+`--deadline-ms N <out-dir> <input>...`; this worker takes the output folder last, so `host-adapter.sh` reorders the arguments inside the image (neither program is changed).
+
+```
+docker compose -f docker-compose.prod.yml --profile sand-casting up -d casting-worker
+CASTING_WORKER_SOCKET=/run/casting-worker/worker.sock    # for the backend; unset: casting analyses stay queued
+casting-worker/e2e.sh                                    # a real STEP part through the real host with the backend's client
+```
+
 ## Checks
 
 ```

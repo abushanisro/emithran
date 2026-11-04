@@ -288,6 +288,8 @@ jobs:
         working-directory: backend
       # Builds OCCT from source (slow), runs the unit tests and the samples in the production sandbox, compares results.
       - run: casting-worker/check.sh
+      # The worker host (core's cad-worker-host + this worker, target `host`) in its sandbox, a real STEP part through the backend's own client over the socket.
+      - run: casting-worker/e2e.sh
 
   cad-engine:
     name: CAD Engine (Docker build)

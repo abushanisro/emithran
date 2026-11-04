@@ -8,6 +8,8 @@ export const AUDIT_ACTIONS = {
   'upload.created': ['fileName', 'sizeBytes', 'duplicate'],
   'upload.completed': ['fileName', 'parts', 'items', 'durationMs'],
   'upload.failed': ['fileName', 'errorCode'],
+  'casting_analysis.requested': ['bomItemId', 'reused'],
+  'casting_analysis.failed': ['errorCode'],
   'file.deleted': ['fileType'],
   'bom.deleted': ['name'],
   'bom_item.deleted': ['name', 'itemType'],

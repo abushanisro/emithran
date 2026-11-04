@@ -12,6 +12,7 @@ import { VendorsModule } from './modules/vendors/vendors.module';
 import { BOMsModule } from './modules/boms/boms.module';
 import { BOMItemsModule } from './modules/bom-items/bom-items.module';
 import { CadUploadsModule } from './modules/cad-uploads/cad-uploads.module';
+import { SandCastingModule } from './modules/sand-casting/sand-casting.module';
 import { AuditModule } from './common/audit/audit.module';
 import { AiModule } from './common/ai/ai.module';
 import { ProcessesModule } from './modules/processes/processes.module';
@@ -79,6 +80,7 @@ import { AppController } from './app.controller';
     BOMsModule,
     BOMItemsModule,
     CadUploadsModule,
+    SandCastingModule,
     AuditModule,
     AiModule,
     ProcessesModule,

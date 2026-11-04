@@ -7226,6 +7226,19 @@
         ],
         "type": "object"
       },
+      "RequestCastingAnalysisDto": {
+        "properties": {
+          "bomItemId": {
+            "description": "The BOM item whose 3D file is to be analysed.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "bomItemId"
+        ],
+        "type": "object"
+      },
       "RequestQuoteDto": {
         "properties": {},
         "type": "object"
@@ -15270,6 +15283,94 @@
         "summary": "Update a specific formula",
         "tags": [
           "Calculators"
+        ]
+      }
+    },
+    "/api/v1/casting-analyses": {
+      "get": {
+        "operationId": "SandCastingController_list_v1",
+        "parameters": [
+          {
+            "description": "The BOM item whose analyses are listed.",
+            "in": "query",
+            "name": "bomItemId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The casting analyses of a BOM item, newest first. An empty list means not requested, never passed.",
+        "tags": [
+          "Casting analyses"
+        ]
+      },
+      "post": {
+        "operationId": "SandCastingController_request_v1",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestCastingAnalysisDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ask for the casting analysis of a BOM item's 3D file. It runs in the background; an identical request returns the existing analysis (200), a new one answers 201.",
+        "tags": [
+          "Casting analyses"
+        ]
+      }
+    },
+    "/api/v1/casting-analyses/{id}": {
+      "get": {
+        "operationId": "SandCastingController_get_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One casting analysis: queued, running, succeeded or partial (with the result) or failed (with a code).",
+        "tags": [
+          "Casting analyses"
         ]
       }
     },

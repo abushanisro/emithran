@@ -104,6 +104,8 @@ org:viewer      GET /api/v1/calculators  CalculatorsController.findAll
 org:viewer      GET /api/v1/calculators/:id  CalculatorsController.findOne
 org:viewer      GET /api/v1/calculators/:id/fields  CalculatorsController.getFields
 org:viewer      GET /api/v1/calculators/:id/formulas  CalculatorsController.getFormulas
+org:viewer      GET /api/v1/casting-analyses  SandCastingController.list
+org:viewer      GET /api/v1/casting-analyses/:id  SandCastingController.get
 org:viewer      GET /api/v1/child-part-costs  ChildPartCostController.findAll
 org:viewer      GET /api/v1/child-part-costs/:id  ChildPartCostController.findOne
 org:viewer      GET /api/v1/copilot/memory  CopilotController.getMemory
@@ -303,6 +305,7 @@ org:member      POST /api/v1/calculators/:id/execute  CalculatorsController.exec
 org:admin       POST /api/v1/calculators/:id/fields  CalculatorsController.createField
 org:admin       POST /api/v1/calculators/:id/formulas  CalculatorsController.createFormula
 org:member      POST /api/v1/calculators/sheet-metal/lookups  CalculatorsController.sheetMetalLookup
+org:member      POST /api/v1/casting-analyses  SandCastingController.request
 org:member      POST /api/v1/child-part-costs  ChildPartCostController.create
 org:member      POST /api/v1/child-part-costs/calculations  ChildPartCostController.calculateOnly
 org:member      POST /api/v1/copilot/chat  CopilotController.chat
