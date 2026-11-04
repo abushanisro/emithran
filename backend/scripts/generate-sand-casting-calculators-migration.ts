@@ -6,7 +6,7 @@
  */
 import { writeFileSync } from 'fs';
 import { join } from 'path';
-import { buildSandCastingCalculatorsMigrationSql, buildSandHotBoxPhysicsMigrationSql } from '../src/modules/bom-items/costing/casting/sand/calculators/sand-casting-calculators-migration';
+import { buildSandCastingCalculatorsMigrationSql, buildSandGatingVelocityMigrationSql, buildSandHotBoxPhysicsMigrationSql } from '../src/modules/bom-items/costing/casting/sand/calculators/sand-casting-calculators-migration';
 
 const OUT = join(__dirname, '../migrations/956_sand_casting_calculators.sql');
 writeFileSync(OUT, buildSandCastingCalculatorsMigrationSql());
@@ -14,3 +14,6 @@ console.log(`wrote ${OUT}`);
 const HOT_BOX = join(__dirname, '../migrations/958_sand_hot_box_physics.sql');
 writeFileSync(HOT_BOX, buildSandHotBoxPhysicsMigrationSql());
 console.log(`wrote ${HOT_BOX}`);
+const GATING = join(__dirname, '../migrations/959_sand_gating_velocity.sql');
+writeFileSync(GATING, buildSandGatingVelocityMigrationSql());
+console.log(`wrote ${GATING}`);

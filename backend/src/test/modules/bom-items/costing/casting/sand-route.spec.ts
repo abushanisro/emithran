@@ -124,6 +124,16 @@ describe('what the user can choose, and what the data cannot do', () => {
     expect(r.warnings.join(' ')).toMatch(/Height above the parting line not measured/);
   });
 
+  it('says how fast the metal enters the casting, and that the riser feeding efficiency is an unverified rule', () => {
+    const text = route!.warnings.join(' ');
+    expect(text).toMatch(/Metal enters the casting at \d+\.\d\d m\/s through the ingates \(\d+\.\d\d m\/s at the choke\)/);
+    // the route is gray iron: no published limit is held for it, so the speed is reported and not judged
+    expect(text).toMatch(/No published limit is held for Gray Iron, so it is not judged/);
+    expect(text).toMatch(/14 % feeding efficiency, a rule with no published source that could be verified/);
+    // the speed in the note is the one the design computed
+    expect(text).toContain(`${route!.gating.ingateVelocityMs.toFixed(2)} m/s through the ingates`);
+  });
+
   it('says what is not costed: patterns, core coating, sand', () => {
     expect(route!.warnings.join(' ')).toMatch(/Patterns, core coating and core gluing are not costed/);
   });

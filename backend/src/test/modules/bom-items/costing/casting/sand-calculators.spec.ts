@@ -1,7 +1,7 @@
 import { erf } from 'mathjs';
 import { readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
-import { buildSandCastingCalculatorsMigrationSql, buildSandHotBoxPhysicsMigrationSql } from '../../../../../modules/bom-items/costing/casting/sand/calculators/sand-casting-calculators-migration';
+import { buildSandCastingCalculatorsMigrationSql, buildSandGatingVelocityMigrationSql, buildSandHotBoxPhysicsMigrationSql } from '../../../../../modules/bom-items/costing/casting/sand/calculators/sand-casting-calculators-migration';
 import {
   loadSandCastingCalculatorSpec,
   sandCastingCalculatorsByName,
@@ -31,6 +31,11 @@ describe('sand casting calculator spec', () => {
   it('the committed migration 958 (the hot box physics) equals what the spec generates for that calculator alone', () => {
     const committed = readFileSync(join(MIGRATIONS, '958_sand_hot_box_physics.sql'), 'utf8');
     expect(committed.replace(/\r\n/g, '\n')).toBe(buildSandHotBoxPhysicsMigrationSql());
+  });
+
+  it('the committed migration 959 (the gating velocity) equals what the spec generates for the gating and riser calculators alone', () => {
+    const committed = readFileSync(join(MIGRATIONS, '959_sand_gating_velocity.sql'), 'utf8');
+    expect(committed.replace(/\r\n/g, '\n')).toBe(buildSandGatingVelocityMigrationSql());
   });
 
   it('has the 20 calculators of the step design: 12 compute operations (20 of them), 8 are helpers', () => {

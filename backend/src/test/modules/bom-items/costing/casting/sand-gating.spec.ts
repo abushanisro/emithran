@@ -110,6 +110,29 @@ describe('designGating on a gray iron casting (real sand data, the calculators o
     expect(s.ingateHeightMm * s.ingateWidthMm).toBeCloseTo(s.ingateAreaMm2 / 2, 6);
   });
 
+  // At the choke the metal moves at the efficiency times sqrt(2 g H) (Bernoulli, by construction of the choke area): 0.90 x sqrt(2 x 9.81 x 0.200) = 1.7828 m/s.
+  // The 1:2:2 ratio makes the runner and the ingates twice the choke area (one cavity), so the metal is half as fast there: 0.8914 m/s.
+  it('the metal moves at 0.90 sqrt(2 g H) = 1.7828 m/s at the choke and half that through the 1:2:2 runner and ingates', () => {
+    const s = system!;
+    expect(s.chokeVelocityMs).toBeCloseTo(0.9 * Math.sqrt(2 * 9.81 * 0.2), 9);
+    expect(s.chokeVelocityMs).toBeCloseTo(1.7828, 4);
+    expect(s.ingateVelocityMs).toBeCloseTo(s.chokeVelocityMs / 2, 9);
+    expect(s.runs.gating.outputs['Runner Velocity']).toBeCloseTo(s.chokeVelocityMs / 2, 9);
+  });
+
+  it('the velocity is the flow over the area: the mould\'s metal over its pouring time, through the ingates together', () => {
+    const s = system!;
+    const poured = 8 + s.risersKg + s.gatingKg;
+    const flow = poured / (7100 * s.pourTimeS); // m3/s
+    expect(s.runs.gating.outputs['Flow Rate']).toBeCloseTo(flow, 12);
+    expect(s.ingateVelocityMs).toBeCloseTo(flow / (s.ingateAreaMm2 * 1e-6), 9);
+  });
+
+  it('two cavities share the flow: each casting has its own ingates, so the velocity through them follows the same ratio', () => {
+    const two = designGating({ ...input, mould: { ...input.mould, cavities: 2 } }).system!;
+    expect(two.ingateVelocityMs).toBeCloseTo(two.chokeVelocityMs / 2, 9);
+  });
+
   it('the gating weight has settled: it is the weight of the system designed for the metal it itself adds', () => {
     const again = designGating({ ...input, netKg: 8 }); // the design is deterministic
     expect(again.system!.gatingKg).toBeCloseTo(system!.gatingKg, 12);

@@ -46,3 +46,30 @@ export function buildSandHotBoxPhysicsMigrationSql(): string {
     },
   );
 }
+
+export const SAND_GATING_VELOCITY_MIGRATION = 959;
+
+/**
+ * The SQL of migrations/959_sand_gating_velocity.sql: the gating and riser calculators alone, as the spec has them now. The gating calculator gains the
+ * metal's velocity at the choke, in the runner and in the ingates; the riser calculator's feeding efficiency, a rule with no source that could be
+ * verified, is named as such. A database that already ran 956 needs this one (calculators are matched by name and their fields replaced, so it is also
+ * harmless after a fresh 956).
+ */
+export function buildSandGatingVelocityMigrationSql(): string {
+  const spec = loadSandCastingCalculatorSpec();
+  return buildDomainCalculatorsMigrationSql(
+    { ...spec, calculators: spec.calculators.filter((c) => c.name === 'Sand Casting - Gating system' || c.name === 'Sand Casting - Risers') },
+    {
+      number: SAND_GATING_VELOCITY_MIGRATION,
+      title: 'Sand casting gating and riser calculators -- the velocity of the metal in the gating; the riser feeding efficiency named as unverified.',
+      generator: 'scripts/generate-sand-casting-calculators-migration.ts',
+      specPath: 'src/modules/bom-items/costing/casting/sand/calculators/sand-casting-calculators.json',
+      rootCause: [
+        'The gating calculator sized the choke, sprue, runner and ingates but never said how fast the metal moves through them. The velocity is the mould\'s metal',
+        'over its pouring time (the flow) over the area it passes through; at the choke it equals the efficiency times sqrt(2 g H) by construction. The riser',
+        'calculator\'s 14 % feeding efficiency was labelled a standard rule; a research pass found a source for the modulus factor 1.2 and the height-to-diameter',
+        'ratio 1.5 but none for the 14 %, so the field is now named an unverified rule and the route says so.',
+      ].join('\n'),
+    },
+  );
+}
