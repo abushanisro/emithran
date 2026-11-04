@@ -29,6 +29,7 @@ import {
 import { gatingWhenOpen, mouldSolids, type FlaskSize } from "@/lib/casting/mould-layout";
 import { processStages, type StageLine } from "@/lib/casting/process-stages";
 import { castingPartView } from "@/lib/casting/result-view";
+import { thicknessField } from "@/lib/casting/thickness-field";
 import { THICKNESS_RAMP_CSS, thicknessMap } from "@/lib/casting/thickness-map";
 
 /** What colours the mesh: a design check (draft, thin walls) or the measured wall thickness itself. */
@@ -173,6 +174,9 @@ export function SandCastingFeaturesPanel({
     : [];
   // The measured thickness needs no design check: it is the worker's own number on a continuous ramp.
   const thickness = thicknessMap(part.wallThickness);
+  // Worker 0.17.0 and later also give the rays: the thickness is then drawn smoothly over each face, on the worker's own thin-to-thick range.
+  const field = overlay === "thickness" ? thicknessField(part.wallRays, part.wallRange) : null;
+  const thicknessRange = field?.range ?? thickness?.range ?? null;
   const faceColors =
     overlay === "thickness"
       ? (thickness?.colors ?? null)
@@ -201,6 +205,7 @@ export function SandCastingFeaturesPanel({
             showMould={showMould}
             section={section}
             faceColors={faceColors}
+            thicknessField={field}
           />
         ) : (
           <div className="flex h-full items-center justify-center text-muted-foreground">
@@ -304,12 +309,13 @@ export function SandCastingFeaturesPanel({
             </select>
             {overlay === "thickness" && thickness && (
               <span className="flex items-center gap-1 text-[9px]">
-                {thickness.range.min.toFixed(1)} mm
+                {(thicknessRange ?? thickness.range).min.toFixed(1)} mm
                 <i
                   className="inline-block h-2 w-16 rounded-sm"
                   style={{ background: THICKNESS_RAMP_CSS }}
                 />
-                {thickness.range.max.toFixed(1)} mm
+                {(thicknessRange ?? thickness.range).max.toFixed(1)} mm
+                {!field && <span className="text-muted-foreground">(per face: re-run the analysis for the smooth map)</span>}
               </span>
             )}
             {overlay && overlay !== "thickness" && (

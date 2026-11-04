@@ -9,6 +9,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 import { fitCameraToBox, type Box3Like } from "@/lib/geometry/camera-fit";
 import type { GlbShape } from "@/lib/casting/gating-layout";
+import { vertexColors, vertexThickness, type ThicknessField } from "@/lib/casting/thickness-field";
 import {
   glbMatchesFaces,
   lineSegments,
@@ -59,6 +60,8 @@ interface CastingPartViewerProps {
   section?: boolean;
   /** Face number (the result's numbering) to colour: the draft overlay. Applied only when the loaded model matches `glbFaces`. */
   faceColors?: ReadonlyMap<number, string> | null;
+  /** The wall thickness over the surface (worker 0.17.0 rays): each vertex coloured from the nearest rays of its face. Wins over `faceColors`. */
+  thicknessField?: ThicknessField | null;
 }
 
 /**
@@ -79,6 +82,7 @@ export function CastingPartViewer({
   showMould = false,
   section = false,
   faceColors = null,
+  thicknessField = null,
 }: CastingPartViewerProps) {
   const part = useGlb(partUrl);
   const cores = useGlb(coresUrl);
@@ -137,7 +141,9 @@ export function CastingPartViewer({
             scene={part.scene}
             meshes={meshes}
             selected={selected}
-            colors={addressable && faceColors ? meshColors(glbFaces, faceColors) : null}
+            colors={addressable && faceColors && !thicknessField ? meshColors(glbFaces, faceColors) : null}
+            field={addressable ? thicknessField : null}
+            glbFaces={glbFaces}
           />
           {showCores && cores.scene && <Cores scene={cores.scene} />}
           <Lines positions={edges} color={EDGE_COLOR} />
@@ -266,12 +272,17 @@ function Body({
   meshes,
   selected,
   colors,
+  field,
+  glbFaces,
 }: {
   scene: THREE.Group;
   meshes: THREE.Mesh[];
   selected: number[];
   /** A colour per mesh (the overlay), or null for the plain body. */
   colors: (string | null)[] | null;
+  /** The thickness over the surface, drawn as vertex colours on the meshes whose face has rays. */
+  field: ThicknessField | null;
+  glbFaces: readonly number[];
 }) {
   const body = useMemo(
     () =>
@@ -322,6 +333,45 @@ function Body({
       byColor.forEach((m) => m.dispose());
     };
   }, [meshes, body, colors]);
+  // The thickness over the surface: vertex colours from the nearest rays of each mesh's own face; a face with no ray keeps what the effect above gave it.
+  useEffect(() => {
+    if (!field) return undefined;
+    scene.updateMatrixWorld(true);
+    const applied: Array<{ mesh: THREE.Mesh; material: THREE.Material | THREE.Material[]; colour: THREE.BufferAttribute | null }> = [];
+    const painted = new THREE.MeshStandardMaterial({
+      color: "#ffffff",
+      vertexColors: true,
+      metalness: 0.05,
+      roughness: 0.6,
+      side: THREE.DoubleSide,
+      polygonOffset: true,
+      polygonOffsetFactor: 1,
+      polygonOffsetUnits: 1,
+    });
+    meshes.forEach((mesh, i) => {
+      const samples = field.byFace.get(glbFaces[i] ?? -1);
+      const position = mesh.geometry.getAttribute("position");
+      if (!samples || !position) return;
+      const world = new Float32Array(position.count * 3);
+      const v = new THREE.Vector3();
+      for (let j = 0; j < position.count; j++) {
+        v.fromBufferAttribute(position, j).applyMatrix4(mesh.matrixWorld);
+        world.set([v.x, v.y, v.z], 3 * j);
+      }
+      const colours = vertexColors(vertexThickness(world, samples), field.range);
+      applied.push({ mesh, material: mesh.material, colour: mesh.geometry.getAttribute("color") as THREE.BufferAttribute | null });
+      mesh.geometry.setAttribute("color", new THREE.BufferAttribute(colours, 3));
+      mesh.material = painted;
+    });
+    return () => {
+      for (const a of applied) {
+        if (a.colour) a.mesh.geometry.setAttribute("color", a.colour);
+        else a.mesh.geometry.deleteAttribute("color");
+        a.mesh.material = a.material;
+      }
+      painted.dispose();
+    };
+  }, [field, meshes, glbFaces, scene, colors]);
   useEffect(
     () => () => {
       highlight.dispose();

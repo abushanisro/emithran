@@ -33,7 +33,7 @@ const part = {
     draw_axis_source: "requested",
     cores_glb: "parts/0-1-1-1-cores.glb",
     draft: { faces: [{ face: 3, min_deg: 0 }, { face: 1, min_deg: 90 }, { face: "x" }, null] },
-    wall_mm: { min: 10, nominal: 20, max: 40, samples: 9, faces: [{ face: 2, min: 10, samples: 3 }, { face: 0, min: 20, samples: 1 }, { face: 1.5 }, null] },
+    wall_mm: { min: 10, nominal: 20, max: 40, samples: 9, faces: [{ face: 2, min: 10, samples: 3 }, { face: 0, min: 20, samples: 1 }, { face: 1.5 }, null], point_stride: 1, points: [[2, 1, 2, 3, 10], [0, 4, 5, 6, 20.5], [0.5, 1, 1, 1, 9], [1, 1, 1], "x", [3, 1, 2, 3, Number.NaN]] },
     parting: {
       height_mm: 50,
       points: [
@@ -90,6 +90,11 @@ describe("castingPartView", () => {
         { face: 2, min: 10 },
         { face: 0, min: 20 },
       ],
+      wallRays: [
+        { face: 2, at: [1, 2, 3], mm: 10 },
+        { face: 0, at: [4, 5, 6], mm: 20.5 },
+      ],
+      wallRange: { min: 10, max: 40 },
     });
   });
 
@@ -129,6 +134,8 @@ describe("castingPartView", () => {
       draftFaces: [],
       wallFaces: [],
       wallThickness: [],
+      wallRays: [],
+      wallRange: null,
       features: [
         {
           id: "Ring:1",
