@@ -12,6 +12,7 @@ import { DatabaseService } from '../../common/database/database.service';
 import { ELECTRONICS_JOB_QUEUE, type QueueHealth } from '../electronics-costing/infrastructure/queue/job-queue.port';
 import { ElectronicsQueueHealthIndicator } from '../electronics-costing/infrastructure/queue/queue.health';
 import { HealthController } from './health.controller';
+import { CastingWorkerHealthIndicator } from './indicators/casting-worker.health';
 import { EngineHealthIndicator } from './indicators/engine.health';
 import { DatabaseHealthIndicator } from './indicators/database.health';
 
@@ -76,6 +77,7 @@ describe('HealthController: liveness and readiness', () => {
       providers: [
         DatabaseHealthIndicator,
         EngineHealthIndicator,
+        CastingWorkerHealthIndicator,
         ElectronicsQueueHealthIndicator,
         { provide: DatabaseService, useValue: database },
         { provide: ELECTRONICS_JOB_QUEUE, useValue: { health: async () => queueHealth } },
