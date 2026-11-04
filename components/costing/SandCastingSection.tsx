@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 
 import type { AnalysisState } from '@/lib/casting/analysis-view';
 import {
+  HOT_BOX_GUIDANCE,
   SAND_CORE_PROCESSES,
   SAND_MOULDING_PROCESSES,
   SAND_SCENARIO_KEYS,
@@ -112,6 +113,30 @@ export function SandCastingSection({ overrides, route, onChange, analysis }: Pro
         parse={parsePositive}
         onCommit={(v) => { onChange({ [SAND_SCENARIO_KEYS.energyPrice]: v }); }}
         title="Electricity price for melting. It is not in the reference data, so nothing is assumed: until you set it, melting energy is not charged."
+      />
+      <NumberField
+        label="Box temp, °C"
+        value={number(SAND_SCENARIO_KEYS.hotBoxCoreboxTemp)}
+        placeholder="set for hot box cores"
+        parse={parsePositive}
+        onCommit={(v) => { onChange({ [SAND_SCENARIO_KEYS.hotBoxCoreboxTemp]: v }); }}
+        title={`Hot box core making. ${HOT_BOX_GUIDANCE.coreboxTemp} Not in the reference data, so nothing is assumed: until the three hot box settings are set the hot box core is not costed.`}
+      />
+      <NumberField
+        label="Cure temp, °C"
+        value={number(SAND_SCENARIO_KEYS.hotBoxCureTemp)}
+        placeholder="set for hot box cores"
+        parse={parsePositive}
+        onCommit={(v) => { onChange({ [SAND_SCENARIO_KEYS.hotBoxCureTemp]: v }); }}
+        title={`Hot box core making. ${HOT_BOX_GUIDANCE.cureTemp}`}
+      />
+      <NumberField
+        label="Cured depth, mm"
+        value={number(SAND_SCENARIO_KEYS.hotBoxCuredDepth)}
+        placeholder="set for hot box cores"
+        parse={parsePositive}
+        onCommit={(v) => { onChange({ [SAND_SCENARIO_KEYS.hotBoxCuredDepth]: v }); }}
+        title={`Hot box core making. ${HOT_BOX_GUIDANCE.curedDepth}`}
       />
       <div className="pt-1 border-t border-border/50 mt-1 space-y-0.5" title="The casting worker measures the exact solid: cores, parting line and wall. Until one is done, the cad-engine's measurements are used.">
         <div className="flex items-center justify-between text-[11px]">

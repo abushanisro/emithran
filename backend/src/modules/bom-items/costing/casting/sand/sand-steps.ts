@@ -43,6 +43,13 @@ export interface SandPart {
   wallNominalMm: number | null;
 }
 
+/** The plant's hot box settings (Cost Guide): the core box temperature and the binder's cure temperature (°C), and the depth of core that must be cured before it is stripped (mm). Each is null until set. */
+export interface HotBoxSettings {
+  coreboxTempC: number | null;
+  cureTempC: number | null;
+  curedDepthMm: number | null;
+}
+
 export interface SandRouteContext {
   ref: SandReference;
   spec: DomainCalculatorSpec;
@@ -57,6 +64,7 @@ export interface SandRouteContext {
   poured: { perCastingKg: number; perMouldKg: number };
   /** USD per kWh for melting; null until the user sets it (no default is assumed). */
   energyPricePerKwh: number | null;
+  hotBox: HotBoxSettings;
 }
 
 export type StepOutcome =

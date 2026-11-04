@@ -1,6 +1,7 @@
+import { erf } from 'mathjs';
 import { readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
-import { buildSandCastingCalculatorsMigrationSql } from '../../../../../modules/bom-items/costing/casting/sand/calculators/sand-casting-calculators-migration';
+import { buildSandCastingCalculatorsMigrationSql, buildSandHotBoxPhysicsMigrationSql } from '../../../../../modules/bom-items/costing/casting/sand/calculators/sand-casting-calculators-migration';
 import {
   loadSandCastingCalculatorSpec,
   sandCastingCalculatorsByName,
@@ -25,6 +26,11 @@ describe('sand casting calculator spec', () => {
   it('the committed migration 956 equals what the spec generates (regenerate, never hand-edit)', () => {
     const committed = readFileSync(join(MIGRATIONS, '956_sand_casting_calculators.sql'), 'utf8');
     expect(committed.replace(/\r\n/g, '\n')).toBe(buildSandCastingCalculatorsMigrationSql());
+  });
+
+  it('the committed migration 958 (the hot box physics) equals what the spec generates for that calculator alone', () => {
+    const committed = readFileSync(join(MIGRATIONS, '958_sand_hot_box_physics.sql'), 'utf8');
+    expect(committed.replace(/\r\n/g, '\n')).toBe(buildSandHotBoxPhysicsMigrationSql());
   });
 
   it('has the 20 calculators of the step design: 12 compute operations (20 of them), 8 are helpers', () => {
@@ -99,10 +105,63 @@ describe('sand calculators run through the shared evaluator on hand-worked input
     expect(runReferenceCalculator(byOperation, 'Shakeout', seeds({ 'Shakeout Time': 2, Cavities: 4 })).value).toBeCloseTo(30, 9);
   });
 
-  it('hot box: 6 kg of core sand at 12 kg/min is 30 s to blow, plus the flagged 30 s cure and 10 s strip estimates: 70 s', () => {
-    const run = runReferenceCalculator(byOperation, 'Hot Box', seeds({ 'Core Sand': 6, 'Blowing Rate': 12 }));
-    expect(run.value).toBeCloseTo(70, 9);
-    expect(byOperation['Hot Box']!.fields.map((f) => f.field_name)).toEqual(expect.arrayContaining(['Cure Time (estimate)', 'Strip and Handling (estimate)']));
+  // The hot box calculator on hand-worked inputs. Sand (staged variables): density 1600 kg/m3, specific heat 1170 J/(kg K), conductivity 0.52 W/(m K),
+  // so alpha = 0.52 / (1600 x 1170) = 2.7778e-7 m2/s. Box 245 C, binder cures at 150 C, sand starts at 20 C: theta = (245 - 150) / (245 - 20) = 0.42222,
+  // erfinv(theta) = 0.3936. A cured depth d takes t = d^2 / (4 alpha 0.3936^2): 2 mm 23.2 s, 3 mm 52.3 s, 6.35 mm 234.3 s (docs/design/sand-casting-hotbox-gating.md).
+  const hotBox = (over: Record<string, number> = {}) =>
+    runReferenceCalculator(byOperation, 'Hot Box', seeds({
+      'Core Sand': 6, 'Blowing Rate': 12, 'Core Section': 60, 'Sand Density': 1600, 'Sand Specific Heat': 1170, 'Sand Conductivity': 0.52,
+      'Initial Sand Temperature': 20, 'Corebox Temperature': 245, 'Cure Temperature': 150, 'Required Cured Depth': 3, 'Strip and Handling': 10, 'Energy Price': 0.1, ...over,
+    }));
+
+  it('hot box: 6 kg at 12 kg/min is 30 s to blow; 3 mm of sand reaches 150 C from a 245 C box in 52.3 s; 10 s to strip: 92.3 s', () => {
+    const run = hotBox();
+    expect(run.outputs['Cure Time']).toBeCloseTo(52.28, 1);
+    expect(run.value).toBeCloseTo(30 + run.outputs['Cure Time']! + 10, 9);
+  });
+
+  it('hot box: the cure time really is the time for the depth to reach the cure temperature (the erf profile at that depth and time is 150 C)', () => {
+    const t = hotBox().outputs['Cure Time']!;
+    const alpha = 0.52 / (1600 * 1170);
+    const temperature = 245 + (20 - 245) * (erf(0.003 / (2 * Math.sqrt(alpha * t))) as number);
+    expect(temperature).toBeCloseTo(150, 6);
+  });
+
+  it('hot box: other depths and temperatures, hand-worked: 2 mm 23.2 s, 6.35 mm 234.3 s; a binder that cures at 100 C needs 8.4 s for 2 mm', () => {
+    expect(hotBox({ 'Required Cured Depth': 2 }).outputs['Cure Time']).toBeCloseTo(23.2, 1);
+    expect(hotBox({ 'Required Cured Depth': 6.35 }).outputs['Cure Time']).toBeCloseTo(234.3, 1);
+    expect(hotBox({ 'Required Cured Depth': 2, 'Cure Temperature': 100 }).outputs['Cure Time']).toBeCloseTo(8.4, 1);
+  });
+
+  it('hot box: the depth cured is half the core\'s smallest section when that is less than the strip criterion (a thin core is cured through)', () => {
+    const thin = hotBox({ 'Core Section': 4 });
+    expect(thin.outputs['Cured Depth']).toBe(2);
+    expect(thin.outputs['Cure Time']).toBeCloseTo(23.2, 1);
+    expect(hotBox({ 'Core Section': 200 }).outputs['Cured Depth']).toBe(3);
+  });
+
+  // The sand's sensible heat to the cure temperature: 6 kg x 1170 J/(kg K) x (150 - 20) K = 912 600 J = 0.2535 kWh; at 0.10 USD/kWh that is 0.02535 USD a core.
+  it('hot box energy: the sand\'s heat from 20 to 150 C, 6 kg: 912 600 J = 0.2535 kWh, 0.02535 USD at 0.10 USD/kWh', () => {
+    const run = hotBox();
+    expect(run.outputs['Sand Heat']).toBeCloseTo(912600, 6);
+    expect(run.outputs['Energy']).toBeCloseTo(0.2535, 9);
+    expect(run.outputs['Energy Cost']).toBeCloseTo(0.02535, 9);
+    // twice the price, twice the cost; no price, none
+    expect(hotBox({ 'Energy Price': 0.2 }).outputs['Energy Cost']).toBeCloseTo(0.0507, 9);
+    expect(hotBox({ 'Energy Price': 0 }).outputs['Energy Cost']).toBe(0);
+    // a cooler binder needs less heat: 100 C is 6 x 1170 x 80 = 561 600 J
+    expect(hotBox({ 'Cure Temperature': 100 }).outputs['Sand Heat']).toBeCloseTo(561600, 6);
+  });
+
+  it('hot box: no cure or strip literals remain, and the settings it needs are named inputs', () => {
+    const names = byOperation['Hot Box']!.fields.map((f) => f.field_name);
+    expect(names).not.toEqual(expect.arrayContaining(['Cure Time (estimate)']));
+    expect(names).toEqual(expect.arrayContaining(['Corebox Temperature', 'Cure Temperature', 'Required Cured Depth', 'Strip and Handling']));
+    const cure = spec.calculators.find((c) => c.name === 'Sand Casting - Hot box coremaking')!.fields.find((f) => f.name === 'Cure Time')!;
+    expect(cure.formula).toContain('ERFINV');
+    for (const f of spec.calculators.find((c) => c.name === 'Sand Casting - Hot box coremaking')!.fields.filter((x) => x.formula)) {
+      expect({ field: f.name, literalOnly: /^[0-9.\s]+$/.test(f.formula!) }).toEqual({ field: f.name, literalOnly: false });
+    }
   });
 
   it('degating: (300 + 100) mm² of cut at 50 mm²/s is 8 s', () => {
@@ -145,7 +204,8 @@ describe('sand calculators run through the shared evaluator on hand-worked input
     'Stub Height': 5, 'Riser Stub Height': 5, 'Parting Line': 800, 'Flash Thickness': 0.5, 'Flash Height': 2, 'Grinding Speed Gating': 410,
     'Grinding Speed Non-Gating': 410, 'Material Factor': 1, 'Inspection Rate': 1.4, Cores: 1, 'Single Core Factor': 1.5, 'Double Core Factor': 2,
     'Multi Core Adder': 0.1, 'Core Volume': 2e6, 'Core Length': 150, 'Print Length': 25, 'Core Sand': 3, 'Cycle per Core': 40, 'Blowing Rate': 12,
-    'Lifetime Volume': 10000, 'Refurb Life': 5000, 'Refurbs per Tool': 2, 'One Cavity Cost': 3000, 'Region Multiplier': 1,
+    'Core Section': 60, 'Initial Sand Temperature': 20, 'Corebox Temperature': 245, 'Cure Temperature': 150, 'Required Cured Depth': 3,
+    'Strip and Handling': 10, 'Lifetime Volume': 10000, 'Refurb Life': 5000, 'Refurbs per Tool': 2, 'One Cavity Cost': 3000, 'Region Multiplier': 1,
   };
 
   it('every calculator of the spec runs to a finite output on a small iron casting, and every input has a plausible value in this table', () => {

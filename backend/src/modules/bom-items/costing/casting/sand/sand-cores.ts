@@ -4,10 +4,12 @@
 // a core stay here. Port of petrus-demo's domain::casting::cores (D127, D143).
 //
 // Left out, as in petrus-demo: isocure (no cycle time in the data) and manual coremaking (its mixing rate alone gives seconds for a core;
-// the curing time that dominates is not modelled). Hot box has no cycle time in the data: its calculator times the blow from the sand and
-// carries the cure and strip times as named estimates.
+// the curing time that dominates is not modelled). Hot box has no cycle time in the data: its calculator times the blow from the sand, the cure
+// from heat conduction into the sand (the plant's box temperature, binder cure temperature and strip depth, set in the Cost Guide; none assumed)
+// and the strip from the handling table.
 import type { ReferenceCalcRun } from '../../shared/calculators/reference-calculator';
 import { machineValue, type SandMachine } from './sand-machines';
+import { handlingTime } from './sand-handling';
 import { valuesProvider } from './sand-seeds';
 import { runStep, selectAndCost, type CostedStep, type SandRouteContext, type StepOutcome } from './sand-steps';
 import type { CostContext } from '../casting-finishing';
@@ -33,6 +35,26 @@ export const CORE_PROCESSES = [
   { process: 'Shell', machineClass: 'sand_casting_shell', limitVariable: 'maxWeightShellCore' },
 ] as const;
 export type CoreProcess = (typeof CORE_PROCESSES)[number];
+
+/**
+ * What the hot box physics needs from the plant, or what is missing and why it cannot work: the box must be hotter than the binder's cure temperature
+ * and that hotter than the sand it is blown at (otherwise the sand never gets there), and the cured depth must be a depth.
+ */
+export function hotBoxSettingsProblems(ctx: SandRouteContext): string[] {
+  const { coreboxTempC: box, cureTempC: cure, curedDepthMm: depth } = ctx.hotBox;
+  const start = ctx.ref.number('sandMoldTemp');
+  const missing = [
+    box == null ? 'the core box temperature (Cost Guide: hot box core box temperature)' : null,
+    cure == null ? "the binder's cure temperature (Cost Guide: hot box cure temperature)" : null,
+    depth == null ? 'the depth of core cured before stripping (Cost Guide: hot box cured depth)' : null,
+  ].filter((m): m is string => m !== null);
+  if (missing.length) return [`hot box: set ${missing.join(', ')}`];
+  if (start == null) return ['sand variable sandMoldTemp'];
+  if (!(box! > cure! && cure! > start)) {
+    return [`hot box: the core box (${box} °C) must be hotter than the binder's cure temperature (${cure} °C), which must be above the sand's starting temperature (${start} °C)`];
+  }
+  return [];
+}
 
 export interface SandCore {
   region: CoreRegion;
@@ -88,9 +110,43 @@ export function makeCoreStep(ctx: SandRouteContext, machine: SandMachine, core: 
     return { ok: false, reasons: [`core boxes up to ${most.map((v) => v.toFixed(0)).join(' x ')} mm`] };
   }
   const isHotBox = process.process === 'Hot Box';
+  if (isHotBox) {
+    const problems = hotBoxSettingsProblems(ctx);
+    if (problems.length) return { ok: false, reasons: problems };
+  }
   if (!isHotBox && !((machineValue(machine, 'base_cycle_time_s') ?? 0) > 0)) return { ok: false, reasons: ['no cycle time in the reference data'] };
-  const r = runStep(ctx, isHotBox ? HOT_BOX : COREMAKING, machine, { core_sand_kg: { value: core.kg, source: 'Sand Casting - Core sand' } });
-  return 'run' in r ? { ok: true, sec: r.run.value!, run: r.run, energyCostUsd: 0, notes: [] } : { ok: false, reasons: r.reasons };
+  // The strip and handling time: the handling table's band that takes this core (its equipment is part of the source shown in the trace).
+  const band = isHotBox ? handlingTime(ctx.ref, core.kg) : null;
+  if (isHotBox && !band) return { ok: false, reasons: [`tblHandlingTimes has no band that takes a ${core.kg.toFixed(1)} kg core`] };
+  const hot = ctx.hotBox;
+  const priced = ctx.energyPricePerKwh != null;
+  const r = runStep(
+    ctx, isHotBox ? HOT_BOX : COREMAKING, machine,
+    {
+      core_sand_kg: { value: core.kg, source: 'Sand Casting - Core sand' },
+      // The core's smallest side: heat arrives from every face, so no sand is further from a face than half of it.
+      core_section_mm: { value: core.region.sizeMm[2], source: "worker: the core's smallest side" },
+    },
+    isHotBox
+      ? {
+          scenario: valuesProvider({
+            hot_box_corebox_temp_c: { value: hot.coreboxTempC ?? NaN, source: 'core box temperature set in the Cost Guide (°C)' },
+            hot_box_cure_temp_c: { value: hot.cureTempC ?? NaN, source: "binder cure temperature set in the Cost Guide (°C)" },
+            hot_box_cured_depth_mm: { value: hot.curedDepthMm ?? NaN, source: 'cured depth before stripping set in the Cost Guide (mm)' },
+            // As for melting: an energy price the user has not set is not assumed; the energy is then not charged, and the line says so.
+            energy_price: { value: priced ? ctx.energyPricePerKwh! : 0, source: priced ? 'energy price set in the Cost Guide (USD/kWh)' : 'energy price not set: energy not charged' },
+          }),
+          lookup: valuesProvider({ 'tblHandlingTimes.Handling Time (s)': { value: band!.seconds, source: `tblHandlingTimes: ${band!.equipment} up to ${band!.maxKg} kg` } }),
+        }
+      : {},
+  );
+  if (!('run' in r)) return { ok: false, reasons: r.reasons };
+  // The sand's sensible heat to the cure temperature (a lower bound: holding the box hot between shots costs more), priced with the energy price.
+  const energyKwh = r.run.outputs['Energy'];
+  const notes = isHotBox && !priced && energyKwh != null
+    ? [`Hot box heating energy is not charged: the energy price is not set (the sand's heat alone is ${energyKwh.toFixed(3)} kWh per core, a lower bound).`]
+    : [];
+  return { ok: true, sec: r.run.value!, run: r.run, energyCostUsd: isHotBox ? r.run.outputs['Energy Cost'] ?? 0 : 0, notes };
 }
 
 export interface CoreLine {
@@ -122,7 +178,15 @@ export function coreLine(input: {
   const main = costed.find((c) => c.p.process === 'Hot Box' && c.step.machine);
   const capable = costed.filter((c) => c.step.machine);
   const pick = main ?? [...capable].sort((a, b) => a.step.line.totalCost - b.step.line.totalCost)[0];
-  if (pick) return { step: pick.step, process: pick.p.process };
+  if (pick) {
+    // The main process (hot box) could not make this core and another did: say why, so the choice is never silent.
+    const hotBox = costed.find((c) => c.p.process === 'Hot Box');
+    if (hotBox && !hotBox.step.machine && pick.p.process !== 'Hot Box') {
+      const reasons = [...new Set((hotBox.step.line.machineChoice?.candidates ?? []).flatMap((c) => c.reasons))];
+      pick.step.warnings.push(`Hot box could not make a core: ${reasons.join('; ') || 'no machine'}. ${pick.p.process} is used instead.`);
+    }
+    return { step: pick.step, process: pick.p.process };
+  }
   const first = costed[0];
   return { step: first!.step, process: first!.p.process };
 }

@@ -1,6 +1,6 @@
 import { loadSandCastingCalculatorSpec, sandCastingCalculatorsByName } from '../../../../../modules/bom-items/costing/casting/sand/calculators/sand-casting-calculator-spec';
 import { buildSandRoute, MOULDING_PROCESSES, type SandRouteInput } from '../../../../../modules/bom-items/costing/casting/sand/sand-route';
-import { allSandMachines, realSandReference, sandMaterial, sandRows } from './sand-test-data';
+import { allSandMachines, realSandReference, sandMaterial, sandRows, HOT_BOX } from './sand-test-data';
 
 const ref = realSandReference();
 const iron = sandMaterial('ASTM Grade 20 Gray Iron');
@@ -15,7 +15,7 @@ const input: SandRouteInput = {
     partingLineMm: 900, abovePartingMm: 50, cores: [{ volumeMm3: 1.2e6, sizeMm: [200, 100, 60] }],
   },
   machinesByClass: machines,
-  scenario: { batchSize: 250, cavities: null, mouldingClass: null, chosenCoreProcess: null, energyPricePerKwh: 0.1, lifetimeVolume: 10000 },
+  scenario: { batchSize: 250, cavities: null, mouldingClass: null, chosenCoreProcess: null, energyPricePerKwh: 0.1, hotBox: HOT_BOX, lifetimeVolume: 10000 },
   costContext,
 };
 
