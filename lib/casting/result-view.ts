@@ -21,6 +21,8 @@ export interface CastingPartView {
   partingHeight: number | null;
   /** The faces whose draft angle the worker measured (casting.draft.faces), numbered as glb_faces and the features number them. */
   draftFaces: number[];
+  /** The faces a wall thickness was measured from (casting.wall_mm.faces), numbered the same way. */
+  wallFaces: number[];
 }
 
 const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
@@ -47,6 +49,7 @@ export function castingPartView(result: unknown): CastingPartView | { reason: st
       draw_axis_source?: unknown;
       parting?: { points?: unknown; height_mm?: unknown } | null;
       draft?: { faces?: unknown } | null;
+      wall_mm?: { faces?: unknown } | null;
     } | null;
   };
   const features = (Array.isArray(p.features) ? p.features : []).flatMap(
@@ -85,6 +88,12 @@ export function castingPartView(result: unknown): CastingPartView | { reason: st
     partingHeight: isNum(p.casting?.parting?.height_mm) ? p.casting.parting.height_mm : null,
     draftFaces: Array.isArray(p.casting?.draft?.faces)
       ? p.casting.draft.faces.flatMap((d: unknown) => {
+          const face = (d as { face?: unknown } | null)?.face;
+          return typeof face === "number" && Number.isInteger(face) ? [face] : [];
+        })
+      : [],
+    wallFaces: Array.isArray(p.casting?.wall_mm?.faces)
+      ? p.casting.wall_mm.faces.flatMap((d: unknown) => {
           const face = (d as { face?: unknown } | null)?.face;
           return typeof face === "number" && Number.isInteger(face) ? [face] : [];
         })
