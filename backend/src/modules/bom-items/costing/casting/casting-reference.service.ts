@@ -39,8 +39,9 @@ export type CastabilityProcess = keyof typeof MATERIAL_GROUP;
 /**
  * Loads the staged memory/Die Casting rows the casting engines read and
  * resolves them (casting-reference.ts). Variables and lookups are cached per
- * process (read error not cached); alloys and machines are editable rows and
- * are read on every call.
+ * process once they resolve (a read error or a table not yet staged is not
+ * cached, so staging it later takes effect without a restart); alloys and
+ * machines are editable rows and are read on every call.
  */
 @Injectable()
 export class CastingReferenceService {
@@ -66,11 +67,12 @@ export class CastingReferenceService {
     ]);
     const error = vars.error ?? lookups.error;
     if (error) return { reference: null, missing: [`Die casting reference data (${error.message})`] };
-    this.cached = resolveCastingReference({
+    const resolved = resolveCastingReference({
       variables: vars.data ?? [],
       lookups: Object.fromEntries((lookups.data ?? []).map((r: any) => [r.key, Array.isArray(r.raw?.rows) ? r.raw.rows : undefined])),
     });
-    return this.cached;
+    if (resolved.reference) this.cached = resolved;
+    return resolved;
   }
 
   private cachedSand: { reference: CastabilityReference | null; missing: string[] } | null = null;
@@ -111,11 +113,12 @@ export class CastingReferenceService {
     ]);
     const error = vars.error ?? lookups.error;
     if (error) return { reference: null, missing: [`Core reference data (${error.message})`] };
-    this.cachedCores = resolveCoreReference({
+    const resolved = resolveCoreReference({
       variables: vars.data ?? [],
       lookups: Object.fromEntries((lookups.data ?? []).map((r: any) => [r.key, Array.isArray(r.raw?.rows) ? r.raw.rows : undefined])),
     });
-    return this.cachedCores;
+    if (resolved.reference) this.cachedCores = resolved;
+    return resolved;
   }
 
   /**
@@ -142,12 +145,13 @@ export class CastingReferenceService {
     if (error) return { reference: null, missing: [`Die tooling reference data (${error.message})`] };
     const rowsOf = (data: any[] | null) =>
       Object.fromEntries((data ?? []).map((r: any) => [r.key, Array.isArray(r.raw?.rows) ? r.raw.rows : Array.isArray(r.raw) ? r.raw : undefined]));
-    this.cachedTooling = resolveDieToolingReference({
+    const resolved = resolveDieToolingReference({
       variables: vars.data ?? [],
       lookups: rowsOf(lookups.data),
       toolShop: rowsOf(shop.data),
     });
-    return this.cachedTooling;
+    if (resolved.reference) this.cachedTooling = resolved;
+    return resolved;
   }
 
   /**
