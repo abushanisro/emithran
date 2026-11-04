@@ -170,6 +170,13 @@ export class CastingAnalysisRunner implements OnModuleInit, OnModuleDestroy {
     const config = parseCastingConfig(row.config);
     if (!config)
       throw new PermanentFailure("invalid_config", "The analysis has a configuration this backend does not know.");
+    // Another item's analysis of this same file may have finished while this one waited in the queue: the worker is not run twice for one file.
+    const twin = await this.finishedTwin(row);
+    if (twin) {
+      await this.adopt(row, twin);
+      this.logger.log(`casting analysis ${row.id} reused ${twin.id} (same file, worker and configuration)`);
+      return;
+    }
     const output = await this.runWorker(bytes, config);
     if (!output.result)
       throw new WorkerRunError(
@@ -233,6 +240,42 @@ export class CastingAnalysisRunner implements OnModuleInit, OnModuleDestroy {
       .eq("id", row.id)
       .eq("status", "running");
     if (saveError) throw new Error(`could not save the result: ${saveError.message}`);
+  }
+
+  /** A finished analysis of the same file, worker, schema and configuration for this organization (made for another item), or null. */
+  private async finishedTwin(row: CastingAnalysisRow): Promise<CastingAnalysisRow | null> {
+    const { data, error } = await this.admin
+      .from("casting_analyses")
+      .select("*")
+      .eq("organization_id", row.organization_id)
+      .eq("input_sha256", row.input_sha256)
+      .eq("worker_version", row.worker_version)
+      .eq("schema_version", row.schema_version)
+      .eq("config_hash", row.config_hash)
+      .in("status", ["succeeded", "partial"])
+      .neq("id", row.id)
+      .limit(1);
+    // A failed look-up is not a reason to fail the analysis: the worker simply runs.
+    if (error) return null;
+    const twin = ((data as CastingAnalysisRow[] | null) ?? [])[0];
+    return twin && twin.result != null && twin.output_prefix ? twin : null;
+  }
+
+  /** Finishes this row with a twin's result and files (its output_prefix points at the original's, as for a reuse at request time). */
+  private async adopt(row: CastingAnalysisRow, twin: CastingAnalysisRow): Promise<void> {
+    const { error } = await this.admin
+      .from("casting_analyses")
+      .update({
+        status: twin.status,
+        result: twin.result,
+        output_prefix: twin.output_prefix,
+        error_code: null,
+        error_detail: null,
+        finished_at: new Date().toISOString(),
+      })
+      .eq("id", row.id)
+      .eq("status", "running");
+    if (error) throw new Error(`could not save the reused result: ${error.message}`);
   }
 
   /** Records the failure; true when the analysis was put back in the queue for another attempt. */

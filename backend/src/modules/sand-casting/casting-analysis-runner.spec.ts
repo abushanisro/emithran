@@ -66,9 +66,17 @@ class TestRunner extends CastingAnalysisRunner {
 
 function setup(
   rows: CastingAnalysisRow[],
-  options: { path?: string | null; bytes?: Buffer | null } = {},
+  options: {
+    path?: string | null;
+    bytes?: Buffer | null;
+    /** An analysis of the same file that finished while this one waited (null: none). */
+    twin?: CastingAnalysisRow | null;
+    /** The twin look-up fails. */
+    twinError?: boolean;
+  } = {},
 ) {
-  const { path = "p/part.step", bytes = BYTES } = options;
+  const { path = "p/part.step", bytes = BYTES, twin = null, twinError = false } = options;
+  const twinFilters: Record<string, unknown> = {};
   const queue = [...rows];
   const updates: { patch: Record<string, unknown>; where: Record<string, unknown> }[] =
     [];
@@ -84,6 +92,12 @@ function setup(
             }),
           }
         : {
+            select: () => {
+              const chain: Record<string, unknown> = {};
+              for (const m of ["eq", "in", "neq"]) chain[m] = (c: string, v: unknown) => ((twinFilters[c] = v), chain);
+              chain.limit = async () => (twinError ? { data: null, error: { message: "down" } } : { data: twin ? [twin] : [], error: null });
+              return chain;
+            },
             update: (patch: Record<string, unknown>) => ({
               eq: (c1: string, v1: unknown) => ({
                 eq: async (c2: string, v2: unknown) => {
@@ -106,7 +120,7 @@ function setup(
     audit as never,
     objects as never,
   );
-  return { runner, updates, stored, audit, queue };
+  return { runner, updates, stored, audit, queue, twinFilters };
 }
 
 afterEach(() => {
@@ -283,5 +297,138 @@ describe("CastingAnalysisRunner: the engineer's draw direction", () => {
     await t.runner.tick();
     expect(t.runner.configs).toEqual([]);
     expect(t.updates[0].patch).toMatchObject({ status: "failed", error_code: "invalid_config" });
+  });
+});
+
+describe("CastingAnalysisRunner: one file is analysed once", () => {
+  const finished = (over: Partial<CastingAnalysisRow> = {}): CastingAnalysisRow =>
+    claimed({ id: "ca-twin", bom_item_id: "item-9", status: "succeeded", result: { parts: [{ twin: true }] }, output_prefix: "casting-analyses/org-1/ca-twin", ...over });
+
+  it("adopts the result and files of an analysis of the same file that finished while this one waited, without running the worker", async () => {
+    const t = setup([claimed()], { twin: finished() });
+    await t.runner.tick();
+    expect(t.runner.configs).toEqual([]);
+    expect(t.stored).toEqual([]);
+    expect(t.updates).toHaveLength(1);
+    expect(t.updates[0].patch).toMatchObject({ status: "succeeded", result: { parts: [{ twin: true }] }, output_prefix: "casting-analyses/org-1/ca-twin", error_code: null });
+    expect(t.updates[0].where).toEqual({ id: "ca-1", status: "running" });
+  });
+
+  it("looks for the same organization, file, worker, schema and configuration, among finished analyses of other rows", async () => {
+    const t = setup([claimed()], { twin: finished() });
+    await t.runner.tick();
+    expect(t.twinFilters).toMatchObject({
+      organization_id: "org-1", input_sha256: SHA, worker_version: CASTING_WORKER_VERSION, schema_version: CASTING_SCHEMA_VERSION, config_hash: "h",
+      status: ["succeeded", "partial"], id: "ca-1",
+    });
+  });
+
+  it("a partial twin is adopted as partial", async () => {
+    const t = setup([claimed()], { twin: finished({ status: "partial" }) });
+    await t.runner.tick();
+    expect(t.updates[0].patch).toMatchObject({ status: "partial" });
+  });
+
+  it("with no twin the worker runs as before", async () => {
+    const t = setup([claimed()]);
+    await t.runner.tick();
+    expect(t.runner.configs).toHaveLength(1);
+    expect(t.updates[0].patch).toMatchObject({ status: "succeeded" });
+  });
+
+  it("a twin with no stored result or files is not adopted (the worker runs)", async () => {
+    for (const twin of [finished({ result: null }), finished({ output_prefix: null })]) {
+      const t = setup([claimed()], { twin });
+      await t.runner.tick();
+      expect(t.runner.configs).toHaveLength(1);
+    }
+  });
+
+  it("a failed look-up does not fail the analysis: the worker runs", async () => {
+    const t = setup([claimed()], { twinError: true });
+    await t.runner.tick();
+    expect(t.runner.configs).toHaveLength(1);
+    expect(t.updates[0].patch).toMatchObject({ status: "succeeded" });
+  });
+});
+
+describe("CastingAnalysisRunner: a queue of duplicates (design step S9)", () => {
+  // 150 BOM items whose files are only 30 distinct ones, all queued before any is analysed: the worker runs 30 times, the other 120 analyses adopt a result.
+  const ITEMS = 150;
+  const FILES = 30;
+  const bytesOf = (k: number) => Buffer.from(`ISO-10303-21; part ${k}`);
+  const shaOf = (k: number) => createHash("sha256").update(bytesOf(k)).digest("hex");
+
+  function queueOf(items: number, files: number) {
+    const rows: CastingAnalysisRow[] = Array.from({ length: items }, (_, i) =>
+      claimed({ id: `ca-${i}`, bom_item_id: `item-${i}`, input_sha256: shaOf(i % files), status: "queued", attempts: 0 }),
+    );
+    const filters = (chain: Record<string, unknown>, into: Record<string, unknown>) => {
+      for (const m of ["eq", "in", "neq"]) chain[m] = (c: string, v: unknown) => ((into[c] = v), m === "neq" ? ((into[`!${c}`] = v), chain) : chain);
+      return chain;
+    };
+    const admin = {
+      rpc: async () => {
+        const next = rows.find((r) => r.status === "queued");
+        if (!next) return { data: [], error: null };
+        next.status = "running";
+        next.attempts += 1;
+        return { data: [{ ...next }], error: null };
+      },
+      from: (table: string) =>
+        table === "bom_items"
+          ? {
+              select: () => ({ eq: (_c: string, id: string) => ({ maybeSingle: async () => ({ data: { file_3d_path: `files/${Number(id.replace("item-", "")) % files}.step` }, error: null }) }) }),
+            }
+          : {
+              select: () => {
+                const f: Record<string, unknown> = {};
+                const chain = filters({}, f);
+                chain.limit = async () => ({
+                  data: rows.filter((r) => r.organization_id === f.organization_id && r.input_sha256 === f.input_sha256 && r.worker_version === f.worker_version && r.schema_version === f.schema_version && r.config_hash === f.config_hash && (f.status as string[]).includes(r.status) && r.id !== f["!id"]).slice(0, 1),
+                  error: null,
+                });
+                return chain;
+              },
+              update: (patch: Record<string, unknown>) => ({
+                eq: (_c1: string, id: string) => ({
+                  eq: async (_c2: string, status: string) => {
+                    const row = rows.find((r) => r.id === id && r.status === status);
+                    if (row) Object.assign(row, patch);
+                    return { error: null };
+                  },
+                }),
+              }),
+            },
+    };
+    const objects = { get: async (_b: string, path: string) => bytesOf(Number(path.replace("files/", "").replace(".step", ""))), put: async () => undefined };
+    process.env.CASTING_WORKER_SOCKET = "/unused.sock";
+    const runner = new TestRunner({ getPrivilegedClient: () => admin } as never, { recordBestEffort: jest.fn(async () => undefined) } as never, objects as never);
+    return { rows, runner };
+  }
+
+  it("150 queued analyses of 30 distinct files run the worker 30 times: 120 adopt a result (a 80 % cache-hit rate), every row finishes", async () => {
+    const { rows, runner } = queueOf(ITEMS, FILES);
+    await runner.tick();
+    expect(runner.configs).toHaveLength(FILES);
+    expect(rows.every((r) => r.status === "succeeded")).toBe(true);
+    // each adopted row points at the files of the analysis that ran: one prefix per distinct file, shared by its duplicates
+    const prefixes = new Set(rows.map((r) => r.output_prefix));
+    expect(prefixes.size).toBe(FILES);
+    for (let k = 0; k < FILES; k++) {
+      const same = rows.filter((_, i) => i % FILES === k);
+      expect(new Set(same.map((r) => r.output_prefix)).size).toBe(1);
+      expect(same).toHaveLength(ITEMS / FILES);
+    }
+  });
+
+  it("all files distinct: nothing to reuse, the worker runs once for each; all one file: it runs once", async () => {
+    const distinct = queueOf(20, 20);
+    await distinct.runner.tick();
+    expect(distinct.runner.configs).toHaveLength(20);
+    const same = queueOf(20, 1);
+    await same.runner.tick();
+    expect(same.runner.configs).toHaveLength(1);
+    expect(same.rows.every((r) => r.status === "succeeded")).toBe(true);
   });
 });
