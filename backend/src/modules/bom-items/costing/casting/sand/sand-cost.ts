@@ -62,6 +62,8 @@ export interface SandMeasurements {
   partingPerimeterMm: number | null;
   /** The cores the extractor measured: volume and box; null when the analysis predates it. */
   rawCores: unknown;
+  /** The casting's height above the parting plane (mm), where the analysis measured it. */
+  abovePartingMm?: number | null;
 }
 
 /**
@@ -90,7 +92,7 @@ export function sandPart(m: SandMeasurements): { part: SandPartInput | null; war
   return {
     warnings,
     missing: [],
-    part: { volumeMm3: m.volumeMm3!, surfaceAreaMm2: m.surfaceAreaMm2!, dimsMm: dims, wallNominalMm: m.wallNominalMm, partingLineMm: m.partingPerimeterMm, abovePartingMm: null, cores },
+    part: { volumeMm3: m.volumeMm3!, surfaceAreaMm2: m.surfaceAreaMm2!, dimsMm: dims, wallNominalMm: m.wallNominalMm, partingLineMm: m.partingPerimeterMm, abovePartingMm: m.abovePartingMm ?? null, cores },
   };
 }
 

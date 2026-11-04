@@ -24,6 +24,7 @@ const claimed = (over: Partial<CastingAnalysisRow> = {}): CastingAnalysisRow => 
   bom_item_id: "item-1",
   requested_by: "u",
   input_sha256: SHA,
+  source_path: "path/part.step",
   worker_version: CASTING_WORKER_VERSION,
   schema_version: CASTING_SCHEMA_VERSION,
   config_hash: "h",
