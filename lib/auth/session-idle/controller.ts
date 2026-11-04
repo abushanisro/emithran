@@ -17,7 +17,8 @@ export interface IdleSnapshot {
   jobRunning: boolean;
 }
 
-export type ServerResult = { ok: true; policy?: unknown } | { ok: false; idle: boolean };
+/** `enforced: false` means the server does not end idle sessions (switched off, or the development bypass). */
+export type ServerResult = { ok: true; policy?: unknown; enforced?: boolean | undefined } | { ok: false; idle: boolean };
 
 export interface IdleControllerDeps {
   now: () => number;

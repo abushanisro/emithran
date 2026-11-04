@@ -196,3 +196,26 @@ describe('SessionActivityService', () => {
   });
 
 });
+
+describe('SessionActivityService with the inactivity timeout switched off', () => {
+  const previous = process.env.SESSION_IDLE_TIMEOUT_ENABLED;
+  beforeEach(() => { process.env.SESSION_IDLE_TIMEOUT_ENABLED = 'false'; });
+  afterEach(() => {
+    if (previous === undefined) delete process.env.SESSION_IDLE_TIMEOUT_ENABLED; else process.env.SESSION_IDLE_TIMEOUT_ENABLED = previous;
+  });
+
+  it('never ends a session, however long it has been idle, and reads and stores nothing', async () => {
+    const db = fakeDatabase();
+    db.rows.set('s1', { last_activity_at: iso(T0 - 24 * 60 * MIN), last_job_at: null });
+    const svc = new SessionActivityService(db.service);
+    await expect(svc.assertActive('s1', 'u1', T0)).resolves.toEqual({ lastActivityAt: T0, lastJobAt: null });
+    expect(db.reads).not.toHaveBeenCalled();
+  });
+
+  it('does not hide a failing session store: with the timeout on it is still a 503 (the switch is read per call)', async () => {
+    process.env.SESSION_IDLE_TIMEOUT_ENABLED = 'true';
+    process.env.NODE_ENV = 'production';
+    const svc = new SessionActivityService(fakeDatabase({ readError: { code: '08006', message: 'down' } }).service);
+    await expect(svc.assertActive('s1', 'u1', T0)).rejects.toThrow(ServiceUnavailableException);
+  });
+});

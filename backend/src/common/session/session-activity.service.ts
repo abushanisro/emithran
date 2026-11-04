@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { evictOldestIfFull } from '../cache/bounded-map';
-import { SESSION_IDLE_POLICY, sessionDeadline, type SessionActivityTimes } from './session-idle-policy';
+import { SESSION_IDLE_POLICY, idleTimeoutEnabled, sessionDeadline, type SessionActivityTimes } from './session-idle-policy';
 
 export type ActivityKind = 'user' | 'job';
 
@@ -40,6 +40,8 @@ export class SessionActivityService {
 
   /** Throws 401 if the session is past its deadline. */
   async assertActive(sessionId: string, userId: string, now = Date.now()): Promise<SessionActivityTimes> {
+    // Switched off: no session is ever past a deadline, and nothing is read or stored.
+    if (!idleTimeoutEnabled()) return { lastActivityAt: now, lastJobAt: null };
     const cached = this.cache.get(sessionId);
     if (cached && sessionDeadline(cached) > now) return cached;
 

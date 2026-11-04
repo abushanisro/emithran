@@ -24,6 +24,7 @@ import { requiredMilledClassFromToolAxes } from '../costing/machining/setup-axis
 import { machiningFeatureCounts } from '../costing/machining/operation/machining-feature-counts';
 import { CAD_FAMILY_TO_PROCESS_GROUP } from '../costing/shared/core/part-family-process-group';
 import { DEFAULT_CAD_ENGINE_URL } from '../../../common/engine-urls';
+import { currentFeatureGraphVersion } from '../analysis-status';
 
 export interface RawGeometry {
   volume: number;
@@ -543,7 +544,7 @@ export class AutoFillService {
       dfmWarnings:            this.buildDFMWarnings(geo, cadResult),
       validationResults:      this.buildValidationChecks(geo, family.family, cadResult),
       manufacturabilityScore: this.extractManufacturabilityScore(cadResult),
-      feature_graph_version:  parseInt(process.env.FEATURE_GRAPH_VERSION ?? '4', 10),
+      feature_graph_version:  currentFeatureGraphVersion(),
       cad_engine_version:     process.env.CAD_ENGINE_VERSION ?? 'geo_v5',
       analyzed_at:            new Date().toISOString(),
       ...(cadV2 ? { feature_graph_v2: this.attachCanonicalOperations(cadV2, family.family, castingDomain) } : {}),

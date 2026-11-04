@@ -223,6 +223,13 @@ class EnvironmentVariables {
   @IsIn(['true', 'false'])
   ALLOW_DEV_AUTH_BYPASS: string = 'false';
 
+  // The 30-minute inactivity sign-out (common/session). On unless explicitly 'false': then a session is never ended for
+  // inactivity and the browser shows no countdown. Auth0's own session lifetime still applies.
+  @IsString()
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  SESSION_IDLE_TIMEOUT_ENABLED: string = 'true';
+
   // Electronics extraction engine (ecad-engine): base URL and API key. Unset: board-set uploads fail with a clear
   // extraction_unavailable error; nothing is guessed.
   @IsString()

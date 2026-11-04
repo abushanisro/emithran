@@ -125,6 +125,8 @@ services:
       NODE_OPTIONS: --max-old-space-size=1434
       # The largest upload accepted (frontend and engine follow).
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-50}
+      # The 30-minute inactivity sign-out: on unless the env file says false (false keeps people signed in until Auth0's own session ends).
+      SESSION_IDLE_TIMEOUT_ENABLED: ${SESSION_IDLE_TIMEOUT_ENABLED:-true}
       # How long one "is this person still authorised" answer is reused: bounds how long a removed user keeps access (0 = every request).
       AUTH_DECISION_CACHE_SECONDS: ${AUTH_DECISION_CACHE_SECONDS:-10}
       # Requests one organization may make per ORG_THROTTLE_TTL ms, across all its users and routes.
