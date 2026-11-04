@@ -27,6 +27,10 @@ import {
   overlayFaceColors,
   type OverlayKind,
 } from "@/lib/casting/face-overlay";
+import { THICKNESS_RAMP_CSS, thicknessMap } from "@/lib/casting/thickness-map";
+
+/** What colours the mesh: a design check (draft, thin walls) or the measured wall thickness itself. */
+type ViewOverlay = OverlayKind | "thickness";
 
 const SEVERITY_CLASS: Record<DfmFinding["severity"], string> = {
   Critical: "bg-red-500/15 text-red-600 border-red-500/30",
@@ -66,7 +70,7 @@ export function SandCastingFeaturesPanel({
   const [showCores, setShowCores] = useState(true);
   const [showParting, setShowParting] = useState(true);
   const [showGating, setShowGating] = useState(true);
-  const [overlay, setOverlay] = useState<OverlayKind | "">("");
+  const [overlay, setOverlay] = useState<ViewOverlay | "">("");
   const [selectedFaces, setSelectedFaces] = useState<number[] | null>(null);
 
   if (!ready || !part) {
@@ -133,13 +137,18 @@ export function SandCastingFeaturesPanel({
     draft: part.draftFaces,
     wall: part.wallFaces,
   };
-  const overlays = (Object.keys(OVERLAYS) as OverlayKind[]).filter(
-    (k) => measuredBy[k].length > 0,
-  );
+  const checkResult = dfm.data?.result ?? null;
+  const overlays = checkResult
+    ? (Object.keys(OVERLAYS) as OverlayKind[]).filter((k) => measuredBy[k].length > 0)
+    : [];
+  // The measured thickness needs no design check: it is the worker's own number on a continuous ramp.
+  const thickness = thicknessMap(part.wallThickness);
   const faceColors =
-    overlay && dfm.data?.result
-      ? overlayFaceColors(overlay, dfm.data.result.findings, measuredBy[overlay])
-      : null;
+    overlay === "thickness"
+      ? (thickness?.colors ?? null)
+      : overlay && checkResult
+        ? overlayFaceColors(overlay, checkResult.findings, measuredBy[overlay])
+        : null;
   const selectedRow = selected
     ? { feature: selected, label: selected.id, parent: selected.parent }
     : null;
@@ -193,31 +202,44 @@ export function SandCastingFeaturesPanel({
             Parting line
           </label>
         )}
-        {overlays.length > 0 && dfm.data?.result && (
+        {(overlays.length > 0 || thickness) && (
           <label
             className="flex items-center gap-1"
             title={
-              overlay
-                ? OVERLAYS[overlay].title
-                : "Colour the model face by face by a design check: draft angle or thin walls."
+              overlay === "thickness"
+                ? "Each face coloured by the thinnest wall measured from it, from the part's thinnest (red) to its thickest (blue) measured face. A measurement, not a design check."
+                : overlay
+                  ? OVERLAYS[overlay].title
+                  : "Colour the model face by face: the measured wall thickness, or a design check (draft angle, thin walls)."
             }
           >
             Overlay
             <select
               value={overlay}
               onChange={(e) => {
-                setOverlay(e.target.value as OverlayKind | "");
+                setOverlay(e.target.value as ViewOverlay | "");
               }}
               className="rounded border border-border bg-background px-1 py-0.5"
             >
               <option value="">off</option>
+              {thickness && <option value="thickness">Wall thickness</option>}
               {overlays.map((k) => (
                 <option key={k} value={k}>
                   {OVERLAYS[k].label}
                 </option>
               ))}
             </select>
-            {overlay && (
+            {overlay === "thickness" && thickness && (
+              <span className="flex items-center gap-1 text-[9px]">
+                {thickness.range.min.toFixed(1)} mm
+                <i
+                  className="inline-block h-2 w-16 rounded-sm"
+                  style={{ background: THICKNESS_RAMP_CSS }}
+                />
+                {thickness.range.max.toFixed(1)} mm
+              </span>
+            )}
+            {overlay && overlay !== "thickness" && (
               <span className="flex items-center gap-1 text-[9px]">
                 {(overlay === "draft"
                   ? (["Critical", "Major", "ok"] as const)

@@ -86,6 +86,10 @@ describe("castingPartView", () => {
       partingHeight: 50,
       draftFaces: [3, 1],
       wallFaces: [2, 0],
+      wallThickness: [
+        { face: 2, min: 10 },
+        { face: 0, min: 20 },
+      ],
     });
   });
 
@@ -124,6 +128,7 @@ describe("castingPartView", () => {
       partingHeight: null,
       draftFaces: [],
       wallFaces: [],
+      wallThickness: [],
       features: [
         {
           id: "Ring:1",

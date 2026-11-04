@@ -4,6 +4,7 @@
  * because the result is stored data and the panel must not break on a shape it did not expect.
  */
 import type { CastingWorkerFeature } from "@/lib/casting/features";
+import type { FaceThickness } from "@/lib/casting/thickness-map";
 import type { Xyz } from "@/lib/casting/viewer-model";
 
 export interface CastingPartView {
@@ -23,6 +24,8 @@ export interface CastingPartView {
   draftFaces: number[];
   /** The faces a wall thickness was measured from (casting.wall_mm.faces), numbered the same way. */
   wallFaces: number[];
+  /** The thinnest wall measured from each of those faces, mm (casting.wall_mm.faces), for the thickness colour map. */
+  wallThickness: FaceThickness[];
 }
 
 const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
@@ -96,6 +99,14 @@ export function castingPartView(result: unknown): CastingPartView | { reason: st
       ? p.casting.wall_mm.faces.flatMap((d: unknown) => {
           const face = (d as { face?: unknown } | null)?.face;
           return typeof face === "number" && Number.isInteger(face) ? [face] : [];
+        })
+      : [],
+    wallThickness: Array.isArray(p.casting?.wall_mm?.faces)
+      ? p.casting.wall_mm.faces.flatMap((d: unknown) => {
+          const r = d as { face?: unknown; min?: unknown } | null;
+          return typeof r?.face === "number" && Number.isInteger(r.face) && isNum(r.min)
+            ? [{ face: r.face, min: r.min }]
+            : [];
         })
       : [],
   };
