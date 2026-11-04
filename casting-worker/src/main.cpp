@@ -44,7 +44,7 @@
 namespace {
 
 constexpr int kSchemaVersion = 1;
-constexpr const char* kWorkerVersion = "0.13.0";
+constexpr const char* kWorkerVersion = "0.14.0";
 
 int fail(const char* code, int exit_code) {
   std::cout << "{\"error\":\"" << code << "\"}\n";
@@ -154,6 +154,21 @@ void write_casting(JsonWriter& json, const std::optional<CastingProperties>& c) 
   json.end_array().key("cores_glb");
   if (c->cores_glb) {
     json.value(*c->cores_glb);
+  } else {
+    json.null();
+  }
+  json.key("draft");
+  if (c->draft) {
+    json.begin_object()
+        .key("parting_planar").value(c->draft->parting_planar)
+        .key("at_parting_plane").value(c->draft->at_parting_plane)
+        .key("unmeasured").value(c->draft->unmeasured)
+        .key("faces").begin_array();
+    for (const FaceDraft& f : c->draft->faces) {
+      const char side[2] = {f.side, '\0'};
+      json.begin_object().key("face").value(f.face).key("side").value(side).key("min_deg").value(f.min_deg).key("max_deg").value(f.max_deg).end_object();
+    }
+    json.end_array().end_object();
   } else {
     json.null();
   }
@@ -445,6 +460,13 @@ int main(int argc, char** argv) {
         find_parting_line(labels.at(p.id), p, *p.casting);
       } catch (const Standard_Failure&) {
         p.problems.push_back("failed:parting");
+      }
+    }
+    if (p.casting) {
+      try {
+        find_draft(labels.at(p.id), p, *p.casting);
+      } catch (const Standard_Failure&) {
+        p.problems.push_back("failed:draft");
       }
     }
     try {

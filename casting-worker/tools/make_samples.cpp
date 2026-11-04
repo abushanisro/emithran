@@ -16,6 +16,8 @@
 //   holes.step            120 x 80 x 40 mm block with a through, blind, counterbored, 3-step, grooved and cross hole
 //   boss.step             100 x 80 x 10 mm plate with a Ø30 x 15 boss
 //   combo.step            100 x 60 x 40 mm block with a closed void and a Ø8 hole into it from outside (one core)
+//   taper-3.step          cone frustum, radius 30 at the base, height 40, its side tapering 3.0 degrees from the axis (draft, S4)
+//   taper-04.step        the same with a 0.4 degree taper (under the 0.5 degree limit of the published rules)
 //   bolt.step             the assembly's bolt alone (radius 5, height 30, named "bolt")
 // make-samples --big <out-dir> <parts>: big-assembly.step, the large-file timing sample (S6, see write_big).
 
@@ -28,6 +30,7 @@
 #include <TopoDS_Compound.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepPrimAPI_MakeBox.hxx>
+#include <BRepPrimAPI_MakeCone.hxx>
 #include <BRepPrimAPI_MakeCylinder.hxx>
 #include <BRep_Builder.hxx>
 #include <IFSelect_ReturnStatus.hxx>
@@ -50,6 +53,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <string>
+#include <cmath>
 
 namespace {
 
@@ -89,6 +93,12 @@ TopoDS_Shape fillet_block() {
     }
   }
   return fillet.Shape();
+}
+
+// A cone frustum on the z axis: radius 30 at z = 0, height 40, the side leaning `degrees` from the axis (the draft of that face along z).
+TopoDS_Shape taper(double degrees) {
+  const double base = 30.0, height = 40.0;
+  return BRepPrimAPI_MakeCone(base, base - height * std::tan(degrees * 3.14159265358979323846 / 180.0), height).Shape();
 }
 
 TopoDS_Shape cylinder_z(double x, double y, double r, double z0, double z1) {
@@ -306,7 +316,8 @@ int main(int argc, char** argv) {
                   write_shape(step_block(), "step-block.step") && write_shape(fillet_block(), "fillet-block.step") &&
                   write_shape(holes(), "holes.step") && write_shape(boss(), "boss.step") &&
                   write_shape(combo(), "combo.step") && write_bolt() && write_shape(rod(), "rod.step") &&
-                  write_shape(stepped_block(), "stepped-block.step");
+                  write_shape(stepped_block(), "stepped-block.step") &&
+                  write_shape(taper(3.0), "taper-3.step") && write_shape(taper(0.4), "taper-04.step");
   if (!ok) {
     std::cerr << "could not write the samples\n";
     return 1;
