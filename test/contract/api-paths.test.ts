@@ -16,11 +16,13 @@ const SNAPSHOT = path.join(ROOT, 'backend/src/test/common/authz/__snapshots__/ro
 const ALLOWLIST = path.join(ROOT, 'test/contract/api-paths-unmatched.json');
 const PLACEHOLDER = ':x';
 
-function backendRoutes(): string[][] {
-  const out: string[][] = [];
+interface BackendRoute { method: string; segments: string[] }
+
+function backendRoutes(): BackendRoute[] {
+  const out: BackendRoute[] = [];
   for (const line of fs.readFileSync(SNAPSHOT, 'utf8').split('\n')) {
-    const m = /^"?\S+\s+(?:GET|POST|PUT|PATCH|DELETE)\s+\/api\/v1\/(\S+)\s/.exec(line);
-    if (m) out.push(m[1].split('/'));
+    const m = /^"?\S+\s+(GET|POST|PUT|PATCH|DELETE)\s+\/api\/v1\/(\S+)\s/.exec(line);
+    if (m) out.push({ method: m[1], segments: m[2].split('/') });
   }
   return out;
 }
@@ -38,11 +40,11 @@ function literalText(node: ts.Node, source: string): string | null {
   return out;
 }
 
-function apiPathsOf(file: string): Array<{ file: string; path: string }> {
+function apiPathsOf(file: string): Array<{ file: string; path: string; method?: string }> {
   const source = fs.readFileSync(path.join(ROOT, file), 'utf8');
   const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
-  const found: Array<{ file: string; path: string }> = [];
-  const add = (node: ts.Node) => {
+  const found: Array<{ file: string; path: string; method?: string }> = [];
+  const add = (node: ts.Node, method?: string) => {
     const text = literalText(node, source);
     if (text === null) return;
     const rest = text.replace(/^\u0001(?=\/)/, '');
@@ -50,11 +52,12 @@ function apiPathsOf(file: string): Array<{ file: string; path: string }> {
     let p = rest.split('?')[0];
     p = p.replace(/([^/])\u0001[^/]*$/, '$1'); // a placeholder glued to the last segment's text is a query string or suffix
     const segments = p.slice(1).split('/').map((s) => (s.includes('\u0001') ? PLACEHOLDER : s)).filter((s, i, a) => !(s === '' && i === a.length - 1));
-    if (segments.length) found.push({ file, path: '/' + segments.join('/') });
+    if (segments.length) found.push({ file, path: '/' + segments.join('/'), ...(method && { method }) });
   };
   const apiFile = file.startsWith('lib/api/');
   (function visit(n: ts.Node) {
-    if (ts.isCallExpression(n) && /^apiClient\.(get|post|put|patch|delete)$/.test(n.expression.getText()) && n.arguments[0]) add(n.arguments[0]);
+    const call = ts.isCallExpression(n) ? /^apiClient\.(get|post|put|patch|delete)$/.exec(n.expression.getText()) : null;
+    if (call && ts.isCallExpression(n) && n.arguments[0]) add(n.arguments[0], call[1].toUpperCase());
     else if (apiFile && (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n) || ts.isTemplateExpression(n))) add(n);
     ts.forEachChild(n, visit);
   })(sf);
@@ -67,15 +70,16 @@ const files = execSync("git ls-files 'app/**/*.ts' 'app/**/*.tsx' 'components/**
 const calls = files.flatMap(apiPathsOf);
 const routes = backendRoutes();
 
-const served = (segments: string[]) =>
-  routes.some((r) => r.length === segments.length && r.every((part, i) => part.startsWith(':') || segments[i] === PLACEHOLDER || part === segments[i]));
+const served = (segments: string[], method?: string) =>
+  routes.some((r) => (!method || r.method === method) && r.segments.length === segments.length
+    && r.segments.every((part, i) => part.startsWith(':') || segments[i] === PLACEHOLDER || part === segments[i]));
 
 // Literals in lib/api that are not endpoints at all (URLs of the app's own pages, other servers, file names) are not paths to check:
 // a path counts only when its first segment is a backend resource.
 const NOT_ENDPOINTS = new Set(['health', 'status', 'tracking', 'api', 'v1', 'members', 'workspaces', 'ready', 'live']);
 const apiCalls = calls.filter((c) => !NOT_ENDPOINTS.has(c.path.split('/')[1]));
 
-const unmatched = [...new Set(apiCalls.filter((c) => !served(c.path.slice(1).split('/'))).map((c) => `${c.file}: ${c.path}`))].sort();
+const unmatched = [...new Set(apiCalls.filter((c) => !served(c.path.slice(1).split('/'), c.method)).map((c) => `${c.file}: ${c.method ?? 'ANY'} ${c.path}`))].sort();
 
 describe('the web app calls only routes the backend serves', () => {
   it('finds the web app\'s API calls', () => {

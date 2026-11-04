@@ -33,6 +33,7 @@ org:admin       DELETE /api/v1/processes/reference-tables/rows/:rowId  Processes
 org:member      DELETE /api/v1/procured-parts-costs/:id  ProcuredPartsCostController.delete
 org:member      DELETE /api/v1/production-entries/:id  ProductionEntryController.remove
 org:member      DELETE /api/v1/production-lots/:id  ProductionPlanningController.deleteProductionLot
+org:member      DELETE /api/v1/production-lots/:id/vendor-assignments/:assignmentId  ProductionPlanningController.deleteVendorAssignment
 org:member      DELETE /api/v1/production-processes/:id  ProductionPlanningController.deleteProductionProcess
 org:member      DELETE /api/v1/production-subtasks/:id  ProductionPlanningController.deleteProcessSubtask
 org:member      DELETE /api/v1/projects/:id  ProjectsController.remove

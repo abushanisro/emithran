@@ -21,58 +21,28 @@ export function useAutoRecalculateCost(options: UseAutoRecalculateCostOptions) {
   const queryClient = useQueryClient();
 
   /**
-   * Trigger automatic cost recalculation
-   * This runs after any cost component is saved
+   * Recalculate the BOM's costs on the server (POST /boms/:id/cost-recalculations) after a cost component is saved, then refresh
+   * every cost view. The views refresh whether or not the recalculation succeeds: a failed one must not leave stale numbers on screen.
    */
   const triggerRecalculation = useCallback(async () => {
     if (!enabled || !bomId) return;
 
+    let recalculated = false;
     try {
-      // Silently recalculate in the background
-      await apiClient.post(`/bom/${bomId}/recalculate-all-costs`);
-
-      // Invalidate all cost-related queries to refresh the UI
-      queryClient.invalidateQueries({ queryKey: ['bom-item-cost'] });
-      queryClient.invalidateQueries({ queryKey: ['bom-cost-report'] });
-      queryClient.invalidateQueries({ queryKey: ['bom-cost-summary'] });
-      queryClient.invalidateQueries({ queryKey: ['bom-item-cost-hierarchy'] });
-
-      // If specific BOM item, also invalidate that
-      if (bomItemId) {
-        queryClient.invalidateQueries({ queryKey: ['bom-item-cost', bomItemId] });
-      }
-
-      // Show subtle success toast
-      toast.success('Costs updated', {
-        duration: 2000,
-        description: 'BOM costs have been recalculated'
-      });
-    } catch (error) {
-      // Silent fail - don't interrupt user workflow
-      // The manual refresh will still work
+      await apiClient.post(`/boms/${bomId}/cost-recalculations`);
+      recalculated = true;
+    } catch {
+      // Silent: it must not interrupt the user's work, and the next load recalculates.
     }
+
+    queryClient.invalidateQueries({ queryKey: ['bom-item-cost'] });
+    queryClient.invalidateQueries({ queryKey: ['bom-cost-report'] });
+    queryClient.invalidateQueries({ queryKey: ['bom-cost-summary'] });
+    queryClient.invalidateQueries({ queryKey: ['bom-item-cost-hierarchy'] });
+    if (bomItemId) queryClient.invalidateQueries({ queryKey: ['bom-item-cost', bomItemId] });
+
+    if (recalculated) toast.success('Costs updated', { duration: 2000, description: 'BOM costs have been recalculated' });
   }, [bomId, bomItemId, enabled, queryClient]);
 
-  /**
-   * Trigger recalculation for a specific BOM item only
-   * Faster than full BOM recalculation
-   */
-  const triggerItemRecalculation = useCallback(async (targetBomItemId: string) => {
-    if (!enabled) return;
-
-    try {
-      await apiClient.post(`/bom-items/${targetBomItemId}/cost/recalculate`);
-
-      // Invalidate queries
-      queryClient.invalidateQueries({ queryKey: ['bom-item-cost', targetBomItemId] });
-      queryClient.invalidateQueries({ queryKey: ['bom-cost-report'] });
-    } catch (error) {
-      // Silent fail - recalculation will happen on next load
-    }
-  }, [enabled, queryClient]);
-
-  return {
-    triggerRecalculation,
-    triggerItemRecalculation,
-  };
+  return { triggerRecalculation };
 }

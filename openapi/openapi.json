@@ -20929,6 +20929,35 @@
       }
     },
     "/api/v1/production-lots/{id}/vendor-assignments/{assignmentId}": {
+      "delete": {
+        "operationId": "ProductionPlanningController_deleteVendorAssignment_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "assignmentId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "ProductionPlanning"
+        ]
+      },
       "patch": {
         "operationId": "ProductionPlanningController_updateVendorAssignment_v1",
         "parameters": [

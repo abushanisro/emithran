@@ -112,19 +112,6 @@ export const productionEntriesApi = {
   },
 
   /**
-   * Get daily production summary
-   */
-  getDailyProduction: async (date: string, lotId?: string): Promise<{
-    date: string;
-    totalQuantity: number;
-    entriesCount: number;
-    byStatus: Record<string, number>;
-  }> => {
-    const params = lotId ? { lot_id: lotId } : {};
-    return apiClient.get(`/production-planning/daily-production/${date}`, { params });
-  },
-
-  /**
    * Get weekly production summary
    */
   getWeeklySummary: async (lotId: string): Promise<{
