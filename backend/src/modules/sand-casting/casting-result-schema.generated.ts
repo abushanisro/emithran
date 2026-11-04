@@ -475,6 +475,39 @@ export const CASTING_RESULT_SCHEMA = {
               "type": "integer",
               "minimum": 1
             },
+            "point_stride": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Absent in results of workers before 0.17.0. 1 when points holds every wall-thickness ray (at most 5000 of them); otherwise points holds every point_stride-th ray"
+            },
+            "points": {
+              "description": "Absent in results of workers before 0.17.0. The wall-thickness rays that found a far side, in face order (S6b): [face, x, y, z, mm]. face is numbered as faces and glb_faces number them; x, y, z are the point on the face (mm, to 0.01); mm is the thickness along the inward normal (to 0.001). The thickness over the surface, for a colour map",
+              "type": "array",
+              "items": {
+                "type": "array",
+                "minItems": 5,
+                "maxItems": 5,
+                "prefixItems": [
+                  {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                ]
+              }
+            },
             "faces": {
               "description": "The thinnest wall measured from each face (S6): the smallest distance from a point of the face, through the metal along the inward normal, to the next surface. Faces numbered as the features, the draft and glb_faces number them; only faces that had a measurement are listed",
               "type": "array",

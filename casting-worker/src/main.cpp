@@ -44,7 +44,7 @@
 namespace {
 
 constexpr int kSchemaVersion = 1;
-constexpr const char* kWorkerVersion = "0.16.0";
+constexpr const char* kWorkerVersion = "0.17.0";
 
 int fail(const char* code, int exit_code) {
   std::cout << "{\"error\":\"" << code << "\"}\n";
@@ -132,6 +132,13 @@ void write_casting(JsonWriter& json, const std::optional<CastingProperties>& c) 
         .key("samples").value(c->wall->samples)
         .key("faces").begin_array();
     for (const FaceWall& f : c->wall->faces) json.begin_object().key("face").value(f.face).key("min").value(f.min).key("samples").value(f.samples).end_object();
+    json.end_array();
+    // [face, x, y, z, mm] per ray: the point to 0.01 mm and the thickness to 0.001 mm (the result stays a few hundred KB).
+    const auto round_to = [](double v, double step) { return std::round(v / step) * step; };
+    json.key("point_stride").value(c->wall->point_stride).key("points").begin_array();
+    for (const WallPoint& p : c->wall->points) {
+      json.begin_array().value(p.face).value(round_to(p.at[0], 0.01)).value(round_to(p.at[1], 0.01)).value(round_to(p.at[2], 0.01)).value(round_to(p.mm, 0.001)).end_array();
+    }
     json.end_array().end_object();
   } else {
     json.null();
