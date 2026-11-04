@@ -2957,6 +2957,16 @@ export class BOMItemsService {
     return { ...appendLines(dto, sec.lines), secondaryOperations: sec.dto };
   }
 
+  /** The design-for-casting checks of a sand-cast item's casting analysis. */
+  async getSandDfm(id: string, userId: string, accessToken: string) {
+    const item = await this.findOne(id, userId, accessToken);
+    const grade = ((item as any).materialGrade ?? (item as any).material ?? null) as string | null;
+    return this.sandCostService.dfm({
+      bomItemId: id, sourcePath: ((item as any).file3dPath ?? (item as any).file_3d_path ?? null) as string | null, grade,
+      client: this.databaseService.getUserClient(accessToken), accessToken,
+    });
+  }
+
   /** The family route's quote, before the shared secondary operations. */
   private async computeCostSummary(
     id: string,
