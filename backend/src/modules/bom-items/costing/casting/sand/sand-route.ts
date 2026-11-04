@@ -12,6 +12,7 @@ import type { CostContext } from '../casting-finishing';
 import { coreboxTooling, coreLine, sandCores, type CoreboxTooling, type CoreRegion } from './sand-cores';
 import { cleanStep, degateStep, finishStep, inspectStep, shakeoutStep, type SandFinishContext } from './sand-finishing-steps';
 import { designGating, type GatingSystem } from './sand-gating';
+import { referenceYieldNote } from './sand-yield';
 import { ingateVelocityNote, RISER_EFFICIENCY_NOTE } from './sand-velocity';
 import { machineValue, type SandMachine } from './sand-machines';
 import type { SandReference } from './sand-reference';
@@ -168,6 +169,8 @@ function sharedFor(input: SandRouteInput, mould: SandMachine, cavities: number):
   );
   if (!('run' in metal)) return fail(...metal.reasons);
   const pouredKg = metal.run.value!;
+  const yieldNote = referenceYieldNote(ref, input.material.materialType, (100 * netKg) / pouredKg);
+  if (yieldNote) notes.push(yieldNote);
   const poured = { perCastingKg: pouredKg, perMouldKg: pouredKg * cavities };
 
   const cored = sandCores({ ...base, poured }, part.cores);

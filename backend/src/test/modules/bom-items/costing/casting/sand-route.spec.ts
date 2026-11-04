@@ -31,6 +31,10 @@ describe('buildSandRoute on a gray iron casting with one core (real sand data)',
     expect(route!.totalUsd).toBeGreaterThan(0);
   });
 
+  it('sets the designed yield beside the plant baseline for the alloy', () => {
+    expect(route!.warnings.some((w) => w.startsWith('Metal yield:') && w.includes('materialYieldGray'))).toBe(true);
+  });
+
   it('is fast enough to run on a request (a whole route for every moulding machine)', () => {
     expect(tookMs).toBeLessThan(8000);
   });
