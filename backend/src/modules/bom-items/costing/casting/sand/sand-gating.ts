@@ -222,3 +222,10 @@ export function designGating(input: GatingInput): { system: GatingSystem | null;
   }
   return fail('the gating design does not settle');
 }
+
+/** The flask of the moulding machine the route is costed on (mm): the sand the mould is made in, cope above the parting plane and drag below. */
+export interface SandFlask {
+  lengthMm: number;
+  widthMm: number;
+  heightMm: number;
+}

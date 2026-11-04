@@ -139,6 +139,28 @@ wall_case tube "10:2,50:2" "outer radius 30, bore 20, height 50: the wall is 10 
 wall_case hollow-box "10:4,20:8" "100 x 60 x 40 with a 60 x 20 x 20 cavity: the faces over the cavity (top, bottom, and the cavity's own) are 10, the other eight 20"
 wall_case step-block "20:2,40:1,50:2,60:2,100:1" "the L step: bottom and step top 20, the high top 40, the left side and the riser 50, front and back 60, the right side 100"
 
+echo "== wall thickness over the surface (S6b): the rays themselves, for a colour map"
+# Every point is on a face the worker listed, its thickness is one of the box's three (20, 50, 100: through the thickness, the width and the length), and the faces' minima are the smallest of their points.
+points_case() { # <sample stem> <allowed thicknesses, comma separated> <why>
+    got="$(node -e '
+        const w = JSON.parse(require("fs").readFileSync(process.argv[1])).parts[0].casting.wall_mm;
+        const allowed = process.argv[2].split(",").map(Number);
+        const faces = new Map(w.faces.map((f) => [f.face, f.min]));
+        const least = new Map();
+        let bad = 0;
+        for (const [face, x, y, z, mm] of w.points) {
+            if (!faces.has(face) || ![x, y, z, mm].every(Number.isFinite)) bad++;
+            if (!allowed.some((a) => Math.abs(a - mm) < 0.01)) bad++;
+            least.set(face, Math.min(least.get(face) ?? Infinity, mm));
+        }
+        for (const [face, min] of faces) if (Math.abs((least.get(face) ?? Infinity) - min) > 0.01) bad++;
+        console.log(bad === 0 && w.points.length > 0 && w.points.length <= 5000 && w.point_stride >= 1 ? "ok" : "bad " + bad + " of " + w.points.length + " stride " + w.point_stride);
+    ' "$WORK/results/$1/result.json" "$2")"
+    [ "$got" = "ok" ] && pass "points $1: every ray on a listed face, thickness one of $2 ($3)" || fail "points $1: $got ($3)"
+}
+points_case box "20,50,100" "the rays of a 100 x 50 x 20 box"
+points_case tube "10,50" "the rays of the tube: 10 through the wall, 50 along the bore"
+
 echo "== limits"
 run_sample assembly --deadline-ms 1
 mv "$WORK/results/assembly.out" "$WORK/deadline.out"; mv "$WORK/results/assembly.exit" "$WORK/deadline.exit"

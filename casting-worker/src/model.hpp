@@ -35,10 +35,19 @@ struct FaceWall {
   int samples;    // rays from this face that found a far side
 };
 
+// One wall-thickness ray: where it started on the surface and how far it ran through the metal to the next surface.
+struct WallPoint {
+  int face;     // numbered as FaceWall::face
+  Xyz at;       // mm, the point on the face
+  double mm;    // thickness along the inward normal
+};
+
 struct WallThickness {
   double min = 0, nominal = 0, max = 0;  // nominal: the area-weighted median
   int samples = 0;
   std::vector<FaceWall> faces;  // every face that had a measurement, in face order: where the thin walls are
+  std::vector<WallPoint> points;  // every point_stride-th ray, in face order: the thickness over the surface, for a colour map
+  int point_stride = 1;           // 1 while there are at most kMaxWallPoints rays, else the step taken through them
 };
 
 // One region of air enclosed between metal along the draw axis: sand must be placed there as a core (D127).

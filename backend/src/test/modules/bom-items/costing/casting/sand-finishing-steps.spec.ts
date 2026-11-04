@@ -52,6 +52,15 @@ describe('shakeoutStep', () => {
     expect(out.ok && out.sec).toBeCloseTo(interpolate(manualTable, 8)! * 60, 9);
   });
 
+  it('an automatic shakeout refuses a part longer than maxAutoShakeoutLength; manual shakeout does not', () => {
+    const max = ref.number('maxAutoShakeoutLength')!;
+    const long = { ...ctx, part: { ...ctx.part, dimsMm: [max + 1, 200, 100] as const } };
+    expect(shakeoutStep(long, conveyor)).toEqual({ ok: false, reasons: [expect.stringContaining(`up to ${max} mm automatically`)] });
+    expect(shakeoutStep(long, manual).ok).toBe(true);
+    const exactly = { ...ctx, part: { ...ctx.part, dimsMm: [max, 200, 100] as const } };
+    expect(shakeoutStep(exactly, conveyor).ok).toBe(true);
+  });
+
   it('refuses a machine that cannot take the mould', () => {
     const tooHeavy = { ...ctx, poured: { perCastingKg: 1e6, perMouldKg: 1e6 } };
     expect(shakeoutStep(tooHeavy, conveyor)).toEqual({ ok: false, reasons: [expect.stringContaining('one mould holds')] });

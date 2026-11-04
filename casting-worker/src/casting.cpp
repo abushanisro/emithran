@@ -35,6 +35,7 @@ namespace {
 
 constexpr int kGrid = 64;                 // rays per side, per axis
 constexpr double kThicknessRays = 10000;  // about this many wall-thickness rays per part
+constexpr int kMaxWallPoints = 5000;       // the rays kept in the result (every k-th beyond this), for the thickness colour map
 
 // Where a line meets the shape, as distances along it, sorted. A ray through an edge meets two faces at one
 // point: counted once.
@@ -219,6 +220,7 @@ std::optional<WallThickness> wall(IntCurvesFace_ShapeIntersector& shape, const T
   NCollection_IndexedMap<TopoDS_Shape, TopTools_ShapeMapHasher> face_numbers;
   TopExp::MapShapes(solid, TopAbs_FACE, face_numbers);
   std::map<int, FaceWall> by_face;
+  std::vector<WallPoint> points;  // every ray that found a far side, thinned to kMaxWallPoints at the end
   for (TopExp_Explorer it(solid, TopAbs_FACE); it.More(); it.Next()) {
     const TopoDS_Face face = TopoDS::Face(it.Current());
     const int face_index = face_numbers.FindIndex(face) - 1;
@@ -250,6 +252,7 @@ std::optional<WallThickness> wall(IntCurvesFace_ShapeIntersector& shape, const T
         const auto next = std::find_if(at.begin(), at.end(), [](double w) { return w > 1e-4; });
         if (next != at.end()) {
           samples.push_back({*next + start, area / (m * m)});
+          points.push_back({face_index, Xyz{point.X(), point.Y(), point.Z()}, *next + start});
           const auto [entry, fresh] = by_face.try_emplace(face_index, FaceWall{face_index, *next + start, 0});
           if (!fresh) entry->second.min = std::min(entry->second.min, *next + start);
           entry->second.samples += 1;
@@ -281,6 +284,9 @@ std::optional<WallThickness> wall(IntCurvesFace_ShapeIntersector& shape, const T
   w.max = percentile(0.95);
   w.samples = static_cast<int>(samples.size());
   for (const auto& [index, face_wall] : by_face) w.faces.push_back(face_wall);
+  // Every ray up to the cap; beyond it every k-th, so the part is covered evenly and the result stays small.
+  w.point_stride = std::max(1, static_cast<int>(std::ceil(static_cast<double>(points.size()) / kMaxWallPoints)));
+  for (std::size_t i = 0; i < points.size(); i += static_cast<std::size_t>(w.point_stride)) w.points.push_back(points[i]);
   return w;
 }
 

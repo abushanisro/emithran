@@ -4,6 +4,8 @@
  * because the result is stored data and the panel must not break on a shape it did not expect.
  */
 import type { CastingWorkerFeature } from "@/lib/casting/features";
+import type { WallRay } from "@/lib/casting/thickness-field";
+import type { FaceThickness } from "@/lib/casting/thickness-map";
 import type { Xyz } from "@/lib/casting/viewer-model";
 
 export interface CastingPartView {
@@ -23,6 +25,11 @@ export interface CastingPartView {
   draftFaces: number[];
   /** The faces a wall thickness was measured from (casting.wall_mm.faces), numbered the same way. */
   wallFaces: number[];
+  /** The thinnest wall measured from each of those faces, mm (casting.wall_mm.faces), for the thickness colour map. */
+  wallThickness: FaceThickness[];
+  /** The wall-thickness rays (casting.wall_mm.points, worker 0.17.0 and later; empty before), and the worker's own thin and thick ends (its 5th and 95th percentiles). */
+  wallRays: WallRay[];
+  wallRange: { min: number; max: number } | null;
 }
 
 const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
@@ -49,7 +56,7 @@ export function castingPartView(result: unknown): CastingPartView | { reason: st
       draw_axis_source?: unknown;
       parting?: { points?: unknown; height_mm?: unknown } | null;
       draft?: { faces?: unknown } | null;
-      wall_mm?: { faces?: unknown } | null;
+      wall_mm?: { faces?: unknown; points?: unknown; min?: unknown; max?: unknown } | null;
     } | null;
   };
   const features = (Array.isArray(p.features) ? p.features : []).flatMap(
@@ -98,5 +105,32 @@ export function castingPartView(result: unknown): CastingPartView | { reason: st
           return typeof face === "number" && Number.isInteger(face) ? [face] : [];
         })
       : [],
+    wallThickness: Array.isArray(p.casting?.wall_mm?.faces)
+      ? p.casting.wall_mm.faces.flatMap((d: unknown) => {
+          const r = d as { face?: unknown; min?: unknown } | null;
+          return typeof r?.face === "number" && Number.isInteger(r.face) && isNum(r.min)
+            ? [{ face: r.face, min: r.min }]
+            : [];
+        })
+      : [],
+    wallRays: rays(p.casting?.wall_mm?.points),
+    wallRange: wallRange(p.casting?.wall_mm),
   };
+}
+
+/** The rays of casting.wall_mm.points: [face, x, y, z, mm] each; an entry that is not that is left out. */
+function rays(points: unknown): WallRay[] {
+  if (!Array.isArray(points)) return [];
+  return points.flatMap((d: unknown): WallRay[] => {
+    if (!Array.isArray(d) || d.length !== 5) return [];
+    const [face, x, y, z, mm] = d as unknown[];
+    return typeof face === "number" && Number.isInteger(face) && isNum(x) && isNum(y) && isNum(z) && isNum(mm)
+      ? [{ face, at: [x, y, z], mm }]
+      : [];
+  });
+}
+
+/** The worker's own thin and thick ends of the wall thickness (its 5th and 95th percentiles), or null. */
+function wallRange(wall: { min?: unknown; max?: unknown } | null | undefined): { min: number; max: number } | null {
+  return wall && isNum(wall.min) && isNum(wall.max) ? { min: wall.min, max: wall.max } : null;
 }

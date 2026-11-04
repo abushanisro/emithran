@@ -13,7 +13,7 @@ describe("casting analysis identity", () => {
     expect(configHash(DEFAULT_CASTING_CONFIG)).toMatch(/^[0-9a-f]{16}$/);
   });
   it("is tied to the worker and contract this backend was built for", () => {
-    expect(CASTING_WORKER_VERSION).toBe("0.16.0");
+    expect(CASTING_WORKER_VERSION).toBe("0.17.0");
     expect(CASTING_SCHEMA_VERSION).toBe(1);
   });
 });

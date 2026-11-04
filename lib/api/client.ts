@@ -17,7 +17,7 @@
 import { config as appConfig } from '../config';
 import { apiConfig } from './config';
 import { fromProblemDetails, isProblemContentType } from './problem-details';
-import { SESSION_IDLE_TIMEOUT_CODE, SESSION_IDLE_TIMEOUT_EVENT } from '../auth/session-idle/policy';
+import { SESSION_IDLE_TIMEOUT_CODE, SESSION_IDLE_TIMEOUT_EVENT, isSessionIdleBody } from '../auth/session-idle/policy';
 
 import { CircuitBreaker, CircuitBreakerError } from './circuit-breaker';
 import { requestMetrics } from './request-metrics';
@@ -578,7 +578,7 @@ class ApiClient {
           // revoked it, so signing in again is the only way on. The session idle
           // controller signs out (this session only) and returns the user here
           // after login.
-          if (response.status === 401 && data.error?.code === SESSION_IDLE_TIMEOUT_CODE) {
+          if (response.status === 401 && isSessionIdleBody(data)) {
             tracker.recordError(401, SESSION_IDLE_TIMEOUT_CODE);
             if (typeof window !== 'undefined') window.dispatchEvent(new Event(SESSION_IDLE_TIMEOUT_EVENT));
             if (silent) return null;

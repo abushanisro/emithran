@@ -237,6 +237,32 @@ describe('the cost summary of a sand casting', () => {
     }
   });
 
+  it('sends the moulding machines compared, with costs under the summary\'s own name', () => {
+    const s = buildCastingCostSummary({ ...base, sand: { route, missing: [] } });
+    const alts = s.sandCasting!.alternatives;
+    expect(alts).toHaveLength(route.alternatives.length);
+    expect(alts[0]).toMatchObject({ chosen: true, totalCost: route.totalUsd });
+    expect(alts.every((a) => !('totalUsd' in a))).toBe(true);
+  });
+
+  it('the material-cost run carries every figure of the metal balance under the field names the web app reads, and the balance closes', () => {
+    const s = buildCastingCostSummary({ ...base, sand: { route, missing: [] } });
+    const trace = s.calculatorRuns!['Sand material cost']!.trace;
+    const v = (label: string) => trace.find((t) => t.fieldName === label)?.value as number;
+    for (const label of ['Net Weight', 'Poured Weight', 'Melt Loss', 'Remelt Allowance', 'Bought Weight']) expect(typeof v(label)).toBe('number');
+    const gates = v('Poured Weight') - v('Net Weight');
+    const allowance = Math.min(Math.max(v('Remelt Allowance'), 0), 1);
+    expect(v('Bought Weight')).toBeCloseTo(v('Net Weight') + v('Melt Loss') + gates * (1 - allowance), 9);
+  });
+
+  it("sends the moulding machine's flask, for the viewer to draw the mould", () => {
+    const s = buildCastingCostSummary({ ...base, sand: { route, missing: [] } });
+    expect(s.sandCasting!.flask).toEqual(route.flask);
+    expect(route.flask.lengthMm).toBeGreaterThan(0);
+    expect(route.flask.widthMm).toBeGreaterThan(0);
+    expect(route.flask.heightMm).toBeGreaterThan(0);
+  });
+
   it('sends the designed gating and risers (sizes only) for the viewer to draw, as the route designed them', () => {
     const s = buildCastingCostSummary({ ...base, sand: { route, missing: [] } });
     const g = route.gating;

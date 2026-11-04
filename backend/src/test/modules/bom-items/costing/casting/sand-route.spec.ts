@@ -31,6 +31,26 @@ describe('buildSandRoute on a gray iron casting with one core (real sand data)',
     expect(route!.totalUsd).toBeGreaterThan(0);
   });
 
+  it('compares every moulding machine tried: the chosen one first and the only one chosen, the rest dearer, the unusable last with their reason', () => {
+    const alts = route!.alternatives;
+    expect(alts.length).toBeGreaterThan(1);
+    expect(alts[0]).toMatchObject({ chosen: true, mouldingMachine: route!.mouldingMachine, totalUsd: route!.totalUsd });
+    expect(alts.filter((a) => a.chosen)).toHaveLength(1);
+    const costed = alts.filter((a) => !a.chosen && a.complete);
+    expect(costed.length).toBeGreaterThan(0);
+    for (const a of costed) expect(a.totalUsd!).toBeGreaterThanOrEqual(route!.totalUsd!);
+    expect(costed.map((a) => a.totalUsd!)).toEqual([...costed.map((a) => a.totalUsd!)].sort((x, y) => x - y));
+    const unusable = alts.filter((a) => a.cavities == null);
+    for (const a of unusable) expect(a.reason).toEqual(expect.any(String));
+    // unusable machines come after every machine that made a route
+    const firstUnusable = alts.findIndex((a) => a.cavities == null);
+    if (firstUnusable >= 0) expect(alts.slice(firstUnusable).every((a) => a.cavities == null)).toBe(true);
+  });
+
+  it('sets the designed yield beside the plant baseline for the alloy', () => {
+    expect(route!.warnings.some((w) => w.startsWith('Metal yield:') && w.includes('materialYieldGray'))).toBe(true);
+  });
+
   it('is fast enough to run on a request (a whole route for every moulding machine)', () => {
     expect(tookMs).toBeLessThan(8000);
   });
