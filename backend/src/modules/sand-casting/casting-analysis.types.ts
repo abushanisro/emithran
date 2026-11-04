@@ -17,11 +17,27 @@ export type CastingAnalysisStatus =
   | "partial"
   | "failed";
 
-/** What the analysis is told to do besides reading the file. Only automatic draw direction exists until the override (design S5). */
+/** The draw direction an analysis was run with: chosen by the worker, or fixed to an axis by an engineer (migration 957). */
+export const DRAW_DIRECTIONS = ["auto", "x", "y", "z"] as const;
+export type DrawDirection = (typeof DRAW_DIRECTIONS)[number];
+/** An engineer's choice: an axis (never "auto", which is no choice). */
+export type DrawAxis = Exclude<DrawDirection, "auto">;
+export const isDrawAxis = (v: unknown): v is DrawAxis => v === "x" || v === "y" || v === "z";
+
+/** What the analysis is told to do besides reading the file. */
 export interface CastingAnalysisConfig {
-  drawDirection: "auto";
+  drawDirection: DrawDirection;
 }
 export const DEFAULT_CASTING_CONFIG: CastingAnalysisConfig = { drawDirection: "auto" };
+
+/** The configuration of a stored row; null when it is not one this backend knows (never guessed). */
+export function parseCastingConfig(raw: unknown): CastingAnalysisConfig | null {
+  const d = (raw as { drawDirection?: unknown } | null)?.drawDirection;
+  return d === "auto" || isDrawAxis(d) ? { drawDirection: d } : null;
+}
+
+/** The configuration an item's draw-direction override (or the lack of one) asks for. */
+export const configForAxis = (axis: DrawAxis | null): CastingAnalysisConfig => ({ drawDirection: axis ?? "auto" });
 
 /** Stable digest of a configuration (keys sorted), so equal configurations always give the same cache key. */
 export function configHash(config: CastingAnalysisConfig): string {
@@ -42,6 +58,8 @@ export interface CastingAnalysisRow {
   worker_version: string;
   schema_version: number;
   config_hash: string;
+  /** What the analysis was run with (its digest is config_hash). */
+  config: CastingAnalysisConfig;
   status: CastingAnalysisStatus;
   attempts: number;
   error_code: string | null;
