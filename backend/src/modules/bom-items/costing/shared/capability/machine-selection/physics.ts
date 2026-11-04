@@ -229,13 +229,11 @@ interface InjectionMoldingRequirement {
   clampTonnageRequired: number | null;
   clampNotDerivableReason: string | null;
   projectedAreaMm2: number;
-  // Full IMM sizing criteria: clamp force, shot weight, tie-bar spacing vs
-  // part dims. Only clamp tonnage has capability data in mhr_records today
-  // (max_tonnage, migration 324); shot weight and part dims are carried on
-  // the requirement so the selector can gate on them the day shot-capacity /
-  // tie-bar columns exist — and can already explain them in reasons.
-  shotWeightG: number | null;    // part + runner mass per shot; null = volume/density unknown
-  partLengthMm: number;          // largest bbox dim — future tie-bar spacing check
+  // Shot one cavity needs in GPPS grams (plastic-molding/shot-size.ts), the unit
+  // a press's shot size is rated in; null = not derivable (no weight, melt
+  // density or reference), in which case the shot is not gated.
+  shotGppsG: number | null;
+  partLengthMm: number;          // largest bbox dim — tie-bar spacing check
   partWidthMm: number;           // second bbox dim
 }
 
@@ -567,7 +565,7 @@ export function injectionMoldingRequirement(input: {
   // recommendCavityCount, cost-injection-molding-engine.ts) — this remains a
   // single-cavity-basis requirement. Route comparison's im-*-tier routes size
   // cavities against each tier's real press.
-  shotWeightG?: number | null;
+  shotGppsG?: number | null;
   partLengthMm?: number;
   partWidthMm?: number;
 }): InjectionMoldingRequirement {
@@ -576,7 +574,7 @@ export function injectionMoldingRequirement(input: {
     clampTonnageRequired: input.clampTonnageRequired,
     clampNotDerivableReason: input.clampNotDerivableReason,
     projectedAreaMm2: Math.max(input.projectedAreaMm2, 0),
-    shotWeightG: input.shotWeightG ?? null,
+    shotGppsG: input.shotGppsG ?? null,
     partLengthMm: Math.max(input.partLengthMm ?? 0, 0),
     partWidthMm: Math.max(input.partWidthMm ?? 0, 0),
   };
