@@ -85,6 +85,27 @@ for bad in w X xy ''; do
 done
 pass "an invalid draw axis (w, X, xy, empty) is refused: exit 64"
 
+echo "== draft angle (S4): every face's angle to the draw axis, worked by hand from the geometry"
+# The angle of a face is 0 when parallel to the draw axis, positive when it tapers away from the parting plane, negative for an undercut; a flat floor or roof
+# is 90 (free). Expected: the faces grouped by min..max angle, with their count.
+draft_case() { # <sample stem> <expected groups> <why>
+    got="$(node -e '
+        const d = JSON.parse(require("fs").readFileSync(process.argv[1])).parts[0].casting.draft;
+        if (!d || d.unmeasured !== 0 || d.at_parting_plane !== 0) { console.log("unexpected: " + JSON.stringify(d && { unmeasured: d.unmeasured, at: d.at_parting_plane })); process.exit(0); }
+        const r = (x) => Math.round(x * 1e4) / 1e4, g = new Map();
+        for (const f of d.faces) { const k = r(f.min_deg) + ".." + r(f.max_deg); g.set(k, (g.get(k) || 0) + 1); }
+        console.log([...g].sort((a, b) => parseFloat(a[0]) - parseFloat(b[0])).map(([k, n]) => k + ":" + n).join(","));
+    ' "$WORK/results/$1/result.json")"
+    [ "$got" = "$2" ] && pass "draft $1: $got ($3)" || fail "draft $1: got '$got', expected '$2' ($3)"
+}
+draft_case box "0..0:4,90..90:2" "four vertical walls, a floor and a roof"
+draft_case cylinder "0..0:1,90..90:2" "one vertical side, a floor and a roof"
+draft_case tube "0..0:2,90..90:2" "two vertical sides (outer and bore), a floor and a roof"
+draft_case step-block "0..0:5,90..90:3" "five vertical faces of the L, three horizontal ones"
+draft_case hollow-box "-90..-90:2,0..0:8,90..90:2" "the two ends of the closed cavity face each other: both undercut (this is why it needs a core); eight walls along x"
+draft_case taper-3 "3..3:1,90..90:2" "a cone leaning 3 degrees from the axis: the side is exactly 3, drafted"
+draft_case taper-04 "0.4..0.4:1,90..90:2" "the same at 0.4 degrees, under the 0.5 degree limit of the published rules"
+
 echo "== limits"
 run_sample assembly --deadline-ms 1
 mv "$WORK/results/assembly.out" "$WORK/deadline.out"; mv "$WORK/results/assembly.exit" "$WORK/deadline.exit"

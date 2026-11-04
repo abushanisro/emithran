@@ -349,7 +349,8 @@
         "hidden_fraction",
         "wall_mm",
         "cores",
-        "cores_glb"
+        "cores_glb",
+        "draft"
       ],
       "properties": {
         "draw_axis": {
@@ -536,6 +537,74 @@
             "string",
             "null"
           ]
+        },
+        "draft": {
+          "description": "Draft angle of every face along the draw axis (S4): asin(n.d) above the parting plane, asin(-n.d) below it, so 0 is parallel to the draw axis and negative is an undercut; a curved face is sampled and reports its smallest and largest angle. Null when there is no parting line (the halves are defined by it)",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "parting_planar",
+            "at_parting_plane",
+            "unmeasured",
+            "faces"
+          ],
+          "properties": {
+            "parting_planar": {
+              "type": "boolean",
+              "description": "False: the parting line is stepped, so the halves are only approximate"
+            },
+            "at_parting_plane": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Flat faces lying in the parting plane, not graded"
+            },
+            "unmeasured": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Faces without a usable normal"
+            },
+            "faces": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "face",
+                  "side",
+                  "min_deg",
+                  "max_deg"
+                ],
+                "properties": {
+                  "face": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The face, numbered as the features and glb_faces number them"
+                  },
+                  "side": {
+                    "enum": [
+                      "c",
+                      "d",
+                      "b"
+                    ],
+                    "description": "c: above the parting plane, d: below it, b: crossing it (graded by the worse side)"
+                  },
+                  "min_deg": {
+                    "type": "number",
+                    "minimum": -90,
+                    "maximum": 90
+                  },
+                  "max_deg": {
+                    "type": "number",
+                    "minimum": -90,
+                    "maximum": 90
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },
