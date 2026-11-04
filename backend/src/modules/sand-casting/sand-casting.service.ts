@@ -12,6 +12,7 @@ import { AuditService } from "../../common/audit/audit.service";
 import { DatabaseService } from "../../common/database/database.service";
 import { OBJECT_STORE, type ObjectStore } from "../../common/storage/object-store";
 import { CastingAnalysisRunner } from "./casting-analysis-runner";
+import { meshKey, meshNames } from './casting-meshes';
 import {
   CASTING_SCHEMA_VERSION,
   CASTING_SOURCE_BUCKET,
@@ -34,6 +35,9 @@ export interface CastingRequest {
 // the user (row-level security decides whether it is theirs), identifies its STEP file by hash, and either returns the analysis that
 // already exists, copies a finished one made for the same file by the same organization, or queues one. It never parses CAD:
 // the runner hands the file to the sandboxed worker.
+/** How long a mesh URL works: long enough to load a model, short enough that a copied link is useless. */
+const MESH_URL_SECONDS = 300;
+
 @Injectable()
 export class SandCastingService {
   constructor(
@@ -179,6 +183,19 @@ export class SandCastingService {
     if (error || !data || data.length === 0) return null;
     const row = data[0] as { result: unknown; worker_version: string };
     return row.result == null ? null : { result: row.result, workerVersion: row.worker_version };
+  }
+
+  /**
+   * A short-lived signed URL for one 3D file of an analysis (its part mesh or its cores). The analysis is read as the user, so another organization's is
+   * not found; the name must be one the result lists; the file is fetched from the store by the browser, not through this process.
+   */
+  async meshUrl(id: string, name: string, token: string): Promise<{ name: string; url: string; expiresInSeconds: number }> {
+    const analysis = await this.get(id, token);
+    const notFound = () => new NotFoundException({ code: 'mesh_not_found', message: 'This analysis has no such 3D file.' });
+    if (!analysis.output_prefix || !meshNames(analysis.result).includes(name)) throw notFound();
+    const key = meshKey(analysis.output_prefix, name);
+    if (!(await this.objects.exists(CASTING_SOURCE_BUCKET, key))) throw notFound();
+    return { name, url: await this.objects.signedGetUrl(CASTING_SOURCE_BUCKET, key, MESH_URL_SECONDS), expiresInSeconds: MESH_URL_SECONDS };
   }
 
   /** The analyses of one BOM item, newest first. An empty list means "not requested", never "passed". */

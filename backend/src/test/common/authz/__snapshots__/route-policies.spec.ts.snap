@@ -106,6 +106,7 @@ org:viewer      GET /api/v1/calculators/:id/fields  CalculatorsController.getFie
 org:viewer      GET /api/v1/calculators/:id/formulas  CalculatorsController.getFormulas
 org:viewer      GET /api/v1/casting-analyses  SandCastingController.list
 org:viewer      GET /api/v1/casting-analyses/:id  SandCastingController.get
+org:viewer      GET /api/v1/casting-analyses/:id/meshes  SandCastingController.mesh
 org:viewer      GET /api/v1/child-part-costs  ChildPartCostController.findAll
 org:viewer      GET /api/v1/child-part-costs/:id  ChildPartCostController.findOne
 org:viewer      GET /api/v1/copilot/memory  CopilotController.getMemory

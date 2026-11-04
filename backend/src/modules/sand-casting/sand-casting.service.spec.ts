@@ -267,3 +267,35 @@ describe("SandCastingService: the file's path, and finding a result by it", () =
     expect(await latest(null, { message: "down" }).service.latestResult("item-1", "p", "t")).toBeNull();
   });
 });
+
+describe("SandCastingService.meshUrl", () => {
+  const result = { parts: [{ glb: "parts/p.glb", casting: { cores_glb: "parts/p-cores.glb" } }] };
+  function build(over: { analysis?: Partial<CastingAnalysisRow> | null; exists?: boolean } = {}) {
+    const analysis = over.analysis === null ? null : row({ status: "succeeded", result, output_prefix: "casting-analyses/org-1/ca-1", ...over.analysis });
+    const userClient = { from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: analysis, error: null }) }) }) }) };
+    const objects = { exists: jest.fn(async () => over.exists ?? true), signedGetUrl: jest.fn(async (_b: string, key: string, ttl: number) => `https://store.example/${key}?ttl=${ttl}`) };
+    const service = new SandCastingService({ getUserClient: () => userClient } as never, {} as never, {} as never, objects as never);
+    return { service, objects };
+  }
+
+  it("signs a short-lived URL for a mesh the result lists, at the analysis's own folder", async () => {
+    const { service, objects } = build();
+    const r = await service.meshUrl("ca-1", "parts/p-cores.glb", "t");
+    expect(r).toEqual({ name: "parts/p-cores.glb", url: "https://store.example/casting-analyses/org-1/ca-1/p-cores.glb?ttl=300", expiresInSeconds: 300 });
+    expect(objects.signedGetUrl).toHaveBeenCalledWith("bom-files", "casting-analyses/org-1/ca-1/p-cores.glb", 300);
+  });
+
+  it("another organization's analysis is not found (row-level security returns nothing), and nothing is signed", async () => {
+    const { service, objects } = build({ analysis: null });
+    await expect(service.meshUrl("ca-1", "parts/p.glb", "t")).rejects.toBeInstanceOf(NotFoundException);
+    expect(objects.signedGetUrl).not.toHaveBeenCalled();
+  });
+
+  it("refuses a name the result does not list, however close, and an analysis with no stored files or a missing object", async () => {
+    for (const name of ["parts/other.glb", "parts/../p.glb", "model.glb", "parts/p.glb/", ""]) {
+      await expect(build().service.meshUrl("ca-1", name, "t")).rejects.toBeInstanceOf(NotFoundException);
+    }
+    await expect(build({ analysis: { output_prefix: null } }).service.meshUrl("ca-1", "parts/p.glb", "t")).rejects.toBeInstanceOf(NotFoundException);
+    await expect(build({ exists: false }).service.meshUrl("ca-1", "parts/p.glb", "t")).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
