@@ -15374,6 +15374,44 @@
         ]
       }
     },
+    "/api/v1/casting-analyses/{id}/meshes": {
+      "get": {
+        "operationId": "SandCastingController_mesh_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "A 3D file the analysis's result lists, e.g. parts/0-1-1-1.glb (its part mesh) or parts/0-1-1-1-cores.glb (its cores).",
+            "in": "query",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A short-lived signed URL for one 3D file of an analysis (its part mesh or its cores), for the viewer. Only a file the analysis's result lists.",
+        "tags": [
+          "Casting analyses"
+        ]
+      }
+    },
     "/api/v1/child-part-costs": {
       "get": {
         "description": "Retrieve paginated list of child part costs with optional filtering",
