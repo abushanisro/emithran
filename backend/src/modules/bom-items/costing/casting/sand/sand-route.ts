@@ -56,8 +56,8 @@ export interface SandScenario {
   chosenCoreProcess: string | null;
   /** USD per kWh for melting: the user's, no default. */
   energyPricePerKwh: number | null;
-  /** Parts made over the tooling's life: core boxes are shared by these. */
-  lifetimeVolume: number;
+  /** Parts made over the tooling's life: core boxes are shared by these. Null: the tooling is not costed (and said so), never spread over an assumed volume. */
+  lifetimeVolume: number | null;
 }
 
 export interface SandRouteInput {
@@ -265,10 +265,14 @@ function routeOn(input: SandRouteInput, mould: SandMachine, mouldingProcess: str
   // Tooling: per core the box material that costs least per part, over the lifetime volume; off when the data disables amortization.
   const amortized = ref.text('disableInvestmentAmortization') !== 'true';
   const items: CoreboxTooling[] = [];
-  for (let i = 0; i < cored.cores.length; i += 1) {
-    const t = coreboxTooling(ctx, scenario.lifetimeVolume);
-    if (t.tooling) items.push(t.tooling);
-    else warnings.push(...t.missing);
+  if (cored.cores.length > 0 && scenario.lifetimeVolume == null) {
+    warnings.push('Core box tooling is not costed: it is amortised over annual volume x production life, and one of them is not set.');
+  } else {
+    for (let i = 0; i < cored.cores.length; i += 1) {
+      const t = coreboxTooling(ctx, scenario.lifetimeVolume!);
+      if (t.tooling) items.push(t.tooling);
+      else warnings.push(...t.missing);
+    }
   }
   const toolingPerPart = amortized ? items.reduce((s, t) => s + t.perPartUsd, 0) : 0;
 
