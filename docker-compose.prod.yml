@@ -147,6 +147,8 @@ services:
       AI_MAX_CONCURRENT_PER_USER: ${AI_MAX_CONCURRENT_PER_USER:-2}
       # python: this backend analyses uploads with the Python cad-engine. rust: the cad-core service does, and this backend only creates the BOM items.
       CAD_CORE: ${CAD_CORE:-python}
+      # Empty: casting analyses stay queued. /run/casting-worker/worker.sock with the sand-casting profile running (casting-worker service below).
+      CASTING_WORKER_SOCKET: ${CASTING_WORKER_SOCKET:-}
       # python: cad-engine /nest. rust: the nester binary shipped in this image (falls back to python if it is unavailable).
       NESTING_ENGINE: ${NESTING_ENGINE:-python}
       # Data: the postgrest service below, with tokens this backend signs. Files: an S3-compatible bucket.
@@ -168,8 +170,11 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
       OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: ${OTEL_EXPORTER_OTLP_METRICS_ENDPOINT:-}
       OTEL_TRACES_SAMPLER_ARG: ${OTEL_TRACES_SAMPLER_ARG:-0.1}
+    # The casting worker host's group and socket, to reach it when CASTING_WORKER_SOCKET is set (docs: casting-worker/README.md).
+    group_add: ["10005"]
     volumes:
       - backend-logs:/app/logs
+      - casting-worker-socket:/run/casting-worker
     tmpfs:
       - /tmp
     healthcheck:
@@ -294,6 +299,41 @@ services:
         limits: { cpus: '1', memory: 2G, pids: 128 }
         reservations: { cpus: '0.25', memory: 256M }
 
+  # --- Casting worker host (sand casting module, backend/src/modules/sand-casting): the sand-casting geometry worker behind core's cad-worker-host,
+  # sandboxed like cad-worker above, on its own socket volume. Run with `--profile sand-casting`, and set CASTING_WORKER_SOCKET=/run/casting-worker/worker.sock
+  # for the backend; unset, the backend leaves casting analyses queued.
+  casting-worker:
+    <<: *hardened
+    profiles: [sand-casting]
+    platform: linux/amd64
+    build:
+      context: ./casting-worker
+      dockerfile: Dockerfile
+      target: host
+      additional_contexts:
+        core: ./core
+    user: "10005:10005"
+    # No network at all: no interface but loopback, so a compromised worker can neither phone home nor reach PostgREST or the bucket.
+    network_mode: none
+    environment:
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-50}
+      # The container limit below is 2 GB; the worker's own address-space limit stays under it.
+      WORKER_MEMORY_MB: 1536
+    volumes:
+      - casting-worker-socket:/run/cad-worker
+    healthcheck:
+      test: ["CMD", "cad-worker-host", "health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    tmpfs:
+      - /tmp:size=1g,uid=10005,gid=10005,mode=0700
+    deploy:
+      resources:
+        limits: { cpus: '2', memory: 2G, pids: 128 }
+        reservations: { cpus: '0.5', memory: 256M }
+
   cad-worker:
     <<: *hardened
     profiles: [rust-core]
@@ -396,6 +436,8 @@ services:
 volumes:
   # The runner's and the worker's only shared object: the worker host's Unix socket.
   cad-worker-socket:
+  # The same for the casting worker host (sand casting module): the backend mounts it read-only.
+  casting-worker-socket:
   cad-temp:
   cad-logs:
   backend-logs:
