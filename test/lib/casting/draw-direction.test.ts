@@ -4,6 +4,7 @@ import {
   describeDrawDirection,
   directionOf,
   drawDirectionError,
+  heldBack,
 } from "@/lib/casting/draw-direction";
 
 describe("analysesForDirection", () => {
@@ -67,5 +68,49 @@ describe("describeDrawDirection", () => {
     expect(
       describeDrawDirection({ axis: null, reason: null, setBy: null, setAt: null }, null),
     ).toMatch(/^Automatic: the worker chooses/);
+  });
+});
+
+describe("a draw direction held back after the item's file was replaced", () => {
+  const view = (over: Record<string, unknown> = {}) =>
+    ({
+      axis: null,
+      declaredAxis: "y",
+      reason: "split on the long side",
+      setBy: "u",
+      setAt: "t",
+      status: "needs_confirmation",
+      notice:
+        "The 3D file was replaced by a different geometry (faces 12 to 17): the draw direction is not applied.",
+      ...over,
+    }) as never;
+
+  it("is the choice with why it is not applied, and it can be confirmed; a pending one cannot (nothing to confirm against yet)", () => {
+    expect(heldBack(view())).toEqual({
+      axis: "y",
+      notice: expect.stringContaining("different geometry"),
+      pending: false,
+    });
+    expect(
+      heldBack(
+        view({
+          status: "pending",
+          notice: "The 3D file was replaced: checked when its analysis is done.",
+        }),
+      ),
+    ).toMatchObject({ axis: "y", pending: true });
+  });
+
+  it("is nothing when there is no choice or it applies", () => {
+    expect(heldBack(undefined)).toBeNull();
+    expect(heldBack(view({ declaredAxis: null, status: null, notice: null }))).toBeNull();
+    expect(heldBack(view({ axis: "y", status: "in_force", notice: null }))).toBeNull();
+  });
+
+  it("runs the analysis automatically meanwhile: the direction is auto, and the words say the choice is held back", () => {
+    expect(directionOf(view())).toBe("auto");
+    expect(describeDrawDirection(view(), null)).toBe(
+      "Automatic for now: the draw direction Y is held back",
+    );
   });
 });

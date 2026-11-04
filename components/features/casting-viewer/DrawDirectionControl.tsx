@@ -12,6 +12,7 @@ import {
   REASON_MAX,
   describeDrawDirection,
   drawDirectionError,
+  heldBack,
 } from "@/lib/casting/draw-direction";
 
 /**
@@ -34,6 +35,9 @@ export function DrawDirectionControl({
   const [reason, setReason] = useState("");
   const [touched, setTouched] = useState(false);
   const current = direction?.axis ?? null;
+  // The choice may exist without applying (the item's file was replaced): it can still be confirmed for the new file or removed.
+  const held = heldBack(direction);
+  const declared = direction?.declaredAxis ?? null;
   const error = drawDirectionError({ axis, reason }, current);
   const busy = set.isPending || clear.isPending;
   const failure = (set.error ?? clear.error) as { message?: string } | null;
@@ -44,8 +48,30 @@ export function DrawDirectionControl({
       <div className="text-muted-foreground">
         {describeDrawDirection(direction, autoAxis)}
       </div>
-      {current && direction?.reason && (
+      {declared && direction?.reason && (
         <div className="text-muted-foreground">Reason: {direction.reason}</div>
+      )}
+      {held && (
+        <div
+          className="space-y-1 rounded border border-amber-500/40 bg-amber-500/10 p-1 text-amber-700 dark:text-amber-500"
+          role="status"
+        >
+          <div>{held.notice}</div>
+          {!held.pending && direction?.reason && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                set.mutate({ axis: held.axis, reason: direction.reason! });
+              }}
+              className="rounded border border-border bg-background px-2 py-0.5 text-foreground hover:bg-muted/50 disabled:opacity-50"
+            >
+              {set.isPending
+                ? "Confirming…"
+                : `Confirm ${held.axis.toUpperCase()} for this file`}
+            </button>
+          )}
+        </div>
       )}
       <form
         className="space-y-1"
@@ -114,7 +140,7 @@ export function DrawDirectionControl({
           >
             {set.isPending ? "Applying…" : "Apply"}
           </button>
-          {current && (
+          {declared && (
             <button
               type="button"
               disabled={busy}

@@ -105,7 +105,7 @@ export function SandCastingFeaturesPanel({
             The features below are the cad-engine&apos;s, not the exact ones of the
             casting analysis.
           </div>
-          {direction.data?.axis && (
+          {direction.data?.declaredAxis && (
             <div className="mt-1">
               <DrawDirectionControl
                 itemId={itemId}
