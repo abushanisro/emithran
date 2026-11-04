@@ -118,6 +118,8 @@ export interface AnalysedPart {
   features: WorkerFeature[];
   /** The draft of each face along the draw axis (worker 0.14.0, casting.draft): its smallest angle in degrees. Null when the analysis has none. */
   draft: Array<{ face: number; minDeg: number }> | null;
+  /** The thinnest wall measured from each face (worker 0.15.0, casting.wall_mm.faces), in mm. Empty when the analysis has none. */
+  wallFaces: Array<{ face: number; minMm: number }>;
 }
 
 const byType = (part: AnalysedPart, ...types: string[]) => part.features.filter((f) => types.includes(f.type));
@@ -128,7 +130,14 @@ const perFeature = (features: WorkerFeature[], value: (f: WorkerFeature) => numb
   });
 
 const MEASURES: Readonly<Record<string, Measure>> = {
-  ThinSection: (p) => (p.wall ? [{ value: p.wall.min, featureIds: [], faces: [] }] : { reason: 'the wall thickness was not measured' }),
+  // Where the worker measured the wall from each face, a thin wall is found where it is: one finding per face thinner than the rule's limit, carrying the face.
+  // Without that (an older analysis) the part's wall measurement (the 5th percentile of all its rays) judges the part as a whole.
+  ThinSection: (p) =>
+    p.wallFaces.length > 0
+      ? p.wallFaces.map((w) => ({ value: w.minMm, featureIds: [], faces: [w.face] }))
+      : p.wall
+        ? [{ value: p.wall.min, featureIds: [], faces: [] }]
+        : { reason: 'the wall thickness was not measured' },
   ThickSection: (p) => (p.wall ? [{ value: p.wall.max, featureIds: [], faces: [] }] : { reason: 'the wall thickness was not measured' }),
   InsufficientHoleDiameter: (p) => perFeature(byType(p, 'SimpleHole', 'MultiStepHole'), (f) => f.parameters['diameter_mm'] ?? null),
   HighThroughHoleLengthToDiameterRatio: (p) =>
@@ -150,7 +159,7 @@ export function analysedPartOf(result: unknown): AnalysedPart | { reason: string
   const parts = (result as { parts?: unknown[] } | null)?.parts;
   if (!Array.isArray(parts) || parts.length !== 1) return { reason: parts?.length ? `the analysis has ${parts.length} distinct parts: the checks are for one part` : 'the analysis has no part' };
   const part = parts[0] as {
-    casting?: { wall_mm?: { min?: unknown; nominal?: unknown; max?: unknown } | null; draft?: { faces?: unknown[] } | null } | null;
+    casting?: { wall_mm?: { min?: unknown; nominal?: unknown; max?: unknown; faces?: unknown[] } | null; draft?: { faces?: unknown[] } | null } | null;
     features?: unknown[];
   };
   const w = part.casting?.wall_mm;
@@ -166,7 +175,12 @@ export function analysedPartOf(result: unknown): AnalysedPart | { reason: string
         return Number.isInteger(x.face) && num(x.min_deg) != null ? [{ face: x.face as number, minDeg: x.min_deg as number }] : [];
       })
     : null;
-  return { wall, features, draft };
+  const wallFaceRows = Array.isArray(w?.faces) ? w.faces : [];
+  const wallFaces = wallFaceRows.flatMap((d): Array<{ face: number; minMm: number }> => {
+    const x = (d ?? {}) as { face?: unknown; min?: unknown };
+    return Number.isInteger(x.face) && num(x.min) != null ? [{ face: x.face as number, minMm: x.min as number }] : [];
+  });
+  return { wall, features, draft, wallFaces };
 }
 
 export interface DfmReference {

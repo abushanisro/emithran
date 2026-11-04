@@ -44,7 +44,7 @@
 namespace {
 
 constexpr int kSchemaVersion = 1;
-constexpr const char* kWorkerVersion = "0.14.0";
+constexpr const char* kWorkerVersion = "0.15.0";
 
 int fail(const char* code, int exit_code) {
   std::cout << "{\"error\":\"" << code << "\"}\n";
@@ -130,7 +130,9 @@ void write_casting(JsonWriter& json, const std::optional<CastingProperties>& c) 
         .key("nominal").value(c->wall->nominal)
         .key("max").value(c->wall->max)
         .key("samples").value(c->wall->samples)
-        .end_object();
+        .key("faces").begin_array();
+    for (const FaceWall& f : c->wall->faces) json.begin_object().key("face").value(f.face).key("min").value(f.min).key("samples").value(f.samples).end_object();
+    json.end_array().end_object();
   } else {
     json.null();
   }

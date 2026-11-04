@@ -16,7 +16,10 @@
 #include <BRep_Tool.hxx>
 #include <IntCurvesFace_ShapeIntersector.hxx>
 #include <Poly_Triangulation.hxx>
+#include <NCollection_IndexedMap.hxx>
+#include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
+#include <TopTools_ShapeMapHasher.hxx>
 #include <TopoDS.hxx>
 #include <XCAFDoc_ShapeTool.hxx>
 #include <gp_Lin.hxx>
@@ -212,8 +215,13 @@ std::optional<WallThickness> wall(IntCurvesFace_ShapeIntersector& shape, const T
     double thickness, area;
   };
   std::vector<Sample> samples;
+  // The thinnest sample of each face, so a thin wall can be shown where it is (faces numbered as the features and glb_faces number them).
+  NCollection_IndexedMap<TopoDS_Shape, TopTools_ShapeMapHasher> face_numbers;
+  TopExp::MapShapes(solid, TopAbs_FACE, face_numbers);
+  std::map<int, FaceWall> by_face;
   for (TopExp_Explorer it(solid, TopAbs_FACE); it.More(); it.Next()) {
     const TopoDS_Face face = TopoDS::Face(it.Current());
+    const int face_index = face_numbers.FindIndex(face) - 1;
     TopLoc_Location location;
     const occ::handle<Poly_Triangulation> t = BRep_Tool::Triangulation(face, location);
     if (t.IsNull() || !t->HasUVNodes()) continue;
@@ -240,7 +248,12 @@ std::optional<WallThickness> wall(IntCurvesFace_ShapeIntersector& shape, const T
         const std::vector<double> at =
             hits(shape, gp_Lin(point.Translated(-start * normal), gp_Dir(normal.Reversed())), 2.0 * diagonal);
         const auto next = std::find_if(at.begin(), at.end(), [](double w) { return w > 1e-4; });
-        if (next != at.end()) samples.push_back({*next + start, area / (m * m)});
+        if (next != at.end()) {
+          samples.push_back({*next + start, area / (m * m)});
+          const auto [entry, fresh] = by_face.try_emplace(face_index, FaceWall{face_index, *next + start, 0});
+          if (!fresh) entry->second.min = std::min(entry->second.min, *next + start);
+          entry->second.samples += 1;
+        }
       };
       for (int i = 0; i < m; ++i) {
         for (int j = 0; i + j < m; ++j) {
@@ -267,6 +280,7 @@ std::optional<WallThickness> wall(IntCurvesFace_ShapeIntersector& shape, const T
   w.nominal = percentile(0.5);
   w.max = percentile(0.95);
   w.samples = static_cast<int>(samples.size());
+  for (const auto& [index, face_wall] : by_face) w.faces.push_back(face_wall);
   return w;
 }
 

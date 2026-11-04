@@ -453,7 +453,8 @@
             "min",
             "nominal",
             "max",
-            "samples"
+            "samples",
+            "faces"
           ],
           "properties": {
             "min": {
@@ -471,6 +472,35 @@
             "samples": {
               "type": "integer",
               "minimum": 1
+            },
+            "faces": {
+              "description": "The thinnest wall measured from each face (S6): the smallest distance from a point of the face, through the metal along the inward normal, to the next surface. Faces numbered as the features, the draft and glb_faces number them; only faces that had a measurement are listed",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "face",
+                  "min",
+                  "samples"
+                ],
+                "properties": {
+                  "face": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "min": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "mm"
+                  },
+                  "samples": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Rays from this face that found a far side"
+                  }
+                }
+              }
             }
           }
         },
