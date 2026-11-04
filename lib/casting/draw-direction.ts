@@ -42,11 +42,29 @@ export function drawDirectionError(
 }
 
 /** One line for the current state; `autoAxis` is the axis the worker chose, when an automatic analysis is shown. */
+/**
+ * An engineer's choice that does not apply to the item's file now (it was replaced by a file that is a different geometry, or one not yet compared): the axis
+ * they chose, why it is held back, and whether it can be confirmed for the new file. Null when there is none or it applies.
+ */
+export function heldBack(
+  d: CastingDrawDirection | undefined,
+): { axis: DrawAxis; notice: string; pending: boolean } | null {
+  if (!d?.declaredAxis || !d.status || d.status === "in_force") return null;
+  return {
+    axis: d.declaredAxis,
+    notice: d.notice ?? "The draw direction is not applied.",
+    pending: d.status === "pending",
+  };
+}
+
 export function describeDrawDirection(
   d: CastingDrawDirection | undefined,
   autoAxis: DrawAxis | null,
 ): string {
   if (d?.axis) return `Fixed to ${d.axis.toUpperCase()} by an engineer`;
+  const held = heldBack(d);
+  if (held)
+    return `Automatic for now: the draw direction ${held.axis.toUpperCase()} is held back`;
   return autoAxis
     ? `Automatic: the worker chose ${autoAxis.toUpperCase()} (fewest hidden regions, then shallowest)`
     : "Automatic: the worker chooses (fewest hidden regions, then shallowest)";

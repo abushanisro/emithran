@@ -67,10 +67,17 @@ export interface SandDfmView {
 
 /** GET /bom-items/:id/draw-direction: the engineer's axis with the reason, who and when, or none (the worker chooses). */
 export interface CastingDrawDirection {
+  /** The axis the analysis runs along: the engineer's while it applies, null (automatic) otherwise. */
   axis: DrawAxis | null;
+  /** The axis the engineer chose, applied or not (held back when the item's file was replaced by a different geometry). */
+  declaredAxis: DrawAxis | null;
   reason: string | null;
   setBy: string | null;
   setAt: string | null;
+  /** Whether the choice applies to the item's file now; null when there is none. */
+  status: "in_force" | "pending" | "needs_confirmation" | null;
+  /** Why it is held back, in words. */
+  notice: string | null;
 }
 
 export const drawDirectionApi = {

@@ -99,3 +99,37 @@ BEGIN
   ASSERT n = 0, 'a direction goes with its BOM item';
 END
 $$;
+
+-- 960: an override is bound to the file and the geometry it was chosen on; overrides made before it are bound to the item's current file
+INSERT INTO public.bom_items (id, organization_id, file_3d_path) VALUES
+  ('00000000-0000-0000-0000-0000000000d4', '00000000-0000-0000-0000-0000000000a1', 'org/a/current.step');
+INSERT INTO public.casting_draw_directions (bom_item_id, organization_id, axis, reason, set_by) VALUES
+  ('00000000-0000-0000-0000-0000000000d4', '00000000-0000-0000-0000-0000000000a1', 'x', 'made before the binding existed', '00000000-0000-0000-0000-0000000000c1');
+DO $$
+DECLARE got record;
+BEGIN
+  SELECT source_path, geometry INTO got FROM public.casting_draw_directions WHERE bom_item_id = '00000000-0000-0000-0000-0000000000d4';
+  ASSERT got.source_path IS NULL AND got.geometry IS NULL, 'a row made without them has no binding until the migration backfills it';
+END
+$$;
+\i /migrations/960_casting_override_binding.sql
+DO $$
+DECLARE got record;
+BEGIN
+  SELECT source_path, geometry INTO got FROM public.casting_draw_directions WHERE bom_item_id = '00000000-0000-0000-0000-0000000000d4';
+  ASSERT got.source_path = 'org/a/current.step', 'the migration binds an earlier override to the file the item has now';
+  ASSERT got.geometry IS NULL, 'and records no geometry it does not know';
+  -- the geometry is stored as jsonb and read back
+  UPDATE public.casting_draw_directions SET geometry = '{"solids":1,"faces":12,"edges":24,"volumeMm3":216000,"areaMm2":30400,"boxMm":[100,60,40]}'
+   WHERE bom_item_id = '00000000-0000-0000-0000-0000000000d4';
+  ASSERT (SELECT (geometry->>'faces')::int FROM public.casting_draw_directions WHERE bom_item_id = '00000000-0000-0000-0000-0000000000d4') = 12, 'the geometry is jsonb';
+  -- running it again changes nothing (idempotent), and never overwrites a recorded path
+  UPDATE public.casting_draw_directions SET source_path = 'org/a/set-on.step' WHERE bom_item_id = '00000000-0000-0000-0000-0000000000d4';
+END
+$$;
+\i /migrations/960_casting_override_binding.sql
+DO $$
+BEGIN
+  ASSERT (SELECT source_path FROM public.casting_draw_directions WHERE bom_item_id = '00000000-0000-0000-0000-0000000000d4') = 'org/a/set-on.step', 'a second run keeps the recorded file';
+END
+$$;

@@ -12,6 +12,8 @@ import { AuditService } from "../../common/audit/audit.service";
 import { DatabaseService } from "../../common/database/database.service";
 import { OBJECT_STORE, type ObjectStore } from "../../common/storage/object-store";
 import { CastingAnalysisRunner } from "./casting-analysis-runner";
+import { fingerprintOf, parseFingerprint, type GeometryFingerprint } from "./geometry-fingerprint";
+import { overrideBinding, type OverrideBinding } from "./override-binding";
 import { meshKey, meshNames } from './casting-meshes';
 import {
   CASTING_SCHEMA_VERSION,
@@ -29,11 +31,20 @@ type AdminClient = ReturnType<DatabaseService["getPrivilegedClient"]>;
 
 /** The item's draw direction as stored: no axis means the worker chooses. */
 export interface DrawDirectionView {
+  /** The axis the analysis runs along: the engineer's while it applies, null (automatic) otherwise. */
   axis: DrawAxis | null;
+  /** The axis the engineer chose, applied or not. */
+  declaredAxis: DrawAxis | null;
   reason: string | null;
   setBy: string | null;
   setAt: string | null;
+  /** Whether the choice applies to the item's file now (see override-binding.ts); null when there is none. */
+  status: OverrideBinding["state"] | null;
+  /** Why it is held back, in words. */
+  notice: string | null;
 }
+
+const NO_DRAW_DIRECTION: DrawDirectionView = { axis: null, declaredAxis: null, reason: null, setBy: null, setAt: null, status: null, notice: null };
 
 export interface CastingRequest {
   bomItemId: string;
@@ -76,7 +87,7 @@ export class SandCastingService {
       });
 
     // What the analysis is run with: the engineer's draw direction for this item if there is one, else the automatic choice.
-    const config = configForAxis((await this.drawDirection(input.bomItemId, input.token)).axis);
+    const config = configForAxis((await this.drawDirection(input.bomItemId, input.token, item.file_3d_path)).axis);
     const key = {
       input_sha256: createHash("sha256").update(bytes).digest("hex"),
       worker_version: CASTING_WORKER_VERSION,
@@ -182,7 +193,7 @@ export class SandCastingService {
   async latestResult(bomItemId: string, sourcePath: string | null, token: string): Promise<{ result: unknown; workerVersion: string } | null> {
     if (!sourcePath) return null;
     // The analysis the item's draw direction asks for: with an override, only an analysis along that axis answers it (never the automatic one).
-    const config = configForAxis((await this.drawDirection(bomItemId, token)).axis);
+    const config = configForAxis((await this.drawDirection(bomItemId, token, sourcePath)).axis);
     const { data, error } = await this.database
       .getUserClient(token)
       .from("casting_analyses")
@@ -206,7 +217,7 @@ export class SandCastingService {
    */
   async currentStatuses(bomItemId: string, sourcePath: string | null, token: string): Promise<string[]> {
     if (!sourcePath) return [];
-    const config = configForAxis((await this.drawDirection(bomItemId, token)).axis);
+    const config = configForAxis((await this.drawDirection(bomItemId, token, sourcePath)).axis);
     const { data, error } = await this.database
       .getUserClient(token)
       .from("casting_analyses")
@@ -240,19 +251,58 @@ export class SandCastingService {
     );
   }
 
-  /** The item's draw direction: the engineer's override with its reason, or none (automatic). Read as the user. */
-  async drawDirection(bomItemId: string, token: string): Promise<DrawDirectionView> {
+  /**
+   * The item's draw direction: the engineer's override with its reason, and whether it applies to the item's file now. It was chosen on the geometry of the file
+   * the item had then: after the file is replaced it applies only if the new file is the same geometry (override-binding.ts); otherwise it is held back (the part is
+   * analysed automatically) until the engineer confirms it or removes it. Read as the user.
+   */
+  async drawDirection(bomItemId: string, token: string, knownPath?: string | null): Promise<DrawDirectionView> {
     const { data, error } = await this.database
       .getUserClient(token)
       .from("casting_draw_directions")
-      .select("axis, reason, set_by, set_at")
+      .select("axis, reason, set_by, set_at, source_path, geometry")
       .eq("bom_item_id", bomItemId)
       .maybeSingle();
     if (error) throw new Error(`Could not read the draw direction: ${error.message}`);
-    const row = data as { axis: unknown; reason: string; set_by: string; set_at: string } | null;
+    const row = data as { axis: unknown; reason: string; set_by: string; set_at: string; source_path: string | null; geometry: unknown } | null;
     // An axis this backend does not know is no override: the part stays automatic rather than being run with a guess.
-    if (!row || !isDrawAxis(row.axis)) return { axis: null, reason: null, setBy: null, setAt: null };
-    return { axis: row.axis, reason: row.reason, setBy: row.set_by, setAt: row.set_at };
+    if (!row || !isDrawAxis(row.axis)) return NO_DRAW_DIRECTION;
+    // The item's file now: the caller's when it already has it, else read.
+    const currentPath = knownPath !== undefined ? knownPath : await this.currentFilePath(bomItemId, token);
+    const replaced = currentPath != null && row.source_path !== currentPath;
+    // The new file's geometry is only looked for when there is something to compare it with.
+    const current = replaced && row.geometry != null ? await this.automaticGeometry(bomItemId, currentPath, token) : null;
+    const binding = overrideBinding({ override: { sourcePath: row.source_path, geometry: parseFingerprint(row.geometry) }, currentPath, current });
+    return {
+      axis: binding.state === "in_force" ? row.axis : null,
+      declaredAxis: row.axis,
+      reason: row.reason,
+      setBy: row.set_by,
+      setAt: row.set_at,
+      status: binding.state,
+      notice: binding.notice,
+    };
+  }
+
+  /** The item's 3D file path now. Read as the user. */
+  private async currentFilePath(bomItemId: string, token: string): Promise<string | null> {
+    return (await this.readItem(bomItemId, token)).file_3d_path;
+  }
+
+  /** The geometry of the item's file at `path` as its automatic analysis measured it, or null when none finished (geometry does not depend on the worker version). */
+  private async automaticGeometry(bomItemId: string, path: string, token: string): Promise<GeometryFingerprint | null> {
+    const { data, error } = await this.database
+      .getUserClient(token)
+      .from("casting_analyses")
+      .select("result")
+      .eq("bom_item_id", bomItemId)
+      .eq("source_path", path)
+      .eq("config_hash", configHash(configForAxis(null)))
+      .in("status", ["succeeded", "partial"])
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (error || !data || data.length === 0) return null;
+    return fingerprintOf((data[0] as { result: unknown }).result);
   }
 
   /**
@@ -264,8 +314,10 @@ export class SandCastingService {
     axis: DrawAxis,
     reason: string,
   ): Promise<{ drawDirection: DrawDirectionView; analysis: CastingAnalysisRow; reused: boolean }> {
-    await this.readItem(input.bomItemId, input.token); // not found for another organization's item
-    const previous = await this.drawDirection(input.bomItemId, input.token);
+    const item = await this.readItem(input.bomItemId, input.token); // not found for another organization's item
+    const previous = await this.drawDirection(input.bomItemId, input.token, item.file_3d_path);
+    // Bound to this file and to its geometry as measured so far (none yet: then a later replacement can only be confirmed, never carried over).
+    const geometry = item.file_3d_path ? await this.automaticGeometry(input.bomItemId, item.file_3d_path, input.token) : null;
     const { error } = await this.admin()
       .from("casting_draw_directions")
       .upsert(
@@ -276,6 +328,8 @@ export class SandCastingService {
           reason: reason.trim(),
           set_by: input.userId,
           set_at: new Date().toISOString(),
+          source_path: item.file_3d_path,
+          geometry,
         },
         { onConflict: "bom_item_id" },
       );
@@ -285,29 +339,29 @@ export class SandCastingService {
       targetType: "bom_item",
       targetId: input.bomItemId,
       organizationId: input.organizationId,
-      meta: { axis, reason: reason.trim(), previousAxis: previous.axis },
+      meta: { axis, reason: reason.trim(), previousAxis: previous.declaredAxis },
     });
     const requested = await this.request(input);
-    return { drawDirection: await this.drawDirection(input.bomItemId, input.token), ...requested };
+    return { drawDirection: await this.drawDirection(input.bomItemId, input.token, item.file_3d_path), ...requested };
   }
 
   /** Returns the part to the automatic draw direction. Audited. */
   async clearDrawDirection(input: CastingRequest): Promise<{ drawDirection: DrawDirectionView; analysis: CastingAnalysisRow; reused: boolean }> {
-    await this.readItem(input.bomItemId, input.token);
-    const previous = await this.drawDirection(input.bomItemId, input.token);
+    const item = await this.readItem(input.bomItemId, input.token);
+    const previous = await this.drawDirection(input.bomItemId, input.token, item.file_3d_path);
     const { error } = await this.admin().from("casting_draw_directions").delete().eq("bom_item_id", input.bomItemId);
     if (error) throw new Error(`Could not remove the draw direction: ${error.message}`);
-    if (previous.axis) {
+    if (previous.declaredAxis) {
       await this.audit.recordBestEffort({
         action: "casting_draw_direction.cleared",
         targetType: "bom_item",
         targetId: input.bomItemId,
         organizationId: input.organizationId,
-        meta: { previousAxis: previous.axis, previousReason: previous.reason },
+        meta: { previousAxis: previous.declaredAxis, previousReason: previous.reason },
       });
     }
     const requested = await this.request(input);
-    return { drawDirection: await this.drawDirection(input.bomItemId, input.token), ...requested };
+    return { drawDirection: await this.drawDirection(input.bomItemId, input.token, item.file_3d_path), ...requested };
   }
 
   /** The analyses of one BOM item, newest first. An empty list means "not requested", never "passed". */

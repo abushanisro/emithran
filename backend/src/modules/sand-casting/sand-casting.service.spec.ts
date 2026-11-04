@@ -59,7 +59,9 @@ function setup(
     bytes?: Buffer | null;
     raceOnInsert?: boolean;
     /** The item's draw-direction override as the user's client reads it (null: none, automatic). */
-    direction?: { axis: string; reason: string; set_by: string; set_at: string } | null;
+    direction?: { axis: string; reason: string; set_by: string; set_at: string; source_path?: string | null; geometry?: unknown } | null;
+    /** The result of the item's automatic analysis of its current file, the geometry a replaced file is compared with (null: none finished). */
+    autoResult?: unknown;
   } = {},
 ) {
   const {
@@ -69,6 +71,7 @@ function setup(
     bytes = BYTES,
     raceOnInsert = false,
     direction = null,
+    autoResult = null,
   } = options;
   let current = own;
   let storedDirection = direction;
@@ -81,7 +84,7 @@ function setup(
   const directionsAdmin = {
     upsert: async (values: Record<string, unknown>) => {
       calls.upserts.push(values);
-      storedDirection = { axis: String(values.axis), reason: String(values.reason), set_by: String(values.set_by), set_at: String(values.set_at) };
+      storedDirection = { axis: String(values.axis), reason: String(values.reason), set_by: String(values.set_by), set_at: String(values.set_at), source_path: values.source_path as string | null, geometry: values.geometry };
       return { error: null };
     },
     delete: () => ({
@@ -144,12 +147,19 @@ function setup(
       }),
     }),
   };
+  // The user's analyses of the item (only the automatic analysis of its current file is asked for here: the geometry to compare a replaced file with).
+  const analysesChain: Record<string, unknown> = {};
+  for (const m of ["select", "eq", "in", "order"]) analysesChain[m] = () => analysesChain;
+  analysesChain.limit = async () => ({ data: autoResult ? [{ result: autoResult }] : [], error: null });
   const userClient = {
-    from: (table: string) => ({
-      select: () => ({
-        eq: () => ({ maybeSingle: async () => ({ data: table === "casting_draw_directions" ? storedDirection : item, error: null }) }),
-      }),
-    }),
+    from: (table: string) =>
+      table === "casting_analyses"
+        ? analysesChain
+        : {
+            select: () => ({
+              eq: () => ({ maybeSingle: async () => ({ data: table === "casting_draw_directions" ? storedDirection : item, error: null }) }),
+            }),
+          },
   };
   const runner = { wake: jest.fn() };
   const audit = { recordBestEffort: jest.fn(async () => undefined) };
@@ -323,7 +333,12 @@ describe("SandCastingService.meshUrl", () => {
 });
 
 describe("SandCastingService: the engineer's draw direction", () => {
-  const set = { axis: "y", reason: "the pattern is split along the long side", set_by: "u", set_at: "2026-11-04T10:00:00.000Z" };
+  // A part of 100 x 60 x 40 mm with 12 faces, as an analysis measured it; the override was set on it, on the item's file.
+  const partResult = (over: Record<string, unknown> = {}) => ({
+    parts: [{ solids: 1, faces: 12, edges: 24, volume_mm3: 216000, area_mm2: 30400, box_mm: { size: [100, 60, 40] }, ...over }],
+  });
+  const GEOMETRY = { solids: 1, faces: 12, edges: 24, volumeMm3: 216000, areaMm2: 30400, boxMm: [100, 60, 40] };
+  const set = { axis: "y", reason: "the pattern is split along the long side", set_by: "u", set_at: "2026-11-04T10:00:00.000Z", source_path: "path/part.step", geometry: GEOMETRY };
 
   it("without an override the analysis is the automatic one; with one, the analysis along that axis (a different key, so the automatic one is kept)", async () => {
     const auto = setup();
@@ -356,7 +371,7 @@ describe("SandCastingService: the engineer's draw direction", () => {
     const out = await service.clearDrawDirection(input);
     expect(calls.deletes).toBe(1);
     expect(audit.recordBestEffort).toHaveBeenCalledWith(expect.objectContaining({ action: "casting_draw_direction.cleared", meta: { previousAxis: "y", previousReason: set.reason } }));
-    expect(out.drawDirection).toEqual({ axis: null, reason: null, setBy: null, setAt: null });
+    expect(out.drawDirection).toEqual({ axis: null, declaredAxis: null, reason: null, setBy: null, setAt: null, status: null, notice: null });
     expect(calls.inserts[0]).toMatchObject({ config: { drawDirection: "auto" } });
   });
 
@@ -376,7 +391,7 @@ describe("SandCastingService: the engineer's draw direction", () => {
 
   it("a stored axis this backend does not know is no override", async () => {
     const { service } = setup({ direction: { ...set, axis: "w" } });
-    expect(await service.drawDirection("item-1", "t")).toEqual({ axis: null, reason: null, setBy: null, setAt: null });
+    expect(await service.drawDirection("item-1", "t")).toEqual({ axis: null, declaredAxis: null, reason: null, setBy: null, setAt: null, status: null, notice: null });
   });
 
   function latest(rows: unknown[], _error: null, direction: typeof set | null) {
@@ -397,9 +412,92 @@ describe("SandCastingService: the engineer's draw direction", () => {
     const auto = latest([{ result: { r: 1 }, worker_version: CASTING_WORKER_VERSION }], null, null);
     await auto.service.latestResult("item-1", "p", "t");
     expect(auto.filters).toMatchObject({ config_hash: configHash({ drawDirection: "auto" }) });
-    const fixed = latest([{ result: { r: 1 }, worker_version: CASTING_WORKER_VERSION }], null, set);
+    const fixed = latest([{ result: { r: 1 }, worker_version: CASTING_WORKER_VERSION }], null, { ...set, source_path: "p" });
     await fixed.service.latestResult("item-1", "p", "t");
     expect(fixed.filters).toMatchObject({ config_hash: configHash({ drawDirection: "y" }) });
+  });
+});
+
+describe("SandCastingService: a draw direction is bound to the geometry it was chosen on", () => {
+  const partResult = (over: Record<string, unknown> = {}) => ({
+    parts: [{ solids: 1, faces: 12, edges: 24, volume_mm3: 216000, area_mm2: 30400, box_mm: { size: [100, 60, 40] }, ...over }],
+  });
+  const GEOMETRY = { solids: 1, faces: 12, edges: 24, volumeMm3: 216000, areaMm2: 30400, boxMm: [100, 60, 40] };
+  const base = { axis: "y", reason: "split on the long side", set_by: "u", set_at: "2026-11-04T10:00:00.000Z" };
+  /** The item's file is path/part.step now; the override was set on `was`. */
+  const overrideOn = (was: string | null, geometry: unknown = GEOMETRY) => ({ ...base, source_path: was, geometry });
+
+  it("while the item's file is the one it was set on, it applies, and the analysis runs along it", async () => {
+    const t = setup({ direction: overrideOn("path/part.step") });
+    expect(await t.service.drawDirection("item-1", "t", "path/part.step")).toMatchObject({ axis: "y", declaredAxis: "y", status: "in_force", notice: null });
+    await t.service.request(input);
+    expect(t.calls.inserts[0]).toMatchObject({ config: { drawDirection: "y" } });
+  });
+
+  it("a replaced file that is the same geometry keeps it: the analysis still runs along the axis", async () => {
+    const t = setup({ direction: overrideOn("old/part.step"), autoResult: partResult({ volume_mm3: 216000.3, box_mm: { size: [100.002, 60, 40] } }) });
+    expect(await t.service.drawDirection("item-1", "t", "path/part.step")).toMatchObject({ axis: "y", status: "in_force" });
+    await t.service.request(input);
+    expect(t.calls.inserts[0]).toMatchObject({ config: { drawDirection: "y" } });
+  });
+
+  it("a replaced file that is a different geometry holds it back: automatic analysis, the choice still shown with why", async () => {
+    const t = setup({ direction: overrideOn("old/part.step"), autoResult: partResult({ faces: 17, volume_mm3: 250000 }) });
+    const view = await t.service.drawDirection("item-1", "t", "path/part.step");
+    expect(view).toMatchObject({ axis: null, declaredAxis: "y", reason: "split on the long side", status: "needs_confirmation" });
+    expect(view.notice).toMatch(/different geometry \(faces 12 to 17; volume 216000 to 250000 mm3\).*Confirm it for the new file or remove it/);
+    await t.service.request(input);
+    expect(t.calls.inserts[0]).toMatchObject({ config: { drawDirection: "auto" } });
+  });
+
+  it("a replaced file not analysed yet is pending, and runs automatically so it can be compared", async () => {
+    const t = setup({ direction: overrideOn("old/part.step"), autoResult: null });
+    expect(await t.service.drawDirection("item-1", "t", "path/part.step")).toMatchObject({ axis: null, declaredAxis: "y", status: "pending" });
+    await t.service.request(input);
+    expect(t.calls.inserts[0]).toMatchObject({ config: { drawDirection: "auto" } });
+  });
+
+  it("an override whose geometry was never recorded is not carried over to a replaced file, even once it is analysed", async () => {
+    const t = setup({ direction: overrideOn("old/part.step", null), autoResult: partResult() });
+    expect(await t.service.drawDirection("item-1", "t", "path/part.step")).toMatchObject({ axis: null, declaredAxis: "y", status: "needs_confirmation" });
+  });
+
+  it("the result used for the item is the automatic one while the override is held back", async () => {
+    const t = setup({ direction: overrideOn("old/part.step"), autoResult: partResult({ faces: 17 }) });
+    // latestResult reads the user's analyses through the same chain: what matters is the key it asks for
+    const asked: Record<string, unknown> = {};
+    const chain: Record<string, unknown> = {};
+    for (const m of ["select", "in", "order"]) chain[m] = () => chain;
+    chain.eq = (c: string, v: unknown) => ((asked[c] = v), chain);
+    chain.limit = async () => ({ data: [], error: null });
+    const service = new SandCastingService({ getUserClient: () => ({ from: (tbl: string) => (tbl === "casting_analyses" ? chain : { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: overrideOn("old/part.step"), error: null }) }) }) }) }) } as never, {} as never, {} as never, {} as never);
+    await service.latestResult("item-1", "path/part.step", "t");
+    expect(asked).toMatchObject({ config_hash: configHash({ drawDirection: "auto" }) });
+    void t;
+  });
+
+  it("setting it records the file and the geometry as measured so far; with no analysis yet the geometry is not recorded", async () => {
+    const withAnalysis = setup({ autoResult: partResult() });
+    await withAnalysis.service.setDrawDirection(input, "z", "foundry splits it flat");
+    expect(withAnalysis.calls.upserts[0]).toMatchObject({ source_path: "path/part.step", geometry: GEOMETRY });
+    const none = setup();
+    await none.service.setDrawDirection(input, "z", "foundry splits it flat");
+    expect(none.calls.upserts[0]).toMatchObject({ source_path: "path/part.step", geometry: null });
+  });
+
+  it("confirming a held-back override for the new file (setting it again) binds it to the new file, and audits the axis it replaced", async () => {
+    const t = setup({ direction: overrideOn("old/part.step"), autoResult: partResult({ faces: 17, volume_mm3: 250000 }) });
+    const out = await t.service.setDrawDirection(input, "y", "confirmed for the new file");
+    expect(t.calls.upserts[0]).toMatchObject({ axis: "y", source_path: "path/part.step", geometry: expect.objectContaining({ faces: 17, volumeMm3: 250000 }) });
+    expect(t.audit.recordBestEffort).toHaveBeenCalledWith(expect.objectContaining({ action: "casting_draw_direction.set", meta: { axis: "y", reason: "confirmed for the new file", previousAxis: "y" } }));
+    expect(out.drawDirection).toMatchObject({ axis: "y", status: "in_force" });
+  });
+
+  it("removing a held-back override is audited like any other (it was the engineer's choice, applied or not)", async () => {
+    const t = setup({ direction: overrideOn("old/part.step"), autoResult: partResult({ faces: 17 }) });
+    await t.service.clearDrawDirection(input);
+    expect(t.calls.deletes).toBe(1);
+    expect(t.audit.recordBestEffort).toHaveBeenCalledWith(expect.objectContaining({ action: "casting_draw_direction.cleared", meta: { previousAxis: "y", previousReason: "split on the long side" } }));
   });
 });
 
