@@ -14,19 +14,26 @@ import {
   useSandDfm,
 } from "@/lib/api/hooks/useCastingAnalyses";
 import { analysisState, isReady } from "@/lib/casting/analysis-view";
-import { castingFeatureProperties, groupCastingFeatures } from "@/lib/casting/features";
-import { castingPartView } from "@/lib/casting/result-view";
-import {
-  gatingSolids,
-  toGlbShape,
-  type SandGatingLayout,
-} from "@/lib/casting/gating-layout";
 import {
   OVERLAYS,
   OVERLAY_COLORS,
   overlayFaceColors,
   type OverlayKind,
 } from "@/lib/casting/face-overlay";
+import { castingFeatureProperties, groupCastingFeatures } from "@/lib/casting/features";
+import {
+  gatingSolids,
+  toGlbShape,
+  type SandGatingLayout,
+} from "@/lib/casting/gating-layout";
+import { gatingWhenOpen, mouldSolids, type FlaskSize } from "@/lib/casting/mould-layout";
+import { processStages, type StageLine } from "@/lib/casting/process-stages";
+import { castingPartView } from "@/lib/casting/result-view";
+import { thicknessField } from "@/lib/casting/thickness-field";
+import { THICKNESS_RAMP_CSS, thicknessMap } from "@/lib/casting/thickness-map";
+
+/** What colours the mesh: a design check (draft, thin walls) or the measured wall thickness itself. */
+type ViewOverlay = OverlayKind | "thickness";
 
 const SEVERITY_CLASS: Record<DfmFinding["severity"], string> = {
   Critical: "bg-red-500/15 text-red-600 border-red-500/30",
@@ -43,11 +50,20 @@ export function SandCastingFeaturesPanel({
   itemId,
   fallback,
   gating = null,
+  flask = null,
+  routeLines = null,
+  mouldingProcess = null,
 }: {
   itemId: string;
   fallback: ReactNode;
   /** The designed gating system and risers from the cost summary: drawn around the part as a schematic. */
   gating?: SandGatingLayout | null;
+  /** The moulding machine's flask from the cost summary: the mould (cope and drag) is drawn around the part in it. */
+  flask?: FlaskSize | null;
+  /** The route's lines (process and cycle time), for the stages of making the casting. */
+  routeLines?: readonly StageLine[] | null;
+  /** The moulding process the route costs (its line is the "make the mould" stage). */
+  mouldingProcess?: string | null;
 }) {
   const list = useCastingAnalyses(itemId);
   const direction = useDrawDirection(itemId);
@@ -66,7 +82,11 @@ export function SandCastingFeaturesPanel({
   const [showCores, setShowCores] = useState(true);
   const [showParting, setShowParting] = useState(true);
   const [showGating, setShowGating] = useState(true);
-  const [overlay, setOverlay] = useState<OverlayKind | "">("");
+  const [showMould, setShowMould] = useState(false);
+  const [mouldOpen, setMouldOpen] = useState(0);
+  const [section, setSection] = useState(false);
+  const [stageKey, setStageKey] = useState<string | null>(null);
+  const [overlay, setOverlay] = useState<ViewOverlay | "">("");
   const [selectedFaces, setSelectedFaces] = useState<number[] | null>(null);
 
   if (!ready || !part) {
@@ -114,16 +134,31 @@ export function SandCastingFeaturesPanel({
 
   const groups = groupCastingFeatures(part.features);
   // The designed system is laid out in the part's own coordinates (its box, draw axis and parting height from the same analysis), then into the viewer's frame.
-  const gatingShapes =
+  const gatingPart =
     gating && part.box && part.drawAxis
-      ? gatingSolids(
-          gating,
-          part.box.min,
-          part.box.max,
-          part.drawAxis,
-          part.partingHeight,
-        ).map(toGlbShape)
+      ? gatingSolids(gating, part.box.min, part.box.max, part.drawAxis, part.partingHeight)
       : [];
+  // The mould: the machine's flask split at the parting plane; opening it lifts the cope, and the sprue and risers with it.
+  const stages = processStages(routeLines, mouldingProcess);
+  const stage = stages.find((s) => s.key === stageKey) ?? null;
+  const mould =
+    flask && part.box && part.drawAxis
+      ? mouldSolids({
+          flask,
+          partMin: part.box.min,
+          partMax: part.box.max,
+          gating: gatingPart,
+          drawAxis: part.drawAxis,
+          partingHeight: part.partingHeight,
+          open: showMould ? mouldOpen : 0,
+        })
+      : null;
+  const gatingShapes = (
+    mould && part.drawAxis && showMould
+      ? gatingWhenOpen(gatingPart, part.drawAxis, mould.shiftMm)
+      : gatingPart
+  ).map(toGlbShape);
+  const mouldShapes = mould ? [mould.cope, mould.drag, mould.partingPlane].map(toGlbShape) : [];
   // A feature picked in the tree, or the faces of a design finding picked in the list (a finding about faces, such as a draft angle, has no feature).
   const selected = part.features.find((f) => f.id === selectedId) ?? null;
   const highlighted =
@@ -133,13 +168,21 @@ export function SandCastingFeaturesPanel({
     draft: part.draftFaces,
     wall: part.wallFaces,
   };
-  const overlays = (Object.keys(OVERLAYS) as OverlayKind[]).filter(
-    (k) => measuredBy[k].length > 0,
-  );
+  const checkResult = dfm.data?.result ?? null;
+  const overlays = checkResult
+    ? (Object.keys(OVERLAYS) as OverlayKind[]).filter((k) => measuredBy[k].length > 0)
+    : [];
+  // The measured thickness needs no design check: it is the worker's own number on a continuous ramp.
+  const thickness = thicknessMap(part.wallThickness);
+  // Worker 0.17.0 and later also give the rays: the thickness is then drawn smoothly over each face, on the worker's own thin-to-thick range.
+  const field = overlay === "thickness" ? thicknessField(part.wallRays, part.wallRange) : null;
+  const thicknessRange = field?.range ?? thickness?.range ?? null;
   const faceColors =
-    overlay && dfm.data?.result
-      ? overlayFaceColors(overlay, dfm.data.result.findings, measuredBy[overlay])
-      : null;
+    overlay === "thickness"
+      ? (thickness?.colors ?? null)
+      : overlay && checkResult
+        ? overlayFaceColors(overlay, checkResult.findings, measuredBy[overlay])
+        : null;
   const selectedRow = selected
     ? { feature: selected, label: selected.id, parent: selected.parent }
     : null;
@@ -158,7 +201,11 @@ export function SandCastingFeaturesPanel({
             showParting={showParting}
             gating={gatingShapes}
             showGating={showGating}
+            mould={mouldShapes}
+            showMould={showMould}
+            section={section}
             faceColors={faceColors}
+            thicknessField={field}
           />
         ) : (
           <div className="flex h-full items-center justify-center text-muted-foreground">
@@ -168,6 +215,46 @@ export function SandCastingFeaturesPanel({
           </div>
         )}
       </div>
+      {stages.some((s) => s.lines.length > 0) && (
+        <div className="space-y-1 rounded border border-border/60 p-1.5">
+          <div className="flex flex-wrap gap-1">
+            {stages.map((s, i) => (
+              <button
+                key={s.key}
+                type="button"
+                onClick={() => {
+                  setStageKey(s.key);
+                  setShowMould(s.view.mould);
+                  setMouldOpen(s.view.open);
+                  setShowCores(s.view.cores);
+                  setShowGating(s.view.gating);
+                  setSection(s.view.section);
+                }}
+                className={`rounded border px-1.5 py-0.5 ${stageKey === s.key ? "border-brand-500 bg-brand-500/10 text-foreground" : "border-border text-muted-foreground hover:bg-muted/50"}`}
+              >
+                {i + 1}. {s.label}
+              </button>
+            ))}
+          </div>
+          {stage && (
+            <div className="space-y-0.5">
+              <p className="leading-tight text-foreground">{stage.what}</p>
+              {stage.lines.length > 0 ? (
+                <p className="leading-tight text-muted-foreground">
+                  {stage.lines.map((l) => `${l.process}: ${Math.round(l.cycleTimeMin * 1000) / 1000} min`).join(" · ")}
+                </p>
+              ) : (
+                <p className="leading-tight text-muted-foreground">
+                  The route has no costed step for this stage.
+                </p>
+              )}
+              <p className="leading-tight text-muted-foreground/70">
+                Shows the mould and the parts in it, not the flow or the freezing of the metal: nothing computes those.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
       <div className="flex gap-3 text-muted-foreground">
         {part.coresGlb && (
           <label className="flex items-center gap-1">
@@ -193,31 +280,45 @@ export function SandCastingFeaturesPanel({
             Parting line
           </label>
         )}
-        {overlays.length > 0 && dfm.data?.result && (
+        {(overlays.length > 0 || thickness) && (
           <label
             className="flex items-center gap-1"
             title={
-              overlay
-                ? OVERLAYS[overlay].title
-                : "Colour the model face by face by a design check: draft angle or thin walls."
+              overlay === "thickness"
+                ? "Each face coloured by the thinnest wall measured from it, from the part's thinnest (red) to its thickest (blue) measured face. A measurement, not a design check."
+                : overlay
+                  ? OVERLAYS[overlay].title
+                  : "Colour the model face by face: the measured wall thickness, or a design check (draft angle, thin walls)."
             }
           >
             Overlay
             <select
               value={overlay}
               onChange={(e) => {
-                setOverlay(e.target.value as OverlayKind | "");
+                setOverlay(e.target.value as ViewOverlay | "");
               }}
               className="rounded border border-border bg-background px-1 py-0.5"
             >
               <option value="">off</option>
+              {thickness && <option value="thickness">Wall thickness</option>}
               {overlays.map((k) => (
                 <option key={k} value={k}>
                   {OVERLAYS[k].label}
                 </option>
               ))}
             </select>
-            {overlay && (
+            {overlay === "thickness" && thickness && (
+              <span className="flex items-center gap-1 text-[9px]">
+                {(thicknessRange ?? thickness.range).min.toFixed(1)} mm
+                <i
+                  className="inline-block h-2 w-16 rounded-sm"
+                  style={{ background: THICKNESS_RAMP_CSS }}
+                />
+                {(thicknessRange ?? thickness.range).max.toFixed(1)} mm
+                {!field && <span className="text-muted-foreground">(per face: re-run the analysis for the smooth map)</span>}
+              </span>
+            )}
+            {overlay && overlay !== "thickness" && (
               <span className="flex items-center gap-1 text-[9px]">
                 {(overlay === "draft"
                   ? (["Critical", "Major", "ok"] as const)
@@ -238,6 +339,54 @@ export function SandCastingFeaturesPanel({
               </span>
             )}
           </label>
+        )}
+        {mould && (
+          <>
+            <label
+              className="flex items-center gap-1"
+              title="The sand the casting is made in: the machine's flask, split at the parting plane into the cope (above) and the drag (below). Placed around the part and its gating as a drawing convention."
+            >
+              <input
+                type="checkbox"
+                checked={showMould}
+                onChange={(e) => {
+                  setShowMould(e.target.checked);
+                }}
+              />
+              Mould (cope / drag)
+            </label>
+            {showMould && (
+              <>
+                <label className="flex items-center gap-1" title="Open the mould: the cope, with the sprue and risers, lifts away along the draw axis.">
+                  Open
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={Math.round(mouldOpen * 100)}
+                    onChange={(e) => {
+                      setMouldOpen(Number(e.target.value) / 100);
+                    }}
+                  />
+                </label>
+                <label className="flex items-center gap-1" title="Cut the mould in half so the part inside shows.">
+                  <input
+                    type="checkbox"
+                    checked={section}
+                    onChange={(e) => {
+                      setSection(e.target.checked);
+                    }}
+                  />
+                  Section
+                </label>
+                {!mould.fits && (
+                  <span className="text-amber-600" title="The part with its gating is larger than the flask of the moulding machine across the draw axis.">
+                    Does not fit the flask
+                  </span>
+                )}
+              </>
+            )}
+          </>
         )}
         {gatingShapes.length > 0 && (
           <label

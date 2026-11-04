@@ -134,5 +134,6 @@ export function sandRouteToLocal(route: SandRoute, usdToLocal: number): SandRout
     material: { ...route.material, costUsd: route.material.costUsd != null ? k(route.material.costUsd) : null },
     tooling: { perPartUsd: Math.round(route.tooling.perPartUsd * usdToLocal * 10000) / 10000, items: route.tooling.items.map((t) => ({ ...t, toolingCostUsd: k(t.toolingCostUsd), perPartUsd: Math.round(t.perPartUsd * usdToLocal * 10000) / 10000 })) },
     totalUsd: route.totalUsd != null ? k(route.totalUsd) : null,
+    alternatives: route.alternatives.map((a) => ({ ...a, totalUsd: a.totalUsd != null ? k(a.totalUsd) : null })),
   };
 }

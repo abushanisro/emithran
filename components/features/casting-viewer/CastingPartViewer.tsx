@@ -9,6 +9,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 import { fitCameraToBox, type Box3Like } from "@/lib/geometry/camera-fit";
 import type { GlbShape } from "@/lib/casting/gating-layout";
+import { vertexColors, vertexThickness, type ThicknessField } from "@/lib/casting/thickness-field";
 import {
   glbMatchesFaces,
   lineSegments,
@@ -23,6 +24,8 @@ const PARTING_COLOR = "#2563eb";
 const CORE_COLOR = "#f59e0b";
 const GATING_COLOR = "#8b5cf6";
 const RISER_COLOR = "#ec4899";
+const COPE_COLOR = "#d6b98c";
+const DRAG_COLOR = "#b99868";
 /** A part's GLB is a few hundred KB; a file far beyond that is not one the worker made. */
 const MAX_GLB_BYTES = 40 * 1024 * 1024;
 
@@ -50,8 +53,15 @@ interface CastingPartViewerProps {
   /** The designed gating system and risers, already in the GLB frame (toGlbShape): a schematic placement, not part of the part. */
   gating?: readonly GlbShape[];
   showGating?: boolean;
+  /** The mould (cope, drag, parting plane) in the GLB frame: the sand the casting is made in, translucent, around the part. */
+  mould?: readonly GlbShape[];
+  showMould?: boolean;
+  /** Cut the mould in half across its length so the part inside shows. */
+  section?: boolean;
   /** Face number (the result's numbering) to colour: the draft overlay. Applied only when the loaded model matches `glbFaces`. */
   faceColors?: ReadonlyMap<number, string> | null;
+  /** The wall thickness over the surface (worker 0.17.0 rays): each vertex coloured from the nearest rays of its face. Wins over `faceColors`. */
+  thicknessField?: ThicknessField | null;
 }
 
 /**
@@ -68,7 +78,11 @@ export function CastingPartViewer({
   showParting = true,
   gating = [],
   showGating = true,
+  mould = [],
+  showMould = false,
+  section = false,
   faceColors = null,
+  thicknessField = null,
 }: CastingPartViewerProps) {
   const part = useGlb(partUrl);
   const cores = useGlb(coresUrl);
@@ -115,7 +129,11 @@ export function CastingPartViewer({
         />
       )}
       {part.scene && (
-        <Canvas dpr={[1, 2]} camera={{ fov: 45 }} gl={{ antialias: true, alpha: true }}>
+        <Canvas dpr={[1, 2]} camera={{ fov: 45 }} gl={{ antialias: true, alpha: true }}
+          onCreated={({ gl }) => {
+            gl.localClippingEnabled = true;
+          }}
+        >
           <ambientLight intensity={0.7} />
           <directionalLight position={[1, 1, 0.5]} intensity={1.1} />
           <directionalLight position={[-1, -1, -0.5]} intensity={0.4} />
@@ -123,12 +141,15 @@ export function CastingPartViewer({
             scene={part.scene}
             meshes={meshes}
             selected={selected}
-            colors={addressable && faceColors ? meshColors(glbFaces, faceColors) : null}
+            colors={addressable && faceColors && !thicknessField ? meshColors(glbFaces, faceColors) : null}
+            field={addressable ? thicknessField : null}
+            glbFaces={glbFaces}
           />
           {showCores && cores.scene && <Cores scene={cores.scene} />}
           <Lines positions={edges} color={EDGE_COLOR} />
           {showParting && <Lines positions={parting} color={PARTING_COLOR} />}
           {showGating && <GatingSolids shapes={gating} />}
+          {showMould && <SandMould shapes={mould} section={section} />}
           <CameraRig bounds={bounds} nonce={nonce} />
           <OrbitControls makeDefault enableDamping />
         </Canvas>
@@ -251,12 +272,17 @@ function Body({
   meshes,
   selected,
   colors,
+  field,
+  glbFaces,
 }: {
   scene: THREE.Group;
   meshes: THREE.Mesh[];
   selected: number[];
   /** A colour per mesh (the overlay), or null for the plain body. */
   colors: (string | null)[] | null;
+  /** The thickness over the surface, drawn as vertex colours on the meshes whose face has rays. */
+  field: ThicknessField | null;
+  glbFaces: readonly number[];
 }) {
   const body = useMemo(
     () =>
@@ -307,6 +333,45 @@ function Body({
       byColor.forEach((m) => m.dispose());
     };
   }, [meshes, body, colors]);
+  // The thickness over the surface: vertex colours from the nearest rays of each mesh's own face; a face with no ray keeps what the effect above gave it.
+  useEffect(() => {
+    if (!field) return undefined;
+    scene.updateMatrixWorld(true);
+    const applied: Array<{ mesh: THREE.Mesh; material: THREE.Material | THREE.Material[]; colour: THREE.BufferAttribute | null }> = [];
+    const painted = new THREE.MeshStandardMaterial({
+      color: "#ffffff",
+      vertexColors: true,
+      metalness: 0.05,
+      roughness: 0.6,
+      side: THREE.DoubleSide,
+      polygonOffset: true,
+      polygonOffsetFactor: 1,
+      polygonOffsetUnits: 1,
+    });
+    meshes.forEach((mesh, i) => {
+      const samples = field.byFace.get(glbFaces[i] ?? -1);
+      const position = mesh.geometry.getAttribute("position");
+      if (!samples || !position) return;
+      const world = new Float32Array(position.count * 3);
+      const v = new THREE.Vector3();
+      for (let j = 0; j < position.count; j++) {
+        v.fromBufferAttribute(position, j).applyMatrix4(mesh.matrixWorld);
+        world.set([v.x, v.y, v.z], 3 * j);
+      }
+      const colours = vertexColors(vertexThickness(world, samples), field.range);
+      applied.push({ mesh, material: mesh.material, colour: mesh.geometry.getAttribute("color") as THREE.BufferAttribute | null });
+      mesh.geometry.setAttribute("color", new THREE.BufferAttribute(colours, 3));
+      mesh.material = painted;
+    });
+    return () => {
+      for (const a of applied) {
+        if (a.colour) a.mesh.geometry.setAttribute("color", a.colour);
+        else a.mesh.geometry.deleteAttribute("color");
+        a.mesh.material = a.material;
+      }
+      painted.dispose();
+    };
+  }, [field, meshes, glbFaces, scene, colors]);
   useEffect(
     () => () => {
       highlight.dispose();
@@ -330,6 +395,34 @@ function Body({
       <primitive object={scene} />
       {overlays.map((o) => (
         <primitive key={o.uuid} object={o} />
+      ))}
+    </>
+  );
+}
+
+/** The mould: cope and drag as translucent sand boxes, the parting plane as a thin plate; cut in half across x when `section` is on. */
+function SandMould({ shapes, section }: { shapes: readonly GlbShape[]; section: boolean }) {
+  const boxes = useMemo(() => shapes.filter((s) => s.kind === "box"), [shapes]);
+  const plane = useMemo(() => {
+    if (boxes.length === 0) return null;
+    const cx = boxes.reduce((sum, b) => sum + b.center[0], 0) / boxes.length;
+    // Keeps the points with x at or below the middle of the mould.
+    return new THREE.Plane(new THREE.Vector3(-1, 0, 0), cx);
+  }, [boxes]);
+  return (
+    <>
+      {boxes.map((shape) => (
+        <mesh key={shape.name} position={shape.center} name={shape.name} renderOrder={-1}>
+          <boxGeometry args={shape.size} />
+          <meshStandardMaterial
+            color={shape.name === "Parting plane" ? PARTING_COLOR : shape.name === "Drag" ? DRAG_COLOR : COPE_COLOR}
+            transparent
+            opacity={shape.name === "Parting plane" ? 0.5 : 0.28}
+            depthWrite={false}
+            side={THREE.DoubleSide}
+            clippingPlanes={section && plane ? [plane] : []}
+          />
+        </mesh>
       ))}
     </>
   );

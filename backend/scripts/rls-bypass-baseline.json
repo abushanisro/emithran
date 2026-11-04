@@ -8,6 +8,7 @@
   "src/modules/bom-items/bom-items.service.ts": 7,
   "src/modules/bom-items/costing/casting/casting-reference.service.ts": 1,
   "src/modules/bom-items/costing/casting/sand/sand-reference.service.ts": 1,
+  "src/modules/bom-items/costing/casting/sand/sand-variable-overrides.service.ts": 1,
   "src/modules/bom-items/costing/machining/lookup/machining-lookup.service.ts": 9,
   "src/modules/bom-items/costing/plastic-molding/lookup/plastic-reference.service.ts": 1,
   "src/modules/bom-items/costing/shared/tolerance/tolerance-reference.service.ts": 1,
