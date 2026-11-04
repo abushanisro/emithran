@@ -8,7 +8,12 @@ cd "$(dirname "$0")/.."
 CONTAINER="${CONTAINER:-docker}"
 IMAGE="casting-worker:${IMAGE_TAG:-check}"
 WORK=".cache/casting-worker-check-$$"
-trap 'rm -rf "$WORK"' EXIT
+# What the worker container wrote belongs to uid 65532, which the runner cannot remove: the container removes it, as root.
+cleanup() {
+    $CONTAINER run --rm --user 0 --network none -v "$PWD/$WORK:/work" --entrypoint rm "$IMAGE" -rf /work/samples /work/results 2>/dev/null || true
+    rm -rf "$WORK"
+}
+trap cleanup EXIT
 mkdir -p "$WORK/samples"; chmod 777 "$WORK/samples"   # the worker container runs as uid 65532, not the runner user (Linux bind mounts keep the host owner)
 compare() { (cd backend && npx ts-node -r tsconfig-paths/register scripts/casting-worker-results.ts "$@"); }
 
