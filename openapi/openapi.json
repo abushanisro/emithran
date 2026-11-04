@@ -14103,6 +14103,35 @@
         ]
       }
     },
+    "/api/v1/bom-items/{id}/sand-dfm": {
+      "get": {
+        "operationId": "BOMItemsController_getSandDfm_v1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Design-for-casting checks of the item's sand casting analysis (severity, measured value, threshold, the rule's note, the faces); rules the analysis cannot measure are listed as not evaluated",
+        "tags": [
+          "BOM Items"
+        ]
+      }
+    },
     "/api/v1/bom-items/{id}/scenario-overrides": {
       "patch": {
         "operationId": "BOMItemsController_patchScenarioOverrides_v1",

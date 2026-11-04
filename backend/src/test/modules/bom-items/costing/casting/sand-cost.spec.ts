@@ -147,6 +147,49 @@ describe('SandCostService.price measures the part by the casting analysis when t
   });
 });
 
+describe('SandCostService.dfm: the design-for-casting checks of the item\'s analysis', () => {
+  const run = (opts: Parameters<typeof service>[0], grade: string | null = 'ASTM Grade 20 Gray Iron') => {
+    const { svc, client } = service(opts);
+    return svc.dfm({ bomItemId: 'item-1', sourcePath: 'path/part.step', grade, client: client as never, accessToken: 't' });
+  };
+
+  it("judges the worker's hollow box against the real published tables for gray iron: walls 10-100 mm are fine; its 12 sharp outer and 12 sharp inner edges have no radius (limits 0.3 mm and 3 mm)", async () => {
+    const v = await run({ analysis: hollowBox });
+    expect(v.status).toBe('ok');
+    expect(v.reasons).toEqual([]);
+    const r = v.result!;
+    expect(r.rulesetVersion).toBe('2026-SandCasting');
+    expect(r.materialType).toBe('Gray Iron');
+    expect(r.passed).toEqual(expect.arrayContaining(['ThinSection', 'ThickSection']));
+    expect(r.findings).toHaveLength(24);
+    expect(r.findings.every((f) => f.severity === 'Major' && f.measured === 0)).toBe(true);
+    expect(r.findings.filter((f) => f.rule === 'InsufficientExternalRadius')).toHaveLength(12);
+    expect(r.findings.filter((f) => f.rule === 'InsufficientExternalRadius').every((f) => f.threshold === 0.3)).toBe(true);
+    expect(r.findings.filter((f) => f.rule === 'InsufficientInternalRadius').every((f) => f.threshold === 3)).toBe(true);
+    expect(r.notEvaluated.map((n) => n.rule)).toEqual(expect.arrayContaining(['InsufficientDraftAngle', 'ClosedVoid', 'TightToleranceFlatness']));
+  });
+
+  it('says so when there is no analysis of the current file, and does not show a pass', async () => {
+    const v = await run({});
+    expect(v).toEqual({ status: 'no_analysis', result: null, reasons: ['There is no casting analysis of the current file: request one.'] });
+  });
+
+  it('names a missing reference, and an analysis it cannot judge (an assembly)', async () => {
+    expect((await run({ analysis: hollowBox, ref: null })).status).toBe('unavailable');
+    const assembly = await run({ analysis: { ...hollowBox, parts: [hollowBox.parts[0], hollowBox.parts[0]] } });
+    expect(assembly).toMatchObject({ status: 'unavailable', result: null });
+    expect(assembly.reasons[0]).toMatch(/2 distinct parts/);
+  });
+
+  it('a grade that is not a sand material still gives the material-free checks, and says the others are not evaluated', async () => {
+    const v = await run({ analysis: hollowBox, material: null }, 'Mystery');
+    expect(v.status).toBe('ok');
+    expect(v.reasons[0]).toMatch(/"Mystery" is not a sand-casting material/);
+    expect(v.result!.materialType).toBeNull();
+    expect(v.result!.notEvaluated).toContainEqual({ rule: 'ThinSection', reason: 'the rule has no row for a part with no material type' });
+  });
+});
+
 describe('sandRouteToLocal', () => {
   it('leaves a USD route as it is', () => {
     const route = buildSandRoute({ ref: realSandReference(), spec: loadSandCastingCalculatorSpec(), calculators, material: iron, part: { volumeMm3: volume, surfaceAreaMm2: 250000, dimsMm: [300, 200, 100], wallNominalMm: 12, partingLineMm: 900, abovePartingMm: null, cores: [] }, machinesByClass: machines, scenario: { batchSize: 250, cavities: null, mouldingClass: 'sand_casting_manual_std_moldmaking', chosenCoreProcess: null, energyPricePerKwh: 0.1, lifetimeVolume: 1e4 }, costContext }).route!;

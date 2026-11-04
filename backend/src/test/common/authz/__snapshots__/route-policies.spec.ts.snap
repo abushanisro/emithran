@@ -91,6 +91,7 @@ org:viewer      GET /api/v1/bom-items/:id/material-strengths  BOMItemsController
 org:viewer      GET /api/v1/bom-items/:id/nre  BOMItemsController.getNre
 org:viewer      GET /api/v1/bom-items/:id/pmi-records  BOMItemsController.getPmiRecords
 org:viewer      GET /api/v1/bom-items/:id/route-comparison  BOMItemsController.getRouteComparison
+org:viewer      GET /api/v1/bom-items/:id/sand-dfm  BOMItemsController.getSandDfm
 org:viewer      GET /api/v1/bom-items/:id/secondary-processes  BOMItemsController.getSecondaryProcesses
 org:viewer      GET /api/v1/bom-items/:id/true-nest  BOMItemsController.getTrueNest
 org:viewer      GET /api/v1/bom-items/analysis-version  BOMItemsController.getAnalysisVersion
