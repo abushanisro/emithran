@@ -198,6 +198,8 @@ export interface NestingResult {
   sheetLengthMm: number;
   sheetWidthMm: number;
   partsPerSheet: number;
+  /** False when the part fits none of the sheets in either orientation: partsPerSheet is then 1 only as a floor, not a nest. */
+  fitsSheet: boolean;
   sheetWeightKg: number;
   grossWeightPerPartKg: number;
   scrapWeightPerPartKg: number;
@@ -315,8 +317,9 @@ export function computeNesting(input: NestingInput): NestingResult {
     }
   }
 
-  // Guard: at least 1 part per sheet
-  if (bestParts < 1) bestParts = 1;
+  // Guard: at least 1 part per sheet, disclosed through fitsSheet
+  const fitsSheet = bestParts >= 1;
+  if (!fitsSheet) bestParts = 1;
 
   const [sheetW, sheetL] = bestSheet;
   const sheetVolMm3 = sheetW * sheetL * thicknessMm;
@@ -347,6 +350,7 @@ export function computeNesting(input: NestingInput): NestingResult {
     sheetLengthMm: sheetL,
     sheetWidthMm: sheetW,
     partsPerSheet: bestParts,
+    fitsSheet,
     sheetWeightKg: Math.round(sheetWeightKg * 1000) / 1000,
     grossWeightPerPartKg: Math.round(grossWeightPerPart * 1000) / 1000,
     scrapWeightPerPartKg: Math.round(scrapWeightPerPart * 1000) / 1000,

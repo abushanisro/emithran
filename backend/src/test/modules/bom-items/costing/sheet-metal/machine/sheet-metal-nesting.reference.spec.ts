@@ -100,3 +100,16 @@ describe('selectBestTrueNestCandidate — MIN(gross weight per part)', () => {
     expect(computeMassBasedUtilizationPct(0, 1)).toBe(0);
   });
 });
+
+describe('computeNesting: a part that fits no sheet', () => {
+  const base = { thicknessMm: 2, netWeightKg: 5, densityKgM3: 7850, materialPricePerKg: 1, partAllowanceMm: 2 };
+  it('says so instead of passing a floor of one part off as a nest', () => {
+    const r = computeNesting({ ...base, flatPatternLengthMm: 4000, flatPatternWidthMm: 3000, sheets: [{ widthMm: 1250, lengthMm: 2500 }] });
+    expect(r.fitsSheet).toBe(false);
+    expect(r.partsPerSheet).toBe(1);
+  });
+  it('reports a real fit', () => {
+    const r = computeNesting({ ...base, flatPatternLengthMm: 200, flatPatternWidthMm: 100, sheets: [{ widthMm: 1250, lengthMm: 2500 }] });
+    expect(r.fitsSheet).toBe(true);
+  });
+});

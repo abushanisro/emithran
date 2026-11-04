@@ -65,6 +65,10 @@ const LASER_MATERIAL_SPEED_FACTOR: Record<string, number> = {
   __default__:  1.0,
 };
 
+// Stainless designations: named, JIS (SUS304), AISI/SS numbers (SS 201, SS304, AISI 316L), and the bare austenitic and
+// ferritic numbers a BOM often carries ("304", "316L", "430"). One pattern for every classifier in this file.
+const STAINLESS_GRADE = /STAINLESS|INOX|\bSUS\s?\d{3}|\bSS\s?[234]\d{2}|AISI\s?[234]\d{2}|\b(?:30[1-4]|31[67]|321|410|430)L?\b|17-4/;
+
 // Coarse substrate classing for physics lookups (UTS, laser factor). Mirrors the
 // frontend classifySubstrate — keep the keyword lists in sync.
 export function classifyMaterialFamily(
@@ -77,7 +81,7 @@ export function classifyMaterialFamily(
   // stored as e.g. "T6 - Sheet" with no alloy number, so match the temper
   // code itself.
   if (/ALUMIN|AA\s?\d{4}|AL\s?\d{4}|6061|6063|5052|5754|7075|2024|\bT6\b/.test(g)) return 'aluminum';
-  if (/STAINLESS|SS\s?3\d{2}|SS\s?4\d{2}|AISI\s?3\d{2}|17-4/.test(g)) return 'stainless';
+  if (STAINLESS_GRADE.test(g)) return 'stainless';
   // SECC/SPCC/SGCC/SPHC/SPCE: JIS G3141/G3302/G3313 cold-rolled and
   // galvanized/electrogalvanized mild-steel sheet codes — common in
   // enclosure/chassis sheet metal, same substrate family as CRCA/IS2062/S235.
@@ -240,7 +244,7 @@ function classifyBendRadiusMaterial(grade: string | null | undefined): BendRadiu
   const g = (grade ?? '').toUpperCase();
   if (/SECC|SGCC|GALV/.test(g)) return 'galvanized_steel';
   if (/ALUMIN|AA\s?\d{4}|AL\s?\d{4}|6061|6063|5052|5754|7075|2024|\bT6\b/.test(g)) return 'aluminum';
-  if (/STAINLESS|SS\s?3\d{2}|SS\s?4\d{2}|AISI\s?3\d{2}|17-4/.test(g)) return 'stainless_steel';
+  if (STAINLESS_GRADE.test(g)) return 'stainless_steel';
   if (/TITANIUM|\bTI\b/.test(g)) return 'titanium';
   if (/BRASS/.test(g)) return 'brass';
   if (/COPPER|\bCU\b/.test(g)) return 'copper';

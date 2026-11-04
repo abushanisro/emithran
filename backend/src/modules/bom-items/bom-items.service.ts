@@ -2869,6 +2869,8 @@ export class BOMItemsService {
   static readonly NO_SHEET_GAP =
     'No stock sheet on file — the selected laser has no nominal sheet size in the machine library and ' +
     'standardSheetWidth/standardSheetLength are missing from sm_reference_data.';
+  static readonly PART_TOO_LARGE_FOR_SHEET =
+    'The flat pattern does not fit the stock sheet in either orientation: material is costed as one part per whole sheet, not a nest.';
   static readonly PART_SPACING_GAP =
     `Nesting part spacing not staged: tblPartSpacing (migration 518) has no ${GROSS_USAGE_SPACING_PROCESS} row`;
 
@@ -4782,7 +4784,9 @@ export class BOMItemsService {
     let smCalculatorVersion: number | undefined;
     let smCalculationTrace: CalculationTraceStep[] | undefined;
     let smCalculatorConfidence: ConfidenceLevel | undefined;
-    if (hasValidDimensions && smNetWeightKg > 0 && smPartAllowanceMm == null) {
+    if (smNestingResult && !smNestingResult.fitsSheet) {
+      smNestingFallbackReason = BOMItemsService.PART_TOO_LARGE_FOR_SHEET;
+    } else if (hasValidDimensions && smNetWeightKg > 0 && smPartAllowanceMm == null) {
       smNestingFallbackReason = BOMItemsService.PART_SPACING_GAP;
     } else if (hasValidDimensions && smNetWeightKg > 0 && !smNestingSheet) {
       smNestingFallbackReason = BOMItemsService.NO_SHEET_GAP;
