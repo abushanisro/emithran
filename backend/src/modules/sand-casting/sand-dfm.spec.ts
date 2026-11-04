@@ -12,15 +12,15 @@ const SEVERITY = [
   row({ "Rule Name": "InsufficientInternalRadius", "Threshold Name": "Insufficient Internal Radius", "Material Type": "Aluminum", "Rule Type": "<", Major: "3", Units: "mm" }),
   row({ "Rule Name": "InsufficientExternalRadius", "Threshold Name": "Insufficient External Radius", "Material Type": "Aluminum", "Rule Type": "<", Major: "0.3", Units: "mm" }),
   row({ "Rule Name": "ClosedVoid", "Threshold Name": "Closed Void", "Rule Type": "Boolean", Critical: "TRUE" }),
-  row({ "Rule Name": "InsufficientDraftAngle", "Threshold Name": "Min Draft Angle", "Rule Type": "<", Critical: "0.01", Major: "0.5" }),
+  row({ "Rule Name": "InsufficientDraftAngle", "Threshold Name": "Min Draft Angle", "Rule Type": "<", Critical: "0.01", Major: "0.5", Units: "degrees" }),
   row({ "Rule Name": "TightToleranceFlatness", "Threshold Name": "Tolerance - flatness", "Rule Type": "Boolean", Major: "TRUE" }),
 ];
 const ADVICE = [...new Set(SEVERITY.map((r) => r["Rule Name"]))].map((n) => ({ "Advice Rule Name": n, Enabled: "true" }));
 const REF: DfmReference = { severity: SEVERITY, adviceRules: ADVICE, version: "2026-SandCasting" };
 
 const feature = (id: string, type: string, parameters: Record<string, number>, faces = [1]) => ({ id, type, parent: null, faces, edges: [], parameters });
-const result = (over: { wall?: unknown; features?: unknown[] } = {}) => ({
-  parts: [{ casting: { wall_mm: over.wall === undefined ? { min: 5, nominal: 10, max: 50, samples: 9 } : over.wall }, features: over.features ?? [] }],
+const result = (over: { wall?: unknown; features?: unknown[]; draft?: unknown } = {}) => ({
+  parts: [{ casting: { wall_mm: over.wall === undefined ? { min: 5, nominal: 10, max: 50, samples: 9 } : over.wall, draft: over.draft ?? null }, features: over.features ?? [] }],
 });
 const evaluate = (r: unknown, material: string | null = "Aluminum") => {
   const out = evaluateSandDfm(r, material, REF);
@@ -70,11 +70,44 @@ describe("evaluateSandDfm: one failing case per rule", () => {
   });
 });
 
+describe("evaluateSandDfm: draft angle (the rule's thresholds: below 0.01 degrees Critical, below 0.5 Major)", () => {
+  const face = (face: number, min_deg: number) => ({ face, side: "c", min_deg, max_deg: min_deg });
+  const withDraft = (...faces: Array<ReturnType<typeof face>>) => evaluate(result({ draft: { parting_planar: true, at_parting_plane: 0, unmeasured: 0, faces } }));
+
+  it("a wall with no taper is Critical, 0.4 degrees is Major, 0.5 and 3 degrees pass, a floor at 90 passes, an undercut is Critical; each finding carries its face", () => {
+    const out = withDraft(face(0, 0), face(1, 0.4), face(2, 0.5), face(3, 3), face(4, 90), face(5, -90));
+    expect(out.findings.map((f) => [f.faces[0], f.severity, f.measured, f.threshold])).toEqual([
+      [0, "Critical", 0, 0.01],
+      [5, "Critical", -90, 0.01],
+      [1, "Major", 0.4, 0.5],
+    ]);
+    expect(out.findings.every((f) => f.rule === "InsufficientDraftAngle" && f.featureIds.length === 0 && f.comparison === "<" && f.unit === "degrees")).toBe(true);
+    expect(out.notEvaluated.map((n) => n.rule)).not.toContain("InsufficientDraftAngle");
+  });
+
+  it("every face drafted: the rule passes", () => {
+    const out = withDraft(face(0, 2), face(1, 5), face(2, 90));
+    expect(out.findings.filter((f) => f.rule === "InsufficientDraftAngle")).toEqual([]);
+    expect(out.passed).toContain("InsufficientDraftAngle");
+  });
+
+  it("without draft angles in the analysis (no parting line, or an older worker) it is not evaluated, with the reason, not passed", () => {
+    const out = evaluate(result());
+    expect(out.passed).not.toContain("InsufficientDraftAngle");
+    expect(out.notEvaluated).toContainEqual({ rule: "InsufficientDraftAngle", reason: expect.stringMatching(/no draft angles.*worker is older than 0\.14\.0/) });
+  });
+
+  it("a face entry that is not a whole face number with a finite angle is ignored, not read as zero", () => {
+    const out = evaluate(result({ draft: { faces: [{ face: "a", min_deg: 0 }, { face: 1.5, min_deg: 0 }, { face: 2, min_deg: "x" }, null, face(3, 0)] } }));
+    expect(out.findings.filter((f) => f.rule === "InsufficientDraftAngle").map((f) => f.faces[0])).toEqual([3]);
+  });
+});
+
 describe("evaluateSandDfm: what it does not claim", () => {
   it("lists the rules the analysis cannot measure, with the reason, and never as passed", () => {
     const out = evaluate(result());
     const not = Object.fromEntries(out.notEvaluated.map((n) => [n.rule, n.reason]));
-    expect(not["InsufficientDraftAngle"]).toMatch(/draft angle/);
+    expect(not["InsufficientDraftAngle"]).toMatch(/draft angles/);
     expect(not["ClosedVoid"]).toMatch(/open to the outside/);
     expect(not["TightToleranceFlatness"]).toMatch(/drawing tolerances/);
     expect(out.passed).not.toContain("InsufficientDraftAngle");

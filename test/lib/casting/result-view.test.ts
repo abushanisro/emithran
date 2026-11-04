@@ -32,6 +32,7 @@ const part = {
     draw_axis: "z",
     draw_axis_source: "requested",
     cores_glb: "parts/0-1-1-1-cores.glb",
+    draft: { faces: [{ face: 3, min_deg: 0 }, { face: 1, min_deg: 90 }, { face: "x" }, null] },
     parting: {
       height_mm: 50,
       points: [
@@ -82,6 +83,7 @@ describe("castingPartView", () => {
       drawAxisSource: "requested",
       box: { min: [0, 0, 0], max: [100, 60, 40] },
       partingHeight: 50,
+      draftFaces: [3, 1],
     });
   });
 
@@ -118,6 +120,7 @@ describe("castingPartView", () => {
       drawAxisSource: null,
       box: null,
       partingHeight: null,
+      draftFaces: [],
       features: [
         {
           id: "Ring:1",

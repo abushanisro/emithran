@@ -16,7 +16,12 @@ import {
 import { analysisState, isReady } from "@/lib/casting/analysis-view";
 import { castingFeatureProperties, groupCastingFeatures } from "@/lib/casting/features";
 import { castingPartView } from "@/lib/casting/result-view";
-import { gatingSolids, toGlbShape, type SandGatingLayout } from "@/lib/casting/gating-layout";
+import {
+  gatingSolids,
+  toGlbShape,
+  type SandGatingLayout,
+} from "@/lib/casting/gating-layout";
+import { DRAFT_COLORS, draftFaceColors } from "@/lib/casting/draft-overlay";
 
 const SEVERITY_CLASS: Record<DfmFinding["severity"], string> = {
   Critical: "bg-red-500/15 text-red-600 border-red-500/30",
@@ -56,6 +61,8 @@ export function SandCastingFeaturesPanel({
   const [showCores, setShowCores] = useState(true);
   const [showParting, setShowParting] = useState(true);
   const [showGating, setShowGating] = useState(true);
+  const [showDraft, setShowDraft] = useState(false);
+  const [selectedFaces, setSelectedFaces] = useState<number[] | null>(null);
 
   if (!ready || !part) {
     const state = analysisState(list.data, Date.now());
@@ -104,9 +111,23 @@ export function SandCastingFeaturesPanel({
   // The designed system is laid out in the part's own coordinates (its box, draw axis and parting height from the same analysis), then into the viewer's frame.
   const gatingShapes =
     gating && part.box && part.drawAxis
-      ? gatingSolids(gating, part.box.min, part.box.max, part.drawAxis, part.partingHeight).map(toGlbShape)
+      ? gatingSolids(
+          gating,
+          part.box.min,
+          part.box.max,
+          part.drawAxis,
+          part.partingHeight,
+        ).map(toGlbShape)
       : [];
+  // A feature picked in the tree, or the faces of a design finding picked in the list (a finding about faces, such as a draft angle, has no feature).
   const selected = part.features.find((f) => f.id === selectedId) ?? null;
+  const highlighted =
+    selected ?? (selectedFaces ? { id: "faces", faces: selectedFaces, edges: [] } : null);
+  // The draft overlay: each measured face coloured by what the design check found; nothing until the checks are read.
+  const faceColors =
+    showDraft && dfm.data?.result
+      ? draftFaceColors(dfm.data.result.findings, part.draftFaces)
+      : null;
   const selectedRow = selected
     ? { feature: selected, label: selected.id, parent: selected.parent }
     : null;
@@ -119,12 +140,13 @@ export function SandCastingFeaturesPanel({
             partUrl={partMesh.data.url}
             coresUrl={coresMesh.data?.url ?? null}
             glbFaces={part.glbFaces}
-            feature={selected}
+            feature={highlighted}
             partingPoints={part.partingPoints}
             showCores={showCores}
             showParting={showParting}
             gating={gatingShapes}
             showGating={showGating}
+            faceColors={faceColors}
           />
         ) : (
           <div className="flex h-full items-center justify-center text-muted-foreground">
@@ -157,6 +179,34 @@ export function SandCastingFeaturesPanel({
               }}
             />
             Parting line
+          </label>
+        )}
+        {part.draftFaces.length > 0 && dfm.data?.result && (
+          <label
+            className="flex items-center gap-1"
+            title="Each face coloured by the design check of its draft angle along the draw axis: red Critical (no taper or an undercut), amber Major, green fine."
+          >
+            <input
+              type="checkbox"
+              checked={showDraft}
+              onChange={(e) => {
+                setShowDraft(e.target.checked);
+              }}
+            />
+            Draft
+            {showDraft && (
+              <span className="flex items-center gap-1 text-[9px]">
+                {(["Critical", "Major", "ok"] as const).map((k) => (
+                  <span key={k} className="flex items-center gap-0.5">
+                    <i
+                      className="inline-block h-2 w-2 rounded-sm"
+                      style={{ background: DRAFT_COLORS[k] }}
+                    />
+                    {k === "ok" ? "fine" : k.toLowerCase()}
+                  </span>
+                ))}
+              </span>
+            )}
           </label>
         )}
         {gatingShapes.length > 0 && (
@@ -210,6 +260,7 @@ export function SandCastingFeaturesPanel({
                       key={r.label}
                       type="button"
                       onClick={() => {
+                        setSelectedFaces(null);
                         setSelectedId(selectedId === r.label ? null : r.label);
                       }}
                       className={`block w-full truncate rounded px-1 py-0.5 text-left font-mono ${selectedId === r.label ? "bg-primary/10 ring-1 ring-primary/30" : "text-muted-foreground hover:bg-muted/40"}`}
@@ -242,7 +293,15 @@ export function SandCastingFeaturesPanel({
         loading={dfm.isLoading}
         failed={dfm.isError}
         selectedId={selectedId}
-        onSelect={setSelectedId}
+        onSelect={(id) => {
+          setSelectedFaces(null);
+          setSelectedId(id);
+        }}
+        selectedFaces={selectedFaces}
+        onSelectFaces={(faces) => {
+          setSelectedId(null);
+          setSelectedFaces(faces);
+        }}
       />
     </div>
   );
@@ -265,12 +324,17 @@ function DfmGroup({
   failed,
   selectedId,
   onSelect,
+  selectedFaces,
+  onSelectFaces,
 }: {
   dfm: SandDfmView | undefined;
   loading: boolean;
   failed: boolean;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
+  /** The faces of the finding picked in the list, for a finding about faces (a draft angle) that has no feature. */
+  selectedFaces: number[] | null;
+  onSelectFaces: (faces: number[] | null) => void;
 }) {
   if (loading)
     return (
@@ -310,18 +374,25 @@ function DfmGroup({
       <div className="space-y-1">
         {findings.map((f, i) => {
           const featureId = f.featureIds[0] ?? null;
+          // A finding is about a feature, or (a draft angle) about a face with no feature: either can be shown on the model.
+          const facesKey =
+            featureId == null && f.faces.length > 0 ? f.faces.join(",") : null;
+          const isSelected =
+            (featureId != null && selectedId === featureId) ||
+            (facesKey != null && selectedFaces?.join(",") === facesKey);
           return (
             <button
-              key={`${f.rule}:${featureId ?? i}`}
+              key={`${f.rule}:${featureId ?? facesKey ?? i}`}
               type="button"
-              disabled={!featureId}
+              disabled={featureId == null && facesKey == null}
               onClick={() => {
                 if (featureId) onSelect(selectedId === featureId ? null : featureId);
+                else if (facesKey) onSelectFaces(isSelected ? null : f.faces);
               }}
-              className={`block w-full rounded border px-1.5 py-1 text-left ${SEVERITY_CLASS[f.severity]} ${featureId && selectedId === featureId ? "ring-1 ring-primary/40" : ""}`}
+              className={`block w-full rounded border px-1.5 py-1 text-left ${SEVERITY_CLASS[f.severity]} ${isSelected ? "ring-1 ring-primary/40" : ""}`}
             >
               <span className="font-semibold">{f.severity}</span> · {f.title || f.rule}
-              {featureId ? ` · ${featureId}` : ""}
+              {featureId ? ` · ${featureId}` : facesKey ? ` · face ${facesKey}` : ""}
               <span className="block font-mono text-foreground">
                 {fmt(f.measured)} {f.comparison} {fmt(f.threshold)}
                 {f.unit ? ` ${f.unit}` : ""}

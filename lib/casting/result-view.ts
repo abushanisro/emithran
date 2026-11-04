@@ -19,6 +19,8 @@ export interface CastingPartView {
   /** The part's bounding box and the parting plane's height along the draw axis (part coordinates, mm), where the gating is laid out. */
   box: { min: Xyz; max: Xyz } | null;
   partingHeight: number | null;
+  /** The faces whose draft angle the worker measured (casting.draft.faces), numbered as glb_faces and the features number them. */
+  draftFaces: number[];
 }
 
 const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
@@ -44,6 +46,7 @@ export function castingPartView(result: unknown): CastingPartView | { reason: st
       draw_axis?: unknown;
       draw_axis_source?: unknown;
       parting?: { points?: unknown; height_mm?: unknown } | null;
+      draft?: { faces?: unknown } | null;
     } | null;
   };
   const features = (Array.isArray(p.features) ? p.features : []).flatMap(
@@ -80,5 +83,11 @@ export function castingPartView(result: unknown): CastingPartView | { reason: st
     drawAxisSource: source === "auto" || source === "requested" ? source : null,
     box: isXyz(p.box_mm?.min) && isXyz(p.box_mm?.max) ? { min: p.box_mm.min, max: p.box_mm.max } : null,
     partingHeight: isNum(p.casting?.parting?.height_mm) ? p.casting.parting.height_mm : null,
+    draftFaces: Array.isArray(p.casting?.draft?.faces)
+      ? p.casting.draft.faces.flatMap((d: unknown) => {
+          const face = (d as { face?: unknown } | null)?.face;
+          return typeof face === "number" && Number.isInteger(face) ? [face] : [];
+        })
+      : [],
   };
 }

@@ -161,12 +161,20 @@ describe('SandCostService.dfm: the design-for-casting checks of the item\'s anal
     expect(r.rulesetVersion).toBe('2026-SandCasting');
     expect(r.materialType).toBe('Gray Iron');
     expect(r.passed).toEqual(expect.arrayContaining(['ThinSection', 'ThickSection']));
-    expect(r.findings).toHaveLength(24);
-    expect(r.findings.every((f) => f.severity === 'Major' && f.measured === 0)).toBe(true);
+    const radius = r.findings.filter((f) => f.rule !== 'InsufficientDraftAngle');
+    expect(radius).toHaveLength(24);
+    expect(radius.every((f) => f.severity === 'Major' && f.measured === 0)).toBe(true);
+    // The draft of its 12 faces along x (worker 0.14.0): eight walls parallel to the draw axis (0 degrees), the two outer ends (+90, free), and the two ends of the
+    // closed cavity facing each other (-90: undercuts, the reason it needs a core). The published rule: below 0.01 degrees is Critical, below 0.5 Major.
+    const draft = r.findings.filter((f) => f.rule === 'InsufficientDraftAngle');
+    expect(draft).toHaveLength(10);
+    expect(draft.every((f) => f.severity === 'Critical' && f.threshold === 0.01 && f.featureIds.length === 0 && f.faces.length === 1)).toBe(true);
+    expect(draft.map((f) => f.measured + 0).sort((a, b) => a - b)).toEqual([-90, -90, 0, 0, 0, 0, 0, 0, 0, 0]);
     expect(r.findings.filter((f) => f.rule === 'InsufficientExternalRadius')).toHaveLength(12);
     expect(r.findings.filter((f) => f.rule === 'InsufficientExternalRadius').every((f) => f.threshold === 0.3)).toBe(true);
     expect(r.findings.filter((f) => f.rule === 'InsufficientInternalRadius').every((f) => f.threshold === 3)).toBe(true);
-    expect(r.notEvaluated.map((n) => n.rule)).toEqual(expect.arrayContaining(['InsufficientDraftAngle', 'ClosedVoid', 'TightToleranceFlatness']));
+    expect(r.notEvaluated.map((n) => n.rule)).toEqual(expect.arrayContaining(['ClosedVoid', 'TightToleranceFlatness']));
+    expect(r.notEvaluated.map((n) => n.rule)).not.toContain('InsufficientDraftAngle');
   });
 
   it('says so when there is no analysis of the current file, and does not show a pass', async () => {

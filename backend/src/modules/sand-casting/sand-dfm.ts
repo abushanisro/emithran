@@ -58,7 +58,6 @@ interface WorkerFeature {
 
 /** Rules whose measurement the casting analysis does not hold, and why (named, so a gap is visible and not a silent pass). */
 const NOT_MEASURED: Readonly<Record<string, string>> = {
-  InsufficientDraftAngle: 'the draft angle of each face is not measured by the casting analysis yet',
   ClosedVoid: 'the analysis does not report whether a void is open to the outside',
   InaccessibleFeature: 'the analysis does not report features the pattern cannot be drawn from',
   ThinWallAroundHole: 'the wall between neighbouring holes is not measured by the casting analysis',
@@ -117,6 +116,8 @@ type Measure = (part: AnalysedPart) => Measured[] | { reason: string };
 export interface AnalysedPart {
   wall: { min: number; nominal: number; max: number } | null;
   features: WorkerFeature[];
+  /** The draft of each face along the draw axis (worker 0.14.0, casting.draft): its smallest angle in degrees. Null when the analysis has none. */
+  draft: Array<{ face: number; minDeg: number }> | null;
 }
 
 const byType = (part: AnalysedPart, ...types: string[]) => part.features.filter((f) => types.includes(f.type));
@@ -134,6 +135,11 @@ const MEASURES: Readonly<Record<string, Measure>> = {
     perFeature(byType(p, 'SimpleHole').filter((f) => f.parameters['through'] === 1), (f) => f.parameters['l_over_d'] ?? null),
   HighBlindHoleLengthToDiameterRatio: (p) =>
     perFeature(byType(p, 'SimpleHole').filter((f) => f.parameters['through'] === 0), (f) => f.parameters['l_over_d'] ?? null),
+  // The smallest draft over each face (0 = parallel to the draw axis, negative = undercut): a rule per face, the face itself highlighted.
+  InsufficientDraftAngle: (p) =>
+    p.draft
+      ? p.draft.map((d) => ({ value: d.minDeg, featureIds: [], faces: [d.face] }))
+      : { reason: 'the analysis has no draft angles (the part has no parting line, or the worker is older than 0.14.0)' },
   // A sharp edge is an edge of the solid where two faces meet with no radius: its radius is 0.
   InsufficientExternalRadius: (p) => perFeature(byType(p, 'SharpEdge').filter((f) => f.parameters['convex'] === 1), () => 0),
   InsufficientInternalRadius: (p) => perFeature(byType(p, 'SharpEdge').filter((f) => f.parameters['convex'] === 0), () => 0),
@@ -143,14 +149,24 @@ const MEASURES: Readonly<Record<string, Measure>> = {
 export function analysedPartOf(result: unknown): AnalysedPart | { reason: string } {
   const parts = (result as { parts?: unknown[] } | null)?.parts;
   if (!Array.isArray(parts) || parts.length !== 1) return { reason: parts?.length ? `the analysis has ${parts.length} distinct parts: the checks are for one part` : 'the analysis has no part' };
-  const part = parts[0] as { casting?: { wall_mm?: { min?: unknown; nominal?: unknown; max?: unknown } | null } | null; features?: unknown[] };
+  const part = parts[0] as {
+    casting?: { wall_mm?: { min?: unknown; nominal?: unknown; max?: unknown } | null; draft?: { faces?: unknown[] } | null } | null;
+    features?: unknown[];
+  };
   const w = part.casting?.wall_mm;
   const wall = w && num(w.min) != null && num(w.nominal) != null && num(w.max) != null ? { min: w.min as number, nominal: w.nominal as number, max: w.max as number } : null;
   const features = (Array.isArray(part.features) ? part.features : []).flatMap((f): WorkerFeature[] => {
     const x = f as Partial<WorkerFeature>;
     return typeof x.id === 'string' && typeof x.type === 'string' ? [{ id: x.id, type: x.type, faces: Array.isArray(x.faces) ? x.faces : [], parameters: x.parameters ?? {} }] : [];
   });
-  return { wall, features };
+  const draftFaces = part.casting?.draft?.faces;
+  const draft = Array.isArray(draftFaces)
+    ? draftFaces.flatMap((d): Array<{ face: number; minDeg: number }> => {
+        const x = (d ?? {}) as { face?: unknown; min_deg?: unknown };
+        return Number.isInteger(x.face) && num(x.min_deg) != null ? [{ face: x.face as number, minDeg: x.min_deg as number }] : [];
+      })
+    : null;
+  return { wall, features, draft };
 }
 
 export interface DfmReference {
