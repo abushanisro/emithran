@@ -17,6 +17,7 @@
 //   boss.step             100 x 80 x 10 mm plate with a Ø30 x 15 boss
 //   combo.step            100 x 60 x 40 mm block with a closed void and a Ø8 hole into it from outside (one core)
 //   taper-3.step          cone frustum, radius 30 at the base, height 40, its side tapering 3.0 degrees from the axis (draft, S4)
+//   slot-block.step       100 x 60 x 40 block with a 60 x 20 x 20 slot cut in from the x = 0 face (y 20..40, z 10..30), open at one end (undercuts, S5)
 //   taper-04.step        the same with a 0.4 degree taper (under the 0.5 degree limit of the published rules)
 //   bolt.step             the assembly's bolt alone (radius 5, height 30, named "bolt")
 // make-samples --big <out-dir> <parts>: big-assembly.step, the large-file timing sample (S6, see write_big).
@@ -99,6 +100,11 @@ TopoDS_Shape fillet_block() {
 TopoDS_Shape taper(double degrees) {
   const double base = 30.0, height = 40.0;
   return BRepPrimAPI_MakeCone(base, base - height * std::tan(degrees * 3.14159265358979323846 / 180.0), height).Shape();
+}
+
+// A 100 x 60 x 40 mm block with a 60 x 20 x 20 mm slot cut in from the x = 0 face (x 0..60, y 20..40, z 10..30): open at one end only.
+TopoDS_Shape slot_block() {
+  return BRepAlgoAPI_Cut(BRepPrimAPI_MakeBox(100.0, 60.0, 40.0).Shape(), BRepPrimAPI_MakeBox(gp_Pnt(-1.0, 20.0, 10.0), 61.0, 20.0, 20.0).Shape()).Shape();
 }
 
 TopoDS_Shape cylinder_z(double x, double y, double r, double z0, double z1) {
@@ -317,7 +323,8 @@ int main(int argc, char** argv) {
                   write_shape(holes(), "holes.step") && write_shape(boss(), "boss.step") &&
                   write_shape(combo(), "combo.step") && write_bolt() && write_shape(rod(), "rod.step") &&
                   write_shape(stepped_block(), "stepped-block.step") &&
-                  write_shape(taper(3.0), "taper-3.step") && write_shape(taper(0.4), "taper-04.step");
+                  write_shape(taper(3.0), "taper-3.step") && write_shape(taper(0.4), "taper-04.step") &&
+                  write_shape(slot_block(), "slot-block.step");
   if (!ok) {
     std::cerr << "could not write the samples\n";
     return 1;
