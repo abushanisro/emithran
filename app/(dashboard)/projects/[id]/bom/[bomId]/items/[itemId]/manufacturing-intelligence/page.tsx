@@ -13,6 +13,7 @@ import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { toast } from 'sonner';
 
 import { CopilotPanel } from '@/components/features/manufacturing-intelligence/CopilotPanel';
+import { SandCastingSection } from '@/components/costing/SandCastingSection';
 import { GcdToleranceTab } from '@/components/features/manufacturing-intelligence/GcdToleranceTab';
 import { MachineChoicePanel } from '@/components/features/manufacturing-intelligence/MachineChoicePanel';
 import { MachineSelector } from '@/components/features/manufacturing-intelligence/MachineSelector';
@@ -6136,6 +6137,16 @@ function CostGuidePanel({
                   lineLabel="die casting line"
                   override={(item.scenarioOverrides?.cavityCount as number | undefined) ?? null}
                   onChange={(v) => { patchScenarioOverrides.mutate({ id: item.id, patch: { cavityCount: v } }); }}
+                />
+              </Section>
+            )}
+
+            {cgpCostSummary?.family === 'sand_cast' && (
+              <Section title="Sand Casting">
+                <SandCastingSection
+                  overrides={item.scenarioOverrides}
+                  route={cgpCostSummary.sandCasting}
+                  onChange={(patch) => { patchScenarioOverrides.mutate({ id: item.id, patch }); }}
                 />
               </Section>
             )}
