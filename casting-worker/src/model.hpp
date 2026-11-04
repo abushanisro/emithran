@@ -58,7 +58,8 @@ struct PartingLine {
 
 // What casting cost needs from the geometry (roadmap M4, D126), along one of the part's own axes.
 struct CastingProperties {
-  char draw_axis = 'z';         // the mould opens along this axis: fewest hidden regions, then shallowest
+  char draw_axis = 'z';         // the mould opens along this axis: fewest hidden regions, then shallowest (or the one asked for)
+  bool axis_requested = false;  // the draw axis was given (--draw-axis), not chosen
   double draw_depth = 0;        // extent along the draw axis
   double projected_area = 0;    // silhouette seen along the draw axis
   // The exact parting line's length when it is planar; otherwise the perimeter of the silhouette (outer and inner
@@ -140,7 +141,8 @@ std::vector<Feature> recognise_features(const TDF_Label& part, const std::option
 void build_cores(const TDF_Label& part, PartProperties& p, const std::string& out_dir);
 
 // Casting measurements of a meshed, valid part (casting.cpp); throws Standard_Failure on an OCCT error.
-CastingProperties measure_casting(const TDF_Label& part, const PartProperties& p);
+// `forced_axis` is 0, 1 or 2 to measure along that axis only (an engineer's choice), -1 to choose the best.
+CastingProperties measure_casting(const TDF_Label& part, const PartProperties& p, int forced_axis = -1);
 // The exact parting line along the measured draw axis (parting.cpp); throws Standard_Failure on an OCCT error.
 void find_parting_line(const TDF_Label& part, const PartProperties& p, CastingProperties& c);
 
