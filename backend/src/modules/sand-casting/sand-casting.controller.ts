@@ -18,7 +18,7 @@ import { CurrentOrganization } from "../../common/decorators/current-organizatio
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { OrganizationContextGuard } from "../../common/guards/organization-context.guard";
 import { OrgRole } from "../../common/authz/authz-policy";
-import { type CastingAnalysisRow } from "./casting-analysis.types";
+import { analysisListView, analysisView } from "./casting-view";
 import { SandCastingService } from "./sand-casting.service";
 
 export class RequestCastingAnalysisDto {
@@ -41,29 +41,6 @@ export class CastingAnalysesQuery {
   @ApiProperty({ format: "uuid", description: "The BOM item whose analyses are listed." })
   @IsUUID()
   bomItemId!: string;
-}
-
-function view(row: CastingAnalysisRow) {
-  return {
-    id: row.id,
-    bomItemId: row.bom_item_id,
-    status: row.status,
-    workerVersion: row.worker_version,
-    schemaVersion: row.schema_version,
-    attempts: row.attempts,
-    errorCode: row.error_code,
-    errorDetail: row.error_detail,
-    result: row.result,
-    createdAt: row.created_at,
-    finishedAt: row.finished_at,
-  };
-}
-
-/** The list view: no result (it can be large, and a page polls this list); the single analysis carries it. */
-function listView(row: CastingAnalysisRow) {
-  const { result: _result, ...rest } = view(row);
-  void _result;
-  return rest;
 }
 
 @ApiTags("Casting analyses")
@@ -93,7 +70,7 @@ export class SandCastingController {
       token,
     });
     res.status(reused ? 200 : 201);
-    return { ...view(analysis), reused };
+    return { ...analysisView(analysis), reused };
   }
 
   @OrgRole("viewer")
@@ -103,7 +80,7 @@ export class SandCastingController {
       "The casting analyses of a BOM item, newest first, without their results (read one analysis for its result). An empty list means not requested, never passed.",
   })
   async list(@Query() query: CastingAnalysesQuery, @AccessToken() token: string) {
-    return (await this.casting.listForItem(query.bomItemId, token)).map(listView);
+    return (await this.casting.listForItem(query.bomItemId, token)).map(analysisListView);
   }
 
   @OrgRole("viewer")
@@ -123,6 +100,6 @@ export class SandCastingController {
       "One casting analysis: queued, running, succeeded or partial (with the result) or failed (with a code).",
   })
   async get(@Param("id", ParseUUIDPipe) id: string, @AccessToken() token: string) {
-    return view(await this.casting.get(id, token));
+    return analysisView(await this.casting.get(id, token));
   }
 }
