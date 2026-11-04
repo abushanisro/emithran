@@ -58,7 +58,7 @@ import type { OperationLine } from './costing/machining/operation/operation-sequ
 import { splitDeepHoleOccurrences, resolveDeepHoleRules } from './costing/machining/operation/deep-hole-routing';
 import { splitKeywayOccurrences } from './costing/machining/operation/keyway-routing';
 import { splitWireEdmOccurrences } from './costing/machining/operation/wire-edm-routing';
-import { computeInjectionMoldedCostSummary, IM_RUNNER_SCRAP_PCT } from './costing/plastic-molding/process/cost-injection-molding-engine';
+import { computeInjectionMoldedCostSummary } from './costing/plastic-molding/process/cost-injection-molding-engine';
 import { computeCompressionMoldingCost } from './costing/plastic-molding/process/cost-compression-molding-engine';
 import { computeReactionInjectionMoldingCost } from './costing/plastic-molding/process/cost-reaction-injection-molding-engine';
 import type { InjectionMoldingCostInput } from './costing/plastic-molding/process/cost-injection-molding-engine';
@@ -1202,6 +1202,8 @@ export class BOMItemsService {
     // The material's reference clamp properties (raw_materials, migration 831),
     // from the same resolveMaterialForFamily row.
     materialClamp: MaterialClampProperties;
+    // The material's melt density (raw_materials im_density_of_melt_kg_m3): converts the shot to GPPS grams.
+    materialMeltDensityKgM3?: number | null;
     // Feature-driven hole extrusion (burring) — see estimateBurlDiameterMm's
     // own doc comment (default-rates.ts) for how burlDiameterMm is derived;
     // callers pass the SAME value already used for the $ cost calculation.
@@ -1455,10 +1457,14 @@ export class BOMItemsService {
         projectedAreaMm2,
         clampTonnageRequired: clamp.derivable ? clamp.requiredTonnes : null,
         clampNotDerivableReason: clamp.derivable ? null : clamp.reason,
-        // Shot weight = finished part + runner allowance (same constant the
-        // cost engine's material model uses — one number, not two copies).
-        shotWeightG: input.weightKg > 0
-          ? input.weightKg * 1000 * (1 + IM_RUNNER_SCRAP_PCT / 100)
+        // The shot one cavity needs in the unit press shot size is rated in
+        // (GPPS grams): the same rule the cost engine and route comparison use.
+        shotGppsG: ref.reference && input.weightKg > 0
+          ? shotGppsGramsPerCavity({
+              shotWeightKg: shotWeightKgPerPart(input.weightKg, 'cold'),
+              meltDensityKgM3: input.materialMeltDensityKgM3,
+              reference: ref.reference,
+            })
           : null,
         partLengthMm: dims[0],
         partWidthMm: dims[1],
@@ -3239,6 +3245,7 @@ export class BOMItemsService {
             bendLengthsMm: realBendLengthsMm(fg),
             utsMpa,
             materialClamp: clampProperties,
+            materialMeltDensityKgM3: densityOfMeltKgM3,
             extrudedFlangeCount: fg?.summary?.extrudedFlangeCount ?? 0,
             burlDiameterMm: estimateBurlDiameterMm(threads, (fg?.summary?.holeDiameters ?? []) as number[]),
             cutLengthMm,
@@ -4199,6 +4206,8 @@ export class BOMItemsService {
 
       const activePlasticRef = await this.plasticReferenceService.getReference();
       const imInput: InjectionMoldingCostInput = {
+        currencySymbol: locInfo.symbol,
+        usdToLocal: locInfo.code === 'USD' ? 1 : rates.convertStrict('USD', locInfo.code),
         plasticReference: activePlasticRef.reference,
         plasticReferenceMissing: activePlasticRef.missing,
         location,
@@ -5817,6 +5826,7 @@ export class BOMItemsService {
             bendLengthsMm: realBendLengthsMm(fg),
             utsMpa,
             materialClamp: rcClampProperties,
+            materialMeltDensityKgM3: rcDensityOfMeltKgM3,
             extrudedFlangeCount: fg?.summary?.extrudedFlangeCount ?? 0,
             burlDiameterMm: estimateBurlDiameterMm(threads, (fg?.summary?.holeDiameters ?? []) as number[]),
             cutLengthMm,
@@ -6367,6 +6377,7 @@ export class BOMItemsService {
         this.databaseService.getClient(accessToken),
         [...tiers.flatMap((t) => t.candidates.map((e) => e.candidate.machineId ?? '')), sfmCandidate?.machineId ?? ''],
       );
+      const rcUsdToLocal = locInfo.code === 'USD' ? 1 : rates.convertStrict('USD', locInfo.code);
       const imCommon: Omit<InjectionMoldingCostInput, 'mhrRate' | 'machineClampTonnes' | 'machineShotCapacityG' | 'pressTiming'> = {
         volume: partVolumeMm3, surfaceArea: (item.surfaceArea ?? 0) as number,
         wallThicknessNominalMm: effectiveWallMmRC, materialGrade: grade,
@@ -6379,6 +6390,7 @@ export class BOMItemsService {
         annualVolume: annualVolume ?? undefined, productionLifeYears,
         bboxMaxMm: imBboxRC[0], bboxMidMm: imBboxRC[1], signals: imSignals,
         currencySymbol: locInfo.symbol,
+        usdToLocal: rcUsdToLocal,
         realResinInputs: rcRealResinInputs,
       };
       // Each tier offers the press with the lowest cost per part among its
@@ -6486,7 +6498,7 @@ export class BOMItemsService {
       // meaningless for a compression press) — only pushed into the flat
       // route list so lowestCost/fastest badges (computed generically below
       // over the whole array) correctly consider them too.
-      const netWeightKgRC = Math.round((Math.max(partVolumeMm3, 0) / 1e9) * materialDensityKgM3 * 1000) / 1000;
+      const netWeightKgRC = (Math.max(partVolumeMm3, 0) / 1e9) * materialDensityKgM3;
       const compressionMaterialCost = this.r2(netWeightKgRC * materialCostPerKg);
       const compressionResult = computeCompressionMoldingCost({
         batchSize,
@@ -6591,6 +6603,7 @@ export class BOMItemsService {
         annualVolume: annualVolume ?? undefined, productionLifeYears,
         bboxMaxMm: imBboxRC[0], bboxMidMm: imBboxRC[1], signals: imSignals,
         currencySymbol: locInfo.symbol,
+        usdToLocal: rcUsdToLocal,
         realResinInputs: rcRealResinInputs,
       };
       const structuralFoamCost = computeInjectionMoldedCostSummary(structuralFoamInput);

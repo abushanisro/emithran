@@ -21,7 +21,7 @@ const IM_HOT_RUNNER_SCRAP_PCT = 1;
 
 export function shotWeightKgPerPart(netWeightKg: number, runner: RunnerSystem): number {
   const pct = runner === 'hot' ? IM_HOT_RUNNER_SCRAP_PCT : IM_RUNNER_SCRAP_PCT;
-  return Math.round(netWeightKg * (1 + pct / 100) * 1000) / 1000;
+  return netWeightKg * (1 + pct / 100);
 }
 
 /** GPPS-equivalent grams one cavity needs, or null without a melt density or reference. */
