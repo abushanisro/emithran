@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 
 import type { AnalysisState } from '@/lib/casting/analysis-view';
+import { alternativeRows, type SandRouteAlternative } from '@/lib/costing/sand-alternatives';
 import {
   HOT_BOX_GUIDANCE,
   SAND_CORE_PROCESSES,
@@ -22,6 +23,8 @@ interface SandCastingBreakdown {
   coresLeftSolid: number;
   complete: boolean;
   measuredBy: 'casting analysis' | 'cad-engine';
+  /** Every moulding machine the route was tried on, compared with the chosen one. */
+  alternatives?: SandRouteAlternative[];
 }
 
 interface Props {
@@ -163,6 +166,25 @@ export function SandCastingSection({ overrides, route, onChange, analysis }: Pro
           <div className="flex items-center justify-between text-[11px]"><span className="text-muted-foreground">Cavities</span><span className="font-medium">{route.cavities}</span></div>
           <div className="flex items-center justify-between text-[11px]"><span className="text-muted-foreground">Cores</span><span className="font-medium">{route.coresMade}{route.coresLeftSolid > 0 ? ` (+${route.coresLeftSolid} left solid, machined later)` : ''}</span></div>
           {!route.complete && <p className="text-[10px] text-amber-600 dark:text-amber-500 leading-tight">Incomplete: a step no machine can do is shown as a gap and left out of the total.</p>}
+          {(route.alternatives?.length ?? 0) > 1 && (
+            <details className="pt-1">
+              <summary className="cursor-pointer text-[11px] text-muted-foreground">Compare moulding machines ({route.alternatives?.length ?? 0})</summary>
+              <div className="max-h-48 overflow-y-auto pt-1 space-y-0.5">
+                {alternativeRows(route.alternatives).map((r) => (
+                  <div key={r.key} className="text-[10px] leading-tight" title={r.note ?? undefined}>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className={`truncate min-w-0 ${r.chosen ? 'font-medium' : ''}`}>{r.chosen ? '✓ ' : ''}{r.machine} <span className="text-muted-foreground">· {r.process}{r.cavities != null ? ` · ${r.cavities} cav` : ''}</span></span>
+                      <span className="tabular-nums shrink-0">
+                        {r.total != null ? r.total.toFixed(2) : '—'}
+                        {r.difference && <span className="text-muted-foreground"> ({r.difference.amount >= 0 ? '+' : ''}{r.difference.amount.toFixed(2)}, {r.difference.percent >= 0 ? '+' : ''}{r.difference.percent.toFixed(1)}%)</span>}
+                      </span>
+                    </div>
+                    {r.note && <div className="text-amber-600 dark:text-amber-500 truncate">{r.note}</div>}
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
         </div>
       )}
       <p className="text-[10px] text-muted-foreground/60 leading-tight pt-0.5">

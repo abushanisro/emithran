@@ -237,6 +237,14 @@ describe('the cost summary of a sand casting', () => {
     }
   });
 
+  it('sends the moulding machines compared, with costs under the summary\'s own name', () => {
+    const s = buildCastingCostSummary({ ...base, sand: { route, missing: [] } });
+    const alts = s.sandCasting!.alternatives;
+    expect(alts).toHaveLength(route.alternatives.length);
+    expect(alts[0]).toMatchObject({ chosen: true, totalCost: route.totalUsd });
+    expect(alts.every((a) => !('totalUsd' in a))).toBe(true);
+  });
+
   it("sends the moulding machine's flask, for the viewer to draw the mould", () => {
     const s = buildCastingCostSummary({ ...base, sand: { route, missing: [] } });
     expect(s.sandCasting!.flask).toEqual(route.flask);
