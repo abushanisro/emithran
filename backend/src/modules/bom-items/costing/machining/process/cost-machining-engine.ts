@@ -342,12 +342,13 @@ export interface MachiningCapabilityResult {
 export function detectMaterialClass(grade: string | null): MaterialClass {
   if (!grade) return 'mild_steel';
   const g = grade.toUpperCase();
-  if (/6061|7075|5052|2024|1100|AA\d|\bAL\b/.test(g)) return 'aluminum';
-  if (/SS\b|304\b|316\b|17-4|17-7|INCONEL|DUPLEX/.test(g)) return 'stainless';
+  if (/ALUMIN|\bAL\s?\d|\bAL\b|\bAA\s?\d|6061|6063|6082|7075|7050|5052|5083|5754|2024|2011|3003|1100/.test(g)) return 'aluminum';
+  // `\bSS\b` (not a bare `SS\b`, which matched the tail of BRASS) and the L grades.
+  if (/\bSS\b|\bSS\s?\d|STAINLESS|\b30[34]L?\b|\b316L?\b|17-4|17-7|INCONEL|DUPLEX/.test(g)) return 'stainless';
   if (/\bTI\b|TI-6|GRADE 5|GRADE 2/.test(g)) return 'titanium';
   if (/BRASS|BRONZE|C36|C26|COPPER/.test(g)) return 'copper_alloy';
   if (/P20|H13|D2\b|M2\b|TOOL STEEL/.test(g)) return 'tool_steel';
-  if (/DELRIN|POM|ACETAL|\bPA6\b|\bPA66\b|\bPA\d|\bNYLON\b|\bABS\b|\bPEEK\b|\bPTFE\b|\bULTEM\b|POLYCARBONATE|\bPC\b|\bPP\b|\bPE\b|PLASTIC/.test(g)) return 'plastic';
+  if (/DELRIN|POM|ACETAL|\bPA6\b|\bPA66\b|\bPA\d|\bNYLON\b|\bABS\b|\bPEEK\b|\bPTFE\b|\bULTEM\b|POLYCARBONATE|\bPC\b|\bPP\b|\bPE\b|\bHDPE\b|\bLDPE\b|PLASTIC/.test(g)) return 'plastic';
   return 'mild_steel';
 }
 
@@ -530,10 +531,16 @@ function secondaryLine(
   warnings: string[],
   identity: Identity,
   extraMissing: string[] = [],
+  // false: the operation runs on a machine whose setup another line already
+  // charges (rotary broaching on the part's own machine) — no second setup.
+  ownSetup = true,
 ): ProcessLineCost {
   const gap = [...extraMissing, ...run.missing];
   if (gap.length > 0) warnings.push(`${process} not priced — missing real input: ${gap.join('; ')}.`);
   const runMin = (run.sec ?? 0) / 60;
+  if (!ownSetup) {
+    return withRun(makeLine(process, 0, r2((runMin / 60) * rate.rate), runMin, rate, identity), run, [], extraMissing);
+  }
   const setupResolution = resolveSetupMinutes({
     process, machineSetupTimeHr: rate.setupTimeHr, machineName: rate.machineName,
   });
@@ -745,7 +752,7 @@ function computeRotaryBroachingLine(
     out.push({ label: `${label} broach`, run });
     return out;
   });
-  return secondaryLine('Rotary Broaching', sumRuns(runs, 'Rotary broaching cycle time'), { ...input.mhrRate, machineClass }, input.batchSize, warnings, input.processIdentityByMachineClass);
+  return secondaryLine('Rotary Broaching', sumRuns(runs, 'Rotary broaching cycle time'), { ...input.mhrRate, machineClass }, input.batchSize, warnings, input.processIdentityByMachineClass, [], false);
 }
 
 // ── Surface Grinding — every CAD planar face, same Ra trigger as the other

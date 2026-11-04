@@ -181,6 +181,7 @@ const THERMOPLASTIC_TOKENS: ReadonlySet<string> = new Set([
   'PPS', 'LCP',
   'TPE', 'TPV',
   'SAN', 'ASA',
+  'PETG', 'TPO', 'TPS', // reference thermoplastics (materials_final.csv) the tokens above miss
   'PLASTIC', 'POLYMER', 'RESIN',
 ]);
 

@@ -198,6 +198,8 @@ export interface NestingResult {
   sheetLengthMm: number;
   sheetWidthMm: number;
   partsPerSheet: number;
+  /** False when the part fits none of the sheets in either orientation: partsPerSheet is then 1 only as a floor, not a nest. */
+  fitsSheet: boolean;
   sheetWeightKg: number;
   grossWeightPerPartKg: number;
   scrapWeightPerPartKg: number;
@@ -293,8 +295,11 @@ export function computeNesting(input: NestingInput): NestingResult {
   let bestSheet: [number, number] = [last.widthMm, last.lengthMm];
 
   for (const { widthMm: w, lengthMm: l } of sheets) {
-    if (w < flatPatternWidthMm + 2 * edgeAllowanceMm) continue;
-    if (l < flatPatternLengthMm + 2 * edgeAllowanceMm) continue;
+    // A sheet can hold the part in either orientation, whichever way round the
+    // stock sheet's width/length happen to be recorded.
+    const fitsUpright = w >= flatPatternWidthMm + 2 * edgeAllowanceMm && l >= flatPatternLengthMm + 2 * edgeAllowanceMm;
+    const fitsRotated = w >= flatPatternLengthMm + 2 * edgeAllowanceMm && l >= flatPatternWidthMm + 2 * edgeAllowanceMm;
+    if (!fitsUpright && !fitsRotated) continue;
 
     const usableW = w - 2 * edgeAllowanceMm;
     const usableL = l - 2 * edgeAllowanceMm;
@@ -312,8 +317,9 @@ export function computeNesting(input: NestingInput): NestingResult {
     }
   }
 
-  // Guard: at least 1 part per sheet
-  if (bestParts < 1) bestParts = 1;
+  // Guard: at least 1 part per sheet, disclosed through fitsSheet
+  const fitsSheet = bestParts >= 1;
+  if (!fitsSheet) bestParts = 1;
 
   const [sheetW, sheetL] = bestSheet;
   const sheetVolMm3 = sheetW * sheetL * thicknessMm;
@@ -344,6 +350,7 @@ export function computeNesting(input: NestingInput): NestingResult {
     sheetLengthMm: sheetL,
     sheetWidthMm: sheetW,
     partsPerSheet: bestParts,
+    fitsSheet,
     sheetWeightKg: Math.round(sheetWeightKg * 1000) / 1000,
     grossWeightPerPartKg: Math.round(grossWeightPerPart * 1000) / 1000,
     scrapWeightPerPartKg: Math.round(scrapWeightPerPart * 1000) / 1000,
