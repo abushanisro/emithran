@@ -50,6 +50,8 @@ interface CastingPartViewerProps {
   /** The designed gating system and risers, already in the GLB frame (toGlbShape): a schematic placement, not part of the part. */
   gating?: readonly GlbShape[];
   showGating?: boolean;
+  /** Face number (the result's numbering) to colour: the draft overlay. Applied only when the loaded model matches `glbFaces`. */
+  faceColors?: ReadonlyMap<number, string> | null;
 }
 
 /**
@@ -66,6 +68,7 @@ export function CastingPartViewer({
   showParting = true,
   gating = [],
   showGating = true,
+  faceColors = null,
 }: CastingPartViewerProps) {
   const part = useGlb(partUrl);
   const cores = useGlb(coresUrl);
@@ -116,7 +119,12 @@ export function CastingPartViewer({
           <ambientLight intensity={0.7} />
           <directionalLight position={[1, 1, 0.5]} intensity={1.1} />
           <directionalLight position={[-1, -1, -0.5]} intensity={0.4} />
-          <Body scene={part.scene} meshes={meshes} selected={selected} />
+          <Body
+            scene={part.scene}
+            meshes={meshes}
+            selected={selected}
+            colors={addressable && faceColors ? meshColors(glbFaces, faceColors) : null}
+          />
           {showCores && cores.scene && <Cores scene={cores.scene} />}
           <Lines positions={edges} color={EDGE_COLOR} />
           {showParting && <Lines positions={parting} color={PARTING_COLOR} />}
@@ -230,14 +238,25 @@ function boundsOfObject(root: THREE.Object3D): Box3Like | null {
 }
 
 /** The part's meshes in the body color, and the selected ones drawn again on top in the feature color. */
+/** The colour of each mesh by the face it shows (null: the body colour). Index i is primitive i of the part GLB. */
+function meshColors(
+  glbFaces: readonly number[],
+  faceColors: ReadonlyMap<number, string>,
+): (string | null)[] {
+  return glbFaces.map((face) => faceColors.get(face) ?? null);
+}
+
 function Body({
   scene,
   meshes,
   selected,
+  colors,
 }: {
   scene: THREE.Group;
   meshes: THREE.Mesh[];
   selected: number[];
+  /** A colour per mesh (the overlay), or null for the plain body. */
+  colors: (string | null)[] | null;
 }) {
   const body = useMemo(
     () =>
@@ -265,16 +284,29 @@ function Body({
   );
   useEffect(() => {
     const original = meshes.map((m) => m.material);
-    meshes.forEach((m) => {
-      m.material = body;
+    // One material per colour of the overlay; a mesh with none keeps the body's.
+    const byColor = new Map<string, THREE.MeshStandardMaterial>();
+    const materialFor = (color: string | null | undefined) => {
+      if (!color) return body;
+      let m = byColor.get(color);
+      if (!m) {
+        m = body.clone();
+        m.color = new THREE.Color(color);
+        byColor.set(color, m);
+      }
+      return m;
+    };
+    meshes.forEach((m, i) => {
+      m.material = materialFor(colors?.[i]);
     });
     return () => {
       meshes.forEach((m, i) => {
         m.material = original[i]!;
       });
       body.dispose();
+      byColor.forEach((m) => m.dispose());
     };
-  }, [meshes, body]);
+  }, [meshes, body, colors]);
   useEffect(
     () => () => {
       highlight.dispose();
@@ -323,7 +355,12 @@ function GatingSolids({ shapes }: { shapes: readonly GlbShape[] }) {
           new THREE.Vector3(...shape.direction),
         );
         return (
-          <mesh key={shape.name} position={shape.center} quaternion={quaternion} name={shape.name}>
+          <mesh
+            key={shape.name}
+            position={shape.center}
+            quaternion={quaternion}
+            name={shape.name}
+          >
             <cylinderGeometry args={[shape.radius, shape.radius, shape.length, 32]} />
             <meshStandardMaterial color={color} transparent opacity={0.55} />
           </mesh>
