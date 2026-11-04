@@ -1,0 +1,236 @@
+// Hand-calculated checks of the injection molding model against memory/Plastic
+// Modeling (materials_final.csv, machine/injection_molding_machines.csv,
+// variables, lookup, settings_usa). Every expected number below is worked out
+// in the comment above it from those files, not read back from the code.
+//
+// Worked part (used throughout): ABS, 50,000 mm3, 2 mm nominal wall, 10,000 mm2
+// projected, one cavity, cold runner (reference default), on the Arburg
+// Allrounder 420 C 1300 - 350 (1300 kN = 132.56 t, 117 g GPPS, 130,000 mm3/s,
+// dry cycle 2.0 s, 14.17 + 15.01 = 29.18 USD/h, yield 1.0).
+//   ABS: 150 MPa, flow ratio 175 (Medium: >=100, <200), melt 240 C, mold 70 C,
+//        eject 85 C, k 0.127, cp 1.8, melt density 885, density 1040, 3.046 USD/kg.
+
+import { requiredClampForce } from '../../../../../modules/bom-items/costing/plastic-molding/clamp-force';
+import { shotGppsGramsPerCavity, shotWeightKgPerPart } from '../../../../../modules/bom-items/costing/plastic-molding/shot-size';
+import { computeCoolingTimeSec, computeCycleTime, resinThermalProps } from '../../../../../modules/bom-items/costing/plastic-molding/process/cycle-time';
+import { computeInjectionMoldedCostSummary } from '../../../../../modules/bom-items/costing/plastic-molding/process/cost-injection-molding-engine';
+import type { InjectionMoldingCostInput } from '../../../../../modules/bom-items/costing/plastic-molding/process/cost-injection-molding-engine';
+import { isPlasticGrade } from '../../../../../modules/bom-items/costing/plastic-molding/process/process-tree';
+import { isCapable } from '../../../../../modules/bom-items/costing/shared/capability/machine-selection/selector';
+import { injectionMoldingRequirement } from '../../../../../modules/bom-items/costing/shared/capability/machine-selection/physics';
+import type { MachineCandidate } from '../../../../../modules/bom-items/dto/machine-selection.dto';
+import { realMaterialClamp, realPlasticReference, realPress, realResinInputs } from './real-plastic-reference';
+
+const REF = realPlasticReference();
+const PRESS_NAME = 'Arburg Allrounder 420 C 1300 - 350';
+const MID = realPress(PRESS_NAME);
+const ABS_CLAMP = realMaterialClamp('ABS');
+const ABS_RESIN = realResinInputs('ABS');
+
+const rate = (machineClass: string, usd: number, name: string | null) =>
+  ({ rate: usd, source: 'mhr_database' as const, machineClass, machineName: name, commodityCode: null });
+
+function absPart(overrides: Partial<InjectionMoldingCostInput> = {}): InjectionMoldingCostInput {
+  return {
+    volume: 50_000, surfaceArea: 40_000, wallThicknessNominalMm: 2, materialGrade: 'ABS',
+    materialCostPerKg: 3.046, materialDensityKgM3: 1040, materialSource: 'db', batchSize: 1000, family: 'plastic_molded',
+    mhrRate: rate('injection_molding', MID.mhrUsd, PRESS_NAME), deburrRate: rate('deburring', 0, null), inspectionRate: rate('cmm', 0, null),
+    machineClampTonnes: MID.maxTonnage, machineShotCapacityG: MID.shotCapacityGrams, pressTiming: MID.timing, goodPartYield: MID.goodPartYield,
+    materialClamp: ABS_CLAMP, realResinInputs: ABS_RESIN, materialType: 'ABS', plasticReference: REF, location: 'USA',
+    signals: { projectedAreaMm2: 10_000, undercutCount: 0 },
+    ...overrides,
+  };
+}
+
+describe('clamp force (reference model)', () => {
+  const model = REF.clampModel;
+  const base = { model, materialLabel: 'x', cavityCount: 1 };
+
+  it('ABS, 10,000 mm2, cold runner: 150 x (1 - 0.15) = 127.5 MPa, Medium flow 34% = 43.35 MPa, x 1.1 / 9806.65 = 48.625 t', () => {
+    const r = requiredClampForce({ ...base, material: ABS_CLAMP, projectedAreaMm2: 10_000, runner: 'cold' });
+    if (!r.derivable) throw new Error(r.reason);
+    expect(r.flowClass).toBe('medium');
+    expect(r.adjustedInjectionPressureMpa).toBeCloseTo(127.5, 6);
+    expect(r.cavityPressureMpa).toBeCloseTo(43.35, 6);
+    expect(r.requiredTonnes).toBeCloseTo(48.625, 3);
+  });
+
+  it('hot runner takes 30% off the pressure: 100 MPa, ratio 150 (Medium), 5,000 mm2 -> 70 MPa x 34% -> 13.348 t', () => {
+    const r = requiredClampForce({ ...base, material: { injectionPressureMaxMpa: 100, flowLengthRatio: 150, referenceMaterial: null }, projectedAreaMm2: 5000, runner: 'hot' });
+    expect(r.derivable && r.requiredTonnes).toBeCloseTo(13.348, 3);
+  });
+
+  it('floors the adjusted pressure at minInjectionPressure (27.57903 MPa): 30 MPa cold = 25.5 -> 27.579; Easy 12%, 2 cavities, 20,000 mm2 -> 14.849 t', () => {
+    const r = requiredClampForce({ ...base, material: { injectionPressureMaxMpa: 30, flowLengthRatio: 250, referenceMaterial: null }, projectedAreaMm2: 20_000, cavityCount: 2, runner: 'cold' });
+    if (!r.derivable) throw new Error(r.reason);
+    expect(r.flowClass).toBe('easy');
+    expect(r.adjustedInjectionPressureMpa).toBeCloseTo(27.57903, 5);
+    expect(r.requiredTonnes).toBeCloseTo(14.849, 3);
+  });
+
+  it('Hard flow (ratio 50) takes 59%: 150 MPa cold, 10,000 mm2 -> 84.379 t', () => {
+    const r = requiredClampForce({ ...base, material: { injectionPressureMaxMpa: 150, flowLengthRatio: 50, referenceMaterial: null }, projectedAreaMm2: 10_000, runner: 'cold' });
+    expect(r.derivable && r.flowClass).toBe('hard');
+    expect(r.derivable && r.requiredTonnes).toBeCloseTo(84.379, 3);
+  });
+
+  it('is not derivable, never defaulted, without material pressure/flow or projected area', () => {
+    expect(requiredClampForce({ ...base, material: { injectionPressureMaxMpa: null, flowLengthRatio: null, referenceMaterial: null }, projectedAreaMm2: 1000, runner: 'cold' }).derivable).toBe(false);
+    expect(requiredClampForce({ ...base, material: ABS_CLAMP, projectedAreaMm2: 0, runner: 'cold' }).derivable).toBe(false);
+  });
+});
+
+describe('shot size', () => {
+  it('52 g ABS part + 8% cold runner = 56.16 g; x GPPS 893 / ABS 885 melt density x 1.02 safety = 57.801 g GPPS', () => {
+    const shotKg = shotWeightKgPerPart(0.052, 'cold');
+    expect(shotKg).toBeCloseTo(0.05616, 9);
+    expect(shotGppsGramsPerCavity({ shotWeightKg: shotKg, meltDensityKgM3: 885, reference: REF })).toBeCloseTo(57.801, 3);
+  });
+
+  it('a hot runner adds 1%, not 8%', () => {
+    expect(shotWeightKgPerPart(0.052, 'hot')).toBeCloseTo(0.05252, 9);
+  });
+
+  it('keeps milligrams: a 4.16 g part shot is 4.4928 g, not rounded to the gram (regression)', () => {
+    expect(shotWeightKgPerPart(0.00416, 'cold')).toBeCloseTo(0.0044928, 9);
+  });
+
+  it('has no GPPS figure without a melt density', () => {
+    expect(shotGppsGramsPerCavity({ shotWeightKg: 0.05, meltDensityKgM3: null, reference: REF })).toBeNull();
+  });
+});
+
+describe('cooling and cycle time', () => {
+  it('ABS 2 mm wall: alpha = 0.127 / (885 x 1800) = 0.07972 mm2/s; Menges 4/(pi2 alpha) ln(4/pi x 170/15) = 13.57 -> 13.6 s', () => {
+    const t = resinThermalProps(ABS_RESIN, REF.cycleModel.moldTemperatureIncreaseC);
+    if (!('props' in t)) throw new Error(t.missing.join());
+    expect(t.props.alpha).toBeCloseTo(0.0797238, 6);
+    expect(computeCoolingTimeSec(2, t.props)).toBe(13.6);
+  });
+
+  it('cooling grows with wall squared: 4 mm is 4x the 2 mm time (54.3 s)', () => {
+    const t = resinThermalProps(ABS_RESIN, 0);
+    if (!('props' in t)) throw new Error('thermal');
+    expect(computeCoolingTimeSec(4, t.props)).toBe(54.3);
+  });
+
+  it('cycle = fill 0.29 + pack 4.8 + cool 13.6 + dry 2.0 = 20.69 s', () => {
+    // fill: 56.16 g / 885 kg/m3 = 63,457.6 mm3 / 130,000 = 0.4881 s x 1.0 (1 cavity) x 0.6 (1 gate) = 0.2929 -> 0.29
+    // pack: max(2, 0.35 x 13.6 = 4.76 -> 4.8)
+    const c = computeCycleTime({
+      wallMm: 2, isLsr: false, real: ABS_RESIN, model: REF.cycleModel, press: MID.timing,
+      shotMeltVolumeMm3: (0.05616 / 885) * 1e9, cavityCount: 1, gatesPerCavity: 1,
+    });
+    if (!c.derivable) throw new Error(c.missing.join());
+    expect(c.fillSec).toBe(0.29);
+    expect(c.packSec).toBe(4.8);
+    expect(c.coolSec).toBe(13.6);
+    expect(c.moldMotionSec).toBe(2);
+    expect(c.totalCycleSec).toBe(20.69);
+  });
+});
+
+describe('cost summary: worked ABS part', () => {
+  const r = computeInjectionMoldedCostSummary(absPart());
+  const im = r.injectionMolding!;
+
+  it('sizes clamp 48.6 t (36.7% of the press) and shot 57.8 g GPPS (49.4% of 117 g)', () => {
+    expect(im.cavityCount).toBe(1);
+    expect(im.cavityConstrainedBy).toBe('default');
+    expect(im.clampRequiredT).toBe(48.6);
+    expect(im.clampUtilPct).toBe(36.7);
+    expect(im.shotRequiredG).toBe(57.8);
+    expect(im.shotUtilPct).toBe(49.4);
+    expect(r.processLines.every((l) => !l.physicsGap)).toBe(true);
+  });
+
+  it('prices material 56.16 g x 3.046 = 0.1711 -> 0.17, machine 20.69 s x 29.18 USD/h = 0.1677 -> 0.17, total 0.34', () => {
+    expect(r.grossWeightKg).toBeCloseTo(0.05616, 6);
+    expect(im.cycleTimeSec).toBe(20.69);
+    expect(r.materialCost).toBe(0.17);
+    expect(r.processLines[0]!.runCost).toBe(0.17);
+    expect(r.totalProcessCost).toBe(0.17);
+    expect(r.totalCost).toBe(0.34);
+  });
+
+  it('tooling, USA, 10,000/yr x 3 yr: mold BOM 2,140 + labour 2,398.67 = 4,538.67, one mold (ABS 144,000 shots), 0.1513 per part', () => {
+    // BOM (no undercut: no Hydraulic Cylinder / Side Lock; Ejector Pin has no quantity; Electrical has no cost):
+    //   Air Poppet 25x30 + Ejector Guide Pin Bushing 30x6 + Guide Bush 100x4 + Guide Pin 100x4 + Limit Switch 50x4 + Return Pin 35x6 = 2,140
+    // design 3.24 h (area <= 59,253 mm2) x 64.73 = 209.73
+    // machining 0.01 m2 / 0.32 x 2 + 4 setup h = 4.0625 h x 100.55 = 408.46
+    // assembly 0.006x30 + 2x6 + 1x4(pins 0.25x4) + 4 + 6 = 23.18 h x 76.81 = 1,780.48 (Guide Bush has no assembly time)
+    const t = computeInjectionMoldedCostSummary(absPart({ annualVolume: 10_000, productionLifeYears: 3 })).tooling!;
+    expect(t.moldBomSubtotalUsd).toBe(2140);
+    expect(t.moldEstimatedDesignHrs).toBe(3.24);
+    expect(t.moldEstimatedMachiningHrs).toBeCloseTo(4.0625, 6);
+    expect(t.moldEstimatedAssemblyHrs).toBeCloseTo(23.18, 6);
+    expect(t.moldLabourCostUsd).toBe(2398.67);
+    expect(t.moldToolLifeShots).toBe(144_000);
+    expect(t.moldsRequired).toBe(1);
+    expect(t.moldCostUsd).toBe(4538.67);
+    expect(t.moldCostPerPartUsd).toBe(0.1513);
+  });
+
+  it('wears out ceil(3,000,000 / 144,000) = 21 molds at 1,000,000/yr x 3 yr: 95,311.97 USD, 0.0318 per part (regression: not rounded to 0.03)', () => {
+    const t = computeInjectionMoldedCostSummary(absPart({ annualVolume: 1_000_000, productionLifeYears: 3 })).tooling!;
+    expect(t.moldsRequired).toBe(21);
+    expect(t.moldCostUsd).toBe(95_311.97);
+    expect(t.moldCostPerPartUsd).toBe(0.0318);
+  });
+});
+
+describe('regressions', () => {
+  it('a 4 g part keeps its milligrams: material at 300/kg is 4.4928 g x 300 = 1.35, not 4 g x 300 = 1.20', () => {
+    const r = computeInjectionMoldedCostSummary(absPart({ volume: 4000, materialCostPerKg: 300, signals: { projectedAreaMm2: 1000, undercutCount: 0 } }));
+    expect(r.grossWeightKg).toBeCloseTo(0.0044928, 6);
+    expect(r.materialCost).toBe(1.35);
+    expect(r.injectionMolding!.runnerScrapKg).toBeCloseTo(0.0003328, 6);
+  });
+
+  it('the 50/kg mis-mapped material alert is a USD benchmark: INR 250/kg (about 3 USD) does not fire it, INR 5,000/kg does', () => {
+    const inr = (perKg: number) => computeInjectionMoldedCostSummary(absPart({ materialCostPerKg: perKg, usdToLocal: 85, currencySymbol: '₹' }));
+    expect(inr(250).warnings.some((w) => w.includes('MATERIAL COST ALERT'))).toBe(false);
+    expect(inr(5000).warnings.some((w) => w.includes('MATERIAL COST ALERT'))).toBe(true);
+  });
+
+  it('the tooling-dominated check compares USD tooling with the material price in USD, not in local currency', () => {
+    // 0.1513 USD/part tooling vs material 0.052 kg: at 3.046 USD/kg = 0.158 USD x 2 -> no warning in USD;
+    // the same part priced in INR (x85) must not change that verdict.
+    const toolingWarn = (usdToLocal: number) => computeInjectionMoldedCostSummary(absPart({
+      materialCostPerKg: 3.046 * usdToLocal, usdToLocal, annualVolume: 10_000, productionLifeYears: 3,
+    })).warnings.some((w) => w.startsWith('Tooling-dominated'));
+    expect(toolingWarn(1)).toBe(false);
+    expect(toolingWarn(85)).toBe(false);
+    // Light part: 5 cm3 = 5.2 g x 3.046 = 0.0158 USD x 2 < 0.1513 tooling -> warns, in either currency.
+    const light = (usdToLocal: number) => computeInjectionMoldedCostSummary(absPart({
+      volume: 5000, materialCostPerKg: 3.046 * usdToLocal, usdToLocal, annualVolume: 10_000, productionLifeYears: 3,
+      signals: { projectedAreaMm2: 1000, undercutCount: 0 },
+    })).warnings.some((w) => w.startsWith('Tooling-dominated'));
+    expect(light(1)).toBe(true);
+    expect(light(85)).toBe(true);
+  });
+
+  it('recognises PETG, TPO and TPS (reference thermoplastics) as plastic grades, and still not a metal', () => {
+    for (const g of ['PETG Copol', 'TPO', 'TPS', 'ABS', 'Nylon, Type 66', 'Polypropylene G-P H']) expect(isPlasticGrade(g)).toBe(true);
+    for (const g of ['SPCC', 'Aluminium 6061', 'Mild Steel IS2062']) expect(isPlasticGrade(g)).toBe(false);
+  });
+});
+
+describe('press capability (active-quote selector): shot size gates a press', () => {
+  const press = (maxTonnage: number, shot: number): MachineCandidate => ({
+    machineId: 'm', machineName: 'press', machineClass: 'injection_molding', availabilityStatus: 'available',
+    capability: { maxTonnage, shotCapacityGrams: shot, tieBarXMm: 600, tieBarYMm: 600, minMoldHeightMm: null, maxMoldHeightMm: null },
+  } as unknown as MachineCandidate);
+  const need = (shotGppsG: number | null) => injectionMoldingRequirement({
+    projectedAreaMm2: 10_000, clampTonnageRequired: 48.6, clampNotDerivableReason: null, shotGppsG, partLengthMm: 150, partWidthMm: 100,
+  });
+
+  it('a press with enough clamp but a 37.69 g shot cannot fill a 57.8 g GPPS shot (regression: it was picked on clamp alone)', () => {
+    expect(isCapable(press(132, 37.69), need(57.8))).toBe(false);
+    expect(isCapable(press(132, 117), need(57.8))).toBe(true);
+  });
+
+  it('does not gate on a shot that is not derivable', () => {
+    expect(isCapable(press(132, 37.69), need(null))).toBe(true);
+  });
+});

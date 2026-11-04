@@ -14,8 +14,9 @@
 //   fill         melted metal per shot (mm3) / moldFillRateGravityDieCasting (mm3/s)
 //   solidify     coolTimeConstantGravityDieCasting (s per mm) x thickest wall (mm)
 //   eject        gravityDropTime (memory default ejection method: Gravity)
-//   cores        coreLoadTimeGravityDieCasting x the measured sand cores
-//                (cad-engine shared/core_geometry.py)
+//   cores        coreLoadTimeGravityDieCasting x the sand cores loaded per
+//                shot: the part's measured cores (cad-engine shared/
+//                core_geometry.py) x n, every cavity takes its own set
 //   shot (s)     (sum) x cycleTimeAdjustmentFactor / the machine Mold Efficiency
 //                (rule, user decision 2026-10-04: memory gives the efficiency
 //                but no formula; dividing makes 0.95 add the 5% of each cycle
@@ -134,7 +135,9 @@ export function computeGdc(input: {
     .put('Projected Area', pos(g.projectedAreaMm2), (x) => castingSeed.cad(x, 'projected area on the parting plane (mm²)'), 'measured projected area')
     .put('Part Volume', pos(vol), (x) => castingSeed.cad(x, 'part volume (mm³)'), 'part volume')
     .put('Wall Max', pos(g.wallMaxMm), (x) => castingSeed.cad(x, 'thickest wall (mm)'), 'measured maximum wall thickness')
-    .put('Core Count', input.coreCount, (x) => castingSeed.cad(x, 'sand cores (trapped regions no die half reaches)'), 'the part cores (re-run analysis as a casting process)')
+    .put('Core Count', input.coreCount != null ? input.coreCount * n : null,
+      (x) => castingSeed.cad(x, `sand cores loaded per shot: ${input.coreCount} (trapped regions no die half reaches) x ${n} cavit${n === 1 ? 'y' : 'ies'}`),
+      'the part cores (re-run analysis as a casting process)')
     .put('Ladle Fill Time', v.ladleFillTimeGravityDieCasting, (x) => castingSeed.variable('ladleFillTimeGravityDieCasting', x), 'variables ladleFillTimeGravityDieCasting')
     .put('Lube Time Constant', v.lubeTimeConstant, (x) => castingSeed.variable('lubeTimeConstant', x), 'variables lubeTimeConstant')
     .put('Lube Time Coefficient', v.lubeTimeCoefficient, (x) => castingSeed.variable('lubeTimeCoefficient', x), 'variables lubeTimeCoefficient')

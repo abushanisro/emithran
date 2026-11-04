@@ -102,6 +102,18 @@ describe('gravity die casting cycle (memory/Die Casting)', () => {
     expect(r.warnings.join(' ')).toMatch(/cores \(re-run analysis/);
   });
 
+  it('every cavity takes its own set of cores: the core load per part does not shrink with the cavity count', () => {
+    const coreLoad = (r: ReturnType<typeof run>) => r.processLines[0]!.featureBreakdown!.find((o) => o.name.startsWith('Core load'))!.timeSec;
+    const one = run({ cavityCountOverride: 1 });
+    const two = run({ cavityCountOverride: 2 });
+    expect(two.cavities!.count).toBe(2);
+    expect(two.processLines[0]!.physicsGap).toBeUndefined();
+    // 2 cores x coreLoadTimeGravityDieCasting per part, however many cavities share the shot.
+    expect(coreLoad(one)).toBeCloseTo(2 * variable('coreLoadTimeGravityDieCasting'), 6);
+    expect(coreLoad(two)).toBeCloseTo(2 * variable('coreLoadTimeGravityDieCasting'), 6);
+    expect(two.processLines[0]!.calculationTrace!.find((t) => t.fieldName === 'Core Load')!.value).toBeCloseTo(4 * variable('coreLoadTimeGravityDieCasting'), 6);
+  });
+
   it('the default cavity count is the gravity default', () => {
     expect(run().cavities!.count).toBe(variable('defaultNumCavitiesGravityDieCasting'));
     expect(run().cavities!.constrainedBy).toBe('default');

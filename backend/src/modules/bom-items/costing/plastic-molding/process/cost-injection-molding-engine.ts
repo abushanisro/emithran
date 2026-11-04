@@ -44,7 +44,9 @@ import {
 } from './cycle-time';
 
 function r2(n: number): number { return Math.round(n * 100) / 100; }
-function r3(n: number): number { return Math.round(n * 1000) / 1000; }
+function r4(n: number): number { return Math.round(n * 1e4) / 1e4; }
+/** Weights are kept to the milligram: a 1 g part must not round to the nearest gram. */
+function r6(n: number): number { return Math.round(n * 1e6) / 1e6; }
 
 // ── Constants not replaced by Phase 4 cycle-time engine ───────────────────────
 
@@ -200,6 +202,10 @@ export interface InjectionMoldingCostInput {
   moldingSubtype?: MoldingSubtype;
   // Local currency symbol (₹, $, €, …) for warning messages; defaults to '$'.
   currencySymbol?: string;
+  // Local currency units per USD (1 when the quote is in USD). Material and
+  // machine prices are local; the mold tooling tables and the USD benchmarks
+  // below are USD, so every comparison between them goes through this.
+  usdToLocal?: number;
   // The material's reference thermal properties (resolveMaterialForFamily, the
   // same raw_materials row as cost and density; melt density via migration
   // 831). Every field is required for the cooling model; any missing leaves
@@ -277,7 +283,7 @@ function pressSizingBasis(input: InjectionMoldingCostInput) {
         runner,
       });
   // Shot per part and its GPPS-equivalent grams (shot-size.ts).
-  const netWeightKg = r3((Math.max(input.volume, 0) / 1e9) * input.materialDensityKgM3);
+  const netWeightKg = (Math.max(input.volume, 0) / 1e9) * input.materialDensityKgM3;
   const shotWeightKg = shotWeightKgPerPart(netWeightKg, runner);
   const meltDensity = input.realResinInputs?.densityOfMeltKgM3 ?? null;
   const shotGppsGPerCavity = shotGppsGramsPerCavity({ shotWeightKg, meltDensityKgM3: meltDensity, reference: plasticRef });
@@ -331,7 +337,8 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
   // Anything above $50/kg almost certainly indicates a mis-mapped material grade
   // (e.g. a metal or composite grade resolved as the fallback for a plastic name).
   // Surface this early so it is impossible to miss in the cost breakdown.
-  if (materialCostPerKg > 50) {
+  const usdToLocal = input.usdToLocal ?? 1;
+  if (materialCostPerKg / usdToLocal > 50) {
     const alertSym = input.currencySymbol ?? '$';
     warnings.push(
       `MATERIAL COST ALERT: ${materialGrade ?? 'Unknown'} resolved to ${alertSym}${materialCostPerKg.toFixed(2)}/kg — ` +
@@ -476,7 +483,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
   );
 
   // ── Runner ─────────────────────────────────────────────────────────────────
-  const runnerScrapKg = r3(Math.max(0, shotWeightKg - netWeightKg) * cavityCount);
+  const runnerScrapKg = r6(Math.max(0, shotWeightKg - netWeightKg) * cavityCount);
   const runnerSystemType: 'hot' | 'cold' = b.runner;
 
   // ── Cost confidence ───────────────────────────────────────────────────────
@@ -551,7 +558,8 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
     }
     const moldsRequired = Math.max(1, Math.ceil(lifetimeShots / toolLifeShots));
     const moldCostUsd = r2((moldTooling.bomSubtotalUsd + (moldTooling.labourCostUsd ?? 0)) * moldsRequired);
-    const moldCostPerPartUsd = r2(moldCostUsd / (annualVol * prodLife));
+    // Per-part tooling is cents at volume: four places, not two (3.18 cents must not read as 3).
+    const moldCostPerPartUsd = r4(moldCostUsd / (annualVol * prodLife));
     toolingResult = {
       moldClass: mold.moldClass,
       moldLifeShotRating: mold.cycleRating,
@@ -570,7 +578,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
       moldsRequired,
     };
     warnings.push(...moldTooling.warnings);
-    if (moldCostPerPartUsd > materialCostPerKg * netWeightKg * 2) {
+    if (moldCostPerPartUsd > (materialCostPerKg / usdToLocal) * netWeightKg * 2) {
       warnings.push(
         `Tooling-dominated: mold cost $${moldCostUsd.toFixed(0)} amortizes to $${moldCostPerPartUsd.toFixed(3)}/part — ` +
         `consider higher volumes or shared tooling (indicative tooling cost only)`,
@@ -581,7 +589,7 @@ function computeAtCavities(input: InjectionMoldingCostInput, sizing: CavitySizin
   return {
     materialCost,
     materialGrade: materialGrade ?? 'Unknown',
-    grossWeightKg: shotWeightKg,
+    grossWeightKg: r6(shotWeightKg),
     materialCostPerKg,
     materialSource,
     processLines,
